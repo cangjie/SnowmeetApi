@@ -89,8 +89,12 @@ namespace SnowmeetApi.Controllers
 
         // DELETE: api/MaintainLive/5
         [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteMaintainLive(int id)
+        public async Task<IActionResult> DeleteMaintainLive(int id, string sessionKey)
         {
+            if (sessionKey.Trim().Equals(""))
+            {
+                return NoContent();
+            }
             var maintainLive = await _context.MaintainLives.FindAsync(id);
             if (maintainLive == null)
             {
