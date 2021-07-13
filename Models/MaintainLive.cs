@@ -11,6 +11,7 @@ namespace SnowmeetApi.Models
         public int id { get;}
         public string shop { get; set; }
         public string open_id { get; set; }
+        
         public string equip_type { get; set; }
         public string brand { get; set; }
         public string scale { get; set; }
@@ -18,6 +19,7 @@ namespace SnowmeetApi.Models
         public int candle { get; set; }
         public int repair_more { get; set; }
         public DateTime? pick_date { get; set; }
+        
         public int task_id { get; set; }
         public int order_id { get; set; }
         public string service_open_id { get; set; }
@@ -26,6 +28,7 @@ namespace SnowmeetApi.Models
         public string confirmed_serial { get; set; }
         public string confirmed_scale { get; set; }
         public string confirmed_year { get; set; }
+        
         public int confirmed_edge { get; set; }
         public int confirmed_degree { get; set; }
         public int confirmed_candle { get; set; }
@@ -42,6 +45,7 @@ namespace SnowmeetApi.Models
         public int label_printed { get; set; }
         public string? task_flow_num { get; set; }
         public int finish { get; set; }
+        
         public DateTime create_date { get; set; }
 
     }

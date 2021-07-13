@@ -22,8 +22,6 @@ namespace SnowmeetApi.Controllers
         }
 
 
-
-
         // GET: api/MaintainLive
         [HttpGet]
         public async Task<ActionResult<IEnumerable<MaintainLive>>> GetMaintainLives()
