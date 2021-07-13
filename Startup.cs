@@ -25,10 +25,11 @@ namespace SnowmeetApi
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
-
+            //string conStr = "Data Source=(local);Initial Catalog=snowmeet;Integrated Security=True";
+            string conStr = "Server=127.0.0.1;Database=snowmeet;UID=sa;PWD=Jarrod780209";
             services.AddControllers();
             services.AddDbContext<ApplicationDBContext>(
-                options => options.UseSqlServer(@"Server=127.0.0.1;Database=snowmeet;UID=sa;PWD=Jarrod780209")
+                options => options.UseSqlServer(conStr)
             );
         }
 

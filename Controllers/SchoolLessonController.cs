@@ -78,10 +78,59 @@ namespace SnowmeetApi.Controllers
         [HttpPost]
         public async Task<ActionResult<SchoolLesson>> PostSchoolLesson(SchoolLesson schoolLesson)
         {
+            if (schoolLesson.open_id == null)
+            {
+                schoolLesson.open_id = "";
+            }
             if (schoolLesson.gender == null)
             {
                 schoolLesson.gender = "";
             }
+            if (schoolLesson.student_name == null)
+            {
+                schoolLesson.student_name = "";
+            }
+            if (schoolLesson.student_cell_number == null)
+            {
+                schoolLesson.student_cell_number = "";
+            }
+            if (schoolLesson.student_gender == null)
+            {
+                schoolLesson.student_gender = "";
+            }
+            if (schoolLesson.student_relation == null)
+            {
+                schoolLesson.student_relation = "";
+            }
+            if (schoolLesson.demand == null)
+            {
+                schoolLesson.demand = "";
+            }
+            if (schoolLesson.resort == null)
+            {
+                schoolLesson.resort = "";
+            }
+            if (schoolLesson.lesson_date == DateTime.MinValue)
+            {
+                schoolLesson.lesson_date = DateTime.Now.Date;
+            }
+            if (schoolLesson.instructor_open_id == null)
+            {
+                schoolLesson.instructor_open_id = "";
+            }
+            if (schoolLesson.training_plan == null)
+            {
+                schoolLesson.training_plan = "";
+            }
+            if (schoolLesson.pay_method == null)
+            {
+                schoolLesson.pay_method = "";
+            }
+            if (schoolLesson.memo == null)
+            {
+                schoolLesson.memo = "";
+            }
+
 
 
 
