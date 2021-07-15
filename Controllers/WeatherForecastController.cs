@@ -31,6 +31,7 @@ namespace SnowmeetApi.Controllers
         {
             Models.MiniSession._context = _context;
             string aa = Models.MiniSession.GetOpenId(@"/+/4JtZEo8Jw0TXPxmHrgw==");
+            _logger.LogTrace(aa);
             var rng = new Random();
             return Enumerable.Range(1, 5).Select(index => new WeatherForecast
             {
