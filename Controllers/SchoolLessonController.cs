@@ -10,7 +10,7 @@ using SnowmeetApi.Models;
 
 namespace SnowmeetApi.Controllers
 {
-    [Route("api/[controller]")]
+    [Route("[controller]")]
     [ApiController]
     public class SchoolLessonController : ControllerBase
     {
