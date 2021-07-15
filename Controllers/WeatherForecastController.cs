@@ -18,14 +18,19 @@ namespace SnowmeetApi.Controllers
 
         private readonly ILogger<WeatherForecastController> _logger;
 
-        public WeatherForecastController(ILogger<WeatherForecastController> logger)
+        private readonly Data.ApplicationDBContext _context;
+
+        public WeatherForecastController(ILogger<WeatherForecastController> logger, Data.ApplicationDBContext context)
         {
             _logger = logger;
+            _context = context;
         }
 
         [HttpGet]
         public IEnumerable<WeatherForecast> Get()
         {
+            Models.MiniSession._context = _context;
+            string aa = Models.MiniSession.GetOpenId(@"/+/4JtZEo8Jw0TXPxmHrgw==");
             var rng = new Random();
             return Enumerable.Range(1, 5).Select(index => new WeatherForecast
             {

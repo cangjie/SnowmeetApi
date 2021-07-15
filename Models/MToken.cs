@@ -7,5 +7,12 @@ namespace SnowmeetApi.Models
 {
     public class MToken
     {
+
+        public static string GetOpenId(string token)
+        {
+            return "";
+        }
     }
+
+    
 }
