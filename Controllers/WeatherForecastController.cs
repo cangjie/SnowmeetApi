@@ -4,7 +4,8 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
-
+using SnowmeetApi.Models;
+using SnowmeetApi.Models.Users;
 namespace SnowmeetApi.Controllers
 {
     [ApiController]
@@ -29,9 +30,8 @@ namespace SnowmeetApi.Controllers
         [HttpGet]
         public IEnumerable<WeatherForecast> Get()
         {
-            Models.MiniSession._context = _context;
-            string aa = Models.MiniSession.GetOpenId(@"/+/4JtZEo8Jw0TXPxmHrgw==");
-            _logger.LogTrace(aa);
+            UnicUser._context = _context;
+            UnicUser.GetUnicUser("15c84b225590e3bb9a8f4ac7bc50ef89d3aeb9bbd061027872ced8792ff36cac2f778927");
             var rng = new Random();
             return Enumerable.Range(1, 5).Select(index => new WeatherForecast
             {

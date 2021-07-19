@@ -1,6 +1,7 @@
 ﻿using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Threading.Tasks;
 
 namespace SnowmeetApi.Models
 {
@@ -32,7 +33,9 @@ namespace SnowmeetApi.Models
 
         public SchoolStaff instructor { get;  }
 
-       
-
+        public static explicit operator Task<object>(SchoolLesson v)
+        {
+            throw new NotImplementedException();
+        }
     }
 }

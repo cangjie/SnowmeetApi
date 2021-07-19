@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SnowmeetApi.Data;
 using SnowmeetApi.Models;
+using SnowmeetApi.Models.Users;
 
 namespace SnowmeetApi.Controllers
 {
@@ -19,19 +20,49 @@ namespace SnowmeetApi.Controllers
         public SchoolLessonController(ApplicationDBContext context)
         {
             _context = context;
+            UnicUser._context = context;
+        }
+
+        public bool IsStaff(string sessionKey)
+        {
+            bool ret = false;
+            if (sessionKey != null)
+            {
+                UnicUser user = UnicUser.GetUnicUser(sessionKey.Trim());
+                if (user != null)
+                {
+                    if (user.miniAppUser.is_admin == 1 || user.officialAccountUser.is_admin == 1)
+                    {
+                        if (_context.SchoolStaffs.Find(user.miniAppOpenId.Trim()) != null
+                            || _context.SchoolStaffs.Find(user.officialAccountOpenId) != null)
+                        {
+                            ret = true;
+                        }
+                    }
+                    
+                }
+            }
+            return ret;
         }
 
         // GET: api/SchoolLesson
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<SchoolLesson>>> GetSchoolLessons()
+        public async Task<ActionResult<IEnumerable<SchoolLesson>>> GetSchoolLessons(string sessionKey)
         {
+            if (!IsStaff(sessionKey))
+            {
+                return NotFound();
+            }
             return await _context.SchoolLessons.ToListAsync();
         }
+
+        
 
         // GET: api/SchoolLesson/5
         [HttpGet("{id}")]
         public async Task<ActionResult<SchoolLesson>> GetSchoolLesson(int id)
         {
+
             var schoolLesson = await _context.SchoolLessons.FindAsync(id);
 
             if (schoolLesson == null)
@@ -76,8 +107,12 @@ namespace SnowmeetApi.Controllers
         // POST: api/SchoolLesson
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPost]
-        public async Task<ActionResult<SchoolLesson>> PostSchoolLesson(SchoolLesson schoolLesson)
+        public async Task<ActionResult<SchoolLesson>> PostSchoolLesson(SchoolLesson schoolLesson, string sessionKey)
         {
+            if (!IsStaff(sessionKey))
+            {
+                return NotFound();
+            }
             if (schoolLesson.open_id == null)
             {
                 schoolLesson.open_id = "";

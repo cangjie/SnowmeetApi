@@ -11,6 +11,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using SnowmeetApi.Data;
 using Microsoft.EntityFrameworkCore;
+using SnowmeetApi.Models.Users;
 namespace SnowmeetApi
 {
     public class Startup

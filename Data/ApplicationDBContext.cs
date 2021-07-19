@@ -1,7 +1,7 @@
 ﻿using System;
 using Microsoft.EntityFrameworkCore;
 using SnowmeetApi.Models;
-
+using SnowmeetApi.Models.Users;
 namespace SnowmeetApi.Data
 {
     public class ApplicationDBContext : DbContext
@@ -25,16 +25,15 @@ namespace SnowmeetApi.Data
             //SchoolLesson
             modelBuilder.Entity<SchoolLesson>().HasKey(c => c.id);
 
-            //MiniSession
-            modelBuilder.Entity<MiniSession>().HasKey(c => c.session_key);
         }
 
         public DbSet<MaintainLive> MaintainLives {get; set;}
-
         public DbSet<SchoolStaff> SchoolStaffs { get; set; }
-
         public DbSet<SchoolLesson> SchoolLessons { get; set; }
-
         public DbSet<MiniSession> MiniSessons { get; set; }
+        public DbSet<MToken> MTokens { get; set; }
+        public DbSet<UnionId> UnionIds { get; set; }
+        public DbSet<MiniAppUser> MiniAppUsers { get; set; }
+        public DbSet<OfficialAccoutUser> officialAccoutUsers { get; set; }
     }
 }
