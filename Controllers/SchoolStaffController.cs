@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SnowmeetApi.Data;
 using SnowmeetApi.Models;
+using SnowmeetApi.Models.Users;
 
 namespace SnowmeetApi.Controllers
 {
@@ -19,6 +20,29 @@ namespace SnowmeetApi.Controllers
         public SchoolStaffController(ApplicationDBContext context)
         {
             _context = context;
+            UnicUser._context = context;
+        }
+
+        public bool IsStaff(string sessionKey)
+        {
+            bool ret = false;
+            if (sessionKey != null)
+            {
+                UnicUser user = UnicUser.GetUnicUser(sessionKey.Trim());
+                if (user != null)
+                {
+                    if (user.miniAppUser.is_admin == 1 || user.officialAccountUser.is_admin == 1)
+                    {
+                        if (_context.SchoolStaffs.Find(user.miniAppOpenId.Trim()) != null
+                            || _context.SchoolStaffs.Find(user.officialAccountOpenId) != null)
+                        {
+                            ret = true;
+                        }
+                    }
+
+                }
+            }
+            return ret;
         }
 
         // GET: api/SchoolStaff
@@ -29,14 +53,26 @@ namespace SnowmeetApi.Controllers
         }
 
         // GET: api/SchoolStaff/5
-        [HttpGet("{id}")]
-        public async Task<ActionResult<SchoolStaff>> GetSchoolStaff(string id)
+        [HttpGet("{sessionkey}")]
+        public async Task<ActionResult<SchoolStaff>> GetSchoolStaff(string sessionKey)
         {
-            var schoolStaff = await _context.SchoolStaffs.FindAsync(id);
+            
+            UnicUser user = UnicUser.GetUnicUser(sessionKey.Trim());
+
+            if (user == null)
+            {
+                return NotFound();
+            }
+
+            var schoolStaff = await _context.SchoolStaffs.FindAsync(user.miniAppOpenId);
 
             if (schoolStaff == null)
             {
-                return NotFound();
+                schoolStaff = await _context.SchoolStaffs.FindAsync(user.officialAccountOpenId);
+                if (schoolStaff == null)
+                {
+                    return NotFound();
+                }
             }
 
             return schoolStaff;
