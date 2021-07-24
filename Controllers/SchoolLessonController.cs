@@ -109,6 +109,7 @@ namespace SnowmeetApi.Controllers
         [HttpPost]
         public async Task<ActionResult<SchoolLesson>> PostSchoolLesson(SchoolLesson schoolLesson, string sessionKey)
         {
+
             if (!IsStaff(sessionKey))
             {
                 return NotFound();

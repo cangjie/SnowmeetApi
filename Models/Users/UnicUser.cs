@@ -92,10 +92,18 @@ namespace SnowmeetApi.Models.Users
             if (!miniAppOpenId.Trim().Equals(""))
             {
                 user.miniAppUser = _context.MiniAppUsers.Find(miniAppOpenId.Trim());
+                if (user.miniAppUser != null)
+                {
+                    user.miniAppOpenId = miniAppOpenId.Trim();
+                }
             }
             if (!officialOpenId.Trim().Equals(""))
             {
                 user.officialAccountUser = _context.officialAccoutUsers.Find(officialOpenId.Trim());
+                if (user.officialAccountUser != null)
+                {
+                    user.officialAccountOpenId = officialOpenId.Trim();
+                }
             }
             return user;
         }
