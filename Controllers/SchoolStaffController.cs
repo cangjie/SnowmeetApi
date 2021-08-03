@@ -45,15 +45,22 @@ namespace SnowmeetApi.Controllers
             return ret;
         }
 
+        [HttpGet("GetInstructor")]
+        public async Task<ActionResult<IEnumerable<SchoolStaff>>> GetInstructor()
+        {
+            return await _context.SchoolStaffs.Where<SchoolStaff>(s => s.role.ToLower().Equals("instructor")).ToListAsync();
+        }
+            
         // GET: api/SchoolStaff
+        /*
         [HttpGet]
         public async Task<ActionResult<IEnumerable<SchoolStaff>>> GetSchoolStaffs()
         {
             return await _context.SchoolStaffs.ToListAsync();
         }
-
+        */
         // GET: api/SchoolStaff/5
-        [HttpGet("{sessionkey}")]
+        [HttpGet("GetSchoolStaff/{sessionkey}")]
         public async Task<ActionResult<SchoolStaff>> GetSchoolStaff(string sessionKey)
         {
             
