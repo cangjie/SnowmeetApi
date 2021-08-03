@@ -166,7 +166,10 @@ namespace SnowmeetApi.Controllers
             {
                 schoolLesson.memo = "";
             }
-
+            if (schoolLesson.videos == null)
+            {
+                schoolLesson.videos = "";
+            }
 
 
 
