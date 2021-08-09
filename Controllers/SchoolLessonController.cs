@@ -60,8 +60,12 @@ namespace SnowmeetApi.Controllers
 
         // GET: api/SchoolLesson/5
         [HttpGet("{id}")]
-        public async Task<ActionResult<SchoolLesson>> GetSchoolLesson(int id)
+        public async Task<ActionResult<SchoolLesson>> GetSchoolLesson(int id, string sessionKey)
         {
+            if (!IsStaff(sessionKey))
+            {
+                return NotFound();
+            }
 
             var schoolLesson = await _context.SchoolLessons.FindAsync(id);
 
