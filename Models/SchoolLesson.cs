@@ -32,6 +32,8 @@ namespace SnowmeetApi.Models
 
         public string instructor_open_id { get; set; }
 
+        public string assistant { get; set; }
+
         public SchoolStaff instructor { get;  }
 
         public static explicit operator Task<object>(SchoolLesson v)

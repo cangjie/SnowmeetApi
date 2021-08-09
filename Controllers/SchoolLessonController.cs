@@ -114,6 +114,7 @@ namespace SnowmeetApi.Controllers
             {
                 return NotFound();
             }
+            string assistantOpenId = UnicUser.GetUnicUser(sessionKey).miniAppOpenId;
             if (schoolLesson.open_id == null)
             {
                 schoolLesson.open_id = "";
@@ -170,6 +171,7 @@ namespace SnowmeetApi.Controllers
             {
                 schoolLesson.videos = "";
             }
+            schoolLesson.assistant = assistantOpenId.Trim();
 
 
 
