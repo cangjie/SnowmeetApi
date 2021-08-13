@@ -34,7 +34,7 @@ namespace SnowmeetApi.Models
         public int training_fee { get; set; }
         public int rent_fee { get; set; }
         public int ticket_fee { get; set; }
-        public int other_fee { get; set; }
+        public int others_fee { get; set; }
 
         
 
