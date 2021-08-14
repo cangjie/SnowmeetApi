@@ -80,11 +80,17 @@ namespace SnowmeetApi.Controllers
         // PUT: api/SchoolLesson/5
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPut("{id}")]
-        public async Task<IActionResult> PutSchoolLesson(int id, SchoolLesson schoolLesson)
+        public async Task<IActionResult> PutSchoolLesson(int id, string sessionKey, SchoolLesson schoolLesson)
         {
+
             if (id != schoolLesson.id)
             {
                 return BadRequest();
+            }
+
+            if (!IsStaff(sessionKey))
+            {
+                return NotFound();
             }
 
             _context.Entry(schoolLesson).State = EntityState.Modified;
