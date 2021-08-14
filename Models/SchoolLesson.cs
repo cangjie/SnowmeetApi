@@ -9,7 +9,7 @@ namespace SnowmeetApi.Models
     public class SchoolLesson
     {
         [Key]
-        public int id { get; }
+        public int id { get; set; }
         public string open_id { get; set; }
         public string cell_number { get; set; }
         public string name { get; set; }
