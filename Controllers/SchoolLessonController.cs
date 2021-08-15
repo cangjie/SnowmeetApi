@@ -60,16 +60,31 @@ namespace SnowmeetApi.Controllers
 
         // GET: api/SchoolLesson/5
         [HttpGet("{id}")]
-        public async Task<ActionResult<SchoolLesson>> GetSchoolLesson(int id, string sessionKey)
+        public async Task<ActionResult<SchoolLesson>> GetSchoolLesson(int id, string sessionKey, string cell = "")
         {
+            /*
             if (!IsStaff(sessionKey))
             {
                 return NotFound();
             }
+            */
+            UnicUser user = UnicUser.GetUnicUser(sessionKey);
 
             var schoolLesson = await _context.SchoolLessons.FindAsync(id);
-
-            if (schoolLesson == null)
+            bool canDisplay = false;
+            if (IsStaff(sessionKey))
+            {
+                canDisplay = true;
+            }
+            else if (schoolLesson.cell_number.Trim().Equals(cell.Trim()))
+            {
+                canDisplay = true;
+            }
+            else if (schoolLesson.open_id.Trim().Equals(user.miniAppOpenId.Trim()))
+            {
+                canDisplay = true;
+            }
+            if (schoolLesson == null && !canDisplay)
             {
                 return NotFound();
             }
