@@ -97,7 +97,7 @@ namespace SnowmeetApi.Controllers
         [HttpPut("{id}")]
         public async Task<IActionResult> PutSchoolLesson(int id, string sessionKey, SchoolLesson schoolLesson)
         {
-
+            
             if (id != schoolLesson.id)
             {
                 return BadRequest();
@@ -105,7 +105,9 @@ namespace SnowmeetApi.Controllers
 
             if (!IsStaff(sessionKey))
             {
-                return NotFound();
+                int orderId = schoolLesson.order_id;
+                schoolLesson = _context.SchoolLessons.Find(id);
+                schoolLesson.order_id = orderId;
             }
 
             _context.Entry(schoolLesson).State = EntityState.Modified;
