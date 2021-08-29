@@ -31,10 +31,10 @@ namespace SnowmeetApi.Models
         public DateTime create_date { get; }
         public string instructor_open_id { get; set; }
         public string assistant { get; set; }
-        public int training_fee { get; set; }
-        public int rent_fee { get; set; }
-        public int ticket_fee { get; set; }
-        public int others_fee { get; set; }
+        public double training_fee { get; set; }
+        public double rent_fee { get; set; }
+        public double ticket_fee { get; set; }
+        public double others_fee { get; set; }
 
         
 
