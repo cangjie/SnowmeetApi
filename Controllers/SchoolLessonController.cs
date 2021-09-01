@@ -84,7 +84,7 @@ namespace SnowmeetApi.Controllers
             {
                 canDisplay = true;
             }
-            if (schoolLesson == null && !canDisplay)
+            if (schoolLesson == null || !canDisplay)
             {
                 return NotFound();
             }
