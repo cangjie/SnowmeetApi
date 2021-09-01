@@ -11,7 +11,7 @@ using SnowmeetApi.Models.Users;
 
 namespace SnowmeetApi.Controllers
 {
-    [Route("[controller]")]
+    [Route("[controller]/[action]")]
     [ApiController]
     public class SchoolLessonController : ControllerBase
     {
@@ -93,6 +93,37 @@ namespace SnowmeetApi.Controllers
             return schoolLesson;
         }
 
+        
+        [HttpGet("{id}")]
+        public async Task<ActionResult<SchoolLesson>> AssignOpenId(int id, string sessionKey)
+        {
+            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            SchoolLesson lesson = _context.SchoolLessons.Find(id);
+            if (lesson.cell_number.Trim().Equals(user.miniAppUser.cell_number.Trim()))
+            {
+                lesson.open_id = user.miniAppUser.open_id.Trim();
+                _context.Entry(lesson).State = EntityState.Modified;
+                try
+                {
+                    await _context.SaveChangesAsync();
+                }
+                catch (DbUpdateConcurrencyException)
+                {
+                    if (!SchoolLessonExists(id))
+                    {
+                        return NotFound();
+                    }
+                    else
+                    {
+                        throw;
+                    }
+                }
+
+            }
+            return NoContent();
+        }
+        
+
         // PUT: api/SchoolLesson/5
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPut("{id}")]
@@ -131,6 +162,8 @@ namespace SnowmeetApi.Controllers
 
             return NoContent();
         }
+
+        
 
         // POST: api/SchoolLesson
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
@@ -210,6 +243,7 @@ namespace SnowmeetApi.Controllers
         }
 
         // DELETE: api/SchoolLesson/5
+        /*
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteSchoolLesson(int id)
         {
@@ -224,7 +258,7 @@ namespace SnowmeetApi.Controllers
 
             return NoContent();
         }
-
+        */
         private bool SchoolLessonExists(int id)
         {
             return _context.SchoolLessons.Any(e => e.id == id);
