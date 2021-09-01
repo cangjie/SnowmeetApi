@@ -76,7 +76,8 @@ namespace SnowmeetApi.Controllers
             {
                 canDisplay = true;
             }
-            else if (schoolLesson.cell_number.Trim().Equals(cell.Trim()))
+            else if (schoolLesson.cell_number.Trim().Equals(cell.Trim())
+                && schoolLesson.open_id.Trim().Equals(""))
             {
                 canDisplay = true;
             }
