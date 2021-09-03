@@ -53,7 +53,7 @@ namespace SnowmeetApi.Controllers
             {
                 return NotFound();
             }
-            return await _context.SchoolLessons.ToListAsync();
+            return await _context.SchoolLessons.OrderByDescending(l => l.id).ToListAsync();
         }
 
         
