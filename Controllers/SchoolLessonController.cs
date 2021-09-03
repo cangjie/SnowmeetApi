@@ -232,6 +232,7 @@ namespace SnowmeetApi.Controllers
             {
                 schoolLesson.videos = "";
             }
+            schoolLesson.create_date = DateTime.Now;
             schoolLesson.assistant = assistantOpenId.Trim();
 
 

@@ -28,7 +28,7 @@ namespace SnowmeetApi.Models
         public int pay_state { get; set; }
         public string memo { get; set; }
         public string videos { get; set; }
-        public DateTime create_date { get; }
+        public DateTime create_date { get; set; }
         public string instructor_open_id { get; set; }
         public string assistant { get; set; }
         public double training_fee { get; set; }
