@@ -56,7 +56,23 @@ namespace SnowmeetApi.Controllers
             return await _context.SchoolLessons.OrderByDescending(l => l.id).ToListAsync();
         }
 
-        
+        [HttpGet("{orderId}")]
+        public async Task<ActionResult<SchoolLesson>> GetSchoolLessonByOrderId(int orderId, string sessionKey)
+        {
+            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            var schoolLesson = await _context.SchoolLessons.FirstAsync<SchoolLesson>(s => s.order_id == orderId);
+            
+            if (IsStaff(sessionKey) || schoolLesson.open_id.Trim().Equals(user.miniAppOpenId))
+            {
+                return  schoolLesson;
+            }
+            else
+            {
+                return NotFound();
+            }
+           
+        }
+
 
         // GET: api/SchoolLesson/5
         [HttpGet("{id}")]
@@ -232,7 +248,7 @@ namespace SnowmeetApi.Controllers
             {
                 schoolLesson.videos = "";
             }
-            schoolLesson.create_date = DateTime.Now;
+            //schoolLesson.create_date = DateTime.Now;
             schoolLesson.assistant = assistantOpenId.Trim();
 
 
