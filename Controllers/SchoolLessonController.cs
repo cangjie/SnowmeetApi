@@ -176,6 +176,7 @@ namespace SnowmeetApi.Controllers
                         throw;
                     }
                 }
+                return lesson;
 
             }
             return NoContent();
