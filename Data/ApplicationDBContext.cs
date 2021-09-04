@@ -25,6 +25,9 @@ namespace SnowmeetApi.Data
             //SchoolLesson
             modelBuilder.Entity<SchoolLesson>().HasKey(c => c.id);
 
+            //OrderOnline
+            modelBuilder.Entity<OrderOnline>().HasKey(c => c.id);
+
         }
 
         public DbSet<MaintainLive> MaintainLives {get; set;}
@@ -35,5 +38,6 @@ namespace SnowmeetApi.Data
         public DbSet<UnionId> UnionIds { get; set; }
         public DbSet<MiniAppUser> MiniAppUsers { get; set; }
         public DbSet<OfficialAccoutUser> officialAccoutUsers { get; set; }
+        public DbSet<OrderOnline> OrderOnlines { get; set; }
     }
 }

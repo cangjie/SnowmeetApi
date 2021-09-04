@@ -73,6 +73,7 @@ namespace SnowmeetApi.Controllers
            
         }
 
+        
 
         // GET: api/SchoolLesson/5
         [HttpGet("{id}")]
@@ -109,6 +110,47 @@ namespace SnowmeetApi.Controllers
             return schoolLesson;
         }
 
+        [HttpGet("{orderId}")]
+        public async Task<ActionResult<SchoolLesson>> SyncPayState(int orderId)
+        {
+            if (!_context.OrderOnlines.Any(o => o.id == orderId))
+            {
+                return NotFound();
+            }
+            var orderOnline = await _context.OrderOnlines.FindAsync(orderId);
+            if (orderOnline.pay_state == 1)
+            {
+                if (!_context.SchoolLessons.Any(o => o.order_id == orderId))
+                {
+                    return NotFound();
+                }
+                var lesson = await _context.SchoolLessons.FirstAsync<SchoolLesson>(s => s.order_id == orderId);
+                lesson.pay_state = 1;
+                _context.Entry(lesson).State = EntityState.Modified;
+                try
+                {
+                    await _context.SaveChangesAsync();
+                }
+                catch (DbUpdateConcurrencyException)
+                {
+                    if (!SchoolLessonExists(lesson.id))
+                    {
+                        return NotFound();
+                    }
+                    else
+                    {
+                        throw;
+                    }
+                }
+                return lesson;
+
+            }
+            else
+            {
+                return NoContent();
+            }
+
+        }
         
         [HttpGet("{id}")]
         public async Task<ActionResult<SchoolLesson>> AssignOpenId(int id, string sessionKey)
