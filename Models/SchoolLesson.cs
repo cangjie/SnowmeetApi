@@ -35,6 +35,10 @@ namespace SnowmeetApi.Models
         public double rent_fee { get; set; }
         public double ticket_fee { get; set; }
         public double others_fee { get; set; }
+        public int used { get; set; }
+        
+        public DateTime? use_date { get; set; }
+        public string use_memo { get; set; }
 
         public string status
         {
