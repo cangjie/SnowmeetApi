@@ -28,7 +28,7 @@ namespace SnowmeetApi.Models
         public int pay_state { get; set; }
         public string memo { get; set; }
         public string videos { get; set; }
-        public DateTime create_date { get; }
+        public DateTime create_date { get; set; }
         public string instructor_open_id { get; set; }
         public string assistant { get; set; }
         public double training_fee { get; set; }
@@ -36,6 +36,30 @@ namespace SnowmeetApi.Models
         public double ticket_fee { get; set; }
         public double others_fee { get; set; }
 
+        public string status
+        {
+            get
+            {
+                string state = "";
+                if (open_id.Trim().Equals(""))
+                {
+                    state = "未打开";
+                }
+                else if (order_id == 0)
+                {
+                    state = "未支付";
+                }
+                else if (pay_state == 0)
+                {
+                    state = "支付未成功";
+                }
+                else
+                {
+                    state = "已支付";
+                }
+                return state.Trim();
+            }
+        }
         
 
         public static explicit operator Task<object>(SchoolLesson v)

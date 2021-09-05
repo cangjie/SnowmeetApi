@@ -53,7 +53,48 @@ namespace SnowmeetApi.Controllers
             {
                 return NotFound();
             }
-            return await _context.SchoolLessons.OrderByDescending(l => l.id).ToListAsync();
+            var lessonsArr = await _context.SchoolLessons.OrderByDescending(l => l.id).ToListAsync();
+            for (int i = 0; i < lessonsArr.Count; i++)
+            {
+                if (DateTime.Now - lessonsArr[i].create_date < new TimeSpan(3, 0, 0))
+                {
+                    if (lessonsArr[i].status == "支付未成功")
+                    {
+                        if (await _context.OrderOnlines.AnyAsync<OrderOnline>(o => o.id == lessonsArr[i].order_id))
+                        {
+                            OrderOnline order =  _context.OrderOnlines.Find(lessonsArr[i].order_id);
+                            if (order.pay_state != 0)
+                            {
+                                lessonsArr[i].pay_state = order.pay_state;
+                                _context.Entry(lessonsArr[i]).State = EntityState.Modified;
+
+                                try
+                                {
+                                    await _context.SaveChangesAsync();
+                                }
+                                catch (DbUpdateConcurrencyException)
+                                {
+                                    if (!SchoolLessonExists(lessonsArr[i].id))
+                                    {
+                                        return NotFound();
+                                    }
+                                    else
+                                    {
+                                        throw;
+                                    }
+                                }
+                            }
+
+                        }
+                        
+                    }
+                }
+                else
+                {
+                    break;
+                }
+            }
+            return lessonsArr;
         }
 
         [HttpGet("{orderId}")]
