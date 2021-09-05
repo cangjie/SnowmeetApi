@@ -332,9 +332,13 @@ namespace SnowmeetApi.Controllers
             {
                 schoolLesson.videos = "";
             }
-            //schoolLesson.create_date = DateTime.Now;
+            schoolLesson.create_date = DateTime.Now;
             schoolLesson.assistant = assistantOpenId.Trim();
 
+            if (schoolLesson.use_memo == null)
+            {
+                schoolLesson.use_memo = "";
+            }
 
 
             _context.SchoolLessons.Add(schoolLesson);

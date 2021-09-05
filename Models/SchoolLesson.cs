@@ -60,6 +60,10 @@ namespace SnowmeetApi.Models
                 else
                 {
                     state = "已支付";
+                    if (used == 1)
+                    {
+                        state = "已核销";
+                    }
                 }
                 return state.Trim();
             }
