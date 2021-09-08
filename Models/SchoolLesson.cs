@@ -40,6 +40,10 @@ namespace SnowmeetApi.Models
         public DateTime? use_date { get; set; }
         public string use_memo { get; set; }
 
+        public string? lesson_videos { get; set; }
+
+        public string? instructor_remark { get; set; }
+
         public string status
         {
             get
@@ -63,6 +67,10 @@ namespace SnowmeetApi.Models
                     if (used == 1)
                     {
                         state = "已核销";
+                        if (instructor_remark != null)
+                        {
+                            state = "教练已点评";
+                        }
                     }
                 }
                 return state.Trim();
