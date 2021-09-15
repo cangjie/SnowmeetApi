@@ -12,7 +12,7 @@
     "IIS Express": {
       "commandName": "IISExpress",
       "launchBrowser": true,
-      "launchUrl": "schoollesson",
+      "launchUrl": "schoollesson/GetSchoolLessons?sessionKey=ID8SY2qoLyarQkIIAhQt9g==",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       }
