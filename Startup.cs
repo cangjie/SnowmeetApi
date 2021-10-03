@@ -12,6 +12,7 @@ using Microsoft.Extensions.Logging;
 using SnowmeetApi.Data;
 using Microsoft.EntityFrameworkCore;
 using SnowmeetApi.Models.Users;
+using Microsoft.OpenApi.Models;
 namespace SnowmeetApi
 {
     public class Startup
@@ -32,6 +33,10 @@ namespace SnowmeetApi
             services.AddDbContext<ApplicationDBContext>(
                 options => options.UseSqlServer(conStr)
             );
+            services.AddSwaggerGen(c =>
+            {
+                c.SwaggerDoc("v1", new OpenApiInfo { Title = "SnowmeetApi", Version = "v1" });
+            });
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -40,7 +45,11 @@ namespace SnowmeetApi
             if (env.IsDevelopment())
             {
                 app.UseDeveloperExceptionPage();
+                app.UseSwagger();
+                app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "SnowmeetApi v1"));
             }
+
+            
 
             app.UseRouting();
 
