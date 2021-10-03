@@ -12,7 +12,6 @@
     <None Remove="Microsoft.EntityFrameworkCore.Design" />
     <None Remove="Microsoft.VisualStudio.Web.CodeGeneration.Design" />
     <None Remove="Models\User\" />
-    <None Remove="Models\rfid\" />
     <None Remove="Controllers\rfid\" />
   </ItemGroup>
   <ItemGroup>
@@ -27,7 +26,6 @@
   <ItemGroup>
     <Folder Include="Data\" />
     <Folder Include="Models\Users\" />
-    <Folder Include="Models\rfid\" />
     <Folder Include="Controllers\rfid\" />
   </ItemGroup>
 </Project>
