@@ -22,7 +22,7 @@ namespace SnowmeetApi.Controllers
             _context = context;
             UnicUser._context = context;
         }
-
+        [HttpGet("{sessionKey}")]
         public bool IsStaff(string sessionKey)
         {
             bool ret = false;
