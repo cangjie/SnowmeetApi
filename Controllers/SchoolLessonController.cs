@@ -31,7 +31,8 @@ namespace SnowmeetApi.Controllers
                 UnicUser user = UnicUser.GetUnicUser(sessionKey.Trim());
                 if (user != null)
                 {
-                    if (user.miniAppUser.is_admin == 1 || user.officialAccountUser.is_admin == 1)
+                    if ((user.miniAppUser != null && user.miniAppUser.is_admin == 1) 
+                        || (user.officialAccountUser != null && user.officialAccountUser.is_admin == 1))
                     {
                         if (_context.SchoolStaffs.Find(user.miniAppOpenId.Trim()) != null
                             || _context.SchoolStaffs.Find(user.officialAccountOpenId) != null)
