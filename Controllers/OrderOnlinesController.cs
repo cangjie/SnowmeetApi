@@ -56,10 +56,10 @@ namespace SnowmeetApi.Controllers
 
             return orderOnline;
         }
-        [HttpGet("{id}")]
-        public async Task<ActionResult<WepayOrder>> Pay(int id, string sessionKey, int mchid, string notify)
+        [HttpGet("{sessionKey}")]
+        public async Task<ActionResult<WepayOrder>> Pay(string sessionKey, int id, int mchid, string notify)
         {
-            sessionKey = HttpUtility.UrlDecode(sessionKey);
+            //sessionKey = HttpUtility.UrlDecode(sessionKey);
             notify = HttpUtility.UrlDecode(notify);
             UnicUser._context = _context;
             UnicUser user = UnicUser.GetUnicUser(sessionKey);
