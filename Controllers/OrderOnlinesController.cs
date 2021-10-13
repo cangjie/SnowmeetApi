@@ -13,6 +13,7 @@ using SnowmeetApi.Models.Users;
 using SKIT.FlurlHttpClient.Wechat.TenpayV3;
 using SKIT.FlurlHttpClient.Wechat.TenpayV3.Settings;
 using SKIT.FlurlHttpClient.Wechat.TenpayV3.Models;
+using System.Web;
 
 namespace SnowmeetApi.Controllers
 {
@@ -56,8 +57,10 @@ namespace SnowmeetApi.Controllers
             return orderOnline;
         }
         [HttpGet("{id}")]
-        public async Task<ActionResult<WepayOrder>> Pay(int id, string sessionKey, int mchid, string nortify)
+        public async Task<ActionResult<WepayOrder>> Pay(int id, string sessionKey, int mchid, string notify)
         {
+            sessionKey = HttpUtility.UrlDecode(sessionKey);
+            notify = HttpUtility.UrlDecode(notify);
             UnicUser._context = _context;
             UnicUser user = UnicUser.GetUnicUser(sessionKey);
             if (user == null)
@@ -123,7 +126,7 @@ namespace SnowmeetApi.Controllers
             wepayOrder = new WepayOrder();
             wepayOrder.out_trade_no = timeStamp;
             wepayOrder.open_id = user.miniAppOpenId;
-            wepayOrder.notify = nortify.Trim();
+            wepayOrder.notify = notify.Trim();
             wepayOrder.order_id = order.id;
             wepayOrder.amount = (int)(order.order_real_pay_price * 100);
             wepayOrder.app_id = _appId;
