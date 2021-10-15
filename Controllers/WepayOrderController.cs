@@ -42,11 +42,14 @@ namespace SnowmeetApi.Controllers
 
         public string _appId = "";
 
-        public WepayOrderController(ApplicationDBContext context, IConfiguration config)
+        private readonly IHttpContextAccessor _httpContextAccessor;
+
+        public WepayOrderController(ApplicationDBContext context, IConfiguration config, IHttpContextAccessor httpContextAccessor)
         {
             _context = context;
             _config = config.GetSection("Settings");
             _appId = _config.GetSection("AppId").Value.Trim();
+            _httpContextAccessor = httpContextAccessor;
         }
 
         [HttpPost]
@@ -54,6 +57,15 @@ namespace SnowmeetApi.Controllers
         {
             string postJson = Newtonsoft.Json.JsonConvert.SerializeObject(postData);
             string path = $"{Environment.CurrentDirectory}";
+            string paySign = "no sign";
+            try
+            {
+                paySign = _httpContextAccessor.HttpContext.Request.Headers["Wechatpay-Signature"].ToString();
+            }
+            catch
+            { 
+            
+            }
             if (path.StartsWith("/"))
             {
                 path = path + "/";
@@ -63,13 +75,19 @@ namespace SnowmeetApi.Controllers
                 path = path + "\\";
             }
             path = path + "wepay_callback.txt";
-            FileStream fs = System.IO.File.Create(path);
+            
             // 此文本只添加到文件一次。
-            using (StreamWriter fw = new StreamWriter(fs))
+            using (StreamWriter fw = new StreamWriter(path, true))
             {
+                fw.WriteLine(DateTimeOffset.Now.ToString());
+                fw.WriteLine(paySign);
                 fw.WriteLine(postJson);
+                fw.WriteLine("");
+                fw.WriteLine("--------------------------------------------------------");
+                fw.WriteLine("");
+                fw.Close();
             }
-            fs.Dispose();
+            
             return "{ \r\n \"code\": \"SUCCESS\", \r\n \"message\": \"成功\" \r\n}";
         }
 
