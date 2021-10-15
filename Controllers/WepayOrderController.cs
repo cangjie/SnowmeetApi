@@ -11,6 +11,7 @@ using Microsoft.Extensions.Configuration;
 using System.IO;
 using SKIT.FlurlHttpClient.Wechat.TenpayV3.Settings;
 using SKIT.FlurlHttpClient.Wechat.TenpayV3;
+using SKIT.FlurlHttpClient.Wechat.TenpayV3.Utilities;
 
 namespace SnowmeetApi.Controllers
 {
@@ -53,28 +54,82 @@ namespace SnowmeetApi.Controllers
             _appId = _config.GetSection("AppId").Value.Trim();
             _httpContextAccessor = httpContextAccessor;
         }
-        /*
+
         [HttpGet]
-        public void DecodeSign()
+        public void ValidSign()
         {
-            WepayKey key =  _context.WepayKeys.Find(1);
+            string cert = "-----BEGIN CERTIFICATE-----MIID8DCCAtigAwIBAgIUT9nvFQufMaii1MsyUbzhiaZb2t8wDQYJKoZIhvcNAQELBQAwXjELMAkGA1UEBhMCQ04xEzARBgNVBAoTClRlbnBheS5jb20xHTAbBgNVBAsTFFRlbnBheS5jb20gQ0EgQ2VudGVyMRswGQYDVQQDExJUZW5wYXkuY29tIFJvb3QgQ0EwHhcNMjExMDEwMDIyMTM1WhcNMjYxMDA5MDIyMTM1WjCBgTETMBEGA1UEAwwKMTYwNDE4NDkzMzEbMBkGA1UECgwS5b6u5L+h5ZWG5oi357O757ufMS0wKwYDVQQLDCTljJfkuqzmmJPpvpnpm6rogZrllYbotLjmnInpmZDlhazlj7gxCzAJBgNVBAYMAkNOMREwDwYDVQQHDAhTaGVuWmhlbjCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAMjjqeQg2/oiG9P4ai77tBqK/ml1qWAYu0dJTSrHhkkq6FfKd6Ol2tF+OKVogGnpYEt1Y7d/CLVu4fBDzj+//PgazUINsExfCPg4xyYj4J0dfdzInRyn6nLLUEnCVQalUzNvDOSHN8OdEF6SapdMygZJYBos91ynH8FqViIIfsPQqsZO6tm+IwFJqZkyjFftKApsbujsJALg4ecIM732wQb0R6T0NGSjbpfN6fyNC9k9bPSAIjgl+YMkqlDDElDHfq+k8vDxLq1meLqff8CtuTBojTcFz379CpHqV0FCH5lx9Ot683ZJDo/c62+WHYzuPYUiTljk28i2c1bMDdk/NqsCAwEAAaOBgTB/MAkGA1UdEwQCMAAwCwYDVR0PBAQDAgTwMGUGA1UdHwReMFwwWqBYoFaGVGh0dHA6Ly9ldmNhLml0cnVzLmNvbS5jbi9wdWJsaWMvaXRydXNjcmw/Q0E9MUJENDIyMEU1MERCQzA0QjA2QUQzOTc1NDk4NDZDMDFDM0U4RUJEMjANBgkqhkiG9w0BAQsFAAOCAQEAGhs0xdUgbJBqCcg4wgsZUB6RPh3tlo5W+L7W8Ds6IOWufDy/KQScj3xSVWmGbzxS+kZaDnu23bTcqpbR+6mXcfTyPdg2VJ5nle2PJKsJsd9TVksXofNNv4b+dd2g29kSmyaJsJhSuQYYCFsJYyvOma5RoAjiUs/LMVK1TYAwSodZMoq2DmDJjv8NMOMRqiwR+vXpWnR2W+4kIG4nwi8Z+epuxehrZOW6fHKHOoaEsZ0JrxQYky2HjFNfvcCmUIX1HP+BzXZmfq+BfeemDCt5VtHNCOHzisehPs640A0S5aIjXrx9GtlYOWqAJlrNERnGJ7KXSq+7nfD0JsFY/flKcg==-----END CERTIFICATE-----";
+            WepayKey key = _context.WepayKeys.Find(1);
             var certManager = new InMemoryCertificateManager();
+            certManager.SetCertificate("7F5ACDBE4382FD3F831184B33FAA6E1D35BEE383", cert);
             var options = new WechatTenpayClientOptions()
             {
                 MerchantId = key.mch_id.Trim(),
-                MerchantV3Secret = "",
-                MerchantCertSerialNumber = key.key_serial.Trim(),
-                MerchantCertPrivateKey = key.private_key.Trim(),
+                //MerchantV3Secret = "-----BEGIN CERTIFICATE-----MIID8DCCAtigAwIBAgIUT9nvFQufMaii1MsyUbzhiaZb2t8wDQYJKoZIhvcNAQELBQAwXjELMAkGA1UEBhMCQ04xEzARBgNVBAoTClRlbnBheS5jb20xHTAbBgNVBAsTFFRlbnBheS5jb20gQ0EgQ2VudGVyMRswGQYDVQQDExJUZW5wYXkuY29tIFJvb3QgQ0EwHhcNMjExMDEwMDIyMTM1WhcNMjYxMDA5MDIyMTM1WjCBgTETMBEGA1UEAwwKMTYwNDE4NDkzMzEbMBkGA1UECgwS5b6u5L+h5ZWG5oi357O757ufMS0wKwYDVQQLDCTljJfkuqzmmJPpvpnpm6rogZrllYbotLjmnInpmZDlhazlj7gxCzAJBgNVBAYMAkNOMREwDwYDVQQHDAhTaGVuWmhlbjCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAMjjqeQg2/oiG9P4ai77tBqK/ml1qWAYu0dJTSrHhkkq6FfKd6Ol2tF+OKVogGnpYEt1Y7d/CLVu4fBDzj+//PgazUINsExfCPg4xyYj4J0dfdzInRyn6nLLUEnCVQalUzNvDOSHN8OdEF6SapdMygZJYBos91ynH8FqViIIfsPQqsZO6tm+IwFJqZkyjFftKApsbujsJALg4ecIM732wQb0R6T0NGSjbpfN6fyNC9k9bPSAIjgl+YMkqlDDElDHfq+k8vDxLq1meLqff8CtuTBojTcFz379CpHqV0FCH5lx9Ot683ZJDo/c62+WHYzuPYUiTljk28i2c1bMDdk/NqsCAwEAAaOBgTB/MAkGA1UdEwQCMAAwCwYDVR0PBAQDAgTwMGUGA1UdHwReMFwwWqBYoFaGVGh0dHA6Ly9ldmNhLml0cnVzLmNvbS5jbi9wdWJsaWMvaXRydXNjcmw/Q0E9MUJENDIyMEU1MERCQzA0QjA2QUQzOTc1NDk4NDZDMDFDM0U4RUJEMjANBgkqhkiG9w0BAQsFAAOCAQEAGhs0xdUgbJBqCcg4wgsZUB6RPh3tlo5W+L7W8Ds6IOWufDy/KQScj3xSVWmGbzxS+kZaDnu23bTcqpbR+6mXcfTyPdg2VJ5nle2PJKsJsd9TVksXofNNv4b+dd2g29kSmyaJsJhSuQYYCFsJYyvOma5RoAjiUs/LMVK1TYAwSodZMoq2DmDJjv8NMOMRqiwR+vXpWnR2W+4kIG4nwi8Z+epuxehrZOW6fHKHOoaEsZ0JrxQYky2HjFNfvcCmUIX1HP+BzXZmfq+BfeemDCt5VtHNCOHzisehPs640A0S5aIjXrx9GtlYOWqAJlrNERnGJ7KXSq+7nfD0JsFY/flKcg==-----END CERTIFICATE-----",
+                //MerchantCertSerialNumber = key.key_serial.Trim(),
+                //MerchantCertPrivateKey = key.private_key.Trim(),
                 CertificateManager = certManager
             };
-
-            string callbackJson = "{\"id\":\"f0b8f844-7bdc-5e53-9b8b-58150caa963c\",\"create_time\":\"2021-10-15T10:07:31+08:00\",\"resource_type\":\"encrypt-resource\",\"event_type\":\"TRANSACTION.SUCCESS\",\"summary\":\"支付成功\",\"resource\":{\"original_type\":\"transaction\",\"algorithm\":\"AEAD_AES_256_GCM\",\"ciphertext\":\"SP6+NyGoBJEATbTuzD+4DBUeK/3uwfEMW7fYVsw6rv3WfeLs9WeqtgbS7cVxH8BhKeclrGCaZCFY6gqHvKx3TV3hHUnbSUkz7WuMSEXOnNz/1YBBopGIHKJTSEohuVf+NqRZ79/U2JZ52iMsEXoYYTwhmOZ5ApbpzK4uzivNTCChti/t083TpwHhdWu1AKUOJBLQVy/S8ZBu0/98Y03JSZO9SzaVD3GAHTxTVQ5sLvfVAcbADCp0oa4ymlk/DXUiHhHMUhlHWY7fdKSahz1f5JjI4nTf/7H1L7+91UME09YJWB4/c0aH/SdrZ/nevCQCWSPSVCzwKitvPpX2j94tEDHdGMZb3snB/857kusKHjshv86X1aRj0l4Kxn/5wHZX9lPa1PhmMjjBfy2l/eXMPxDgYu1Uw9pPCHHxfaPDInErcGdX8WQy4AntNivSJVfLULRS+gyWpP/IbfT8VHLmzOCSV788lmZypZtZN6t86yZoqFlB7fC+pUSTv4ecMQhR75+HP9UzD7OrdqWj9gREg8Dk79iy7lpXUIM9SCRRKX0wtxm1GpOYzKZqMinxjzLK\",\"associated_data\":\"transaction\",\"nonce\":\"g553iJEtj6hg\"}}";
-            string callbackTimestamp = "微信回调通知中的 Wechatpay-Timestamp 标头";
-            string callbackNonce = "微信回调通知中的 Wechatpay-Nonce 标头";
-            string callbackSignature = "微信回调通知中的 Wechatpay-Signature 标头";
-            string callbackSerialNumber = "微信回调通知中的 Wechatpay-Serial 标头";
+            var client = new WechatTenpayClient(options);
+            bool valid = client.VerifyEventSignature(
+                callbackTimestamp: "1634265418",
+                callbackNonce: "r3lQS3Zc1j87PXlsRwKTRu0DmUvrUQxe",
+                callbackBody: "{\"id\":\"74b7445b-e1c6-56cd-9dcf-f9de8d4400e2\",\"create_time\":\"2021-10-15T10:36:58+08:00\",\"resource_type\":\"encrypt-resource\",\"event_type\":\"TRANSACTION.SUCCESS\",\"summary\":\"支付成功\",\"resource\":{\"original_type\":\"transaction\",\"algorithm\":\"AEAD_AES_256_GCM\",\"ciphertext\":\"5njznsCzxzmaQfgoTDIpfoOAcbJ2FtSOOKVi9zJJ1qTR9WNZo1FQDSzX0DL10JTXq+sUoQkk+xuK9Cj2pQIOVj8yWy2PoIU9Nsqt8Pp5c+APiQNnqiC0r1h9uOVLhyfKr4unmisb73bugswGmutBcS3xWDFObl1K2iDAHCv/LnCgH3IHomavO4HuUBg0CQXLBStV1SEbkGaoUDTVLexveCNg+GqcPtutYA7zTrWB2c7TD4ypoZx315RcchpJYH8laWInbGZUtORRjyswLosZjjQpEL1MH5fe+g9vcwRzp0loIQU7V2OjTMqrvBIabsHizSdX+EmoCWSNiZ0e+h/MtQaBlmc9scCin/AJVtHiJaZnNtIxXFr+XaSrdrkzWiA6kfYEKR1rIZT06hnbkxHxN1olOcCdLdboqdsPrySME7fIi/5ponxg199KC3cIuv8zMslnYIUFcJCjB3U34eziDzPrt4LY3JRE5YWYXc9cx/nvXa22VZgtqH12P+XDrSoo7rMbROObw2zWox8BGwZYTwjOyIwuo/HJk1NmnmcjUCLxC2XEmDkkQ/iwAbQ14ZK6\",\"associated_data\":\"transaction\",\"nonce\":\"LRxoOYFpmJAn\"}}",
+                callbackSignature: "DuBPYfdtZ9RDfwM49DQBBUj4xfHlXc+MC90HSCp9vKhBfTEsJSAqt+/r78l6nmXLSJxkqWwiWKCazRQL40mWERrHF/J0j4OJtXLb5vcKasm2th8YBIJThzpQCfU9WRJl2vSWKYyy++ubEc3IOLR+VMTVGt3g6yPs16bgMVMs7npmCkALutEaKESfV9F2f5mFgLmaWiM//ojYWzBB1NZUSDlsA57JG8dvrwwilvw2s14npxJ3I+Dgr70w9yWvjOEGkTB3lBrkz0sc0qB8q1/Smw9ApyqhbQDXJqK+v2leS/96231JCUQZR7YACIYWQx8ihu5Sbl2z09GnWUmu2IVpFw==",
+                callbackSerialNumber: "7F5ACDBE4382FD3F831184B33FAA6E1D35BEE383"
+            );
         }
-        */
+
+        [HttpGet]
+        public void DecodeSign()
+        {
+            string cert = "-----BEGIN CERTIFICATE-----MIID8DCCAtigAwIBAgIUT9nvFQufMaii1MsyUbzhiaZb2t8wDQYJKoZIhvcNAQELBQAwXjELMAkGA1UEBhMCQ04xEzARBgNVBAoTClRlbnBheS5jb20xHTAbBgNVBAsTFFRlbnBheS5jb20gQ0EgQ2VudGVyMRswGQYDVQQDExJUZW5wYXkuY29tIFJvb3QgQ0EwHhcNMjExMDEwMDIyMTM1WhcNMjYxMDA5MDIyMTM1WjCBgTETMBEGA1UEAwwKMTYwNDE4NDkzMzEbMBkGA1UECgwS5b6u5L+h5ZWG5oi357O757ufMS0wKwYDVQQLDCTljJfkuqzmmJPpvpnpm6rogZrllYbotLjmnInpmZDlhazlj7gxCzAJBgNVBAYMAkNOMREwDwYDVQQHDAhTaGVuWmhlbjCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAMjjqeQg2/oiG9P4ai77tBqK/ml1qWAYu0dJTSrHhkkq6FfKd6Ol2tF+OKVogGnpYEt1Y7d/CLVu4fBDzj+//PgazUINsExfCPg4xyYj4J0dfdzInRyn6nLLUEnCVQalUzNvDOSHN8OdEF6SapdMygZJYBos91ynH8FqViIIfsPQqsZO6tm+IwFJqZkyjFftKApsbujsJALg4ecIM732wQb0R6T0NGSjbpfN6fyNC9k9bPSAIjgl+YMkqlDDElDHfq+k8vDxLq1meLqff8CtuTBojTcFz379CpHqV0FCH5lx9Ot683ZJDo/c62+WHYzuPYUiTljk28i2c1bMDdk/NqsCAwEAAaOBgTB/MAkGA1UdEwQCMAAwCwYDVR0PBAQDAgTwMGUGA1UdHwReMFwwWqBYoFaGVGh0dHA6Ly9ldmNhLml0cnVzLmNvbS5jbi9wdWJsaWMvaXRydXNjcmw/Q0E9MUJENDIyMEU1MERCQzA0QjA2QUQzOTc1NDk4NDZDMDFDM0U4RUJEMjANBgkqhkiG9w0BAQsFAAOCAQEAGhs0xdUgbJBqCcg4wgsZUB6RPh3tlo5W+L7W8Ds6IOWufDy/KQScj3xSVWmGbzxS+kZaDnu23bTcqpbR+6mXcfTyPdg2VJ5nle2PJKsJsd9TVksXofNNv4b+dd2g29kSmyaJsJhSuQYYCFsJYyvOma5RoAjiUs/LMVK1TYAwSodZMoq2DmDJjv8NMOMRqiwR+vXpWnR2W+4kIG4nwi8Z+epuxehrZOW6fHKHOoaEsZ0JrxQYky2HjFNfvcCmUIX1HP+BzXZmfq+BfeemDCt5VtHNCOHzisehPs640A0S5aIjXrx9GtlYOWqAJlrNERnGJ7KXSq+7nfD0JsFY/flKcg==-----END CERTIFICATE-----";
+
+            //WechatTenpayClient cline = new WechatTenpayClient();
+
+
+
+            string callbackJson = "{\"id\":\"74b7445b-e1c6-56cd-9dcf-f9de8d4400e2\",\"create_time\":\"2021-10-15T10:36:58+08:00\",\"resource_type\":\"encrypt-resource\",\"event_type\":\"TRANSACTION.SUCCESS\",\"summary\":\"支付成功\",\"resource\":{\"original_type\":\"transaction\",\"algorithm\":\"AEAD_AES_256_GCM\",\"ciphertext\":\"5njznsCzxzmaQfgoTDIpfoOAcbJ2FtSOOKVi9zJJ1qTR9WNZo1FQDSzX0DL10JTXq+sUoQkk+xuK9Cj2pQIOVj8yWy2PoIU9Nsqt8Pp5c+APiQNnqiC0r1h9uOVLhyfKr4unmisb73bugswGmutBcS3xWDFObl1K2iDAHCv/LnCgH3IHomavO4HuUBg0CQXLBStV1SEbkGaoUDTVLexveCNg+GqcPtutYA7zTrWB2c7TD4ypoZx315RcchpJYH8laWInbGZUtORRjyswLosZjjQpEL1MH5fe+g9vcwRzp0loIQU7V2OjTMqrvBIabsHizSdX+EmoCWSNiZ0e+h/MtQaBlmc9scCin/AJVtHiJaZnNtIxXFr+XaSrdrkzWiA6kfYEKR1rIZT06hnbkxHxN1olOcCdLdboqdsPrySME7fIi/5ponxg199KC3cIuv8zMslnYIUFcJCjB3U34eziDzPrt4LY3JRE5YWYXc9cx/nvXa22VZgtqH12P+XDrSoo7rMbROObw2zWox8BGwZYTwjOyIwuo/HJk1NmnmcjUCLxC2XEmDkkQ/iwAbQ14ZK6\",\"associated_data\":\"transaction\",\"nonce\":\"LRxoOYFpmJAn\"}}";
+            string callbackTimestamp = "1634265418";
+            string callbackNonce = "r3lQS3Zc1j87PXlsRwKTRu0DmUvrUQxe";
+            string callbackSignature = "DuBPYfdtZ9RDfwM49DQBBUj4xfHlXc+MC90HSCp9vKhBfTEsJSAqt+/r78l6nmXLSJxkqWwiWKCazRQL40mWERrHF/J0j4OJtXLb5vcKasm2th8YBIJThzpQCfU9WRJl2vSWKYyy++ubEc3IOLR+VMTVGt3g6yPs16bgMVMs7npmCkALutEaKESfV9F2f5mFgLmaWiM//ojYWzBB1NZUSDlsA57JG8dvrwwilvw2s14npxJ3I+Dgr70w9yWvjOEGkTB3lBrkz0sc0qB8q1/Smw9ApyqhbQDXJqK+v2leS/96231JCUQZR7YACIYWQx8ihu5Sbl2z09GnWUmu2IVpFw==";
+            string callbackSerialNumber = "7F5ACDBE4382FD3F831184B33FAA6E1D35BEE383";
+
+            
+
+            
+            
+            
+            
+            WepayKey key = _context.WepayKeys.Find(1);
+            var certManager = new InMemoryCertificateManager();
+            certManager.SetCertificate(callbackSerialNumber, cert);
+            var options = new WechatTenpayClientOptions()
+            {
+                //MerchantId = key.mch_id.Trim(),
+                //MerchantV3Secret = "-----BEGIN CERTIFICATE-----MIID8DCCAtigAwIBAgIUT9nvFQufMaii1MsyUbzhiaZb2t8wDQYJKoZIhvcNAQELBQAwXjELMAkGA1UEBhMCQ04xEzARBgNVBAoTClRlbnBheS5jb20xHTAbBgNVBAsTFFRlbnBheS5jb20gQ0EgQ2VudGVyMRswGQYDVQQDExJUZW5wYXkuY29tIFJvb3QgQ0EwHhcNMjExMDEwMDIyMTM1WhcNMjYxMDA5MDIyMTM1WjCBgTETMBEGA1UEAwwKMTYwNDE4NDkzMzEbMBkGA1UECgwS5b6u5L+h5ZWG5oi357O757ufMS0wKwYDVQQLDCTljJfkuqzmmJPpvpnpm6rogZrllYbotLjmnInpmZDlhazlj7gxCzAJBgNVBAYMAkNOMREwDwYDVQQHDAhTaGVuWmhlbjCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAMjjqeQg2/oiG9P4ai77tBqK/ml1qWAYu0dJTSrHhkkq6FfKd6Ol2tF+OKVogGnpYEt1Y7d/CLVu4fBDzj+//PgazUINsExfCPg4xyYj4J0dfdzInRyn6nLLUEnCVQalUzNvDOSHN8OdEF6SapdMygZJYBos91ynH8FqViIIfsPQqsZO6tm+IwFJqZkyjFftKApsbujsJALg4ecIM732wQb0R6T0NGSjbpfN6fyNC9k9bPSAIjgl+YMkqlDDElDHfq+k8vDxLq1meLqff8CtuTBojTcFz379CpHqV0FCH5lx9Ot683ZJDo/c62+WHYzuPYUiTljk28i2c1bMDdk/NqsCAwEAAaOBgTB/MAkGA1UdEwQCMAAwCwYDVR0PBAQDAgTwMGUGA1UdHwReMFwwWqBYoFaGVGh0dHA6Ly9ldmNhLml0cnVzLmNvbS5jbi9wdWJsaWMvaXRydXNjcmw/Q0E9MUJENDIyMEU1MERCQzA0QjA2QUQzOTc1NDk4NDZDMDFDM0U4RUJEMjANBgkqhkiG9w0BAQsFAAOCAQEAGhs0xdUgbJBqCcg4wgsZUB6RPh3tlo5W+L7W8Ds6IOWufDy/KQScj3xSVWmGbzxS+kZaDnu23bTcqpbR+6mXcfTyPdg2VJ5nle2PJKsJsd9TVksXofNNv4b+dd2g29kSmyaJsJhSuQYYCFsJYyvOma5RoAjiUs/LMVK1TYAwSodZMoq2DmDJjv8NMOMRqiwR+vXpWnR2W+4kIG4nwi8Z+epuxehrZOW6fHKHOoaEsZ0JrxQYky2HjFNfvcCmUIX1HP+BzXZmfq+BfeemDCt5VtHNCOHzisehPs640A0S5aIjXrx9GtlYOWqAJlrNERnGJ7KXSq+7nfD0JsFY/flKcg==-----END CERTIFICATE-----",
+                //MerchantCertSerialNumber = key.key_serial.Trim(),
+                //MerchantCertPrivateKey = key.private_key.Trim(),
+                CertificateManager = certManager
+            };
+            var client = new WechatTenpayClient(options);
+            bool valid = client.VerifyEventSignature(callbackTimestamp, callbackNonce, callbackJson, callbackSignature, callbackSerialNumber);
+            if (valid)
+            {
+                /* 将 JSON 反序列化得到通知对象 */
+                /* 你也可以将 WechatTenpayEvent 类型直接绑定到 MVC 模型上，这样就不再需要手动反序列化 */
+                var callbackModel = client.DeserializeEvent(callbackJson);
+                if ("TRANSACTION.SUCCESS".Equals(callbackModel.EventType))
+                {
+                    /* 根据事件类型，解密得到支付通知敏感数据 */
+                    var callbackResource = client.DecryptEventResource<SKIT.FlurlHttpClient.Wechat.TenpayV3.Events.TransactionResource>(callbackModel);
+                    string outTradeNumber = callbackResource.OutTradeNumber;
+                    string transactionId = callbackResource.TransactionId;
+                    Console.WriteLine("订单 {0} 已完成支付，交易单号为 {1}", outTradeNumber, transactionId);
+                }
+            }
+        }
+        
         [HttpPost]
         public async Task<ActionResult<string>> CallBack(CallBackStruct postData)
         {
