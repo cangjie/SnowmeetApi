@@ -57,7 +57,7 @@ namespace SnowmeetApi.Controllers
             return orderOnline;
         }
         [HttpGet("{sessionKey}")]
-        public async Task<ActionResult<WepayOrder>> Pay(string sessionKey, int id, int mchid, string notify)
+        public async Task<ActionResult<WepayOrder>> Pay(string sessionKey, int id, int mchid = 1, string notify = "http://mini.snowmeet.top/core/WepayOrder/PaymentCallback")
         {
             //sessionKey = HttpUtility.UrlDecode(sessionKey);
             notify = HttpUtility.UrlDecode(notify);
@@ -152,7 +152,7 @@ namespace SnowmeetApi.Controllers
                 AppId = _appId,
                 Description = wepayOrder.description.Trim().Equals("")?"测试商品":wepayOrder.description.Trim(),
                 ExpireTime = DateTimeOffset.Now.AddMinutes(30),
-                NotifyUrl = wepayOrder.notify.Trim(),
+                NotifyUrl = wepayOrder.notify.Trim() + "/" + mchid.ToString(),
                 Amount = new CreatePayTransactionJsapiRequest.Types.Amount()
                 { 
                     Total = wepayOrder.amount

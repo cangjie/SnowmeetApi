@@ -14,6 +14,6 @@ namespace wechat_miniapp_base.Models
         public string mch_name { get; set; }
         public string key_serial { get; set; }
         public string private_key { get; set; }
-
+        public string api_key { get; set; }
     }
 }

@@ -275,9 +275,25 @@ namespace SnowmeetApi.Controllers
             }
         }
         
-        [HttpPost]
-        public async Task<ActionResult<string>> CallBack(CallBackStruct postData)
+        [HttpPost("{mchid}")]
+        public ActionResult<string> PaymentCallback(int mchid, CallBackStruct postData)
         {
+
+            string apiKey = "";
+            WepayKey key = _context.WepayKeys.Find(mchid);
+
+            if (key == null)
+            {
+                return NotFound();
+            }
+
+            apiKey = key.api_key.Trim();
+
+            if (apiKey == null || apiKey.Trim().Equals(""))
+            {
+                return NotFound();
+            }
+
             string postJson = Newtonsoft.Json.JsonConvert.SerializeObject(postData);
             string path = $"{Environment.CurrentDirectory}";
             string paySign = "no sign";
@@ -330,19 +346,13 @@ namespace SnowmeetApi.Controllers
                     sr.Close();
                 }
 
-                string keyStr = "";
-
-                using(StreamReader sr = new StreamReader(path + serial.Trim() + "_pub.pem", true))
-                {
-                    keyStr = sr.ReadToEnd();
-                    sr.Close();
-                }
+                
 
                 var certManager = new InMemoryCertificateManager();
                 certManager.SetCertificate(serial, cerStr);
                 var options = new WechatTenpayClientOptions()
                 {
-                    MerchantV3Secret = "snowmeetsnowmeetsnowmeetsnowmeet",
+                    MerchantV3Secret = apiKey,
                     CertificateManager = certManager
                 };
                 var client = new WechatTenpayClient(options);
@@ -356,6 +366,14 @@ namespace SnowmeetApi.Controllers
                         var callbackResource = client.DecryptEventResource<SKIT.FlurlHttpClient.Wechat.TenpayV3.Events.TransactionResource>(callbackModel);
                         string outTradeNumber = callbackResource.OutTradeNumber;
                         string transactionId = callbackResource.TransactionId;
+                        string callbackStr = Newtonsoft.Json.JsonConvert.SerializeObject(callbackResource);
+                        using (StreamWriter sw = new StreamWriter(path + "callback_decrypt_" + dateStr + ".txt", true))
+                        {
+                            sw.WriteLine(DateTimeOffset.Now.ToString());
+                            sw.WriteLine(callbackStr);
+                            sw.WriteLine("");
+                            sw.Close();
+                        }
                         //Console.WriteLine("订单 {0} 已完成支付，交易单号为 {1}", outTradeNumber, transactionId);
                     }
                 }
@@ -365,8 +383,6 @@ namespace SnowmeetApi.Controllers
             {
                 Console.WriteLine(err.ToString());
             }
-
-
             return "{ \r\n \"code\": \"SUCCESS\", \r\n \"message\": \"成功\" \r\n}";
         }
 
