@@ -19,6 +19,7 @@ using Org.BouncyCastle.Crypto.Parameters;
 using Org.BouncyCastle.Crypto.Engines;
 using System.Text;
 using System.Net.Http.Headers;
+using SnowmeetApi.Models;
 
 namespace SnowmeetApi.Controllers
 {
@@ -85,8 +86,8 @@ namespace SnowmeetApi.Controllers
             _httpContextAccessor = httpContextAccessor;
         }
 
-        [HttpGet]
-        public async Task<ActionResult<CerList>> GetCer()
+        
+        protected async Task<ActionResult<CerList>> GetCer()
         {
             WepayKey key = _context.WepayKeys.Find(1);
             HttpClient client = new HttpClient(new HttpHandler(key.mch_id, key.key_serial, key.private_key));
@@ -177,8 +178,8 @@ namespace SnowmeetApi.Controllers
             
         }
 
-        [HttpGet]
-        public void ValidSign()
+
+        protected void ValidSign()
         {
             string cert = "-----BEGIN CERTIFICATE-----MIID8DCCAtigAwIBAgIUT9nvFQufMaii1MsyUbzhiaZb2t8wDQYJKoZIhvcNAQELBQAwXjELMAkGA1UEBhMCQ04xEzARBgNVBAoTClRlbnBheS5jb20xHTAbBgNVBAsTFFRlbnBheS5jb20gQ0EgQ2VudGVyMRswGQYDVQQDExJUZW5wYXkuY29tIFJvb3QgQ0EwHhcNMjExMDEwMDIyMTM1WhcNMjYxMDA5MDIyMTM1WjCBgTETMBEGA1UEAwwKMTYwNDE4NDkzMzEbMBkGA1UECgwS5b6u5L+h5ZWG5oi357O757ufMS0wKwYDVQQLDCTljJfkuqzmmJPpvpnpm6rogZrllYbotLjmnInpmZDlhazlj7gxCzAJBgNVBAYMAkNOMREwDwYDVQQHDAhTaGVuWmhlbjCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAMjjqeQg2/oiG9P4ai77tBqK/ml1qWAYu0dJTSrHhkkq6FfKd6Ol2tF+OKVogGnpYEt1Y7d/CLVu4fBDzj+//PgazUINsExfCPg4xyYj4J0dfdzInRyn6nLLUEnCVQalUzNvDOSHN8OdEF6SapdMygZJYBos91ynH8FqViIIfsPQqsZO6tm+IwFJqZkyjFftKApsbujsJALg4ecIM732wQb0R6T0NGSjbpfN6fyNC9k9bPSAIjgl+YMkqlDDElDHfq+k8vDxLq1meLqff8CtuTBojTcFz379CpHqV0FCH5lx9Ot683ZJDo/c62+WHYzuPYUiTljk28i2c1bMDdk/NqsCAwEAAaOBgTB/MAkGA1UdEwQCMAAwCwYDVR0PBAQDAgTwMGUGA1UdHwReMFwwWqBYoFaGVGh0dHA6Ly9ldmNhLml0cnVzLmNvbS5jbi9wdWJsaWMvaXRydXNjcmw/Q0E9MUJENDIyMEU1MERCQzA0QjA2QUQzOTc1NDk4NDZDMDFDM0U4RUJEMjANBgkqhkiG9w0BAQsFAAOCAQEAGhs0xdUgbJBqCcg4wgsZUB6RPh3tlo5W+L7W8Ds6IOWufDy/KQScj3xSVWmGbzxS+kZaDnu23bTcqpbR+6mXcfTyPdg2VJ5nle2PJKsJsd9TVksXofNNv4b+dd2g29kSmyaJsJhSuQYYCFsJYyvOma5RoAjiUs/LMVK1TYAwSodZMoq2DmDJjv8NMOMRqiwR+vXpWnR2W+4kIG4nwi8Z+epuxehrZOW6fHKHOoaEsZ0JrxQYky2HjFNfvcCmUIX1HP+BzXZmfq+BfeemDCt5VtHNCOHzisehPs640A0S5aIjXrx9GtlYOWqAJlrNERnGJ7KXSq+7nfD0JsFY/flKcg==-----END CERTIFICATE-----";
             WepayKey key = _context.WepayKeys.Find(1);
@@ -202,8 +203,7 @@ namespace SnowmeetApi.Controllers
             );
         }
 
-        [HttpGet]
-        public void DecodeSign()
+        protected void DecodeSign()
         {
             
 
@@ -367,13 +367,22 @@ namespace SnowmeetApi.Controllers
                         string outTradeNumber = callbackResource.OutTradeNumber;
                         string transactionId = callbackResource.TransactionId;
                         string callbackStr = Newtonsoft.Json.JsonConvert.SerializeObject(callbackResource);
-                        using (StreamWriter sw = new StreamWriter(path + "callback_decrypt_" + dateStr + ".txt", true))
+                        try
                         {
-                            sw.WriteLine(DateTimeOffset.Now.ToString());
-                            sw.WriteLine(callbackStr);
-                            sw.WriteLine("");
-                            sw.Close();
+                            using (StreamWriter sw = new StreamWriter(path + "callback_decrypt_" + dateStr + ".txt", true))
+                            {
+                                sw.WriteLine(DateTimeOffset.Now.ToString());
+                                sw.WriteLine(callbackStr);
+                                sw.WriteLine("");
+                                sw.Close();
+                            }
                         }
+                        catch
+                        {
+
+                        }
+                        SetWepayOrderSuccess(outTradeNumber);
+
                         //Console.WriteLine("订单 {0} 已完成支付，交易单号为 {1}", outTradeNumber, transactionId);
                     }
                 }
@@ -386,6 +395,27 @@ namespace SnowmeetApi.Controllers
             return "{ \r\n \"code\": \"SUCCESS\", \r\n \"message\": \"成功\" \r\n}";
         }
 
+        private void SetWepayOrderSuccess(string outTradeNo)
+        {
+            WepayOrder wePayOrder = _context.WepayOrders.Find(outTradeNo);
+            if (wePayOrder != null)
+            {
+                try
+                {
+                    OrderOnline orderOnline = _context.OrderOnlines.Find(wePayOrder.order_id);
+                    orderOnline.pay_state = 1;
+                    wePayOrder.state = 2;
+                    _context.Entry<OrderOnline>(orderOnline).State = EntityState.Modified;
+                    _context.Entry<WepayOrder>(wePayOrder).State = EntityState.Modified;
+                    _context.SaveChanges();
+
+                }
+                catch
+                {
+
+                }
+            }
+        }
 
         /*
         // GET: api/WepayOrder

@@ -116,6 +116,12 @@ namespace SnowmeetApi.Controllers
 
             string timeStamp = Util.getTime13().ToString();
 
+            WepayKey key = await _context.WepayKeys.FindAsync(mchid);
+            if (key == null)
+            {
+                return NotFound();
+            }
+
             WepayOrder wepayOrder = await _context.WepayOrders.FindAsync(timeStamp.Trim());
 
             if (wepayOrder != null)
@@ -131,10 +137,10 @@ namespace SnowmeetApi.Controllers
             wepayOrder.amount = (int)(order.order_real_pay_price * 100);
             wepayOrder.app_id = _appId;
             wepayOrder.description = "";
-
+            wepayOrder.mch_id = mchid;
             _context.WepayOrders.Add(wepayOrder);
             await _context.SaveChangesAsync();
-            WepayKey key = await _context.WepayKeys.FindAsync(mchid);
+            
 
             var certManager = new InMemoryCertificateManager();
             var options = new WechatTenpayClientOptions()

@@ -22,7 +22,7 @@ namespace wechat_miniapp_base.Models
         public string sign { get; set; }
         public string timestamp { get; set; }
         public int state { get; set; }
-
+        public int mch_id { get; set; }
         public string prepay_id { get; set; }
     }
 }

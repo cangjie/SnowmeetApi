@@ -1,0 +1,9 @@
+10/18/2021 13:48:17 +08:00
+{"mchid":"1604184933","appid":"wxd1310896f2aa68bb","out_trade_no":"1634265388473","transaction_id":"4200001174202110155377155585","trade_type":"JSAPI","trade_state":"SUCCESS","trade_state_desc":"支付成功","bank_type":"PAB_CREDIT","attach":"","success_time":"2021-10-15T10:36:58+08:00","payer":{"openid":"oHdTn5Wlwy37YA6kmJP6zE9AoTlI"},"amount":{"total":1,"currency":"CNY","payer_total":1,"payer_currency":"CNY"},"scene_info":null,"promotion_detail":null}
+
+10/18/2021 13:49:07 +08:00
+{"mchid":"1604184933","appid":"wxd1310896f2aa68bb","out_trade_no":"1634265388473","transaction_id":"4200001174202110155377155585","trade_type":"JSAPI","trade_state":"SUCCESS","trade_state_desc":"支付成功","bank_type":"PAB_CREDIT","attach":"","success_time":"2021-10-15T10:36:58+08:00","payer":{"openid":"oHdTn5Wlwy37YA6kmJP6zE9AoTlI"},"amount":{"total":1,"currency":"CNY","payer_total":1,"payer_currency":"CNY"},"scene_info":null,"promotion_detail":null}
+
+10/18/2021 13:49:58 +08:00
+{"mchid":"1604184933","appid":"wxd1310896f2aa68bb","out_trade_no":"1634265388473","transaction_id":"4200001174202110155377155585","trade_type":"JSAPI","trade_state":"SUCCESS","trade_state_desc":"支付成功","bank_type":"PAB_CREDIT","attach":"","success_time":"2021-10-15T10:36:58+08:00","payer":{"openid":"oHdTn5Wlwy37YA6kmJP6zE9AoTlI"},"amount":{"total":1,"currency":"CNY","payer_total":1,"payer_currency":"CNY"},"scene_info":null,"promotion_detail":null}
+
