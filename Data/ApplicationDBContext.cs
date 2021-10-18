@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.EntityFrameworkCore;
 using SnowmeetApi.Models;
 using SnowmeetApi.Models.Users;
@@ -45,6 +45,8 @@ namespace SnowmeetApi.Data
         public DbSet<WepayKey> WepayKeys { get; set; }
 
         public DbSet<WepayOrder> WepayOrders { get; set; }
+
+        public DbSet<SnowmeetApi.Models.OrderOnlineTemp> OrderOnlineTemp { get; set; }
         
 
     }
