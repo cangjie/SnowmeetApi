@@ -31,7 +31,7 @@ namespace SnowmeetApi
         public void ConfigureServices(IServiceCollection services)
         {
             //string conStr = "Data Source=(local);Initial Catalog=snowmeet;Integrated Security=True";
-            string conStr = "Server=52.80.17.211,9753;Database=snowmeet;UID=sa;PWD=Jarrod780209";
+            string conStr = "Server=52.83.254.45;Database=snowmeet;UID=sa;PWD=Jarrod780209";
             services.AddControllers();
             services.AddDbContext<ApplicationDBContext>(
                 options => options.UseSqlServer(conStr)
