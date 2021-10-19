@@ -45,8 +45,16 @@ namespace SnowmeetApi.Controllers
 
         // GET: api/OrderOnlines/5
         [HttpGet("{id}")]
-        public async Task<ActionResult<OrderOnline>> GetOrderOnline(int id)
+        public async Task<ActionResult<OrderOnline>> GetOrderOnline(int id, string sessionKey)
         {
+            sessionKey = Util.UrlDecode(sessionKey);
+            UnicUser._context = _context;
+            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            if (user == null)
+            {
+                return NotFound();
+            }
+
             var orderOnline = await _context.OrderOnlines.FindAsync(id);
 
             if (orderOnline == null)
@@ -54,7 +62,14 @@ namespace SnowmeetApi.Controllers
                 return NotFound();
             }
 
-            return orderOnline;
+            if (user.officialAccountUser.is_admin == 1 || user.miniAppUser.is_admin == 1
+                || orderOnline.open_id.Trim().Equals(user.officialAccountOpenId.Trim())
+                || orderOnline.open_id.Trim().Equals(user.miniAppOpenId.Trim()))
+            {
+                return orderOnline;
+            }
+
+            return NotFound();
         }
         [HttpGet("{sessionKey}")]
         public async Task<ActionResult<WepayOrder>> Pay(string sessionKey, int id)
