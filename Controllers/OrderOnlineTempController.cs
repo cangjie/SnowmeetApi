@@ -7,6 +7,8 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SnowmeetApi.Data;
 using SnowmeetApi.Models;
+using System.Web;
+using SnowmeetApi.Models.Users;
 
 namespace SnowmeetApi.Controllers
 {
@@ -31,13 +33,31 @@ namespace SnowmeetApi.Controllers
         */
         // GET: api/OrderOnlineTemp/5
         [HttpGet("{id}")]
-        public async Task<ActionResult<OrderOnlineTemp>> GetOrderOnlineTemp(int id)
+        public async Task<ActionResult<OrderOnlineTemp>> GetOrderOnlineTemp(int id, string sessionKey)
         {
             var orderOnlineTemp = await _context.OrderOnlineTemp.FindAsync(id);
 
             if (orderOnlineTemp == null)
             {
                 return NotFound();
+            }
+            if (orderOnlineTemp.online_order_id != null)
+            {
+                OrderOnline order = _context.OrderOnlines.Find(orderOnlineTemp.online_order_id);
+                if (order != null)
+                {
+                    sessionKey = Util.UrlDecode(sessionKey);
+                    UnicUser._context = _context;
+                    UnicUser user = UnicUser.GetUnicUser(sessionKey);
+                    if (user == null)
+                    {
+                        return NotFound();
+                    }
+                    if (!order.open_id.Trim().Equals(user.miniAppOpenId) && order.open_id.Trim().Equals(user.officialAccountOpenId))
+                    {
+                        return NotFound();
+                    }
+                }
             }
 
             return orderOnlineTemp;

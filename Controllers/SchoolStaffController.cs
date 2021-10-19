@@ -25,7 +25,7 @@ namespace SnowmeetApi.Controllers
         [HttpGet("{sessionKey}")]
         public bool IsStaff(string sessionKey)
         {
-            sessionKey = System.Web.HttpUtility.UrlDecode(sessionKey);
+            sessionKey = Util.UrlDecode(sessionKey);
             bool ret = false;
             if (sessionKey != null)
             {
@@ -56,7 +56,7 @@ namespace SnowmeetApi.Controllers
         [HttpGet("GetSchoolStaff/{sessionkey}")]
         public async Task<ActionResult<SchoolStaff>> GetSchoolStaff(string sessionKey)
         {
-            sessionKey = System.Web.HttpUtility.UrlDecode(sessionKey);
+            sessionKey = Util.UrlDecode(sessionKey);
             UnicUser user = UnicUser.GetUnicUser(sessionKey.Trim());
 
             if (user == null)

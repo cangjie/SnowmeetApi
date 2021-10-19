@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Web;
 
 namespace SnowmeetApi
 {
@@ -14,6 +15,11 @@ namespace SnowmeetApi
             //得到精确到毫秒的时间戳（长度13位）
             long time = (long)ts.TotalMilliseconds;
             return time;
+        }
+
+        public static string UrlDecode(string str)
+        {
+            return HttpUtility.UrlDecode(str).Replace(" ", "+");
         }
     }
 }
