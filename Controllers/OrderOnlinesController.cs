@@ -59,6 +59,7 @@ namespace SnowmeetApi.Controllers
         [HttpGet("{sessionKey}")]
         public async Task<ActionResult<WepayOrder>> Pay(string sessionKey, int id)
         {
+            sessionKey = HttpUtility.UrlDecode(sessionKey);
             int mchid = 3;
             string notify = "http://mini.snowmeet.top/core/WepayOrder/PaymentCallback";
             //sessionKey = HttpUtility.UrlDecode(sessionKey);

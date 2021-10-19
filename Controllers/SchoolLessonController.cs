@@ -25,6 +25,7 @@ namespace SnowmeetApi.Controllers
         [HttpGet("{sessionKey}")]
         public bool IsStaff(string sessionKey)
         {
+            sessionKey = System.Web.HttpUtility.UrlDecode(sessionKey);
             bool ret = false;
             if (sessionKey != null)
             {
@@ -50,6 +51,7 @@ namespace SnowmeetApi.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<SchoolLesson>>> GetSchoolLessons(string sessionKey)
         {
+            sessionKey = System.Web.HttpUtility.UrlDecode(sessionKey);
             if (!IsStaff(sessionKey))
             {
                 return NotFound();
@@ -101,6 +103,7 @@ namespace SnowmeetApi.Controllers
         [HttpGet("{orderId}")]
         public async Task<ActionResult<SchoolLesson>> GetSchoolLessonByOrderId(int orderId, string sessionKey)
         {
+            sessionKey = System.Web.HttpUtility.UrlDecode(sessionKey);
             UnicUser user = UnicUser.GetUnicUser(sessionKey);
             var schoolLesson = await _context.SchoolLessons.FirstAsync<SchoolLesson>(s => s.order_id == orderId);
             
@@ -127,6 +130,7 @@ namespace SnowmeetApi.Controllers
                 return NotFound();
             }
             */
+            sessionKey = System.Web.HttpUtility.UrlDecode(sessionKey);
             UnicUser user = UnicUser.GetUnicUser(sessionKey);
 
             var schoolLesson = await _context.SchoolLessons.FindAsync(id);
@@ -197,6 +201,7 @@ namespace SnowmeetApi.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<SchoolLesson>> AssignOpenId(int id, string sessionKey)
         {
+            sessionKey = System.Web.HttpUtility.UrlDecode(sessionKey);
             UnicUser user = UnicUser.GetUnicUser(sessionKey);
             SchoolLesson lesson = _context.SchoolLessons.Find(id);
             if (lesson.cell_number.Trim().Equals(user.miniAppUser.cell_number.Trim()))
@@ -230,7 +235,7 @@ namespace SnowmeetApi.Controllers
         [HttpPut("{id}")]
         public async Task<IActionResult> PutSchoolLesson(int id, string sessionKey, SchoolLesson schoolLesson)
         {
-            
+            sessionKey = System.Web.HttpUtility.UrlDecode(sessionKey);
             if (id != schoolLesson.id)
             {
                 return BadRequest();
@@ -271,7 +276,7 @@ namespace SnowmeetApi.Controllers
         [HttpPost]
         public async Task<ActionResult<SchoolLesson>> PostSchoolLesson(SchoolLesson schoolLesson, string sessionKey)
         {
-
+            sessionKey = System.Web.HttpUtility.UrlDecode(sessionKey);
             if (!IsStaff(sessionKey))
             {
                 return NotFound();
