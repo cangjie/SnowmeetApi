@@ -62,7 +62,7 @@ namespace SnowmeetApi.Controllers
                 return NotFound();
             }
 
-            if (user.officialAccountUser.is_admin == 1 || user.miniAppUser.is_admin == 1
+            if (user.isAdmin
                 || orderOnline.open_id.Trim().Equals(user.officialAccountOpenId.Trim())
                 || orderOnline.open_id.Trim().Equals(user.miniAppOpenId.Trim()))
             {

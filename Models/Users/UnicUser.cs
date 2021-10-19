@@ -36,6 +36,22 @@ namespace SnowmeetApi.Models.Users
         //public bool isAdmin = false;
         //public bool isSchoolStaff = false;
 
+        public bool isAdmin
+        {
+            get
+            {
+                if (officialAccountUser != null && officialAccountUser.is_admin == 1)
+                {
+                    return true;
+                }
+                if (miniAppUser != null && miniAppUser.is_admin == 1)
+                {
+                    return true;
+                }
+                return false;
+            }
+        }
+
 
         public static UnicUser GetUnicUser(string sessionKey)
         {
