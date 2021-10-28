@@ -48,6 +48,6 @@ namespace SnowmeetApi.Data
 
         public DbSet<SnowmeetApi.Models.OrderOnlineTemp> OrderOnlineTemp { get; set; }
         
-
+        //public DbSet<SnowmeetApi.Models.WepayOrderRefund> WePayOrderRefund { get; set; }
     }
 }
