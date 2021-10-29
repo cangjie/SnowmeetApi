@@ -252,13 +252,15 @@ namespace SnowmeetApi.Controllers
             {
                 return NotFound();
             }
-            
+            int parseResult = 0;
             var wepayOrderRefundArr =
-                _context.WePayOrderRefund.Where(r => (r.wepay_out_trade_no == outTradeNo && !r.status.Trim().Equals("") )).ToList<WepayOrderRefund>();
+                _context.WePayOrderRefund.Where(r => r.wepay_out_trade_no == outTradeNo).ToList<WepayOrderRefund>();
             int totalRefundAmount = 0;
             for (int i = 0; i < wepayOrderRefundArr.Count; i++)
             {
-                totalRefundAmount = wepayOrderRefundArr[i].amount + totalRefundAmount;
+                WepayOrderRefund currentRefund = wepayOrderRefundArr[i];
+                if (int.TryParse(currentRefund.status, out parseResult))
+                    totalRefundAmount = wepayOrderRefundArr[i].amount + totalRefundAmount;
             }
             if (totalRefundAmount + amount <= wepayOrder.amount)
             {
@@ -314,6 +316,9 @@ namespace SnowmeetApi.Controllers
                 }
                 catch
                 {
+                    refund.status = response.ErrorMessage.Trim();
+                    _context.Entry<WepayOrderRefund>(refund).State = EntityState.Modified;
+                    await _context.SaveChangesAsync();
                     return NotFound();
                 }
                 
