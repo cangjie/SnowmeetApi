@@ -53,7 +53,7 @@ namespace SnowmeetApi.Controllers
         }
         
         // GET: api/SchoolStaff/5
-        [HttpGet("GetSchoolStaff/{sessionkey}")]
+        [HttpGet]
         public async Task<ActionResult<SchoolStaff>> GetSchoolStaff(string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey);
