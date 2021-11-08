@@ -25,9 +25,9 @@
     <PackageReference Include="Microsoft.VisualStudio.Web.CodeGeneration.Design" Version="5.0.2" />
   </ItemGroup>
   <ItemGroup>
+    <Folder Include="Controllers\rfid\" />
     <Folder Include="Data\" />
     <Folder Include="Models\Users\" />
     <Folder Include="Models\rfid\" />
-    <Folder Include="Controllers\rfid\" />
   </ItemGroup>
 </Project>

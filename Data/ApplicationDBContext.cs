@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using SnowmeetApi.Models;
 using SnowmeetApi.Models.Users;
+using SnowmeetApi.Models.rfid;
 namespace SnowmeetApi.Data
 {
     public class ApplicationDBContext : DbContext
