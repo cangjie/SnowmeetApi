@@ -12,6 +12,10 @@ using Microsoft.Extensions.Logging;
 using SnowmeetApi.Data;
 using Microsoft.EntityFrameworkCore;
 using SnowmeetApi.Models.Users;
+using Microsoft.OpenApi.Models;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+
 namespace SnowmeetApi
 {
     public class Startup
@@ -27,20 +31,33 @@ namespace SnowmeetApi
         public void ConfigureServices(IServiceCollection services)
         {
             //string conStr = "Data Source=(local);Initial Catalog=snowmeet;Integrated Security=True";
-            string conStr = "Server=52.80.17.211,9753;Database=snowmeet;UID=sa;PWD=Jarrod780209";
+            string conStr = "Server=52.83.254.45;Database=snowmeet;UID=sa;PWD=Jarrod780209";
             services.AddControllers();
             services.AddDbContext<ApplicationDBContext>(
                 options => options.UseSqlServer(conStr)
             );
+            services.AddSwaggerGen(c =>
+            {
+                c.SwaggerDoc("v1", new OpenApiInfo { Title = "SnowmeetApi", Version = "v1" });
+            });
+            services.TryAddSingleton<IHttpContextAccessor, HttpContextAccessor>();
+            
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
         {
+            /*
             if (env.IsDevelopment())
             {
                 app.UseDeveloperExceptionPage();
+                app.UseSwagger();
+                app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "SnowmeetApi v1"));
             }
+            */
+            app.UseDeveloperExceptionPage();
+            app.UseSwagger();
+            app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "SnowmeetApi v1"));
 
             app.UseRouting();
 

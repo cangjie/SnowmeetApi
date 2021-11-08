@@ -22,9 +22,10 @@ namespace SnowmeetApi.Controllers
             _context = context;
             UnicUser._context = context;
         }
-
+        [HttpGet("{sessionKey}")]
         public bool IsStaff(string sessionKey)
         {
+            sessionKey = Util.UrlDecode(sessionKey);
             bool ret = false;
             if (sessionKey != null)
             {
@@ -52,10 +53,10 @@ namespace SnowmeetApi.Controllers
         }
         
         // GET: api/SchoolStaff/5
-        [HttpGet("GetSchoolStaff/{sessionkey}")]
+        [HttpGet]
         public async Task<ActionResult<SchoolStaff>> GetSchoolStaff(string sessionKey)
         {
-            
+            sessionKey = Util.UrlDecode(sessionKey);
             UnicUser user = UnicUser.GetUnicUser(sessionKey.Trim());
 
             if (user == null)

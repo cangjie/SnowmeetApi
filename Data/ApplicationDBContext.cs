@@ -1,8 +1,9 @@
-﻿using System;
+using System;
 using Microsoft.EntityFrameworkCore;
 using SnowmeetApi.Models;
 using SnowmeetApi.Models.Users;
-using SnowmeetApi.Models.rfid;
+using wechat_miniapp_base.Models;
+//using SnowmeetApi.Models.rfid;
 namespace SnowmeetApi.Data
 {
     public class ApplicationDBContext : DbContext
@@ -40,5 +41,13 @@ namespace SnowmeetApi.Data
         public DbSet<MiniAppUser> MiniAppUsers { get; set; }
         public DbSet<OfficialAccoutUser> officialAccoutUsers { get; set; }
         public DbSet<OrderOnline> OrderOnlines { get; set; }
+
+        public DbSet<WepayKey> WepayKeys { get; set; }
+
+        public DbSet<WepayOrder> WepayOrders { get; set; }
+
+        public DbSet<SnowmeetApi.Models.OrderOnlineTemp> OrderOnlineTemp { get; set; }
+        
+        public DbSet<SnowmeetApi.Models.WepayOrderRefund> WePayOrderRefund { get; set; }
     }
 }

@@ -36,6 +36,22 @@ namespace SnowmeetApi.Models.Users
         //public bool isAdmin = false;
         //public bool isSchoolStaff = false;
 
+        public bool isAdmin
+        {
+            get
+            {
+                if (officialAccountUser != null && officialAccountUser.is_admin == 1)
+                {
+                    return true;
+                }
+                if (miniAppUser != null && miniAppUser.is_admin == 1)
+                {
+                    return true;
+                }
+                return false;
+            }
+        }
+
 
         public static UnicUser GetUnicUser(string sessionKey)
         {
@@ -91,19 +107,15 @@ namespace SnowmeetApi.Models.Users
             }
             if (!miniAppOpenId.Trim().Equals(""))
             {
+                user.miniAppOpenId = miniAppOpenId.Trim();
                 user.miniAppUser = _context.MiniAppUsers.Find(miniAppOpenId.Trim());
-                if (user.miniAppUser != null)
-                {
-                    user.miniAppOpenId = miniAppOpenId.Trim();
-                }
+                
             }
             if (!officialOpenId.Trim().Equals(""))
             {
+                user.officialAccountOpenId = officialOpenId.Trim();
                 user.officialAccountUser = _context.officialAccoutUsers.Find(officialOpenId.Trim());
-                if (user.officialAccountUser != null)
-                {
-                    user.officialAccountOpenId = officialOpenId.Trim();
-                }
+                
             }
             return user;
         }
