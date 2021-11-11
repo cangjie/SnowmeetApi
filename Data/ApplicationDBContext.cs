@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using SnowmeetApi.Models;
 using SnowmeetApi.Models.Users;
 using wechat_miniapp_base.Models;
+using SnowmeetApi.Models.Product;
 //using SnowmeetApi.Models.rfid;
 namespace SnowmeetApi.Data
 {
@@ -49,5 +50,9 @@ namespace SnowmeetApi.Data
         public DbSet<SnowmeetApi.Models.OrderOnlineTemp> OrderOnlineTemp { get; set; }
         
         public DbSet<SnowmeetApi.Models.WepayOrderRefund> WePayOrderRefund { get; set; }
+        
+        public DbSet<SnowmeetApi.Models.Product.Product> Product { get; set; }
+
+        public DbSet<OrderOnlineDetail> OrderOnlineDetails { get; set; }
     }
 }
