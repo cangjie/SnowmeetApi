@@ -38,7 +38,6 @@
   <ItemGroup>
     <Folder Include="Data\" />
     <Folder Include="Models\Users\" />
-    <Folder Include="WepayCertificate\" />
     <Folder Include="Models\Product\" />
   </ItemGroup>
 </Project>
