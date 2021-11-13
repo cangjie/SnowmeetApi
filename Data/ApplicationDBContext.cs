@@ -31,6 +31,8 @@ namespace SnowmeetApi.Data
             //OrderOnline
             modelBuilder.Entity<OrderOnline>().HasKey(c => c.id);
 
+            //modelBuilder.Entity<Experience>().HasOne<OrderOnline>(e=>e.order).WithOne(e=>e.)
+
         }
 
         public DbSet<MaintainLive> MaintainLives {get; set;}

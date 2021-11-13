@@ -15,6 +15,9 @@ namespace SnowmeetApi.Models
         public int guarantee_order_id { get; set; }
         public string cell_number { get; set; }
         public string open_id { get; set; }
+
+        [ForeignKey("guarantee_order_id")]
+        public OrderOnline order { get; set; }
         
     }
 }

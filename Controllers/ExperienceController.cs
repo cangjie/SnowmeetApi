@@ -118,6 +118,33 @@ namespace SnowmeetApi.Controllers
             return NoContent();
         }
 
+        [HttpGet("{id}")]
+        public async Task<ActionResult<Experience>> GetExperience(int id, string sessionKey)
+        {
+            var experience = await _context.Experience.FindAsync(id);
+
+            if (experience.guarantee_order_id > 0)
+            {
+                experience.order = await _context.OrderOnlines.FindAsync(experience.guarantee_order_id);
+            }
+
+            UnicUser._context = _context;
+            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+
+            if (!user.isAdmin && !experience.open_id.Trim().Equals(user.miniAppOpenId.Trim()))
+            {
+                return NoContent();
+            }
+
+
+
+            if (experience == null)
+            {
+                return NotFound();
+            }
+
+            return experience;
+        }
 
         /*
 
