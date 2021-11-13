@@ -131,11 +131,17 @@ namespace SnowmeetApi.Controllers
             UnicUser._context = _context;
             UnicUser user = UnicUser.GetUnicUser(sessionKey);
 
-            if (!user.isAdmin && !experience.open_id.Trim().Equals(user.miniAppOpenId.Trim()))
+            try
+            {
+                if (!user.isAdmin && !experience.open_id.Trim().Equals(user.miniAppOpenId.Trim()))
+                {
+                    return NoContent();
+                }
+            }
+            catch
             {
                 return NoContent();
             }
-
 
 
             if (experience == null)
@@ -144,6 +150,50 @@ namespace SnowmeetApi.Controllers
             }
 
             return experience;
+        }
+
+        [HttpPut("{id}")]
+        public async Task<IActionResult> PutExperience(int id, string sessionKey, Experience experience)
+        {
+            if (id != experience.id)
+            {
+                return BadRequest();
+            }
+
+            UnicUser._context = _context;
+            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+
+            try
+            {
+                if (!user.isAdmin && !experience.open_id.Trim().Equals(user.miniAppOpenId.Trim()))
+                {
+                    return NoContent();
+                }
+            }
+            catch
+            {
+                return NoContent();
+            }
+
+            _context.Entry(experience).State = EntityState.Modified;
+
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                if (!ExperienceExists(id))
+                {
+                    return NotFound();
+                }
+                else
+                {
+                    throw;
+                }
+            }
+
+            return NoContent();
         }
 
         /*
