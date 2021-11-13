@@ -103,20 +103,19 @@ namespace SnowmeetApi.Controllers
                 return NotFound();
             }
             string timeStamp = Util.getTime13().ToString();
-            if (order.open_id.Trim().Equals(""))
+           
+            order.open_id = user.miniAppUser.open_id.Trim();
+            order.out_trade_no = timeStamp.Trim();
+            _context.Entry(order).State = EntityState.Modified;
+            try
             {
-                order.open_id = user.miniAppUser.open_id.Trim();
-                order.out_trade_no = timeStamp.Trim();
-                _context.Entry(order).State = EntityState.Modified;
-                try
-                {
-                    await _context.SaveChangesAsync();
-                }
-                catch
-                { 
-                
-                }
+                await _context.SaveChangesAsync();
             }
+            catch
+            { 
+                
+            }
+            
 
             if (order != null && (order.open_id.Trim().Equals(user.miniAppOpenId.Trim())
                 ||     order.open_id.Trim().Equals(user.officialAccountOpenId)     ))
