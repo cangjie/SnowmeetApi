@@ -54,5 +54,7 @@ namespace SnowmeetApi.Data
         public DbSet<SnowmeetApi.Models.Product.Product> Product { get; set; }
 
         public DbSet<OrderOnlineDetail> OrderOnlineDetails { get; set; }
+
+        public DbSet<SnowmeetApi.Models.Experience> Experience { get; set; }
     }
 }
