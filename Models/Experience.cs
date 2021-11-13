@@ -16,7 +16,7 @@ namespace SnowmeetApi.Models
         public string cell_number { get; set; }
         public string open_id { get; set; }
         public string return_memo { get; set; }
-        public double rerund_amount { get; set; }
+        public double refund_amount { get; set; }
 
 
         [ForeignKey("guarantee_order_id")]
