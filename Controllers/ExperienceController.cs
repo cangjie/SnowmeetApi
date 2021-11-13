@@ -121,6 +121,7 @@ namespace SnowmeetApi.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<Experience>> GetExperience(int id, string sessionKey)
         {
+            sessionKey = Util.UrlDecode(sessionKey);
             var experience = await _context.Experience.FindAsync(id);
 
             if (experience.guarantee_order_id > 0)
@@ -155,6 +156,7 @@ namespace SnowmeetApi.Controllers
         [HttpPut("{id}")]
         public async Task<IActionResult> PutExperience(int id, string sessionKey, Experience experience)
         {
+            sessionKey = Util.UrlDecode(sessionKey);
             if (id != experience.id)
             {
                 return BadRequest();
