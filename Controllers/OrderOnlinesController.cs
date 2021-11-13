@@ -102,10 +102,11 @@ namespace SnowmeetApi.Controllers
             {
                 return NotFound();
             }
-
+            string timeStamp = Util.getTime13().ToString();
             if (order.open_id.Trim().Equals(""))
             {
                 order.open_id = user.miniAppUser.open_id.Trim();
+                order.out_trade_no = timeStamp.Trim();
                 _context.Entry(order).State = EntityState.Modified;
                 try
                 {
@@ -131,7 +132,7 @@ namespace SnowmeetApi.Controllers
                 return NotFound();
             }
 
-            string timeStamp = Util.getTime13().ToString();
+            
 
             WepayKey key = await _context.WepayKeys.FindAsync(mchid);
             if (key == null)
