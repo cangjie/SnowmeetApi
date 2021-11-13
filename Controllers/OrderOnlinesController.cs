@@ -98,6 +98,8 @@ namespace SnowmeetApi.Controllers
 
             OrderOnline order = await _context.OrderOnlines.FindAsync(id);
 
+            mchid = GetMchId(order);
+
             if (order == null)
             {
                 return NotFound();
@@ -265,6 +267,16 @@ namespace SnowmeetApi.Controllers
         private bool OrderOnlineExists(int id)
         {
             return _context.OrderOnlines.Any(e => e.id == id);
+        }
+
+        private int GetMchId(OrderOnline order)
+        {
+            int mchId = 3;
+            if (order.type == "押金")
+            {
+                mchId = 5;
+            }
+            return mchId;
         }
     }
 }
