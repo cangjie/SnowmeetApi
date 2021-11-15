@@ -276,6 +276,10 @@ namespace SnowmeetApi.Controllers
             {
                 mchId = 5;
             }
+            if (order.type == "店销" && order.shop == "南山")
+            {
+                mchId = 4;
+            }
             return mchId;
         }
     }
