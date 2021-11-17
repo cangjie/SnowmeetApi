@@ -48,6 +48,17 @@ namespace SnowmeetApi.Models
         
         public DateTime create_date { get; set; }
 
+
+        //附加费用商品编号
+        public int AddtionalFeeProductId
+        {
+            get
+            {
+                return 146;
+            }
+        }
+
+
     }
 }
 

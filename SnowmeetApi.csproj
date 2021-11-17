@@ -17,6 +17,7 @@
     <None Remove="Microsoft.EntityFrameworkCore.Sqlite" />
     <None Remove="System.IO.FileSystem" />
     <None Remove="WepayCertificate\" />
+    <None Remove="Models\Product\" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="5.0.11" />
@@ -37,6 +38,6 @@
   <ItemGroup>
     <Folder Include="Data\" />
     <Folder Include="Models\Users\" />
-    <Folder Include="WepayCertificate\" />
+    <Folder Include="Models\Product\" />
   </ItemGroup>
 </Project>

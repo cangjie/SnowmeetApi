@@ -486,6 +486,7 @@ namespace SnowmeetApi.Controllers
                 {
                     OrderOnline orderOnline = _context.OrderOnlines.Find(wePayOrder.order_id);
                     orderOnline.pay_state = 1;
+                    orderOnline.pay_time = DateTime.Now;
                     wePayOrder.state = 2;
                     _context.Entry<OrderOnline>(orderOnline).State = EntityState.Modified;
                     _context.Entry<WepayOrder>(wePayOrder).State = EntityState.Modified;

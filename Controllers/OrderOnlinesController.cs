@@ -98,24 +98,26 @@ namespace SnowmeetApi.Controllers
 
             OrderOnline order = await _context.OrderOnlines.FindAsync(id);
 
+            mchid = GetMchId(order);
+
             if (order == null)
             {
                 return NotFound();
             }
-
-            if (order.open_id.Trim().Equals(""))
+            string timeStamp = Util.getTime13().ToString();
+           
+            order.open_id = user.miniAppUser.open_id.Trim();
+            order.out_trade_no = timeStamp.Trim();
+            _context.Entry(order).State = EntityState.Modified;
+            try
             {
-                order.open_id = user.miniAppUser.open_id.Trim();
-                _context.Entry(order).State = EntityState.Modified;
-                try
-                {
-                    await _context.SaveChangesAsync();
-                }
-                catch
-                { 
-                
-                }
+                await _context.SaveChangesAsync();
             }
+            catch
+            { 
+                
+            }
+            
 
             if (order != null && (order.open_id.Trim().Equals(user.miniAppOpenId.Trim())
                 ||     order.open_id.Trim().Equals(user.officialAccountOpenId)     ))
@@ -131,7 +133,7 @@ namespace SnowmeetApi.Controllers
                 return NotFound();
             }
 
-            string timeStamp = Util.getTime13().ToString();
+            
 
             WepayKey key = await _context.WepayKeys.FindAsync(mchid);
             if (key == null)
@@ -265,6 +267,20 @@ namespace SnowmeetApi.Controllers
         private bool OrderOnlineExists(int id)
         {
             return _context.OrderOnlines.Any(e => e.id == id);
+        }
+
+        private int GetMchId(OrderOnline order)
+        {
+            int mchId = 3;
+            if (order.type == "押金")
+            {
+                mchId = 5;
+            }
+            if (order.type == "店销" && order.shop == "南山")
+            {
+                mchId = 4;
+            }
+            return mchId;
         }
     }
 }
