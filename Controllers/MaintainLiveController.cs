@@ -124,7 +124,7 @@ namespace SnowmeetApi.Controllers
                             int productId = tasks[i].confirmed_product_id;
                             int count = 1;
                             
-                            if (productId == 0 && tasks[i].confirmed_additional_fee > 0)
+                            if (productId == 0 && tasks[i].confirmed_additional_fee != 0)
                             {
                                 productId = tasks[i].AddtionalFeeProductId;
                             }
