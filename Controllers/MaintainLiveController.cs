@@ -122,28 +122,34 @@ namespace SnowmeetApi.Controllers
                         for (int i = 0; i < tasks.Count; i++)
                         {
                             int productId = tasks[i].confirmed_product_id;
-                            int count = 1;
                             
-                            if (productId == 0 && tasks[i].confirmed_additional_fee != 0)
-                            {
-                                productId = tasks[i].AddtionalFeeProductId;
-                            }
-                            Product product =  _context.Product.Find(productId);
-                            if (productId == tasks[i].AddtionalFeeProductId)
-                            {
-                                count = (int)(tasks[i].confirmed_additional_fee / product.sale_price);
-                            }
 
-                            OrderOnlineDetail detail = new OrderOnlineDetail()
+                            if (productId > 0)
                             {
-                                OrderOnlineId = 0,
-                                product_id = productId,
-                                count = count,
-                                product_name = product.name,
-                                price = product.sale_price
-                            };
-                            totalPrice = totalPrice + count * product.sale_price;
-                            details.Add(detail);
+                                Product product = _context.Product.Find(productId);
+                                OrderOnlineDetail detail = new OrderOnlineDetail()
+                                {
+                                    OrderOnlineId = 0,
+                                    product_id = productId,
+                                    count = 1,
+                                    product_name = product.name,
+                                    price = product.sale_price
+                                };
+                                totalPrice = totalPrice + product.sale_price;
+                                details.Add(detail);
+                            }
+                            
+                            if (tasks[i].confirmed_additional_fee != 0)
+                            {
+                                int count = 0;
+                                productId = tasks[i].AddtionalFeeProductId;
+                                Product product = _context.Product.Find(productId);
+                                count = (int)(tasks[i].confirmed_additional_fee / product.sale_price);
+                                totalPrice = totalPrice + count * product.sale_price;
+                            }
+                            
+                            
+                            
                         }
                         if (totalPrice == 0)
                         {
