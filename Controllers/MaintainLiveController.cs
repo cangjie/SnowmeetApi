@@ -27,7 +27,23 @@ namespace SnowmeetApi.Controllers
         }
 
 
-
+        [HttpGet("{openId}")]
+        public async Task<ActionResult<MaintainLive>> GetLast(string openId, string sessionKey)
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            UnicUser._context = _context;
+            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            if (!user.isAdmin)
+            {
+                return NoContent();
+            }
+            var lastItemArr = await _context.MaintainLives.Where(m => m.open_id.Equals(openId)).OrderByDescending(m => m.id).ToListAsync();
+            if (lastItemArr != null && lastItemArr.Count > 0)
+            {
+                return (MaintainLive)lastItemArr[0];
+            }
+            return NoContent();
+        }
         
         [HttpGet("{id}")]
         public ActionResult<OrderOnline> PlaceOrder(int id, string sessionKey)
