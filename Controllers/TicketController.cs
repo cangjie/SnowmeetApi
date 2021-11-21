@@ -28,9 +28,9 @@ namespace SnowmeetApi.Controllers
 
         // GET: api/Ticket/5
         [HttpGet("{id}")]
-        public async Task<ActionResult<Ticket>> GetTicket(string id)
+        public async Task<ActionResult<Ticket>> GetTicket(string code)
         {
-            var ticket = await _context.Ticket.FindAsync(id);
+            var ticket = await _context.Ticket.FindAsync(code);
 
             if (ticket == null)
             {

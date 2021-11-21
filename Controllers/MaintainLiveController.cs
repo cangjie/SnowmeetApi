@@ -31,6 +31,7 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<MaintainLive>> GetLast(string openId, string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey);
+            openId = Util.UrlDecode(sessionKey);
             UnicUser._context = _context;
             UnicUser user = UnicUser.GetUnicUser(sessionKey);
             if (!user.isAdmin)
