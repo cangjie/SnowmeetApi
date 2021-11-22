@@ -45,7 +45,7 @@ namespace SnowmeetApi.Models
         public int label_printed { get; set; }
         public string? task_flow_num { get; set; }
         public int finish { get; set; }
-        
+        public string ticket_code { get; set; }
         public DateTime create_date { get; set; }
 
 
