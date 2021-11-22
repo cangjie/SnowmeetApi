@@ -21,6 +21,7 @@ using System.Text;
 using System.Net.Http.Headers;
 using SnowmeetApi.Models;
 using SnowmeetApi.Models.Users;
+using SnowmeetApi.Models.Ticket;
 using SKIT.FlurlHttpClient.Wechat.TenpayV3.Models;
 
 namespace SnowmeetApi.Controllers
@@ -491,6 +492,23 @@ namespace SnowmeetApi.Controllers
                     _context.Entry<OrderOnline>(orderOnline).State = EntityState.Modified;
                     _context.Entry<WepayOrder>(wePayOrder).State = EntityState.Modified;
                     _context.SaveChanges();
+                    try
+                    {
+                        if (orderOnline.ticket_code != null && orderOnline.ticket_code.Trim().Equals(""))
+                        {
+                            Ticket ticket = _context.Ticket.Find(orderOnline.ticket_code.Trim());
+                            ticket.used = 1;
+                            ticket.used_time = DateTime.Now;
+                            _context.Entry<Ticket>(ticket).State = EntityState.Modified;
+                            _context.SaveChanges();
+
+                        }
+                    }
+                    catch
+                    {
+
+                    }
+                    //if (orderOnline.ticket_code!=null && orderOnline.ticket_code.Trim().Equals(""))
 
                 }
                 catch
