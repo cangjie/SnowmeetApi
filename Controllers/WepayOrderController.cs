@@ -494,7 +494,7 @@ namespace SnowmeetApi.Controllers
                     _context.SaveChanges();
                     try
                     {
-                        if (orderOnline.ticket_code != null && orderOnline.ticket_code.Trim().Equals(""))
+                        if (orderOnline.ticket_code != null && !orderOnline.ticket_code.Trim().Equals(""))
                         {
                             Ticket ticket = _context.Ticket.Find(orderOnline.ticket_code.Trim());
                             ticket.used = 1;
