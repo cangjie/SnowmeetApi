@@ -27,7 +27,7 @@ namespace SnowmeetApi.Controllers
         }
 
         // GET: api/Ticket/5
-        [HttpGet("{id}")]
+        [HttpGet("{code}")]
         public async Task<ActionResult<Ticket>> GetTicket(string code)
         {
             var ticket = await _context.Ticket.FindAsync(code);
