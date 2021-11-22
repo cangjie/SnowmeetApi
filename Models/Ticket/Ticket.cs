@@ -14,7 +14,13 @@ namespace SnowmeetApi.Models.Ticket
 
         public string open_id { get; set; }
 
+        public string oper_open_id { get; set; }
+
+        public int printed { get; set; }
+
         public int used { get; set; }
-        public DateTime? used_time { get; set; } 
+        public DateTime? used_time { get; set; }
+
+        public int template_id { get; set; }
     }
 }

@@ -8,6 +8,8 @@ using Microsoft.EntityFrameworkCore;
 using SnowmeetApi.Data;
 using SnowmeetApi.Models.Ticket;
 using Microsoft.Extensions.Configuration;
+using SnowmeetApi.Models.Users;
+using SnowmeetApi.Models.Card;
 namespace SnowmeetApi.Controllers
 {
     [Route("[controller]/[action]")]
@@ -38,6 +40,84 @@ namespace SnowmeetApi.Controllers
             }
 
             return ticket;
+        }
+
+        [HttpGet("{templateId}")]
+        public async Task<ActionResult<IEnumerable<Ticket>>> GenerateTickets(int templateId, int count, string sessionKey)
+        {
+            TicketTemplate template = _context.TicketTemplate.Find(templateId);
+            if (template == null)
+            {
+                return NoContent();
+            }
+
+            sessionKey = Util.UrlDecode(sessionKey);
+            UnicUser._context = _context;
+            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            if (user == null || !user.isAdmin)
+            {
+                //return NoContent();
+            }
+            Ticket[] tickets = new Ticket[count];
+            for (int i = 0; i < count; i++)
+            {
+                int retryTimes = 0;
+                bool isDuplicate = true;
+                string code = Util.GetRandomCode(9);
+                for (; isDuplicate && retryTimes < 1000;)
+                {
+                    isDuplicate = _context.Card.Any(e => e.card_no == code);
+                }
+                if (isDuplicate)
+                {
+                    continue;
+                }
+                Card card = new Card {
+                    card_no = code,
+                    is_ticket = 1
+                };
+                _context.Card.Add(card);
+                await _context.SaveChangesAsync();
+                Ticket ticket = new Ticket
+                {
+                    code = code,
+                    template_id = templateId,
+                    name = template.name.Trim(),
+                    memo = template.memo.Trim(),
+                    oper_open_id = user.miniAppOpenId.Trim(),
+                    printed = 0,
+                    used = 0
+                };
+                _context.Ticket.Add(ticket);
+                bool insertTicketSuccess = true;
+                try
+                {
+                    await _context.SaveChangesAsync();
+                }
+                catch(DbUpdateException exp1)
+                {
+                    insertTicketSuccess = false;
+                    _context.Ticket.Remove(ticket);
+                    
+                    
+                }
+                if (!insertTicketSuccess)
+                {
+                    card = await _context.Card.FindAsync(code);
+                    _context.Card.Remove(card);
+                    try
+                    {
+                        await _context.SaveChangesAsync();
+                    }
+                    catch (DbUpdateException exp)
+                    {
+                        Console.WriteLine(exp.ToString());
+                    }
+                }
+                
+
+            }
+            return NoContent();
         }
 
 

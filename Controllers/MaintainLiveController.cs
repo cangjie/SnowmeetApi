@@ -34,7 +34,7 @@ namespace SnowmeetApi.Controllers
             openId = Util.UrlDecode(sessionKey);
             UnicUser._context = _context;
             UnicUser user = UnicUser.GetUnicUser(sessionKey);
-            if (!user.isAdmin)
+            if (user == null || !user.isAdmin)
             {
                 return NoContent();
             }

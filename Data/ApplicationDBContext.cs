@@ -5,6 +5,7 @@ using SnowmeetApi.Models.Users;
 using wechat_miniapp_base.Models;
 using SnowmeetApi.Models.Product;
 using SnowmeetApi.Models.Ticket;
+using SnowmeetApi.Models.Card;
 //using SnowmeetApi.Models.rfid;
 namespace SnowmeetApi.Data
 {
@@ -61,5 +62,11 @@ namespace SnowmeetApi.Data
         public DbSet<SnowmeetApi.Models.Experience> Experience { get; set; }
 
         public DbSet<SnowmeetApi.Models.Ticket.Ticket> Ticket { get; set; }
+
+        public DbSet<SnowmeetApi.Models.Ticket.TicketTemplate> TicketTemplate { get; set; }
+
+        public DbSet<SnowmeetApi.Models.Card.Card> Card { get; set; }
+
+
     }
 }
