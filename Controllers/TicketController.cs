@@ -86,13 +86,16 @@ namespace SnowmeetApi.Controllers
                     memo = template.memo.Trim(),
                     oper_open_id = user.miniAppOpenId.Trim(),
                     printed = 0,
-                    used = 0
+                    used = 0,
+                    miniapp_recept_path = template.miniapp_recept_path,
+                    open_id = ""
                 };
                 _context.Ticket.Add(ticket);
                 bool insertTicketSuccess = true;
                 try
                 {
                     await _context.SaveChangesAsync();
+                    tickets[i] = ticket;
                 }
                 catch(DbUpdateException exp1)
                 {
@@ -117,7 +120,7 @@ namespace SnowmeetApi.Controllers
                 
 
             }
-            return NoContent();
+            return tickets;
         }
 
 
