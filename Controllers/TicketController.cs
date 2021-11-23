@@ -56,7 +56,7 @@ namespace SnowmeetApi.Controllers
             UnicUser user = UnicUser.GetUnicUser(sessionKey);
             if (user == null || !user.isAdmin)
             {
-                //return NoContent();
+                return NoContent();
             }
             Ticket[] tickets = new Ticket[count];
             for (int i = 0; i < count; i++)
