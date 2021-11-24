@@ -60,6 +60,11 @@ namespace SnowmeetApi.Controllers
                         }
                     }
                 }
+                string ticketCode = "";
+                if (exp.ticket_code != null)
+                {
+                    ticketCode = exp.ticket_code.Trim();
+                }
                 OrderOnline order = new OrderOnline()
                 {
                     type = "押金",
@@ -71,7 +76,8 @@ namespace SnowmeetApi.Controllers
                     order_real_pay_price = exp.guarantee_cash,
                     pay_state = 0,
                     shop = exp.shop.Trim(),
-                    out_trade_no = ""
+                    out_trade_no = "",
+                    ticket_code = ticketCode.Trim()
                 };
                 _context.OrderOnlines.Add(order);
                 _context.SaveChanges();

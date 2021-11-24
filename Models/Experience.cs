@@ -18,6 +18,7 @@ namespace SnowmeetApi.Models
         public string return_memo { get; set; }
         public double refund_amount { get; set; }
 
+        public string ticket_code { get; set; }
 
         [ForeignKey("guarantee_order_id")]
         public OrderOnline order { get; set; }

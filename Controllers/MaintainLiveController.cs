@@ -27,7 +27,24 @@ namespace SnowmeetApi.Controllers
         }
 
 
-
+        [HttpGet("{openId}")]
+        public async Task<ActionResult<MaintainLive>> GetLast(string openId, string sessionKey)
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            openId = Util.UrlDecode(sessionKey);
+            UnicUser._context = _context;
+            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            if (user == null || !user.isAdmin)
+            {
+                return NoContent();
+            }
+            var lastItemArr = await _context.MaintainLives.Where(m => m.open_id.Equals(openId)).OrderByDescending(m => m.id).ToListAsync();
+            if (lastItemArr != null && lastItemArr.Count > 0)
+            {
+                return (MaintainLive)lastItemArr[0];
+            }
+            return NoContent();
+        }
         
         [HttpGet("{id}")]
         public ActionResult<OrderOnline> PlaceOrder(int id, string sessionKey)
@@ -63,6 +80,7 @@ namespace SnowmeetApi.Controllers
         private OrderOnline PlaceOrderAll(int id, string sessionKey, string idType = "batch")
         {
             bool exists = false;
+            string ticketCode = "";
             if (idType.Trim().Equals("batch"))
             {
                 exists = MaintainLiveBatchExists(id);
@@ -118,7 +136,10 @@ namespace SnowmeetApi.Controllers
                     double totalPrice = 0;
                     if (tasks.Count > 0)
                     {
-
+                        if (tasks[0].ticket_code != null)
+                        {
+                            ticketCode = tasks[0].ticket_code.Trim();
+                        }
                         for (int i = 0; i < tasks.Count; i++)
                         {
                             int productId = tasks[i].confirmed_product_id;
@@ -182,7 +203,8 @@ namespace SnowmeetApi.Controllers
                                 order_real_pay_price = totalPrice,
                                 pay_state = 0,
                                 shop = tasks[0].shop.Trim(),
-                                out_trade_no = ""
+                                out_trade_no = "",
+                                ticket_code = ticketCode.Trim()
                             };
                             _context.OrderOnlines.Add(order);
                             _context.SaveChanges();

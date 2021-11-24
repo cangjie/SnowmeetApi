@@ -20,6 +20,8 @@ namespace SnowmeetApi.Models
         public string cell_number { get; set; }
         public string shop { get; set; }
         public string name { get; set; }
+
+        public string ticket_code { get; set; }
         
         public List<OrderOnlineDetail> details { get; set; }
     }
