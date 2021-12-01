@@ -22,5 +22,7 @@ namespace SnowmeetApi.Models.Ticket
         public DateTime? used_time { get; set; }
 
         public int template_id { get; set; }
+
+        public string miniapp_recept_path { get; set; }
     }
 }

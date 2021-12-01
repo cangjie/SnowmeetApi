@@ -11,5 +11,6 @@ namespace SnowmeetApi.Models.Ticket
         public string type { get; set; }
         public string name { get; set; }
         public string memo { get; set; }
+        public string miniapp_recept_path { get; set; }
     }
 }

@@ -86,7 +86,8 @@ namespace SnowmeetApi.Controllers
                     memo = template.memo.Trim(),
                     oper_open_id = user.miniAppOpenId.Trim(),
                     printed = 0,
-                    used = 0
+                    used = 0,
+                    miniapp_recept_path = template.miniapp_recept_path.Trim()
                 };
                 _context.Ticket.Add(ticket);
                 bool insertTicketSuccess = true;
