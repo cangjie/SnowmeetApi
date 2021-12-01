@@ -56,7 +56,7 @@ namespace SnowmeetApi.Controllers
             UnicUser user = UnicUser.GetUnicUser(sessionKey);
             if (user == null || !user.isAdmin)
             {
-                //return NoContent();
+                return NoContent();
             }
             Ticket[] tickets = new Ticket[count];
             for (int i = 0; i < count; i++)
@@ -87,13 +87,16 @@ namespace SnowmeetApi.Controllers
                     oper_open_id = user.miniAppOpenId.Trim(),
                     printed = 0,
                     used = 0,
-                    miniapp_recept_path = template.miniapp_recept_path.Trim()
+                    miniapp_recept_path = template.miniapp_recept_path.Trim(),
+                    open_id = ""
+
                 };
                 _context.Ticket.Add(ticket);
                 bool insertTicketSuccess = true;
                 try
                 {
                     await _context.SaveChangesAsync();
+                    tickets[i] = ticket;
                 }
                 catch(DbUpdateException exp1)
                 {
@@ -118,7 +121,7 @@ namespace SnowmeetApi.Controllers
                 
 
             }
-            return NoContent();
+            return tickets;
         }
 
 
