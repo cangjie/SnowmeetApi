@@ -28,6 +28,13 @@ namespace SnowmeetApi.Controllers
             _appId = _config.GetSection("AppId").Value.Trim();
         }
 
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<TicketTemplate>>> GetTemplateList()
+        {
+
+            return await _context.TicketTemplate.Where<TicketTemplate>(tt => tt.hide == 0).ToListAsync();
+        }
+
         // GET: api/Ticket/5
         [HttpGet("{code}")]
         public async Task<ActionResult<Ticket>> GetTicket(string code)
