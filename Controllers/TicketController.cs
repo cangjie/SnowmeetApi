@@ -131,7 +131,26 @@ namespace SnowmeetApi.Controllers
             return tickets;
         }
 
-
+        [HttpGet("{code}")]
+        public async Task<ActionResult<Ticket>> SetPrinted(string code, string sessionKey)
+        {
+            
+            sessionKey = Util.UrlDecode(sessionKey);
+            UnicUser._context = _context;
+            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            if (user.isAdmin)
+            {
+                Ticket ticket = await _context.Ticket.FindAsync(code);
+                ticket.printed = 1;
+                _context.Entry<Ticket>(ticket).State = EntityState.Modified;
+                await _context.SaveChangesAsync();
+                return ticket;
+            }
+            else
+            {
+                return NoContent();
+            }
+        }
         /*
 
         // GET: api/Ticket
