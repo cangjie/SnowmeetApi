@@ -151,6 +151,20 @@ namespace SnowmeetApi.Controllers
                 return NoContent();
             }
         }
+
+        [HttpGet("{used}")]
+        public async Task<ActionResult<IEnumerable<Ticket>>> GetMyTickets(int used, string sessionKey)
+        {
+            UnicUser._context = _context;
+            sessionKey = Util.UrlDecode(sessionKey).Trim();
+            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            if (user == null || user.miniAppOpenId == null || user.miniAppOpenId.Trim().Equals(""))
+            {
+                return NotFound();
+            }
+
+            return await _context.Ticket.Where<Ticket>(t => (t.open_id == user.miniAppOpenId && t.used == used)).OrderBy(t=>t.create_date).ToListAsync();
+        }
         /*
 
         // GET: api/Ticket
