@@ -166,6 +166,36 @@ namespace SnowmeetApi.Controllers
 
             return await _context.Ticket.Where<Ticket>(t => (t.open_id == user.miniAppOpenId && t.used == used)).OrderBy(t=>t.create_date).ToListAsync();
         }
+
+        [HttpGet("{code}")]
+        public async Task<ActionResult<bool>> Bind(string code, string sessionKey)
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            UnicUser._context = _context;
+            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            if (user == null)
+            {
+                return NotFound();
+            }
+            Ticket ticket = await _context.Ticket.FindAsync(code.Trim());
+            if (ticket == null)
+            {
+                return NoContent();
+            }
+            ticket.open_id = user.miniAppOpenId.Trim();
+            _context.Entry<Ticket>(ticket).State = EntityState.Modified;
+            try
+            {
+                await _context.SaveChangesAsync();
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+
         /*
 
         // GET: api/Ticket
