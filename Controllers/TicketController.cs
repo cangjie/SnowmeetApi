@@ -95,7 +95,8 @@ namespace SnowmeetApi.Controllers
                     printed = 0,
                     used = 0,
                     miniapp_recept_path = template.miniapp_recept_path.Trim(),
-                    open_id = ""
+                    open_id = "",
+                    create_date = DateTime.Now
 
                 };
                 _context.Ticket.Add(ticket);
