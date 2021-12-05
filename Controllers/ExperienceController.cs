@@ -49,7 +49,7 @@ namespace SnowmeetApi.Controllers
                 {
                     openId = user.miniAppOpenId.Trim();
                 }
-                if (!exp.open_id.Trim().Equals("") && !exp.open_id.Trim().Equals(openId.Trim()))
+                if (!exp.open_id.Trim().Equals(""))
                 {
                     if (exp.guarantee_order_id > 0)
                     {
