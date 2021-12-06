@@ -71,8 +71,8 @@ namespace SnowmeetApi.Controllers
 
             return NotFound();
         }
-        [HttpGet("{id}")]
-        public async Task<ActionResult<WepayOrder>> Pay(int id,string sessionKey)
+        [HttpGet("{sessionKey}")]
+        public async Task<ActionResult<WepayOrder>> Pay(string sessionKey, int id)
         {
             sessionKey = Util.UrlDecode(sessionKey);
             int mchid = 3;
