@@ -153,7 +153,7 @@ namespace SnowmeetApi.Controllers
             wepayOrder.open_id = user.miniAppOpenId;
             wepayOrder.notify = notify.Trim();
             wepayOrder.order_id = order.id;
-            wepayOrder.amount = (int)(order.order_real_pay_price * 100);
+            wepayOrder.amount = (int)Math.Round((order.order_real_pay_price * 100),0);
             wepayOrder.app_id = _appId;
             wepayOrder.description = "";
             wepayOrder.mch_id = mchid;
