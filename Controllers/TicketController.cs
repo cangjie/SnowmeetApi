@@ -28,6 +28,13 @@ namespace SnowmeetApi.Controllers
             _appId = _config.GetSection("AppId").Value.Trim();
         }
 
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<TicketTemplate>>> GetTemplateList()
+        {
+
+            return await _context.TicketTemplate.Where<TicketTemplate>(tt => tt.hide == 0).ToListAsync();
+        }
+
         // GET: api/Ticket/5
         [HttpGet("{code}")]
         public async Task<ActionResult<Ticket>> GetTicket(string code)
@@ -56,7 +63,7 @@ namespace SnowmeetApi.Controllers
             UnicUser user = UnicUser.GetUnicUser(sessionKey);
             if (user == null || !user.isAdmin)
             {
-                //return NoContent();
+                return NoContent();
             }
             Ticket[] tickets = new Ticket[count];
             for (int i = 0; i < count; i++)
@@ -86,13 +93,18 @@ namespace SnowmeetApi.Controllers
                     memo = template.memo.Trim(),
                     oper_open_id = user.miniAppOpenId.Trim(),
                     printed = 0,
-                    used = 0
+                    used = 0,
+                    miniapp_recept_path = template.miniapp_recept_path.Trim(),
+                    open_id = "",
+                    create_date = DateTime.Now
+
                 };
                 _context.Ticket.Add(ticket);
                 bool insertTicketSuccess = true;
                 try
                 {
                     await _context.SaveChangesAsync();
+                    tickets[i] = ticket;
                 }
                 catch(DbUpdateException exp1)
                 {
@@ -117,7 +129,70 @@ namespace SnowmeetApi.Controllers
                 
 
             }
-            return NoContent();
+            return tickets;
+        }
+
+        [HttpGet("{code}")]
+        public async Task<ActionResult<Ticket>> SetPrinted(string code, string sessionKey)
+        {
+            
+            sessionKey = Util.UrlDecode(sessionKey);
+            UnicUser._context = _context;
+            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            if (user.isAdmin)
+            {
+                Ticket ticket = await _context.Ticket.FindAsync(code);
+                ticket.printed = 1;
+                _context.Entry<Ticket>(ticket).State = EntityState.Modified;
+                await _context.SaveChangesAsync();
+                return ticket;
+            }
+            else
+            {
+                return NoContent();
+            }
+        }
+
+        [HttpGet("{used}")]
+        public async Task<ActionResult<IEnumerable<Ticket>>> GetMyTickets(int used, string sessionKey)
+        {
+            UnicUser._context = _context;
+            sessionKey = Util.UrlDecode(sessionKey).Trim();
+            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            if (user == null || user.miniAppOpenId == null || user.miniAppOpenId.Trim().Equals(""))
+            {
+                return NotFound();
+            }
+
+            return await _context.Ticket.Where<Ticket>(t => (t.open_id == user.miniAppOpenId && t.used == used)).OrderBy(t=>t.create_date).ToListAsync();
+        }
+
+        [HttpGet("{code}")]
+        public async Task<ActionResult<bool>> Bind(string code, string sessionKey)
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            UnicUser._context = _context;
+            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            if (user == null)
+            {
+                return NotFound();
+            }
+            Ticket ticket = await _context.Ticket.FindAsync(code.Trim());
+            if (ticket == null)
+            {
+                return NoContent();
+            }
+            ticket.open_id = user.miniAppOpenId.Trim();
+            _context.Entry<Ticket>(ticket).State = EntityState.Modified;
+            try
+            {
+                await _context.SaveChangesAsync();
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
 
