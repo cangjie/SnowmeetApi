@@ -276,9 +276,9 @@ namespace SnowmeetApi.Controllers
             {
                 mchId = 5;
             }
-            if (order.type == "店销" && order.shop == "南山")
+            if (order.type != "雪票" && order.shop == "南山")
             {
-                mchId = 4;
+                mchId = 6;
             }
             return mchId;
         }
