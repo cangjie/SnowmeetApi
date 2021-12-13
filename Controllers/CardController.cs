@@ -26,6 +26,39 @@ namespace SnowmeetApi.Controllers
             _appId = _config.GetSection("AppId").Value.Trim();
         }
 
+
+        public string CreateCard(string type)
+        {
+            string code = Util.GetRandomCode(9);
+            int retryTimes = 0;
+            bool isDuplicate = true;
+            for (; isDuplicate && retryTimes < 1000;)
+            {
+                isDuplicate = _context.Card.Any(e => e.card_no == code);
+            }
+            if (isDuplicate)
+            {
+                return "";
+            }
+            Card card = new Card()
+            {
+                card_no = code,
+                is_ticket = 0,
+                type = type
+            };
+            try
+            {
+                _context.Card.Add(card);
+                _context.SaveChanges();
+                return code.Trim();
+            }
+            catch
+            {
+
+            }
+            return "";
+        }
+
         /*
 
         // GET: api/Card

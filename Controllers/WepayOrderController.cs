@@ -508,6 +508,26 @@ namespace SnowmeetApi.Controllers
                     {
 
                     }
+
+                    try
+                    {
+                        if (orderOnline.type.Trim().Equals("雪票"))
+                        {
+                            CardController cardController = new CardController(_context, _config);
+                            string code = cardController.CreateCard("雪票");
+                            if (!code.Trim().Equals(""))
+                            {
+                                orderOnline.code = code; 
+                            }
+                            _context.Entry<OrderOnline>(orderOnline).State = EntityState.Modified;
+                            _context.SaveChanges();
+                        }
+                    }
+                    catch
+                    {
+
+                    }
+
                     //if (orderOnline.ticket_code!=null && orderOnline.ticket_code.Trim().Equals(""))
 
                 }
