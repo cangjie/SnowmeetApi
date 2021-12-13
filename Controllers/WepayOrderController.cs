@@ -77,6 +77,8 @@ namespace SnowmeetApi.Controllers
 
         private IConfiguration _config;
 
+        private IConfiguration _originConfig;
+
         public string _appId = "";
 
         private readonly IHttpContextAccessor _httpContextAccessor;
@@ -87,6 +89,7 @@ namespace SnowmeetApi.Controllers
             _config = config.GetSection("Settings");
             _appId = _config.GetSection("AppId").Value.Trim();
             _httpContextAccessor = httpContextAccessor;
+            _originConfig = config;
         }
 
         
@@ -513,7 +516,7 @@ namespace SnowmeetApi.Controllers
                     {
                         if (orderOnline.type.Trim().Equals("雪票"))
                         {
-                            CardController cardController = new CardController(_context, _config);
+                            CardController cardController = new CardController(_context, _originConfig);
                             string code = cardController.CreateCard("雪票");
                             if (!code.Trim().Equals(""))
                             {
@@ -523,9 +526,9 @@ namespace SnowmeetApi.Controllers
                             _context.SaveChanges();
                         }
                     }
-                    catch
+                    catch(Exception ex)
                     {
-
+                        Console.WriteLine(ex.ToString());
                     }
 
                     //if (orderOnline.ticket_code!=null && orderOnline.ticket_code.Trim().Equals(""))

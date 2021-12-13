@@ -16,7 +16,7 @@ namespace SnowmeetApi.Controllers
     {
         private readonly ApplicationDBContext _context;
         private IConfiguration _config;
-
+        
         public string _appId = "";
 
         public CardController(ApplicationDBContext context, IConfiguration config)
@@ -24,6 +24,7 @@ namespace SnowmeetApi.Controllers
             _context = context;
             _config = config.GetSection("Settings");
             _appId = _config.GetSection("AppId").Value.Trim();
+            
         }
 
 
