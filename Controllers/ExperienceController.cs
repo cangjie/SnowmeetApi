@@ -77,7 +77,8 @@ namespace SnowmeetApi.Controllers
                     pay_state = 0,
                     shop = exp.shop.Trim(),
                     out_trade_no = "",
-                    ticket_code = ticketCode.Trim()
+                    ticket_code = ticketCode.Trim(),
+                    code = ""
                 };
                 _context.OrderOnlines.Add(order);
                 _context.SaveChanges();
