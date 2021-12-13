@@ -81,7 +81,8 @@ namespace SnowmeetApi.Controllers
                 }
                 Card card = new Card {
                     card_no = code,
-                    is_ticket = 1
+                    is_ticket = 1,
+                    type = ""
                 };
                 _context.Card.Add(card);
                 await _context.SaveChangesAsync();
