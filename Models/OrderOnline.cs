@@ -26,7 +26,7 @@ namespace SnowmeetApi.Models
         public string ticket_code { get; set; }
 
         [DefaultValue("")]
-        public string memo { get; set; }
+        public string memo { get; set; } = "";
         
         public List<OrderOnlineDetail> details { get; set; }
     }
