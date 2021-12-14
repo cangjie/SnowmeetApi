@@ -27,7 +27,7 @@ namespace SnowmeetApi.Controllers
             
         }
 
-
+        [NonAction]
         public string CreateCard(string type)
         {
             string code = Util.GetRandomCode(9);
