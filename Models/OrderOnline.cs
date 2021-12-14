@@ -2,6 +2,8 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Collections.Generic;
+using System.ComponentModel;
+
 namespace SnowmeetApi.Models
 {
     [Table("order_online")]
@@ -22,6 +24,9 @@ namespace SnowmeetApi.Models
         public string name { get; set; }
         public string code { get; set; }
         public string ticket_code { get; set; }
+
+        [DefaultValue("")]
+        public string memo { get; set; }
         
         public List<OrderOnlineDetail> details { get; set; }
     }
