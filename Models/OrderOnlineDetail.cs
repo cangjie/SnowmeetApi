@@ -14,9 +14,9 @@ namespace SnowmeetApi.Models
         public string product_name { get; set; }
         public double price { get; set; }
         public int count { get; set; }
-        public double retail_price { get; set; }
+        public double? retail_price { get; set; }
 
-        public OrderOnline order { get; set; }
+        //public OrderOnline order { get; set; }
 
         
     }

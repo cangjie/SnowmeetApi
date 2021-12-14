@@ -28,6 +28,6 @@ namespace SnowmeetApi.Models
         [DefaultValue("")]
         public string memo { get; set; } = "";
         
-        public List<OrderOnlineDetail> details { get; set; }
+        //public List<OrderOnlineDetail> details { get; set; }
     }
 }

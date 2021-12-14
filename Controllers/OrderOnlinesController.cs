@@ -14,9 +14,14 @@ using SKIT.FlurlHttpClient.Wechat.TenpayV3;
 using SKIT.FlurlHttpClient.Wechat.TenpayV3.Settings;
 using SKIT.FlurlHttpClient.Wechat.TenpayV3.Models;
 using System.Web;
-
+using Newtonsoft.Json;
+using SnowmeetApi.Models.Product;
 namespace SnowmeetApi.Controllers
 {
+    public class SkiPassMemo
+    {
+        public string use_date;
+    }
     [Route("[controller]/[action]")]
     [ApiController]
     public class OrderOnlinesController : ControllerBase
@@ -36,6 +41,38 @@ namespace SnowmeetApi.Controllers
             _appId = _config.GetSection("AppId").Value.Trim();
         }
 
+        [ActionName("GetSkiPassNum")]
+        [HttpGet("{type}")]
+        public async Task<ActionResult<int>> GetSkiPassNum(int type, string dateStr)
+        {
+            int num = 0;
+            DateTime date = DateTime.Parse(dateStr);
+            DateTime startDate = date.AddDays(-6);
+            List<OrderOnline> orders = await _context.OrderOnlines
+                .Where<OrderOnline>(o => (o.pay_time >= startDate && o.pay_time <= date.AddDays(1) && o.type.Trim().Equals("雪票") && o.shop.Trim().Equals("南山")))
+                .ToListAsync<OrderOnline>();
+            for (int i = 0; i < orders.Count; i++)
+            {
+                SkiPassMemo memo = JsonConvert.DeserializeObject<SkiPassMemo>(orders[i].memo.Trim());
+                if (DateTime.Parse(memo.use_date).Date == date.Date)
+                {
+                    List<OrderOnlineDetail> detail = await _context.OrderOnlineDetails
+                        .Where<OrderOnlineDetail>(o => (o.OrderOnlineId == orders[i].id)).ToListAsync<OrderOnlineDetail>();
+                    Product prodcut = await _context.Product.FindAsync(detail[0].product_id);
+                    if (type == 0 && prodcut.name.IndexOf("夜") < 0)
+                    {
+                        num++;
+                    }
+                    if (type == 1 && prodcut.name.IndexOf("夜") >= 0)
+                    {
+                        num++;
+                    }
+                }
+            }
+            return num;
+        }
+
+
         // GET: api/OrderOnlines
         [HttpGet]
         public async Task<ActionResult<IEnumerable<OrderOnline>>> GetOrderOnlines()
@@ -44,6 +81,7 @@ namespace SnowmeetApi.Controllers
         }
 
         // GET: api/OrderOnlines/5
+        [ActionName("GetOrderOnline")]
         [HttpGet("{id}")]
         public async Task<ActionResult<OrderOnline>> GetOrderOnline(int id, string sessionKey)
         {
