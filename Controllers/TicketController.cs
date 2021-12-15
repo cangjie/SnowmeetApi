@@ -37,9 +37,12 @@ namespace SnowmeetApi.Controllers
 
         [HttpGet]
         [ActionName("GetChannels")]
-        public async Task<ActionResult<IEnumerable<Ticket>>> GetChannels()
+        public async Task<ActionResult<IEnumerable<string>>> GetChannels()
         {
-            return await _context.Ticket.Where(t => !t.channel.Trim().Equals("")).Distinct<Ticket>().ToListAsync<Ticket>();
+            var r = await _context.Ticket
+                .Where(tt=>!tt.channel.Trim().Equals(""))
+                .Select(tt => tt.channel).Distinct().ToListAsync();
+            return r;
             
         }
 
