@@ -35,6 +35,14 @@ namespace SnowmeetApi.Controllers
             return await _context.TicketTemplate.Where<TicketTemplate>(tt => tt.hide == 0).ToListAsync();
         }
 
+        [HttpGet]
+        [ActionName("GetChannels")]
+        public async Task<ActionResult<IEnumerable<Ticket>>> GetChannels()
+        {
+            return await _context.Ticket.Where(t => !t.channel.Trim().Equals("")).Distinct<Ticket>().ToListAsync<Ticket>();
+            
+        }
+
         // GET: api/Ticket/5
         [HttpGet("{code}")]
         public async Task<ActionResult<Ticket>> GetTicket(string code)
@@ -50,7 +58,7 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet("{templateId}")]
-        public async Task<ActionResult<IEnumerable<Ticket>>> GenerateTickets(int templateId, int count, string sessionKey)
+        public async Task<ActionResult<IEnumerable<Ticket>>> GenerateTickets(int templateId, int count, string sessionKey, string channel = "")
         {
             TicketTemplate template = _context.TicketTemplate.Find(templateId);
             if (template == null)
@@ -97,7 +105,8 @@ namespace SnowmeetApi.Controllers
                     used = 0,
                     miniapp_recept_path = template.miniapp_recept_path.Trim(),
                     open_id = "",
-                    create_date = DateTime.Now
+                    create_date = DateTime.Now,
+                    channel = channel.Trim()
 
                 };
                 _context.Ticket.Add(ticket);
