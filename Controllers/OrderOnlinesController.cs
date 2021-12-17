@@ -61,11 +61,11 @@ namespace SnowmeetApi.Controllers
                     Product prodcut = await _context.Product.FindAsync(detail[0].product_id);
                     if (type == 0 && prodcut.name.IndexOf("夜") < 0)
                     {
-                        num++;
+                        num = num + detail[0].count;
                     }
                     if (type == 1 && prodcut.name.IndexOf("夜") >= 0)
                     {
-                        num++;
+                        num = num + detail[0].count;
                     }
                 }
             }
