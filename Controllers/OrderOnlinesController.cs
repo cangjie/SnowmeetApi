@@ -318,6 +318,10 @@ namespace SnowmeetApi.Controllers
             {
                 mchId = 6;
             }
+            if (order.type == "雪票" && order.shop == "南山")
+            {
+                mchId = 7;
+            }
             return mchId;
         }
     }
