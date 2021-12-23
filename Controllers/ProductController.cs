@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using SnowmeetApi.Data;
 using SnowmeetApi.Models.Product;
 
@@ -15,13 +16,32 @@ namespace SnowmeetApi.Controllers
     public class ProductController : ControllerBase
     {
 
-        /*
+
+
         private readonly ApplicationDBContext _context;
 
-        public ProductController(ApplicationDBContext context)
+        private IConfiguration _config;
+
+        public string _appId = "";
+
+        public ProductController(ApplicationDBContext context, IConfiguration config)
         {
             _context = context;
+            _config = config.GetSection("Settings");
+            _appId = _config.GetSection("AppId").Value.Trim();
+
         }
+
+        [HttpGet]
+        [ActionName("GetNanshanTodaySkipass")]
+        public async Task<ActionResult<IEnumerable<Product>>> GetNanshanTodaySkipass()
+        {
+            return await _context.Product
+                .Where(p => (p.name.Trim().IndexOf("当日票") >= 0 && p.shop.Trim().Equals("南山") && p.type.Trim().Equals("雪票") && p.end_date > DateTime.Now ))
+                .ToListAsync();
+        }
+
+        /*
 
         // GET: api/Product
         [HttpGet]
