@@ -74,7 +74,62 @@ namespace SnowmeetApi.Controllers
             }
         }
 
-
+        [HttpGet("{batchId}")]
+        public async Task<ActionResult<OrderOnline>> PlaceBlankOrderBatch(int batchId, string sessionKey)
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            //string openId = Util.UrlDecode(sessionKey);
+            UnicUser._context = _context;
+            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            if (user == null || !user.isAdmin)
+            {
+                return NoContent();
+            }
+            string openId = user.miniAppOpenId.Trim();
+            var taskList = await _context.MaintainLives.Where(m => m.batch_id == batchId).ToListAsync();
+            if (taskList.Count == 0)
+            {
+                return NotFound();
+            }
+            string payMethod = taskList[0].pay_method.Trim();
+            if (payMethod.Trim().Equals("微信"))
+            {
+                return NoContent();
+            }
+            OrderOnline order = new OrderOnline()
+            {
+                type = "服务",
+                open_id = openId,
+                cell_number = taskList[0].confirmed_cell.Trim(),
+                name = taskList[0].confirmed_name.Trim(),
+                pay_method = taskList[0].pay_method.Trim(),
+                order_price = 0,
+                order_real_pay_price = 0,
+                pay_state = 1,
+                pay_time = DateTime.Now,
+                shop = taskList[0].shop.Trim(),
+                out_trade_no = "",
+                ticket_code = "",
+                code = ""
+            };
+            _context.OrderOnlines.Add(order);
+            _context.SaveChanges();
+            if (order.id == 0)
+            {
+                return NoContent();
+            }
+            else
+            {
+                for (int i = 0; i < taskList.Count; i++)
+                {
+                    var task = taskList[i];
+                    task.order_id = order.id;
+                    _context.Entry<MaintainLive>(task);
+                    _context.SaveChanges();
+                }
+                return order;
+            }
+        }
 
         [HttpGet("id")]
         private OrderOnline PlaceOrderAll(int id, string sessionKey, string idType = "batch")

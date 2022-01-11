@@ -48,6 +48,10 @@ namespace SnowmeetApi.Models
         public string ticket_code { get; set; }
         public DateTime create_date { get; set; }
 
+        public string pay_method { get; set; }
+
+        public string pay_memo { get; set; }
+
 
         //附加费用商品编号
         public int AddtionalFeeProductId
