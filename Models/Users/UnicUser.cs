@@ -22,6 +22,7 @@ namespace SnowmeetApi.Models.Users
         public string gender = "";
         public string headImage = "";
         */
+        public string officialAccountOpenIdOld = "";
         public string officialAccountOpenId = "";
         public string miniAppOpenId = "";
         public string unionId = "";
@@ -49,6 +50,48 @@ namespace SnowmeetApi.Models.Users
                     return true;
                 }
                 return false;
+            }
+        }
+
+        public static UnicUser GetUnicUser(string openId, string type)
+        {
+            var unionIds = _context.UnionIds.FromSqlRaw(" select * from unionids where open_id = '" + openId.Trim().Replace("'", "") + "' "
+                + " and source = '" + type.Replace("'", "") + "'").ToList();
+            if (unionIds.Count > 0)
+            {
+                string unionId = unionIds[0].union_id;
+                var allIds = _context.UnionIds.Where(u => u.union_id.Trim().Equals(unionId)).ToList();
+                string officialAccountOpenId = "";
+                string officialAccountOpenIdOld = "";
+                string miniAppOpenId = "";
+                for (int i = 0; i < allIds.Count; i++)
+                {
+                    switch (allIds[i].source.Trim())
+                    {
+                        case "snowmeet_mini":
+                            miniAppOpenId = allIds[i].open_id.Trim();
+                            break;
+                        case "snowmeet_official_account":
+                            officialAccountOpenIdOld = allIds[i].open_id.Trim();
+                            break;
+                        case "snowmeet_official_account_new":
+                            officialAccountOpenId = allIds[i].open_id.Trim();
+                            break;
+                        default:
+                            break;
+                    }
+                }
+                UnicUser user = new UnicUser()
+                {
+                    miniAppOpenId = miniAppOpenId.Trim(),
+                    officialAccountOpenId = officialAccountOpenId.Trim(),
+                    officialAccountOpenIdOld = officialAccountOpenIdOld.Trim()
+                };
+                return user;
+            }
+            else
+            {
+                return null;
             }
         }
 

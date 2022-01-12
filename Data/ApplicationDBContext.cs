@@ -67,6 +67,10 @@ namespace SnowmeetApi.Data
 
         public DbSet<SnowmeetApi.Models.Card.Card> Card { get; set; }
 
+        public DbSet<SnowmeetApi.Models.BltDevice> BltDevice { get; set; }
+
+        public DbSet<SnowmeetApi.Models.Users.Point> Point { get; set; }
+
 
     }
 }
