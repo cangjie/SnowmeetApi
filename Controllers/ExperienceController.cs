@@ -74,7 +74,7 @@ namespace SnowmeetApi.Controllers
                     pay_method = "微信",
                     order_price = exp.guarantee_cash,
                     order_real_pay_price = exp.guarantee_cash,
-                    pay_state = 0,
+                    pay_state = exp.guarantee_cash==0?1:0,
                     shop = exp.shop.Trim(),
                     out_trade_no = "",
                     ticket_code = ticketCode.Trim(),
