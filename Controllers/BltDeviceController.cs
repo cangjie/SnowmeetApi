@@ -10,7 +10,7 @@ using SnowmeetApi.Models;
 
 namespace SnowmeetApi.Controllers
 {
-    [Route("api/[controller]")]
+    [Route("[controller]/[action]")]
     [ApiController]
     public class BltDeviceController : ControllerBase
     {
