@@ -49,6 +49,52 @@ namespace SnowmeetApi.Controllers
             return sum;
         }
 
+        [HttpGet]
+        public ActionResult<int> GetMyPointsSummary(string sessionKey)
+        {
+            UnicUser._context = _context;
+            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            return GetUserPointsSummary(user.miniAppOpenId, "snowmeet_mini");
+        }
+
+        [HttpGet]
+        public async Task<ActionResult<Point>> SetPoint(int points, string sessionKey, string memo)
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            memo = Util.UrlDecode(memo);
+            UnicUser._context = _context;
+            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            Point point = new Point()
+            {
+                points = points,
+                user_open_id = user.miniAppOpenId.Trim(),
+                memo = memo,
+                transact_date = DateTime.Now
+            };
+            _context.Point.Add(point);
+            await _context.SaveChangesAsync();
+            //return CreatedAtAction("SetPoint", new { id = point.id }, point);
+            return point;
+        }
+
+
+        [HttpGet]
+        public  ActionResult<List<Point>> GetMyPointsBalance(string sessionKey)
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            UnicUser._context = _context;
+            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            List<Point> pointsList = GetUserPointBalance(user.miniAppOpenId, "snowmeet_mini");
+            for (int i = 0; i < pointsList.Count; i++)
+            {
+                pointsList[i].user_open_id = "";
+            }
+            return pointsList;
+        }
+
+
+
+        /*
         // GET: api/Point
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Point>>> GetPoint()
@@ -127,6 +173,9 @@ namespace SnowmeetApi.Controllers
 
             return NoContent();
         }
+
+        */
+
 
         private bool PointExists(int id)
         {
