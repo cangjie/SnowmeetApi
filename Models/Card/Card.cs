@@ -10,7 +10,7 @@ namespace SnowmeetApi.Models.Card
         public string card_no { get; set; }
         public int is_ticket { get; set; }
         public string type {get;set;}
-        public string use_memo { get; set; }
+        public string use_memo { get; set; } = "";
 
     }
 }
