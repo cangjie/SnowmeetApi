@@ -41,6 +41,31 @@ namespace SnowmeetApi.Controllers
             _appId = _config.GetSection("AppId").Value.Trim();
         }
 
+        [HttpGet("{orderId}")]
+        public async Task<ActionResult<bool>> SetSkiPassCertNo(int orderId, string certNo, string sessionKey)
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            UnicUser._context = _context;
+            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            OrderOnline order = await _context.OrderOnlines.FindAsync(orderId);
+            if (!order.open_id.Trim().Equals(user.miniAppOpenId)
+                && !order.open_id.Trim().Equals(user.officialAccountOpenId.Trim())
+                && !order.open_id.Trim().Equals(user.officialAccountOpenIdOld.Trim()))
+            {
+                return NoContent();
+            }
+            string code = order.code;
+            if (code.Trim().Equals(""))
+            {
+                return NotFound();
+            }
+            var card = await _context.Card.FindAsync(code);
+            card.use_memo = certNo.Trim();
+            _context.Entry(card).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
+            return true;
+        }
+
         [ActionName("GetSkiPassNum")]
         [HttpGet("{type}")]
         public async Task<ActionResult<int>> GetSkiPassNum(int type, string dateStr)
