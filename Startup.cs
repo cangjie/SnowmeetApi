@@ -15,7 +15,6 @@ using SnowmeetApi.Models.Users;
 using Microsoft.OpenApi.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-
 namespace SnowmeetApi
 {
     public class Startup

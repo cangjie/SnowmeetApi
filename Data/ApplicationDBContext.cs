@@ -71,6 +71,8 @@ namespace SnowmeetApi.Data
 
         public DbSet<SnowmeetApi.Models.Users.Point> Point { get; set; }
 
+        public DbSet<SnowmeetApi.Models.SummerMaintain> SummerMaintain { get; set; }
+
 
     }
 }
