@@ -1,4 +1,4 @@
-using System;
+ï»¿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -39,7 +39,7 @@ namespace SnowmeetApi.Controllers
             summerMaintain.open_id = user.miniAppOpenId.Trim();
             
             int productId = 144;
-            if (summerMaintain.service.Trim().Equals("´úÈ¡»Ø¼Ä"))
+            if (summerMaintain.service.Trim().Equals("ä»£å–å›å¯„"))
             {
                 productId = 145;
             }
@@ -58,15 +58,15 @@ namespace SnowmeetApi.Controllers
 
             OrderOnline order = new OrderOnline()
             {
-                type = "·şÎñ¿¨",
+                type = "æœåŠ¡å¡",
                 open_id = user.miniAppOpenId,
                 cell_number = user.miniAppUser.cell_number.Trim(),
                 name = user.miniAppUser.nick.Trim(),
-                pay_method = "Î¢ĞÅ",
+                pay_method = "å¾®ä¿¡",
                 order_price = totalPrice,
                 order_real_pay_price = totalPrice,
                 pay_state = 0,
-                shop = "ÍòÁú",
+                shop = "ä¸‡é¾™",
                 out_trade_no = "",
                 ticket_code = "",
                 code = ""
