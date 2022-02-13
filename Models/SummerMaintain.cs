@@ -27,5 +27,7 @@ namespace SnowmeetApi.Models
         public string code { get; set; } = "";
         public int order_id { get; set; } = 0;
 
+        public string source { get; set; } = "";
+
     }
 }
