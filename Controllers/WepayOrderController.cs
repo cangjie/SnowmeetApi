@@ -22,6 +22,7 @@ using System.Net.Http.Headers;
 using SnowmeetApi.Models;
 using SnowmeetApi.Models.Users;
 using SnowmeetApi.Models.Ticket;
+using SnowmeetApi.Models.Card;
 using SKIT.FlurlHttpClient.Wechat.TenpayV3.Models;
 
 namespace SnowmeetApi.Controllers
@@ -481,6 +482,14 @@ namespace SnowmeetApi.Controllers
             return "{ \r\n \"code\": \"SUCCESS\", \r\n \"message\": \"成功\" \r\n}";
         }
 
+        /*
+        [HttpGet]
+        public ActionResult<string> Test(string outTradeNo)
+        {
+            SetWepayOrderSuccess(outTradeNo);
+            return "";
+        }
+        */
         private void SetWepayOrderSuccess(string outTradeNo)
         {
             WepayOrder wePayOrder = _context.WepayOrders.Find(outTradeNo);
@@ -524,6 +533,43 @@ namespace SnowmeetApi.Controllers
                             }
                             _context.Entry<OrderOnline>(orderOnline).State = EntityState.Modified;
                             _context.SaveChanges();
+                        }
+                        if (orderOnline.type.Trim().Equals("服务卡"))
+                        {
+                            List<OrderOnlineDetail> detailList = _context.OrderOnlineDetails.Where(d => d.OrderOnlineId == orderOnline.id).ToList();
+                            int productId = 0;
+                            foreach (var d in detailList)
+                            {
+
+                                if (((OrderOnlineDetail)d).product_id == 144 || ((OrderOnlineDetail)d).product_id == 145)
+                                {
+                                    productId = ((OrderOnlineDetail)d).product_id;
+                                    break;
+                                }
+                            }
+                            if (productId == 144 || productId == 145)
+                            {
+                                CardController cardController = new CardController(_context, _originConfig);
+                                string code = cardController.CreateCard(orderOnline.type.Trim());
+                                Card card = _context.Card.Find(code);
+                                card.product_id = productId;
+                                card.is_package = 0;
+                                card.is_ticket = 0;
+                                card.owner_open_id = orderOnline.open_id.Trim();
+                                card.use_memo = "";
+                                _context.Entry<Card>(card).State = EntityState.Modified;
+                                _context.SaveChanges();
+
+                                var summerList = _context.SummerMaintain.Where(s => s.order_id == orderOnline.id).ToList();
+                                if (summerList.Count > 0)
+                                {
+                                    SummerMaintain sm = (SummerMaintain)summerList[0];
+                                    sm.code = code.Trim();
+                                    _context.Entry<SummerMaintain>(sm).State = EntityState.Modified;
+                                    _context.SaveChanges();
+                                }
+
+                            }
                         }
                     }
                     catch(Exception ex)
