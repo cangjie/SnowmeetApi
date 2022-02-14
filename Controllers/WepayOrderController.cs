@@ -565,6 +565,7 @@ namespace SnowmeetApi.Controllers
                                 {
                                     SummerMaintain sm = (SummerMaintain)summerList[0];
                                     sm.code = code.Trim();
+                                    sm.state = "未填快递单号";
                                     _context.Entry<SummerMaintain>(sm).State = EntityState.Modified;
                                     _context.SaveChanges();
                                 }
