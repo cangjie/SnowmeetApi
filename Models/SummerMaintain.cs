@@ -28,6 +28,7 @@ namespace SnowmeetApi.Models
         public int order_id { get; set; } = 0;
 
         public string source { get; set; } = "";
+        public string waybill_no { get; set; } = "";
         public string state { get; set; } = "";
     }
 }

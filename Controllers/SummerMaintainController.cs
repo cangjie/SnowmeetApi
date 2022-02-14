@@ -106,6 +106,36 @@ namespace SnowmeetApi.Controllers
             return summerMaintainList;
         }
 
+        [HttpGet("{id}")]
+        public async Task<ActionResult<bool>> FillWaybillNo(int id, string waybillNo, string sessionKey)
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            UnicUser._context = _context;
+            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+
+            bool ret = true;
+
+            try
+            {
+                SummerMaintain sm = await _context.SummerMaintain.FindAsync(id);
+                if (sm.open_id.Trim().Equals(user.miniAppOpenId.Trim()))
+                {
+                    sm.waybill_no = waybillNo;
+                    _context.Entry(sm).State = EntityState.Modified;
+                    await _context.SaveChangesAsync();
+                }
+                else
+                {
+                    ret = false;
+                }
+            }
+            catch
+            {
+                ret = false;
+            }
+            return ret;
+        }
+
         /*
         // GET: api/SummerMaintain
         [HttpGet]
