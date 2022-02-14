@@ -91,6 +91,21 @@ namespace SnowmeetApi.Controllers
             return order.id;
         }
 
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<SummerMaintain>>> GetMySummerMaintain(string sessionKey)
+        { 
+            sessionKey = Util.UrlDecode(sessionKey);
+            UnicUser._context = _context;
+            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+
+            List<SummerMaintain> summerMaintainList = await _context.SummerMaintain
+                .Where(s => (s.open_id.Trim().Equals(user.miniAppOpenId.Trim()) && !s.state.Trim().Equals("未支付")))
+                .OrderByDescending(s=>s.id).ToListAsync();
+
+
+            return summerMaintainList;
+        }
+
         /*
         // GET: api/SummerMaintain
         [HttpGet]
