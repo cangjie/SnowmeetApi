@@ -569,6 +569,7 @@ namespace SnowmeetApi.Controllers
                                     {
                                         sm.state = "养护中";
                                     }
+                                    else
                                     {
                                         sm.state = "未填快递单号";
                                     }
