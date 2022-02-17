@@ -31,5 +31,7 @@ namespace SnowmeetApi.Models
         public string waybill_no { get; set; } = "";
         public string state { get; set; } = "";
         public string images { get; set; } = "";
+        public string owner_name { get; set; } = "";
+        public string owner_cell { get; set; } = "";
     }
 }
