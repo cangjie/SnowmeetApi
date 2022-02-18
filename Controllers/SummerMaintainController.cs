@@ -36,7 +36,8 @@ namespace SnowmeetApi.Controllers
             SummerMaintain summerMaintain = await _context.SummerMaintain.FindAsync(id);
             UnicUser._context = _context;
             UnicUser user = UnicUser.GetUnicUser(sessionKey);
-            if (user.isAdmin || user.miniAppOpenId.Trim().Equals(summerMaintain.open_id.Trim()))
+            if (user.isAdmin || user.miniAppOpenId.Trim().Equals(summerMaintain.open_id.Trim()) 
+                || summerMaintain.open_id.Trim().Equals(""))
             {
                 return summerMaintain;
             }
