@@ -29,6 +29,22 @@ namespace SnowmeetApi.Controllers
             _appId = _config.GetSection("AppId").Value.Trim();
         }
 
+        [HttpPost("{id}")]
+        public async Task<ActionResult<SummerMaintain>> GetSummerMaintain(int id, string sessionKey)
+        {
+            SummerMaintain summerMaintain = await _context.SummerMaintain.FindAsync(id);
+            UnicUser._context = _context;
+            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            if (user.isAdmin || user.miniAppOpenId.Trim().Equals(summerMaintain.open_id.Trim()))
+            {
+                return summerMaintain;
+            }
+            else
+            {
+                return NotFound();
+            }
+        }
+
         [HttpPost]
         public async Task<ActionResult<int>> Recept(SummerMaintain summerMaintain)
         {
