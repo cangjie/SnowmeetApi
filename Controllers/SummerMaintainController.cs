@@ -30,6 +30,22 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpPost]
+        public async Task<ActionResult<int>> Recept(SummerMaintain summerMaintain)
+        {
+            string sessionKey = summerMaintain.oper_open_id.Trim();
+            UnicUser._context = _context;
+            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            if (!user.isAdmin)
+            {
+                return NotFound();
+            }
+            summerMaintain.oper_open_id = user.miniAppOpenId.Trim();
+            await _context.SummerMaintain.AddAsync(summerMaintain);
+            await _context.SaveChangesAsync();
+            return summerMaintain.id;
+        }
+
+        [HttpPost]
         public async Task<ActionResult<int>> PlaceOrder(SummerMaintain summerMaintain)
         {
             string sessionKey = summerMaintain.open_id.Trim();
