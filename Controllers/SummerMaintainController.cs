@@ -32,6 +32,7 @@ namespace SnowmeetApi.Controllers
         [HttpPost("{id}")]
         public async Task<ActionResult<SummerMaintain>> GetSummerMaintain(int id, string sessionKey)
         {
+            sessionKey = Util.UrlDecode(sessionKey);
             SummerMaintain summerMaintain = await _context.SummerMaintain.FindAsync(id);
             UnicUser._context = _context;
             UnicUser user = UnicUser.GetUnicUser(sessionKey);
@@ -49,6 +50,7 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<int>> Recept(SummerMaintain summerMaintain)
         {
             string sessionKey = summerMaintain.oper_open_id.Trim();
+            sessionKey = Util.UrlDecode(sessionKey);
             UnicUser._context = _context;
             UnicUser user = UnicUser.GetUnicUser(sessionKey);
             if (!user.isAdmin)
