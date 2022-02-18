@@ -29,7 +29,7 @@ namespace SnowmeetApi.Controllers
             _appId = _config.GetSection("AppId").Value.Trim();
         }
 
-        [HttpPost("{id}")]
+        [HttpGet("{id}")]
         public async Task<ActionResult<SummerMaintain>> GetSummerMaintain(int id, string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey);
