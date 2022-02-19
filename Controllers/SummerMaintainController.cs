@@ -44,8 +44,8 @@ namespace SnowmeetApi.Controllers
                 return NotFound();
             }
             SummerMaintain summerMaintain = await _context.SummerMaintain.FindAsync(id);
-            summerMaintain.owner_name = name.Trim();
-            summerMaintain.owner_cell = cell.Trim();
+            summerMaintain.owner_name = Util.UrlDecode(name).Trim();
+            summerMaintain.owner_cell = Util.UrlDecode(cell).Trim();
             _context.Entry(summerMaintain).State = EntityState.Modified;
             await _context.SaveChangesAsync();
             return summerMaintain;
