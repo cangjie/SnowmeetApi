@@ -12,6 +12,7 @@ using SnowmeetApi.Models.Users;
 using SnowmeetApi.Models.Card;
 using SnowmeetApi.Models;
 using SnowmeetApi.Models.Product;
+using wechat_miniapp_base.Models;
 namespace SnowmeetApi.Controllers
 {
     [Route("[controller]/[action]")]
@@ -20,13 +21,16 @@ namespace SnowmeetApi.Controllers
     {
         private readonly ApplicationDBContext _context;
         private IConfiguration _config;
+        private IConfiguration wholeConfig;
 
         public string _appId = "";
         public SummerMaintainController(ApplicationDBContext context, IConfiguration config)
         {
             _context = context;
+            wholeConfig = config;
             _config = config.GetSection("Settings");
             _appId = _config.GetSection("AppId").Value.Trim();
+            
         }
 
         [HttpGet("{id}")]
@@ -45,6 +49,86 @@ namespace SnowmeetApi.Controllers
             {
                 return NotFound();
             }
+        }
+
+        [HttpGet("{id}")]
+        public async Task<ActionResult<WepayOrder>> Pay(int id, string sessionKey)
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            UnicUser._context = _context;
+            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            SummerMaintain summerMaintain = await _context.SummerMaintain.FindAsync(id);
+            if (summerMaintain == null
+                || (!summerMaintain.open_id.Trim().Equals("") && !summerMaintain.open_id.Trim().Equals(user.miniAppOpenId))
+                || !summerMaintain.code.Trim().Equals(""))
+            {
+                return NotFound();
+            }
+            int orderId = summerMaintain.order_id;
+            if (orderId != 0)
+            {
+                OrderOnline order = await _context.OrderOnlines.FindAsync(orderId);
+                if (order == null || !order.open_id.Trim().Equals(user.miniAppOpenId.Trim()))
+                {
+                    return NotFound();
+                }
+            }
+            summerMaintain.open_id = user.miniAppOpenId.Trim();
+            _context.Entry(summerMaintain).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
+
+            int productId = 144;
+            if (summerMaintain.service.Trim().Equals("代取回寄"))
+            {
+                productId = 145;
+            }
+
+            if (orderId == 0)
+            {
+                Product product = await _context.Product.FindAsync(productId);
+                List<OrderOnlineDetail> details = new List<OrderOnlineDetail>();
+                OrderOnlineDetail detail = new OrderOnlineDetail()
+                {
+                    OrderOnlineId = 0,
+                    product_id = productId,
+                    count = 1,
+                    product_name = product.name,
+                    price = product.sale_price
+                };
+                double totalPrice = product.sale_price;
+                details.Add(detail);
+
+                OrderOnline orderNew = new OrderOnline()
+                {
+                    type = "服务卡",
+                    open_id = user.miniAppOpenId,
+                    cell_number = user.miniAppUser.cell_number.Trim(),
+                    name = user.miniAppUser.nick.Trim(),
+                    pay_method = "微信",
+                    order_price = totalPrice,
+                    order_real_pay_price = totalPrice,
+                    pay_state = 0,
+                    shop = "万龙",
+                    out_trade_no = "",
+                    ticket_code = "",
+                    code = ""
+                };
+                _context.OrderOnlines.Add(orderNew);
+                await _context.SaveChangesAsync();
+                summerMaintain.order_id = orderNew.id;
+                orderId = orderNew.id;
+                _context.Entry(summerMaintain).State = EntityState.Modified;
+                await _context.SaveChangesAsync();
+
+            }
+
+            if (orderId == 0)
+            {
+                return NoContent();
+            }
+
+            OrderOnlinesController orderController = new OrderOnlinesController(_context, wholeConfig);
+            return await orderController.Pay(orderId, sessionKey);
         }
 
         [HttpPost]
