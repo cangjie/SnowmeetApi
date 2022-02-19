@@ -482,14 +482,14 @@ namespace SnowmeetApi.Controllers
             return "{ \r\n \"code\": \"SUCCESS\", \r\n \"message\": \"成功\" \r\n}";
         }
 
-        /*
+        
         [HttpGet]
         public ActionResult<string> Test(string outTradeNo)
         {
             SetWepayOrderSuccess(outTradeNo);
             return "";
         }
-        */
+        
         private void SetWepayOrderSuccess(string outTradeNo)
         {
             WepayOrder wePayOrder = _context.WepayOrders.Find(outTradeNo);

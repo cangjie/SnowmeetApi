@@ -117,6 +117,12 @@ namespace SnowmeetApi.Controllers
                 await _context.SaveChangesAsync();
                 summerMaintain.order_id = orderNew.id;
                 orderId = orderNew.id;
+                foreach (OrderOnlineDetail d in details)
+                {
+                    d.OrderOnlineId = orderId;
+                    _context.OrderOnlineDetails.Add(d);
+                    await _context.SaveChangesAsync();
+                }
                 _context.Entry(summerMaintain).State = EntityState.Modified;
                 await _context.SaveChangesAsync();
 
