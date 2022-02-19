@@ -41,6 +41,12 @@ namespace SnowmeetApi.Controllers
                 .ToListAsync();
         }
 
+        [HttpGet("{id}")]
+        public async Task<ActionResult<Product>> Get(int id)
+        {
+            return await _context.Product.FindAsync(id);
+        }
+
         /*
 
         // GET: api/Product
