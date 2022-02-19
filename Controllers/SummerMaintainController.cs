@@ -68,7 +68,7 @@ namespace SnowmeetApi.Controllers
             if (orderId != 0)
             {
                 OrderOnline order = await _context.OrderOnlines.FindAsync(orderId);
-                if (order == null || !order.open_id.Trim().Equals(user.miniAppOpenId.Trim()))
+                if (order == null || !order.open_id.Trim().Equals(user.miniAppOpenId.Trim()) || order.pay_state > 0)
                 {
                     return NotFound();
                 }
