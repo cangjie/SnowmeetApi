@@ -29,6 +29,7 @@ namespace SnowmeetApi.Controllers
         [HttpGet]
         public async Task<ActionResult<MiniAppUser>> GetMiniAppUser(string openId, string sessionKey)
         {
+            openId = Util.UrlDecode(openId.Trim());
             sessionKey = Util.UrlDecode(sessionKey);
             UnicUser._context = _context;
             UnicUser user = UnicUser.GetUnicUser(sessionKey);
