@@ -34,6 +34,25 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet("{id}")]
+        public async Task<ActionResult<SummerMaintain>> UpdateOwnerInfo(int id, string name, string cell, string sessionKey)
+        {
+            UnicUser._context = _context;
+            sessionKey = Util.UrlDecode(sessionKey);
+            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            if (!user.isAdmin)
+            {
+                return NotFound();
+            }
+            SummerMaintain summerMaintain = await _context.SummerMaintain.FindAsync(id);
+            summerMaintain.owner_name = name.Trim();
+            summerMaintain.owner_cell = cell.Trim();
+            _context.Entry(summerMaintain).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
+            return summerMaintain;
+
+        }
+
+        [HttpGet("{id}")]
         public async Task<ActionResult<SummerMaintain>> GetSummerMaintain(int id, string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey);
