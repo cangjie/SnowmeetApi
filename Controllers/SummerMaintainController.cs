@@ -53,6 +53,36 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet("{id}")]
+        public async Task<ActionResult<SummerMaintain>> UpdateOwnerAndDeliverInfo(int id, string ownerName, string ownerCell,
+            bool keep, string deliverName, string deliverCell, string address, string sessionKey)
+        {
+            UnicUser._context = _context;
+            sessionKey = Util.UrlDecode(sessionKey);
+            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            if (!user.isAdmin)
+            {
+                return NotFound();
+            }
+            if (keep)
+            {
+                deliverName = "";
+                deliverCell = "";
+                address = "";
+            }
+            SummerMaintain summerMaintain = await _context.SummerMaintain.FindAsync(id);
+            summerMaintain.owner_name = Util.UrlDecode(ownerName).Trim();
+            summerMaintain.owner_cell = Util.UrlDecode(ownerCell).Trim();
+            summerMaintain.keep = keep ? "是" : "否";
+            summerMaintain.contact_name = deliverName.Trim();
+            summerMaintain.cell = deliverCell.Trim();
+            summerMaintain.address = address.Trim();
+            _context.Entry(summerMaintain).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
+            return summerMaintain;
+
+        }
+
+        [HttpGet("{id}")]
         public async Task<ActionResult<SummerMaintain>> GetSummerMaintain(int id, string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey);
@@ -278,6 +308,37 @@ namespace SnowmeetApi.Controllers
                 ret = false;
             }
             return ret;
+        }
+
+        [HttpPut("{sessionKey}")]
+        public async Task<IActionResult> UpdateInfo(string sessionKey, SummerMaintain summerMaintain)
+        {
+            sessionKey = Util.UrlDecode(sessionKey.Trim());
+            UnicUser._context = _context;
+            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            if (!user.isAdmin)
+            {
+                return BadRequest();
+            }
+            _context.Entry(summerMaintain).State = EntityState.Modified;
+
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                if (!SummerMaintainExists(summerMaintain.id))
+                {
+                    return NotFound();
+                }
+                else
+                {
+                    throw;
+                }
+            }
+
+            return NoContent();
         }
 
         /*
