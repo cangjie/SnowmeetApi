@@ -33,6 +33,19 @@ namespace SnowmeetApi.Controllers
             
         }
 
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<SummerMaintain>>> GetAll(string sessionKey)
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            UnicUser._context = _context;
+            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            if (!user.isAdmin)
+            {
+                return NotFound();
+            }
+            return await _context.SummerMaintain.Where(s => !s.code.Trim().Equals("")).OrderByDescending(s => s.id).ToListAsync();
+        }
+
         [HttpGet("{id}")]
         public async Task<ActionResult<SummerMaintain>> UpdateOwnerInfo(int id, string name, string cell, string sessionKey)
         {
