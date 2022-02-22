@@ -34,5 +34,6 @@ namespace SnowmeetApi.Models
         public string owner_name { get; set; } = "";
         public string owner_cell { get; set; } = "";
         public string oper_open_id { get; set; } = "";
+        public DateTime create_date { get; set } = DateTime.Now;
     }
 }
