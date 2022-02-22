@@ -310,7 +310,7 @@ namespace SnowmeetApi.Controllers
             return ret;
         }
 
-        [HttpPut("{sessionKey}")]
+        [HttpPut]
         public async Task<IActionResult> UpdateInfo(string sessionKey, SummerMaintain summerMaintain)
         {
             sessionKey = Util.UrlDecode(sessionKey.Trim());
