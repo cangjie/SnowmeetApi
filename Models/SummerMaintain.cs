@@ -10,7 +10,7 @@ namespace SnowmeetApi.Models
         public int id { get; set; }
 
         public string open_id { get; set; } = "";
-
+        public string pay_method { get; set; } = "微信";
         public string equip_type { get; set; } = "";
         public string brand { get; set; } = "";
         public string scale { get; set; } = "";
