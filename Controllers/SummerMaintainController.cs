@@ -225,7 +225,7 @@ namespace SnowmeetApi.Controllers
                     {
                         openId = users[0].open_id.Trim();
                     }
-
+                    summerMaintain.open_id = openId.Trim();
                     break;
             }
             await _context.SummerMaintain.AddAsync(summerMaintain);
