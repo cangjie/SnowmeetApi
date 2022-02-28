@@ -22,6 +22,7 @@ namespace SnowmeetApi.Controllers
         private readonly ApplicationDBContext _context;
         private IConfiguration _config;
         private IConfiguration wholeConfig;
+        
 
         public string _appId = "";
         public SummerMaintainController(ApplicationDBContext context, IConfiguration config)
@@ -221,16 +222,141 @@ namespace SnowmeetApi.Controllers
                     string ownerCell = summerMaintain.owner_cell.Trim();
                     var users = await _context.MiniAppUsers.Where(u => u.cell_number.Trim().Equals(ownerCell.Trim())).ToListAsync();
                     string openId = "";
+
                     if (users.Count > 0)
                     {
                         openId = users[0].open_id.Trim();
+             
                     }
                     summerMaintain.open_id = openId.Trim();
+                    if (!summerMaintain.pay_method.Trim().Equals("招待"))
+                    {
+                        PlaceOrderInner(summerMaintain);
+                    }
+                    if (!openId.Trim().Equals(""))
+                    {
+                        //Generate card code.
+                    }
+
                     break;
             }
             await _context.SummerMaintain.AddAsync(summerMaintain);
             await _context.SaveChangesAsync();
             return summerMaintain.id;
+        }
+
+        public int PlaceOrderInner(SummerMaintain summerMaintain)
+        {
+            if (summerMaintain.order_id != 0)
+            {
+                return summerMaintain.order_id;
+            }
+            int productId = 144;
+            if (summerMaintain.service.Trim().Equals("代取回寄"))
+            {
+                productId = 145;
+            }
+            Product product = _context.Product.Find(productId);
+            List<OrderOnlineDetail> details = new List<OrderOnlineDetail>();
+            OrderOnlineDetail detail = new OrderOnlineDetail()
+            {
+                OrderOnlineId = 0,
+                product_id = productId,
+                count = 1,
+                product_name = product.name,
+                price = product.sale_price
+            };
+            double totalPrice = product.sale_price;
+            details.Add(detail);
+
+            OrderOnline order = new OrderOnline()
+            {
+                type = "服务卡",
+                open_id = summerMaintain.open_id.Trim(),
+                cell_number = summerMaintain.owner_cell.Trim(),
+                name = summerMaintain.owner_name,
+                pay_method = summerMaintain.pay_method.Trim(),
+                order_price = totalPrice,
+                order_real_pay_price = totalPrice,
+                pay_state = 0,
+                shop = "万龙",
+                out_trade_no = "",
+                ticket_code = "",
+                code = ""
+            };
+            _context.OrderOnlines.Add(order);
+            _context.SaveChanges();
+            if (order.id > 0)
+            {
+                foreach(OrderOnlineDetail d in details)
+                {
+                    d.OrderOnlineId = order.id;
+                    _context.OrderOnlineDetails.Add(d);
+                    _context.SaveChanges();
+                }
+                summerMaintain.order_id = order.id;
+            }
+            _context.Entry(summerMaintain).State = EntityState.Modified;
+            _context.SaveChanges();
+            return order.id;
+        }
+
+        public string SetPaySuccess(SummerMaintain summerMaintain)
+        {
+            if (!summerMaintain.code.Trim().Equals(""))
+            {
+                return summerMaintain.code.Trim();
+            }
+            if (summerMaintain.open_id.Trim().Equals(""))
+            {
+                return "";
+            }
+            int productId = 144;
+            if (summerMaintain.service.Trim().Equals("代取回寄"))
+            {
+                productId = 145;
+            }
+            CardController cardController = new CardController(_context, wholeConfig);
+            string code = cardController.CreateCard("服务卡");
+            Card card = _context.Card.Find(code);
+            card.product_id = productId;
+            card.is_package = 0;
+            card.is_ticket = 0;
+            card.owner_open_id = summerMaintain.open_id.Trim();
+            card.use_memo = "";
+            _context.Entry<Card>(card).State = EntityState.Modified;
+            _context.SaveChanges();
+
+            if (summerMaintain.order_id != 0)
+            {
+                OrderOnline order = _context.OrderOnlines.Find(summerMaintain.order_id);
+                order.pay_state = 1;
+                order.pay_time = DateTime.Now;
+                _context.Entry(order).State = EntityState.Modified;
+                _context.SaveChanges();
+            }
+
+            return code;
+        }
+
+        public bool AssignOpen(SummerMaintain summerMaintain, string openId)
+        {
+            if (!summerMaintain.open_id.Trim().Equals(""))
+            {
+                return false;
+            }
+            summerMaintain.open_id = openId.Trim();
+            _context.Entry(summerMaintain).State = EntityState.Modified;
+            _context.SaveChanges();
+            if (summerMaintain.order_id != 0)
+            {
+                OrderOnline order = _context.OrderOnlines.Find(summerMaintain.order_id);
+                order.open_id = openId;
+                
+                _context.Entry(order).State = EntityState.Modified;
+                _context.SaveChanges();
+            }
+            return true;
         }
 
         [HttpPost]
