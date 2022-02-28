@@ -211,6 +211,23 @@ namespace SnowmeetApi.Controllers
                 return NotFound();
             }
             summerMaintain.oper_open_id = user.miniAppOpenId.Trim();
+
+
+            switch (summerMaintain.pay_method)
+            {
+                case "微信":
+                    break;
+                default:
+                    string ownerCell = summerMaintain.owner_cell.Trim();
+                    var users = await _context.MiniAppUsers.Where(u => u.cell_number.Trim().Equals(ownerCell.Trim())).ToListAsync();
+                    string openId = "";
+                    if (users.Count > 0)
+                    {
+                        openId = users[0].open_id.Trim();
+                    }
+
+                    break;
+            }
             await _context.SummerMaintain.AddAsync(summerMaintain);
             await _context.SaveChangesAsync();
             return summerMaintain.id;
