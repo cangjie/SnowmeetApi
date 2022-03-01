@@ -17,5 +17,6 @@ namespace SnowmeetApi.Models.Users
         public string gender { get; set; }
         public int blocked { get; set; }
         public int is_admin { get; set; }
+        public DateTime create_date { get; set; }
     }
 }

@@ -26,6 +26,21 @@ namespace SnowmeetApi.Controllers
             _appId = _config.GetSection("AppId").Value.Trim();
         }
 
+        [NonAction]
+        public async Task<ActionResult<string>> GetOpenIdByCell(string cell)
+        {
+            string openId = "";
+            var uArr = await _context.MiniAppUsers.Where(u => u.cell_number.Trim().Equals(cell.Trim()))
+                .OrderByDescending(u => u.create_date).ToListAsync();
+            if (uArr != null && uArr.Count > 0)
+            {
+                openId = uArr[0].open_id.Trim();
+            }
+            return openId;
+        }
+
+
+
         [HttpGet]
         public async Task<ActionResult<MiniAppUser>> GetMiniAppUser(string openId, string sessionKey)
         {

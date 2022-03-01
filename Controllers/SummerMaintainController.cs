@@ -33,6 +33,121 @@ namespace SnowmeetApi.Controllers
             
         }
 
+
+        //NonAction Methods
+        [NonAction]
+        public async Task<ActionResult<int>> Create(SummerMaintain summerMaintain)
+        {
+            await _context.SummerMaintain.AddAsync(summerMaintain);
+            await _context.SaveChangesAsync();
+            return summerMaintain.id;
+        }
+
+        [NonAction]
+        public async Task<ActionResult<int>> CreateOrder(SummerMaintain summerMaintain)
+        {
+            int orderId = 0;
+            if (summerMaintain.id <= 0 || summerMaintain.order_id != 0)
+            {
+                return NoContent();
+            }
+            int productId = 144;
+            if (summerMaintain.service.Trim().Equals("代取回寄"))
+            {
+                productId = 145;
+            }
+            Product product = await _context.Product.FindAsync(productId);
+            List<OrderOnlineDetail> details = new List<OrderOnlineDetail>();
+            OrderOnlineDetail detail = new OrderOnlineDetail()
+            {
+                OrderOnlineId = 0,
+                product_id = productId,
+                count = 1,
+                product_name = product.name,
+                price = product.sale_price
+            };
+            double totalPrice = product.sale_price;
+            details.Add(detail);
+
+            OrderOnline orderNew = new OrderOnline()
+            {
+                type = "服务卡",
+                open_id = summerMaintain.open_id.Trim(),
+                cell_number = summerMaintain.owner_cell.Trim(),
+                name = summerMaintain.owner_name.Trim(),
+                pay_method = summerMaintain.pay_method.Trim(),
+                order_price = totalPrice,
+                order_real_pay_price = totalPrice,
+                pay_state = 0,
+                shop = "万龙",
+                out_trade_no = "",
+                ticket_code = "",
+                code = ""
+            };
+            _context.OrderOnlines.Add(orderNew);
+            await _context.SaveChangesAsync();
+            summerMaintain.order_id = orderNew.id;
+            orderId = orderNew.id;
+            foreach (OrderOnlineDetail d in details)
+            {
+                d.OrderOnlineId = orderId;
+                _context.OrderOnlineDetails.Add(d);
+                await _context.SaveChangesAsync();
+            }
+            _context.Entry(summerMaintain).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
+            return orderId;
+        }
+
+
+
+        //Web APIs
+
+        [HttpPost]
+        public async Task<ActionResult<int>> ReceptWithOthersPayment(SummerMaintain summerMaintain)
+        {
+            string sessionKey = Util.UrlDecode(summerMaintain.oper_open_id);
+            UnicUser._context = _context;
+            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            if (!user.isAdmin)
+            {
+                return NoContent();
+            }
+            summerMaintain.oper_open_id = user.miniAppOpenId.Trim();
+
+            string cell = summerMaintain.owner_cell.Trim();
+            if (cell.Trim().Equals(""))
+            {
+                cell = summerMaintain.cell.Trim();
+            }
+            string openId = "";
+            if (!cell.Trim().Equals(""))
+            {
+                MiniAppUserController userCtrl = new MiniAppUserController(_context, wholeConfig);
+                var r = await userCtrl.GetOpenIdByCell(cell);
+                openId = r.Value.ToString().Trim();
+            }
+
+            summerMaintain.open_id = openId.Trim();
+            if (summerMaintain.id == 0)
+            {
+                _context.SummerMaintain.Add(summerMaintain);
+                await _context.SaveChangesAsync();
+            }
+            else
+            {
+                _context.Entry(summerMaintain).State = EntityState.Modified;
+                await _context.SaveChangesAsync();
+            }
+            
+            if (!summerMaintain.pay_method.Trim().Equals("招待") && summerMaintain.id > 0)
+            {
+                await CreateOrder(summerMaintain);
+            }
+
+            return summerMaintain.id;
+        }
+
         [HttpGet]
         public async Task<ActionResult<IEnumerable<SummerMaintain>>> GetAll(string sessionKey)
         {
