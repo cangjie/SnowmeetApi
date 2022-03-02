@@ -99,7 +99,62 @@ namespace SnowmeetApi.Controllers
             return orderId;
         }
 
+        [NonAction]
+        public async Task<ActionResult<string>> SetPaySuccess(SummerMaintain summerMaintain)
+        {
+            string code = "";
+            int orderId = summerMaintain.order_id;
+            if (orderId == 0)
+            {
+                return "";
+            }
+            OrderOnline order = await _context.OrderOnlines.FindAsync(orderId);
+            var detailArr = await _context.OrderOnlineDetails.Where(d => d.OrderOnlineId == order.id).ToListAsync();
+            int productId = 144;
+            if (detailArr.Count == 0)
+            {
+                return "";
+            }
+            productId = detailArr[0].product_id;
+            order.pay_state = 1;
+            order.pay_time = DateTime.Now;
+            _context.Entry(order).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
+            CardController cardController = new CardController(_context, wholeConfig);
+            code = cardController.CreateCard(order.type.Trim());
+            Card card = _context.Card.Find(code);
+            card.product_id = productId;
+            card.is_package = 0;
+            card.is_ticket = 0;
+            card.owner_open_id = order.open_id.Trim();
+            card.use_memo = "";
+            _context.Entry<Card>(card).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
+            summerMaintain.code = code;
+            _context.Entry(summerMaintain).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
+            return code;
+        }
 
+        [NonAction]
+        public async Task<ActionResult<int>> AsignOpenId(SummerMaintain summerMaintainm, string openId)
+        {
+            int ret = 0;
+            int orderId = summerMaintainm.order_id;
+            if (orderId == 0)
+            {
+                return 0;
+            }
+            OrderOnline order = await _context.OrderOnlines.FindAsync(orderId);
+            summerMaintainm.open_id = openId.Trim();
+            order.open_id = openId.Trim();
+            _context.Entry(order).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
+            _context.Entry(summerMaintainm).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
+            ret = 1;
+            return ret;
+        }
 
         //Web APIs
 
