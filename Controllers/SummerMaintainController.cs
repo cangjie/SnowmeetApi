@@ -131,6 +131,7 @@ namespace SnowmeetApi.Controllers
             _context.Entry<Card>(card).State = EntityState.Modified;
             await _context.SaveChangesAsync();
             summerMaintain.code = code;
+            summerMaintain.state = "养护中";
             _context.Entry(summerMaintain).State = EntityState.Modified;
             await _context.SaveChangesAsync();
             return code;
