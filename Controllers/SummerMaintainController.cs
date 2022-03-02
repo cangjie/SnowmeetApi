@@ -200,6 +200,11 @@ namespace SnowmeetApi.Controllers
                 await CreateOrder(summerMaintain);
             }
 
+            if (!openId.Trim().Equals(""))
+            {
+                await SetPaySuccess(summerMaintain);
+            }
+
             return summerMaintain.id;
         }
 
