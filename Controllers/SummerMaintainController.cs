@@ -159,6 +159,44 @@ namespace SnowmeetApi.Controllers
 
         //Web APIs
 
+        [HttpGet("{id}")]
+        public async Task<ActionResult<bool>> SetOpenId(int id, string sessionKey)
+        {
+            
+            sessionKey = Util.UrlDecode(sessionKey);
+            UnicUser._context = _context;
+            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            string openId = user.miniAppOpenId.Trim();
+            if (openId.Trim().Equals(""))
+            {
+                return NoContent();
+            }
+            SummerMaintain sm = await _context.SummerMaintain.FindAsync(id);
+            if (sm.order_id == 0)
+            {
+                return NotFound();
+            }
+            OrderOnline order = await _context.OrderOnlines.FindAsync(sm.order_id);
+            if (order == null)
+            {
+                return NotFound();
+            }
+            if (sm.open_id.Trim().Equals("") && order.open_id.Trim().Equals(""))
+            {
+                sm.open_id = openId.Trim();
+                _context.Entry(sm).State = EntityState.Modified;
+                await _context.SaveChangesAsync();
+                order.open_id = openId.Trim();
+                _context.Entry(order).State = EntityState.Modified;
+                await _context.SaveChangesAsync();
+                return true;
+            }
+            else
+            {
+                return false;
+            }
+        }
+
         [HttpPost]
         public async Task<ActionResult<int>> ReceptWithOthersPayment(SummerMaintain summerMaintain)
         {
