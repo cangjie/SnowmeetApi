@@ -175,26 +175,46 @@ namespace SnowmeetApi.Controllers
             {
                 return NotFound();
             }
-            OrderOnline order = await _context.OrderOnlines.FindAsync(sm.order_id);
-            if (order == null)
+     
+            if (sm.open_id.Trim().Equals(""))
             {
-                return NotFound();
-            }
-            if (sm.open_id.Trim().Equals("") && order.open_id.Trim().Equals(""))
-            {
-                sm.open_id = openId.Trim();
-                _context.Entry(sm).State = EntityState.Modified;
-                await _context.SaveChangesAsync();
-                order.open_id = openId.Trim();
-                _context.Entry(order).State = EntityState.Modified;
-                await _context.SaveChangesAsync();
-                await SetPaySuccess(sm);
-                return true;
+                if (sm.order_id == 0)
+                {
+                    sm.open_id = openId.Trim();
+                    _context.Entry(sm).State = EntityState.Modified;
+                    await _context.SaveChangesAsync();
+                    await SetPaySuccess(sm);
+                    return true;
+                }
+                else
+                {
+                    OrderOnline order = await _context.OrderOnlines.FindAsync(sm.order_id);
+                    if (order == null)
+                    {
+                        return NotFound();
+                    }
+                    if (order.open_id.Trim().Equals(""))
+                    {
+                        order.open_id = openId.Trim();
+                        _context.Entry(order).State = EntityState.Modified;
+                        await _context.SaveChangesAsync();
+                        sm.open_id = openId.Trim();
+                        _context.Entry(sm).State = EntityState.Modified;
+                        await _context.SaveChangesAsync();
+                        await SetPaySuccess(sm);
+                        return true;
+                    }
+                    else
+                    {
+                        return false;
+                    }
+                }
             }
             else
             {
                 return false;
             }
+            
         }
 
         [HttpPost]
