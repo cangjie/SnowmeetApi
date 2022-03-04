@@ -103,30 +103,30 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<string>> SetPaySuccess(SummerMaintain summerMaintain)
         {
             string code = "";
-            int orderId = summerMaintain.order_id;
-            if (orderId == 0)
-            {
-                return "";
-            }
-            OrderOnline order = await _context.OrderOnlines.FindAsync(orderId);
-            var detailArr = await _context.OrderOnlineDetails.Where(d => d.OrderOnlineId == order.id).ToListAsync();
             int productId = 144;
-            if (detailArr.Count == 0)
+            string type = "服务卡";
+            string openId = summerMaintain.open_id.Trim();
+            if (summerMaintain.order_id != 0)
             {
-                return "";
+                OrderOnline order = await _context.OrderOnlines.FindAsync(summerMaintain.order_id);
+                type = order.type.Trim();
+                var detailArr = await _context.OrderOnlineDetails.Where(d => d.OrderOnlineId == order.id).ToListAsync();
+                if (detailArr.Count > 0)
+                {
+                    productId = detailArr[0].product_id;
+                }
+                order.pay_state = 1;
+                order.pay_time = DateTime.Now;
+                _context.Entry(order).State = EntityState.Modified;
+                await _context.SaveChangesAsync();
             }
-            productId = detailArr[0].product_id;
-            order.pay_state = 1;
-            order.pay_time = DateTime.Now;
-            _context.Entry(order).State = EntityState.Modified;
-            await _context.SaveChangesAsync();
             CardController cardController = new CardController(_context, wholeConfig);
-            code = cardController.CreateCard(order.type.Trim());
+            code = cardController.CreateCard(type.Trim());
             Card card = _context.Card.Find(code);
             card.product_id = productId;
             card.is_package = 0;
             card.is_ticket = 0;
-            card.owner_open_id = order.open_id.Trim();
+            card.owner_open_id = openId.Trim();
             card.use_memo = "";
             _context.Entry<Card>(card).State = EntityState.Modified;
             await _context.SaveChangesAsync();
