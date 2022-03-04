@@ -162,7 +162,6 @@ namespace SnowmeetApi.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<bool>> SetOpenId(int id, string sessionKey)
         {
-            
             sessionKey = Util.UrlDecode(sessionKey);
             UnicUser._context = _context;
             UnicUser user = UnicUser.GetUnicUser(sessionKey);
@@ -189,6 +188,7 @@ namespace SnowmeetApi.Controllers
                 order.open_id = openId.Trim();
                 _context.Entry(order).State = EntityState.Modified;
                 await _context.SaveChangesAsync();
+                await SetPaySuccess(sm);
                 return true;
             }
             else
