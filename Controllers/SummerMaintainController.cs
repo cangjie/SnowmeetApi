@@ -157,24 +157,46 @@ namespace SnowmeetApi.Controllers
             return ret;
         }
 
-        //Web APIs
+        //Web API
+        [HttpGet("{id}")]
+        public async Task<ActionResult<bool>> SetBlankOpenId(int id, string sessionKey)
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            UnicUser._context = _context;
+            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            if (!user.isAdmin)
+            {
+                return NoContent();
+            }
+            SummerMaintain sm = await _context.SummerMaintain.FindAsync(id);
+            if (!sm.open_id.Trim().Equals(""))
+            {
+                return NotFound();
+            }
+            int orderId = sm.order_id;
+            if (orderId != 0)
+            {
+                OrderOnline order = await _context.OrderOnlines.FindAsync(sm.order_id);
+                if (order == null || !order.open_id.Trim().Equals(""))
+                {
+                    return NotFound();
+                }
+            }
+            await SetPaySuccess(sm);
+            return true;
+        }
 
         [HttpGet("{id}")]
         public async Task<ActionResult<bool>> SetOpenId(int id, string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey);
-            string openId = "";
-            if (!sessionKey.Trim().Equals(""))
+            UnicUser._context = _context;
+            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            string openId = user.miniAppOpenId.Trim();
+            if (openId.Trim().Equals(""))
             {
-                UnicUser._context = _context;
-                UnicUser user = UnicUser.GetUnicUser(sessionKey);
-                openId = user.miniAppOpenId.Trim();
-                if (openId.Trim().Equals(""))
-                {
-                    return NoContent();
-                }
+                return NoContent();
             }
-            
             SummerMaintain sm = await _context.SummerMaintain.FindAsync(id);
             
             if (sm.open_id.Trim().Equals(""))
