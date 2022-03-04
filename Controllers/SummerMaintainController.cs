@@ -171,11 +171,7 @@ namespace SnowmeetApi.Controllers
                 return NoContent();
             }
             SummerMaintain sm = await _context.SummerMaintain.FindAsync(id);
-            if (sm.order_id == 0)
-            {
-                return NotFound();
-            }
-     
+            
             if (sm.open_id.Trim().Equals(""))
             {
                 if (sm.order_id == 0)
@@ -183,7 +179,10 @@ namespace SnowmeetApi.Controllers
                     sm.open_id = openId.Trim();
                     _context.Entry(sm).State = EntityState.Modified;
                     await _context.SaveChangesAsync();
-                    await SetPaySuccess(sm);
+                    if (!sm.pay_method.Trim().Equals("微信"))
+                    {
+                        await SetPaySuccess(sm);
+                    }
                     return true;
                 }
                 else
@@ -201,7 +200,10 @@ namespace SnowmeetApi.Controllers
                         sm.open_id = openId.Trim();
                         _context.Entry(sm).State = EntityState.Modified;
                         await _context.SaveChangesAsync();
-                        await SetPaySuccess(sm);
+                        if (!sm.pay_method.Trim().Equals("微信"))
+                        {
+                            await SetPaySuccess(sm);
+                        }
                         return true;
                     }
                     else
