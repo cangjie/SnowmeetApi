@@ -163,13 +163,18 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<bool>> SetOpenId(int id, string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey);
-            UnicUser._context = _context;
-            UnicUser user = UnicUser.GetUnicUser(sessionKey);
-            string openId = user.miniAppOpenId.Trim();
-            if (openId.Trim().Equals(""))
+            string openId = "";
+            if (!sessionKey.Trim().Equals(""))
             {
-                return NoContent();
+                UnicUser._context = _context;
+                UnicUser user = UnicUser.GetUnicUser(sessionKey);
+                openId = user.miniAppOpenId.Trim();
+                if (openId.Trim().Equals(""))
+                {
+                    return NoContent();
+                }
             }
+            
             SummerMaintain sm = await _context.SummerMaintain.FindAsync(id);
             
             if (sm.open_id.Trim().Equals(""))
