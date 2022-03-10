@@ -563,7 +563,7 @@ namespace SnowmeetApi.Controllers
             _context.SaveChanges();
             return order.id;
         }
-
+        /*
         public string SetPaySuccess(SummerMaintain summerMaintain)
         {
             if (!summerMaintain.code.Trim().Equals(""))
@@ -601,7 +601,7 @@ namespace SnowmeetApi.Controllers
 
             return code;
         }
-
+        */
         public bool AssignOpen(SummerMaintain summerMaintain, string openId)
         {
             if (!summerMaintain.open_id.Trim().Equals(""))
