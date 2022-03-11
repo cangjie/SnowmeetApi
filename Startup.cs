@@ -82,6 +82,7 @@ namespace SnowmeetApi
             app.UseEndpoints(endpoints => {
                 endpoints.MapRazorPages();
             });
+            app.UseStaticFiles();
 
             //swagger
             
