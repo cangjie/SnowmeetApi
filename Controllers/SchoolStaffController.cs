@@ -11,7 +11,7 @@ using SnowmeetApi.Models.Users;
 
 namespace SnowmeetApi.Controllers
 {
-    [Route("[controller]")]
+    [Route("[controller]/[Action]")]
     [ApiController]
     public class SchoolStaffController : ControllerBase
     {
@@ -46,7 +46,7 @@ namespace SnowmeetApi.Controllers
             return ret;
         }
 
-        [HttpGet("GetInstructor")]
+        [HttpGet]
         public async Task<ActionResult<IEnumerable<SchoolStaff>>> GetInstructor()
         {
             return await _context.SchoolStaffs.Where<SchoolStaff>(s => s.role.ToLower().Contains("instructor")).ToListAsync();

@@ -1,0 +1,49 @@
+@page
+@model SnowmeetApi.Pages.SchoolStaff.CreateModel
+
+@{
+    ViewData["Title"] = "Create";
+}
+
+<h1>Create</h1>
+
+<h4>SchoolStaff</h4>
+<hr />
+<div class="row">
+    <div class="col-md-4">
+        <form method="post">
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+            <div class="form-group">
+                <label asp-for="SchoolStaff.open_id" class="control-label"></label>
+                <input asp-for="SchoolStaff.open_id" class="form-control" />
+                <span asp-validation-for="SchoolStaff.open_id" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="SchoolStaff.name" class="control-label"></label>
+                <input asp-for="SchoolStaff.name" class="form-control" />
+                <span asp-validation-for="SchoolStaff.name" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="SchoolStaff.role" class="control-label"></label>
+                <input asp-for="SchoolStaff.role" class="form-control" />
+                <span asp-validation-for="SchoolStaff.role" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="SchoolStaff.head_image" class="control-label"></label>
+                <input asp-for="SchoolStaff.head_image" class="form-control" />
+                <span asp-validation-for="SchoolStaff.head_image" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <input type="submit" value="Create" class="btn btn-primary" />
+            </div>
+        </form>
+    </div>
+</div>
+
+<div>
+    <a asp-page="Index">Back to List</a>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+}

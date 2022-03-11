@@ -30,17 +30,36 @@ namespace SnowmeetApi
         public void ConfigureServices(IServiceCollection services)
         {
             //string conStr = "Data Source=(local);Initial Catalog=snowmeet;Integrated Security=True";
+
+
+            //config db constr
             string conStr = "Server=52.83.254.45;Database=snowmeet;UID=sa;PWD=Jarrod780209";
             services.AddControllers();
             services.AddDbContext<ApplicationDBContext>(
                 options => options.UseSqlServer(conStr)
             );
+            services.TryAddSingleton<IHttpContextAccessor, HttpContextAccessor>();
+
+
+
+
+            //Razor page
+
+            services.AddRazorPages(options =>
+            {
+                options.Conventions.AddPageRoute("/pages/SchoolStaff", "SchoolStaff");
+            });
+
+
+
+            //swagger
+            
             services.AddSwaggerGen(c =>
             {
                 c.SwaggerDoc("v1", new OpenApiInfo { Title = "SnowmeetApi", Version = "v1" });
             });
-            services.TryAddSingleton<IHttpContextAccessor, HttpContextAccessor>();
             
+
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -55,17 +74,25 @@ namespace SnowmeetApi
             }
             */
             app.UseDeveloperExceptionPage();
-            app.UseSwagger();
-            app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "SnowmeetApi v1"));
-
             app.UseRouting();
-
             app.UseAuthorization();
 
+
+            //razor
+            app.UseEndpoints(endpoints => {
+                endpoints.MapRazorPages();
+            });
+
+            //swagger
+            
+            app.UseSwagger();
+            app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "SnowmeetApi v1"));
             app.UseEndpoints(endpoints =>
             {
                 endpoints.MapControllers();
             });
+            
+            
         }
     }
 }

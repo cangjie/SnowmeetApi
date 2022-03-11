@@ -1,0 +1,180 @@
+@page
+@model SnowmeetApi.Pages.SummerMaintain.IndexModel
+
+@{
+    ViewData["Title"] = "Index";
+}
+
+<h1>Index</h1>
+
+<p>
+    <a asp-page="Create">Create New</a>
+</p>
+<table class="table">
+    <thead>
+        <tr>
+            <th>
+                @Html.DisplayNameFor(model => model.SummerMaintain[0].open_id)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.SummerMaintain[0].pay_method)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.SummerMaintain[0].equip_type)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.SummerMaintain[0].brand)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.SummerMaintain[0].scale)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.SummerMaintain[0].binder_brand)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.SummerMaintain[0].binder_color)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.SummerMaintain[0].send_item)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.SummerMaintain[0].wanlong_no)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.SummerMaintain[0].associates)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.SummerMaintain[0].keep)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.SummerMaintain[0].contact_name)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.SummerMaintain[0].address)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.SummerMaintain[0].cell)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.SummerMaintain[0].service)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.SummerMaintain[0].code)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.SummerMaintain[0].order_id)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.SummerMaintain[0].source)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.SummerMaintain[0].waybill_no)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.SummerMaintain[0].state)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.SummerMaintain[0].images)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.SummerMaintain[0].owner_name)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.SummerMaintain[0].owner_cell)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.SummerMaintain[0].oper_open_id)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.SummerMaintain[0].create_date)
+            </th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+@foreach (var item in Model.SummerMaintain) {
+        <tr>
+            <td>
+                @Html.DisplayFor(modelItem => item.open_id)
+            </td>
+            <td>
+                @Html.DisplayFor(modelItem => item.pay_method)
+            </td>
+            <td>
+                @Html.DisplayFor(modelItem => item.equip_type)
+            </td>
+            <td>
+                @Html.DisplayFor(modelItem => item.brand)
+            </td>
+            <td>
+                @Html.DisplayFor(modelItem => item.scale)
+            </td>
+            <!----td>
+                @Html.DisplayFor(modelItem => item.binder_brand)
+            </td>
+            <td>
+                @Html.DisplayFor(modelItem => item.binder_color)
+            </td>
+            <td>
+                @Html.DisplayFor(modelItem => item.send_item)
+            </td>
+            <td>
+                @Html.DisplayFor(modelItem => item.wanlong_no)
+            </td>
+            <td>
+                @Html.DisplayFor(modelItem => item.associates)
+            </td>
+            <td>
+                @Html.DisplayFor(modelItem => item.keep)
+            </td>
+            <td>
+                @Html.DisplayFor(modelItem => item.contact_name)
+            </td>
+            <td>
+                @Html.DisplayFor(modelItem => item.address)
+            </td>
+            <td>
+                @Html.DisplayFor(modelItem => item.cell)
+            </td>
+            <td>
+                @Html.DisplayFor(modelItem => item.service)
+            </td>
+            <td>
+                @Html.DisplayFor(modelItem => item.code)
+            </td>
+            <td>
+                @Html.DisplayFor(modelItem => item.order_id)
+            </td>
+            <td>
+                @Html.DisplayFor(modelItem => item.source)
+            </td>
+            <td>
+                @Html.DisplayFor(modelItem => item.waybill_no)
+            </td>
+            <td>
+                @Html.DisplayFor(modelItem => item.state)
+            </td>
+            <td>
+                @Html.DisplayFor(modelItem => item.images)
+            </td-->
+            <td>
+                @Html.DisplayFor(modelItem => item.owner_name)
+            </td>
+            <td>
+                @Html.DisplayFor(modelItem => item.owner_cell)
+            </td>
+            <td>
+                @Html.DisplayFor(modelItem => item.oper_open_id)
+            </td>
+            <td>
+                @Html.DisplayFor(modelItem => item.create_date)
+            </td>
+            <td>
+                <a asp-page="./Edit" asp-route-id="@item.id">Edit</a> |
+                <a asp-page="./Details" asp-route-id="@item.id">Details</a> |
+                <a asp-page="./Delete" asp-route-id="@item.id">Delete</a>
+            </td>
+        </tr>
+}
+    </tbody>
+</table>

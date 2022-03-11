@@ -1,0 +1,48 @@
+@page
+@model SnowmeetApi.Pages.SchoolStaff.IndexModel
+
+@{
+    ViewData["Title"] = "Index";
+}
+
+<h1>Index</h1>
+
+<p>
+    <a asp-page="Create">Create New</a>
+</p>
+<table class="table">
+    <thead>
+        <tr>
+            <th>
+                @Html.DisplayNameFor(model => model.SchoolStaff[0].name)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.SchoolStaff[0].role)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.SchoolStaff[0].head_image)
+            </th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+@foreach (var item in Model.SchoolStaff) {
+        <tr>
+            <td>
+                @Html.DisplayFor(modelItem => item.name)
+            </td>
+            <td>
+                @Html.DisplayFor(modelItem => item.role)
+            </td>
+            <td>
+                @Html.DisplayFor(modelItem => item.head_image)
+            </td>
+            <td>
+                <a asp-page="./Edit" asp-route-id="@item.open_id">Edit</a> |
+                <a asp-page="./Details" asp-route-id="@item.open_id">Details</a> |
+                <a asp-page="./Delete" asp-route-id="@item.open_id">Delete</a>
+            </td>
+        </tr>
+}
+    </tbody>
+</table>

@@ -1,0 +1,154 @@
+@page
+@model SnowmeetApi.Pages.SummerMaintain.CreateModel
+
+@{
+    ViewData["Title"] = "Create";
+}
+
+<h1>Create</h1>
+
+<h4>SummerMaintain</h4>
+<hr />
+<div class="row">
+    <div class="col-md-4">
+        <form method="post">
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+            <div class="form-group">
+                <label asp-for="SummerMaintain.open_id" class="control-label"></label>
+                <input asp-for="SummerMaintain.open_id" class="form-control" />
+                <span asp-validation-for="SummerMaintain.open_id" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="SummerMaintain.pay_method" class="control-label"></label>
+                <input asp-for="SummerMaintain.pay_method" class="form-control" />
+                <span asp-validation-for="SummerMaintain.pay_method" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="SummerMaintain.equip_type" class="control-label"></label>
+                <input asp-for="SummerMaintain.equip_type" class="form-control" />
+                <span asp-validation-for="SummerMaintain.equip_type" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="SummerMaintain.brand" class="control-label"></label>
+                <input asp-for="SummerMaintain.brand" class="form-control" />
+                <span asp-validation-for="SummerMaintain.brand" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="SummerMaintain.scale" class="control-label"></label>
+                <input asp-for="SummerMaintain.scale" class="form-control" />
+                <span asp-validation-for="SummerMaintain.scale" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="SummerMaintain.binder_brand" class="control-label"></label>
+                <input asp-for="SummerMaintain.binder_brand" class="form-control" />
+                <span asp-validation-for="SummerMaintain.binder_brand" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="SummerMaintain.binder_color" class="control-label"></label>
+                <input asp-for="SummerMaintain.binder_color" class="form-control" />
+                <span asp-validation-for="SummerMaintain.binder_color" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="SummerMaintain.send_item" class="control-label"></label>
+                <input asp-for="SummerMaintain.send_item" class="form-control" />
+                <span asp-validation-for="SummerMaintain.send_item" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="SummerMaintain.wanlong_no" class="control-label"></label>
+                <input asp-for="SummerMaintain.wanlong_no" class="form-control" />
+                <span asp-validation-for="SummerMaintain.wanlong_no" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="SummerMaintain.associates" class="control-label"></label>
+                <input asp-for="SummerMaintain.associates" class="form-control" />
+                <span asp-validation-for="SummerMaintain.associates" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="SummerMaintain.keep" class="control-label"></label>
+                <input asp-for="SummerMaintain.keep" class="form-control" />
+                <span asp-validation-for="SummerMaintain.keep" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="SummerMaintain.contact_name" class="control-label"></label>
+                <input asp-for="SummerMaintain.contact_name" class="form-control" />
+                <span asp-validation-for="SummerMaintain.contact_name" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="SummerMaintain.address" class="control-label"></label>
+                <input asp-for="SummerMaintain.address" class="form-control" />
+                <span asp-validation-for="SummerMaintain.address" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="SummerMaintain.cell" class="control-label"></label>
+                <input asp-for="SummerMaintain.cell" class="form-control" />
+                <span asp-validation-for="SummerMaintain.cell" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="SummerMaintain.service" class="control-label"></label>
+                <input asp-for="SummerMaintain.service" class="form-control" />
+                <span asp-validation-for="SummerMaintain.service" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="SummerMaintain.code" class="control-label"></label>
+                <input asp-for="SummerMaintain.code" class="form-control" />
+                <span asp-validation-for="SummerMaintain.code" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="SummerMaintain.order_id" class="control-label"></label>
+                <input asp-for="SummerMaintain.order_id" class="form-control" />
+                <span asp-validation-for="SummerMaintain.order_id" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="SummerMaintain.source" class="control-label"></label>
+                <input asp-for="SummerMaintain.source" class="form-control" />
+                <span asp-validation-for="SummerMaintain.source" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="SummerMaintain.waybill_no" class="control-label"></label>
+                <input asp-for="SummerMaintain.waybill_no" class="form-control" />
+                <span asp-validation-for="SummerMaintain.waybill_no" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="SummerMaintain.state" class="control-label"></label>
+                <input asp-for="SummerMaintain.state" class="form-control" />
+                <span asp-validation-for="SummerMaintain.state" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="SummerMaintain.images" class="control-label"></label>
+                <input asp-for="SummerMaintain.images" class="form-control" />
+                <span asp-validation-for="SummerMaintain.images" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="SummerMaintain.owner_name" class="control-label"></label>
+                <input asp-for="SummerMaintain.owner_name" class="form-control" />
+                <span asp-validation-for="SummerMaintain.owner_name" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="SummerMaintain.owner_cell" class="control-label"></label>
+                <input asp-for="SummerMaintain.owner_cell" class="form-control" />
+                <span asp-validation-for="SummerMaintain.owner_cell" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="SummerMaintain.oper_open_id" class="control-label"></label>
+                <input asp-for="SummerMaintain.oper_open_id" class="form-control" />
+                <span asp-validation-for="SummerMaintain.oper_open_id" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="SummerMaintain.create_date" class="control-label"></label>
+                <input asp-for="SummerMaintain.create_date" class="form-control" />
+                <span asp-validation-for="SummerMaintain.create_date" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <input type="submit" value="Create" class="btn btn-primary" />
+            </div>
+        </form>
+    </div>
+</div>
+
+<div>
+    <a asp-page="Index">Back to List</a>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+}
