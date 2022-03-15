@@ -15,6 +15,7 @@ using SnowmeetApi.Models.Users;
 using Microsoft.OpenApi.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using System.IO;
 namespace SnowmeetApi
 {
     public class Startup
@@ -33,7 +34,27 @@ namespace SnowmeetApi
 
 
             //config db constr
-            string conStr = "Server=52.83.254.45;Database=snowmeet;UID=sa;PWD=Jarrod780209";
+            string path = $"{Environment.CurrentDirectory}";
+
+            if (path.StartsWith("/"))
+            {
+                path = path + "/";
+            }
+            else
+            {
+                path = path + "\\";
+            }
+            path = path + "config.sqlServer";
+
+            string conStr = "";
+
+            using (StreamReader sr = new StreamReader(path, true))
+            {
+                conStr = sr.ReadToEnd();
+                sr.Close();
+            }
+
+            
             services.AddControllers();
             services.AddDbContext<ApplicationDBContext>(
                 options => options.UseSqlServer(conStr)
