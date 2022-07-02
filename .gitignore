@@ -405,3 +405,10 @@ ASALocalRun/
 .localhistory/
 /WepayCertificate/*.txt
 config.sqlServer
+*.dll
+*.a
+*.so
+SnowmeetApi
+SnowmeetApi.deps.json
+SnowmeetApi.runtimeconfig.json
+createdump
