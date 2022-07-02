@@ -30,9 +30,7 @@ namespace SnowmeetApi
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
-            //string conStr = "Data Source=(local);Initial Catalog=snowmeet;Integrated Security=True";
-            //string conStr = "Server=52.83.254.45;Database=snowmeet;UID=sa;PWD=Jarrod780209";
-
+           
             string path = $"{Environment.CurrentDirectory}";
 
             if (path.StartsWith("/"))
@@ -77,6 +75,7 @@ namespace SnowmeetApi
                 app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "SnowmeetApi v1"));
             }
             */
+            
             app.UseStaticFiles();
             app.UseDeveloperExceptionPage();
             app.UseSwagger();
