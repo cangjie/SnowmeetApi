@@ -93,7 +93,7 @@ namespace SnowmeetApi.Controllers
             _originConfig = config;
         }
 
-        
+        /*
         protected async Task<ActionResult<CerList>> GetCer()
         {
             WepayKey key = _context.WepayKeys.Find(1);
@@ -179,6 +179,7 @@ namespace SnowmeetApi.Controllers
                 callbackSerialNumber: "7F5ACDBE4382FD3F831184B33FAA6E1D35BEE383"
             );
         }
+        
 
         protected void DecodeSign()
         {
@@ -228,10 +229,12 @@ namespace SnowmeetApi.Controllers
             {
                 /* 将 JSON 反序列化得到通知对象 */
                 /* 你也可以将 WechatTenpayEvent 类型直接绑定到 MVC 模型上，这样就不再需要手动反序列化 */
+                /*
                 var callbackModel = client.DeserializeEvent(callbackJson);
                 if ("TRANSACTION.SUCCESS".Equals(callbackModel.EventType))
                 {
                     /* 根据事件类型，解密得到支付通知敏感数据 */
+                /*
                     var callbackResource = client.DecryptEventResource<SKIT.FlurlHttpClient.Wechat.TenpayV3.Events.TransactionResource>(callbackModel);
                     string outTradeNumber = callbackResource.OutTradeNumber;
                     string transactionId = callbackResource.TransactionId;
@@ -450,6 +453,7 @@ namespace SnowmeetApi.Controllers
                     if ("TRANSACTION.SUCCESS".Equals(callbackModel.EventType))
                     {
                         /* 根据事件类型，解密得到支付通知敏感数据 */
+                /*
                         var callbackResource = client.DecryptEventResource<SKIT.FlurlHttpClient.Wechat.TenpayV3.Events.TransactionResource>(callbackModel);
                         string outTradeNumber = callbackResource.OutTradeNumber;
                         string transactionId = callbackResource.TransactionId;
@@ -481,7 +485,7 @@ namespace SnowmeetApi.Controllers
             }
             return "{ \r\n \"code\": \"SUCCESS\", \r\n \"message\": \"成功\" \r\n}";
         }
-
+        */
         
         [HttpGet]
         public ActionResult<string> Test(string outTradeNo)

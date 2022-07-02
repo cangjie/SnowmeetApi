@@ -137,7 +137,7 @@ namespace SnowmeetApi.Controllers
 
         
 
-
+        /*
         [HttpGet("{id}")]
         public async Task<ActionResult<WepayOrder>> Pay(int id,string sessionKey)
         {
@@ -272,6 +272,7 @@ namespace SnowmeetApi.Controllers
 
             return NotFound();
         }
+        */
 
         // PUT: api/OrderOnlines/5
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754

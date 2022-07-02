@@ -375,7 +375,7 @@ namespace SnowmeetApi.Controllers
                 return NotFound();
             }
         }
-
+        /*
         [HttpGet("{id}")]
         public async Task<ActionResult<WepayOrder>> Pay(int id, string sessionKey)
         {
@@ -461,7 +461,7 @@ namespace SnowmeetApi.Controllers
             OrderOnlinesController orderController = new OrderOnlinesController(_context, wholeConfig);
             return await orderController.Pay(orderId, sessionKey);
         }
-
+        */
         [HttpPost]
         public async Task<ActionResult<int>> Recept(SummerMaintain summerMaintain)
         {
