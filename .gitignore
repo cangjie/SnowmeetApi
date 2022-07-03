@@ -412,3 +412,4 @@ SnowmeetApi
 SnowmeetApi.deps.json
 SnowmeetApi.runtimeconfig.json
 createdump
+upload
