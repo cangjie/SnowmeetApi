@@ -242,7 +242,8 @@ namespace SnowmeetApi.Controllers
                 }
             }
         }
-        
+        */
+
         [HttpGet("{outTradeNo}")]
         public async Task<ActionResult<string>> Refund(string outTradeNo, int amount, string sessionKey)
         {
@@ -291,9 +292,9 @@ namespace SnowmeetApi.Controllers
                 {
                     MerchantId = key.mch_id.Trim(),
                     MerchantV3Secret = "",
-                    MerchantCertSerialNumber = key.key_serial.Trim(),
-                    MerchantCertPrivateKey = key.private_key.Trim(),
-                    CertificateManager = certManager
+                    MerchantCertificateSerialNumber = key.key_serial.Trim(),
+                    MerchantCertificatePrivateKey = key.private_key.Trim(),
+                    PlatformCertificateManager = certManager
                 };
                 string refundTransId = refund.wepay_out_trade_no + refund.id.ToString().PadLeft(2, '0');
                 var client = new WechatTenpayClient(options);
@@ -335,7 +336,7 @@ namespace SnowmeetApi.Controllers
             }
             return NotFound();
         }
-
+        
         [HttpPost]
         public ActionResult<string> RefundCallback([FromBody] object postData)
         {
@@ -364,6 +365,7 @@ namespace SnowmeetApi.Controllers
             }
             return "{ \r\n \"code\": \"SUCCESS\", \r\n \"message\": \"成功\" \r\n}";
         }
+        
         
         [HttpPost("{mchid}")]
         public ActionResult<string> PaymentCallback(int mchid, CallBackStruct postData)
@@ -439,11 +441,13 @@ namespace SnowmeetApi.Controllers
                 
 
                 var certManager = new InMemoryCertificateManager();
-                certManager.SetCertificate(serial, cerStr);
+                CertificateEntry ce = new CertificateEntry(serial, cerStr, DateTimeOffset.MinValue, DateTimeOffset.MaxValue);
+
+                //certManager.SetCertificate(serial, cerStr);
                 var options = new WechatTenpayClientOptions()
                 {
                     MerchantV3Secret = apiKey,
-                    CertificateManager = certManager
+                    PlatformCertificateManager = certManager
                 };
                 var client = new WechatTenpayClient(options);
                 bool valid = client.VerifyEventSignature(timeStamp, nonce, postJson, paySign, serial);
@@ -453,7 +457,7 @@ namespace SnowmeetApi.Controllers
                     if ("TRANSACTION.SUCCESS".Equals(callbackModel.EventType))
                     {
                         /* 根据事件类型，解密得到支付通知敏感数据 */
-                /*
+                
                         var callbackResource = client.DecryptEventResource<SKIT.FlurlHttpClient.Wechat.TenpayV3.Events.TransactionResource>(callbackModel);
                         string outTradeNumber = callbackResource.OutTradeNumber;
                         string transactionId = callbackResource.TransactionId;
@@ -485,7 +489,7 @@ namespace SnowmeetApi.Controllers
             }
             return "{ \r\n \"code\": \"SUCCESS\", \r\n \"message\": \"成功\" \r\n}";
         }
-        */
+        
         
         [HttpGet]
         public ActionResult<string> Test(string outTradeNo)

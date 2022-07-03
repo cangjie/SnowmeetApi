@@ -137,7 +137,7 @@ namespace SnowmeetApi.Controllers
 
         
 
-        /*
+        
         [HttpGet("{id}")]
         public async Task<ActionResult<WepayOrder>> Pay(int id,string sessionKey)
         {
@@ -233,9 +233,9 @@ namespace SnowmeetApi.Controllers
             {
                 MerchantId = key.mch_id.Trim(),
                 MerchantV3Secret = "",
-                MerchantCertSerialNumber = key.key_serial.Trim(),
-                MerchantCertPrivateKey = key.private_key.Trim(),
-                CertificateManager = certManager
+                MerchantCertificateSerialNumber = key.key_serial.Trim(),
+                MerchantCertificatePrivateKey = key.private_key.Trim(),
+                PlatformCertificateManager = certManager
             };
             var client = new WechatTenpayClient(options);
             var request = new CreatePayTransactionJsapiRequest()
@@ -272,7 +272,7 @@ namespace SnowmeetApi.Controllers
 
             return NotFound();
         }
-        */
+        
 
         // PUT: api/OrderOnlines/5
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
