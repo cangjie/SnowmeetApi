@@ -148,7 +148,7 @@ namespace LuqinMiniAppBase.Controllers
 
                 */
         [HttpGet]
-        public  ActionResult<Code2Session> Login(string code)
+        public  async Task<ActionResult<Code2Session>> Login(string code)
         {
             string appId = _settings.appId;
             string appSecret = _settings.appSecret;
@@ -160,6 +160,41 @@ namespace LuqinMiniAppBase.Controllers
             
             if (sessionObj.errcode.ToString().Equals(""))
             {
+                var sessionList = _db.MiniSessons.Where(m => (m.session_key.Trim().Equals(sessionObj.session_key.Trim())
+                    && m.open_id.Trim().Equals(sessionObj.openid.Trim()))).ToList();
+                if (sessionList.Count == 0)
+                {
+                    MiniSession mSession = new MiniSession()
+                    {
+                        session_key = sessionObj.session_key.Trim(),
+                        open_id = sessionObj.openid.Trim()
+                    };
+                    await _db.MiniSessons.AddAsync(mSession);
+                    await _db.SaveChangesAsync();
+                }
+                MiniAppUser user = await _db.MiniAppUsers.FindAsync(sessionObj.openid);
+                if (user == null)
+                {
+                    user = new MiniAppUser()
+                    {
+                        open_id = sessionObj.openid
+                    };
+                    await _db.MiniAppUsers.AddAsync(user);
+                    await _db.SaveChangesAsync();
+                }
+                var uidList = _db.UnionIds.Where(u => (u.open_id.Trim().Equals(sessionObj.openid.Trim())
+                    && u.source.Trim().Equals("snowmeet_mini") && u.union_id.Trim().Equals(sessionObj.unionid.Trim()))).ToList();
+                if (uidList.Count == 0)
+                {
+                    UnionId uid = new UnionId()
+                    {
+                        source = "snowmeet_mini",
+                        open_id = sessionObj.openid,
+                        union_id = sessionObj.unionid.Trim()
+                    };
+                    await _db.UnionIds.AddAsync(uid);
+                    await _db.SaveChangesAsync();
+                }
                 return sessionObj;
             }
             return NotFound();

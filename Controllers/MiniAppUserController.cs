@@ -55,6 +55,32 @@ namespace SnowmeetApi.Controllers
             return await _context.MiniAppUsers.FindAsync(openId);
         }
 
+        [HttpGet]
+        public async Task<ActionResult<MiniAppUserList>> GetMiniUserOld(string sessionKey)
+        {
+            sessionKey = Util.UrlDecode(sessionKey.Trim());
+
+            var mSessionList = await _context.MiniSessons.Where(m => (m.session_key.Trim().Equals(sessionKey.Trim()))).ToListAsync();
+            if (mSessionList.Count == 0)
+            {
+                return NotFound();
+            }
+            MiniAppUser user = await _context.MiniAppUsers.FindAsync(mSessionList[0].open_id);
+            if (user != null)
+            {
+                MiniAppUserList l = new MiniAppUserList()
+                {
+                    mini_users = new MiniAppUser[] { user }
+                };
+                return l;
+            }
+            else
+            {
+                return NotFound();
+            }
+            
+        }
+
         /*
 
         // GET: api/MiniAppUser

@@ -10,20 +10,21 @@ namespace SnowmeetApi.Models.Users
     {
         [Key]
         public string open_id { get; set; }
-        public string cell_number { get; set; }
-        public string real_name { get; set; }
-        public string nick { get; set; }
-        public string head_image { get; set; }
-        public string gender { get; set; }
-        public int blocked { get; set; }
-        public int is_admin { get; set; }
-        public DateTime create_date { get; set; }
+        public string cell_number { get; set; } = "";
+        public string real_name { get; set; } = "";
+        public string nick { get; set; } = "";
+        public string head_image { get; set; } = "";
+        public string gender { get; set; } = "";
+        public int blocked { get; set; } = 0;
+        public int is_admin { get; set; } = 0;
+        public DateTime create_date { get; set; } = DateTime.Now;
     }
 
     [NotMapped]
-    public class LoginInfo
+    public class MiniAppUserList
     {
-        public string session_key { get; set; }
-        public string role { get; set; }
+        public int status { get; set; } = 0;
+        public int count { get; set; } = 1;
+        public MiniAppUser[] mini_users { get; set; }
     }
 }
