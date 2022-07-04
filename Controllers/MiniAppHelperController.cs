@@ -21,7 +21,7 @@ using SnowmeetApi;
 
 namespace LuqinMiniAppBase.Controllers
 {
-    [Route("api/[controller]/[action]")]
+    [Route("core/[controller]/[action]")]
     [ApiController]
     public class MiniAppHelperController : ControllerBase
     {

@@ -22,7 +22,7 @@ namespace SnowmeetApi.Controllers
     {
         public string use_date;
     }
-    [Route("[controller]/[action]")]
+    [Route("core/[controller]/[action]")]
     [ApiController]
     public class OrderOnlinesController : ControllerBase
     {

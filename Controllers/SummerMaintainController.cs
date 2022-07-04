@@ -15,7 +15,7 @@ using SnowmeetApi.Models.Product;
 using wechat_miniapp_base.Models;
 namespace SnowmeetApi.Controllers
 {
-    [Route("[controller]/[action]")]
+    [Route("core/[controller]/[action]")]
     [ApiController]
     public class SummerMaintainController : ControllerBase
     {

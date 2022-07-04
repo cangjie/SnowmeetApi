@@ -12,7 +12,7 @@ using SnowmeetApi.Models.Users;
 using SnowmeetApi.Models.Card;
 namespace SnowmeetApi.Controllers
 {
-    [Route("[controller]/[action]")]
+    [Route("core/[controller]/[action]")]
     [ApiController]
     public class TicketController : ControllerBase
     {

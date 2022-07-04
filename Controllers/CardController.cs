@@ -10,7 +10,7 @@ using SnowmeetApi.Models.Card;
 using Microsoft.Extensions.Configuration;
 namespace SnowmeetApi.Controllers
 {
-    [Route("[controller]/[action]")]
+    [Route("core/[controller]/[action]")]
     [ApiController]
     public class CardController : ControllerBase
     {

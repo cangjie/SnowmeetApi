@@ -11,7 +11,7 @@ using SnowmeetApi.Models.Users;
 
 namespace SnowmeetApi.Controllers
 {
-    [Route("[controller]")]
+    [Route("core/[controller]")]
     [ApiController]
     public class SchoolStaffController : ControllerBase
     {

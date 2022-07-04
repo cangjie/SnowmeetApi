@@ -27,7 +27,7 @@ using SKIT.FlurlHttpClient.Wechat.TenpayV3.Models;
 
 namespace SnowmeetApi.Controllers
 {
-    [Route("[controller]/[action]")]
+    [Route("core/[controller]/[action]")]
     [ApiController]
     public class WepayOrderController : ControllerBase
     {
