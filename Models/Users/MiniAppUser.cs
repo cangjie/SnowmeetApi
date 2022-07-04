@@ -19,4 +19,11 @@ namespace SnowmeetApi.Models.Users
         public int is_admin { get; set; }
         public DateTime create_date { get; set; }
     }
+
+    [NotMapped]
+    public class LoginInfo
+    {
+        public string session_key { get; set; }
+        public string role { get; set; }
+    }
 }
