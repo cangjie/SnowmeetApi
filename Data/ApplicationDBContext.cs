@@ -31,7 +31,7 @@ namespace SnowmeetApi.Data
             modelBuilder.Entity<SchoolLesson>().HasKey(c => c.id);
 
             //OrderOnline
-            modelBuilder.Entity<OrderOnline>().HasKey(c => c.id);
+            //modelBuilder.Entity<OrderOnline>().HasKey(c => c.id);
 
             //modelBuilder.Entity<Experience>().HasOne<OrderOnline>(e=>e.order).WithOne(e=>e.)
 
@@ -73,6 +73,6 @@ namespace SnowmeetApi.Data
 
         public DbSet<SnowmeetApi.Models.SummerMaintain> SummerMaintain { get; set; }
 
-
+        public DbSet<SnowmeetApi.Models.Order.Mi7Order> mi7Order { get; set; }
     }
 }

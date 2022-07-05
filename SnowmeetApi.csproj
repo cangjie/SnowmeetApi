@@ -19,6 +19,8 @@
     <None Remove="WepayCertificate\" />
     <None Remove="Models\Product\" />
     <None Remove="Models\Card\" />
+    <None Remove="Models\Order\" />
+    <None Remove="Controllers\Order\" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="6.0.6" />
@@ -41,5 +43,7 @@
     <Folder Include="Models\Users\" />
     <Folder Include="Models\Product\" />
     <Folder Include="Models\Card\" />
+    <Folder Include="Models\Order\" />
+    <Folder Include="Controllers\Order\" />
   </ItemGroup>
 </Project>

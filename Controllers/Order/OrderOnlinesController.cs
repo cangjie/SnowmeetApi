@@ -16,6 +16,7 @@ using SKIT.FlurlHttpClient.Wechat.TenpayV3.Models;
 using System.Web;
 using Newtonsoft.Json;
 using SnowmeetApi.Models.Product;
+using SnowmeetApi.Models.Order;
 namespace SnowmeetApi.Controllers
 {
     public class SkiPassMemo
@@ -34,12 +35,41 @@ namespace SnowmeetApi.Controllers
 
         public bool isStaff = false;
 
+        
+
         public OrderOnlinesController(ApplicationDBContext context, IConfiguration config)
         {
             _context = context;
             _config = config.GetSection("Settings");
             _appId = _config.GetSection("AppId").Value.Trim();
         }
+
+
+        [HttpPost]
+        public async Task<ActionResult<OrderOnline>> PlaceOrderByStaff(OrderOnline order, string staffSessionKey)
+        {
+            staffSessionKey = Util.UrlDecode(staffSessionKey);
+            UnicUser._context = _context;
+            UnicUser user = UnicUser.GetUnicUser(staffSessionKey);
+            if (!user.isAdmin)
+            {
+                return NoContent();
+            }
+            await _context.OrderOnlines.AddAsync(order);
+            int i = await _context.SaveChangesAsync();
+            if (i <= 0)
+            {
+                return NoContent();
+            }
+            for (int j = 0; j < order.mi7Orders.Length; j++)
+            {
+                order.mi7Orders[i].order_id = order.id;
+                await _context.mi7Order.AddAsync(order.mi7Orders[i]);
+            }
+            await _context.SaveChangesAsync();
+            return order;
+        }
+
 
         [HttpGet("{orderId}")]
         public async Task<ActionResult<bool>> SetSkiPassCertNo(int orderId, string certNo, string sessionKey)
