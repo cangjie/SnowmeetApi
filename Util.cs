@@ -100,6 +100,14 @@ namespace SnowmeetApi
             TimeSpan ts = currentDateTime - new DateTime(1970, 1, 1, 0, 0, 0, 0);
             return Convert.ToInt64(ts.TotalMilliseconds).ToString();
         }
+
+        public static bool IsAdmin(string staffSessionKey, Data.ApplicationDBContext db)
+        {
+            Models.Users.UnicUser._context = db;
+            staffSessionKey = UrlDecode(staffSessionKey).Trim();
+            Models.Users.UnicUser staffUser = Models.Users.UnicUser.GetUnicUser(staffSessionKey);
+            return staffUser.isAdmin;
+        }
     }
 
 }

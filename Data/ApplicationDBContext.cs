@@ -74,5 +74,7 @@ namespace SnowmeetApi.Data
         public DbSet<SnowmeetApi.Models.SummerMaintain> SummerMaintain { get; set; }
 
         public DbSet<SnowmeetApi.Models.Order.Mi7Order> mi7Order { get; set; }
+
+        public DbSet<SnowmeetApi.Models.Shop> Shop { get; set; }
     }
 }

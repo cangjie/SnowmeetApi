@@ -25,7 +25,7 @@ namespace SnowmeetApi.Controllers
             _config = config.GetSection("Settings");
             _appId = _config.GetSection("AppId").Value.Trim();
         }
-
+        
         [NonAction]
         public async Task<ActionResult<string>> GetOpenIdByCell(string cell)
         {
@@ -38,7 +38,26 @@ namespace SnowmeetApi.Controllers
             }
             return openId;
         }
-
+        
+        [HttpGet("{cell}")]
+        public async Task<ActionResult<MiniAppUser>> GetUserByCell(string cell, string staffSessionKey)
+        {
+            if (!Util.IsAdmin(staffSessionKey, _context))
+            {
+                return NoContent();
+            }
+            var miniUserList = await _context.MiniAppUsers
+                .Where(u => u.cell_number.Trim().Equals(cell.Trim()))
+                .OrderByDescending(u => u.create_date).ToListAsync();
+            if (miniUserList.Count == 0)
+            {
+                return NotFound();
+            }
+            else
+            {
+                return miniUserList[0];
+            }
+        }
 
 
         [HttpGet]
