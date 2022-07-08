@@ -36,6 +36,17 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet]
+        public async Task<ActionResult<IEnumerable<Ticket>>> GetUnusedTicketsByCode(string ticketCodeArr)
+        {
+            ticketCodeArr = Util.UrlDecode(ticketCodeArr);
+            var ticketArr = await _context.Ticket
+                .FromSqlRaw(" select * from ticket where used = 0 and code in ("
+                + ticketCodeArr.Replace("'", "").Trim() + ") ")
+                .ToListAsync();
+            return ticketArr;
+        }
+
+        [HttpGet]
         [ActionName("GetChannels")]
         public async Task<ActionResult<IEnumerable<string>>> GetChannels()
         {

@@ -27,16 +27,7 @@ namespace SnowmeetApi.Controllers
             
         }
 
-        [HttpGet]
-        public async Task<ActionResult<IEnumerable<Card>>> GetUnusedCards(string cardNoArr)
-        {
-            cardNoArr = Util.UrlDecode(cardNoArr);
-            var cardArr = await _context.Card
-                .FromSqlRaw(" select * from card where used = 0 and card_no in ("
-                + cardNoArr.Replace("'", "").Trim() + ") ")
-                .ToListAsync();
-            return cardArr;
-        }
+        
 
         [NonAction]
         public string CreateCard(string type)
