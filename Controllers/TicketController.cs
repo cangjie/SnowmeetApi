@@ -219,6 +219,18 @@ namespace SnowmeetApi.Controllers
             }
         }
 
+        [HttpGet("{used}")]
+        public async Task<ActionResult<IEnumerable<Ticket>>> GetTicketsByUser(int used, string openId, string sessionKey)
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            if (!Util.IsAdmin(sessionKey, _context))
+            {
+                return NoContent();
+            }
+            var ticketList = await _context.Ticket.Where(t => (t.open_id.Trim().Equals(openId.Trim()) && t.used == used)).ToListAsync();
+            return ticketList;
+        }
+
 
         /*
 
