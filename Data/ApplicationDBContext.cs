@@ -6,6 +6,7 @@ using wechat_miniapp_base.Models;
 using SnowmeetApi.Models.Product;
 using SnowmeetApi.Models.Ticket;
 using SnowmeetApi.Models.Card;
+using SnowmeetApi.Models.Order;
 //using SnowmeetApi.Models.rfid;
 namespace SnowmeetApi.Data
 {
@@ -76,5 +77,7 @@ namespace SnowmeetApi.Data
         public DbSet<SnowmeetApi.Models.Order.Mi7Order> mi7Order { get; set; }
 
         public DbSet<SnowmeetApi.Models.Shop> Shop { get; set; }
+
+        public DbSet<SnowmeetApi.Models.Order.ShopSaleInteract> ShopSaleInteract { get; set; }
     }
 }
