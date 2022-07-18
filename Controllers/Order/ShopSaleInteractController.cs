@@ -24,6 +24,13 @@ namespace SnowmeetApi.Controllers.Order
 
         public bool isStaff = false;
 
+        public class ScanInfo
+        {
+            public int id = 0;
+            public bool scan = false;
+            //public UnicUser scanUser;
+        }
+
 
         public ShopSaleInteractController(ApplicationDBContext context, IConfiguration config)
         {
@@ -80,6 +87,27 @@ namespace SnowmeetApi.Controllers.Order
                 return retId;
             }
             //return NotFound();
+        }
+
+        [HttpGet("{id}")]
+        public async Task<ActionResult<ShopSaleInteract>> GetScanInfo(int id, string sessionKey)
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            UnicUser._context = _context;
+            UnicUser staffUser = UnicUser.GetUnicUser(sessionKey);
+            if (!staffUser.isAdmin)
+            {
+                return NoContent();
+            }
+            var scan = await _context.ShopSaleInteract.FindAsync(id);
+            if (scan == null)
+            {
+                return NotFound();
+            }
+            else
+            {
+                return scan;
+            }
         }
 
         /*
