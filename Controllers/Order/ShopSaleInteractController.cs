@@ -98,7 +98,7 @@ namespace SnowmeetApi.Controllers.Order
             }
             var scan = await _context.ShopSaleInteract.FindAsync(id);
             UnicUser scanUser = UnicUser.GetUnicUser(scan.scaner_oa_open_id, "snowmeet_official_account_new");
-            if (!scanUser.miniAppOpenId.Trim().Equals(""))
+            if (scanUser!= null && !scanUser.miniAppOpenId.Trim().Equals(""))
             {
                 scan.miniAppUser = (await miniAppUserHelper.GetMiniAppUser(scanUser.miniAppOpenId, sessionKey)).Value;
             }
