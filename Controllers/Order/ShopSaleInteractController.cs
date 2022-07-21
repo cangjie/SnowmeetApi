@@ -24,12 +24,7 @@ namespace SnowmeetApi.Controllers.Order
 
         public bool isStaff = false;
 
-        public class ScanInfo
-        {
-            public int id = 0;
-            public bool scan = false;
-            //public UnicUser scanUser;
-        }
+        public MiniAppUserController miniAppUserHelper;
 
 
         public ShopSaleInteractController(ApplicationDBContext context, IConfiguration config)
@@ -37,6 +32,8 @@ namespace SnowmeetApi.Controllers.Order
             _context = context;
             _config = config.GetSection("Settings");
             _appId = _config.GetSection("AppId").Value.Trim();
+
+            miniAppUserHelper = new MiniAppUserController(context, config);
 
         }
         [HttpGet]
@@ -100,6 +97,11 @@ namespace SnowmeetApi.Controllers.Order
                 return NoContent();
             }
             var scan = await _context.ShopSaleInteract.FindAsync(id);
+            UnicUser scanUser = UnicUser.GetUnicUser(scan.scaner_oa_open_id, "snowmeet_official_account_new");
+            if (!scanUser.miniAppOpenId.Trim().Equals(""))
+            {
+                scan.miniAppUser = (await miniAppUserHelper.GetMiniAppUser(scanUser.miniAppOpenId, sessionKey)).Value;
+            }
             if (scan == null)
             {
                 return NotFound();

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace SnowmeetApi.Models.Users
@@ -18,6 +19,12 @@ namespace SnowmeetApi.Models.Users
         public int blocked { get; set; } = 0;
         public int is_admin { get; set; } = 0;
         public DateTime create_date { get; set; } = DateTime.Now;
+        /*
+        public static implicit operator MiniAppUser(ActionResult<MiniAppUser> v)
+        {
+            throw new NotImplementedException();
+        }
+        */
     }
 
     [NotMapped]
