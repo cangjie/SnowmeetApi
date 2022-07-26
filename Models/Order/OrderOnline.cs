@@ -4,12 +4,15 @@ using System.ComponentModel.DataAnnotations.Schema;
 using System.Collections.Generic;
 using System.ComponentModel;
 using SnowmeetApi.Models.Order;
+using SnowmeetApi.Models.Users;
 
 namespace SnowmeetApi.Models
 {
     [Table("order_online")]
     public class OrderOnline
     {
+
+        
         [Key]
         public int id { get; set; }
 
@@ -34,11 +37,16 @@ namespace SnowmeetApi.Models
         public string out_trade_no { get; set; }
         public string pay_memo { get; set; } = "全额支付";
 
-
         [NotMapped]
-        public Mi7Order[] mi7Orders;
-
+        public OrderPayment[]? payments { get; set; }
+        [NotMapped]
+        public MiniAppUser? user { get; set; }
+        [NotMapped]
+        public Mi7Order[]? mi7Orders { get; set; }
+        
+        
         /*
+        
         [Key]
         public int id { get; set; }
         public string type { get; set; }

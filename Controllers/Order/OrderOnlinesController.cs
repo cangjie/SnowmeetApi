@@ -44,7 +44,7 @@ namespace SnowmeetApi.Controllers
             _appId = _config.GetSection("AppId").Value.Trim();
         }
 
-
+        
         [HttpPost]
         public async Task<ActionResult<OrderOnline>> PlaceOrderByStaff(OrderOnline order, string staffSessionKey)
         {
@@ -70,7 +70,7 @@ namespace SnowmeetApi.Controllers
             return order;
         }
 
-
+        
         [HttpGet("{orderId}")]
         public async Task<ActionResult<bool>> SetSkiPassCertNo(int orderId, string certNo, string sessionKey)
         {

@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
-namespace wechat_miniapp_base.Models
+namespace SnowmeetApi.Models
 {
     [Table("wepay_order")]
     public class WepayOrder
