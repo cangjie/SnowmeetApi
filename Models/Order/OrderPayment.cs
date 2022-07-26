@@ -22,6 +22,7 @@ namespace SnowmeetApi.Models.Order
         public string? sign { get; set; }
         public string? timestamp { get; set; }
         public string? prepay_id { get; set; }
+        public string? ssyn { get; set; }
     }
 }
 
