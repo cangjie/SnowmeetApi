@@ -40,7 +40,7 @@ namespace LuqinMiniAppBase.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<string>> PushMessage(string signature,
+        public ActionResult<string> PushMessage(string signature,
             string timestamp, string nonce, string echostr)
         {
             return echostr.Trim();
