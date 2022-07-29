@@ -67,6 +67,17 @@ namespace SnowmeetApi.Controllers
                 await _context.mi7Order.AddAsync(order.mi7Orders[i]);
             }
             await _context.SaveChangesAsync();
+
+            if (order.payments != null && order.payments.Length == 1 && !order.pay_memo.Trim().Equals("无需付款"))
+            {
+                var payment = order.payments[0];
+                payment.order_id = order.id;
+
+                
+            }
+            
+
+
             return order;
         }
 
