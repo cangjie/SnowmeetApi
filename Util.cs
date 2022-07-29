@@ -108,6 +108,41 @@ namespace SnowmeetApi
             Models.Users.UnicUser staffUser = Models.Users.UnicUser.GetUnicUser(staffSessionKey);
             return staffUser.isAdmin;
         }
+
+        public static double GetScoreRate(double realPayPrice, double marketPrice)
+        {
+            double disCountRate = realPayPrice / marketPrice;
+            double rate = 0;
+            if (disCountRate == 1)
+                rate = 1;
+            else if (disCountRate >= 0.95)
+                rate = 0.925;
+            else if (disCountRate >= 0.9)
+                rate = 0.85;
+            else if (disCountRate >= 0.85)
+                rate = 0.775;
+            else if (disCountRate >= 0.8)
+                rate = 0.7;
+            else if (disCountRate >= 0.75)
+                rate = 0.625;
+            else if (disCountRate >= 0.7)
+                rate = 0.55;
+            else if (disCountRate >= 0.65)
+                rate = 0.475;
+            else if (disCountRate >= 0.6)
+                rate = 0.4;
+            else if (disCountRate >= 0.55)
+                rate = 0.325;
+            else if (disCountRate >= 0.5)
+                rate = 0.25;
+            else if (disCountRate >= 0.45)
+                rate = 0.175;
+            else if (disCountRate >= 0.4)
+                rate = 0.1;
+            else
+                rate = 0;
+            return rate;
+        }
     }
 
 }

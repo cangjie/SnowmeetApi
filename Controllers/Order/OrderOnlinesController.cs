@@ -44,6 +44,13 @@ namespace SnowmeetApi.Controllers
             _appId = _config.GetSection("AppId").Value.Trim();
         }
 
+
+        [HttpGet]
+        public ActionResult<double> GetScoreRate(double orderPrice, double finalPrice)
+        {
+            return Util.GetScoreRate(finalPrice, orderPrice);
+        }
+
         
         [HttpPost]
         public async Task<ActionResult<OrderOnline>> PlaceOrderByStaff(OrderOnline order, string staffSessionKey)
@@ -55,6 +62,8 @@ namespace SnowmeetApi.Controllers
             {
                 return NoContent();
             }
+            order.score_rate = Util.GetScoreRate(order.final_price, order.order_price);
+            order.generate_score = (int)(order.final_price * order.score_rate);
             await _context.OrderOnlines.AddAsync(order);
             int i = await _context.SaveChangesAsync();
             if (i <= 0)
