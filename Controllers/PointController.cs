@@ -50,6 +50,22 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet]
+        public ActionResult<int> GetUserPointsTotalEarned(string openId, string openIdType)
+        {
+            List<Point> pointList = GetUserPointBalance(openId, openIdType);
+            int sum = 0;
+
+            for (int i = 0; i < pointList.Count; i++)
+            {
+                if (pointList[i].points > 0)
+                {
+                    sum = sum + pointList[i].points;
+                }
+            }
+            return sum;
+        }
+
+        [HttpGet]
         public ActionResult<int> GetMyPointsSummary(string sessionKey)
         {
             UnicUser._context = _context;

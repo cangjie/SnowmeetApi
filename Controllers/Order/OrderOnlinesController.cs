@@ -72,10 +72,11 @@ namespace SnowmeetApi.Controllers
             {
                 var payment = order.payments[0];
                 payment.order_id = order.id;
-
-                
+                await _context.OrderPayment.AddAsync(payment);
+                await _context.SaveChangesAsync();
+                order.payments[0] = payment;
             }
-            
+
 
 
             return order;
