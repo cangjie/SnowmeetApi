@@ -70,24 +70,24 @@ namespace SnowmeetApi.Controllers
             {
                 return NoContent();
             }
-            for (int j = 0; j < order.mi7Orders.Length; j++)
+            if (order.mi7Orders != null)
             {
-                order.mi7Orders[i].order_id = order.id;
-                await _context.mi7Order.AddAsync(order.mi7Orders[i]);
+                for (int j = 0; j < order.mi7Orders.Length; j++)
+                {
+                    order.mi7Orders[j].order_id = order.id;
+                    await _context.mi7Order.AddAsync(order.mi7Orders[j]);
+                }
+                await _context.SaveChangesAsync();
             }
-            await _context.SaveChangesAsync();
-
             if (order.payments != null && order.payments.Length == 1 && !order.pay_memo.Trim().Equals("无需付款"))
             {
                 var payment = order.payments[0];
                 payment.order_id = order.id;
+                payment.status = "待支付";
                 await _context.OrderPayment.AddAsync(payment);
                 await _context.SaveChangesAsync();
                 order.payments[0] = payment;
             }
-
-
-
             return order;
         }
 
