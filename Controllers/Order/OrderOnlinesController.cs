@@ -137,6 +137,18 @@ namespace SnowmeetApi.Controllers
                 await _context.SaveChangesAsync();
                 order.payments[0] = payment;
             }
+
+            if (!order.user.open_id.Trim().Equals(""))
+            {
+                MiniAppUser customerUser = await _context.MiniAppUsers.FindAsync(order.user.open_id);
+                customerUser.real_name = order.user.real_name.Trim();
+                customerUser.cell_number = order.user.cell_number.Trim();
+                customerUser.gender = order.user.gender.Trim();
+                _context.Entry(customerUser).State = EntityState.Modified;
+                await _context.SaveChangesAsync();
+
+            }
+
             return order;
         }
 
