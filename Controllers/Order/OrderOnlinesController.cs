@@ -51,6 +51,46 @@ namespace SnowmeetApi.Controllers
             return Util.GetScoreRate(finalPrice, orderPrice);
         }
 
+        [HttpGet("{orderId}")]
+        public async Task<ActionResult<OrderOnline>> GetWholeOrderByStaff(int orderId, string staffSessionKey)
+        {
+            staffSessionKey = Util.UrlDecode(staffSessionKey);
+            UnicUser._context = _context;
+            UnicUser user = UnicUser.GetUnicUser(staffSessionKey);
+            if (!user.isAdmin)
+            {
+                return NoContent();
+            }
+            OrderOnline order = await _context.OrderOnlines.FindAsync(orderId);
+            if (!order.open_id.Trim().Equals(""))
+            {
+                UnicUser customerUser = UnicUser.GetUnicUser(order.open_id, "snowmeet_mini");
+                if (customerUser == null)
+                {
+                    customerUser = UnicUser.GetUnicUser(order.open_id, "snowmeet_official_account_new");
+                }
+                if (customerUser == null)
+                {
+                    customerUser = UnicUser.GetUnicUser(order.open_id, "snowmeet_official_account");
+                }
+                if (customerUser != null)
+                {
+                    order.user = await _context.MiniAppUsers.FindAsync(customerUser.miniAppOpenId);
+                    
+                }
+            }
+            var mi7Orders = await _context.mi7Order.Where(o => o.order_id == orderId).ToArrayAsync();
+            if (mi7Orders != null && mi7Orders.Length > 0)
+            {
+                order.mi7Orders = mi7Orders;
+            }
+            if (!order.pay_memo.Trim().Equals("无需支付"))
+            {
+                var payments = await _context.OrderPayment.Where(p => p.order_id == orderId).ToArrayAsync();
+                order.payments = payments;
+            }
+            return order;
+        }
         
         [HttpPost]
         public async Task<ActionResult<OrderOnline>> PlaceOrderByStaff(OrderOnline order, string staffSessionKey)
@@ -64,6 +104,15 @@ namespace SnowmeetApi.Controllers
             }
             order.score_rate = Util.GetScoreRate(order.final_price, order.order_price);
             order.generate_score = (int)(order.final_price * order.score_rate);
+            if (order.pay_memo.Trim().Equals("无需付款")
+                || (!order.pay_method.Trim().Equals("微信支付") && order.pay_memo.Trim().Equals("全额支付")))
+            {
+                order.pay_state = 1;
+            }
+            if (!order.pay_method.Trim().Equals("微信支付") && order.pay_memo.Trim().Equals("部分支付"))
+            {
+                order.pay_state = 2;
+            }
             await _context.OrderOnlines.AddAsync(order);
             int i = await _context.SaveChangesAsync();
             if (i <= 0)

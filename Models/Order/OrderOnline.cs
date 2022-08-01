@@ -29,10 +29,10 @@ namespace SnowmeetApi.Models
         public string syssn { get; set; }
         public string memo { get; set; } = "";
         public string shop { get; set; }
-        public int? mchid { get; set; }
+        public string? mchid { get; set; }
         public double ticket_amount { get; set; }
         public double score_rate { get; set; }
-        public int generate_score { get; set; }
+        public double generate_score { get; set; }
         public string ticket_code { get; set; }
         public string out_trade_no { get; set; }
         public string pay_memo { get; set; } = "全额支付";
