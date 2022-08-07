@@ -102,11 +102,11 @@ namespace SnowmeetApi.Controllers
                 return NoContent();
             }
             OrderPayment payment = await _context.OrderPayment.FindAsync(paymentId);
-            if (payment == null)
+            if (payment == null || payment.status.Trim().Equals(""))
             {
                 return NotFound();
             }
-            if (!payment.staff_open_id.Trim().Equals(user.miniAppOpenId.Trim()) && !payment.staff_open_id.Trim().Equals(""))
+            if (!payment.staff_open_id.Trim().Equals(user.miniAppOpenId.Trim()) && !payment.staff_open_id.Trim().Equals("待支付"))
             {
                 return NoContent();
             }
@@ -130,16 +130,47 @@ namespace SnowmeetApi.Controllers
                 {
                     order.pay_state = -1;
                 }
+                order.pay_time = DateTime.Now;
                 _context.Entry(order).State = EntityState.Modified;
                 await _context.SaveChangesAsync();
+                if (!order.ticket_code.Trim().Equals(""))
+                {
+                    var ticket = await _context.Ticket.FindAsync(order.ticket_code.Trim());
+                    ticket.used = 1;
+                    ticket.used_time = DateTime.Now;
+                    _context.Entry(ticket).State = EntityState.Modified;
+                    await _context.SaveChangesAsync();
+                }
             }
             else
             {
                 return NotFound();
             }
+            return await GetWholeOrderByStaff(payment.order_id, staffSessionKey);
+        }
 
-
-            return order;
+        [HttpPost("{orderId}")]
+        public async Task<ActionResult<OrderOnline>> ConfirmNonPaymentOrder(int orderId, string staffSessionKey)
+        {
+            UnicUser._context = _context;
+            UnicUser user = UnicUser.GetUnicUser(staffSessionKey);
+            if (!user.isAdmin)
+            {
+                return NoContent();
+            }
+            var order = await _context.OrderOnlines.FindAsync(orderId);
+            if (order.pay_state == 0 && order.pay_memo.Trim().Equals("无需付款"))
+            {
+                order.pay_state = 1;
+                order.pay_time = DateTime.Now;
+                _context.Entry(order).State = EntityState.Modified;
+                await _context.SaveChangesAsync();
+                return await GetWholeOrderByStaff(orderId, staffSessionKey);
+            }
+            else
+            {
+                return NotFound();
+            }
         }
 
 
