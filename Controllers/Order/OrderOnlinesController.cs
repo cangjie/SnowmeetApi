@@ -185,8 +185,16 @@ namespace SnowmeetApi.Controllers
                 return NoContent();
             }
             order.staff_open_id = user.miniAppOpenId.Trim();
-            order.score_rate = Util.GetScoreRate(order.final_price, order.order_price);
-            order.generate_score = (int)(order.final_price * order.score_rate);
+            if (order.have_score == 1)
+            {
+                order.score_rate = Util.GetScoreRate(order.final_price, order.order_price);
+                order.generate_score = (int)(order.final_price * order.score_rate);
+            }
+            else
+            {
+                order.score_rate = 0;
+                order.generate_score = 0;
+            }
             order.pay_state = 0;
             await _context.OrderOnlines.AddAsync(order);
             int i = await _context.SaveChangesAsync();
