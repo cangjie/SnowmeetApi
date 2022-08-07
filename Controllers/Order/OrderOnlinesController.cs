@@ -139,7 +139,7 @@ namespace SnowmeetApi.Controllers
                 order.payments[0] = payment;
             }
 
-            if (order.user != null && !order.user.open_id.Trim().Equals(""))
+            if (order.user != null && order.user.open_id != null &&  !order.user.open_id.Trim().Equals(""))
             {
                 MiniAppUser customerUser = await _context.MiniAppUsers.FindAsync(order.user.open_id);
                 customerUser.real_name = order.user.real_name.Trim();
