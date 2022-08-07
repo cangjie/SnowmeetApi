@@ -91,7 +91,58 @@ namespace SnowmeetApi.Controllers
             }
             return order;
         }
-        
+
+        [HttpGet("{paymentId}")]
+        public async Task<ActionResult<OrderOnline>> SetPaymentSuccess(int paymentId, string staffSessionKey)
+        {
+            UnicUser._context = _context;
+            UnicUser user = UnicUser.GetUnicUser(staffSessionKey);
+            if (!user.isAdmin)
+            {
+                return NoContent();
+            }
+            OrderPayment payment = await _context.OrderPayment.FindAsync(paymentId);
+            if (payment == null)
+            {
+                return NotFound();
+            }
+            if (!payment.staff_open_id.Trim().Equals(user.miniAppOpenId.Trim()) && !payment.staff_open_id.Trim().Equals(""))
+            {
+                return NoContent();
+            }
+            payment.status = "支付成功";
+            _context.Entry(payment).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
+
+            var payments =  await _context.OrderPayment.Where(p => (p.status == "支付成功" && p.order_id == payment.order_id)).ToListAsync();
+
+            var paidAmount = payments.Sum(p => p.amount);
+
+
+            OrderOnline order = await _context.OrderOnlines.FindAsync(payment.order_id);
+            if (order != null)
+            {
+                if (order.final_price <= paidAmount)
+                {
+                    order.pay_state = 1;
+                }
+                else
+                {
+                    order.pay_state = -1;
+                }
+                _context.Entry(order).State = EntityState.Modified;
+                await _context.SaveChangesAsync();
+            }
+            else
+            {
+                return NotFound();
+            }
+
+
+            return order;
+        }
+
+
         [HttpPost]
         public async Task<ActionResult<OrderOnline>> PlaceOrderByStaff(OrderOnline order, string staffSessionKey)
         {
@@ -105,15 +156,7 @@ namespace SnowmeetApi.Controllers
             order.staff_open_id = user.miniAppOpenId.Trim();
             order.score_rate = Util.GetScoreRate(order.final_price, order.order_price);
             order.generate_score = (int)(order.final_price * order.score_rate);
-            if (order.pay_memo.Trim().Equals("无需付款")
-                || (!order.pay_method.Trim().Equals("微信支付") && order.pay_memo.Trim().Equals("全额支付")))
-            {
-                order.pay_state = 1;
-            }
-            if (!order.pay_method.Trim().Equals("微信支付") && order.pay_memo.Trim().Equals("部分支付"))
-            {
-                order.pay_state = 2;
-            }
+            order.pay_state = 0;
             await _context.OrderOnlines.AddAsync(order);
             int i = await _context.SaveChangesAsync();
             if (i <= 0)
@@ -134,6 +177,7 @@ namespace SnowmeetApi.Controllers
                 var payment = order.payments[0];
                 payment.order_id = order.id;
                 payment.status = "待支付";
+                payment.staff_open_id = order.staff_open_id;
                 await _context.OrderPayment.AddAsync(payment);
                 await _context.SaveChangesAsync();
                 order.payments[0] = payment;
