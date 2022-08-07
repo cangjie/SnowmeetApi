@@ -38,6 +38,7 @@ namespace SnowmeetApi.Models
         public string pay_memo { get; set; } = "全额支付";
         public double other_discount { get; set; }
         public double final_price { get; set; }
+        public string? staff_open_id { get; set; }
 
         [NotMapped]
         public OrderPayment[]? payments { get; set; }

@@ -102,6 +102,7 @@ namespace SnowmeetApi.Controllers
             {
                 return NoContent();
             }
+            order.staff_open_id = user.miniAppOpenId.Trim();
             order.score_rate = Util.GetScoreRate(order.final_price, order.order_price);
             order.generate_score = (int)(order.final_price * order.score_rate);
             if (order.pay_memo.Trim().Equals("无需付款")
