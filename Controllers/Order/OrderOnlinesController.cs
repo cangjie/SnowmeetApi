@@ -211,7 +211,7 @@ namespace SnowmeetApi.Controllers
                 }
                 await _context.SaveChangesAsync();
             }
-            if (order.payments != null && order.payments.Length == 1 && !order.pay_memo.Trim().Equals("无需付款"))
+            if (order.payments != null && order.payments.Length == 1 && !(order.pay_memo.Trim().Equals("无需付款") || order.pay_memo.Trim().Equals("暂缓支付")))
             {
                 var payment = order.payments[0];
                 payment.order_id = order.id;
