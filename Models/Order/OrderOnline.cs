@@ -40,6 +40,7 @@ namespace SnowmeetApi.Models
         public double final_price { get; set; }
         public string? staff_open_id { get; set; }
         public int have_score { get; set; }
+        public DateTime create_date { get; set; }
 
         [NotMapped]
         public OrderPayment[]? payments { get; set; }
@@ -47,7 +48,60 @@ namespace SnowmeetApi.Models
         public MiniAppUser? user { get; set; }
         [NotMapped]
         public Mi7Order[]? mi7Orders { get; set; }
-        
+        [NotMapped]
+        public string status
+        {
+            get
+            {
+                string str = "待支付";
+                if (paidAmount == 0)
+                {
+                    switch (pay_memo.Trim())
+                    {
+                        case "无需支付":
+                            str = "支付完成";
+                            break;
+                        case "暂缓支付":
+                            str = "待支付";
+                            break;
+                        default:
+                            if (create_date.AddDays(1) < DateTime.Now)
+                            {
+                                str = "订单关闭";
+                            }
+                            break;
+                    }
+                }
+                else if (paidAmount >= final_price)
+                {
+                    str = "支付完成";
+                }
+                else if (paidAmount > 0 && paidAmount < final_price)
+                {
+                    str = "部分支付";
+                }
+                return str.Trim();
+            }
+        }
+        [NotMapped]
+        public double paidAmount
+        {
+            get
+            {
+                double amount = 0;
+                if (payments != null)
+                {
+                    for (int i = 0; i < payments.Length; i++)
+                    {
+                        if (payments[i].status.Trim().Equals("支付成功"))
+                        {
+                            amount = amount + payments[i].amount;
+                        }
+                    }
+                }
+                return amount;
+            }
+        }
         
         /*
         

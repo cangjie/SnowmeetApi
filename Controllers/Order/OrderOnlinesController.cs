@@ -51,6 +51,23 @@ namespace SnowmeetApi.Controllers
             return Util.GetScoreRate(finalPrice, orderPrice);
         }
 
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<OrderOnline>>> GetOrdersByStaff(DateTime startDate, DateTime endDate,
+            string shop, string status, string staffSessionKey)
+        {
+            staffSessionKey = Util.UrlDecode(staffSessionKey);
+            UnicUser._context = _context;
+            UnicUser user = UnicUser.GetUnicUser(staffSessionKey);
+            if (!user.isAdmin)
+            {
+                return NoContent();
+            }
+            var list = await _context.OrderOnlines.Where(o => (o.create_date >= startDate && o.create_date <= endDate
+             && (shop==null ? true : (o.shop.Trim().Equals(shop.Trim())))
+             && (status==null ? true : (o.status.Trim().Equals(status.Trim()))))).OrderByDescending(o => o.id).ToListAsync();
+            return list;
+        }
+
         [HttpGet("{orderId}")]
         public async Task<ActionResult<OrderOnline>> GetWholeOrderByStaff(int orderId, string staffSessionKey)
         {
