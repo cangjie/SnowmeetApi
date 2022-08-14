@@ -5,14 +5,17 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using SnowmeetApi.Models.Order;
 using SnowmeetApi.Models.Users;
+using SnowmeetApi.Models.Ticket;
 
 namespace SnowmeetApi.Models
 {
     [Table("order_online")]
     public class OrderOnline
     {
+        public string staffRealName = "";
 
-        
+        public Ticket.Ticket[] ticketArray = new Ticket.Ticket[0];
+   
         [Key]
         public int id { get; set; }
 
@@ -100,6 +103,24 @@ namespace SnowmeetApi.Models
                     }
                 }
                 return amount;
+            }
+        }
+
+        [NotMapped]
+        public string staffName
+        {
+            get
+            {
+                return staffRealName.Trim();
+            }
+        }
+
+        [NotMapped]
+        public Ticket.Ticket[] tickets
+        {
+            get
+            {
+                return ticketArray;
             }
         }
         

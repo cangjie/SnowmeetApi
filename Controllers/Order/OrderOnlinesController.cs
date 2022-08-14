@@ -106,6 +106,23 @@ namespace SnowmeetApi.Controllers
                 var payments = await _context.OrderPayment.Where(p => p.order_id == orderId).ToArrayAsync();
                 order.payments = payments;
             }
+
+            string staffRealName = "";
+            if (order.staff_open_id != null && !order.staff_open_id.Trim().Equals(""))
+            {
+                MiniAppUser staffUser = await _context.MiniAppUsers.FindAsync(order.staff_open_id);
+                if (staffUser != null)
+                {
+                    staffRealName = staffUser.real_name.Trim();
+                }
+            }
+            order.staffRealName = staffRealName.Trim();
+
+            if (order.ticket_code != null && !order.ticket_code.Trim().Equals(""))
+            {
+                order.ticketArray = await _context.Ticket.Where(t => t.code.Trim().Equals(order.ticket_code)).ToArrayAsync();
+            }
+
             return order;
         }
 
