@@ -104,6 +104,18 @@ namespace SnowmeetApi.Controllers
             if (!order.pay_memo.Trim().Equals("无需支付"))
             {
                 var payments = await _context.OrderPayment.Where(p => p.order_id == orderId).ToArrayAsync();
+                for (int i = 0; i < payments.Length; i++)
+                {
+                    var payment = payments[i];
+                    if (payment.staff_open_id != null && !payment.staff_open_id.Trim().Equals(""))
+                    {
+                        var staffUser = await _context.MiniAppUsers.FindAsync(payment.staff_open_id);
+                        if (staffUser != null)
+                        {
+                            payment.staffRealName = staffUser.real_name.Trim();
+                        }
+                    }
+                }
                 order.payments = payments;
             }
 

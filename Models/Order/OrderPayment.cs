@@ -6,6 +6,9 @@ namespace SnowmeetApi.Models.Order
     [Table("order_payment")]
     public class OrderPayment
     {
+
+        public string staffRealName = "";
+
         [Key]
         public int id { get; set; }
 
@@ -24,6 +27,15 @@ namespace SnowmeetApi.Models.Order
         public string? prepay_id { get; set; }
         public string? ssyn { get; set; }
         public string staff_open_id { get; set; } = "";
+
+        [NotMapped]
+        public string staffName
+        {
+            get
+            {
+                return staffRealName.Trim();
+            }
+        }
     }
 }
 
