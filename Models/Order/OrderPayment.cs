@@ -27,6 +27,7 @@ namespace SnowmeetApi.Models.Order
         public string? prepay_id { get; set; }
         public string? ssyn { get; set; }
         public string staff_open_id { get; set; } = "";
+        public DateTime create_date { get; set; }
 
         [NotMapped]
         public string staffName
