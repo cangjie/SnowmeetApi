@@ -55,6 +55,8 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<IEnumerable<OrderOnline>>> GetOrdersByStaff(DateTime startDate, DateTime endDate,
             string shop, string status, string staffSessionKey)
         {
+            startDate = startDate.Date;
+            endDate = endDate.Date.AddHours(24);
             staffSessionKey = Util.UrlDecode(staffSessionKey);
             UnicUser._context = _context;
             UnicUser user = UnicUser.GetUnicUser(staffSessionKey);
