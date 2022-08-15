@@ -63,9 +63,25 @@ namespace SnowmeetApi.Controllers
                 return NoContent();
             }
             var list = await _context.OrderOnlines.Where(o => (o.create_date >= startDate && o.create_date <= endDate
-             && (shop==null ? true : (o.shop.Trim().Equals(shop.Trim())))
-             && (status==null ? true : (o.status.Trim().Equals(status.Trim()))))).OrderByDescending(o => o.id).ToListAsync();
-            return list;
+             && (shop==null ? true : (o.shop.Trim().Equals(shop.Trim()))))).OrderByDescending(o => o.id).ToListAsync();
+
+            if (status == null || status.Trim().Equals(""))
+            {
+                return list;
+            }
+            else
+            {
+                var newList = new List<OrderOnline>();
+                for (int i = 0; i < list.Count; i++)
+                {
+                    if (list[i].status.Trim().Equals(status.Trim()))
+                    {
+                        newList.Add(list[i]);
+                    }
+                }
+                return newList;
+            }
+          
         }
 
         [HttpGet("{orderId}")]
