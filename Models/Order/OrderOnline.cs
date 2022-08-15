@@ -43,7 +43,7 @@ namespace SnowmeetApi.Models
         public double final_price { get; set; }
         public string? staff_open_id { get; set; }
         public int have_score { get; set; }
-        public DateTime create_date { get; set; }
+        public DateTime create_date { get; set; } = DateTime.Now;
 
         [NotMapped]
         public OrderPayment[]? payments { get; set; }
