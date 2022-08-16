@@ -51,6 +51,45 @@ namespace SnowmeetApi.Controllers
             return Util.GetScoreRate(finalPrice, orderPrice);
         }
 
+        [HttpGet("{orderId}")]
+        public async Task<ActionResult<OrderOnline>> OrderChargeByStaff(int orderId, double amount, string payMethod, string staffSessionKey)
+        {
+            UnicUser._context = _context;
+            UnicUser user = UnicUser.GetUnicUser(staffSessionKey);
+            if (!user.isAdmin)
+            {
+                return NoContent();
+            }
+            OrderOnline order = (await GetWholeOrderByStaff(orderId, staffSessionKey)).Value;
+            if (order == null)
+            {
+                return NotFound();
+            }
+            if (order.paidAmount + amount > order.final_price)
+            {
+                return NoContent();
+            }
+            OrderPayment payment = new OrderPayment()
+            {
+                order_id = order.id,
+                pay_method = payMethod.Trim(),
+                amount = amount,
+                staff_open_id = user.miniAppOpenId.Trim()
+            };
+            if (!payMethod.Trim().Equals("微信支付"))
+            {
+                payment.status = "支付成功";
+            }
+            else
+            {
+                payment.status = "待支付";
+            }
+            await _context.OrderPayment.AddAsync(payment);
+            await _context.SaveChangesAsync();
+
+            return (await GetWholeOrderByStaff(orderId, staffSessionKey)).Value;
+        }
+
         [HttpGet]
         public async Task<ActionResult<IEnumerable<OrderOnline>>> GetOrdersByStaff(DateTime startDate, DateTime endDate,
             string shop, string status, string staffSessionKey)
