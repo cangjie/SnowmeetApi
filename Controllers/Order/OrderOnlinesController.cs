@@ -87,6 +87,15 @@ namespace SnowmeetApi.Controllers
             await _context.OrderPayment.AddAsync(payment);
             await _context.SaveChangesAsync();
 
+            order = (await GetWholeOrderByStaff(orderId, staffSessionKey)).Value;
+
+            if (order.paidAmount >= order.final_price)
+            {
+                order.pay_state = 1;
+                _context.Entry(order).State = EntityState.Modified;
+                await _context.SaveChangesAsync();
+            }
+
             return (await GetWholeOrderByStaff(orderId, staffSessionKey)).Value;
         }
 
