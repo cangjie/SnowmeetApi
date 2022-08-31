@@ -30,7 +30,9 @@ namespace SnowmeetApi.Controllers
         [HttpGet]
         public async Task<ActionResult<Equip[]>> GetEquip(string openId)
         {
-            var list = await _context.MaintainLives.Where(m => m.open_id.Trim().Equals(openId))
+            openId = Util.UrlDecode(openId);
+            var list = await _context.MaintainLives
+                .Where(m => (m.open_id.Trim().Equals(openId) && m.task_flow_num != null ))
                 .Select(m => new { m.confirmed_equip_type, m.confirmed_brand, m.confirmed_scale })
                 .Distinct()
                 .ToListAsync();
@@ -47,6 +49,17 @@ namespace SnowmeetApi.Controllers
                 };
             }
             return equipArr;
+        }
+
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<MaintainLive>>> GetMaintainLog(string openId)
+        {
+            openId = Util.UrlDecode(openId);
+            var list = await _context.MaintainLives
+                .Where(m => (m.open_id.Trim().Equals(openId) && m.task_flow_num != null))
+                .OrderByDescending(m => m.id).ToListAsync();
+            return list;
+
         }
 
 
