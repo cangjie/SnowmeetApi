@@ -10,6 +10,7 @@ using SnowmeetApi.Models;
 using Microsoft.Extensions.Configuration;
 using SnowmeetApi.Models.Users;
 using SnowmeetApi.Models.Product;
+using SnowmeetApi.Models.Maintain;
 namespace SnowmeetApi.Controllers
 {
     [Route("core/[controller]/[action]")]
@@ -24,6 +25,28 @@ namespace SnowmeetApi.Controllers
         {
             _context = context;
             _config = config.GetSection("Settings");
+        }
+
+        [HttpGet]
+        public async Task<ActionResult<Equip[]>> GetEquip(string openId)
+        {
+            var list = await _context.MaintainLives.Where(m => m.open_id.Trim().Equals(openId))
+                .Select(m => new { m.confirmed_equip_type, m.confirmed_brand, m.confirmed_scale })
+                .Distinct()
+                .ToListAsync();
+            Equip[] equipArr = new Equip[list.Count];
+            for (int i = 0; i < list.Count; i++)
+            {
+                equipArr[i] = new Equip()
+                {
+                    type = list[i].confirmed_equip_type.Trim(),
+                    brand = list[i].confirmed_brand.Trim(),
+                    serial = "",
+                    year = "",
+                    scale = list[i].confirmed_scale.Trim()
+                };
+            }
+            return equipArr;
         }
 
 
