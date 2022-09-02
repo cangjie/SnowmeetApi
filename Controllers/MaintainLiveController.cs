@@ -28,8 +28,15 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<Equip[]>> GetEquip(string openId)
+        public async Task<ActionResult<Equip[]>> GetEquip(string openId, string sessionKey)
         {
+            sessionKey = Util.UrlDecode(sessionKey);
+            UnicUser._context = _context;
+            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            if (!user.isAdmin)
+            {
+                return NoContent();
+            }
             openId = Util.UrlDecode(openId);
             var list = await _context.MaintainLives
                 .Where(m => (m.open_id.Trim().Equals(openId) && m.task_flow_num != null ))
@@ -52,8 +59,14 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<MaintainLive>>> GetMaintainLog(string openId)
+        public async Task<ActionResult<IEnumerable<MaintainLive>>> GetMaintainLog(string openId, string sessionKey)
         {
+            UnicUser._context = _context;
+            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            if (!user.isAdmin)
+            {
+                return NoContent();
+            }
             openId = Util.UrlDecode(openId);
             var list = await _context.MaintainLives
                 .Where(m => (m.open_id.Trim().Equals(openId) && m.task_flow_num != null))
