@@ -31,6 +31,8 @@ namespace SnowmeetApi.Data
             //SchoolLesson
             modelBuilder.Entity<SchoolLesson>().HasKey(c => c.id);
 
+            modelBuilder.Entity<SnowmeetApi.Models.Maintain.Brand>().HasNoKey();
+
             //OrderOnline
             //modelBuilder.Entity<OrderOnline>().HasKey(c => c.id);
 
@@ -81,5 +83,7 @@ namespace SnowmeetApi.Data
         public DbSet<SnowmeetApi.Models.Order.ShopSaleInteract> ShopSaleInteract { get; set; }
 
         public DbSet<SnowmeetApi.Models.Order.OrderPayment> OrderPayment { get; set; }
+
+        public DbSet<SnowmeetApi.Models.Maintain.Brand> Brand { get; set; }
     }
 }

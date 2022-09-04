@@ -28,6 +28,12 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet]
+        public async Task<ActionResult<IEnumerable<Brand>>> GetBrand(string type)
+        {
+            return await _context.Brand.Where(b => b.brand_type.Trim().Equals(type.Trim())).ToListAsync();
+        }
+
+        [HttpGet]
         public async Task<ActionResult<Equip[]>> GetEquip(string openId, string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey);
