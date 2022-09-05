@@ -85,5 +85,7 @@ namespace SnowmeetApi.Data
         public DbSet<SnowmeetApi.Models.Order.OrderPayment> OrderPayment { get; set; }
 
         public DbSet<SnowmeetApi.Models.Maintain.Brand> Brand { get; set; }
+
+        public DbSet<SnowmeetApi.Models.UploadFile> UploadFile { get; set; }
     }
 }

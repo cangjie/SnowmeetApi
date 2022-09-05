@@ -47,5 +47,9 @@
     <Folder Include="Models\Order\" />
     <Folder Include="Controllers\Order\" />
     <Folder Include="Controllers\User\" />
+    <Folder Include="wwwroot\upload\" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Remove="wwwroot\upload\" />
   </ItemGroup>
 </Project>
