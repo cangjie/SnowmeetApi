@@ -14,7 +14,7 @@ using SnowmeetApi.Models.Users;
 
 namespace SnowmeetApi.Controllers
 {
-    [Route("api/[controller]/[action]")]
+    [Route("core/[controller]/[action]")]
     [ApiController]
     public class UploadFileController : ControllerBase
     {
