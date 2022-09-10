@@ -40,7 +40,19 @@ namespace SnowmeetApi.Models
         public string confirmed_name { get; set; }
         public string confirmed_gender { get; set; }
         public int confirmed_product_id { get; set; }
-        public string confirmed_images { get; set; }
+        public string confirmed_images { get; set; } = "";
+
+        public int confirmed_urgent { get; set; } = 0;
+        public string confirmed_foot_length { get; set; } = "";
+        public string confirmed_front { get; set; } = "";
+        public string confirmed_height { get; set; } = "";
+        public string confirmed_weight { get; set; } = "";
+        public string confirmed_binder_gap { get; set; } = "";
+        public string confirmed_front_din { get; set; } = "";
+        public string confirmed_rear_din { get; set; } = "";
+        public string confirmed_angle { get; set; } = "";
+        public string confirmed_relation { get; set; } = "";
+
         public int batch_id { get; set; }
         public int label_printed { get; set; }
         public string? task_flow_num { get; set; }
