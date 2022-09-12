@@ -47,6 +47,14 @@ namespace SnowmeetApi.Controllers
             return await _context.Product.FindAsync(id);
         }
 
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<Product>>> GetMaintainProduct(string shop)
+        {
+            return await _context.Product
+                .Where(p => (p.id == 137 || p.id == 138 || p.id == 139 || p.id == 140 || p.id == 142 || p.id == 143 || p.id == 202))
+                .ToListAsync();
+        }
+
         /*
 
         // GET: api/Product
