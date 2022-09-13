@@ -20,12 +20,52 @@ namespace SnowmeetApi.Controllers
         private readonly ApplicationDBContext _context;
         private IConfiguration _config;
 
+        
 
         public MaintainLiveController(ApplicationDBContext context, IConfiguration config)
         {
             _context = context;
             _config = config.GetSection("Settings");
         }
+
+        [HttpPost("{sessionKey}")]
+        public async Task<ActionResult<MaintainOrder>> Recept(string sessionKey, MaintainOrder maintainOrder)
+        {
+            UnicUser._context = _context;
+            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            if (!user.isAdmin)
+            {
+                return NoContent();
+            }
+
+            if (!maintainOrder.payOption.Trim().Equals("无需支付"))
+            {
+                OrderOnline order = new OrderOnline()
+                {
+                    id = 0,
+                    open_id = maintainOrder.customerOpenId,
+                    cell_number = maintainOrder.cell.Trim(),
+                    pay_method = maintainOrder.payMethod.Trim(),
+                    pay_memo = maintainOrder.payOption.Trim(),
+                    pay_state = 0,
+                    order_price = maintainOrder.summaryPrice,
+                    order_real_pay_price = maintainOrder.summaryPrice,
+                    ticket_amount = maintainOrder.ticketDiscount,
+                    other_discount = maintainOrder.discount,
+                    final_price = maintainOrder.summaryPrice - maintainOrder.ticketDiscount - maintainOrder.discount,
+                    ticket_code = maintainOrder.ticketCode.Trim()
+
+
+                };
+            }
+            
+
+            //OrderOnline order = new OrderOnline();
+            
+            return maintainOrder;
+        }
+
+
 
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Brand>>> GetBrand(string type)
