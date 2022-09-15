@@ -28,7 +28,7 @@ namespace SnowmeetApi.Controllers
             _config = config.GetSection("Settings");
         }
 
-        [HttpPost("{sessionKey}")]
+        [HttpPost]
         public async Task<ActionResult<MaintainOrder>> Recept(string sessionKey, MaintainOrder maintainOrder)
         {
             UnicUser._context = _context;
@@ -37,6 +37,8 @@ namespace SnowmeetApi.Controllers
             {
                 return NoContent();
             }
+
+            int orderId = 0;
 
             if (!maintainOrder.payOption.Trim().Equals("无需支付"))
             {
@@ -53,12 +55,53 @@ namespace SnowmeetApi.Controllers
                     ticket_amount = maintainOrder.ticketDiscount,
                     other_discount = maintainOrder.discount,
                     final_price = maintainOrder.summaryPrice - maintainOrder.ticketDiscount - maintainOrder.discount,
-                    ticket_code = maintainOrder.ticketCode.Trim()
-
-
+                    ticket_code = maintainOrder.ticketCode.Trim(),
+                    staff_open_id = user.miniAppOpenId.Trim()
                 };
+                await _context.AddAsync(order);
+                await _context.SaveChangesAsync();
+                orderId = order.id;
+                if (order.id <= 0)
+                {
+                    return NotFound();
+                }
+                for (int i = 0; i < maintainOrder.items.Length; i++)
+                {
+                    MaintainLive item = maintainOrder.items[i];
+                    if (item.confirmed_product_id > 0)
+                    {
+                        OrderOnlineDetail detail = new OrderOnlineDetail()
+                        {
+                            OrderOnlineId = orderId,
+                            product_id = item.confirmed_product_id,
+                            count = 1
+                        };
+                        await _context.AddAsync(detail);
+                        await _context.SaveChangesAsync();
+                    }
+                    if (item.confirmed_additional_fee > 0)
+                    {
+                        OrderOnlineDetail detail = new OrderOnlineDetail()
+                        {
+                            OrderOnlineId = orderId,
+                            product_id = 146,
+                            count = (int)item.confirmed_additional_fee
+                        };
+                        await _context.AddAsync(detail);
+                        await _context.SaveChangesAsync();
+                    }
+                }
+
             }
-            
+
+            for (int i = 0; i < maintainOrder.items.Length; i++)
+            {
+                MaintainLive item = maintainOrder.items[i];
+                item.order_id = orderId;
+                item.service_open_id = user.miniAppOpenId.Trim();
+                await _context.AddAsync(item);
+                await _context.SaveChangesAsync();
+            }
 
             //OrderOnline order = new OrderOnline();
             

@@ -13,16 +13,16 @@ namespace SnowmeetApi.Models
         public string open_id { get; set; }
         
         public string equip_type { get; set; }
-        public string brand { get; set; }
-        public string scale { get; set; }
-        public int edge { get; set; }
-        public int candle { get; set; }
-        public int repair_more { get; set; }
-        public DateTime? pick_date { get; set; }
-        
-        public int task_id { get; set; }
-        public int order_id { get; set; }
-        public string service_open_id { get; set; }
+        public string brand { get; set; } = "";
+        public string scale { get; set; } = "";
+        public int edge { get; set; } = 0;
+        public int candle { get; set; } = 0;
+        public int repair_more { get; set; } = 0;
+        public DateTime? pick_date { get; set; } = DateTime.Now;
+
+        public int task_id { get; set; } = 0;
+        public int order_id { get; set; } = 0;
+        public string service_open_id { get; set; } = "";
         public string confirmed_equip_type { get; set; }
         public string confirmed_brand { get; set; }
         public string confirmed_serial { get; set; }
@@ -34,7 +34,7 @@ namespace SnowmeetApi.Models
         public int confirmed_candle { get; set; }
         public string confirmed_more { get; set; }
         public string confirmed_memo { get; set; }
-        public DateTime confirmed_pick_date { get; set; }
+        public DateTime confirmed_pick_date { get; set; } = DateTime.Now;
         public double confirmed_additional_fee { get; set; }
         public string confirmed_cell { get; set; }
         public string confirmed_name { get; set; }
@@ -53,16 +53,16 @@ namespace SnowmeetApi.Models
         public string confirmed_angle { get; set; } = "";
         public string confirmed_relation { get; set; } = "";
 
-        public int batch_id { get; set; }
-        public int label_printed { get; set; }
-        public string? task_flow_num { get; set; }
-        public int finish { get; set; }
-        public string ticket_code { get; set; }
-        public DateTime create_date { get; set; }
+        public int batch_id { get; set; } = 0;
+        public int label_printed { get; set; } = 0;
+        public string? task_flow_num { get; set; } = "";
+        public int finish { get; set; } = 0;
+        public string ticket_code { get; set; } = "";
+        public DateTime create_date { get; set; } = DateTime.Now;
 
-        public string pay_method { get; set; }
+        public string pay_method { get; set; } = "微信支付";
 
-        public string pay_memo { get; set; }
+        public string pay_memo { get; set; } = "";
 
 
         //附加费用商品编号
