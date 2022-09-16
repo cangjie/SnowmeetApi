@@ -5,6 +5,8 @@ namespace SnowmeetApi.Models.Maintain
     public class MaintainOrder
     {
         public string shop { get; set; } = "";
+        public string name { get; set; } = "";
+        public string gender { get; set; } = "";
         public string payMethod { get; set; } = "";
         public string payOption { get; set; } = "";
         public float summaryPrice { get; set; } = 0;

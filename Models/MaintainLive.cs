@@ -32,14 +32,14 @@ namespace SnowmeetApi.Models
         public int confirmed_edge { get; set; }
         public int confirmed_degree { get; set; }
         public int confirmed_candle { get; set; }
-        public string confirmed_more { get; set; }
-        public string confirmed_memo { get; set; }
+        public string confirmed_more { get; set; } = "";
+        public string confirmed_memo { get; set; } = "";
         public DateTime confirmed_pick_date { get; set; } = DateTime.Now;
-        public double confirmed_additional_fee { get; set; }
-        public string confirmed_cell { get; set; }
-        public string confirmed_name { get; set; }
-        public string confirmed_gender { get; set; }
-        public int confirmed_product_id { get; set; }
+        public double confirmed_additional_fee { get; set; } = 0;
+        public string confirmed_cell { get; set; } = "";
+        public string confirmed_name { get; set; } = "";
+        public string confirmed_gender { get; set; } = "";
+        public int confirmed_product_id { get; set; } = 0;
         public string confirmed_images { get; set; } = "";
 
         public int confirmed_urgent { get; set; } = 0;

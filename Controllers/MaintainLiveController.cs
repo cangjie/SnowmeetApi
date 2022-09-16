@@ -39,13 +39,24 @@ namespace SnowmeetApi.Controllers
             }
 
             int orderId = 0;
-
+            string customerName = maintainOrder.name.Trim();
+            if (maintainOrder.gender.Trim().Equals("男"))
+            {
+                customerName += "先生";
+            }
+            if (maintainOrder.gender.Trim().Equals("女"))
+            {
+                customerName += "女士";
+            }
             if (!maintainOrder.payOption.Trim().Equals("无需支付"))
             {
                 OrderOnline order = new OrderOnline()
                 {
                     id = 0,
+                    type = "服务",
+                    shop = maintainOrder.shop.Trim(),
                     open_id = maintainOrder.customerOpenId,
+                    name = customerName,
                     cell_number = maintainOrder.cell.Trim(),
                     pay_method = maintainOrder.payMethod.Trim(),
                     pay_memo = maintainOrder.payOption.Trim(),
