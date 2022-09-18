@@ -1,7 +1,7 @@
 ﻿using System;
 namespace SnowmeetApi.Models.Maintain
 {
-    
+       
     public class MaintainOrder
     {
         public string shop { get; set; } = "";
@@ -17,6 +17,7 @@ namespace SnowmeetApi.Models.Maintain
         public string customerOpenId { get; set; } = "";
         public string cell { get; set; } = "";
         public MaintainLive[] items { get; set; } = new MaintainLive[0];
+        public OrderOnline? order { get; set; } 
     }
 }
 

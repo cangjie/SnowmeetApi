@@ -20,12 +20,38 @@ namespace SnowmeetApi.Controllers
         private readonly ApplicationDBContext _context;
         private IConfiguration _config;
 
-        
+
 
         public MaintainLiveController(ApplicationDBContext context, IConfiguration config)
         {
             _context = context;
             _config = config.GetSection("Settings");
+        }
+
+        [HttpGet("{orderId}")]
+        public async Task<ActionResult<MaintainOrder>> GetMaintainOrder(int orderId, string sessionKey)
+        { 
+            if (orderId <= 0)
+            {
+                return NotFound();
+            }
+            UnicUser._context = _context;
+            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            if (!user.isAdmin)
+            {
+                return NoContent();
+            }
+            MaintainLive[] items = await _context.MaintainLives.Where(m => m.order_id == orderId).ToArrayAsync();
+            OrderOnline order = await _context.OrderOnlines.FindAsync(orderId);
+            MaintainOrder mOrder = new MaintainOrder()
+            {
+                cell = order.cell_number,
+                name = order.name,
+                orderId = orderId,
+                order = order,
+                items = items
+            };
+            return mOrder;
         }
 
         [HttpPost]
@@ -72,6 +98,7 @@ namespace SnowmeetApi.Controllers
                 await _context.AddAsync(order);
                 await _context.SaveChangesAsync();
                 orderId = order.id;
+                maintainOrder.order = order;
                 if (order.id <= 0)
                 {
                     return NotFound();
@@ -115,6 +142,7 @@ namespace SnowmeetApi.Controllers
             }
 
             maintainOrder.orderId = orderId;
+            
             //OrderOnline order = new OrderOnline();
             
             return maintainOrder;
