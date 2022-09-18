@@ -1,4 +1,5 @@
 ﻿using System;
+using SnowmeetApi.Models.Ticket;
 namespace SnowmeetApi.Models.Maintain
 {
        
@@ -17,7 +18,8 @@ namespace SnowmeetApi.Models.Maintain
         public string customerOpenId { get; set; } = "";
         public string cell { get; set; } = "";
         public MaintainLive[] items { get; set; } = new MaintainLive[0];
-        public OrderOnline? order { get; set; } 
+        public OrderOnline? order { get; set; }
+        public Ticket.Ticket? ticket { get; set; }
     }
 }
 

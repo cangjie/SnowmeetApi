@@ -51,6 +51,10 @@ namespace SnowmeetApi.Controllers
                 order = order,
                 items = items
             };
+            if (!order.ticket_code.Trim().Equals(""))
+            {
+                mOrder.ticket = await _context.Ticket.FindAsync(order.ticket_code.Trim());
+            }
             return mOrder;
         }
 
