@@ -11,6 +11,7 @@ using Microsoft.Extensions.Configuration;
 using SnowmeetApi.Models.Users;
 using SnowmeetApi.Models.Product;
 using SnowmeetApi.Models.Maintain;
+using SnowmeetApi.Models.Ticket;
 namespace SnowmeetApi.Controllers
 {
     [Route("core/[controller]/[action]")]
@@ -19,18 +20,19 @@ namespace SnowmeetApi.Controllers
     {
         private readonly ApplicationDBContext _context;
         private IConfiguration _config;
-
+        private IConfiguration _originConfig;
 
 
         public MaintainLiveController(ApplicationDBContext context, IConfiguration config)
         {
             _context = context;
             _config = config.GetSection("Settings");
+            _originConfig = config;
         }
 
         [HttpGet("{orderId}")]
         public async Task<ActionResult<MaintainOrder>> GetMaintainOrder(int orderId, string sessionKey)
-        { 
+        {
             if (orderId <= 0)
             {
                 return NotFound();
@@ -146,11 +148,99 @@ namespace SnowmeetApi.Controllers
             }
 
             maintainOrder.orderId = orderId;
-            
+
             //OrderOnline order = new OrderOnline();
-            
+
             return maintainOrder;
         }
+
+        [HttpGet("{orderId}")]
+        public async Task<ActionResult<MaintainOrder>> MaitainOrderPaySuccessManual(int orderId, string sessionKey)
+        {
+            UnicUser._context = _context;
+            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            if (!user.isAdmin)
+            {
+                return NoContent();
+            }
+            OrderOnline order = await _context.OrderOnlines.FindAsync(orderId);
+            if (!order.pay_method.Trim().Equals("微信支付"))
+            {
+                OrderOnlinesController orderController = new OrderOnlinesController(_context, _originConfig);
+                order = (await orderController.OrderChargeByStaff(orderId, order.final_price, order.pay_method.Trim(), sessionKey)).Value;
+                if (order.payments.Length > 0)
+                {
+                    int paymentId = order.payments[0].id;
+                    order = (await orderController.SetPaymentSuccess(paymentId, sessionKey)).Value;
+                }
+                if (order.status.Trim().Equals("支付完成"))
+                {
+                    var tastList = await _context.MaintainLives.Where(m => m.order_id == order.id).ToListAsync();
+                    for (int i = 0; i < tastList.Count; i++)
+                    {
+                        await GenerateFlowNum(tastList[i].id, sessionKey);
+                    }
+                }
+
+                return await GetMaintainOrder(orderId, sessionKey);
+
+            }
+            else
+            {
+                return NoContent();
+            }
+
+        }
+
+        [HttpGet("{taskId}")]
+        public async Task<ActionResult<MaintainLive>> GenerateFlowNum(int taskId, string sessionKey)
+        {
+            UnicUser._context = _context;
+            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            if (!user.isAdmin)
+            {
+                return NoContent();
+            }
+
+            MaintainLive task = await _context.MaintainLives.FindAsync(taskId);
+            if (!task.task_flow_num.Trim().Equals(""))
+            {
+                return task;
+            }
+            string dateStr = task.create_date.Year.ToString().Substring(2, 2)
+                + task.create_date.Month.ToString().PadLeft(2, '0') + task.create_date.Day.ToString().PadLeft(2, '0');
+            string flowNum = "";
+            try
+            {
+                MaintainLive lastTask = await _context.MaintainLives.Where(m => m.task_flow_num.StartsWith(dateStr)).OrderByDescending(m => m.task_flow_num).FirstAsync();
+
+                if (lastTask != null)
+                {
+                    if (lastTask.task_flow_num.StartsWith(dateStr))
+                    {
+                        int seq = int.Parse(lastTask.task_flow_num.Split('-')[1].Trim());
+                        flowNum = dateStr + "-" + (seq + 1).ToString().PadLeft(5, '0');
+                       
+                    }
+                }
+            }
+            catch
+            {
+
+            }
+            if (flowNum.Trim().Equals(""))
+            {
+                flowNum = dateStr + "-00001";
+            }
+            task.task_flow_num = flowNum.Trim();
+            _context.Entry(task).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
+
+            return task;
+        }
+
+
+        //public async Task<ActionResult<MaintainOrder>> 
 
 
 
