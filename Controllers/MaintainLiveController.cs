@@ -33,6 +33,7 @@ namespace SnowmeetApi.Controllers
         [HttpGet("{orderId}")]
         public async Task<ActionResult<MaintainOrder>> GetMaintainOrder(int orderId, string sessionKey)
         {
+            sessionKey = Util.UrlDecode(sessionKey);
             if (orderId <= 0)
             {
                 return NotFound();
@@ -44,7 +45,8 @@ namespace SnowmeetApi.Controllers
                 return NoContent();
             }
             MaintainLive[] items = await _context.MaintainLives.Where(m => m.order_id == orderId).ToArrayAsync();
-            OrderOnline order = await _context.OrderOnlines.FindAsync(orderId);
+            OrderOnlinesController orderController = new OrderOnlinesController(_context, _originConfig);
+            OrderOnline order = (await orderController.GetWholeOrderByStaff(orderId, sessionKey)).Value;
             MaintainOrder mOrder = new MaintainOrder()
             {
                 cell = order.cell_number,
@@ -63,6 +65,7 @@ namespace SnowmeetApi.Controllers
         [HttpPost]
         public async Task<ActionResult<MaintainOrder>> Recept(string sessionKey, MaintainOrder maintainOrder)
         {
+            sessionKey = Util.UrlDecode(sessionKey);
             UnicUser._context = _context;
             UnicUser user = UnicUser.GetUnicUser(sessionKey);
             if (!user.isAdmin)
@@ -157,6 +160,7 @@ namespace SnowmeetApi.Controllers
         [HttpGet("{orderId}")]
         public async Task<ActionResult<MaintainOrder>> MaitainOrderPaySuccessManual(int orderId, string sessionKey)
         {
+            sessionKey = Util.UrlDecode(sessionKey);
             UnicUser._context = _context;
             UnicUser user = UnicUser.GetUnicUser(sessionKey);
             if (!user.isAdmin)
@@ -168,6 +172,10 @@ namespace SnowmeetApi.Controllers
             {
                 OrderOnlinesController orderController = new OrderOnlinesController(_context, _originConfig);
                 order = (await orderController.OrderChargeByStaff(orderId, order.final_price, order.pay_method.Trim(), sessionKey)).Value;
+                if (order == null)
+                {
+                    order = (await orderController.GetWholeOrderByStaff(orderId, sessionKey)).Value;
+                }
                 if (order.payments.Length > 0)
                 {
                     int paymentId = order.payments[0].id;
@@ -195,6 +203,7 @@ namespace SnowmeetApi.Controllers
         [HttpGet("{taskId}")]
         public async Task<ActionResult<MaintainLive>> GenerateFlowNum(int taskId, string sessionKey)
         {
+            sessionKey = Util.UrlDecode(sessionKey);
             UnicUser._context = _context;
             UnicUser user = UnicUser.GetUnicUser(sessionKey);
             if (!user.isAdmin)
@@ -285,6 +294,7 @@ namespace SnowmeetApi.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<MaintainLive>>> GetMaintainLog(string openId, string sessionKey)
         {
+            sessionKey = Util.UrlDecode(sessionKey);
             UnicUser._context = _context;
             UnicUser user = UnicUser.GetUnicUser(sessionKey);
             if (!user.isAdmin)
@@ -322,6 +332,7 @@ namespace SnowmeetApi.Controllers
         [HttpGet("{id}")]
         public ActionResult<OrderOnline> PlaceOrder(int id, string sessionKey)
         {
+            sessionKey = Util.UrlDecode(sessionKey);
             OrderOnline order = PlaceOrderAll(id, sessionKey, "");
             if (order == null)
             {
@@ -336,6 +347,7 @@ namespace SnowmeetApi.Controllers
         [HttpGet("{id}")]
         public ActionResult<OrderOnline> PlaceOrderBatch(int id, string sessionKey)
         {
+            sessionKey = Util.UrlDecode(sessionKey);
             OrderOnline order = PlaceOrderAll(id, sessionKey, "batch");
             if (order == null)
             {
@@ -407,6 +419,7 @@ namespace SnowmeetApi.Controllers
         [HttpGet("id")]
         private OrderOnline PlaceOrderAll(int id, string sessionKey, string idType = "batch")
         {
+            sessionKey = Util.UrlDecode(sessionKey);
             bool exists = false;
             string ticketCode = "";
             if (idType.Trim().Equals("batch"))
