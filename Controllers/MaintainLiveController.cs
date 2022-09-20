@@ -40,8 +40,13 @@ namespace SnowmeetApi.Controllers
             {
                 return NoContent();
             }
+            start = start.Date;
+            end = end.Date.AddDays(1);
+            var liveArr = await _context.MaintainLives
+                .Where(m => (!m.task_flow_num.Trim().Equals("") && m.create_date >= start && m.create_date < end))
+                .OrderByDescending(m => m.id).ToListAsync();
 
-            return NoContent();
+            return liveArr;
         }
 
         [HttpGet("{orderId}")]
