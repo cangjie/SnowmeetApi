@@ -31,35 +31,39 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<MaintainLive>>> GetTasks(DateTime start, DateTime end, string sessionKey)
+        public async Task<ActionResult<IEnumerable<Serial>>> GetSerials(string brand)
         {
-            sessionKey = Util.UrlDecode(sessionKey.Trim());
-            UnicUser._context = _context;
-            UnicUser user = UnicUser.GetUnicUser(sessionKey);
-            if (!user.isAdmin)
-            {
-                return NoContent();
-            }
-            start = start.Date;
-            end = end.Date.AddDays(1);
-            var liveArr = await _context.MaintainLives
-                .Where(m => (!m.task_flow_num.Trim().Equals("") && m.create_date >= start && m.create_date < end))
-                .OrderByDescending(m => m.id).ToListAsync();
-
-            return liveArr;
+            brand = Util.UrlDecode(brand).Trim();
+            return await _context.Serial.Where(s => s.brand_name.Trim().Equals(brand)).ToListAsync();
         }
 
-        [HttpGet("{id}")]
-        public async Task<ActionResult<MaintainLive>> GetTask(int id, string sessionKey)
+        [HttpGet]
+        public async Task<ActionResult<Serial>> AddSerial(string brand, string serialName, string sessionKey)
         {
-            sessionKey = Util.UrlDecode(sessionKey.Trim());
+            sessionKey = Util.UrlDecode(sessionKey).Trim();
             UnicUser._context = _context;
             UnicUser user = UnicUser.GetUnicUser(sessionKey);
             if (!user.isAdmin)
             {
                 return NoContent();
             }
-            return await _context.MaintainLives.FindAsync(id);
+            brand = Util.UrlDecode(brand).Trim();
+            serialName = Util.UrlDecode(serialName).Trim();
+            var list = await _context.Serial.Where(s => (s.brand_name.Trim().Equals(brand)
+                && s.serial_name.Trim().Equals(serialName.Trim()))).ToListAsync();
+            if (list.Count > 0)
+            {
+                return NoContent();
+            }
+            Serial s = new Serial()
+            {
+                id = 0,
+                brand_name = brand,
+                serial_name = serialName.Trim()
+            };
+            await _context.Serial.AddAsync(s);
+            await _context.SaveChangesAsync();
+            return s;
         }
 
         [HttpGet("{orderId}")]
@@ -180,15 +184,9 @@ namespace SnowmeetApi.Controllers
                 item.service_open_id = user.miniAppOpenId.Trim();
                 await _context.AddAsync(item);
                 await _context.SaveChangesAsync();
-                if (orderId == 0 && item.id > 0)
-                {
-                    await GenerateFlowNum(item.id, sessionKey);
-                }
             }
 
             maintainOrder.orderId = orderId;
-
-            
 
             //OrderOnline order = new OrderOnline();
 
