@@ -62,6 +62,25 @@ namespace SnowmeetApi.Controllers
             return mOrder;
         }
 
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<MaintainLive>>> GetTasks(DateTime start, DateTime end, string sessionKey)
+        {
+            sessionKey = Util.UrlDecode(sessionKey.Trim());
+            UnicUser._context = _context;
+            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            if (!user.isAdmin)
+            {
+                return NoContent();
+            }
+            start = start.Date;
+            end = end.Date.AddDays(1);
+            var liveArr = await _context.MaintainLives
+                .Where(m => (!m.task_flow_num.Trim().Equals("") && m.create_date >= start && m.create_date < end))
+                .OrderByDescending(m => m.id).ToListAsync();
+
+            return liveArr;
+        }
+
         [HttpPost]
         public async Task<ActionResult<MaintainOrder>> Recept(string sessionKey, MaintainOrder maintainOrder)
         {
