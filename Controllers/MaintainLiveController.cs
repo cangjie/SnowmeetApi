@@ -62,6 +62,19 @@ namespace SnowmeetApi.Controllers
             return mOrder;
         }
 
+        [HttpGet("{id}")]
+        public async Task<ActionResult<MaintainLive>> GetTask(int id, string sessionKey)
+        {
+            sessionKey = Util.UrlDecode(sessionKey.Trim());
+            UnicUser._context = _context;
+            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            if (!user.isAdmin)
+            {
+                return NoContent();
+            }
+            return await _context.MaintainLives.FindAsync(id);
+        }
+
         [HttpGet]
         public async Task<ActionResult<IEnumerable<MaintainLive>>> GetTasks(DateTime start, DateTime end, string sessionKey)
         {
