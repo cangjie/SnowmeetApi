@@ -30,6 +30,38 @@ namespace SnowmeetApi.Controllers
             _originConfig = config;
         }
 
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<MaintainLive>>> GetTasks(DateTime start, DateTime end, string sessionKey)
+        {
+            sessionKey = Util.UrlDecode(sessionKey.Trim());
+            UnicUser._context = _context;
+            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            if (!user.isAdmin)
+            {
+                return NoContent();
+            }
+            start = start.Date;
+            end = end.Date.AddDays(1);
+            var liveArr = await _context.MaintainLives
+                .Where(m => (!m.task_flow_num.Trim().Equals("") && m.create_date >= start && m.create_date < end))
+                .OrderByDescending(m => m.id).ToListAsync();
+
+            return liveArr;
+        }
+
+        [HttpGet("{id}")]
+        public async Task<ActionResult<MaintainLive>> GetTask(int id, string sessionKey)
+        {
+            sessionKey = Util.UrlDecode(sessionKey.Trim());
+            UnicUser._context = _context;
+            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            if (!user.isAdmin)
+            {
+                return NoContent();
+            }
+            return await _context.MaintainLives.FindAsync(id);
+        }
+
         [HttpGet("{orderId}")]
         public async Task<ActionResult<MaintainOrder>> GetMaintainOrder(int orderId, string sessionKey)
         {
@@ -148,9 +180,15 @@ namespace SnowmeetApi.Controllers
                 item.service_open_id = user.miniAppOpenId.Trim();
                 await _context.AddAsync(item);
                 await _context.SaveChangesAsync();
+                if (orderId == 0 && item.id > 0)
+                {
+                    await GenerateFlowNum(item.id, sessionKey);
+                }
             }
 
             maintainOrder.orderId = orderId;
+
+            
 
             //OrderOnline order = new OrderOnline();
 
