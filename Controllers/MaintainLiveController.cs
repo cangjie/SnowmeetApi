@@ -30,42 +30,6 @@ namespace SnowmeetApi.Controllers
             _originConfig = config;
         }
 
-        [HttpGet]
-        public async Task<ActionResult<IEnumerable<Serial>>> GetSerials(string brand)
-        {
-            brand = Util.UrlDecode(brand).Trim();
-            return await _context.Serial.Where(s => s.brand_name.Trim().Equals(brand)).ToListAsync();
-        }
-
-        [HttpGet]
-        public async Task<ActionResult<Serial>> AddSerial(string brand, string serialName, string sessionKey)
-        {
-            sessionKey = Util.UrlDecode(sessionKey).Trim();
-            UnicUser._context = _context;
-            UnicUser user = UnicUser.GetUnicUser(sessionKey);
-            if (!user.isAdmin)
-            {
-                return NoContent();
-            }
-            brand = Util.UrlDecode(brand).Trim();
-            serialName = Util.UrlDecode(serialName).Trim();
-            var list = await _context.Serial.Where(s => (s.brand_name.Trim().Equals(brand)
-                && s.serial_name.Trim().Equals(serialName.Trim()))).ToListAsync();
-            if (list.Count > 0)
-            {
-                return NoContent();
-            }
-            Serial s = new Serial()
-            {
-                id = 0,
-                brand_name = brand,
-                serial_name = serialName.Trim()
-            };
-            await _context.Serial.AddAsync(s);
-            await _context.SaveChangesAsync();
-            return s;
-        }
-
         [HttpGet("{orderId}")]
         public async Task<ActionResult<MaintainOrder>> GetMaintainOrder(int orderId, string sessionKey)
         {
