@@ -52,6 +52,7 @@ namespace SnowmeetApi.Models
         public string confirmed_rear_din { get; set; } = "";
         public string confirmed_angle { get; set; } = "";
         public string confirmed_relation { get; set; } = "";
+        public string confirmed_id { get; set; } = "";
 
         public int batch_id { get; set; } = 0;
         public int label_printed { get; set; } = 0;
