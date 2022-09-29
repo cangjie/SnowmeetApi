@@ -12,7 +12,7 @@ using SnowmeetApi.Models.Users;
 
 namespace SnowmeetApi.Controllers.Maintain
 {
-    [Route("api/[controller]")]
+    [Route("core/[controller]/[action]")]
     [ApiController]
     public class MaintainLogsController : ControllerBase
     {
