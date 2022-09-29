@@ -19,6 +19,7 @@ namespace SnowmeetApi.Controllers
         private readonly ApplicationDBContext _context;
         private IConfiguration _config;
         private IConfiguration _originConfig;
+        
 
 
         public MaintainLiveController(ApplicationDBContext context, IConfiguration config)
@@ -26,6 +27,7 @@ namespace SnowmeetApi.Controllers
             _context = context;
             _config = config.GetSection("Settings");
             _originConfig = config;
+            
         }
 
         [HttpPost]

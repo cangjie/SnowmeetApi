@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Microsoft.EntityFrameworkCore;
 using SnowmeetApi.Models;
 using SnowmeetApi.Models.Users;
@@ -7,6 +7,7 @@ using SnowmeetApi.Models.Product;
 using SnowmeetApi.Models.Ticket;
 using SnowmeetApi.Models.Card;
 using SnowmeetApi.Models.Order;
+using SnowmeetApi.Models.Maintain;
 //using SnowmeetApi.Models.rfid;
 namespace SnowmeetApi.Data
 {
@@ -89,5 +90,7 @@ namespace SnowmeetApi.Data
         public DbSet<SnowmeetApi.Models.UploadFile> UploadFile { get; set; }
 
         public DbSet<SnowmeetApi.Models.Maintain.Serial> Serial { get; set; }
+
+        public DbSet<SnowmeetApi.Models.Maintain.MaintainLog> MaintainLog { get; set; }
     }
 }
