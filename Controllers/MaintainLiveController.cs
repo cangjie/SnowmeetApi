@@ -1,17 +1,15 @@
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using SnowmeetApi.Data;
+using SnowmeetApi.Models;
+using SnowmeetApi.Models.Maintain;
+using SnowmeetApi.Models.Product;
+using SnowmeetApi.Models.Users;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using SnowmeetApi.Data;
-using SnowmeetApi.Models;
-using Microsoft.Extensions.Configuration;
-using SnowmeetApi.Models.Users;
-using SnowmeetApi.Models.Product;
-using SnowmeetApi.Models.Maintain;
-using SnowmeetApi.Models.Ticket;
 namespace SnowmeetApi.Controllers
 {
     [Route("core/[controller]/[action]")]
@@ -55,6 +53,9 @@ namespace SnowmeetApi.Controllers
                     await _context.SaveChangesAsync();
                 }
             }
+
+          
+
             _context.Entry(task).State = EntityState.Modified;
             await _context.SaveChangesAsync();
             return task;
@@ -328,7 +329,7 @@ namespace SnowmeetApi.Controllers
                     {
                         int seq = int.Parse(lastTask.task_flow_num.Split('-')[1].Trim());
                         flowNum = dateStr + "-" + (seq + 1).ToString().PadLeft(5, '0');
-                       
+
                     }
                 }
             }
@@ -356,7 +357,7 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<IEnumerable<Brand>>> GetBrand(string type)
         {
             return await _context.Brand.Where(b => b.brand_type.Trim().Equals(type.Trim()))
-                .OrderBy(b=>b.brand_name).ToListAsync();
+                .OrderBy(b => b.brand_name).ToListAsync();
         }
 
         [HttpGet]
@@ -371,7 +372,7 @@ namespace SnowmeetApi.Controllers
             }
             openId = Util.UrlDecode(openId);
             var list = await _context.MaintainLives
-                .Where(m => (m.open_id.Trim().Equals(openId) && m.task_flow_num != null ))
+                .Where(m => (m.open_id.Trim().Equals(openId) && m.task_flow_num != null))
                 .Select(m => new { m.confirmed_equip_type, m.confirmed_brand, m.confirmed_scale })
                 .Distinct()
                 .ToListAsync();
@@ -427,7 +428,7 @@ namespace SnowmeetApi.Controllers
             }
             return NoContent();
         }
-        
+
         [HttpGet("{id}")]
         public ActionResult<OrderOnline> PlaceOrder(int id, string sessionKey)
         {
@@ -546,12 +547,12 @@ namespace SnowmeetApi.Controllers
                     bool canOrder = true;
                     if (idType.Trim().Equals("batch"))
                     {
-                        tasks =  _context.MaintainLives.Where(m => m.batch_id == id).ToList<MaintainLive>();
+                        tasks = _context.MaintainLives.Where(m => m.batch_id == id).ToList<MaintainLive>();
                         for (int i = 0; canOrder && i < tasks.Count; i++)
                         {
                             if (tasks[i].order_id != 0)
                             {
-                                OrderOnline tempOrder =  _context.OrderOnlines.Find(tasks[i].order_id);
+                                OrderOnline tempOrder = _context.OrderOnlines.Find(tasks[i].order_id);
                                 if (tempOrder.pay_state != 0)
                                 {
                                     canOrder = false;
@@ -561,8 +562,8 @@ namespace SnowmeetApi.Controllers
                     }
                     else
                     {
-                        MaintainLive task =  _context.MaintainLives.Find(id);
-                        OrderOnline tempOrder =  _context.OrderOnlines.Find(task.order_id);
+                        MaintainLive task = _context.MaintainLives.Find(id);
+                        OrderOnline tempOrder = _context.OrderOnlines.Find(task.order_id);
                         if (tempOrder.pay_state != 0)
                         {
                             canOrder = false;
@@ -583,7 +584,7 @@ namespace SnowmeetApi.Controllers
                         for (int i = 0; i < tasks.Count; i++)
                         {
                             int productId = tasks[i].confirmed_product_id;
-                            
+
 
                             if (productId > 0)
                             {
@@ -599,7 +600,7 @@ namespace SnowmeetApi.Controllers
                                 totalPrice = totalPrice + product.sale_price;
                                 details.Add(detail);
                             }
-                            
+
                             if (tasks[i].confirmed_additional_fee != 0)
                             {
                                 int count = 0;
@@ -608,9 +609,9 @@ namespace SnowmeetApi.Controllers
                                 count = (int)(tasks[i].confirmed_additional_fee / product.sale_price);
                                 totalPrice = totalPrice + count * product.sale_price;
                             }
-                            
-                            
-                            
+
+
+
                         }
                         if (totalPrice == 0)
                         {
@@ -677,7 +678,7 @@ namespace SnowmeetApi.Controllers
                             return orderRet;
 
                         }
-                        
+
 
                     }
                     else
@@ -691,7 +692,7 @@ namespace SnowmeetApi.Controllers
             {
                 return null;
             }
-            
+
         }
 
         /*

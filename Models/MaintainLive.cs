@@ -8,7 +8,7 @@ namespace SnowmeetApi.Models
     public class MaintainLive
     {
         [Key]
-        public int id { get;}
+        public int id { get; set; }
         public string shop { get; set; }
         public string open_id { get; set; }
         
