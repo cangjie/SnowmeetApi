@@ -60,8 +60,9 @@ namespace SnowmeetApi.Controllers.Maintain
         }
 
         [HttpGet("{id}")]
-        public async Task<ActionResult<MaintainLog>> EndStep(int id, string sessionKey)
+        public async Task<ActionResult<MaintainLog>> EndStep(int id, string memo, string sessionKey)
         {
+            memo = Util.UrlDecode(memo);
             sessionKey = Util.UrlDecode(sessionKey);
             UnicUser user = UnicUser.GetUnicUser(sessionKey);
             if (!user.isAdmin)
