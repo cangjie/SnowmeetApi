@@ -93,6 +93,7 @@ namespace SnowmeetApi.Controllers.Maintain
                 return BadRequest();
             }
             MaintainLog log = await _context.MaintainLog.FindAsync(id);
+            log.memo = memo;
             if (log.staff_open_id.Trim().Equals(user.miniAppOpenId.Trim()))
             {
                 log.end_time = DateTime.Now;
