@@ -60,7 +60,7 @@ namespace SnowmeetApi.Controllers.Maintain
         }
 
         [HttpGet("{taskId}")]
-        public async Task<ActionResult<IEnumerable<MaintainLog>>> GetSteps(int taskId, string sessionKey)
+        public async Task<ActionResult<IEnumerable<MaintainLog>>> GetStepsByStaff(int taskId, string sessionKey)
         {
             MiniAppUserController mUserController = new MiniAppUserController(_context, _originConfig);
             UnicUser user = UnicUser.GetUnicUser(sessionKey);
