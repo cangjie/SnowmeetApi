@@ -29,6 +29,38 @@ namespace SnowmeetApi.Controllers
             _config = config.GetSection("Settings");
             _originConfig = config;
         }
+
+        [HttpPost]
+        public async Task<ActionResult<MaintainLive>> UpdateTask(MaintainLive task, string sessionKey)
+        {
+            sessionKey = Util.UrlDecode(sessionKey).Trim();
+            UnicUser._context = _context;
+            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            if (!user.isAdmin)
+            {
+                return NoContent();
+            }
+            if (!task.confirmed_serial.Trim().Equals("") && !task.confirmed_brand.Trim().Equals(""))
+            {
+                var serialList = await _context.Serial.Where(s => (s.brand_name.Trim().Equals(task.confirmed_brand.Trim()) && s.serial_name.Trim().Equals(task.confirmed_serial.Trim()))).ToListAsync();
+                if (serialList.Count == 0)
+                {
+                    Serial s = new Serial()
+                    {
+                        id = 0,
+                        brand_name = task.confirmed_brand.Trim(),
+                        serial_name = task.confirmed_serial.Trim()
+                    };
+                    await _context.Serial.AddAsync(s);
+                    await _context.SaveChangesAsync();
+                }
+            }
+            _context.Entry(task).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
+            return task;
+        }
+
+
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Serial>>> GetSerials(string brand)
         {
