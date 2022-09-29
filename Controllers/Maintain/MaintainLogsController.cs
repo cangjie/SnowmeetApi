@@ -108,6 +108,7 @@ namespace SnowmeetApi.Controllers.Maintain
             }
             _context.Entry(log).State = EntityState.Modified;
             await _context.SaveChangesAsync();
+            log.staffName = user.miniAppUser.real_name.Trim();
             return log;
         }
 
