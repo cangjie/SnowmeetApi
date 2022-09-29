@@ -8,6 +8,8 @@ namespace SnowmeetApi.Models.Maintain
     {
         [Key]
         public int id { get; set; }
+
+        public string type { get; set; }
         public string brand_name { get; set; }
         public string serial_name { get; set; }
     }

@@ -46,6 +46,7 @@ namespace SnowmeetApi.Controllers
                     Serial s = new Serial()
                     {
                         id = 0,
+                        type = task.confirmed_equip_type.Trim(),
                         brand_name = task.confirmed_brand.Trim(),
                         serial_name = task.confirmed_serial.Trim()
                     };
@@ -63,10 +64,10 @@ namespace SnowmeetApi.Controllers
 
 
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Serial>>> GetSerials(string brand)
+        public async Task<ActionResult<IEnumerable<Serial>>> GetSerials(string brand, string type)
         {
             brand = Util.UrlDecode(brand).Trim();
-            return await _context.Serial.Where(s => s.brand_name.Trim().Equals(brand)).ToListAsync();
+            return await _context.Serial.Where(s => (s.brand_name.Trim().Equals(brand) && s.type.Trim().Equals(type.Trim()) )).ToListAsync();
         }
 
         [HttpGet]
