@@ -53,7 +53,7 @@ namespace SnowmeetApi.Controllers.Maintain
             return log;
         }
 
-        [HttpGet]
+        [HttpGet("{taskId}")]
         public async Task<ActionResult<IEnumerable<MaintainLog>>> GetSteps(int taskId)
         {
             return await _context.MaintainLog.Where(m => m.task_id == taskId).OrderBy(m => m.id).ToListAsync();
