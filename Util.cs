@@ -53,7 +53,19 @@ namespace SnowmeetApi
 
         public static string UrlDecode(string urlStr)
         {
-            return HttpUtility.UrlDecode(urlStr).Replace(" ", "+").Trim();
+            if (urlStr.Trim().Equals(""))
+            {
+                return "";
+            }
+            try
+            {
+                return HttpUtility.UrlDecode(urlStr).Replace(" ", "+").Trim();
+            }
+            catch
+            {
+                return "";
+            }
+            
         }
 
         public static string GetWebContent(string url)
