@@ -46,7 +46,8 @@ namespace SnowmeetApi.Controllers.Maintain
                 start_time = DateTime.Now,
                 staff_open_id = user.miniAppOpenId.Trim(),
                 status = "已开始",
-                stop_open_id = ""
+                stop_open_id = "",
+                memo = ""
             };
             await _context.MaintainLog.AddAsync(log);
             await _context.SaveChangesAsync();
