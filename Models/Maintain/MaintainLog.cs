@@ -16,6 +16,11 @@ namespace SnowmeetApi.Models.Maintain
         public string staff_open_id { get; set; }
         public string status { get; set; }
         public string stop_open_id { get; set; }
+
+        [NotMapped]
+        public bool isMine { get; set; } = true;
+        [NotMapped]
+        public string staffName { get; set; } = "";
        
     }
 }

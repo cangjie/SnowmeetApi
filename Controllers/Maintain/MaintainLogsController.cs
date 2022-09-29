@@ -29,7 +29,7 @@ namespace SnowmeetApi.Controllers.Maintain
         }
 
         [HttpGet("{taskId}")]
-        public async Task<ActionResult<MaintainLog>> Start(int taskId, string stepName, string sessionKey)
+        public async Task<ActionResult<MaintainLog>> StartStep(int taskId, string stepName, string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey);
             stepName = Util.UrlDecode(stepName);
@@ -57,6 +57,28 @@ namespace SnowmeetApi.Controllers.Maintain
         public async Task<ActionResult<IEnumerable<MaintainLog>>> GetSteps(int taskId)
         {
             return await _context.MaintainLog.Where(m => m.task_id == taskId).OrderBy(m => m.id).ToListAsync();
+        }
+
+        [HttpGet("{taskId}")]
+        public async Task<ActionResult<IEnumerable<MaintainLog>>> GetSteps(int taskId, string sessionKey)
+        {
+            MiniAppUserController mUserController = new MiniAppUserController(_context, _originConfig);
+            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            if (!user.isAdmin)
+            {
+                return BadRequest();
+            }
+            var logList = await  _context.MaintainLog.Where(m => m.task_id == taskId).OrderBy(m => m.id).ToListAsync();
+            for (int i = 0; i < logList.Count; i++)
+            {
+                if (!user.miniAppOpenId.Trim().Equals(logList[i].staff_open_id.Trim()))
+                {
+                    logList[i].isMine = false;
+                }
+                var staffUser = await mUserController.GetMiniAppUser(logList[i].staff_open_id, sessionKey);
+                logList[i].staffName = staffUser.Value.real_name.Trim();
+            }
+            return logList; 
         }
 
         [HttpGet("{id}")]
