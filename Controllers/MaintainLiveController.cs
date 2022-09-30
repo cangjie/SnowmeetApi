@@ -43,7 +43,7 @@ namespace SnowmeetApi.Controllers
             if (!task.confirmed_serial.Trim().Equals("") && !task.confirmed_brand.Trim().Equals(""))
             {
                 var serialList = await _context.Serial.Where(s => (s.brand_name.Trim().Equals(task.confirmed_brand.Trim()) && s.serial_name.Trim().Equals(task.confirmed_serial.Trim()))).ToListAsync();
-                if (serialList.Count == 0)
+                if (serialList.Count == 0 && !task.confirmed_serial.Equals("未知"))
                 {
                     Serial s = new Serial()
                     {
