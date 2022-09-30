@@ -50,7 +50,8 @@ namespace SnowmeetApi.Models
         public string confirmed_binder_gap { get; set; } = "";
         public string confirmed_front_din { get; set; } = "";
         public string confirmed_rear_din { get; set; } = "";
-        public string confirmed_angle { get; set; } = "";
+        public string confirmed_left_angle { get; set; } = "";
+        public string confirmed_right_angle { get; set; } = "";
         public string confirmed_relation { get; set; } = "";
         public string confirmed_id { get; set; } = "";
 
