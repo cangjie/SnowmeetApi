@@ -44,7 +44,6 @@ namespace SnowmeetApi.Controllers
             _appId = _config.GetSection("AppId").Value.Trim();
         }
 
-
         [HttpGet]
         public ActionResult<double> GetScoreRate(double orderPrice, double finalPrice)
         {

@@ -102,6 +102,30 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet("{orderId}")]
+        public async Task<ActionResult<MaintainOrder>> BindNewMember(int orderId, string sessionKey)
+        {
+            OrderOnline order = await _context.OrderOnlines.FindAsync(orderId);
+            if (!order.open_id.Trim().Equals(""))
+            {
+                return NotFound();
+            }
+            sessionKey = Util.UrlDecode(sessionKey.Trim());
+            UnicUser._context = _context;
+            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            order.open_id = user.miniAppOpenId.Trim();
+            _context.Entry(order).State = EntityState.Modified;
+            MaintainLive[] items = await _context.MaintainLives.Where(m => m.order_id == orderId).ToArrayAsync();
+            foreach (MaintainLive i in items)
+            {
+                i.open_id = user.miniAppOpenId.Trim();
+                _context.Entry(i).State = EntityState.Modified;
+            }
+            await _context.SaveChangesAsync();
+            return await GetMaintainOrder(orderId, sessionKey);
+
+        }
+
+        [HttpGet("{orderId}")]
         public async Task<ActionResult<MaintainOrder>> GetMaintainOrder(int orderId, string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey);
@@ -111,13 +135,17 @@ namespace SnowmeetApi.Controllers
             }
             UnicUser._context = _context;
             UnicUser user = UnicUser.GetUnicUser(sessionKey);
-            if (!user.isAdmin)
-            {
-                return NoContent();
-            }
+            
             MaintainLive[] items = await _context.MaintainLives.Where(m => m.order_id == orderId).ToArrayAsync();
             OrderOnlinesController orderController = new OrderOnlinesController(_context, _originConfig);
-            OrderOnline order = (await orderController.GetWholeOrderByStaff(orderId, sessionKey)).Value;
+            OrderOnline order = await _context.OrderOnlines.FindAsync(orderId);   //(await orderController.GetWholeOrderByStaff(orderId, sessionKey)).Value;
+
+            if (!order.open_id.Trim().Equals(user.miniAppOpenId.Trim()) && !order.open_id.Equals(user.officialAccountOpenId.Trim())
+                && !order.open_id.Trim().Equals(user.officialAccountOpenIdOld.Trim()) && !user.isAdmin)
+            {
+                return BadRequest();
+            }
+            
             MaintainOrder mOrder = new MaintainOrder()
             {
                 cell = order.cell_number,
@@ -126,9 +154,21 @@ namespace SnowmeetApi.Controllers
                 order = order,
                 items = items
             };
+            if (!user.isAdmin)
+            {
+                foreach (MaintainLive m in mOrder.items)
+                {
+                    m.open_id = "";
+                }
+                
+            }
             if (!order.ticket_code.Trim().Equals(""))
             {
                 mOrder.ticket = await _context.Ticket.FindAsync(order.ticket_code.Trim());
+                if (!user.isAdmin && mOrder.ticket != null)
+                {
+                    mOrder.ticket.open_id = "";
+                }
             }
             return mOrder;
         }
