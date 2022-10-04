@@ -115,6 +115,24 @@ namespace SnowmeetApi.Controllers
             
         }
 
+        [HttpPost]
+        public async Task<ActionResult<MiniAppUser>> UpdateUserInfo(string sessionKey, string encData, string iv)
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            UnicUser._context = _context;
+            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            MiniAppUser miniUser = user.miniAppUser;
+            string json = Util.AES_decrypt(encData.Trim(), sessionKey, iv);
+            Newtonsoft.Json.Linq.JToken jsonObj = (Newtonsoft.Json.Linq.JToken)Newtonsoft.Json.JsonConvert.DeserializeObject(json);
+            if (jsonObj["phoneNumber"] != null)
+            {
+                miniUser.cell_number = jsonObj["phoneNumber"].ToString().Trim();
+            }
+            _context.Entry(miniUser).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
+            return user.miniAppUser;
+        }
+
         /*
 
         // GET: api/MiniAppUser
