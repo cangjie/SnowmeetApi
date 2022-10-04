@@ -115,7 +115,7 @@ namespace SnowmeetApi.Controllers
             
         }
 
-        [HttpPost]
+        [HttpGet]
         public async Task<ActionResult<MiniAppUser>> UpdateUserInfo(string sessionKey, string encData, string iv)
         {
             sessionKey = Util.UrlDecode(sessionKey);
