@@ -177,7 +177,9 @@ namespace LuqinMiniAppBase.Controllers
                 {
                     user = new MiniAppUser()
                     {
-                        open_id = sessionObj.openid
+                        open_id = sessionObj.openid,
+                        union_id = sessionObj.unionid.Trim()
+                        
                     };
                     await _db.MiniAppUsers.AddAsync(user);
                     await _db.SaveChangesAsync();

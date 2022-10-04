@@ -11,6 +11,7 @@ namespace SnowmeetApi.Models.Users
     {
         [Key]
         public string open_id { get; set; }
+        public string union_id { get; set; }
         public string cell_number { get; set; } = "";
         public string real_name { get; set; } = "";
         public string nick { get; set; } = "";
