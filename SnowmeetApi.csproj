@@ -50,10 +50,14 @@
     <Folder Include="wwwroot\upload\" />
     <Folder Include="wwwroot\mapp\" />
     <Folder Include="wwwroot\mapp\maintain\" />
+    <Folder Include="wwwroot\mapp\maintain\admin\" />
+    <Folder Include="wwwroot\mapp\maintain\admin\task\" />
   </ItemGroup>
   <ItemGroup>
     <Content Remove="wwwroot\upload\" />
     <Content Remove="wwwroot\mapp\" />
     <Content Remove="wwwroot\mapp\maintain\" />
+    <Content Remove="wwwroot\mapp\maintain\admin\" />
+    <Content Remove="wwwroot\mapp\maintain\admin\task\" />
   </ItemGroup>
 </Project>
