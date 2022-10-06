@@ -49,15 +49,15 @@
     <Folder Include="Controllers\User\" />
     <Folder Include="wwwroot\upload\" />
     <Folder Include="wwwroot\mapp\" />
-    <Folder Include="wwwroot\mapp\maintain\" />
-    <Folder Include="wwwroot\mapp\maintain\admin\" />
-    <Folder Include="wwwroot\mapp\maintain\admin\task\" />
+    <Folder Include="wwwroot\mapp\admin\" />
+    <Folder Include="wwwroot\mapp\admin\maintain\" />
+    <Folder Include="wwwroot\mapp\admin\maintain\task\" />
   </ItemGroup>
   <ItemGroup>
     <Content Remove="wwwroot\upload\" />
     <Content Remove="wwwroot\mapp\" />
-    <Content Remove="wwwroot\mapp\maintain\" />
-    <Content Remove="wwwroot\mapp\maintain\admin\" />
-    <Content Remove="wwwroot\mapp\maintain\admin\task\" />
+    <Content Remove="wwwroot\mapp\admin\" />
+    <Content Remove="wwwroot\mapp\admin\maintain\" />
+    <Content Remove="wwwroot\mapp\admin\maintain\task\" />
   </ItemGroup>
 </Project>
