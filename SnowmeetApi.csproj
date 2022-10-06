@@ -48,8 +48,12 @@
     <Folder Include="Controllers\Order\" />
     <Folder Include="Controllers\User\" />
     <Folder Include="wwwroot\upload\" />
+    <Folder Include="wwwroot\maintain\" />
+    <Folder Include="wwwroot\maintain\task\" />
   </ItemGroup>
   <ItemGroup>
     <Content Remove="wwwroot\upload\" />
+    <Content Remove="wwwroot\maintain\" />
+    <Content Remove="wwwroot\maintain\task\" />
   </ItemGroup>
 </Project>
