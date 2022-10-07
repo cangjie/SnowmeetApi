@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Org.BouncyCastle.Utilities;
 using SnowmeetApi.Data;
 using SnowmeetApi.Models;
 using SnowmeetApi.Models.Maintain;
@@ -126,6 +127,53 @@ namespace SnowmeetApi.Controllers
             return await GetMaintainOrder(orderId, sessionKey);
 
         }
+
+        [HttpGet]
+        public async Task<ActionResult<MaintainOrder[]>> GetMyMaintainOrders(string sessionKey)
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            UnicUser._context = _context;
+            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            return await GetMaintainOrders(user.miniAppOpenId, DateTime.Parse("2022-9-1"), DateTime.Parse("2999-1-1"));
+        }
+
+        [NonAction]
+        public async Task<MaintainOrder[]> GetMaintainOrders(string openId, DateTime start, DateTime end)
+        {
+            
+            OrderOnline[] orderList;
+            if (openId.Trim().Equals(""))
+            {
+                orderList = await _context.OrderOnlines
+                    .Where(o => (o.create_date.Date >= start.Date && o.create_date.Date <= end.Date)).ToArrayAsync();
+            }
+            else
+            {
+                orderList = await _context.OrderOnlines
+                    .Where(o => (o.create_date.Date >= start.Date && o.create_date.Date <= end.Date && o.open_id.Trim().Equals(openId))).ToArrayAsync();
+            }
+            MaintainOrder[] maintainOrderArray = new MaintainOrder[orderList.Length];
+            for (int i = 0; i < maintainOrderArray.Length; i++)
+            {
+                OrderOnline onlineOrder = orderList[i];
+                MaintainLive[] items = await _context.MaintainLives.Where(m => m.order_id == onlineOrder.id).ToArrayAsync();
+                MaintainOrder order = new MaintainOrder()
+                {
+                    cell = onlineOrder.cell_number.Trim(),
+                    name = onlineOrder.name,
+                    orderId = onlineOrder.id,
+                    order = onlineOrder,
+                    items = items,
+                    orderDate = onlineOrder.create_date
+
+                };
+                maintainOrderArray[i] = order;
+            }
+            return maintainOrderArray;
+        }
+
+
+
 
         [HttpGet("{orderId}")]
         public async Task<ActionResult<MaintainOrder>> GetMaintainOrder(int orderId, string sessionKey)
