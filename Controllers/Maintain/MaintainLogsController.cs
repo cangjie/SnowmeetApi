@@ -9,6 +9,7 @@ using Microsoft.Extensions.Configuration;
 using SnowmeetApi.Data;
 using SnowmeetApi.Models.Maintain;
 using SnowmeetApi.Models.Users;
+using SnowmeetApi.Models;
 
 namespace SnowmeetApi.Controllers.Maintain
 {
@@ -52,6 +53,15 @@ namespace SnowmeetApi.Controllers.Maintain
             };
             await _context.MaintainLog.AddAsync(log);
             await _context.SaveChangesAsync();
+
+            if (stepName.Trim().Equals("发板") || stepName.Trim().Equals("强行索回"))
+            {
+                MaintainLive task = await _context.MaintainLives.FindAsync(taskId);
+                task.finish = 1;
+                _context.Entry(task).State = EntityState.Modified;
+                await _context.SaveChangesAsync();
+            }
+
             return log;
         }
 
