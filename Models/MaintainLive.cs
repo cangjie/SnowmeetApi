@@ -66,6 +66,11 @@ namespace SnowmeetApi.Models
 
         public string pay_memo { get; set; } = "";
 
+        [NotMapped]
+        public Maintain.MaintainLog[] taskLog { get; set; }
+
+        
+
 
         //附加费用商品编号
         public int AddtionalFeeProductId

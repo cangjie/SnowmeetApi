@@ -100,6 +100,7 @@ namespace SnowmeetApi.Controllers
                 return NotFound();
             }
             MiniAppUser user = await _context.MiniAppUsers.FindAsync(mSessionList[0].open_id);
+            user.open_id = "";
             if (user != null)
             {
                 MiniAppUserList l = new MiniAppUserList()

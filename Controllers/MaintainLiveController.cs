@@ -30,6 +30,8 @@ namespace SnowmeetApi.Controllers
             
         }
 
+
+
         [HttpPost]
         public async Task<ActionResult<MaintainLive>> UpdateTask(MaintainLive task, string sessionKey)
         {
@@ -137,6 +139,10 @@ namespace SnowmeetApi.Controllers
             UnicUser user = UnicUser.GetUnicUser(sessionKey);
             
             MaintainLive[] items = await _context.MaintainLives.Where(m => m.order_id == orderId).ToArrayAsync();
+            foreach (MaintainLive item in items)
+            {
+                item.taskLog = await _context.MaintainLog.Where(l => l.task_id == item.id).OrderBy(l => l.id).ToArrayAsync();
+            }
             OrderOnlinesController orderController = new OrderOnlinesController(_context, _originConfig);
             OrderOnline order = await _context.OrderOnlines.FindAsync(orderId);   //(await orderController.GetWholeOrderByStaff(orderId, sessionKey)).Value;
 
@@ -176,14 +182,19 @@ namespace SnowmeetApi.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<MaintainLive>> GetTask(int id, string sessionKey)
         {
+            MaintainLive task = await _context.MaintainLives.FindAsync(id);
             sessionKey = Util.UrlDecode(sessionKey.Trim());
             UnicUser._context = _context;
             UnicUser user = UnicUser.GetUnicUser(sessionKey);
-            if (!user.isAdmin)
+            if (!user.isAdmin && !task.open_id.Trim().Equals(user.miniAppOpenId.Trim()))
             {
                 return NoContent();
             }
-            return await _context.MaintainLives.FindAsync(id);
+            if (!user.isAdmin)
+            {
+                task.open_id = "";
+            }
+            return task;
         }
 
         [HttpGet]

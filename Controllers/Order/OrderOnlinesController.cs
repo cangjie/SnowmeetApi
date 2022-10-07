@@ -443,6 +443,10 @@ namespace SnowmeetApi.Controllers
                 || orderOnline.open_id.Trim().Equals(user.officialAccountOpenId.Trim())
                 || orderOnline.open_id.Trim().Equals(user.miniAppOpenId.Trim()))
             {
+                if (!user.isAdmin)
+                {
+                    orderOnline.open_id = "";
+                }
                 return orderOnline;
             }
 

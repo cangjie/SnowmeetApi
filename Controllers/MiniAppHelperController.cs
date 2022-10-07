@@ -197,6 +197,7 @@ namespace LuqinMiniAppBase.Controllers
                     await _db.UnionIds.AddAsync(uid);
                     await _db.SaveChangesAsync();
                 }
+                sessionObj.openid = "";
                 return sessionObj;
             }
             return NotFound();
