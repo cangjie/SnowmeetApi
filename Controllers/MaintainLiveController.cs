@@ -134,7 +134,16 @@ namespace SnowmeetApi.Controllers
             sessionKey = Util.UrlDecode(sessionKey);
             UnicUser._context = _context;
             UnicUser user = UnicUser.GetUnicUser(sessionKey);
-            return await GetMaintainOrders(user.miniAppOpenId, DateTime.Parse("2022-9-1"), DateTime.Parse("2999-1-1"));
+            MaintainOrder[] orders = await GetMaintainOrders(user.miniAppOpenId, DateTime.Parse("2022-9-1"), DateTime.Parse("2999-1-1"));
+            for (int i = 0; i < orders.Length; i++)
+            {
+                orders[i].order.open_id = "";
+                for (int j = 0; j < orders[i].items.Length; j++)
+                {
+                    orders[i].items[j].open_id = "";
+                }
+            }
+            return orders; 
         }
 
         [NonAction]
