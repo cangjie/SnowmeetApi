@@ -158,7 +158,8 @@ namespace SnowmeetApi.Controllers
                 name = order.name,
                 orderId = orderId,
                 order = order,
-                items = items
+                items = items,
+                orderDate = order.create_date
             };
             if (!user.isAdmin)
             {

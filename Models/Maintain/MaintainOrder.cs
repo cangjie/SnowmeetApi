@@ -20,6 +20,7 @@ namespace SnowmeetApi.Models.Maintain
         public MaintainLive[] items { get; set; } = new MaintainLive[0];
         public OrderOnline? order { get; set; }
         public Ticket.Ticket? ticket { get; set; }
+        public DateTime orderDate { get; set; }
     }
 }
 
