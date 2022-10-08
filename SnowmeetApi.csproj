@@ -57,6 +57,8 @@
     <Folder Include="wwwroot\mapp\admin\" />
     <Folder Include="wwwroot\mapp\admin\maintain\" />
     <Folder Include="wwwroot\mapp\admin\maintain\task\" />
+    <Folder Include="wwwroot\js\" />
+    <Folder Include="wwwroot\mi7_upload\" />
   </ItemGroup>
   <ItemGroup>
     <Content Remove="wwwroot\upload\" />
@@ -64,5 +66,7 @@
     <Content Remove="wwwroot\mapp\admin\" />
     <Content Remove="wwwroot\mapp\admin\maintain\" />
     <Content Remove="wwwroot\mapp\admin\maintain\task\" />
+    <Content Remove="wwwroot\js\" />
+    <Content Remove="wwwroot\mi7_upload\" />
   </ItemGroup>
 </Project>
