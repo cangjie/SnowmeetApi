@@ -27,6 +27,45 @@ namespace SnowmeetApi.Controllers
             _config = config.GetSection("Settings");
         }
 
+        [HttpPost]
+        public async Task<ActionResult<string>> UploadUnExposeFile(string sessionKey, string purpose, IFormFile file)
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            UnicUser._context = _db;
+            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+
+            
+
+            string dateStr = DateTime.Now.Year.ToString() + DateTime.Now.Month.ToString().PadLeft(2, '0') + DateTime.Now.Day.ToString().PadLeft(2, '0');
+            string filePath = Util.workingPath + "/upload/" + dateStr;
+            if (!Directory.Exists(filePath))
+            {
+                Directory.CreateDirectory(filePath);
+            }
+            string[] fileNameArr = file.FileName.Split('.');
+            string ext = fileNameArr[fileNameArr.Length - 1].Trim();
+            string fileName = Util.GetLongTimeStamp(DateTime.Now).Trim() + "." + ext.Trim();
+            string returnFileName = "/upload/" + dateStr + "/" + fileName.Trim();
+            using (Stream s = System.IO.File.Create(filePath + "/" + fileName.Trim()))
+            {
+                await file.CopyToAsync(s);
+            }
+
+            UploadFile fileSave = new UploadFile()
+            {
+                id = 0,
+                owner = user.miniAppOpenId.Trim(),
+                file_path_name = returnFileName,
+                is_web = 0
+            };
+            await _db.UploadFile.AddAsync(fileSave);
+            await _db.SaveChangesAsync();
+
+            return returnFileName.Trim();
+        }
+
+
+
         [HttpPost("{sessionKey}")]
         public async Task<ActionResult<string>> Upload(string sessionKey, IFormFile file)
         {
