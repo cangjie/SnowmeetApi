@@ -26,6 +26,8 @@
     <None Remove="QRCoder" />
     <None Remove="QrCode.Net" />
     <None Remove="Net.Codecrete.QrCodeGenerator" />
+    <None Remove="Models\Background\" />
+    <None Remove="Controllers\Background\" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="6.0.9" />
@@ -59,6 +61,9 @@
     <Folder Include="wwwroot\mapp\admin\maintain\task\" />
     <Folder Include="wwwroot\js\" />
     <Folder Include="wwwroot\mi7_upload\" />
+    <Folder Include="Models\Background\" />
+    <Folder Include="Controllers\Background\" />
+    <Folder Include="wwwroot\background\" />
   </ItemGroup>
   <ItemGroup>
     <Content Remove="wwwroot\upload\" />
@@ -68,5 +73,6 @@
     <Content Remove="wwwroot\mapp\admin\maintain\task\" />
     <Content Remove="wwwroot\js\" />
     <Content Remove="wwwroot\mi7_upload\" />
+    <Content Remove="wwwroot\background\" />
   </ItemGroup>
 </Project>
