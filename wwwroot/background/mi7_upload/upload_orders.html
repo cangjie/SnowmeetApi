@@ -18,13 +18,28 @@
             fileData.append('file', files[0]);
             //fileData.append('sessionKey', 'aaa');
             //fileData.append('purpose', 'bbb');
+            var sessionKey = getCookie('sessionKey');
+            sessionKey = encodeURIComponent(sessionKey);
+            var purpose = 'mi7orders';
+            purpose = encodeURIComponent(purpose);
             $.ajax({
-                url: '../../core/UploadFile/UploadUnExposeFile?sessionKey=aaa&purpose=bbb',
+                url: '../../core/UploadFile/UploadUnExposeFile?sessionKey=' + sessionKey + '&purpose=' + purpose,
                 //url: '../../core/UploadFile/UploadUnExposeFile',
-                type: 'POST',
-                data: fileData.get('file'),
-                success: function (msg, status) {
 
+                dataType: 'json',
+
+                async: false,
+
+                type: 'POST',
+
+                processData: false,
+
+                contentType: false,
+
+                data: fileData,
+
+                success: function (msg, status) {
+                    console.log(msg);
                 }
             })
         }

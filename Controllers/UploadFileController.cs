@@ -30,6 +30,7 @@ namespace SnowmeetApi.Controllers
         [HttpPost]
         public async Task<ActionResult<string>> UploadUnExposeFile(string sessionKey, string purpose, IFormFile file)
         {
+            
             sessionKey = Util.UrlDecode(sessionKey);
             UnicUser._context = _db;
             UnicUser user = UnicUser.GetUnicUser(sessionKey);
