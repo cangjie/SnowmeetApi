@@ -28,17 +28,16 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpPost]
-        public async Task<ActionResult<string>> UploadUnExposeFile(string sessionKey, string purpose, IFormFile file)
+        public async Task<ActionResult<string>> UploadFile(string sessionKey, string purpose, bool isPublic, IFormFile file)
         {
             
             sessionKey = Util.UrlDecode(sessionKey);
+            purpose = Util.UrlDecode(purpose);
             UnicUser._context = _db;
             UnicUser user = UnicUser.GetUnicUser(sessionKey);
 
-            
-
             string dateStr = DateTime.Now.Year.ToString() + DateTime.Now.Month.ToString().PadLeft(2, '0') + DateTime.Now.Day.ToString().PadLeft(2, '0');
-            string filePath = Util.workingPath + "/upload/" + dateStr;
+            string filePath = Util.workingPath + (isPublic? "/wwwroot/":"") + "/upload/" + dateStr;
             if (!Directory.Exists(filePath))
             {
                 Directory.CreateDirectory(filePath);
@@ -57,7 +56,8 @@ namespace SnowmeetApi.Controllers
                 id = 0,
                 owner = user.miniAppOpenId.Trim(),
                 file_path_name = returnFileName,
-                is_web = 0
+                is_web = isPublic? 1:0,
+                purpose = purpose
             };
             await _db.UploadFile.AddAsync(fileSave);
             await _db.SaveChangesAsync();
