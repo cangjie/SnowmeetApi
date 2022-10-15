@@ -95,5 +95,9 @@ namespace SnowmeetApi.Data
         public DbSet<SnowmeetApi.Models.Maintain.MaintainLog> MaintainLog { get; set; }
 
         public DbSet<SnowmeetApi.Models.Background.BackgroundLoginSession> BackgroundLoginSession { get; set; }
+
+        public DbSet<SnowmeetApi.Models.Order.Mi7OrderDetail> mi7OrderDetail { get; set; }
+
+   
     }
 }

@@ -13,10 +13,13 @@ using SnowmeetApi.Models.Users;
 using SKIT.FlurlHttpClient.Wechat.TenpayV3;
 using SKIT.FlurlHttpClient.Wechat.TenpayV3.Settings;
 using SKIT.FlurlHttpClient.Wechat.TenpayV3.Models;
-using System.Web;
 using Newtonsoft.Json;
 using SnowmeetApi.Models.Product;
 using SnowmeetApi.Models.Order;
+using System.IO;
+using System.Collections;
+using System.Text.RegularExpressions;
+
 namespace SnowmeetApi.Controllers
 {
     public class SkiPassMemo
@@ -35,7 +38,7 @@ namespace SnowmeetApi.Controllers
 
         public bool isStaff = false;
 
-        
+
 
         public OrderOnlinesController(ApplicationDBContext context, IConfiguration config)
         {
@@ -49,6 +52,176 @@ namespace SnowmeetApi.Controllers
         {
             return Util.GetScoreRate(finalPrice, orderPrice);
         }
+
+        [HttpPost]
+        public async Task<ActionResult<Mi7OrderDetail[]>> ParseMi7OrderFromUploadFile(string sessionKey, IFormFile file)
+        {
+            
+            sessionKey = Util.UrlDecode(sessionKey);
+            UploadFileController uploadController = new UploadFileController(_context, _config);
+            UploadFile upload = (await uploadController.UploadFile(sessionKey, "7色米订单明细", true, file)).Value;
+            if (upload == null)
+            {
+                return BadRequest();
+            }
+            string filePath = Util.workingPath + "/wwwroot" + upload.file_path_name.Trim();
+            StreamReader sr = System.IO.File.OpenText(filePath);
+            string content = await sr.ReadToEndAsync();
+            sr.Close();
+            content = content.Trim();
+            string[] linesArr = content.Split('\r');
+
+
+            int index_order_date = -1;
+            int index_customer_mi7_order = -1;
+            int index_customer_mi7_name = -1;
+            int index_product_code = -1;
+            int index_product_name = -1;
+            int index_product_class = -1;
+            int index_product_scale = -1;
+            int index_product_properties = -1;
+            int index_unit = -1;
+            int index_barcode = -1;
+            int index_storage = -1;
+            int index_count = -1;
+            int index_product_price = -1;
+            int index_discount_rate = -1;
+            int index_sale_price = -1;
+            int index_charge_summary = -1;
+            int index_total_cost = -1;
+
+            ArrayList mi7OrderDetails = new ArrayList();
+
+            Regex reg = new Regex(",\".*,.*\",");
+
+            for (int i = 0; i < linesArr.Length; i++)
+            {
+                string lineStr = linesArr[i].Trim();
+
+                MatchCollection mc = reg.Matches(lineStr);
+
+                foreach (Match m in mc)
+                {
+                    Console.WriteLine(m.ToString());
+                    string originStr = m.Value.Trim();
+                    originStr = originStr.Replace(",\"", "").Replace("\",", "").Trim();
+                    string newStr = originStr.Replace(",", "，");
+                    lineStr = lineStr.Replace(originStr, newStr);
+
+                }
+                
+                string[] fields = lineStr.Split(',');
+                if (i == 0)
+                {
+                    for (int j = 0; j < fields.Length; j++)
+                    {
+                        switch (fields[j].Trim())
+                        {
+                            case "业务日期":
+                                index_order_date = j;
+                                break;
+                            case "单据编号":
+                                index_customer_mi7_order = j;
+                                break;
+                            case "客户名称":
+                                index_customer_mi7_name = j;
+                                break;
+                            case "商品编号":
+                                index_product_code = j;
+                                break;
+                            case "商品名称":
+                                index_product_name = j;
+                                break;
+                            case "商品分类":
+                                index_product_class = j;
+                                break;
+                            case "规格":
+                                index_product_scale = j;
+                                break;
+                            case "属性":
+                                index_product_properties = j;
+                                break;
+                            case "单位":
+                                index_unit = j;
+                                break;
+                            case "商品条码":
+                                index_barcode = j;
+                                break;
+                            case "出库仓库":
+                                index_storage = j;
+                                break;
+                            case "数量":
+                                index_count = j;
+                                break;
+                            case "单价":
+                                index_product_price = j;
+                                break;
+                            case "折扣":
+                                index_discount_rate = j;
+                                break;
+                            case "折后单价":
+                                index_sale_price = j;
+                                break;
+                            case "总额":
+                                index_charge_summary = j;
+                                break;
+                            case "成本额":
+                                index_total_cost = j;
+                                break;
+                            default:
+                                break;
+                        }
+                    }
+                }
+                else
+                {
+                    try
+                    {
+                        Mi7OrderDetail detail = new Mi7OrderDetail()
+                        {
+                            id = 0,
+                            order_date = DateTime.Parse(fields[index_order_date].Trim()),
+                            mi7_order_id = 0,
+                            customer_mi7_order = fields[index_customer_mi7_order].Trim(),
+                            customer_mi7_name = fields[index_customer_mi7_name].Trim(),
+                            product_code = fields[index_product_code].Trim(),
+                            product_name = fields[index_product_name].Trim(),
+                            product_class = fields[index_product_class].Trim(),
+                            product_scale = fields[index_product_scale].Trim(),
+                            product_properties = fields[index_product_properties].Trim(),
+                            unit = fields[index_unit].Trim(),
+                            barcode = fields[index_barcode].Trim(),
+                            storage = fields[index_storage].Trim(),
+                            count = int.Parse(fields[index_count].Trim()),
+                            product_price = double.Parse(fields[index_product_price].Trim()),
+                            discount_rate = double.Parse(fields[index_discount_rate].Trim()),
+                            sale_price = double.Parse(fields[index_sale_price].Trim()),
+                            charge_summary = double.Parse(fields[index_charge_summary].Trim()),
+                            total_cost = double.Parse(fields[index_total_cost].Trim()),
+                            original_file_id = 0,
+                            updated_file_id = 0,
+                            create_date = DateTime.Now,
+                            update_date = DateTime.Now
+                        };
+
+                        mi7OrderDetails.Add(detail);
+                    }
+                    catch(Exception err)
+                    {
+                        Console.WriteLine(err.ToString());
+                    }
+                }
+            }
+
+            Mi7OrderDetail[] details = new Mi7OrderDetail[mi7OrderDetails.Count];
+            for (int i = 0; i < details.Length; i++)
+            {
+                details[i] = (Mi7OrderDetail)mi7OrderDetails[i];
+            }
+
+            return details;
+        }
+            
 
         [HttpGet("{orderId}")]
         public async Task<ActionResult<OrderOnline>> OrderChargeByStaff(int orderId, double amount, string payMethod, string staffSessionKey)
