@@ -15,3 +15,9 @@ function getCookie(cname) {
     return "";
 }
 
+function formatDate(dateStr) {
+    var date = new Date(dateStr);
+    var monthStr = (date.getMonth() + 1).toString();
+    var dayStr = date.getDate().toString();
+    return date.getFullYear().toString() + '-' + '00'.substr(0, 2 - monthStr.length) + monthStr + '-' + '00'.substr(0, 2 - dayStr.length) + dayStr;
+}

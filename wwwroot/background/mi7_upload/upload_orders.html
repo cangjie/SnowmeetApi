@@ -2,16 +2,19 @@
 <html>
 <head>
     <meta charset="utf-8" />
-    <title></title>
+    <title>上传七色米订单明细</title>
+    <link rel="stylesheet" href="../../css/bootstrap.css"  />
+    <link rel="stylesheet" href="../../css/bootstrap-grid.css" />
+    <link rel="stylesheet" href="../../css/bootstrap-reboot.css" />
     <script type="text/javascript" src="../../js/jquery-3.6.1.min.js"></script>
     <script type="text/javascript" src="../../js/util.js"></script>
-    <script type="text/javascript" >
-        var sessionKey = getCookie('sessionKey');
+    <script type="text/javascript">var sessionKey = getCookie('sessionKey');
+        var orderDetails = [];
         if (sessionKey == '') {
             window.location.href = '../index.html';
         }
         function upload() {
-           
+
             var files = $('#file').prop('files');
             var frm = document.getElementById('frm');
             var fileData = new FormData(frm);
@@ -23,7 +26,7 @@
             var purpose = 'mi7orders';
             purpose = encodeURIComponent(purpose);
             $.ajax({
-                url: '../../core/UploadFile/UploadUnExposeFile?sessionKey=' + sessionKey + '&purpose=' + purpose,
+                url: '../../core/OrderOnlines/ParseMi7OrderFromUploadFile?sessionKey=' + sessionKey,
                 //url: '../../core/UploadFile/UploadUnExposeFile',
 
                 dataType: 'json',
@@ -40,20 +43,131 @@
 
                 success: function (msg, status) {
                     console.log(msg);
+                    orderDetails = msg;
+                    var tbody = document.getElementById("data_table");
+                    for (var i = 0; i < orderDetails.length; i++) {
+                        var d = orderDetails[i];
+                        var tr = document.createElement("tr");
+
+                        var td = document.createElement("td");
+                        td.innerText = formatDate(d.order_date);
+                        tr.appendChild(td);
+
+
+                        td = document.createElement("td");
+                        td.innerText = d.customer_mi7_order.toString().trim();
+                        tr.appendChild(td);
+
+                        td = document.createElement("td");
+                        td.innerText = d.customer_mi7_name.toString().trim();
+                        tr.appendChild(td);
+
+                        td = document.createElement("td");
+                        td.innerText = d.product_code.toString().trim();
+                        tr.appendChild(td);
+
+                        td = document.createElement("td");
+                        td.innerText = d.product_name.toString().trim();
+                        tr.appendChild(td);
+
+                        td = document.createElement("td");
+                        td.innerText = d.product_class.toString().trim();
+                        tr.appendChild(td);
+
+                        td = document.createElement("td");
+                        td.innerText = d.product_scale.toString().trim();
+                        tr.appendChild(td);
+
+                        td = document.createElement("td");
+                        td.innerText = d.product_properties.toString().trim();
+                        tr.appendChild(td);
+
+                        td = document.createElement("td");
+                        td.innerText = d.barcode.toString().trim();
+                        tr.appendChild(td);
+
+                        td = document.createElement("td");
+                        td.innerText = d.storage.toString().trim();
+                        tr.appendChild(td);
+
+                        td = document.createElement("td");
+                        td.innerText = d.count.toString().trim();
+                        tr.appendChild(td);
+
+                        td = document.createElement("td");
+                        td.innerText = d.unit.toString().trim();
+                        tr.appendChild(td);
+
+                        td = document.createElement("td");
+                        td.innerText = d.product_price.toString().trim();
+                        tr.appendChild(td);
+
+                        td = document.createElement("td");
+                        td.innerText = d.discount_rate.toString().trim();
+                        tr.appendChild(td);
+
+                        td = document.createElement("td");
+                        td.innerText = d.sale_price.toString().trim();
+                        tr.appendChild(td);
+
+                        td = document.createElement("td");
+                        td.innerText = d.charge_summary.toString().trim();
+                        tr.appendChild(td);
+
+                        td = document.createElement("td");
+                        td.innerText = d.total_cost.toString().trim();
+                        tr.appendChild(td);
+
+                        tbody.appendChild(tr);
+
+
+                    }
+
                 }
             })
-        }
-    </script>
+        }</script>
+    <script type="text/javascript" src="../../js/bootstrap.js"></script>
+
 </head>
 <body>
-    <form id="frm" enctype="multipart/form-data">
-        <input type="file" id="file" />
-    </form>
-    <input type="button" onclick="upload()" value="Upload" />
-    
-    
+    <div id="navigator_menu"></div>
+    <div style="height:50px" >
+        <hr />
+    </div>
+    <div>
+        <form id="frm" enctype="multipart/form-data">
+            <input type="file" id="file" /> <input type="button" onclick="upload()" value="上传UTF8的CSV文件" />
+        </form>  
+    </div>
+    <div>
+        <table class="table" >
+            <thead>
+                <tr>
+                    <td><b>日期</b></td>
+                    <td><b>单号</b></td>
+                    <td><b>客户</b></td>
+                    <td><b>编号</b></td>
+                    <td><b>商品</b></td>
+                    <td><b>分类</b></td>
+                    <td><b>规格</b></td>
+                    <td><b>属性</b></td>
+                    <td><b>条码</b></td>
+                    <td><b>仓库</b></td>
+                    <td><b>数量</b></td>
+                    <td><b>单位</b></td>
+                    <td><b>单价</b></td>
+                    <td><b>折扣</b></td>
+                    <td><b>折后</b></td>
+                    <td><b>总额</b></td>
+                    <td><b>成本</b></td>
+                </tr>
+            </thead>
+            <tbody id="data_table" >
+
+            </tbody>
+        </table>
+    </div>
+
 </body>
 </html>
-<script type="text/javascript" >
-
-</script>
+<script type="text/javascript" src="../../js/show_navigator.js" ></script>

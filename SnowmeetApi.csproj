@@ -66,6 +66,7 @@
     <Folder Include="wwwroot\background\" />
     <Folder Include="wwwroot\background\mi7_upload\" />
     <Folder Include="upload\" />
+    <Folder Include="wwwroot\css\" />
   </ItemGroup>
   <ItemGroup>
     <Content Remove="wwwroot\upload\" />
@@ -76,5 +77,6 @@
     <Content Remove="wwwroot\js\" />
     <Content Remove="wwwroot\background\" />
     <Content Remove="wwwroot\background\mi7_upload\" />
+    <Content Remove="wwwroot\css\" />
   </ItemGroup>
 </Project>

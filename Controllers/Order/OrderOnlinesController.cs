@@ -198,7 +198,7 @@ namespace SnowmeetApi.Controllers
                             sale_price = double.Parse(fields[index_sale_price].Trim()),
                             charge_summary = double.Parse(fields[index_charge_summary].Trim()),
                             total_cost = double.Parse(fields[index_total_cost].Trim()),
-                            original_file_id = 0,
+                            original_file_id = upload.id,
                             updated_file_id = 0,
                             create_date = DateTime.Now,
                             update_date = DateTime.Now
