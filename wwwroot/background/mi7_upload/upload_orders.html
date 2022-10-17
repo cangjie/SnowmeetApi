@@ -122,10 +122,37 @@
 
 
                     }
+                    var upload_div = document.getElementById("upload_div");
+                    upload_div.style.display = 'none';
+
+                    var recordNum = document.getElementById("record_num");
+                    recordNum.innerText = orderDetails.length.toString();
+
+                    var confirm_div = document.getElementById("confirm_div");
+                    confirm_div.style.display = 'flex';
+
+
+
 
                 }
             })
-        }</script>
+        }
+        function save() {
+            var saveUrl = '../../core/OrderOnlines/SaveMi7OrderDetail?sessionKey=' + encodeURIComponent(sessionKey)
+            var postData = JSON.stringify(orderDetails);
+            $.ajax({
+                url: saveUrl,
+                dataType: 'json',
+                async: true,
+                type: 'POST',
+                contentType: 'application/json',
+                data: postData,
+                success: function (msg, status) {
+                    console.log(msg);
+                }
+            })
+        }
+    </script>
     <script type="text/javascript" src="../../js/bootstrap.js"></script>
 
 </head>
@@ -134,10 +161,15 @@
     <div style="height:50px" >
         <hr />
     </div>
-    <div>
+    <div id="upload_div">
         <form id="frm" enctype="multipart/form-data">
             <input type="file" id="file" /> <input type="button" onclick="upload()" value="上传UTF8的CSV文件" />
         </form>  
+    </div>
+    <div id="confirm_div" style="display:none;flex-direction:row" >
+        <p style="margin-top:11px;"  >一共上传了<span id="record_num" >100</span>条订单明细。请</p>
+        <input style="height:45px" type="button" value="点击确认" onclick="save()" />
+        <p style="margin-top:11px;">。</p>
     </div>
     <div>
         <table class="table" >

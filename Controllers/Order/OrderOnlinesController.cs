@@ -19,6 +19,7 @@ using SnowmeetApi.Models.Order;
 using System.IO;
 using System.Collections;
 using System.Text.RegularExpressions;
+using static SKIT.FlurlHttpClient.Wechat.TenpayV3.Models.CreateHKTransactionMicroPayRequest.Types;
 
 namespace SnowmeetApi.Controllers
 {
@@ -51,6 +52,115 @@ namespace SnowmeetApi.Controllers
         public ActionResult<double> GetScoreRate(double orderPrice, double finalPrice)
         {
             return Util.GetScoreRate(finalPrice, orderPrice);
+        }
+
+        [HttpPost]
+        public async Task<ActionResult<Mi7OrderDetail[]>> SaveMi7OrderDetail(string sessionKey, Mi7OrderDetail[] details)
+        {
+            for (int i = 0; i < details.Length; i++)
+            {
+                Mi7OrderDetail detail = details[i];
+                var detailOriginList = await _context.mi7OrderDetail
+                    .Where(m => (m.order_date.Date == detail.order_date.Date
+                    && m.customer_mi7_order.Trim().Equals(detail.customer_mi7_order.Trim())
+                    && m.product_code.Trim().Equals(detail.product_code.Trim())
+                    && m.count == detail.count)).OrderByDescending(m=>m.id).ToListAsync();
+
+                var mi7OrderList = await _context.mi7Order
+                        .Where(m => (m.mi7_order_id.Trim().Equals(detail.customer_mi7_order.Trim())))
+                        .OrderByDescending(m => m.id).ToListAsync();
+
+                if (mi7OrderList.Count > 0)
+                {
+                    Mi7Order mi7Order = mi7OrderList[0];
+                    if (detailOriginList.Count == 0)
+                    {
+                        detail.mi7_order_id = mi7Order.order_id;
+                        await _context.AddAsync(detail);
+                        await _context.SaveChangesAsync();
+                    }
+                    else
+                    {
+                        Mi7OrderDetail detailOrigin = detailOriginList[0];
+                        bool modified = false;
+                        if (!detailOrigin.customer_mi7_name.Trim().Equals(detail.customer_mi7_name.Trim()))
+                        {
+                            modified = true;
+                            detailOrigin.customer_mi7_name = detail.customer_mi7_name.Trim();
+                        }
+                        if (!detailOrigin.product_name.Trim().Equals(detail.product_name.Trim()))
+                        {
+                            modified = true;
+                            detailOrigin.product_name = detail.product_name.Trim();
+                        }
+                        if (!detailOrigin.product_class.Trim().Equals(detail.product_class.Trim()))
+                        {
+                            modified = true;
+                            detailOrigin.product_class = detail.product_class.Trim();
+                        }
+                        if (!detailOrigin.product_scale.Trim().Equals(detail.product_scale.Trim()))
+                        {
+                            modified = true;
+                            detailOrigin.product_scale = detail.product_scale.Trim();
+                        }
+                        if (!detailOrigin.product_properties.Trim().Equals(detail.product_properties.Trim()))
+                        {
+                            modified = true;
+                            detailOrigin.product_properties = detail.product_properties.Trim();
+                        }
+                        if (!detailOrigin.unit.Trim().Equals(detail.unit.Trim()))
+                        {
+                            modified = true;
+                            detailOrigin.unit = detail.unit;
+                        }
+                        if (!detailOrigin.barcode.Trim().Equals(detail.barcode.Trim()))
+                        {
+                            modified = true;
+                            detailOrigin.barcode = detail.barcode.Trim();
+                        }
+                        if (!detailOrigin.storage.Trim().Equals(detail.storage.Trim()))
+                        {
+                            modified = true;
+                            detailOrigin.storage = detail.storage.Trim();
+                        }
+                        if (detailOrigin.count != detail.count)
+                        {
+                            modified = true;
+                            detailOrigin.count = detail.count;
+                        }
+                        if (detailOrigin.product_price != detail.product_price)
+                        {
+                            modified = true;
+                            detailOrigin.product_price = detail.product_price;
+                        }
+                        if (detailOrigin.discount_rate != detail.discount_rate)
+                        {
+                            modified = true;
+                            detailOrigin.discount_rate = detail.discount_rate;
+                        }
+                        if (detailOrigin.sale_price != detail.sale_price)
+                        {
+                            modified = true;
+                            detailOrigin.sale_price = detail.sale_price;
+                        }
+                        if (detailOrigin.total_cost != detail.total_cost)
+                        {
+                            modified = true;
+                            detailOrigin.total_cost = detail.total_cost;
+                        }
+                        if (modified)
+                        {
+                            detailOrigin.update_date = DateTime.Now;
+                            detailOrigin.updated_file_id = detail.original_file_id;
+                            _context.Entry(detailOrigin).State = EntityState.Modified;
+                            await _context.SaveChangesAsync();
+                            details[i] = detailOrigin;
+                        }
+                    }
+                }
+                
+            }
+            return details;
         }
 
         [HttpPost]
