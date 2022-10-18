@@ -20,11 +20,13 @@ namespace SnowmeetApi.Controllers
     {
         private readonly ApplicationDBContext _db;
         private IConfiguration _config;
+        
 
         public UploadFileController(ApplicationDBContext context, IConfiguration config)
         {
             _db = context;
             _config = config.GetSection("Settings");
+            UnicUser._context = context;
         }
 
         [HttpPost]
@@ -67,6 +69,28 @@ namespace SnowmeetApi.Controllers
             await _db.SaveChangesAsync();
 
             return fileSave;
+        }
+
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<UploadFile>>> GetUploadList(string sessionKey, string purpose)
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            purpose = Util.UrlDecode(purpose);
+            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            if (!user.isAdmin)
+            {
+                return BadRequest();
+            }
+            if (purpose.Trim().Equals(""))
+            {
+                return await _db.UploadFile.OrderByDescending(u => u.id).ToListAsync();
+            }
+            else 
+            {
+                return await _db.UploadFile.Where(u => u.purpose.IndexOf(purpose) >= 0)
+                    .OrderByDescending(u => u.id).ToListAsync();
+            }
+
         }
 
 

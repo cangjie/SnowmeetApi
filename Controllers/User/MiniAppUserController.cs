@@ -24,6 +24,19 @@ namespace SnowmeetApi.Controllers
             _context = context;
             _config = config.GetSection("Settings");
             _appId = _config.GetSection("AppId").Value.Trim();
+            UnicUser._context = context;
+        }
+
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<MiniAppUser>>> GetStaffList(string sessionKey)
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            if (!user.isAdmin)
+            {
+                return BadRequest();
+            }
+            return await _context.MiniAppUsers.Where(u => u.is_admin == 1).ToListAsync();
         }
         
         [NonAction]
