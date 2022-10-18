@@ -46,7 +46,13 @@
                     if (sessionKey != '') {
                         clearInterval(interVal);
                         setCookie('sessionKey', sessionKey.trim(), 60);
-                        window.location.href = 'mi7_upload/upload_orders.html';
+                        var ref = document.referrer;
+                        if (ref == undefined || ref == '') {
+                            window.location.href = 'mi7_upload/upload_orders.html';
+                        }
+                        else {
+                            window.location.href = ref;
+                        }
                     }
                     
                 }

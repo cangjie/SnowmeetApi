@@ -1,0 +1,108 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>七色米订单上传记录</title>
+    <link rel="stylesheet" href="../../css/bootstrap.css" />
+    <link rel="stylesheet" href="../../css/bootstrap-grid.css" />
+    <link rel="stylesheet" href="../../css/bootstrap-reboot.css" />
+    <script type="text/javascript" src="../../js/jquery-3.6.1.min.js"></script>
+    <script type="text/javascript" src="../../js/util.js"></script>
+    <script type="text/javascript" >
+        var sessionKey = getCookie('sessionKey');
+        if (sessionKey == '') {
+            window.location.href = '../index.html';
+        }
+    </script>
+</head>
+<body>
+    <div id="navigator_menu"></div>
+    <div style="height:50px">
+        <hr />
+    </div>
+    <div>
+        <table class="table">
+            <thead>
+                <tr>
+                    <td><b>ID</b></td>
+                    <td><b>日期</b></td>
+                    <td><b>时间</b></td>
+                    <td><b>上传人</b></td>
+                    <td><b>文件名</b></td>
+                </tr>
+            </thead>
+            <tbody id="table_data">
+
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>
+<script type="text/javascript" src="../../js/show_navigator.js"></script>
+<script type="text/javascript" >
+    var getStaffUrl = '../../core/MiniAppUser/GetStaffList?sessionKey=' + encodeURIComponent(sessionKey);
+    $.ajax({
+        url: getStaffUrl,
+        type: 'GET',
+        async: true,
+        success: function (msg, status) {
+            //console.log(msg);
+            var staffList = msg;
+            var getUploadHistoryUrl = '../../core/UploadFile/GetUploadList?sessionKey='
+                + encodeURIComponent(sessionKey) + '&purpose=' + encodeURIComponent('7色米订单明细');
+            $.ajax({
+                url: getUploadHistoryUrl,
+                type: 'GET',
+                success: function (msg, status) {
+                    //console.log(msg);
+                    var uploadList = msg;
+                    var tbody = document.getElementById('table_data');
+                    for (var i = 0; i < msg.length; i++) {
+                        var item = msg[i];
+                        var openId = item.owner;
+                        var name = '--';
+                        for (var j = 0; j < staffList.length; j++) {
+                            if (staffList[j].open_id == openId) {
+                                name = staffList[j].nick.trim();
+                                break;
+                            }
+                        }
+                        item.name = name;
+                        var date = formatDate(item.create_date.toString());
+                        var time = formatTime(item.create_date.toString());
+
+
+                        var tr = document.createElement('tr');
+
+                        var td = document.createElement('td');
+                        td.innerText = item.id;
+                        tr.appendChild(td);
+
+                        td = document.createElement('td');
+                        td.innerText = date;
+                        tr.appendChild(td);
+
+                        td = document.createElement('td');
+                        td.innerText = time;
+                        tr.appendChild(td);
+
+                        td = document.createElement('td');
+                        td.innerText = item.name;
+                        tr.appendChild(td);
+
+                        var fileName = item.file_path_name.split('/');
+                        td = document.createElement('td');
+                        td.innerHTML = "<a href='" + item.file_path_name + "' target='_blank' >"
+                            + fileName[fileName.length - 1].trim() + "</a>";
+                        tr.appendChild(td);
+                        tbody.appendChild(tr);
+                    }
+                    
+
+                    console.log(msg);
+
+                }
+            });
+        }
+    });
+</script>

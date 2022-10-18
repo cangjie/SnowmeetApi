@@ -12,7 +12,7 @@ namespace SnowmeetApi.Models
         public string file_path_name { get; set; }
         public int is_web { get; set; } = 1;
         public string purpose { get; set; } = "";
-
+        public DateTime create_date { get; set; } = DateTime.Now;
     }
 }
 

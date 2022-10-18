@@ -21,3 +21,21 @@ function formatDate(dateStr) {
     var dayStr = date.getDate().toString();
     return date.getFullYear().toString() + '-' + '00'.substr(0, 2 - monthStr.length) + monthStr + '-' + '00'.substr(0, 2 - dayStr.length) + dayStr;
 }
+
+function formatTime(dateStr) {
+    var date = new Date(dateStr);
+    const year = date.getFullYear()
+    const month = date.getMonth() + 1
+    const day = date.getDate()
+    const hour = date.getHours()
+    const minute = date.getMinutes()
+    const second = date.getSeconds()
+
+    return [hour, minute, second].map(formatNumber).join(':')
+
+}
+
+function formatNumber (n) {
+    n = n.toString()
+    return n[1] ? n : '0' + n
+}
