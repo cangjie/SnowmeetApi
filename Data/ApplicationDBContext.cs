@@ -35,6 +35,8 @@ namespace SnowmeetApi.Data
 
             modelBuilder.Entity<SnowmeetApi.Models.Maintain.Brand>().HasNoKey();
 
+            modelBuilder.Entity<SnowmeetApi.Models.Users.UnionId>().HasKey(u => new { u.union_id, u.open_id });
+
             //OrderOnline
             //modelBuilder.Entity<OrderOnline>().HasKey(c => c.id);
 

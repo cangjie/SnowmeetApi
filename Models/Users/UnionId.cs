@@ -6,7 +6,6 @@ using Microsoft.EntityFrameworkCore;
 namespace SnowmeetApi.Models.Users
 {
     [Table("unionids")]
-    [Keyless]
     public class UnionId
     {
         public UnionId()

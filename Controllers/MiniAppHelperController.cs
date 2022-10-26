@@ -5,6 +5,9 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
+using Microsoft.EntityFrameworkCore;
+
+
 using SnowmeetApi.Models;
 using SnowmeetApi.Models.Users;
 using Microsoft.Extensions.Configuration;
@@ -160,8 +163,11 @@ namespace LuqinMiniAppBase.Controllers
             
             if (sessionObj.errcode.ToString().Equals(""))
             {
-                var sessionList = _db.MiniSessons.Where(m => (m.session_key.Trim().Equals(sessionObj.session_key.Trim())
-                    && m.open_id.Trim().Equals(sessionObj.openid.Trim()))).ToList();
+                var sessionList = await _db.MiniSessons.Where(m => (m.session_key.Trim().Equals(sessionObj.session_key.Trim())
+                    && m.open_id.Trim().Equals(sessionObj.openid.Trim()))).ToListAsync();
+
+                
+
                 if (sessionList.Count == 0)
                 {
                     MiniSession mSession = new MiniSession()
