@@ -139,6 +139,10 @@ namespace SnowmeetApi.Controllers.Order
                 }
             }
 
+            order.open_id = user.miniAppOpenId.Trim();
+            _context.Entry(order).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
+
             string notifyUrl = "https://mini.snowmeet.top/core/OrderPayment/TenpayPaymentCallBack/" + mchid.ToString();
             string outTradeNo = order.id.ToString().PadLeft(6, '0') + payment.id.ToString().PadLeft(2, '0') + timeStamp.Substring(3, 10);
             var client = new WechatTenpayClient(options);
@@ -192,7 +196,7 @@ namespace SnowmeetApi.Controllers.Order
 
 
         [HttpPost("{mchid}")]
-        public ActionResult<string> TenpayPaymentCallback(int mchid, TenpayCallBackStruct postData)
+        public async Task<ActionResult<string>> TenpayPaymentCallbackAsync(int mchid, TenpayCallBackStruct postData)
         {
 
             string apiKey = "";
@@ -305,7 +309,7 @@ namespace SnowmeetApi.Controllers.Order
                         {
 
                         }
-                        //SetWepayOrderSuccess(outTradeNumber);
+                        await SetTenpayPaymentSuccess(outTradeNumber);
 
                         //Console.WriteLine("订单 {0} 已完成支付，交易单号为 {1}", outTradeNumber, transactionId);
                     }
@@ -317,6 +321,50 @@ namespace SnowmeetApi.Controllers.Order
                 Console.WriteLine(err.ToString());
             }
             return "{ \r\n \"code\": \"SUCCESS\", \r\n \"message\": \"成功\" \r\n}";
+        }
+
+        [HttpGet]
+        private async Task<ActionResult<OrderOnline>> SetTenpayPaymentSuccess(string outTradeNumber)
+        {
+            var paymentList = await _context.OrderPayment.Where(o => o.out_trade_no.Trim().Equals(outTradeNumber.Trim())).ToListAsync();
+            if (paymentList == null || paymentList.Count == 0)
+            {
+                return NotFound();
+            }
+            OrderPayment payment = paymentList[0];
+            payment.status = "支付成功";
+            _context.Entry(payment).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
+
+            OrderOnline order = await _context.OrderOnlines.FindAsync(payment.order_id);
+            if (order == null)
+            {
+                return NotFound();
+            }
+            OrderPayment[] paymentsArr = await _context.OrderPayment.Where(p => p.order_id == order.id).ToArrayAsync();
+            order.payments = paymentsArr;
+            if (order.final_price <= order.paidAmount)
+            {
+                order.pay_state = 1;
+            }
+            _context.Entry(order).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
+
+            var pointList = await _context.Point.Where(p => p.memo.Contains("支付赠送龙珠，订单ID：" + order.id.ToString())).ToListAsync();
+            if (pointList.Count == 0 && !order.open_id.Trim().Equals(""))
+            {
+                Point p = new Point()
+                {
+                    memo = "店销现货支付赠送龙珠，订单ID：" + order.id,
+                    user_open_id = order.open_id.Trim(),
+                    points = (int)order.generate_score,
+                    transact_date = DateTime.Now
+                };
+                await _context.Point.AddAsync(p);
+                await _context.SaveChangesAsync();
+            }
+            return order;
+            
         }
 
         [NonAction]
