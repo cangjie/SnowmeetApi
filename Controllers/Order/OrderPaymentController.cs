@@ -265,14 +265,19 @@ namespace SnowmeetApi.Controllers.Order
 
 
                 var certManager = new InMemoryCertificateManager();
+               
                 CertificateEntry ce = new CertificateEntry(serial, cerStr, DateTimeOffset.MinValue, DateTimeOffset.MaxValue);
 
+
+                certManager.AddEntry(ce);
                 //certManager.SetCertificate(serial, cerStr);
                 var options = new WechatTenpayClientOptions()
                 {
                     MerchantV3Secret = apiKey,
                     PlatformCertificateManager = certManager
+                    
                 };
+                
                 var client = new WechatTenpayClient(options);
                 bool valid = client.VerifyEventSignature(timeStamp, nonce, postJson, paySign, serial);
                 if (valid)
