@@ -18,7 +18,7 @@ using SnowmeetApi.Models.Product;
 using SnowmeetApi.Models.Users;
 namespace SnowmeetApi.Controllers.Order
 {
-    [Route("api/[controller]")]
+    [Route("core/[controller]/[action]")]
     [ApiController]
     public class OrderPaymentController : ControllerBase
     {
@@ -37,7 +37,7 @@ namespace SnowmeetApi.Controllers.Order
             
         }
 
-        [HttpGet("id")]
+        [HttpGet("{id}")]
         public async Task<ActionResult<TenpaySet>> TenpayRequest(int id, string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey.Trim());
@@ -182,7 +182,26 @@ namespace SnowmeetApi.Controllers.Order
             }
             return mchId;
         }
-
+        
+        [HttpGet("{paymentId}")]
+        public async Task<ActionResult<OrderOnline>> GetWholeOrder(int paymentId, string sessionKey)
+        {
+            sessionKey = Util.UrlDecode(sessionKey.Trim());
+            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            OrderPayment payment = await _context.OrderPayment.FindAsync(paymentId);
+            if (payment == null || (payment.open_id != null && !payment.open_id.Trim().Equals("") 
+                && !payment.open_id.Trim().Equals(user.miniAppOpenId.Trim()) && !user.isAdmin ))
+            {
+                return BadRequest();
+            }
+            OrderOnline order = await _context.OrderOnlines.FindAsync(payment.order_id);
+            if (order == null)
+            {
+                return BadRequest();
+            }
+            return order;
+        }
+        
         /*
 
         // GET: api/OrderPayment
