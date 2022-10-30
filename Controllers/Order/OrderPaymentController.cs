@@ -16,6 +16,10 @@ using SKIT.FlurlHttpClient.Wechat.TenpayV3.Models;
 using Microsoft.Extensions.Configuration;
 using SnowmeetApi.Models.Product;
 using SnowmeetApi.Models.Users;
+//using SnowmeetApi.Controllers.WepayOrderController;
+using System.IO;
+using System.Net.Http.Headers;
+
 namespace SnowmeetApi.Controllers.Order
 {
     [Route("core/[controller]/[action]")]
@@ -28,11 +32,33 @@ namespace SnowmeetApi.Controllers.Order
 
         public string _appId = "";
 
-        public OrderPaymentController(ApplicationDBContext context, IConfiguration config)
+        private readonly IHttpContextAccessor _httpContextAccessor;
+
+        public class TenpayResource
+        {
+            public string original_type { get; set; }
+            public string algorithm { get; set; }
+            public string ciphertext { get; set; }
+            public string associated_data { get; set; }
+            public string nonce { get; set; }
+        }
+
+        public class TenpayCallBackStruct
+        {
+            public string id { get; set; }
+            public DateTimeOffset create_time { get; set; }
+            public string resource_type { get; set; }
+            public string event_type { get; set; }
+            public string summary { get; set; }
+            public TenpayResource resource { get; set; }
+        }
+
+        public OrderPaymentController(ApplicationDBContext context, IConfiguration config, IHttpContextAccessor httpContextAccessor)
         {
             _context = context;
             _config = config.GetSection("Settings");
             _appId = _config.GetSection("AppId").Value.Trim();
+            _httpContextAccessor = httpContextAccessor;
             UnicUser._context = context;
             
         }
@@ -113,7 +139,7 @@ namespace SnowmeetApi.Controllers.Order
                 }
             }
 
-            string notifyUrl = "https://mini.snowmeet.top/core/OrderPayment/CallBack/" + mchid.ToString();
+            string notifyUrl = "https://mini.snowmeet.top/core/OrderPayment/TenpayCallBack/" + mchid.ToString();
             string outTradeNo = order.id.ToString().PadLeft(6, '0') + payment.id.ToString().PadLeft(2, '0') + timeStamp.Substring(3, 10);
             var client = new WechatTenpayClient(options);
             var request = new CreatePayTransactionJsapiRequest()
@@ -162,6 +188,130 @@ namespace SnowmeetApi.Controllers.Order
                 return set;
             }
             return BadRequest();
+        }
+
+
+        [HttpPost("{mchid}")]
+        public ActionResult<string> TenpayPaymentCallback(int mchid, TenpayCallBackStruct postData)
+        {
+
+            string apiKey = "";
+            WepayKey key = _context.WepayKeys.Find(mchid);
+
+            if (key == null)
+            {
+                return NotFound();
+            }
+
+            apiKey = key.api_key.Trim();
+
+            if (apiKey == null || apiKey.Trim().Equals(""))
+            {
+                return NotFound();
+            }
+
+            string postJson = Newtonsoft.Json.JsonConvert.SerializeObject(postData);
+            string path = $"{Environment.CurrentDirectory}";
+            string paySign = "no sign";
+            string nonce = "no nonce";
+            string serial = "no serial";
+            string timeStamp = "no time";
+            try
+            {
+                paySign = _httpContextAccessor.HttpContext.Request.Headers["Wechatpay-Signature"].ToString();
+                nonce = _httpContextAccessor.HttpContext.Request.Headers["Wechatpay-Nonce"].ToString();
+                serial = _httpContextAccessor.HttpContext.Request.Headers["Wechatpay-Serial"].ToString();
+                timeStamp = _httpContextAccessor.HttpContext.Request.Headers["Wechatpay-Timestamp"].ToString();
+            }
+            catch
+            {
+
+            }
+            if (path.StartsWith("/"))
+            {
+                path = path + "/WepayCertificate/";
+            }
+            else
+            {
+                path = path + "\\WepayCertificate\\";
+            }
+            string dateStr = DateTime.Now.Year.ToString() + DateTime.Now.Month.ToString().PadLeft(2, '0')
+                + DateTime.Now.Day.ToString().PadLeft(2, '0');
+            //path = path + "callback_" +  + ".txt";
+            // 此文本只添加到文件一次。
+            using (StreamWriter fw = new StreamWriter(path + "callback_origin_" + dateStr + ".txt", true))
+            {
+                fw.WriteLine(DateTimeOffset.Now.ToString());
+                fw.WriteLine(serial);
+                fw.WriteLine(timeStamp);
+                fw.WriteLine(nonce);
+                fw.WriteLine(paySign);
+                fw.WriteLine(postJson);
+                fw.WriteLine("");
+                fw.WriteLine("--------------------------------------------------------");
+                fw.WriteLine("");
+                fw.Close();
+            }
+
+            try
+            {
+                string cerStr = "";
+                using (StreamReader sr = new StreamReader(path + serial.Trim() + ".pem", true))
+                {
+                    cerStr = sr.ReadToEnd();
+                    sr.Close();
+                }
+
+
+
+                var certManager = new InMemoryCertificateManager();
+                CertificateEntry ce = new CertificateEntry(serial, cerStr, DateTimeOffset.MinValue, DateTimeOffset.MaxValue);
+
+                //certManager.SetCertificate(serial, cerStr);
+                var options = new WechatTenpayClientOptions()
+                {
+                    MerchantV3Secret = apiKey,
+                    PlatformCertificateManager = certManager
+                };
+                var client = new WechatTenpayClient(options);
+                bool valid = client.VerifyEventSignature(timeStamp, nonce, postJson, paySign, serial);
+                if (valid)
+                {
+                    var callbackModel = client.DeserializeEvent(postJson);
+                    if ("TRANSACTION.SUCCESS".Equals(callbackModel.EventType))
+                    {
+                        /* 根据事件类型，解密得到支付通知敏感数据 */
+
+                        var callbackResource = client.DecryptEventResource<SKIT.FlurlHttpClient.Wechat.TenpayV3.Events.TransactionResource>(callbackModel);
+                        string outTradeNumber = callbackResource.OutTradeNumber;
+                        string transactionId = callbackResource.TransactionId;
+                        string callbackStr = Newtonsoft.Json.JsonConvert.SerializeObject(callbackResource);
+                        try
+                        {
+                            using (StreamWriter sw = new StreamWriter(path + "callback_decrypt_" + dateStr + ".txt", true))
+                            {
+                                sw.WriteLine(DateTimeOffset.Now.ToString());
+                                sw.WriteLine(callbackStr);
+                                sw.WriteLine("");
+                                sw.Close();
+                            }
+                        }
+                        catch
+                        {
+
+                        }
+                        //SetWepayOrderSuccess(outTradeNumber);
+
+                        //Console.WriteLine("订单 {0} 已完成支付，交易单号为 {1}", outTradeNumber, transactionId);
+                    }
+                }
+
+            }
+            catch (Exception err)
+            {
+                Console.WriteLine(err.ToString());
+            }
+            return "{ \r\n \"code\": \"SUCCESS\", \r\n \"message\": \"成功\" \r\n}";
         }
 
         [NonAction]
