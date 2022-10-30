@@ -139,7 +139,7 @@ namespace SnowmeetApi.Controllers.Order
                 }
             }
 
-            string notifyUrl = "https://mini.snowmeet.top/core/OrderPayment/TenpayCallBack/" + mchid.ToString();
+            string notifyUrl = "https://mini.snowmeet.top/core/OrderPayment/TenpayPaymentCallBack/" + mchid.ToString();
             string outTradeNo = order.id.ToString().PadLeft(6, '0') + payment.id.ToString().PadLeft(2, '0') + timeStamp.Substring(3, 10);
             var client = new WechatTenpayClient(options);
             var request = new CreatePayTransactionJsapiRequest()
