@@ -730,6 +730,7 @@ namespace SnowmeetApi.Controllers
                 {
                     orderOnline.open_id = "";
                 }
+                orderOnline.LoadPayments(_context);
                 return orderOnline;
             }
 

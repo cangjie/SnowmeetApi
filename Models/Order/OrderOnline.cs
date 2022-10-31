@@ -6,6 +6,11 @@ using System.ComponentModel;
 using SnowmeetApi.Models.Order;
 using SnowmeetApi.Models.Users;
 using SnowmeetApi.Models.Ticket;
+using System.Linq;
+using System.Threading.Tasks;
+
+
+using Microsoft.EntityFrameworkCore;
 
 namespace SnowmeetApi.Models
 {
@@ -45,6 +50,7 @@ namespace SnowmeetApi.Models
         public int have_score { get; set; }
         public DateTime create_date { get; set; } = DateTime.Now;
 
+        
         [NotMapped]
         public OrderPayment[]? payments { get; set; }
         [NotMapped]
@@ -122,6 +128,13 @@ namespace SnowmeetApi.Models
             {
                 return ticketArray;
             }
+        }
+
+        //public SnowmeetApi.Data.ApplicationDBContext db;
+
+        public async void LoadPayments(SnowmeetApi.Data.ApplicationDBContext db)
+        {
+            payments = await db.OrderPayment.Where(o => o.order_id == id).ToArrayAsync();
         }
         
         /*

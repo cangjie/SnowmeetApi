@@ -402,6 +402,9 @@ namespace SnowmeetApi.Controllers.Order
             {
                 return BadRequest();
             }
+            
+            order.LoadPayments(_context);
+            
             return order;
         }
         
