@@ -132,7 +132,7 @@ namespace SnowmeetApi.Models
 
         //public SnowmeetApi.Data.ApplicationDBContext db;
 
-        public  void LoadPayments(SnowmeetApi.Data.ApplicationDBContext db)
+        public void LoadPayments(SnowmeetApi.Data.ApplicationDBContext db)
         {
             payments =  db.OrderPayment.Where(o => o.order_id == id).ToArray();
         }
