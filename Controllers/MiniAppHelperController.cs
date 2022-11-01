@@ -190,8 +190,8 @@ namespace LuqinMiniAppBase.Controllers
                     await _db.MiniAppUsers.AddAsync(user);
                     await _db.SaveChangesAsync();
                 }
-                var uidList = _db.UnionIds.Where(u => (u.open_id.Trim().Equals(sessionObj.openid.Trim())
-                    && u.source.Trim().Equals("snowmeet_mini") && u.union_id.Trim().Equals(sessionObj.unionid.Trim()))).ToList();
+                var uidList = await _db.UnionIds.Where(u => (u.open_id.Trim().Equals(sessionObj.openid.Trim())
+                    && u.source.Trim().Equals("snowmeet_mini") && u.union_id.Trim().Equals(sessionObj.unionid.Trim()))).ToListAsync();
                 if (uidList.Count == 0)
                 {
                     UnionId uid = new UnionId()
