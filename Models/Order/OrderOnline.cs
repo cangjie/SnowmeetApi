@@ -8,6 +8,7 @@ using SnowmeetApi.Models.Users;
 using SnowmeetApi.Models.Ticket;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Mvc;
 
 
 using Microsoft.EntityFrameworkCore;
@@ -132,9 +133,10 @@ namespace SnowmeetApi.Models
 
         //public SnowmeetApi.Data.ApplicationDBContext db;
 
-        public void LoadPayments(SnowmeetApi.Data.ApplicationDBContext db)
+        public async Task<ActionResult<OrderOnline>> LoadPayments(SnowmeetApi.Data.ApplicationDBContext db)
         {
-            payments =  db.OrderPayment.Where(o => o.order_id == id).ToArray();
+            payments =  await db.OrderPayment.Where(o => o.order_id == id).ToArrayAsync();
+            return this;
         }
         
         /*
