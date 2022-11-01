@@ -108,14 +108,18 @@ namespace SnowmeetApi.Models.Users
             {
                 miniAppOpenId = miniSession.open_id.Trim();
                 user.miniAppOpenId = miniAppOpenId;
-                
-                var unionIds = _context.UnionIds.FromSqlRaw(" select * from unionids where  open_id = '"
-                    + miniAppOpenId.Trim() + "' and source = 'snowmeet_mini' ").ToList();
+
+                //var unionIds = _context.UnionIds.FromSqlRaw(" select * from unionids where  open_id = '"
+                //    + miniAppOpenId.Trim() + "' and source = 'snowmeet_mini' ").ToList();
+
+                var unionIds =  _context.UnionIds.Where(u => (u.open_id.Trim().Equals(miniAppOpenId.Trim()) && u.source.Trim().Equals("snowmeet_mini"))).ToList();
+
                 if (unionIds.Count > 0)
                 {
                     unionId = unionIds[0].union_id.Trim();
-                    unionIds = _context.UnionIds.FromSqlRaw(" select * from unionids where union_id = '"
-                        + unionId.Trim() + "' and source = 'snowmeet_official_account' ").ToList();
+                    //unionIds = _context.UnionIds.FromSqlRaw(" select * from unionids where union_id = '"
+                    //    + unionId.Trim() + "' and source = 'snowmeet_official_account' ").ToList();
+                    unionIds = _context.UnionIds.Where(u => (u.union_id.Trim().Equals(unionId.Trim()) && u.source.Trim().Equals("snowmeet_official_account"))).ToList();
                     if (unionIds.Count > 0)
                     {
                         officialOpenId = unionIds[0].open_id.Trim();
@@ -129,13 +133,17 @@ namespace SnowmeetApi.Models.Users
                 if (mToken != null && mToken.isvalid == 1 && mToken.expire > DateTime.Now)
                 {
                     officialOpenId = mToken.open_id.Trim();
-                    var unionIds = _context.UnionIds.FromSqlRaw(" select * from unionids where  open_id = '"
-                        + officialOpenId.Trim() + "' and source = 'snowmeet_official_account' ").ToList();
+                    //var unionIds = _context.UnionIds.FromSqlRaw(" select * from unionids where  open_id = '"
+                    //    + officialOpenId.Trim() + "' and source = 'snowmeet_official_account' ").ToList();
+
+                    var unionIds = _context.UnionIds.Where(u => (u.open_id.Trim().Equals(officialOpenId.Trim()) && u.source.Trim().Equals("snowmeet_official_account"))).ToList();
+
                     if (unionIds.Count > 0)
                     {
                         unionId = unionIds[0].union_id.Trim();
-                        unionIds = _context.UnionIds.FromSqlRaw(" select * from unionids where union_id = '"
-                            + unionId.Trim() + "' and source = 'snowmeet_mini' ").ToList();
+                        //unionIds = _context.UnionIds.FromSqlRaw(" select * from unionids where union_id = '"
+                        //    + unionId.Trim() + "' and source = 'snowmeet_mini' ").ToList();
+                        unionIds = _context.UnionIds.Where(u => (u.union_id.Trim().Equals(unionId.Trim()) && u.source.Trim().Equals("snowmeet_mini"))).ToList();
                         if (unionIds.Count > 0)
                         {
                             miniAppOpenId = unionIds[0].open_id.Trim();
