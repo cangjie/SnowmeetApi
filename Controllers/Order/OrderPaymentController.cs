@@ -403,7 +403,7 @@ namespace SnowmeetApi.Controllers.Order
                 return BadRequest();
             }
             
-            await order.LoadPayments(_context);
+            order.LoadPayments(_context);
             
             return order;
         }

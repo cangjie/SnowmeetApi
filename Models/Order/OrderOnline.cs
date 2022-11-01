@@ -133,10 +133,10 @@ namespace SnowmeetApi.Models
 
         //public SnowmeetApi.Data.ApplicationDBContext db;
 
-        public async Task<ActionResult<OrderOnline>> LoadPayments(SnowmeetApi.Data.ApplicationDBContext db)
+        public void LoadPayments(SnowmeetApi.Data.ApplicationDBContext db)
         {
-            payments =  await db.OrderPayment.Where(o => o.order_id == id).ToArrayAsync();
-            return this;
+            payments =  db.OrderPayment.Where(o => o.order_id == id).ToArray();
+            //return this;
         }
         
         /*
