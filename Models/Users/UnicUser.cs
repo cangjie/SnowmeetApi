@@ -4,6 +4,9 @@ using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
 using Microsoft.EntityFrameworkCore;
 
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Mvc;
+
 
 namespace SnowmeetApi.Models.Users
 {
@@ -95,6 +98,80 @@ namespace SnowmeetApi.Models.Users
             }
         }
 
+        public static async Task<ActionResult<UnicUser>> GetUnicUserAsync(string sessionKey, Data.ApplicationDBContext db)
+        {
+            UnicUser user = new UnicUser();
+            string miniAppOpenId = "";
+            string officialOpenId = "";
+            string unionId = "";
+
+            MiniSession miniSession = _context.MiniSessons.Find(sessionKey);
+            if (miniSession != null)
+            {
+                miniAppOpenId = miniSession.open_id.Trim();
+                user.miniAppOpenId = miniAppOpenId;
+
+                //var unionIds = _context.UnionIds.FromSqlRaw(" select * from unionids where  open_id = '"
+                //    + miniAppOpenId.Trim() + "' and source = 'snowmeet_mini' ").ToList();
+
+                var unionIds = await _context.UnionIds.Where(u => (u.open_id.Trim().Equals(miniAppOpenId.Trim()) && u.source.Trim().Equals("snowmeet_mini"))).ToListAsync();
+
+                if (unionIds.Count > 0)
+                {
+                    unionId = unionIds[0].union_id.Trim();
+                    //unionIds = _context.UnionIds.FromSqlRaw(" select * from unionids where union_id = '"
+                    //    + unionId.Trim() + "' and source = 'snowmeet_official_account' ").ToList();
+                    unionIds = await _context.UnionIds.Where(u => (u.union_id.Trim().Equals(unionId.Trim()) && u.source.Trim().Equals("snowmeet_official_account"))).ToListAsync();
+                    if (unionIds.Count > 0)
+                    {
+                        officialOpenId = unionIds[0].open_id.Trim();
+                    }
+                }
+
+            }
+            if (miniAppOpenId.Trim().Equals(""))
+            {
+                MToken mToken = _context.MTokens.Find(sessionKey);
+                if (mToken != null && mToken.isvalid == 1 && mToken.expire > DateTime.Now)
+                {
+                    officialOpenId = mToken.open_id.Trim();
+                    //var unionIds = _context.UnionIds.FromSqlRaw(" select * from unionids where  open_id = '"
+                    //    + officialOpenId.Trim() + "' and source = 'snowmeet_official_account' ").ToList();
+
+                    var unionIds = await _context.UnionIds.Where(u => (u.open_id.Trim().Equals(officialOpenId.Trim()) && u.source.Trim().Equals("snowmeet_official_account"))).ToListAsync();
+
+                    if (unionIds.Count > 0)
+                    {
+                        unionId = unionIds[0].union_id.Trim();
+                        //unionIds = _context.UnionIds.FromSqlRaw(" select * from unionids where union_id = '"
+                        //    + unionId.Trim() + "' and source = 'snowmeet_mini' ").ToList();
+                        unionIds = await _context.UnionIds.Where(u => (u.union_id.Trim().Equals(unionId.Trim()) && u.source.Trim().Equals("snowmeet_mini"))).ToListAsync();
+                        if (unionIds.Count > 0)
+                        {
+                            miniAppOpenId = unionIds[0].open_id.Trim();
+                        }
+                    }
+                }
+            }
+            user.unionId = unionId.Trim();
+            if (miniAppOpenId.Trim().Equals("") && officialOpenId.Trim().Equals(""))
+            {
+                return null;
+            }
+            if (!miniAppOpenId.Trim().Equals(""))
+            {
+                user.miniAppOpenId = miniAppOpenId.Trim();
+                user.miniAppUser = _context.MiniAppUsers.Find(miniAppOpenId.Trim());
+
+            }
+            if (!officialOpenId.Trim().Equals(""))
+            {
+                user.officialAccountOpenId = officialOpenId.Trim();
+                user.officialAccountUser = _context.officialAccoutUsers.Find(officialOpenId.Trim());
+
+            }
+            return user;
+        }
 
         public static UnicUser GetUnicUser(string sessionKey)
         {

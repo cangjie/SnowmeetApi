@@ -708,8 +708,8 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<OrderOnline>> GetOrderOnline(int id, string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey);
-            UnicUser._context = _context;
-            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            //UnicUser._context = _context;
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;//.GetUnicUser(sessionKey);
             if (user == null)
             {
                 return NotFound();

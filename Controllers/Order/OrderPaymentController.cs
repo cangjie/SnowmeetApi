@@ -393,7 +393,7 @@ namespace SnowmeetApi.Controllers.Order
         public async Task<ActionResult<OrderOnline>> GetWholeOrder(int paymentId, string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey.Trim());
-            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;//.GetUnicUser(sessionKey);
             OrderPayment payment = await _context.OrderPayment.FindAsync(paymentId);
             if (payment == null || (payment.open_id != null && !payment.open_id.Trim().Equals("") 
                 && !payment.open_id.Trim().Equals(user.miniAppOpenId.Trim()) && !user.isAdmin ))
