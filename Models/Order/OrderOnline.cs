@@ -20,7 +20,7 @@ namespace SnowmeetApi.Models
     {
         public string staffRealName = "";
 
-        public Ticket.Ticket[] ticketArray = new Ticket.Ticket[0];
+        //public Ticket.Ticket[] ticketArray = new Ticket.Ticket[0];
    
         [Key]
         public int id { get; set; }
@@ -122,6 +122,10 @@ namespace SnowmeetApi.Models
             }
         }
 
+
+        [NotMapped]
+        public Ticket.Ticket[] tickets { get; set; }
+        /*
         [NotMapped]
         public Ticket.Ticket[] tickets
         {
@@ -130,14 +134,10 @@ namespace SnowmeetApi.Models
                 return ticketArray;
             }
         }
-
+        */
         //public SnowmeetApi.Data.ApplicationDBContext db;
 
-        public void LoadPayments(SnowmeetApi.Data.ApplicationDBContext db)
-        {
-            payments =  db.OrderPayment.Where(o => o.order_id == id).ToArray();
-            //return this;
-        }
+        
         
         /*
         

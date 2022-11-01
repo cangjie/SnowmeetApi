@@ -487,7 +487,7 @@ namespace SnowmeetApi.Controllers
 
             if (order.ticket_code != null && !order.ticket_code.Trim().Equals(""))
             {
-                order.ticketArray = await _context.Ticket.Where(t => t.code.Trim().Equals(order.ticket_code)).ToArrayAsync();
+                order.tickets = await _context.Ticket.Where(t => t.code.Trim().Equals(order.ticket_code)).ToArrayAsync();
             }
 
             return order;
@@ -730,7 +730,12 @@ namespace SnowmeetApi.Controllers
                 {
                     orderOnline.open_id = "";
                 }
-                orderOnline.LoadPayments(_context);
+                orderOnline.payments = await _context.OrderPayment.Where(p => p.order_id == orderOnline.id).ToArrayAsync();
+                if (orderOnline.ticket_code != null && !orderOnline.ticket_code.ToString().Trim().Equals(""))
+                {
+                    orderOnline.tickets = await _context.Ticket.Where(t => t.code == orderOnline.ticket_code).ToArrayAsync();
+                }
+                //orderOnline.ticketArray
                 return orderOnline;
             }
 

@@ -397,13 +397,14 @@ namespace SnowmeetApi.Controllers.Order
             {
                 return BadRequest();
             }
-            OrderOnline order = await _context.OrderOnlines.FindAsync(payment.order_id);
+            OrderOnlinesController orderController = new OrderOnlinesController(_context, _config);
+            OrderOnline order =  (await orderController.GetOrderOnline(payment.order_id, sessionKey)).Value;
             if (order == null)
             {
                 return BadRequest();
             }
-            
-            order.LoadPayments(_context);
+
+            //order.payments = await _context.OrderPayment.Where(p => p.order_id == order.id).ToArrayAsync();
             
             return order;
         }
