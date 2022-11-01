@@ -57,6 +57,7 @@ namespace SnowmeetApi.Controllers.Order
 
         public OrderPaymentController(ApplicationDBContext context, IConfiguration config, IHttpContextAccessor httpContextAccessor)
         {
+            _originConfig = config;
             _context = context;
             _config = config.GetSection("Settings");
             _appId = _config.GetSection("AppId").Value.Trim();
