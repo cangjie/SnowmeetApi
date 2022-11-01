@@ -30,6 +30,8 @@ namespace SnowmeetApi.Controllers.Order
 
         private IConfiguration _config;
 
+        private IConfiguration _originConfig;
+
         public string _appId = "";
 
         private readonly IHttpContextAccessor _httpContextAccessor;
@@ -397,7 +399,7 @@ namespace SnowmeetApi.Controllers.Order
             {
                 return BadRequest();
             }
-            OrderOnlinesController orderController = new OrderOnlinesController(_context, _config);
+            OrderOnlinesController orderController = new OrderOnlinesController(_context, _originConfig);
             OrderOnline order =  (await orderController.GetOrderOnline(payment.order_id, sessionKey)).Value;
             if (order == null)
             {
