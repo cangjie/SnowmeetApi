@@ -203,7 +203,7 @@ namespace SnowmeetApi.Controllers
                 item.taskLog = await _context.MaintainLog.Where(l => l.task_id == item.id).OrderBy(l => l.id).ToArrayAsync();
             }
             OrderOnlinesController orderController = new OrderOnlinesController(_context, _originConfig);
-            OrderOnline order = await _context.OrderOnlines.FindAsync(orderId);   //(await orderController.GetWholeOrderByStaff(orderId, sessionKey)).Value;
+            OrderOnline order = (await orderController.GetOrderOnline(orderId, sessionKey)).Value; //await _context.OrderOnlines.FindAsync(orderId);   //(await orderController.GetWholeOrderByStaff(orderId, sessionKey)).Value;
 
             if (!order.open_id.Trim().Equals(user.miniAppOpenId.Trim()) && !order.open_id.Equals(user.officialAccountOpenId.Trim())
                 && !order.open_id.Trim().Equals(user.officialAccountOpenIdOld.Trim()) && !user.isAdmin)
