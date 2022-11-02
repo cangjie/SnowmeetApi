@@ -105,7 +105,7 @@ namespace SnowmeetApi.Models.Users
             string officialOpenId = "";
             string unionId = "";
 
-            MiniSession miniSession = _context.MiniSessons.Find(sessionKey);
+            MiniSession miniSession = db.MiniSessons.Find(sessionKey);
             if (miniSession != null)
             {
                 miniAppOpenId = miniSession.open_id.Trim();
@@ -114,14 +114,14 @@ namespace SnowmeetApi.Models.Users
                 //var unionIds = _context.UnionIds.FromSqlRaw(" select * from unionids where  open_id = '"
                 //    + miniAppOpenId.Trim() + "' and source = 'snowmeet_mini' ").ToList();
 
-                var unionIds = await _context.UnionIds.Where(u => (u.open_id.Trim().Equals(miniAppOpenId.Trim()) && u.source.Trim().Equals("snowmeet_mini"))).ToListAsync();
+                var unionIds = await db.UnionIds.Where(u => (u.open_id.Trim().Equals(miniAppOpenId.Trim()) && u.source.Trim().Equals("snowmeet_mini"))).ToListAsync();
 
                 if (unionIds.Count > 0)
                 {
                     unionId = unionIds[0].union_id.Trim();
                     //unionIds = _context.UnionIds.FromSqlRaw(" select * from unionids where union_id = '"
                     //    + unionId.Trim() + "' and source = 'snowmeet_official_account' ").ToList();
-                    unionIds = await _context.UnionIds.Where(u => (u.union_id.Trim().Equals(unionId.Trim()) && u.source.Trim().Equals("snowmeet_official_account"))).ToListAsync();
+                    unionIds = await db.UnionIds.Where(u => (u.union_id.Trim().Equals(unionId.Trim()) && u.source.Trim().Equals("snowmeet_official_account"))).ToListAsync();
                     if (unionIds.Count > 0)
                     {
                         officialOpenId = unionIds[0].open_id.Trim();
@@ -131,21 +131,21 @@ namespace SnowmeetApi.Models.Users
             }
             if (miniAppOpenId.Trim().Equals(""))
             {
-                MToken mToken = _context.MTokens.Find(sessionKey);
+                MToken mToken = db.MTokens.Find(sessionKey);
                 if (mToken != null && mToken.isvalid == 1 && mToken.expire > DateTime.Now)
                 {
                     officialOpenId = mToken.open_id.Trim();
                     //var unionIds = _context.UnionIds.FromSqlRaw(" select * from unionids where  open_id = '"
                     //    + officialOpenId.Trim() + "' and source = 'snowmeet_official_account' ").ToList();
 
-                    var unionIds = await _context.UnionIds.Where(u => (u.open_id.Trim().Equals(officialOpenId.Trim()) && u.source.Trim().Equals("snowmeet_official_account"))).ToListAsync();
+                    var unionIds = await db.UnionIds.Where(u => (u.open_id.Trim().Equals(officialOpenId.Trim()) && u.source.Trim().Equals("snowmeet_official_account"))).ToListAsync();
 
                     if (unionIds.Count > 0)
                     {
                         unionId = unionIds[0].union_id.Trim();
                         //unionIds = _context.UnionIds.FromSqlRaw(" select * from unionids where union_id = '"
                         //    + unionId.Trim() + "' and source = 'snowmeet_mini' ").ToList();
-                        unionIds = await _context.UnionIds.Where(u => (u.union_id.Trim().Equals(unionId.Trim()) && u.source.Trim().Equals("snowmeet_mini"))).ToListAsync();
+                        unionIds = await db.UnionIds.Where(u => (u.union_id.Trim().Equals(unionId.Trim()) && u.source.Trim().Equals("snowmeet_mini"))).ToListAsync();
                         if (unionIds.Count > 0)
                         {
                             miniAppOpenId = unionIds[0].open_id.Trim();
@@ -161,13 +161,13 @@ namespace SnowmeetApi.Models.Users
             if (!miniAppOpenId.Trim().Equals(""))
             {
                 user.miniAppOpenId = miniAppOpenId.Trim();
-                user.miniAppUser = _context.MiniAppUsers.Find(miniAppOpenId.Trim());
+                user.miniAppUser = db.MiniAppUsers.Find(miniAppOpenId.Trim());
 
             }
             if (!officialOpenId.Trim().Equals(""))
             {
                 user.officialAccountOpenId = officialOpenId.Trim();
-                user.officialAccountUser = _context.officialAccoutUsers.Find(officialOpenId.Trim());
+                user.officialAccountUser = db.officialAccoutUsers.Find(officialOpenId.Trim());
 
             }
             return user;

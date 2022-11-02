@@ -735,6 +735,7 @@ namespace SnowmeetApi.Controllers
                 {
                     orderOnline.tickets = await _context.Ticket.Where(t => t.code == orderOnline.ticket_code).ToArrayAsync();
                 }
+                orderOnline.details = await _context.OrderOnlineDetails.Where(d => d.OrderOnlineId == orderOnline.id).ToArrayAsync();
                 //orderOnline.ticketArray
                 return orderOnline;
             }
