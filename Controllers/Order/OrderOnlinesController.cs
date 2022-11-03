@@ -698,7 +698,7 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<bool>> BindUser(int orderId, string sessionKey)
         {
             OrderOnline order = await _context.OrderOnlines.FindAsync(orderId);
-            if (order.open_id.Trim().Equals(""))
+            if (!order.open_id.Trim().Equals(""))
             {
                 return false;
             }
