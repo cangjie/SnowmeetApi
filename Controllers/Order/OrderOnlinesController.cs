@@ -694,6 +694,24 @@ namespace SnowmeetApi.Controllers
             return num;
         }
 
+        [HttpGet("{id}")]
+        public async Task<ActionResult<bool>> BindUser(int orderId, string sessionKey)
+        {
+            OrderOnline order = await _context.OrderOnlines.FindAsync(orderId);
+            if (order.open_id.Trim().Equals(""))
+            {
+                return false;
+            }
+            else
+            {
+                UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+                order.open_id = user.miniAppOpenId.Trim();
+                _context.Entry(order).State = EntityState.Modified;
+                await _context.SaveChangesAsync();
+                return true;
+            }
+        }
+
 
         // GET: api/OrderOnlines
         [HttpGet]
