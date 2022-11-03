@@ -7,6 +7,7 @@ using SnowmeetApi.Models;
 using SnowmeetApi.Models.Maintain;
 using SnowmeetApi.Models.Product;
 using SnowmeetApi.Models.Users;
+using SnowmeetApi.Models.Order;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -280,8 +281,8 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<MaintainOrder>> Recept(string sessionKey, MaintainOrder maintainOrder)
         {
             sessionKey = Util.UrlDecode(sessionKey);
-            UnicUser._context = _context;
-            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            //UnicUser._context = _context;
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;//UnicUser.GetUnicUser(sessionKey);
             if (!user.isAdmin)
             {
                 return NoContent();
@@ -320,6 +321,18 @@ namespace SnowmeetApi.Controllers
                 };
                 await _context.AddAsync(order);
                 await _context.SaveChangesAsync();
+
+                OrderPayment payment = new OrderPayment()
+                {
+                    order_id = order.id,
+                    pay_method = order.pay_method.Trim(),
+                    amount = order.final_price,
+                    status = "待支付",
+                    staff_open_id = user.miniAppOpenId.Trim()
+                };
+                await _context.OrderPayment.AddAsync(payment);
+                await _context.SaveChangesAsync();
+
                 orderId = order.id;
                 maintainOrder.order = order;
                 if (order.id <= 0)

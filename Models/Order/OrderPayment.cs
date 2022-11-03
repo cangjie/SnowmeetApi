@@ -1,6 +1,9 @@
 ﻿using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Mvc;
+
 namespace SnowmeetApi.Models.Order
 {
     [Table("order_payment")]
@@ -15,7 +18,7 @@ namespace SnowmeetApi.Models.Order
         public int order_id { get; set; }
         public string pay_method { get; set; }
         public double amount { get; set; }
-        public string status { get; set; }
+        public string status { get; set; } = "待支付";
         public string? out_trade_no { get; set; }
         public int? mch_id { get; set; }
         public string? open_id { get; set; }
@@ -37,6 +40,28 @@ namespace SnowmeetApi.Models.Order
                 return staffRealName.Trim();
             }
         }
+        /*
+        public async Task<ActionResult<bool>> GetStaffRealName(SnowmeetApi.Data.ApplicationDBContext db)
+        {
+            if (!staff_open_id.Trim().Equals(""))
+            {
+                var staffUser = await db.MiniAppUsers.FindAsync(staff_open_id.Trim());
+                if (staffUser != null)
+                {
+                    staffRealName = staffUser.real_name.Trim();
+                    return true;
+                }
+                else
+                {
+                    return false;
+                }
+            }
+            else
+            {
+                return false;
+            }
+        }
+        */
     }
 }
 
