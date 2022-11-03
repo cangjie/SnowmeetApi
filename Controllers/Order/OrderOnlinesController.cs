@@ -694,7 +694,7 @@ namespace SnowmeetApi.Controllers
             return num;
         }
 
-        [HttpGet("{id}")]
+        [HttpGet("{orderId}")]
         public async Task<ActionResult<bool>> BindUser(int orderId, string sessionKey)
         {
             OrderOnline order = await _context.OrderOnlines.FindAsync(orderId);
