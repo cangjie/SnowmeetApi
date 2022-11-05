@@ -37,6 +37,7 @@ namespace SnowmeetApi.Controllers
             {
                 return BadRequest();
             }
+            experience.open_id = "";
             experience.staff_open_id = user.miniAppOpenId;
             await _context.Experience.AddAsync(experience);
             await _context.SaveChangesAsync();
@@ -147,7 +148,7 @@ namespace SnowmeetApi.Controllers
                 await _context.OrderPayment.AddAsync(payment);
                 await _context.SaveChangesAsync();
 
-                OrderOnlinesController orderController = new OrderOnlinesController(_context, _config);
+                OrderOnlinesController orderController = new OrderOnlinesController(_context, _originConfig);
 
                 OrderOnline orderRet = (await orderController.GetOrderOnline(order.id, sessionKey)).Value;
 
