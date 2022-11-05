@@ -10,6 +10,7 @@ using SnowmeetApi.Models;
 using Microsoft.Extensions.Configuration;
 using SnowmeetApi.Models.Users;
 using SnowmeetApi.Models.Product;
+using SnowmeetApi.Models.Order;
 
 namespace SnowmeetApi.Controllers
 {
@@ -19,11 +20,27 @@ namespace SnowmeetApi.Controllers
     {
         private readonly ApplicationDBContext _context;
         private IConfiguration _config;
+        private IConfiguration _originConfig;
 
         public ExperienceController(ApplicationDBContext context, IConfiguration config)
         {
             _context = context;
             _config = config.GetSection("Settings");
+            _originConfig = config;
+        }
+
+        [HttpPost]
+        public async Task<ActionResult<OrderOnline>> PlaceOrder(Experience experience, string sessionKey)
+        {
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            if (!user.isAdmin)
+            {
+                return BadRequest();
+            }
+            experience.staff_open_id = user.miniAppOpenId;
+            await _context.Experience.AddAsync(experience);
+            await _context.SaveChangesAsync();
+            return (await PlaceOrder(experience.id, sessionKey)).Value;
         }
 
         [HttpGet("{id}")]
@@ -33,8 +50,8 @@ namespace SnowmeetApi.Controllers
             {
                 Experience exp = await _context.Experience.FindAsync(id);
                 sessionKey = Util.UrlDecode(sessionKey);
-                UnicUser._context = _context;
-                UnicUser user = UnicUser.GetUnicUser(sessionKey);
+                //UnicUser._context = _context;
+                UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
                 string openId = "";
                 if (user == null && user.miniAppOpenId == null && user.miniAppOpenId.Trim().Equals("")
                     && user.officialAccountOpenId == null && user.officialAccountOpenId.Trim().Equals(""))
@@ -71,13 +88,16 @@ namespace SnowmeetApi.Controllers
                     open_id = openId,
                     cell_number = exp.cell_number.Trim(),
                     name = "",
-                    pay_method = "微信",
+                    pay_method = "微信支付",
                     order_price = exp.guarantee_cash,
                     order_real_pay_price = exp.guarantee_cash,
                     pay_state = exp.guarantee_cash==0?1:0,
                     shop = exp.shop.Trim(),
                     out_trade_no = "",
                     ticket_code = ticketCode.Trim(),
+                    ticket_amount = 0,
+                    other_discount = 0,
+                    final_price = exp.guarantee_cash,
                     code = ""
                 };
                 _context.OrderOnlines.Add(order);
@@ -115,11 +135,23 @@ namespace SnowmeetApi.Controllers
                 {
 
                 }
-                OrderOnline orderRet = new OrderOnline()
+
+                OrderPayment payment = new OrderPayment()
                 {
-                    id = order.id,
-                    order_real_pay_price = order.order_real_pay_price
+                    amount = order.final_price,
+                    pay_method = order.pay_method,
+                    status = "待支付",
+                    order_id = order.id,
+                    staff_open_id = user.miniAppOpenId.Trim()
                 };
+                await _context.OrderPayment.AddAsync(payment);
+                await _context.SaveChangesAsync();
+
+                OrderOnlinesController orderController = new OrderOnlinesController(_context, _config);
+
+                OrderOnline orderRet = (await orderController.GetOrderOnline(order.id, sessionKey)).Value;
+
+               
                 return orderRet;
             }
             return NoContent();

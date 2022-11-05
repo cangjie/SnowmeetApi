@@ -20,6 +20,10 @@ namespace SnowmeetApi.Models
 
         public string ticket_code { get; set; }
 
+        public string staff_open_id { get; set; }
+
+
+
         [ForeignKey("guarantee_order_id")]
         public OrderOnline order { get; set; }
         
