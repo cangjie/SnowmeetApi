@@ -29,6 +29,35 @@ namespace SnowmeetApi.Controllers
             _originConfig = config;
         }
 
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<Experience>>> GetExperiencesTemp(string sessionKey)
+        {
+            DateTime currentSeasonStartDate = DateTime.Parse("2022-10-1");
+            var expList = await _context.Experience.Where(e => (e.create_date >= currentSeasonStartDate) )
+                .OrderByDescending(e => e.id).ToListAsync();
+            OrderOnlinesController orderHelper = new OrderOnlinesController(_context, _originConfig);
+            for (int i = 0; i < expList.Count; i++)
+            {
+                Experience exp = expList[i];
+                bool paid = false;
+                if (exp.guarantee_order_id > 0)
+                {
+                    OrderOnline order = (await orderHelper.GetOrderOnline(exp.guarantee_order_id, sessionKey)).Value;
+                    if (order != null && order.payments.Length > 0 && order.payments[0].status.Trim().Equals("支付成功"))
+                    {
+                        paid = true;
+                        exp.order = order;
+                    }
+                }
+                if (!paid)
+                {
+                    expList.Remove(exp);
+                    i--;
+                }
+            }
+            return expList;
+        }
+
         [HttpPost]
         public async Task<ActionResult<Experience>> PlaceOrder(Experience experience, string sessionKey)
         {

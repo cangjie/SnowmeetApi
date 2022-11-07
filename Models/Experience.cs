@@ -22,7 +22,7 @@ namespace SnowmeetApi.Models
 
         public string staff_open_id { get; set; } = "";
 
-
+        public DateTime create_date { get; set; } = DateTime.Now;
 
         [ForeignKey("guarantee_order_id")]
         public OrderOnline order { get; set; } = null;

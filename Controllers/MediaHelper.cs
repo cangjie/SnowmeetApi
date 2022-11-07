@@ -11,7 +11,7 @@ using System.Collections;
 //using QRCoder;
 //using System.Reflection.Emit;
 
-using Net.Codecrete.QrCodeGenerator;
+//using Net.Codecrete.QrCodeGenerator;
 
 
 namespace SnowmeetApi.Controllers
