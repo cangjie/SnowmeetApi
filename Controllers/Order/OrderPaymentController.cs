@@ -376,7 +376,8 @@ namespace SnowmeetApi.Controllers.Order
             int mchId = 3;
             if (order.type == "押金")
             {
-                mchId = 5;
+                //mchId = 5;
+                mchId = 3;
             }
             if (order.type != "雪票" && order.shop == "南山")
             {
