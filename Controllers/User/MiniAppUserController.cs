@@ -133,14 +133,42 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<MiniAppUser>> UpdateUserInfo(string sessionKey, string encData, string iv)
         {
             sessionKey = Util.UrlDecode(sessionKey);
-            UnicUser._context = _context;
-            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            //UnicUser._context = _context;
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
             MiniAppUser miniUser = user.miniAppUser;
             string json = Util.AES_decrypt(encData.Trim(), sessionKey, iv);
             Newtonsoft.Json.Linq.JToken jsonObj = (Newtonsoft.Json.Linq.JToken)Newtonsoft.Json.JsonConvert.DeserializeObject(json);
             if (jsonObj["phoneNumber"] != null)
             {
                 miniUser.cell_number = jsonObj["phoneNumber"].ToString().Trim();
+            }
+            string nick = "";
+            if (jsonObj["nickName"] != null && !jsonObj["nickName"].ToString().Trim().Equals("微信用户"))
+            {
+                nick = jsonObj["nickName"].ToString().Trim();
+            }
+            else
+            {
+                nick = miniUser.real_name.Trim();
+            }
+            miniUser.nick = nick;
+            string gender = "";
+            if (jsonObj["gender"].ToString().Equals("0"))
+            {
+                gender = "男";
+            }
+            else
+            {
+                gender = "女";
+            }
+            miniUser.gender = gender.Trim();
+            if (jsonObj["unionId"] != null && jsonObj["unionId"].ToString().Trim().Equals(""))
+            {
+                miniUser.union_id = jsonObj["unionId"].ToString().Trim();
+            }
+            if (jsonObj["avatarUrl"] != null && !jsonObj["avatarUrl"].ToString().Trim().Equals(""))
+            {
+                miniUser.head_image = jsonObj["avatarUrl"].ToString().Trim();
             }
             _context.Entry(miniUser).State = EntityState.Modified;
             await _context.SaveChangesAsync();
