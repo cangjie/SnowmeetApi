@@ -55,6 +55,10 @@ namespace SnowmeetApi.Controllers
                 sessionKey = Util.UrlDecode(sessionKey);
                 //UnicUser._context = _context;
                 UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+                if (!user.isAdmin)
+                {
+                    return BadRequest();
+                }
                 string openId = "";
                 if (user == null && user.miniAppOpenId == null && user.miniAppOpenId.Trim().Equals("")
                     && user.officialAccountOpenId == null && user.officialAccountOpenId.Trim().Equals(""))
@@ -88,7 +92,7 @@ namespace SnowmeetApi.Controllers
                 OrderOnline order = new OrderOnline()
                 {
                     type = "押金",
-                    open_id = openId,
+                    open_id = "",
                     cell_number = exp.cell_number.Trim(),
                     name = "",
                     pay_method = "微信支付",
