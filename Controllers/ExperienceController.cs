@@ -141,6 +141,7 @@ namespace SnowmeetApi.Controllers
 
                 OrderPayment payment = new OrderPayment()
                 {
+                    open_id = "",
                     amount = order.final_price,
                     pay_method = order.pay_method,
                     status = "待支付",

@@ -21,7 +21,7 @@ namespace SnowmeetApi.Models.Order
         public string status { get; set; } = "待支付";
         public string? out_trade_no { get; set; }
         public int? mch_id { get; set; }
-        public string? open_id { get; set; }
+        public string open_id { get; set; } = "";
         public string? app_id { get; set; }
         public string? notify { get; set; }
         public string? nonce { get; set; }
