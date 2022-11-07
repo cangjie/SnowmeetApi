@@ -30,7 +30,7 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpPost]
-        public async Task<ActionResult<OrderOnline>> PlaceOrder(Experience experience, string sessionKey)
+        public async Task<ActionResult<Experience>> PlaceOrder(Experience experience, string sessionKey)
         {
             UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
             if (!user.isAdmin)
@@ -41,7 +41,9 @@ namespace SnowmeetApi.Controllers
             experience.staff_open_id = user.miniAppOpenId;
             await _context.Experience.AddAsync(experience);
             await _context.SaveChangesAsync();
-            return (await PlaceOrder(experience.id, sessionKey)).Value;
+            OrderOnline order = (await PlaceOrder(experience.id, sessionKey)).Value;
+            experience.order = order;
+            return experience;
         }
 
         [HttpGet("{id}")]
