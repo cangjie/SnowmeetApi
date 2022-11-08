@@ -22,9 +22,9 @@ namespace SnowmeetApi.Models
 
         public string staff_open_id { get; set; } = "";
 
-        public DateTime start_time { get; set; } = DateTime.Now;
+        public DateTime? start_time { get; set; } = DateTime.Now;
 
-        public DateTime end_time { get; set; } = DateTime.Now.AddHours(2);
+        public DateTime? end_time { get; set; } = DateTime.Now.AddHours(2);
 
         public DateTime create_date { get; set; } = DateTime.Now;
 
