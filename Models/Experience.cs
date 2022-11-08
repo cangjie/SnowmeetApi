@@ -10,6 +10,8 @@ namespace SnowmeetApi.Models
         [Key]
         public int id { get; set; }
 
+
+
         public string shop { get; set; } = "";
         public double guarantee_cash { get; set; } = 0;
         public int guarantee_order_id { get; set; } = 0;
@@ -21,6 +23,10 @@ namespace SnowmeetApi.Models
         public string ticket_code { get; set; } = "";
 
         public string staff_open_id { get; set; } = "";
+
+        public string asset_name { get; set; } = "";
+        public string asset_scale { get; set; } = "";
+        public string asset_photos { get; set; } = "";
 
         public DateTime? start_time { get; set; } = DateTime.Now;
 
