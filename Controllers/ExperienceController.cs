@@ -22,6 +22,8 @@ namespace SnowmeetApi.Controllers
         private IConfiguration _config;
         private IConfiguration _originConfig;
 
+
+
         public ExperienceController(ApplicationDBContext context, IConfiguration config)
         {
             _context = context;
@@ -56,6 +58,21 @@ namespace SnowmeetApi.Controllers
                 }
             }
             return expList;
+        }
+
+        [HttpGet("{id}")]
+        public async Task<ActionResult<Experience>> GetExperienceTemp(int id, string sessionKey)
+        {
+            OrderOnlinesController orderHelper = new OrderOnlinesController(_context, _originConfig);
+            sessionKey = Util.UrlDecode(sessionKey);
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            Experience exp = await _context.Experience.FindAsync(id);
+            if (!user.isAdmin && !exp.open_id.Trim().Equals("") && exp.open_id.Trim().Equals(user.miniAppOpenId.Trim()))
+            {
+                return BadRequest();
+            }
+            exp.order = (await orderHelper.GetOrderOnline(exp.guarantee_order_id, sessionKey)).Value;
+            return exp;
         }
 
         [HttpPost]
