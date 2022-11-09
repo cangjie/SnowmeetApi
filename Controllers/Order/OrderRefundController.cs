@@ -43,15 +43,7 @@ namespace SnowmeetApi.Controllers.Order
 
         }
 
-        public OrderRefundController(ApplicationDBContext context, IConfiguration config)
-        {
-            _db = context;
-            _originConfig = config;
-            _config = config.GetSection("Settings");
-            _appId = _config.GetSection("AppId").Value.Trim();
-            //_httpContextAccessor = httpContextAccessor;
-
-        }
+        
 
         [NonAction]
         public async Task<OrderPaymentRefund> TenpayRefund(int paymentId, double amount, string sessionKey)
