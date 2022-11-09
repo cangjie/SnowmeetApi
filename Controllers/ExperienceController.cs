@@ -21,14 +21,15 @@ namespace SnowmeetApi.Controllers
         private readonly ApplicationDBContext _context;
         private IConfiguration _config;
         private IConfiguration _originConfig;
+        private readonly IHttpContextAccessor _httpContextAccessor;
 
 
-
-        public ExperienceController(ApplicationDBContext context, IConfiguration config)
+        public ExperienceController(ApplicationDBContext context, IConfiguration config, IHttpContextAccessor httpContextAccessor)
         {
             _context = context;
             _config = config.GetSection("Settings");
             _originConfig = config;
+            _httpContextAccessor = httpContextAccessor;
         }
 
         [HttpGet]
@@ -302,7 +303,7 @@ namespace SnowmeetApi.Controllers
             Experience exp = (await GetExperienceTemp(id, sessionKey)).Value;
             if ((exp.order.refunds == null || exp.order.refunds.Length == 0) && exp.order.payments != null && exp.order.paidAmount >= amount )
             {
-                Order.OrderRefundController refundHelper = new Order.OrderRefundController(_context, _originConfig);
+                Order.OrderRefundController refundHelper = new Order.OrderRefundController(_context, _originConfig, _httpContextAccessor);
                 for (int i = 0; i < exp.order.payments.Length; i++)
                 {
                     OrderPayment payment = exp.order.payments[i];
