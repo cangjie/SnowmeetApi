@@ -22,7 +22,7 @@ using SnowmeetApi.Models.Maintain;
 
 namespace SnowmeetApi.Controllers.Order
 {
-    [Route("api/[controller]/[action]")]
+    [Route("core/[controller]/[action]")]
     [ApiController]
     public class OrderRefundController : ControllerBase
     {
