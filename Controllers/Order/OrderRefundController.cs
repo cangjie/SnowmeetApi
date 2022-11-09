@@ -140,7 +140,7 @@ namespace SnowmeetApi.Controllers.Order
         }
 
         [HttpPost("{mchid}")]
-        public async Task<ActionResult<string>> RefundCallback(int mchid, [FromBody]object postData)
+        public async Task<ActionResult<string>> TenpayRefundCallback(int mchid, [FromBody]object postData)
         {
             string paySign = _httpContextAccessor.HttpContext.Request.Headers["Wechatpay-Signature"].ToString();
             string nonce = _httpContextAccessor.HttpContext.Request.Headers["Wechatpay-Nonce"].ToString();
