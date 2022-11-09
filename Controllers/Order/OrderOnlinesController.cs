@@ -748,7 +748,7 @@ namespace SnowmeetApi.Controllers
                 {
                     orderOnline.open_id = "";
                 }
-                orderOnline.payments = await _context.OrderPayment.Where(p => (p.order_id == orderOnline.id && p.status.Trim().Equals("支付成功")))
+                orderOnline.payments = await _context.OrderPayment.Where(p => (p.order_id == orderOnline.id))
                     .OrderByDescending(p => p.id).ToArrayAsync();
 
                 orderOnline.refunds = await _context.OrderPaymentRefund.Where(r => r.order_id == orderOnline.id &&  (!r.refund_id.Trim().Equals("") || r.state == 1))
