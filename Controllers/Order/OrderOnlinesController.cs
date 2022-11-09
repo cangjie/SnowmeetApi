@@ -748,13 +748,17 @@ namespace SnowmeetApi.Controllers
                 {
                     orderOnline.open_id = "";
                 }
-                orderOnline.payments = await _context.OrderPayment.Where(p => p.order_id == orderOnline.id).ToArrayAsync();
+                orderOnline.payments = await _context.OrderPayment.Where(p => (p.order_id == orderOnline.id && p.status.Trim().Equals("支付成功")))
+                    .OrderByDescending(p => p.id).ToArrayAsync();
+
+                orderOnline.refunds = await _context.OrderPaymentRefund.Where(r => r.order_id == orderOnline.id &&  (!r.refund_id.Trim().Equals("") || r.state == 1))
+                    .OrderByDescending(r => r.id).ToArrayAsync();
+
                 if (orderOnline.ticket_code != null && !orderOnline.ticket_code.ToString().Trim().Equals(""))
                 {
                     orderOnline.tickets = await _context.Ticket.Where(t => t.code == orderOnline.ticket_code).ToArrayAsync();
                 }
                 orderOnline.details = await _context.OrderOnlineDetails.Where(d => d.OrderOnlineId == orderOnline.id).ToArrayAsync();
-                //orderOnline.ticketArray
                 return orderOnline;
             }
 

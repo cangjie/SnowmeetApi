@@ -291,6 +291,33 @@ namespace SnowmeetApi.Controllers
             return NoContent();
         }
 
+        [HttpGet("{id}")]
+        public async Task<ActionResult<Experience>> Refund(int id, double amount, string sessionKey)
+        {
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            if (!user.isAdmin)
+            {
+                return BadRequest();
+            }
+            Experience exp = (await GetExperienceTemp(id, sessionKey)).Value;
+            if ((exp.order.refunds == null || exp.order.refunds.Length == 0) && exp.order.payments != null && exp.order.paidAmount >= amount )
+            {
+                Order.OrderRefundController refundHelper = new Order.OrderRefundController(_context, _originConfig);
+                for (int i = 0; i < exp.order.payments.Length; i++)
+                {
+                    OrderPayment payment = exp.order.payments[i];
+                    if (payment.amount >= amount)
+                    {
+                        await refundHelper.TenpayRefund(payment.id, amount, sessionKey);
+                        break;
+                    }
+                }
+
+            }
+            exp = (await GetExperienceTemp(id, sessionKey)).Value;
+            return exp;
+        }
+
         /*
 
         // GET: api/Experience

@@ -43,6 +43,16 @@ namespace SnowmeetApi.Controllers.Order
 
         }
 
+        public OrderRefundController(ApplicationDBContext context, IConfiguration config)
+        {
+            _db = context;
+            _originConfig = config;
+            _config = config.GetSection("Settings");
+            _appId = _config.GetSection("AppId").Value.Trim();
+            //_httpContextAccessor = httpContextAccessor;
+
+        }
+
         [NonAction]
         public async Task<OrderPaymentRefund> TenpayRefund(int paymentId, double amount, string sessionKey)
         {
@@ -73,7 +83,7 @@ namespace SnowmeetApi.Controllers.Order
                 order_id = payment.order_id,
                 payment_id = payment.id,
                 amount = amount,
-                oper = "",
+                oper = user.miniAppOpenId.Trim(),
                 state = 0,
                 memo = "",
                 notify_url = notify.Trim()
@@ -220,7 +230,31 @@ namespace SnowmeetApi.Controllers.Order
                 var callbackModel = client.DeserializeEvent(postData.ToString());
                 if ("REFUND.SUCCESS".Equals(callbackModel.EventType))
                 {
-                    var callbackResource = client.DecryptEventResource<SKIT.FlurlHttpClient.Wechat.TenpayV3.Events.TransactionResource>(callbackModel);
+                    try
+                    {
+                        var callbackResource = client.DecryptEventResource<SKIT.FlurlHttpClient.Wechat.TenpayV3.Events.TransactionResource>(callbackModel);
+                        OrderPayment payment = await _db.OrderPayment
+                            .Where(p => p.out_trade_no.Trim().Equals(callbackResource.OutTradeNumber)
+                            && p.pay_method.Trim().Equals("微信支付") && p.status.Trim().Equals("支付成功"))
+                            .OrderByDescending(p => p.id).FirstAsync();
+
+
+                        double refundAmount = Math.Round(((double)callbackResource.Amount.Total) / 100, 2);
+                        OrderPaymentRefund refund = await _db.OrderPaymentRefund.Where(r => (r.payment_id == payment.id
+                         && r.amount == refundAmount && r.state == 0)).FirstAsync();
+
+                        refund.state = 1;
+                        refund.memo = callbackResource.TransactionId;
+                        _db.Entry(refund).State = EntityState.Modified;
+                        await _db.SaveChangesAsync();
+                    }
+                    catch
+                    {
+
+                    }
+                    
+                        
+                    
 
                 }
 
