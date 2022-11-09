@@ -11,7 +11,7 @@ using SnowmeetApi.Models;
 using wechat_miniapp_base.Models;
 using SKIT.FlurlHttpClient.Wechat.TenpayV3.Settings;
 using SKIT.FlurlHttpClient.Wechat.TenpayV3;
-using NuGet.Packaging.Signing;
+//using NuGet.Packaging.Signing;
 using SKIT.FlurlHttpClient.Wechat.TenpayV3.Models;
 using Microsoft.Extensions.Configuration;
 using SnowmeetApi.Models.Product;

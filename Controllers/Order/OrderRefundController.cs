@@ -6,22 +6,22 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+
+using SKIT.FlurlHttpClient.Wechat.TenpayV3;
+using SKIT.FlurlHttpClient.Wechat.TenpayV3.Models;
+using SKIT.FlurlHttpClient.Wechat.TenpayV3.Settings;
 using SnowmeetApi.Data;
+using SnowmeetApi.Models;
 using SnowmeetApi.Models.Order;
 using SnowmeetApi.Models.Users;
-using SnowmeetApi.Models;
-using SKIT.FlurlHttpClient.Wechat.TenpayV3.Settings;
-using SKIT.FlurlHttpClient.Wechat.TenpayV3;
-using NuGet.Packaging.Signing;
-using SKIT.FlurlHttpClient.Wechat.TenpayV3.Models;
 using wechat_miniapp_base.Models;
-
 namespace SnowmeetApi.Controllers.Order
 {
     [Route("api/[controller]/[action]")]
     [ApiController]
     public class OrderRefundController : ControllerBase
     {
+
         private readonly ApplicationDBContext _db;
         private IConfiguration _config;
         private IConfiguration _originConfig;
@@ -36,25 +36,30 @@ namespace SnowmeetApi.Controllers.Order
 
         }
 
-        [HttpGet("{id}")]
+        [HttpGet("{paymentId}")]
         public async Task<OrderPaymentRefund> TenpayRefund(int paymentId, double amount, string sessionKey)
         {
-            OrderPayment payment = await _db.OrderPayment.FindAsync(paymentId);
+            
+            OrderPayment payment = await _db.OrderPayment.FindAsync(paymentId); 
             if (!payment.pay_method.Trim().Equals("微信支付"))
             {
-                return null;
+                
+                return null; 
             }
+            
 
-            string notify = payment.notify.Trim().Replace("OrderPayment/TenpayPaymentCallBack", "OrderRefund/TenpayRefundCallback");
+            string notify = payment.notify.Trim().Replace("OrderPayment/TenpayPaymentCallBack", "OrderRefund/TenpayRefundCallback"); 
 
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _db)).Value;
-            double refundedAmount = await _db.OrderPaymentRefund.Where(r => (r.payment_id == paymentId && r.state == 1)).SumAsync(s => s.amount);
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _db)).Value; 
+            double refundedAmount = await _db.OrderPaymentRefund.Where(r => (r.payment_id == paymentId && r.state == 1)).SumAsync(s => s.amount); 
             
             
             if (refundedAmount >= payment.amount || refundedAmount + amount > payment.amount)
             {
-                return null;
+                
+                return null; 
             }
+            
 
             OrderPaymentRefund refund = new OrderPaymentRefund()
             {
@@ -66,13 +71,14 @@ namespace SnowmeetApi.Controllers.Order
                 memo = "",
                 notify_url = notify.Trim()
 
-            };
 
-            await _db.OrderPaymentRefund.AddAsync(refund);
+            }; 
+
+            await _db.OrderPaymentRefund.AddAsync(refund); 
             await _db.SaveChangesAsync();
             //var client = new WechatTenpayClient(options);
-            OrderOnlinesController orderHelper = new OrderOnlinesController(_db, _originConfig);
-            OrderOnline order = (await orderHelper.GetOrderOnline(payment.order_id, sessionKey)).Value;
+            OrderOnlinesController orderHelper = new OrderOnlinesController(_db, _originConfig); 
+            OrderOnline order = (await orderHelper.GetOrderOnline(payment.order_id, sessionKey)).Value; 
 
             WepayKey key = await _db.WepayKeys.FindAsync(payment.mch_id);
 
@@ -94,9 +100,10 @@ namespace SnowmeetApi.Controllers.Order
                 Amount = new CreateRefundDomesticRefundRequest.Types.Amount()
                 {
                     Total = (int)Math.Round(payment.amount * 100, 0),
-                    Refund = (int)(Math.Round(amount*100))
+                    Refund = (int)(Math.Round(amount * 100))
                 },
                 Reason = user.miniAppOpenId,
+
                 NotifyUrl = refund.notify_url.Trim()
             };
             var response = await client.ExecuteCreateRefundDomesticRefundAsync(request);
@@ -121,10 +128,9 @@ namespace SnowmeetApi.Controllers.Order
                 await _db.SaveChangesAsync();
                 return refund;
             }
+
             
         }
-
-
 
         /*
 
