@@ -63,7 +63,7 @@ namespace SnowmeetApi.Controllers.Order
             _appId = _config.GetSection("AppId").Value.Trim();
             _httpContextAccessor = httpContextAccessor;
             UnicUser._context = context;
-            
+
         }
 
         [HttpGet("{id}")]
@@ -178,7 +178,7 @@ namespace SnowmeetApi.Controllers.Order
 
                 };
 
-                payment.out_trade_no = order.id.ToString().PadLeft(6, '0') + payment.id.ToString().PadLeft(2,'0') +  timeStamp;
+                payment.out_trade_no = order.id.ToString().PadLeft(6, '0') + payment.id.ToString().PadLeft(2, '0') + timeStamp;
                 payment.mch_id = mchid;
                 payment.open_id = user.miniAppOpenId.Trim();
                 payment.app_id = _appId;
@@ -195,6 +195,15 @@ namespace SnowmeetApi.Controllers.Order
                 return set;
             }
             return BadRequest();
+        }
+
+        [NonAction]
+        public async Task<OrderPayment> TenpayRefund(int id, double amount, string sessionKey)
+        {
+            OrderPayment payment = await _context.OrderPayment.FindAsync(id);
+
+
+            return payment;
         }
 
 

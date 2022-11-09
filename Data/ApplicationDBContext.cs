@@ -100,6 +100,8 @@ namespace SnowmeetApi.Data
 
         public DbSet<SnowmeetApi.Models.Order.Mi7OrderDetail> mi7OrderDetail { get; set; }
 
+        public DbSet<SnowmeetApi.Models.Order.OrderPaymentRefund> OrderPaymentRefund { get; set; }
+
    
     }
 }
