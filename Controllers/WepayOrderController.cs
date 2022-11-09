@@ -441,7 +441,7 @@ namespace SnowmeetApi.Controllers
                 
 
                 var certManager = new InMemoryCertificateManager();
-                CertificateEntry ce = new CertificateEntry(serial, cerStr, DateTimeOffset.MinValue, DateTimeOffset.MaxValue);
+                //CertificateEntry ce = new CertificateEntry(serial, cerStr, DateTimeOffset.MinValue, DateTimeOffset.MaxValue);
 
                 //certManager.SetCertificate(serial, cerStr);
                 var options = new WechatTenpayClientOptions()
