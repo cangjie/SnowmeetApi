@@ -293,7 +293,7 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet("{id}")]
-        public async Task<ActionResult<Experience>> Refund(int id, double amount, string sessionKey)
+        public async Task<ActionResult<Experience>> Refund(int id, double amount, string sessionKey, string memo)
         {
             UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
             if (!user.isAdmin)
@@ -301,6 +301,9 @@ namespace SnowmeetApi.Controllers
                 return BadRequest();
             }
             Experience exp = (await GetExperienceTemp(id, sessionKey)).Value;
+            exp.return_memo = memo.Trim();
+            _context.Entry(exp).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
             if ((exp.order.refunds == null || exp.order.refunds.Length == 0) && exp.order.payments != null && exp.order.paidAmount >= amount )
             {
                 Order.OrderRefundController refundHelper = new Order.OrderRefundController(_context, _originConfig, _httpContextAccessor);
