@@ -295,6 +295,8 @@ namespace SnowmeetApi.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<Experience>> Refund(int id, double amount, string sessionKey, string memo)
         {
+            sessionKey = Util.UrlDecode(sessionKey);
+            memo = Util.UrlDecode(memo);
             UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
             if (!user.isAdmin)
             {
