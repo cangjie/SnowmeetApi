@@ -104,7 +104,7 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<SchoolLesson>> GetSchoolLessonByOrderId(int orderId, string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey);
-            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
             var schoolLesson = await _context.SchoolLessons.FirstAsync<SchoolLesson>(s => s.order_id == orderId);
             
             if (IsStaff(sessionKey) || schoolLesson.open_id.Trim().Equals(user.miniAppOpenId))
@@ -131,7 +131,7 @@ namespace SnowmeetApi.Controllers
             }
             */
             sessionKey = Util.UrlDecode(sessionKey);
-            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
 
             var schoolLesson = await _context.SchoolLessons.FindAsync(id);
             bool canDisplay = false;
@@ -202,7 +202,7 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<SchoolLesson>> AssignOpenId(int id, string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey);
-            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
             SchoolLesson lesson = _context.SchoolLessons.Find(id);
             if (lesson.cell_number.Trim().Equals(user.miniAppUser.cell_number.Trim()))
             {

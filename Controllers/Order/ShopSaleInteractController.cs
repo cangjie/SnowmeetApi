@@ -40,7 +40,7 @@ namespace SnowmeetApi.Controllers.Order
         public async Task<ActionResult<int>> GetInterviewId(string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey.Trim());
-            UnicUser._context = _context;
+            
             UnicUser staffUser = UnicUser.GetUnicUser(sessionKey);
             if (!staffUser.isAdmin)
             {
@@ -90,7 +90,7 @@ namespace SnowmeetApi.Controllers.Order
         public async Task<ActionResult<ShopSaleInteract>> GetScanInfo(int id, string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey);
-            UnicUser._context = _context;
+            
             UnicUser staffUser = UnicUser.GetUnicUser(sessionKey);
             if (!staffUser.isAdmin)
             {

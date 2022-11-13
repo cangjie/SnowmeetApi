@@ -47,8 +47,8 @@ namespace SnowmeetApi.Controllers
                 if (order != null)
                 {
                     sessionKey = Util.UrlDecode(sessionKey);
-                    UnicUser._context = _context;
-                    UnicUser user = UnicUser.GetUnicUser(sessionKey);
+                    
+                    UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
                     if (user == null)
                     {
                         return NotFound();

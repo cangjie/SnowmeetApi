@@ -336,7 +336,7 @@ namespace SnowmeetApi.Controllers
         [HttpGet("{orderId}")]
         public async Task<ActionResult<OrderOnline>> OrderChargeByStaff(int orderId, double amount, string payMethod, string staffSessionKey)
         {
-            UnicUser._context = _context;
+            
             UnicUser user = UnicUser.GetUnicUser(staffSessionKey);
             if (!user.isAdmin)
             {
@@ -388,7 +388,7 @@ namespace SnowmeetApi.Controllers
             startDate = startDate.Date;
             endDate = endDate.Date.AddHours(24);
             staffSessionKey = Util.UrlDecode(staffSessionKey);
-            UnicUser._context = _context;
+            
             UnicUser user = UnicUser.GetUnicUser(staffSessionKey);
             if (!user.isAdmin)
             {
@@ -427,7 +427,7 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<OrderOnline>> GetWholeOrderByStaff(int orderId, string staffSessionKey)
         {
             staffSessionKey = Util.UrlDecode(staffSessionKey);
-            UnicUser._context = _context;
+            
             UnicUser user = UnicUser.GetUnicUser(staffSessionKey);
             if (!user.isAdmin)
             {
@@ -496,7 +496,7 @@ namespace SnowmeetApi.Controllers
         [HttpGet("{paymentId}")]
         public async Task<ActionResult<OrderOnline>> SetPaymentSuccess(int paymentId, string staffSessionKey)
         {
-            UnicUser._context = _context;
+            
             UnicUser user = UnicUser.GetUnicUser(staffSessionKey);
             if (!user.isAdmin)
             {
@@ -553,7 +553,7 @@ namespace SnowmeetApi.Controllers
         [HttpPost("{orderId}")]
         public async Task<ActionResult<OrderOnline>> ConfirmNonPaymentOrder(int orderId, string staffSessionKey)
         {
-            UnicUser._context = _context;
+            
             UnicUser user = UnicUser.GetUnicUser(staffSessionKey);
             if (!user.isAdmin)
             {
@@ -579,7 +579,7 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<OrderOnline>> PlaceOrderByStaff(OrderOnline order, string staffSessionKey)
         {
             staffSessionKey = Util.UrlDecode(staffSessionKey);
-            UnicUser._context = _context;
+            
             UnicUser user = UnicUser.GetUnicUser(staffSessionKey);
             if (!user.isAdmin)
             {
@@ -642,8 +642,8 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<bool>> SetSkiPassCertNo(int orderId, string certNo, string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey);
-            UnicUser._context = _context;
-            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
             OrderOnline order = await _context.OrderOnlines.FindAsync(orderId);
             if (!order.open_id.Trim().Equals(user.miniAppOpenId)
                 && !order.open_id.Trim().Equals(user.officialAccountOpenId.Trim())
@@ -726,7 +726,7 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<OrderOnline>> GetOrderOnline(int id, string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey);
-            //UnicUser._context = _context;
+            //
             UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;//.GetUnicUser(sessionKey);
             if (user == null)
             {
@@ -775,8 +775,8 @@ namespace SnowmeetApi.Controllers
             int mchid = 3;
             string notify = "http://mini.snowmeet.top/core/WepayOrder/PaymentCallback";
             notify = Util.UrlDecode(notify);
-            UnicUser._context = _context;
-            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
             if (user == null)
             {
                 return NotFound();

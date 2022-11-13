@@ -31,7 +31,7 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<IEnumerable<MiniAppUser>>> GetStaffList(string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey);
-            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
             if (!user.isAdmin)
             {
                 return BadRequest();
@@ -78,8 +78,8 @@ namespace SnowmeetApi.Controllers
         {
             openId = Util.UrlDecode(openId.Trim());
             sessionKey = Util.UrlDecode(sessionKey);
-            UnicUser._context = _context;
-            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
             if (!user.isAdmin)
             {
                 return NoContent();
@@ -133,7 +133,7 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<MiniAppUser>> UpdateUserInfo(string sessionKey, string encData, string iv)
         {
             sessionKey = Util.UrlDecode(sessionKey);
-            //UnicUser._context = _context;
+            //
             UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
             MiniAppUser miniUser = user.miniAppUser;
             string json = Util.AES_decrypt(encData.Trim(), sessionKey, iv);

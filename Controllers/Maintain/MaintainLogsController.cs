@@ -34,7 +34,7 @@ namespace SnowmeetApi.Controllers.Maintain
         {
             sessionKey = Util.UrlDecode(sessionKey);
             stepName = Util.UrlDecode(stepName);
-            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
             if (!user.isAdmin)
             {
                 return BadRequest();
@@ -75,7 +75,7 @@ namespace SnowmeetApi.Controllers.Maintain
         public async Task<ActionResult<IEnumerable<MaintainLog>>> GetStepsByStaff(int taskId, string sessionKey)
         {
             MiniAppUserController mUserController = new MiniAppUserController(_context, _originConfig);
-            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
             if (!user.isAdmin)
             {
                 return BadRequest();
@@ -98,7 +98,7 @@ namespace SnowmeetApi.Controllers.Maintain
         {
             memo = Util.UrlDecode(memo);
             sessionKey = Util.UrlDecode(sessionKey);
-            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
             if (!user.isAdmin)
             {
                 return BadRequest();

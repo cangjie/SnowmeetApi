@@ -38,8 +38,8 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<MaintainLive>> UpdateTask(MaintainLive task, string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey).Trim();
-            UnicUser._context = _context;
-            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
             if (!user.isAdmin)
             {
                 return NoContent();
@@ -80,8 +80,8 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<Serial>> AddSerial(string brand, string serialName, string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey).Trim();
-            UnicUser._context = _context;
-            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
             if (!user.isAdmin)
             {
                 return NoContent();
@@ -114,8 +114,8 @@ namespace SnowmeetApi.Controllers
                 return NotFound();
             }
             sessionKey = Util.UrlDecode(sessionKey.Trim());
-            UnicUser._context = _context;
-            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
             order.open_id = user.miniAppOpenId.Trim();
             _context.Entry(order).State = EntityState.Modified;
             MaintainLive[] items = await _context.MaintainLives.Where(m => m.order_id == orderId).ToArrayAsync();
@@ -133,8 +133,8 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<MaintainOrder[]>> GetMyMaintainOrders(string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey);
-            UnicUser._context = _context;
-            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
             MaintainOrder[] orders = await GetMaintainOrders(user.miniAppOpenId, DateTime.Parse("2022-9-1"), DateTime.Parse("2999-1-1"));
             for (int i = 0; i < orders.Length; i++)
             {
@@ -195,8 +195,8 @@ namespace SnowmeetApi.Controllers
             {
                 return NotFound();
             }
-            UnicUser._context = _context;
-            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
             
             MaintainLive[] items = await _context.MaintainLives.Where(m => m.order_id == orderId).ToArrayAsync();
             foreach (MaintainLive item in items)
@@ -245,8 +245,8 @@ namespace SnowmeetApi.Controllers
         {
             MaintainLive task = await _context.MaintainLives.FindAsync(id);
             sessionKey = Util.UrlDecode(sessionKey.Trim());
-            UnicUser._context = _context;
-            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
             if (!user.isAdmin && !task.open_id.Trim().Equals(user.miniAppOpenId.Trim()))
             {
                 return NoContent();
@@ -262,8 +262,8 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<IEnumerable<MaintainLive>>> GetTasks(DateTime start, DateTime end, string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey.Trim());
-            UnicUser._context = _context;
-            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
             if (!user.isAdmin)
             {
                 return NoContent();
@@ -281,7 +281,7 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<MaintainOrder>> Recept(string sessionKey, MaintainOrder maintainOrder)
         {
             sessionKey = Util.UrlDecode(sessionKey);
-            //UnicUser._context = _context;
+            //
             UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;//UnicUser.GetUnicUser(sessionKey);
             if (!user.isAdmin)
             {
@@ -388,8 +388,8 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<MaintainOrder>> MaitainOrderPaySuccessManual(int orderId, string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey);
-            UnicUser._context = _context;
-            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            //
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
             if (!user.isAdmin)
             {
                 return NoContent();
@@ -431,8 +431,8 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<MaintainLive>> GenerateFlowNum(int taskId, string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey);
-            UnicUser._context = _context;
-            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            //
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
             if (!user.isAdmin)
             {
                 return NoContent();
@@ -491,8 +491,8 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<Equip[]>> GetEquip(string openId, string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey);
-            UnicUser._context = _context;
-            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            //
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
             if (!user.isAdmin)
             {
                 return NoContent();
@@ -522,8 +522,8 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<IEnumerable<MaintainLive>>> GetMaintainLog(string openId, string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey);
-            UnicUser._context = _context;
-            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            //
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
             if (!user.isAdmin)
             {
                 return NoContent();
@@ -542,8 +542,8 @@ namespace SnowmeetApi.Controllers
         {
             sessionKey = Util.UrlDecode(sessionKey);
             openId = Util.UrlDecode(sessionKey);
-            UnicUser._context = _context;
-            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
             if (user == null || !user.isAdmin)
             {
                 return NoContent();
@@ -557,10 +557,10 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet("{id}")]
-        public ActionResult<OrderOnline> PlaceOrder(int id, string sessionKey)
+        public async Task<ActionResult<OrderOnline>> PlaceOrder(int id, string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey);
-            OrderOnline order = PlaceOrderAll(id, sessionKey, "");
+            OrderOnline order = (await PlaceOrderAll(id, sessionKey, "")).Value;
             if (order == null)
             {
                 return NoContent();
@@ -572,10 +572,10 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet("{id}")]
-        public ActionResult<OrderOnline> PlaceOrderBatch(int id, string sessionKey)
+        public async Task<ActionResult<OrderOnline>> PlaceOrderBatch(int id, string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey);
-            OrderOnline order = PlaceOrderAll(id, sessionKey, "batch");
+            OrderOnline order = (await PlaceOrderAll(id, sessionKey, "batch")).Value;
             if (order == null)
             {
                 return NoContent();
@@ -591,8 +591,8 @@ namespace SnowmeetApi.Controllers
         {
             sessionKey = Util.UrlDecode(sessionKey);
             //string openId = Util.UrlDecode(sessionKey);
-            UnicUser._context = _context;
-            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
             if (user == null || !user.isAdmin)
             {
                 return NoContent();
@@ -644,7 +644,7 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet("id")]
-        private OrderOnline PlaceOrderAll(int id, string sessionKey, string idType = "batch")
+        private async Task<ActionResult<OrderOnline>> PlaceOrderAll(int id, string sessionKey, string idType = "batch")
         {
             sessionKey = Util.UrlDecode(sessionKey);
             bool exists = false;
@@ -660,8 +660,8 @@ namespace SnowmeetApi.Controllers
             if (exists)
             {
                 sessionKey = Util.UrlDecode(sessionKey);
-                UnicUser._context = _context;
-                UnicUser user = UnicUser.GetUnicUser(sessionKey);
+                
+                UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
                 if (user == null && user.miniAppOpenId == null && user.miniAppOpenId.Trim().Equals("")
                     && user.officialAccountOpenId == null && user.officialAccountOpenId.Trim().Equals(""))
                 {

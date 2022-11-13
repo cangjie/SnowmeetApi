@@ -70,7 +70,7 @@ namespace SnowmeetApi.Controllers.Order
         public async Task<ActionResult<TenpaySet>> TenpayRequest(int id, string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey.Trim());
-            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
             if (user == null)
             {
                 return BadRequest();

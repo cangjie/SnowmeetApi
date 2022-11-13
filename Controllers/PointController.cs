@@ -29,7 +29,7 @@ namespace SnowmeetApi.Controllers
 
         protected List<Point> GetUserPointBalance(string openId, string openIdType)
         {
-            UnicUser._context = _context;
+            
             UnicUser user = UnicUser.GetUnicUser(openId, openIdType);
             return _context.Point.Where(p => (p.user_open_id.Trim().Equals(user.miniAppOpenId)
             || p.user_open_id.Trim().Equals(user.officialAccountOpenId) || p.user_open_id.Trim().Equals(user.officialAccountOpenIdOld)))
@@ -66,10 +66,10 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet]
-        public ActionResult<int> GetMyPointsSummary(string sessionKey)
+        public async Task<ActionResult<int>> GetMyPointsSummary(string sessionKey)
         {
-            UnicUser._context = _context;
-            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
             return GetUserPointsSummary(user.miniAppOpenId, "snowmeet_mini");
         }
 
@@ -78,8 +78,8 @@ namespace SnowmeetApi.Controllers
         {
             sessionKey = Util.UrlDecode(sessionKey);
             memo = Util.UrlDecode(memo);
-            UnicUser._context = _context;
-            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
             Point point = new Point()
             {
                 points = points,
@@ -95,11 +95,11 @@ namespace SnowmeetApi.Controllers
 
 
         [HttpGet]
-        public  ActionResult<List<Point>> GetMyPointsBalance(string sessionKey)
+        public async Task<ActionResult<List<Point>>> GetMyPointsBalance(string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey);
-            UnicUser._context = _context;
-            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
             List<Point> pointsList = GetUserPointBalance(user.miniAppOpenId, "snowmeet_mini");
             for (int i = 0; i < pointsList.Count; i++)
             {

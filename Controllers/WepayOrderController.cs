@@ -248,8 +248,8 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<string>> Refund(string outTradeNo, int amount, string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey);
-            UnicUser._context = _context;
-            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
             if (user == null || !user.isAdmin)
             {
                 return NotFound();

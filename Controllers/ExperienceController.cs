@@ -100,7 +100,7 @@ namespace SnowmeetApi.Controllers
             {
                 Experience exp = await _context.Experience.FindAsync(id);
                 sessionKey = Util.UrlDecode(sessionKey);
-                //UnicUser._context = _context;
+                //
                 UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
                 if (!user.isAdmin)
                 {
@@ -223,8 +223,8 @@ namespace SnowmeetApi.Controllers
                 experience.order = await _context.OrderOnlines.FindAsync(experience.guarantee_order_id);
             }
 
-            UnicUser._context = _context;
-            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
 
             try
             {
@@ -256,8 +256,8 @@ namespace SnowmeetApi.Controllers
                 return BadRequest();
             }
 
-            UnicUser._context = _context;
-            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
 
             try
             {

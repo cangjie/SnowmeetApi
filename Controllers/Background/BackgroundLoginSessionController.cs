@@ -53,7 +53,7 @@ namespace SnowmeetApi.Controllers.Background
         {
             sessionKey = Util.UrlDecode(sessionKey);
             BackgroundLoginSession session = await _context.BackgroundLoginSession.FindAsync(timeStamp);
-            UnicUser user = UnicUser.GetUnicUser(sessionKey);
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
             if (user.isAdmin)
             {
                 session.session_key = sessionKey;
