@@ -19,6 +19,7 @@ using SnowmeetApi.Models.Order;
 using System.IO;
 using System.Collections;
 using System.Text.RegularExpressions;
+
 using static SKIT.FlurlHttpClient.Wechat.TenpayV3.Models.CreateHKTransactionMicroPayRequest.Types;
 
 namespace SnowmeetApi.Controllers
@@ -337,7 +338,7 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<OrderOnline>> OrderChargeByStaff(int orderId, double amount, string payMethod, string staffSessionKey)
         {
             
-            UnicUser user = UnicUser.GetUnicUser(staffSessionKey);
+            UnicUser user = (await UnicUser.GetUnicUserAsync(staffSessionKey, _context)).Value;
             if (!user.isAdmin)
             {
                 return NoContent();
@@ -389,7 +390,7 @@ namespace SnowmeetApi.Controllers
             endDate = endDate.Date.AddHours(24);
             staffSessionKey = Util.UrlDecode(staffSessionKey);
             
-            UnicUser user = UnicUser.GetUnicUser(staffSessionKey);
+            UnicUser user = (await UnicUser.GetUnicUserAsync(staffSessionKey, _context)).Value;
             if (!user.isAdmin)
             {
                 return NoContent();
@@ -427,7 +428,7 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<OrderOnline>> GetWholeOrderByStaff(int orderId, string staffSessionKey)
         {
             staffSessionKey = Util.UrlDecode(staffSessionKey);
-            
+            UnicUser._context = _context;
             UnicUser user = (await UnicUser.GetUnicUserAsync(staffSessionKey, _context)).Value;
             if (!user.isAdmin)
             {
@@ -497,7 +498,7 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<OrderOnline>> SetPaymentSuccess(int paymentId, string staffSessionKey)
         {
             
-            UnicUser user = UnicUser.GetUnicUser(staffSessionKey);
+            UnicUser user = (await UnicUser.GetUnicUserAsync(staffSessionKey, _context)).Value;
             if (!user.isAdmin)
             {
                 return NoContent();
@@ -554,7 +555,7 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<OrderOnline>> ConfirmNonPaymentOrder(int orderId, string staffSessionKey)
         {
             
-            UnicUser user = UnicUser.GetUnicUser(staffSessionKey);
+            UnicUser user = (await UnicUser.GetUnicUserAsync(staffSessionKey, _context)).Value;
             if (!user.isAdmin)
             {
                 return NoContent();
@@ -580,7 +581,7 @@ namespace SnowmeetApi.Controllers
         {
             staffSessionKey = Util.UrlDecode(staffSessionKey);
             
-            UnicUser user = UnicUser.GetUnicUser(staffSessionKey);
+            UnicUser user = (await  UnicUser.GetUnicUserAsync(staffSessionKey, _context)).Value;
             if (!user.isAdmin)
             {
                 return NoContent();
