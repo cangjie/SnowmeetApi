@@ -56,14 +56,14 @@ namespace SnowmeetApi.Models.Users
             }
         }
 
-        public static UnicUser GetUnicUser(string openId, string type)
+        public static async Task<ActionResult<UnicUser>> GetUnicUser(string openId, string type, Data.ApplicationDBContext _context)
         {
-            var unionIds = _context.UnionIds.FromSqlRaw(" select * from unionids where open_id = '" + openId.Trim().Replace("'", "") + "' "
-                + " and source = '" + type.Replace("'", "") + "'").ToList();
+            var unionIds = await _context.UnionIds.FromSqlRaw(" select * from unionids where open_id = '" + openId.Trim().Replace("'", "") + "' "
+                + " and source = '" + type.Replace("'", "") + "'").ToListAsync();
             if (unionIds.Count > 0)
             {
                 string unionId = unionIds[0].union_id;
-                var allIds = _context.UnionIds.Where(u => u.union_id.Trim().Equals(unionId)).ToList();
+                var allIds = await _context.UnionIds.Where(u => u.union_id.Trim().Equals(unionId)).ToListAsync();
                 string officialAccountOpenId = "";
                 string officialAccountOpenIdOld = "";
                 string miniAppOpenId = "";

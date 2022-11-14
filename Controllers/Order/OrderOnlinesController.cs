@@ -437,14 +437,14 @@ namespace SnowmeetApi.Controllers
             OrderOnline order = await _context.OrderOnlines.FindAsync(orderId);
             if (!order.open_id.Trim().Equals(""))
             {
-                UnicUser customerUser = UnicUser.GetUnicUser(order.open_id, "snowmeet_mini");
+                UnicUser customerUser = (await UnicUser.GetUnicUser(order.open_id, "snowmeet_mini", _context)).Value;
                 if (customerUser == null)
                 {
-                    customerUser = UnicUser.GetUnicUser(order.open_id, "snowmeet_official_account_new");
+                    customerUser = (await UnicUser.GetUnicUser(order.open_id, "snowmeet_official_account_new", _context)).Value;
                 }
                 if (customerUser == null)
                 {
-                    customerUser = UnicUser.GetUnicUser(order.open_id, "snowmeet_official_account");
+                    customerUser = (await UnicUser.GetUnicUser(order.open_id, "snowmeet_official_account", _context)).Value;
                 }
                 if (customerUser != null)
                 {
