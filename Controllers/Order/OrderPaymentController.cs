@@ -336,7 +336,7 @@ namespace SnowmeetApi.Controllers.Order
         }
 
         [HttpGet]
-        private async Task<ActionResult<OrderOnline>> SetTenpayPaymentSuccess(string outTradeNumber)
+        public  async Task<ActionResult<OrderOnline>> SetTenpayPaymentSuccess(string outTradeNumber)
         {
             var paymentList = await _context.OrderPayment.Where(o => o.out_trade_no.Trim().Equals(outTradeNumber.Trim())).ToListAsync();
             if (paymentList == null || paymentList.Count == 0)
@@ -359,6 +359,10 @@ namespace SnowmeetApi.Controllers.Order
             {
                 order.pay_state = 1;
             }
+            if (order.open_id.Trim().Equals(""))
+            {
+                order.open_id = payment.open_id.Trim();
+            }
             _context.Entry(order).State = EntityState.Modified;
             await _context.SaveChangesAsync();
 
@@ -380,7 +384,7 @@ namespace SnowmeetApi.Controllers.Order
             {
                 case "服务":
                     MaintainLiveController maintainHelper = new MaintainLiveController(_context, _originConfig);
-                    maintainHelper.MaitainOrderPaySuccess(order.id);
+                    await maintainHelper.MaitainOrderPaySuccess(order.id);
                     break;
                 default:
                     break;

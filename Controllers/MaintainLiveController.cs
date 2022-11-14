@@ -389,9 +389,17 @@ namespace SnowmeetApi.Controllers
         [NonAction]
         public async Task MaitainOrderPaySuccess(int orderId)
         {
+            OrderOnline order = await _context.OrderOnlines.FindAsync(orderId);
             var tastList = await _context.MaintainLives.Where(m => m.order_id == orderId).ToListAsync();
             for (int i = 0; i < tastList.Count; i++)
             {
+                if (tastList[i].open_id == null || tastList[i].open_id.Trim().Equals(""))
+                {
+                    MaintainLive task = tastList[i];
+                    task.open_id = order.open_id.Trim();
+                    _context.Entry(task).State = EntityState.Modified;
+                    await _context.SaveChangesAsync();
+                }
                 await GenerateFlowNum(tastList[i].id);
             }
         }
