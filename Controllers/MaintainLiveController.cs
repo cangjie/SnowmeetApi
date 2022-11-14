@@ -387,7 +387,7 @@ namespace SnowmeetApi.Controllers
         }
 
         [NonAction]
-        public async void MaitainOrderPaySuccess(int orderId)
+        public async Task MaitainOrderPaySuccess(int orderId)
         {
             var tastList = await _context.MaintainLives.Where(m => m.order_id == orderId).ToListAsync();
             for (int i = 0; i < tastList.Count; i++)
@@ -425,7 +425,7 @@ namespace SnowmeetApi.Controllers
                 }
                 if (order.status.Trim().Equals("支付完成"))
                 {
-                    MaitainOrderPaySuccess(order.id);
+                    await MaitainOrderPaySuccess(order.id);
                 }
 
                 return await GetMaintainOrder(orderId, sessionKey);
