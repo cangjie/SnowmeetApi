@@ -12,6 +12,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Org.BouncyCastle.Asn1.X509;
+
 namespace SnowmeetApi.Controllers
 {
     [Route("core/[controller]/[action]")]
@@ -384,6 +386,16 @@ namespace SnowmeetApi.Controllers
             return maintainOrder;
         }
 
+        [NonAction]
+        public async void MaitainOrderPaySuccess(int orderId)
+        {
+            var tastList = await _context.MaintainLives.Where(m => m.order_id == orderId).ToListAsync();
+            for (int i = 0; i < tastList.Count; i++)
+            {
+                await GenerateFlowNum(tastList[i].id);
+            }
+        }
+
         [HttpGet("{orderId}")]
         public async Task<ActionResult<MaintainOrder>> MaitainOrderPaySuccessManual(int orderId, string sessionKey)
         {
@@ -395,6 +407,9 @@ namespace SnowmeetApi.Controllers
                 return NoContent();
             }
             OrderOnline order = await _context.OrderOnlines.FindAsync(orderId);
+
+
+
             if (!order.pay_method.Trim().Equals("微信支付"))
             {
                 OrderOnlinesController orderController = new OrderOnlinesController(_context, _originConfig);
@@ -410,11 +425,7 @@ namespace SnowmeetApi.Controllers
                 }
                 if (order.status.Trim().Equals("支付完成"))
                 {
-                    var tastList = await _context.MaintainLives.Where(m => m.order_id == order.id).ToListAsync();
-                    for (int i = 0; i < tastList.Count; i++)
-                    {
-                        await GenerateFlowNum(tastList[i].id, sessionKey);
-                    }
+                    MaitainOrderPaySuccess(order.id);
                 }
 
                 return await GetMaintainOrder(orderId, sessionKey);
@@ -427,17 +438,10 @@ namespace SnowmeetApi.Controllers
 
         }
 
-        [HttpGet("{taskId}")]
-        public async Task<ActionResult<MaintainLive>> GenerateFlowNum(int taskId, string sessionKey)
+        [NonAction]
+        public async Task<ActionResult<MaintainLive>> GenerateFlowNum(int taskId)
         {
-            sessionKey = Util.UrlDecode(sessionKey);
-            //
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
-            if (!user.isAdmin)
-            {
-                return NoContent();
-            }
-
+            
             MaintainLive task = await _context.MaintainLives.FindAsync(taskId);
             if (!task.task_flow_num.Trim().Equals(""))
             {

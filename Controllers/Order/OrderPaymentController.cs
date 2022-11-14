@@ -208,7 +208,7 @@ namespace SnowmeetApi.Controllers.Order
 
 
         [HttpPost("{mchid}")]
-        public async Task<ActionResult<string>> TenpayPaymentCallbackAsync(int mchid, TenpayCallBackStruct postData)
+        public async Task<ActionResult<string>> TenpayPaymentCallback(int mchid, TenpayCallBackStruct postData)
         {
 
             string apiKey = "";
@@ -375,6 +375,18 @@ namespace SnowmeetApi.Controllers.Order
                 await _context.Point.AddAsync(p);
                 await _context.SaveChangesAsync();
             }
+
+            switch (order.type.Trim())
+            {
+                case "服务":
+                    MaintainLiveController maintainHelper = new MaintainLiveController(_context, _originConfig);
+                    maintainHelper.MaitainOrderPaySuccess(order.id);
+                    break;
+                default:
+                    break;
+            }
+
+
             return order;
             
         }
