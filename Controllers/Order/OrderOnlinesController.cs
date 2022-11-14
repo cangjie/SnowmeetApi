@@ -497,6 +497,7 @@ namespace SnowmeetApi.Controllers
         [HttpGet("{paymentId}")]
         public async Task<ActionResult<OrderOnline>> SetPaymentSuccess(int paymentId, string staffSessionKey)
         {
+            staffSessionKey = Util.UrlDecode(staffSessionKey);
             
             UnicUser user = (await UnicUser.GetUnicUserAsync(staffSessionKey, _context)).Value;
             if (!user.isAdmin)
@@ -535,7 +536,7 @@ namespace SnowmeetApi.Controllers
                 order.pay_time = DateTime.Now;
                 _context.Entry(order).State = EntityState.Modified;
                 await _context.SaveChangesAsync();
-                if (!order.ticket_code.Trim().Equals(""))
+                if (order.ticket_code != null && !order.ticket_code.Trim().Equals(""))
                 {
                     var ticket = await _context.Ticket.FindAsync(order.ticket_code.Trim());
                     ticket.used = 1;

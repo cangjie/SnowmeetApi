@@ -42,7 +42,7 @@ namespace SnowmeetApi.Models
         public double ticket_amount { get; set; }
         public double score_rate { get; set; }
         public double generate_score { get; set; }
-        public string ticket_code { get; set; }
+        public string ticket_code { get; set; } = "";
         public string out_trade_no { get; set; } = "";
         public string pay_memo { get; set; } = "全额支付";
         public double other_discount { get; set; }
