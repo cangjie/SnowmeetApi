@@ -302,6 +302,10 @@ namespace SnowmeetApi.Controllers
             }
             if (!maintainOrder.payOption.Trim().Equals("无需支付") && !maintainOrder.payOption.Trim().Equals("次卡支付"))
             {
+                double finalPrice = maintainOrder.summaryPrice - maintainOrder.ticketDiscount - maintainOrder.discount;
+                
+                double scoreRate = Util.GetScoreRate(finalPrice, maintainOrder.summaryPrice);
+                double score = finalPrice * scoreRate;
                 OrderOnline order = new OrderOnline()
                 {
                     id = 0,
@@ -319,7 +323,10 @@ namespace SnowmeetApi.Controllers
                     other_discount = maintainOrder.discount,
                     final_price = maintainOrder.summaryPrice - maintainOrder.ticketDiscount - maintainOrder.discount,
                     ticket_code = maintainOrder.ticketCode.Trim(),
-                    staff_open_id = user.miniAppOpenId.Trim()
+                    staff_open_id = user.miniAppOpenId.Trim(),
+                    score_rate = scoreRate,
+                    generate_score = score
+
                 };
                 await _context.AddAsync(order);
                 await _context.SaveChangesAsync();
