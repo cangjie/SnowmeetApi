@@ -367,13 +367,14 @@ namespace SnowmeetApi.Controllers.Order
             await _context.SaveChangesAsync();
 
             var pointList = await _context.Point.Where(p => p.memo.Contains("支付赠送龙珠，订单ID：" + order.id.ToString())).ToListAsync();
-            if (pointList.Count == 0 && !order.open_id.Trim().Equals(""))
+            int score = (int)Math.Round(order.generate_score, 0);
+            if (pointList.Count == 0 && !order.open_id.Trim().Equals("") && score > 0)
             {
                 Point p = new Point()
                 {
                     memo = "店销现货支付赠送龙珠，订单ID：" + order.id,
                     user_open_id = order.open_id.Trim(),
-                    points = (int)order.generate_score,
+                    points = score,
                     transact_date = DateTime.Now
                 };
                 await _context.Point.AddAsync(p);

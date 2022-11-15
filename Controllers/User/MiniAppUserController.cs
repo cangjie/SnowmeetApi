@@ -153,13 +153,16 @@ namespace SnowmeetApi.Controllers
             }
             miniUser.nick = nick;
             string gender = "";
-            if (jsonObj["gender"].ToString().Equals("0"))
+            if (jsonObj["gender"] != null)
             {
-                gender = "男";
-            }
-            else
-            {
-                gender = "女";
+                if (jsonObj["gender"].ToString().Equals("0"))
+                {
+                    gender = "男";
+                }
+                else
+                {
+                    gender = "女";
+                }
             }
             miniUser.gender = gender.Trim();
             if (jsonObj["unionId"] != null && jsonObj["unionId"].ToString().Trim().Equals(""))
