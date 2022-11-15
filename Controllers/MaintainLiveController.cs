@@ -300,7 +300,7 @@ namespace SnowmeetApi.Controllers
             {
                 customerName += "女士";
             }
-            if (!maintainOrder.payOption.Trim().Equals("无需支付"))
+            if (!maintainOrder.payOption.Trim().Equals("无需支付") || !maintainOrder.payOption.Trim().Equals("次卡支付"))
             {
                 OrderOnline order = new OrderOnline()
                 {
@@ -377,6 +377,11 @@ namespace SnowmeetApi.Controllers
                 item.service_open_id = user.miniAppOpenId.Trim();
                 await _context.AddAsync(item);
                 await _context.SaveChangesAsync();
+                if (item.pay_memo.Trim().Equals("无需支付") || item.pay_memo.Trim().Equals("次卡支付"))
+                {
+                    await GenerateFlowNum(item.id);
+                }
+                
             }
 
             maintainOrder.orderId = orderId;
