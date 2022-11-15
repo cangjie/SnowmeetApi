@@ -300,7 +300,7 @@ namespace SnowmeetApi.Controllers
             {
                 customerName += "女士";
             }
-            if (!maintainOrder.payOption.Trim().Equals("无需支付") || !maintainOrder.payOption.Trim().Equals("次卡支付"))
+            if (!maintainOrder.payOption.Trim().Equals("无需支付") && !maintainOrder.payOption.Trim().Equals("次卡支付"))
             {
                 OrderOnline order = new OrderOnline()
                 {
@@ -375,9 +375,14 @@ namespace SnowmeetApi.Controllers
                 MaintainLive item = maintainOrder.items[i];
                 item.order_id = orderId;
                 item.service_open_id = user.miniAppOpenId.Trim();
+                item.pay_method = maintainOrder.payMethod.Trim();
+                if (maintainOrder.payOption.Trim().Equals("无需支付") || maintainOrder.payOption.Trim().Equals("次卡支付"))
+                {
+                    item.pay_memo = maintainOrder.payOption.Trim();
+                }
                 await _context.AddAsync(item);
                 await _context.SaveChangesAsync();
-                if (item.pay_memo.Trim().Equals("无需支付") || item.pay_memo.Trim().Equals("次卡支付"))
+                if (maintainOrder.payOption.Trim().Equals("无需支付") || maintainOrder.payOption.Trim().Equals("次卡支付"))
                 {
                     await GenerateFlowNum(item.id);
                 }
@@ -386,7 +391,7 @@ namespace SnowmeetApi.Controllers
 
             maintainOrder.orderId = orderId;
 
-            //OrderOnline order = new OrderOnline();
+
 
             return maintainOrder;
         }
