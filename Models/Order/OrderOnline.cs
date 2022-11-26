@@ -92,6 +92,10 @@ namespace SnowmeetApi.Models
                 {
                     str = "部分支付";
                 }
+                if (pay_state == -1)
+                {
+                    str = "订单作废";
+                }
                 return str.Trim();
             }
         }
