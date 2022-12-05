@@ -26,29 +26,29 @@ namespace SnowmeetApi.Models
         public int id { get; set; }
 
         public string type { get; set; }
-        public string open_id { get; set; }
-        public string cell_number { get; set; }
-        public string name { get; set; }
-        public string pay_method { get; set; }
-        public double order_price { get; set; }
-        public double order_real_pay_price { get; set; }
-        public int pay_state { get; set; }
+        public string open_id { get; set; } = "";
+        public string cell_number { get; set; } = "";
+        public string name { get; set; } = "";
+        public string pay_method { get; set; } = "微信支付";
+        public double order_price { get; set; } = 0;
+        public double order_real_pay_price { get; set; } = 0;
+        public int pay_state { get; set; } = 0;
         public DateTime? pay_time { get; set; }
         public string code { get; set; } = "";
-        public string syssn { get; set; }
+        public string syssn { get; set; } = "";
         public string memo { get; set; } = "";
-        public string shop { get; set; }
+        public string shop { get; set; } = "";
         public string? mchid { get; set; }
-        public double ticket_amount { get; set; }
-        public double score_rate { get; set; }
-        public double generate_score { get; set; }
+        public double ticket_amount { get; set; } = 0;
+        public double score_rate { get; set; } = 0;
+        public double generate_score { get; set; } = 0;
         public string ticket_code { get; set; } = "";
         public string out_trade_no { get; set; } = "";
         public string pay_memo { get; set; } = "全额支付";
-        public double other_discount { get; set; }
-        public double final_price { get; set; }
+        public double other_discount { get; set; } = 0;
+        public double final_price { get; set; } = 0;
         public string? staff_open_id { get; set; }
-        public int have_score { get; set; }
+        public int have_score { get; set; } = 0;
         public DateTime create_date { get; set; } = DateTime.Now;
 
         

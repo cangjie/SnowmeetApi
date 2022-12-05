@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using SnowmeetApi.Data;
 using SnowmeetApi.Models.Product;
-
+using Newtonsoft.Json;
 namespace SnowmeetApi.Controllers
 {
     [Route("core/[controller]/[action]")]
@@ -54,7 +54,50 @@ namespace SnowmeetApi.Controllers
                 .Where(p => (p.id == 137 || p.id == 138 || p.id == 139 || p.id == 140 || p.id == 142 || p.id == 143 || p.id == 202))
                 .ToListAsync();
         }
+        /*
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<object>>> GetSkiPassProduct(string resort, DateTime date, string tags)
+        {
+            string[] tagArr = tags == null? new string[] { } : Util.UrlDecode(tags.Trim()).Split(',');
+            
+            var skiPassProdustList = await _context.Product.Where(p => (p.shop.Trim().Equals(resort.Trim()) && p.hidden == 0))
+                .Join(_context.skiPass, p => p.id, s => s.product_id,
+                (p, s) => new { p.id, p.name, p.sale_price, p.deposit, s.product_id,
+                    s.resort, s.end_sale_time, s.rules,
+                    s.available_days, s.unavailable_days,
+                    s.tags })
 
+                .OrderBy(p => p.sale_price).ToListAsync();
+
+
+            for (int i = 0; i < skiPassProdustList.Count; i++)
+            {
+                var r = skiPassProdustList[i];
+                SkiPass skiPass = new SkiPass()
+                {
+                    product_id = r.product_id,
+                    resort = r.resort.Trim(),
+                    end_sale_time = r.end_sale_time,
+                    rules = r.rules,
+                    available_days = r.available_days,
+                    unavailable_days = r.unavailable_days,
+                    tags = r.tags
+
+                };
+
+                if (!skiPass.DateMatch(date) || !skiPass.TagMatch(tagArr))
+                {
+                    skiPassProdustList.RemoveAt(i);
+                    i--;
+                }
+
+
+            }
+
+
+            return skiPassProdustList;
+        }
+        */
         /*
 
         // GET: api/Product
