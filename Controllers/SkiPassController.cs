@@ -90,7 +90,6 @@ namespace SnowmeetApi.Controllers
                 return BadRequest();
             }
             return (await CreateSkiPassOrder(new Product[] { product }, user, null, date, count));
-            
         }
 
         [HttpGet("{productId}")]
