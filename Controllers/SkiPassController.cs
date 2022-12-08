@@ -29,6 +29,28 @@ namespace SnowmeetApi.Controllers
             _context = context;
             _config = config;
         }
+
+        [HttpGet("{id}")]
+        public async Task<ActionResult<object>> GetSkiPassDetailInfo(int id)
+        {
+            return await _context.Product.Where(p => p.id == id)
+                .Join(_context.SkiPass, p => p.id, s => s.product_id,
+                (p, s) => new
+                {
+                    p.id,
+                    p.name,
+                    p.sale_price,
+                    p.deposit,
+                    s.product_id,
+                    s.resort,
+                    s.end_sale_time,
+                    s.rules,
+                    s.available_days,
+                    s.unavailable_days,
+                    s.tags
+                }).FirstAsync();
+        }
+
         [HttpGet]
         public async Task<ActionResult<IEnumerable<object>>> GetSkiPassProduct(string resort, DateTime date, string tags)
         {
