@@ -270,8 +270,8 @@ namespace SnowmeetApi.Controllers
             string memo = order.memo.Trim();
             try
             {
-                var objMemo = JsonConvert.DeserializeObject<Dictionary<string, DateTime>>(memo);
-                DateTime reserveDate = objMemo["use_date"];
+                var objMemo = JsonConvert.DeserializeObject<Dictionary<string, object>>(memo);
+                DateTime reserveDate = DateTime.Parse(objMemo["use_date"].ToString());
                 CardController cardHelper = new CardController(_context, _config);
                 string code = cardHelper.CreateCard("雪票");
                 Card card = await _context.Card.FindAsync(code);

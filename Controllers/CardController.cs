@@ -22,8 +22,8 @@ namespace SnowmeetApi.Controllers
         public CardController(ApplicationDBContext context, IConfiguration config)
         {
             _context = context;
-            _config = config.GetSection("Settings");
-            _appId = _config.GetSection("AppId").Value.Trim();
+            _config = config;//.GetSection("Settings");
+            _appId = _config.GetSection("Settings").GetSection("AppId").Value.Trim();
             
         }
 

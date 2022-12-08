@@ -59,6 +59,7 @@ namespace SnowmeetApi.Controllers.Order
         {
             _originConfig = config;
             _context = context;
+            _originConfig = config;
             _config = config.GetSection("Settings");
             _appId = _config.GetSection("AppId").Value.Trim();
             _httpContextAccessor = httpContextAccessor;
@@ -388,7 +389,7 @@ namespace SnowmeetApi.Controllers.Order
                     await maintainHelper.MaitainOrderPaySuccess(order.id);
                     break;
                 case "雪票":
-                    SkiPassController skiPassHelper = new SkiPassController(_context, _config);
+                    SkiPassController skiPassHelper = new SkiPassController(_context, _originConfig);
                     await skiPassHelper.CreateSkiPass(order);
                     break;
                 default:
