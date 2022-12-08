@@ -16,7 +16,7 @@ using SnowmeetApi.Models.Card;
 using Newtonsoft.Json;
 namespace SnowmeetApi.Controllers
 {
-    [Route("api/[controller]/[action]")]
+    [Route("core/[controller]/[action]")]
     [ApiController]
     public class SkiPassController : ControllerBase
     {
