@@ -210,7 +210,7 @@ namespace SnowmeetApi.Controllers
             }
             for (int i = 0; i < prodctArr.Length; i++)
             {
-                totalPrice = totalPrice + prodctArr[i].sale_price * count;
+                totalPrice = totalPrice + (prodctArr[i].deposit + prodctArr[i].sale_price) * count;
                 if (prodctArr[i].name.IndexOf("租") >= 0)
                 {
                     needRent = true;
@@ -220,12 +220,13 @@ namespace SnowmeetApi.Controllers
             OrderOnline order = new OrderOnline()
             {
                 type = "雪票",
+                shop = prodctArr[0].shop.Trim(),
                 order_price = totalPrice,
                 order_real_pay_price = totalPrice,
                 final_price = totalPrice,
                 open_id = openId.Trim(),
                 staff_open_id = staffOpenId.Trim(),
-                memo = "{ \"use_date\": \"" + date.ToShortDateString() + "\" \"rent\" : \"" + (needRent? "1" : "0") + "\"}"
+                memo = "{ \"use_date\": \"" + date.Year.ToString() + "-" + date.Month.ToString().PadLeft(2, '0') + "-" + date.Day.ToString().PadLeft(2, '0') + "\" \"rent\" : \"" + (needRent? "1" : "0") + "\"}"
             };
             await _context.AddAsync(order);
             await _context.SaveChangesAsync();
