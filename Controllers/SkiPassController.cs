@@ -31,6 +31,48 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet("{id}")]
+        public async Task<ActionResult<int>> CheckNanshanReserveAvaliabelCount(int id, DateTime date)
+        {
+            Product p = await _context.Product.FindAsync(id);
+            if (!p.shop.Trim().Equals("南山"))
+            {
+                return int.MaxValue;
+            }
+            bool isEvening = false;
+            if (p.name.IndexOf("夜场") >= 0 && p.name.IndexOf("下午") < 0)
+            {
+                isEvening = true;
+            }
+            int totalCount = 20;
+            if (isEvening)
+            {
+                totalCount = 15;
+            }
+            int reserveCount = 0;
+
+            var orderList = await _context.OrderOnlineDetails
+                .Join(_context.OrderOnlines, d => d.OrderOnlineId, o => o.id, (d, o) => new { o.id, o.pay_state, o.code, o.memo, d.count, d.product_id })
+                .Where(o => o.product_id != 297 && o.pay_state == 1 && o.memo.IndexOf(date.ToShortDateString()) > 0)
+                .Join(_context.Product, o => o.product_id, p => p.id, (o, p) => new { o.id, o.pay_state, o.code, o.count, o.product_id, p.name, o.memo })
+                .ToListAsync();
+            for (int i = 0; i < orderList.Count; i++)
+            {
+                var order = orderList[i];
+                if (isEvening && order.name.IndexOf("夜场") >= 0 && order.name.IndexOf("下午") < 0)
+                {
+                    reserveCount++;
+                }
+                if (!isEvening && (order.name.IndexOf("夜场") < 0 || order.name.IndexOf("下午") >= 0))
+                {
+                    reserveCount++;
+                }
+            }
+
+            return totalCount - reserveCount;
+        }
+
+
+        [HttpGet("{id}")]
         public async Task<ActionResult<object>> GetSkiPassDetailInfo(int id)
         {
             return await _context.Product.Where(p => p.id == id)
