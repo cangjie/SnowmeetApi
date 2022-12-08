@@ -389,7 +389,7 @@ namespace SnowmeetApi.Controllers.Order
                     break;
                 case "雪票":
                     SkiPassController skiPassHelper = new SkiPassController(_context, _config);
-
+                    await skiPassHelper.CreateSkiPass(order);
                     break;
                 default:
                     break;

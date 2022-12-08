@@ -226,7 +226,7 @@ namespace SnowmeetApi.Controllers
                 final_price = totalPrice,
                 open_id = openId.Trim(),
                 staff_open_id = staffOpenId.Trim(),
-                memo = "{ \"use_date\": \"" + date.Year.ToString() + "-" + date.Month.ToString().PadLeft(2, '0') + "-" + date.Day.ToString().PadLeft(2, '0') + "\" \"rent\" : \"" + (needRent? "1" : "0") + "\"}"
+                memo = "{ \"use_date\": \"" + date.Year.ToString() + "-" + date.Month.ToString().PadLeft(2, '0') + "-" + date.Day.ToString().PadLeft(2, '0') + "\", \"rent\" : \"" + (needRent? "1" : "0") + "\"}"
             };
             await _context.AddAsync(order);
             await _context.SaveChangesAsync();
@@ -283,9 +283,9 @@ namespace SnowmeetApi.Controllers
                 await _context.SaveChangesAsync();
                 return code;
             }
-            catch
+            catch(Exception err)
             {
-
+                Console.WriteLine(err.ToString());
             }
 
             return "";
