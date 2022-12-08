@@ -15,7 +15,8 @@ namespace SnowmeetApi.Models.Card
         public string owner_open_id { get; set; } = "";
         public int is_package { get; set; } = 0;
         public int product_id { get; set; } = 0;
-
+        public DateTime? use_date { get; set; }
+        public int used { get; set; } = 0;
 
     }
 }

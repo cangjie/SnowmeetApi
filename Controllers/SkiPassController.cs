@@ -11,7 +11,9 @@ using SnowmeetApi.Models;
 using System.Configuration;
 using Microsoft.Extensions.Configuration;
 using SnowmeetApi.Models.Users;
-
+using SnowmeetApi.Models.Order;
+using SnowmeetApi.Models.Card;
+using Newtonsoft.Json;
 namespace SnowmeetApi.Controllers
 {
     [Route("api/[controller]/[action]")]
@@ -162,7 +164,47 @@ namespace SnowmeetApi.Controllers
                 }
                 
             }
+
+            OrderPayment payment = new OrderPayment()
+            {
+                order_id = order.id,
+                pay_method = order.pay_method.Trim(),
+                amount = order.final_price,
+                status = "待支付",
+                staff_open_id = (staff != null) ? staff.miniAppOpenId : ""
+            };
+            await _context.OrderPayment.AddAsync(payment);
+            await _context.SaveChangesAsync();
+            order.payments = new OrderPayment[] { payment };
             return order;
+        }
+
+        [NonAction]
+        public async Task<ActionResult<string>> CreateSkiPass(OrderOnline order)
+        {
+            //OrderOnline order = await _context.OrderOnlines.FindAsync(orderId);
+            string memo = order.memo.Trim();
+            try
+            {
+                var objMemo = JsonConvert.DeserializeObject<Dictionary<string, DateTime>>(memo);
+                DateTime reserveDate = objMemo["use_date"];
+                CardController cardHelper = new CardController(_context, _config);
+                string code = cardHelper.CreateCard("雪票");
+                Card card = await _context.Card.FindAsync(code);
+                card.use_date = reserveDate;
+                card.used = 0;
+                order.code = code;
+                _context.Entry(card).State = EntityState.Modified;
+                _context.Entry(order).State = EntityState.Modified;
+                await _context.SaveChangesAsync();
+                return code;
+            }
+            catch
+            {
+
+            }
+
+            return "";
         }
 
         /*

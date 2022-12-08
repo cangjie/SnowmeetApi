@@ -387,6 +387,10 @@ namespace SnowmeetApi.Controllers.Order
                     MaintainLiveController maintainHelper = new MaintainLiveController(_context, _originConfig);
                     await maintainHelper.MaitainOrderPaySuccess(order.id);
                     break;
+                case "雪票":
+                    SkiPassController skiPassHelper = new SkiPassController(_context, _config);
+
+                    break;
                 default:
                     break;
             }
