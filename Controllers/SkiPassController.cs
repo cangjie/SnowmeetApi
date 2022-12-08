@@ -146,7 +146,7 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet("{productId}")]
-        public async Task<ActionResult<object>> ReserveSkiPass(int productId, DateTime date, int count, string sessionKey)
+        public async Task<ActionResult<object>> ReserveSkiPass(int productId, DateTime date, int count, string cell, string name, string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey);
             Product product = await _context.Product.FindAsync(productId);
@@ -155,7 +155,26 @@ namespace SnowmeetApi.Controllers
             {
                 return BadRequest();
             }
-            return (await CreateSkiPassOrder(new Product[] { product }, user, null, date, count));
+            OrderOnline order = (await CreateSkiPassOrder(new Product[] { product }, user, null, date, count));
+
+            order.cell_number = cell.Trim();
+            order.name = name.Trim();
+            _context.Entry(order).State = EntityState.Modified;
+            MiniAppUser miniUser = await _context.MiniAppUsers.FindAsync(order.open_id.Trim());
+            if (miniUser != null)
+            {
+                if (miniUser.real_name.Trim().Length <= 1)
+                {
+                    miniUser.real_name = name;
+                }
+                if (miniUser.cell_number.Length != 11)
+                {
+                    miniUser.cell_number = cell.Trim();
+                }
+                _context.Entry(miniUser).State = EntityState.Modified;
+            }
+            await _context.SaveChangesAsync();
+            return order;
         }
 
         [HttpGet("{productId}")]
