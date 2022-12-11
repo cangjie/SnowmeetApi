@@ -261,7 +261,7 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<MaintainLive>>> GetTasks(DateTime start, DateTime end, string sessionKey)
+        public async Task<ActionResult<IEnumerable<MaintainLive>>> GetTasks(DateTime start, DateTime end, string sessionKey, string shop = "")
         {
             sessionKey = Util.UrlDecode(sessionKey.Trim());
             
@@ -273,7 +273,7 @@ namespace SnowmeetApi.Controllers
             start = start.Date;
             end = end.Date.AddDays(1);
             var liveArr = await _context.MaintainLives
-                .Where(m => (!m.task_flow_num.Trim().Equals("") && m.create_date >= start && m.create_date < end))
+                .Where(m => (!m.task_flow_num.Trim().Equals("") && m.create_date >= start && m.create_date < end && (shop.Equals("") || m.shop.Equals(shop)) ))
                 .OrderByDescending(m => m.id).ToListAsync();
 
             return liveArr;
