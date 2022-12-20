@@ -40,11 +40,14 @@ namespace SnowmeetApi.Controllers
 
         public bool isStaff = false;
 
+        private IConfiguration _oriConfig;
+
 
 
         public OrderOnlinesController(ApplicationDBContext context, IConfiguration config)
         {
             _context = context;
+            _oriConfig = config;
             _config = config.GetSection("Settings");
             _appId = _config.GetSection("AppId").Value.Trim();
         }
@@ -549,6 +552,21 @@ namespace SnowmeetApi.Controllers
             {
                 return NotFound();
             }
+
+
+            try
+            {
+                if (order.generate_score > 0)
+                {
+                    PointController pc = new PointController(_context, _oriConfig);
+                    await pc.SetPoint((int)order.generate_score, staffSessionKey, "店销现货支付赠送龙珠，订单ID：" + order.id.ToString());
+                }
+            }
+            catch
+            {
+
+            }
+
             return await GetWholeOrderByStaff(payment.order_id, staffSessionKey);
         }
 
