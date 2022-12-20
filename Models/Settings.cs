@@ -16,7 +16,7 @@ namespace SnowmeetApi.Models
             string appId = settings.GetSection("AppId").Value.Trim();
             string appSecret = settings.GetSection("AppSecret").Value.Trim();
             string originalId = settings.GetSection("OriginalId").Value.Trim();
-            //string token = settings.GetSection("token").Value.Trim();
+            string token = settings.GetSection("token").Value.Trim();
             //string mediaRoot = settings.GetSection("MediaRoot").Value.Trim();
 
             return new Settings()
@@ -24,7 +24,7 @@ namespace SnowmeetApi.Models
                 appId = appId,
                 appSecret = appSecret,
                 originalId = originalId,
-                //token = token,
+                token = token,
                 //mediaRoot = mediaRoot
             };
         }
