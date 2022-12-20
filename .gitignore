@@ -1,4 +1,6 @@
 # globs
+appsettings.json
+appsettings.Development.json
 Makefile.in
 *.userprefs
 *.usertasks
