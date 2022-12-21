@@ -123,7 +123,7 @@ namespace LuqinMiniAppBase.Controllers
                     msgType = root.SelectSingleNode("MsgType").InnerText.Trim();
                 }
 
-                /*
+                
                 OAReceive msg = new OAReceive()
                 {
                     id = 0,
@@ -139,6 +139,7 @@ namespace LuqinMiniAppBase.Controllers
                 };
                 await _db.oAReceive.AddAsync(msg);
                 await _db.SaveChangesAsync();
+                /*
                 OfficailAccountReply reply = new OfficailAccountReply(_db, _config, msg);
                 return reply.Reply().Trim();
                 */
