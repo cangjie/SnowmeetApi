@@ -106,6 +106,10 @@ namespace SnowmeetApi.Data
 
         public DbSet<SnowmeetApi.Models.OAReceive> oAReceive { get; set; }
 
+        public DbSet<SnowmeetApi.Models.Ticket.TicketLog> ticketLog { get; set; }
+
+        public DbSet<SnowmeetApi.Models.ServiceMessage> ServiceMessage { get; set; }
+
         //public DbSet<SnowmeetApi.Models.Product.SkiPass> skiPass { get; set; }
 
 

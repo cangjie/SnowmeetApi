@@ -11,6 +11,7 @@ using Microsoft.Extensions.Configuration;
 using SnowmeetApi.Models.Users;
 using SnowmeetApi.Models.Product;
 using SnowmeetApi.Models.Order;
+using SnowmeetApi.Models.Ticket;
 
 namespace SnowmeetApi.Controllers
 {
@@ -321,8 +322,52 @@ namespace SnowmeetApi.Controllers
 
             }
             exp = (await GetExperienceTemp(id, sessionKey)).Value;
+
+            await SendTicket(exp.id, sessionKey);
+
             return exp;
         }
+
+        [HttpGet("{id}")]
+        public async Task<ActionResult<Ticket>> SendTicket(int id, string sessionKey)
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            if (user == null || !user.isAdmin)
+            {
+                return BadRequest();
+            }
+            TicketController ticketHelper = new TicketController(_context, _originConfig);
+            Ticket ticket = (await ticketHelper.GenerateTickets(9, 1, sessionKey, "租赁订单")).Value[0];
+            if (ticket == null)
+            {
+                return BadRequest();
+            }
+            Experience exp = await _context.Experience.FindAsync(id);
+            ticket.open_id = exp.open_id.Trim();
+            _context.Entry(ticket).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
+
+            TicketLog log = new TicketLog()
+            {
+                code = ticket.code,
+                sender_open_id = user.miniAppOpenId.Trim(),
+                accepter_open_id = exp.open_id.Trim(),
+                memo = "体验订单获得，ID:" + exp.id,
+                transact_time = DateTime.Now
+            };
+            await _context.AddAsync(log);
+            await _context.SaveChangesAsync();
+
+            ServiceMessageController messageHelper = new ServiceMessageController(_context, _originConfig);
+            await messageHelper.SendMiniAppMessage(exp.open_id.Trim(), "感谢您的体验，特赠送一张9折购物券，详情请点击查看。",
+                "pages/mine/ticket/ticket_list", "gltv7fpLtJQg_sTpVwzJYy4Pi7apYNR6cg-P5jG6lWdcdcbyHRoSLgMz3BirNQNm", sessionKey);
+
+
+            return ticket;
+
+        }
+
 
         /*
 

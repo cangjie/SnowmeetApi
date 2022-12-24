@@ -72,7 +72,7 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet("{templateId}")]
-        public async Task<ActionResult<IEnumerable<Ticket>>> GenerateTickets(int templateId, int count, string sessionKey, string channel = "")
+        public async Task<ActionResult<Ticket[]>> GenerateTickets(int templateId, int count, string sessionKey, string channel = "")
         {
             TicketTemplate template = _context.TicketTemplate.Find(templateId);
             if (template == null)

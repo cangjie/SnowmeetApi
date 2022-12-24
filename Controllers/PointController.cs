@@ -174,22 +174,6 @@ namespace SnowmeetApi.Controllers
             return CreatedAtAction("GetPoint", new { id = point.id }, point);
         }
 
-        // DELETE: api/Point/5
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> DeletePoint(int id)
-        {
-            var point = await _context.Point.FindAsync(id);
-            if (point == null)
-            {
-                return NotFound();
-            }
-
-            _context.Point.Remove(point);
-            await _context.SaveChangesAsync();
-
-            return NoContent();
-        }
-
         */
 
 
