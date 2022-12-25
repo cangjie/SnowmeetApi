@@ -354,7 +354,7 @@ namespace SnowmeetApi.Controllers
             {
                 code = ticket.code,
                 sender_open_id = user.miniAppOpenId.Trim(),
-                accepter_open_id = exp.open_id.Trim(),
+                accepter_open_id = order.open_id.Trim(),
                 memo = "体验订单获得，ID:" + exp.id,
                 transact_time = DateTime.Now
             };
