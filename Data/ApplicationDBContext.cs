@@ -110,6 +110,8 @@ namespace SnowmeetApi.Data
 
         public DbSet<SnowmeetApi.Models.ServiceMessage> ServiceMessage { get; set; }
 
+        public DbSet<SnowmeetApi.Models.TemplateMessage> templateMessage { get; set; }
+
         //public DbSet<SnowmeetApi.Models.Product.SkiPass> skiPass { get; set; }
 
 

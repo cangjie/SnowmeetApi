@@ -10,6 +10,7 @@ using SnowmeetApi.Models;
 using Microsoft.Extensions.Configuration;
 using SnowmeetApi.Models.Users;
 using static SKIT.FlurlHttpClient.Wechat.TenpayV3.Models.CreateApplyForSubMerchantApplymentRequest.Types.Business.Types.SaleScene.Types;
+using static System.Net.WebRequestMethods;
 
 namespace SnowmeetApi.Controllers
 {
@@ -51,6 +52,50 @@ namespace SnowmeetApi.Controllers
             return uidList[0].open_id.Trim();
         }
 
+        [HttpGet]
+        public async Task<ActionResult<TemplateMessage>> SendTemplateMessage(string miniAppOpenId, string templateId, string first, string keywords, string remark, string url, string sessionKey)
+        {
+            miniAppOpenId = Util.UrlDecode(miniAppOpenId);
+            templateId = Util.UrlDecode(templateId);
+            first = Util.UrlDecode(first);
+            keywords = Util.UrlDecode(keywords);
+            remark = Util.UrlDecode(remark);
+            url = Util.UrlDecode(url);
+            sessionKey = Util.UrlDecode(sessionKey);
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            if (user == null || !user.isAdmin)
+            {
+                return BadRequest();
+            }
+            string openId = await GetOAOpenId(miniAppOpenId);
+
+            string[] keywordArr = keywords.Split('|');
+            string keywordJson = "";
+            for (int i = 1; i <= keywordArr.Length; i++)
+            {
+                keywordJson = keywordJson  + ",\"keyword" + i.ToString() + "\": { \"value\": \"" + keywordArr[i - 1].Trim() + "\" , \"color\": \"#173177\"}";
+            }
+            keywordJson = "\"first\": { \"value\": \"" + first + "\", \"color\": \"#000000\" } " + keywordJson
+                + ", \"remark\": { \"value\": \"" + remark + "\", \"color\": \"#000000\" }";
+            string postJson = "{ \"touser\": \"" + openId.Trim() + "\", \"template_id\" : \"" + templateId.Trim() + "\", \"url\": \"" + url.Trim() + "\", "
+                + " \"topcolor\": \"#FF0000\", \"data\":  {" + keywordJson + "}}";
+            string postUrl = "https://api.weixin.qq.com/cgi-bin/message/template/send?access_token=" + GetToken();
+            string ret = Util.GetWebContent(postUrl, postJson);
+            TemplateMessage msg = new TemplateMessage()
+            {
+                from = _originId,
+                to = openId,
+                template_id = templateId,
+                first = first,
+                keywords = keywords,
+                remark = remark,
+                url = url,
+                ret_message = ret
+            };
+            await _context.AddAsync(msg);
+            await _context.SaveChangesAsync();
+            return Ok(msg);
+        }
 
         [HttpGet]
         public async Task<ActionResult<ServiceMessage>> SendMiniAppMessage(string miniAppOpenId, string title, string path, string mediaId, string sessionKey)
@@ -87,18 +132,6 @@ namespace SnowmeetApi.Controllers
 
             return msg;
 
-
-            /*
-            string appId = _settings.miniAppId.Trim();
-            //Util.GetWebContent()
-            string postJson = "{\"touser\":\"" + openId + "\",  \"msgtype\":\"miniprogrampage\",    \"miniprogrampage\": {"
-                + "\"title\":\"" + title + "\",    \"appid\":\"" + appId + "\", "
-                + "\"pagepath\":\"" + path + "\",        \"thumb_media_id\":\"" + mediaId + "\"   }}";
-            OfficialAccountApi oaHelper = new OfficialAccountApi(_db, _config);
-            string token = oaHelper.GetAccessToken();
-            string postUrl = "https://api.weixin.qq.com/cgi-bin/message/custom/send?access_token=" + token.Trim();
-            Console.WriteLine(Util.GetWebContent(postUrl, postJson));
-            */
         }
 
 

@@ -344,7 +344,9 @@ namespace SnowmeetApi.Controllers
                 return BadRequest();
             }
             Experience exp = await _context.Experience.FindAsync(id);
-            ticket.open_id = exp.open_id.Trim();
+            OrderOnline order = await _context.OrderOnlines.FindAsync(exp.guarantee_order_id);
+            string openId = order.open_id.Trim();
+            ticket.open_id = openId;
             _context.Entry(ticket).State = EntityState.Modified;
             await _context.SaveChangesAsync();
 
@@ -359,10 +361,19 @@ namespace SnowmeetApi.Controllers
             await _context.AddAsync(log);
             await _context.SaveChangesAsync();
 
-            ServiceMessageController messageHelper = new ServiceMessageController(_context, _originConfig);
-            await messageHelper.SendMiniAppMessage(exp.open_id.Trim(), "感谢您的体验，特赠送一张9折购物券，详情请点击查看。",
-                "pages/mine/ticket/ticket_list", "gltv7fpLtJQg_sTpVwzJYy4Pi7apYNR6cg-P5jG6lWdcdcbyHRoSLgMz3BirNQNm", sessionKey);
+            
 
+            ServiceMessageController messageHelper = new ServiceMessageController(_context, _originConfig);
+            //await messageHelper.SendMiniAppMessage(openId, "感谢您的体验，特赠送一张9折购物券，详情请点击查看。",
+            //    "pages/mine/ticket/ticket_list", "gltv7fpLtJQg_sTpVwzJYy4Pi7apYNR6cg-P5jG6lWdcdcbyHRoSLgMz3BirNQNm", sessionKey);
+
+            double paidAmount = Math.Round(exp.guarantee_cash - exp.refund_amount, 2);
+
+            string paidAmountStr = "¥" + (((int)(100 * paidAmount)) / 100 == (int)paidAmount ? paidAmount.ToString() + ".00" : paidAmount.ToString());
+
+            await messageHelper.SendTemplateMessage(order.open_id, "zk6Bde8PolaoPQVLytFZRhKIYux3uHABpzK9Oqy_lfk",
+                "感谢您参与易龙雪聚体验活动，特赠送一张9折购物券。", "¥" + paidAmountStr + "|¥" + paidAmountStr + "|¥0.00|" + order.pay_method.Trim() + "|9折购物券",
+                "点击下面👇公众号菜单查看", "", sessionKey);
 
             return ticket;
 
