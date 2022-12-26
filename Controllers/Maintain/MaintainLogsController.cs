@@ -154,7 +154,7 @@ namespace SnowmeetApi.Controllers.Maintain
                                     code = ticket.code,
                                     sender_open_id = user.miniAppOpenId,
                                     accepter_open_id = order.open_id.Trim(),
-                                    memo = "养护订单获得，ID:" + order.id.ToString(),
+                                    memo = "养护订单获得，ID:" + task.id.ToString(),
                                     transact_time = DateTime.Now
                                 };
                                 await _context.AddAsync(tLog);
