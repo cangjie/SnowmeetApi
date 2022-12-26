@@ -762,7 +762,8 @@ namespace SnowmeetApi.Controllers
 
             if (user.isAdmin
                 || orderOnline.open_id.Trim().Equals(user.officialAccountOpenId.Trim())
-                || orderOnline.open_id.Trim().Equals(user.miniAppOpenId.Trim()))
+                || orderOnline.open_id.Trim().Equals(user.miniAppOpenId.Trim())
+                || orderOnline.open_id.Trim().Equals(""))
             {
                 if (!user.isAdmin)
                 {
