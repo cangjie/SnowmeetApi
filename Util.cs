@@ -22,6 +22,13 @@ namespace SnowmeetApi
             return time;
         }
 
+        public static string GetMoneyStr(double amount)
+        {
+            return (int)(amount * 100) == ((int)amount) * 100 ?
+                "¥" + ((int)amount).ToString() + ".00"
+                : "¥" + Math.Round(amount, 2).ToString();
+        }
+
        
 
         public static string GetRandomCode(int digit)

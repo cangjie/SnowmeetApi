@@ -10,6 +10,7 @@ using SnowmeetApi.Data;
 using SnowmeetApi.Models.Maintain;
 using SnowmeetApi.Models.Users;
 using SnowmeetApi.Models;
+using SnowmeetApi.Models.Ticket;
 
 namespace SnowmeetApi.Controllers.Maintain
 {
@@ -119,6 +120,69 @@ namespace SnowmeetApi.Controllers.Maintain
             _context.Entry(log).State = EntityState.Modified;
             await _context.SaveChangesAsync();
             log.staffName = user.miniAppUser.real_name.Trim();
+
+            try
+            {
+
+                int taskId = log.task_id;
+
+                if (taskId > 0)
+                {
+                    var ticketLogList = await _context.ticketLog.Where(log => log.memo.IndexOf("养护订单获得，ID:" + taskId.ToString()) >= 0).ToListAsync();
+                    if (ticketLogList == null || ticketLogList.Count == 0)
+                    {
+                        
+
+                        MaintainLive task = await _context.MaintainLives.FindAsync(taskId);
+                        if (task != null)
+                        {
+                            OrderOnlinesController orderHelper = new OrderOnlinesController(_context, _originConfig);
+                            OrderOnline order = (await orderHelper.GetWholeOrderByStaff(task.order_id, sessionKey)).Value;
+                            if (order != null)
+                            {
+                                TicketController ticketHelper = new TicketController(_context, _originConfig);
+                                Ticket ticket = (await ticketHelper.GenerateTickets(8, 1, sessionKey, "养护订单")).Value[0];
+                                if (ticket == null)
+                                {
+                                    return BadRequest();
+                                }
+                                ticket.open_id = order.open_id.Trim();
+                                _context.Entry(ticket).State = EntityState.Modified;
+                                await _context.SaveChangesAsync();
+                                TicketLog tLog = new TicketLog()
+                                {
+                                    code = ticket.code,
+                                    sender_open_id = user.miniAppOpenId,
+                                    accepter_open_id = order.open_id.Trim(),
+                                    memo = "养护订单获得，ID:" + order.id.ToString(),
+                                    transact_time = DateTime.Now
+                                };
+                                await _context.AddAsync(tLog);
+                                await _context.SaveChangesAsync();
+
+                                double paidAmount = order.paidAmount;
+                                double orderPrice = order.order_price;
+
+                                ServiceMessageController messageHelper = new ServiceMessageController(_context, _originConfig);
+
+                                await messageHelper.SendTemplateMessage(order.open_id, "zk6Bde8PolaoPQVLytFZRhKIYux3uHABpzK9Oqy_lfk",
+                                    "感谢您在易龙雪聚养护装备，特赠送一张养护券。", "" + Util.GetMoneyStr(orderPrice) + "|" + Util.GetMoneyStr(paidAmount)
+                                    + "|" + Util.GetMoneyStr(orderPrice - paidAmount) + "|" + order.pay_method.Trim() + "|养护券",
+                                    "点击下面👇公众号菜单查看", "", sessionKey);
+                            }
+                            
+
+
+
+                        }
+                    }
+                }
+            }
+            catch
+            {
+
+            }
+
             return log;
         }
 
