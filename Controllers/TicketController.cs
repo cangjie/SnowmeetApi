@@ -57,6 +57,69 @@ namespace SnowmeetApi.Controllers
             
         }
 
+        [HttpGet("{code}")]
+        public async Task<ActionResult<Ticket>> SetTicketToShare(string code, string sessionKey)
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+
+            Ticket ticket = await _context.Ticket.FindAsync(code);
+            if (ticket == null || !ticket.open_id.Trim().Equals(user.miniAppOpenId.Trim()))
+            {
+                return NotFound();
+            }
+            ticket.shared = 1;
+            ticket.shared_time = DateTime.Now;
+
+            _context.Entry(ticket).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
+
+            ticket.open_id = "";
+
+            return Ok(ticket);
+        }
+
+        [HttpGet("{code}")]
+        public async Task<ActionResult<Ticket>> AcceptTicket(string code, string memo, string sessionKey)
+        {
+            memo = Util.UrlDecode(memo).Trim();
+            sessionKey = Util.UrlDecode(sessionKey);
+
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+
+            Ticket ticket = await _context.Ticket.FindAsync(code);
+
+            if (ticket.shared != 1)
+            {
+                return NotFound();
+            }
+
+            TicketLog log = new TicketLog()
+            {
+                code = ticket.code,
+                sender_open_id = ticket.open_id.Trim(),
+                accepter_open_id = user.miniAppOpenId.Trim(),
+                memo = memo,
+                transact_time = DateTime.Now
+            };
+            await _context.AddAsync(log);
+            await _context.SaveChangesAsync();
+
+            ticket.open_id = user.miniAppOpenId.Trim();
+
+            _context.Entry(ticket).State = EntityState.Modified;
+
+            await _context.SaveChangesAsync();
+
+            ticket.open_id = "";
+
+            return Ok(ticket);
+
+
+
+        }
+
         // GET: api/Ticket/5
         [HttpGet("{code}")]
         public async Task<ActionResult<Ticket>> GetTicket(string code)
@@ -67,6 +130,8 @@ namespace SnowmeetApi.Controllers
             {
                 return NotFound();
             }
+
+            ticket.open_id = "";
 
             return ticket;
         }
