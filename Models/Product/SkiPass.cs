@@ -76,6 +76,14 @@ namespace SnowmeetApi.Models.Product
                 }
 				
 			}
+
+			if (date >= DateTime.Parse("2022-12-31") && date <= DateTime.Parse("2023-1-1"))
+			{
+				if (tags.IndexOf("节假日") <= 0)
+				{
+					valid = false;
+				}
+			}
 			
 
 			return valid;
