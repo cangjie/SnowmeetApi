@@ -96,7 +96,17 @@ namespace SnowmeetApi.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<object>>> GetSkiPassProduct(string resort, DateTime date, string tags)
         {
+
+            if (date >= DateTime.Parse("2022-12-31") && date <= DateTime.Parse("2023-1-2"))
+            {
+                tags = "节假日";
+            }
+
+
             string[] tagArr = tags == null ? new string[] { } : Util.UrlDecode(tags.Trim()).Split(',');
+
+            
+
 
             var skiPassProdustList = await _context.Product.Where(p => (p.shop.Trim().Equals(resort.Trim()) && p.hidden == 0))
                 .Join(_context.SkiPass, p => p.id, s => s.product_id,
