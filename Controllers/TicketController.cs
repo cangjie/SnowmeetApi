@@ -143,6 +143,14 @@ namespace SnowmeetApi.Controllers
             sessionKey = Util.UrlDecode(sessionKey);
             channel = Util.UrlDecode(channel);
             UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+
+            var tList = await _context.Ticket.Where(t => (t.template_id == templateId
+                && t.open_id.Trim().Equals(user.miniAppOpenId)
+                && t.used == 0 && t.create_date >= DateTime.Parse("2023-1-1"))).ToListAsync();
+            if (tList.Count > 0)
+            {
+                return BadRequest();
+            }
             
             int retryTimes = 0;
             bool isDuplicate = true;
