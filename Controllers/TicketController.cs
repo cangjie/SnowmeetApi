@@ -146,7 +146,7 @@ namespace SnowmeetApi.Controllers
 
             var tList = await _context.Ticket.Where(t => (t.template_id == templateId
                 && t.open_id.Trim().Equals(user.miniAppOpenId)
-                && t.used == 0 && t.create_date >= DateTime.Parse("2023-1-1"))).ToListAsync();
+                && t.used == 0 )).ToListAsync();
             if (tList.Count > 0)
             {
                 return BadRequest();
