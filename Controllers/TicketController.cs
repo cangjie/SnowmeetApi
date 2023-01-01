@@ -136,6 +136,56 @@ namespace SnowmeetApi.Controllers
             return ticket;
         }
 
+
+        [HttpGet("{templateId}")]
+        public async Task<ActionResult<Ticket>> GenerateTicketsByUser(int templateId, string sessionKey, string channel = "")
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            channel = Util.UrlDecode(channel);
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            
+            int retryTimes = 0;
+            bool isDuplicate = true;
+            string code = Util.GetRandomCode(9);
+            for (; isDuplicate && retryTimes < 1000;)
+            {
+                isDuplicate = _context.Card.Any(e => e.card_no == code);
+            }
+
+            if (isDuplicate)
+            {
+                return NoContent();
+            }
+
+            TicketTemplate template = await _context.TicketTemplate.FindAsync(templateId);
+
+            Card card = new Card
+            {
+                card_no = code,
+                is_ticket = 1,
+                type = ""
+            };
+            await _context.Card.AddAsync(card);
+            await _context.SaveChangesAsync();
+            Ticket ticket = new Ticket
+            {
+                code = code,
+                template_id = templateId,
+                name = template.name.Trim(),
+                memo = template.memo.Trim(),
+                oper_open_id = user.miniAppOpenId.Trim(),
+                printed = 0,
+                used = 0,
+                miniapp_recept_path = template.miniapp_recept_path.Trim(),
+                open_id = user.miniAppOpenId.Trim(),
+                create_date = DateTime.Now,
+                channel = channel.Trim()
+
+            };
+            await _context.Ticket.AddAsync(ticket);
+            return Ok(ticket);
+        }
+
         [HttpGet("{templateId}")]
         public async Task<ActionResult<Ticket[]>> GenerateTickets(int templateId, int count, string sessionKey, string channel = "")
         {
