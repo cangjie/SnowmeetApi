@@ -183,6 +183,7 @@ namespace SnowmeetApi.Controllers
 
             };
             await _context.Ticket.AddAsync(ticket);
+            await _context.SaveChangesAsync();
             return Ok(ticket);
         }
 
