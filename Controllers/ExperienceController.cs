@@ -36,7 +36,8 @@ namespace SnowmeetApi.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Experience>>> GetExperiencesTemp(string sessionKey)
         {
-            DateTime currentSeasonStartDate = DateTime.Parse("2022-10-1");
+            //DateTime currentSeasonStartDate = DateTime.Parse("2022-10-1");
+            DateTime currentSeasonStartDate = DateTime.Now.AddDays(-7);
             var expList = await _context.Experience.Where(e => (e.create_date >= currentSeasonStartDate) )
                 .OrderByDescending(e => e.id).ToListAsync();
             OrderOnlinesController orderHelper = new OrderOnlinesController(_context, _originConfig);
