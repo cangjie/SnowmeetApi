@@ -115,6 +115,7 @@ namespace SnowmeetApi.Controllers
                     p.name,
                     p.sale_price,
                     p.deposit,
+                    p.sort,
                     s.product_id,
                     s.resort,
                     s.end_sale_time,
@@ -124,7 +125,7 @@ namespace SnowmeetApi.Controllers
                     s.tags
                 })
 
-                .OrderBy(p => p.sale_price).ToListAsync();
+                .OrderBy(p => p.sort).ToListAsync();
 
 
             for (int i = 0; i < skiPassProdustList.Count; i++)
