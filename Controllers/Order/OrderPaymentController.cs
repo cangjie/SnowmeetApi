@@ -148,7 +148,7 @@ namespace SnowmeetApi.Controllers.Order
             await _context.SaveChangesAsync();
 
             string notifyUrl = "https://mini.snowmeet.top/core/OrderPayment/TenpayPaymentCallBack/" + mchid.ToString();
-            string? outTradeNo = payment.out_trade_no.Trim();
+            string? outTradeNo = payment.out_trade_no;
             if (outTradeNo == null || outTradeNo.Length != 20)
             { 
                 outTradeNo = order.id.ToString().PadLeft(6, '0') + payment.id.ToString().PadLeft(2, '0') + timeStamp.Substring(3, 10);
