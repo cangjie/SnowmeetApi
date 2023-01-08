@@ -373,7 +373,7 @@ namespace SnowmeetApi.Controllers
             string paidAmountStr = "¥" + ( ((int)(paidAmount*100)) == ((int)paidAmount) * 100  ? paidAmount.ToString() + ".00" : paidAmount.ToString());
 
             await messageHelper.SendTemplateMessage(order.open_id, "zk6Bde8PolaoPQVLytFZRhKIYux3uHABpzK9Oqy_lfk",
-                "感谢您参与易龙雪聚体验活动，特赠送一张9折购物券。", "" + paidAmountStr + "|" + paidAmountStr + "|¥0.00|" + order.pay_method.Trim() + "|9折购物券",
+                "感谢您参与易龙雪聚体验活动，特赠送一张100元代金券。", "" + paidAmountStr + "|" + paidAmountStr + "|¥0.00|" + order.pay_method.Trim() + "|9折购物券",
                 "点击下面👇公众号菜单查看", "", sessionKey);
 
             return ticket;
