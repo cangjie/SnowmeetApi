@@ -148,7 +148,12 @@ namespace SnowmeetApi.Controllers.Order
             await _context.SaveChangesAsync();
 
             string notifyUrl = "https://mini.snowmeet.top/core/OrderPayment/TenpayPaymentCallBack/" + mchid.ToString();
-            string outTradeNo = order.id.ToString().PadLeft(6, '0') + payment.id.ToString().PadLeft(2, '0') + timeStamp.Substring(3, 10);
+            string? outTradeNo = payment.out_trade_no;
+            if (outTradeNo == null || outTradeNo.Length != 20)
+            { 
+                outTradeNo = order.id.ToString().PadLeft(6, '0') + payment.id.ToString().PadLeft(2, '0') + timeStamp.Substring(3, 10);
+            }
+             //order.id.ToString().PadLeft(6, '0') + payment.id.ToString().PadLeft(2, '0') + timeStamp.Substring(3, 10);
             var client = new WechatTenpayClient(options);
             var request = new CreatePayTransactionJsapiRequest()
             {
@@ -179,7 +184,7 @@ namespace SnowmeetApi.Controllers.Order
 
                 };
 
-                payment.out_trade_no = order.id.ToString().PadLeft(6, '0') + payment.id.ToString().PadLeft(2, '0') + timeStamp;
+                //payment.out_trade_no = order.id.ToString().PadLeft(6, '0') + payment.id.ToString().PadLeft(2, '0') + timeStamp;
                 payment.mch_id = mchid;
                 payment.open_id = user.miniAppOpenId.Trim();
                 payment.app_id = _appId;
@@ -191,8 +196,6 @@ namespace SnowmeetApi.Controllers.Order
                 payment.timestamp = set.timeStamp.Trim();
                 _context.Entry(payment).State = EntityState.Modified;
                 await _context.SaveChangesAsync();
-
-
                 return set;
             }
             return BadRequest();
