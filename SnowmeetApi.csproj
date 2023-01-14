@@ -31,6 +31,7 @@
     <None Remove="upload\" />
     <None Remove="Microsoft.Extensions.FileSystemGlobbing" />
     <None Remove="Microsoft.EntityFrameworkCore.Tools" />
+    <None Remove="Models\Rent\" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="SKIT.FlurlHttpClient.Wechat.TenpayV3" Version="2.13.1" />
@@ -64,6 +65,7 @@
     <Folder Include="wwwroot\background\mi7_upload\" />
     <Folder Include="upload\" />
     <Folder Include="wwwroot\css\" />
+    <Folder Include="Models\Rent\" />
   </ItemGroup>
   <ItemGroup>
     <Content Remove="wwwroot\upload\" />
