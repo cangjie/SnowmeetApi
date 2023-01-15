@@ -17,13 +17,15 @@ namespace SnowmeetApi.Models.Rent
 
         public string shop { get; set; }
 
-        public string order_id { get; set; }
+        public int order_id { get; set; }
 
         public double deposit { get; set; }
 
+        public double deposit_real { get; set; }
+
         public double deposit_reduce { get; set; }
 
-        public double deposit_reduce_ticket { get; set; }
+        public double deposit_reduce_ticket { get; set; } = 0;
 
         public double deposit_final { get; set; }
 
@@ -31,9 +33,11 @@ namespace SnowmeetApi.Models.Rent
 
         public DateTime due_end_date { get; set; }
 
-        public DateTime end_date { get; set; }
+        public DateTime? end_date { get; set; }
 
         public double rental { get; set; }
+
+        public double rental_real { get; set; }
 
         public double rental_reduce { get; set; }
 
@@ -45,16 +49,20 @@ namespace SnowmeetApi.Models.Rent
 
         public int has_guarantee_credit { get; set; }
 
-        public string guarantee_credit_name { get; set; }
-
         public string guarantee_credit_photos { get; set; }
 
         public string memo { get; set; }
 
-        public double refund { get; set; }
+        public string pay_option { get; set; }
 
         [NotMapped]
         public RentOrderDetail[] details {get; set;}
+
+        [NotMapped]
+        public string payMethod { get; set; } = "微信支付";
+
+        [NotMapped]
+        public OrderOnline order { get; set; }
 
     }
 }

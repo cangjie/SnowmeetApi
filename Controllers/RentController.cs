@@ -7,7 +7,11 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using SnowmeetApi.Data;
+using SnowmeetApi.Models;
+using SnowmeetApi.Models.Maintain;
+using SnowmeetApi.Models.Order;
 using SnowmeetApi.Models.Rent;
+using SnowmeetApi.Models.Users;
 
 namespace SnowmeetApi.Controllers
 {
@@ -25,12 +29,15 @@ namespace SnowmeetApi.Controllers
 
         private IConfiguration _oriConfig;
 
-        public RentController(ApplicationDBContext context, IConfiguration config)
+        private readonly IHttpContextAccessor _httpContextAccessor;
+
+        public RentController(ApplicationDBContext context, IConfiguration config, IHttpContextAccessor httpContextAccessor)
         {
             _context = context;
             _oriConfig = config;
             _config = config.GetSection("Settings");
             _appId = _config.GetSection("AppId").Value.Trim();
+            _httpContextAccessor = httpContextAccessor;
         }
 
         [HttpGet("{code}")]
@@ -50,9 +57,75 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpPost]
-        public async Task<ActionResult<RentOrder>> Recept(string sessionKey, RentOrder order)
+        public async Task<ActionResult<RentOrder>> Recept([FromQuery]string sessionKey, [FromBody]RentOrder rentOrder)
         {
-            return NotFound();
+            sessionKey = Util.UrlDecode(sessionKey).Trim();
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            if (!user.isAdmin)
+            {
+                return BadRequest();
+            }
+
+            int orderId = 0;
+
+            if (rentOrder.deposit_final >0)
+            {
+                OrderOnline order = new OrderOnline()
+                {
+                    id = 0,
+                    type = "押金",
+                    shop = rentOrder.shop.Trim(),
+                    open_id = rentOrder.open_id.Trim(),
+                    name = rentOrder.real_name.Trim(),
+                    cell_number = rentOrder.cell_number.Trim(),
+                    pay_method = rentOrder.payMethod.Trim(),
+                    pay_memo = "",
+                    pay_state = 0,
+                    order_price = rentOrder.deposit,
+                    order_real_pay_price = rentOrder.deposit_final,
+                    ticket_amount = 0,
+                    other_discount = 0,
+                    final_price = rentOrder.deposit_final,
+                    ticket_code = rentOrder.ticket_code.Trim(),
+                    staff_open_id = user.miniAppOpenId.Trim(),
+                    score_rate = 0,
+                    generate_score = 0
+
+                };
+                await _context.AddAsync(order);
+                await _context.SaveChangesAsync();
+
+                OrderPayment payment = new OrderPayment()
+                {
+                    order_id = order.id,
+                    pay_method = order.pay_method.Trim(),
+                    amount = order.final_price,
+                    status = "待支付",
+                    staff_open_id = user.miniAppOpenId.Trim()
+                };
+                await _context.OrderPayment.AddAsync(payment);
+                await _context.SaveChangesAsync();
+                orderId = order.id;
+            }
+            rentOrder.order_id = orderId;
+
+            await _context.RentOrder.AddAsync(rentOrder);
+            await _context.SaveChangesAsync();
+
+            for (int i = 0; i < rentOrder.details.Length; i++)
+            {
+                RentOrderDetail detail = rentOrder.details[i];
+                detail.rent_list_id = rentOrder.id;
+                await _context.RentOrderDetail.AddAsync(detail);
+                await _context.SaveChangesAsync();
+            }
+
+            OrderOnlinesController orderHelper = new OrderOnlinesController(_context, _oriConfig);
+            OrderOnline newOrder = (await orderHelper.GetWholeOrderByStaff(orderId, sessionKey)).Value;
+
+            rentOrder.order = newOrder;
+
+            return rentOrder;
         }
 
         /*
