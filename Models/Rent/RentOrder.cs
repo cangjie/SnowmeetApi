@@ -64,6 +64,45 @@ namespace SnowmeetApi.Models.Rent
         [NotMapped]
         public OrderOnline order { get; set; }
 
+        [NotMapped]
+        public string status
+        {
+            get
+            {
+                string s = "未支付";
+                if (order_id == 0)
+                {
+                    s = "免押金";
+                }
+                else if (order != null && order.pay_state == 1)
+                {
+                    s = "已付押金";
+                }
+                else
+                {
+                    s = "未支付";
+                }
+                bool finish = true;
+                for (int i = 0; i < details.Length; i++)
+                {
+                    if (details[i].real_end_date == null)
+                    {
+                        finish = false;
+                        break;
+                    }
+                }
+                if (finish)
+                {
+                    s = "全部归还";
+                    if (order.refunds != null && order.refunds.Length > 0)
+                    {
+                        s = "已退款";
+                    }
+                }
+                return s;
+            }
+        }
+
     }
 }
 

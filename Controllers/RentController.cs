@@ -128,6 +128,47 @@ namespace SnowmeetApi.Controllers
             return rentOrder;
         }
 
+        [HttpGet]
+        public async Task<ActionResult<RentOrder[]>> GetRentOrderListByStaff(
+            DateTime start, DateTime end, string status, string sessionKey)
+        {
+            OrderOnlinesController orderHelper = new OrderOnlinesController(_context, _oriConfig);
+
+
+            sessionKey = Util.UrlDecode(sessionKey).Trim();
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            if (!user.isAdmin)
+            {
+                return BadRequest();
+            }
+            RentOrder[] orderArr = await _context.RentOrder
+                .Where(o => (o.start_date >= start && o.start_date <= end)).ToArrayAsync();
+            for (int i = 0; i < orderArr.Length; i++)
+            {
+                RentOrder order = orderArr[i];
+                order.details = await _context.RentOrderDetail.Where(d => d.rent_list_id == order.id).ToArrayAsync();
+                order.order = (await orderHelper.GetWholeOrderByStaff(order.order_id, sessionKey)).Value;
+                orderArr[i] = order;
+            }
+            if (status == null)
+            {
+                return Ok(orderArr);
+            }
+            else
+            {
+                List<RentOrder> newArr = new List<RentOrder>();
+                for (int i = 0; i < orderArr.Length; i++)
+                {
+                    if (orderArr[i].status.Trim().Equals(status))
+                    {
+                        newArr.Add(orderArr[i]);
+                    }
+                }
+                return Ok(newArr.ToArray());
+            }
+
+        }
+
         /*
 
         // GET: api/Rent
