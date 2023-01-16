@@ -129,12 +129,19 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<RentOrder[]>> GetRentOrderListByStaff(
+        public async Task<ActionResult<RentOrder[]>> GetRentOrderListByStaff(string shop,
             DateTime start, DateTime end, string status, string sessionKey)
         {
             OrderOnlinesController orderHelper = new OrderOnlinesController(_context, _oriConfig);
-
-
+            if (shop == null)
+            {
+                shop = "";
+            }
+            if (status != null)
+            {
+                status = Util.UrlDecode(status.Trim());
+            }
+            shop = Util.UrlDecode(shop.Trim());
             sessionKey = Util.UrlDecode(sessionKey).Trim();
             UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
             if (!user.isAdmin)
@@ -142,7 +149,7 @@ namespace SnowmeetApi.Controllers
                 return BadRequest();
             }
             RentOrder[] orderArr = await _context.RentOrder
-                .Where(o => (o.start_date >= start && o.start_date <= end)).ToArrayAsync();
+                .Where(o => (o.start_date >= start && o.start_date <= end  && (shop.Trim().Equals("") || o.shop.Trim().Equals(shop)))).ToArrayAsync();
             for (int i = 0; i < orderArr.Length; i++)
             {
                 RentOrder order = orderArr[i];
