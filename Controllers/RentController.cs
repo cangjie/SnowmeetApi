@@ -216,23 +216,29 @@ namespace SnowmeetApi.Controllers
                 {
                     case "南山":
                         TimeSpan ts = nowDate - rentOrder.start_date;
+                        
                         if (ts.Hours < 4)
                         {
                             detail._suggestRental = detail.unit_rental;
+                            detail._timeLength = "1场";
                         }
                         else if (nowDate.Hour > 8)
                         {
                             detail._suggestRental = detail.unit_rental * 1.5;
+                            detail._timeLength = "1.5场";
                         }
                         else
                         {
                             detail._suggestRental = detail.unit_rental;
+                            detail._timeLength = "1场";
                         }
+                        
                         break;
                     default:
                         TimeSpan ts1 = nowDate - rentOrder.start_date;
                         int days = ts1.Days == 0 ? 1 : ts1.Days;
                         detail._suggestRental = detail.unit_rental;
+                        detail._timeLength = days.ToString() + "天";
                         break;
                 }
             }

@@ -50,7 +50,15 @@ namespace SnowmeetApi.Models.Rent
             }
         }
 
-        public string timeLength = "";
+        [NotMapped]
+        public string timeLength
+        {
+            get
+            {
+                return _timeLength;
+            }
+        }
+        public string _timeLength = "";
 
         public double _suggestRental = 0;
 
