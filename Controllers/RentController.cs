@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Org.BouncyCastle.Asn1.X509;
 using SnowmeetApi.Data;
 using SnowmeetApi.Models;
 using SnowmeetApi.Models.Maintain;
@@ -173,6 +174,41 @@ namespace SnowmeetApi.Controllers
                 }
                 return Ok(newArr.ToArray());
             }
+
+        }
+
+        [HttpGet("{id}")]
+        public async Task<ActionResult<RentOrder>> GetRentOrder(int id, string sessionKey)
+        {
+            sessionKey = Util.UrlDecode(sessionKey).Trim();
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+
+            RentOrder rentOrder = await _context.RentOrder.FindAsync(id);
+            if (rentOrder == null)
+            {
+                return NotFound();
+            }
+            if (!user.isAdmin && !rentOrder.open_id.Trim().Equals(user.miniAppOpenId.Trim()))
+            {
+                return BadRequest();
+            }
+            rentOrder.details = await _context.RentOrderDetail
+                .Where(d => d.rent_list_id == rentOrder.id).ToArrayAsync();
+            if (rentOrder.order_id > 0)
+            {
+                OrderOnlinesController orderHelper = new OrderOnlinesController(_context, _oriConfig);
+                rentOrder.order = (await orderHelper.GetWholeOrderByStaff(rentOrder.order_id, sessionKey)).Value;
+            }
+
+            if (!user.isAdmin)
+            {
+                rentOrder.open_id = "";
+                if (rentOrder.order != null)
+                {
+                    rentOrder.order.open_id = "";
+                }
+            }
+            return rentOrder;
 
         }
 
