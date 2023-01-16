@@ -208,6 +208,35 @@ namespace SnowmeetApi.Controllers
                     rentOrder.order.open_id = "";
                 }
             }
+            DateTime nowDate = DateTime.Now;
+            for (int i = 0; i < rentOrder.details.Length; i++)
+            {
+                RentOrderDetail detail = rentOrder.details[i];
+                switch (rentOrder.shop.Trim())
+                {
+                    case "南山":
+                        TimeSpan ts = nowDate - rentOrder.start_date;
+                        if (ts.Hours < 4)
+                        {
+                            detail._suggestRental = detail.unit_rental;
+                        }
+                        else if (nowDate.Hour > 8)
+                        {
+                            detail._suggestRental = detail.unit_rental * 1.5;
+                        }
+                        else
+                        {
+                            detail._suggestRental = detail.unit_rental;
+                        }
+                        break;
+                    default:
+                        TimeSpan ts1 = nowDate - rentOrder.start_date;
+                        int days = ts1.Days == 0 ? 1 : ts1.Days;
+                        detail._suggestRental = detail.unit_rental;
+                        break;
+                }
+            }
+
             return rentOrder;
 
         }

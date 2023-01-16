@@ -26,6 +26,34 @@ namespace SnowmeetApi.Models.Rent
 
 	    public string memo { get; set; }
 
+        [NotMapped]
+        public string status
+        {
+            get
+            {
+                if (real_end_date == null)
+                {
+                    return "未归还";
+                }
+                else
+                {
+                    return "已归还";
+                }
+            }
+        }
+        [NotMapped]
+        public double suggestRental
+        {
+            get
+            {
+                return _suggestRental;
+            }
+        }
+
+        public string timeLength = "";
+
+        public double _suggestRental = 0;
+
     }
 }
 
