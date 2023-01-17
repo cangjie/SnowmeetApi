@@ -249,9 +249,10 @@ namespace SnowmeetApi.Controllers
 
         [HttpGet("{id}")]
         public async Task<ActionResult<RentOrderDetail>> SetReturn(int id,
-            float rental, DateTime returnDate, string sessionKey)
+            float rental, DateTime returnDate, string memo, string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey).Trim();
+            memo = Util.UrlDecode(memo);
             UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
             if (!user.isAdmin)
             {
@@ -260,6 +261,7 @@ namespace SnowmeetApi.Controllers
             RentOrderDetail detail = await _context.RentOrderDetail.FindAsync(id);
             detail.real_end_date = returnDate;
             detail.real_rental = rental;
+            detail.memo = memo.Trim();
             _context.Entry(detail).State = EntityState.Modified;
             await _context.SaveChangesAsync();
 
