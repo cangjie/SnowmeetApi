@@ -243,8 +243,27 @@ namespace SnowmeetApi.Controllers
                 }
             }
 
-            return rentOrder;
+            return Ok(rentOrder);
 
+        }
+
+        [HttpGet("{id}")]
+        public async Task<ActionResult<RentOrderDetail>> SetReturn(int id,
+            float rental, DateTime returnDate, string sessionKey)
+        {
+            sessionKey = Util.UrlDecode(sessionKey).Trim();
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            if (user.isAdmin)
+            {
+                return BadRequest();
+            }
+            RentOrderDetail detail = await _context.RentOrderDetail.FindAsync(id);
+            detail.real_end_date = returnDate;
+            detail.real_rental = rental;
+            _context.Entry(detail).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
+
+            return Ok(detail);
         }
 
         /*
