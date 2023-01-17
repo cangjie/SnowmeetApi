@@ -289,6 +289,7 @@ namespace SnowmeetApi.Controllers
             }
             rentOrder.memo = memo;
             rentOrder.refund = amount;
+            rentOrder.end_date = DateTime.Now;
             _context.Entry(rentOrder).State = EntityState.Modified;
             await _context.SaveChangesAsync();
 
