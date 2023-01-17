@@ -19,6 +19,7 @@ using SnowmeetApi.Models.Users;
 //using SnowmeetApi.Controllers.WepayOrderController;
 using System.IO;
 using System.Net.Http.Headers;
+using SnowmeetApi.Models.Rent;
 
 namespace SnowmeetApi.Controllers.Order
 {
@@ -394,6 +395,17 @@ namespace SnowmeetApi.Controllers.Order
                 case "雪票":
                     SkiPassController skiPassHelper = new SkiPassController(_context, _originConfig);
                     await skiPassHelper.CreateSkiPass(order);
+                    break;
+                case "押金":
+                    List<RentOrder> rentOrderList = await _context.RentOrder
+                        .Where(o => o.order_id == order.id).OrderByDescending(o => o.id).ToListAsync();
+                    if (rentOrderList != null && rentOrderList.Count > 0)
+                    {
+                        RentOrder rentOrder = rentOrderList[0];
+                        rentOrder.open_id = order.open_id;
+                        _context.Entry(rentOrder);
+                        await _context.SaveChangesAsync();
+                    }
                     break;
                 default:
                     break;
