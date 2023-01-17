@@ -242,8 +242,8 @@ namespace SnowmeetApi.Controllers
                         break;
                 }
             }
-
-            return Ok(rentOrder);
+            var ret = Ok(rentOrder);
+            return ret;
 
         }
 
@@ -268,6 +268,46 @@ namespace SnowmeetApi.Controllers
             return Ok(detail);
         }
 
+        [HttpGet("id")]
+        public async Task<ActionResult<RentOrder>> Refund(int id, double amount,
+            string memo, string sessionKey)
+        {
+            
+            RentOrder rentOrder = (RentOrder)((OkObjectResult)(await GetRentOrder(id, sessionKey)).Result).Value;
+            if (rentOrder == null)
+            {
+                return NotFound();
+            }
+
+            memo = Util.UrlDecode(memo);
+            sessionKey = Util.UrlDecode(sessionKey);
+
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            if (!user.isAdmin)
+            {
+                return BadRequest();
+            }
+            rentOrder.memo = memo;
+            rentOrder.refund = amount;
+            _context.Entry(rentOrder).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
+
+            if (amount > 0 && rentOrder.order_id > 0 && rentOrder.order != null && rentOrder.order.pay_method.Trim().Equals("微信支付")
+                && rentOrder.order.payments != null && rentOrder.order.payments.Length > 0)
+            {
+                OrderPayment payment = rentOrder.order.payments[0];
+                Order.OrderRefundController refundHelper = new Order.OrderRefundController(
+                    _context, _oriConfig, _httpContextAccessor);
+                if (payment.amount >= amount)
+                {
+                    await refundHelper.TenpayRefund(payment.id, amount, sessionKey);
+                }
+            }
+
+            return Ok(rentOrder);
+
+
+        }
         /*
 
         // GET: api/Rent
