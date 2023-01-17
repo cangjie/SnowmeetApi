@@ -268,7 +268,7 @@ namespace SnowmeetApi.Controllers
             return Ok(detail);
         }
 
-        [HttpGet("id")]
+        [HttpGet("{id}")]
         public async Task<ActionResult<RentOrder>> Refund(int id, double amount,
             string memo, string sessionKey)
         {
