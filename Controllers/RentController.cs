@@ -309,6 +309,34 @@ namespace SnowmeetApi.Controllers
 
 
         }
+
+        [HttpGet("{id}")]
+        public async Task<ActionResult<RentOrder>>SetPaid(int id, string sessionKey)
+        {
+            RentOrder rentOrder = (RentOrder)((OkObjectResult)(await GetRentOrder(id, sessionKey)).Result).Value;
+            sessionKey = Util.UrlDecode(sessionKey);
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            if (!user.isAdmin)
+            {
+                return BadRequest();
+            }
+
+            if (rentOrder == null || rentOrder.order == null
+                || rentOrder.order.payments == null || rentOrder.order.payments.Length <= 0)
+            {
+                return NotFound();
+            }
+            OrderPayment payment = rentOrder.order.payments[0];
+            OrderOnline order = rentOrder.order;
+            payment.status = "支付成功";
+            order.pay_state = 1;
+            _context.Entry(payment).State = EntityState.Modified;
+            _context.Entry(order).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
+
+            return Ok(rentOrder);
+        }
+
         /*
 
         // GET: api/Rent
