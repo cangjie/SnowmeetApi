@@ -337,6 +337,41 @@ namespace SnowmeetApi.Controllers
             return Ok(rentOrder);
         }
 
+        [HttpGet("{id}")]
+        public async Task<ActionResult<RentOrder>> Bind(int id, string sessionKey)
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            RentOrder rentOrder = (RentOrder)((OkObjectResult)(await GetRentOrder(id, sessionKey)).Result).Value;
+            if (rentOrder == null)
+            {
+                return NotFound();
+            }
+            if (rentOrder.open_id.Trim().Equals(""))
+            {
+                rentOrder.open_id = user.miniAppOpenId;
+                _context.Entry(rentOrder).State = EntityState.Modified;
+            }
+            if (rentOrder.order != null && rentOrder.open_id.Trim().Equals(""))
+            {
+                OrderOnline order = rentOrder.order;
+                order.open_id = user.miniAppOpenId.Trim();
+                _context.Entry(order).State = EntityState.Modified;
+                if (order.payments != null && order.payments.Length > 0)
+                {
+                    OrderPayment pay = order.payments[0];
+                    if (pay.open_id.Trim().Equals(""))
+                    {
+                        pay.open_id = user.miniAppOpenId.Trim();
+                        _context.Entry(pay).State = EntityState.Modified;
+                    }
+                    
+                }
+            }
+            await _context.SaveChangesAsync();
+            return Ok(rentOrder);
+        }
+
         /*
 
         // GET: api/Rent
