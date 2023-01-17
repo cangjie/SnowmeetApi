@@ -26,6 +26,8 @@ namespace SnowmeetApi.Models.Rent
 
 	    public string memo { get; set; }
 
+        public string images { get; set; }
+
         [NotMapped]
         public string status
         {
