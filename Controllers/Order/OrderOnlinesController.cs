@@ -476,6 +476,9 @@ namespace SnowmeetApi.Controllers
                     }
                 }
                 order.payments = payments;
+
+                var refunds = await _context.OrderPaymentRefund.Where(r => r.order_id == order.id).ToArrayAsync();
+                order.refunds = refunds;
             }
 
             string staffRealName = "";
