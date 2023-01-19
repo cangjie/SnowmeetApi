@@ -77,7 +77,8 @@ namespace SnowmeetApi.Models.Product
 				
 			}
 
-			if (date >= DateTime.Parse("2022-12-31") && date <= DateTime.Parse("2023-1-2"))
+			if ((date >= DateTime.Parse("2022-12-31") && date <= DateTime.Parse("2023-1-2"))
+				|| (date >= DateTime.Parse("2023-1-21") && date <= DateTime.Parse("2023-1-27")))
 			{
 				if (tags.IndexOf("节假日") <= 0)
 				{
@@ -89,6 +90,18 @@ namespace SnowmeetApi.Models.Product
 					valid = true;
 				}
 			}
+			if (date >= DateTime.Parse("2023-1-28") && date <= DateTime.Parse("2023-1-29"))
+			{
+                if (tags.IndexOf("平日") <= 0)
+                {
+                    valid = true;
+                }
+                else
+                {
+
+                    valid = false;
+                }
+            }
 			
 
 			return valid;

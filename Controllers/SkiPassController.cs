@@ -147,8 +147,15 @@ namespace SnowmeetApi.Controllers
                     tags = r.tags
 
                 };
-
-                if (!skiPass.DateMatch(date) || !skiPass.TagMatch(tagArr))
+                if (date >= DateTime.Parse("2023-1-28") && date <= DateTime.Parse("2023-1-29"))
+                {
+                    if (!skiPass.DateMatch(date))
+                    {
+                        skiPassProdustList.RemoveAt(i);
+                        i--;
+                    }
+                }
+                else if (!skiPass.DateMatch(date) || !skiPass.TagMatch(tagArr))
                 {
                     skiPassProdustList.RemoveAt(i);
                     i--;
