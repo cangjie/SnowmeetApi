@@ -97,11 +97,16 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<IEnumerable<object>>> GetSkiPassProduct(string resort, DateTime date, string tags)
         {
 
-            if (date >= DateTime.Parse("2022-12-31") && date <= DateTime.Parse("2023-1-2"))
+            if ((date >= DateTime.Parse("2022-12-31") && date <= DateTime.Parse("2023-1-2") )
+                || (date >= DateTime.Parse("2023-1-21") && date <= DateTime.Parse("2023-1-27")) )
             {
                 tags = "节假日";
             }
 
+            if (date >= DateTime.Parse("2023-1-28") && date <= DateTime.Parse("2023-1-29"))
+            {
+                tags = "平日";
+            }
 
             string[] tagArr = tags == null ? new string[] { } : Util.UrlDecode(tags.Trim()).Split(',');
 
