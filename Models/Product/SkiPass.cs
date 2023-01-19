@@ -92,7 +92,7 @@ namespace SnowmeetApi.Models.Product
 			}
 			if (date >= DateTime.Parse("2023-1-28") && date <= DateTime.Parse("2023-1-29"))
 			{
-                if (tags.IndexOf("平日") <= 0)
+                if (tags.IndexOf("平日") >= 0)
                 {
                     valid = true;
                 }
