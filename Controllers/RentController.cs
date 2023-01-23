@@ -319,7 +319,7 @@ namespace SnowmeetApi.Controllers
 
             memo = Util.UrlDecode(memo);
             sessionKey = Util.UrlDecode(sessionKey);
-
+            amount = Math.Round(amount, 2);
             UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
             if (!user.isAdmin)
             {
@@ -339,7 +339,8 @@ namespace SnowmeetApi.Controllers
                 OrderPayment payment = rentOrder.order.payments[0];
                 Order.OrderRefundController refundHelper = new Order.OrderRefundController(
                     _context, _oriConfig, _httpContextAccessor);
-                if (payment.amount >= amount)
+                double paidAmount = payment.amount;
+                if (paidAmount >= amount)
                 {
                     await refundHelper.TenpayRefund(payment.id, amount, sessionKey);
                 }
