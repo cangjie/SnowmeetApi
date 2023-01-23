@@ -67,7 +67,7 @@ namespace SnowmeetApi.Models.Rent
 
         public string staff_name { get; set; } = "";
 
-        public DateTime create_date { get; set; }
+        public DateTime create_date { get; set; } = DateTime.Now;
 
         
 
