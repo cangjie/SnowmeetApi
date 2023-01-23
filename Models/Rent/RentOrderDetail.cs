@@ -28,6 +28,8 @@ namespace SnowmeetApi.Models.Rent
 
         public string images { get; set; }
 
+        public double reparation { get; set; }
+
         [NotMapped]
         public string status
         {

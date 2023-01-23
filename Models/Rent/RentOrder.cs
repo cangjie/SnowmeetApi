@@ -1,11 +1,17 @@
 ﻿using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Collections;
+using System.Collections.Generic;
+
 namespace SnowmeetApi.Models.Rent
 {
     [Table("rent_list")]
     public class RentOrder
     {
+
+        
+
         [Key]
         public int id { get; set; }
 
@@ -61,6 +67,10 @@ namespace SnowmeetApi.Models.Rent
 
         public string staff_name { get; set; } = "";
 
+        public DateTime create_date { get; set; }
+
+        
+
         [NotMapped]
         public RentOrderDetail[] details {get; set;}
 
@@ -108,6 +118,113 @@ namespace SnowmeetApi.Models.Rent
                 return s;
             }
         }
+
+        [NotMapped]
+        public List<RentalDetail> rentalDetails
+        {
+            get
+            {
+                DateTime startDate = start_date;
+                if (startDate.Hour >= 16)
+                {
+                    startDate = startDate.Date.AddDays(1);
+                }
+                else
+                {
+                    startDate = startDate.Date;
+                }
+                //DateTime endDate = DateTime.Now;
+
+                List<RentalDetail> detailList = new List<RentalDetail>();
+
+
+                for (int i = 0; i < details.Length; i++)
+                {
+                    RentOrderDetail rentOrderDetail = details[i];
+                    DateTime endDate = rentOrderDetail.real_end_date == null ? DateTime.Now : (DateTime)rentOrderDetail.real_end_date;
+                    
+
+                    //夜场
+                    if (startDate.Date == endDate.Date && start_date.Hour >= 16)
+                    {
+                        RentalDetail rentalDetail = new RentalDetail();
+                        rentalDetail.date = startDate.Date;
+                        rentalDetail.item = rentOrderDetail;
+                        rentalDetail.rental = rentOrderDetail.real_rental;
+                        rentalDetail.type = "夜场";
+                        detailList.Add(rentalDetail);
+                    }
+                    //非夜场
+                    else
+                    {
+                        if (endDate.Hour >= 18)
+                        {
+                            endDate = endDate.Date.AddDays(1);
+
+                        }
+                        else
+                        {
+                            endDate = endDate.Date;
+                        }
+                        double totalRental = 0;
+                        for (DateTime d = startDate; d.Date <= endDate.Date; d = d.AddDays(1))
+                        {
+                            RentalDetail rentalDetail = new RentalDetail();
+                            rentalDetail.date = d.Date;
+                            rentalDetail.item = rentOrderDetail;
+
+                            //最后一天
+                            if (rentOrderDetail.real_end_date != null && d.Date == endDate.Date)
+                            {
+                                rentalDetail.type = "结算日";
+                                rentalDetail.rental = rentOrderDetail.real_rental - totalRental;
+                            }
+                            else
+                            {
+                                rentalDetail.type = "";
+                                rentalDetail.rental = rentOrderDetail.unit_rental;
+                                totalRental = rentOrderDetail.unit_rental + totalRental;
+                            }
+                            detailList.Add(rentalDetail);
+                        }
+                    }
+                    
+                }
+
+
+                return detailList;
+            }
+        }
+
+        public string GetPastStatus(DateTime date)
+        {
+            if (date.Date < create_date.Date)
+            {
+                return "";
+            }
+            else
+            {
+                string ret = "";
+                if (this.order != null && this.order.pay_state == 1
+                    && this.order.payments != null && this.order.payments.Length > 0)
+                {
+                    if (this.order.payments[0].create_date.Date >= date.Date)
+                    {
+                        ret = "已付押金";
+                        if (this.order.refunds != null && this.order.refunds.Length > 0)
+                        {
+                            if (this.order.refunds[0].create_date.Date >= date.Date)
+                            {
+                                ret = "已退款";
+                            }
+                        }
+                    }
+                }
+                return ret;
+            }
+        }
+
+        
 
     }
 }

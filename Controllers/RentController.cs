@@ -32,6 +32,40 @@ namespace SnowmeetApi.Controllers
 
         private readonly IHttpContextAccessor _httpContextAccessor;
 
+
+        /*
+        public struct DailyReport
+        {
+            public DateTime date;
+
+            //summary
+            //待退押金
+            public double depositionDueRefund;
+            //待结算租金
+            public double depositionDeuRental;
+            //【当日完结租金】当日租，当日结算
+            public double currentDaySettledRental;
+            //【当日收入总押金】
+            public double currentDayIncomeDeposit;
+            //【非当日租赁退押金】
+            public double pastOrderTodayRefund;
+            //【当日已退押金】
+            public double todayDepositRefund;
+            //【当日未退押金】
+            public double todayDepositUnRefund;
+            //【今日业务总租金】
+            public double todayTotalRental;
+            //【今日业务已结算租金】
+            public double todaySettledRental;
+            //【今日业务待结算资金】
+            public double todayUnSettledRental;
+            //【非今日业务结算租金】
+            public double todaySettledDepositionRental;
+
+        }
+        */
+        
+
         public RentController(ApplicationDBContext context, IConfiguration config, IHttpContextAccessor httpContextAccessor)
         {
             _context = context;
@@ -375,6 +409,34 @@ namespace SnowmeetApi.Controllers
             return Ok(rentOrder);
         }
 
+        
+
+
+        /*
+        [HttpGet]
+        public async Task<ActionResult<DailyReport[]>> GetCurrentSeasonAllRentOrder(string sessionKey, DateTime seasonStart, DateTime currentDate)
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            if (!user.isAdmin)
+            {
+                return BadRequest();
+            }
+            List<RentOrder> orderList = await _context.RentOrder
+                .Where(o => o.create_date.Date >= seasonStart.Date && o.create_date.Date <= currentDate.Date)
+                .ToListAsync();
+
+            for (int i = 0; i < orderList.Count; i++)
+            {
+                orderList[i] = (await GetRentOrder(orderList[i].id, sessionKey)).Value;
+            }
+
+            
+
+
+            return Ok(new DailyReport[] { });
+        }
+        */
         /*
 
         // GET: api/Rent
