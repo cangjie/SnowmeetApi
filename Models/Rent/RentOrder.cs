@@ -57,6 +57,10 @@ namespace SnowmeetApi.Models.Rent
 
         public string pay_option { get; set; }
 
+        public string staff_open_id { get; set; } = "";
+
+        public string staff_name { get; set; } = "";
+
         [NotMapped]
         public RentOrderDetail[] details {get; set;}
 

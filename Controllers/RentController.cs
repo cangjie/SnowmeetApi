@@ -67,6 +67,9 @@ namespace SnowmeetApi.Controllers
                 return BadRequest();
             }
 
+            rentOrder.staff_open_id = user.miniAppOpenId.Trim();
+            rentOrder.staff_name = user.miniAppUser.real_name.Trim();
+
             int orderId = 0;
 
             if (rentOrder.deposit_final >0)
