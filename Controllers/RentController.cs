@@ -308,7 +308,7 @@ namespace SnowmeetApi.Controllers
 
         [HttpGet("{id}")]
         public async Task<ActionResult<RentOrder>> Refund(int id, double amount,
-            string memo, string sessionKey)
+            double rentalReduce, double rentalReduceTicket, string memo, string sessionKey)
         {
             
             RentOrder rentOrder = (RentOrder)((OkObjectResult)(await GetRentOrder(id, sessionKey)).Result).Value;
@@ -328,6 +328,8 @@ namespace SnowmeetApi.Controllers
             rentOrder.memo = memo;
             rentOrder.refund = amount;
             rentOrder.end_date = DateTime.Now;
+            rentOrder.rental_reduce = rentalReduce;
+            rentOrder.rental_reduce_ticket = rentalReduceTicket;
             _context.Entry(rentOrder).State = EntityState.Modified;
             await _context.SaveChangesAsync();
 
