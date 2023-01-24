@@ -33,39 +33,6 @@ namespace SnowmeetApi.Controllers
         private readonly IHttpContextAccessor _httpContextAccessor;
 
 
-        /*
-        public struct DailyReport
-        {
-            public DateTime date;
-
-            //summary
-            //待退押金
-            public double depositionDueRefund;
-            //待结算租金
-            public double depositionDeuRental;
-            //【当日完结租金】当日租，当日结算
-            public double currentDaySettledRental;
-            //【当日收入总押金】
-            public double currentDayIncomeDeposit;
-            //【非当日租赁退押金】
-            public double pastOrderTodayRefund;
-            //【当日已退押金】
-            public double todayDepositRefund;
-            //【当日未退押金】
-            public double todayDepositUnRefund;
-            //【今日业务总租金】
-            public double todayTotalRental;
-            //【今日业务已结算租金】
-            public double todaySettledRental;
-            //【今日业务待结算资金】
-            public double todayUnSettledRental;
-            //【非今日业务结算租金】
-            public double todaySettledDepositionRental;
-
-        }
-        */
-        
-
         public RentController(ApplicationDBContext context, IConfiguration config, IHttpContextAccessor httpContextAccessor)
         {
             _context = context;
@@ -286,7 +253,7 @@ namespace SnowmeetApi.Controllers
 
         [HttpGet("{id}")]
         public async Task<ActionResult<RentOrderDetail>> SetReturn(int id, float rental,
-            double reparation, DateTime returnDate, string memo, string sessionKey)
+            double reparation, DateTime returnDate, string memo, string sessionKey, double overTimeCharge = 0)
         {
             sessionKey = Util.UrlDecode(sessionKey).Trim();
             memo = Util.UrlDecode(memo);
@@ -300,6 +267,7 @@ namespace SnowmeetApi.Controllers
             detail.real_rental = rental;
             detail.reparation = reparation;
             detail.memo = memo.Trim();
+            detail.overtime_charge = overTimeCharge;
             _context.Entry(detail).State = EntityState.Modified;
             await _context.SaveChangesAsync();
 
