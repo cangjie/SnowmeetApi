@@ -104,9 +104,12 @@ namespace SnowmeetApi.Models.Rent
                 {
                     if (details[i].real_end_date == null)
                     {
-                        totalRental = totalRental + details[i].real_rental;
                         finish = false;
                         break;
+                    }
+                    else
+                    {
+                        totalRental = totalRental + details[i].real_rental;
                     }
                 }
                 if (finish)
