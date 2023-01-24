@@ -99,10 +99,12 @@ namespace SnowmeetApi.Models.Rent
                     s = "未支付";
                 }
                 bool finish = true;
+                double totalRental = 0;
                 for (int i = 0; i < details.Length; i++)
                 {
                     if (details[i].real_end_date == null)
                     {
+                        totalRental = totalRental + details[i].real_rental;
                         finish = false;
                         break;
                     }
@@ -110,7 +112,7 @@ namespace SnowmeetApi.Models.Rent
                 if (finish)
                 {
                     s = "全部归还";
-                    if (order.refunds != null && order.refunds.Length > 0)
+                    if ((order.refunds != null && order.refunds.Length > 0) || (totalRental >= deposit_final))
                     {
                         s = "已退款";
                     }
