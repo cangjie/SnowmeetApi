@@ -212,10 +212,15 @@ namespace SnowmeetApi.Controllers
                     rentOrder.order.open_id = "";
                 }
             }
-            DateTime nowDate = DateTime.Now;
+            
             for (int i = 0; i < rentOrder.details.Length; i++)
             {
+                DateTime endDate = DateTime.Now;
                 RentOrderDetail detail = rentOrder.details[i];
+                if (detail.real_end_date != null)
+                {
+                    endDate = (DateTime)detail.real_end_date;
+                }
                 DateTime endTime = DateTime.Now;
                 if (detail.real_end_date != null)
                 {
@@ -241,14 +246,14 @@ namespace SnowmeetApi.Controllers
                 switch (rentOrder.shop.Trim())
                 {
                     case "南山":
-                        TimeSpan ts = nowDate - rentOrder.start_date;
+                        TimeSpan ts = endDate - rentOrder.start_date;
                         
                         if (ts.Hours < 4)
                         {
                             detail._suggestRental = detail.unit_rental;
                             detail._timeLength = "1场";
                         }
-                        else if (nowDate.Hour > 8)
+                        else if (endDate.Hour > 8)
                         {
                             detail._suggestRental = detail.unit_rental * 1.5;
                             detail._timeLength = "1.5场";
@@ -261,10 +266,30 @@ namespace SnowmeetApi.Controllers
                         
                         break;
                     default:
-                        TimeSpan ts1 = nowDate - rentOrder.start_date;
-                        int days = ts1.Days == 0 ? 1 : ts1.Days;
-                        detail._suggestRental = detail.unit_rental;
-                        detail._timeLength = days.ToString() + "天";
+
+                        if (rentOrder.start_date.Date == endDate.Date && rentOrder.start_date.Hour >= 16)
+                        {
+                            detail._suggestRental = detail.unit_rental;
+                            detail._timeLength = "夜场";
+                        }
+                        else 
+                        {
+                            TimeSpan ts1 = endDate.Date - rentOrder.start_date.Date;
+                            int days = 1;
+                            if (rentOrder.start_date.Hour < 16)
+                            {
+                                days = 1;
+                            }
+                            else
+                            {
+                                days = ts1.Days;
+                            }
+                            detail._suggestRental = detail.unit_rental * days;
+                            detail._timeLength = days.ToString() + "天";
+
+                        }
+                        //
+                        
 
                         break;
                 }
