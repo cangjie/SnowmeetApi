@@ -30,7 +30,10 @@ namespace SnowmeetApi.Models.Rent
 
         public double reparation { get; set; }
 
-        public double overtime_charge { get; set; } 
+        public double overtime_charge { get; set; }
+
+        [NotMapped]
+        public bool overTime { get; set; } = false;
 
         [NotMapped]
         public string status

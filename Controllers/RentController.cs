@@ -216,6 +216,28 @@ namespace SnowmeetApi.Controllers
             for (int i = 0; i < rentOrder.details.Length; i++)
             {
                 RentOrderDetail detail = rentOrder.details[i];
+                DateTime endTime = DateTime.Now;
+                if (detail.real_end_date != null)
+                {
+                    endTime = (DateTime)detail.real_end_date;
+                }
+
+                if (rentOrder.start_date.Hour >= 16 && rentOrder.start_date.Date == endTime.Date)
+                {
+                    detail.overTime = false;
+                }
+                else if (endTime.Hour >= 18)
+                {
+                    detail.overTime = true;
+                }
+                else
+                {
+                    detail.overTime = false;
+
+                }
+
+                //if (rentOrder.start_date.Hour >= 16 && )
+
                 switch (rentOrder.shop.Trim())
                 {
                     case "南山":
@@ -243,6 +265,7 @@ namespace SnowmeetApi.Controllers
                         int days = ts1.Days == 0 ? 1 : ts1.Days;
                         detail._suggestRental = detail.unit_rental;
                         detail._timeLength = days.ToString() + "天";
+
                         break;
                 }
             }
