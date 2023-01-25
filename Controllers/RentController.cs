@@ -315,6 +315,28 @@ namespace SnowmeetApi.Controllers
             _context.Entry(detail).State = EntityState.Modified;
             await _context.SaveChangesAsync();
 
+            bool allReturned = true;
+
+            double rentalTotal = 0;
+
+            RentOrder rentOrder = (RentOrder)((OkObjectResult)(await GetRentOrder(detail.rent_list_id, sessionKey)).Result).Value;
+
+            for (int i = 0; i < rentOrder.details.Length; i++)
+            {
+                RentOrderDetail item = rentOrder.details[i];
+                rentalTotal = rentalTotal + item.real_rental + item.overtime_charge + item.reparation;
+                if (detail.status.Trim().Equals("未归还"))
+                {
+                    allReturned = false;
+                    //break;
+                }
+            }
+            if (allReturned && Math.Round(rentalTotal, 2) >= Math.Round(rentOrder.deposit_final, 2))
+            {
+                rentOrder.end_date = DateTime.Now;
+                _context.Entry(rentOrder);
+                await _context.SaveChangesAsync();
+            }
             return Ok(detail);
         }
 
@@ -425,7 +447,20 @@ namespace SnowmeetApi.Controllers
             return Ok(rentOrder);
         }
 
-        
+        /*
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<RentOrder>>> GetUnRefundOrder(DateTime date, string sessionKey)
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            if (!user.isAdmin)
+            {
+                return BadRequest();
+            }
+
+            return BadRequest();
+        }
+        */
 
 
         /*
