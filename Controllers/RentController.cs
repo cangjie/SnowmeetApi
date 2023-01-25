@@ -494,7 +494,7 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<RentOrderCollection>> GetCurrentDaySettled(DateTime date, string sessionKey)
+        public async Task<ActionResult<RentOrderCollection>> GetCurrentSameDaySettled(DateTime date, string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey);
             UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
