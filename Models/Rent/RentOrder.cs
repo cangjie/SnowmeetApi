@@ -6,6 +6,9 @@ using System.Collections.Generic;
 
 namespace SnowmeetApi.Models.Rent
 {
+
+    
+
     [Table("rent_list")]
     public class RentOrder
     {
@@ -100,7 +103,7 @@ namespace SnowmeetApi.Models.Rent
                 }
                 bool finish = true;
                 double totalRental = 0;
-                for (int i = 0; i < details.Length; i++)
+                for (int i = 0; details != null && i < details.Length; i++)
                 {
                     if (details[i].real_end_date == null)
                     {
@@ -115,7 +118,7 @@ namespace SnowmeetApi.Models.Rent
                 if (finish)
                 {
                     s = "全部归还";
-                    if ((order.refunds != null && order.refunds.Length > 0) || (totalRental >= deposit_final))
+                    if ( order != null && ((order.refunds != null && order.refunds.Length > 0) || (totalRental >= deposit_final)))
                     {
                         s = "已退款";
                     }
@@ -143,7 +146,7 @@ namespace SnowmeetApi.Models.Rent
                 List<RentalDetail> detailList = new List<RentalDetail>();
 
 
-                for (int i = 0; i < details.Length; i++)
+                for (int i = 0; details != null && i < details.Length; i++)
                 {
                     RentOrderDetail rentOrderDetail = details[i];
                     DateTime endDate = rentOrderDetail.real_end_date == null ? DateTime.Now : (DateTime)rentOrderDetail.real_end_date;

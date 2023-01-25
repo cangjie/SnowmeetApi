@@ -447,9 +447,9 @@ namespace SnowmeetApi.Controllers
             return Ok(rentOrder);
         }
 
-        /*
+        
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<RentOrder>>> GetUnRefundOrder(DateTime date, string sessionKey)
+        public async Task<ActionResult<RentOrderCollection>> GetUnSettledOrderBefore(DateTime date, string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey);
             UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
@@ -457,11 +457,170 @@ namespace SnowmeetApi.Controllers
             {
                 return BadRequest();
             }
-
-            return BadRequest();
+            var rentOrderList = await _context.RentOrder
+                .Where(r => (r.create_date.Date < date.Date
+                    && (r.end_date == null || ((DateTime)r.end_date).Date >= date.Date)
+                    && r.order_id != 0 ))
+                .Join(_context.OrderOnlines, r => r.order_id, o => o.id,
+                    (r, o) => new {r.id, r.start_date, r.end_date, o.pay_state, o.final_price, r.deposit_final, r.refund})
+                .Where(o => o.pay_state == 1)
+                .ToListAsync();
+            RentOrder[] orderArr = new RentOrder[rentOrderList.Count];
+            double totalDeposit = 0;
+            double totalRental = 0;
+            for (int i = 0; i < orderArr.Length; i++)
+            {
+                orderArr[i] = (RentOrder)((OkObjectResult)(await GetRentOrder(rentOrderList[i].id, sessionKey)).Result).Value;
+                totalDeposit = orderArr[i].deposit_final + totalDeposit;
+                double subTotalRental = 0;
+                for (int j = 0; j < orderArr[i].rentalDetails.Count; j++)
+                {
+                    RentalDetail detail = orderArr[i].rentalDetails[j];
+                    if (detail.date.Date < date.Date)
+                    {
+                        subTotalRental = subTotalRental + detail.rental;
+                    }
+                    
+                }
+                totalRental = totalRental + subTotalRental;
+            }
+            RentOrderCollection sum = new RentOrderCollection();
+            sum.date = date.Date;
+            sum.type = "当日前未完结";
+            sum.unRefundDeposit = totalDeposit;
+            sum.unSettledRental = totalRental;
+            sum.orders = orderArr;
+            return Ok(sum);
         }
-        */
 
+        [HttpGet]
+        public async Task<ActionResult<RentOrderCollection>> GetCurrentDaySettled(DateTime date, string sessionKey)
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            if (!user.isAdmin)
+            {
+                return BadRequest();
+            }
+            var rentOrderList = await _context.RentOrder
+                .Where(r => (r.create_date.Date == date.Date 
+                    && (r.end_date != null || ((DateTime)r.end_date).Date == date.Date)
+                    && r.order_id != 0))
+                .Join(_context.OrderOnlines, r => r.order_id, o => o.id,
+                    (r, o) => new { r.id, r.start_date, r.end_date, o.pay_state, o.final_price, r.deposit_final, r.refund })
+                .Where(o => o.pay_state == 1)
+                .ToListAsync();
+
+            double totalDeposit = 0;
+            double totalRental = 0;
+            RentOrder[] orderArr = new RentOrder[rentOrderList.Count];
+            for (int i = 0; i < orderArr.Length; i++)
+            {
+                orderArr[i] = (RentOrder)((OkObjectResult)(await GetRentOrder(rentOrderList[i].id, sessionKey)).Result).Value;
+                totalDeposit = orderArr[i].deposit_final + totalDeposit;
+                double subTotalRental = 0;
+                for (int j = 0; j < orderArr[i].rentalDetails.Count; j++)
+                {
+                    RentalDetail detail = orderArr[i].rentalDetails[j];
+                    subTotalRental = subTotalRental + detail.rental;
+                }
+                totalRental = totalRental + subTotalRental;
+            }
+            RentOrderCollection sum = new RentOrderCollection();
+            sum.date = date.Date;
+            sum.type = "日租日结";
+            sum.totalDeposit = totalDeposit;
+            sum.totalRental = totalRental;
+            sum.orders = orderArr;
+            return Ok(sum);
+        }
+
+        [HttpGet]
+        public async Task<ActionResult<RentOrderCollection>> GetCurrentDayPlaced(DateTime date, string sessionKey)
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            if (!user.isAdmin)
+            {
+                return BadRequest();
+            }
+            var rentOrderList = await _context.RentOrder
+                .Where(r => (r.create_date.Date == date.Date))
+                .Join(_context.OrderOnlines, r => r.order_id, o => o.id,
+                    (r, o) => new { r.id, r.start_date, r.end_date, o.pay_state, o.final_price, r.deposit_final, r.refund })
+                .Where(o => o.pay_state == 1)
+                .ToListAsync();
+
+            double totalDeposit = 0;
+            double totalRental = 0;
+            RentOrder[] orderArr = new RentOrder[rentOrderList.Count];
+            for (int i = 0; i < orderArr.Length; i++)
+            {
+                orderArr[i] = (RentOrder)((OkObjectResult)(await GetRentOrder(rentOrderList[i].id, sessionKey)).Result).Value;
+                totalDeposit = orderArr[i].deposit_final + totalDeposit;
+                double subTotalRental = 0;
+                for (int j = 0; j < orderArr[i].rentalDetails.Count; j++)
+                {
+                    RentalDetail detail = orderArr[i].rentalDetails[j];
+                    if (detail.date.Date <= date.Date)
+                    {
+                        subTotalRental = subTotalRental + detail.rental;
+                    }
+                }
+                totalRental = totalRental + subTotalRental;
+            }
+            RentOrderCollection sum = new RentOrderCollection();
+            sum.date = date.Date;
+            sum.type = "当日新订单";
+            sum.totalDeposit = totalDeposit;
+            sum.totalRental = totalRental;
+            sum.orders = orderArr;
+            return Ok(sum);
+        }
+
+        [HttpGet]
+        public async Task<ActionResult<RentOrderCollection>> GetCurrentDaySettledPlacedBefore(DateTime date, string sessionKey)
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            if (!user.isAdmin)
+            {
+                return BadRequest();
+            }
+            var rentOrderList = await _context.RentOrder
+                .Where(r => (r.create_date.Date < date.Date
+                    && (r.end_date != null && ((DateTime)r.end_date).Date == date.Date)))
+                .Join(_context.OrderOnlines, r => r.order_id, o => o.id,
+                    (r, o) => new { r.id, r.start_date, r.end_date, o.pay_state, o.final_price, r.deposit_final, r.refund })
+                .Where(o => o.pay_state == 1)
+                .ToListAsync();
+
+            double totalDeposit = 0;
+            double totalRental = 0;
+            RentOrder[] orderArr = new RentOrder[rentOrderList.Count];
+            for (int i = 0; i < orderArr.Length; i++)
+            {
+                orderArr[i] = (RentOrder)((OkObjectResult)(await GetRentOrder(rentOrderList[i].id, sessionKey)).Result).Value;
+                totalDeposit = orderArr[i].deposit_final + totalDeposit;
+                double subTotalRental = 0;
+                for (int j = 0; j < orderArr[i].rentalDetails.Count; j++)
+                {
+                    RentalDetail detail = orderArr[i].rentalDetails[j];
+                    if (detail.date.Date <= date.Date)
+                    {
+                        subTotalRental = subTotalRental + detail.rental;
+                    }
+                }
+                totalRental = totalRental + subTotalRental;
+            }
+            RentOrderCollection sum = new RentOrderCollection();
+            sum.date = date.Date;
+            sum.type = "当日新订单";
+            sum.totalDeposit = totalDeposit;
+            sum.totalRental = totalRental;
+            sum.orders = orderArr;
+            return Ok(sum);
+        }
 
         /*
         [HttpGet]
