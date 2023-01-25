@@ -153,10 +153,10 @@ namespace SnowmeetApi.Models.Rent
                     
 
                     //夜场
-                    if (startDate.Date == endDate.Date && start_date.Hour >= 16)
+                    if (start_date.Date == endDate.Date && start_date.Hour >= 16)
                     {
                         RentalDetail rentalDetail = new RentalDetail();
-                        rentalDetail.date = startDate.Date;
+                        rentalDetail.date = start_date.Date;
                         rentalDetail.item = rentOrderDetail;
                         rentalDetail.rental = rentOrderDetail.real_rental;
                         rentalDetail.type = "夜场";
@@ -165,6 +165,7 @@ namespace SnowmeetApi.Models.Rent
                     //非夜场
                     else
                     {
+                        /*
                         if (endDate.Hour >= 18)
                         {
                             endDate = endDate.Date.AddDays(1);
@@ -174,6 +175,7 @@ namespace SnowmeetApi.Models.Rent
                         {
                             endDate = endDate.Date;
                         }
+                        */
                         double totalRental = 0;
                         for (DateTime d = startDate; d.Date <= endDate.Date; d = d.AddDays(1))
                         {
