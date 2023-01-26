@@ -122,7 +122,7 @@ namespace SnowmeetApi.Models.Rent
                     {
                         s = "已退款";
                     }
-                    else if (order != null && ((order.refunds != null && order.refunds.Length > 0) || (totalRental >= deposit_final)))
+                    else if (order != null && ((order.refunds != null && order.refunds.Length > 0) || (Math.Round(totalRental, 2) >= Math.Round(deposit_final, 2))))
                     {
                         s = "已退款";
                     }
