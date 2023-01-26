@@ -100,6 +100,7 @@ namespace SnowmeetApi.Models.Rent
                 else
                 {
                     s = "未支付";
+                    return s;
                 }
                 bool finish = true;
                 double totalRental = 0;
@@ -117,11 +118,19 @@ namespace SnowmeetApi.Models.Rent
                 }
                 if (finish)
                 {
-                    s = "全部归还";
-                    if ( order != null && ((order.refunds != null && order.refunds.Length > 0) || (totalRental >= deposit_final)))
+                    if (!order.pay_method.Trim().Equals("微信支付"))
                     {
                         s = "已退款";
                     }
+                    else if (order != null && ((order.refunds != null && order.refunds.Length > 0) || (totalRental >= deposit_final)))
+                    {
+                        s = "已退款";
+                    }
+                    else
+                    {
+                        s = "全部归还";
+                    }
+
                 }
                 return s;
             }
