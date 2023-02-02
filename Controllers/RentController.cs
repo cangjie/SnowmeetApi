@@ -179,9 +179,15 @@ namespace SnowmeetApi.Controllers
                 List<RentOrder> newArr = new List<RentOrder>();
                 for (int i = 0; i < orderArr.Length; i++)
                 {
-                    if (orderArr[i].status.Trim().Equals(status))
+                    try
                     {
-                        newArr.Add(orderArr[i]);
+                        if (orderArr[i].status.Trim().Equals(status))
+                        {
+                            newArr.Add(orderArr[i]);
+                        }
+                    }
+                    catch
+                    { 
                     }
                 }
                 return Ok(newArr.ToArray());
