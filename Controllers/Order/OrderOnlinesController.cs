@@ -438,7 +438,7 @@ namespace SnowmeetApi.Controllers
                 return NoContent();
             }
             OrderOnline order = await _context.OrderOnlines.FindAsync(orderId);
-            if (!order.open_id.Trim().Equals(""))
+            if (order != null && !order.open_id.Trim().Equals(""))
             {
                 UnicUser customerUser = (await UnicUser.GetUnicUser(order.open_id, "snowmeet_mini", _context)).Value;
                 if (customerUser == null)
@@ -460,7 +460,7 @@ namespace SnowmeetApi.Controllers
             {
                 order.mi7Orders = mi7Orders;
             }
-            if (!order.pay_memo.Trim().Equals("无需支付"))
+            if (order != null && !order.pay_memo.Trim().Equals("无需支付"))
             {
                 var payments = await _context.OrderPayment.Where(p => p.order_id == orderId).ToArrayAsync();
                 for (int i = 0; i < payments.Length; i++)
@@ -487,7 +487,7 @@ namespace SnowmeetApi.Controllers
             }
 
             string staffRealName = "";
-            if (order.staff_open_id != null && !order.staff_open_id.Trim().Equals(""))
+            if (order != null && order.staff_open_id != null && !order.staff_open_id.Trim().Equals(""))
             {
                 MiniAppUser staffUser = await _context.MiniAppUsers.FindAsync(order.staff_open_id);
                 if (staffUser != null)
@@ -495,9 +495,13 @@ namespace SnowmeetApi.Controllers
                     staffRealName = staffUser.real_name.Trim();
                 }
             }
-            order.staffRealName = staffRealName.Trim();
+            if (order != null)
+            {
+                order.staffRealName = staffRealName.Trim();
+            }
+            
 
-            if (order.ticket_code != null && !order.ticket_code.Trim().Equals(""))
+            if (order != null && order.ticket_code != null && !order.ticket_code.Trim().Equals(""))
             {
                 order.tickets = await _context.Ticket.Where(t => t.code.Trim().Equals(order.ticket_code)).ToArrayAsync();
             }
