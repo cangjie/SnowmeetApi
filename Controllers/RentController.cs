@@ -635,7 +635,12 @@ namespace SnowmeetApi.Controllers
             sum.orders = orderArr;
             return Ok(sum);
         }
-
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<string>>> GetRentClass()
+        {
+            return await _context.RentItem.OrderBy(r => r.@class)
+                .Select(r => r.@class).Distinct().ToListAsync();
+        }
         /*
         [HttpGet]
         public async Task<ActionResult<DailyReport[]>> GetCurrentSeasonAllRentOrder(string sessionKey, DateTime seasonStart, DateTime currentDate)

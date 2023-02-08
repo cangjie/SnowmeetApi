@@ -12,6 +12,7 @@ namespace SnowmeetApi.Models.Rent
 		public string name { get; set; }
 		public string code { get; set; }
 		public double deposit { get; set; }
+        public string @class { get; set; }
 
 		[NotMapped]
 		public double rental { get; set; } = 0;
