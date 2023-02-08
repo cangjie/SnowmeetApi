@@ -118,7 +118,7 @@ namespace SnowmeetApi.Models.Rent
                 }
                 if (finish)
                 {
-                    if (!order.pay_method.Trim().Equals("微信支付"))
+                    if (order != null && !order.pay_method.Trim().Equals("微信支付"))
                     {
                         s = "已退款";
                     }

@@ -157,10 +157,18 @@ namespace SnowmeetApi.Controllers
                 .Where(o => (o.start_date >= start && o.start_date < end.Date.AddDays(1)  && (shop.Trim().Equals("") || o.shop.Trim().Equals(shop)))).ToArrayAsync();
             for (int i = 0; i < orderArr.Length; i++)
             {
-                RentOrder order = orderArr[i];
-                order.details = await _context.RentOrderDetail.Where(d => d.rent_list_id == order.id).ToArrayAsync();
-                order.order = (await orderHelper.GetWholeOrderByStaff(order.order_id, sessionKey)).Value;
-                orderArr[i] = order;
+                try
+                {
+                    RentOrder order = orderArr[i];
+                    order.details = await _context.RentOrderDetail.Where(d => d.rent_list_id == order.id).ToArrayAsync();
+                    order.order = (await orderHelper.GetWholeOrderByStaff(order.order_id, sessionKey)).Value;
+                    orderArr[i] = order;
+                }
+                catch 
+                { 
+                
+                }
+                
             }
             if (status == null)
             {
@@ -171,9 +179,15 @@ namespace SnowmeetApi.Controllers
                 List<RentOrder> newArr = new List<RentOrder>();
                 for (int i = 0; i < orderArr.Length; i++)
                 {
-                    if (orderArr[i].status.Trim().Equals(status))
+                    try
                     {
-                        newArr.Add(orderArr[i]);
+                        if (orderArr[i].status.Trim().Equals(status))
+                        {
+                            newArr.Add(orderArr[i]);
+                        }
+                    }
+                    catch
+                    { 
                     }
                 }
                 return Ok(newArr.ToArray());
