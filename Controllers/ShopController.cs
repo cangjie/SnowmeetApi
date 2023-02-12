@@ -25,7 +25,7 @@ namespace SnowmeetApi.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Shop>>> GetShop()
         {
-            return await _context.Shop.ToListAsync();
+            return await _context.Shop.OrderBy(s => s.sort).ToListAsync();
         }
 
 
