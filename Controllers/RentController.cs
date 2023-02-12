@@ -636,7 +636,7 @@ namespace SnowmeetApi.Controllers
             return Ok(sum);
         }
 
-        [HttpGet]
+        [HttpGet("{id}")]
         public async Task<ActionResult<RentOrderDetail>> ModItemInfo(int id, float rental,
             double reparation, string memo, double overTimeCharge, string sessionKey)
         {
