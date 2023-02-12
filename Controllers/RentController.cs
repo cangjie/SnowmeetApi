@@ -636,6 +636,28 @@ namespace SnowmeetApi.Controllers
             return Ok(sum);
         }
 
+        [HttpGet]
+        public async Task<ActionResult<RentOrderDetail>> ModItemInfo(int id, float rental,
+            double reparation, string memo, double overTimeCharge, string sessionKey)
+        {
+            sessionKey = Util.UrlDecode(sessionKey).Trim();
+            memo = Util.UrlDecode(memo);
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            if (!user.isAdmin)
+            {
+                return BadRequest();
+            }
+            RentOrderDetail detail = await _context.RentOrderDetail.FindAsync(id);
+            //detail.real_end_date = returnDate;
+            detail.real_rental = rental;
+            detail.reparation = reparation;
+            detail.memo = memo.Trim();
+            detail.overtime_charge = overTimeCharge;
+            _context.Entry(detail).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
+            return Ok(detail);
+        }
+
         /*
         [HttpGet]
         public async Task<ActionResult<DailyReport[]>> GetCurrentSeasonAllRentOrder(string sessionKey, DateTime seasonStart, DateTime currentDate)
