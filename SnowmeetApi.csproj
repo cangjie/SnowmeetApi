@@ -66,6 +66,7 @@
     <Folder Include="upload\" />
     <Folder Include="wwwroot\css\" />
     <Folder Include="Models\Rent\" />
+    <Folder Include="wwwroot\mapp\tickets\" />
   </ItemGroup>
   <ItemGroup>
     <Content Remove="wwwroot\upload\" />
@@ -77,5 +78,6 @@
     <Content Remove="wwwroot\background\" />
     <Content Remove="wwwroot\background\mi7_upload\" />
     <Content Remove="wwwroot\css\" />
+    <Content Remove="wwwroot\mapp\tickets\" />
   </ItemGroup>
 </Project>
