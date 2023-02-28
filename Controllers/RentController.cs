@@ -658,6 +658,12 @@ namespace SnowmeetApi.Controllers
             return Ok(detail);
         }
 
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<object>>> GetClassList()
+        {
+            return await _context.RentItem.Select(r => r.@class).Distinct().ToListAsync();
+        }
+
         /*
         [HttpGet]
         public async Task<ActionResult<DailyReport[]>> GetCurrentSeasonAllRentOrder(string sessionKey, DateTime seasonStart, DateTime currentDate)

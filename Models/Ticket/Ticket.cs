@@ -30,5 +30,28 @@ namespace SnowmeetApi.Models.Ticket
         public DateTime create_date { get; set; }
 
         public string channel { get; set; } = "";
+
+        [NotMapped]
+        public string status
+        {
+            get
+            {
+                string status = "";
+                if (used == 1)
+                {
+                    status = "已使用";
+                }
+                else if (shared == 1)
+                {
+                    status = "分享中";
+                }
+                else
+                {
+                    status = "未使用";
+                }
+                return status;
+
+            }
+        }
     }
 }
