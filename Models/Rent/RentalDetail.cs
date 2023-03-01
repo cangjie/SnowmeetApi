@@ -5,10 +5,46 @@ namespace SnowmeetApi.Models.Rent
 {
     public class RentalDetail
     {
+        public string _name = "";
+        public string _cell = "";
+        public string _shop = "";
         public DateTime date { get; set; }
         public RentOrderDetail item { get; set; }
         public double rental { get; set; }
         public string type { get; set; }
+        public string name
+        {
+            get
+            {
+                return _name.Trim();
+            }
+            set
+            {
+                _name = value;
+            }
+        }
+        public string cell
+        {
+            get
+            {
+                return _cell;
+            }
+            set
+            {
+                _cell = value;
+            }
+        }
+        public string shop
+        {
+            get
+            {
+                return _shop;
+            }
+            set
+            {
+                _shop = value;
+            }
+        }
     }
 
     public struct RentOrderCollection
@@ -24,5 +60,17 @@ namespace SnowmeetApi.Models.Rent
 
         public RentOrder[] orders { get; set; }
     }
+    /*
+    public struct RentDetail
+    {
+        public int id { get; set; }
+        public DateTime date { get; set; }
+        public string code { get; set; }
+        public string name { get; set; }
+        public double rental { get; set; }
+        public double reparation { get; set; }
+        public double overTimeCharge { get; set; }
+    }
+    */
 }
 

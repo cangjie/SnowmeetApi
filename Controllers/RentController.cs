@@ -13,7 +13,7 @@ using SnowmeetApi.Models.Maintain;
 using SnowmeetApi.Models.Order;
 using SnowmeetApi.Models.Rent;
 using SnowmeetApi.Models.Users;
-
+using System.Collections;
 namespace SnowmeetApi.Controllers
 {
     [Route("core/[controller]/[action]")]
@@ -662,6 +662,65 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<IEnumerable<object>>> GetClassList()
         {
             return await _context.RentItem.Select(r => r.@class).Distinct().ToListAsync();
+        }
+
+
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<RentalDetail>>> GetRentDetailReport(DateTime start, DateTime end, string sessionKey)
+        {
+
+            //RentalDetail[] details = new RentalDetail[];
+            ArrayList details = new ArrayList();
+            //RentOrder rentOrder = (RentOrder)((OkObjectResult)(await GetRentOrder(detail.rent_list_id, sessionKey)).Result).Value;
+            RentOrderCollection beforeOrders = (RentOrderCollection)((OkObjectResult)(await GetUnSettledOrderBefore(start, sessionKey)).Result).Value;
+            for (int i = 0; i < beforeOrders.orders.Length; i++)
+            {
+                RentOrder order = beforeOrders.orders[i];
+                for (int j = 0; j < order.rentalDetails.Count; j++)
+                {
+                    if (order.rentalDetails[j].date >= start.Date && order.rentalDetails[j].date <= end.Date)
+                    {
+                        RentalDetail dtl = order.rentalDetails[j];
+                        dtl._name = order.real_name;
+                        dtl._cell = order.cell_number;
+                        dtl._shop = order.shop.Trim();
+                        details.Add(dtl);
+                    }
+                }
+            }
+
+            var rentOrderIdList = await _context.RentOrder
+                .Where(r => (r.create_date.Date >= start.Date && r.create_date.Date <= end.Date))
+                .Join(_context.OrderOnlines, r => r.order_id, o => o.id,
+                    (r, o) => new { r.id, r.start_date, r.end_date, o.pay_state, o.final_price, r.deposit_final, r.refund })
+                .Where(o => o.pay_state == 1).ToListAsync();
+            for (int i = 0; i < rentOrderIdList.Count; i++)
+            {
+                RentOrder order = (RentOrder)((OkObjectResult)(await GetRentOrder(rentOrderIdList[i].id, sessionKey)).Result).Value;
+                for (int j = 0; j < order.rentalDetails.Count; j++)
+                {
+                    DateTime rentDate = order.rentalDetails[j].date;
+                    if (rentDate.Date >= start && rentDate.Date <= end)
+                    {
+                        RentalDetail dtl = order.rentalDetails[j];
+                        dtl._name = order.real_name;
+                        dtl._cell = order.cell_number;
+                        dtl._shop = order.shop.Trim();
+                        details.Add(dtl);
+                    }
+                }
+            }
+
+
+            RentalDetail[] detailArr = new RentalDetail[details.Count];
+            
+            for (int i = 0; i < detailArr.Length; i++)
+            {
+                detailArr[i] = (RentalDetail)details[i];
+            }
+
+            return Ok(detailArr);
+
         }
 
         /*

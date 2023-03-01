@@ -1,0 +1,88 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>2月租赁明细报表</title>
+    <link rel="stylesheet" href="../css/bootstrap.css" />
+    <link rel="stylesheet" href="../css/bootstrap-grid.css" />
+    <link rel="stylesheet" href="../css/bootstrap-reboot.css" />
+    <script type="text/javascript" src="../js/jquery-3.6.1.min.js"></script>
+    <script type="text/javascript" src="../js/util.js"></script>
+    <script type="text/javascript" >
+        var sessionKey = getCookie('sessionKey');
+        if (sessionKey == '') {
+            window.location.href = 'index.html';
+        }
+    </script>
+</head>
+<body>
+    <table class="table" >
+        <thead>
+            <tr>
+                <td>日期</td>
+                <td>订单号</td>
+                <td>店铺</td>
+                <td>姓名</td>
+                <td>电话</td>
+                <td>物品编码</td>
+                <td>物品名称</td>
+                <td>租金</td>
+            </tr>
+        </thead>
+        <tbody id="body">
+            
+        </tbody>
+    </table>
+    <script type="text/javascript" >
+        var dataUrl = '/core/Rent/GetRentDetailReport?start=2023-02-01&end=2023-02-28&sessionKey=' + encodeURIComponent(sessionKey);
+        $.ajax({
+            url: dataUrl,
+            type: 'GET',
+            success: function (msg, status) {
+                if (status == 'success') {
+                    console.log(msg);
+                    var body = document.getElementById('body');
+                    for (var i = 0; i < msg.length; i++) {
+                        var date = formatDate(msg[i].date);
+                        var orderId = msg[i].item.rent_list_id;
+                        var shop = msg[i].shop;
+                        var name = msg[i].name;
+                        var cell = msg[i].cell;
+                        var item = msg[i].item.rent_item_name;
+                        var code = msg[i].item.rent_item_code;
+                        var rental = msg[i].rental;
+                        var tr = document.createElement('tr');
+                        var tdDate = document.createElement('td');
+                        tdDate.innerText = date;
+                        tr.appendChild(tdDate);
+                        var tdId = document.createElement('td');
+                        tdId.innerText = orderId;
+                        tr.appendChild(tdId);
+                        var tdShop = document.createElement('td');
+                        tdShop.innerText = shop;
+                        tr.appendChild(tdShop);
+                        var tdName = document.createElement('td');
+                        tdName.innerText = name;
+                        tr.appendChild(tdName);
+                        var tdCell = document.createElement('td');
+                        tdCell.innerText = cell;
+                        tr.appendChild(tdCell);
+                        var tdCode = document.createElement('td');
+                        tdCode.innerText = code;
+                        tr.appendChild(tdCode);
+                        var tdItem = document.createElement('td');
+                        tdItem.innerText = item;
+                        tr.appendChild(tdItem);
+                        var tdRental = document.createElement('td');
+                        tdRental.innerText = rental;
+                        tr.appendChild(tdRental);
+                        body.appendChild(tr);
+
+
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+</html>
