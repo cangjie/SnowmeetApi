@@ -403,7 +403,7 @@ namespace SnowmeetApi.Controllers.Order
                     {
                         RentOrder rentOrder = rentOrderList[0];
                         rentOrder.open_id = order.open_id;
-                        _context.Entry(rentOrder);
+                        _context.Entry(rentOrder).State = EntityState.Modified;
                         await _context.SaveChangesAsync();
                     }
                     break;
@@ -458,7 +458,32 @@ namespace SnowmeetApi.Controllers.Order
             
             return order;
         }
-        
+
+        [HttpGet("{paymentId}")]
+        public async Task<ActionResult<OrderOnline>> ModPayMethod(int paymentId, string payMethod, string sessionKey)
+        {
+            sessionKey = Util.UrlDecode(sessionKey.Trim());
+            payMethod = Util.UrlDecode(payMethod.Trim());
+
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            if (!user.isAdmin)
+            {
+                return BadRequest();
+            }
+
+            OrderPayment payment = await _context.OrderPayment.FindAsync(paymentId);
+            if (payment != null)
+            {
+                payment.pay_method = payMethod;
+                _context.Entry(payment).State = EntityState.Modified;
+                await _context.SaveChangesAsync();
+
+            }
+            OrderOnlinesController orderController = new OrderOnlinesController(_context, _originConfig);
+            OrderOnline order = (await orderController.GetOrderOnline(payment.order_id, sessionKey)).Value;
+            return Ok(order);
+        }
+
         /*
 
         // GET: api/OrderPayment
