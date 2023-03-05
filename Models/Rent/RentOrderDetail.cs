@@ -18,6 +18,10 @@ namespace SnowmeetApi.Models.Rent
 
         public double deposit { get; set; }
 
+        public string deposit_type { get; set; } = "立即租赁";
+
+        public DateTime? start_date { get; set; }
+
         public double unit_rental { get; set; }
 
         public double real_rental { get; set; }
