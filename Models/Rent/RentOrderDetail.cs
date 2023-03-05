@@ -37,6 +37,40 @@ namespace SnowmeetApi.Models.Rent
         public double overtime_charge { get; set; }
 
         [NotMapped]
+        public string rentStatus
+        {
+            get
+            {
+                var status = "";
+                if (real_end_date != null)
+                {
+                    status = "已归还";
+                }
+                else
+                {
+                    switch (deposit_type.Trim())
+                    {
+                        case "立即租赁":
+                            status = "已领取";
+                            break;
+                        default:
+                            if (start_date == null)
+                            {
+                                status = "未领取";
+                            }
+                            else
+                            {
+                                status = "已领取";
+                            }
+                            break;
+                        
+                    }
+                }
+                return status.Trim();
+            }
+        }
+
+        [NotMapped]
         public bool overTime { get; set; } = false;
 
         [NotMapped]
@@ -46,7 +80,7 @@ namespace SnowmeetApi.Models.Rent
             {
                 if (real_end_date == null)
                 {
-                    return "未归还";
+                    return rentStatus;
                 }
                 else
                 {
