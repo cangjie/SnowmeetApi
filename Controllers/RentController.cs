@@ -360,7 +360,7 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet("{id}")]
-        public async Task<ActionResult<RentOrderDetail>> RentOrderDetail(int id, string sessionKey)
+        public async Task<ActionResult<RentOrderDetail>> SetRentStart(int id, string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey).Trim();
             UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
