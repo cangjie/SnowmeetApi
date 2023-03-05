@@ -16,6 +16,8 @@ namespace SnowmeetApi.Models.Rent
 
         public string rent_item_code { get; set; }
 
+        public string rent_item_class { get; set; }
+
         public double deposit { get; set; }
 
         public string deposit_type { get; set; } = "立即租赁";
