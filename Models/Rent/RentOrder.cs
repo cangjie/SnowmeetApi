@@ -106,7 +106,8 @@ namespace SnowmeetApi.Models.Rent
                 double totalRental = 0;
                 for (int i = 0; details != null && i < details.Length; i++)
                 {
-                    if (details[i].real_end_date == null && details[i].start_date != null)
+                    //if (details[i].real_end_date == null && details[i].start_date != null)
+                    if (details[i].status.Trim().Equals("已领取"))
                     {
                         finish = false;
                         break;
