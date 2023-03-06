@@ -744,6 +744,34 @@ namespace SnowmeetApi.Controllers
 
         }
 
+        [HttpPost]
+        public async Task<ActionResult<RentOrderDetail>> AppendDetail(string sessionKey, RentOrderDetail detail)
+        {
+            sessionKey = Util.UrlDecode(sessionKey).Trim();
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            if (!user.isAdmin)
+            {
+                return BadRequest();
+            }
+            await _context.RentOrderDetail.AddAsync(detail);
+            await _context.SaveChangesAsync();
+            return Ok(detail);
+        }
+
+        [HttpPost]
+        public async Task<ActionResult<RentalDetail>> UpdateDetail(string sessionKey, RentalDetail detail)
+        {
+            sessionKey = Util.UrlDecode(sessionKey).Trim();
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            if (!user.isAdmin)
+            {
+                return BadRequest();
+            }
+            _context.Entry(detail).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
+            return Ok(detail);
+        }
+
         /*
         [HttpGet]
         public async Task<ActionResult<DailyReport[]>> GetCurrentSeasonAllRentOrder(string sessionKey, DateTime seasonStart, DateTime currentDate)
