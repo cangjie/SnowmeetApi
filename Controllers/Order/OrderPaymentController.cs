@@ -481,6 +481,9 @@ namespace SnowmeetApi.Controllers.Order
             }
             OrderOnlinesController orderController = new OrderOnlinesController(_context, _originConfig);
             OrderOnline order = (await orderController.GetOrderOnline(payment.order_id, sessionKey)).Value;
+            order.pay_method = payMethod;
+            _context.Entry(order).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
             return Ok(order);
         }
 
