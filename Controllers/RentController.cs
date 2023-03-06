@@ -759,7 +759,7 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpPost]
-        public async Task<ActionResult<RentalDetail>> UpdateDetail(string sessionKey, RentalDetail detail)
+        public async Task<ActionResult<RentalDetail>> UpdateDetail(string sessionKey, RentOrderDetail detail)
         {
             sessionKey = Util.UrlDecode(sessionKey).Trim();
             UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
