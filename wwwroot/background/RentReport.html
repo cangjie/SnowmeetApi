@@ -27,6 +27,7 @@
                 <td>物品编码</td>
                 <td>物品名称</td>
                 <td>租金</td>
+                <td>接待</td>
             </tr>
         </thead>
         <tbody id="body">
@@ -51,6 +52,7 @@
                         var item = msg[i].item.rent_item_name;
                         var code = msg[i].item.rent_item_code;
                         var rental = msg[i].rental;
+                        var staff = msg[i].staff;
                         var tr = document.createElement('tr');
                         var tdDate = document.createElement('td');
                         tdDate.innerText = date;
@@ -76,6 +78,9 @@
                         var tdRental = document.createElement('td');
                         tdRental.innerText = rental;
                         tr.appendChild(tdRental);
+                        var tdStaff = document.createElement('td');
+                        tdStaff.innerText = staff;
+                        tr.appendChild(tdStaff);
                         body.appendChild(tr);
 
 

@@ -705,19 +705,22 @@ namespace SnowmeetApi.Controllers
                         dtl._name = order.real_name;
                         dtl._cell = order.cell_number;
                         dtl._shop = order.shop.Trim();
+                        dtl._staff = order.staff_name.Trim();
                         details.Add(dtl);
                     }
                 }
             }
 
+            
             var rentOrderIdList = await _context.RentOrder
                 .Where(r => (r.create_date.Date >= start.Date && r.create_date.Date <= end.Date))
                 .Join(_context.OrderOnlines, r => r.order_id, o => o.id,
-                    (r, o) => new { r.id, r.start_date, r.end_date, o.pay_state, o.final_price, r.deposit_final, r.refund })
+                    (r, o) => new { r.id, r.start_date, r.end_date, o.pay_state, o.final_price, r.deposit_final, r.refund, r.staff_name })
                 .Where(o => o.pay_state == 1).ToListAsync();
             for (int i = 0; i < rentOrderIdList.Count; i++)
             {
                 RentOrder order = (RentOrder)((OkObjectResult)(await GetRentOrder(rentOrderIdList[i].id, sessionKey)).Result).Value;
+                
                 for (int j = 0; j < order.rentalDetails.Count; j++)
                 {
                     DateTime rentDate = order.rentalDetails[j].date;
@@ -727,6 +730,7 @@ namespace SnowmeetApi.Controllers
                         dtl._name = order.real_name;
                         dtl._cell = order.cell_number;
                         dtl._shop = order.shop.Trim();
+                        dtl._staff = order.staff_name.Trim();
                         details.Add(dtl);
                     }
                 }
@@ -737,7 +741,8 @@ namespace SnowmeetApi.Controllers
             
             for (int i = 0; i < detailArr.Length; i++)
             {
-                detailArr[i] = (RentalDetail)details[i];
+                var dtl = details[i];
+                detailArr[i] = (RentalDetail)dtl;
             }
 
             return Ok(detailArr);

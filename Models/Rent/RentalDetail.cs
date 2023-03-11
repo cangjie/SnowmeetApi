@@ -8,6 +8,7 @@ namespace SnowmeetApi.Models.Rent
         public string _name = "";
         public string _cell = "";
         public string _shop = "";
+        public string _staff = "";
         public DateTime date { get; set; }
         public RentOrderDetail item { get; set; }
         public double rental { get; set; }
@@ -43,6 +44,17 @@ namespace SnowmeetApi.Models.Rent
             set
             {
                 _shop = value;
+            }
+        }
+        public string staff
+        {
+            get
+            {
+                return _staff;
+            }
+            set
+            {
+                _staff = value;
             }
         }
     }
