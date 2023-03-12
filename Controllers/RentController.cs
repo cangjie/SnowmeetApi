@@ -777,6 +777,28 @@ namespace SnowmeetApi.Controllers
             return Ok(detail);
         }
 
+        [HttpGet]
+        public async Task<ActionResult<RentOrderDetail>> ReserveMore(int detailId, string sessionKey)
+        {
+            sessionKey = Util.UrlDecode(sessionKey).Trim();
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            if (!user.isAdmin)
+            {
+                return BadRequest();
+            }
+            RentOrderDetail item = await _context.RentOrderDetail.FindAsync(detailId);
+            item.id = 0;
+            item.real_end_date = null;
+            item.start_date = ((DateTime)item.real_end_date).Date.AddDays(1);
+            item.reparation = 0;
+            item.overtime_charge = 0;
+            item.deposit_type = "预约租赁";
+            await _context.AddAsync(item);
+            await _context.SaveChangesAsync();
+            return Ok(item);
+
+        }
+
         /*
         [HttpGet]
         public async Task<ActionResult<DailyReport[]>> GetCurrentSeasonAllRentOrder(string sessionKey, DateTime seasonStart, DateTime currentDate)
