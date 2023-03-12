@@ -789,7 +789,7 @@ namespace SnowmeetApi.Controllers
             RentOrderDetail item = await _context.RentOrderDetail.FindAsync(detailId);
             item.id = 0;
             item.real_end_date = null;
-            item.start_date = ((DateTime)item.real_end_date).Date.AddDays(1);
+            item.start_date = DateTime.Now.Date.AddDays(1);
             item.reparation = 0;
             item.overtime_charge = 0;
             item.deposit_type = "预约租赁";
