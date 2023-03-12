@@ -777,7 +777,7 @@ namespace SnowmeetApi.Controllers
             return Ok(detail);
         }
 
-        [HttpGet]
+        [HttpGet("{detailId}")]
         public async Task<ActionResult<RentOrderDetail>> ReserveMore(int detailId, string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey).Trim();
