@@ -44,6 +44,9 @@ namespace SnowmeetApi.Models.Rent
             get
             {
                 var status = "";
+
+
+
                 if (real_end_date != null)
                 {
                     status = "已归还";

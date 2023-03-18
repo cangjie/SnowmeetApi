@@ -486,9 +486,10 @@ namespace SnowmeetApi.Controllers
 
         
         [HttpGet]
-        public async Task<ActionResult<RentOrderCollection>> GetUnSettledOrderBefore(DateTime date, string sessionKey)
+        public async Task<ActionResult<RentOrderCollection>> GetUnSettledOrderBefore(DateTime date, string sessionKey, string shop = "")
         {
             sessionKey = Util.UrlDecode(sessionKey);
+            shop = Util.UrlDecode(shop);
             UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
             if (!user.isAdmin)
             {
@@ -497,7 +498,7 @@ namespace SnowmeetApi.Controllers
             var rentOrderList = await _context.RentOrder
                 .Where(r => (r.create_date.Date < date.Date
                     && (r.end_date == null || ((DateTime)r.end_date).Date >= date.Date)
-                    && r.order_id != 0 ))
+                    && r.order_id != 0 && (shop.Trim().Equals("") || shop.Trim().Equals(r.shop.Trim())) ))
                 .Join(_context.OrderOnlines, r => r.order_id, o => o.id,
                     (r, o) => new {r.id, r.start_date, r.end_date, o.pay_state, o.final_price, r.deposit_final, r.refund})
                 .Where(o => o.pay_state == 1)
@@ -531,9 +532,10 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<RentOrderCollection>> GetCurrentSameDaySettled(DateTime date, string sessionKey)
+        public async Task<ActionResult<RentOrderCollection>> GetCurrentSameDaySettled(DateTime date, string sessionKey, string shop = "")
         {
             sessionKey = Util.UrlDecode(sessionKey);
+            shop = Util.UrlDecode(shop);
             UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
             if (!user.isAdmin)
             {
@@ -542,7 +544,7 @@ namespace SnowmeetApi.Controllers
             var rentOrderList = await _context.RentOrder
                 .Where(r => (r.create_date.Date == date.Date 
                     && (r.end_date != null || ((DateTime)r.end_date).Date == date.Date)
-                    && r.order_id != 0))
+                    && r.order_id != 0 && (shop.Trim().Equals("") || shop.Trim().Equals(r.shop.Trim())) ))
                 .Join(_context.OrderOnlines, r => r.order_id, o => o.id,
                     (r, o) => new { r.id, r.start_date, r.end_date, o.pay_state, o.final_price, r.deposit_final, r.refund })
                 .Where(o => o.pay_state == 1)
@@ -573,16 +575,18 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<RentOrderCollection>> GetCurrentDayPlaced(DateTime date, string sessionKey)
+        public async Task<ActionResult<RentOrderCollection>> GetCurrentDayPlaced(DateTime date, string sessionKey, string shop = "")
         {
             sessionKey = Util.UrlDecode(sessionKey);
+            shop = Util.UrlDecode(shop).Trim();
             UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
             if (!user.isAdmin)
             {
                 return BadRequest();
             }
             var rentOrderList = await _context.RentOrder
-                .Where(r => (r.create_date.Date == date.Date))
+                .Where(r => (r.create_date.Date == date.Date
+                && (shop.Equals("") || shop.Equals(r.shop.Trim()))))
                 .Join(_context.OrderOnlines, r => r.order_id, o => o.id,
                     (r, o) => new { r.id, r.start_date, r.end_date, o.pay_state, o.final_price, r.deposit_final, r.refund })
                 .Where(o => o.pay_state == 1)
@@ -616,9 +620,10 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<RentOrderCollection>> GetCurrentDaySettledPlacedBefore(DateTime date, string sessionKey)
+        public async Task<ActionResult<RentOrderCollection>> GetCurrentDaySettledPlacedBefore(DateTime date, string sessionKey, string shop = "")
         {
             sessionKey = Util.UrlDecode(sessionKey);
+            shop = Util.UrlDecode(shop).Trim();
             UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
             if (!user.isAdmin)
             {
@@ -626,6 +631,7 @@ namespace SnowmeetApi.Controllers
             }
             var rentOrderList = await _context.RentOrder
                 .Where(r => (r.create_date.Date < date.Date
+                    && (shop.Equals("") || shop.Equals(r.shop.Trim()))
                     && (r.end_date != null && ((DateTime)r.end_date).Date == date.Date)))
                 .Join(_context.OrderOnlines, r => r.order_id, o => o.id,
                     (r, o) => new { r.id, r.start_date, r.end_date, o.pay_state, o.final_price, r.deposit_final, r.refund })
