@@ -506,14 +506,27 @@ namespace SnowmeetApi.Controllers
             RentOrder[] orderArr = new RentOrder[rentOrderList.Count];
             double totalDeposit = 0;
             double totalRental = 0;
+            List<RentOrder> list = new List<RentOrder>();
+            
             for (int i = 0; i < orderArr.Length; i++)
             {
-                orderArr[i] = (RentOrder)((OkObjectResult)(await GetRentOrder(rentOrderList[i].id, sessionKey)).Result).Value;
-                totalDeposit = orderArr[i].deposit_final + totalDeposit;
-                double subTotalRental = 0;
-                for (int j = 0; j < orderArr[i].rentalDetails.Count; j++)
+                RentOrder order = (RentOrder)((OkObjectResult)(await GetRentOrder(rentOrderList[i].id, sessionKey)).Result).Value;
+                if (order.status.Equals("已付押金"))
                 {
-                    RentalDetail detail = orderArr[i].rentalDetails[j];
+                    list.Add(order);
+                    //list.Append(order);
+                }
+                else
+                {
+                    continue;
+                }
+
+                //orderArr[i] = (RentOrder)((OkObjectResult)(await GetRentOrder(rentOrderList[i].id, sessionKey)).Result).Value;
+                totalDeposit = order.deposit_final + totalDeposit;
+                double subTotalRental = 0;
+                for (int j = 0; j < order.rentalDetails.Count; j++)
+                {
+                    RentalDetail detail = order.rentalDetails[j];
                     if (detail.date.Date < date.Date)
                     {
                         subTotalRental = subTotalRental + detail.rental;
@@ -527,7 +540,7 @@ namespace SnowmeetApi.Controllers
             sum.type = "当日前未完结";
             sum.unRefundDeposit = totalDeposit;
             sum.unSettledRental = totalRental;
-            sum.orders = orderArr;
+            sum.orders = list.ToArray();
             return Ok(sum);
         }
 
