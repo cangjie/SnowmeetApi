@@ -139,6 +139,44 @@ namespace SnowmeetApi.Controllers
             return rentOrder;
         }
 
+        [HttpGet("{cell}")]
+        public async Task<ActionResult<RentOrder[]>> GetRentOrderListByCell(string cell, string sessionKey, string status = "", string shop = "")
+        {
+            cell = cell.Trim();
+            if (cell.Length < 4)
+            {
+                return BadRequest();
+            }
+            shop = Util.UrlDecode(shop).Trim();
+            status = Util.UrlDecode(status).Trim();
+            sessionKey = Util.UrlDecode(sessionKey).Trim();
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            if (!user.isAdmin)
+            {
+                return BadRequest();
+            }
+
+            var orderListTemp = await _context.RentOrder
+                .Where(o => (o.cell_number.EndsWith(cell) && (shop.Equals("") || o.shop.Trim().Equals(shop)) ))
+                .OrderByDescending(o => o.id).ToListAsync();
+            if (orderListTemp == null || orderListTemp.Count <= 0)
+            {
+                return NotFound();
+            }
+
+            List<RentOrder> orderList = new List<RentOrder>();
+            for (int i = 0; i < orderListTemp.Count; i++)
+            {
+                RentOrder order = (RentOrder)((OkObjectResult)(await GetRentOrder(orderListTemp[i].id, sessionKey)).Result).Value;
+                if (status.Equals("") || order.status.Trim().Equals(status))
+                {
+                    orderList.Add(order);
+                }
+            }
+            return Ok(orderList.ToArray<RentOrder>());
+        }
+
+
         [HttpGet]
         public async Task<ActionResult<RentOrder[]>> GetRentOrderListByStaff(string shop,
             DateTime start, DateTime end, string status, string sessionKey)
