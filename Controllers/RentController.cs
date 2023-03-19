@@ -442,6 +442,7 @@ namespace SnowmeetApi.Controllers
             OrderOnline order = rentOrder.order;
             payment.status = "支付成功";
             order.pay_state = 1;
+            order.pay_time = DateTime.Now;
             _context.Entry(payment).State = EntityState.Modified;
             _context.Entry(order).State = EntityState.Modified;
             await _context.SaveChangesAsync();

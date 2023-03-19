@@ -363,6 +363,7 @@ namespace SnowmeetApi.Controllers.Order
             if (order.final_price <= order.paidAmount)
             {
                 order.pay_state = 1;
+                order.pay_time = DateTime.Now;
             }
             if (order.open_id.Trim().Equals(""))
             {
