@@ -103,7 +103,7 @@ namespace SnowmeetApi.Models.Rent
                 else
                 {
                     s = "未支付";
-                    if (closed == 1 || create_date <= DateTime.Now.AddHours(4))
+                    if (closed == 1 || create_date <= DateTime.Now.AddHours(-4))
                     {
                         s = "已关闭";
                     }
