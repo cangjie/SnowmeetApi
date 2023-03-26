@@ -872,7 +872,7 @@ namespace SnowmeetApi.Controllers
             }
 
             var result = (await GetRentOrder(id, sessionKey)).Result;
-            if (!result.GetType().Equals("OkObjectResult"))
+            if (!result.GetType().Name.Trim().Equals("OkObjectResult"))
             {
                 return NotFound();
             }
