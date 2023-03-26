@@ -6,6 +6,8 @@ using System.Net;
 using System.Security.Cryptography;
 using System.Threading.Tasks;
 using System.Web;
+using Microsoft.EntityFrameworkCore;
+using SnowmeetApi.Models.Users;
 
 namespace SnowmeetApi
 {
@@ -199,6 +201,13 @@ namespace SnowmeetApi
             }
 
             return result;
+        }
+
+        public static async Task<UnicUser> GetUser(string sessionKey, Data.ApplicationDBContext db)
+        {
+            sessionKey = Util.UrlDecode(sessionKey).Trim();
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, db)).Value;
+            return user;
         }
     }
 

@@ -14,6 +14,8 @@ using SnowmeetApi.Models.Order;
 using SnowmeetApi.Models.Rent;
 using SnowmeetApi.Models.Users;
 using System.Collections;
+using static SKIT.FlurlHttpClient.Wechat.TenpayV3.Models.DepositMarketingMemberCardOpenCardCodesResponse.Types;
+
 namespace SnowmeetApi.Controllers
 {
     [Route("core/[controller]/[action]")]
@@ -858,6 +860,42 @@ namespace SnowmeetApi.Controllers
             return Ok(item);
 
         }
+
+        [HttpGet("{id}")]
+        public async Task<ActionResult<RentOrder>> SetClose(int id, string sessionKey)
+        {
+            UnicUser user = await Util.GetUser(sessionKey, _context);
+
+            if (!user.isAdmin)
+            {
+                return BadRequest();
+            }
+
+            var result = (await GetRentOrder(id, sessionKey)).Result;
+            if (!result.GetType().Equals("OkObjectResult"))
+            {
+                return NotFound();
+            }
+
+            RentOrder order = (RentOrder)((OkObjectResult)result).Value;
+            if (order.status.Trim().Equals("未支付"))
+            {
+                order.closed = 1;
+                _context.Entry(order).State = EntityState.Modified;
+                await _context.SaveChangesAsync();
+            }
+            return Ok(order);
+        }
+
+
+        [NonAction]
+        public async Task<UnicUser> GetUser(string sessionKey)
+        {
+            sessionKey = Util.UrlDecode(sessionKey).Trim();
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            return user;
+        }
+
 
         /*
         [HttpGet]
