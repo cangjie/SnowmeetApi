@@ -70,7 +70,10 @@ namespace SnowmeetApi.Models.Rent
 
         public string staff_name { get; set; } = "";
 
+        public int closed { get; set; } = 0;
+
         public DateTime create_date { get; set; } = DateTime.Now;
+
 
         
 
@@ -100,6 +103,10 @@ namespace SnowmeetApi.Models.Rent
                 else
                 {
                     s = "未支付";
+                    if (closed == 1 || create_date <= DateTime.Now.AddHours(4))
+                    {
+                        s = "已关闭";
+                    }
                     return s;
                 }
                 bool finish = true;
