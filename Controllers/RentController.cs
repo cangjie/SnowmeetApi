@@ -70,6 +70,29 @@ namespace SnowmeetApi.Controllers
                 return BadRequest();
             }
 
+            MiniAppUser customerUser = await _context.MiniAppUsers.FindAsync(rentOrder.open_id);
+
+            if (customerUser != null)
+            {
+                if (customerUser.real_name.Trim().Equals(""))
+                {
+                    string realName = rentOrder.real_name.Replace("先生", "").Replace("女士", "").Trim();
+                    string gender = "";
+                    if (rentOrder.real_name.Replace(realName, "").IndexOf("先生") >= 0)
+                    {
+                        gender = "男";
+                    }
+                    else if (rentOrder.real_name.Replace(realName, "").IndexOf("女士") >= 0)
+                    {
+                        gender = "女";
+                    }
+                    customerUser.real_name = realName;
+                    customerUser.gender = gender;
+                    _context.Entry(customerUser).State = EntityState.Modified;
+                    await _context.SaveChangesAsync();
+                }
+            }
+
             rentOrder.staff_open_id = user.miniAppOpenId.Trim();
             rentOrder.staff_name = user.miniAppUser.real_name.Trim();
 
