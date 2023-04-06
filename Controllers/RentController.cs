@@ -365,7 +365,7 @@ namespace SnowmeetApi.Controllers
                 return BadRequest();
             }
             RentOrderDetail detail = await _context.RentOrderDetail.FindAsync(id);
-            detail.start_date = null;
+            detail.real_end_date = null;
             _context.Entry(detail).State = EntityState.Modified;
             await _context.SaveChangesAsync();
             return Ok(detail);
