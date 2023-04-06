@@ -357,6 +357,21 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet("{id}")]
+        public async Task<ActionResult<RentOrderDetail>> SetUnReturn(int id, string sessionKey)
+        {
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            if (!user.isAdmin)
+            {
+                return BadRequest();
+            }
+            RentOrderDetail detail = await _context.RentOrderDetail.FindAsync(id);
+            detail.start_date = null;
+            _context.Entry(detail).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
+            return Ok(detail);
+        }
+
+        [HttpGet("{id}")]
         public async Task<ActionResult<RentOrderDetail>> SetReturn(int id, float rental,
             double reparation, DateTime returnDate, string memo, string sessionKey, double overTimeCharge = 0)
         {
