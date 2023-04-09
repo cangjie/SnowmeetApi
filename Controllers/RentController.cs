@@ -151,6 +151,7 @@ namespace SnowmeetApi.Controllers
                     detail.start_date = DateTime.Now;
                 }
                 */
+                detail.rent_staff = user.miniAppOpenId.Trim();
                 detail.rent_list_id = rentOrder.id;
                 await _context.RentOrderDetail.AddAsync(detail);
                 await _context.SaveChangesAsync();
@@ -325,6 +326,24 @@ namespace SnowmeetApi.Controllers
 
                 }
 
+                if (!detail.rent_staff.Trim().Equals(""))
+                {
+                    detail.rentStaff = await _context.MiniAppUsers.FindAsync(detail.rent_staff);
+                }
+                else
+                {
+                    detail.rentStaff = null;
+                }
+
+                if (!detail.return_staff.Trim().Equals(""))
+                {
+                    detail.returnStaff = await _context.MiniAppUsers.FindAsync(detail.return_staff);
+                }
+                else
+                {
+                    detail.returnStaff = null;
+                }
+
                 //if (rentOrder.start_date.Hour >= 16 && )
 
                 switch (rentOrder.shop.Trim())
@@ -411,6 +430,7 @@ namespace SnowmeetApi.Controllers
             detail.reparation = reparation;
             detail.memo = memo.Trim();
             detail.overtime_charge = overTimeCharge;
+            detail.return_staff = user.miniAppOpenId.Trim();
             _context.Entry(detail).State = EntityState.Modified;
             await _context.SaveChangesAsync();
 
@@ -450,6 +470,7 @@ namespace SnowmeetApi.Controllers
             }
             RentOrderDetail detail = await _context.RentOrderDetail.FindAsync(id);
             detail.start_date = DateTime.Now;
+            detail.rent_staff = user.miniAppOpenId.Trim();
             _context.Entry(detail).State = EntityState.Modified;
             await _context.SaveChangesAsync();
             return Ok(detail);

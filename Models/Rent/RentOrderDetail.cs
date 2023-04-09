@@ -38,6 +38,16 @@ namespace SnowmeetApi.Models.Rent
 
         public double overtime_charge { get; set; }
 
+        public string rent_staff { get; set; }
+
+        public string return_staff { get; set; }
+
+        [NotMapped]
+        public Models.Users.MiniAppUser? rentStaff { get; set; }
+
+        [NotMapped]
+        public Models.Users.MiniAppUser? returnStaff { get; set; }
+
         [NotMapped]
         public string rentStatus
         {
