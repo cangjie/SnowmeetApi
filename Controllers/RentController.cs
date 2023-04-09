@@ -152,6 +152,7 @@ namespace SnowmeetApi.Controllers
                 }
                 */
                 detail.rent_staff = user.miniAppOpenId.Trim();
+                detail.return_staff = "";
                 detail.rent_list_id = rentOrder.id;
                 await _context.RentOrderDetail.AddAsync(detail);
                 await _context.SaveChangesAsync();
