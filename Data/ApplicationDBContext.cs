@@ -119,6 +119,8 @@ namespace SnowmeetApi.Data
 
         public DbSet<SnowmeetApi.Models.Rent.RentOrderDetail> RentOrderDetail { get; set; }
 
+        public DbSet<SnowmeetApi.Models.Recept> Recept { get; set; }
+
         //public DbSet<SnowmeetApi.Models.Product.SkiPass> skiPass { get; set; }
 
 
