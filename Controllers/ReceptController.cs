@@ -10,6 +10,7 @@ using SnowmeetApi.Models;
 using Newtonsoft.Json;
 using Microsoft.Extensions.Configuration;
 using SnowmeetApi.Models.Users;
+using SnowmeetApi.Models.Rent;
 
 namespace SnowmeetApi.Controllers
 {
@@ -61,8 +62,73 @@ namespace SnowmeetApi.Controllers
             return s;
         }
 
+        [HttpGet]
+        public async Task<ActionResult<Recept>> NewRecept(string openId, string scene, string shop, string sessionKey)
+        {
+            MiniAppUser adminUser = await GetUser(sessionKey);
+            if (adminUser.is_admin != 1)
+            {
+                return BadRequest();
+            }
+            openId = Util.UrlDecode(openId);
+            scene = Util.UrlDecode(scene);
+            shop = Util.UrlDecode(shop);
+            MiniAppUser user = await _context.MiniAppUsers.FindAsync(openId);
+            string realName = user.real_name.Trim();
+            switch (user.gender.Trim())
+            {
+                case "男":
+                    realName += " 先生";
+                    break;
+                case "女":
+                    realName += " 女士";
+                    break;
+                default:
+                    break;
+            }
+            string entityJson = "";
+
+            switch (scene)
+            {
+                case "租赁下单":
+                    
+                    RentOrder order = new RentOrder()
+                    {
+                        open_id = openId,
+                        cell_number = user.cell_number.Trim(),
+                        real_name = realName,
+                        shop = shop
+                    };
+                    entityJson = Newtonsoft.Json.JsonConvert.SerializeObject(order);
+                    break;
+                default:
+                    break;
+            }
+            Recept recept = new Recept()
+            {
+                shop = shop.Trim(),
+                open_id = openId.Trim(),
+                cell = user.cell_number.Trim(),
+                real_name = user.real_name.Trim(),
+                current_step = "",
+                gender = user.gender.Trim(),
+                recept_type = scene.Trim(),
+                submit_data = entityJson.Trim(),
+                recept_staff = adminUser.open_id.Trim(),
+                update_staff = "",
+                submit_return_id = 0,
+                create_date = DateTime.Now,
+                update_date = DateTime.Now
+            };
+            await _context.Recept.AddAsync(recept);
+            await _context.SaveChangesAsync();
+
+            return Ok(recept);
+
+        }
+
         [HttpPost("{sessionKey}")]
-        public async Task<ActionResult<Recept>> Recept(string sessionKey, Recept recept)
+        public async Task<ActionResult<Recept>> ReceptTest(string sessionKey, Recept recept)
         {
             sessionKey = Util.UrlDecode(sessionKey);
             UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
@@ -87,11 +153,23 @@ namespace SnowmeetApi.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<Recept>> GetRecept(int id, string sessionKey)
         {
-            if (await IsAdmin(sessionKey))
+            if (!(await IsAdmin(sessionKey)))
             {
                 return BadRequest();
             }
             Recept recept = await _context.Recept.FindAsync(id);
+            /*
+            string json = recept.submit_data.Trim();
+            switch (recept.recept_type.Trim())
+            {
+                case "租赁下单":
+                    object rentOrder = Newtonsoft.Json.JsonConvert.DeserializeObject(json, typeof(RentOrder));
+                    recept.rentOrder = (RentOrder)rentOrder;
+                    break;
+                default:
+                    break;
+            }
+            */
             return Ok(recept);
         }
 
@@ -114,6 +192,13 @@ namespace SnowmeetApi.Controllers
             sessionKey = Util.UrlDecode(sessionKey);
             UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
             return user.isAdmin;
+        }
+
+        [NonAction]
+        public async Task<MiniAppUser> GetUser(string sessionKey)
+        {
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            return user.miniAppUser;
         }
 
         /*
