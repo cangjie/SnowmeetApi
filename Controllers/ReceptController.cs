@@ -132,10 +132,13 @@ namespace SnowmeetApi.Controllers
         [HttpPost("{sessionKey}")]
         public async Task<ActionResult<Recept>> UpdateRecept(string sessionKey, Recept recept)
         {
-            if (await IsAdmin(sessionKey))
+            MiniAppUser adminUser = await GetUser(sessionKey);
+            if (adminUser.is_admin == 0)
             {
                 return BadRequest();
             }
+            recept.update_staff = adminUser.open_id.Trim();
+            recept.update_date = DateTime.Now;
             _context.Entry(recept).State = EntityState.Modified;
             await _context.SaveChangesAsync();
             return Ok(recept);
