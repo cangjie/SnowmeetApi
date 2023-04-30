@@ -62,6 +62,8 @@ namespace SnowmeetApi.Controllers
             return s;
         }
 
+
+
         [HttpGet]
         public async Task<ActionResult<Recept>> NewRecept(string openId, string scene, string shop, string sessionKey)
         {
@@ -128,6 +130,18 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpPost("{sessionKey}")]
+        public async Task<ActionResult<Recept>> UpdateRecept(string sessionKey, Recept recept)
+        {
+            if (await IsAdmin(sessionKey))
+            {
+                return BadRequest();
+            }
+            _context.Entry(recept).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
+            return Ok(recept);
+        }
+        /*
+        [HttpPost("{sessionKey}")]
         public async Task<ActionResult<Recept>> ReceptTest(string sessionKey, Recept recept)
         {
             sessionKey = Util.UrlDecode(sessionKey);
@@ -149,7 +163,7 @@ namespace SnowmeetApi.Controllers
             }
             return Ok(recept);
         }
-
+        */
         [HttpGet("{id}")]
         public async Task<ActionResult<Recept>> GetRecept(int id, string sessionKey)
         {
@@ -158,18 +172,6 @@ namespace SnowmeetApi.Controllers
                 return BadRequest();
             }
             Recept recept = await _context.Recept.FindAsync(id);
-            /*
-            string json = recept.submit_data.Trim();
-            switch (recept.recept_type.Trim())
-            {
-                case "租赁下单":
-                    object rentOrder = Newtonsoft.Json.JsonConvert.DeserializeObject(json, typeof(RentOrder));
-                    recept.rentOrder = (RentOrder)rentOrder;
-                    break;
-                default:
-                    break;
-            }
-            */
             return Ok(recept);
         }
 
