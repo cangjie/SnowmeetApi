@@ -35,7 +35,8 @@ namespace SnowmeetApi.Models
         public DateTime create_date { get; set; }
         public DateTime update_date { get; set; }
         public DateTime? submit_date { get; set; }
-        
+
+        public RentOrder _rentOrder;
 
         [NotMapped]
         public SerialTest entity { get; set; }
@@ -45,18 +46,29 @@ namespace SnowmeetApi.Models
         {
             get
             {
-                if (recept_type.Trim().Equals("租赁下单"))
+                if (_rentOrder == null)
                 {
-                    object order = JsonConvert.DeserializeObject(submit_data, typeof(Rent.RentOrder));
-                    return (RentOrder)order;
+                    if (recept_type.Trim().Equals("租赁下单"))
+                    {
+                        object order = JsonConvert.DeserializeObject(submit_data, typeof(Rent.RentOrder));
+                        return (RentOrder)order;
 
+                    }
+                    else
+                    {
+                        return null;
+                    }
                 }
                 else
                 {
-                    return null;
+                    return _rentOrder;
                 }
+                
             }
-
+            set
+            {
+                _rentOrder = value;
+            }
         }
 
         [NotMapped]

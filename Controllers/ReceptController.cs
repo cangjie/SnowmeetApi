@@ -132,6 +132,7 @@ namespace SnowmeetApi.Controllers
         [HttpPost("{sessionKey}")]
         public async Task<ActionResult<Recept>> UpdateRecept(string sessionKey, Recept recept)
         {
+            //Recept recept = JsonConvert.DeserializeObject(receptJson.ToString(), typeof(Recept));
             MiniAppUser adminUser = await GetUser(sessionKey);
             if (adminUser.is_admin == 0)
             {

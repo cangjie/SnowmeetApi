@@ -75,10 +75,22 @@ namespace SnowmeetApi.Models.Rent
         public DateTime create_date { get; set; } = DateTime.Now;
 
 
-        
+        public RentOrderDetail[] _details;
 
         [NotMapped]
-        public RentOrderDetail[] details {get; set;}
+        public RentOrderDetail[] details
+        {
+            get
+            {
+                return _details;
+            }
+            set
+            {
+                _details = value;
+            }
+        }
+
+        
 
         [NotMapped]
         public string payMethod { get; set; } = "微信支付";

@@ -6,41 +6,41 @@ namespace SnowmeetApi.Models.Rent
 	[Table("rent_list_detail")]
 	public class RentOrderDetail
 	{
-        public int id { get; set; }
+        public int id { get; set; } = 0;
 
-        public int rent_list_id { get; set; }
+        public int rent_list_id { get; set; } = 0;
 
         //public int rent_item_id { get; set; }
 
-        public string rent_item_name { get; set; }
+        public string rent_item_name { get; set; } = "";
 
-        public string rent_item_code { get; set; }
+        public string rent_item_code { get; set; } = "";
 
         public string rent_item_class { get; set; } = "";
 
-        public double deposit { get; set; }
+        public double deposit { get; set; } = 0;
 
         public string deposit_type { get; set; } = "立即租赁";
 
-        public DateTime? start_date { get; set; }
+        public DateTime? start_date { get; set; } = null;
 
-        public double unit_rental { get; set; }
+        public double unit_rental { get; set; } = 0;
 
-        public double real_rental { get; set; }
+        public double real_rental { get; set; } = 0;
 
-        public DateTime? real_end_date { get; set; }
+        public DateTime? real_end_date { get; set; } = null;
 
-	    public string memo { get; set; }
+        public string memo { get; set; } = "";
 
-        public string images { get; set; }
+        public string images { get; set; } = "";
 
-        public double reparation { get; set; }
+        public double reparation { get; set; } = 0;
 
-        public double overtime_charge { get; set; }
+        public double overtime_charge { get; set; } = 0;
 
-        public string rent_staff { get; set; }
+        public string rent_staff { get; set; } = "";
 
-        public string return_staff { get; set; }
+        public string return_staff { get; set; } = "";
 
         [NotMapped]
         public Models.Users.MiniAppUser? rentStaff { get; set; }
