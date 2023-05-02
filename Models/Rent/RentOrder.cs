@@ -207,7 +207,7 @@ namespace SnowmeetApi.Models.Rent
                         }
                         */
                         double totalRental = 0;
-                        for (DateTime d = startDate; d.Date <= endDate.Date; d = d.AddDays(1))
+                        for (DateTime d = startDate; startDate.Year > 2000 && d.Date <= endDate.Date; d = d.AddDays(1))
                         {
                             RentalDetail rentalDetail = new RentalDetail();
                             rentalDetail.date = d.Date;
