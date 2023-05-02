@@ -11,6 +11,7 @@ using Newtonsoft.Json;
 using Microsoft.Extensions.Configuration;
 using SnowmeetApi.Models.Users;
 using SnowmeetApi.Models.Rent;
+using Org.BouncyCastle.Asn1.X509;
 
 namespace SnowmeetApi.Controllers
 {
@@ -138,6 +139,16 @@ namespace SnowmeetApi.Controllers
             {
                 return BadRequest();
             }
+            string entityJson = "";
+            switch (recept.recept_type.Trim())
+            {
+                case "租赁下单":
+                    entityJson = Newtonsoft.Json.JsonConvert.SerializeObject(recept.rentOrder);
+                    break;
+                default:
+                    break;
+            }
+            recept.submit_data = entityJson;
             recept.update_staff = adminUser.open_id.Trim();
             recept.update_date = DateTime.Now;
             _context.Entry(recept).State = EntityState.Modified;
