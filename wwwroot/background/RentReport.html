@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="utf-8" />
-    <title>2月租赁明细报表</title>
+    <title>22-23雪季租赁明细报表</title>
     <link rel="stylesheet" href="../css/bootstrap.css" />
     <link rel="stylesheet" href="../css/bootstrap-grid.css" />
     <link rel="stylesheet" href="../css/bootstrap-reboot.css" />
@@ -35,7 +35,7 @@
         </tbody>
     </table>
     <script type="text/javascript" >
-        var dataUrl = '/core/Rent/GetRentDetailReport?start=2023-03-01&end=2023-03-31&sessionKey=' + encodeURIComponent(sessionKey);
+        var dataUrl = '/core/Rent/GetRentDetailReport?start=2023-01-01&end=2023-05-31&sessionKey=' + encodeURIComponent(sessionKey);
         $.ajax({
             url: dataUrl,
             type: 'GET',
