@@ -38,6 +38,8 @@ namespace SnowmeetApi.Data
 
             modelBuilder.Entity<SnowmeetApi.Models.Users.UnionId>().HasKey(u => new { u.union_id, u.open_id });
 
+            modelBuilder.Entity<SnowmeetApi.Models.DD.ExtendedProperties>().HasNoKey();
+
             //OrderOnline
             //modelBuilder.Entity<OrderOnline>().HasKey(c => c.id);
 
@@ -120,6 +122,14 @@ namespace SnowmeetApi.Data
         public DbSet<SnowmeetApi.Models.Rent.RentOrderDetail> RentOrderDetail { get; set; }
 
         public DbSet<SnowmeetApi.Models.Recept> Recept { get; set; }
+
+        public DbSet<SnowmeetApi.Models.DD.SysObject> sysObject { get; set; }
+
+        public DbSet<SnowmeetApi.Models.DD.SysType> sysType { get; set; }
+
+        public DbSet<SnowmeetApi.Models.DD.ExtendedProperties> extendedProperties { get; set; }
+
+
 
         //public DbSet<SnowmeetApi.Models.Product.SkiPass> skiPass { get; set; }
 
