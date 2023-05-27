@@ -62,10 +62,8 @@
     <Folder Include="wwwroot\js\" />
     <Folder Include="Models\Background\" />
     <Folder Include="Controllers\Background\" />
-    <Folder Include="wwwroot\background\" />
     <Folder Include="wwwroot\background\mi7_upload\" />
     <Folder Include="upload\" />
-    <Folder Include="wwwroot\css\" />
     <Folder Include="Models\Rent\" />
     <Folder Include="wwwroot\mapp\tickets\" />
     <Folder Include="Models\DD\" />

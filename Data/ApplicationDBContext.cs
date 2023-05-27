@@ -40,6 +40,8 @@ namespace SnowmeetApi.Data
 
             modelBuilder.Entity<SnowmeetApi.Models.DD.ExtendedProperties>().HasNoKey();
 
+            modelBuilder.Entity<SnowmeetApi.Models.DD.SysColumn>().HasNoKey();
+
             //OrderOnline
             //modelBuilder.Entity<OrderOnline>().HasKey(c => c.id);
 
@@ -128,6 +130,8 @@ namespace SnowmeetApi.Data
         public DbSet<SnowmeetApi.Models.DD.SysType> sysType { get; set; }
 
         public DbSet<SnowmeetApi.Models.DD.ExtendedProperties> extendedProperties { get; set; }
+
+        public DbSet<SnowmeetApi.Models.DD.SysColumn> sysColumn { get; set; }
 
 
 

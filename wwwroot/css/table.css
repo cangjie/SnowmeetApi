@@ -1,0 +1,27 @@
+﻿.table_head {
+    font-size: small;
+    background-color: #000000;
+    color: #ffffff;
+    text-align: center;
+    border-right-style: solid;
+    border-right-width: 1px;
+    border-right-color: white;
+}
+
+.table_body_cell_text {
+    text-align: center
+}
+
+.table_body_cell_numeric {
+    text-align: right;
+}
+
+.table_body_row tr:nth-child(even) {
+    background-color: #ffffff;
+    height: 40px;
+}
+
+.table_body_row tr:nth-child(odd) {
+    background-color: #f0f0f0;
+    height: 40px;
+}

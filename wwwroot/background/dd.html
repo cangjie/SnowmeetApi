@@ -1,0 +1,123 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title></title>
+    <link rel="stylesheet" href="../css/bootstrap.css" />
+    <link rel="stylesheet" href="../css/bootstrap-grid.css" />
+    <link rel="stylesheet" href="../css/bootstrap-reboot.css" />
+    <link rel="stylesheet" href="../css/table.css" />
+    <script type="text/javascript" src="../js/jquery-3.6.1.min.js"></script>
+    <script type="text/javascript" src="../js/util.js"></script>
+</head>
+<body>
+    <div>总共：<span id="total_table_num"></span></div>
+    <div id="tables">
+
+    </div>
+   
+</body>
+</html>
+<script type="text/javascript" >
+    var getTablesUrl = '/core/DD/GetTables';
+    var tableArr = [];
+    var divTables = document.getElementById('tables');
+    $.ajax({
+        url: getTablesUrl,
+        type: 'GET',
+        success: function (msg, status) {
+            if (status != 'success') {
+                return;
+            }
+            console.log('tables', msg);
+            tableArr = msg;
+            var totalNum = document.getElementById('total_table_num');
+            totalNum.innerText = tableArr.length.toString();
+            GetTableDetails();
+        }
+    })
+
+
+    function GetTableDetails() {
+        var tableName = '';
+        for (var i = 0; i < tableArr.length; i++) {
+            var tableObj = tableArr[i];
+            if (tableObj.fields == null) {
+                tableName = tableObj.tableName.trim();
+                break;
+            }
+        }
+        if (tableName == '') {
+            return;
+        }
+        var getTableDetailUrl = '/core/DD/GetTableDetail/' + encodeURIComponent(tableName);
+        $.ajax({
+            url: getTableDetailUrl,
+            type: 'GET',
+            success: function (msg, status) {
+                if (status != 'success') {
+                    return;
+                }
+                console.log(tableName, msg);
+                for (var i = 0; i < tableArr.length; i++) {
+                    if (tableArr[i].tableName == tableName) {
+                        tableArr[i].fields = msg.fields;
+                        DisplayTableInfo(tableArr[i]);
+                        break;
+                    }
+                }
+                GetTableDetails();
+            }
+        })
+    }
+
+    function DisplayTableInfo(table) {
+        var divTable = document.createElement('div');
+        divTable.setAttribute('id', table.tableName);
+        var divTitle = document.createElement('div');
+        divTitle.setAttribute('style', 'background-color:black;font-size:15pt;color:white;');
+        divTitle.innerHTML = '<b>' + table.tableName + '</b>';
+        divTable.appendChild(divTitle);
+
+        var divDesc = document.createElement('div');
+        divDesc.setAttribute('style', 'background-color: #CCCCCC; font-size: 12pt');
+        divDesc.innerText = '说明：' + table.description;
+        divTable.appendChild(divDesc);
+
+        var divFieldsNum = document.createElement('div');
+        divFieldsNum.setAttribute('style', 'background-color: #CCCCCC; font-size: 12pt');
+        divFieldsNum.innerText = '字段数：' + table.fields.length.toString();
+        divTable.appendChild(divFieldsNum);
+
+        var divBlank = document.createElement('div');
+        divBlank.setAttribute('style', 'height:5px;background-color:white');
+        divTable.appendChild(divBlank);
+
+        var tableFields = document.createElement('table');
+        tableFields.setAttribute('style', 'width:100%');
+        var tableHead = document.createElement('thead');
+        tableHead.innerHTML = '<tr><td style = "width: 100px;" > <b>名称</b></td><td style="width: 100px;"><b>类型</b></td><td style="width: 100px;"><b>长度</b></td><td><b>说明</b></td></tr>';
+        tableFields.appendChild(tableHead);
+        var tableBody = document.createElement('tbody');
+        tableBody.setAttribute('class', 'table_body_row');
+
+        for (var i = 0; i < table.fields.length; i++) {
+            var tr = document.createElement('tr');
+            tr.innerHTML = '<td>' + table.fields[i].name + '</td><td>' + table.fields[i].type
+                + '</td><td>' + table.fields[i].length.toString() + '</td><td>'
+                + (table.fields[i].description == undefined ? '' : table.fields[i].description) + '</td>';
+            tableBody.appendChild(tr);
+        }
+        tableFields.appendChild(tableBody);
+        divTable.appendChild(tableFields);
+
+        divBlank = document.createElement('div');
+        divBlank.setAttribute('style', 'height:15px;background-color:white');
+        divTable.appendChild(divBlank);
+
+
+
+        divTables.appendChild(divTable);
+    }
+
+</script>
