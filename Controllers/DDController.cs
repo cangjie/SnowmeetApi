@@ -35,7 +35,7 @@ namespace SnowmeetApi.Controllers
             public string type { get; set; }
 
             public int length { get; set; }
-            public string desccription { get; set; }
+            public string description { get; set; }
         }
 
         public struct table
@@ -96,7 +96,7 @@ namespace SnowmeetApi.Controllers
                         tableDesc = extList[k].value.Trim();
                     }
                 }
-                fArr[j].desccription = cDesc;
+                fArr[j].description = cDesc;
             }
             table tRet = new table();
             tRet.tableName = tableName.Trim();
@@ -170,7 +170,7 @@ namespace SnowmeetApi.Controllers
                             break;
                         }
                     }
-                    fArr[j].desccription = cDesc;
+                    fArr[j].description = cDesc;
                 }
 
                 table currentTable = new table();
