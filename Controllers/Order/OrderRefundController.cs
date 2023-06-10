@@ -202,7 +202,7 @@ namespace SnowmeetApi.Controllers.Order
 
             var certManager = new InMemoryCertificateManager();
 
-            CertificateEntry ce = new CertificateEntry(serial, cerStr, DateTimeOffset.MinValue, DateTimeOffset.MaxValue);
+            CertificateEntry ce = new CertificateEntry("AEAD_AES_256_GCM", serial, cerStr, DateTimeOffset.MinValue, DateTimeOffset.MaxValue);
 
 
             certManager.AddEntry(ce);
