@@ -79,5 +79,6 @@
     <Content Remove="wwwroot\background\mi7_upload\" />
     <Content Remove="wwwroot\css\" />
     <Content Remove="wwwroot\mapp\tickets\" />
+    <Content Remove="wwwroot\hcCmTXvtQ0.txt" />
   </ItemGroup>
 </Project>

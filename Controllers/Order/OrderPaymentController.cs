@@ -291,9 +291,12 @@ namespace SnowmeetApi.Controllers.Order
                     cerStr = sr.ReadToEnd();
                     sr.Close();
                 }
+                CertificateEntry ce = new CertificateEntry("RSA", cerStr);
 
+                //CertificateEntry ce = new CertificateEntry()
 
                 var manager = new InMemoryCertificateManager();
+                manager.AddEntry(ce);
                 var options = new WechatTenpayClientOptions()
                 {
                     MerchantId = key.mch_id.Trim(),
@@ -317,7 +320,7 @@ namespace SnowmeetApi.Controllers.Order
                     callbackSerialNumber: serial
                 );
                 */
-                if (valid || true)
+                if (valid)
                 {
                     var callbackModel = client.DeserializeEvent(postJson);
                     if ("TRANSACTION.SUCCESS".Equals(callbackModel.EventType))
