@@ -3,12 +3,15 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace SnowmeetApi.Models.DD
 {
-    [Table("syscolumns")]
+    [Table("dd_fields")]
     public class SysColumn
 	{
-		public string name { get; set; }
-		public int id { get; set; }
-		public int xtype { get; set; }
+		public int table_id { get; set; }
+		public string column_name { get; set; }
+		public string data_type { get; set; }
+		public short type_length { get; set; }
+
+		public short colid { get; set; }
 	}
 }
 

@@ -7,6 +7,9 @@ using SnowmeetApi.Models;
 using Microsoft.EntityFrameworkCore;
 using System.Threading.Tasks;
 using System.Linq;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+using System.Collections;
+using System.Collections.Generic;
 
 namespace SnowmeetApi.Controllers
 {
@@ -30,7 +33,9 @@ namespace SnowmeetApi.Controllers
         {
             public string name { get; set; }
             public string type { get; set; }
-            public string desccription { get; set; }
+
+            public int length { get; set; }
+            public string description { get; set; }
         }
 
         public struct table
@@ -55,15 +60,127 @@ namespace SnowmeetApi.Controllers
             _httpContextAccessor = httpContextAccessor;
         }
 
-        [HttpGet]
-        public async  Task<ActionResult<SerialTest>> TestSerial()
+        [HttpGet("{tableName}")]
+        public async Task<ActionResult<table>> GetTableDetail(string tableName)
         {
-            //var tableList = _context.Database.SqlQuery("select * from sysobjects where type = 'U'");//   .ExecuteSqlRaw(" select * from sysobjects where type = 'U' ");
-            //_context.oAReceive.FromSqlRaw<sysobject>(" select * from sysobjects where type = 'U' ");
-            var tableList = await _context.sysObject.Where(s => s.type.Trim().Equals("U")).ToListAsync();
-            var extList = await _context.extendedProperties.ToListAsync();
+            var tableList = await _context.sysObject
+                .Where(s => s.type.Trim().Equals("U") && s.name.Equals(tableName.Trim()))
+                .ToListAsync();
+            if (tableList == null || tableList.Count == 0)
+            {
+                return NotFound();
+            }
+            var t = tableList[0];
+            var extList = await _context.extendedProperties
+                .Where(e => e.major_id == t.id).OrderBy(e => e.minor_id).ToListAsync();
+            string tableDesc = "";
+            var columnList = await _context.sysColumn.Where(c => c.table_id == t.id)
+                .OrderBy(c => c.colid).ToListAsync();
+            fields[] fArr = new fields[columnList.Count];
+            for (int j = 0; j < fArr.Length; j++)
+            {
+                fArr[j] = new fields();
+                fArr[j].name = columnList[j].column_name;
+                fArr[j].type = columnList[j].data_type;
+                fArr[j].length = columnList[j].type_length;
+                string cDesc = "";
+                for (int k = 0; k < extList.Count; k++)
+                {
+                    if (extList[k].minor_id == j + 1)
+                    {
+                        cDesc = extList[k].value.Trim();
+                        break;
+                    }
+                    else if (extList[k].minor_id == 0)
+                    {
+                        tableDesc = extList[k].value.Trim();
+                    }
+                }
+                fArr[j].description = cDesc;
+            }
+            table tRet = new table();
+            tRet.tableName = tableName.Trim();
+            tRet.description = tableDesc.Trim();
+            tRet.fields = fArr;
+            return Ok(tRet);
+        }
 
-            return BadRequest();
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<table>>> GetTables()
+        {
+            var tableList = await _context.sysObject.Where(s => s.type.Trim().Equals("U"))
+                    .OrderBy(t => t.name).ToListAsync();
+            table[] tArr = new table[tableList.Count];
+            for (int i = 0; i < tableList.Count; i++)
+            {
+                var t = tableList[i];
+                string tableName = t.name;
+                var extList = await _context.extendedProperties
+                    .Where(e => e.major_id == t.id)
+                    .OrderBy(e => e.minor_id).ToListAsync();
+                string desc = "";
+                if (extList.Count > 0 && extList[0].minor_id == 0)
+                {
+                    desc = extList[0].value.Trim();
+                }
+                table currentTable = new table();
+                currentTable.tableName = t.name;
+                currentTable.description = desc;
+                //currentTable.fields = fArr;
+                tArr[i] = currentTable;
+            }
+            return Ok(tArr);
+        }
+
+        [HttpGet]
+        public async Task<ActionResult<table[]>> TestSerial()
+        {
+
+            var tableList = await _context.sysObject.Where(s => s.type.Trim().Equals("U"))
+                .OrderBy(t => t.name).ToListAsync();
+            table[] tArr = new table[tableList.Count];
+
+            for (int i = 0; i < tableList.Count; i++)
+            {
+                var t = tableList[i];
+                string tableName = t.name;
+                var extList = await _context.extendedProperties
+                    .Where(e => e.major_id == t.id)
+                    .OrderBy(e => e.minor_id).ToListAsync();
+                string desc = "";
+                if (extList.Count > 0 && extList[0].minor_id == 0)
+                {
+                    desc = extList[0].value.Trim();
+                }
+                var columnList = await _context.sysColumn//.Where(c => c.table_id == t.id)
+                    .OrderBy(c => c.colid).ToListAsync();
+                fields[] fArr = new fields[columnList.Count];
+                for (int j = 0; j < fArr.Length; j++)
+                {
+                    fArr[j] = new fields();
+                    fArr[j].name = columnList[j].column_name;
+                    fArr[j].type = columnList[j].data_type;
+                    fArr[j].length = columnList[j].type_length;
+                    string cDesc = "";
+                    for (int k = 0; k < extList.Count; k++)
+                    {
+                        if (extList[k].minor_id == j)
+                        { 
+                            cDesc = extList[k].value.Trim();
+                            break;
+                        }
+                    }
+                    fArr[j].description = cDesc;
+                }
+
+                table currentTable = new table();
+                currentTable.tableName = t.name;
+                currentTable.description = desc;
+                currentTable.fields = fArr;
+                tArr[i] = currentTable;
+
+            }
+            return Ok(tArr);
         }
 
     }
