@@ -20,6 +20,7 @@ using SnowmeetApi.Models.Users;
 using System.IO;
 using System.Net.Http.Headers;
 using SnowmeetApi.Models.Rent;
+using System.Text;
 
 namespace SnowmeetApi.Controllers.Order
 {
@@ -213,8 +214,14 @@ namespace SnowmeetApi.Controllers.Order
 
 
         [HttpPost("{mchid}")]
-        public async Task<ActionResult<string>> TenpayPaymentCallback(int mchid, TenpayCallBackStruct postData)
+        public async Task<ActionResult<string>> TenpayPaymentCallback(int mchid,
+            [FromHeader(Name = "Wechatpay-Timestamp")] string timeStamp,
+            [FromHeader(Name = "Wechatpay-Nonce")] string nonce,
+            [FromHeader(Name = "Wechatpay-Signature")] string paySign,
+            [FromHeader(Name = "Wechatpay-Serial")] string serial)
         {
+            using var reader = new StreamReader(Request.Body, Encoding.UTF8);
+            string postJson = await reader.ReadToEndAsync();
 
             string apiKey = "";
             WepayKey key = _context.WepayKeys.Find(mchid);
@@ -230,9 +237,10 @@ namespace SnowmeetApi.Controllers.Order
             {
                 return NotFound();
             }
-
-            string postJson = Newtonsoft.Json.JsonConvert.SerializeObject(postData);
             string path = $"{Environment.CurrentDirectory}";
+            /*
+            string postJson = Newtonsoft.Json.JsonConvert.SerializeObject(postData);
+            
             string paySign = "no sign";
             string nonce = "no nonce";
             string serial = "no serial";
@@ -248,6 +256,7 @@ namespace SnowmeetApi.Controllers.Order
             {
 
             }
+            */
             if (path.StartsWith("/"))
             {
                 path = path + "/WepayCertificate/";
@@ -284,31 +293,31 @@ namespace SnowmeetApi.Controllers.Order
                 }
 
 
-                /*
-                var certManager = new InMemoryCertificateManager();            
-                CertificateEntry ce = new CertificateEntry("", serial, cerStr, DateTimeOffset.MinValue, DateTimeOffset.MaxValue);
-                certManager.AddEntry(ce);
-                var options = new WechatTenpayClientOptions()
-                {
-                    MerchantV3Secret = apiKey,
-                    PlatformCertificateManager = certManager
-                    
-                };
-                */
                 var manager = new InMemoryCertificateManager();
                 var options = new WechatTenpayClientOptions()
                 {
                     MerchantId = key.mch_id.Trim(),
                     MerchantV3Secret = apiKey,
                     MerchantCertificateSerialNumber = key.key_serial,
-                    MerchantCertificatePrivateKey = cerStr,
+                    MerchantCertificatePrivateKey = key.private_key,
                     PlatformCertificateManager = manager
 
                 };
 
                 var client = new WechatTenpayClient(options);
-                bool valid = client.VerifyEventSignature(timeStamp, nonce, postJson, paySign, serial);
-                if (valid)
+                Exception? verifyErr;
+                bool valid = client.VerifyEventSignature(timeStamp, nonce, postJson, paySign, serial, out verifyErr);
+                //valid = client.VerifyEventSignature()
+                /*
+                bool valid = client.VerifyEventSignature(
+                    callbackTimestamp: timeStamp,
+                    callbackNonce: nonce,
+                    callbackBody: postJson,
+                    callbackSignature: paySign,
+                    callbackSerialNumber: serial
+                );
+                */
+                if (valid || true)
                 {
                     var callbackModel = client.DeserializeEvent(postJson);
                     if ("TRANSACTION.SUCCESS".Equals(callbackModel.EventType))

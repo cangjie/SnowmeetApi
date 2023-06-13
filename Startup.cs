@@ -16,6 +16,7 @@ using Microsoft.OpenApi.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using System.IO;
+
 namespace SnowmeetApi
 {
     public class Startup
@@ -61,7 +62,7 @@ namespace SnowmeetApi
                 c.SwaggerDoc("v1", new OpenApiInfo { Title = "SnowmeetApi", Version = "v1" });
             });
             services.TryAddSingleton<IHttpContextAccessor, HttpContextAccessor>();
-            
+            //services.AddHostedService<Services.BackgroundServices.TenpayCertificateRefreshingBackgroundService>();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
