@@ -284,22 +284,28 @@ namespace SnowmeetApi.Controllers.Order
                 }
 
 
-
-                var certManager = new InMemoryCertificateManager();
-               
-                CertificateEntry ce = new CertificateEntry("AEAD_AES_256_GCM", serial, cerStr, DateTimeOffset.MinValue, DateTimeOffset.MaxValue);
-
-                //CertificateEntry ce = new CertificateEntry()
-
+                /*
+                var certManager = new InMemoryCertificateManager();            
+                CertificateEntry ce = new CertificateEntry("", serial, cerStr, DateTimeOffset.MinValue, DateTimeOffset.MaxValue);
                 certManager.AddEntry(ce);
-                //certManager.SetCertificate(serial, cerStr);
                 var options = new WechatTenpayClientOptions()
                 {
                     MerchantV3Secret = apiKey,
                     PlatformCertificateManager = certManager
                     
                 };
-                
+                */
+                var manager = new InMemoryCertificateManager();
+                var options = new WechatTenpayClientOptions()
+                {
+                    MerchantId = key.mch_id.Trim(),
+                    MerchantV3Secret = apiKey,
+                    MerchantCertificateSerialNumber = key.key_serial,
+                    MerchantCertificatePrivateKey = cerStr,
+                    PlatformCertificateManager = manager
+
+                };
+
                 var client = new WechatTenpayClient(options);
                 bool valid = client.VerifyEventSignature(timeStamp, nonce, postJson, paySign, serial);
                 if (valid)
