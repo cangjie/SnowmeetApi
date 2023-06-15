@@ -13,6 +13,10 @@ namespace SnowmeetApi.Models.Users
 
         public string open_id { get; set; }
 
+        public string session_type { get; set; } = "";
+
+        /*
+
         public static Data.ApplicationDBContext _context;
 
         public static string GetOpenId(string sessionKey)
@@ -29,5 +33,6 @@ namespace SnowmeetApi.Models.Users
             
 
         }
+        */
     }
 }

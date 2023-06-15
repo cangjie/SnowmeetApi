@@ -1,4 +1,5 @@
 # globs
+access_token.*
 appsettings.json
 appsettings.Development.json
 Makefile.in
