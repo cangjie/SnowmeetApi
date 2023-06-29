@@ -22,7 +22,7 @@ namespace SnowmeetApi.Controllers
             _db = context;
         }
 
-        [HttpGet("{reserve}")]
+        [HttpGet("{reserveAble}")]
         public async Task<ActionResult<IEnumerable<UTVTrip>>> GetTrips(int reserveAble, DateTime date)
         {
             if (reserveAble == 1)
