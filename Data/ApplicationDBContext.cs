@@ -1,16 +1,8 @@
-using System;
 using Microsoft.EntityFrameworkCore;
 using SnowmeetApi.Models;
 using SnowmeetApi.Models.Users;
 using wechat_miniapp_base.Models;
-using SnowmeetApi.Models.Product;
-using SnowmeetApi.Models.Ticket;
-using SnowmeetApi.Models.Card;
-using SnowmeetApi.Models.Order;
-using SnowmeetApi.Models.Maintain;
-using SnowmeetApi.Models.Background;
-using SnowmeetApi.Models.Rent;
-//using SnowmeetApi.Models.rfid;
+using SnowmeetApi.Models.UTV;
 namespace SnowmeetApi.Data
 {
     public class ApplicationDBContext : DbContext
@@ -133,6 +125,13 @@ namespace SnowmeetApi.Data
 
         public DbSet<SnowmeetApi.Models.DD.SysColumn> sysColumn { get; set; }
 
+        public DbSet<UTVTrip> utvTrip { get; set; }
+
+        public DbSet<UTVUsers> utvUser { get; set; }
+
+        public DbSet<UTVVehicleSchedule> utvVehicleSchedule { get; set; }
+
+        public DbSet<Vehicle> vehicle { get; set; }
 
 
         //public DbSet<SnowmeetApi.Models.Product.SkiPass> skiPass { get; set; }

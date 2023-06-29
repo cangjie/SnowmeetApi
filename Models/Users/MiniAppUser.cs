@@ -19,6 +19,7 @@ namespace SnowmeetApi.Models.Users
         public string gender { get; set; } = "";
         public int blocked { get; set; } = 0;
         public int is_admin { get; set; } = 0;
+        public int member_id { get; set; } = 0;
         public DateTime create_date { get; set; } = DateTime.Now;
         /*
         public static implicit operator MiniAppUser(ActionResult<MiniAppUser> v)
