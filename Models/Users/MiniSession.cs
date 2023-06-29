@@ -14,7 +14,7 @@ namespace SnowmeetApi.Models.Users
         public string open_id { get; set; }
 
         public string session_type { get; set; } = "";
-        public DateTime create_date { get; set; }
+        public DateTime create_date { get; set; } = DateTime.Now;
 
         /*
 
