@@ -112,7 +112,7 @@ namespace SnowmeetApi.Controllers
                     totalNum++;
                 }
             }
-            var reserveList = await _db.utvReserve.Where(r => (r.trip_id == tripId && !r.status.Equals("待确认"))).ToListAsync();
+            var reserveList = await _db.utvReserve.Where(r => (r.trip_id == tripId && !r.status.Equals("待确认") && !r.status.Equals("已关闭"))).ToListAsync();
             int lockNum = 0;
             for (int i = 0; i < reserveList.Count; i++)
             {
