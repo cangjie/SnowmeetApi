@@ -133,6 +133,8 @@ namespace SnowmeetApi.Data
 
         public DbSet<Vehicle> vehicle { get; set; }
 
+        public DbSet<UTVReserve> utvReserve { get; set; }
+
 
         //public DbSet<SnowmeetApi.Models.Product.SkiPass> skiPass { get; set; }
 

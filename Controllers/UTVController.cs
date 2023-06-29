@@ -94,5 +94,31 @@ namespace SnowmeetApi.Controllers
             }
 
         }
+        [HttpGet("{tripId}")]
+        public async Task<ActionResult<int>> GetAvailableVehicleNum(int tripId)
+        {
+            int totalNum = 0;
+            var trip = await _db.utvTrip.FindAsync(tripId);
+            var vehicleList = await _db.vehicle.ToListAsync();
+            for (int i = 0; i < vehicleList.Count; i++)
+            { 
+                var vehicle = vehicleList[i];
+                if (vehicle.valid == 1)
+                {
+                    totalNum++;
+                }
+                else if (vehicle.update_date.AddDays(5).Date < trip.trip_date.Date)
+                {
+                    totalNum++;
+                }
+            }
+            var reserveList = await _db.utvReserve.Where(r => (r.trip_id == tripId && !r.status.Equals("待确认"))).ToListAsync();
+            int lockNum = 0;
+            for (int i = 0; i < reserveList.Count; i++)
+            {
+                lockNum = lockNum + reserveList[i].vehicle_num;
+            }
+            return Ok(totalNum - lockNum);
+        }
     }
 }
