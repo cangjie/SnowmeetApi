@@ -8,12 +8,36 @@ using System.Threading.Tasks;
 using System.Web;
 using Microsoft.EntityFrameworkCore;
 using SnowmeetApi.Models.Users;
+using Microsoft.AspNetCore.Mvc;
 
 namespace SnowmeetApi
 {
     public class Util
     {
+
+
         public static string workingPath = $"{Environment.CurrentDirectory}";
+
+        public static Object GetValueFromResult(ActionResult value)
+        {
+            try
+            {
+                if (value.GetType().Name.Trim().Equals("OkObjectResult"))
+                {
+                    OkObjectResult result = (OkObjectResult)value;
+                    return result.Value;
+                }
+                else
+                {
+                    return null;
+                }
+            }
+            catch
+            {
+                return null;
+            }
+            
+        }
 
         public static long getTime13()
         {

@@ -11,7 +11,7 @@ namespace SnowmeetApi.Models.UTV
         public int trip_id { get; set; }
         public int vehicle_num { get; set; }
         public string line_type { get; set; }
-        public string status { get; set; }
+        public string status { get; set; } = "待确认";
         public string source { get; set; } = "";
     }
 }

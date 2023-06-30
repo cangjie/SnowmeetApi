@@ -120,5 +120,28 @@ namespace SnowmeetApi.Controllers
             }
             return Ok(totalNum - lockNum);
         }
+        [HttpGet("{tripId}")]
+        public async Task<ActionResult<int>> Reserve(int tripId, string lineType, int vehicleNum, string cell, string name, string sessionKey)
+        {
+            
+            sessionKey = Util.UrlDecode(sessionKey.Trim());
+            UTVUsers user = (UTVUsers)Util.GetValueFromResult((await GetUserBySessionKey(sessionKey)).Result);
+            if (user == null || user.id == 0)
+            {
+                return NotFound();
+            }
+            UTVReserve r = new UTVReserve()
+            {
+                utv_user_id = user.id,
+                trip_id = tripId,
+                vehicle_num = vehicleNum,
+                line_type = lineType.Trim(),
+                status = "待确认",
+                source = "wechat"
+            };
+            await _db.AddAsync(r);
+            await _db.SaveChangesAsync();
+            return Ok(r.id);
+        }
     }
 }
