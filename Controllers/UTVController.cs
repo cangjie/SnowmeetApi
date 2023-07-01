@@ -280,7 +280,7 @@ namespace SnowmeetApi.Controllers
             UTVTrip trip = await _db.utvTrip.FindAsync(reserve.trip_id);
             reserve.trip_name = trip.trip_name;
             reserve.trip_date = trip.trip_date;
-            return Ok(trip);
+            return Ok(reserve);
         }
 
         [HttpPost("{sessionKey}")]
