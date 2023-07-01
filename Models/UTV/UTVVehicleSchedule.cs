@@ -10,7 +10,7 @@ namespace SnowmeetApi.Models.UTV
         public int id { get; set; }
         public int trip_id { get; set; }
         public int reserve_id { get; set; }
-        public int car_no { get; set; }
+        public string car_no { get; set; }
         public string status { get; set; }
         public string start_mile { get; set; }
         public string end_mile { get; set; }

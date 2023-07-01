@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using System;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 namespace SnowmeetApi.Models.UTV
 {
@@ -17,5 +18,13 @@ namespace SnowmeetApi.Models.UTV
         public string real_name { get; set; } = "";
         public string status { get; set; } = "待确认";
         public string source { get; set; } = "";
+
+        public string memo { get; set; } = "";
+        public int order_id { get; set; } = 0;
+
+        [NotMapped]
+        public DateTime trip_date { get; set; }
+        [NotMapped]
+        public string trip_name { get; set; }
     }
 }
