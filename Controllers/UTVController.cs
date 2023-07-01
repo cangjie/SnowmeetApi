@@ -121,7 +121,7 @@ namespace SnowmeetApi.Controllers
             return Ok(totalNum - lockNum);
         }
         [HttpGet("{tripId}")]
-        public async Task<ActionResult<int>> Reserve(int tripId, string lineType, int vehicleNum, string cell, string name, string sessionKey)
+        public async Task<ActionResult<int>> Reserve(int tripId, string lineType, int vehicleNum, string cell, string name, string source, string sessionKey)
         {
             
             sessionKey = Util.UrlDecode(sessionKey.Trim());
@@ -130,14 +130,62 @@ namespace SnowmeetApi.Controllers
             {
                 return NotFound();
             }
+
+            bool userInfoModified = false;
+
+            if (user.cell.Trim().Equals(""))
+            {
+                user.cell = cell.Trim();
+                userInfoModified = true;
+            }
+
+            if (user.real_name.Trim().Equals(""))
+            {
+                user.real_name = name.Trim();
+                userInfoModified = true;
+            }
+
+            if (userInfoModified)
+            {
+                await _db.SaveChangesAsync();
+            }
+
+            if (!user.wechat_open_id.Trim().Equals(""))
+            {
+                userInfoModified = false;
+                MiniAppUser mUser = await _db.MiniAppUsers.FindAsync(user.wechat_open_id.Trim());
+                if (mUser != null)
+                {
+                    if (mUser.cell_number.Trim().Equals(""))
+                    {
+                        mUser.cell_number = cell.Trim();
+                        userInfoModified = true;
+                    }
+
+                    if (mUser.real_name.Trim().Equals(""))
+                    {
+                        mUser.real_name = name.Trim();
+                        userInfoModified = true;
+                    }
+                    if (userInfoModified)
+                    { 
+                        _db.Entry(mUser).State = EntityState.Modified;
+                        await _db.SaveChangesAsync();
+                    }
+                }
+            }
+
+
             UTVReserve r = new UTVReserve()
             {
                 utv_user_id = user.id,
                 trip_id = tripId,
                 vehicle_num = vehicleNum,
                 line_type = lineType.Trim(),
+                cell = cell.Trim(),
+                real_name = name.Trim(),
                 status = "待确认",
-                source = "wechat"
+                source = source.Trim()
             };
             await _db.AddAsync(r);
             await _db.SaveChangesAsync();
