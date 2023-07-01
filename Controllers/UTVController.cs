@@ -123,8 +123,16 @@ namespace SnowmeetApi.Controllers
         [HttpGet("{tripId}")]
         public async Task<ActionResult<int>> Reserve(int tripId, string lineType, int vehicleNum, string cell, string name, string source, string sessionKey)
         {
-            
+            UTVTrip trip = await _db.utvTrip.FindAsync(tripId);
+
+            if (trip == null || trip.reserve_able == 0 || trip.trip_date.Date < DateTime.Now.Date)
+            {
+                return NotFound();
+            }
+
             sessionKey = Util.UrlDecode(sessionKey.Trim());
+            lineType = Util.UrlDecode(lineType);
+            name = Util.UrlDecode(name);
             UTVUsers user = (UTVUsers)Util.GetValueFromResult((await GetUserBySessionKey(sessionKey)).Result);
             if (user == null || user.id == 0)
             {
