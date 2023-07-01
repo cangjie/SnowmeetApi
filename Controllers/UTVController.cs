@@ -24,6 +24,24 @@ namespace SnowmeetApi.Controllers
             _db = context;
         }
 
+        [HttpGet]
+        public ActionResult<float> GetUnitDeposit()
+        {
+            return Ok(3000);
+        }
+
+        [HttpGet]
+        public ActionResult<float> GetUnitLongCharge()
+        {
+            return Ok(1280);
+        }
+
+        [HttpGet]
+        public ActionResult<float> GetUnitShortCharge()
+        {
+            return Ok(680);
+        }
+
         [HttpGet("{reserveAble}")]
         public async Task<ActionResult<IEnumerable<UTVTrip>>> GetTrips(int reserveAble, DateTime date)
         {
