@@ -172,7 +172,7 @@ namespace SnowmeetApi.Controllers
 
 
             var sList = await _db.utvVehicleSchedule
-                 .Where(s => (s.trip_id == reserveId && (getAll == 1 || (getAll == 0 && !s.status.Trim().Equals("取消"))) )).ToListAsync();
+                 .Where(s => (s.reserve_id == reserveId && (getAll == 1 || (getAll == 0 && !s.status.Trim().Equals("取消"))) )).ToListAsync();
             for (int i = 0; i < sList.Count; i++)
             {
                 if (!isAdmin)
