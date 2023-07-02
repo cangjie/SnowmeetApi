@@ -324,14 +324,28 @@ namespace SnowmeetApi.Controllers
             {
                 return NotFound();
             }
-            reserve.status = "代付押金";
+            reserve.status = "待付押金";
             reserve = (UTVReserve)Util.GetValueFromResult((await UpdateReserve(sessionKey, reserve)).Result);
             if (reserve == null)
             {
                 return BadRequest();
             }
+            double deposit = (double)Util.GetValueFromResult(GetUnitDeposit().Result);
+            double charge = 0;
+            switch (reserve.line_type.Trim())
+            {
+                case "长线":
+                    charge = (double)Util.GetValueFromResult(GetUnitLongCharge().Result);
+                    break;
+                case "短线":
+                    charge = (double)Util.GetValueFromResult(GetUnitShortCharge().Result);
+                    break;
+                default:
+                    break;
+            }
             for (int i = 0; i < reserve.vehicle_num; i++)
             {
+               
                 UTVVehicleSchedule s = new UTVVehicleSchedule()
                 {
                     trip_id = reserve.trip_id,
@@ -341,9 +355,10 @@ namespace SnowmeetApi.Controllers
                     start_mile = "",
                     end_mile = "",
                     line_type = reserve.line_type.Trim(),
-                    charge = 0,
-                    deposit = 0,
-                    discount = 0,
+                    charge = charge,
+                    charge_discount = 0,
+                    deposit = deposit,
+                    deposit_discount = 0,
                     ticket_code = "",
                     ticket_discount = 0,
                     driver_user_id = 0,

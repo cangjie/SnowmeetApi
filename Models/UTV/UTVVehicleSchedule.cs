@@ -16,8 +16,10 @@ namespace SnowmeetApi.Models.UTV
         public string end_mile { get; set; }
         public string line_type { get; set; }
         public double charge { get; set; }
+
+        public double charge_discount { get; set; }
         public double deposit { get; set; }
-        public double discount { get; set; }
+        public double deposit_discount { get; set; }
         public string ticket_code { get; set; }
         public double ticket_discount { get; set; }
         public int driver_user_id { get; set; }
