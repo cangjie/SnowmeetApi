@@ -351,7 +351,7 @@ namespace SnowmeetApi.Controllers
                     trip_id = reserve.trip_id,
                     reserve_id = reserve.id,
                     car_no = "",
-                    status = "",
+                    status = "待支付",
                     start_mile = "",
                     end_mile = "",
                     line_type = reserve.line_type.Trim(),
