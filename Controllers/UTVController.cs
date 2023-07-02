@@ -25,21 +25,21 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet]
-        public ActionResult<float> GetUnitDeposit()
+        public ActionResult<double> GetUnitDeposit()
         {
-            return Ok(3000);
+            return Ok((double)3000);
         }
 
         [HttpGet]
-        public ActionResult<float> GetUnitLongCharge()
+        public ActionResult<double> GetUnitLongCharge()
         {
-            return Ok(1280);
+            return Ok((double)1280);
         }
 
         [HttpGet]
-        public ActionResult<float> GetUnitShortCharge()
+        public ActionResult<double> GetUnitShortCharge()
         {
-            return Ok(680);
+            return Ok((double)680);
         }
 
         [HttpGet("{reserveAble}")]
