@@ -154,6 +154,38 @@ namespace SnowmeetApi.Controllers
             return Ok(sList);
         }
 
+        [HttpGet("{reserveId}")]
+        public async Task<ActionResult<IEnumerable<UTVVehicleSchedule>>> GetScheduleForReserve(int reserveId, string sessionKey, int getAll = 0)
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            bool isAdmin = await IsAdmin(sessionKey);
+            if (!isAdmin)
+            {
+                UTVUsers user = await GetUTVUser(sessionKey);
+                UTVReserve reserve = (UTVReserve)Util.GetValueFromResult((await GetReserve(reserveId, sessionKey)).Result);
+                if (reserve.utv_user_id == user.id)
+                {
+                    isAdmin = true;
+                }
+            }
+            
+
+
+            var sList = await _db.utvVehicleSchedule
+                 .Where(s => (s.trip_id == reserveId && (getAll == 1 || (getAll == 0 && !s.status.Trim().Equals("取消"))) )).ToListAsync();
+            for (int i = 0; i < sList.Count; i++)
+            {
+                if (!isAdmin)
+                {
+                    sList[i].driver_user_id = 0;
+                    sList[i].driver_insurance = "";
+                    sList[i].passenger_user_id = 0;
+                    sList[i].passenger_insurance = "";
+                }
+            }
+            return Ok(sList);
+        }
+
         [HttpGet("{tripId}")]
         public async Task<ActionResult<int>> GetLockedNumForTrip(int tripId, string sessionKey)
         {
