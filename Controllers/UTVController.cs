@@ -342,18 +342,25 @@ namespace SnowmeetApi.Controllers
                 return BadRequest();
             }
             bool needChangeScheduleTripId = false;
-            UTVReserve oriReserve = await _db.utvReserve.FindAsync(reserve.id);
-            if (oriReserve == null)
+
+            var oriReserveList = await _db.utvReserve.Where(r => r.id == reserve.id).AsNoTracking().ToListAsync();
+            if (oriReserveList == null || oriReserveList.Count == 0)
             {
                 return NotFound();
             }
-            if (oriReserve.trip_id != reserve.trip_id)
+            if (oriReserveList[0].trip_id != reserve.trip_id)
             {
                 needChangeScheduleTripId = true;
             }
-            _db.Entry(reserve).State = EntityState.Modified;
-            await _db.SaveChangesAsync();
 
+
+            _db.Entry(reserve).State = EntityState.Modified;
+            
+
+            
+
+            await _db.SaveChangesAsync();
+            
             if (needChangeScheduleTripId)
             {
                 var scheduleList = await _db.utvVehicleSchedule.Where(s => s.reserve_id == reserve.id).ToListAsync();
