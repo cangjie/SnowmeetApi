@@ -429,7 +429,19 @@ namespace SnowmeetApi.Controllers
         {
             sessionKey = Util.UrlDecode(sessionKey).Trim();
             bool isAdmin = await IsAdmin(sessionKey);
+            
             UTVVehicleSchedule s = await _db.utvVehicleSchedule.FindAsync(id);
+
+            if (!isAdmin)
+            {
+                UTVReserve reserve = await _db.utvReserve.FindAsync(s.reserve_id);
+                UTVUsers user = await GetUTVUser(sessionKey);
+                if (reserve.utv_user_id == user.id)
+                {
+                    isAdmin = true;
+                }
+            }
+
             if (!isAdmin)
             {
                 s.driver_user_id = 0;
@@ -440,7 +452,20 @@ namespace SnowmeetApi.Controllers
             return Ok(s);
         }
 
-       
+        [HttpPost("{sessionKey}")]
+        public async Task<ActionResult<UTVVehicleSchedule>> UpdateSchedule(string sessionKey, UTVVehicleSchedule schedule)
+        {
+            sessionKey = Util.UrlDecode(sessionKey).Trim();
+            bool isAdmin = await IsAdmin(sessionKey);
+            if (!isAdmin)
+            {
+                return BadRequest();
+            }
+            _db.Entry(schedule).State = EntityState.Modified;
+            await _db.SaveChangesAsync();
+            return Ok(schedule);
+        }
+
 
         /*
         [NonAction]
