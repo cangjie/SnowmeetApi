@@ -337,14 +337,34 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<UTVReserve>> UpdateReserve(string sessionKey, UTVReserve reserve)
         {
             sessionKey = Util.UrlDecode(sessionKey.Trim());
-           
             if (!(await IsAdmin(sessionKey)))
             {
                 return BadRequest();
             }
-
+            bool needChangeScheduleTripId = false;
+            UTVReserve oriReserve = await _db.utvReserve.FindAsync(reserve.id);
+            if (oriReserve == null)
+            {
+                return NotFound();
+            }
+            if (oriReserve.trip_id != reserve.trip_id)
+            {
+                needChangeScheduleTripId = true;
+            }
             _db.Entry(reserve).State = EntityState.Modified;
             await _db.SaveChangesAsync();
+
+            if (needChangeScheduleTripId)
+            {
+                var scheduleList = await _db.utvVehicleSchedule.Where(s => s.reserve_id == reserve.id).ToListAsync();
+                for (int i = 0; i < scheduleList.Count; i++)
+                {
+                    scheduleList[i].trip_id = reserve.trip_id;
+                    _db.Entry(scheduleList[i]).State = EntityState.Modified;
+                }
+                await _db.SaveChangesAsync();
+            }
+
             return Ok(reserve);
         }
 
