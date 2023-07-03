@@ -342,7 +342,6 @@ namespace SnowmeetApi.Controllers
                 return BadRequest();
             }
             bool needChangeScheduleTripId = false;
-
             var oriReserveList = await _db.utvReserve.Where(r => r.id == reserve.id).AsNoTracking().ToListAsync();
             if (oriReserveList == null || oriReserveList.Count == 0)
             {
@@ -352,15 +351,8 @@ namespace SnowmeetApi.Controllers
             {
                 needChangeScheduleTripId = true;
             }
-
-
             _db.Entry(reserve).State = EntityState.Modified;
-            
-
-            
-
             await _db.SaveChangesAsync();
-            
             if (needChangeScheduleTripId)
             {
                 var scheduleList = await _db.utvVehicleSchedule.Where(s => s.reserve_id == reserve.id).ToListAsync();
@@ -430,6 +422,22 @@ namespace SnowmeetApi.Controllers
             }
             await _db.SaveChangesAsync();
             return await _db.utvVehicleSchedule.Where(s => s.reserve_id == reserve.id).ToListAsync();
+        }
+
+        [HttpGet("{id}")]
+        public async Task<ActionResult<UTVVehicleSchedule>> GetSchedule(int id, string sessionKey)
+        {
+            sessionKey = Util.UrlDecode(sessionKey).Trim();
+            bool isAdmin = await IsAdmin(sessionKey);
+            UTVVehicleSchedule s = await _db.utvVehicleSchedule.FindAsync(id);
+            if (!isAdmin)
+            {
+                s.driver_user_id = 0;
+                s.driver_insurance = "";
+                s.passenger_user_id = 0;
+                s.passenger_insurance = "";
+            }
+            return Ok(s);
         }
 
        
