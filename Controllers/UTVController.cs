@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -7,9 +8,13 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using SnowmeetApi.Data;
+using SnowmeetApi.Models;
+using SnowmeetApi.Models.Order;
 using SnowmeetApi.Models.Users;
 using SnowmeetApi.Models.UTV;
+using static Org.BouncyCastle.Math.EC.ECCurve;
 
 namespace SnowmeetApi.Controllers
 {
@@ -18,10 +23,12 @@ namespace SnowmeetApi.Controllers
     public class UTVController : ControllerBase
     {
         private readonly ApplicationDBContext _db;
+        private readonly Order.OrderPaymentController payCtrl;
 
-        public UTVController(ApplicationDBContext context)
+        public UTVController(ApplicationDBContext context, IConfiguration config, IHttpContextAccessor httpContextAccessor)
         {
             _db = context;
+            payCtrl = new Order.OrderPaymentController(context, config, httpContextAccessor);
         }
 
         [HttpGet]
@@ -341,7 +348,12 @@ namespace SnowmeetApi.Controllers
         {
             sessionKey = Util.UrlDecode(sessionKey);
             bool isAdmin = await IsAdmin(sessionKey);
-            UTVUsers user = await GetUTVUser(sessionKey);
+            string openId = await GetOpenId(sessionKey);
+            if (openId == null || openId.Trim().Equals(""))
+            {
+                return NoContent();
+            }
+            UTVUsers user = await GetUTVUser(openId);
             UTVReserve reserve = await _db.utvReserve.FindAsync(id);
             if (reserve == null) 
             {
@@ -490,7 +502,52 @@ namespace SnowmeetApi.Controllers
             return Ok(schedule);
         }
 
+        [HttpGet("{id}")]
+        public async Task<ActionResult<Models.Order.TenpaySet>> PayDepositByTencent(int reserveId, string sessionKey)
+        {
+            string openId = await GetOpenId(sessionKey);
+            UTVUsers user = await GetUser(openId.Trim());
+            UTVReserve reserve = await _db.utvReserve.FindAsync(reserveId);
+            if (reserve.status != "待付押金" || reserve.utv_user_id != user.id)
+            {
+                return BadRequest();
+            }
 
+            var scheduleList = await _db.utvVehicleSchedule.Where(s => (s.status == "待支付" && s.reserve_id == reserveId)).ToListAsync();
+            double depositTotal = 0;
+            for (int i = 0; i < scheduleList.Count; i++)
+            {
+                depositTotal += (scheduleList[i].deposit - scheduleList[i].deposit_discount);
+            }
+
+            OrderOnline order = new OrderOnline()
+            {
+                type = "UTV",
+                shop = "万龙体验中心",
+                order_price = depositTotal,
+                order_real_pay_price = depositTotal,
+                final_price = depositTotal,
+                open_id = openId.Trim(),
+                staff_open_id = "",
+                memo = ""
+            };
+            await _db.AddAsync(order);
+            await _db.SaveChangesAsync();
+            OrderPayment payment = new OrderPayment()
+            {
+                order_id = order.id,
+                pay_method = order.pay_method.Trim(),
+                amount = order.final_price,
+                status = "待支付",
+                staff_open_id =  ""
+            };
+            await _db.OrderPayment.AddAsync(payment);
+            await _db.SaveChangesAsync();
+
+            Models.Order.TenpaySet set =  (Models.Order.TenpaySet)Util.GetValueFromResult((await payCtrl.TenpayRequest(payment.id, sessionKey)).Result);
+
+            return Ok(set);
+        }
         /*
         [NonAction]
         public async Task<IEnumerable<UTVVehicleSchedule>> AllocateVehicleForReserve(int reserveId)
