@@ -296,13 +296,27 @@ namespace SnowmeetApi.Controllers
         {
             sessionKey = Util.UrlDecode(sessionKey.Trim());
             status = Util.UrlDecode(status.Trim()).Trim();
-            if (!(await IsAdmin(sessionKey)))
+            bool isAdmin = await IsAdmin(sessionKey);
+            int userId = 0;
+            if (!isAdmin)
             {
-                return BadRequest();
+                UTVUsers user = (await GetUser(sessionKey));
+                if (user == null)
+                {
+                    return NoContent();
+                }
+                userId = user.id;
+                if (userId == 0)
+                {
+                    return NoContent();
+                }     
             }
             var rList = await _db.utvReserve.Join(_db.utvTrip, r => r.trip_id, t => t.id,
-                (r, t) => new { r.id, r.trip_id, r.cell, r.real_name, r.line_type, r.vehicle_num, r.status, t.trip_name, t.trip_date })
-                .Where(r => ((status.Equals("") || r.status.Trim().Equals(status)) && r.trip_date.Date >= startDate.Date && r.trip_date.Date <= endDate.Date))
+                (r, t) => new { r.id, r.trip_id, r.cell, r.real_name, r.line_type, r.vehicle_num, r.status, t.trip_name, t.trip_date, r.utv_user_id })
+                .Where(r => ((status.Equals("") || r.status.Trim().Equals(status))
+                    && r.trip_date.Date >= startDate.Date
+                    && r.trip_date.Date <= endDate.Date
+                    && (userId == 0 || r.utv_user_id == userId)))
                 .ToListAsync();
             if (rList == null)
             { 
@@ -311,6 +325,8 @@ namespace SnowmeetApi.Controllers
             
             return Ok(rList);
         }
+
+       
 
         [HttpGet("{id}")]
         public async Task<ActionResult<UTVReserve>> GetReserve(int id, string sessionKey)
