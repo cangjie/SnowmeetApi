@@ -297,7 +297,12 @@ namespace SnowmeetApi.Controllers
             sessionKey = Util.UrlDecode(sessionKey.Trim());
             status = Util.UrlDecode(status.Trim()).Trim();
             bool isAdmin = await IsAdmin(sessionKey);
-            UTVUsers user = (await GetUser(sessionKey));
+            string openId = await GetOpenId(sessionKey);
+            if (openId == null || openId.Trim().Equals(""))
+            {
+                return NoContent();
+            }
+            UTVUsers user = (await GetUser(openId));
             int userId = 0;
             if (user == null)
             {
