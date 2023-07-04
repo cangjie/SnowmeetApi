@@ -502,7 +502,7 @@ namespace SnowmeetApi.Controllers
             return Ok(schedule);
         }
 
-        [HttpGet("{id}")]
+        [HttpGet("{reserveId}")]
         public async Task<ActionResult<Models.Order.TenpaySet>> PayDepositByTencent(int reserveId, string sessionKey)
         {
             string openId = await GetOpenId(sessionKey);
@@ -513,6 +513,13 @@ namespace SnowmeetApi.Controllers
                 return BadRequest();
             }
 
+            int orderId = reserve.order_id;
+            if (orderId > 0)
+            {
+                OrderOnline orderTmp = (OrderOnline)Util.GetValueFromResult((await payCtrl.CancelOrder(orderId, sessionKey)).Result);
+            }
+
+
             var scheduleList = await _db.utvVehicleSchedule.Where(s => (s.status == "待支付" && s.reserve_id == reserveId)).ToListAsync();
             double depositTotal = 0;
             for (int i = 0; i < scheduleList.Count; i++)
@@ -522,14 +529,16 @@ namespace SnowmeetApi.Controllers
 
             OrderOnline order = new OrderOnline()
             {
-                type = "UTV",
+                cell_number = reserve.cell.Trim(),
+                name = reserve.real_name.Trim(),
+                type = "押金",
                 shop = "万龙体验中心",
                 order_price = depositTotal,
                 order_real_pay_price = depositTotal,
                 final_price = depositTotal,
                 open_id = openId.Trim(),
                 staff_open_id = "",
-                memo = ""
+                memo = "UTV"
             };
             await _db.AddAsync(order);
             await _db.SaveChangesAsync();
@@ -541,12 +550,14 @@ namespace SnowmeetApi.Controllers
                 status = "待支付",
                 staff_open_id =  ""
             };
+            reserve.order_id = order.id;
             await _db.OrderPayment.AddAsync(payment);
+            _db.Entry(reserve).State = EntityState.Modified;
             await _db.SaveChangesAsync();
 
-            Models.Order.TenpaySet set =  (Models.Order.TenpaySet)Util.GetValueFromResult((await payCtrl.TenpayRequest(payment.id, sessionKey)).Result);
+            var set =  await payCtrl.TenpayRequest(payment.id, sessionKey);
 
-            return Ok(set);
+            return Ok(set.Value);
         }
         /*
         [NonAction]

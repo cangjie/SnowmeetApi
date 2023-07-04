@@ -69,6 +69,8 @@ namespace SnowmeetApi.Controllers.Order
 
         }
 
+
+
         [HttpGet("{id}")]
         public async Task<ActionResult<TenpaySet>> TenpayRequest(int id, string sessionKey)
         {
@@ -505,6 +507,61 @@ namespace SnowmeetApi.Controllers.Order
             _context.Entry(order).State = EntityState.Modified;
             await _context.SaveChangesAsync();
             return Ok(order);
+        }
+
+        [HttpGet("{orderId}")]
+        public async Task<ActionResult<OrderOnline>> CancelOrder(int orderId, string sessionKey)
+        {
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            
+           
+
+            OrderOnlinesController orderController = new OrderOnlinesController(_context, _originConfig);
+
+            bool canCancel = true;
+            OrderOnline order = await _context.OrderOnlines.FindAsync(orderId);
+            if (order == null)
+            {
+                return NotFound();
+            }
+            if (!user.isAdmin && !order.open_id.Trim().Equals(user.miniAppOpenId.Trim()))
+            {
+                return BadRequest();
+            }
+
+
+            if (order.pay_state != 0)
+            {
+                canCancel = false;
+            }
+            var paymentList = await _context.OrderPayment.Where(p => p.order_id == orderId).ToListAsync();
+            for (int i = 0; i < paymentList.Count; i++)
+            {
+                if (!paymentList[i].status.Trim().Equals("待支付"))
+                {
+                    canCancel = false;
+                    break;
+                }
+            }
+
+            if (!canCancel)
+            {
+                OrderOnline orderNew = (await orderController.GetOrderOnline(orderId, sessionKey)).Value;
+                return Ok(orderNew);
+            }
+
+            order.pay_state = -1;
+            _context.Entry(order).State = EntityState.Modified;
+            for (int i = 0; i < paymentList.Count; i++)
+            {
+                paymentList[i].status = "已取消";
+                _context.Entry(paymentList[i]).State = EntityState.Modified;
+            }
+
+            await _context.SaveChangesAsync();
+            //OrderOnline orderNew1 = (await orderController.GetOrderOnline(orderId, sessionKey)).Value;
+            return Ok((await orderController.GetOrderOnline(orderId, sessionKey)).Value);
+
         }
 
         /*
