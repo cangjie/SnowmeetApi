@@ -513,12 +513,6 @@ namespace SnowmeetApi.Controllers
                 return BadRequest();
             }
 
-            int orderId = reserve.order_id;
-            if (orderId > 0)
-            {
-                OrderOnline orderTmp = (OrderOnline)Util.GetValueFromResult((await payCtrl.CancelOrder(orderId, sessionKey)).Result);
-            }
-
 
             var scheduleList = await _db.utvVehicleSchedule.Where(s => (s.status == "待支付" && s.reserve_id == reserveId)).ToListAsync();
             double depositTotal = 0;
@@ -527,38 +521,106 @@ namespace SnowmeetApi.Controllers
                 depositTotal += (scheduleList[i].deposit - scheduleList[i].deposit_discount);
             }
 
-            OrderOnline order = new OrderOnline()
-            {
-                cell_number = reserve.cell.Trim(),
-                name = reserve.real_name.Trim(),
-                type = "押金",
-                shop = "万龙体验中心",
-                order_price = depositTotal,
-                order_real_pay_price = depositTotal,
-                final_price = depositTotal,
-                open_id = openId.Trim(),
-                staff_open_id = "",
-                memo = "UTV"
-            };
-            await _db.AddAsync(order);
-            await _db.SaveChangesAsync();
-            OrderPayment payment = new OrderPayment()
-            {
-                order_id = order.id,
-                pay_method = order.pay_method.Trim(),
-                amount = order.final_price,
-                status = "待支付",
-                staff_open_id =  ""
-            };
-            reserve.order_id = order.id;
-            await _db.OrderPayment.AddAsync(payment);
-            _db.Entry(reserve).State = EntityState.Modified;
-            await _db.SaveChangesAsync();
+            int orderId = reserve.order_id;
+            int paymentId = 0;
+            OrderPayment paymentFinal = new OrderPayment();
+            bool needCreateNew = false;
 
-            var set =  await payCtrl.TenpayRequest(payment.id, sessionKey);
+            if (orderId == 0)
+            {
+                needCreateNew = true;
+                
 
-            return Ok(set.Value);
+            }
+
+            OrderOnline orderOri = await _db.OrderOnlines.FindAsync(orderId);
+
+            if (orderOri == null || orderOri.pay_state != 0)
+            {
+                needCreateNew = true;
+            }
+
+            var payList = await _db.OrderPayment.Where(p => (p.order_id == orderId)).ToListAsync();
+            if (payList == null || payList.Count == 0)
+            {
+                needCreateNew = true;
+            }
+            else
+            {
+                
+                for (int i = 0; i < payList.Count; i++)
+                {
+                    if (payList[i].status.Trim().Equals("待支付")
+                        && Math.Round(payList[i].amount, 2) == Math.Round(depositTotal, 2))
+                    {
+                        paymentId = payList[i].id;
+                        paymentFinal = payList[i];
+                        break;
+                    }
+                }
+                if (paymentId == 0)
+                {
+                    needCreateNew = true;
+                }
+            }
+
+            if (needCreateNew)
+            {
+                if (orderId > 0)
+                {
+                    await payCtrl.CancelOrder(orderId, sessionKey);
+                }
+                OrderOnline order = new OrderOnline()
+                {
+                    cell_number = reserve.cell.Trim(),
+                    name = reserve.real_name.Trim(),
+                    type = "押金",
+                    shop = "万龙体验中心",
+                    order_price = depositTotal,
+                    order_real_pay_price = depositTotal,
+                    final_price = depositTotal,
+                    open_id = openId.Trim(),
+                    staff_open_id = "",
+                    memo = "UTV"
+                };
+                await _db.AddAsync(order);
+                await _db.SaveChangesAsync();
+                OrderPayment payment = new OrderPayment()
+                {
+                    order_id = order.id,
+                    pay_method = order.pay_method.Trim(),
+                    amount = order.final_price,
+                    status = "待支付",
+                    staff_open_id = ""
+                };
+                reserve.order_id = order.id;
+                await _db.OrderPayment.AddAsync(payment);
+                _db.Entry(reserve).State = EntityState.Modified;
+                await _db.SaveChangesAsync();
+                paymentId = payment.id;
+                var set = await payCtrl.TenpayRequest(payment.id, sessionKey);
+                return Ok(set.Value);
+            }
+            else
+            {
+                TenpaySet set = new TenpaySet()
+                {
+                    nonce = paymentFinal.nonce,
+                    prepay_id = paymentFinal.prepay_id,
+                    timeStamp = paymentFinal.timestamp,
+                    sign = paymentFinal.sign
+                };
+                return Ok(set);
+            }
+
+            
+            
+                
         }
+
+
+    
+        
         /*
         [NonAction]
         public async Task<IEnumerable<UTVVehicleSchedule>> AllocateVehicleForReserve(int reserveId)
@@ -638,6 +700,36 @@ namespace SnowmeetApi.Controllers
             }
             return userList[0];
         }
+
+        /*
+
+        [NonAction]
+        public async Task<UTVReserve> SetDepositPaySuccess(int reserveId)
+        {
+
+        }
+
+        [NonAction]
+        public async Task<UTVVehicleSchedule> LockTripSchedule(int scheduleId, string sessionKey)
+        {
+            string status = "已锁定";
+            UTVVehicleSchedule s = await _db.utvVehicleSchedule.FindAsync(scheduleId);
+            if (s == null)
+            {
+                return null;
+            }
+            int lockNum = (int)Util.GetValueFromResult((await GetLockedNumForTrip(s.trip_id, sessionKey)).Result);
+            int totalNum = (int)Util.GetValueFromResult((await GetAvailableVehicleNum(s.trip_id)).Result);
+            if (lockNum >= totalNum)
+            {
+                status = "候补";
+            }
+            s.status = status;
+            _db.Entry(s).State = EntityState.Modified;
+            await _db.SaveChangesAsync();
+            return s;
+        }
+        */
             
     }
 }
