@@ -535,9 +535,16 @@ namespace SnowmeetApi.Controllers
 
             OrderOnline orderOri = await _db.OrderOnlines.FindAsync(orderId);
 
-            if (orderOri == null || orderOri.pay_state != 0)
+            if (orderOri == null)
             {
                 needCreateNew = true;
+            }
+            else
+            {
+                if (orderOri.pay_state != 0)
+                {
+                    return BadRequest();
+                }
             }
 
             var payList = await _db.OrderPayment.Where(p => (p.order_id == orderId)).ToListAsync();
