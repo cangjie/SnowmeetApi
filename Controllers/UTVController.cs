@@ -581,7 +581,7 @@ namespace SnowmeetApi.Controllers
                 {
                     cell_number = reserve.cell.Trim(),
                     name = reserve.real_name.Trim(),
-                    type = "押金",
+                    type = "UTV押金",
                     shop = "万龙体验中心",
                     order_price = depositTotal,
                     order_real_pay_price = depositTotal,
@@ -625,7 +625,49 @@ namespace SnowmeetApi.Controllers
                 
         }
 
+        [HttpGet]
+        public async Task<bool> SetReservePaySuccess(int reserveId)
+        {
+            UTVReserve reserve = await _db.utvReserve.FindAsync(reserveId);
+            if (reserve == null)
+            {
+                return false;
+            }
+            reserve.status = "已付押金";
+            _db.Entry(reserve).State = EntityState.Modified;
 
+            int lockNum = 0;
+
+            var vScheduleList = await _db.utvVehicleSchedule
+                .Where(s => ((s.status.Equals("锁定") || s.status.Equals("候补"))
+                && s.trip_id == reserve.trip_id)).ToListAsync();
+            lockNum = vScheduleList.Count;
+
+            int totalNum = (int)Util.GetValueFromResult((await GetAvailableVehicleNum(reserve.trip_id)).Result);
+
+            vScheduleList = await _db.utvVehicleSchedule
+                .Where(v => (v.status.Trim().Equals("待支付") && v.reserve_id == reserveId))
+                .ToListAsync();
+            if (vScheduleList == null)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < vScheduleList.Count; i++)
+            {
+                string status = "锁定";
+                if ((i + 1) > (totalNum - lockNum))
+                {
+                    status = "候补";
+                }
+                vScheduleList[i].status = status.Trim();
+                _db.Entry(vScheduleList[i]).State = EntityState.Modified;
+            }
+
+            await _db.SaveChangesAsync();
+
+            return true;
+        }
     
         
         /*

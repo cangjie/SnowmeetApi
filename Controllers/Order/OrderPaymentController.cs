@@ -429,6 +429,15 @@ namespace SnowmeetApi.Controllers.Order
                         await _context.SaveChangesAsync();
                     }
                     break;
+                case "UTV押金":
+                    UTVController uCtl = new UTVController(_context, _originConfig, _httpContextAccessor);
+                    var utvList = await _context.utvReserve.Where(u => u.order_id == order.id).ToListAsync();
+                    if (utvList != null && utvList.Count == 1)
+                    {
+                        await uCtl.SetReservePaySuccess(utvList[0].id);
+                    }
+                    //await uCtl.SetReservePaySuccess()
+                    break;
                 default:
                     break;
             }
