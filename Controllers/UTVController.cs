@@ -141,7 +141,11 @@ namespace SnowmeetApi.Controllers
             }   
             return Ok(totalNum);
         }
-
+        [HttpGet("{tripId}")]
+        public async Task<ActionResult<UTVTrip>> GetTrip(int tripId)
+        {
+            return await _db.utvTrip.FindAsync(tripId);
+        }
         [HttpGet("{tripId}")]
         public async Task<ActionResult<IEnumerable<UTVVehicleSchedule>>> GetSchedulesForTrip(int tripId, string sessionKey)
         {
