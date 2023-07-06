@@ -672,7 +672,95 @@ namespace SnowmeetApi.Controllers
 
             return true;
         }
-    
+
+        [HttpPost("{sessionKey}")]
+        public async Task<ActionResult<UTVUsers>> RefreshUTVUser(string sessionKey, UTVUsers user)
+        {
+            UTVUsers oriUser = await GetUser(sessionKey);
+            if (oriUser == null)
+            {
+                string openId = await GetOpenId(sessionKey);
+                if (openId == null || openId.Trim().Equals(""))
+                {
+                    return BadRequest();
+                }
+            }
+            
+            var uList = await _db.utvUser.Where(u => (u.cell.Trim().Equals(user.cell.Trim())
+                && u.real_name.Trim().Equals(user.real_name.Trim()) && u.is_adult == user.is_adult
+                && u.gender.Trim().Equals(user.gender.Trim()))).AsNoTracking().ToListAsync();
+            if (uList == null || uList.Count == 0)
+            {
+                await _db.utvUser.AddAsync(user);
+                await _db.SaveChangesAsync();
+                if (oriUser != null && oriUser.id > 0 && user.id > 0)
+                {
+                    UTVUserGroup grp = new UTVUserGroup()
+                    {
+                        host_id = oriUser.id,
+                        guest_id = user.id
+                    };
+                    await _db.uTVUserGroups.AddAsync(grp);
+                    await _db.SaveChangesAsync();
+                }
+            }
+            else
+            {
+                if (user.id == 0 && uList.Count == 1)
+                {
+                    user.id = uList[0].id;
+
+                }
+                _db.Entry(user).State = EntityState.Modified;
+                await _db.SaveChangesAsync();
+            }
+            
+            return Ok(user);
+        }
+
+
+        [HttpGet("{cell}")]
+        public async Task<ActionResult<UTVUsers>> GetUTVUser(string cell, string name)
+        {
+            name = Util.UrlDecode(name.Trim()).Trim();
+            var uList = await _db.utvUser.Where(u => (u.cell.Trim().Equals(cell) && u.real_name.Trim().Equals(name))).ToListAsync();
+            if (uList == null || uList.Count == 0)
+            {
+                UTVUsers u = new UTVUsers()
+                {
+                    user_id = 0,
+                    wechat_open_id = "",
+                    tiktok_open_id = "",
+                    real_name = name.Trim(),
+                    cell = cell,
+                    driver_license = ""
+                };
+                await _db.utvUser.AddAsync(u);
+                await _db.SaveChangesAsync();
+                return Ok(u);
+            }
+            return Ok(uList[0]);
+        }
+
+        [HttpGet("id")]
+        public async Task<ActionResult<UTVUsers>> GetUTVUserById(int id, string sessionKey)
+        {
+            sessionKey = Util.UrlEncode(sessionKey);
+            string openId = await GetOpenId(sessionKey);
+            bool isAdmin = await IsAdmin(sessionKey);
+
+            isAdmin = true;
+
+            if (!isAdmin)
+            {
+                return NotFound();
+            }
+
+            
+
+            return await _db.utvUser.FindAsync(id);
+
+        }
         
         /*
         [NonAction]
