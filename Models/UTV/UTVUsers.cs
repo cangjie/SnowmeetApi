@@ -18,6 +18,8 @@ namespace SnowmeetApi.Models.UTV
         public int is_adult { get; set; } = 0;
 
         public string gender { get; set; } = "";
+        public string contact_name { get; set; } = "";
+        public string contact_cell { get; set; } = "";
 
     }
 }
