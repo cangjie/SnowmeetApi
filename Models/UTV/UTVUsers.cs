@@ -8,12 +8,12 @@ namespace SnowmeetApi.Models.UTV
     {
         [Key]
         public int id { get; set; } = 0;
-        public int user_id { get; set; }
-        public string wechat_open_id { get; set; }
-        public string tiktok_open_id { get; set; }
-        public string real_name { get; set; }
-        public string cell { get; set; }
-        public string driver_license { get; set; }
+        public int user_id { get; set; } = 0;
+        public string wechat_open_id { get; set; } = "";
+        public string tiktok_open_id { get; set; } = "";
+        public string real_name { get; set; } = "";
+        public string cell { get; set; } = "";
+        public string driver_license { get; set; } = "";
 
         public int is_adult { get; set; } = 0;
 
