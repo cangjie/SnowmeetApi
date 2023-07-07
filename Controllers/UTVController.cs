@@ -742,7 +742,7 @@ namespace SnowmeetApi.Controllers
             return Ok(uList[0]);
         }
 
-        [HttpGet("id")]
+        [HttpGet("{id}")]
         public async Task<ActionResult<UTVUsers>> GetUTVUserById(int id, string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey);
