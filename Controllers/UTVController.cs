@@ -682,7 +682,7 @@ namespace SnowmeetApi.Controllers
                 string openId = await GetOpenId(sessionKey);
                 if (openId == null || openId.Trim().Equals(""))
                 {
-                    return BadRequest();
+                    //return BadRequest();
                 }
             }
             
@@ -706,7 +706,7 @@ namespace SnowmeetApi.Controllers
             }
             else
             {
-                if (user.id == 0 && uList.Count == 1)
+                if (user.id == 0 || uList.Count == 1)
                 {
                     user.id = uList[0].id;
 
