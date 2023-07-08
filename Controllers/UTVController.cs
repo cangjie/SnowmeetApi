@@ -682,12 +682,12 @@ namespace SnowmeetApi.Controllers
                 string openId = await GetOpenId(sessionKey);
                 if (openId == null || openId.Trim().Equals(""))
                 {
-                    //return BadRequest();
+                    return BadRequest();
                 }
             }
             
             var uList = await _db.utvUser.Where(u => (u.cell.Trim().Equals(user.cell.Trim())
-                && u.real_name.Trim().Equals(user.real_name.Trim()) && u.is_adult == user.is_adult
+                && u.real_name.Trim().Equals(user.real_name.Trim()) 
                 && u.gender.Trim().Equals(user.gender.Trim()))).AsNoTracking().ToListAsync();
             if (uList == null || uList.Count == 0)
             {
