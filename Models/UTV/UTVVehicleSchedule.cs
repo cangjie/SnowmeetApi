@@ -27,6 +27,11 @@ namespace SnowmeetApi.Models.UTV
         public int passenger_user_id { get; set; }
         public string passenger_insurance { get; set; }
         public string memo { get; set; }
+
+        [NotMapped]
+        public UTVUsers driver { get; set; }
+        [NotMapped]
+        public UTVUsers passenger { get; set; }
         
     }
 }

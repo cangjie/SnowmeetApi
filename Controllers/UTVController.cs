@@ -180,6 +180,14 @@ namespace SnowmeetApi.Controllers
                     sList[i].passenger_user_id = 0;
                     sList[i].passenger_insurance = "";
                 }
+                if (sList[i].driver_user_id > 0)
+                {
+                    sList[i].driver = await _db.utvUser.FindAsync(sList[i].driver_user_id);
+                }
+                if (sList[i].passenger_user_id > 0)
+                {
+                    sList[i].passenger = await _db.utvUser.FindAsync(sList[i].passenger_user_id);
+                }
             }
 
             return Ok(sList);
