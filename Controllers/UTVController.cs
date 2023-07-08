@@ -62,6 +62,24 @@ namespace SnowmeetApi.Controllers
             }
         }
 
+        [HttpGet("{date}")]
+        public async Task<ActionResult<IEnumerable<UTVTrip>>> GetTripsDetail(DateTime date, string sessionKey)
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            if (!(await IsAdmin(sessionKey)))
+            {
+                return BadRequest();
+            }
+            var tripList = await _db.utvTrip.Where(t => t.trip_date.Date == date.Date).ToListAsync();
+            for (int i = 0; i < tripList.Count; i++)
+            {
+                UTVTrip trip = tripList[i];
+                trip.vehicleSchedule = await _db.utvVehicleSchedule.Where(s => !s.status.Trim().Equals("取消")).ToListAsync();
+
+            }
+            return Ok(tripList);
+        }
+
         [HttpGet("{sessionKey}")]
         public async Task<ActionResult<UTVUsers>> GetUserBySessionKey(string sessionKey)
         {
@@ -162,6 +180,7 @@ namespace SnowmeetApi.Controllers
                     sList[i].passenger_insurance = "";
                 }
             }
+
             return Ok(sList);
         }
 
