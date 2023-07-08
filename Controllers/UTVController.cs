@@ -74,7 +74,8 @@ namespace SnowmeetApi.Controllers
             for (int i = 0; i < tripList.Count; i++)
             {
                 UTVTrip trip = tripList[i];
-                trip.vehicleSchedule = await _db.utvVehicleSchedule.Where(s => !s.status.Trim().Equals("取消")).ToListAsync();
+                trip.vehicleSchedule = await _db.utvVehicleSchedule
+                    .Where(s => (!s.status.Trim().Equals("取消") && s.trip_id == trip.id)).ToListAsync();
 
             }
             return Ok(tripList);
