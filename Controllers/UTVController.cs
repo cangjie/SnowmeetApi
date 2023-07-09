@@ -527,6 +527,18 @@ namespace SnowmeetApi.Controllers
             bool isAdmin = await IsAdmin(sessionKey);
             if (!isAdmin)
             {
+                string openId = await GetOpenId(sessionKey);
+                UTVUsers user = await GetUser(openId);
+                UTVReserve reserve = await _db.utvReserve.FindAsync(schedule.reserve_id);
+                if (reserve != null && reserve.utv_user_id == user.id)
+                {
+                    isAdmin = true;
+                }
+                
+                
+            }
+            if (!isAdmin)
+            {
                 return BadRequest();
             }
             _db.Entry(schedule).State = EntityState.Modified;
