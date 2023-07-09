@@ -24,5 +24,7 @@ namespace SnowmeetApi.Models.Users
         public string memo { get; set; }
         public string gender { get; set; }
         public string real_name { get; set; }
+
+        public string union_id { get; set; } = "";
     }
 }
