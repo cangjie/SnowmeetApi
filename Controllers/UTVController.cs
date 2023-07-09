@@ -385,13 +385,13 @@ namespace SnowmeetApi.Controllers
             {
                 return NoContent();
             }
-            UTVUsers user = await GetUTVUser(openId);
+            UTVUsers user = await GetUTVUser(sessionKey);
             UTVReserve reserve = await _db.utvReserve.FindAsync(id);
             if (reserve == null) 
             {
                 return NotFound();
             }
-            if (!isAdmin && reserve.utv_user_id != user.id)
+            if (!isAdmin &&  reserve.utv_user_id != user.id)
             {
                 return NoContent();
             }
@@ -861,7 +861,7 @@ namespace SnowmeetApi.Controllers
             }
             string source = sessionList[0].session_type.Trim();
             string openId = sessionList[0].open_id.Trim();
-            var userList = await _db.utvUser.Where(u => ((source.Equals("wechat") && u.wechat_open_id.Trim().Equals(openId))
+            var userList = await _db.utvUser.Where(u => (( (source.Equals("") || source.Equals("wechat")) && u.wechat_open_id.Trim().Equals(openId))
                 || (source.Equals("tiktok") && u.tiktok_open_id.Trim().Equals(openId)))).ToListAsync();
             if (userList == null || userList.Count == 0)
             {
