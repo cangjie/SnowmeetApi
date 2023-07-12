@@ -167,7 +167,7 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Vehicle>>> GetAvailiableVehicles()
+        public async Task<ActionResult<IEnumerable<Vehicle>>> GetAvailableVehicles()
         {
             return await _db.vehicle.Where(v => v.valid == 1).ToListAsync();
         }
