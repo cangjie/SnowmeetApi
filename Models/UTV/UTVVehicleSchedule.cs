@@ -43,6 +43,9 @@ namespace SnowmeetApi.Models.UTV
         public bool havePassengerInsurance { get; set; }
         [NotMapped]
         public bool canGo { get; set; } = false;
+
+        [NotMapped]
+        public UTVReserve reserve { get; set; } = null;
         
     }
 }

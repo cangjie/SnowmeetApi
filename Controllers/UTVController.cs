@@ -260,6 +260,10 @@ namespace SnowmeetApi.Controllers
                 {
                     sList[i].canGo = true;
                 }
+                if (sList[i].reserve_id > 0)
+                {
+                    sList[i].reserve = await _db.utvReserve.FindAsync(sList[i].reserve_id);
+                }
             }
 
             return Ok(sList);
