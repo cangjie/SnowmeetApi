@@ -197,8 +197,35 @@ namespace SnowmeetApi.Controllers
                 if (sList[i].driver_user_id > 0)
                 {
                     sList[i].driver = await _db.utvUser.FindAsync(sList[i].driver_user_id);
+                    if (sList[i].driver == null)
+                    {
+                        sList[i].haveDriverLicense = false;
+                    }
+                    else
+                    {
+                        if (sList[i].driver.driver_license.Trim().Equals(""))
+                        {
+                            sList[i].haveDriverLicense = false;
+                        }
+                        else
+                        {
+                            sList[i].haveDriverLicense = true;
+                        }
+                    }
+                    if (sList[i].driver_insurance.Trim().Equals(""))
+                    {
+                        sList[i].haveDriverInsurance = false;
+                    }
+                    else
+                    {
+                        sList[i].haveDriverInsurance = true;
+                    }
                 }
-
+                else
+                {
+                    sList[i].haveDriverInsurance = true;
+                    sList[i].haveDriverLicense = true;
+                }
                 if (sList[i].passenger_user_id > 0)
                 {
                     sList[i].passenger = await _db.utvUser.FindAsync(sList[i].passenger_user_id);
