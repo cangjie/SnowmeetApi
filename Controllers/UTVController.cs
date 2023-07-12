@@ -256,6 +256,7 @@ namespace SnowmeetApi.Controllers
                     && sList[i].havePassengerInsurance && sList[i].driver != null
                     && !sList[i].driver.real_name.Trim().Equals("") && !sList[i].driver.cell.Trim().Equals("")
                     && (sList[i].passenger == null || (!sList[i].passenger.real_name.Trim().Equals("") && !sList[i].passenger.cell.Trim().Equals("")))
+                    && !sList[i].car_no.Trim().Equals("")
                 )
                 {
                     sList[i].canGo = true;
