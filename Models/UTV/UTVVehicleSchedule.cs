@@ -32,6 +32,17 @@ namespace SnowmeetApi.Models.UTV
         public UTVUsers driver { get; set; }
         [NotMapped]
         public UTVUsers passenger { get; set; }
+
+        [NotMapped]
+        public bool haveDriverLicense { get; set; }
+        [NotMapped]
+        public bool havePassengerLicense { get; set; }
+        [NotMapped]
+        public bool haveDriverInsurance { get; set; }
+        [NotMapped]
+        public bool havePassengerInsurance { get; set; }
+        [NotMapped]
+        public bool canGo { get; set; } = false;
         
     }
 }

@@ -165,12 +165,26 @@ namespace SnowmeetApi.Controllers
         {
             return await _db.utvTrip.FindAsync(tripId);
         }
+
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<Vehicle>>> GetAvailiableVehicles()
+        {
+            return await _db.vehicle.Where(v => v.valid == 1).ToListAsync();
+        }
+
         [HttpGet("{tripId}")]
-        public async Task<ActionResult<IEnumerable<UTVVehicleSchedule>>> GetSchedulesForTrip(int tripId, string sessionKey)
+        public async Task<ActionResult<IEnumerable<UTVVehicleSchedule>>> GetSchedulesForTrip(int tripId, string sort, string sessionKey)
         {
            bool isAdmin = await IsAdmin(sessionKey);
-            var sList = await _db.utvVehicleSchedule
-                 .Where(s => s.trip_id == tripId).ToListAsync();
+            sort = Util.UrlDecode(sort);
+           var sList = await _db.utvVehicleSchedule
+                 .Where(s => s.trip_id == tripId).OrderBy(s => s.reserve_id) .ToListAsync();
+            if (sort.Trim().Equals("car_no"))
+            {
+                sList = await _db.utvVehicleSchedule
+                 .Where(s => s.trip_id == tripId).OrderBy(s => s.car_no).ToListAsync();
+            }
+
             for(int i = 0; i < sList.Count; i++) 
             {
                 if (!isAdmin)
@@ -184,9 +198,40 @@ namespace SnowmeetApi.Controllers
                 {
                     sList[i].driver = await _db.utvUser.FindAsync(sList[i].driver_user_id);
                 }
+
                 if (sList[i].passenger_user_id > 0)
                 {
                     sList[i].passenger = await _db.utvUser.FindAsync(sList[i].passenger_user_id);
+                    if (sList[i].passenger.driver_license.Trim().Equals(""))
+                    {
+                        sList[i].havePassengerLicense = false;
+                    }
+                    else
+                    {
+                        sList[i].havePassengerLicense = true;
+                    }
+                    if (sList[i].passenger_insurance.Trim().Equals(""))
+                    {
+                        sList[i].havePassengerInsurance = false;
+                    }
+                    else
+                    {
+                        sList[i].havePassengerInsurance = true;
+                    }
+                }
+                else
+                {
+                    sList[i].havePassengerInsurance = true;
+                    sList[i].havePassengerLicense = true;
+                }
+
+                if (sList[i].haveDriverLicense && sList[i].haveDriverInsurance
+                    && sList[i].havePassengerInsurance && sList[i].driver != null
+                    && !sList[i].driver.real_name.Trim().Equals("") && !sList[i].driver.cell.Trim().Equals("")
+                    && (sList[i].passenger == null || (!sList[i].passenger.real_name.Trim().Equals("") && !sList[i].passenger.cell.Trim().Equals("")))
+                )
+                {
+                    sList[i].canGo = true;
                 }
             }
 
@@ -229,7 +274,7 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<int>> GetLockedNumForTrip(int tripId, string sessionKey)
         {
             IEnumerable<UTVVehicleSchedule> sList 
-                = (IEnumerable<UTVVehicleSchedule>)Util.GetValueFromResult((await GetSchedulesForTrip(tripId, sessionKey)).Result);
+                = (IEnumerable<UTVVehicleSchedule>)Util.GetValueFromResult((await GetSchedulesForTrip(tripId, "", sessionKey)).Result);
             if (sList == null)
             {
                 return 0;
