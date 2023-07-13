@@ -1067,6 +1067,26 @@ namespace SnowmeetApi.Controllers
             return Ok(iList);
         }
 
+        [HttpGet("{id}")]
+        public async Task<ActionResult<UTVRentItem>> ReturnItem(int id, int isReturn, string sessionKey)
+        {
+            sessionKey = Util.UrlDecode(sessionKey.Trim()).Trim();
+            if (!(await IsAdmin(sessionKey)))
+            {
+                return BadRequest();
+            }
+            UTVRentItem item = await _db.utvrentItem.FindAsync(id);
+            if (item == null)
+            {
+                return NotFound();
+            }
+            item.returned = isReturn;
+            item.return_staff = await GetOpenId(sessionKey);
+            _db.Entry(item).State = EntityState.Modified;
+            await _db.SaveChangesAsync();
+            return Ok(item);
+        }
+
         /*
 
         [NonAction]
