@@ -1043,14 +1043,15 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet("{scheduleId}")]
-        public async Task<ActionResult<IEnumerable<UTVRentItem>>> ResetRentItems(int scheduleId, string sessionKey)
+        public async Task<ActionResult<IEnumerable<UTVRentItem>>> ResetRentItems(int scheduleId, string name, string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey.Trim()).Trim();
+            name = Util.UrlDecode(name.Trim()).Trim();
             if (!(await IsAdmin(sessionKey)))
             {
                 return BadRequest();
             }
-            var iList = await _db.utvrentItem.Where(i => (i.schedule_id == scheduleId && i.confirm_rent == 1)).ToListAsync();
+            var iList = await _db.utvrentItem.Where(i => (i.schedule_id == scheduleId && i.confirm_rent == 1 && i.name.Trim().Equals(name))).ToListAsync();
             if (iList == null || iList.Count == 0)
             {
                 return Ok(iList);
