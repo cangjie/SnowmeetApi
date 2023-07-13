@@ -1043,7 +1043,7 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet("{scheduleId}")]
-        public async Task<ActionResult<IEnumerable<UTVRentItem>>> ResetRentItems(int scheduleId, string name, string sessionKey)
+        public async Task<ActionResult<IEnumerable<UTVRentItem>>> ResetRentItem(int scheduleId, string name, string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey.Trim()).Trim();
             name = Util.UrlDecode(name.Trim()).Trim();
