@@ -68,6 +68,25 @@ namespace SnowmeetApi.Controllers
             }
         }
 
+        [HttpGet("{date}")]
+        public async Task<ActionResult<IEnumerable<UTVTrip>>> GetTripsDetail(DateTime date, string sessionKey)
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            if (!(await IsAdmin(sessionKey)))
+            {
+                return BadRequest();
+            }
+            var tripList = await _db.utvTrip.Where(t => t.trip_date.Date == date.Date).ToListAsync();
+            for (int i = 0; i < tripList.Count; i++)
+            {
+                UTVTrip trip = tripList[i];
+                trip.vehicleSchedule = await _db.utvVehicleSchedule
+                    .Where(s => (!s.status.Trim().Equals("取消") && s.trip_id == trip.id)).ToListAsync();
+
+            }
+            return Ok(tripList);
+        }
+
         [HttpGet("{sessionKey}")]
         public async Task<ActionResult<UTVUsers>> GetUserBySessionKey(string sessionKey)
         {
@@ -147,13 +166,31 @@ namespace SnowmeetApi.Controllers
             }   
             return Ok(totalNum);
         }
+        [HttpGet("{tripId}")]
+        public async Task<ActionResult<UTVTrip>> GetTrip(int tripId)
+        {
+            return await _db.utvTrip.FindAsync(tripId);
+        }
+
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<Vehicle>>> GetAvailableVehicles()
+        {
+            return await _db.vehicle.Where(v => v.valid == 1).ToListAsync();
+        }
 
         [HttpGet("{tripId}")]
-        public async Task<ActionResult<IEnumerable<UTVVehicleSchedule>>> GetSchedulesForTrip(int tripId, string sessionKey)
+        public async Task<ActionResult<IEnumerable<UTVVehicleSchedule>>> GetSchedulesForTrip(int tripId, string sort, string sessionKey)
         {
            bool isAdmin = await IsAdmin(sessionKey);
-            var sList = await _db.utvVehicleSchedule
-                 .Where(s => s.trip_id == tripId).ToListAsync();
+            sort = Util.UrlDecode(sort);
+           var sList = await _db.utvVehicleSchedule
+                 .Where(s => s.trip_id == tripId).OrderBy(s => s.reserve_id) .ToListAsync();
+            if (sort.Trim().Equals("car_no"))
+            {
+                sList = await _db.utvVehicleSchedule
+                 .Where(s => s.trip_id == tripId).OrderBy(s => s.car_no).ToListAsync();
+            }
+
             for(int i = 0; i < sList.Count; i++) 
             {
                 if (!isAdmin)
@@ -163,7 +200,79 @@ namespace SnowmeetApi.Controllers
                     sList[i].passenger_user_id = 0;
                     sList[i].passenger_insurance = "";
                 }
+                if (sList[i].driver_user_id > 0)
+                {
+                    sList[i].driver = await _db.utvUser.FindAsync(sList[i].driver_user_id);
+                    if (sList[i].driver == null)
+                    {
+                        sList[i].haveDriverLicense = false;
+                    }
+                    else
+                    {
+                        if (sList[i].driver.driver_license.Trim().Equals(""))
+                        {
+                            sList[i].haveDriverLicense = false;
+                        }
+                        else
+                        {
+                            sList[i].haveDriverLicense = true;
+                        }
+                    }
+                    if (sList[i].driver_insurance.Trim().Equals(""))
+                    {
+                        sList[i].haveDriverInsurance = false;
+                    }
+                    else
+                    {
+                        sList[i].haveDriverInsurance = true;
+                    }
+                }
+                else
+                {
+                    sList[i].haveDriverInsurance = true;
+                    sList[i].haveDriverLicense = true;
+                }
+                if (sList[i].passenger_user_id > 0)
+                {
+                    sList[i].passenger = await _db.utvUser.FindAsync(sList[i].passenger_user_id);
+                    if (sList[i].passenger.driver_license.Trim().Equals(""))
+                    {
+                        sList[i].havePassengerLicense = false;
+                    }
+                    else
+                    {
+                        sList[i].havePassengerLicense = true;
+                    }
+                    if (sList[i].passenger_insurance.Trim().Equals(""))
+                    {
+                        sList[i].havePassengerInsurance = false;
+                    }
+                    else
+                    {
+                        sList[i].havePassengerInsurance = true;
+                    }
+                }
+                else
+                {
+                    sList[i].havePassengerInsurance = true;
+                    sList[i].havePassengerLicense = true;
+                }
+
+                if (sList[i].haveDriverLicense && sList[i].haveDriverInsurance
+                    && sList[i].havePassengerInsurance && sList[i].driver != null
+                    && !sList[i].driver.real_name.Trim().Equals("") && !sList[i].driver.cell.Trim().Equals("")
+                    && (sList[i].passenger == null || (!sList[i].passenger.real_name.Trim().Equals("") && !sList[i].passenger.cell.Trim().Equals("")))
+                    && !sList[i].car_no.Trim().Equals("")
+                )
+                {
+                    sList[i].canGo = true;
+                }
+                if (sList[i].reserve_id > 0)
+                {
+                    sList[i].reserve = await _db.utvReserve.FindAsync(sList[i].reserve_id);
+                }
             }
+
             return Ok(sList);
         }
 
@@ -203,7 +312,7 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<int>> GetLockedNumForTrip(int tripId, string sessionKey)
         {
             IEnumerable<UTVVehicleSchedule> sList 
-                = (IEnumerable<UTVVehicleSchedule>)Util.GetValueFromResult((await GetSchedulesForTrip(tripId, sessionKey)).Result);
+                = (IEnumerable<UTVVehicleSchedule>)Util.GetValueFromResult((await GetSchedulesForTrip(tripId, "", sessionKey)).Result);
             if (sList == null)
             {
                 return 0;
@@ -359,13 +468,13 @@ namespace SnowmeetApi.Controllers
             {
                 return NoContent();
             }
-            UTVUsers user = await GetUTVUser(openId);
+            UTVUsers user = await GetUTVUser(sessionKey);
             UTVReserve reserve = await _db.utvReserve.FindAsync(id);
             if (reserve == null) 
             {
                 return NotFound();
             }
-            if (!isAdmin && reserve.utv_user_id != user.id)
+            if (!isAdmin &&  reserve.utv_user_id != user.id)
             {
                 return NoContent();
             }
@@ -501,6 +610,18 @@ namespace SnowmeetApi.Controllers
             bool isAdmin = await IsAdmin(sessionKey);
             if (!isAdmin)
             {
+                string openId = await GetOpenId(sessionKey);
+                UTVUsers user = await GetUser(openId);
+                UTVReserve reserve = await _db.utvReserve.FindAsync(schedule.reserve_id);
+                if (reserve != null && reserve.utv_user_id == user.id)
+                {
+                    isAdmin = true;
+                }
+                
+                
+            }
+            if (!isAdmin)
+            {
                 return BadRequest();
             }
             _db.Entry(schedule).State = EntityState.Modified;
@@ -519,12 +640,6 @@ namespace SnowmeetApi.Controllers
                 return BadRequest();
             }
 
-            int orderId = reserve.order_id;
-            if (orderId > 0)
-            {
-                OrderOnline orderTmp = (OrderOnline)Util.GetValueFromResult((await payCtrl.CancelOrder(orderId, sessionKey)).Result);
-            }
-
 
             var scheduleList = await _db.utvVehicleSchedule.Where(s => (s.status == "待支付" && s.reserve_id == reserveId)).ToListAsync();
             double depositTotal = 0;
@@ -533,38 +648,243 @@ namespace SnowmeetApi.Controllers
                 depositTotal += (scheduleList[i].deposit - scheduleList[i].deposit_discount);
             }
 
-            OrderOnline order = new OrderOnline()
-            {
-                cell_number = reserve.cell.Trim(),
-                name = reserve.real_name.Trim(),
-                type = "押金",
-                shop = "万龙体验中心",
-                order_price = depositTotal,
-                order_real_pay_price = depositTotal,
-                final_price = depositTotal,
-                open_id = openId.Trim(),
-                staff_open_id = "",
-                memo = "UTV"
-            };
-            await _db.AddAsync(order);
-            await _db.SaveChangesAsync();
-            OrderPayment payment = new OrderPayment()
-            {
-                order_id = order.id,
-                pay_method = order.pay_method.Trim(),
-                amount = order.final_price,
-                status = "待支付",
-                staff_open_id =  ""
-            };
-            reserve.order_id = order.id;
-            await _db.OrderPayment.AddAsync(payment);
-            _db.Entry(reserve).State = EntityState.Modified;
-            await _db.SaveChangesAsync();
+            int orderId = reserve.order_id;
+            int paymentId = 0;
+            OrderPayment paymentFinal = new OrderPayment();
+            bool needCreateNew = false;
 
-            var set =  await payCtrl.TenpayRequest(payment.id, sessionKey);
+            if (orderId == 0)
+            {
+                needCreateNew = true;
+                
 
-            return Ok(set.Value);
+            }
+
+            OrderOnline orderOri = await _db.OrderOnlines.FindAsync(orderId);
+
+            if (orderOri == null)
+            {
+                needCreateNew = true;
+            }
+            else
+            {
+                if (orderOri.pay_state != 0)
+                {
+                    return BadRequest();
+                }
+            }
+
+            var payList = await _db.OrderPayment.Where(p => (p.order_id == orderId)).ToListAsync();
+            if (payList == null || payList.Count == 0)
+            {
+                needCreateNew = true;
+            }
+            else
+            {
+                
+                for (int i = 0; i < payList.Count; i++)
+                {
+                    if (payList[i].status.Trim().Equals("待支付")
+                        && Math.Round(payList[i].amount, 2) == Math.Round(depositTotal, 2))
+                    {
+                        paymentId = payList[i].id;
+                        paymentFinal = payList[i];
+                        break;
+                    }
+                }
+                if (paymentId == 0)
+                {
+                    needCreateNew = true;
+                }
+            }
+
+            if (needCreateNew)
+            {
+                if (orderId > 0)
+                {
+                    await payCtrl.CancelOrder(orderId, sessionKey);
+                }
+                OrderOnline order = new OrderOnline()
+                {
+                    cell_number = reserve.cell.Trim(),
+                    name = reserve.real_name.Trim(),
+                    type = "UTV押金",
+                    shop = "万龙体验中心",
+                    order_price = depositTotal,
+                    order_real_pay_price = depositTotal,
+                    final_price = depositTotal,
+                    open_id = openId.Trim(),
+                    staff_open_id = "",
+                    memo = "UTV"
+                };
+                await _db.AddAsync(order);
+                await _db.SaveChangesAsync();
+                OrderPayment payment = new OrderPayment()
+                {
+                    order_id = order.id,
+                    pay_method = order.pay_method.Trim(),
+                    amount = order.final_price,
+                    status = "待支付",
+                    staff_open_id = ""
+                };
+                reserve.order_id = order.id;
+                await _db.OrderPayment.AddAsync(payment);
+                _db.Entry(reserve).State = EntityState.Modified;
+                await _db.SaveChangesAsync();
+                paymentId = payment.id;
+                var set = await payCtrl.TenpayRequest(payment.id, sessionKey);
+                return Ok(set.Value);
+            }
+            else
+            {
+                TenpaySet set = new TenpaySet()
+                {
+                    nonce = paymentFinal.nonce,
+                    prepay_id = paymentFinal.prepay_id,
+                    timeStamp = paymentFinal.timestamp,
+                    sign = paymentFinal.sign
+                };
+                return Ok(set);
+            }
+
+            
+            
+                
         }
+
+        [HttpGet]
+        public async Task<bool> SetReservePaySuccess(int reserveId)
+        {
+            UTVReserve reserve = await _db.utvReserve.FindAsync(reserveId);
+            if (reserve == null)
+            {
+                return false;
+            }
+            reserve.status = "已付押金";
+            _db.Entry(reserve).State = EntityState.Modified;
+
+            int lockNum = 0;
+
+            var vScheduleList = await _db.utvVehicleSchedule
+                .Where(s => ((s.status.Equals("锁定") || s.status.Equals("候补"))
+                && s.trip_id == reserve.trip_id)).ToListAsync();
+            lockNum = vScheduleList.Count;
+
+            int totalNum = (int)Util.GetValueFromResult((await GetAvailableVehicleNum(reserve.trip_id)).Result);
+
+            vScheduleList = await _db.utvVehicleSchedule
+                .Where(v => (v.status.Trim().Equals("待支付") && v.reserve_id == reserveId))
+                .ToListAsync();
+            if (vScheduleList == null)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < vScheduleList.Count; i++)
+            {
+                string status = "锁定";
+                if ((i + 1) > (totalNum - lockNum))
+                {
+                    status = "候补";
+                }
+                vScheduleList[i].status = status.Trim();
+                _db.Entry(vScheduleList[i]).State = EntityState.Modified;
+            }
+
+            await _db.SaveChangesAsync();
+
+            return true;
+        }
+
+        [HttpPost("{sessionKey}")]
+        public async Task<ActionResult<UTVUsers>> RefreshUTVUser(string sessionKey, UTVUsers user)
+        {
+            UTVUsers oriUser = await GetUser(sessionKey);
+            if (oriUser == null)
+            {
+                string openId = await GetOpenId(sessionKey);
+                if (openId == null || openId.Trim().Equals(""))
+                {
+                    return BadRequest();
+                }
+            }
+            
+            var uList = await _db.utvUser.Where(u => (u.cell.Trim().Equals(user.cell.Trim())
+                && u.real_name.Trim().Equals(user.real_name.Trim()) 
+                && u.gender.Trim().Equals(user.gender.Trim()))).AsNoTracking().ToListAsync();
+            if (uList == null || uList.Count == 0)
+            {
+                await _db.utvUser.AddAsync(user);
+                await _db.SaveChangesAsync();
+                if (oriUser != null && oriUser.id > 0 && user.id > 0)
+                {
+                    UTVUserGroup grp = new UTVUserGroup()
+                    {
+                        host_id = oriUser.id,
+                        guest_id = user.id
+                    };
+                    await _db.uTVUserGroups.AddAsync(grp);
+                    await _db.SaveChangesAsync();
+                }
+            }
+            else
+            {
+                if (user.id == 0 || uList.Count == 1)
+                {
+                    user.id = uList[0].id;
+
+                }
+                _db.Entry(user).State = EntityState.Modified;
+                await _db.SaveChangesAsync();
+            }
+            
+            return Ok(user);
+        }
+
+
+        [HttpGet("{cell}")]
+        public async Task<ActionResult<UTVUsers>> GetUTVUser(string cell, string name)
+        {
+            name = Util.UrlDecode(name.Trim()).Trim();
+            var uList = await _db.utvUser.Where(u => (u.cell.Trim().Equals(cell) && u.real_name.Trim().Equals(name))).ToListAsync();
+            if (uList == null || uList.Count == 0)
+            {
+                UTVUsers u = new UTVUsers()
+                {
+                    user_id = 0,
+                    wechat_open_id = "",
+                    tiktok_open_id = "",
+                    real_name = name.Trim(),
+                    cell = cell,
+                    driver_license = ""
+                };
+                await _db.utvUser.AddAsync(u);
+                await _db.SaveChangesAsync();
+                return Ok(u);
+            }
+            return Ok(uList[0]);
+        }
+
+        [HttpGet("{id}")]
+        public async Task<ActionResult<UTVUsers>> GetUTVUserById(int id, string sessionKey)
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            string openId = await GetOpenId(sessionKey);
+            bool isAdmin = await IsAdmin(sessionKey);
+
+            isAdmin = true;
+
+            if (!isAdmin)
+            {
+                return NotFound();
+            }
+
+            
+
+            return await _db.utvUser.FindAsync(id);
+
+        }
+        
         /*
         [NonAction]
         public async Task<IEnumerable<UTVVehicleSchedule>> AllocateVehicleForReserve(int reserveId)
@@ -636,7 +956,7 @@ namespace SnowmeetApi.Controllers
             }
             string source = sessionList[0].session_type.Trim();
             string openId = sessionList[0].open_id.Trim();
-            var userList = await _db.utvUser.Where(u => ((source.Equals("wechat") && u.wechat_open_id.Trim().Equals(openId))
+            var userList = await _db.utvUser.Where(u => (( (source.Equals("") || source.Equals("wechat")) && u.wechat_open_id.Trim().Equals(openId))
                 || (source.Equals("tiktok") && u.tiktok_open_id.Trim().Equals(openId)))).ToListAsync();
             if (userList == null || userList.Count == 0)
             {
@@ -644,6 +964,36 @@ namespace SnowmeetApi.Controllers
             }
             return userList[0];
         }
+
+        /*
+
+        [NonAction]
+        public async Task<UTVReserve> SetDepositPaySuccess(int reserveId)
+        {
+
+        }
+
+        [NonAction]
+        public async Task<UTVVehicleSchedule> LockTripSchedule(int scheduleId, string sessionKey)
+        {
+            string status = "已锁定";
+            UTVVehicleSchedule s = await _db.utvVehicleSchedule.FindAsync(scheduleId);
+            if (s == null)
+            {
+                return null;
+            }
+            int lockNum = (int)Util.GetValueFromResult((await GetLockedNumForTrip(s.trip_id, sessionKey)).Result);
+            int totalNum = (int)Util.GetValueFromResult((await GetAvailableVehicleNum(s.trip_id)).Result);
+            if (lockNum >= totalNum)
+            {
+                status = "候补";
+            }
+            s.status = status;
+            _db.Entry(s).State = EntityState.Modified;
+            await _db.SaveChangesAsync();
+            return s;
+        }
+        */
             
     }
 }

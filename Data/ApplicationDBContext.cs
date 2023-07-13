@@ -137,8 +137,8 @@ namespace SnowmeetApi.Data
 
         public DbSet<UTVRentItem> utvrentItem { get; set;}
 
+        public DbSet<UTVUserGroup> uTVUserGroups { get; set; }  
 
-        //public DbSet<SnowmeetApi.Models.Product.SkiPass> skiPass { get; set; }
 
 
     }

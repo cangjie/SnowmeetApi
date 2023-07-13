@@ -9,7 +9,7 @@ namespace SnowmeetApi.Models.UTV
     {
         [Key]
         public int id { get; set; }
-
+        public string name { get; set; }
         public int valid { get; set; }
         public DateTime update_date { get; set; }
 
