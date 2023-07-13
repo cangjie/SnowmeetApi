@@ -49,6 +49,12 @@ namespace SnowmeetApi.Controllers
             return Ok((double)680);
         }
 
+        [HttpGet]
+        public ActionResult<string[]> GetRentItem()
+        {
+            return new string[] { "头盔", "车钥匙", "手套", "衣服", "头套", "手台", "蓝牙耳机" };
+        }
+
         [HttpGet("{reserveAble}")]
         public async Task<ActionResult<IEnumerable<UTVTrip>>> GetTrips(int reserveAble, DateTime date)
         {
