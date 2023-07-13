@@ -50,9 +50,36 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet]
-        public ActionResult<string[]> GetRentItem()
+        public ActionResult<UTVRentItem[]> GetRentItem()
         {
-            return new string[] { "头盔", "车钥匙", "手套", "衣服", "头套", "手台", "蓝牙耳机" };
+            UTVRentItem[] itemArr = new UTVRentItem[]
+            {
+                new UTVRentItem()
+                { 
+                    name = "头盔"
+                },
+                new UTVRentItem()
+                {
+                    name = "车钥匙"
+                },
+                new UTVRentItem()
+                {
+                    name = "手套"
+                },
+                new UTVRentItem()
+                {
+                    name = "衣服"
+                },
+                new UTVRentItem()
+                {
+                    name = "手台"
+                },
+                new UTVRentItem()
+                {
+                    name = "蓝牙耳机"
+                }
+            };
+            return Ok(itemArr);
         }
 
         [HttpGet("{reserveAble}")]
@@ -965,6 +992,80 @@ namespace SnowmeetApi.Controllers
             return userList[0];
         }
 
+        [HttpGet("{scheduleId}")]
+        public async Task<ActionResult<UTVRentItem>> SetRent(int scheduleId, string name, string sessionKey)
+        {
+            sessionKey = Util.UrlDecode(sessionKey.Trim()).Trim();
+            string openId = await GetOpenId(sessionKey);
+            name = Util.UrlDecode(name).Trim();
+            if (!(await IsAdmin(sessionKey)))
+            {
+                return BadRequest();
+            }
+
+            var iList = await _db.utvrentItem.Where(i => (i.schedule_id == scheduleId && i.name.Trim().Equals(name))).ToListAsync();
+            UTVRentItem item;
+            if (iList == null || iList.Count == 0)
+            {
+                item = new UTVRentItem()
+                {
+                    schedule_id = scheduleId,
+                    name = name,
+                    confirm_rent = 1,
+                    rent_staff = openId.Trim(),
+                    return_staff = "",
+                    returned = 0
+                };
+                await _db.AddAsync(item);
+            }
+            else
+            {
+                item = iList[0];
+                item.confirm_rent = 1;
+                item.returned = 0;
+                item.rent_staff = openId.Trim();
+                item.return_staff = "";
+                _db.Entry(item).State = EntityState.Modified;
+            }
+            await _db.SaveChangesAsync();
+            return Ok(item);
+        }
+
+        [HttpGet("{scheduleId}")]
+        public async Task<ActionResult<IEnumerable<UTVRentItem>>> GetRentItems(int scheduleId, string sessionKey)
+        {
+            sessionKey = Util.UrlDecode(sessionKey.Trim()).Trim();
+            if (!(await IsAdmin(sessionKey)))
+            {
+                return BadRequest();
+            }
+            return Ok(await _db.utvrentItem.Where(i => (i.schedule_id == scheduleId && i.confirm_rent == 1)).ToListAsync());
+        }
+
+        [HttpGet("{scheduleId}")]
+        public async Task<ActionResult<IEnumerable<UTVRentItem>>> ResetRentItems(int scheduleId, string sessionKey)
+        {
+            sessionKey = Util.UrlDecode(sessionKey.Trim()).Trim();
+            if (!(await IsAdmin(sessionKey)))
+            {
+                return BadRequest();
+            }
+            var iList = await _db.utvrentItem.Where(i => (i.schedule_id == scheduleId && i.confirm_rent == 1)).ToListAsync();
+            if (iList == null || iList.Count == 0)
+            {
+                return Ok(iList);
+            }
+            for (int i = 0; i < iList.Count; i++)
+            {
+                UTVRentItem item = iList[i];
+                item.confirm_rent = 0;
+                _db.Entry(item).State = EntityState.Modified;
+
+            }
+            await _db.SaveChangesAsync();
+            return Ok(iList);
+        }
+
         /*
 
         [NonAction]
@@ -994,6 +1095,6 @@ namespace SnowmeetApi.Controllers
             return s;
         }
         */
-            
+
     }
 }

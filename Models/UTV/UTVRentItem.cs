@@ -10,7 +10,7 @@ namespace SnowmeetApi.Models.UTV
         public int schedule_id { get; set; }
         public string name { get; set; }
         public int confirm_rent { get; set; }
-        public int returned { get; set; }
+        public int returned { get; set; } = 0;
         public string rent_staff { get; set; }
         public string return_staff { get; set; }
 
