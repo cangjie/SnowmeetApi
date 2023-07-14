@@ -1,5 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Collections.Generic;
 
 namespace SnowmeetApi.Models.UTV
 {
@@ -27,6 +28,7 @@ namespace SnowmeetApi.Models.UTV
         public int passenger_user_id { get; set; }
         public string passenger_insurance { get; set; }
         public string memo { get; set; }
+        
 
         [NotMapped]
         public UTVUsers driver { get; set; }
@@ -46,6 +48,12 @@ namespace SnowmeetApi.Models.UTV
 
         [NotMapped]
         public UTVReserve reserve { get; set; } = null;
+
+        [NotMapped]
+        public IEnumerable<UTVRentItem> rentItem { get; set; } = null;
+
+        [NotMapped]
+        public bool rentReturned { get; set; } = false;
         
     }
 }

@@ -639,6 +639,20 @@ namespace SnowmeetApi.Controllers
                 s.passenger_user_id = 0;
                 s.passenger_insurance = "";
             }
+
+            var rentList = await _db.utvrentItem.Where(i => (i.confirm_rent == 1 && i.schedule_id == s.id)).ToListAsync();
+            s.rentItem = rentList;
+            bool allReturned = true;
+            for (int i = 0; i < rentList.Count; i++)
+            {
+                if (rentList[i].returned == 0)
+                {
+                    allReturned = false;
+                    break;
+                }
+            }
+            s.rentReturned = allReturned;
+
             return Ok(s);
         }
 
