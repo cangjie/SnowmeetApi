@@ -56,7 +56,19 @@ namespace SnowmeetApi.Controllers
             {
                 new UTVRentItem()
                 { 
-                    name = "头盔"
+                    name = "主驾头盔"
+                },
+                new UTVRentItem()
+                {
+                    name = "副驾头盔"
+                },
+                new UTVRentItem()
+                {
+                    name = "主驾衣服"
+                },
+                new UTVRentItem()
+                {
+                    name = "副驾衣服"
                 },
                 new UTVRentItem()
                 {
@@ -64,12 +76,12 @@ namespace SnowmeetApi.Controllers
                 },
                 new UTVRentItem()
                 {
-                    name = "手套"
+                    name = "主驾手套"
                 },
                 new UTVRentItem()
                 {
-                    name = "衣服"
-                },
+                    name = "副驾手套"
+                },   
                 new UTVRentItem()
                 {
                     name = "手台"
