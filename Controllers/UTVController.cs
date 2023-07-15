@@ -1140,6 +1140,19 @@ namespace SnowmeetApi.Controllers
             
         }
 
+        [HttpPost]
+        public async Task<ActionResult<UTVTrip>> UpdateTrip([FromQuery] string sessionKey, [FromBody] UTVTrip trip)
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            if (!(await IsAdmin(sessionKey)))
+            {
+                return BadRequest();
+            }
+            _db.Entry(trip).State = EntityState.Modified;
+            await _db.SaveChangesAsync();
+            return Ok(trip);
+        }
+
         /*
 
         [NonAction]
