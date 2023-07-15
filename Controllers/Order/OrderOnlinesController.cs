@@ -459,8 +459,18 @@ namespace SnowmeetApi.Controllers
                     }
                 }
                 catch
-                { 
-                
+                {
+                    if (!order.open_id.Trim().Equals(""))
+                    {
+                        try
+                        {
+                            order.user = await _context.MiniAppUsers.FindAsync(order.open_id.Trim());
+                        }
+                        catch
+                        { 
+                        
+                        }
+                    }        
                 }
             }
             var mi7Orders = await _context.mi7Order.Where(o => o.order_id == orderId).ToArrayAsync();
