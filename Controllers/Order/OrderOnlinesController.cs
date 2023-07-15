@@ -440,19 +440,27 @@ namespace SnowmeetApi.Controllers
             OrderOnline order = await _context.OrderOnlines.FindAsync(orderId);
             if (order != null && !order.open_id.Trim().Equals(""))
             {
-                UnicUser customerUser = (await UnicUser.GetUnicUser(order.open_id, "snowmeet_mini", _context)).Value;
-                if (customerUser == null)
+                try
                 {
-                    customerUser = (await UnicUser.GetUnicUser(order.open_id, "snowmeet_official_account_new", _context)).Value;
+                    UnicUser customerUser = (await UnicUser.GetUnicUser(order.open_id, "snowmeet_mini", _context)).Value;
+                    if (customerUser == null)
+                    {
+                        customerUser = (await UnicUser.GetUnicUser(order.open_id, "snowmeet_official_account_new", _context)).Value;
+                    }
+                    if (customerUser == null)
+                    {
+                        customerUser = (await UnicUser.GetUnicUser(order.open_id, "snowmeet_official_account", _context)).Value;
+                    }
+
+                    if (customerUser != null)
+                    {
+                        order.user = await _context.MiniAppUsers.FindAsync(customerUser.miniAppOpenId);
+
+                    }
                 }
-                if (customerUser == null)
-                {
-                    customerUser = (await UnicUser.GetUnicUser(order.open_id, "snowmeet_official_account", _context)).Value;
-                }
-                if (customerUser != null)
-                {
-                    order.user = await _context.MiniAppUsers.FindAsync(customerUser.miniAppOpenId);
-                    
+                catch
+                { 
+                
                 }
             }
             var mi7Orders = await _context.mi7Order.Where(o => o.order_id == orderId).ToArrayAsync();
