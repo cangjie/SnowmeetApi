@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using SnowmeetApi.Controllers.Order;
 using SnowmeetApi.Data;
 using SnowmeetApi.Models;
 using SnowmeetApi.Models.Order;
@@ -24,10 +25,14 @@ namespace SnowmeetApi.Controllers
     {
         private readonly ApplicationDBContext _db;
         private readonly Order.OrderPaymentController payCtrl;
+        private readonly IConfiguration _config;
+        private readonly IHttpContextAccessor _http;
 
         public UTVController(ApplicationDBContext context, IConfiguration config, IHttpContextAccessor httpContextAccessor)
         {
             _db = context;
+            _config = config;
+            _http = httpContextAccessor;
             payCtrl = new Order.OrderPaymentController(context, config, httpContextAccessor);
         }
 
@@ -1097,6 +1102,42 @@ namespace SnowmeetApi.Controllers
             _db.Entry(item).State = EntityState.Modified;
             await _db.SaveChangesAsync();
             return Ok(item);
+        }
+
+        [HttpGet("{id}")]
+        public async Task<ActionResult<OrderPaymentRefund>> Refund(int id, double amount, string sessionKey)
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            if (!(await IsAdmin(sessionKey))) 
+            {
+                return BadRequest();
+            }
+            UTVVehicleSchedule schedule = await _db.utvVehicleSchedule.FindAsync(id);
+            if (schedule == null)
+            {
+                return NotFound();
+            }
+            UTVReserve reserve = await _db.utvReserve.FindAsync(schedule.reserve_id);
+            if (reserve == null)
+            {
+                return NotFound();
+            }
+            if (reserve.order_id == 0)
+            {
+                return NoContent();
+            }
+            var paymentList = await _db.OrderPayment.Where(p => (p.order_id == reserve.order_id && p.status.Equals("支付成功"))).ToListAsync();
+            if (paymentList == null || paymentList.Count == 0)
+            {
+                return NotFound();
+            }
+            OrderRefundController refundHelper = new OrderRefundController(_db, _config, _http);
+            OrderPaymentRefund refund = await refundHelper.TenpayRefund(paymentList[0].id, amount, sessionKey);
+            refund.memo = id.ToString();
+            _db.Entry(refund).State = EntityState.Modified;
+            await _db.SaveChangesAsync();
+            return Ok(refund);
+            
         }
 
         /*

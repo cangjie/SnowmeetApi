@@ -451,7 +451,7 @@ namespace SnowmeetApi.Controllers.Order
         private int GetMchId(OrderOnline order)
         {
             int mchId = 3;
-            if (order.type == "押金")
+            if (order.type == "押金" || order.type == "UTV押金")
             {
                 mchId = 5;
                 //mchId = 3;
