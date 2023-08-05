@@ -129,6 +129,24 @@ namespace SnowmeetApi.Controllers
             
         }
 
+        [HttpPost]
+        public async Task<ActionResult<MiniAppUser>> UpdateMiniUser([FromQuery] string sessionKey, [FromBody] MiniAppUser miniUser)
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            if (!user.isAdmin && !miniUser.open_id.Trim().Equals(""))
+            {
+                return BadRequest();
+            }
+            if (miniUser.open_id.Trim().Equals(""))
+            {
+                miniUser.open_id = user.miniAppOpenId.Trim();
+            }
+            _context.Entry(miniUser).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
+            return Ok(miniUser);
+        }
+
         [HttpGet]
         public async Task<ActionResult<MiniAppUser>> UpdateUserInfo(string sessionKey, string encData, string iv)
         {
