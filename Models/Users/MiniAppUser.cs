@@ -20,6 +20,8 @@ namespace SnowmeetApi.Models.Users
         public int blocked { get; set; } = 0;
         public int is_admin { get; set; } = 0;
         public int member_id { get; set; } = 0;
+
+        public string wechat_id { get; set; } = "";
         public DateTime create_date { get; set; } = DateTime.Now;
         /*
         public static implicit operator MiniAppUser(ActionResult<MiniAppUser> v)
