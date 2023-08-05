@@ -151,7 +151,7 @@ namespace SnowmeetApi.Controllers
             trackUser.wechat_id = miniUser.wechat_id.Trim();
             _context.Entry(trackUser).State = EntityState.Modified;
             await _context.SaveChangesAsync();
-            return Ok(miniUser);
+            return Ok(trackUser);
         }
 
         [HttpGet]
