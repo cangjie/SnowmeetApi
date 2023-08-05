@@ -138,11 +138,18 @@ namespace SnowmeetApi.Controllers
             {
                 return BadRequest();
             }
-            if (miniUser.open_id.Trim().Equals(""))
+            string openId = miniUser.open_id.Trim();
+            if (openId.Equals(""))
             {
-                miniUser.open_id = user.miniAppOpenId.Trim();
+                openId = user.miniAppOpenId.Trim();
             }
-            _context.Entry(miniUser).State = EntityState.Modified;
+            MiniAppUser trackUser = await _context.MiniAppUsers.FindAsync(openId);
+            trackUser.nick = miniUser.nick.Trim();
+            trackUser.real_name = miniUser.real_name.Trim();
+            trackUser.gender = miniUser.gender.Trim();
+            trackUser.cell_number = miniUser.cell_number.Trim();
+            trackUser.wechat_id = miniUser.wechat_id.Trim();
+            _context.Entry(trackUser).State = EntityState.Modified;
             await _context.SaveChangesAsync();
             return Ok(miniUser);
         }
