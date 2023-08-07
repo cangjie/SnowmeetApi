@@ -68,6 +68,7 @@ namespace SnowmeetApi.Controllers
         [HttpGet]
         public async Task<ActionResult<Recept>> NewRecept(string openId, string scene, string shop, string sessionKey, string code = "")
         {
+            sessionKey = Util.UrlDecode(sessionKey);
             MiniAppUser adminUser = await GetUser(sessionKey);
             if (adminUser.is_admin != 1)
             {
@@ -154,6 +155,50 @@ namespace SnowmeetApi.Controllers
             await _context.SaveChangesAsync();
             return Ok(recept);
         }
+
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<Recept>>> GetUnSubmitRecept(string shop, string sessionKey)
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            if (! await IsAdmin(sessionKey))
+            {
+                return BadRequest();
+            }
+            shop = Util.UrlDecode(shop).Trim();
+            var list = await _context.Recept
+                .Where(r => (r.submit_return_id == 0 && r.create_date.Date == DateTime.Now.Date && r.shop.Trim().Equals(shop)))
+                .OrderBy(r => r.id).AsNoTracking().ToListAsync();
+            if (list == null)
+            {
+                return BadRequest();
+            }
+            for (int i = 0; i < list.Count; i++)
+            {
+                Recept r = list[i];
+                if (!r.recept_staff.Trim().Equals(""))
+                {
+                    MiniAppUser user = await _context.MiniAppUsers.FindAsync(r.recept_staff.Trim());
+                    if (user != null)
+                    {
+                        r.recept_staff_name = user.real_name.Trim();
+                    }
+                    
+                }
+                if (!r.update_staff.Trim().Equals(""))
+                {
+                    MiniAppUser user = await _context.MiniAppUsers.FindAsync(r.update_staff.Trim());
+                    if (user != null)
+                    {
+                        r.update_staff_name = user.real_name.Trim();
+                    }
+                }
+            }
+            return Ok(list);
+            //return await _context.Recept.Where(r => )
+        }
+
+
+
         /*
         [HttpPost("{sessionKey}")]
         public async Task<ActionResult<Recept>> ReceptTest(string sessionKey, Recept recept)
@@ -189,18 +234,6 @@ namespace SnowmeetApi.Controllers
             return Ok(recept);
         }
 
-        [HttpGet("{sessionKey}")]
-        public async Task<ActionResult<IEnumerable<Recept>>> GetUnfinishRecept(string sessionKey, string shop)
-        {
-            shop = Util.UrlDecode(shop);
-            if(await IsAdmin(sessionKey))
-            {
-                return BadRequest();
-            }
-            var list = await _context.Recept.Where(r => r.submit_return_id == 0 && r.shop.Equals(shop))
-                .OrderByDescending(r => r.id).ToListAsync();
-            return Ok(list);
-        }
 
         [NonAction]
         public async Task<bool> IsAdmin(string sessionKey)
