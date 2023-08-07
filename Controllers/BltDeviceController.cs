@@ -42,6 +42,14 @@ namespace SnowmeetApi.Controllers
 
             return bltDevice;
         }
+
+        [HttpGet]
+        public ActionResult<string> Test()
+        {
+            string ret = DateTime.Now.ToLongTimeString();
+            return Ok(ret);
+        }
+
         /*
         // PUT: api/BltDevice/5
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754

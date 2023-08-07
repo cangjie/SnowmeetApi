@@ -66,7 +66,7 @@ namespace SnowmeetApi.Controllers
 
 
         [HttpGet]
-        public async Task<ActionResult<Recept>> NewRecept(string openId, string scene, string shop, string sessionKey)
+        public async Task<ActionResult<Recept>> NewRecept(string openId, string scene, string shop, string sessionKey, string code = "")
         {
             MiniAppUser adminUser = await GetUser(sessionKey);
             if (adminUser.is_admin != 1)
@@ -121,7 +121,8 @@ namespace SnowmeetApi.Controllers
                 update_staff = "",
                 submit_return_id = 0,
                 create_date = DateTime.Now,
-                update_date = DateTime.Now
+                update_date = DateTime.Now,
+                code = code
             };
             await _context.Recept.AddAsync(recept);
             await _context.SaveChangesAsync();

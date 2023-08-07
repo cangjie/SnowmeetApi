@@ -32,6 +32,7 @@ namespace SnowmeetApi.Models
         public string recept_staff { get; set; }
         public string update_staff { get; set; }
         public int submit_return_id { get; set; } = 0;
+        public string code { get; set; } = "";
         public DateTime create_date { get; set; }
         public DateTime update_date { get; set; }
         public DateTime? submit_date { get; set; }
