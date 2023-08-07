@@ -25,7 +25,7 @@ namespace SnowmeetApi.Models
         public string open_id { get; set; }
         public string cell { get; set; }
         public string real_name { get; set; }
-        public string current_step { get; set; }
+        public int current_step { get; set; }
         public string gender { get; set; }
         public string recept_type { get; set; }
         public string submit_data { get; set; } = "";
