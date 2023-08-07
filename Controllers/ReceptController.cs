@@ -126,9 +126,7 @@ namespace SnowmeetApi.Controllers
             };
             await _context.Recept.AddAsync(recept);
             await _context.SaveChangesAsync();
-
             return Ok(recept);
-
         }
 
         [HttpPost("{sessionKey}")]
