@@ -113,7 +113,7 @@ namespace SnowmeetApi.Controllers
                 open_id = openId.Trim(),
                 cell = user.cell_number.Trim(),
                 real_name = user.real_name.Trim(),
-                current_step = "",
+                current_step = 0,
                 gender = user.gender.Trim(),
                 recept_type = scene.Trim(),
                 submit_data = entityJson.Trim(),
