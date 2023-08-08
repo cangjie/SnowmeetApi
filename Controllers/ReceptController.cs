@@ -197,6 +197,83 @@ namespace SnowmeetApi.Controllers
             //return await _context.Recept.Where(r => )
         }
 
+        [HttpGet("{id}")]
+        public async Task<ActionResult<Recept>> PlaceOrder(int id, string sessionKey)
+        {
+            sessionKey = Util.UrlDecode(sessionKey).Trim();
+            if (!await IsAdmin(sessionKey))
+            {
+                return BadRequest();
+            }
+            Recept r = await _context.Recept.FindAsync(id);
+            switch (r.recept_type)
+            {
+                case "租赁下单":
+                    r = await CreateRendOrder(r);
+                    break;
+                default:
+                    break;
+            }
+            if (r == null) 
+            {
+                return NotFound();
+            }
+            return Ok(r);
+        }
+
+        [NonAction]
+        public async Task<Recept> CreateRendOrder(Recept recept)
+        {
+            string jsonStr = recept.submit_data.Trim();
+            RentOrder rentOrder = JsonConvert.DeserializeObject<RentOrder>(jsonStr);
+            if (rentOrder.deposit_real == 0)
+            {
+                rentOrder.deposit_real = rentOrder.deposit;
+            }
+            rentOrder.deposit_final = rentOrder.deposit_real 
+                - rentOrder.deposit_reduce - rentOrder.deposit_reduce_ticket;
+            await _context.RentOrder.AddAsync(rentOrder);
+            await _context.SaveChangesAsync();
+            recept.rentOrder = rentOrder;
+            if (rentOrder.id <= 0)
+            {
+                return recept;
+            }
+            for (int i = 0; i < rentOrder.details.Length; i++)
+            {
+                RentOrderDetail detail = rentOrder.details[i];
+                detail.rent_list_id = rentOrder.id;
+                await _context.RentOrderDetail.AddAsync(detail);
+            }
+            await _context.SaveChangesAsync();
+            OrderOnline order = new OrderOnline()
+            {
+                id = 0,
+                type = "押金",
+                open_id = recept.open_id.Trim(),
+                cell_number = recept.cell.Trim(),
+                name = recept.real_name.Trim(),
+                pay_method = rentOrder.payMethod.Trim(),
+                order_price = rentOrder.deposit_final,
+                order_real_pay_price = rentOrder.deposit_final,
+                pay_state = 0,
+                pay_memo = rentOrder.pay_option.Trim(),
+                shop = recept.shop,
+                ticket_amount = 0,
+                have_score = 0,
+                score_rate = 0,
+                ticket_code = recept.code.Trim(),
+                other_discount = 0,
+                final_price = rentOrder.deposit_final,
+                staff_open_id = recept.update_staff.Trim().Equals("") ? recept.recept_staff.Trim() : recept.update_staff.Trim()
+            };
+            await _context.OrderOnlines.AddAsync(order);
+            await _context.SaveChangesAsync();
+            rentOrder.order_id = order.id;
+            _context.Entry(rentOrder).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
+            return recept;
+        }
 
 
         /*
