@@ -233,7 +233,7 @@ namespace SnowmeetApi.Controllers
                         s += b.member.gender + ",";
                         break;
                     case "门店":
-                        s += b.shop;
+                        s += b.shop + ",";
                         break;
                     default:
                         if (fields[i].StartsWith("退款"))
