@@ -15,6 +15,8 @@ namespace SnowmeetApi.Models.Order
         public string memo { get; set; } = "";
         public string notify_url { get; set; } = "";
         public string refund_id { get; set; } = "";
+        public double RefundFee { get; set; } = 0;
+        public string TransactionId { get; set; } = "";
         public DateTime create_date { get; set; } = DateTime.Now;
     }
 }

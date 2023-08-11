@@ -43,6 +43,99 @@ namespace SnowmeetApi.Controllers.Order
 
         }
 
+        [NonAction]
+        public async Task<ActionResult<int>> RefreshWepayRefundInfo()
+        {
+            var refundList = await _db.OrderPaymentRefund
+                .Where(r => (!r.refund_id.Trim().Equals("") && r.TransactionId.Trim().Equals("") && r.create_date.Date > DateTime.Parse("2022-9-1")))
+                .ToListAsync();
+            if (refundList == null)
+            {
+                return BadRequest();
+            }
+            int num = 0;
+            for (int i = 0; i < refundList.Count; i++)
+            {
+                OrderPaymentRefund r = refundList[i];
+                OrderPayment p = await _db.OrderPayment.FindAsync(r.payment_id);
+                if (p == null)
+                {
+                    continue;
+                }
+                WepayKey key = await _db.WepayKeys.FindAsync(p.mch_id);
+                var certManager = new InMemoryCertificateManager();
+                var options = new WechatTenpayClientOptions()
+                {
+                    MerchantId = key.mch_id.Trim(),
+                    MerchantV3Secret = "",
+                    MerchantCertificateSerialNumber = key.key_serial.Trim(),
+                    MerchantCertificatePrivateKey = key.private_key.Trim(),
+                    PlatformCertificateManager = certManager
+                };
+                var client = new WechatTenpayClient(options);
+                //var req = new GetRefund
+                var request = new GetRefundDomesticRefundByOutRefundNumberRequest()
+                {
+                    OutRefundNumber = r.id.ToString()
+                };
+                var reponse = await client.ExecuteGetRefundDomesticRefundByOutRefundNumberAsync(request);
+                try
+                {
+                    r.TransactionId = reponse.TransactionId.Trim();
+                    r.RefundFee = double.Parse(reponse.Amount.RefundFee.ToString()) / 100;
+                    _db.Entry(r).State = EntityState.Modified;
+                    await _db.SaveChangesAsync();
+                    num++;
+                }
+                catch
+                {
+
+                }
+            }
+            return Ok(num);
+        }
+
+
+        [HttpGet]
+        public async Task<ActionResult<int>> GetResult(string outTradeNo)
+        {
+            var paymentList = await _db.OrderPayment.Where(p => p.out_trade_no.Trim().Equals(outTradeNo.Trim())).ToListAsync();
+            if (paymentList == null || paymentList.Count == 0)
+            {
+                return NotFound();
+            }
+            int? mchId = paymentList[0].mch_id;
+            int paymentId = paymentList[0].id;
+            if (mchId == null)
+            {
+                return NoContent();
+            }
+            var paymentRefundList = await _db.OrderPaymentRefund.Where(r => r.payment_id == paymentId).ToListAsync();
+            if (paymentRefundList == null || paymentRefundList.Count == 0)
+            {
+                return NotFound();
+            }
+            WepayKey key = await _db.WepayKeys.FindAsync(mchId);
+
+            var certManager = new InMemoryCertificateManager();
+            var options = new WechatTenpayClientOptions()
+            {
+                MerchantId = key.mch_id.Trim(),
+                MerchantV3Secret = "",
+                MerchantCertificateSerialNumber = key.key_serial.Trim(),
+                MerchantCertificatePrivateKey = key.private_key.Trim(),
+                PlatformCertificateManager = certManager
+            };
+            var client = new WechatTenpayClient(options);
+            //var req = new GetRefund
+            var request = new GetRefundDomesticRefundByOutRefundNumberRequest()
+            {
+                OutRefundNumber = paymentRefundList[0].id.ToString()
+            };
+            var reponse = await client.ExecuteGetRefundDomesticRefundByOutRefundNumberAsync(request);
+            return BadRequest();
+        }
+
         
 
         [NonAction]

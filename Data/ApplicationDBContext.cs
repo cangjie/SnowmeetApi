@@ -137,7 +137,9 @@ namespace SnowmeetApi.Data
 
         public DbSet<UTVRentItem> utvrentItem { get; set;}
 
-        public DbSet<UTVUserGroup> uTVUserGroups { get; set; }  
+        public DbSet<UTVUserGroup> uTVUserGroups { get; set; }
+
+        public DbSet<WepayTransaction> wepayTransaction { get; set; }
 
 
 
