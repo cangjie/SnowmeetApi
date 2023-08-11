@@ -108,7 +108,7 @@ namespace SnowmeetApi.Controllers
             {
                 Directory.CreateDirectory(dirPath);
             }
-            string fileName = mch_id.Trim() + "_" + DateTime.Now.ToLongDateString() + "_" + DateTime.Now.ToLongTimeString() + ".csv";
+            string fileName = mch_id.Trim() + "_" + Util.GetLongTimeStamp(DateTime.Now) + ".csv";
             Balance[] bArr = await GetBalance(mch_id);
             string headLine = "序号,日期,时间,类别,月份,运营区间,门店,昵称,手机,姓名,性别,支付渠道,渠道商户号,商户订单号,支付订单号,重复数,业务单号,收入类型,业务明细,收入,手续费,入账金额,退款方式,退款,手续费退回,出账金额";
             int maxRefunds = 0;
@@ -374,7 +374,7 @@ namespace SnowmeetApi.Controllers
 
 
                 //&& t.out_trade_no.Length > 5
-                //&& t.out_trade_no.Trim().Equals("02695821242381071955")
+                && t.out_trade_no.Trim().Equals("03112963237295000301")
                 //&& t.trans_date.StartsWith("2023")
 
                 ).OrderBy(t => t.trans_date)
@@ -387,8 +387,8 @@ namespace SnowmeetApi.Controllers
                 Balance b = new Balance();
                 b.id = i + 1;
                 DateTime tDate = DateTime.Parse(l.trans_date);
-                b.date = tDate.ToShortDateString();
-                b.time = tDate.ToShortTimeString();
+                b.date = tDate.Year.ToString() + "-" + tDate.Month.ToString().PadLeft(2, '0') + "-" + tDate.Day.ToString().PadLeft(2, '0');
+                b.time = tDate.Hour.ToString().PadLeft(2, '0') + ":" + tDate.Minute.ToString().PadLeft(2, '0') + ":" + tDate.Second.ToString().PadLeft(2, '0');
                 b.month = tDate.Month.ToString();
                 b.season = GetSeason(tDate);
                 b.mch_id = mch_id.Trim();
@@ -408,8 +408,8 @@ namespace SnowmeetApi.Controllers
                         DateTime rDate = DateTime.Parse(l.trans_date);
                         Refund r = new Refund()
                         {
-                            date = rDate.ToShortDateString(),
-                            time = rDate.ToShortTimeString(),
+                            date = rDate.Year.ToString() + "-" + rDate.Month.ToString().PadLeft(2, '0') + "-" + rDate.Day.ToString().PadLeft(2, '0'),
+                            time = rDate.Hour.ToString().PadLeft(2, '0') + ":" + rDate.Minute.ToString().PadLeft(2, '0') + rDate.Second.ToString().PadLeft(2, '0'),
                             refund_type = l.refund_type.Trim(),
                             wepay_refund_id = l.wepay_refund_no,
                             out_refund_id = l.out_refund_no.Trim(),
