@@ -615,10 +615,10 @@ namespace SnowmeetApi.Controllers
 
                 for (int i = 0; i < l.Count; i++)
                 {
-                    string subDesc = l[i].confirmed_brand + "," + l[i].confirmed_serial + "," + l[i].confirmed_scale
-                        + "," + (l[i].confirmed_edge == 1 ? "修刃" : "") + "," + (l[i].confirmed_candle == 1 ? "打蜡" : "")
-                        + "," + l[i].confirmed_more.Trim();
-                    desc += subDesc + ";";
+                    string subDesc = l[i].confirmed_brand + "~" + l[i].confirmed_serial + "~" + l[i].confirmed_scale
+                        + "~" + (l[i].confirmed_edge == 1 ? "修刃" : "") + "~" + (l[i].confirmed_candle == 1 ? "打蜡" : "")
+                        + "~" + l[i].confirmed_more.Trim();
+                    desc += subDesc + "|";
 
                 }
                 desc = desc.Substring(0, desc.Length - 1);
@@ -689,7 +689,7 @@ namespace SnowmeetApi.Controllers
                     var dtl = await _context.RentOrderDetail.Where(d => d.rent_list_id == rL[0].id).AsNoTracking().ToListAsync();
                     for (int i = 0; dtl != null && i < dtl.Count; i++)
                     {
-                        desc += dtl[i].rent_item_class + "," + dtl[i].rent_item_name + "," + dtl[i].rent_item_code + ";";
+                        desc += dtl[i].rent_item_class + "~" + dtl[i].rent_item_name + "~" + dtl[i].rent_item_code + "|";
                     }
                     desc = desc.Substring(0, desc.Length - 1);
                     bi.description = desc;
