@@ -110,7 +110,7 @@ namespace SnowmeetApi.Controllers
             }
             string fileName = mch_id.Trim() + "_" + Util.GetLongTimeStamp(DateTime.Now) + ".csv";
             Balance[] bArr = await GetBalance(mch_id);
-            string headLine = "序号,日期,时间,类别,月份,运营区间,门店,昵称,手机,姓名,性别,支付渠道,渠道商户号,商户订单号,支付订单号,重复数,业务单号,收入类型,业务明细,收入,手续费,入账金额,退款方式,退款,手续费退回,出账金额";
+            string headLine = "序号,日期,时间,类别,月份,运营区间,门店,昵称,手机,姓名,性别,支付渠道,渠道商户号,商户订单号,支付订单号,业务单号,收入类型,业务明细,退款次数,支付订单当前结余,收入,手续费,入账金额,退款方式,退款,手续费退回,出账金额";
             int maxRefunds = 0;
             for (int i = 0; i < bArr.Length; i++)
             {
@@ -118,9 +118,9 @@ namespace SnowmeetApi.Controllers
             }
             for (int i = 0; i < maxRefunds; i++)
             {
-                headLine += ",退款日期i,退款时间i,退款单号i,退款金额i,退款返回手续费i,退款实际出账i".Replace("i", (i + 1).ToString());
+                headLine += ",退款日期i,退款时间i,退款方式i,退款单号i,退款金额i,退款返回手续费i,退款实际出账i".Replace("i", (i + 1).ToString());
             }
-            headLine += ",退款合计,退回手术费合计,实际出账合计,支付订单当前结余";
+            headLine += ",退款合计,退回手续费合计,实际出账合计";
 
             string content = headLine + "\r\n";
 
@@ -175,7 +175,7 @@ namespace SnowmeetApi.Controllers
                     case "支付订单号":
                         s += b.TransactId + ",";
                         break;
-                    case "重复数":
+                    case "退款次数":
                         s += b.refunds.Count.ToString() + ",";
                         break;
                     case "收入类型":
@@ -234,6 +234,9 @@ namespace SnowmeetApi.Controllers
                         break;
                     case "门店":
                         s += b.shop + ",";
+                        break;
+                    case "退回手续费合计":
+                        s += b.total_refund_fee + ",";
                         break;
                     default:
                         if (fields[i].StartsWith("退款"))
@@ -296,6 +299,16 @@ namespace SnowmeetApi.Controllers
                                     if (b.refunds != null && index < b.refunds.Count)
                                     {
                                         s += b.refunds[index].summary + ",";
+                                    }
+                                    else
+                                    {
+                                        s += "-,";
+                                    }
+                                    break;
+                                case "退款方式":
+                                    if (b.refunds != null && index < b.refunds.Count)
+                                    {
+                                        s += b.refunds[index].refund_type + ",";
                                     }
                                     else
                                     {
@@ -374,7 +387,7 @@ namespace SnowmeetApi.Controllers
 
 
                 //&& t.out_trade_no.Length > 5
-                //&& t.out_trade_no.Trim().Equals("03112963237295000301")
+                && t.out_trade_no.Trim().Equals("03013953235577216652")
                 //&& t.trans_date.StartsWith("2023")
 
                 ).OrderBy(t => t.trans_date)
@@ -405,12 +418,13 @@ namespace SnowmeetApi.Controllers
                         b.fee = "-";
                         b.summary = "-";
                         b.trans_type = "退款";
+                        b.refund_type = l.out_refund_no.Trim().Length < 10 ? "API" : "后台";
                         DateTime rDate = DateTime.Parse(l.trans_date);
                         Refund r = new Refund()
                         {
                             date = rDate.Year.ToString() + "-" + rDate.Month.ToString().PadLeft(2, '0') + "-" + rDate.Day.ToString().PadLeft(2, '0'),
                             time = rDate.Hour.ToString().PadLeft(2, '0') + ":" + rDate.Minute.ToString().PadLeft(2, '0') + rDate.Second.ToString().PadLeft(2, '0'),
-                            refund_type = l.refund_type.Trim(),
+                            refund_type = b.refund_type.Trim(),
                             wepay_refund_id = l.wepay_refund_no,
                             out_refund_id = l.out_refund_no.Trim(),
                             refund_amount = l.refund_amount,
@@ -446,7 +460,7 @@ namespace SnowmeetApi.Controllers
                         b.refund_amount = l.refund_amount.Trim();
                         b.refund_fee = l.fee;
                         b.refund_summary = Math.Round(double.Parse(b.refund_amount) + double.Parse(b.refund_fee), 2).ToString();
-                        b.refund_type = "";
+                        //b.refund_type = "";
                         b.total_refund = "-";
                         b.total_refund_fee = "-";
                         b.total_summary = "-";
