@@ -96,6 +96,7 @@ namespace SnowmeetApi.Controllers
             public string total_summary { get; set; }
             public string fee_rate { get; set; }
             public BusinessInfo business { get; set; }
+            public string oper { get; set; } = "";
            
         }
 
@@ -110,7 +111,7 @@ namespace SnowmeetApi.Controllers
             }
             string fileName = mch_id.Trim() + "_" + Util.GetLongTimeStamp(DateTime.Now) + ".csv";
             Balance[] bArr = await GetBalance(mch_id);
-            string headLine = "序号,日期,时间,类别,月份,运营区间,门店,昵称,手机,姓名,性别,支付渠道,渠道商户号,商户订单号,支付订单号,业务单号,收入类型,业务明细,退款次数,支付订单当前结余,收入,手续费,入账金额,退款方式,退款,手续费退回,出账金额";
+            string headLine = "序号,日期,时间,类别,月份,运营区间,门店,昵称,手机,姓名,性别,支付渠道,渠道商户号,商户订单号,支付订单号,业务单号,收入类型,业务明细,收入,手续费,入账金额,退款合计,退回手续费合计,实际出账合计,支付订单当前结余,退款次数,退款方式,退款,手续费退回,出账金额";
             int maxRefunds = 0;
             for (int i = 0; i < bArr.Length; i++)
             {
@@ -120,7 +121,7 @@ namespace SnowmeetApi.Controllers
             {
                 headLine += ",退款日期i,退款时间i,退款方式i,退款单号i,退款金额i,退款返回手续费i,退款实际出账i".Replace("i", (i + 1).ToString());
             }
-            headLine += ",退款合计,退回手续费合计,实际出账合计";
+            headLine += ",操作员";
 
             string content = headLine + "\r\n";
 
@@ -238,6 +239,9 @@ namespace SnowmeetApi.Controllers
                     case "退回手续费合计":
                         s += b.total_refund_fee + ",";
                         break;
+                    case "操作员":
+                        s += b.oper.Trim() + ",";
+                        break;
                     default:
                         if (fields[i].StartsWith("退款"))
                         {
@@ -322,6 +326,11 @@ namespace SnowmeetApi.Controllers
                         break;
                 }
             }
+            if (s.EndsWith(","))
+            {
+                s = s.Substring(0, s.Length - 1);
+
+            }
             return s;
         }
 
@@ -387,7 +396,7 @@ namespace SnowmeetApi.Controllers
 
 
                 //&& t.out_trade_no.Length > 5
-                && t.out_trade_no.Trim().Equals("03013953235577216652")
+                //&& t.out_trade_no.Trim().Equals("03013953235577216652")
                 //&& t.trans_date.StartsWith("2023")
 
                 ).OrderBy(t => t.trans_date)
@@ -419,6 +428,7 @@ namespace SnowmeetApi.Controllers
                         b.summary = "-";
                         b.trans_type = "退款";
                         b.refund_type = l.out_refund_no.Trim().Length < 10 ? "API" : "后台";
+                        b.oper = await GetRefundOper(l);
                         DateTime rDate = DateTime.Parse(l.trans_date);
                         Refund r = new Refund()
                         {
@@ -479,6 +489,25 @@ namespace SnowmeetApi.Controllers
                         OrderOnline order = await FindOrder(b.out_trade_no.Trim());
                         if (order != null)
                         {
+                            if (order.staff_open_id == null)
+                            {
+                                b.oper = "";
+                            }
+                            else
+                            {
+                                MemberInfo operMember = await GetMemberInfo(order.staff_open_id.Trim());
+                                if (operMember != null)
+                                {
+
+                                    b.oper = operMember.real_name.Trim();
+                                }
+                                else
+                                {
+                                    b.oper = "";
+                                }
+                            }
+                            
+                            
                             b.business = await GetBusiness(order);
                             b.shop = order.shop;
                             if (b.business != null && b.member != null)
@@ -503,6 +532,36 @@ namespace SnowmeetApi.Controllers
                 bArr[i] = b;
             }
             return bArr;
+        }
+
+        [NonAction]
+        public async Task<string> GetRefundOper(WepayTransaction l)
+        {
+            string openId = "";
+            var newList = await _context.OrderPaymentRefund.Where(o => o.refund_id.Trim().Equals(l.wepay_refund_no)).AsNoTracking().ToListAsync();
+            if (newList != null && newList.Count > 0)
+            {
+                openId = newList[0].oper.Trim();
+            }
+            if (openId.Trim().Equals(""))
+            {
+                var oldList = await _context.WePayOrderRefund
+                    .Where(o => o.status.Trim().Equals(l.wepay_refund_no) || o.wepay_out_trade_no.Trim().Equals(l.out_trade_no))
+                    .AsNoTracking().ToListAsync();
+                if (oldList != null && oldList.Count > 0)
+                {
+                    openId = oldList[0].oper_open_id.Trim();
+                }
+            }
+            MemberInfo memberInfo = await GetMemberInfo(openId);
+            if (memberInfo == null)
+            {
+                return "";
+            }
+            else
+            {
+                return memberInfo.real_name.Trim();
+            }
         }
 
         [NonAction]
@@ -603,14 +662,42 @@ namespace SnowmeetApi.Controllers
                     break;
                 case "店销现货":
                 case "店销":
-                    bi.type = "店销现货";
-                    bi.id = order.id.ToString();
+                    bi = await GetSaleInfo(order);
                     break;
                 default:
                     bi.type = order.type.Trim();
                     bi.id = "0";
                     break;
             }
+            return bi;
+        }
+
+        [NonAction]
+        public async Task<BusinessInfo> GetSaleInfo(OrderOnline order)
+        {
+            BusinessInfo bi = new BusinessInfo()
+            {
+                type = "店销现货",
+                id = order.id.ToString(),
+                description = "",
+                name = "",
+                cell = ""
+            };
+            var mi7L = await _context.mi7Order.Where(m => m.order_id == order.id)
+                .AsNoTracking().ToListAsync();
+            string desc = "";
+            for (int i = 0; i < mi7L.Count; i++)
+            {
+                if (mi7L[i].mi7_order_id != null)
+                {
+                    desc += mi7L[i].mi7_order_id + ",";
+                }
+            }
+            if (desc.EndsWith(","))
+            {
+                desc = desc.Substring(0, desc.Length - 1);
+            }
+            bi.description = desc;
             return bi;
         }
 
