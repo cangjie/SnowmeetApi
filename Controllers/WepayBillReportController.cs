@@ -62,40 +62,40 @@ namespace SnowmeetApi.Controllers
         public class Balance
         {
             public int id { get; set; }
-            public string date { get; set; }
-            public string time { get; set; }
-            public string trans_type { get; set; }
-            public string month { get; set; }
-            public string season { get; set; }
-            public MemberInfo member { get; set; }
+            public string date { get; set; } = "";
+            public string time { get; set; } = "";
+            public string trans_type { get; set; } = "";
+            public string month { get; set; } = "";
+            public string season { get; set; } = "";
+            public MemberInfo member { get; set; } 
             public string payMethod { get; set; } = "微信支付";
-            public string mch_id { get; set; }
-            public string out_trade_no { get; set; }
-            public string TransactId { get; set; }
-            public string duplicate_num { get; set; }
-            public string order_type { get; set; }
-            public string shop { get; set; }
-            public string task_id { get; set; }
-            public string order_id { get; set; }
+            public string mch_id { get; set; } = "";
+            public string out_trade_no { get; set; } = "";
+            public string TransactId { get; set; } = "";
+            public string duplicate_num { get; set; } = "";
+            public string order_type { get; set; } = "";
+            public string shop { get; set; } = "";
+            public string task_id { get; set; } = "";
+            public string order_id { get; set; } = "";
 
-            public string income { get; set; }
-            public string fee { get; set; }
-            public string summary { get; set; }
+            public string income { get; set; } = "";
+            public string fee { get; set; } = "";
+            public string summary { get; set; } = "";
 
-            public string refund_amount { get; set; }
-            public string refund_fee { get; set; }
-            public string refund_summary { get; set; }
-            public string refund_type { get; set; }
+            public string refund_amount { get; set; } = "";
+            public string refund_fee { get; set; } = "";
+            public string refund_summary { get; set; } = "";
+            public string refund_type { get; set; } = "";
 
 
 
-            public List<Refund> refunds { get; set; }
-            public string total_refund { get; set; }
-            public string total_refund_fee { get; set; }
-            public string total_refund_summary { get; set; }
-            public string total_summary { get; set; }
-            public string fee_rate { get; set; }
-            public BusinessInfo business { get; set; }
+            public List<Refund> refunds { get; set; } 
+            public string total_refund { get; set; } = "";
+            public string total_refund_fee { get; set; } = "";
+            public string total_refund_summary { get; set; } = "";
+            public string total_summary { get; set; } = "";
+            public string fee_rate { get; set; } = "";
+            public BusinessInfo business { get; set; } 
             public string oper { get; set; } = "";
            
         }
