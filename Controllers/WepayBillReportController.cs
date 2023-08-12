@@ -392,14 +392,20 @@ namespace SnowmeetApi.Controllers
         public async Task<Balance[]> GetBalance(string mch_id)
         {
             var list = await _context.wepayTransaction
-                .Where(t => t.mch_id.Trim().Equals(mch_id.Trim())
 
+                .Where(
+
+                t => t.mch_id.Trim().Equals(mch_id.Trim())
+
+                || true
 
                 //&& t.out_trade_no.Length > 5
                 //&& t.out_trade_no.Trim().Equals("03013953235577216652")
                 //&& t.trans_date.StartsWith("2023")
 
-                ).OrderBy(t => t.trans_date)
+                )
+
+                .OrderBy(t => t.trans_date)
                 .AsNoTracking().ToListAsync();
             Balance[] bArr = new Balance[list.Count];
             for (int i = 0; i < list.Count; i++)
