@@ -180,13 +180,13 @@ namespace SnowmeetApi.Controllers
                         s += b.refunds.Count.ToString().Replace(",", "，") + ",";
                         break;
                     case "收入类型":
-                        s += (b.business==null? "-,":b.business.type + ",").Replace(",", "，");
+                        s += (b.business==null? "-,":b.business.type.Replace(",", "，") + ",");
                         break;
                     case "业务明细":
-                        s += (b.business == null ? "-," : b.business.description + ",").Replace(",", "，");
+                        s += (b.business == null ? "-," : b.business.description.Replace(",", "，") + ",");
                         break;
                     case "业务单号":
-                        s += (b.business == null? "-," : b.business.id.Trim() + ",").Replace(",", "，");
+                        s += (b.business == null? "-," : b.business.id.Trim().Replace(",", "，") + ",");
                         break;
                     case "收入":
                         s += b.income.Replace(",", "，") + ",";
