@@ -150,97 +150,97 @@ namespace SnowmeetApi.Controllers
                         s += b.id.ToString() + ",";
                         break;
                     case "日期":
-                        s += b.date + ",";
+                        s += b.date.Replace(",", "，") + ",";
                         break;
                     case "时间":
-                        s += b.time + ",";
+                        s += b.time.Replace(",", "，") + ",";
                         break;
                     case "类别":
-                        s += b.trans_type + ",";
+                        s += b.trans_type.Replace(",", "，") + ",";
                         break;
                     case "月份":
-                        s += b.month + ",";
+                        s += b.month.Replace(",", "，") + ",";
                         break;
                     case "运营区间":
-                        s += b.season + ",";
+                        s += b.season.Replace(",", "，") + ",";
                         break;
                     case "支付渠道":
-                        s += b.payMethod + ",";
+                        s += b.payMethod.Replace(",", "，") + ",";
                         break;
                     case "渠道商户号":
-                        s += b.mch_id + ",";
+                        s += b.mch_id.Replace(",", "，") + ",";
                         break;
                     case "商户订单号":
-                        s += b.out_trade_no + ",";
+                        s += b.out_trade_no.Replace(",", "，") + ",";
                         break;
                     case "支付订单号":
-                        s += b.TransactId + ",";
+                        s += b.TransactId.Replace(",", "，") + ",";
                         break;
                     case "退款次数":
-                        s += b.refunds.Count.ToString() + ",";
+                        s += b.refunds.Count.ToString().Replace(",", "，") + ",";
                         break;
                     case "收入类型":
-                        s += b.business==null? "-,":b.business.type + ",";
+                        s += (b.business==null? "-,":b.business.type + ",").Replace(",", "，");
                         break;
                     case "业务明细":
-                        s += b.business == null ? "-," : b.business.description + ",";
+                        s += (b.business == null ? "-," : b.business.description + ",").Replace(",", "，");
                         break;
                     case "业务单号":
-                        s += b.business == null? "-," : b.business.id.Trim() + ",";
+                        s += (b.business == null? "-," : b.business.id.Trim() + ",").Replace(",", "，");
                         break;
                     case "收入":
-                        s += b.income + ",";
+                        s += b.income.Replace(",", "，") + ",";
                         break;
                     case "手续费":
-                        s += b.fee + ",";
+                        s += b.fee.Replace(",", "，") + ",";
                         break;
                     case "入账金额":
-                        s += b.summary + ",";
+                        s += b.summary.Replace(",", "，") + ",";
                         break;
                     case "退款方式":
-                        s += b.refund_type + ",";
+                        s += b.refund_type.Replace(",", "，") + ",";
                         break;
                     case "退款":
-                        s += b.refund_amount + ",";
+                        s += b.refund_amount.Replace(",", "，") + ",";
                         break;
                     case "手续费退回":
-                        s += b.refund_fee + ",";
+                        s += b.refund_fee.Replace(",", "，") + ",";
                         break;
                     case "出账金额":
-                        s += b.refund_summary + ",";
+                        s += b.refund_summary.Replace(",", "，") + ",";
                         break;
                     case "退款合计":
-                        s += b.total_refund + ",";
+                        s += b.total_refund.Replace(",", "，") + ",";
                         break;
                     case "退回手术费合计":
-                        s += b.total_refund_fee + ",";
+                        s += b.total_refund_fee.Replace(",", "，") + ",";
                         break;
                     case "实际出账合计":
-                        s += b.total_refund_summary + ",";
+                        s += b.total_refund_summary.Replace(",", "，") + ",";
                         break;
                     case "支付订单当前结余":
-                        s += b.total_summary + ",";
+                        s += b.total_summary.Replace(",", "，") + ",";
                         break;
                     case "昵称":
-                        s += b.member.nick + ",";
+                        s += b.member.nick.Replace(",", "，") + ",";
                         break;
                     case "手机":
-                        s += b.member.cell + ",";
+                        s += b.member.cell.Replace(",", "，") + ",";
                         break;
                     case "姓名":
-                        s += b.member.real_name + ",";
+                        s += b.member.real_name.Replace(",", "，") + ",";
                         break;
                     case "性别":
-                        s += b.member.gender + ",";
+                        s += b.member.gender.Replace(",", "，") + ",";
                         break;
                     case "门店":
-                        s += b.shop + ",";
+                        s += b.shop.Replace(",", "，") + ",";
                         break;
                     case "退回手续费合计":
-                        s += b.total_refund_fee + ",";
+                        s += b.total_refund_fee.Replace(",", "，") + ",";
                         break;
                     case "操作员":
-                        s += b.oper.Trim() + ",";
+                        s += b.oper.Trim().Replace(",", "，") + ",";
                         break;
                     default:
                         if (fields[i].StartsWith("退款"))
@@ -252,7 +252,7 @@ namespace SnowmeetApi.Controllers
                                 case "退款日期":
                                     if (b.refunds != null  && index < b.refunds.Count)
                                     {
-                                        s += b.refunds[index].date + ",";
+                                        s += b.refunds[index].date.Replace(",", "，") + ",";
                                     }
                                     else
                                     {
@@ -262,7 +262,7 @@ namespace SnowmeetApi.Controllers
                                 case "退款时间":
                                     if (b.refunds != null && index < b.refunds.Count)
                                     {
-                                        s += b.refunds[index].time + ",";
+                                        s += b.refunds[index].time.Replace(",", "，") + ",";
                                     }
                                     else
                                     {
@@ -272,7 +272,7 @@ namespace SnowmeetApi.Controllers
                                 case "退款单号":
                                     if (b.refunds != null && index < b.refunds.Count)
                                     {
-                                        s += b.refunds[index].wepay_refund_id + ",";
+                                        s += b.refunds[index].wepay_refund_id.Replace(",", "，") + ",";
                                     }
                                     else
                                     {
@@ -282,7 +282,7 @@ namespace SnowmeetApi.Controllers
                                 case "退款金额":
                                     if (b.refunds != null && index < b.refunds.Count)
                                     {
-                                        s += b.refunds[index].refund_amount + ",";
+                                        s += b.refunds[index].refund_amount.Replace(",", "，") + ",";
                                     }
                                     else
                                     {
@@ -292,7 +292,7 @@ namespace SnowmeetApi.Controllers
                                 case "退款返回手续费":
                                     if (b.refunds != null && index < b.refunds.Count)
                                     {
-                                        s += b.refunds[index].return_fee + ",";
+                                        s += b.refunds[index].return_fee.Replace(",", "，") + ",";
                                     }
                                     else
                                     {
@@ -302,7 +302,7 @@ namespace SnowmeetApi.Controllers
                                 case "退款实际出账":
                                     if (b.refunds != null && index < b.refunds.Count)
                                     {
-                                        s += b.refunds[index].summary + ",";
+                                        s += b.refunds[index].summary.Replace(",", "，") + ",";
                                     }
                                     else
                                     {
@@ -312,7 +312,7 @@ namespace SnowmeetApi.Controllers
                                 case "退款方式":
                                     if (b.refunds != null && index < b.refunds.Count)
                                     {
-                                        s += b.refunds[index].refund_type + ",";
+                                        s += b.refunds[index].refund_type.Replace(",", "，") + ",";
                                     }
                                     else
                                     {
