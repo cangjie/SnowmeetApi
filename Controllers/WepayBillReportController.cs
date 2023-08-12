@@ -419,7 +419,7 @@ namespace SnowmeetApi.Controllers
                 b.time = tDate.Hour.ToString().PadLeft(2, '0') + ":" + tDate.Minute.ToString().PadLeft(2, '0') + ":" + tDate.Second.ToString().PadLeft(2, '0');
                 b.month = tDate.Month.ToString();
                 b.season = GetSeason(tDate);
-                b.mch_id = mch_id.Trim();
+                b.mch_id = l.mch_id.Trim();
                 b.out_trade_no = l.out_trade_no.Trim();
                 b.TransactId = l.wepay_order_id.Trim();
                 b.fee_rate = l.fee_rate;
