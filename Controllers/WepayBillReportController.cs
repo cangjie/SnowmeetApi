@@ -54,6 +54,8 @@ namespace SnowmeetApi.Controllers
             public string oaOpenId { get; set; }
             public string oaOldOpenId { get; set; }
             public string miniOpenId { get; set; }
+            public string commonOpenId { get; set; }
+
         }
 
         public class BusinessInfo
@@ -157,6 +159,263 @@ namespace SnowmeetApi.Controllers
 
             return Ok(dirPath + "/" + fileName.Trim());
         }
+
+        [HttpGet]
+        public async Task<ActionResult<int>> ExportToDbPerLine()
+        {
+            Balance[] bArr = await GetBalance("");
+            for (int i = 0; i < bArr.Length; i++)
+            {
+                try
+                {
+                    await SaveToDb(bArr[i]);
+                }
+                catch (Exception err)
+                {
+                    throw new Exception("save db error, line " + i.ToString() + " " + err.ToString());
+                }
+            }
+            return Ok(0);
+        }
+
+        [NonAction]
+        public async Task<bool> SaveToDb(Balance b)
+        {
+            BusinessReport br = new BusinessReport();
+            br.date = DateTime.Parse(b.date);
+            br.time = b.time;
+            br.type = b.trans_type.Trim();
+            br.month = b.month;
+            br.season = b.season;
+            br.shop = b.shop;
+            MemberInfo memberInfo = await GetUnicUser(b.open_id);
+            br.mini_open_id = memberInfo.miniOpenId != null ? memberInfo.miniOpenId.Trim() : "";
+            br.oa_open_id = memberInfo.oaOpenId != null ? memberInfo.oaOpenId.Trim() : "";
+            br.oaold_open_id = memberInfo.oaOldOpenId != null ? memberInfo.oaOldOpenId.Trim() : "";
+            br.real_name = memberInfo.real_name != null ? memberInfo.real_name.Trim() : "";
+            br.nick = memberInfo.nick != null ? memberInfo.nick : "";
+            br.cell = memberInfo.cell != null ? memberInfo.cell : "";
+            br.gender = memberInfo.gender != null ? memberInfo.gender : "";
+            br.pay_method = "微信支付";
+            br.mch_id = b.mch_id;
+            br.out_trade_no = b.out_trade_no;
+            br.TransactionId = b.TransactId;
+
+
+
+            if (b.business != null)
+            {
+                br.business_id = b.business.id;
+                br.business_type = b.business.type;
+                br.business_detail = b.business.description;
+            }
+
+            
+            br.is_test = 0;
+            br.order_status = "";
+            br.order_type = "";
+            br.income_type = "";
+            br.refund_times = b.refunds.Count;
+
+
+
+
+            switch (br.type.Trim())
+            {
+                case "收入":
+                    try
+                    {
+                        br.income = double.Parse(b.income);
+                    }
+                    catch
+                    {
+                        br.income = 0;
+                    }
+                    try
+                    {
+                        br.income_fee = double.Parse(b.fee);
+                    }
+                    catch
+                    {
+                        br.income_fee = 0;
+                    }
+                    try
+                    {
+                        br.income_real = br.income - br.income_fee;
+                    }
+                    catch
+                    {
+                        br.income_real = 0;
+                    }
+                    try
+                    {
+                        br.refund_summary = double.Parse(b.total_refund);
+                    }
+                    catch
+                    {
+                        br.refund_summary = 0;
+                    }
+                    try
+                    {
+                        br.refund_fee_summary = double.Parse(b.total_refund_fee);
+                    }
+                    catch
+                    {
+                        br.refund_fee_summary = 0;
+                    }
+                    try
+                    {
+                        br.refund_real_summary = br.refund_summary + br.refund_fee_summary;
+                    }
+                    catch
+                    {
+                        br.refund_real_summary = 0;
+                    }
+                    try
+                    {
+                        br.total_summary = br.income_real - br.refund_real_summary;
+                    }
+                    catch
+                    {
+                        br.total_summary = 0;
+                    }
+
+                    for (int j = 0; j < b.refunds.Count; j++)
+                    {
+                        Refund r = b.refunds[j];
+                        switch (j)
+                        {
+                            case 0:
+                                br.refund1_oper_open_id = r.openId;
+                                MemberInfo member1 = await GetUnicUser(r.openId);
+                                br.refund1_oper_name = member1.real_name.Trim();
+                                br.refund1_date = DateTime.Parse(r.date);
+                                br.refund1_time = r.time;
+                                br.refund1_amount = double.Parse(r.refund_amount);
+                                br.refund1_fee = double.Parse(r.return_fee);
+                                br.refund1_summary = br.refund1_amount + br.refund1_fee;
+                                br.refund1_no = r.wepay_refund_id;
+                                br.refund1_type = r.refund_type;
+                                break;
+                            case 1:
+                                br.refund2_oper_open_id = r.openId;
+                                MemberInfo member2 = await GetUnicUser(r.openId);
+                                br.refund2_oper_name = member2.real_name.Trim();
+                                br.refund2_date = DateTime.Parse(r.date);
+                                br.refund2_time = r.time;
+                                br.refund2_amount = double.Parse(r.refund_amount);
+                                br.refund2_fee = double.Parse(r.return_fee);
+                                br.refund2_summary = br.refund1_amount + br.refund1_fee;
+                                br.refund2_no = r.wepay_refund_id;
+                                br.refund2_type = r.refund_type;
+                                break;
+                            case 2:
+                                br.refund3_oper_open_id = r.openId;
+                                MemberInfo member3 = await GetUnicUser(r.openId);
+                                br.refund3_oper_name = member3.real_name.Trim();
+                                br.refund3_date = DateTime.Parse(r.date);
+                                br.refund3_time = r.time;
+                                br.refund3_amount = double.Parse(r.refund_amount);
+                                br.refund3_fee = double.Parse(r.return_fee);
+                                br.refund3_summary = br.refund1_amount + br.refund1_fee;
+                                br.refund3_no = r.wepay_refund_id;
+                                br.refund3_type = r.refund_type;
+                                break;
+                            case 3:
+                                br.refund4_oper_open_id = r.openId;
+                                MemberInfo member4 = await GetUnicUser(r.openId);
+                                br.refund4_oper_name = member4.real_name.Trim();
+                                br.refund4_date = DateTime.Parse(r.date);
+                                br.refund4_time = r.time;
+                                br.refund4_amount = double.Parse(r.refund_amount);
+                                br.refund4_fee = double.Parse(r.return_fee);
+                                br.refund4_summary = br.refund1_amount + br.refund1_fee;
+                                br.refund4_no = r.wepay_refund_id;
+                                br.refund4_type = r.refund_type;
+                                break;
+                            case 4:
+                                br.refund5_oper_open_id = r.openId;
+                                MemberInfo member5 = await GetUnicUser(r.openId);
+                                br.refund5_oper_name = member5.real_name.Trim();
+                                br.refund5_date = DateTime.Parse(r.date);
+                                br.refund5_time = r.time;
+                                br.refund5_amount = double.Parse(r.refund_amount);
+                                br.refund5_fee = double.Parse(r.return_fee);
+                                br.refund5_summary = br.refund1_amount + br.refund1_fee;
+                                br.refund5_no = r.wepay_refund_id;
+                                br.refund5_type = r.refund_type;
+                                break;
+                            case 5:
+                                br.refund6_oper_open_id = r.openId;
+                                MemberInfo member6 = await GetUnicUser(r.openId);
+                                br.refund6_oper_name = member6.real_name.Trim();
+                                br.refund6_date = DateTime.Parse(r.date);
+                                br.refund6_time = r.time;
+                                br.refund6_amount = double.Parse(r.refund_amount);
+                                br.refund6_fee = double.Parse(r.return_fee);
+                                br.refund6_summary = br.refund1_amount + br.refund1_fee;
+                                br.refund6_no = r.wepay_refund_id;
+                                br.refund6_type = r.refund_type;
+                                break;
+                            default:
+                                break;
+                        }
+
+                    }
+
+                    br.income_oper_open_id = b.operOpenId.Trim();
+                    MemberInfo openMember = await GetUnicUser(b.operOpenId.Trim());
+
+                    br.income_oper_name = openMember.real_name.Trim();
+
+                    break;
+                case "退款":
+                    try
+                    {
+                        br.refund_amount = double.Parse(b.refund_amount);
+                    }
+                    catch
+                    {
+                        br.refund_amount = 0;
+                    }
+                    try
+                    {
+                        br.refund_fee = double.Parse(b.refund_fee);
+                    }
+                    catch
+                    {
+                        br.refund_fee = 0;
+                    }
+                    try
+                    {
+                        br.refund_real = br.refund_amount + br.refund_fee;
+                    }
+                    catch
+                    {
+                        br.refund_real = 0;
+                    }
+                    br.refund_oper_open_id = b.operOpenId;
+                    br.refund_oper_name = (await GetUnicUser(b.operOpenId)).real_name.Trim();
+
+                    break;
+                default:
+                    break;
+            }
+            try
+            {
+                await _context.businessReport.AddAsync(br);
+                await _context.SaveChangesAsync();
+                return true;
+            }
+            catch(Exception err)
+            {
+                throw new Exception(err.ToString());
+                //return false;
+            }
+
+            
+        }
+
         [HttpGet]
         public async Task<ActionResult<int>> ExportDataToDb()
         {
@@ -381,9 +640,9 @@ namespace SnowmeetApi.Controllers
                     num++;
 
                 }
-                catch
+                catch(Exception err)
                 {
-
+                    
                 }
                 
             }
@@ -635,6 +894,7 @@ namespace SnowmeetApi.Controllers
             {
                 user = await Models.Users.UnicUser.GetUnicUser(openId, "snowmeet_official_account", _context);
             }
+
             if (user != null)
             {
                 UnicUser realUser = (UnicUser)(user.Value);
@@ -669,7 +929,7 @@ namespace SnowmeetApi.Controllers
                 }
                 if (m.cell.Trim().Equals("") || m.real_name.Equals(""))
                 {
-                    var bl = await _context.MaintainLives.Where(a => a.open_id.Trim().Equals(m.miniOpenId) || a.open_id.Trim().Equals(m.oaOpenId)).AsNoTracking().ToListAsync();
+                    var bl = await _context.MaintainLives.Where(a => (a.open_id.Trim().Equals(m.miniOpenId) || a.open_id.Trim().Equals(m.oaOpenId)) && !a.open_id.Trim().Equals("")).AsNoTracking().ToListAsync();
                     if (bl != null && bl.Count > 0)
                     {
                         if (m.cell.Equals(""))
@@ -684,7 +944,7 @@ namespace SnowmeetApi.Controllers
                 }
                 if (m.cell.Trim().Equals("") || m.real_name.Equals(""))
                 {
-                    var bl = await _context.RentOrder.Where(a => a.open_id.Trim().Equals(m.miniOpenId) || a.open_id.Trim().Equals(m.oaOpenId)).AsNoTracking().ToListAsync();
+                    var bl = await _context.RentOrder.Where(a => (a.open_id.Trim().Equals(m.miniOpenId) || a.open_id.Trim().Equals(m.oaOpenId)) && !a.open_id.Trim().Equals("")).AsNoTracking().ToListAsync();
                     if (bl != null && bl.Count > 0)
                     {
                         if (m.cell.Equals(""))
@@ -697,9 +957,28 @@ namespace SnowmeetApi.Controllers
                         }
                     }
                 }
-
+                return m;
             }
-            return m;
+            else
+            {
+                string cell = "";
+                string name = "";
+                var oL = await _context.OrderOnlines.Where(o => o.open_id.Trim().Equals(openId.Trim())).ToListAsync();
+                if (oL != null || oL.Count > 0)
+                {
+
+                    cell = oL[0].cell_number.Trim();
+                    name = oL[0].name.Trim();
+                }
+                return new MemberInfo()
+                {
+                    miniOpenId = "",
+                    oaOldOpenId = openId.Trim(),
+                    cell = cell,
+                    real_name = name
+                };
+            }
+            
         }
 
 
@@ -756,9 +1035,9 @@ namespace SnowmeetApi.Controllers
 
                 .Where(
 
-                t => t.mch_id.Trim().Equals(mch_id.Trim())
-
-                || true
+                t => //t.mch_id.Trim().Equals(mch_id.Trim())
+                 true || t.id == 6899 || t.id == 6904 || t.id == 6901 || t.id == 6915 ||t.id == 6916
+                 //t.mch_id.Trim().Equals("1615235183")
 
                 //&& t.out_trade_no.Length > 5
                 //&& t.out_trade_no.Trim().Equals("03013953235577216652")
@@ -785,8 +1064,8 @@ namespace SnowmeetApi.Controllers
                 b.TransactId = l.wepay_order_id.Trim();
                 b.fee_rate = l.fee_rate;
                 b.refunds = new List<Refund>();
-                b.member = await GetMemberInfo(l.open_id.Trim());
-
+                //b.member = await GetMemberInfo(l.open_id.Trim());
+                b.open_id = l.open_id;
                 //b.trans_type = l.trans_type.Trim();
                 switch (l.trans_status.Trim())
                 {
@@ -907,6 +1186,14 @@ namespace SnowmeetApi.Controllers
                 }
 
                 bArr[i] = b;
+                /*
+                bool ret = await SaveToDb(b);
+                if (!ret)
+                {
+                    throw new Exception("save db error line " + i.ToString());
+                    //break;
+                }
+                */
             }
             return bArr;
         }
