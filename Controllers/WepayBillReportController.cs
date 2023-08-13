@@ -168,18 +168,19 @@ namespace SnowmeetApi.Controllers
             {
                 try
                 {
-                    await SaveToDb(bArr[i]);
+                    await SaveToDb(bArr[i], _context);
                 }
                 catch (Exception err)
                 {
                     throw new Exception("save db error, line " + i.ToString() + " " + err.ToString());
                 }
             }
+            await _context.SaveChangesAsync();
             return Ok(0);
         }
 
         [NonAction]
-        public async Task<bool> SaveToDb(Balance b)
+        public async Task<bool> SaveToDb(Balance b, Data.ApplicationDBContext db)
         {
             BusinessReport br = new BusinessReport();
             br.date = DateTime.Parse(b.date);
@@ -403,8 +404,8 @@ namespace SnowmeetApi.Controllers
             }
             try
             {
-                await _context.businessReport.AddAsync(br);
-                await _context.SaveChangesAsync();
+                await db.businessReport.AddAsync(br);
+                //await _context.SaveChangesAsync();
                 return true;
             }
             catch(Exception err)
@@ -416,6 +417,7 @@ namespace SnowmeetApi.Controllers
             
         }
 
+        /*
         [HttpGet]
         public async Task<ActionResult<int>> ExportDataToDb()
         {
@@ -648,7 +650,7 @@ namespace SnowmeetApi.Controllers
             }
             return Ok(num);
         }
-
+        */
         [NonAction]
         public string GetLineString(Balance b, string headLine)
         {
