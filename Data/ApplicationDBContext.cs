@@ -141,6 +141,8 @@ namespace SnowmeetApi.Data
 
         public DbSet<WepayTransaction> wepayTransaction { get; set; }
 
+        public DbSet<BusinessReport> businessReport { get; set; }
+
 
 
     }

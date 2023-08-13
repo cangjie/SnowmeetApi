@@ -10,6 +10,7 @@ using System.Linq;
 using Microsoft.EntityFrameworkCore;
 using System.Collections.Generic;
 using static SKIT.FlurlHttpClient.Wechat.TenpayV3.Models.CreateApplyForSubMerchantApplymentRequest.Types.Business.Types.SaleScene.Types;
+using SnowmeetApi.Models.Users;
 
 namespace SnowmeetApi.Controllers
 {
@@ -40,6 +41,8 @@ namespace SnowmeetApi.Controllers
             public string return_fee { get; set; }
             public string summary { get; set; }
             public string status { get; set; }
+            public string oper { get; set; }
+            public string openId { get; set; } = "";
         }
 
         public class MemberInfo
@@ -48,6 +51,9 @@ namespace SnowmeetApi.Controllers
             public string gender { get; set; }
             public string cell { get; set; }
             public string nick { get; set; }
+            public string oaOpenId { get; set; }
+            public string oaOldOpenId { get; set; }
+            public string miniOpenId { get; set; }
         }
 
         public class BusinessInfo
@@ -77,7 +83,7 @@ namespace SnowmeetApi.Controllers
             public string shop { get; set; } = "";
             public string task_id { get; set; } = "";
             public string order_id { get; set; } = "";
-
+            public string open_id { get; set; } = "";
             public string income { get; set; } = "";
             public string fee { get; set; } = "";
             public string summary { get; set; } = "";
@@ -87,7 +93,7 @@ namespace SnowmeetApi.Controllers
             public string refund_summary { get; set; } = "";
             public string refund_type { get; set; } = "";
 
-
+            public string operOpenId { get; set; } = "";
 
             public List<Refund> refunds { get; set; } 
             public string total_refund { get; set; } = "";
@@ -99,6 +105,21 @@ namespace SnowmeetApi.Controllers
             public string oper { get; set; } = "";
            
         }
+
+        [HttpGet]
+        public async Task<ActionResult<BusinessReport>> Test()
+        {
+            BusinessReport br = new BusinessReport()
+            {
+                date = DateTime.Now.Date,
+                time = DateTime.Now.Hour.ToString()+":" + DateTime.Now.Minute.ToString()+":" + DateTime.Now.Second.ToString()
+            };
+            await _context.businessReport.AddAsync(br);
+            await _context.SaveChangesAsync();
+            return Ok(br);
+        }
+
+        
 
         [HttpGet]
         public async Task<ActionResult<string>> ExportDataFile(string mch_id)
@@ -119,7 +140,7 @@ namespace SnowmeetApi.Controllers
             }
             for (int i = 0; i < maxRefunds; i++)
             {
-                headLine += ",退款日期i,退款时间i,退款方式i,退款单号i,退款金额i,退款返回手续费i,退款实际出账i".Replace("i", (i + 1).ToString());
+                headLine += ",退款日期i,退款时间i,退款单号i,退款金额i,退款返回手续费i,退款实际出账i,退款方式i,退款操作员i".Replace("i", (i + 1).ToString());
             }
             headLine += ",操作员";
 
@@ -135,6 +156,238 @@ namespace SnowmeetApi.Controllers
             System.IO.File.AppendAllText(dirPath + "/" + fileName.Trim(), content, System.Text.Encoding.UTF8);
 
             return Ok(dirPath + "/" + fileName.Trim());
+        }
+        [HttpGet]
+        public async Task<ActionResult<int>> ExportDataToDb()
+        {
+            int num = 0;
+            Balance[] bArr = await GetBalance("");
+            for (int i = 0; i < bArr.Length; i++)
+            {
+                Balance b = bArr[i];
+                BusinessReport br = new BusinessReport();
+                br.date = DateTime.Parse(b.date);
+                br.time = b.time;
+                br.type = b.trans_type.Trim();
+                br.month = b.month;
+                br.season = b.season;
+                br.shop = b.shop;
+                MemberInfo memberInfo = await GetUnicUser(b.open_id);
+                br.mini_open_id = memberInfo.miniOpenId != null ? memberInfo.miniOpenId.Trim() : "";
+                br.oa_open_id = memberInfo.oaOpenId != null ? memberInfo.oaOpenId.Trim() : "";
+                br.oaold_open_id = memberInfo.oaOldOpenId != null ? memberInfo.oaOldOpenId.Trim() : "";
+                br.real_name = memberInfo.real_name != null ? memberInfo.real_name.Trim() : "";
+                br.nick = memberInfo.nick != null ? memberInfo.nick : "";
+                br.cell = memberInfo.cell != null ? memberInfo.cell : "";
+                br.gender = memberInfo.gender != null ? memberInfo.gender : "";
+                br.pay_method = "微信支付";
+                br.mch_id = b.mch_id;
+                br.out_trade_no = b.out_trade_no;
+                br.TransactionId = b.TransactId;
+                br.business_id = b.task_id;
+                br.business_type = b.business.type;
+                br.business_detail = b.business.description;
+                br.is_test = 0;
+                br.order_status = "";
+                br.order_type = "";
+                br.income_type = "";
+                br.refund_times = b.refunds.Count;
+
+
+
+
+                switch (br.type.Trim())
+                {
+                    case "收入":
+                        try
+                        {
+                            br.income = double.Parse(b.income);
+                        }
+                        catch
+                        {
+                            br.income = 0;
+                        }
+                        try
+                        {
+                            br.income_fee = double.Parse(b.fee);
+                        }
+                        catch
+                        {
+                            br.income_fee = 0;
+                        }
+                        try
+                        {
+                            br.income_real = br.income - br.income_fee;
+                        }
+                        catch
+                        {
+                            br.income_real = 0;
+                        }
+                        try
+                        {
+                            br.refund_summary = double.Parse(b.total_refund);
+                        }
+                        catch
+                        {
+                            br.refund_summary = 0;
+                        }
+                        try
+                        {
+                            br.refund_fee_summary = double.Parse(b.total_refund_fee);
+                        }
+                        catch
+                        {
+                            br.refund_fee_summary = 0;
+                        }
+                        try
+                        {
+                            br.refund_real_summary = br.refund_summary + br.refund_fee_summary;
+                        }
+                        catch
+                        {
+                            br.refund_real_summary = 0;
+                        }
+                        try
+                        {
+                            br.total_summary = br.income_real - br.refund_real_summary;
+                        }
+                        catch
+                        {
+                            br.total_summary = 0;
+                        }
+
+                        for (int j = 0; j < b.refunds.Count; j++)
+                        {
+                            Refund r = b.refunds[j];
+                            switch (j)
+                            {
+                                case 0:
+                                    br.refund1_oper_open_id = r.openId;
+                                    MemberInfo member1 = await GetUnicUser(r.openId);
+                                    br.refund1_oper_name = member1.real_name.Trim();
+                                    br.refund1_date = DateTime.Parse(r.date);
+                                    br.refund1_time = r.time;
+                                    br.refund1_amount = double.Parse(r.refund_amount);
+                                    br.refund1_fee = double.Parse(r.return_fee);
+                                    br.refund1_summary = br.refund1_amount + br.refund1_fee;
+                                    br.refund1_no = r.wepay_refund_id;
+                                    br.refund1_type = r.refund_type;
+                                    break;
+                                case 1:
+                                    br.refund2_oper_open_id = r.openId;
+                                    MemberInfo member2 = await GetUnicUser(r.openId);
+                                    br.refund2_oper_name = member2.real_name.Trim();
+                                    br.refund2_date = DateTime.Parse(r.date);
+                                    br.refund2_time = r.time;
+                                    br.refund2_amount = double.Parse(r.refund_amount);
+                                    br.refund2_fee = double.Parse(r.return_fee);
+                                    br.refund2_summary = br.refund1_amount + br.refund1_fee;
+                                    br.refund2_no = r.wepay_refund_id;
+                                    br.refund2_type = r.refund_type;
+                                    break;
+                                case 2:
+                                    br.refund3_oper_open_id = r.openId;
+                                    MemberInfo member3 = await GetUnicUser(r.openId);
+                                    br.refund3_oper_name = member3.real_name.Trim();
+                                    br.refund3_date = DateTime.Parse(r.date);
+                                    br.refund3_time = r.time;
+                                    br.refund3_amount = double.Parse(r.refund_amount);
+                                    br.refund3_fee = double.Parse(r.return_fee);
+                                    br.refund3_summary = br.refund1_amount + br.refund1_fee;
+                                    br.refund3_no = r.wepay_refund_id;
+                                    br.refund3_type = r.refund_type;
+                                    break;
+                                case 3:
+                                    br.refund4_oper_open_id = r.openId;
+                                    MemberInfo member4 = await GetUnicUser(r.openId);
+                                    br.refund4_oper_name = member4.real_name.Trim();
+                                    br.refund4_date = DateTime.Parse(r.date);
+                                    br.refund4_time = r.time;
+                                    br.refund4_amount = double.Parse(r.refund_amount);
+                                    br.refund4_fee = double.Parse(r.return_fee);
+                                    br.refund4_summary = br.refund1_amount + br.refund1_fee;
+                                    br.refund4_no = r.wepay_refund_id;
+                                    br.refund4_type = r.refund_type;
+                                    break;
+                                case 4:
+                                    br.refund5_oper_open_id = r.openId;
+                                    MemberInfo member5 = await GetUnicUser(r.openId);
+                                    br.refund5_oper_name = member5.real_name.Trim();
+                                    br.refund5_date = DateTime.Parse(r.date);
+                                    br.refund5_time = r.time;
+                                    br.refund5_amount = double.Parse(r.refund_amount);
+                                    br.refund5_fee = double.Parse(r.return_fee);
+                                    br.refund5_summary = br.refund1_amount + br.refund1_fee;
+                                    br.refund5_no = r.wepay_refund_id;
+                                    br.refund5_type = r.refund_type;
+                                    break;
+                                case 5:
+                                    br.refund6_oper_open_id = r.openId;
+                                    MemberInfo member6 = await GetUnicUser(r.openId);
+                                    br.refund6_oper_name = member6.real_name.Trim();
+                                    br.refund6_date = DateTime.Parse(r.date);
+                                    br.refund6_time = r.time;
+                                    br.refund6_amount = double.Parse(r.refund_amount);
+                                    br.refund6_fee = double.Parse(r.return_fee);
+                                    br.refund6_summary = br.refund1_amount + br.refund1_fee;
+                                    br.refund6_no = r.wepay_refund_id;
+                                    br.refund6_type = r.refund_type;
+                                    break;
+                                default:
+                                    break;
+                            }
+
+                        }
+
+
+
+                        break;
+                    case "退款":
+                        try
+                        {
+                            br.refund_amount = double.Parse(b.refund_amount);
+                        }
+                        catch
+                        {
+                            br.refund_amount = 0;
+                        }
+                        try
+                        {
+                            br.refund_fee = double.Parse(b.refund_fee);
+                        }
+                        catch
+                        {
+                            br.refund_fee = 0;
+                        }
+                        try
+                        {
+                            br.refund_real = br.refund_amount + br.refund_fee;
+                        }
+                        catch
+                        {
+                            br.refund_real = 0;
+                        }
+                        br.refund_oper_open_id = b.operOpenId;
+                        br.refund_oper_name = (await GetUnicUser(b.operOpenId)).real_name.Trim();
+
+                        break;
+                    default:
+                        break;
+                }
+                try
+                {
+                    await _context.AddAsync(br);
+                    await _context.SaveChangesAsync();
+                    num++;
+
+                }
+                catch
+                {
+
+                }
+                
+            }
+            return Ok(num);
         }
 
         [NonAction]
@@ -319,6 +572,16 @@ namespace SnowmeetApi.Controllers
                                         s += "-,";
                                     }
                                     break;
+                                case "退款操作员":
+                                    if (b.refunds != null && index < b.refunds.Count)
+                                    {
+                                        s += b.refunds[index].oper.Replace(",", "，") + ",";
+                                    }
+                                    else
+                                    {
+                                        s += "-,";
+                                    }
+                                    break;
                                 default:
                                     break;
                             }
@@ -346,9 +609,107 @@ namespace SnowmeetApi.Controllers
             _httpContextAccessor = httpContextAccessor;
         }
 
+
+
+
+        [NonAction]
+        public async Task<MemberInfo> GetUnicUser(string openId)
+        {
+            MemberInfo m = new MemberInfo()
+            {
+                nick = "",
+                real_name = "",
+                gender = "",
+                cell = "",
+                oaOpenId = "",
+                oaOldOpenId = "",
+                miniOpenId = ""
+            };
+            var user = await Models.Users.UnicUser.GetUnicUser(openId, "snowmeet_mini", _context);
+            //Models.Users.UnicUser user = (Models.Users.UnicUser)((OkObjectResult)().Result).Value;
+            if (user == null)
+            {
+                user = await Models.Users.UnicUser.GetUnicUser(openId, "snowmeet_official_account_new", _context);
+            }
+            if (user == null)
+            {
+                user = await Models.Users.UnicUser.GetUnicUser(openId, "snowmeet_official_account", _context);
+            }
+            if (user != null)
+            {
+                UnicUser realUser = (UnicUser)(user.Value);
+                if (realUser.miniAppUser != null)
+                {
+                    m.miniOpenId = realUser.miniAppUser.open_id;
+                    m.real_name = realUser.miniAppUser.real_name.Trim();
+                    m.cell = realUser.miniAppUser.cell_number.Trim();
+                    m.gender = realUser.miniAppUser.gender;
+                    m.nick = realUser.miniAppUser.nick;
+                }
+                if (realUser.officialAccountUser != null)
+                {
+                    m.oaOpenId = realUser.officialAccountUser.open_id.Trim();
+                    if (m.real_name.Equals(""))
+                    {
+                        m.real_name = realUser.officialAccountUser.real_name.Trim();
+                    }
+                    if (m.cell.Equals(""))
+                    {
+                        m.cell = realUser.officialAccountUser.cell_number.Trim();
+                    }
+                    if (m.nick.Equals(""))
+                    {
+                        m.nick = realUser.officialAccountUser.nick;
+                    }
+                }
+                if (realUser.officialAccountOpenIdOld != null)
+                {
+                    m.oaOldOpenId = realUser.officialAccountOpenIdOld.Trim();
+
+                }
+                if (m.cell.Trim().Equals("") || m.real_name.Equals(""))
+                {
+                    var bl = await _context.MaintainLives.Where(a => a.open_id.Trim().Equals(m.miniOpenId) || a.open_id.Trim().Equals(m.oaOpenId)).AsNoTracking().ToListAsync();
+                    if (bl != null && bl.Count > 0)
+                    {
+                        if (m.cell.Equals(""))
+                        {
+                            m.cell = bl[0].confirmed_cell;
+                        }
+                        if (m.real_name.Trim().Equals(""))
+                        {
+                            m.real_name = bl[0].confirmed_name;
+                        }
+                    }
+                }
+                if (m.cell.Trim().Equals("") || m.real_name.Equals(""))
+                {
+                    var bl = await _context.RentOrder.Where(a => a.open_id.Trim().Equals(m.miniOpenId) || a.open_id.Trim().Equals(m.oaOpenId)).AsNoTracking().ToListAsync();
+                    if (bl != null && bl.Count > 0)
+                    {
+                        if (m.cell.Equals(""))
+                        {
+                            m.cell = bl[0].cell_number;
+                        }
+                        if (m.real_name.Trim().Equals(""))
+                        {
+                            m.real_name = bl[0].real_name;
+                        }
+                    }
+                }
+
+            }
+            return m;
+        }
+
+
+
         [NonAction]
         public async Task<MemberInfo> GetMemberInfo(string openId)
         {
+
+            //Models.Users.UnicUser user
+
             Models.Users.MiniAppUser mUser = await _context.MiniAppUsers.FindAsync(openId);
             if (mUser != null)
             {
@@ -425,6 +786,7 @@ namespace SnowmeetApi.Controllers
                 b.fee_rate = l.fee_rate;
                 b.refunds = new List<Refund>();
                 b.member = await GetMemberInfo(l.open_id.Trim());
+
                 //b.trans_type = l.trans_type.Trim();
                 switch (l.trans_status.Trim())
                 {
@@ -434,7 +796,9 @@ namespace SnowmeetApi.Controllers
                         b.summary = "-";
                         b.trans_type = "退款";
                         b.refund_type = l.out_refund_no.Trim().Length < 10 ? "API" : "后台";
-                        b.oper = await GetRefundOper(l);
+                        b.oper = "";//await GetRefundOper(l);
+                        b.operOpenId = await GetRefundOpenId(l);
+                        b.open_id = l.open_id.Trim();
                         DateTime rDate = DateTime.Parse(l.trans_date);
                         Refund r = new Refund()
                         {
@@ -446,7 +810,9 @@ namespace SnowmeetApi.Controllers
                             refund_amount = l.refund_amount,
                             return_fee = l.fee,
                             status = l.refund_status,
-                            summary = Math.Round(double.Parse(l.refund_amount) + double.Parse(l.fee), 2).ToString()
+                            summary = Math.Round(double.Parse(l.refund_amount) + double.Parse(l.fee), 2).ToString(),
+                            oper = b.oper,
+                            openId = l.open_id
 
                         };
                         for (int j = 0; j < bArr.Length; j++)
@@ -495,6 +861,7 @@ namespace SnowmeetApi.Controllers
                         OrderOnline order = await FindOrder(b.out_trade_no.Trim());
                         if (order != null)
                         {
+                            /*
                             if (order.staff_open_id == null)
                             {
                                 b.oper = "";
@@ -512,7 +879,7 @@ namespace SnowmeetApi.Controllers
                                     b.oper = "";
                                 }
                             }
-                            
+                            */
                             
                             b.business = await GetBusiness(order);
                             b.shop = order.shop;
@@ -527,6 +894,10 @@ namespace SnowmeetApi.Controllers
                                     b.member.cell = b.business.cell.Trim();
                                 }
                             }
+
+                            b.oper = "";// await GetOrderOper(order, b.business);
+                            b.operOpenId = await GetOrderOperOpenId(order, b.business);
+
                         }
                         b.summary = Math.Round(double.Parse(b.income.Trim()) - double.Parse(b.fee), 2).ToString();
                         b.total_refund = "0";
@@ -541,7 +912,62 @@ namespace SnowmeetApi.Controllers
         }
 
         [NonAction]
-        public async Task<string> GetRefundOper(WepayTransaction l)
+        public async Task<string> GetOrderOperOpenId(OrderOnline order, BusinessInfo business)
+        {
+            string openId = "";
+            //string name = "";
+            if (order.staff_open_id != null)
+            {
+                openId = order.staff_open_id.Trim();
+            }
+            else
+            {
+                if (business.id != null && !business.id.Equals("0"))
+                {
+                    int id = 0;
+                    try
+                    {
+                        id = int.Parse(business.id);
+                    }
+                    catch
+                    {
+                        return "";
+                    }
+                    switch (business.type)
+                    {
+                        case "试滑":
+                            Experience e = await _context.Experience.FindAsync(id);
+                            openId = e.staff_open_id.Trim();
+                            break;
+                        case "服务":
+                            MaintainLive m = await _context.MaintainLives.FindAsync(id);
+                            openId = m.service_open_id.Trim();
+                            break;
+                        case "租赁":
+                            Models.Rent.RentOrder r = await _context.RentOrder.FindAsync(id);
+                            openId = r.staff_open_id.Trim();
+                            break;
+                        default:
+                            break;
+                    }
+
+
+                }
+
+            }
+            return openId.Trim();
+        }
+
+        [NonAction]
+        public async Task<string> GetOrderOper(OrderOnline order, BusinessInfo business)
+        {
+            string openId = await GetOrderOperOpenId(order, business);
+            string name = (await GetMemberInfo(openId)).real_name.Trim();
+            return name;
+        }
+
+        [NonAction]
+        public async Task<string> GetRefundOpenId(WepayTransaction l)
         {
             string openId = "";
             var newList = await _context.OrderPaymentRefund.Where(o => o.refund_id.Trim().Equals(l.wepay_refund_no)).AsNoTracking().ToListAsync();
@@ -559,7 +985,14 @@ namespace SnowmeetApi.Controllers
                     openId = oldList[0].oper_open_id.Trim();
                 }
             }
-            MemberInfo memberInfo = await GetMemberInfo(openId);
+            return openId;
+        }
+
+        [NonAction]
+        public async Task<string> GetRefundOper(WepayTransaction l)
+        {
+            
+            MemberInfo memberInfo = await GetMemberInfo(await GetRefundOpenId(l));
             if (memberInfo == null)
             {
                 return "";
