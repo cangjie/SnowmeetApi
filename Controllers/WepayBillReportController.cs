@@ -108,6 +108,443 @@ namespace SnowmeetApi.Controllers
            
         }
 
+        public class SkiPassReserve
+        {
+            public string? rent { get; set; }
+            public DateTime? use_date { get; set; }
+        }
+
+        public class SkiPass
+        {
+            public DateTime? trans_date { get; set; }
+            public string? code { get; set; }
+            public string? shop { get; set; }
+            public string? name { get; set; }
+            public string? outTradeNo { get; set; }
+
+            public string? type { get; set; }
+            public string? eventType { get; set; }
+
+            public DateTime? useDate { get; set; }
+            public string? useDayOfWeek { get; set; }
+            public string? useType { get; set; }
+
+
+            public DateTime? reserveDate { get; set; }
+            public string? reserveDayOfWeek { get; set; }
+
+
+            public string? dateType { get; set; }
+
+            public bool? rent { get; set; }
+            public string? skiOrBoard { get; set; }
+
+            public string? roundType { get; set; }
+
+
+            public bool? withMeal { get; set; }
+            public int? count { get; set; }
+            public double? unitPrice { get; set; }
+            public double? depositPrice { get; set; }
+            public double? priceSummary { get; set; }
+            public double? depositSummary { get; set; }
+            public bool? used { get; set; }
+            
+            public OrderOnline? order { get; set; }
+            public OfficialAccoutUser? oaUser { get; set; }
+            public MiniAppUser? miniUser { get; set; }
+            
+            public string? checkOpenId { get; set; }
+            public string? checkName { get; set; }
+            public string? checkCell { get; set; }
+            public bool findTrans { get; set; } = false;
+
+        }
+
+        [HttpGet]
+        public async Task CreateSkiPassReport()
+        {
+           
+            var orderList = await _context.OrderOnlines
+                .Where(o => (o.type.Trim().Equals("雪票") && o.pay_state == 1 && o.id >= 1864 && o.code.Length == 9
+                 //&& o.id >= 3153 && o.id <= 3800
+                //&& o.create_date.Year >= 2023
+                //&& o.code.Trim().Equals("457388673")
+
+                ))
+                .AsNoTracking().ToListAsync();
+            List<SkiPass> lArr = new List<SkiPass>();
+            for (int i = 0; i < orderList.Count  ; i++)
+            {
+                OrderOnline order = orderList[i];
+                if (order.code.Trim().Length != 9)
+                {
+                    continue;
+                }
+                string code = order.code.Trim();
+                string outTradeNo = await GetOutTradeNo(order);
+                if (outTradeNo.Trim().Equals(""))
+                {
+                    continue;
+                }
+                DateTime transDate = DateTime.MinValue;
+                var transList = await _context.wepayTransaction
+                    .Where(t => t.out_trade_no.Trim().Equals(outTradeNo))
+                    .AsNoTracking().ToListAsync();
+                if (transList != null && transList.Count > 0)
+                {
+                    transDate = DateTime.Parse(transList[0].trans_date);
+                }
+                else
+                {
+                    continue;
+                }
+                string name = "";
+                int count = 0;
+                double unitPrice = 0;
+                double unitDeposit = 0;
+                var detailList = await _context.OrderOnlineDetails
+                    .Where(d => d.OrderOnlineId == order.id)
+                    .AsNoTracking().ToListAsync();
+                if (detailList != null)
+                {
+                    for (int j = 0; j < detailList.Count; j++)
+                    {
+                        count = detailList[0].count;
+                        if (detailList[j].product_name.IndexOf("押金") >= 0)
+                        {
+                            unitDeposit = detailList[j].price;
+                        }
+                        else
+                        {
+                            name = detailList[j].product_name;
+                            unitPrice = detailList[j].price;
+                        }
+                    }
+
+                    if (name.Equals("") || unitPrice == 0)
+                    {
+                        continue;
+                    }
+                }
+                else
+                {
+                    continue;
+                }
+                string reserveJson = order.memo.Trim();
+                SkiPassReserve spr = new SkiPassReserve();
+                bool rent = false;
+                DateTime? reserveDate;
+                try
+                {
+                    spr = Newtonsoft.Json.JsonConvert.DeserializeObject<SkiPassReserve>(reserveJson);
+                    reserveDate = spr.use_date;
+                    rent = spr.rent != null && spr.rent.ToString().Equals("1") ? true : false;
+
+                }
+                catch
+                {
+                
+                    reserveDate = ((DateTime)order.pay_time).Date;
+                    rent = false;
+                }
+
+                bool used = false;
+                DateTime? useDate = DateTime.MinValue;
+                Models.Card.Card card = await _context.Card.FindAsync(code);
+                if (card == null)
+                {
+                    continue;
+                }
+                if (card.used == 1)
+                {
+                    used = true;
+                    useDate = card.use_date == null? spr.use_date : card.use_date ;
+                }
+
+                var rList = await _context.oldWxReceive
+                    .Where(r => r.wxreceivemsg_eventkey.Trim().Equals("3" + code))
+                    .AsNoTracking().ToListAsync();
+                string checkOpenId = "【-】";
+                string checkName = "【-】";
+                string checkCell = "【-】";
+                DateTime? checkDate;
+                if (rList != null && rList.Count > 0)
+                {
+          
+                    checkOpenId = rList[0].wxreceivemsg_from;
+                    checkDate = rList[0].wxreceivemsg_crt;
+                    MemberInfo member = await GetUnicUser(checkOpenId);
+                    if (member != null)
+                    {
+                        checkName = member.real_name;// + "(" + member.cell + ")";
+                        checkCell = member.cell;
+                        checkOpenId = member.oaOldOpenId.Trim().Equals("") ? member.oaOpenId.Trim() : member.oaOldOpenId.Trim();
+                    }
+                }
+                Console.WriteLine(i.ToString() + "\t\t" + code + " " + transDate.ToShortDateString());
+                SkiPass sp = new SkiPass()
+                {
+                    trans_date = transDate,
+                    code = code,
+                    name = name,
+                    shop = order.shop,
+                    outTradeNo = (string)outTradeNo.Trim(),
+                    ///////////
+                    type = "",
+                    eventType = "",
+                    ///////////
+                    ///
+                    useDate = used ? useDate : null,
+                    useDayOfWeek = used ? GetDayOfWeek((DateTime)reserveDate) : null,
+                    reserveDate = reserveDate,
+                    reserveDayOfWeek = GetDayOfWeek((DateTime)reserveDate),
+                    useType = ((DateTime)useDate).Date == ((DateTime)reserveDate).Date
+                        ? "当日" : ((DateTime)useDate).Date > ((DateTime)reserveDate).Date ? "延后" : "提前",
+                    dateType = name.IndexOf("平日")>=0? "平":"末",
+                    rent = spr.rent != null && spr.rent.Trim().Equals("1")? true: false,
+                    skiOrBoard = name.IndexOf("单板")>=0?"单板":name.IndexOf("双板") >= 0 ? "双板" : "未知",
+                    roundType = name.IndexOf("日场") >= 0?"日"
+                        :name.IndexOf("下午") >= 0 && name.IndexOf("夜")>=0?"下午+夜"
+                        :name.IndexOf("上午") >= 0?"上午": name.IndexOf("夜") >= 0?"夜":"未知",
+                    withMeal = name.IndexOf("餐") >= 0 ? true: false,
+                    count = count,
+                    unitPrice = unitPrice,
+                    depositPrice = unitDeposit,
+                    priceSummary = unitPrice * count,
+                    depositSummary = unitDeposit * count,
+                    checkName = checkName.Trim(),
+                    checkCell = checkCell.Trim(),
+                    checkOpenId = checkOpenId.Trim()
+                };
+                FixSkiPass(sp);
+                lArr.Add(sp);
+                //Console.WriteLine(i.ToString() + "\t\t" + code + "\r" + transDate.ToShortDateString());
+            }
+
+            //2431		457388673 1/1/2020
+
+
+            string headLine = "trans_date,out_trade_no,code,类型,活动类型,使用日期,使用星期,日期核对,票面日期,票面星期,平、末,自带、租板,单、双,场次,含餐,数量,票价,押金,【票款】合计,【押金】合计,核销人公众号OpenId,核销人电话,核销人姓名";
+            string[] headLineArr = headLine.Split(',');
+            string content = headLine + "\r\n";
+
+            for (int i = 0; i < lArr.Count; i++)
+            {
+                SkiPass s = lArr[i];
+                string line = "";
+                for (int j = 0; j < headLineArr.Length; j++)
+                {
+                    switch (headLineArr[j].Trim())
+                    {
+                        case "trans_date":
+                            line += s.trans_date.ToString() + ",";
+                            break;
+                        case "out_trade_no":
+                            line += "`" + s.outTradeNo.ToString() + ",";
+                            break;
+                        case "code":
+                            line += "`" + s.code.ToString() + ",";
+                            break;
+                        case "类型":
+                            line += s.type.ToString() + ",";
+                            break;
+                        case "活动类型":
+                            line += s.eventType.ToString() + ",";
+                            break;
+                        case "使用日期":
+
+
+                            //line += (s.useDate != null? ((DateTime)s.useDate).ToShortDateString():"【-】") + ",";
+                            if (s.useDate != null)
+                            {
+                                DateTime useDate = (DateTime)s.useDate;
+                                line += useDate.Year.ToString() + "-" + useDate.Month.ToString().PadLeft(2, '0')
+                                    + "-" + useDate.Day.ToString().PadLeft(2, '0') + ",";
+                            }
+                            else
+                            {
+                                line += "【-】" + ",";
+                            }
+
+                            break;
+                        case "使用星期":
+                            
+                            line += (s.useDate != null ? s.useDayOfWeek : "【-】") + ",";
+                            break;
+                        case "日期核对":
+                            line += (s.useDate != null ? s.useType : "【-】") + ",";
+                            break;
+                        case "票面日期":
+                            DateTime rDate = (DateTime)s.reserveDate;
+                            line += rDate.Year.ToString() + "-" + rDate.Month.ToString().PadLeft(2, '0') + "-" + rDate.Day.ToString().PadLeft(2, '0') + ",";
+                            break;
+                        case "票面星期":
+                            line += s.reserveDayOfWeek + ",";
+                            break;
+                        case "平、末":
+                            line += s.dateType + ",";
+                            break;
+                        case "自带、租板":
+                            line += ((bool)s.rent? "租板" : "自带") + ",";
+                            break;
+                        case "单、双":
+                            line += s.skiOrBoard + ",";
+                            break;
+                        case "场次":
+                            line += s.roundType.ToString() + ",";
+                            break;
+                        case "含餐":
+                            line += ((bool)s.withMeal? "含": "不含")  + ",";
+                            break;
+                        case "数量":
+                            line += s.count.ToString() + ",";
+                            break;
+                        case "票价":
+                            line += s.unitPrice.ToString() + ",";
+                            break;
+                        case "押金":
+                            line += s.depositPrice.ToString() + ",";
+                            break;
+                        case "【票款】合计":
+                            line += (s.unitPrice * s.count ).ToString() + ",";
+                            break;
+                        case "【押金】合计":
+                            line += (s.depositPrice * s.count).ToString() + ",";
+                            break;
+                        case "核销人姓名":
+                            line += s.checkName + ",";
+                            break;
+                        case "核销人公众号OpenId":
+                            line += s.checkOpenId + ",";
+                            break;
+                        case "核销人电话":
+                            line += s.checkCell + ",";
+                            break;
+                        default:
+                            break;
+                    }
+                }
+                line = line.EndsWith(",") ? line.Substring(0, line.Length - 1).Trim() : line.Trim();
+                content += line + "\r\n";
+            }
+            string dirPath = Util.workingPath + "/wwwroot/bidata";
+            string fileName = "skipass_" + Util.GetLongTimeStamp(DateTime.Now) + ".csv";
+            System.IO.File.AppendAllText(dirPath + "/" + fileName.Trim(), content, System.Text.Encoding.UTF8);
+
+        }
+
+        [NonAction]
+        public SkiPass FixSkiPass(SkiPass sp)
+        {
+
+            switch (sp.shop.Trim())
+            {
+                case "单板海选":
+                    sp.type = "八易 - 活动";
+                    sp.eventType = "单板海选";
+                    break;
+                case "八易租单板":
+                    sp.skiOrBoard = "单板";
+                    sp.eventType = "【-】";
+                    break;
+                case "八易租双板":
+                    sp.skiOrBoard = "双板";
+                    sp.eventType = "【-】";
+                    break;
+                default:
+                    sp.type = "常规";
+                    sp.eventType = "【-】";
+
+                    if (sp.name.IndexOf("单板") >= 0)
+                    {
+                        sp.skiOrBoard = "单板";
+                    }
+                    if (sp.name.IndexOf("双板") >= 0)
+                    {
+                        sp.skiOrBoard = "双板";
+                    }
+
+                    if (sp.name.IndexOf("试") >= 0)
+                    {
+                        sp.type = sp.shop + " - 试营业";
+                    }
+
+                    break;
+            }
+            if (sp.type.Trim().Equals(""))
+            {
+                sp.type = "常规";
+            }
+            return sp;
+        }
+
+
+        [NonAction]
+        public string GetDayOfWeek(DateTime date)
+        {
+            string dayOfWeek = "";
+            switch (date.DayOfWeek)
+            {
+                case DayOfWeek.Sunday:
+                    dayOfWeek = "日";
+                    break;
+                case DayOfWeek.Monday:
+                    dayOfWeek = "一";
+                    break;
+                case DayOfWeek.Tuesday:
+                    dayOfWeek = "二";
+                    break;
+                case DayOfWeek.Wednesday:
+                    dayOfWeek = "三";
+                    break;
+                case DayOfWeek.Thursday:
+                    dayOfWeek = "四";
+                    break;
+                case DayOfWeek.Friday:
+                    dayOfWeek = "五";
+                    break;
+                case DayOfWeek.Saturday:
+                    dayOfWeek = "六";
+                    break;
+                default:
+                    break;
+            }
+            return dayOfWeek;
+        }
+
+        [NonAction]
+        public async Task<string> GetOutTradeNo(OrderOnline order)
+        {
+            if (!order.out_trade_no.Trim().Equals(""))
+            {
+                return order.out_trade_no.Trim();
+            }
+            string outTradeNo = "";
+            var pList = await _context.OrderPayment.Where(p => p.order_id == order.id && p.status.Equals("支付成功")).AsNoTracking().ToListAsync();
+            if (pList != null && pList.Count > 0)
+            {
+                outTradeNo = pList[0].out_trade_no.Trim();
+            }
+            if (outTradeNo.Trim().Equals(""))
+            {
+                var wPList = await _context.WepayOrders.Where(w => w.order_id == order.id).AsNoTracking().ToListAsync();
+                if (wPList != null && wPList.Count > 0)
+                {
+                    outTradeNo = wPList[0].out_trade_no.Trim();
+                }
+            }
+            if (outTradeNo.Trim().Equals(""))
+            {
+                var oldPlist = await _context.oldWeixinPaymentOrder.Where(o => o.order_product_id.Equals(order.id.ToString())).AsNoTracking().ToListAsync();
+                if (oldPlist != null && oldPlist.Count > 0)
+                {
+                    outTradeNo = oldPlist[0].order_out_trade_no.ToString();
+                }
+            }
+            return outTradeNo;
+        }
+
         [HttpGet]
         public async Task<ActionResult<BusinessReport>> Test()
         {
@@ -900,6 +1337,15 @@ namespace SnowmeetApi.Controllers
             if (user != null)
             {
                 UnicUser realUser = (UnicUser)(user.Value);
+                if (!realUser.miniAppOpenId.Trim().Equals(""))
+                {
+                    realUser.miniAppUser = await _context.MiniAppUsers.FindAsync(realUser.miniAppOpenId.Trim());
+                }
+                if (!realUser.officialAccountOpenId.Trim().Equals(""))
+                {
+                    realUser.officialAccountUser = await _context.officialAccoutUsers.FindAsync(realUser.officialAccountOpenId);
+                    
+                }
                 if (realUser.miniAppUser != null)
                 {
                     m.miniOpenId = realUser.miniAppUser.open_id;

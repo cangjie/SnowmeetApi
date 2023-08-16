@@ -50,7 +50,7 @@ namespace SnowmeetApi.Models
         public string? staff_open_id { get; set; }
         public int have_score { get; set; } = 0;
         public DateTime create_date { get; set; } = DateTime.Now;
-
+        public DateTime? crt { get; set; } = DateTime.Now;
         
         [NotMapped]
         public OrderPayment[]? payments { get; set; }

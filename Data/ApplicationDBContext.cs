@@ -34,6 +34,8 @@ namespace SnowmeetApi.Data
 
             modelBuilder.Entity<SnowmeetApi.Models.DD.SysColumn>().HasNoKey();
 
+            modelBuilder.Entity<SnowmeetApi.Models.OldWeixinReceive>().HasNoKey();
+
             //OrderOnline
             //modelBuilder.Entity<OrderOnline>().HasKey(c => c.id);
 
@@ -143,7 +145,9 @@ namespace SnowmeetApi.Data
 
         public DbSet<BusinessReport> businessReport { get; set; }
 
+        public DbSet<Models.Order.OldWeixinPaymentOrder> oldWeixinPaymentOrder { get; set; }
 
+        public DbSet<Models.OldWeixinReceive> oldWxReceive { get; set; }
 
     }
 }
