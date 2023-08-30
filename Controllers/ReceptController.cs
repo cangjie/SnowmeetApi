@@ -77,19 +77,28 @@ namespace SnowmeetApi.Controllers
             openId = Util.UrlDecode(openId);
             scene = Util.UrlDecode(scene);
             shop = Util.UrlDecode(shop);
-            MiniAppUser user = await _context.MiniAppUsers.FindAsync(openId);
-            string realName = user.real_name.Trim();
-            switch (user.gender.Trim())
+            string realName = "";
+            string gender = "";
+            string cell = "";
+            if (!openId.Trim().Equals(""))
             {
-                case "男":
-                    realName += " 先生";
-                    break;
-                case "女":
-                    realName += " 女士";
-                    break;
-                default:
-                    break;
+                MiniAppUser user = await _context.MiniAppUsers.FindAsync(openId);
+                realName = user.real_name.Trim();
+                switch (user.gender.Trim())
+                {
+                    case "男":
+                        realName += " 先生";
+                        break;
+                    case "女":
+                        realName += " 女士";
+                        break;
+                    default:
+                        break;
+                }
+                cell = user.cell_number.Trim();
+                gender = user.gender.Trim();
             }
+            
             string entityJson = "";
 
             switch (scene)
@@ -99,7 +108,7 @@ namespace SnowmeetApi.Controllers
                     RentOrder order = new RentOrder()
                     {
                         open_id = openId,
-                        cell_number = user.cell_number.Trim(),
+                        cell_number = cell,
                         real_name = realName,
                         shop = shop
                     };
@@ -112,10 +121,10 @@ namespace SnowmeetApi.Controllers
             {
                 shop = shop.Trim(),
                 open_id = openId.Trim(),
-                cell = user.cell_number.Trim(),
-                real_name = user.real_name.Trim(),
+                cell = cell,
+                real_name = realName,
                 current_step = 0,
-                gender = user.gender.Trim(),
+                gender = gender,
                 recept_type = scene.Trim(),
                 submit_data = entityJson.Trim(),
                 recept_staff = adminUser.open_id.Trim(),
