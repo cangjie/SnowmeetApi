@@ -15,7 +15,7 @@ using SnowmeetApi.Models;
 using SnowmeetApi.Models.Order;
 using SnowmeetApi.Models.Users;
 using SnowmeetApi.Models.UTV;
-using static Org.BouncyCastle.Math.EC.ECCurve;
+//using static Org.BouncyCastle.Math.EC.ECCurve;
 
 namespace SnowmeetApi.Controllers
 {

@@ -1,14 +1,11 @@
 ﻿using System;
-using Azure.Core;
 using System.IO;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Newtonsoft.Json;
 using SnowmeetApi.Data;
 using SnowmeetApi.Models;
-using static Org.BouncyCastle.Math.EC.ECCurve;
 using System.Threading.Tasks;
-using Org.BouncyCastle.Ocsp;
 using SnowmeetApi.Models.Users;
 namespace SnowmeetApi.Controllers.Tiktok
 {

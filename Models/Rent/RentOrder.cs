@@ -56,13 +56,13 @@ namespace SnowmeetApi.Models.Rent
 
         public double refund { get; set; }
 
-        public string ticket_code { get; set; }
+        public string ticket_code { get; set; } = "";
 
         public int has_guarantee_credit { get; set; }
 
-        public string guarantee_credit_photos { get; set; }
+        public string guarantee_credit_photos { get; set; } = "";
 
-        public string memo { get; set; }
+        public string memo { get; set; } = "";
 
         public string pay_option { get; set; }
 

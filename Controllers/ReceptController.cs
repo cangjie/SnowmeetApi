@@ -218,7 +218,7 @@ namespace SnowmeetApi.Controllers
             switch (r.recept_type)
             {
                 case "租赁下单":
-                    r = await CreateRendOrder(r);
+                    r = await CreateRentOrder(r);
                     break;
                 default:
                     break;
@@ -231,7 +231,7 @@ namespace SnowmeetApi.Controllers
         }
 
         [NonAction]
-        public async Task<Recept> CreateRendOrder(Recept recept)
+        public async Task<Recept> CreateRentOrder(Recept recept)
         {
             string jsonStr = recept.submit_data.Trim();
             RentOrder rentOrder = JsonConvert.DeserializeObject<RentOrder>(jsonStr);
@@ -248,6 +248,9 @@ namespace SnowmeetApi.Controllers
             {
                 return recept;
             }
+            recept.submit_return_id = rentOrder.id;
+            _context.Entry(recept).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
             for (int i = 0; i < rentOrder.details.Length; i++)
             {
                 RentOrderDetail detail = rentOrder.details[i];

@@ -9,7 +9,6 @@ using SnowmeetApi.Data;
 using SnowmeetApi.Models;
 using System.IO;
 using Microsoft.Extensions.Configuration;
-using static Org.BouncyCastle.Math.EC.ECCurve;
 using SnowmeetApi.Models.Users;
 
 namespace SnowmeetApi.Controllers
