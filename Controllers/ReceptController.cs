@@ -259,7 +259,7 @@ namespace SnowmeetApi.Controllers
             }
             await _context.SaveChangesAsync();
 
-            if (!rentOrder.pay_option.Trim().Equals("招待"))
+            if (!rentOrder.pay_option.Trim().Equals("招待") || rentOrder.deposit_final == 0)
             {
 
                 OrderOnline order = new OrderOnline()
