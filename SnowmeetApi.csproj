@@ -54,7 +54,8 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="7.0.10" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="QRCoder" Version="1.4.3" />
-    <PackageReference Include="AlipaySdk" Version="2.0.0" />
+    <PackageReference Include="AlipaySDKNet.OpenAPI" Version="1.0.2" />
+    <PackageReference Include="AlipaySDKNet.Standard" Version="4.8.2" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Data\" />

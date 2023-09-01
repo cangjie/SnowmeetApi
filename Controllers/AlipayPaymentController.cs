@@ -13,11 +13,11 @@ using AlipaySDKNet.OpenAPI.Util.Model;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Diagnostics;
-
+/*
 using Aop.Api.Request;
 using Aop.Api;
 using Aop.Api.Response;
-
+*/
 
 
 using Newtonsoft.Json;
@@ -25,6 +25,9 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.IO.Pipelines;
+using Aop.Api;
+using Aop.Api.Request;
+using Aop.Api.Response;
 
 namespace SnowmeetApi.Controllers
 {
