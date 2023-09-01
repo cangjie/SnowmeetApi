@@ -152,7 +152,7 @@ namespace SnowmeetApi.Controllers
             switch (recept.recept_type.Trim())
             {
                 case "租赁下单":
-                    recept.rentOrder._details = null;
+                    //recept.rentOrder._details = null;
                     //recept.rentOrder.rentalDetails = null;
                     entityJson = Newtonsoft.Json.JsonConvert.SerializeObject(recept.rentOrder);
                     break;
