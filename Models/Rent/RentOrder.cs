@@ -75,7 +75,7 @@ namespace SnowmeetApi.Models.Rent
         public DateTime create_date { get; set; } = DateTime.Now;
 
 
-        public RentOrderDetail[] _details;
+        public RentOrderDetail[]? _details;
 
         [NotMapped]
         public RentOrderDetail[] details
