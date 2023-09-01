@@ -258,32 +258,39 @@ namespace SnowmeetApi.Controllers
                 await _context.RentOrderDetail.AddAsync(detail);
             }
             await _context.SaveChangesAsync();
-            OrderOnline order = new OrderOnline()
+
+            if (!rentOrder.pay_option.Trim().Equals("招待"))
             {
-                id = 0,
-                type = "押金",
-                open_id = recept.open_id.Trim(),
-                cell_number = recept.cell.Trim(),
-                name = recept.real_name.Trim(),
-                pay_method = rentOrder.payMethod.Trim(),
-                order_price = rentOrder.deposit_final,
-                order_real_pay_price = rentOrder.deposit_final,
-                pay_state = 0,
-                pay_memo = rentOrder.pay_option.Trim(),
-                shop = recept.shop,
-                ticket_amount = 0,
-                have_score = 0,
-                score_rate = 0,
-                ticket_code = recept.code.Trim(),
-                other_discount = 0,
-                final_price = rentOrder.deposit_final,
-                staff_open_id = recept.update_staff.Trim().Equals("") ? recept.recept_staff.Trim() : recept.update_staff.Trim()
-            };
-            await _context.OrderOnlines.AddAsync(order);
-            await _context.SaveChangesAsync();
-            rentOrder.order_id = order.id;
-            _context.Entry(rentOrder).State = EntityState.Modified;
-            await _context.SaveChangesAsync();
+
+                OrderOnline order = new OrderOnline()
+                {
+                    id = 0,
+                    type = "押金",
+                    open_id = recept.open_id.Trim(),
+                    cell_number = recept.cell.Trim(),
+                    name = recept.real_name.Trim(),
+                    pay_method = rentOrder.payMethod.Trim(),
+                    order_price = rentOrder.deposit_final,
+                    order_real_pay_price = rentOrder.deposit_final,
+                    pay_state = 0,
+                    pay_memo = rentOrder.pay_option.Trim(),
+                    shop = recept.shop,
+                    ticket_amount = 0,
+                    have_score = 0,
+                    score_rate = 0,
+                    ticket_code = recept.code.Trim(),
+                    other_discount = 0,
+                    final_price = rentOrder.deposit_final,
+                    staff_open_id = recept.update_staff.Trim().Equals("") ? recept.recept_staff.Trim() : recept.update_staff.Trim()
+                };
+                await _context.OrderOnlines.AddAsync(order);
+                await _context.SaveChangesAsync();
+                rentOrder.order_id = order.id;
+                _context.Entry(rentOrder).State = EntityState.Modified;
+                await _context.SaveChangesAsync();
+            }
+
+            
             return recept;
         }
 
