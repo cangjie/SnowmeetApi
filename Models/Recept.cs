@@ -84,7 +84,7 @@ namespace SnowmeetApi.Models
         {
             get
             {
-                if (recept_type.Trim().Equals("rent"))
+                if (recept_type.Trim().Equals("养护下单"))
                 {
                     object order = JsonConvert.DeserializeObject(submit_data, typeof(Maintain.MaintainOrder));
                     return (Maintain.MaintainOrder)order;
