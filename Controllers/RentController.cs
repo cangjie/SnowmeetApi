@@ -523,6 +523,41 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet("{id}")]
+        public async Task<ActionResult<RentOrder>> SetPaidManual(int id, string payMethod, string sessionKey)
+        {
+            RentOrder rentOrder = (RentOrder)((OkObjectResult)(await GetRentOrder(id, sessionKey)).Result).Value;
+            sessionKey = Util.UrlDecode(sessionKey);
+            payMethod = Util.UrlDecode(payMethod);
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            if (!user.isAdmin)
+            {
+                return BadRequest();
+            }
+            if (rentOrder == null || rentOrder.order == null)
+            {
+                return NotFound();
+            }
+            if (rentOrder.order.payments == null || rentOrder.order.payments.Length == 0)
+            {
+                OrderPayment payment = new OrderPayment()
+                {
+                    id = 0,
+                    pay_method = payMethod,
+                    amount = rentOrder.order.final_price,
+                    staff_open_id = user.miniAppOpenId,
+                    order_id = rentOrder.order.id
+                };
+                await _context.OrderPayment.AddAsync(payment);
+            }
+            OrderOnline order = await _context.OrderOnlines.FindAsync(rentOrder.order_id);
+            order.pay_method = payMethod;
+            _context.Entry(order).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
+            return await SetPaid(id, sessionKey);
+           
+        }
+
+        [HttpGet("{id}")]
         public async Task<ActionResult<RentOrder>>SetPaid(int id, string sessionKey)
         {
             RentOrder rentOrder = (RentOrder)((OkObjectResult)(await GetRentOrder(id, sessionKey)).Result).Value;
