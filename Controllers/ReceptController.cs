@@ -109,6 +109,7 @@ namespace SnowmeetApi.Controllers
             if (orderId>0)
             {
                 OrderOnline order = await _context.OrderOnlines.FindAsync(orderId);
+                order.open_id = openId;
                 _context.Entry(order).State = EntityState.Modified;
                 await _context.SaveChangesAsync();
             }
