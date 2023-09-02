@@ -169,6 +169,16 @@ namespace SnowmeetApi.Controllers
                     };
                     entityJson = Newtonsoft.Json.JsonConvert.SerializeObject(order);
                     break;
+                case "养护下单":
+                    MaintainLive maintain = new MaintainLive()
+                    {
+                        open_id = openId,
+                        confirmed_cell = cell,
+                        confirmed_name = realName,
+                        shop = shop
+                    };
+                    entityJson = Newtonsoft.Json.JsonConvert.SerializeObject(maintain);
+                    break;
                 default:
                     break;
             }
@@ -352,30 +362,7 @@ namespace SnowmeetApi.Controllers
         }
 
 
-        /*
-        [HttpPost("{sessionKey}")]
-        public async Task<ActionResult<Recept>> ReceptTest(string sessionKey, Recept recept)
-        {
-            sessionKey = Util.UrlDecode(sessionKey);
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
-            if (await IsAdmin(sessionKey))
-            {
-                return BadRequest();
-            }
-
-            if (recept.id == 0)
-            {
-                await _context.Recept.AddAsync(recept);
-                await _context.SaveChangesAsync();
-            }
-            else
-            {
-                _context.Entry(recept).State = EntityState.Modified;
-                await _context.SaveChangesAsync();
-            }
-            return Ok(recept);
-        }
-        */
+      
         [HttpGet("{id}")]
         public async Task<ActionResult<Recept>> GetRecept(int id, string sessionKey)
         {
@@ -404,86 +391,7 @@ namespace SnowmeetApi.Controllers
             return user.miniAppUser;
         }
 
-        /*
-        // GET: api/Recept
-        [HttpGet]
-        public async Task<ActionResult<IEnumerable<Recept>>> GetRecept()
-        {
-            return await _context.Recept.ToListAsync();
-        }
-
-        // GET: api/Recept/5
-        [HttpGet("{id}")]
-        public async Task<ActionResult<Recept>> GetRecept(int id)
-        {
-            var recept = await _context.Recept.FindAsync(id);
-
-            if (recept == null)
-            {
-                return NotFound();
-            }
-
-            return recept;
-        }
-
-        // PUT: api/Recept/5
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
-        [HttpPut("{id}")]
-        public async Task<IActionResult> PutRecept(int id, Recept recept)
-        {
-            if (id != recept.id)
-            {
-                return BadRequest();
-            }
-
-            _context.Entry(recept).State = EntityState.Modified;
-
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!ReceptExists(id))
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
-            }
-
-            return NoContent();
-        }
-
-        // POST: api/Recept
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
-        [HttpPost]
-        public async Task<ActionResult<Recept>> PostRecept(Recept recept)
-        {
-            _context.Recept.Add(recept);
-            await _context.SaveChangesAsync();
-
-            return CreatedAtAction("GetRecept", new { id = recept.id }, recept);
-        }
-
-        // DELETE: api/Recept/5
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteRecept(int id)
-        {
-            var recept = await _context.Recept.FindAsync(id);
-            if (recept == null)
-            {
-                return NotFound();
-            }
-
-            _context.Recept.Remove(recept);
-            await _context.SaveChangesAsync();
-
-            return NoContent();
-        }
-        */
+     
         private bool ReceptExists(int id)
         {
             return _context.Recept.Any(e => e.id == id);
