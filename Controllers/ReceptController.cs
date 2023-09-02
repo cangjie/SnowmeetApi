@@ -63,6 +63,60 @@ namespace SnowmeetApi.Controllers
             return s;
         }
 
+        [HttpGet("{id}")]
+        public async Task<ActionResult<Recept>> UpdateReceptOpenId(int id, string openId, string sessionKey)
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            MiniAppUser adminUser = await GetUser(sessionKey);
+            if (adminUser.is_admin != 1)
+            {
+                return BadRequest();
+            }
+            openId = Util.UrlDecode(openId);
+
+            Recept recept = await _context.Recept.FindAsync(id);
+            if (recept == null)
+            {
+                return NotFound();
+            }
+
+            recept.open_id = openId;
+
+            _context.Entry(recept).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
+            int orderId = 0;
+            switch (recept.recept_type)
+            {
+                case "租赁下单":
+                    int rentId = recept.submit_return_id;
+                    RentOrder rent = await _context.RentOrder.FindAsync(rentId);
+                    rent.open_id = openId.Trim();
+                    _context.Entry(rent).State = EntityState.Modified;
+                    await _context.SaveChangesAsync();
+                    orderId = rent.order_id;
+                    break;
+                case "养护下单":
+                    int maintainId = recept.submit_return_id;
+                    MaintainLive mOrder = await _context.MaintainLives.FindAsync(maintainId);
+                    mOrder.open_id = openId.Trim();
+                    _context.Entry(mOrder).State = EntityState.Modified;
+                    await _context.SaveChangesAsync();
+                    orderId = mOrder.order_id;
+                    break;
+                default:
+                    break;
+            }
+            if (orderId>0)
+            {
+                OrderOnline order = await _context.OrderOnlines.FindAsync(orderId);
+                _context.Entry(order).State = EntityState.Modified;
+                await _context.SaveChangesAsync();
+            }
+            return Ok(recept);
+
+        }
+
+
 
 
         [HttpGet]
