@@ -170,14 +170,15 @@ namespace SnowmeetApi.Controllers
                     entityJson = Newtonsoft.Json.JsonConvert.SerializeObject(order);
                     break;
                 case "养护下单":
-                    MaintainLive maintain = new MaintainLive()
+                    Models.Maintain.MaintainOrder mOrder = new Models.Maintain.MaintainOrder()
                     {
-                        open_id = openId,
-                        confirmed_cell = cell,
-                        confirmed_name = realName,
-                        shop = shop
+                        customerOpenId = openId,
+                        cell = cell,
+                        name = realName,
+                        gender = gender,
+                        ticketCode = code
                     };
-                    entityJson = Newtonsoft.Json.JsonConvert.SerializeObject(maintain);
+                    entityJson = Newtonsoft.Json.JsonConvert.SerializeObject(mOrder);
                     break;
                 default:
                     break;
