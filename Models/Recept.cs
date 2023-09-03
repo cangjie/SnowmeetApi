@@ -45,6 +45,7 @@ namespace SnowmeetApi.Models
         public DateTime? submit_date { get; set; }
 
         public RentOrder _rentOrder;
+        public Maintain.MaintainOrder _maintainOrder;
 
         [NotMapped]
         public SerialTest entity { get; set; }
@@ -79,10 +80,11 @@ namespace SnowmeetApi.Models
             }
         }
 
-        [NotMapped]
-        public Maintain.MaintainOrder maintainOrder
-        {
-            get
+    [NotMapped]
+    public Maintain.MaintainOrder maintainOrder
+    {
+        get
+        {   if (_maintainOrder == null)
             {
                 if (recept_type.Trim().Equals("养护下单"))
                 {
@@ -95,8 +97,17 @@ namespace SnowmeetApi.Models
                     return null;
                 }
             }
-
+            else
+            {
+                return _maintainOrder;
+            }
         }
+        set
+        {
+            _maintainOrder = value;
+        }
+
+    }
 
        
 

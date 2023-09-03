@@ -5,6 +5,7 @@ namespace SnowmeetApi.Models.Maintain
        
     public class MaintainOrder
     {
+        private MaintainLive[] _items;// = new MaintainLive[0];
         public string shop { get; set; } = "";
         public string name { get; set; } = "";
         public string gender { get; set; } = "";
@@ -17,7 +18,17 @@ namespace SnowmeetApi.Models.Maintain
         public int orderId { get; set; } = 0;
         public string customerOpenId { get; set; } = "";
         public string cell { get; set; } = "";
-        public MaintainLive[] items { get; set; } = new MaintainLive[0];
+        public MaintainLive[] items
+        {
+            get
+            {
+                return _items;
+            }
+            set
+            {
+                _items = value;
+            }
+        }
         public OrderOnline? order { get; set; }
         public Ticket.Ticket? ticket { get; set; }
         public DateTime orderDate { get; set; }
