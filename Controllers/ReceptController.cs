@@ -222,6 +222,9 @@ namespace SnowmeetApi.Controllers
                     //recept.rentOrder.rentalDetails = null;
                     entityJson = Newtonsoft.Json.JsonConvert.SerializeObject(recept.rentOrder);
                     break;
+                case "养护下单":
+                    entityJson = Newtonsoft.Json.JsonConvert.SerializeObject(recept.maintainOrder);
+                    break;
                 default:
                     break;
             }
