@@ -291,6 +291,9 @@ namespace SnowmeetApi.Controllers
                 case "租赁下单":
                     r = await CreateRentOrder(r);
                     break;
+                case "养护下单":
+                    r = await CreateMaintainOrder(r);
+                    break;
                 default:
                     break;
             }
@@ -299,6 +302,71 @@ namespace SnowmeetApi.Controllers
                 return NotFound();
             }
             return Ok(r);
+        }
+
+        [NonAction]
+        public async Task<Recept> CreateMaintainOrder(Recept recept)
+        {
+            string jsonStr = recept.submit_data.Trim();
+            Models.Maintain.MaintainOrder maintainOrder = JsonConvert.DeserializeObject<Models.Maintain.MaintainOrder>(jsonStr);
+            double realPayAmount = maintainOrder.summaryPrice - maintainOrder.discount - maintainOrder.ticketDiscount;
+            int orderId = 0;
+            if (realPayAmount > 0 && maintainOrder.payOption.Trim().Equals("现场支付"))
+            {
+                OrderOnline order = new OrderOnline()
+                {
+                    id = 0,
+                    type = "服务",
+                    shop = recept.shop.Trim(),
+                    open_id = recept.open_id,
+                    name = recept.real_name.Trim(),
+                    cell_number = recept.cell.Trim(),
+                    pay_method = maintainOrder.payMethod.Trim().Equals("") ? "微信支付" : maintainOrder.payMethod.Trim(),
+                    pay_memo = maintainOrder.payOption.Trim(),
+                    pay_state = 0,
+                    order_price = maintainOrder.summaryPrice,
+                    order_real_pay_price = maintainOrder.summaryPrice,
+                    ticket_amount = maintainOrder.ticketDiscount,
+                    other_discount = maintainOrder.discount,
+                    final_price = maintainOrder.summaryPrice - maintainOrder.ticketDiscount - maintainOrder.discount,
+                    ticket_code = maintainOrder.ticketCode.Trim(),
+                    staff_open_id = recept.update_staff,
+                    score_rate = 0,
+                    generate_score = 0
+
+                };
+                await _context.AddAsync(order);
+                await _context.SaveChangesAsync();
+                orderId = order.id;
+            }
+
+
+
+
+            for (int i = 0; i < maintainOrder.items.Length; i++)
+            {
+                MaintainLive m = maintainOrder.items[i];
+                m.id = 0;
+                m.shop = recept.shop.Trim();
+                m.open_id = recept.open_id.Trim();
+                m.service_open_id = recept.recept_staff.Trim();
+                m.task_id = 0;
+                m.confirmed_serial = m.confirmed_serial == null ? "" : m.confirmed_serial.Trim();
+                if (m.confirmed_urgent == 1)
+                {
+                    m.confirmed_pick_date = DateTime.Now.Date;
+                }
+                else
+                {
+                    m.confirmed_pick_date = DateTime.Now.Date.AddDays(1);
+                }
+                m.order_id = orderId;
+                m.pay_memo = maintainOrder.payOption.Trim();
+                await _context.MaintainLives.AddAsync(m);
+            }
+            await _context.SaveChangesAsync();
+
+            return recept;
         }
 
         [NonAction]
