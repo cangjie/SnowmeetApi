@@ -12,6 +12,7 @@ using Microsoft.Extensions.Configuration;
 using SnowmeetApi.Models.Users;
 using SnowmeetApi.Models.Rent;
 using Org.BouncyCastle.Asn1.X509;
+using System.Security.Cryptography;
 
 namespace SnowmeetApi.Controllers
 {
@@ -309,9 +310,51 @@ namespace SnowmeetApi.Controllers
         {
             string jsonStr = recept.submit_data.Trim();
             Models.Maintain.MaintainOrder maintainOrder = JsonConvert.DeserializeObject<Models.Maintain.MaintainOrder>(jsonStr);
-            double realPayAmount = maintainOrder.summaryPrice - maintainOrder.discount - maintainOrder.ticketDiscount;
+
+            int productId = 0;
+            double totalAmount = 0;
+            for (int i = 0; i < maintainOrder.items.Length; i++)
+            {
+                MaintainLive item = maintainOrder.items[i];
+                if (item.confirmed_urgent == 1)
+                {
+                    if (item.confirmed_edge == 1 && item.confirmed_candle == 1)
+                    {
+                        productId = 137;
+        }
+                    else if (item.confirmed_edge == 1)
+                    {
+                        productId = 138;
+                    }
+                    else if (item.confirmed_candle == 1)
+                    {
+                        productId = 142;
+                    }
+                }
+                else
+                {
+                    if (item.confirmed_edge == 1 && item.confirmed_candle == 1)
+                    {
+                        productId = 139;
+        }
+                    else if (item.confirmed_edge == 1)
+                    {
+                        productId = 140;
+                    }
+                    else if (item.confirmed_candle == 1)
+                    {
+                        productId = 143;
+                    }
+                }
+                item.confirmed_product_id = productId;
+                Models.Product.Product p = await _context.Product.FindAsync(productId);
+                totalAmount = totalAmount + p.sale_price + item.confirmed_additional_fee;
+            }
+
+
+            double realPayAmount = totalAmount - maintainOrder.discount - maintainOrder.ticketDiscount;
             int orderId = 0;
-            if (realPayAmount > 0 && maintainOrder.payOption.Trim().Equals("现场支付"))
+            if (realPayAmount > 0 && (maintainOrder.payOption.Trim().Equals("现场支付") || maintainOrder.payOption.Trim().Equals("")))
             {
                 OrderOnline order = new OrderOnline()
                 {
