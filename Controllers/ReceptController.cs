@@ -486,6 +486,25 @@ namespace SnowmeetApi.Controllers
                 return BadRequest();
             }
             Recept recept = await _context.Recept.FindAsync(id);
+            if (recept.submit_return_id > 0)
+            {
+                switch (recept.recept_type)
+                {
+                    case "租赁下单":
+                        RentOrder rOrder = await _context.RentOrder.FindAsync(recept.submit_return_id);
+                        recept.rentOrder = rOrder;
+                        break;
+                    case "养护下单":
+                        MaintainLiveController mc = new MaintainLiveController(_context, _oriConfig);
+                        Models.Maintain.MaintainOrder mOrder = (Models.Maintain.MaintainOrder)((OkObjectResult)(await mc.GetMaintainOrder(recept.submit_return_id, sessionKey)).Result).Value;
+                        recept.maintainOrder = mOrder;
+                        break;
+                    default:
+                        break;
+                }
+
+            }
+            
             return Ok(recept);
         }
 
