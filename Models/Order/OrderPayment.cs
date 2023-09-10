@@ -9,6 +9,12 @@ namespace SnowmeetApi.Models.Order
     [Table("order_payment")]
     public class OrderPayment
     {
+        public enum PaymentStatus
+        {
+            待支付,
+            支付成功,
+            取消
+        }
 
         public string staffRealName = "";
 

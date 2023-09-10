@@ -239,7 +239,7 @@ namespace SnowmeetApi.Controllers
                     mOrder.ticket.open_id = "";
                 }
             }
-            return mOrder;
+            return Ok(mOrder);
         }
 
         [HttpGet("{id}")]

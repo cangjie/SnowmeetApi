@@ -68,7 +68,7 @@ namespace SnowmeetApi.Controllers
                     .Where(m => (m.order_date.Date == detail.order_date.Date
                     && m.customer_mi7_order.Trim().Equals(detail.customer_mi7_order.Trim())
                     && m.product_code.Trim().Equals(detail.product_code.Trim())
-                    && m.count == detail.count)).OrderByDescending(m=>m.id).ToListAsync();
+                    && m.count == detail.count)).OrderByDescending(m => m.id).ToListAsync();
 
                 var mi7OrderList = await _context.mi7Order
                         .Where(m => (m.mi7_order_id.Trim().Equals(detail.customer_mi7_order.Trim())))
@@ -162,7 +162,7 @@ namespace SnowmeetApi.Controllers
                         }
                     }
                 }
-                
+
             }
             return details;
         }
@@ -170,7 +170,7 @@ namespace SnowmeetApi.Controllers
         [HttpPost]
         public async Task<ActionResult<Mi7OrderDetail[]>> ParseMi7OrderFromUploadFile(string sessionKey, IFormFile file)
         {
-            
+
             sessionKey = Util.UrlDecode(sessionKey);
             UploadFileController uploadController = new UploadFileController(_context, _config);
             UploadFile upload = (await uploadController.UploadFile(sessionKey, "7色米订单明细", true, file)).Value;
@@ -223,7 +223,7 @@ namespace SnowmeetApi.Controllers
                     lineStr = lineStr.Replace(originStr, newStr);
 
                 }
-                
+
                 string[] fields = lineStr.Split(',');
                 if (i == 0)
                 {
@@ -320,7 +320,7 @@ namespace SnowmeetApi.Controllers
 
                         mi7OrderDetails.Add(detail);
                     }
-                    catch(Exception err)
+                    catch (Exception err)
                     {
                         Console.WriteLine(err.ToString());
                     }
@@ -335,12 +335,12 @@ namespace SnowmeetApi.Controllers
 
             return details;
         }
-            
+
 
         [HttpGet("{orderId}")]
         public async Task<ActionResult<OrderOnline>> OrderChargeByStaff(int orderId, double amount, string payMethod, string staffSessionKey)
         {
-            
+
             UnicUser user = (await UnicUser.GetUnicUserAsync(staffSessionKey, _context)).Value;
             if (!user.isAdmin)
             {
@@ -392,14 +392,14 @@ namespace SnowmeetApi.Controllers
             startDate = startDate.Date;
             endDate = endDate.Date.AddHours(24);
             staffSessionKey = Util.UrlDecode(staffSessionKey);
-            
+
             UnicUser user = (await UnicUser.GetUnicUserAsync(staffSessionKey, _context)).Value;
             if (!user.isAdmin)
             {
                 return NoContent();
             }
             var list = await _context.OrderOnlines
-                .Where(o => (o.create_date >= startDate && o.create_date <= endDate && (shop==null ? true : (o.shop.Trim().Equals(shop.Trim())))))
+                .Where(o => (o.create_date >= startDate && o.create_date <= endDate && (shop == null ? true : (o.shop.Trim().Equals(shop.Trim())))))
                 .OrderByDescending(o => o.id).ToListAsync();
 
             for (int i = 0; i < list.Count; i++)
@@ -424,7 +424,7 @@ namespace SnowmeetApi.Controllers
                 }
                 return newList;
             }
-          
+
         }
 
         [HttpGet("{orderId}")]
@@ -467,10 +467,10 @@ namespace SnowmeetApi.Controllers
                             order.user = await _context.MiniAppUsers.FindAsync(order.open_id.Trim());
                         }
                         catch
-                        { 
-                        
+                        {
+
                         }
-                    }        
+                    }
                 }
             }
             var mi7Orders = await _context.mi7Order.Where(o => o.order_id == orderId).ToArrayAsync();
@@ -501,7 +501,7 @@ namespace SnowmeetApi.Controllers
 
                     order.refunds = refunds;
                 }
-                
+
             }
 
             string staffRealName = "";
@@ -517,14 +517,56 @@ namespace SnowmeetApi.Controllers
             {
                 order.staffRealName = staffRealName.Trim();
             }
-            
+
 
             if (order != null && order.ticket_code != null && !order.ticket_code.Trim().Equals(""))
             {
                 order.tickets = await _context.Ticket.Where(t => t.code.Trim().Equals(order.ticket_code)).ToArrayAsync();
             }
 
-            return order;
+            return Ok(order);
+        }
+
+        [HttpGet("{orderId}")]
+        public async Task<ActionResult<OrderOnline>> SetOrderPaidManual(int orderId, string payMethod, string sessionKey)
+        {
+            payMethod = Util.UrlDecode(payMethod);
+            sessionKey = Util.UrlDecode(sessionKey);
+
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            if (!user.isAdmin)
+            {
+                return NoContent();
+            }
+            OrderOnline order = await _context.OrderOnlines.FindAsync(orderId);
+            var paymentList = await _context.OrderPayment.Where(p => p.order_id == order.id).ToListAsync();
+            for (int i = 0; i < paymentList.Count; i++)
+            {
+                OrderPayment payment = (OrderPayment)paymentList[i];
+                if (payment.status.Trim().Equals(OrderPayment.PaymentStatus.待支付.ToString()))
+                {
+                    payment.status = OrderPayment.PaymentStatus.取消.ToString();
+                }
+                _context.Entry(payment).State = EntityState.Modified;
+            }
+            await _context.SaveChangesAsync();
+            OrderPayment currentPayment = new OrderPayment()
+            {
+                order_id = order.id,
+                pay_method = payMethod.Trim(),
+                status = OrderPayment.PaymentStatus.支付成功.ToString(),
+                amount = order.final_price
+            };
+            await _context.OrderPayment.AddAsync(currentPayment);
+            order.pay_method = payMethod.Trim();
+            order.pay_state = 1;
+            order.pay_time = DateTime.Now;
+            _context.Entry(order).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
+            OrderOnline orderNew = (OrderOnline)
+                ((OkObjectResult)(await GetWholeOrderByStaff(order.id, sessionKey)).Result).Value;
+            return Ok(orderNew);
+
         }
 
         [HttpGet("{paymentId}")]

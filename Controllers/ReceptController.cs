@@ -65,6 +65,47 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet("{id}")]
+        public async Task<ActionResult<Recept>> SetPaidManual(int id, string payMethod, string sessionKey)
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            MiniAppUser adminUser = await GetUser(sessionKey);
+            if (adminUser.is_admin != 1)
+            {
+                return BadRequest();
+            }
+            Recept recept = await _context.Recept.FindAsync(id);
+
+            int orderId = 0;
+
+            OrderOnlinesController orderHelper = new OrderOnlinesController(_context, _oriConfig);
+            
+            switch (recept.recept_type)
+            {
+                case "租赁下单":
+                    RentOrder rentOrder = await _context.RentOrder.FindAsync(recept.submit_return_id);
+                    orderId = rentOrder.order_id;
+                    break;
+                case "养护下单":
+                    MaintainLiveController maintainHelper = new MaintainLiveController(_context, _oriConfig);
+                    Models.Maintain.MaintainOrder maintainOrder = (Models.Maintain.MaintainOrder)
+                        ((OkObjectResult)(await maintainHelper.GetMaintainOrder(recept.submit_return_id, sessionKey)).Result).Value;
+                    orderId = maintainOrder.orderId;
+                    await maintainHelper.MaitainOrderPaySuccess(orderId);
+                    break;
+                default:
+                    break;
+            }
+
+
+            if (orderId > 0)
+            {
+                await orderHelper.SetOrderPaidManual(orderId, payMethod, sessionKey);
+            }
+            
+            return Ok(recept);
+        }
+
+        [HttpGet("{id}")]
         public async Task<ActionResult<Recept>> UpdateReceptOpenId(int id, string openId, string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey);
@@ -321,7 +362,7 @@ namespace SnowmeetApi.Controllers
                     if (item.confirmed_edge == 1 && item.confirmed_candle == 1)
                     {
                         productId = 137;
-        }
+                    }
                     else if (item.confirmed_edge == 1)
                     {
                         productId = 138;
@@ -336,7 +377,7 @@ namespace SnowmeetApi.Controllers
                     if (item.confirmed_edge == 1 && item.confirmed_candle == 1)
                     {
                         productId = 139;
-        }
+                    }
                     else if (item.confirmed_edge == 1)
                     {
                         productId = 140;
@@ -379,6 +420,12 @@ namespace SnowmeetApi.Controllers
 
                 };
                 await _context.AddAsync(order);
+                
+                
+                await _context.SaveChangesAsync();
+                recept.submit_return_id = order.id;
+                recept.submit_date = DateTime.Now;
+                _context.Entry(recept).State = EntityState.Modified;
                 await _context.SaveChangesAsync();
                 orderId = order.id;
             }
@@ -431,6 +478,7 @@ namespace SnowmeetApi.Controllers
                 return recept;
             }
             recept.submit_return_id = rentOrder.id;
+            recept.submit_date = DateTime.Now;
             _context.Entry(recept).State = EntityState.Modified;
             await _context.SaveChangesAsync();
             for (int i = 0; i < rentOrder.details.Length; i++)
@@ -468,6 +516,7 @@ namespace SnowmeetApi.Controllers
                 await _context.OrderOnlines.AddAsync(order);
                 await _context.SaveChangesAsync();
                 rentOrder.order_id = order.id;
+                
                 _context.Entry(rentOrder).State = EntityState.Modified;
                 await _context.SaveChangesAsync();
             }

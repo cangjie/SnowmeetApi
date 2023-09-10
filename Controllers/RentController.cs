@@ -581,7 +581,6 @@ namespace SnowmeetApi.Controllers
             _context.Entry(payment).State = EntityState.Modified;
             _context.Entry(order).State = EntityState.Modified;
             await _context.SaveChangesAsync();
-
             return Ok(rentOrder);
         }
 
