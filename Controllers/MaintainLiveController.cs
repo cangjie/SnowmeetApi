@@ -201,9 +201,13 @@ namespace SnowmeetApi.Controllers
             UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
             
             MaintainLive[] items = await _context.MaintainLives.Where(m => m.order_id == orderId).ToArrayAsync();
+            double itemPriceSummary = 0;
+
             foreach (MaintainLive item in items)
             {
                 item.taskLog = await _context.MaintainLog.Where(l => l.task_id == item.id).OrderBy(l => l.id).ToArrayAsync();
+                Models.Product.Product p = await _context.Product.FindAsync(item.confirmed_product_id);
+                itemPriceSummary = itemPriceSummary + p.sale_price + item.confirmed_additional_fee;
             }
             OrderOnlinesController orderController = new OrderOnlinesController(_context, _originConfig);
             OrderOnline order = (await orderController.GetOrderOnline(orderId, sessionKey)).Value; //await _context.OrderOnlines.FindAsync(orderId);   //(await orderController.GetWholeOrderByStaff(orderId, sessionKey)).Value;
@@ -213,7 +217,7 @@ namespace SnowmeetApi.Controllers
             {
                 return BadRequest();
             }
-            
+
             MaintainOrder mOrder = new MaintainOrder()
             {
                 cell = order.cell_number,
@@ -221,7 +225,11 @@ namespace SnowmeetApi.Controllers
                 orderId = orderId,
                 order = order,
                 items = items,
-                orderDate = order.create_date
+                orderDate = order.create_date,
+                summaryPrice = itemPriceSummary,
+                discount = order.other_discount,
+                ticketCode = order.ticket_code,
+                ticketDiscount = order.ticket_amount
             };
             if (!user.isAdmin)
             {

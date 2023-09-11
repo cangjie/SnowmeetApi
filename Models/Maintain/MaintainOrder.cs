@@ -11,9 +11,9 @@ namespace SnowmeetApi.Models.Maintain
         public string gender { get; set; } = "";
         public string payMethod { get; set; } = "";
         public string payOption { get; set; } = "";
-        public float summaryPrice { get; set; } = 0;
-        public float ticketDiscount { get; set; } = 0;
-        public float discount { get; set; } = 0;
+        public double summaryPrice { get; set; } = 0;
+        public double ticketDiscount { get; set; } = 0;
+        public double discount { get; set; } = 0;
         public string ticketCode { get; set; } = "";
         public int orderId { get; set; } = 0;
         public string customerOpenId { get; set; } = "";
