@@ -452,6 +452,9 @@ namespace SnowmeetApi.Controllers
                 }
                 m.order_id = orderId;
                 m.pay_memo = maintainOrder.payOption.Trim();
+                m.confirmed_name = recept.real_name;
+                m.confirmed_cell = recept.cell;
+
                 await _context.MaintainLives.AddAsync(m);
             }
             await _context.SaveChangesAsync();
