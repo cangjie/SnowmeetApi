@@ -328,13 +328,22 @@ namespace SnowmeetApi.Controllers
                 return BadRequest();
             }
             Recept r = await _context.Recept.FindAsync(id);
+            bool needVerriTicket = false;
             switch (r.recept_type)
             {
                 case "租赁下单":
                     r = await CreateRentOrder(r);
+                    if (r.rentOrder.order_id == 0)
+                    {
+                        needVerriTicket = true;
+                    }
                     break;
                 case "养护下单":
                     r = await CreateMaintainOrder(r);
+                    if (r.maintainOrder.orderId == 0)
+                    {
+                        needVerriTicket = true;
+                    }
                     break;
                 default:
                     break;
@@ -343,6 +352,12 @@ namespace SnowmeetApi.Controllers
             {
                 return NotFound();
             }
+            if (needVerriTicket)
+            {
+                TicketController tHelper = new TicketController(_context, _oriConfig);
+                await tHelper.Use(r.code, sessionKey);
+            }
+            
             return Ok(r);
         }
 
@@ -421,8 +436,8 @@ namespace SnowmeetApi.Controllers
 
                 };
                 await _context.AddAsync(order);
-                
-                
+
+
                 await _context.SaveChangesAsync();
                 recept.submit_return_id = order.id;
                 recept.submit_date = DateTime.Now;
@@ -430,6 +445,7 @@ namespace SnowmeetApi.Controllers
                 await _context.SaveChangesAsync();
                 orderId = order.id;
             }
+            
 
 
 
