@@ -287,7 +287,7 @@ namespace SnowmeetApi.Controllers
             if (rentOrder.order_id > 0)
             {
                 OrderOnlinesController orderHelper = new OrderOnlinesController(_context, _oriConfig);
-                rentOrder.order = (await orderHelper.GetWholeOrderByStaff(rentOrder.order_id, sessionKey)).Value;
+                rentOrder.order = (OrderOnline)((OkObjectResult)(await orderHelper.GetWholeOrderByStaff(rentOrder.order_id, sessionKey)).Result).Value;
             }
 
             if (!user.isAdmin)
