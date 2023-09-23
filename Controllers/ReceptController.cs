@@ -416,7 +416,8 @@ namespace SnowmeetApi.Controllers
                     ticket_code = maintainOrder.ticketCode.Trim(),
                     staff_open_id = recept.update_staff,
                     score_rate = 0,
-                    generate_score = 0
+                    generate_score = 0,
+                    code = recept.code.Trim()
 
                 };
                 await _context.AddAsync(order);
@@ -454,7 +455,7 @@ namespace SnowmeetApi.Controllers
                 m.pay_memo = maintainOrder.payOption.Trim();
                 m.confirmed_name = recept.real_name;
                 m.confirmed_cell = recept.cell;
-
+                m.ticket_code = recept.code.Trim();
                 await _context.MaintainLives.AddAsync(m);
             }
             await _context.SaveChangesAsync();
@@ -473,6 +474,7 @@ namespace SnowmeetApi.Controllers
             }
             rentOrder.deposit_final = rentOrder.deposit_real 
                 - rentOrder.deposit_reduce - rentOrder.deposit_reduce_ticket;
+            rentOrder.ticket_code = recept.code;
             await _context.RentOrder.AddAsync(rentOrder);
             await _context.SaveChangesAsync();
             recept.rentOrder = rentOrder;
@@ -514,7 +516,8 @@ namespace SnowmeetApi.Controllers
                     ticket_code = recept.code.Trim(),
                     other_discount = 0,
                     final_price = rentOrder.deposit_final,
-                    staff_open_id = recept.update_staff.Trim().Equals("") ? recept.recept_staff.Trim() : recept.update_staff.Trim()
+                    staff_open_id = recept.update_staff.Trim().Equals("") ? recept.recept_staff.Trim() : recept.update_staff.Trim(),
+                    code = recept.code
                 };
                 await _context.OrderOnlines.AddAsync(order);
                 await _context.SaveChangesAsync();
