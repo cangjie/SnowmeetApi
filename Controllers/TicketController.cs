@@ -355,6 +355,45 @@ namespace SnowmeetApi.Controllers
             return ticketList;
         }
 
+        [HttpGet("{code}")]
+        public async Task<ActionResult<Ticket>> Use(string code, string sessionKey)
+        {
+            if (code.Trim().Equals(""))
+            {
+                return NotFound();
+            }
+
+            sessionKey = Util.UrlDecode(sessionKey);
+
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            if (!user.isAdmin)
+            {
+                return BadRequest();
+            }
+            
+
+            Ticket ticket = await _context.Ticket.FindAsync(code);
+            if (ticket == null)
+            {
+                return NotFound();
+            }
+            ticket.used = 1;
+            ticket.used_time = DateTime.Now;
+            TicketLog tLog = new TicketLog()
+            {
+                code = code,
+                sender_open_id = "",
+                accepter_open_id = user.miniAppOpenId.Trim(),
+                memo = "核销",
+                transact_time = DateTime.Now
+            };
+            await _context.ticketLog.AddAsync(tLog);
+            _context.Entry(ticket).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
+            return Ok(ticket);
+
+        }
+
 
         /*
 
