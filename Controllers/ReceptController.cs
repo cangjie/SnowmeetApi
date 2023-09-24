@@ -102,7 +102,7 @@ namespace SnowmeetApi.Controllers
                 await orderHelper.SetOrderPaidManual(orderId, payMethod, sessionKey);
             }
 
-            if (recept.code != null && recept.code.Trim().Equals(""))
+            if (recept.code != null && !recept.code.Trim().Equals(""))
             {
                 TicketController tHelper = new TicketController(_context, _oriConfig);
                 await tHelper.Use(recept.code, sessionKey);
