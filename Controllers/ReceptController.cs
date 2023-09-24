@@ -346,7 +346,7 @@ namespace SnowmeetApi.Controllers
                     break;
                 case "养护下单":
                     r = await CreateMaintainOrder(r);
-                    if (r.maintainOrder.orderId == 0)
+                    if (r.submit_return_id == -1)
                     {
                         needVerriTicket = true;
                     }
@@ -447,11 +447,17 @@ namespace SnowmeetApi.Controllers
                 await _context.SaveChangesAsync();
                 recept.submit_return_id = order.id;
                 recept.submit_date = DateTime.Now;
-                _context.Entry(recept).State = EntityState.Modified;
-                await _context.SaveChangesAsync();
+                
                 orderId = order.id;
             }
-            
+            else
+            {
+                recept.submit_return_id = -1;
+                recept.submit_date = DateTime.Now;
+
+            }
+            _context.Entry(recept).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
 
 
 
