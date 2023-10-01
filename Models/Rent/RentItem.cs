@@ -13,6 +13,15 @@ namespace SnowmeetApi.Models.Rent
 		public string code { get; set; }
 		public double deposit { get; set; }
         public string @class { get; set; }
+        public string image { get; set; }
+        public string forAge { get; set; }
+        public string forGender { get; set; }
+        public string brand { get; set; }
+        public string style { get; set; }
+        public string scale { get; set; }
+        public string grade { get; set; }
+        public string bwh { get; set; }
+
 
 		[NotMapped]
 		public double rental { get; set; } = 0;
