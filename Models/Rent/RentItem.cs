@@ -14,8 +14,8 @@ namespace SnowmeetApi.Models.Rent
 		public double deposit { get; set; }
         public string @class { get; set; }
         public string image { get; set; }
-        public string forAge { get; set; }
-        public string forGender { get; set; }
+        public string for_age { get; set; }
+        public string for_gender { get; set; }
         public string brand { get; set; }
         public string style { get; set; }
         public string scale { get; set; }
