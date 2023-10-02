@@ -26,6 +26,8 @@ namespace SnowmeetApi.Models.Rent
 		[NotMapped]
 		public double rental { get; set; } = 0;
 
+      
+
 		public double GetRental(string shop)
 		{
 			double rental = 0;

@@ -42,6 +42,8 @@ namespace SnowmeetApi.Models.Rent
 
         public string return_staff { get; set; } = "";
 
+        public RentItem _item;
+
         [NotMapped]
         public Models.Users.MiniAppUser? rentStaff { get; set; }
 
@@ -123,6 +125,20 @@ namespace SnowmeetApi.Models.Rent
         public string _timeLength = "";
 
         public double _suggestRental = 0;
+
+        
+        public RentItem item
+        {
+            get
+            {
+                return _item;
+            }
+            set
+            {
+                _item = value;
+            }
+        }
+
 
     }
 }

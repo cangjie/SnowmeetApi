@@ -576,6 +576,7 @@ namespace SnowmeetApi.Controllers
                     case "租赁下单":
                         RentOrder rOrder = await _context.RentOrder.FindAsync(recept.submit_return_id);
                         recept.rentOrder = rOrder;
+                       
                         break;
                     case "养护下单":
                         MaintainLiveController mc = new MaintainLiveController(_context, _oriConfig);
@@ -587,7 +588,30 @@ namespace SnowmeetApi.Controllers
                 }
 
             }
-            
+            if (recept.rentOrder != null && recept.rentOrder.details != null)
+            {
+                for (int i = 0; i < recept.rentOrder.details.Length; i++)
+                {
+                    RentOrder rOrder = recept.rentOrder;
+                    RentOrderDetail dtl = rOrder.details[i];
+                    
+                    if (dtl.rent_item_code != null && !dtl.rent_item_code.Trim().Equals(""))
+                    {
+                        
+                        var riL = await _context.RentItem
+                            .Where(r => r.code.Trim().Equals(dtl.rent_item_code.Trim()))
+                            .ToListAsync();
+                        
+                        if (riL != null && riL.Count > 0)
+                        {
+                            rOrder.details[i].item = riL[0];
+                            recept.rentOrder = rOrder;
+                        }
+                        
+                    }
+                    
+                }
+            }
             return Ok(recept);
         }
 
