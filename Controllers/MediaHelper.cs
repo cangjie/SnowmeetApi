@@ -117,7 +117,7 @@ namespace SnowmeetApi.Controllers
                     img.Mutate(x => x.RotateFlip(RotateMode.Rotate90, FlipMode.None));
                     break;
             }
-            img.Mutate(x => x.RotateFlip(RotateMode.Rotate90, FlipMode.None));
+            //img.Mutate(x => x.RotateFlip(RotateMode.Rotate90, FlipMode.None));
             img.Save(sOut, enc);
             s.Close();
             res.Close();
