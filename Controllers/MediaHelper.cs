@@ -1,12 +1,11 @@
-﻿using System;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using System.Drawing;
-using System.Drawing.Imaging;
+﻿using Microsoft.AspNetCore.Mvc;
 using System.IO;
 using System.IO.Pipelines;
 using System.Net;
-using System.Collections;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Processing;
+using SixLabors.ImageSharp.Formats;
+using System.Threading.Tasks;
 //using ThoughtWorks.QRCode.Codec;
 //using QRCoder;
 //using System.Reflection.Emit;
@@ -92,6 +91,38 @@ namespace SnowmeetApi.Controllers
 
         }
         */
+
+        [HttpGet("{angle}")]
+        public void ShowImageRotate(string imgUrl, int angle=90)
+        {
+            ImageEncoder enc = new SixLabors.ImageSharp.Formats.Jpeg.JpegEncoder();
+            imgUrl = Util.UrlDecode(imgUrl);
+            HttpWebRequest req = (HttpWebRequest)WebRequest.Create(imgUrl);
+            HttpWebResponse res = (HttpWebResponse)req.GetResponse();
+            byte[] buf = new byte[1024 * 1024 * 100];
+            Stream s = res.GetResponseStream();
+            Response.ContentType = "image/jpeg";
+            PipeWriter pw = Response.BodyWriter;
+            Stream sOut = pw.AsStream();
+            Image img =  Image.Load(s);
+            switch (angle)
+            {
+                case 180:
+                    img.Mutate(x => x.RotateFlip(RotateMode.Rotate180, FlipMode.None));
+                    break;
+                case 270:
+                    img.Mutate(x => x.RotateFlip(RotateMode.Rotate270, FlipMode.None));
+                    break;
+                default:
+                    img.Mutate(x => x.RotateFlip(RotateMode.Rotate90, FlipMode.None));
+                    break;
+            }
+            img.Mutate(x => x.RotateFlip(RotateMode.Rotate90, FlipMode.None));
+            img.Save(sOut, enc);
+            s.Close();
+            res.Close();
+            req.Abort();
+        }
 
         [HttpGet]
         public void ShowImageFromOfficialAccount(string img)
