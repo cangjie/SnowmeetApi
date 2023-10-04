@@ -1336,7 +1336,7 @@ namespace SnowmeetApi.Controllers
 
             if (user != null)
             {
-                UnicUser realUser = (UnicUser)(user.Value);
+                UnicUser realUser = (UnicUser)user;
                 if (!realUser.miniAppOpenId.Trim().Equals(""))
                 {
                     realUser.miniAppUser = await _context.MiniAppUsers.FindAsync(realUser.miniAppOpenId.Trim());

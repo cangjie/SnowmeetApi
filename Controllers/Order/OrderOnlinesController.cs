@@ -442,14 +442,14 @@ namespace SnowmeetApi.Controllers
             {
                 try
                 {
-                    UnicUser customerUser = (await UnicUser.GetUnicUser(order.open_id, "snowmeet_mini", _context)).Value;
+                    UnicUser customerUser = await UnicUser.GetUnicUser(order.open_id, "snowmeet_mini", _context);
                     if (customerUser == null)
                     {
-                        customerUser = (await UnicUser.GetUnicUser(order.open_id, "snowmeet_official_account_new", _context)).Value;
+                        customerUser = await UnicUser.GetUnicUser(order.open_id, "snowmeet_official_account_new", _context);
                     }
                     if (customerUser == null)
                     {
-                        customerUser = (await UnicUser.GetUnicUser(order.open_id, "snowmeet_official_account", _context)).Value;
+                        customerUser = await UnicUser.GetUnicUser(order.open_id, "snowmeet_official_account", _context);
                     }
 
                     if (customerUser != null)
