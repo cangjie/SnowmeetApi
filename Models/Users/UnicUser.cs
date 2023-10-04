@@ -92,6 +92,33 @@ namespace SnowmeetApi.Models.Users
                 };
                 return user;
             }
+            else if (type.Trim().Equals("snowmeet_official_account_new"))
+            {
+                OfficialAccoutUser oaUser = await _context.officialAccoutUsers.FindAsync(openId.Trim());
+                if (oaUser == null)
+                {
+                    return null;
+                }
+                var l = await _context.MiniAppUsers
+                    .Where(m => m.union_id.Trim().Equals(oaUser.union_id.Trim()))
+                    .ToListAsync();
+                if (l == null || l.Count == 0)
+                {
+                    return null;
+                }
+                else
+                {
+                    MiniAppUser maUser = l[0];
+                    UnicUser user = new UnicUser()
+                    {
+                        miniAppOpenId = maUser.open_id.Trim(),
+                        officialAccountOpenId = oaUser.open_id.Trim(),
+                        officialAccountOpenIdOld = ""
+                    };
+                    return user;
+
+                }
+            }
             else
             {
                 return null;
