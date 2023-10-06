@@ -42,6 +42,7 @@ namespace SnowmeetApi.Models.Rent
 
         public string return_staff { get; set; } = "";
 
+        [NotMapped]
         public RentItem _item;
 
         [NotMapped]
@@ -122,11 +123,12 @@ namespace SnowmeetApi.Models.Rent
                 return _timeLength;
             }
         }
+        [NotMapped]
         public string _timeLength = "";
-
+        [NotMapped]
         public double _suggestRental = 0;
 
-        
+        [NotMapped]
         public RentItem item
         {
             get
