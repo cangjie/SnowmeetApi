@@ -101,7 +101,7 @@ namespace SnowmeetApi.Controllers.Order
             {
                 return NotFound();
             }
-            UnicUser scanUser = (await UnicUser.GetUnicUser(scan.scaner_oa_open_id, "snowmeet_official_account_new", _context)).Value;
+            UnicUser scanUser = await UnicUser.GetUnicUser(scan.scaner_oa_open_id, "snowmeet_official_account_new", _context);
             if (scanUser!= null && !scanUser.miniAppOpenId.Trim().Equals(""))
             {
                 scan.miniAppUser = (await miniAppUserHelper.GetMiniAppUser(scanUser.miniAppOpenId, sessionKey)).Value;
