@@ -75,6 +75,9 @@ namespace SnowmeetApi.Models.Rent
         public DateTime create_date { get; set; } = DateTime.Now;
 
 
+        public OrderOnline _order;
+
+
         public RentOrderDetail[]? _details;
 
         [NotMapped]
@@ -96,7 +99,17 @@ namespace SnowmeetApi.Models.Rent
         public string payMethod { get; set; } = "微信支付";
 
         [NotMapped]
-        public OrderOnline order { get; set; }
+        public OrderOnline order
+        {
+            get
+            {
+                return _order;
+            }
+            set
+            {
+                _order = value;
+            }
+        }
 
         [NotMapped]
         public string status
