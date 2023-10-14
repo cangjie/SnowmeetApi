@@ -91,7 +91,7 @@ namespace SnowmeetApi.Controllers.Maintain
                 var staffUser = await mUserController.GetMiniAppUser(logList[i].staff_open_id, sessionKey);
                 logList[i].staffName = staffUser.Value.real_name.Trim();
             }
-            return logList; 
+            return Ok(logList); 
         }
 
         [HttpGet("{id}")]

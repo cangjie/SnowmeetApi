@@ -69,6 +69,8 @@ namespace SnowmeetApi.Models
         [NotMapped]
         public Maintain.MaintainLog[] taskLog { get; set; }
 
+        [NotMapped]
+        public string status { get; set; }
         
 
 

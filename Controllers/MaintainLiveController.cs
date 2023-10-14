@@ -13,6 +13,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Org.BouncyCastle.Asn1.X509;
+using SnowmeetApi.Controllers.Maintain;
 
 namespace SnowmeetApi.Controllers
 {
@@ -23,6 +24,7 @@ namespace SnowmeetApi.Controllers
         private readonly ApplicationDBContext _context;
         private IConfiguration _config;
         private IConfiguration _originConfig;
+        private readonly MaintainLogsController _logHelper;
         
 
 
@@ -31,7 +33,7 @@ namespace SnowmeetApi.Controllers
             _context = context;
             _config = config.GetSection("Settings");
             _originConfig = config;
-            
+            _logHelper = new MaintainLogsController(context, config);
         }
 
 
@@ -284,7 +286,29 @@ namespace SnowmeetApi.Controllers
                 .Where(m => (!m.task_flow_num.Trim().Equals("") && m.create_date >= start && m.create_date < end && (shop.Equals("") || m.shop.Equals(shop)) ))
                 .OrderByDescending(m => m.id).ToListAsync();
 
-            return liveArr;
+            for (int i = 0; i < liveArr.Count; i++)
+            {
+                MaintainLive m = (MaintainLive)liveArr[i];
+                //var logs = 
+                m.taskLog = ((IEnumerable<MaintainLog>)((OkObjectResult)(await _logHelper.GetStepsByStaff(m.id, sessionKey)).Result).Value).ToArray();
+                string lastStep = m.taskLog[m.taskLog.Length - 1].step_name.Trim();
+                if (m.taskLog == null || m.taskLog.Length == 0)
+                {
+                    m.status = "未开始";
+                }
+                else if (lastStep.Trim().Equals("发板") || lastStep.Trim().Equals("强行索回"))
+                {
+                    m.status = "已完成";
+                }
+                else
+                {
+                    m.status = "进行中";
+                }
+
+
+            }
+
+            return Ok(liveArr);
         }
 
         [HttpPost]
