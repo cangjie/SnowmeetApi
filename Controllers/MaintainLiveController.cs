@@ -291,7 +291,10 @@ namespace SnowmeetApi.Controllers
                 MaintainLive m = (MaintainLive)liveArr[i];
                 //var logs = 
                 m.taskLog = ((IEnumerable<MaintainLog>)((OkObjectResult)(await _logHelper.GetStepsByStaff(m.id, sessionKey)).Result).Value).ToArray();
-                string lastStep = m.taskLog[m.taskLog.Length - 1].step_name.Trim();
+                string lastStep = m.taskLog.Length == 0 ? ""
+                    : m.taskLog[m.taskLog.Length - 1].step_name.Trim();
+                
+                //lastStep = m.taskLog[m.taskLog.Length - 1].step_name.Trim();
                 if (m.taskLog == null || m.taskLog.Length == 0)
                 {
                     m.status = "未开始";
