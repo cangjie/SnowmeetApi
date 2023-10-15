@@ -590,6 +590,10 @@ namespace SnowmeetApi.Controllers.Order
             {
                 amount = order.final_price;
             }
+            if (amount > order.final_price)
+            {
+                return BadRequest();
+            }
             bool find = false;
             var paymentList = await _context.OrderPayment.Where(p => p.order_id == orderId).ToListAsync();
             OrderPayment payment = new OrderPayment();
@@ -610,6 +614,7 @@ namespace SnowmeetApi.Controllers.Order
                 payment.order_id = orderId;
                 payment.pay_method = payMethod.Trim();
                 payment.amount = amount;
+                payment.status = "待支付";
                 await _context.OrderPayment.AddAsync(payment);
             }
             await _context.SaveChangesAsync();
