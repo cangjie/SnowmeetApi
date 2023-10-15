@@ -564,23 +564,45 @@ namespace SnowmeetApi.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<Recept>> GetRecept(int id, string sessionKey)
         {
-            if (!(await IsAdmin(sessionKey)))
+            sessionKey = Util.UrlDecode(sessionKey.Trim());
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            Recept recept = await _context.Recept.FindAsync(id);
+            bool isAdmin = await IsAdmin(sessionKey);
+            if (!isAdmin && !recept.open_id.Trim().Equals(user.miniAppOpenId.Trim()))
             {
                 return BadRequest();
             }
-            Recept recept = await _context.Recept.FindAsync(id);
+
+            if (!isAdmin)
+            {
+                recept.open_id = "";
+                recept.submit_data = "";
+            }
             if (recept.submit_return_id > 0)
             {
                 switch (recept.recept_type)
                 {
                     case "租赁下单":
                         RentOrder rOrder = await _context.RentOrder.FindAsync(recept.submit_return_id);
+                        if (!isAdmin)
+                        {
+
+                            rOrder.open_id = "";
+                        }
                         recept.rentOrder = rOrder;
                        
                         break;
                     case "养护下单":
                         MaintainLiveController mc = new MaintainLiveController(_context, _oriConfig);
                         Models.Maintain.MaintainOrder mOrder = (Models.Maintain.MaintainOrder)((OkObjectResult)(await mc.GetMaintainOrder(recept.submit_return_id, sessionKey)).Result).Value;
+                        if (!isAdmin)
+                        {
+                            mOrder.order.open_id = "";
+                            for (int i = 0; i < mOrder.items.Length; i++)
+                            {
+                                mOrder.items[i].open_id = "";
+                            }
+                        }
                         recept.maintainOrder = mOrder;
                         break;
                     default:
@@ -588,6 +610,9 @@ namespace SnowmeetApi.Controllers
                 }
 
             }
+
+
+
             if (recept.rentOrder != null && recept.rentOrder.details != null)
             {
                 for (int i = 0; i < recept.rentOrder.details.Length; i++)
@@ -612,6 +637,7 @@ namespace SnowmeetApi.Controllers
                     
                 }
             }
+
             return Ok(recept);
         }
 

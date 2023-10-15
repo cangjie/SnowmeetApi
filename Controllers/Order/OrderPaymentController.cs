@@ -577,6 +577,45 @@ namespace SnowmeetApi.Controllers.Order
 
         }
 
+        [HttpGet("{orderId}")]
+        public async Task<ActionResult<OrderPayment>> CreatePayment(int orderId, string payMethod, double amount)
+        {
+            payMethod = Util.UrlDecode(payMethod).Trim();
+            OrderOnline order = await _context.OrderOnlines.FindAsync(orderId);
+            if (order == null)
+            {
+                return NotFound();
+            }
+            if (amount == 0)
+            {
+                amount = order.final_price;
+            }
+            bool find = false;
+            var paymentList = await _context.OrderPayment.Where(p => p.order_id == orderId).ToListAsync();
+            OrderPayment payment = new OrderPayment();
+            for (int i = 0; paymentList != null && i < paymentList.Count; i++)
+            {
+                payment = paymentList[i];
+                if (Math.Round(payment.amount * 100, 0) == Math.Round(amount * 100, 0) && payment.status.Trim().Equals("待支付"))
+                {
+                    payment.pay_method = payMethod.Trim();
+                    find = true;
+                    _context.Entry(payment).State = EntityState.Modified;
+                    
+                    break;
+                }
+            }
+            if (!find)
+            {
+                payment.order_id = orderId;
+                payment.pay_method = payMethod.Trim();
+                payment.amount = amount;
+                await _context.OrderPayment.AddAsync(payment);
+            }
+            await _context.SaveChangesAsync();
+            return Ok(payment);
+        }
+
         /*
 
         // GET: api/OrderPayment
