@@ -578,7 +578,7 @@ namespace SnowmeetApi.Controllers.Order
         }
 
         [HttpGet("{orderId}")]
-        public async Task<ActionResult<OrderPayment>> CreatePayment(int orderId, string payMethod, double amount)
+        public async Task<ActionResult<OrderPayment>> CreatePayment(int orderId, string payMethod, double amount = 0)
         {
             payMethod = Util.UrlDecode(payMethod).Trim();
             OrderOnline order = await _context.OrderOnlines.FindAsync(orderId);
