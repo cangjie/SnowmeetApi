@@ -163,6 +163,34 @@ namespace SnowmeetApi
             return str;
         }
 
+        public static string GetWebContent(string url, string[] headers)
+        {
+            try
+            {
+                HttpWebRequest req = (HttpWebRequest)WebRequest.Create(url);
+                req.Method = "GET";
+                for (int i = 0; i < headers.Length; i++)
+                {
+                    req.Headers.Add(headers[i].Trim());
+                }
+                HttpWebResponse res = (HttpWebResponse)req.GetResponse();
+                Stream s = res.GetResponseStream();
+                StreamReader sr = new StreamReader(s);
+                string str = sr.ReadToEnd();
+                sr.Close();
+                s.Close();
+                res.Close();
+                req.Abort();
+                return str;
+            }
+            catch(Exception err)
+            {
+                Console.WriteLine(err.ToString());
+                return "";
+            }
+
+        }
+
 
 
         public static string GetLongTimeStamp(DateTime currentDateTime)

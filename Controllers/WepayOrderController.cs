@@ -24,6 +24,7 @@ using SnowmeetApi.Models.Users;
 using SnowmeetApi.Models.Ticket;
 using SnowmeetApi.Models.Card;
 using SKIT.FlurlHttpClient.Wechat.TenpayV3.Models;
+using System.Reflection.PortableExecutable;
 
 namespace SnowmeetApi.Controllers
 {
@@ -93,156 +94,7 @@ namespace SnowmeetApi.Controllers
             _originConfig = config;
         }
 
-        /*
-        protected async Task<ActionResult<CerList>> GetCer()
-        {
-            WepayKey key = _context.WepayKeys.Find(1);
-            HttpClient client = new HttpClient(new HttpHandler(key.mch_id, key.key_serial, key.private_key));
-            var response = await client.GetAsync("https://api.mch.weixin.qq.com/v3/certificates");
-
-            HttpRequestHeaders h = response.RequestMessage.Headers;
-
-            string authStr = h.Authorization.Parameter.Trim();
-            //mchid=\"1604184933\",nonce_str=\"b4235bhc.nhv\",timestamp=\"1634307680\",serial_no=\"4FD9EF150B9F31A8A2D4CB3251BCE189A65BDADF\",signature=\"RQOyiQyGaGP/wWiidPoyI0sXxgDtgUk8BAfi0z1JjREI4FTsbT6HJQtN1RfYeB4vVRShKXeSBu/vvDTdY5GVNpfopfKDVPsg7YhneCCNywAgLtQk2/iratzbvPrGgTzdma/HgCyXwqyv6oEoYyjdN26DKlB/7OhNqxfyYTQ5wj4oHxAtHKAfAHyUKoCBIWBPVN0Q2kilyYY7be9ucks6DQuH+xeN7zkd3OSj5Ltq42uX0kGFjd7K15I7uokJWisnDXeNAKnp/jTNYEWbuihE9MAuwdEYA1wFm8s5zf4gQlry++G+oP+hYR4sgv83HKvpSOM9u6F8+FOeElcaZ3q7Ow==\""
-
-
-            authStr = authStr.Substring(authStr.IndexOf("nonce_str"), authStr.Length - authStr.IndexOf("nonce_str"));
-
-            authStr = authStr.Substring(0, authStr.IndexOf(","));
-
-            string nonce = authStr.Replace("nonce_str=", "").Replace("\"", "");
-
-            Stream s = response.Content.ReadAsStream();
-            StreamReader sr = new StreamReader(s);
-            string cerStr = sr.ReadToEnd();
-            sr.Close();
-            s.Close();
-            
-            CerList cList = Newtonsoft.Json.JsonConvert.DeserializeObject<CerList>(cerStr);
-            var certManager = new InMemoryCertificateManager();
-            certManager.SetCertificate("7F5ACDBE4382FD3F831184B33FAA6E1D35BEE383", cList.data[0].encrypt_certificate.ciphertext);
-                            
-            var options = new WechatTenpayClientOptions()
-            {
-                CertificateManager = certManager,
-                SignAlgorithm = cList.data[0].encrypt_certificate.algorithm
-            };
-            var verifyClient = new WechatTenpayClient(options);
-            bool valid = verifyClient.VerifyEventSignature(
-                callbackTimestamp: "1634265418",
-                callbackNonce: "r3lQS3Zc1j87PXlsRwKTRu0DmUvrUQxe",
-                callbackBody: "{\"id\":\"74b7445b-e1c6-56cd-9dcf-f9de8d4400e2\",\"create_time\":\"2021-10-15T10:36:58+08:00\",\"resource_type\":\"encrypt-resource\",\"event_type\":\"TRANSACTION.SUCCESS\",\"summary\":\"支付成功\",\"resource\":{\"original_type\":\"transaction\",\"algorithm\":\"AEAD_AES_256_GCM\",\"ciphertext\":\"5njznsCzxzmaQfgoTDIpfoOAcbJ2FtSOOKVi9zJJ1qTR9WNZo1FQDSzX0DL10JTXq+sUoQkk+xuK9Cj2pQIOVj8yWy2PoIU9Nsqt8Pp5c+APiQNnqiC0r1h9uOVLhyfKr4unmisb73bugswGmutBcS3xWDFObl1K2iDAHCv/LnCgH3IHomavO4HuUBg0CQXLBStV1SEbkGaoUDTVLexveCNg+GqcPtutYA7zTrWB2c7TD4ypoZx315RcchpJYH8laWInbGZUtORRjyswLosZjjQpEL1MH5fe+g9vcwRzp0loIQU7V2OjTMqrvBIabsHizSdX+EmoCWSNiZ0e+h/MtQaBlmc9scCin/AJVtHiJaZnNtIxXFr+XaSrdrkzWiA6kfYEKR1rIZT06hnbkxHxN1olOcCdLdboqdsPrySME7fIi/5ponxg199KC3cIuv8zMslnYIUFcJCjB3U34eziDzPrt4LY3JRE5YWYXc9cx/nvXa22VZgtqH12P+XDrSoo7rMbROObw2zWox8BGwZYTwjOyIwuo/HJk1NmnmcjUCLxC2XEmDkkQ/iwAbQ14ZK6\",\"associated_data\":\"transaction\",\"nonce\":\"LRxoOYFpmJAn\"}}",
-                callbackSignature: "DuBPYfdtZ9RDfwM49DQBBUj4xfHlXc+MC90HSCp9vKhBfTEsJSAqt+/r78l6nmXLSJxkqWwiWKCazRQL40mWERrHF/J0j4OJtXLb5vcKasm2th8YBIJThzpQCfU9WRJl2vSWKYyy++ubEc3IOLR+VMTVGt3g6yPs16bgMVMs7npmCkALutEaKESfV9F2f5mFgLmaWiM//ojYWzBB1NZUSDlsA57JG8dvrwwilvw2s14npxJ3I+Dgr70w9yWvjOEGkTB3lBrkz0sc0qB8q1/Smw9ApyqhbQDXJqK+v2leS/96231JCUQZR7YACIYWQx8ihu5Sbl2z09GnWUmu2IVpFw==",
-                callbackSerialNumber: "7F5ACDBE4382FD3F831184B33FAA6E1D35BEE383"
-            );
-
-            string path = $"{Environment.CurrentDirectory}";
-
-            if(path.StartsWith("/"))
-            {
-                path = path + "/";
-            }
-            else
-            {
-                path = path + "\\";
-            }
-            path = path + "wepay_platform_cert.pem";
-
-            using (StreamWriter fw = new StreamWriter(path, true))
-            {
-                fw.WriteLine(cList.data[0].encrypt_certificate.ciphertext.Trim());
-                fw.Close();
-            }
-            return cList;
-
-            
-        }
-
-
-        protected void ValidSign()
-        {
-            string cert = "-----BEGIN CERTIFICATE-----MIID8DCCAtigAwIBAgIUT9nvFQufMaii1MsyUbzhiaZb2t8wDQYJKoZIhvcNAQELBQAwXjELMAkGA1UEBhMCQ04xEzARBgNVBAoTClRlbnBheS5jb20xHTAbBgNVBAsTFFRlbnBheS5jb20gQ0EgQ2VudGVyMRswGQYDVQQDExJUZW5wYXkuY29tIFJvb3QgQ0EwHhcNMjExMDEwMDIyMTM1WhcNMjYxMDA5MDIyMTM1WjCBgTETMBEGA1UEAwwKMTYwNDE4NDkzMzEbMBkGA1UECgwS5b6u5L+h5ZWG5oi357O757ufMS0wKwYDVQQLDCTljJfkuqzmmJPpvpnpm6rogZrllYbotLjmnInpmZDlhazlj7gxCzAJBgNVBAYMAkNOMREwDwYDVQQHDAhTaGVuWmhlbjCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAMjjqeQg2/oiG9P4ai77tBqK/ml1qWAYu0dJTSrHhkkq6FfKd6Ol2tF+OKVogGnpYEt1Y7d/CLVu4fBDzj+//PgazUINsExfCPg4xyYj4J0dfdzInRyn6nLLUEnCVQalUzNvDOSHN8OdEF6SapdMygZJYBos91ynH8FqViIIfsPQqsZO6tm+IwFJqZkyjFftKApsbujsJALg4ecIM732wQb0R6T0NGSjbpfN6fyNC9k9bPSAIjgl+YMkqlDDElDHfq+k8vDxLq1meLqff8CtuTBojTcFz379CpHqV0FCH5lx9Ot683ZJDo/c62+WHYzuPYUiTljk28i2c1bMDdk/NqsCAwEAAaOBgTB/MAkGA1UdEwQCMAAwCwYDVR0PBAQDAgTwMGUGA1UdHwReMFwwWqBYoFaGVGh0dHA6Ly9ldmNhLml0cnVzLmNvbS5jbi9wdWJsaWMvaXRydXNjcmw/Q0E9MUJENDIyMEU1MERCQzA0QjA2QUQzOTc1NDk4NDZDMDFDM0U4RUJEMjANBgkqhkiG9w0BAQsFAAOCAQEAGhs0xdUgbJBqCcg4wgsZUB6RPh3tlo5W+L7W8Ds6IOWufDy/KQScj3xSVWmGbzxS+kZaDnu23bTcqpbR+6mXcfTyPdg2VJ5nle2PJKsJsd9TVksXofNNv4b+dd2g29kSmyaJsJhSuQYYCFsJYyvOma5RoAjiUs/LMVK1TYAwSodZMoq2DmDJjv8NMOMRqiwR+vXpWnR2W+4kIG4nwi8Z+epuxehrZOW6fHKHOoaEsZ0JrxQYky2HjFNfvcCmUIX1HP+BzXZmfq+BfeemDCt5VtHNCOHzisehPs640A0S5aIjXrx9GtlYOWqAJlrNERnGJ7KXSq+7nfD0JsFY/flKcg==-----END CERTIFICATE-----";
-            WepayKey key = _context.WepayKeys.Find(1);
-            var certManager = new InMemoryCertificateManager();
-            certManager.SetCertificate("7F5ACDBE4382FD3F831184B33FAA6E1D35BEE383", cert);
-            var options = new WechatTenpayClientOptions()
-            {
-                MerchantId = key.mch_id.Trim(),
-                CertificateManager = certManager
-            };
-            var client = new WechatTenpayClient(options);
-            bool valid = client.VerifyEventSignature(
-                callbackTimestamp: "1634265418",
-                callbackNonce: "r3lQS3Zc1j87PXlsRwKTRu0DmUvrUQxe",
-                callbackBody: "{\"id\":\"74b7445b-e1c6-56cd-9dcf-f9de8d4400e2\",\"create_time\":\"2021-10-15T10:36:58+08:00\",\"resource_type\":\"encrypt-resource\",\"event_type\":\"TRANSACTION.SUCCESS\",\"summary\":\"支付成功\",\"resource\":{\"original_type\":\"transaction\",\"algorithm\":\"AEAD_AES_256_GCM\",\"ciphertext\":\"5njznsCzxzmaQfgoTDIpfoOAcbJ2FtSOOKVi9zJJ1qTR9WNZo1FQDSzX0DL10JTXq+sUoQkk+xuK9Cj2pQIOVj8yWy2PoIU9Nsqt8Pp5c+APiQNnqiC0r1h9uOVLhyfKr4unmisb73bugswGmutBcS3xWDFObl1K2iDAHCv/LnCgH3IHomavO4HuUBg0CQXLBStV1SEbkGaoUDTVLexveCNg+GqcPtutYA7zTrWB2c7TD4ypoZx315RcchpJYH8laWInbGZUtORRjyswLosZjjQpEL1MH5fe+g9vcwRzp0loIQU7V2OjTMqrvBIabsHizSdX+EmoCWSNiZ0e+h/MtQaBlmc9scCin/AJVtHiJaZnNtIxXFr+XaSrdrkzWiA6kfYEKR1rIZT06hnbkxHxN1olOcCdLdboqdsPrySME7fIi/5ponxg199KC3cIuv8zMslnYIUFcJCjB3U34eziDzPrt4LY3JRE5YWYXc9cx/nvXa22VZgtqH12P+XDrSoo7rMbROObw2zWox8BGwZYTwjOyIwuo/HJk1NmnmcjUCLxC2XEmDkkQ/iwAbQ14ZK6\",\"associated_data\":\"transaction\",\"nonce\":\"LRxoOYFpmJAn\"}}",
-                callbackSignature: "DuBPYfdtZ9RDfwM49DQBBUj4xfHlXc+MC90HSCp9vKhBfTEsJSAqt+/r78l6nmXLSJxkqWwiWKCazRQL40mWERrHF/J0j4OJtXLb5vcKasm2th8YBIJThzpQCfU9WRJl2vSWKYyy++ubEc3IOLR+VMTVGt3g6yPs16bgMVMs7npmCkALutEaKESfV9F2f5mFgLmaWiM//ojYWzBB1NZUSDlsA57JG8dvrwwilvw2s14npxJ3I+Dgr70w9yWvjOEGkTB3lBrkz0sc0qB8q1/Smw9ApyqhbQDXJqK+v2leS/96231JCUQZR7YACIYWQx8ihu5Sbl2z09GnWUmu2IVpFw==",
-                callbackSerialNumber: "7F5ACDBE4382FD3F831184B33FAA6E1D35BEE383"
-            );
-        }
-        
-
-        protected void DecodeSign()
-        {
-            string callbackJson = "{\"id\":\"74b7445b-e1c6-56cd-9dcf-f9de8d4400e2\",\"create_time\":\"2021-10-15T10:36:58+08:00\",\"resource_type\":\"encrypt-resource\",\"event_type\":\"TRANSACTION.SUCCESS\",\"summary\":\"支付成功\",\"resource\":{\"original_type\":\"transaction\",\"algorithm\":\"AEAD_AES_256_GCM\",\"ciphertext\":\"5njznsCzxzmaQfgoTDIpfoOAcbJ2FtSOOKVi9zJJ1qTR9WNZo1FQDSzX0DL10JTXq+sUoQkk+xuK9Cj2pQIOVj8yWy2PoIU9Nsqt8Pp5c+APiQNnqiC0r1h9uOVLhyfKr4unmisb73bugswGmutBcS3xWDFObl1K2iDAHCv/LnCgH3IHomavO4HuUBg0CQXLBStV1SEbkGaoUDTVLexveCNg+GqcPtutYA7zTrWB2c7TD4ypoZx315RcchpJYH8laWInbGZUtORRjyswLosZjjQpEL1MH5fe+g9vcwRzp0loIQU7V2OjTMqrvBIabsHizSdX+EmoCWSNiZ0e+h/MtQaBlmc9scCin/AJVtHiJaZnNtIxXFr+XaSrdrkzWiA6kfYEKR1rIZT06hnbkxHxN1olOcCdLdboqdsPrySME7fIi/5ponxg199KC3cIuv8zMslnYIUFcJCjB3U34eziDzPrt4LY3JRE5YWYXc9cx/nvXa22VZgtqH12P+XDrSoo7rMbROObw2zWox8BGwZYTwjOyIwuo/HJk1NmnmcjUCLxC2XEmDkkQ/iwAbQ14ZK6\",\"associated_data\":\"transaction\",\"nonce\":\"LRxoOYFpmJAn\"}}";
-            string callbackTimestamp = "1634265418";
-            string callbackNonce = "r3lQS3Zc1j87PXlsRwKTRu0DmUvrUQxe";
-            string callbackSignature = "DuBPYfdtZ9RDfwM49DQBBUj4xfHlXc+MC90HSCp9vKhBfTEsJSAqt+/r78l6nmXLSJxkqWwiWKCazRQL40mWERrHF/J0j4OJtXLb5vcKasm2th8YBIJThzpQCfU9WRJl2vSWKYyy++ubEc3IOLR+VMTVGt3g6yPs16bgMVMs7npmCkALutEaKESfV9F2f5mFgLmaWiM//ojYWzBB1NZUSDlsA57JG8dvrwwilvw2s14npxJ3I+Dgr70w9yWvjOEGkTB3lBrkz0sc0qB8q1/Smw9ApyqhbQDXJqK+v2leS/96231JCUQZR7YACIYWQx8ihu5Sbl2z09GnWUmu2IVpFw==";
-            string callbackSerialNumber = "7F5ACDBE4382FD3F831184B33FAA6E1D35BEE383";
-
-
-
-            string path = $"{Environment.CurrentDirectory}";
-
-            if (path.StartsWith("/"))
-            {
-                path = path + "/";
-            }
-            else
-            {
-                path = path + "\\";
-            }
-            //path = path + "wechatpay_" + callbackSerialNumber + "_key.pem";
-            string keyStr = "";
-            using (StreamReader sr = new StreamReader(path + "wechatpay_" + callbackSerialNumber + "_key.pem", true))
-            {
-                keyStr = sr.ReadToEnd();
-                sr.Close();
-            }
-
-            string cerStr = "";
-
-            using (StreamReader sr = new StreamReader(path + "wechatpay_" + callbackSerialNumber + ".pem", true))
-            {
-                cerStr = sr.ReadToEnd();
-                sr.Close();
-            }
-
-            var certManager = new InMemoryCertificateManager();
-            certManager.SetCertificate(callbackSerialNumber, cerStr);
-            var options = new WechatTenpayClientOptions()
-            {
-                CertificateManager = certManager
-            };
-            var client = new WechatTenpayClient(options);
-            bool valid = client.VerifyEventSignature(callbackTimestamp, callbackNonce, callbackJson, callbackSignature, callbackSerialNumber);
-            if (valid)
-            {
-                /* 将 JSON 反序列化得到通知对象 */
-                /* 你也可以将 WechatTenpayEvent 类型直接绑定到 MVC 模型上，这样就不再需要手动反序列化 */
-                /*
-                var callbackModel = client.DeserializeEvent(callbackJson);
-                if ("TRANSACTION.SUCCESS".Equals(callbackModel.EventType))
-                {
-                    /* 根据事件类型，解密得到支付通知敏感数据 */
-                /*
-                    var callbackResource = client.DecryptEventResource<SKIT.FlurlHttpClient.Wechat.TenpayV3.Events.TransactionResource>(callbackModel);
-                    string outTradeNumber = callbackResource.OutTradeNumber;
-                    string transactionId = callbackResource.TransactionId;
-                    Console.WriteLine("订单 {0} 已完成支付，交易单号为 {1}", outTradeNumber, transactionId);
-                }
-            }
-        }
-        */
+       
 
         [HttpGet("{outTradeNo}")]
         public async Task<ActionResult<string>> Refund(string outTradeNo, int amount, string sessionKey)
@@ -604,104 +456,35 @@ namespace SnowmeetApi.Controllers
             }
         }
 
-        /*
-        // GET: api/WepayOrder
-        [HttpGet]
-        public async Task<ActionResult<IEnumerable<WepayOrder>>> GetWepayOrders()
+        [HttpGet("{mchId}")]
+        public async Task<ActionResult<string>> RequestTradeBill(int mchId, DateTime billDate)
         {
-            return await _context.WepayOrders.ToListAsync();
-        }
+            WepayKey k = await _context.WepayKeys.FindAsync(mchId);
 
-        // GET: api/WepayOrder/5
-        [HttpGet("{id}")]
-        public async Task<ActionResult<WepayOrder>> GetWepayOrder(string id)
-        {
-            var wepayOrder = await _context.WepayOrders.FindAsync(id);
+            string getUrl = "https://api.mch.weixin.qq.com/v3/bill/tradebill?bill_date=" + billDate.ToString("yyyy-MM-dd");
 
-            if (wepayOrder == null)
-            {
-                return NotFound();
-            }
+            HttpHandler handle = new HttpHandler(k.mch_id.Trim(), k.key_serial.Trim(), k.private_key.Trim());
+            HttpRequestMessage req = new HttpRequestMessage(HttpMethod.Get, getUrl);
+            string authStr = await handle.BuildAuthAsync(req);
+            string value = $"WECHATPAY2-SHA256-RSA2048 {authStr}";
+            string[] headers = new string[] { "Authorization:" + value.Trim(), "Accept:application/json" };
+            Console.WriteLine("curl " + getUrl + " -H 'Authorization: " + value + "' -H 'Accept: application/json'");
+            string ret = Util.GetWebContent(getUrl, headers);
 
-            return wepayOrder;
-        }
+            /*
+            string signMessage = "GET\n/v3/bill/tradebill\n"
+                + Util.GetLongTimeStamp(DateTime.Now).Trim() + "\n"
+                + Path.GetRandomFileName() + "\n\n";
+            string sign = handle.Sign(signMessage).Trim();
+            string value = $"WECHATPAY2-SHA256-RSA2048 {sign}";
+            
+            
 
-        // PUT: api/WepayOrder/5
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
-        [HttpPut("{id}")]
-        public async Task<IActionResult> PutWepayOrder(string id, WepayOrder wepayOrder)
-        {
-            if (id != wepayOrder.out_trade_no)
-            {
-                return BadRequest();
-            }
+            */
 
-            _context.Entry(wepayOrder).State = EntityState.Modified;
-
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!WepayOrderExists(id))
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
-            }
 
             return NoContent();
         }
-
-        // POST: api/WepayOrder
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
-        [HttpPost]
-        public async Task<ActionResult<WepayOrder>> PostWepayOrder(WepayOrder wepayOrder)
-        {
-            _context.WepayOrders.Add(wepayOrder);
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateException)
-            {
-                if (WepayOrderExists(wepayOrder.out_trade_no))
-                {
-                    return Conflict();
-                }
-                else
-                {
-                    throw;
-                }
-            }
-
-            return CreatedAtAction("GetWepayOrder", new { id = wepayOrder.out_trade_no }, wepayOrder);
-        }
-
-        // DELETE: api/WepayOrder/5
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteWepayOrder(string id)
-        {
-            var wepayOrder = await _context.WepayOrders.FindAsync(id);
-            if (wepayOrder == null)
-            {
-                return NotFound();
-            }
-
-            _context.WepayOrders.Remove(wepayOrder);
-            await _context.SaveChangesAsync();
-
-            return NoContent();
-        }
-
-        private bool WepayOrderExists(string id)
-        {
-            return _context.WepayOrders.Any(e => e.out_trade_no == id);
-        }
-        */
+       
     }
 }

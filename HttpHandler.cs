@@ -39,7 +39,7 @@ namespace HttpHandlerDemo
             return await base.SendAsync(request, cancellationToken);
         }
 
-        protected async Task<string> BuildAuthAsync(HttpRequestMessage request)
+        public async Task<string> BuildAuthAsync(HttpRequestMessage request)
         {
             string method = request.Method.ToString();
             string body = "";
@@ -58,7 +58,7 @@ namespace HttpHandlerDemo
             return $"mchid=\"{merchantId}\",nonce_str=\"{nonce}\",timestamp=\"{timestamp}\",serial_no=\"{serialNo}\",signature=\"{signature}\"";
         }
 
-        protected string Sign(string message)
+        public string Sign(string message)
         {
             // NOTE： 私钥不包括私钥文件起始的-----BEGIN PRIVATE KEY-----
             //        亦不包括结尾的-----END PRIVATE KEY-----
