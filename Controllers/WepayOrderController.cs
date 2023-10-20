@@ -23,6 +23,7 @@ using SnowmeetApi.Models;
 using SnowmeetApi.Models.Users;
 using SnowmeetApi.Models.Ticket;
 using SnowmeetApi.Models.Card;
+using SnowmeetApi.Models.Order;
 using SKIT.FlurlHttpClient.Wechat.TenpayV3.Models;
 using System.Reflection.PortableExecutable;
 using System.Threading;
@@ -464,9 +465,14 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet("{mchId}")]
-        public async Task<ActionResult<string>> RequestTradeBill(int mchId, DateTime billDate)
+        public async Task  RequestTradeBill(int mchId, DateTime billDate)
         {
-            
+            var summaryList = await _context.wepaySummary.Where(s => s.trans_date.Date == billDate.Date)
+                .AsNoTracking().ToListAsync();
+            if (summaryList != null && summaryList.Count > 0)
+            {
+                return;
+            }
 
             WepayKey k = await _context.WepayKeys.FindAsync(mchId);
 
@@ -488,9 +494,151 @@ namespace SnowmeetApi.Controllers
             req.RequestUri = new Uri(downloadUrl.download_url.Trim());
             res = await handle.GetWebContent(req, cancel);
             sr = new StreamReader(await res.Content.ReadAsStreamAsync());
-            str = await sr.ReadToEndAsync();
+            str = (await sr.ReadToEndAsync()).Trim();
             sr.Close();
             Console.WriteLine(str);
+
+            string[] lineArr = str.Split('\n');
+            string[] summaryFields = lineArr[lineArr.Length - 1].Split(',');
+
+
+            WepaySummary summary = new WepaySummary()
+            {
+                id = 0,
+                trans_date = billDate.Date,
+                trans_num = int.Parse(summaryFields[0].Replace("`", "")),
+                total_settle_amount = double.Parse(summaryFields[1].Replace("`", "")),
+                total_refund_amount = double.Parse(summaryFields[2].Replace("`", "")),
+                coupon_refund_amount = double.Parse(summaryFields[3].Replace("`", "")),
+                total_fee = double.Parse(summaryFields[4].Replace("`", "")),
+                total_order_amount = double.Parse(summaryFields[5].Replace("`", "")),
+                total_request_refund_amount = double.Parse(summaryFields[6].Replace("`", ""))
+            };
+
+
+            WepayBalance[] balanceArr = new WepayBalance[lineArr.Length - 3];
+
+
+            for (int i = 1; i < lineArr.Length - 2; i++)
+            {
+                WepayBalance b = new WepayBalance();
+                string[] fieldArr = lineArr[i].Split(',');
+                for (int j = 0; j < fieldArr.Length; j++)
+                {
+                    string v = fieldArr[j].Trim().Replace("`", "");
+                    switch (j)
+                    {
+                        case 0:
+                            b.trans_date = DateTime.Parse(v);
+                            break;
+                        case 1:
+                            b.app_id = v.Trim();
+                            break;
+                        case 2:
+                            b.mch_id = v.Trim();
+                            break;
+                        case 3:
+                            b.spc_mch_id = v.Trim();
+                            break;
+                        case 4:
+                            b.device_id = v.Trim();
+                            break;
+                        case 5:
+                            b.wepay_order_num = v.Trim();
+                            break;
+                        case 6:
+                            b.out_trade_no = v.Trim();
+                            break;
+                        case 7:
+                            b.open_id = v.Trim();
+                            break;
+                        case 8:
+                            b.trans_type = v.Trim();
+                            break;
+                        case 9:
+                            b.pay_status = v.Trim();
+                            break;
+                        case 10:
+                            b.bank = v.Trim();
+                            break;
+                        case 11:
+                            b.currency = v.Trim();
+                            break;
+                        case 12:
+                            b.settle_amount = double.Parse(v.Trim());
+                            break;
+                        case 13:
+                            b.coupon_amount = double.Parse(v.Trim());
+                            break;
+                        case 14:
+                            b.refund_no = v.Trim();
+                            break;
+                        case 15:
+                            b.out_refund_no = v.Trim();
+                            break;
+                        case 16:
+                            b.refund_amount = double.Parse(v.Trim());
+                            break;
+                        case 17:
+                            b.coupon_refund_amount = double.Parse(v.Trim());
+                            break;
+                        case 18:
+                            b.refund_type = v.Trim();
+                            break;
+                        case 19:
+                            b.refund_status = v.Trim();
+                            break;
+                        case 20:
+                            b.product_name = v.Trim();
+                            break;
+                        case 21:
+                            b.product_package = v.Trim();
+                            break;
+                        case 22:
+                            b.fee = double.Parse(v.Trim());
+                            break;
+                        case 23:
+                            b.fee_rate = v.Trim();
+                            break;
+                        case 24:
+                            b.order_amount = double.Parse(v.Trim());
+                            break;
+                        case 25:
+                            b.request_refund_amount = double.Parse(v.Trim());
+                            break;
+                        case 26:
+                            b.fee_rate_memo = v.Trim();
+                            break;
+                        default:
+                            break;
+                    }
+                }
+                balanceArr[i-1] = b;
+            }
+
+            if (summary.trans_num == balanceArr.Length)
+            {
+                await _context.wepaySummary.AddAsync(summary);
+                await _context.SaveChangesAsync();
+                if (summary.id > 0)
+                {
+                    try
+                    {
+                        for (int i = 0; i < balanceArr.Length; i++)
+                        {
+                            balanceArr[i].summary_id = summary.id;
+                            await _context.wepayBalance.AddAsync(balanceArr[i]);
+                        }
+                        await _context.SaveChangesAsync();
+                    }
+                    catch
+                    {
+                        _context.wepaySummary.Remove(summary);
+                        await _context.SaveChangesAsync();
+                    }
+                }
+
+            }
 
             /*
 
@@ -515,7 +663,7 @@ namespace SnowmeetApi.Controllers
             */
 
 
-            return NoContent();
+            
         }
        
     }

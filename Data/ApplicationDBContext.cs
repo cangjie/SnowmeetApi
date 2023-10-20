@@ -141,13 +141,17 @@ namespace SnowmeetApi.Data
 
         public DbSet<UTVUserGroup> uTVUserGroups { get; set; }
 
-        public DbSet<WepayTransaction> wepayTransaction { get; set; }
+        //public DbSet<WepayTransaction> wepayTransaction { get; set; }
 
         public DbSet<BusinessReport> businessReport { get; set; }
 
         public DbSet<Models.Order.OldWeixinPaymentOrder> oldWeixinPaymentOrder { get; set; }
 
         public DbSet<Models.OldWeixinReceive> oldWxReceive { get; set; }
+
+        public DbSet<Models.Order.WepayBalance> wepayBalance { get; set; }
+
+        public DbSet<Models.Order.WepaySummary> wepaySummary { get; set; }
 
     }
 }
