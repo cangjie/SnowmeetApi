@@ -9,6 +9,8 @@ using System.Web;
 using Microsoft.EntityFrameworkCore;
 using SnowmeetApi.Models.Users;
 using Microsoft.AspNetCore.Mvc;
+using System.Net.Http.Headers;
+using System.Net.Http;
 
 namespace SnowmeetApi
 {
@@ -163,16 +165,31 @@ namespace SnowmeetApi
             return str;
         }
 
-        public static string GetWebContent(string url, string[] headers)
+        public static async Task<string> GetWebContent(string url, string[] headers)
         {
             try
             {
-                HttpWebRequest req = (HttpWebRequest)WebRequest.Create(url);
-                req.Method = "GET";
+                HttpClient client = new HttpClient();
                 for (int i = 0; i < headers.Length; i++)
                 {
-                    req.Headers.Add(headers[i].Trim());
+                    string headerName = headers[i].Trim().Split(':')[0].Trim();
+                    string headerValue = headers[i].Trim().Split(':')[1].Trim();
+                    client.DefaultRequestHeaders.Add(headerName, headerValue);
                 }
+                var ret = await client.GetStringAsync(url);
+                return "";
+
+                /*
+                HttpWebRequest req = (HttpWebRequest)WebRequest.Create(url);
+                req.Method = "GET";
+                WebHeaderCollection headsC = req.Headers;
+                for (int i = 0; i < headers.Length; i++)
+                {
+                    string headerName = headers[i].Trim().Split(':')[0].Trim();
+                    string headerValue = headers[i].Trim().Split(':')[1].Trim();
+                    headsC.Add(headerName.Trim(), headerValue);
+                }
+                
                 HttpWebResponse res = (HttpWebResponse)req.GetResponse();
                 Stream s = res.GetResponseStream();
                 StreamReader sr = new StreamReader(s);
@@ -182,6 +199,7 @@ namespace SnowmeetApi
                 res.Close();
                 req.Abort();
                 return str;
+                */
             }
             catch(Exception err)
             {

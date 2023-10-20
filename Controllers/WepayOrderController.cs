@@ -25,6 +25,8 @@ using SnowmeetApi.Models.Ticket;
 using SnowmeetApi.Models.Card;
 using SKIT.FlurlHttpClient.Wechat.TenpayV3.Models;
 using System.Reflection.PortableExecutable;
+using System.Threading;
+using Newtonsoft.Json.Converters;
 
 namespace SnowmeetApi.Controllers
 {
@@ -456,20 +458,50 @@ namespace SnowmeetApi.Controllers
             }
         }
 
+        private struct DownloadUrl
+        {
+            public string download_url { get; set; }
+        }
+
         [HttpGet("{mchId}")]
         public async Task<ActionResult<string>> RequestTradeBill(int mchId, DateTime billDate)
         {
+            
+
             WepayKey k = await _context.WepayKeys.FindAsync(mchId);
 
             string getUrl = "https://api.mch.weixin.qq.com/v3/bill/tradebill?bill_date=" + billDate.ToString("yyyy-MM-dd");
 
             HttpHandler handle = new HttpHandler(k.mch_id.Trim(), k.key_serial.Trim(), k.private_key.Trim());
+
+            HttpRequestMessage req = new HttpRequestMessage();
+            req.RequestUri = new Uri(getUrl);
+            CancellationToken cancel = new CancellationToken();
+            HttpResponseMessage res = await handle.GetWebContent(req, cancel);
+            StreamReader sr = new StreamReader(await res.Content.ReadAsStreamAsync());
+            string str = await sr.ReadToEndAsync();
+            sr.Close();
+            DownloadUrl downloadUrl = Newtonsoft.Json.JsonConvert.DeserializeObject<DownloadUrl>(str);
+
+            handle = new HttpHandler(k.mch_id.Trim(), k.key_serial.Trim(), k.private_key.Trim());
+            req = new HttpRequestMessage();
+            req.RequestUri = new Uri(downloadUrl.download_url.Trim());
+            res = await handle.GetWebContent(req, cancel);
+            sr = new StreamReader(await res.Content.ReadAsStreamAsync());
+            str = await sr.ReadToEndAsync();
+            sr.Close();
+            Console.WriteLine(str);
+
+            /*
+
             HttpRequestMessage req = new HttpRequestMessage(HttpMethod.Get, getUrl);
             string authStr = await handle.BuildAuthAsync(req);
             string value = $"WECHATPAY2-SHA256-RSA2048 {authStr}";
             string[] headers = new string[] { "Authorization:" + value.Trim(), "Accept:application/json" };
             Console.WriteLine("curl " + getUrl + " -H 'Authorization: " + value + "' -H 'Accept: application/json'");
-            string ret = Util.GetWebContent(getUrl, headers);
+            
+            string ret = await Util.GetWebContent(getUrl, headers);
+            */
 
             /*
             string signMessage = "GET\n/v3/bill/tradebill\n"

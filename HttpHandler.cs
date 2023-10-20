@@ -27,6 +27,12 @@ namespace HttpHandlerDemo
             this.privateKey = privateKey;
         }
 
+        public async Task<HttpResponseMessage> GetWebContent(HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            return await SendAsync(request, cancellationToken);
+        }
+
         protected async override Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request,
             CancellationToken cancellationToken)
