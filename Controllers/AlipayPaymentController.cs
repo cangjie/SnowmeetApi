@@ -44,6 +44,20 @@ namespace SnowmeetApi.Controllers
         //private readonly string privateKey = "9fQQanADekz/FUt6//ts0w==";
         //private readonly string publicKey = "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAoIC17Lr5tp14L27r7w57bYUqnWlMtH3lehlMLP8f8+5bY7jZ4WNFl0Knl+lWKaU9FizeIf98eJO3A16wHLTVrDFQRot/S9JnygtsptR8yPiGEI1DCVeTFD3+B0G7mjcI2jervvlDzLKL0+VotBXoaf85BFB2GfH//J2XdYWRNcub+L2VuITk5nojjfRRmD99GAiv4aR0GdovIghKKWzp4y92CnfI1HdhsgW4fMJxD2D1BtAC52rIcU4G8ctzwqWFTZRObtgrsXP4S+EuFmPVz4U0PwIBDotTQpV4d0bbb5WaNAbTIvTKpH0LdYfcdMDxEyCADlBerTPK/SFQazciSQIDAQAB";
 
+        public class AlipayRequestResult
+        {
+            public AlipayTradeResponse alipay_trade_precreate_response { get; set; }
+            public string sign { get; set; }
+            public string alipay_cert_sn { get; set; }
+        }
+
+        public class AlipayTradeResponse
+        {
+            public string code { get; set; }
+            public string msg { get; set; }
+            public string out_trade_no { get; set; }
+            public string qr_code { get; set; }
+        }
 
         public AlipayPaymentController(ApplicationDBContext context, IConfiguration config, IHttpContextAccessor httpContextAccessor)
         {
@@ -53,7 +67,7 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet]
-        public void QRCodeTest()
+        public void QRCodeTest(string qrCodeUrl)
         {
             /*
             ThoughtWorks.QRCode.Codec.QRCodeEncoder coder = new ThoughtWorks.QRCode.Codec.QRCodeEncoder();
@@ -61,11 +75,7 @@ namespace SnowmeetApi.Controllers
             bmp.Save(Util.workingPath + "/wwwroot/images/alipayqr.bmp");
             */
 
-            byte[] bArr = QRCoder.BitmapByteQRCodeHelper.GetQRCode("https://qr.alipay.com/bax07611fimfgrbn8vyk5511", QRCoder.QRCodeGenerator.ECCLevel.Q, 5);
-            
-
-
-            
+            byte[] bArr = QRCoder.BitmapByteQRCodeHelper.GetQRCode(qrCodeUrl, QRCoder.QRCodeGenerator.ECCLevel.Q, 5);
             Response.ContentType = "image/jpeg";
             Response.ContentLength = bArr.Length;
             PipeWriter pw = Response.BodyWriter;
@@ -75,12 +85,10 @@ namespace SnowmeetApi.Controllers
                 sOut.WriteByte(bArr[k]);
             }
             sOut.Close();
-
-            //Response.StatusCode = 200;
         }
 
         [HttpGet]
-        public async Task<ActionResult<string>> Test()
+        public async Task  Test()
         {
             CertParams certParams = new CertParams
             {
@@ -90,7 +98,7 @@ namespace SnowmeetApi.Controllers
             };
             IAopClient client = new DefaultAopClient("https://openapi.alipay.com/gateway.do", appId, privateKey, "json", "1.0", "RSA2", "utf-8", false, certParams);
             AlipayTradePrecreateRequest request = new AlipayTradePrecreateRequest();
-            request.SetNotifyUrl("");
+            request.SetNotifyUrl("https://mini.snowmeet.top/AlipayPayment/callback");
             string outTradeNo = DateTime.Now.Year.ToString() + DateTime.Now.Month.ToString().PadLeft(2, '0') + DateTime.Now.Day.ToString().PadLeft(2, '0') + DateTime.Now.Hour.ToString().PadLeft(2, '0')
                 + DateTime.Now.Minute.ToString().PadLeft(2, '0') + DateTime.Now.Second.ToString().PadLeft(2, '0');
             Dictionary<string, object> bizContent = new Dictionary<string, object>();
@@ -98,54 +106,22 @@ namespace SnowmeetApi.Controllers
             bizContent.Add("total_amount", 0.02);
             bizContent.Add("subject", "测试商品");
 
-            ////商品明细信息，按需传入
-            //List<object> goodsDetails = new List<object>();
-            //Dictionary<string, object> goods1 = new Dictionary<string, object>();
-            //goods1.Add("goods_id", "goodsNo1");
-            //goods1.Add("goods_name", "子商品1");
-            //goods1.Add("quantity", 1);
-            //goods1.Add("price", 0.01);
-            //goodsDetails.Add(goods1);
-            //bizContent.Add("goods_detail", goodsDetails);
-
-            ////扩展信息，按需传入
-            //Dictionary<string, object> extendParams = new Dictionary<string, object>();
-            //extendParams.Add("sys_service_provider_id", "2088501624560335");
-            //bizContent.Add("extend_params", extendParams);
-
-            //// 结算信息，按需传入
-            //Dictionary<string, object> settleInfo = new Dictionary<string, object>();
-            //List<object> settleDetailInfos = new List<object>();
-            //Dictionary<string, object> settleDetail = new Dictionary<string, object>();
-            //settleDetail.Add("trans_in_type", "defaultSettle");
-            //settleDetail.Add("amount", 0.01);
-            //settleDetailInfos.Add(settleDetail);
-            //settleInfo.Add("settle_detail_infos", settleDetailInfos);
-            //bizContent.Add("settle_info", settleInfo);
-
-            //// 二级商户信息，按需传入
-            //Dictionary<string, object> subMerchant = new Dictionary<string, object>();
-            //subMerchant.Add("merchant_id", "2088600522519475");
-            //bizContent.Add("sub_merchant", subMerchant);
-
-            //// 业务参数信息，按需传入
-            //Dictionary<string, object> businessParams = new Dictionary<string, object>();
-            //businessParams.Add("busi_params_key", "busiParamsValue");
-            //bizContent.Add("business_params", businessParams);
-
-            //// 营销信息，按需传入
-            //Dictionary<string, object> promoParams = new Dictionary<string, object>();
-            //promoParams.Add("promo_params_key", "promoParamsValue");
-            //bizContent.Add("promo_params", promoParams);
 
             string Contentjson = JsonConvert.SerializeObject(bizContent);
             request.BizContent = Contentjson;
             //AlipayTradePrecreateResponse response = client.Execute(request);
             AlipayTradePrecreateResponse response = client.CertificateExecute(request);
-            Console.WriteLine(response.Body);
-            return Ok(response.Body);
+            string responseStr = response.Body.Trim();
+            Console.WriteLine(responseStr);
+            AlipayRequestResult respObj = JsonConvert.DeserializeObject<AlipayRequestResult>(responseStr);
+            QRCodeTest(respObj.alipay_trade_precreate_response.qr_code.Trim());
         }
-            
+
+        [HttpPost]
+        public void callback()
+        {
+            System.IO.File.AppendAllText("alipay_callback.txt", DateTime.Now.ToString() + "\t" + Request.Body.ToString() + "\r\n");
+        }
 
 
 	}

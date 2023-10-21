@@ -40,6 +40,7 @@
     <None Remove="AlipayCertificate\" />
     <None Remove="AlipayCertificate\2023082515454\" />
     <None Remove="AlipayCertificate\2021004112603265\" />
+    <None Remove="AlipayCertificate\2021004108630187\" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="SKIT.FlurlHttpClient.Wechat.TenpayV3" Version="2.20.0" />
@@ -55,7 +56,7 @@
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="QRCoder" Version="1.4.3" />
     <PackageReference Include="AlipaySDKNet.OpenAPI" Version="1.0.2" />
-    <PackageReference Include="AlipaySDKNet.Standard" Version="4.8.2" />
+    <PackageReference Include="AlipaySDKNet.Standard" Version="4.8.50" />
     <PackageReference Include="SixLabors.ImageSharp" Version="3.0.2" />
     <PackageReference Include="SixLabors.ImageSharp.Drawing" Version="2.0.0" />
   </ItemGroup>
@@ -84,6 +85,7 @@
     <Folder Include="AlipayCertificate\" />
     <Folder Include="AlipayCertificate\2023082515454\" />
     <Folder Include="AlipayCertificate\2021004112603265\" />
+    <Folder Include="AlipayCertificate\2021004108630187\" />
   </ItemGroup>
   <ItemGroup>
     <Content Remove="wwwroot\upload\" />
