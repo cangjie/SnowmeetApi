@@ -418,3 +418,4 @@ createdump
 upload
 republish.sh
 wwwroot/bidata/*.csv
+alipay_callback.txt
