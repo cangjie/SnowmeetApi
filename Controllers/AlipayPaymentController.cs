@@ -98,7 +98,7 @@ namespace SnowmeetApi.Controllers
             };
             IAopClient client = new DefaultAopClient("https://openapi.alipay.com/gateway.do", appId, privateKey, "json", "1.0", "RSA2", "utf-8", false, certParams);
             AlipayTradePrecreateRequest request = new AlipayTradePrecreateRequest();
-            request.SetNotifyUrl("https://mini.snowmeet.top/AlipayPayment/callback");
+            request.SetNotifyUrl("https://mini.snowmeet.top/core/AlipayPayment/callback");
             string outTradeNo = DateTime.Now.Year.ToString() + DateTime.Now.Month.ToString().PadLeft(2, '0') + DateTime.Now.Day.ToString().PadLeft(2, '0') + DateTime.Now.Hour.ToString().PadLeft(2, '0')
                 + DateTime.Now.Minute.ToString().PadLeft(2, '0') + DateTime.Now.Second.ToString().PadLeft(2, '0');
             Dictionary<string, object> bizContent = new Dictionary<string, object>();
