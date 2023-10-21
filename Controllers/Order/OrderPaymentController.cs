@@ -142,6 +142,7 @@ namespace SnowmeetApi.Controllers.Order
             goodDtl.GoodsName = "测试商品明细1";
             goodDtl.Quantity = 1;
             goodDtl.UnitPrice = 10000;
+            goodDtl.MerchantGoodsId = "unknown";
 
             dtl.GoodsList = new List<CreatePayTransactionAppRequest.Types.Detail.Types.GoodsDetail>();
             dtl.GoodsList.Add(goodDtl);
@@ -150,6 +151,7 @@ namespace SnowmeetApi.Controllers.Order
             goodDtl.GoodsName = "测试商品明细2";
             goodDtl.Quantity = 2;
             goodDtl.UnitPrice = 20000;
+            goodDtl.MerchantGoodsId = "unknown";
 
             dtl.GoodsList.Add(goodDtl);
 
