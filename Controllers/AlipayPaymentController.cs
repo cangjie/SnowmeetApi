@@ -123,8 +123,8 @@ namespace SnowmeetApi.Controllers
             StreamReader sr = new StreamReader(Request.Body);
             string postStr = await sr.ReadToEndAsync();
             sr.Close();
-            
             System.IO.File.AppendAllText("alipay_callback.txt", DateTime.Now.ToString() + "\t" + postStr + "\r\n");
+            await Response.WriteAsync("success");
         }
 
 
