@@ -118,9 +118,13 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpPost]
-        public void callback([FromForm] object body)
+        public async Task  callback()
         {
-            System.IO.File.AppendAllText("alipay_callback.txt", DateTime.Now.ToString() + "\t" + body.ToString() + "\r\n");
+            StreamReader sr = new StreamReader(Request.Body);
+            string postStr = await sr.ReadToEndAsync();
+            sr.Close();
+            
+            System.IO.File.AppendAllText("alipay_callback.txt", DateTime.Now.ToString() + "\t" + postStr + "\r\n");
         }
 
 
