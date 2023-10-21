@@ -636,7 +636,7 @@ namespace SnowmeetApi.Controllers
                 return BadRequest();
             }
             var rentOrderList = await _context.RentOrder
-                .Where(r => (r.create_date.Date < date.Date
+                .Where(r => (r.create_date.Date < date.Date && r.create_date.Date >= DateTime.Parse("2023-10-20")
                     && (r.end_date == null || ((DateTime)r.end_date).Date >= date.Date)
                     && r.order_id != 0 && (shop.Trim().Equals("") || shop.Trim().Equals(r.shop.Trim())) ))
                 .Join(_context.OrderOnlines, r => r.order_id, o => o.id,
@@ -695,7 +695,7 @@ namespace SnowmeetApi.Controllers
                 return BadRequest();
             }
             var rentOrderList = await _context.RentOrder
-                .Where(r => (r.create_date.Date == date.Date 
+                .Where(r => (r.create_date.Date == date.Date && r.create_date >= DateTime.Parse("2023-10-20")
                     && (r.end_date != null || ((DateTime)r.end_date).Date == date.Date)
                     && r.order_id != 0 && (shop.Trim().Equals("") || shop.Trim().Equals(r.shop.Trim())) ))
                 .Join(_context.OrderOnlines, r => r.order_id, o => o.id,
@@ -738,7 +738,7 @@ namespace SnowmeetApi.Controllers
                 return BadRequest();
             }
             var rentOrderList = await _context.RentOrder
-                .Where(r => (r.create_date.Date == date.Date
+                .Where(r => (r.create_date.Date == date.Date && r.create_date >= DateTime.Parse("2023-10-20")
                 && (shop.Equals("") || shop.Equals(r.shop.Trim()))))
                 .Join(_context.OrderOnlines, r => r.order_id, o => o.id,
                     (r, o) => new { r.id, r.start_date, r.end_date, o.pay_state, o.final_price, r.deposit_final, r.refund })
@@ -783,7 +783,7 @@ namespace SnowmeetApi.Controllers
                 return BadRequest();
             }
             var rentOrderList = await _context.RentOrder
-                .Where(r => (r.create_date.Date < date.Date
+                .Where(r => (r.create_date.Date < date.Date && r.create_date >= DateTime.Parse("2023-10-20")
                     && (shop.Equals("") || shop.Equals(r.shop.Trim()))
                     && (r.end_date != null && ((DateTime)r.end_date).Date == date.Date)))
                 .Join(_context.OrderOnlines, r => r.order_id, o => o.id,
