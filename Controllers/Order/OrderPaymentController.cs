@@ -143,6 +143,7 @@ namespace SnowmeetApi.Controllers.Order
             goodDtl.Quantity = 1;
             goodDtl.UnitPrice = 10000;
 
+            dtl.GoodsList = new List<CreatePayTransactionAppRequest.Types.Detail.Types.GoodsDetail>();
             dtl.GoodsList.Add(goodDtl);
 
             goodDtl = new CreatePayTransactionAppRequest.Types.Detail.Types.GoodsDetail();
