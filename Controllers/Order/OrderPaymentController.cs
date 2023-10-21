@@ -126,6 +126,33 @@ namespace SnowmeetApi.Controllers.Order
                 }
                 desc = desc + mi7Nos.Trim();
             }
+            else if (order.type.Trim().StartsWith("服务"))
+            {
+                desc = "养护";
+            }
+            else
+            {
+                desc = "租赁";
+            }
+
+            CreatePayTransactionJsapiRequest.Types.Detail dtl = new CreatePayTransactionJsapiRequest.Types.Detail();
+
+            CreatePayTransactionJsapiRequest.Types.Detail.Types.GoodsDetail goodDtl
+                = new CreatePayTransactionAppRequest.Types.Detail.Types.GoodsDetail();
+            goodDtl.GoodsName = "测试商品明细1";
+            goodDtl.Quantity = 1;
+            goodDtl.UnitPrice = 10000;
+
+            dtl.GoodsList.Add(goodDtl);
+
+            goodDtl = new CreatePayTransactionAppRequest.Types.Detail.Types.GoodsDetail();
+            goodDtl.GoodsName = "测试商品明细2";
+            goodDtl.Quantity = 2;
+            goodDtl.UnitPrice = 20000;
+
+            dtl.GoodsList.Add(goodDtl);
+
+            //goodDtl
 
             if (order.type.Trim().Equals("服务"))
             {
@@ -157,6 +184,10 @@ namespace SnowmeetApi.Controllers.Order
             { 
                 outTradeNo = order.id.ToString().PadLeft(6, '0') + payment.id.ToString().PadLeft(2, '0') + timeStamp.Substring(3, 10);
             }
+
+            //CreatePayTransactionAppRequest.Types.Detail.Types.GoodsDetail  dtl = new CreatePayTransactionAppRequest.Types.Detail.Types.GoodsDetail();
+            //dtl.
+
              //order.id.ToString().PadLeft(6, '0') + payment.id.ToString().PadLeft(2, '0') + timeStamp.Substring(3, 10);
             var client = new WechatTenpayClient(options);
             var request = new CreatePayTransactionJsapiRequest()
@@ -173,8 +204,13 @@ namespace SnowmeetApi.Controllers.Order
                 Payer = new CreatePayTransactionJsapiRequest.Types.Payer()
                 {
                     OpenId = user.miniAppOpenId.Trim()
-                }
+                },
+                GoodsTag = "testing goods tag",
+                Detail = dtl
+                
             };
+            
+            
             var response = await client.ExecuteCreatePayTransactionJsapiAsync(request);
             var paraMap = client.GenerateParametersForJsapiPayRequest(request.AppId, response.PrepayId);
             if (response != null && response.PrepayId != null && !response.PrepayId.Trim().Equals(""))

@@ -467,7 +467,7 @@ namespace SnowmeetApi.Controllers
         [HttpGet("{mchId}")]
         public async Task  RequestTradeBill(int mchId, DateTime billDate)
         {
-            var summaryList = await _context.wepaySummary.Where(s => s.trans_date.Date == billDate.Date)
+            var summaryList = await _context.wepaySummary.Where(s => s.trans_date.Date == billDate.Date && s.mch_id == mchId)
                 .AsNoTracking().ToListAsync();
             if (summaryList != null && summaryList.Count > 0)
             {
@@ -505,6 +505,7 @@ namespace SnowmeetApi.Controllers
             WepaySummary summary = new WepaySummary()
             {
                 id = 0,
+                mch_id = mchId,
                 trans_date = billDate.Date,
                 trans_num = int.Parse(summaryFields[0].Replace("`", "")),
                 total_settle_amount = double.Parse(summaryFields[1].Replace("`", "")),
@@ -639,29 +640,6 @@ namespace SnowmeetApi.Controllers
                 }
 
             }
-
-            /*
-
-            HttpRequestMessage req = new HttpRequestMessage(HttpMethod.Get, getUrl);
-            string authStr = await handle.BuildAuthAsync(req);
-            string value = $"WECHATPAY2-SHA256-RSA2048 {authStr}";
-            string[] headers = new string[] { "Authorization:" + value.Trim(), "Accept:application/json" };
-            Console.WriteLine("curl " + getUrl + " -H 'Authorization: " + value + "' -H 'Accept: application/json'");
-            
-            string ret = await Util.GetWebContent(getUrl, headers);
-            */
-
-            /*
-            string signMessage = "GET\n/v3/bill/tradebill\n"
-                + Util.GetLongTimeStamp(DateTime.Now).Trim() + "\n"
-                + Path.GetRandomFileName() + "\n\n";
-            string sign = handle.Sign(signMessage).Trim();
-            string value = $"WECHATPAY2-SHA256-RSA2048 {sign}";
-            
-            
-
-            */
-
 
             
         }
