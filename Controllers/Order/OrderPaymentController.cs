@@ -490,6 +490,8 @@ namespace SnowmeetApi.Controllers.Order
         private int GetMchId(OrderOnline order)
         {
             int mchId = 3;
+            /*
+
             if (order.type == "押金" || order.type == "UTV押金")
             {
                 mchId = 5;
@@ -503,9 +505,69 @@ namespace SnowmeetApi.Controllers.Order
             {
                 mchId = 7;
             }
+            */
 
             //test
-            mchId = 9;
+            //mchId = 9;
+
+            if (order.shop.Trim().IndexOf("南山") >= 0)
+            {
+                switch (order.type.Trim())
+                {
+                    case "店销现货":
+                        mchId = 6;
+                        break;
+                    case "雪票":
+                        mchId = 7;
+                        break;
+                    default:
+                        mchId = 6;
+                        break;
+
+                }
+            }
+            else if (order.shop.Trim().IndexOf("万龙") >= 0)
+            {
+                switch (order.type.Trim())
+                {
+                    case "服务":
+                        mchId = 3;
+                        break;
+                    case "押金":
+                        mchId = 5;
+                        break;
+                    case "店销现货":
+                        mchId = 12;
+                        break;
+                    default:
+                        mchId = 12;
+                        break;
+
+                }
+            }
+            else
+            {
+                switch (order.type.Trim())
+                {
+                    case "服务":
+                        mchId = 8;
+                        break;
+                    case "押金":
+                        mchId = 10;
+                        break;
+                    case "店销现货":
+                        mchId = 9;
+                        break;
+                    case "雪票":
+                        mchId = 11;
+                        break;
+                    default:
+                        mchId = 9;
+                        break;
+
+                }
+            }
+
 
             return mchId;
         }
