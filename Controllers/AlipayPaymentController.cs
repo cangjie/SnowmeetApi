@@ -118,7 +118,7 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpPost]
-        public void callback([FromBody] string body)
+        public void callback([FromBody] object body)
         {
             System.IO.File.AppendAllText("alipay_callback.txt", DateTime.Now.ToString() + "\t" + body.ToString() + "\r\n");
         }
