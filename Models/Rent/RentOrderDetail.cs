@@ -28,6 +28,10 @@ namespace SnowmeetApi.Models.Rent
 
         public double real_rental { get; set; } = 0;
 
+        public double rental_discount { get; set; } = 0;
+
+        public int rental_count { get; set; } = 0;
+
         public DateTime? real_end_date { get; set; } = null;
 
         public string memo { get; set; } = "";
