@@ -934,6 +934,8 @@ namespace SnowmeetApi.Controllers
             {
                 return BadRequest();
             }
+            RentOrder order = (RentOrder)((OkObjectResult)(await GetRentOrder(detail.rent_list_id, sessionKey)).Result).Value;
+            detail.rental_count = order.rentalDetails.Count;
             _context.Entry(detail).State = EntityState.Modified;
             await _context.SaveChangesAsync();
             return Ok(detail);
