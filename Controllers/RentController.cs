@@ -289,7 +289,7 @@ namespace SnowmeetApi.Controllers
                 return BadRequest();
             }
             rentOrder.details = await _context.RentOrderDetail
-                .Where(d => d.rent_list_id == rentOrder.id).ToArrayAsync();
+                .Where(d => d.rent_list_id == rentOrder.id).AsNoTracking().ToArrayAsync();
             if (rentOrder.order_id > 0)
             {
                 OrderOnlinesController orderHelper = new OrderOnlinesController(_context, _oriConfig);
