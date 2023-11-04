@@ -30,6 +30,8 @@ namespace SnowmeetApi.Models.Rent
 
         public double rental_discount { get; set; } = 0;
 
+        public double rental_ticket_discount {get; set;} = 0;
+
         public int rental_count { get; set; } = 0;
 
         public DateTime? real_end_date { get; set; } = null;

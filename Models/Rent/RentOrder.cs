@@ -220,13 +220,17 @@ namespace SnowmeetApi.Models.Rent
                         }
                         */
                         double totalRental = 0;
-                        for (DateTime d = startDate; startDate.Year > 2000 && d.Date <= endDate.Date; d = d.AddDays(1))
+                        int count = 0;
+                        for (DateTime d = startDate; startDate.Year > 2000 && d.Date <= endDate.Date 
+                            && (rentOrderDetail.rental_count == 0 || ( rentOrderDetail.rental_count > 0 && count < rentOrderDetail.rental_count ) ) ; d = d.AddDays(1))
                         {
+                            count++;
                             RentalDetail rentalDetail = new RentalDetail();
                             rentalDetail.date = d.Date;
                             rentalDetail.item = rentOrderDetail;
 
                             //最后一天
+                            
                             if (rentOrderDetail.real_end_date != null && d.Date == endDate.Date)
                             {
                                 rentalDetail.type = "结算日";
@@ -240,6 +244,7 @@ namespace SnowmeetApi.Models.Rent
                             }
                             detailList.Add(rentalDetail);
                         }
+                        rentOrderDetail.rental_count = count;
                     }
                     
                 }
