@@ -649,7 +649,9 @@ namespace SnowmeetApi.Controllers
             var rentOrderList = await _context.RentOrder.FromSqlRaw(" select  * from rent_list  "
                 + " where create_date < '" + date.ToShortDateString() + "' and create_date > '" + startDate.ToShortDateString() + "' "
                 + " and exists ( select 'a' from rent_list_detail  where rent_list_detail.rent_list_id = rent_list.id and "
-                + " (real_end_date is null or real_end_date >= '" + date.ToShortDateString() + "' )) " ).AsNoTracking().ToListAsync();
+                + " (real_end_date is null or real_end_date >= '" + date.ToShortDateString() + "' )) "
+                + (shop.Trim().Equals("")? " " : " and shop = '" + shop.Replace("'", "").Trim() + "'  " ) )
+                .AsNoTracking().ToListAsync();
 
             RentOrder[] orderArr = new RentOrder[rentOrderList.Count];
             double totalDeposit = 0;
@@ -705,7 +707,7 @@ namespace SnowmeetApi.Controllers
             }
             var rentOrderList = await _context.RentOrder
                 .Where(r => (r.create_date.Date == date.Date && r.create_date >= startDate
-                    && (r.end_date != null || ((DateTime)r.end_date).Date == date.Date)
+                    &&  ((DateTime)r.end_date).Date == date.Date
                     && r.order_id != 0 && (shop.Trim().Equals("") || shop.Trim().Equals(r.shop.Trim())) ))
                 .Join(_context.OrderOnlines, r => r.order_id, o => o.id,
                     (r, o) => new { r.id, r.start_date, r.end_date, o.pay_state, o.final_price, r.deposit_final, r.refund })
@@ -733,6 +735,7 @@ namespace SnowmeetApi.Controllers
             sum.totalDeposit = totalDeposit;
             sum.totalRental = totalRental;
             sum.orders = orderArr;
+            sum.count = sum.orders.Length;
             return Ok(sum);
         }
 
