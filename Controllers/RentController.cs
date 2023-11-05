@@ -636,6 +636,7 @@ namespace SnowmeetApi.Controllers
             {
                 return BadRequest();
             }
+            /*
             var rentOrderList = await _context.RentOrder
                 .Where(r => (r.create_date.Date < date.Date && r.create_date.Date >= startDate
                     && (r.end_date == null || ((DateTime)r.end_date).Date >= date.Date)
@@ -644,6 +645,12 @@ namespace SnowmeetApi.Controllers
                     (r, o) => new {r.id, r.start_date, r.end_date, o.pay_state, o.final_price, r.deposit_final, r.refund})
                 .Where(o => o.pay_state == 1)
                 .ToListAsync();
+            */
+            var rentOrderList = await _context.RentOrder.FromSqlRaw(" select  * from rent_list  "
+                + " where create_date < '" + date.ToShortDateString() + "' and create_date > '" + startDate.ToShortDateString() + "' "
+                + " and exists ( select 'a' from rent_list_detail  where rent_list_detail.rent_list_id = rent_list.id and "
+                + " (real_end_date is null or real_end_date >= '" + date.ToShortDateString() + "' )) " ).AsNoTracking().ToListAsync();
+
             RentOrder[] orderArr = new RentOrder[rentOrderList.Count];
             double totalDeposit = 0;
             double totalRental = 0;
@@ -652,7 +659,7 @@ namespace SnowmeetApi.Controllers
             for (int i = 0; i < orderArr.Length; i++)
             {
                 RentOrder order = (RentOrder)((OkObjectResult)(await GetRentOrder(rentOrderList[i].id, sessionKey)).Result).Value;
-                if (order.status.Equals("已付押金"))
+                if (order.status.Equals("已付押金") || order.status.Equals("已退款"))
                 {
                     list.Add(order);
                     //list.Append(order);
@@ -679,6 +686,7 @@ namespace SnowmeetApi.Controllers
             RentOrderCollection sum = new RentOrderCollection();
             sum.date = date.Date;
             sum.type = "当日前未完结";
+            sum.count = list.Count;
             sum.unRefundDeposit = totalDeposit;
             sum.unSettledRental = totalRental;
             sum.orders = list.ToArray();
