@@ -108,6 +108,28 @@ namespace SnowmeetApi.Models.Rent
             }
         }
 
+        [NotMapped]
+        public bool noDeposit
+        {
+            get
+            {
+                double rental = 0;
+                for (int i = 0; i < details.Length; i++)
+                {
+                    rental += details[i].real_rental;
+                }
+
+                if (rental >= deposit_final)
+                {
+                    return true;
+                }
+                else
+                {
+                    return false;
+                }
+            }
+        }
+
 
         [NotMapped]
         public RentOrderDetail[] details
