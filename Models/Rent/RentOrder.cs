@@ -81,6 +81,35 @@ namespace SnowmeetApi.Models.Rent
         public RentOrderDetail[]? _details;
 
         [NotMapped]
+        public double discount
+        {
+            get
+            {
+                double discount = 0;
+                for (int i = 0; i < details.Length; i++)
+                {
+                    discount += details[i].rental_discount;
+                }
+                return discount;
+            }
+        }
+
+        [NotMapped]
+        public double ticketDiscount
+        {
+            get
+            {
+                double discount = 0;
+                for (int i = 0; i < details.Length; i++)
+                {
+                    discount += details[i].rental_ticket_discount;
+                }
+                return discount;
+            }
+        }
+
+
+        [NotMapped]
         public RentOrderDetail[] details
         {
             get
