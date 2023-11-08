@@ -85,8 +85,9 @@ namespace SnowmeetApi.Models.Rent
         {
             get
             {
+                
                 double discount = 0;
-                for (int i = 0; i < details.Length; i++)
+                for (int i = 0; details != null && i < details.Length; i++)
                 {
                     discount += details[i].rental_discount;
                 }
@@ -100,7 +101,7 @@ namespace SnowmeetApi.Models.Rent
             get
             {
                 double discount = 0;
-                for (int i = 0; i < details.Length; i++)
+                for (int i = 0; details != null && i < details.Length; i++)
                 {
                     discount += details[i].rental_ticket_discount;
                 }
