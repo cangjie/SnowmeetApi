@@ -115,12 +115,12 @@ namespace SnowmeetApi.Models.Rent
             get
             {
                 double rental = 0;
-                for (int i = 0; i < details.Length; i++)
+                for (int i = 0; details != null &&  i < details.Length; i++)
                 {
                     rental += details[i].real_rental;
                 }
 
-                if (rental >= deposit_final)
+                if (Math.Round(rental, 2) >= Math.Round(deposit_final, 2))
                 {
                     return true;
                 }
