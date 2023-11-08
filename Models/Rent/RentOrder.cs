@@ -167,6 +167,10 @@ namespace SnowmeetApi.Models.Rent
         {
             get
             {
+                if (_forceTerminate)
+                {
+                    return "强行终止";
+                }
                 string s = "未支付";
                 if (order_id == 0)
                 {
@@ -220,6 +224,9 @@ namespace SnowmeetApi.Models.Rent
                 return s;
             }
         }
+
+        [NotMapped]
+        public bool _forceTerminate = false;
 
         [NotMapped]
         public List<RentalDetail> rentalDetails
@@ -285,14 +292,25 @@ namespace SnowmeetApi.Models.Rent
                             {
                                 rentalDetail.type = "结算日";
                                 rentalDetail.rental = rentOrderDetail.real_rental - totalRental;
+                                detailList.Add(rentalDetail);
                             }
                             else
                             {
-                                rentalDetail.type = "";
-                                rentalDetail.rental = rentOrderDetail.unit_rental;
-                                totalRental = rentOrderDetail.unit_rental + totalRental;
+                                if (totalRental + rentOrderDetail.unit_rental > deposit_final)
+                                {
+                                    _forceTerminate = true;
+
+                                }
+                                else
+                                {
+
+                                    rentalDetail.type = "";
+                                    rentalDetail.rental = rentOrderDetail.unit_rental;
+                                    totalRental = rentOrderDetail.unit_rental + totalRental;
+                                    detailList.Add(rentalDetail);
+                                }
                             }
-                            detailList.Add(rentalDetail);
+                            
                         }
                         rentOrderDetail.rental_count = count;
                     }
