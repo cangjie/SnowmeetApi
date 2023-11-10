@@ -52,7 +52,10 @@ namespace SnowmeetApi.Controllers
             if (rentItemList != null && rentItemList.Count > 0)
             {
                 RentItem item = rentItemList[0];
-                item.rental = item.GetRental(shop);
+                if (item.rental == 0)
+                {
+                    item.rental = item.GetRental(shop);
+                }
                 return Ok(item);
             }
             else

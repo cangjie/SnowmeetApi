@@ -23,7 +23,7 @@ namespace SnowmeetApi.Models.Rent
         public string bwh { get; set; }
 
 
-		[NotMapped]
+		
 		public double rental { get; set; } = 0;
 
       
