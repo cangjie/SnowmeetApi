@@ -307,7 +307,8 @@ namespace SnowmeetApi.Controllers
                     rentOrder.order.open_id = "";
                 }
             }
-            
+            bool allReturned = true;
+            DateTime returnTime = rentOrder.create_date;
             for (int i = 0; i < rentOrder.details.Length; i++)
             {
                 DateTime endDate = DateTime.Now;
@@ -353,6 +354,19 @@ namespace SnowmeetApi.Controllers
                 {
                     detail.returnStaff = null;
                 }
+
+                if (!detail.rentStatus.Trim().Equals("已归还"))
+                {
+                    allReturned = false;
+                }
+                else
+                {
+                    if (detail.real_end_date != null)
+                    {
+                        returnTime = detail.real_end_date > returnTime ? (DateTime)detail.real_end_date : returnTime;
+                    }
+                }
+                
 
                 //if (rentOrder.start_date.Hour >= 16 && )
 
@@ -403,6 +417,15 @@ namespace SnowmeetApi.Controllers
                         break;
                 }
             }
+
+            if (allReturned && rentOrder.order != null && !rentOrder.order.pay_method.Trim().Equals("微信支付")
+                && rentOrder.end_date == null)
+            {
+                rentOrder.end_date = returnTime;
+                _context.RentOrder.Entry(rentOrder).State = EntityState.Modified;
+                await _context.SaveChangesAsync();
+            }
+
             var ret = Ok(rentOrder);
             return ret;
 
