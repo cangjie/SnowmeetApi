@@ -567,12 +567,27 @@ namespace SnowmeetApi.Controllers
             sessionKey = Util.UrlDecode(sessionKey.Trim());
             UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
             Recept recept = await _context.Recept.FindAsync(id);
+            if (recept.recept_type.Trim().Equals("养护下单") && recept.shop.Trim().Equals("万龙体验中心"))
+            {
+                recept.shop = "万龙服务中心";
+                _context.Entry(recept).State = EntityState.Modified;
+                await _context.SaveChangesAsync();
+            }
+
+            if (recept.recept_type.Trim().Equals("租赁下单") && recept.shop.Trim().Equals("万龙服务中心"))
+            {
+                recept.shop = "万龙体验中心";
+                _context.Entry(recept).State = EntityState.Modified;
+                await _context.SaveChangesAsync();
+            }
+
             bool isAdmin = await IsAdmin(sessionKey);
+            
             if (!isAdmin && !recept.open_id.Trim().Equals(user.miniAppOpenId.Trim()))
             {
                 return BadRequest();
             }
-
+            
             if (!isAdmin)
             {
                 recept.open_id = "";
