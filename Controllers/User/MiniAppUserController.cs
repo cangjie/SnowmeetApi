@@ -160,6 +160,8 @@ namespace SnowmeetApi.Controllers
             try
             {
                 sessionKey = Util.UrlDecode(sessionKey);
+                encData = Util.UrlDecode(encData);
+                iv = Util.UrlDecode(iv);
                 //
                 UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
                 MiniAppUser miniUser = user.miniAppUser;
