@@ -345,6 +345,7 @@ namespace SnowmeetApi.Controllers
                 else
                 {
                     detail.rentStaff = null;
+
                 }
 
                 if (!detail.return_staff.Trim().Equals(""))
@@ -426,7 +427,10 @@ namespace SnowmeetApi.Controllers
                 _context.RentOrder.Entry(rentOrder).State = EntityState.Modified;
                 await _context.SaveChangesAsync();
             }
-
+            if (rentOrder.staff_name.Trim().Equals(""))
+            {
+                rentOrder.staff_name = rentOrder.order.staffName.Trim();
+            }
             var ret = Ok(rentOrder);
             return ret;
 
