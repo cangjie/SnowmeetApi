@@ -340,6 +340,7 @@ namespace SnowmeetApi.Controllers
                 if (!detail.rent_staff.Trim().Equals(""))
                 {
                     detail.rentStaff = await _context.MiniAppUsers.FindAsync(detail.rent_staff);
+                    rentOrder.staff_name = detail.rentStaff.real_name;
                 }
                 else
                 {
