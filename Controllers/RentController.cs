@@ -235,13 +235,7 @@ namespace SnowmeetApi.Controllers
             {
                 try
                 {
-                    /*
-                    RentOrder order = orderArr[i];
-                    order.details = await _context.RentOrderDetail.Where(d => d.rent_list_id == order.id).ToArrayAsync();
-                    OrderOnline payOrder = (OrderOnline)((OkObjectResult)(await orderHelper.GetWholeOrderByStaff(order.order_id, sessionKey)).Result).Value;
-                    order.order = payOrder;
-                    orderArr[i] = order;
-                    */
+                   
                     RentOrder order = (RentOrder)((OkObjectResult)(await GetRentOrder(orderArr[i].id, sessionKey)).Result).Value;
                     orderArr[i] = order;
                 }

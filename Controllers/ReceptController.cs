@@ -65,6 +65,27 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet("{id}")]
+        public async Task SendPaymentOAMessage(int id, string sessionKey)
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            MiniAppUser adminUser = await GetUser(sessionKey);
+            if (adminUser.is_admin != 1)
+            {
+                return;
+            }
+            Recept r = await _context.Recept.FindAsync(id);
+            string content = "您有一笔费用需要支付。<a data-miniprogram-appid=\"wxd1310896f2aa68bb\" data-miniprogram-path=\"/pages/payment/pay_recept?id=" + r.id.ToString() + "\" >点击这里查看</a>。";
+            MiniAppUser u = await _context.MiniAppUsers.FindAsync(r.open_id.Trim());
+            if (u == null) 
+            {
+                return;
+            }
+            string sendUrl = "https://wxoa.snowmeet.top/api/OfficialAccountApi/SendTextMessage?unionId="
+                + Util.UrlEncode(u.union_id) + "&content=" + Util.UrlEncode(content);
+            Util.GetWebContent(sendUrl);
+        }
+
+        [HttpGet("{id}")]
         public async Task<ActionResult<Recept>> SetPaidManual(int id, string payMethod, string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey);
