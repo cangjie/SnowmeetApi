@@ -423,7 +423,19 @@ namespace SnowmeetApi.Controllers
             }
             if (rentOrder.staff_name.Trim().Equals(""))
             {
-                rentOrder.staff_name = rentOrder.order.staffName.Trim();
+                rentOrder.staff_name = rentOrder.order == null? "" :  rentOrder.order.staffName.Trim();
+            }
+            if (rentOrder.staff_name.Trim().Equals(""))
+            {
+                var rl = await _context.Recept
+                    .Where(r => (r.recept_type.Trim().Equals("租赁下单") && r.submit_return_id == rentOrder.id))
+                    .AsNoTracking().ToListAsync();
+                if (rl != null && rl.Count > 0)
+                {
+                    rentOrder.staff_name = rl[0].update_staff_name.Trim().Equals("") ?
+                        rl[0].recept_staff_name : rl[0].update_staff_name.Trim();
+                }
+
             }
             var ret = Ok(rentOrder);
             return ret;
