@@ -226,7 +226,7 @@ namespace SnowmeetApi.Controllers
                 return BadRequest();
             }
             RentOrder[] orderArr = await _context.RentOrder
-                .Where(o => (o.start_date >= start && o.start_date < end.Date.AddDays(1)  && (shop.Trim().Equals("") || o.shop.Trim().Equals(shop))))
+                .Where(o => (o.create_date >= start && o.create_date < end.Date.AddDays(1)  && (shop.Trim().Equals("") || o.shop.Trim().Equals(shop))))
                 .OrderByDescending(o => o.id).ToArrayAsync();
             for (int i = 0; i < orderArr.Length; i++)
             {
