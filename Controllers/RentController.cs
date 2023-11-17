@@ -52,7 +52,10 @@ namespace SnowmeetApi.Controllers
             if (rentItemList != null && rentItemList.Count > 0)
             {
                 RentItem item = rentItemList[0];
-                item.rental = item.GetRental(shop);
+                if (item.rental == 0)
+                {
+                    item.rental = item.GetRental(shop);
+                }
                 return Ok(item);
             }
             else
@@ -232,13 +235,7 @@ namespace SnowmeetApi.Controllers
             {
                 try
                 {
-                    /*
-                    RentOrder order = orderArr[i];
-                    order.details = await _context.RentOrderDetail.Where(d => d.rent_list_id == order.id).ToArrayAsync();
-                    OrderOnline payOrder = (OrderOnline)((OkObjectResult)(await orderHelper.GetWholeOrderByStaff(order.order_id, sessionKey)).Result).Value;
-                    order.order = payOrder;
-                    orderArr[i] = order;
-                    */
+                   
                     RentOrder order = (RentOrder)((OkObjectResult)(await GetRentOrder(orderArr[i].id, sessionKey)).Result).Value;
                     orderArr[i] = order;
                 }
@@ -304,7 +301,8 @@ namespace SnowmeetApi.Controllers
                     rentOrder.order.open_id = "";
                 }
             }
-            
+            bool allReturned = true;
+            DateTime returnTime = rentOrder.create_date;
             for (int i = 0; i < rentOrder.details.Length; i++)
             {
                 DateTime endDate = DateTime.Now;
@@ -336,10 +334,12 @@ namespace SnowmeetApi.Controllers
                 if (!detail.rent_staff.Trim().Equals(""))
                 {
                     detail.rentStaff = await _context.MiniAppUsers.FindAsync(detail.rent_staff);
+                    rentOrder.staff_name = detail.rentStaff.real_name;
                 }
                 else
                 {
                     detail.rentStaff = null;
+
                 }
 
                 if (!detail.return_staff.Trim().Equals(""))
@@ -350,6 +350,19 @@ namespace SnowmeetApi.Controllers
                 {
                     detail.returnStaff = null;
                 }
+
+                if (!detail.rentStatus.Trim().Equals("已归还"))
+                {
+                    allReturned = false;
+                }
+                else
+                {
+                    if (detail.real_end_date != null)
+                    {
+                        returnTime = detail.real_end_date > returnTime ? (DateTime)detail.real_end_date : returnTime;
+                    }
+                }
+                
 
                 //if (rentOrder.start_date.Hour >= 16 && )
 
@@ -399,6 +412,30 @@ namespace SnowmeetApi.Controllers
 
                         break;
                 }
+            }
+
+            if (allReturned && rentOrder.order != null && !rentOrder.order.pay_method.Trim().Equals("微信支付")
+                && rentOrder.end_date == null)
+            {
+                rentOrder.end_date = returnTime;
+                _context.RentOrder.Entry(rentOrder).State = EntityState.Modified;
+                await _context.SaveChangesAsync();
+            }
+            if (rentOrder.staff_name.Trim().Equals(""))
+            {
+                rentOrder.staff_name = rentOrder.order == null? "" :  rentOrder.order.staffName.Trim();
+            }
+            if (rentOrder.staff_name.Trim().Equals(""))
+            {
+                var rl = await _context.Recept
+                    .Where(r => (r.recept_type.Trim().Equals("租赁下单") && r.submit_return_id == rentOrder.id))
+                    .AsNoTracking().ToListAsync();
+                if (rl != null && rl.Count > 0)
+                {
+                    rentOrder.staff_name = rl[0].update_staff_name.Trim().Equals("") ?
+                        rl[0].recept_staff_name : rl[0].update_staff_name.Trim();
+                }
+
             }
             var ret = Ok(rentOrder);
             return ret;

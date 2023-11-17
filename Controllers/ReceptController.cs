@@ -65,6 +65,27 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet("{id}")]
+        public async Task SendPaymentOAMessage(int id, string sessionKey)
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            MiniAppUser adminUser = await GetUser(sessionKey);
+            if (adminUser.is_admin != 1)
+            {
+                return;
+            }
+            Recept r = await _context.Recept.FindAsync(id);
+            string content = "您有一笔费用需要支付。<a data-miniprogram-appid=\"wxd1310896f2aa68bb\" data-miniprogram-path=\"/pages/payment/pay_recept?id=" + r.id.ToString() + "\" >点击这里查看</a>。";
+            MiniAppUser u = await _context.MiniAppUsers.FindAsync(r.open_id.Trim());
+            if (u == null) 
+            {
+                return;
+            }
+            string sendUrl = "https://wxoa.snowmeet.top/api/OfficialAccountApi/SendTextMessage?unionId="
+                + Util.UrlEncode(u.union_id) + "&content=" + Util.UrlEncode(content);
+            Util.GetWebContent(sendUrl);
+        }
+
+        [HttpGet("{id}")]
         public async Task<ActionResult<Recept>> SetPaidManual(int id, string payMethod, string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey);
@@ -410,7 +431,7 @@ namespace SnowmeetApi.Controllers
                 }
                 item.confirmed_product_id = productId;
                 Models.Product.Product p = await _context.Product.FindAsync(productId);
-                totalAmount = totalAmount + p.sale_price + item.confirmed_additional_fee;
+                totalAmount = totalAmount + ((p!=null)?p.sale_price:0) + item.confirmed_additional_fee;
             }
 
 
@@ -567,12 +588,27 @@ namespace SnowmeetApi.Controllers
             sessionKey = Util.UrlDecode(sessionKey.Trim());
             UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
             Recept recept = await _context.Recept.FindAsync(id);
+            if (recept.recept_type.Trim().Equals("养护下单") && recept.shop.Trim().Equals("万龙体验中心"))
+            {
+                recept.shop = "万龙服务中心";
+                _context.Entry(recept).State = EntityState.Modified;
+                await _context.SaveChangesAsync();
+            }
+
+            if (recept.recept_type.Trim().Equals("租赁下单") && recept.shop.Trim().Equals("万龙服务中心"))
+            {
+                recept.shop = "万龙体验中心";
+                _context.Entry(recept).State = EntityState.Modified;
+                await _context.SaveChangesAsync();
+            }
+
             bool isAdmin = await IsAdmin(sessionKey);
+            
             if (!isAdmin && !recept.open_id.Trim().Equals(user.miniAppOpenId.Trim()))
             {
                 return BadRequest();
             }
-
+            
             if (!isAdmin)
             {
                 recept.open_id = "";

@@ -209,7 +209,7 @@ namespace SnowmeetApi.Controllers
             {
                 item.taskLog = await _context.MaintainLog.Where(l => l.task_id == item.id).OrderBy(l => l.id).ToArrayAsync();
                 Models.Product.Product p = await _context.Product.FindAsync(item.confirmed_product_id);
-                itemPriceSummary = itemPriceSummary + p.sale_price + item.confirmed_additional_fee;
+                itemPriceSummary = itemPriceSummary + (p!=null?p.sale_price:0) + item.confirmed_additional_fee;
             }
             OrderOnlinesController orderController = new OrderOnlinesController(_context, _originConfig);
             OrderOnline order = (await orderController.GetOrderOnline(orderId, sessionKey)).Value; //await _context.OrderOnlines.FindAsync(orderId);   //(await orderController.GetWholeOrderByStaff(orderId, sessionKey)).Value;
