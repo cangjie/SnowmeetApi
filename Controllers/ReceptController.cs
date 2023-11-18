@@ -432,6 +432,7 @@ namespace SnowmeetApi.Controllers
                 item.confirmed_product_id = productId;
                 Models.Product.Product p = await _context.Product.FindAsync(productId);
                 totalAmount = totalAmount + ((p!=null)?p.sale_price:0) + item.confirmed_additional_fee;
+                item.batch_id = recept.id;
             }
 
 
