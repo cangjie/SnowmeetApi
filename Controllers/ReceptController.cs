@@ -108,10 +108,23 @@ namespace SnowmeetApi.Controllers
                     break;
                 case "养护下单":
                     MaintainLiveController maintainHelper = new MaintainLiveController(_context, _oriConfig);
-                    Models.Maintain.MaintainOrder maintainOrder = (Models.Maintain.MaintainOrder)
-                        ((OkObjectResult)(await maintainHelper.GetMaintainOrder(recept.submit_return_id, sessionKey)).Result).Value;
-                    orderId = maintainOrder.orderId;
-                    await maintainHelper.MaitainOrderPaySuccess(orderId);
+                    if (recept.submit_return_id > 0)
+                    {
+                        Models.Maintain.MaintainOrder maintainOrder = (Models.Maintain.MaintainOrder)
+                            ((OkObjectResult)(await maintainHelper.GetMaintainOrder(recept.submit_return_id, sessionKey)).Result).Value;
+                        orderId = maintainOrder.orderId;
+                        await maintainHelper.MaitainOrderPaySuccess(orderId);
+                    }
+                    else
+                    {
+                        var ml = await _context.MaintainLives.Where(m => m.batch_id == recept.id)
+                            .AsNoTracking().ToListAsync();
+                        for (int i = 0; i < ml.Count; i++)
+                        {
+                            await maintainHelper.GenerateFlowNum(ml[i].id);
+                        }
+                        
+                    }
                     break;
                 default:
                     break;
@@ -506,6 +519,7 @@ namespace SnowmeetApi.Controllers
                 m.confirmed_name = recept.real_name;
                 m.confirmed_cell = recept.cell;
                 m.ticket_code = recept.code.Trim();
+                
                 await _context.MaintainLives.AddAsync(m);
             }
             await _context.SaveChangesAsync();
