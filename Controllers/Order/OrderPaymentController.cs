@@ -520,6 +520,12 @@ namespace SnowmeetApi.Controllers.Order
                     case "雪票":
                         mchId = 7;
                         break;
+                    case "押金":
+                        mchId = 17;
+                        break;
+                    case "服务":
+                        mchId = 15;
+                        break;
                     default:
                         mchId = 6;
                         break;
