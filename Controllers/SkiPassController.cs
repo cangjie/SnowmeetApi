@@ -113,7 +113,7 @@ namespace SnowmeetApi.Controllers
             
 
 
-            var skiPassProdustList = await _context.Product.Where(p => (p.shop.Trim().Equals(resort.Trim()) && p.hidden == 0))
+            var skiPassProdustList = await _context.Product.Where(p => (p.shop.Trim().Equals(resort.Trim()) && p.hidden == 0 && p.end_date >= DateTime.Now.Date))
                 .Join(_context.SkiPass, p => p.id, s => s.product_id,
                 (p, s) => new {
                     p.id,
