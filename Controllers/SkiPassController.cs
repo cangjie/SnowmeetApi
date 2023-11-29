@@ -33,6 +33,7 @@ namespace SnowmeetApi.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<int>> CheckNanshanReserveAvaliabelCount(int id, DateTime date)
         {
+            /*
             Product p = await _context.Product.FindAsync(id);
             if (!p.shop.Trim().Equals("南山"))
             {
@@ -43,10 +44,10 @@ namespace SnowmeetApi.Controllers
             {
                 isEvening = true;
             }
-            int totalCount = 20;
+            int totalCount = 200000;
             if (isEvening)
             {
-                totalCount = 15;
+                totalCount = 150000;
             }
             int reserveCount = 0;
 
@@ -67,8 +68,9 @@ namespace SnowmeetApi.Controllers
                     reserveCount++;
                 }
             }
-
-            return totalCount - reserveCount;
+            */
+            //return totalCount - reserveCount;
+            return 9999999;
         }
 
 
