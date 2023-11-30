@@ -51,7 +51,7 @@ namespace SnowmeetApi.Controllers
                 + ",\n\t\"isSend\": \"1\",\n\t\"linkMan\": \"" + name
                 + "\",\n\t\"linkPhone\": \"" + cell + "\",\n\t\"num\": " + count.ToString()
                 + ",\n\t\"orderMemo\": \"" + memo + "\",\n\t\"orderSourceId\": \"" + orderId.ToString()
-                + "\",\n\t\"travelDate\": \"" + date.ToShortDateString() + "\"\n}";
+                + "\",\n\t\"travelDate\": \"" + date.ToString("yyyy-MM-dd") + "\"\n}";
             string ret = Util.GetWebContent("https://task-api-stag.zowoyoo.com/api/thirdPaty/order/add",
                 postData, "application/json");
             ZiwoyouPlaceOrderResult r = JsonConvert.DeserializeObject<ZiwoyouPlaceOrderResult>(ret);
