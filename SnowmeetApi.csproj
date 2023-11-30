@@ -39,6 +39,7 @@
     <None Remove="AlipayCertificate\2023082515454\" />
     <None Remove="AlipayCertificate\2021004112603265\" />
     <None Remove="AlipayCertificate\2021004108630187\" />
+    <None Remove="Models\WanLong\" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="SKIT.FlurlHttpClient.Wechat.TenpayV3" Version="2.20.0" />
@@ -84,6 +85,7 @@
     <Folder Include="AlipayCertificate\2023082515454\" />
     <Folder Include="AlipayCertificate\2021004112603265\" />
     <Folder Include="AlipayCertificate\2021004108630187\" />
+    <Folder Include="Models\WanLong\" />
   </ItemGroup>
   <ItemGroup>
     <Content Remove="wwwroot\upload\" />
