@@ -11,7 +11,7 @@ using SnowmeetApi.Models.Users;
 using Microsoft.AspNetCore.Mvc;
 using System.Net.Http.Headers;
 using System.Net.Http;
-
+using System.Text;
 namespace SnowmeetApi
 {
     public class Util
@@ -150,7 +150,8 @@ namespace SnowmeetApi
             HttpWebRequest req = (HttpWebRequest)WebRequest.Create(url);
             req.Method = "POST";
             req.ContentType = contentType;
-            req.ContentLength = postData.Length;
+            int len = System.Text.Encoding.UTF8.GetByteCount(postData);
+            req.ContentLength = len;
             Stream sPost = req.GetRequestStream();
             StreamWriter sw = new StreamWriter(sPost);
             sw.Write(postData);

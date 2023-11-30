@@ -37,10 +37,26 @@ namespace SnowmeetApi.Controllers
         public ActionResult<ProductQueryResult> GetProductList()
         {
             string ret = Util.GetWebContent("https://task-api-stag.zowoyoo.com/api/thirdPaty/prod/list",
-                "{\"apikey\": \"3951EA4CA7BF7B679787F67E6262E1DD\",\t\"catIds\": \"\",\t\"cityId\": \"\",\t\"cityName\": \"\",\t\"custId\": 6914348 ,\t\"isConfirm\": \"\",\t\"isExpress\": \"\",\t\"isMulti\": \"\",\t\"isPackage\": \"\",\t\"isPay\": \"\",\t\"keyWord\": \"\",\t\"orderBy\": \"\",\t\"page\": 0,\t\"productNos\": \"\",\t\"resultNum\": 0,\t\"tagIds\": \"\",\t\"treeId\": \"\",\t\"viewId\": \"\"}",
+                "{\"apikey\": \"" + apiKey + "\",\t\"catIds\": \"\",\t\"cityId\": \"\",\t\"cityName\": \"\",\t\"custId\": " + custId + " ,\t\"isConfirm\": \"\",\t\"isExpress\": \"\",\t\"isMulti\": \"\",\t\"isPackage\": \"\",\t\"isPay\": \"\",\t\"keyWord\": \"\",\t\"orderBy\": \"\",\t\"page\": 0,\t\"productNos\": \"\",\t\"resultNum\": 0,\t\"tagIds\": \"\",\t\"treeId\": \"\",\t\"viewId\": \"\"}",
                 "application/json");
             ProductQueryResult r = JsonConvert.DeserializeObject<ProductQueryResult>(ret);
             return Ok(r);
+        }
+
+        [HttpGet]
+        public ActionResult<ZiwoyouPlaceOrderResult> PlaceOrder(string productNo, string name, string cell, int count, DateTime date, string memo, int orderId)
+        {
+            string postData = "{\n\t\"apikey\": \"" + apiKey
+                + "\",\n\t\"custId\": " + custId + " ,\n\t\"infoId\": " + productNo
+                + ",\n\t\"isSend\": \"1\",\n\t\"linkMan\": \"" + name
+                + "\",\n\t\"linkPhone\": \"" + cell + "\",\n\t\"num\": " + count.ToString()
+                + ",\n\t\"orderMemo\": \"" + memo + "\",\n\t\"orderSourceId\": \"" + orderId.ToString()
+                + "\",\n\t\"travelDate\": \"" + date.ToShortDateString() + "\"\n}";
+            string ret = Util.GetWebContent("https://task-api-stag.zowoyoo.com/api/thirdPaty/order/add",
+                postData, "application/json");
+            ZiwoyouPlaceOrderResult r = JsonConvert.DeserializeObject<ZiwoyouPlaceOrderResult>(ret);
+            return Ok(r);
+
         }
 
 	}
