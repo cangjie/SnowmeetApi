@@ -80,8 +80,19 @@ namespace SnowmeetApi.Controllers
             return Ok(ret);
 
         }
-       
 
-	}
+        [HttpGet("{orderId}")]
+        public ActionResult<string> CancelOrder(int orderId)
+        {
+            string postData = "{\"apikey\": \"" + apiKey + "\",\"custId\": " + custId.Trim()
+                + ",\"orderId\": " + orderId.ToString() + "}";
+            string ret = Util.GetWebContent("https://task-api-stag.zowoyoo.com/api/thirdPaty/order/detail",
+                postData, "application/json");
+            return Ok(ret);
+
+        }
+
+
+    }
 }
 
