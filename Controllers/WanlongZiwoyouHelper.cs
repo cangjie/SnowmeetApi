@@ -59,6 +59,17 @@ namespace SnowmeetApi.Controllers
 
         }
 
+        [HttpGet]
+        public ActionResult<PayResult> Pay(int orderId)
+        {
+            string postData = "{\"apikey\": \"" + apiKey + "\",\"custId\": " + custId.Trim() + ",\"orderId\": " + orderId.ToString() + "}";
+            string ret = Util.GetWebContent("https://task-api-stag.zowoyoo.com/api/thirdPaty/order/pay",
+                postData, "application/json");
+            PayResult p = JsonConvert.DeserializeObject<PayResult>(ret);
+            return Ok(p);
+
+        }
+
 	}
 }
 
