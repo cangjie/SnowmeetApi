@@ -59,7 +59,7 @@ namespace SnowmeetApi.Controllers
 
         }
 
-        [NonAction]
+        [HttpGet("{orderId}")]
         public ActionResult<PayResult> Pay(int orderId)
         {
             string postData = "{\"apikey\": \"" + apiKey + "\",\"custId\": " + custId.Trim() + ",\"orderId\": " + orderId.ToString() + "}";
