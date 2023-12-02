@@ -71,8 +71,9 @@ namespace SnowmeetApi.Models
 
         [NotMapped]
         public string status { get; set; }
-        
 
+        [NotMapped]
+        public OrderOnline? order { get; set; }
 
         //附加费用商品编号
         public int AddtionalFeeProductId

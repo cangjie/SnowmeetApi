@@ -25,6 +25,7 @@ namespace SnowmeetApi.Controllers
         private IConfiguration _config;
         private IConfiguration _originConfig;
         private readonly MaintainLogsController _logHelper;
+        private readonly OrderOnlinesController _orderHelper;
         
 
 
@@ -34,6 +35,7 @@ namespace SnowmeetApi.Controllers
             _config = config.GetSection("Settings");
             _originConfig = config;
             _logHelper = new MaintainLogsController(context, config);
+            _orderHelper = new OrderOnlinesController(context, config);
         }
 
 
@@ -308,7 +310,7 @@ namespace SnowmeetApi.Controllers
                     m.status = "进行中";
                 }
 
-
+                m.order = (OrderOnline)((OkObjectResult) (await _orderHelper.GetWholeOrderByStaff(m.order_id, sessionKey)).Result).Value;
             }
 
             return Ok(liveArr);
