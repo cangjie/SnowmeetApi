@@ -7,6 +7,7 @@ namespace SnowmeetApi.Models.WanLong
 		public string productName { get; set; }
 		public string img { get; set; }
 		public double settlementPrice { get; set; }
+		public string orderDesc { get; set; }
 
     }
 }
