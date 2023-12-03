@@ -10,6 +10,8 @@ using SnowmeetApi.Models.Users;
 using Microsoft.Extensions.Configuration;
 using SnowmeetApi.Models.WanLong;
 using Newtonsoft.Json;
+using Aop.Api.Domain;
+
 namespace SnowmeetApi.Controllers
 {
     [Route("core/[controller]/[action]")]
@@ -57,6 +59,15 @@ namespace SnowmeetApi.Controllers
             ZiwoyouPlaceOrderResult r = JsonConvert.DeserializeObject<ZiwoyouPlaceOrderResult>(ret);
             return Ok(r);
 
+        }
+
+        [HttpGet("{productNo}")]
+        public ActionResult<string> GetProductDetail(string productNo)
+        {
+            string postData = "{\"apikey\": \"" + apiKey + "\",\"custId\": " + custId.Trim() + ",\"productNo\": " + productNo.ToString() + "}";
+            string ret = Util.GetWebContent("https://task-api-stag.zowoyoo.com/api/thirdPaty/prod/detail",
+                postData, "application/json");
+            return Ok(ret);
         }
 
         [HttpGet("{orderId}")]
