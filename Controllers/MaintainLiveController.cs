@@ -269,7 +269,8 @@ namespace SnowmeetApi.Controllers
             {
                 task.open_id = "";
             }
-            return task;
+            task.order = (OrderOnline)((OkObjectResult)(await _orderHelper.GetWholeOrderByStaff(task.order_id, sessionKey)).Result).Value;
+            return Ok(task);
         }
 
         [HttpGet]

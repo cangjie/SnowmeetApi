@@ -61,6 +61,7 @@ namespace SnowmeetApi.Controllers
 
         }
 
+        /*
         [HttpGet("{productNo}")]
         public ActionResult<string> GetProductDetail(string productNo)
         {
@@ -69,6 +70,7 @@ namespace SnowmeetApi.Controllers
                 postData, "application/json");
             return Ok(ret);
         }
+        */
 
         [HttpGet("{orderId}")]
         public ActionResult<PayResult> Pay(int orderId)
