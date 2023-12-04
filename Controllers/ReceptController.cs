@@ -13,7 +13,7 @@ using SnowmeetApi.Models.Users;
 using SnowmeetApi.Models.Rent;
 using Org.BouncyCastle.Asn1.X509;
 using System.Security.Cryptography;
-
+using Aop.Api.Domain;
 namespace SnowmeetApi.Controllers
 {
     [Route("core/[controller]/[action]")]
@@ -199,7 +199,70 @@ namespace SnowmeetApi.Controllers
 
         }
 
+        [HttpGet]
+        public async Task<ActionResult<Recept>> NewVipRecept(int vipId,
+            string shop,  string scene, string sessionKey)
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            shop = Util.UrlDecode(shop.Trim());
+            MiniAppUser adminUser = await GetUser(sessionKey);
+            if (adminUser.is_admin != 1)
+            {
+                return BadRequest();
+            }
+            Vip vip = await _context.vip.FindAsync(vipId);
+            if (vip == null)
+            {
+                return NotFound();
+            }
+            string entityJson = "";
 
+            switch (scene)
+            {
+                case "租赁招待":
+
+                    RentOrder order = new RentOrder()
+                    {
+                        open_id = "",
+                        cell_number = vip.cell,
+                        real_name = vip.name,
+                        shop = shop
+                    };
+                    entityJson = Newtonsoft.Json.JsonConvert.SerializeObject(order);
+                    break;
+                case "养护招待":
+                    Models.Maintain.MaintainOrder mOrder = new Models.Maintain.MaintainOrder()
+                    {
+                        customerOpenId = "",
+                        cell = vip.cell.Trim(),
+                        name = vip.name.Trim()
+                    };
+                    entityJson = Newtonsoft.Json.JsonConvert.SerializeObject(mOrder);
+                    break;
+                default:
+                    break;
+            }
+
+            Recept recept = new Recept()
+            {
+                shop = shop.Trim(),
+                open_id = "",
+                cell = vip.cell,
+                real_name = vip.name,
+                current_step = 0,
+                gender = "",
+                recept_type = scene.Trim(),
+                submit_data = entityJson.Trim(),
+                recept_staff = adminUser.open_id.Trim(),
+                update_staff = "",
+                submit_return_id = 0,
+                create_date = DateTime.Now,
+                update_date = DateTime.Now
+            };
+            await _context.Recept.AddAsync(recept);
+            await _context.SaveChangesAsync();
+            return Ok(recept);
+        }
 
 
         [HttpGet]
