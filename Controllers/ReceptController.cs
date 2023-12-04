@@ -223,11 +223,12 @@ namespace SnowmeetApi.Controllers
                 .OrderByDescending(r => r.id).AsNoTracking().ToListAsync();
             if (rList != null && rList.Count > 0)
             {
-                return Ok(rList[0]);
+                return await GetRecept(rList[0].id, sessionKey);
             }
             else
             {
-                return await NewVipRecept(vipId, shop, scene, sessionKey);
+                Recept r = (Recept)((OkObjectResult)(await NewVipRecept(vipId, shop, scene, sessionKey)).Result).Value;
+                return await GetRecept(r.id, sessionKey);
             }
 
         }
