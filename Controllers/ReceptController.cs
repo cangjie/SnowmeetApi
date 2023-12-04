@@ -482,6 +482,23 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet("{id}")]
+        public async Task<ActionResult<Recept>> ConfirmServe(int id, string sessionKey)
+        {
+            sessionKey = Util.UrlDecode(sessionKey).Trim();
+            if (!await IsAdmin(sessionKey))
+            {
+                return BadRequest();
+            }
+            Recept r = (Recept)((OkObjectResult)(await GetRecept(id, sessionKey)).Result).Value;
+            switch (r.recept_type)
+            {
+                default:
+                    break;
+            }
+            return BadRequest();
+        }
+
+        [HttpGet("{id}")]
         public async Task<ActionResult<Recept>> PlaceOrder(int id, string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey).Trim();

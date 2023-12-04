@@ -23,6 +23,8 @@ namespace SnowmeetApi.Controllers.User
             _appId = _config.GetSection("AppId").Value.Trim();
         }
 
+        
+
         [HttpGet("{cell}")]
         public async Task<ActionResult<Vip>> GetVipInfo(string cell, string sessionKey)
         {
