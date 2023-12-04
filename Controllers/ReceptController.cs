@@ -468,6 +468,7 @@ namespace SnowmeetApi.Controllers
             bool needVerriTicket = false;
             switch (r.recept_type)
             {
+                case "租赁招待":
                 case "租赁下单":
                     r = await CreateRentOrder(r);
                     if (r.rentOrder.order_id == 0)
@@ -475,6 +476,7 @@ namespace SnowmeetApi.Controllers
                         needVerriTicket = true;
                     }
                     break;
+                case "养护招待":
                 case "养护下单":
                     r = await CreateMaintainOrder(r);
                     if (r.submit_return_id == -1)
