@@ -223,7 +223,30 @@ namespace SnowmeetApi.Controllers
                 .OrderByDescending(r => r.id).AsNoTracking().ToListAsync();
             if (rList != null && rList.Count > 0)
             {
-                return await GetRecept(rList[0].id, sessionKey);
+                Recept r = (Recept)((OkObjectResult)(await GetRecept(rList[0].id, sessionKey)).Result).Value;
+                bool renew = false;
+                switch (r.recept_type.Trim())
+                {
+                    case "养护招待":
+                        if (r.maintainOrder == null)
+                        {
+                            renew = true;
+                        }
+                        break;
+                    case "租赁招待":
+                        if (r.rentOrder == null)
+                        {
+                            renew = true;
+                        }
+                        break;
+                    default:
+                        break;
+                }
+                if (renew)
+                {
+                    r = (Recept)((OkObjectResult)(await NewVipRecept(vipId, shop, scene, sessionKey)).Result).Value;
+                }
+                return Ok(r);
             }
             else
             {
