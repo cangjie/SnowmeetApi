@@ -153,5 +153,7 @@ namespace SnowmeetApi.Data
 
         public DbSet<Models.Order.WepaySummary> wepaySummary { get; set; }
 
+        public DbSet<Vip> vip { get; set; }
+
     }
 }
