@@ -199,6 +199,39 @@ namespace SnowmeetApi.Controllers
 
         }
 
+        [HttpGet("{vipId}")]
+        public async Task<ActionResult<Recept>> GetUnFinishedRecept(int vipId,
+            string shop, string scene, string sessionKey)
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            shop = Util.UrlDecode(shop.Trim());
+            scene = Util.UrlDecode(scene);
+            MiniAppUser adminUser = await GetUser(sessionKey);
+            if (adminUser.is_admin != 1)
+            {
+                return BadRequest();
+            }
+            Vip vip = await _context.vip.FindAsync(vipId);
+            if (vip == null)
+            {
+                return NotFound();
+            }
+
+            var rList = await _context.Recept.Where(r => (r.open_id.Trim().Equals("")
+                && r.cell.Trim().Equals(vip.cell.Trim()) && r.shop.Trim().Equals(shop)
+                && r.recept_type.Trim().Equals(scene.Trim()) && r.create_date.Date == DateTime.Now.Date))
+                .OrderByDescending(r => r.id).AsNoTracking().ToListAsync();
+            if (rList != null && rList.Count > 0)
+            {
+                return Ok(rList[0]);
+            }
+            else
+            {
+                return await NewVipRecept(vipId, shop, scene, sessionKey);
+            }
+
+        }
+
         [HttpGet]
         public async Task<ActionResult<Recept>> NewVipRecept(int vipId,
             string shop,  string scene, string sessionKey)
