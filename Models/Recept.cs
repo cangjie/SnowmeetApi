@@ -57,7 +57,7 @@ namespace SnowmeetApi.Models
             {
                 if (_rentOrder == null)
                 {
-                    if (recept_type.Trim().Equals("租赁下单"))
+                    if (recept_type.Trim().Equals("租赁下单") || recept_type.Trim().Equals("租赁招待"))
                     {
                         object order = JsonConvert.DeserializeObject(submit_data, typeof(Rent.RentOrder));
                         return (RentOrder)order;
@@ -86,7 +86,7 @@ namespace SnowmeetApi.Models
         get
         {   if (_maintainOrder == null)
             {
-                if (recept_type.Trim().Equals("养护下单"))
+                if (recept_type.Trim().Equals("养护下单") || recept_type.Trim().Equals("养护招待"))
                 {
                     object order = JsonConvert.DeserializeObject(submit_data, typeof(Maintain.MaintainOrder));
                     return (Maintain.MaintainOrder)order;
