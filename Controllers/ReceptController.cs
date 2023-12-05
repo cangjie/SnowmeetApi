@@ -32,6 +32,8 @@ namespace SnowmeetApi.Controllers
 
         private readonly IHttpContextAccessor _httpContextAccessor;
 
+        private readonly MaintainLiveController _maintainHelper;
+
         public ReceptController(ApplicationDBContext context, IConfiguration config, IHttpContextAccessor httpContextAccessor)
         {
             _context = context;
@@ -39,6 +41,7 @@ namespace SnowmeetApi.Controllers
             _config = config.GetSection("Settings");
             _appId = _config.GetSection("AppId").Value.Trim();
             _httpContextAccessor = httpContextAccessor;
+            _maintainHelper = new MaintainLiveController(context, config);
         }
 
         [HttpGet]
@@ -219,6 +222,7 @@ namespace SnowmeetApi.Controllers
 
             var rList = await _context.Recept.Where(r => (r.open_id.Trim().Equals("")
                 && r.cell.Trim().Equals(vip.cell.Trim()) && r.shop.Trim().Equals(shop)
+                && r.submit_return_id == 0
                 && r.recept_type.Trim().Equals(scene.Trim()) && r.create_date.Date == DateTime.Now.Date))
                 .OrderByDescending(r => r.id).AsNoTracking().ToListAsync();
             if (rList != null && rList.Count > 0)
@@ -492,10 +496,23 @@ namespace SnowmeetApi.Controllers
             Recept r = (Recept)((OkObjectResult)(await GetRecept(id, sessionKey)).Result).Value;
             switch (r.recept_type)
             {
+                case "养护招待":
+                    r = await CreateMaintainOrder(r);
+                    var mList = await _context.MaintainLives.Where(l => l.batch_id == r.id)
+                        .AsNoTracking().ToListAsync();
+                    for (int i = 0; i < mList.Count; i++)
+                    {
+                        MaintainLive m = mList[i];
+                        await _maintainHelper.GenerateFlowNum(m.id);
+                    }
+                    break;
+                case "租赁招待":
+                    r = await CreateRentOrder(r);
+                    break;
                 default:
                     break;
             }
-            return BadRequest();
+            return Ok(r);
         }
 
         [HttpGet("{id}")]
@@ -592,7 +609,8 @@ namespace SnowmeetApi.Controllers
 
             double realPayAmount = totalAmount - maintainOrder.discount - maintainOrder.ticketDiscount;
             int orderId = 0;
-            if (realPayAmount > 0 && (maintainOrder.payOption.Trim().Equals("现场支付") || maintainOrder.payOption.Trim().Equals("")))
+            if (realPayAmount > 0 && (maintainOrder.payOption.Trim().Equals("现场支付") || maintainOrder.payOption.Trim().Equals(""))
+                && recept.recept_type.Trim().Equals("养护下单"))
             {
                 OrderOnline order = new OrderOnline()
                 {
