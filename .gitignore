@@ -420,3 +420,6 @@ republish.sh
 wwwroot/bidata/*.csv
 alipay_callback.txt
 *.sln
+.vscode/launch.json
+.vscode/tasks.json
+.vscode/launch.json
