@@ -665,6 +665,7 @@ namespace SnowmeetApi.Controllers
                 m.service_open_id = recept.recept_staff.Trim();
                 m.task_id = 0;
                 m.confirmed_serial = m.confirmed_serial == null ? "" : m.confirmed_serial.Trim();
+                /*
                 if (m.confirmed_urgent == 1)
                 {
                     m.confirmed_pick_date = DateTime.Now.Date;
@@ -672,6 +673,12 @@ namespace SnowmeetApi.Controllers
                 else
                 {
                     m.confirmed_pick_date = DateTime.Now.Date.AddDays(1);
+                }
+                */
+                //临时矫正取板日期
+                if (m.confirmed_urgent == 0 && m.confirmed_pick_date.Date == DateTime.Now.Date)
+                {
+                    m.confirmed_pick_date = m.confirmed_pick_date.AddDays(1);
                 }
                 m.order_id = orderId;
                 m.pay_memo = maintainOrder.payOption.Trim();
