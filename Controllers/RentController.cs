@@ -762,7 +762,7 @@ namespace SnowmeetApi.Controllers
                 for (int j = 0; j < orderArr[i].rentalDetails.Count; j++)
                 {
                     RentalDetail detail = orderArr[i].rentalDetails[j];
-                    subTotalRental = subTotalRental + detail.rental ;
+                    subTotalRental = subTotalRental + detail.rental;
                 }
                 totalRental = totalRental + subTotalRental;
             }
