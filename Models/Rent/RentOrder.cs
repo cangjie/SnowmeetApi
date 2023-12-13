@@ -292,7 +292,7 @@ namespace SnowmeetApi.Models.Rent
                             if (rentOrderDetail.real_end_date != null && d.Date == endDate.Date)
                             {
                                 rentalDetail.type = "结算日";
-                                rentalDetail.rental = rentOrderDetail.real_rental - totalRental
+                                rentalDetail.rental = rentOrderDetail.unit_rental 
                                     - rentOrderDetail.rental_discount - rentOrderDetail.rental_ticket_discount;
                                 detailList.Add(rentalDetail);
                             }
