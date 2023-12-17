@@ -311,6 +311,22 @@ namespace SnowmeetApi.Controllers
                     m.status = "进行中";
                 }
 
+                string desc = "";
+                if (m.confirmed_edge == 1)
+                {
+                    desc += "修刃：" + m.confirmed_degree.ToString();
+                }
+                if (m.confirmed_candle == 1)
+                {
+                    desc += " 打蜡 ";
+                }
+                if (!m.confirmed_more.Trim().Equals(""))
+                {
+                    desc += " " + m.confirmed_more.Trim() + " ";
+                }
+                desc += m.confirmed_memo;
+                m.description = desc;
+
                 m.order = (OrderOnline)((OkObjectResult) (await _orderHelper.GetWholeOrderByStaff(m.order_id, sessionKey)).Result).Value;
             }
 
