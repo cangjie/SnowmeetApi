@@ -66,6 +66,21 @@ namespace SnowmeetApi.Controllers.Maintain
             return log;
         }
 
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<MaintainReport>>> GetReport(DateTime startDate, DateTime endDate, string sessionKey)
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            if (!user.isAdmin)
+            {
+                return BadRequest();
+            }
+            var list = await _context.maintainReport.FromSqlRaw(" select * from dbo.func_maintain_report('"
+                + startDate.ToShortDateString() + "', '" + endDate.AddDays(1).ToShortDateString() + "') ")
+                .AsNoTracking().ToListAsync();
+            return Ok(list);
+        }
+
         [HttpGet("{taskId}")]
         public async Task<ActionResult<IEnumerable<MaintainLog>>> GetSteps(int taskId)
         {

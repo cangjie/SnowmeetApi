@@ -85,7 +85,7 @@ namespace SnowmeetApi
             app.UseRouting();
 
             app.UseAuthorization();
-
+            //app.UsePathBase(new PathString("/background/index.html"));
             app.UseEndpoints(endpoints =>
             {
                 endpoints.MapControllers();

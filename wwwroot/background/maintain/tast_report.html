@@ -1,0 +1,155 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>养护业务报表</title>
+    <link rel="stylesheet" href="../../css/table.css" />
+    <link rel="stylesheet" href="../../css/bootstrap.css" />
+    <link rel="stylesheet" href="../../css/bootstrap-grid.css" />
+    <link rel="stylesheet" href="../../css/bootstrap-reboot.css" />
+    <link rel="stylesheet" href="../../css/common.css" />
+    <script type="text/javascript" src="../../js/jquery-3.6.1.min.js"></script>
+    <script type="text/javascript" src="../../js/bootstrap.js"></script>
+    <script type="text/javascript" src="../../js/util.js"></script>
+    <script type="text/javascript" src="../../js/get_sessionkey.js"></script>
+    <script type="text/javascript">//alert(sessionKey);</script>
+    <style>
+        td{
+            text-align:center
+        }
+    </style>
+</head>
+<body>
+    <div style="margin-top: 20px">
+        <h1 style="text-align:center">养护业务报表</h1>
+    </div>
+    <div class="row_view" style="align-items:center;justify-content:center; margin-top:20px">
+        日期：从&nbsp;<input type="date" id="date_from" oninput="setDate()" />&nbsp;到&nbsp;<input type="date" id="date_to" oninput="setDate()" />&nbsp;<button id="btn" onclick="getData()"> 查 询 </button>
+    </div>
+    <div style="height:20px"></div>
+    <h1></h1>
+    <div style="height:20px"></div>
+    <table style="width:100%">
+        <thead>
+            <tr>
+                <td class="table_head">流水号</td>
+                <td class="table_head">类型</td>
+                <td class="table_head">品牌</td>
+                <td class="table_head">长度</td>
+                <td class="table_head">角度</td>
+                <td class="table_head">修刃</td>
+                <td class="table_head">打蜡</td>
+                <td class="table_head">刮蜡</td>
+                <td class="table_head">其它</td>
+                <td class="table_head">备注</td>
+                <td class="table_head">维修技师</td>
+                <td class="table_head">附加费用</td>
+                <td class="table_head">接待</td>
+                <td class="table_head">日期</td>
+                <td class="table_head">时间</td>
+            </tr>
+        </thead>
+        <tbody id="report_rows">
+        </tbody>
+    </table>
+</body>
+</html>
+<script type="text/javascript" >
+
+    
+    function FillItem(item) {
+        var rows = document.getElementById('report_rows');
+        var newRow = document.createElement('tr');
+
+        var td_task_flow_num = document.createElement('td');
+        td_task_flow_num.innerText = item.task_flow_num;
+        newRow.appendChild(td_task_flow_num);
+
+        var td_equip_type = document.createElement('td');
+        td_equip_type.innerText = item.equip_type;
+        newRow.appendChild(td_equip_type);
+
+        var td_equip_brand = document.createElement('td');
+        td_equip_brand.innerText = item.equip_brand;
+        newRow.appendChild(td_equip_brand);
+
+        var td_equip_scale = document.createElement('td');
+        td_equip_scale.innerText = item.equip_scale;
+        newRow.appendChild(td_equip_scale);
+
+        var td_degree = document.createElement('td');
+        td_degree.innerText = item.degree;
+        newRow.appendChild(td_degree);
+
+        var td_edge = document.createElement('td');
+        td_edge.innerText = item.edge;
+        newRow.appendChild(td_edge);
+
+        var td_vax = document.createElement('td');
+        td_vax.innerText = item.vax;
+        newRow.appendChild(td_vax);
+
+        var td_unvax = document.createElement('td');
+        td_unvax.innerText = item.unvax;
+        newRow.appendChild(td_unvax);
+
+        var td_more = document.createElement('td');
+        td_more.innerText = item.more;
+        newRow.appendChild(td_more);
+
+        var td_memo = document.createElement('td');
+        td_memo.innerText = item.memo;
+        newRow.appendChild(td_memo);
+
+        var td_jishi = document.createElement('td');
+        td_jishi.innerText = item.jishi;
+        newRow.appendChild(td_jishi);
+
+        var td_additional_fee = document.createElement('td');
+        td_additional_fee.innerText = formatAmount(item.additional_fee);
+        var attr = document.createAttribute('style');
+        attr.value = 'text-align:right';
+        td_additional_fee.attributes.setNamedItem(attr);
+        newRow.appendChild(td_additional_fee);
+
+        var td_staff = document.createElement('td');
+        td_staff.innerText = item.staff;
+        newRow.appendChild(td_staff);
+
+        var td_date = document.createElement('td');
+        td_date.innerText = formatDate(item.create_date);
+        newRow.appendChild(td_date);
+
+        var td_time = document.createElement('td');
+        td_time.innerText = formatTime(item.create_date);
+        newRow.appendChild(td_time);
+
+        rows.appendChild(newRow);
+    }
+
+    function getData() {
+        var btnCtrl = document.getElementById('btn');
+        btnCtrl.disabled = true;
+        var getUrl = '../../core/MaintainLogs/GetReport?sessionKey=' + encodeURIComponent(sessionKey)
+            + '&startDate=' + formatDate(startDate) + '&endDate=' + formatDate(endDate);
+        $.ajax({
+            url: getUrl,
+            type: 'GET',
+            success: function (msg, status) {
+                console.log('get data msg', msg)
+                console.log('get data status', status)
+                if (status != 'success') {
+                    return
+                }
+                for (var i = 0; i < msg.length; i++) {
+                    FillItem(msg[i]);
+                }
+            },
+            complete: function (msg, status) {
+                btnCtrl.disabled = false;
+            }
+        })
+
+    }
+</script>
+<script type="text/javascript" src="../../js/date_selector.js" ></script>

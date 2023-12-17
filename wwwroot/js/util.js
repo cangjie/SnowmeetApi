@@ -39,3 +39,16 @@ function formatNumber (n) {
     n = n.toString()
     return n[1] ? n : '0' + n
 }
+
+function formatAmount(n) {
+    var amount = parseFloat(n);
+    if (isNaN(amount)) {
+        return '--';
+    }
+    amount = Math.round(amount, 2);
+    var amountStrArr = amount.toString().split('.');
+    var amountStr = amountStrArr[0] + (amountStrArr.length == 1 ? '.00'
+        : (amountStrArr[1] + '00'.substring(0, 2 - amountStrArr[1].length)))
+
+    return '¥' + amountStr;
+}

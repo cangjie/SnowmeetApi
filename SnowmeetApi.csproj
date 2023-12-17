@@ -86,6 +86,7 @@
     <Folder Include="AlipayCertificate\2021004112603265\" />
     <Folder Include="AlipayCertificate\2021004108630187\" />
     <Folder Include="Models\WanLong\" />
+    <Folder Include="wwwroot\background\maintain\" />
   </ItemGroup>
   <ItemGroup>
     <Content Remove="wwwroot\upload\" />
@@ -99,5 +100,6 @@
     <Content Remove="wwwroot\css\" />
     <Content Remove="wwwroot\mapp\tickets\" />
     <Content Remove="wwwroot\hcCmTXvtQ0.txt" />
+    <Content Remove="wwwroot\background\maintain\" />
   </ItemGroup>
 </Project>
