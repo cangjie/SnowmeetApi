@@ -187,8 +187,22 @@ namespace SnowmeetApi.Controllers
                 return BadRequest();
             }
 
+            int orderId = 0;
+            if (cell.Trim().Length == 4)
+            {
+                try
+                {
+                    orderId = int.Parse(cell);
+                }
+                catch
+                {
+
+                }
+            }
+
             var orderListTemp = await _context.RentOrder
-                .Where(o => (o.cell_number.EndsWith(cell) && (shop.Equals("") || o.shop.Trim().Equals(shop)) ))
+                .Where(o => ((o.cell_number.EndsWith(cell) || o.id == orderId ) && (shop.Equals("") || o.shop.Trim().Equals(shop)) )
+                && o.create_date.Date > DateTime.Parse("2023-11-5")    )
                 .OrderByDescending(o => o.id).ToListAsync();
             if (orderListTemp == null || orderListTemp.Count <= 0)
             {
