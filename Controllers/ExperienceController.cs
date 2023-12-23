@@ -316,7 +316,7 @@ namespace SnowmeetApi.Controllers
                     OrderPayment payment = exp.order.payments[i];
                     if (payment.amount >= amount)
                     {
-                        await refundHelper.TenpayRefund(payment.id, amount, sessionKey);
+                        await refundHelper.TenpayRefund(payment.id, amount, memo, sessionKey);
                         break;
                     }
                 }

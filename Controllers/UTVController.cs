@@ -1146,7 +1146,7 @@ namespace SnowmeetApi.Controllers
                 return NotFound();
             }
             OrderRefundController refundHelper = new OrderRefundController(_db, _config, _http);
-            OrderPaymentRefund refund = await refundHelper.TenpayRefund(paymentList[0].id, amount, sessionKey);
+            OrderPaymentRefund refund = await refundHelper.TenpayRefund(paymentList[0].id, amount, "", sessionKey);
             refund.memo = id.ToString();
             _db.Entry(refund).State = EntityState.Modified;
             await _db.SaveChangesAsync();

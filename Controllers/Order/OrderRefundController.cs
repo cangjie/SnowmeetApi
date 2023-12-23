@@ -139,7 +139,7 @@ namespace SnowmeetApi.Controllers.Order
         
 
         [NonAction]
-        public async Task<OrderPaymentRefund> TenpayRefund(int paymentId, double amount, string sessionKey)
+        public async Task<OrderPaymentRefund> TenpayRefund(int paymentId, double amount, string memo, string sessionKey)
         {
             
             OrderPayment payment = await _db.OrderPayment.FindAsync(paymentId); 
@@ -170,7 +170,7 @@ namespace SnowmeetApi.Controllers.Order
                 amount = amount,
                 oper = user.miniAppOpenId.Trim(),
                 state = 0,
-                memo = "",
+                memo = memo,
                 notify_url = notify.Trim()
 
 

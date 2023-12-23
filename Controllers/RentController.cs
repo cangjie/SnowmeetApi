@@ -565,12 +565,13 @@ namespace SnowmeetApi.Controllers
                 && rentOrder.order.payments != null && rentOrder.order.payments.Length > 0)
             {
                 OrderPayment payment = rentOrder.order.payments[0];
+                
                 Order.OrderRefundController refundHelper = new Order.OrderRefundController(
                     _context, _oriConfig, _httpContextAccessor);
                 double paidAmount = payment.amount;
                 if (paidAmount >= amount)
                 {
-                    await refundHelper.TenpayRefund(payment.id, amount, sessionKey);
+                    await refundHelper.TenpayRefund(payment.id, amount,memo, sessionKey);
                 }
             }
 
