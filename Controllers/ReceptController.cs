@@ -524,6 +524,10 @@ namespace SnowmeetApi.Controllers
                 return BadRequest();
             }
             Recept r = await _context.Recept.FindAsync(id);
+            if (r.submit_return_id != 0)
+            {
+                return BadRequest();
+            }
             bool needVerriTicket = false;
             switch (r.recept_type)
             {
