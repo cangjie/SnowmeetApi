@@ -446,8 +446,26 @@ namespace SnowmeetApi.Controllers
                     .AsNoTracking().ToListAsync();
                 if (rl != null && rl.Count > 0)
                 {
+                    
                     rentOrder.staff_name = rl[0].update_staff_name.Trim().Equals("") ?
                         rl[0].recept_staff_name : rl[0].update_staff_name.Trim();
+                    if (rentOrder.staff_name.Trim().Equals(""))
+                    {
+                        try
+                        {
+                            string staffOpenId = rl[0].update_staff.Trim().Equals("") ?
+                                rl[0].recept_staff.Trim() : rl[0].update_staff.Trim();
+                            MiniAppUser? staffUser = await _context.MiniAppUsers.FindAsync(staffOpenId.Trim());
+                            if (staffUser != null)
+                            {
+                                rentOrder.staff_name = staffUser.real_name.Trim();
+                            }
+                        }
+                        catch
+                        {
+
+                        }
+                    }
                 }
 
             }
