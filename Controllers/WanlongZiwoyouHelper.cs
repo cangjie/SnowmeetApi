@@ -42,6 +42,11 @@ namespace SnowmeetApi.Controllers
             string ret = Util.GetWebContent("https://task-api-stag.zowoyoo.com/api/thirdPaty/prod/list", postJson,"application/json");
             Console.WriteLine(postJson);
             ProductQueryResult r = JsonConvert.DeserializeObject<ProductQueryResult>(ret);
+            for (int i = 0; i < r.data.results.Length; i++)
+            {
+                r.data.results[i].salePrice = r.data.results[i].salePrice * 0.94 + 10;
+            }
+
             return Ok(r);
         }
 
