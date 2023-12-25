@@ -91,6 +91,10 @@ namespace SnowmeetApi.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<Recept>> SetPaidManual(int id, string payMethod, string sessionKey)
         {
+            if (payMethod.Trim().Equals("微信支付"))
+            {
+                return BadRequest();
+            }
             sessionKey = Util.UrlDecode(sessionKey);
             MiniAppUser adminUser = await GetUser(sessionKey);
             if (adminUser.is_admin != 1)
