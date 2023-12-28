@@ -693,10 +693,23 @@ namespace SnowmeetApi.Controllers
                 m.confirmed_name = recept.real_name;
                 m.confirmed_cell = recept.cell;
                 m.ticket_code = recept.code.Trim();
+                //m.batch_id = recept.id;
                 
                 await _context.MaintainLives.AddAsync(m);
             }
             await _context.SaveChangesAsync();
+
+
+            if (realPayAmount == 0)
+            {
+                var ml = await _context.MaintainLives.Where(m => m.batch_id == recept.id)
+                    .AsNoTracking().ToListAsync();
+                for (int i = 0; i < ml.Count; i++)
+                {
+                    await _maintainHelper.GenerateFlowNum(ml[i].id);
+                }
+            }
+
 
             return recept;
         }

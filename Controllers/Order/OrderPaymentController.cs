@@ -243,7 +243,7 @@ namespace SnowmeetApi.Controllers.Order
             }
             return BadRequest();
         }
-
+        /*
         [NonAction]
         public async Task<OrderPayment> TenpayRefund(int id, double amount, string sessionKey)
         {
@@ -252,7 +252,7 @@ namespace SnowmeetApi.Controllers.Order
 
             return payment;
         }
-
+        */
 
         [HttpPost("{mchid}")]
         public async Task<ActionResult<string>> TenpayPaymentCallback(int mchid,
