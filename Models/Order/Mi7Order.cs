@@ -12,6 +12,7 @@ namespace SnowmeetApi.Models.Order
         public string mi7_order_id { get; set; }
         public double sale_price { get; set; }
         public double real_charge { get; set; }
+        public string barCode { get; set; } = "";
 
     }
 }
