@@ -77,8 +77,8 @@ namespace SnowmeetApi.Models.Product
 				
 			}
 
-			if ((date >= DateTime.Parse("2022-12-31") && date <= DateTime.Parse("2023-1-2"))
-				|| (date >= DateTime.Parse("2023-1-21") && date <= DateTime.Parse("2023-1-27")))
+			if ((date >= DateTime.Parse("2023-12-30") && date <= DateTime.Parse("2024-1-1"))
+				|| (date >= DateTime.Parse("2024-2-9") && date <= DateTime.Parse("2024-2-18")))
 			{
 				if (tags.IndexOf("节假日") <= 0)
 				{
