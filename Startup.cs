@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -62,6 +62,10 @@ namespace SnowmeetApi
                 c.SwaggerDoc("v1", new OpenApiInfo { Title = "SnowmeetApi", Version = "v1" });
             });
             services.TryAddSingleton<IHttpContextAccessor, HttpContextAccessor>();
+            /*
+            services.AddDbContext<AppDBContext>(options =>
+                    options.UseSqlite(Configuration.GetConnectionString("AppDBContext")));
+            */
             //services.AddHostedService<Services.BackgroundServices.TenpayCertificateRefreshingBackgroundService>();
         }
 
