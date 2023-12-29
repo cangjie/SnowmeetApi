@@ -161,5 +161,8 @@ namespace SnowmeetApi.Data
 
         public DbSet<Models.Maintain.MaintainReport> maintainReport { get; set; }
 
+
+        public DbSet<SnowmeetApi.Models.Printer> Printer { get; set; }
+
     }
 }
