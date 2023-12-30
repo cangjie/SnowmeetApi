@@ -25,6 +25,8 @@ namespace SnowmeetApi.Models.Rent
 
 		
 		public double rental { get; set; } = 0;
+        public double rental_member { get; set; } = 0;
+        public double rental_reserve { get; set; } = 0;
 
       
 
