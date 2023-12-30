@@ -84,6 +84,15 @@ namespace SnowmeetApi.Controllers
             {
                 return NoContent();
             }
+            MiniAppUser miniUser = await _context.MiniAppUsers.FindAsync(openId);
+
+            var orderL = await _context.OrderOnlines.Where(o => o.open_id.Trim().Equals(miniUser.open_id.Trim())
+                && o.pay_state == 1).AsNoTracking().Take(1).ToListAsync();
+            if (orderL.Count > 0)
+            {
+                miniUser.isMember = true;
+            }
+
             return await _context.MiniAppUsers.FindAsync(openId);
         }
 

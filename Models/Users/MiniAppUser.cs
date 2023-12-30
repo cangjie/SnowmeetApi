@@ -23,6 +23,12 @@ namespace SnowmeetApi.Models.Users
 
         public string wechat_id { get; set; } = "";
         public DateTime create_date { get; set; } = DateTime.Now;
+
+        [NotMapped]
+        public bool isMember { get; set; } = false;
+
+
+
         /*
         public static implicit operator MiniAppUser(ActionResult<MiniAppUser> v)
         {
