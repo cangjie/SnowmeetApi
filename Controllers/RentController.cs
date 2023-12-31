@@ -412,14 +412,21 @@ namespace SnowmeetApi.Controllers
                         }
                         else 
                         {
-                            TimeSpan ts1 = endDate.Date - rentOrder.start_date.Date;
-                            int days = ts1.Days;
-                            if (rentOrder.start_date.Hour < 16)
+                            if (detail.start_date == null)
                             {
-                                days++;
+                                detail._timeLength = "--";
                             }
-                            detail._suggestRental = detail.unit_rental * days;
-                            detail._timeLength = days.ToString() + "天";
+                            else
+                            {
+                                TimeSpan ts1 = endDate.Date - ((DateTime)detail.start_date).Date;
+                                int days = ts1.Days;
+                                if (rentOrder.start_date.Hour < 16)
+                                {
+                                    days++;
+                                }
+                                detail._suggestRental = detail.unit_rental * days;
+                                detail._timeLength = days.ToString() + "天";
+                            }
 
                         }
                         //
