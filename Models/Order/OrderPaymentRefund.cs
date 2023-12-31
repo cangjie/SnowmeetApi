@@ -18,6 +18,36 @@ namespace SnowmeetApi.Models.Order
         public double RefundFee { get; set; } = 0;
         public string TransactionId { get; set; } = "";
         public DateTime create_date { get; set; } = DateTime.Now;
+
+        
+        public bool refundSuccess
+        {
+            get
+            {
+                bool suc = false;
+                if (!refund_id.Trim().Equals("") || state == 1)
+                {
+                    suc = true;
+                }
+                return suc;
+            }
+        }
+
+        public bool isManual
+        {
+            get
+            {
+                bool manual = false;
+                if (refundSuccess)
+                {
+                    if (refund_id.Trim().Equals("") && state == 1)
+                    {
+                        manual = true;   
+                    }
+                }
+                return manual; 
+            }
+        }
     }
 }
 
