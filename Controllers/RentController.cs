@@ -56,7 +56,7 @@ namespace SnowmeetApi.Controllers
                 {
                     item.rental = item.GetRental(shop);
                 }
-                item.rental_reserve = item.rental_member;
+                //item.rental_reserve = item.rental_member;
                 return Ok(item);
             }
             else
