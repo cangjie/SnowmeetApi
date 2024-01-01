@@ -6,6 +6,9 @@ namespace SnowmeetApi.Models.Maintain
 
 	public class MaintainReport
 	{
+		public int order_id { get; set; }
+		public string shop { get; set; }
+		public double total_paid { get; set; }
 		public string task_flow_num { get; set; }
 		public string equip_type { get; set; }
 		public string equip_brand { get; set; }

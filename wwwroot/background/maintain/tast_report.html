@@ -28,10 +28,11 @@
     </div>
     <div style="height:20px"></div>
     <h1></h1>
-    <div style="height:20px"></div>
+    <div style="height:20px" id="total"></div>
     <table style="width:100%">
         <thead>
             <tr>
+                <td class="table_head">门店</td>
                 <td class="table_head">流水号</td>
                 <td class="table_head">类型</td>
                 <td class="table_head">品牌</td>
@@ -47,6 +48,8 @@
                 <td class="table_head">接待</td>
                 <td class="table_head">日期</td>
                 <td class="table_head">时间</td>
+                <td class="table_head">订单号</td>
+                <td class="table_head">金额</td>
             </tr>
         </thead>
         <tbody id="report_rows">
@@ -56,10 +59,21 @@
 </html>
 <script type="text/javascript" >
 
-    
+    var currentColor = '#DDDDDD';
+    var totalPaid = 0;
     function FillItem(item) {
+        var totalColNum = 18;
         var rows = document.getElementById('report_rows');
         var newRow = document.createElement('tr');
+        //newRow.style.backgroundColor = item.odd ? 'white' : '#DDDDDD';
+        //newRow.id = item.task_flow_num;
+
+
+        var td_shop = document.createElement('td');
+        td_shop.innerText = item.shop;
+        newRow.appendChild(td_shop);
+
+
 
         var td_task_flow_num = document.createElement('td');
         td_task_flow_num.innerText = item.task_flow_num;
@@ -124,10 +138,68 @@
         td_time.innerText = formatTime(item.create_date);
         newRow.appendChild(td_time);
 
+        var lastOrderId = '-1';
+        var lastRow = {};
+        if (rows.childNodes.length > 0) {
+            for (var j = 0; j < rows.childNodes.length; j++) {
+                if (rows.childNodes[rows.childNodes.length - 1 - j].childNodes.length == totalColNum) {
+                    lastRow = rows.childNodes[rows.childNodes.length - 1 - j];
+                    lastOrderId = lastRow.childNodes[lastRow.childNodes.length - 2].innerText;
+                    break;
+                }
+            }
+            
+        }
+
+        if (item.order_id.toString() == lastOrderId && item.order_id > 0) {
+            var lastOrderIdTd = lastRow.childNodes[lastRow.childNodes.length - 2];
+            var lastPaidTd = lastRow.childNodes[lastRow.childNodes.length - 1];
+            var attrOrderIdTdRowSpan = lastOrderIdTd.attributes["rowspan"];
+            var attrPaidTdRowSpan = lastPaidTd.attributes["rowspan"];
+            if (attrOrderIdTdRowSpan == null || attrOrderIdTdRowSpan == undefined) {
+                attrOrderIdTdRowSpan = document.createAttribute("rowspan");
+                attrOrderIdTdRowSpan.value = "2";
+                lastOrderIdTd.attributes.setNamedItem(attrOrderIdTdRowSpan);
+                attrPaidTdRowSpan = document.createAttribute("rowspan");
+                attrPaidTdRowSpan.value = "2";
+                lastPaidTd.attributes.setNamedItem(attrPaidTdRowSpan);
+            }
+            else {
+                var span = parseInt(attrOrderIdTdRowSpan.value);
+                span++;
+                attrOrderIdTdRowSpan.value = span.toString();
+                attrPaidTdRowSpan.value = span.toString();
+            }
+        }
+        else {
+
+            if (currentColor == '#DDDDDD') {
+                currentColor = 'white';
+            }
+            else {
+                currentColor = '#DDDDDD';
+            }
+
+            var td_order_id = document.createElement('td');
+            td_order_id.innerText = item.order_id;
+            newRow.appendChild(td_order_id);
+
+            var td_paid = document.createElement('td');
+            td_paid.innerText = formatAmount(item.total_paid);
+            attr = document.createAttribute('style');
+            attr.value = 'text-align:right';
+            td_paid.attributes.setNamedItem(attr);
+            newRow.appendChild(td_paid);
+            totalPaid += item.total_paid;
+        }
+        newRow.style.backgroundColor = currentColor;
         rows.appendChild(newRow);
     }
 
     function getData() {
+        totalPaid = 0;
+        var rows = document.getElementById('report_rows');
+        rows.innerHTML = '';
         var btnCtrl = document.getElementById('btn');
         btnCtrl.disabled = true;
         var getUrl = '../../core/MaintainLogs/GetReport?sessionKey=' + encodeURIComponent(sessionKey)
@@ -141,9 +213,25 @@
                 if (status != 'success') {
                     return
                 }
+                //var odd = false;
+                //var totalPaid = 0;
+                
                 for (var i = 0; i < msg.length; i++) {
+                 /*  
+                    if (i > 0 && msg[i].order_id == msg[i - 1].order_id && msg[i].order_id > 0){
+                        msg[i].odd = odd;
+                    }
+                    else {
+                        msg[i].odd = !odd;
+                        odd = !odd;
+                        totalPaid += msg[i].total_paid
+                    }
+                   */
                     FillItem(msg[i]);
                 }
+                var divTotal = document.getElementById('total');
+                divTotal.innerText = '总计：' + formatAmount(totalPaid);
+                //alert(totalPaid);
             },
             complete: function (msg, status) {
                 btnCtrl.disabled = false;

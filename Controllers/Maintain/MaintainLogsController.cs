@@ -76,7 +76,8 @@ namespace SnowmeetApi.Controllers.Maintain
                 return BadRequest();
             }
             var list = await _context.maintainReport.FromSqlRaw(" select * from dbo.func_maintain_report('"
-                + startDate.ToShortDateString() + "', '" + endDate.AddDays(1).ToShortDateString() + "') ")
+                + startDate.ToShortDateString() + "', '" + endDate.AddDays(1).ToShortDateString() + "')  "
+                + "  order by create_date desc , order_id desc ")
                 .AsNoTracking().ToListAsync();
             return Ok(list);
         }
