@@ -37,6 +37,8 @@ namespace SnowmeetApi.Data
             modelBuilder.Entity<SnowmeetApi.Models.OldWeixinReceive>().HasNoKey();
 
             modelBuilder.Entity<SnowmeetApi.Models.Maintain.MaintainReport>().HasNoKey();
+
+            modelBuilder.Entity<Models.Order.SaleReport>().HasNoKey();
             
 
             //OrderOnline
@@ -163,6 +165,8 @@ namespace SnowmeetApi.Data
 
 
         public DbSet<SnowmeetApi.Models.Printer> Printer { get; set; }
+
+        public DbSet<Models.Order.SaleReport> saleReport { get; set; }
 
     }
 }
