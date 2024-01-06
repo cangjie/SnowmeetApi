@@ -168,5 +168,7 @@ namespace SnowmeetApi.Data
 
         public DbSet<Models.Order.SaleReport> saleReport { get; set; }
 
+        public DbSet<Models.IdList> idList { get; set; }
+
     }
 }

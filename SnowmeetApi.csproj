@@ -88,6 +88,7 @@
     <Folder Include="Models\WanLong\" />
     <Folder Include="wwwroot\background\maintain\" />
     <Folder Include="wwwroot\background\sale\" />
+    <Folder Include="wwwroot\background\rent\" />
   </ItemGroup>
   <ItemGroup>
     <Content Remove="wwwroot\upload\" />
@@ -103,5 +104,6 @@
     <Content Remove="wwwroot\hcCmTXvtQ0.txt" />
     <Content Remove="wwwroot\background\maintain\" />
     <Content Remove="wwwroot\background\sale\" />
+    <Content Remove="wwwroot\background\rent\" />
   </ItemGroup>
 </Project>

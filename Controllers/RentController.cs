@@ -6,16 +6,12 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
-using Org.BouncyCastle.Asn1.X509;
 using SnowmeetApi.Data;
 using SnowmeetApi.Models;
-using SnowmeetApi.Models.Maintain;
 using SnowmeetApi.Models.Order;
 using SnowmeetApi.Models.Rent;
 using SnowmeetApi.Models.Users;
 using System.Collections;
-using static SKIT.FlurlHttpClient.Wechat.TenpayV3.Models.DepositMarketingMemberCardOpenCardCodesResponse.Types;
-
 namespace SnowmeetApi.Controllers
 {
     [Route("core/[controller]/[action]")]
@@ -35,6 +31,19 @@ namespace SnowmeetApi.Controllers
         private readonly IHttpContextAccessor _httpContextAccessor;
 
         private readonly DateTime startDate = DateTime.Parse("2023-10-20");
+
+        public class Balance
+        {
+            public int id { get; set; }
+            public string shop { get; set; }
+            public string name { get; set; } = "";
+            public string cell { get; set; } = "";
+            public DateTime settleDate { get; set; }
+            public double deposit { get; set; } = 0;
+            public double refund { get; set; } = 0;
+            public double earn { get; set; } = 0;
+            public string staff { get; set; } = "";
+        }
 
         public RentController(ApplicationDBContext context, IConfiguration config, IHttpContextAccessor httpContextAccessor)
         {
@@ -63,6 +72,55 @@ namespace SnowmeetApi.Controllers
             {
                 return NotFound();
             }
+        }
+
+        [HttpGet]
+        public async Task<ActionResult<List<Balance>>> GetBalance(DateTime startDate, DateTime endDate, string sessionKey)
+        {
+            sessionKey = Util.UrlDecode(sessionKey).Trim();
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            if (!user.isAdmin)
+            {
+                return BadRequest();
+            }
+
+            var idList = await _context.idList.FromSqlRaw(" select distinct rent_list_id as id from rent_list_detail  "
+                + " where real_end_date >= '" + startDate.ToShortDateString() + "' "
+                + " and real_end_date <= '" + endDate.AddDays(1).ToShortDateString() + "' ")
+                .AsNoTracking().ToListAsync();
+            List<Balance> bList = new List<Balance>();
+            for (int i = 0; i < idList.Count; i++)
+            {
+                RentOrder order = (RentOrder)((OkObjectResult)(await GetRentOrder(idList[i].id, sessionKey)).Result).Value;
+                if (!order.status.Trim().Equals("已退款"))
+                {
+                    continue;
+                }
+                double totalPayment = 0;
+                double totalRefund = 0;
+                for (int j = 0; j < order.order.payments.Length; j++)
+                {
+                    totalPayment += order.order.payments[j].amount;
+                }
+                for (int j = 0; j < order.order.refunds.Length; j++)
+                {
+                    totalRefund += order.order.refunds[j].amount;
+                }
+                Balance b = new Balance()
+                {
+                    id = order.id,
+                    shop = order.shop,
+                    name = order.real_name.Trim(),
+                    cell = order.cell_number.Trim(),
+                    settleDate = (DateTime)order.end_date,
+                    deposit = totalPayment,
+                    refund = totalRefund,
+                    earn = totalPayment - totalRefund,
+                    staff = order.staff_name
+                };
+                bList.Add(b);
+            }
+            return Ok(bList);
         }
 
         [HttpPost]
