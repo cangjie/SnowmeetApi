@@ -870,6 +870,11 @@ namespace SnowmeetApi.Controllers
             for (int i = 0; i < orderArr.Length; i++)
             {
                 orderArr[i] = (RentOrder)((OkObjectResult)(await GetRentOrder(rentOrderList[i].id, sessionKey)).Result).Value;
+                if (!orderArr[i].status.Trim().Equals("已退款")
+                    && !orderArr[i].status.Trim().Equals("全部归还"))
+                {
+                    continue;
+                }
                 totalDeposit = orderArr[i].deposit_final + totalDeposit;
                 double subTotalRental = 0;
                 for (int j = 0; j < orderArr[i].rentalDetails.Count; j++)
