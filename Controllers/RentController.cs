@@ -866,20 +866,24 @@ namespace SnowmeetApi.Controllers
 
             double totalDeposit = 0;
             double totalRental = 0;
-            RentOrder[] orderArr = new RentOrder[rentOrderList.Count];
-            for (int i = 0; i < orderArr.Length; i++)
+            List<RentOrder> orderArr = new List<RentOrder>();
+            //RentOrder[] orderArr = new RentOrder[rentOrderList.Count];
+            for (int i = 0; i < rentOrderList.Count; i++)
             {
-                orderArr[i] = (RentOrder)((OkObjectResult)(await GetRentOrder(rentOrderList[i].id, sessionKey)).Result).Value;
-                if (!orderArr[i].status.Trim().Equals("已退款")
-                    && !orderArr[i].status.Trim().Equals("全部归还"))
+                RentOrder order = (RentOrder)((OkObjectResult)(await GetRentOrder(rentOrderList[i].id, sessionKey)).Result).Value;
+                //orderArr[i] = (RentOrder)((OkObjectResult)(await GetRentOrder(rentOrderList[i].id, sessionKey)).Result).Value;
+                if (!order.status.Trim().Equals("已退款")
+                    && !order.status.Trim().Equals("全部归还"))
                 {
                     continue;
+                    
                 }
-                totalDeposit = orderArr[i].deposit_final + totalDeposit;
+                orderArr.Add(order);
+                totalDeposit = order.deposit_final + totalDeposit;
                 double subTotalRental = 0;
-                for (int j = 0; j < orderArr[i].rentalDetails.Count; j++)
+                for (int j = 0; j < order.rentalDetails.Count; j++)
                 {
-                    RentalDetail detail = orderArr[i].rentalDetails[j];
+                    RentalDetail detail = order.rentalDetails[j];
                     subTotalRental = subTotalRental + detail.rental;
                 }
                 totalRental = totalRental + subTotalRental;
@@ -889,7 +893,7 @@ namespace SnowmeetApi.Controllers
             sum.type = "日租日结";
             sum.totalDeposit = totalDeposit;
             sum.totalRental = totalRental;
-            sum.orders = orderArr;
+            sum.orders = orderArr.ToArray<RentOrder>();
             sum.count = sum.orders.Length;
             return Ok(sum);
         }
