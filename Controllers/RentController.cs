@@ -104,7 +104,10 @@ namespace SnowmeetApi.Controllers
                 }
                 for (int j = 0; j < order.order.refunds.Length; j++)
                 {
-                    totalRefund += order.order.refunds[j].amount;
+                    if (!order.order.refunds[j].refund_id.Trim().Equals("") || order.order.refunds[j].state == 1)
+                    {
+                        totalRefund += order.order.refunds[j].amount;
+                    }
                 }
                 Balance b = new Balance()
                 {
