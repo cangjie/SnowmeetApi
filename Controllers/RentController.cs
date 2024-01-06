@@ -118,7 +118,11 @@ namespace SnowmeetApi.Controllers
                     earn = totalPayment - totalRefund,
                     staff = order.staff_name
                 };
-                bList.Add(b);
+                if (b.settleDate >= startDate && b.settleDate.Date <= endDate.Date)
+                {
+                    bList.Add(b);
+                }
+                
             }
             return Ok(bList);
         }
