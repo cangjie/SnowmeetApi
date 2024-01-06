@@ -38,7 +38,7 @@ namespace SnowmeetApi.Controllers
             public string shop { get; set; }
             public string name { get; set; } = "";
             public string cell { get; set; } = "";
-            public DateTime settleDate { get; set; }
+            public DateTime? settleDate { get; set; }
             public double deposit { get; set; } = 0;
             public double refund { get; set; } = 0;
             public double earn { get; set; } = 0;
@@ -115,15 +115,22 @@ namespace SnowmeetApi.Controllers
                     shop = order.shop,
                     name = order.real_name.Trim(),
                     cell = order.cell_number.Trim(),
-                    settleDate = (DateTime)order.end_date,
+                    settleDate = order.end_date,
                     deposit = totalPayment,
                     refund = totalRefund,
                     earn = totalPayment - totalRefund,
                     staff = order.staff_name
                 };
-                if (b.settleDate >= startDate && b.settleDate.Date <= endDate.Date)
+                try
                 {
-                    bList.Add(b);
+                    if (b.settleDate >= startDate && ((DateTime)b.settleDate).Date <= endDate.Date)
+                    {
+                        bList.Add(b);
+                    }
+                }
+                catch
+                {
+
                 }
                 
             }

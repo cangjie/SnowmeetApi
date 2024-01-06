@@ -42,7 +42,7 @@ namespace SnowmeetApi.Models.Rent
 
         public DateTime due_end_date { get; set; } = DateTime.Now;
 
-        public DateTime? end_date { get; set; } = DateTime.Now;
+        public DateTime? end_date { get; set; } = null;
 
         public double rental { get; set; } = 0;
 
