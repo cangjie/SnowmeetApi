@@ -964,15 +964,23 @@ namespace SnowmeetApi.Controllers
 
             double totalDeposit = 0;
             double totalRental = 0;
-            RentOrder[] orderArr = new RentOrder[rentOrderList.Count];
-            for (int i = 0; i < orderArr.Length; i++)
+            List<RentOrder> orderArr = new List<RentOrder>();
+
+            for (int i = 0; i < rentOrderList.Count; i++)
             {
-                orderArr[i] = (RentOrder)((OkObjectResult)(await GetRentOrder(rentOrderList[i].id, sessionKey)).Result).Value;
-                totalDeposit = orderArr[i].deposit_final + totalDeposit;
-                double subTotalRental = 0;
-                for (int j = 0; j < orderArr[i].rentalDetails.Count; j++)
+                RentOrder order = (RentOrder)((OkObjectResult)(await GetRentOrder(rentOrderList[i].id, sessionKey)).Result).Value;
+                if (!order.status.Trim().Equals("已退款")
+                    && !order.status.Trim().Equals("全部归还"))
                 {
-                    RentalDetail detail = orderArr[i].rentalDetails[j];
+                    continue;
+
+                }
+                orderArr.Add(order);
+                totalDeposit = order.deposit_final + totalDeposit;
+                double subTotalRental = 0;
+                for (int j = 0; j < order.rentalDetails.Count; j++)
+                {
+                    RentalDetail detail = order.rentalDetails[j];
                     if (detail.date.Date <= date.Date)
                     {
                         subTotalRental = subTotalRental + detail.rental;
@@ -985,7 +993,7 @@ namespace SnowmeetApi.Controllers
             sum.type = "当日新订单";
             sum.totalDeposit = totalDeposit;
             sum.totalRental = totalRental;
-            sum.orders = orderArr;
+            sum.orders = orderArr.ToArray<RentOrder>();
             return Ok(sum);
         }
 
