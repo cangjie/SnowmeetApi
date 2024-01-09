@@ -28,6 +28,29 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet]
+        public async Task<ActionResult<MiniAppUser>> SetStaff(string openId, bool isStaff, string sessionKey)
+        {
+            openId = Util.UrlDecode(openId);
+            sessionKey = Util.UrlDecode(sessionKey);
+            MiniAppUser managerUser = (MiniAppUser)((OkObjectResult)(await GetMiniUserOld(sessionKey)).Result).Value;
+            if (managerUser.is_manager != 1)
+            {
+                return NotFound();
+            }
+            MiniAppUser user = await _context.MiniAppUsers.FindAsync(openId);
+            if (isStaff)
+            {
+                user.is_admin = 1;
+            }
+            else
+            {
+                user.is_admin = 0;
+            }
+            return Ok(user);
+
+        }
+
+        [HttpGet]
         public async Task<ActionResult<IEnumerable<MiniAppUser>>> GetStaffList(string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey);
