@@ -46,6 +46,8 @@ namespace SnowmeetApi.Controllers
             {
                 user.is_admin = 0;
             }
+            _context.MiniAppUsers.Entry(user).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
             return Ok(user);
 
         }
