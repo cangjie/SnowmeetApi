@@ -32,7 +32,7 @@ namespace SnowmeetApi.Controllers
         {
             openId = Util.UrlDecode(openId);
             sessionKey = Util.UrlDecode(sessionKey);
-            MiniAppUser managerUser = (MiniAppUser)((OkObjectResult)(await GetMiniUserOld(sessionKey)).Result).Value;
+            MiniAppUser managerUser = (MiniAppUser)((OkObjectResult)(await GetMiniUser(sessionKey)).Result).Value;
             if (managerUser.is_manager != 1)
             {
                 return NotFound();
@@ -159,6 +159,21 @@ namespace SnowmeetApi.Controllers
                 return NotFound();
             }
             
+        }
+
+        [HttpGet]
+        public async Task<ActionResult<MiniAppUserList>> GetMiniUser(string sessionKey)
+        {
+            sessionKey = Util.UrlDecode(sessionKey.Trim());
+
+            var mSessionList = await _context.MiniSessons.Where(m => (m.session_key.Trim().Equals(sessionKey.Trim()))).ToListAsync();
+            if (mSessionList.Count == 0)
+            {
+                return NotFound();
+            }
+            MiniAppUser user = await _context.MiniAppUsers.FindAsync(mSessionList[0].open_id);
+            return Ok(user);
+
         }
 
         [HttpPost]
