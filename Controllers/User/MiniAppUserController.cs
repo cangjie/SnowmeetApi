@@ -28,6 +28,67 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet]
+        public async Task<ActionResult<string>> GetNewStaffName(string sessionKey)
+        {
+            string name = "";
+            sessionKey = Util.UrlDecode(sessionKey);
+            //(MiniAppUser)((await GetMiniUserOld(sessionKey)).Value)
+            //MiniAppUser miniUser = ((List<MiniAppUser>)(await GetMiniUserOld(sessionKey)).Value)[0];
+            MiniAppUser miniUser = await GetMiniAppUser(sessionKey);
+            if (miniUser == null)
+            {
+                return BadRequest();
+            }
+            string unionId = miniUser.union_id.Trim();
+            var oaUserList = await _context.officialAccoutUsers.Where(o => o.union_id.Trim().Equals(unionId.Trim()))
+                .AsNoTracking().ToListAsync();
+            if (oaUserList == null || oaUserList.Count == 0)
+            {
+                return BadRequest();
+            }
+            var sendMsgList = await _context.oAReceive.Where(r => r.FromUserName.Trim().Equals(oaUserList[0].open_id))
+                .OrderByDescending(m => m.id).AsNoTracking().ToListAsync();
+            for (int i = 0; sendMsgList != null && i < sendMsgList.Count; i++)
+            {
+                string msg = sendMsgList[i].Content.Trim();
+                if (msg.StartsWith("我要入职"))
+                {
+                    name = msg.Replace("我要入职", "").Trim();
+                    if (!name.Trim().Equals(""))
+                        break;
+                }
+            }
+            return Ok(name);
+        }
+
+        [HttpGet("{cell}")]
+        public async Task<ActionResult<int>> StaffCheckIn(string cell, string name, string sessionKey)
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            
+            MiniAppUser miniUser = await GetMiniAppUser(sessionKey);
+            name = Util.UrlDecode(name);
+            miniUser.real_name = name;
+            miniUser.cell_number = cell;
+            miniUser.is_admin = 1;
+            _context.MiniAppUsers.Entry(miniUser).State = EntityState.Modified;
+            int i = await _context.SaveChangesAsync();
+            return Ok(i);
+        }
+
+        [NonAction]
+        public async Task<MiniAppUser> GetMiniAppUser(string sessionKey)
+        {
+            var sList = await _context.MiniSessons.Where(s => s.session_key.Trim().Equals(sessionKey))
+                .OrderByDescending(s => s.create_date).AsNoTracking().ToListAsync();
+            if (sList == null || sList.Count <= 0)
+            {
+                return null;
+            }
+            return await _context.MiniAppUsers.FindAsync(sList[0].open_id);
+        }
+
+        [HttpGet]
         public async Task<ActionResult<IEnumerable<MiniAppUser>>> GetStaffList(string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey);
