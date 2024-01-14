@@ -43,6 +43,9 @@ namespace SnowmeetApi.Controllers
             public double refund { get; set; } = 0;
             public double earn { get; set; } = 0;
             public string staff { get; set; } = "";
+            public double reparation { get; set; } = 0;
+            public double rental { get; set; } = 0;
+            public string payMethod { get; set; } = "";
         }
 
         public RentController(ApplicationDBContext context, IConfiguration config, IHttpContextAccessor httpContextAccessor)
@@ -75,9 +78,10 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<List<Balance>>> GetBalance(DateTime startDate, DateTime endDate, string sessionKey)
+        public async Task<ActionResult<List<Balance>>> GetBalance(string shop, DateTime startDate, DateTime endDate, string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey).Trim();
+            shop = Util.UrlDecode(shop).Replace("'", "").Trim();
             UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
             if (!user.isAdmin)
             {
@@ -85,8 +89,11 @@ namespace SnowmeetApi.Controllers
             }
 
             var idList = await _context.idList.FromSqlRaw(" select distinct rent_list_id as id from rent_list_detail  "
+                + "left join rent_list on rent_list.[id] = rent_list_id"
                 + " where real_end_date >= '" + startDate.ToShortDateString() + "' "
-                + " and real_end_date <= '" + endDate.AddDays(1).ToShortDateString() + "' ")
+                + " and real_end_date <= '" + endDate.AddDays(1).ToShortDateString() + "' and shop like '" + shop + "%' "
+                //+ " and rent_list.[id] = 2434"
+                )
                 .AsNoTracking().ToListAsync();
             List<Balance> bList = new List<Balance>();
             for (int i = 0; i < idList.Count; i++)
@@ -109,6 +116,16 @@ namespace SnowmeetApi.Controllers
                         totalRefund += order.order.refunds[j].amount;
                     }
                 }
+                double totalReparation = 0;
+                double totalRental = 0;
+                for (int j = 0; j < order.details.Length; j++)
+                {
+                    totalReparation += order.details[j].reparation;
+                    RentOrderDetail detail = order.details[j];
+                    double subRental = Math.Round(detail.suggestRental, 2) - Math.Round(detail.rental_ticket_discount, 2)
+                        - Math.Round(detail.rental_discount , 2) + Math.Round(detail.overtime_charge, 2) ;
+                    totalRental += subRental;
+                }
                 Balance b = new Balance()
                 {
                     id = order.id,
@@ -119,7 +136,10 @@ namespace SnowmeetApi.Controllers
                     deposit = totalPayment,
                     refund = totalRefund,
                     earn = totalPayment - totalRefund,
-                    staff = order.staff_name
+                    reparation = totalReparation,
+                    staff = order.staff_name,
+                    payMethod = order.order.pay_method.Trim(),
+                    rental = totalRental //totalPayment - totalRefund - totalReparation
                 };
                 try
                 {

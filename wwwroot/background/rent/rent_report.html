@@ -24,7 +24,7 @@
         <h1 style="text-align:center">租赁业务报表</h1>
     </div>
     <div class="row_view" style="align-items:center;justify-content:center; margin-top:20px">
-        日期：从&nbsp;<input type="date" id="date_from" oninput="setDate()" />&nbsp;到&nbsp;<input type="date" id="date_to" oninput="setDate()" />&nbsp;<button id="btn" onclick="getData()"> 查 询 </button>
+        门店：<select id="shop"><option>万龙</option><option>南山</option><option>怀北</option><option>渔阳</option></select> 日期：从&nbsp;<input type="date" id="date_from" oninput="setDate()" />&nbsp;到&nbsp;<input type="date" id="date_to" oninput="setDate()" />&nbsp;<button id="btn" onclick="getData()"> 查 询 </button>
     </div>
     <div style="height:20px"></div>
     <h1></h1>
@@ -38,7 +38,10 @@
                 <td class="table_head">电话</td>
                 <td class="table_head">押金</td>
                 <td class="table_head">退款</td>
+                <td class="table_head">结余</td>
+                <td class="table_head">损坏赔偿</td>
                 <td class="table_head">租金</td>
+                <td class="table_head">支付方式</td>
                 <td class="table_head">日期</td>
                 <td class="table_head">时间</td>
                 <td class="table_head">接待</td>
@@ -52,7 +55,7 @@
 <script type="text/javascript">var currentColor = '#DDDDDD';
     var totalPaid = 0;
     function FillItem(item) {
-        var totalColNum = 10;
+        var totalColNum = 13;
         var orderIdIndex = 0;
         var rows = document.getElementById('report_rows');
         var newRow = document.createElement('tr');
@@ -142,10 +145,30 @@
             td_earn.attributes.setNamedItem(rightAttr)
             newRow.appendChild(td_earn);
 
+            rightAttr = document.createAttribute('style');
+            rightAttr.value = 'text-align:right';
+            var td_reparation = document.createElement('td');
+            td_reparation.innerText = formatAmount(item.reparation);
+            td_reparation.attributes.setNamedItem(rightAttr)
+            newRow.appendChild(td_reparation);
+
+            rightAttr = document.createAttribute('style');
+            rightAttr.value = 'text-align:right';
+            if (item.rental != item.earn) {
+                rightAttr.value = 'text-align:right;color:red';
+            }
+            var td_rental = document.createElement('td');
+            td_rental.innerText = formatAmount(item.rental);
+            td_rental.attributes.setNamedItem(rightAttr)
+            newRow.appendChild(td_rental);
+
+            var td_pay_method = document.createElement('td');
+            td_pay_method.innerText = item.payMethod;
+            //td_pay_method.attributes.setNamedItem(rightAttr)
+            newRow.appendChild(td_pay_method);
 
 
-
-            totalPaid += item.earn;
+            totalPaid += item.rental;
 
             var td_date = document.createElement('td');
             td_date.innerText = formatDate(item.settleDate);
@@ -167,13 +190,16 @@
     }
 
     function getData() {
+        var selShop = document.getElementById('shop');
+        var shop = encodeURIComponent(selShop.value);
+        
         totalPaid = 0;
         var rows = document.getElementById('report_rows');
         rows.innerHTML = '';
         var btnCtrl = document.getElementById('btn');
         btnCtrl.disabled = true;
         var getUrl = '../../core/Rent/GetBalance?sessionKey=' + encodeURIComponent(sessionKey)
-            + '&startDate=' + formatDate(startDate) + '&endDate=' + formatDate(endDate);
+            + '&startDate=' + formatDate(startDate) + '&endDate=' + formatDate(endDate) + '&shop=' + shop;
         $.ajax({
             url: getUrl,
             type: 'GET',

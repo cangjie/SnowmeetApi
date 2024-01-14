@@ -88,6 +88,31 @@ namespace SnowmeetApi.Controllers
             return await _context.MiniAppUsers.FindAsync(sList[0].open_id);
         }
 
+        public async Task<ActionResult<MiniAppUser>> SetStaff(string openId, bool isStaff, string sessionKey)
+        {
+            openId = Util.UrlDecode(openId);
+            sessionKey = Util.UrlDecode(sessionKey);
+            MiniAppUser managerUser = (MiniAppUser)((OkObjectResult)(await GetMiniUser(sessionKey)).Result).Value;
+            if (managerUser.is_manager != 1)
+            {
+                return NotFound();
+            }
+            MiniAppUser user = await _context.MiniAppUsers.FindAsync(openId);
+            if (isStaff)
+            {
+                user.is_admin = 1;
+            }
+            else
+            {
+                user.is_admin = 0;
+            }
+            _context.MiniAppUsers.Entry(user).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
+            return Ok(user);
+
+
+        }
+
         [HttpGet]
         public async Task<ActionResult<IEnumerable<MiniAppUser>>> GetStaffList(string sessionKey)
         {
@@ -197,6 +222,21 @@ namespace SnowmeetApi.Controllers
                 return NotFound();
             }
             
+        }
+
+        [HttpGet]
+        public async Task<ActionResult<MiniAppUserList>> GetMiniUser(string sessionKey)
+        {
+            sessionKey = Util.UrlDecode(sessionKey.Trim());
+
+            var mSessionList = await _context.MiniSessons.Where(m => (m.session_key.Trim().Equals(sessionKey.Trim()))).ToListAsync();
+            if (mSessionList.Count == 0)
+            {
+                return NotFound();
+            }
+            MiniAppUser user = await _context.MiniAppUsers.FindAsync(mSessionList[0].open_id);
+            return Ok(user);
+
         }
 
         [HttpPost]
