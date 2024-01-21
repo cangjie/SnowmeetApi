@@ -742,6 +742,10 @@ namespace SnowmeetApi.Controllers
             for (int i = 0; i < rentOrder.details.Length; i++)
             {
                 RentOrderDetail detail = rentOrder.details[i];
+                if (detail.deposit_type.Trim().Equals("立即租赁"))
+                {
+                    detail.start_date = DateTime.Now;
+                }
                 detail.rent_list_id = rentOrder.id;
                 await _context.RentOrderDetail.AddAsync(detail);
             }
