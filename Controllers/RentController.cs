@@ -1149,6 +1149,7 @@ namespace SnowmeetApi.Controllers
             {
                 return BadRequest();
             }
+            detail.memo = DateTime.Now.ToString() + " " + user.miniAppUser.real_name + " 追加";
             await _context.RentOrderDetail.AddAsync(detail);
             await _context.SaveChangesAsync();
             return Ok(detail);
