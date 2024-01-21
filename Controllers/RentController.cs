@@ -445,7 +445,7 @@ namespace SnowmeetApi.Controllers
                 }
                 else
                 {
-                    detail.rentStaff = null;
+                    detail.rentStaff = await _context.MiniAppUsers.FindAsync(rentOrder.staff_open_id);
 
                 }
 
