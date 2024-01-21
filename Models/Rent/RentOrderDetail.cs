@@ -98,7 +98,7 @@ namespace SnowmeetApi.Models.Rent
                                     status = "已领取";
                                 }
                             }
-                            if (log.Count > 0)
+                            if (log != null && log.Count > 0)
                             {
                                 status = log[0].status.Trim();
                             }
