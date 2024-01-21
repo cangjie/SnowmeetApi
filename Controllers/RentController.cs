@@ -733,10 +733,26 @@ namespace SnowmeetApi.Controllers
                 return BadRequest();
             }
             RentOrderDetail detail = await _context.RentOrderDetail.FindAsync(id);
-            detail.start_date = DateTime.Now;
+
+            DateTime startDate = DateTime.Now;
+            if (detail.start_date != null)
+            {
+                startDate = (DateTime)detail.start_date;
+                startDate = startDate.AddHours(DateTime.Now.Hour).AddMinutes(DateTime.Now.Minute);
+
+            }
+            else
+            {
+                startDate = DateTime.Now;
+            }
+
+            detail.start_date = startDate;
             detail.rent_staff = user.miniAppOpenId.Trim();
             _context.Entry(detail).State = EntityState.Modified;
             await _context.SaveChangesAsync();
+
+            await SetDetailLog(detail.id, "已发放", sessionKey);
+
             return Ok(detail);
         }
 
