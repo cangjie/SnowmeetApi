@@ -1140,7 +1140,7 @@ namespace SnowmeetApi.Controllers
 
         }
 
-        [HttpGet("{id}")]
+        [HttpGet("{orderId}")]
         public async Task<ActionResult<RentOrder>> SetMemo(int orderId, string memo, string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey).Trim();
