@@ -498,11 +498,11 @@ namespace SnowmeetApi.Controllers
                     }
                 }
 
-                detail.log = await _context.rentDetailLog.Where(l => l.detail_id == detail.id)
+                
+                detail.log = await _context.rentOrderDetailLog.Where(r => r.detail_id == detail.id)
                     .OrderByDescending(d => d.id).AsNoTracking().ToListAsync();
 
-                //if (rentOrder.start_date.Hour >= 16 && )
-
+                
                 switch (rentOrder.shop.Trim())
                 {
                     case "南山":
@@ -608,7 +608,7 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet("{id}")]
-        public async Task<ActionResult<RentDetailLog>> SetDetailLog(int id, string status, string sessionKey)
+        public async Task<ActionResult<RentOrderDetailLog>> SetDetailLog(int id, string status, string sessionKey)
         {
             UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
             if (!user.isAdmin)
@@ -639,7 +639,7 @@ namespace SnowmeetApi.Controllers
                     }
                 }
             }
-            RentDetailLog log = new RentDetailLog()
+            RentOrderDetailLog log = new RentOrderDetailLog()
             {
                 id = 0,
                 detail_id = id,
@@ -647,7 +647,8 @@ namespace SnowmeetApi.Controllers
                 staff_open_id = user.miniAppOpenId,
                 create_date = DateTime.Now
             };
-            await _context.rentDetailLog.AddAsync(log);
+            
+            await _context.rentOrderDetailLog.AddAsync(log);
             await _context.SaveChangesAsync();
             return Ok(log);
         }
@@ -665,7 +666,7 @@ namespace SnowmeetApi.Controllers
             _context.Entry(detail).State = EntityState.Modified;
             await _context.SaveChangesAsync();
             await SetDetailLog(id, "已发放", sessionKey);
-            detail.log = await _context.rentDetailLog.Where(l => l.detail_id == detail.id)
+            detail.log = await _context.rentOrderDetailLog.Where(l => l.detail_id == detail.id)
                 .OrderByDescending(l => l.id).AsNoTracking().ToListAsync();
             return Ok(detail);
         }
@@ -693,7 +694,7 @@ namespace SnowmeetApi.Controllers
 
 
             await SetDetailLog(id, "已归还", sessionKey);
-            detail.log = await _context.rentDetailLog.Where(l => l.detail_id == detail.id)
+            detail.log = await _context.rentOrderDetailLog.Where(l => l.detail_id == detail.id)
                 .OrderByDescending(l => l.id).AsNoTracking().ToListAsync();
 
 

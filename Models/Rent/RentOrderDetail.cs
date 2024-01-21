@@ -49,7 +49,8 @@ namespace SnowmeetApi.Models.Rent
 
         public string return_staff { get; set; } = "";
 
-        public List<RentDetailLog> log { get; set; }
+        [NotMapped]
+        public List<RentOrderDetailLog> log { get; set; }
 
         [NotMapped]
         public RentItem _item;
