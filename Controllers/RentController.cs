@@ -1140,6 +1140,28 @@ namespace SnowmeetApi.Controllers
 
         }
 
+        [HttpGet("{id}")]
+        public async Task<ActionResult<RentOrder>> SetMemo(int orderId, string memo, string sessionKey)
+        {
+            sessionKey = Util.UrlDecode(sessionKey).Trim();
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            if (!user.isAdmin)
+            {
+                return BadRequest();
+            }
+            memo = Util.UrlDecode(memo).Trim();
+
+            RentOrder? order = await _context.RentOrder.FindAsync(orderId);
+            if (order == null)
+            {
+                return BadRequest();
+            }
+            order.memo = memo;
+            _context.RentOrder.Entry(order).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
+            return Ok(order);
+        }
+
         [HttpPost]
         public async Task<ActionResult<RentOrderDetail>> AppendDetail(string sessionKey, RentOrderDetail detail)
         {
