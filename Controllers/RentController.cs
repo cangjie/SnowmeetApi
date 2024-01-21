@@ -377,6 +377,21 @@ namespace SnowmeetApi.Controllers
 
         }
 
+        [NonAction]
+        public async Task RestoreStaffInfo(RentOrder order)
+        {
+            var receptList = await _context.Recept.Where(r => r.submit_return_id == order.id)
+                .AsNoTracking().ToListAsync();
+            if (receptList != null && receptList.Count > 0)
+            {
+                order.staff_open_id = receptList[0].update_staff.Trim();
+                MiniAppUser? staffUser = await _context.MiniAppUsers.FindAsync(order.staff_open_id);
+                order.staff_name = staffUser == null ? "" : staffUser.real_name;
+                _context.RentOrder.Entry(order);
+                await _context.SaveChangesAsync();
+            }
+        }
+
         [HttpGet("{id}")]
         public async Task<ActionResult<RentOrder>> GetRentOrder(int id, string sessionKey)
         {
@@ -391,6 +406,17 @@ namespace SnowmeetApi.Controllers
             if (!user.isAdmin && !rentOrder.open_id.Trim().Equals(user.miniAppOpenId.Trim()))
             {
                 return BadRequest();
+            }
+            if (rentOrder.staff_open_id.Trim().Equals("") || rentOrder.staff_name.Trim().Equals(""))
+            {
+                try
+                {
+                    await RestoreStaffInfo(rentOrder);
+                }
+                catch
+                {
+                    
+                }
             }
             rentOrder.details = await _context.RentOrderDetail
                 .Where(d => d.rent_list_id == rentOrder.id).AsNoTracking().ToArrayAsync();
