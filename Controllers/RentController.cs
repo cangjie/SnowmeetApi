@@ -497,7 +497,9 @@ namespace SnowmeetApi.Controllers
                         returnTime = detail.real_end_date > returnTime ? (DateTime)detail.real_end_date : returnTime;
                     }
                 }
-                
+
+                detail.log = await _context.rentDetailLog.Where(l => l.detail_id == detail.id)
+                    .OrderByDescending(d => d.id).AsNoTracking().ToListAsync();
 
                 //if (rentOrder.start_date.Hour >= 16 && )
 
@@ -606,6 +608,51 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet("{id}")]
+        public async Task<ActionResult<RentDetailLog>> SetDetailLog(int id, string status, string sessionKey)
+        {
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            if (!user.isAdmin)
+            {
+                return BadRequest();
+            }
+            status = Util.UrlDecode(status);
+            if (status.Trim().Equals("已发放"))
+            {
+                RentOrderDetail? detail = await _context.RentOrderDetail.FindAsync(id);
+                if (detail != null)
+                {
+                    if (detail.start_date == null)
+                    {
+                        detail.start_date = DateTime.Now;
+                    }
+                    else
+                    {
+                        DateTime startDate = (DateTime)detail.start_date;
+                        if (startDate.Hour == 0 && startDate.Minute == 0 && startDate.Second == 0 && startDate.Millisecond == 0)
+                        {
+                            startDate = startDate.AddHours(DateTime.Now.Hour).AddMinutes(DateTime.Now.Minute);
+                        }
+                        detail.start_date = startDate;
+                        _context.RentOrderDetail.Entry(detail);
+                        await _context.SaveChangesAsync();
+
+                    }
+                }
+            }
+            RentDetailLog log = new RentDetailLog()
+            {
+                id = 0,
+                detail_id = id,
+                status = status,
+                staff_open_id = user.miniAppOpenId,
+                create_date = DateTime.Now
+            };
+            await _context.rentDetailLog.AddAsync(log);
+            await _context.SaveChangesAsync();
+            return Ok(log);
+        }
+
+        [HttpGet("{id}")]
         public async Task<ActionResult<RentOrderDetail>> SetUnReturn(int id, string sessionKey)
         {
             UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
@@ -617,6 +664,9 @@ namespace SnowmeetApi.Controllers
             detail.real_end_date = null;
             _context.Entry(detail).State = EntityState.Modified;
             await _context.SaveChangesAsync();
+            await SetDetailLog(id, "已发放", sessionKey);
+            detail.log = await _context.rentDetailLog.Where(l => l.detail_id == detail.id)
+                .OrderByDescending(l => l.id).AsNoTracking().ToListAsync();
             return Ok(detail);
         }
 
@@ -640,6 +690,12 @@ namespace SnowmeetApi.Controllers
             detail.return_staff = user.miniAppOpenId.Trim();
             _context.Entry(detail).State = EntityState.Modified;
             await _context.SaveChangesAsync();
+
+
+            await SetDetailLog(id, "已归还", sessionKey);
+            detail.log = await _context.rentDetailLog.Where(l => l.detail_id == detail.id)
+                .OrderByDescending(l => l.id).AsNoTracking().ToListAsync();
+
 
             bool allReturned = true;
 

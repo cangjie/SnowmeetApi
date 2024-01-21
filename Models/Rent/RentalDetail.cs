@@ -1,6 +1,8 @@
 ﻿using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Collections.Generic;
+
 namespace SnowmeetApi.Models.Rent
 {
     public class RentalDetail
@@ -13,6 +15,7 @@ namespace SnowmeetApi.Models.Rent
         public RentOrderDetail item { get; set; }
         public double rental { get; set; }
         public string type { get; set; }
+        
         public string name
         {
             get

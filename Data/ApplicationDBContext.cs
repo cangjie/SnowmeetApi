@@ -170,5 +170,7 @@ namespace SnowmeetApi.Data
 
         public DbSet<Models.IdList> idList { get; set; }
 
+        public DbSet<Models.Rent.RentDetailLog> rentDetailLog { get; set; }
+
     }
 }
