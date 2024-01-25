@@ -88,6 +88,7 @@ namespace SnowmeetApi.Controllers
             return await _context.MiniAppUsers.FindAsync(sList[0].open_id);
         }
 
+        [HttpGet]
         public async Task<ActionResult<MiniAppUser>> SetStaff(string openId, bool isStaff, string sessionKey)
         {
             openId = Util.UrlDecode(openId);
