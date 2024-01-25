@@ -726,6 +726,8 @@ namespace SnowmeetApi.Controllers
             rentOrder.deposit_final = rentOrder.deposit_real 
                 - rentOrder.deposit_reduce - rentOrder.deposit_reduce_ticket;
             rentOrder.ticket_code = recept.code;
+            rentOrder.staff_open_id = recept.recept_staff;
+            rentOrder.staff_name = recept.recept_staff_name;
             await _context.RentOrder.AddAsync(rentOrder);
             await _context.SaveChangesAsync();
             recept.rentOrder = rentOrder;
@@ -740,6 +742,10 @@ namespace SnowmeetApi.Controllers
             for (int i = 0; i < rentOrder.details.Length; i++)
             {
                 RentOrderDetail detail = rentOrder.details[i];
+                if (detail.deposit_type.Trim().Equals("立即租赁"))
+                {
+                    detail.start_date = DateTime.Now;
+                }
                 detail.rent_list_id = rentOrder.id;
                 await _context.RentOrderDetail.AddAsync(detail);
             }

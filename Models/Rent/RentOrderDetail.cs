@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 namespace SnowmeetApi.Models.Rent
@@ -49,6 +50,9 @@ namespace SnowmeetApi.Models.Rent
         public string return_staff { get; set; } = "";
 
         [NotMapped]
+        public List<RentOrderDetailLog>? log { get; set; } = null;
+
+        [NotMapped]
         public RentItem _item;
 
         [NotMapped]
@@ -84,7 +88,19 @@ namespace SnowmeetApi.Models.Rent
                             }
                             else
                             {
-                                status = "已领取";
+                                DateTime startDate = (DateTime)start_date;
+                                if (startDate.Hour == 0 && startDate.Minute == 0 && startDate.Second == 0 && startDate.Microsecond == 0)
+                                {
+                                    status = "未领取";
+                                }
+                                else
+                                {
+                                    status = "已领取";
+                                }
+                            }
+                            if (log != null && log.Count > 0)
+                            {
+                                status = log[0].status.Trim();
                             }
                             break;
                         
