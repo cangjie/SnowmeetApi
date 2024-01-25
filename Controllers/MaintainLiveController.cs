@@ -161,13 +161,15 @@ namespace SnowmeetApi.Controllers
             if (openId.Trim().Equals(""))
             {
                 orderList = await _context.OrderOnlines
-                    .Where(o => (o.create_date.Date >= start.Date && o.create_date.Date <= end.Date))
+                    .Where(o => (o.create_date.Date >= start.Date && o.create_date.Date <= end.Date
+                    && o.type.Equals("服务")))
                     .OrderByDescending(o=>o.id).ToArrayAsync();
             }
             else
             {
                 orderList = await _context.OrderOnlines
-                    .Where(o => (o.create_date.Date >= start.Date && o.create_date.Date <= end.Date && o.open_id.Trim().Equals(openId)))
+                    .Where(o => (o.create_date.Date >= start.Date && o.create_date.Date <= end.Date
+                    && o.open_id.Trim().Equals(openId) && o.type.Equals("服务") ))
                     .OrderByDescending(o=>o.id).ToArrayAsync();
             }
             MaintainOrder[] maintainOrderArray = new MaintainOrder[orderList.Length];
