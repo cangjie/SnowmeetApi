@@ -205,6 +205,8 @@ namespace SnowmeetApi.Controllers
                 {
                     taskL[i].order.open_id = "";
                 }
+                taskL[i].log = await _context.MaintainLog.Where(t => t.task_id == taskL[i].id)
+                    .OrderBy(t => t.id).AsNoTracking().ToArrayAsync();
             }
             return Ok(taskL);
         }
@@ -246,7 +248,7 @@ namespace SnowmeetApi.Controllers
 
             foreach (MaintainLive item in items)
             {
-                item.taskLog = await _context.MaintainLog.Where(l => l.task_id == item.id).OrderBy(l => l.id).ToArrayAsync();
+                item.taskLog = await _context.MaintainLog.Where(l => l.task_id == item.id).AsNoTracking().OrderBy(l => l.id).ToArrayAsync();
                 Models.Product.Product p = await _context.Product.FindAsync(item.confirmed_product_id);
                 itemPriceSummary = itemPriceSummary + (p!=null?p.sale_price:0) + item.confirmed_additional_fee;
             }
@@ -307,6 +309,7 @@ namespace SnowmeetApi.Controllers
                 task.open_id = "";
             }
             task.order = (OrderOnline)((OkObjectResult)(await _orderHelper.GetWholeOrderByStaff(task.order_id, sessionKey)).Result).Value;
+            task.log = await _context.MaintainLog.Where(l => l.task_id == id).OrderBy(m => m.id).AsNoTracking().ToArrayAsync();
             return Ok(task);
         }
 
