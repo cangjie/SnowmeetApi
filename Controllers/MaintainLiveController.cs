@@ -192,6 +192,41 @@ namespace SnowmeetApi.Controllers
             return maintainOrderArray;
         }
 
+        [HttpGet]
+        public async Task<ActionResult<List<MaintainLive>>> GetMyMaintainTask(string sessionKey)
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            var taskL = await GetMaintainTask(DateTime.Parse("2020-1-1"), DateTime.Parse("2099-1-1"), user.miniAppOpenId);
+            for (int i = 0; taskL != null && i < taskL.Count; i++)
+            {
+                taskL[i].open_id = "";
+                if (taskL[i].order != null)
+                {
+                    taskL[i].order.open_id = "";
+                }
+            }
+            return Ok(taskL);
+        }
+
+
+        [NonAction]
+        public async Task<List<MaintainLive>> GetMaintainTask(DateTime startDate, DateTime endDate, string openId)
+        {
+            openId = openId.Trim();
+            var taskL = await _context.MaintainLives.Where(m => (m.task_flow_num != null
+                && m.create_date.Date >= startDate && m.create_date.Date <= endDate.Date
+                && (openId.Equals("") || m.open_id.Trim().Equals(openId))))
+                .OrderByDescending(m=> m.id).AsNoTracking().ToListAsync();
+            for (int i = 0; taskL != null && i < taskL.Count; i++)
+            {
+                if (taskL[i].order_id > 0)
+                {
+                    taskL[i].order = await _context.OrderOnlines.FindAsync(taskL[i].order_id);
+                }
+            }
+            return taskL;
+        }
 
 
 
