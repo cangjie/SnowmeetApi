@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
@@ -77,6 +78,33 @@ namespace SnowmeetApi.Models
 
         [NotMapped]
         public string description { get; set; } = "";
+
+        [NotMapped]
+        public Maintain.MaintainLog[] log { get; set; }
+
+        
+        public string outStatus
+        {
+            get
+            {
+                string s = "未开始";
+                if (log != null && log.Length > 0)
+                {
+                    s = "已开始";
+                    if (log[log.Length - 1].step_name.Trim().Equals("发板")
+                        || log[log.Length - 1].step_name.Trim().Equals("强行索回"))
+                    {
+                        s = log[log.Length - 1].step_name.Trim();
+                    }
+                    else
+                    {
+                        s = "进行中";
+                    }
+                }
+                return s;
+
+            }
+        }
 
         //附加费用商品编号
         public int AddtionalFeeProductId
