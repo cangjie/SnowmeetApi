@@ -25,7 +25,7 @@ namespace SnowmeetApi.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Printer>>> GetPrinters(string shop, string color, string sessionKey)
         {
-            var l = await _db.Printer.Where(p => p.id <= 3)
+            var l = await _db.Printer.Where(p => (p.id <= 3 || p.id >= 8))
                 .AsNoTracking().ToListAsync();
             return Ok(l);
 
