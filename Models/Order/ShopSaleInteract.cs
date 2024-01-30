@@ -14,6 +14,7 @@ namespace SnowmeetApi.Models.Order
         public string staff_mapp_open_id { get; set; }
         public string scaner_oa_open_id { get; set; } = "";
         public int scan { get; set; } = 0;
+        public string scan_type { get; set; } = "recept";
         public DateTime create_date { get; set; } = DateTime.Now;
 
         [NotMapped]

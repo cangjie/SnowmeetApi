@@ -36,8 +36,9 @@ namespace SnowmeetApi.Controllers.Order
             miniAppUserHelper = new MiniAppUserController(context, config);
 
         }
+
         [HttpGet]
-        public async Task<ActionResult<int>> GetInterviewId(string sessionKey)
+        public async Task<ActionResult<int>> GetInterviewId(string sessionKey, string scanType = "recept")
         {
             sessionKey = Util.UrlDecode(sessionKey.Trim());
             
@@ -51,7 +52,9 @@ namespace SnowmeetApi.Controllers.Order
             try
             {
                 var scan = await _context
-                    .ShopSaleInteract.Where(s => s.staff_mapp_open_id == staffUser.miniAppOpenId.Trim())
+                    .ShopSaleInteract
+                    .Where(s => (s.staff_mapp_open_id == staffUser.miniAppOpenId.Trim()
+                    && s.scan_type.Trim().Equals(scanType.Trim())))
                     .OrderByDescending(s => s.id).FirstAsync();
                 if (scan == null || scan.scan == 1 || scan.create_date < DateTime.Now.AddMinutes(-600))
                 {
@@ -73,7 +76,8 @@ namespace SnowmeetApi.Controllers.Order
                 {
                     id = 0,
                     staff_mapp_open_id = staffUser.miniAppOpenId.Trim(),
-                    scan = 0
+                    scan = 0,
+                    scan_type = scanType.Trim()
                 };
                 await _context.AddAsync(scanNew);
                 await _context.SaveChangesAsync();
