@@ -79,7 +79,16 @@ namespace SnowmeetApi.Models.Rent
                     switch (deposit_type.Trim())
                     {
                         case "立即租赁":
+                            DateTime startDate = (DateTime)start_date;
                             status = "已领取";
+                            if (startDate.Hour == 0 && startDate.Minute == 0 && startDate.Second == 0 && startDate.Microsecond == 0)
+                            {
+                                status = "未领取";
+                            }
+                            else
+                            {
+                                status = "已领取";
+                            }
                             break;
                         default:
                             if (start_date == null)
@@ -88,7 +97,7 @@ namespace SnowmeetApi.Models.Rent
                             }
                             else
                             {
-                                DateTime startDate = (DateTime)start_date;
+                                startDate = (DateTime)start_date;
                                 if (startDate.Hour == 0 && startDate.Minute == 0 && startDate.Second == 0 && startDate.Microsecond == 0)
                                 {
                                     status = "未领取";
