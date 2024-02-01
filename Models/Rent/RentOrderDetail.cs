@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Runtime.InteropServices.Marshalling;
 namespace SnowmeetApi.Models.Rent
 {
 	[Table("rent_list_detail")]
@@ -79,15 +80,22 @@ namespace SnowmeetApi.Models.Rent
                     switch (deposit_type.Trim())
                     {
                         case "立即租赁":
-                            DateTime startDate = (DateTime)start_date;
-                            status = "已领取";
-                            if (startDate.Hour == 0 && startDate.Minute == 0 && startDate.Second == 0 && startDate.Microsecond == 0)
+                            if (start_date == null)
                             {
                                 status = "未领取";
                             }
                             else
                             {
+                                DateTime startDate = (DateTime)start_date;
                                 status = "已领取";
+                                if (startDate.Hour == 0 && startDate.Minute == 0 && startDate.Second == 0 && startDate.Microsecond == 0)
+                                {
+                                    status = "未领取";
+                                }
+                                else
+                                {
+                                    status = "已领取";
+                                }
                             }
                             break;
                         default:
@@ -97,7 +105,7 @@ namespace SnowmeetApi.Models.Rent
                             }
                             else
                             {
-                                startDate = (DateTime)start_date;
+                                DateTime startDate = (DateTime)start_date;
                                 if (startDate.Hour == 0 && startDate.Minute == 0 && startDate.Second == 0 && startDate.Microsecond == 0)
                                 {
                                     status = "未领取";
