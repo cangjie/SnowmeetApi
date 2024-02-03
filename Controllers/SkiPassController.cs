@@ -105,7 +105,7 @@ namespace SnowmeetApi.Controllers
                 tags = "节假日";
             }
 
-            if (date >= DateTime.Parse("2023-1-28") && date <= DateTime.Parse("2023-1-29"))
+            if (date >= DateTime.Parse("2024-2-4") )
             {
                 tags = "平日";
             }
