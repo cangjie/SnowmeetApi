@@ -196,7 +196,7 @@ namespace SnowmeetApi.Models.Rent
                 {
                     string status = details[i].status.Trim();
                     //if (details[i].real_end_date == null && details[i].start_date != null)
-                    if (status.Equals("已领取") || (status.Equals("未领取") && !details[i].deposit_type.Trim().Equals("立即租赁")))
+                    if (status.Equals("已发放") || (status.Equals("未领取") && !details[i].deposit_type.Trim().Equals("立即租赁")))
                     {
                         finish = false;
                         break;
