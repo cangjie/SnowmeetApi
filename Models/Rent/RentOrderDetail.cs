@@ -87,14 +87,14 @@ namespace SnowmeetApi.Models.Rent
                             else
                             {
                                 DateTime startDate = (DateTime)start_date;
-                                status = "已领取";
+                                status = "已发放";
                                 if (startDate.Hour == 0 && startDate.Minute == 0 && startDate.Second == 0 && startDate.Microsecond == 0)
                                 {
                                     status = "未领取";
                                 }
                                 else
                                 {
-                                    status = "已领取";
+                                    status = "已发放";
                                 }
                             }
                             break;
@@ -112,7 +112,7 @@ namespace SnowmeetApi.Models.Rent
                                 }
                                 else
                                 {
-                                    status = "已领取";
+                                    status = "已发放";
                                 }
                             }
                             if (log != null && log.Count > 0)
