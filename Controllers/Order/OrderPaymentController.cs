@@ -469,7 +469,7 @@ namespace SnowmeetApi.Controllers.Order
                         rentOrder.open_id = order.open_id;
                         _context.Entry(rentOrder).State = EntityState.Modified;
                         await _context.SaveChangesAsync();
-                        _rentHelper.StartRent(rentOrder.id);
+                        await _rentHelper.StartRent(rentOrder.id);
                     }
 
                     break;
