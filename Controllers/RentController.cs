@@ -58,7 +58,7 @@ namespace SnowmeetApi.Controllers
         }
 
         [NonAction]
-        public async  void StartRent(int rentId)
+        public async Task StartRent(int rentId)
         {
             var rentItemList = await _context.RentOrderDetail.Where(i => i.rent_list_id == rentId).ToListAsync();
             for (int i = 0; rentItemList != null && i < rentItemList.Count; i++)
