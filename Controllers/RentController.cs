@@ -57,6 +57,34 @@ namespace SnowmeetApi.Controllers
             _httpContextAccessor = httpContextAccessor;
         }
 
+        [NonAction]
+        public async  void StartRent(int rentId)
+        {
+            var rentItemList = await _context.RentOrderDetail.Where(i => i.rent_list_id == rentId).ToListAsync();
+            for (int i = 0; rentItemList != null && i < rentItemList.Count; i++)
+            {
+                RentOrderDetail detail = rentItemList[i];
+                if (detail.deposit_type.Trim().Equals("立即租赁"))
+                {
+                    DateTime nowTime = DateTime.Now;
+                    if (detail.start_date == null)
+                    {
+                        detail.start_date = DateTime.Now;
+                    }
+                    else
+                    {
+                        DateTime startDate = (DateTime)detail.start_date;
+                        startDate = startDate.AddHours(nowTime.Hour).AddMinutes(nowTime.Minute)
+                            .AddSeconds(nowTime.Second).AddMilliseconds(nowTime.Millisecond);
+                        detail.start_date = startDate;
+                    }
+                    _context.RentOrderDetail.Entry(detail).State = EntityState.Modified;
+                }
+            }
+            await _context.SaveChangesAsync();
+        }
+        
+
         [HttpGet("{code}")]
         public async Task<ActionResult<RentItem>> GetRentItem(string code, string shop)
         {

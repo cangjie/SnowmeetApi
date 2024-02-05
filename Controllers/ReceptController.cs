@@ -34,6 +34,8 @@ namespace SnowmeetApi.Controllers
 
         private readonly MaintainLiveController _maintainHelper;
 
+        private readonly RentController _rentHelper;
+
         public ReceptController(ApplicationDBContext context, IConfiguration config, IHttpContextAccessor httpContextAccessor)
         {
             _context = context;
@@ -42,6 +44,7 @@ namespace SnowmeetApi.Controllers
             _appId = _config.GetSection("AppId").Value.Trim();
             _httpContextAccessor = httpContextAccessor;
             _maintainHelper = new MaintainLiveController(context, config);
+            _rentHelper = new RentController(context, config, httpContextAccessor);
         }
 
         [HttpGet]
@@ -112,6 +115,7 @@ namespace SnowmeetApi.Controllers
                 case "租赁下单":
                     RentOrder rentOrder = await _context.RentOrder.FindAsync(recept.submit_return_id);
                     orderId = rentOrder.order_id;
+                    _rentHelper.StartRent(recept.submit_return_id);
                     break;
                 case "养护下单":
                     MaintainLiveController maintainHelper = new MaintainLiveController(_context, _oriConfig);
@@ -742,10 +746,12 @@ namespace SnowmeetApi.Controllers
             for (int i = 0; i < rentOrder.details.Length; i++)
             {
                 RentOrderDetail detail = rentOrder.details[i];
+                /*
                 if (detail.deposit_type.Trim().Equals("立即租赁"))
                 {
                     detail.start_date = DateTime.Now;
                 }
+                */
                 detail.rent_list_id = rentOrder.id;
                 await _context.RentOrderDetail.AddAsync(detail);
             }

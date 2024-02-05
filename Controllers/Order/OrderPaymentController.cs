@@ -38,6 +38,8 @@ namespace SnowmeetApi.Controllers.Order
 
         private readonly IHttpContextAccessor _httpContextAccessor;
 
+        private readonly RentController _rentHelper;
+
         public class TenpayResource
         {
             public string original_type { get; set; }
@@ -65,6 +67,7 @@ namespace SnowmeetApi.Controllers.Order
             _config = config.GetSection("Settings");
             _appId = _config.GetSection("AppId").Value.Trim();
             _httpContextAccessor = httpContextAccessor;
+            _rentHelper = new RentController(context, config, httpContextAccessor);
             UnicUser._context = context;
 
         }
@@ -466,7 +469,9 @@ namespace SnowmeetApi.Controllers.Order
                         rentOrder.open_id = order.open_id;
                         _context.Entry(rentOrder).State = EntityState.Modified;
                         await _context.SaveChangesAsync();
+                        _rentHelper.StartRent(rentOrder.id);
                     }
+
                     break;
                 case "UTV押金":
                     UTVController uCtl = new UTVController(_context, _originConfig, _httpContextAccessor);
