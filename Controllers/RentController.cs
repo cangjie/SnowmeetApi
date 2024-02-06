@@ -639,6 +639,10 @@ namespace SnowmeetApi.Controllers
             if (rentOrder.order.pay_state == 0)
             {
                 rentOrder.backColor = "red";
+                if (rentOrder.status.Trim().Equals("已关闭"))
+                {
+                    rentOrder.backColor = "";
+                }
             }
 
             if (!rentOrder.order.pay_method.Trim().Equals("微信支付") && rentOrder.status.Equals("全部归还"))
