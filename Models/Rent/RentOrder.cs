@@ -74,11 +74,17 @@ namespace SnowmeetApi.Models.Rent
 
         public DateTime create_date { get; set; } = DateTime.Now;
 
-
+        [NotMapped]
         public OrderOnline _order;
 
-
+        [NotMapped]
         public RentOrderDetail[]? _details;
+
+        [NotMapped]
+        public string textColor { get; set; } = "black";
+
+        [NotMapped]
+        public string backColor { get; set; } = "white";
 
         [NotMapped]
         public double discount

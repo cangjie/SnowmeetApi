@@ -630,6 +630,31 @@ namespace SnowmeetApi.Controllers
                 }
 
             }
+
+            if (rentOrder.pay_option.Trim().Equals("招待"))
+            {
+                rentOrder.backColor = "yellow";
+            }
+
+            if (rentOrder.order.pay_state == 0)
+            {
+                rentOrder.backColor = "red";
+            }
+
+            if (!rentOrder.order.pay_method.Trim().Equals("微信支付") && rentOrder.status.Equals("全部归还"))
+            {
+                rentOrder.textColor = "red";
+            }
+            if (rentOrder.status.Equals("已退款"))
+            {
+                rentOrder.textColor = "red";
+            }
+            if (rentOrder.status.Trim().Equals("已关闭"))
+            {
+                rentOrder.textColor = "#C0C0C0";
+            }
+
+
             var ret = Ok(rentOrder);
             return ret;
 
