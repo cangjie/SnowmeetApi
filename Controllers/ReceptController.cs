@@ -115,7 +115,7 @@ namespace SnowmeetApi.Controllers
                 case "租赁下单":
                     RentOrder rentOrder = await _context.RentOrder.FindAsync(recept.submit_return_id);
                     orderId = rentOrder.order_id;
-                    _rentHelper.StartRent(recept.submit_return_id);
+                    await _rentHelper.StartRent(recept.submit_return_id);
                     break;
                 case "养护下单":
                     MaintainLiveController maintainHelper = new MaintainLiveController(_context, _oriConfig);
