@@ -635,20 +635,27 @@ namespace SnowmeetApi.Controllers
             {
                 rentOrder.backColor = "yellow";
             }
-
-            if (rentOrder.order.pay_state == 0)
+            if (rentOrder.order != null)
             {
-                rentOrder.backColor = "red";
-                if (rentOrder.status.Trim().Equals("已关闭"))
+                if (rentOrder.order.pay_state == 0)
                 {
-                    rentOrder.backColor = "";
+                    rentOrder.backColor = "red";
+                    if (rentOrder.status.Trim().Equals("已关闭"))
+                    {
+                        rentOrder.backColor = "";
+                    }
+                }
+
+                if (!rentOrder.order.pay_method.Trim().Equals("微信支付") && rentOrder.status.Equals("全部归还"))
+                {
+                    rentOrder.textColor = "red";
                 }
             }
-
-            if (!rentOrder.order.pay_method.Trim().Equals("微信支付") && rentOrder.status.Equals("全部归还"))
+            else
             {
-                rentOrder.textColor = "red";
+                rentOrder.backColor = "yellow";
             }
+
             if (rentOrder.status.Equals("已退款"))
             {
                 rentOrder.textColor = "red";
