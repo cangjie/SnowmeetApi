@@ -546,6 +546,8 @@ namespace SnowmeetApi.Controllers
                     {
                         needVerriTicket = true;
                     }
+
+
                     break;
                 
                 case "养护下单":
@@ -785,11 +787,17 @@ namespace SnowmeetApi.Controllers
                 await _context.OrderOnlines.AddAsync(order);
                 await _context.SaveChangesAsync();
                 rentOrder.order_id = order.id;
-                
+
                 _context.Entry(rentOrder).State = EntityState.Modified;
                 await _context.SaveChangesAsync();
             }
-
+            else
+            {
+                if (rentOrder.pay_option.Trim().Equals("招待") || rentOrder.deposit_final == 0)
+                {
+                    await _rentHelper.StartRent(rentOrder.id);
+                }
+            }
             
             return recept;
         }
