@@ -325,7 +325,7 @@ namespace SnowmeetApi.Controllers
 
             var orderListTemp = await _context.RentOrder
                 .Where(o => ((o.cell_number.EndsWith(cell) || o.id == orderId ) && (shop.Equals("") || o.shop.Trim().Equals(shop)) )
-                && o.create_date.Date > DateTime.Parse("2023-11-5")    )
+                && o.create_date.Date > DateTime.Parse("2022-11-5")    )
                 .OrderByDescending(o => o.id).ToListAsync();
             if (orderListTemp == null || orderListTemp.Count <= 0)
             {
@@ -1385,6 +1385,48 @@ namespace SnowmeetApi.Controllers
             sessionKey = Util.UrlDecode(sessionKey).Trim();
             UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
             return user;
+        }
+
+        [HttpGet]
+        public async Task<List<RentOrder>> GetUnRetrunedItems()
+        {
+            var rentItemList = await _context.RentOrderDetail
+                .FromSqlRaw(" select * from rent_list_detail  "
+                + "  where  datepart(hh,rent_list_detail.start_date) <> 0 and  "
+                + " datepart(mi,rent_list_detail.start_date) <> 0 "
+                + " and datepart(s,rent_list_detail.start_date) <> 0 and real_end_date is null ")
+                .AsNoTracking().ToListAsync();
+            List<RentOrder> ret = new List<RentOrder>();
+            for (int i = 0; i < rentItemList.Count; i++)
+            {
+                RentOrderDetail item = rentItemList[i];
+                if (!item.status.Trim().Equals("已发放"))
+                {
+                    continue;
+                }
+                RentOrder rentOrder = await _context.RentOrder.FindAsync(item.rent_list_id);
+                if (rentOrder == null)
+                {
+                    continue;
+                }
+                if (rentOrder.order_id > 0)
+                {
+                    rentOrder.order = await _context.OrderOnlines.FindAsync(rentOrder.order_id);
+                    rentOrder.order.payments = await _context.OrderPayment
+                        .Where(p => p.order_id == rentOrder.order_id).ToArrayAsync();
+                    rentOrder.order.refunds = await _context.OrderPaymentRefund
+                        .Where(r => r.order_id == rentOrder.order_id).ToArrayAsync();
+                    rentOrder.details = new RentOrderDetail[] { item };
+                }
+                if (!rentOrder.status.Equals("已关闭")
+                    && !rentOrder.status.Equals("未支付")
+                    && !rentOrder.status.Equals("已退款")
+                    && !rentOrder.status.Equals("全部归还"))
+                {
+                    ret.Add(rentOrder);
+                }
+            }
+            return ret;
         }
 
 
