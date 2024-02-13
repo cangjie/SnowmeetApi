@@ -1408,7 +1408,8 @@ namespace SnowmeetApi.Controllers
                 .FromSqlRaw(" select * from rent_list_detail  "
                 + "  where  datepart(hh,rent_list_detail.start_date) <> 0 and  "
                 + " datepart(mi,rent_list_detail.start_date) <> 0 "
-                + " and datepart(s,rent_list_detail.start_date) <> 0 and real_end_date is null ")
+                + " and datepart(s,rent_list_detail.start_date) <> 0 "
+                + " and real_end_date is null order by [id] desc ")
                 .AsNoTracking().ToListAsync();
             List<RentOrder> ret = new List<RentOrder>();
             for (int i = 0; i < rentItemList.Count; i++)
