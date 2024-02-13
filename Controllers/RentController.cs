@@ -1388,7 +1388,21 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet]
-        public async Task<List<RentOrder>> GetUnRetrunedItems()
+        public async Task<ActionResult<RentOrder>> GetUnReturnedItems(string sessionKey, string shop)
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            shop = Util.UrlDecode(shop);
+            UnicUser user = await Util.GetUser(sessionKey, _context);
+            if (!user.isAdmin)
+            {
+                return BadRequest();
+            }
+            return Ok(await GetUnReturnedItems(shop));
+        }
+
+
+        [NonAction]
+        public async Task<List<RentOrder>> GetUnReturnedItems(string shop = "")
         {
             var rentItemList = await _context.RentOrderDetail
                 .FromSqlRaw(" select * from rent_list_detail  "
@@ -1423,7 +1437,10 @@ namespace SnowmeetApi.Controllers
                     && !rentOrder.status.Equals("已退款")
                     && !rentOrder.status.Equals("全部归还"))
                 {
-                    ret.Add(rentOrder);
+                    if (shop.Trim().Equals("") || rentOrder.shop.Trim().Equals(shop))
+                    {
+                        ret.Add(rentOrder);
+                    }
                 }
             }
             return ret;
