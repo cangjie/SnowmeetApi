@@ -387,7 +387,7 @@ namespace SnowmeetApi.Controllers
             {
                 return NoContent();
             }
-            var liveArr = await _context.MaintainLives.FromSqlRaw(" select top 100 * from maintain_in_shop_request "
+            var liveArr = await _context.MaintainLives.FromSqlRaw(" select top 300 * from maintain_in_shop_request "
                 + " where not exists ( select 'a' from maintain_log where maintain_log.task_id = maintain_in_shop_request.[id] and step_name in ('发板','强行索回') ) "
                 + (shop.Trim().Equals("")? " " : " and shop = '" + shop.Trim().Replace("'", "") + "'  ")
                 + " and task_flow_num <> '' order by [id] desc ").AsNoTracking().ToListAsync();
