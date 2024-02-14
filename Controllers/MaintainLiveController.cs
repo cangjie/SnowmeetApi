@@ -368,10 +368,74 @@ namespace SnowmeetApi.Controllers
                 desc += m.confirmed_memo;
                 m.description = desc;
 
-                m.order = (OrderOnline)((OkObjectResult) (await _orderHelper.GetWholeOrderByStaff(m.order_id, sessionKey)).Result).Value;
+                if (m.order_id > 0)
+                {
+                    m.order = (OrderOnline)((OkObjectResult)(await _orderHelper.GetWholeOrderByStaff(m.order_id, sessionKey)).Result).Value;
+                }
             }
 
             return Ok(liveArr);
+        }
+
+        [HttpGet]
+        public async Task<ActionResult<List<MaintainLive>>> GetInStockTask(string sessionKey)
+        {
+            sessionKey = Util.UrlDecode(sessionKey.Trim());
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            if (!user.isAdmin)
+            {
+                return NoContent();
+            }
+            var liveArr = await _context.MaintainLives.FromSqlRaw(" select top 100 * from maintain_in_shop_request "
+                + " where not exists ( select 'a' from maintain_log where maintain_log.task_id = maintain_in_shop_request.[id] and step_name in ('发板','强行索回') ) "
+                + " and task_flow_num <> '' order by [id] desc ").AsNoTracking().ToListAsync();
+
+            for (int i = 0; i < liveArr.Count; i++)
+            {
+                MaintainLive m = (MaintainLive)liveArr[i];
+                //var logs = 
+                m.taskLog = ((IEnumerable<MaintainLog>)((OkObjectResult)(await _logHelper.GetStepsByStaff(m.id, sessionKey)).Result).Value).ToArray();
+                string lastStep = m.taskLog.Length == 0 ? ""
+                    : m.taskLog[m.taskLog.Length - 1].step_name.Trim();
+
+                //lastStep = m.taskLog[m.taskLog.Length - 1].step_name.Trim();
+                if (m.taskLog == null || m.taskLog.Length == 0)
+                {
+                    m.status = "未开始";
+                }
+                else if (lastStep.Trim().Equals("发板") || lastStep.Trim().Equals("强行索回"))
+                {
+                    m.status = "已完成";
+                }
+                else
+                {
+                    m.status = "进行中";
+                }
+
+                string desc = "";
+                if (m.confirmed_edge == 1)
+                {
+                    desc += "修刃：" + m.confirmed_degree.ToString();
+                }
+                if (m.confirmed_candle == 1)
+                {
+                    desc += " 打蜡 ";
+                }
+                if (!m.confirmed_more.Trim().Equals(""))
+                {
+                    desc += " " + m.confirmed_more.Trim() + " ";
+                }
+                desc += m.confirmed_memo;
+                m.description = desc;
+
+                if (m.order_id > 0)
+                {
+                    m.order = (OrderOnline)((OkObjectResult)(await _orderHelper.GetWholeOrderByStaff(m.order_id, sessionKey)).Result).Value;
+                }
+            }
+
+            return Ok(liveArr);
+
         }
 
         [HttpPost]
