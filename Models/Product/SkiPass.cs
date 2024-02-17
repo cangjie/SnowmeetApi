@@ -90,7 +90,7 @@ namespace SnowmeetApi.Models.Product
 					valid = true;
 				}
 			}
-			if (date.Date == DateTime.Parse("2024-2-4") )
+			if (date.Date == DateTime.Parse("2024-2-19") )
 			{
                 if (tags.IndexOf("平日") >= 0)
                 {
