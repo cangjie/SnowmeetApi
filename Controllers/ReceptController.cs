@@ -462,8 +462,8 @@ namespace SnowmeetApi.Controllers
             }
             shop = Util.UrlDecode(shop).Trim();
             var list = await _context.Recept
-                .Where(r => (r.submit_return_id == 0 && r.create_date.Date == DateTime.Now.Date && r.shop.Trim().Equals(shop)))
-                .OrderBy(r => r.id).AsNoTracking().ToListAsync();
+                .Where(r => (r.submit_return_id == 0 && r.create_date.Date == DateTime.Now.Date && (r.shop.Trim().Equals(shop) || shop.Trim().Equals("") ) ))
+                .OrderByDescending(r => r.id).AsNoTracking().ToListAsync();
             if (list == null)
             {
                 return BadRequest();
