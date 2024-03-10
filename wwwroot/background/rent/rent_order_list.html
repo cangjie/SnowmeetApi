@@ -1,0 +1,302 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>租赁订单报表</title>
+    <link rel="stylesheet" href="../../css/table.css" />
+    <link rel="stylesheet" href="../../css/bootstrap.css" />
+    <link rel="stylesheet" href="../../css/bootstrap-grid.css" />
+    <link rel="stylesheet" href="../../css/bootstrap-reboot.css" />
+    <link rel="stylesheet" href="../../css/common.css" />
+    <script type="text/javascript" src="../../js/jquery-3.6.1.min.js"></script>
+    <script type="text/javascript" src="../../js/bootstrap.js"></script>
+    <script type="text/javascript" src="../../js/util.js"></script>
+    <script type="text/javascript" src="../../js/get_sessionkey.js"></script>
+    <script type="text/javascript">//alert(sessionKey);</script>
+    <style>
+        td {
+            text-align: center;
+            padding-left:5px;
+            padding-right:5px;
+            border:solid;
+            border-width:1px;
+            border-color:#fcfcfc;
+        }
+    </style>
+
+</head>
+<body>
+    <div style="margin-top: 20px">
+        <h1 style="text-align:center">租赁订单报表</h1>
+    </div>
+    <div class="row_view" style="align-items:center;justify-content:center; margin-top:20px">
+        日期：从&nbsp;<input type="date" id="date_from" oninput="setDate()" />&nbsp;到&nbsp;<input type="date" id="date_to" oninput="setDate()" />
+        &nbsp;<button id="btn" onclick="getData()"> 查 询 </button>&nbsp;<button  onclick="download()"> 下 载 </button>
+    </div>
+    <div style="text-align:center;display:flex;justify-content:center">
+        <table style="border:solid;border-width:1px" >
+            <thead>
+                <tr id="tHead">
+                </tr>
+            </thead>
+            <tbody id="tBody" class="table_body_row" >
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>
+<script type="text/javascript">
+    function download() {
+        if (tHead.length <= 0 || tData.length <= 0) {
+            return;
+        }
+        var csvContent = '';
+        var lineContent = '';
+        for (var i = 0; i < tHead.length; i++) {
+            lineContent += (i > 0 ? ',' : '') + tHead[i];
+        }
+        csvContent += lineContent + '\r\n';
+        for (var i = 0; i < tData.length; i++) {
+            lineContent = '';
+            for (var j = 0; j < tHead.length; j++) {
+                lineContent += (j > 0 ? ',' : '') + tData[i][j];
+            }
+            csvContent += lineContent + '\r\n';
+        }
+        csvContent = csvContent.trim();
+        var link = document.createElement('a');
+        link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvContent);
+        link.download = encodeURIComponent('rent_order_' + formatDate(startDate) + '_' + formatDate(endDate) + '.csv');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+    var tHeadTemplate = ['序号', '门店', '日序号', '订单日期', '支付时间', '订单号', '状态', '免押金', '押金', '姓名', '电话', '备注', '支付方式', '租金合计'];
+    var tHead = tHeadTemplate;
+    var tData = [];
+    function getData() {
+
+
+        tHeadTemplate = ['序号', '门店', '日序号', '订单日期', '支付时间', '订单号', '状态', '免押金', '押金', '姓名', '电话', '备注', '支付方式', '租金合计'];
+        tHead = tHeadTemplate;
+        tData = [];
+
+
+        var btnCtrl = document.getElementById('btn');
+        btnCtrl.disabled = true;
+        btnCtrl.innerText = "查询中……";
+        var getUrl = '../../core/Rent/GetRentOrderList?sessionKey=' + encodeURIComponent(sessionKey)
+            + '&startDate=' + formatDate(startDate) + '&endDate=' + formatDate(endDate);
+        $.ajax({
+            url: getUrl,
+            type: 'GET',
+            success: function (msg, status) {
+                console.log('get data msg', msg)
+                console.log('get data status', status)
+                btnCtrl.disabled = false;
+                btnCtrl.innerText = " 查 询 ";
+                if (status != 'success') {
+                    return
+                }
+                for (var i = 0; i < msg.maxRentalLength; i++) {
+                    tHead.push('租金' + (i + 1).toString());
+                }
+                tHead.push('退押金');
+                for (var i = 0; i < msg.maxRefundLength; i++) {
+                    tHead.push('退款金额' + (i + 1).toString());
+                    tHead.push('退款日期' + (i + 1).toString());
+                    tHead.push('退款时间' + (i + 1).toString());
+                }
+                
+
+                for (var i = 0; i < msg.items.length; i++) {
+                    var lineData = [];
+                    var data = msg.items[i];
+                    for (var j = 0; j < tHead.length; j++) {
+                        switch (tHead[j]) {
+                            case '序号':
+                                lineData[j] = (i + 1).toString();
+                                break;
+                            case '门店':
+                                lineData[j] = data.shop;
+                                break;
+                            case '日序号':
+                                lineData[j] = data.indexOfDay;
+                                break;
+                            case '订单日期':
+                                lineData[j] = formatDate(data.orderDate);
+                                break;
+                            case '支付时间':
+                                if (data.payDate != undefined && data.payDate != null) {
+                                    lineData[j] = formatTime(data.payDate);
+                                }
+                                else {
+                                    lineData[j] = '--';
+                                }
+                                break;
+                            case '订单号':
+                                lineData[j] = data.id;
+                                break;
+                            case '状态':
+                                lineData[j] = data.status;
+                                break;
+                            case '免押金':
+                                if (data.deposits == null ||data.deposits.length == 0) {
+                                    lineData[j] = '是';
+                                }
+                                else {
+                                    lineData[j] = '否';
+                                }
+                                break;
+                            case '押金':
+                                if (data.deposits != null && data.deposits.length != 0) {
+                                    lineData[j] = formatAmount(data.deposits[0].amount);
+                                }
+                                else {
+                                    lineData[j] = '¥0.00';
+                                }
+                                break;
+                            case '姓名':
+                                lineData[j] = data.name;
+                                break;
+                            case '电话':
+                                lineData[j] = data.cell;
+                                break;
+                            case '备注':
+                                lineData[j] = data.memo;
+                                break;
+                            case '支付方式':
+                                if (data.deposits != null && data.deposits.length != 0) {
+                                    lineData[j] = data.deposits[0].payMethod;
+                                }
+                                else {
+                                    lineData[j] = '--';
+                                }
+                                break;
+                            case '租金合计':
+                                var totalRental = 0;
+                                for (var k = 0; data.rental != null && data.rental != undefined && k < data.rental.length; k++) {
+                                    try {
+                                        if (data.rental[k] != null) {
+                                            totalRental += data.rental[k].rental;
+                                        }
+                                    }
+                                    catch {
+                                        console.log('error', data);
+                                    }
+                                }
+                                lineData[j] = formatAmount(totalRental);
+                                break;
+                            case '退押金':
+                                var totalRefund = 0;
+                                for (var k = 0; data.refunds != undefined && data.refunds != null &&  k < data.refunds.length; k++) {
+                                    totalRefund += data.refunds[k].amount;
+                                }
+                                lineData[j] = formatAmount(totalRefund);
+                                break;
+                            default:
+                                var colName = tHead[j];
+                                var realColName = '';
+                                if (colName.indexOf('租金') >= 0) {
+                                    realColName = '租金';
+                                }
+                                else if (colName.indexOf('退款金额') >= 0) {
+                                    realColName = '退款金额';
+                                }
+                                else if (colName.indexOf('退款日期') >= 0) {
+                                    realColName = '退款日期';
+                                }
+                                else {
+                                    realColName = '退款时间';
+                                }
+
+                                if (realColName == '') {
+                                    continue;
+                                }
+                                var colIndex = parseInt(colName.replace(realColName, ''));
+                                colIndex--;
+                                if (colIndex < 0) {
+                                    continue;
+                                }
+                                switch (realColName) {
+                                    case '租金':
+                                        if (data.rental != undefined && data.rental != null && data.rental.length > 0
+                                            && data.rental[colIndex] != null) {
+                                            lineData[j] = formatAmount(data.rental[colIndex].rental);
+                                        }
+                                        else {
+                                            lineData[j] = '--';
+                                        }
+                                        
+                                        break;
+                                    case '退款金额':
+                                        if (data.refunds != undefined && data.refunds != null && data.refunds.length > 0
+                                            && data.refunds[colIndex] != null ) {
+                                            lineData[j] = formatAmount(data.refunds[colIndex].amount);
+                                        }
+                                        else {
+                                            lineData[j] = '--';
+                                        }
+                                        break;
+                                    case '退款日期':
+                                        if (data.refunds != undefined && data.refunds != null && data.refunds.length > 0
+                                            && data.refunds[colIndex] != null) {
+                                            lineData[j] = formatDate(data.refunds[colIndex].refundDate);
+                                        }
+                                        else {
+                                            lineData[j] = '--';
+                                        }
+                                        break;
+                                    case '退款时间':
+                                        if (data.refunds != undefined && data.refunds != null && data.refunds.length > 0
+                                            && data.refunds[colIndex] != null) {
+                                            lineData[j] = formatTime(data.refunds[colIndex].refundDate);
+                                        }
+                                        else {
+                                            lineData[j] = '--';
+                                        }
+                                        break;
+                                    default:
+                                        break;
+                                }
+                                break;
+                        }
+                    }
+                    console.log('line data', lineData);
+                    tData.push(lineData);
+                }
+                console.log('get head', tHead);
+                render();
+            },
+            finally: function (msg, status) {
+                btnCtrl.disabled = false;
+                btnCtrl.innerText = " 查 询 ";
+            }
+        })
+    }
+    function render() {
+        var tHeadCtl = document.getElementById('tHead');
+        tHeadCtl.innerHTML = '';
+        for (var i = 0; i < tHead.length; i++) {
+            var td = document.createElement('td');
+            td.innerText = tHead[i];
+            var classAttr = document.createAttribute('class');
+            classAttr.value = 'table_head';
+            td.attributes.setNamedItem(classAttr);
+            tHeadCtl.appendChild(td);
+        }
+        var tBodyCtl = document.getElementById('tBody');
+        tBodyCtl.innerHTML = '';
+        for (var i = 0; i < tData.length; i++) {
+            var tr = document.createElement('tr');
+            
+            for (var j = 0; j < tHead.length; j++) {
+                var td = document.createElement('td');
+                td.innerText = tData[i][j];
+                tr.appendChild(td);
+            }
+            tBodyCtl.appendChild(tr);
+        }
+    }
+</script>
+<script type="text/javascript" src="../../js/date_selector.js"></script>

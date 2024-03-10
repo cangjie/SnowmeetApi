@@ -304,6 +304,35 @@ namespace SnowmeetApi
             UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, db)).Value;
             return user;
         }
+
+        public static string GetDayOfWeek(DateTime date)
+        {
+            string ret = "";
+            switch (date.DayOfWeek)
+            {
+                case DayOfWeek.Sunday:
+                    ret = "日";
+                    break;
+                case DayOfWeek.Monday:
+                    ret = "一";
+                    break;
+                case DayOfWeek.Tuesday:
+                    ret = "二";
+                    break;
+                case DayOfWeek.Wednesday:
+                    ret = "三";
+                    break;
+                case DayOfWeek.Thursday:
+                    ret = "四";
+                    break;
+                case DayOfWeek.Friday:
+                    ret = "五";
+                    break;
+                default:
+                    break;
+            }
+            return ret;
+        }
     }
 
 }

@@ -1447,6 +1447,117 @@ namespace SnowmeetApi.Controllers
             return ret;
         }
 
+        [HttpGet]
+        public async Task<ActionResult<RentOrderList>> GetRentOrderList(DateTime startDate, DateTime endDate, string sessionKey)
+        {
+            sessionKey = Util.UrlDecode(sessionKey).Trim();
+            UnicUser user = await Util.GetUser(sessionKey, _context);
+            if (!user.isAdmin)
+            {
+                return BadRequest();
+            }
+
+            RentOrderList list = new RentOrderList();
+            list.items = new List<RentOrderList.ListItem>();
+
+            var rentList = await _context.RentOrder.FromSqlRaw(" select * from rent_list where ( pay_option = '招待' "
+                + " or exists ( select 'a' from order_online where rent_list.order_id = order_online.id and pay_state = 1 ) ) "
+                + " and create_date >= '" + startDate.ToShortDateString() + "' and create_date < '" + endDate.AddDays(1).ToShortDateString() + "' ")
+                .OrderByDescending(r => r.id).AsNoTracking().ToListAsync();
+            for (int i = 0; i < rentList.Count; i++)
+            {
+                RentOrder rentOrder = (RentOrder)((OkObjectResult)(await GetRentOrder(rentList[i].id, sessionKey)).Result).Value;
+                if (!rentOrder.pay_option.Trim().Equals("招待")
+                    && (rentOrder.order_id == 0 || rentOrder.order == null || rentOrder.order.pay_state != 1))
+                {
+                    continue;
+                }
+                if (!rentOrder.status.Equals("全部归还") && !rentOrder.status.Equals("已退款"))
+                {
+                    continue;
+                }
+                    
+                RentOrderList.ListItem item = new RentOrderList.ListItem();
+                item.cell = rentOrder.cell_number.Trim();
+                item.name = rentOrder.real_name.Trim();
+                item.dayOfWeek = Util.GetDayOfWeek(rentOrder.create_date);
+                item.staffOpenId = rentOrder.staff_open_id;
+                item.staffName = rentOrder.staff_name;
+                item.status = rentOrder.status;
+                item.shop = rentOrder.shop.Trim();
+                item.orderDate = rentOrder.create_date;
+                item.payDate = (rentOrder.order != null && rentOrder.order.pay_state == 1) ?
+                    rentOrder.order.pay_time : null;
+                item.id = rentOrder.id;
+                item.memo = rentOrder.memo;
+                for (int j = 0; rentOrder.order_id != 0 && rentOrder.order != null
+                    &&  j < rentOrder.order.payments.Length; j++)
+                {
+                    if (rentOrder.order.payments[j].status.Trim().Equals("支付成功"))
+                    {
+                        RentOrderList.RentDeposit deposit = new RentOrderList.RentDeposit();
+                        deposit.id = rentOrder.order.payments[j].id;
+                        deposit.payDate = (DateTime)rentOrder.order.pay_time;
+                        deposit.payMethod = rentOrder.order.payments[j].pay_method.Trim();
+                        deposit.amount = rentOrder.order.payments[j].amount;
+                        item.deposits = new RentOrderList.RentDeposit[] { deposit };
+                    }
+                }
+
+                List<RentOrderList.RentRefund> refundList = new List<RentOrderList.RentRefund>();
+                //item.refunds = new RentOrderList.RentRefund[rentOrder.order.refunds.Length];
+                for (int j = 0; rentOrder.order_id != 0 && rentOrder.order != null
+                    && j < rentOrder.order.refunds.Length; j++)
+                {
+                    RentOrderList.RentRefund r = new RentOrderList.RentRefund();
+                    r.id = rentOrder.order.refunds[j].id;
+                    r.refundDate = rentOrder.order.refunds[j].create_date;
+                    r.depositId = rentOrder.order.refunds[j].payment_id;
+                    r.amount = rentOrder.order.refunds[j].amount;
+                    //item.refunds[j] = r;
+                    refundList.Add(r);
+                }
+                item.refunds = refundList.ToArray<RentOrderList.RentRefund>();
+                item.rental = new RentOrderList.Rental[rentOrder.rentalDetails.Count];
+                for (int j = 0; rentOrder.order_id != 0 && rentOrder.order != null
+                    &&  j < rentOrder.rentalDetails.Count; j++)
+                {
+                    RentOrderList.Rental r = new RentOrderList.Rental();
+                    r.rental = rentOrder.rentalDetails[j].rental;
+                    r.rentalDate = rentOrder.rentalDetails[j].date;
+                    item.rental[j] = r;
+                }
+
+                list.items.Add(item);
+
+            }
+
+            list.startDate = startDate;
+            list.endDate = endDate;
+            int dayIndex = 1;
+            for (int i = list.items.Count - 1; i >= 0; i--)
+            {
+                list.items[i].indexOfDay = dayIndex;
+                if (i > 0)
+                {
+                    if (list.items[i].orderDate.Date < list.items[i - 1].orderDate.Date)
+                    {
+                        dayIndex = 1;
+                    }
+                    else
+                    {
+                        dayIndex++;
+                    }
+                }
+                list.maxDepositsLength = Math.Max(list.maxDepositsLength,
+                    (list.items[i].deposits != null) ?list.items[i].deposits.Length: 0);
+                list.maxRefundLength = Math.Max(list.maxRefundLength,
+                    (list.items[i].refunds != null) ?list.items[i].refunds.Length : 0);
+                list.maxRentalLength = Math.Max(list.maxRentalLength,
+                    (list.items[1].rental != null) ? list.items[1].rental.Length : 0);
+            }
+            return Ok(list);
+        }
 
         /*
         [HttpGet]
