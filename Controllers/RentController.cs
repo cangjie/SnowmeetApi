@@ -1462,7 +1462,9 @@ namespace SnowmeetApi.Controllers
 
             var rentList = await _context.RentOrder.FromSqlRaw(" select * from rent_list where ( pay_option = '招待' "
                 + " or exists ( select 'a' from order_online where rent_list.order_id = order_online.id and pay_state = 1 ) ) "
-                + " and create_date >= '" + startDate.ToShortDateString() + "' and create_date < '" + endDate.AddDays(1).ToShortDateString() + "' ")
+                + " and create_date >= '" + startDate.ToShortDateString() + "' and create_date < '" + endDate.AddDays(1).ToShortDateString() + "' "
+                //+ " and [id] = 4297 "
+                )
                 .OrderByDescending(r => r.id).AsNoTracking().ToListAsync();
             for (int i = 0; i < rentList.Count; i++)
             {
@@ -1518,16 +1520,37 @@ namespace SnowmeetApi.Controllers
                     refundList.Add(r);
                 }
                 item.refunds = refundList.ToArray<RentOrderList.RentRefund>();
-                item.rental = new RentOrderList.Rental[rentOrder.rentalDetails.Count];
+
+                List<RentOrderList.Rental> rentalList = new List<RentOrderList.Rental>();
+                //item.rental = new RentOrderList.Rental[rentOrder.rentalDetails.Count];
                 for (int j = 0; rentOrder.order_id != 0 && rentOrder.order != null
                     &&  j < rentOrder.rentalDetails.Count; j++)
                 {
-                    RentOrderList.Rental r = new RentOrderList.Rental();
-                    r.rental = rentOrder.rentalDetails[j].rental;
-                    r.rentalDate = rentOrder.rentalDetails[j].date;
-                    item.rental[j] = r;
+                    if (rentOrder.rentalDetails[j] == null)
+                    {
+                        continue;
+                    }
+                    RentalDetail rentalDtl = rentOrder.rentalDetails[j];
+                    bool exists = false;
+                    for (int k = 0; k < rentalList.Count; k++)
+                    {
+                        if (rentalList[k].rentalDate.Date == rentalDtl.date.Date)
+                        {
+                            rentalList[k].rental += rentalDtl.rental;
+                            exists = true;
+                            break;
+                        }
+                    }
+                    if (!exists)
+                    {
+                        RentOrderList.Rental r = new RentOrderList.Rental();
+                        r.rental = rentOrder.rentalDetails[j].rental;
+                        r.rentalDate = rentOrder.rentalDetails[j].date;
+                        rentalList.Add(r);
+                    }
+                    
                 }
-
+                item.rental = rentalList.ToArray();
                 list.items.Add(item);
 
             }
@@ -1554,7 +1577,7 @@ namespace SnowmeetApi.Controllers
                 list.maxRefundLength = Math.Max(list.maxRefundLength,
                     (list.items[i].refunds != null) ?list.items[i].refunds.Length : 0);
                 list.maxRentalLength = Math.Max(list.maxRentalLength,
-                    (list.items[1].rental != null) ? list.items[1].rental.Length : 0);
+                    (list.items[i].rental != null) ? list.items[i].rental.Length : 0);
             }
             return Ok(list);
         }
