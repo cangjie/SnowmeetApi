@@ -258,7 +258,11 @@ namespace SnowmeetApi.Models.Rent
                 {
                     RentOrderDetail rentOrderDetail = details[i];
                     DateTime endDate = rentOrderDetail.real_end_date == null ? DateTime.Now : (DateTime)rentOrderDetail.real_end_date;
-                    
+                    if (details[i].start_date != null)
+                    {
+                        start_date = (DateTime)details[i].start_date;
+                        startDate = start_date;
+                    }
 
                     //夜场
                     if (start_date.Date == endDate.Date && start_date.Hour >= 16)
