@@ -128,7 +128,8 @@ namespace SnowmeetApi.Controllers
         public void ShowImageFromOfficialAccount(string img)
         {
             img = Util.UrlDecode(img);
-            string imgUrl = "http://weixin.snowmeet.top/" + img;
+            string scene = img.Split('=')[1].Trim();
+            string imgUrl = "https://wxoa.snowmeet.top/api/OfficialAccountApi/GetOAQRCodeUrl?content=" + scene.Trim();
             HttpWebRequest req = (HttpWebRequest)WebRequest.Create(imgUrl);
             HttpWebResponse res = (HttpWebResponse)req.GetResponse();
             byte[] buf = new byte[1024 * 1024 * 100];
