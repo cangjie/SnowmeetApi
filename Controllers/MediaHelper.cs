@@ -130,7 +130,8 @@ namespace SnowmeetApi.Controllers
             img = Util.UrlDecode(img);
             string scene = img.Split('=')[1].Trim();
             string imgUrl = "https://wxoa.snowmeet.top/api/OfficialAccountApi/GetOAQRCodeUrl?content=" + scene.Trim();
-            HttpWebRequest req = (HttpWebRequest)WebRequest.Create(imgUrl);
+            string qrCodeUrl = Util.GetWebContent(imgUrl);
+            HttpWebRequest req = (HttpWebRequest)WebRequest.Create(qrCodeUrl);
             HttpWebResponse res = (HttpWebResponse)req.GetResponse();
             byte[] buf = new byte[1024 * 1024 * 100];
             Stream s = res.GetResponseStream();
