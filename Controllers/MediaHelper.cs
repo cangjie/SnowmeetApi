@@ -158,6 +158,22 @@ namespace SnowmeetApi.Controllers
             }
             sOut.Close();
         }
+
+        [HttpGet]
+        public void GetQRCode(string qrCodeText)
+        {
+            byte[] bArr = QRCoder.BitmapByteQRCodeHelper.GetQRCode(qrCodeText, QRCoder.QRCodeGenerator.ECCLevel.Q, 5);
+            Response.ContentType = "image/jpeg";
+            Response.ContentLength = bArr.Length;
+            PipeWriter pw = Response.BodyWriter;
+            Stream sOut = pw.AsStream();
+            for (int k = 0; k < bArr.Length; k++)
+            {
+                sOut.WriteByte(bArr[k]);
+            }
+            sOut.Close();
+        }
+
     }
 
 

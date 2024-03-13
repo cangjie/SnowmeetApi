@@ -38,7 +38,8 @@ namespace SnowmeetApi.Controllers.Background
             };
             await _context.BackgroundLoginSession.AddAsync(session);
             await _context.SaveChangesAsync();
-            return "http://weixin.snowmeet.top/show_qrcode.aspx?qrcodetext=" + timeStamp.ToString();
+            return "https://mini.snowmeet.top/core/MediaHelper/GetQRCode?qrCodeText=" + timeStamp.ToString();
+            //return "http://weixin.snowmeet.top/show_qrcode.aspx?qrcodetext=" + timeStamp.ToString();
         }
 
 
