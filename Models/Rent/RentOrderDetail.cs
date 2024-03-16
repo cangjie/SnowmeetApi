@@ -115,13 +115,14 @@ namespace SnowmeetApi.Models.Rent
                                     status = "已发放";
                                 }
                             }
-                            if (log != null && log.Count > 0)
-                            {
-                                status = log[0].status.Trim();
-                            }
+                            
                             break;
                         
                     }
+                }
+                if (log != null && log.Count > 0)
+                {
+                    status = log[0].status.Trim();
                 }
                 return status.Trim();
             }
