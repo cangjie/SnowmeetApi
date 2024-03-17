@@ -1440,7 +1440,18 @@ namespace SnowmeetApi.Controllers
                 {
                     if (shop.Trim().Equals("") || rentOrder.shop.Trim().Equals(shop))
                     {
-                        ret.Add(rentOrder);
+                        bool exists = false;
+                        for (int j = 0; j < ret.Count; j++)
+                        {
+                            if (ret[j].id == rentOrder.id)
+                            {
+                                exists = true;
+                            }
+                        }
+                        if (!exists)
+                        {
+                            ret.Add(rentOrder);
+                        }
                     }
                 }
             }
