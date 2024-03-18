@@ -1419,7 +1419,13 @@ namespace SnowmeetApi.Controllers
                 {
                     continue;
                 }
-                RentOrder rentOrder = await _context.RentOrder.FindAsync(item.rent_list_id);
+                var rL = await _context.RentOrder.Where(r => r.id == item.rent_list_id)
+                    .AsNoTracking().ToListAsync();
+                if (rL == null || rL.Count == 0)
+                {
+                    continue;
+                }
+                RentOrder rentOrder = rL[0];
                 if (rentOrder == null)
                 {
                     continue;
@@ -1431,8 +1437,9 @@ namespace SnowmeetApi.Controllers
                         .Where(p => p.order_id == rentOrder.order_id).ToArrayAsync();
                     rentOrder.order.refunds = await _context.OrderPaymentRefund
                         .Where(r => r.order_id == rentOrder.order_id).ToArrayAsync();
-                    rentOrder.details = new RentOrderDetail[] { item };
+                    
                 }
+                rentOrder.details = new RentOrderDetail[] { item };
                 if (!rentOrder.status.Equals("已关闭")
                     && !rentOrder.status.Equals("未支付")
                     && !rentOrder.status.Equals("已退款")
@@ -1440,18 +1447,8 @@ namespace SnowmeetApi.Controllers
                 {
                     if (shop.Trim().Equals("") || rentOrder.shop.Trim().Equals(shop))
                     {
-                        bool exists = false;
-                        for (int j = 0; j < ret.Count; j++)
-                        {
-                            if (ret[j].id == rentOrder.id)
-                            {
-                                exists = true;
-                            }
-                        }
-                        if (!exists)
-                        {
-                            ret.Add(rentOrder);
-                        }
+                        
+                        ret.Add(rentOrder);
                     }
                 }
             }
