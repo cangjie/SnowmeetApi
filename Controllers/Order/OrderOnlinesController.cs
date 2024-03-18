@@ -495,7 +495,8 @@ namespace SnowmeetApi.Controllers
                 }
                 order.payments = payments;
 
-                var refunds = await _context.OrderPaymentRefund.Where(r => r.order_id == order.id).ToArrayAsync();
+                var refunds = await _context.OrderPaymentRefund.Where(r => r.order_id == order.id
+                    && (r.state == 1 || !r.refund_id.Trim().Equals(""))).ToArrayAsync();
                 if (refunds != null)
                 {
 
