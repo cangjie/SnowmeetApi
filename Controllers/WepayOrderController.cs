@@ -464,9 +464,24 @@ namespace SnowmeetApi.Controllers
             public string download_url { get; set; }
         }
 
+        [HttpGet]
+        public async Task DownloadCurrentSeason()
+        {
+            int[] mchId = new int[] { 1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 15, 17 };
+            for (DateTime i = DateTime.Parse("2023-12-20"); i <= DateTime.Parse("2024-3-21"); i = i.AddDays(1))
+            {
+                for (int j = 0; j < mchId.Length; j++)
+                {
+                    await RequestTradeBill(mchId[j], i);
+                }
+            }
+        }
+
+
         [HttpGet("{mchId}")]
         public async Task  RequestTradeBill(int mchId, DateTime billDate)
         {
+            Console.WriteLine(mchId.ToString() + "\t" + billDate.ToShortDateString());
             var summaryList = await _context.wepaySummary.Where(s => s.trans_date.Date == billDate.Date && s.mch_id == mchId)
                 .AsNoTracking().ToListAsync();
             if (summaryList != null && summaryList.Count > 0)
@@ -489,6 +504,11 @@ namespace SnowmeetApi.Controllers
             sr.Close();
             DownloadUrl downloadUrl = Newtonsoft.Json.JsonConvert.DeserializeObject<DownloadUrl>(str);
 
+            if (downloadUrl.download_url == null)
+            {
+                return;
+            }
+            Console.WriteLine(downloadUrl.download_url.Trim());
             handle = new HttpHandler(k.mch_id.Trim(), k.key_serial.Trim(), k.private_key.Trim());
             req = new HttpRequestMessage();
             req.RequestUri = new Uri(downloadUrl.download_url.Trim());

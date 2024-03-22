@@ -1472,8 +1472,10 @@ namespace SnowmeetApi.Controllers
                 + " or exists ( select 'a' from order_online where rent_list.order_id = order_online.id and pay_state = 1 ) ) "
                 + " and create_date >= '" + startDate.ToShortDateString() + "' and create_date < '" + endDate.AddDays(1).ToShortDateString() + "' "
                 //+ " and [id] = 4297 "
-                )
-                .OrderByDescending(r => r.id).AsNoTracking().ToListAsync();
+                
+                ).OrderBy(r => r.shop).OrderByDescending(r =>r.create_date.Date)
+                //.OrderBy(r => r.shop)
+                .AsNoTracking().ToListAsync();
             for (int i = 0; i < rentList.Count; i++)
             {
                 RentOrder rentOrder = (RentOrder)((OkObjectResult)(await GetRentOrder(rentList[i].id, sessionKey)).Result).Value;
@@ -1500,6 +1502,18 @@ namespace SnowmeetApi.Controllers
                     rentOrder.order.pay_time : null;
                 item.id = rentOrder.id;
                 item.memo = rentOrder.memo;
+                item.entertain = rentOrder.pay_option.IndexOf("招待") >= 0 ? "是" : "否";
+                for (int j = 0; rentOrder.order_id > 0
+                    && rentOrder.order != null && j < rentOrder.order.payments.Length; j++)
+                {
+                    if (rentOrder.order.payments[j].status.Trim().Equals("支付成功")
+                        && rentOrder.order.payments[j].out_trade_no != null)
+                    {
+                        item.out_trade_no = rentOrder.order.payments[j].out_trade_no.Trim();
+                        break;
+                    }
+                }
+                //item.out_trade_no = rentOrder.order.payments
                 for (int j = 0; rentOrder.order_id != 0 && rentOrder.order != null
                     &&  j < rentOrder.order.payments.Length; j++)
                 {
@@ -1524,6 +1538,18 @@ namespace SnowmeetApi.Controllers
                     r.refundDate = rentOrder.order.refunds[j].create_date;
                     r.depositId = rentOrder.order.refunds[j].payment_id;
                     r.amount = rentOrder.order.refunds[j].amount;
+                    r.refund_id = rentOrder.order.refunds[j].refund_id.Trim();
+                    string operOpenId = rentOrder.order.refunds[j].oper;
+                    MiniAppUser refundUser = await _context.MiniAppUsers.FindAsync(operOpenId);
+                    if (refundUser != null)
+                    {
+                        r.staffName = refundUser.real_name.Trim();
+                    }
+                    else
+                    {
+                        r.staffName = "";
+                    }
+                    //r.staffName = rentOrder.order.refunds[j].s
                     //item.refunds[j] = r;
                     refundList.Add(r);
                 }
@@ -1571,7 +1597,7 @@ namespace SnowmeetApi.Controllers
                 list.items[i].indexOfDay = dayIndex;
                 if (i > 0)
                 {
-                    if (list.items[i].orderDate.Date < list.items[i - 1].orderDate.Date)
+                    if (list.items[i].orderDate.Date < list.items[i - 1].orderDate.Date || !list.items[i - 1].shop.Trim().Equals(list.items[i].shop.Trim()) )
                     {
                         dayIndex = 1;
                     }

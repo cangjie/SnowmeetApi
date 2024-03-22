@@ -25,7 +25,7 @@
     </style>
 
 </head>
-<body>
+<body >
     <div style="margin-top: 20px">
         <h1 style="text-align:center">租赁订单报表</h1>
     </div>
@@ -33,7 +33,7 @@
         日期：从&nbsp;<input type="date" id="date_from" oninput="setDate()" />&nbsp;到&nbsp;<input type="date" id="date_to" oninput="setDate()" />
         &nbsp;<button id="btn" onclick="getData()"> 查 询 </button>&nbsp;<button  onclick="download()"> 下 载 </button>
     </div>
-    <div style="text-align:center;display:flex;justify-content:center">
+    <div style="text-align:center;display:flex;justify-content:left;width:4000px">
         <table style="border:solid;border-width:1px" >
             <thead>
                 <tr id="tHead">
@@ -71,13 +71,13 @@
         link.click();
         document.body.removeChild(link);
     }
-    var tHeadTemplate = ['序号', '门店', '日序号', '订单日期', '支付时间', '订单号', '状态', '免押金', '押金', '姓名', '电话', '备注', '支付方式', '租金合计'];
+    var tHeadTemplate = ['序号', '门店', '日序号', '星期','订单日期', '支付时间', '订单号', '状态', '免押金', '押金', '招待','姓名', '电话', '备注','开单人', '支付方式', '商户订单号', '租金合计'];
     var tHead = tHeadTemplate;
     var tData = [];
     function getData() {
 
 
-        tHeadTemplate = ['序号', '门店', '日序号', '订单日期', '支付时间', '订单号', '状态', '免押金', '押金', '姓名', '电话', '备注', '支付方式', '租金合计'];
+        tHeadTemplate = ['序号', '门店', '日序号', '星期','订单日期', '支付时间', '订单号', '状态', '免押金', '押金', '招待', '姓名', '电话', '备注', '开单人' ,'支付方式', '商户订单号', '租金合计'];
         tHead = tHeadTemplate;
         tData = [];
 
@@ -103,9 +103,12 @@
                 }
                 tHead.push('退押金');
                 for (var i = 0; i < msg.maxRefundLength; i++) {
+                    tHead.push('退款单号' + (i + 1).toString());
                     tHead.push('退款金额' + (i + 1).toString());
                     tHead.push('退款日期' + (i + 1).toString());
                     tHead.push('退款时间' + (i + 1).toString());
+                    tHead.push('退款人' + (i + 1).toString());
+                    
                 }
                 
 
@@ -115,7 +118,7 @@
                     for (var j = 0; j < tHead.length; j++) {
                         switch (tHead[j]) {
                             case '序号':
-                                lineData[j] = (i + 1).toString();
+                                lineData[j] = (msg.items.length - i).toString();
                                 break;
                             case '门店':
                                 lineData[j] = data.shop;
@@ -125,6 +128,12 @@
                                 break;
                             case '订单日期':
                                 lineData[j] = formatDate(data.orderDate);
+                                break;
+                            case '星期':
+                                lineData[j] = data.dayOfWeek;
+                                break;
+                            case '商户订单号':
+                                lineData[j] = data.out_trade_no;
                                 break;
                             case '支付时间':
                                 if (data.payDate != undefined && data.payDate != null) {
@@ -140,6 +149,9 @@
                             case '状态':
                                 lineData[j] = data.status;
                                 break;
+                            case '招待':
+                                lineData[j] = data.entertain;
+                                break;
                             case '免押金':
                                 if (data.deposits == null ||data.deposits.length == 0) {
                                     lineData[j] = '是';
@@ -147,6 +159,9 @@
                                 else {
                                     lineData[j] = '否';
                                 }
+                                break;
+                            case '开单人':
+                                lineData[j] = data.staffName;
                                 break;
                             case '押金':
                                 if (data.deposits != null && data.deposits.length != 0) {
@@ -206,6 +221,13 @@
                                 else if (colName.indexOf('退款日期') >= 0) {
                                     realColName = '退款日期';
                                 }
+                                else if (colName.indexOf('退款单号') >= 0) {
+                                    realColName = '退款单号';
+                                }
+                                else if (colName.indexOf('退款人') >= 0) {
+                                    realColName = '退款人';
+                                }
+
                                 else {
                                     realColName = '退款时间';
                                 }
@@ -251,6 +273,24 @@
                                         if (data.refunds != undefined && data.refunds != null && data.refunds.length > 0
                                             && data.refunds[colIndex] != null) {
                                             lineData[j] = formatTime(data.refunds[colIndex].refundDate);
+                                        }
+                                        else {
+                                            lineData[j] = '--';
+                                        }
+                                        break;
+                                    case '退款单号':
+                                        if (data.refunds != undefined && data.refunds != null && data.refunds.length > 0
+                                            && data.refunds[colIndex] != null) {
+                                            lineData[j] = data.refunds[colIndex].refund_id;
+                                        }
+                                        else {
+                                            lineData[j] = '--';
+                                        }
+                                        break;
+                                    case '退款人':
+                                        if (data.refunds != undefined && data.refunds != null && data.refunds.length > 0
+                                            && data.refunds[colIndex] != null) {
+                                            lineData[j] = data.refunds[colIndex].staffName;
                                         }
                                         else {
                                             lineData[j] = '--';

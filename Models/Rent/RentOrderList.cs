@@ -18,6 +18,8 @@ namespace SnowmeetApi.Models.Rent
 			public int depositId { get; set; }
 			public double amount { get; set; }
 			public DateTime refundDate { get; set; }
+			public string refund_id { get; set; }
+			public string staffName { get; set; }
 		}
 		public class Rental
 		{
@@ -49,6 +51,8 @@ namespace SnowmeetApi.Models.Rent
 			public int indexOfDay { get; set; }
 			public string shop { get; set; }
 			public string memo { get; set; } = "";
+			public string entertain { get; set; } = "否";
+			public string out_trade_no { get; set; } = "";
 		}
 
 		public DateTime startDate { get; set; }

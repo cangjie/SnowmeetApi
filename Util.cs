@@ -328,6 +328,9 @@ namespace SnowmeetApi
                 case DayOfWeek.Friday:
                     ret = "五";
                     break;
+                case DayOfWeek.Saturday:
+                    ret = "六";
+                    break;
                 default:
                     break;
             }
