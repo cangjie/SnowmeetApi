@@ -677,7 +677,7 @@ namespace SnowmeetApi.Controllers
 
             var paidArr = await _context.wepayBalance.Where(b => b.trans_date.Date >= startDate.Date
                 && b.trans_date.Date <= endDate.Date && b.pay_status.Trim().Equals("SUCCESS"))
-                .OrderByDescending(b => b.id).AsNoTracking().ToListAsync();
+                .OrderByDescending(b => b.trans_date).AsNoTracking().ToListAsync();
             
             var wepayKeyList = await _context.WepayKeys.ToListAsync();
 
