@@ -663,6 +663,134 @@ namespace SnowmeetApi.Controllers
 
             
         }
+
+        [HttpGet]
+        public async Task<ActionResult<WepayReport>> GetWepayBalance(DateTime startDate, DateTime endDate, string sessionKey)
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            if (user == null || !user.isAdmin)
+            {
+                return NotFound();
+            }
+
+            var paidArr = await _context.wepayBalance.Where(b => b.trans_date.Date >= startDate.Date
+                && b.trans_date.Date <= endDate.Date && b.pay_status.Trim().Equals("SUCCESS"))
+                .OrderByDescending(b => b.id).AsNoTracking().ToListAsync();
+            
+            var wepayKeyList = await _context.WepayKeys.ToListAsync();
+
+            List<WepayBalance> retList = new List<WepayBalance>();
+            int maxLen = 0;
+            for (int i = 0; i < paidArr.Count; i++)
+            {
+                WepayBalance b = paidArr[i];
+                string orderId = "";
+                int orderOnlineId = 0;
+                string shop = "";
+                string orderType = "";
+                string mchName = "";
+                string cell = "";
+                string realName = "";
+                string gender = "";
+
+                var pList = await _context.OrderPayment.Where(p => p.status.Equals("支付成功")
+                    && p.out_trade_no.Trim().Equals(b.out_trade_no.Trim())).ToListAsync();
+                if (pList != null && pList.Count > 0)
+                {
+                    orderOnlineId = pList[0].order_id;
+                }
+
+                OrderOnline? orderOnline = await _context.OrderOnlines.FindAsync(orderOnlineId);
+                if (orderOnline != null)
+                {
+                    shop = orderOnline.shop.Trim();
+                    switch (orderOnline.type.Trim())
+                    {
+                        case "服务":
+                            orderType = "养护";
+                            var maintailList = await _context.MaintainLives.Where(m => m.order_id == orderOnlineId)
+                                .AsNoTracking().ToListAsync();
+                            for (int j = 0; j < maintailList.Count; j++)
+                            {
+                                orderId = orderId + (j == 0 ? "" : ",") + maintailList[j].task_flow_num.Trim();
+                            }
+                            break;
+                        case "押金":
+                            orderType = "租赁";
+                            var rentOrderList = await _context.RentOrder.Where(r => r.order_id == orderOnlineId)
+                                .AsNoTracking().ToListAsync();
+                            if (rentOrderList != null && rentOrderList.Count > 0)
+                            {
+                                orderId = rentOrderList[0].id.ToString();
+                                
+                            }
+                            break;
+                        case "店销现货":
+                            orderType = "店销现货";
+                            orderId = orderOnlineId.ToString();
+                            break;
+                        case "雪票":
+                            orderType = "雪票";
+                            var skiPassList = await _context.OrderOnlineDetails
+                                .Where(d => d.OrderOnlineId == orderOnlineId)
+                                .AsNoTracking().ToListAsync();
+                            for (int j = 0; skiPassList != null && j < skiPassList.Count; j++)
+                            {
+                                orderId = orderId + (j == 0 ? "" : ",") + skiPassList[j].product_name
+                                    + "x" + skiPassList[j].count.ToString();
+                            }
+                            break;
+                        default:
+                            break;
+                    }
+                    MiniAppUser mUser = await _context.MiniAppUsers.FindAsync(orderOnline.open_id);
+                    if (mUser != null)
+                    {
+                        cell = mUser.cell_number.Trim();
+                        realName = mUser.real_name.Trim();
+                        gender = mUser.gender.Trim();
+                    }
+                }
+
+                for (int j = 0; j < wepayKeyList.Count; j++)
+                {
+                    if (wepayKeyList[j].mch_id.Trim().Equals(b.mch_id))
+                    {
+                        mchName = wepayKeyList[j].mch_name.Trim();
+                        break;
+                    }
+                }
+                b.orderId = orderId.Trim();
+                b.refunds = await _context.wepayBalance.Where(c =>  c.pay_status.Trim().Equals("REFUND")
+                    && c.out_trade_no.Trim().Equals(b.out_trade_no)
+                    && c.refund_status.Trim().Equals("SUCCESS"))
+                    .OrderBy(b => b.id).AsNoTracking().ToListAsync();
+                maxLen = Math.Max(maxLen, b.refunds.Count);
+                for (int j = 0; j < b.refunds.Count; j++)
+                {
+                    b.totalRefundAmount += b.refunds[j].refund_amount;
+                }
+                b.netAmount = b.settle_amount - b.totalRefundAmount;
+                b.shop = shop;
+                b.orderType = orderType;
+                b.real_name = realName;
+                b.cell = cell;
+                b.gender = gender;
+                b.mchName = mchName;
+                b.dayOfWeek = Util.GetDayOfWeek(b.trans_date.Date);
+                retList.Add(b);
+
+            }
+
+
+            WepayReport report = new WepayReport();
+            report.maxRefundLength = maxLen;
+            report.items = retList;
+
+            return Ok(report);
+        }
        
     }
 }

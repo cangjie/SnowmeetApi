@@ -1,0 +1,273 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>租赁订单报表</title>
+    <link rel="stylesheet" href="../../css/table.css" />
+    <link rel="stylesheet" href="../../css/bootstrap.css" />
+    <link rel="stylesheet" href="../../css/bootstrap-grid.css" />
+    <link rel="stylesheet" href="../../css/bootstrap-reboot.css" />
+    <link rel="stylesheet" href="../../css/common.css" />
+    <script type="text/javascript" src="../../js/jquery-3.6.1.min.js"></script>
+    <script type="text/javascript" src="../../js/bootstrap.js"></script>
+    <script type="text/javascript" src="../../js/util.js"></script>
+    <script type="text/javascript" src="../../js/get_sessionkey.js"></script>
+    <script type="text/javascript">//alert(sessionKey);</script>
+    <style>
+        td {
+            text-align: center;
+            padding-left: 5px;
+            padding-right: 5px;
+            border: solid;
+            border-width: 1px;
+            border-color: #fcfcfc;
+        }
+    </style>
+
+</head>
+<body>
+    <div style="margin-top: 20px">
+        <h1 style="text-align:center">微信支付订单</h1>
+    </div>
+    <div class="row_view" style="align-items:center;justify-content:center; margin-top:20px">
+        日期：从&nbsp;<input type="date" id="date_from" oninput="setDate()" />&nbsp;到&nbsp;<input type="date" id="date_to" oninput="setDate()" />
+        &nbsp;<button id="btn" onclick="getData()"> 查 询 </button>&nbsp;<button onclick="download()"> 下 载 </button>
+    </div>
+    <div style="text-align:center;display:flex;justify-content:left;width:4000px">
+        <table style="border:solid;border-width:1px">
+            <thead>
+                <tr id="tHead">
+                </tr>
+            </thead>
+            <tbody id="tBody" class="table_body_row">
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>
+<script type="text/javascript">function download() {
+        if (tHead.length <= 0 || tData.length <= 0) {
+            return;
+        }
+        var csvContent = '';
+        var lineContent = '';
+        for (var i = 0; i < tHead.length; i++) {
+            lineContent += (i > 0 ? ',' : '') + tHead[i];
+        }
+        csvContent += lineContent + '\r\n';
+        for (var i = 0; i < tData.length; i++) {
+            lineContent = '';
+            for (var j = 0; j < tHead.length; j++) {
+                lineContent += (j > 0 ? ',' : '') + tData[i][j];
+            }
+            csvContent += lineContent + '\r\n';
+        }
+        csvContent = csvContent.trim();
+        var link = document.createElement('a');
+        link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvContent);
+        link.download = encodeURIComponent('rent_order_' + formatDate(startDate) + '_' + formatDate(endDate) + '.csv');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+    var tHeadTemplate = ['序号', '门店', '日序号', '星期','订单日期', '支付时间', '订单号', '状态', '免押金', '押金', '招待','姓名', '电话', '备注','开单人', '支付方式', '商户订单号', '租金合计'];
+    var tHead = tHeadTemplate;
+    var tData = [];
+    function getData() {
+
+
+        tHeadTemplate = ['序号', '日期', '时间', '星期', '账户号', '账户名称', '门店', '商户订单号', '业务', '业务订单号', '姓名', '性别', '电话', '支付金额', '退款金额', '结余金额'];
+        tHead = tHeadTemplate;
+        tData = [];
+
+
+        var btnCtrl = document.getElementById('btn');
+        btnCtrl.disabled = true;
+        btnCtrl.innerText = "查询中……";
+        var getUrl = '../../core/WepayOrder/GetWepayBalance?sessionKey=' + encodeURIComponent(sessionKey)
+            + '&startDate=' + formatDate(startDate) + '&endDate=' + formatDate(endDate);
+        $.ajax({
+            url: getUrl,
+            type: 'GET',
+            success: function (msg, status) {
+                console.log('get data msg', msg)
+                console.log('get data status', status)
+                btnCtrl.disabled = false;
+                btnCtrl.innerText = " 查 询 ";
+                if (status != 'success') {
+                    return
+                }
+                
+                for (var i = 0; i < msg.maxRefundLength; i++) {
+                    tHead.push('退款单号' + (i + 1).toString());
+                    tHead.push('退款金额' + (i + 1).toString());
+                    tHead.push('退款日期' + (i + 1).toString());
+                    tHead.push('退款时间' + (i + 1).toString());
+                    //tHead.push('退款人' + (i + 1).toString());
+
+                }
+
+
+                for (var i = 0; i < msg.items.length; i++) {
+                    var lineData = [];
+                    var data = msg.items[i];
+                    for (var j = 0; j < tHead.length; j++) {
+                        switch (tHead[j]) {
+                            case '序号':
+                                lineData[j] = (msg.items.length - i).toString();
+                                break;
+                            case '日期':
+                                lineData[j] = formatDate(data.trans_date);
+                                break;
+                            case '时间':
+                                lineData[j] = formatTime(data.trans_date);
+                                break;
+                            case '星期':
+                                lineData[j] = data.dayOfWeek;
+                                break;
+                            case '账户号':
+                                lineData[j] = data.mch_id;
+                                break;
+                            case '账户名称':
+                                lineData[j] = data.mchName;
+                                break;
+                            case '门店':
+                                lineData[j] = data.shop;
+                                break;
+                            case '商户订单号':
+                                lineData[j] = data.out_trade_no;
+                                break;
+                            case '业务':
+                                lineData[j] = data.orderType;
+                                break;
+                            case '业务订单号':
+                                lineData[j] = data.orderId;
+                                break;
+                            case '姓名':
+                                lineData[j] = data.real_name;
+                                break;
+                            case '性别':
+                                lineData[j] = data.gender;
+                                break;
+                            case '电话':
+                                lineData[j] = data.cell;
+                                break;
+                            case '备注':
+                                lineData[j] = data.memo;
+                                break;
+                            
+                            case '支付金额':
+                                lineData[j] = formatAmount(data.settle_amount);
+                                break;
+                            case '退款金额':
+                                lineData[j] = formatAmount(data.totalRefundAmount);
+                                break;
+                            case '结余金额':
+                                lineData[j] = formatAmount(data.netAmount);
+                                break;
+                            default:
+                                var colName = tHead[j];
+                                var realColName = '';
+                                if (colName.indexOf('退款金额') >= 0) {
+                                    realColName = '退款金额';
+                                }
+                                else if (colName.indexOf('退款日期') >= 0) {
+                                    realColName = '退款日期';
+                                }
+                                else if (colName.indexOf('退款单号') >= 0) {
+                                    realColName = '退款单号';
+                                }
+                                else {
+                                    realColName = '退款时间';
+                                }
+
+                                if (realColName == '') {
+                                    continue;
+                                }
+                                var colIndex = parseInt(colName.replace(realColName, ''));
+                                colIndex--;
+                                if (colIndex < 0) {
+                                    continue;
+                                }
+                                switch (realColName) {
+                                    
+                                    case '退款金额':
+                                        if (data.refunds != undefined && data.refunds != null && data.refunds.length > 0
+                                            && data.refunds[colIndex] != null ) {
+                                            lineData[j] = formatAmount(data.refunds[colIndex].refund_amount);
+                                        }
+                                        else {
+                                            lineData[j] = '--';
+                                        }
+                                        break;
+                                    case '退款日期':
+                                        if (data.refunds != undefined && data.refunds != null && data.refunds.length > 0
+                                            && data.refunds[colIndex] != null) {
+                                            lineData[j] = formatDate(data.refunds[colIndex].trans_date);
+                                        }
+                                        else {
+                                            lineData[j] = '--';
+                                        }
+                                        break;
+                                    case '退款时间':
+                                        if (data.refunds != undefined && data.refunds != null && data.refunds.length > 0
+                                            && data.refunds[colIndex] != null) {
+                                            lineData[j] = formatTime(data.refunds[colIndex].trans_date);
+                                        }
+                                        else {
+                                            lineData[j] = '--';
+                                        }
+                                        break;
+                                    case '退款单号':
+                                        if (data.refunds != undefined && data.refunds != null && data.refunds.length > 0
+                                            && data.refunds[colIndex] != null) {
+                                            lineData[j] = data.refunds[colIndex].refund_no;
+                                        }
+                                        else {
+                                            lineData[j] = '--';
+                                        }
+                                        break;
+                                    
+                                    default:
+                                        break;
+                                }
+                                break;
+                        }
+                    }
+                    console.log('line data', lineData);
+                    tData.push(lineData);
+                }
+                console.log('get head', tHead);
+                render();
+            },
+            finally: function (msg, status) {
+                btnCtrl.disabled = false;
+                btnCtrl.innerText = " 查 询 ";
+            }
+        })
+    }
+    function render() {
+        var tHeadCtl = document.getElementById('tHead');
+        tHeadCtl.innerHTML = '';
+        for (var i = 0; i < tHead.length; i++) {
+            var td = document.createElement('td');
+            td.innerText = tHead[i];
+            var classAttr = document.createAttribute('class');
+            classAttr.value = 'table_head';
+            td.attributes.setNamedItem(classAttr);
+            tHeadCtl.appendChild(td);
+        }
+        var tBodyCtl = document.getElementById('tBody');
+        tBodyCtl.innerHTML = '';
+        for (var i = 0; i < tData.length; i++) {
+            var tr = document.createElement('tr');
+
+            for (var j = 0; j < tHead.length; j++) {
+                var td = document.createElement('td');
+                td.innerText = tData[i][j];
+                tr.appendChild(td);
+            }
+            tBodyCtl.appendChild(tr);
+        }
+    }</script>
+<script type="text/javascript" src="../../js/date_selector.js"></script>
