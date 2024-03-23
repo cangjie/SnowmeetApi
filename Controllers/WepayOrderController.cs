@@ -468,7 +468,7 @@ namespace SnowmeetApi.Controllers
         public async Task DownloadCurrentSeason()
         {
             int[] mchId = new int[] { 1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 15, 17 };
-            for (DateTime i = DateTime.Parse("2023-12-20"); i <= DateTime.Parse("2024-3-21"); i = i.AddDays(1))
+            for (DateTime i = DateTime.Now.Date.AddDays(-11); i <= DateTime.Now.Date.AddDays(-1); i = i.AddDays(1))
             {
                 for (int j = 0; j < mchId.Length; j++)
                 {
@@ -476,6 +476,7 @@ namespace SnowmeetApi.Controllers
                 }
             }
         }
+
 
 
         [HttpGet("{mchId}")]
