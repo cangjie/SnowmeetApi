@@ -468,14 +468,28 @@ namespace SnowmeetApi.Controllers
         public async Task DownloadCurrentSeason()
         {
             int[] mchId = new int[] { 1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 15, 17 };
-            for (DateTime i = DateTime.Parse("2023-12-20"); i <= DateTime.Parse("2024-3-21"); i = i.AddDays(1))
+            for (DateTime i = DateTime.Parse("2024-2-1"); i <= DateTime.Parse("2024-3-28"); i = i.AddDays(1))
             {
                 for (int j = 0; j < mchId.Length; j++)
                 {
-                    await RequestTradeBill(mchId[j], i);
+                    await RequestFlowBill(mchId[j], i);
                 }
             }
         }
+
+        [HttpGet]
+        public async Task DownloadToday()
+        {
+            int[] mchId = new int[] { 1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 15, 17 };
+            for (int j = 0; j < mchId.Length; j++)
+            {
+                await RequestTradeBill(mchId[j], DateTime.Now.Date.AddDays(-1));
+                await RequestFlowBill(mchId[j], DateTime.Now.Date.AddDays(-1));
+            }
+
+        }
+
+
 
 
         [HttpGet("{mchId}")]
@@ -660,9 +674,82 @@ namespace SnowmeetApi.Controllers
                 }
 
             }
-
-            
         }
-       
+
+        [HttpGet]
+        public async Task RequestFlowBill(int mchId, DateTime billDate)
+        {
+            WepayKey k = await _context.WepayKeys.FindAsync(mchId);
+
+            string getUrl = "https://api.mch.weixin.qq.com/v3/bill/fundflowbill?bill_date=" + billDate.ToString("yyyy-MM-dd");
+
+            HttpHandler handle = new HttpHandler(k.mch_id.Trim(), k.key_serial.Trim(), k.private_key.Trim());
+
+            HttpRequestMessage req = new HttpRequestMessage();
+            req.RequestUri = new Uri(getUrl);
+            CancellationToken cancel = new CancellationToken();
+            HttpResponseMessage res = await handle.GetWebContent(req, cancel);
+            StreamReader sr = new StreamReader(await res.Content.ReadAsStreamAsync());
+            string str = await sr.ReadToEndAsync();
+            sr.Close();
+            DownloadUrl downloadUrl = Newtonsoft.Json.JsonConvert.DeserializeObject<DownloadUrl>(str);
+
+            if (downloadUrl.download_url == null)
+            {
+                return;
+            }
+            Console.WriteLine(downloadUrl.download_url.Trim());
+            handle = new HttpHandler(k.mch_id.Trim(), k.key_serial.Trim(), k.private_key.Trim());
+            req = new HttpRequestMessage();
+            req.RequestUri = new Uri(downloadUrl.download_url.Trim());
+            res = await handle.GetWebContent(req, cancel);
+            sr = new StreamReader(await res.Content.ReadAsStreamAsync());
+            str = (await sr.ReadToEndAsync()).Trim();
+            sr.Close();
+            Console.WriteLine(str);
+            string[] lineArr = str.Split('\r');
+            for (int i = 1; i < lineArr.Length - 2; i++)
+            {
+                Console.WriteLine(lineArr[i].Trim());
+                string[] fields = lineArr[i].Trim().Split(',');
+                for (int j = 0; j < fields.Length; j++)
+                {
+                    fields[j] = fields[j].Replace("`", "");
+                }
+                WepayFlowBill bill = new WepayFlowBill()
+                {
+                    mch_id = k.mch_id,
+                    bill_date_time = DateTime.Parse(fields[0]),
+                    biz_no = fields[1].Trim(),
+                    flow_no = fields[2].Trim(),
+                    biz_name = fields[3].Trim(),
+                    biz_type = fields[4].Trim(),
+                    bill_type = fields[5].Trim(),
+                    amount = double.Parse(fields[6].Trim()),
+                    surplus = double.Parse(fields[7].Trim()),
+                    oper = fields[8].Trim(),
+                    memo = fields[9].Trim(),
+                    invoice_id = fields[10].Trim()
+                };
+                try
+                {
+                    await _context.wepayFlowBill.AddAsync(bill);
+                }
+                catch
+                {
+
+                }
+            }
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch
+            {
+
+            }
+        }
+        
+        
     }
 }
