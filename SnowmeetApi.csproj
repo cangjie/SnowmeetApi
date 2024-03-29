@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
   <PropertyGroup>
     <TargetFramework>net7.0</TargetFramework>
+    <BuildWithMSBuildOnMono>true</BuildWithMSBuildOnMono>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <WarningLevel>4</WarningLevel>
@@ -89,6 +90,7 @@
     <Folder Include="wwwroot\background\maintain\" />
     <Folder Include="wwwroot\background\sale\" />
     <Folder Include="wwwroot\background\rent\" />
+    <Folder Include="wwwroot\background\wepay\" />
   </ItemGroup>
   <ItemGroup>
     <Content Remove="wwwroot\upload\" />
@@ -105,5 +107,6 @@
     <Content Remove="wwwroot\background\maintain\" />
     <Content Remove="wwwroot\background\sale\" />
     <Content Remove="wwwroot\background\rent\" />
+    <Content Remove="wwwroot\background\wepay\" />
   </ItemGroup>
 </Project>

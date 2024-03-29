@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Aop.Api.Domain;
@@ -39,7 +40,33 @@ namespace SnowmeetApi.Models.Order
         public string fee_rate { get; set;}              
         public double  order_amount { get; set;}          
         public double  request_refund_amount { get; set;} 
-        public string  fee_rate_memo { get; set;}         
+        public string  fee_rate_memo { get; set;}
+
+
+        [NotMapped]
+        public string orderType { get; set; } = "";
+        [NotMapped]
+        public string orderId { get; set; } = "";
+        [NotMapped]
+        public string shop { get; set; } = "";
+        [NotMapped]
+        public string mchNo { get; set; } = "";
+        [NotMapped]
+        public string mchName { get; set; } = "";
+        [NotMapped]
+        public string cell { get; set; } = "";
+        [NotMapped]
+        public string real_name { get; set; } = "";
+        [NotMapped]
+        public string gender { get; set; } = "";
+        [NotMapped]
+        public double netAmount { get; set; } = 0;
+        [NotMapped]
+        public double totalRefundAmount { get; set; } = 0;
+        [NotMapped]
+        public string dayOfWeek { get; set; } = "";
+        [NotMapped]
+        public List<WepayBalance> refunds { get; set; } = new List<WepayBalance>();
 	}
 }
 
