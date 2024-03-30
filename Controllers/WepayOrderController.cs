@@ -882,6 +882,125 @@ namespace SnowmeetApi.Controllers
 
             return Ok(report);
         }
+
+        [HttpGet]
+        public async Task<ActionResult<EPaymentDailyReport>> GetReport(DateTime reportDate, int mchId)
+        {
+            return Ok(await CreateEPaymentDailyReport(reportDate, mchId.ToString()));
+        }
+
+
+        [NonAction]
+        public async Task<EPaymentDailyReport> CreateEPaymentDailyReport(DateTime reportDate, string mchId, string payMehtod = "微信支付")
+        {
+            reportDate = reportDate.Date;
+            EPaymentDailyReport report = new EPaymentDailyReport();
+            payMehtod = payMehtod.Trim();
+            report.pay_method = payMehtod;
+            report.biz_date = reportDate.Date;
+            if (payMehtod.Trim().Equals("微信支付"))
+            {
+                WepayKey key = await _context.WepayKeys.FindAsync(int.Parse(mchId));
+                mchId = key.mch_id.Trim();
+                report.mch_id = mchId.Trim();
+
+
+                //get last surplus
+                var flowList = await _context.wepayFlowBill.Where(b => b.bill_date_time.Date < reportDate.Date
+                    && b.mch_id.Trim().Equals(mchId))
+                    .OrderByDescending(b => b.id).Take(1).ToListAsync();
+
+                
+                if (flowList == null || flowList.Count == 0)
+                {
+                    report.last_surplus = 0;
+                }
+                else
+                {
+                    report.last_surplus = flowList[0].surplus;
+                }
+
+                //get current surplus
+                flowList = await _context.wepayFlowBill.Where(b => b.bill_date_time.Date == reportDate.Date
+                    && b.mch_id.Trim().Equals(mchId))
+                    .OrderByDescending(b => b.id).Take(1).ToListAsync();
+                if (flowList == null || flowList.Count == 0)
+                {
+                    report.current_surplus = report.last_surplus;
+                }
+                else
+                {
+                    report.current_surplus = flowList[0].surplus;
+                }
+
+                //计算提现金额
+                flowList = await _context.wepayFlowBill.Where(b => b.mch_id.Trim().Equals(mchId)
+                    && b.bill_date_time.Date == reportDate.Date
+                    && b.biz_name.Trim().Equals("充值/提现") && b.biz_type.Trim().Equals("提现")
+                    && b.bill_type.Trim().Equals("支出")).ToListAsync();
+                report.withdraw = 0;
+                for (int i = 0; flowList != null && i < flowList.Count; i++)
+                {
+                    report.withdraw += flowList[i].amount;
+                }
+                
+
+                //收款
+                var balanceList = await _context.wepayBalance.Where(b => (b.mch_id.Trim().Equals(mchId)
+                    && b.pay_status.Trim().Equals("SUCCESS") && b.trans_date.Date == reportDate.Date)).ToListAsync();
+                report.biz_count = 0;
+                report.order_amount = 0;
+                report.order_fee = 0;
+                for (int i = 0; balanceList != null && i < balanceList.Count; i++)
+                {
+                    report.biz_count++;
+                    report.order_amount += balanceList[i].order_amount;
+                    report.order_fee += balanceList[i].fee;
+                    
+                }
+                report.order_balance = report.order_amount - report.order_fee;
+
+                balanceList = await _context.wepayBalance.Where(b => (b.mch_id.Trim().Equals(mchId)
+                    && b.pay_status.Trim().Equals("REFUND") && b.refund_status.Trim().Equals("SUCCESS")
+                    && b.trans_date.Date == reportDate.Date)).ToListAsync();
+                report.refund_count = 0;
+                report.refund_amount = 0;
+                report.refund_fee = 0;
+
+                for (int i = 0; balanceList != null && i < balanceList.Count; i++)
+                {
+                    report.refund_count++;
+                    report.refund_amount += balanceList[i].refund_amount;
+                    report.refund_fee += -1 * balanceList[i].fee;
+                }
+                report.refund_balance = report.refund_amount - report.refund_fee;
+
+                
+
+
+
+
+
+
+
+            }
+            else
+            {
+                return null;
+            }
+
+            report.computed_surplus = report.last_surplus + report.order_amount - report.order_fee - report.refund_amount + report.refund_fee - report.withdraw;
+            if (Math.Round(report.computed_surplus, 2) != Math.Round(report.current_surplus, 2))
+            {
+                report.isCorrect = false;
+            }
+            else
+            {
+                report.isCorrect = true;
+            }
+
+            return report;
+        }
        
 
     }
