@@ -28,6 +28,7 @@ using SKIT.FlurlHttpClient.Wechat.TenpayV3.Models;
 using System.Reflection.PortableExecutable;
 using System.Threading;
 using Newtonsoft.Json.Converters;
+using SnowmeetApi.Models.Rent;
 
 namespace SnowmeetApi.Controllers
 {
@@ -904,7 +905,6 @@ namespace SnowmeetApi.Controllers
                 mchId = key.mch_id.Trim();
                 report.mch_id = mchId.Trim();
 
-
                 //get last surplus
                 var flowList = await _context.wepayFlowBill.Where(b => b.bill_date_time.Date < reportDate.Date
                     && b.mch_id.Trim().Equals(mchId))
@@ -944,7 +944,6 @@ namespace SnowmeetApi.Controllers
                     report.withdraw += flowList[i].amount;
                 }
                 
-
                 //收款
                 var balanceList = await _context.wepayBalance.Where(b => (b.mch_id.Trim().Equals(mchId)
                     && b.pay_status.Trim().Equals("SUCCESS") && b.trans_date.Date == reportDate.Date)).ToListAsync();
@@ -960,6 +959,7 @@ namespace SnowmeetApi.Controllers
                 }
                 report.order_balance = report.order_amount - report.order_fee;
 
+                //退款
                 balanceList = await _context.wepayBalance.Where(b => (b.mch_id.Trim().Equals(mchId)
                     && b.pay_status.Trim().Equals("REFUND") && b.refund_status.Trim().Equals("SUCCESS")
                     && b.trans_date.Date == reportDate.Date)).ToListAsync();
@@ -975,13 +975,130 @@ namespace SnowmeetApi.Controllers
                 }
                 report.refund_balance = report.refund_amount - report.refund_fee;
 
+                RentController rentHelper = new RentController(_context, _originConfig, _httpContextAccessor);
+                Models.Rent.RentOrderCollection rc =
+                    (Models.Rent.RentOrderCollection)
+                    ((OkObjectResult)((await rentHelper.GetUnSettledOrderBefore(report.biz_date.Date, "SystemInvoke")).Result)).Value;
+
+                double totalDeposit = 0;
+                double totalReceiveable = 0;
                 
+                for (int i = 0; i < rc.orders.Length; i++)
+                {
+                    double deposit = 0;
+                    double rental = 0;
+                    RentOrder rOrder = rc.orders[i];
+                    for (int j = 0; j < rOrder.order.payments.Length; j++)
+                    {
+                        OrderPayment p = rOrder.order.payments[j];
+                        if (p.pay_method.Trim().Equals("微信支付") && p.status.Trim().Equals("支付成功")
+                            && p.mch_id == key.id)
+                        {
+                            deposit += rOrder.order.paidAmount;
+                            break;
+                        }
+                    }
+                    
+                    totalDeposit += deposit;
+                    totalReceiveable += rental;
+                }
+
+                double totalRentalToday = 0;
+                double totalRentalBefore = 0;
+                RentOrderCollection sameDaySettledOrder = (RentOrderCollection)
+                    ((OkObjectResult)
+                    (await rentHelper.GetCurrentSameDaySettled(report.biz_date.Date, "SystemInvoke")).Result).Value;
+                for (int i = 0; i < sameDaySettledOrder.orders.Length; i++)
+                {
+                    for (int j = 0; j < sameDaySettledOrder.orders[i].order.payments.Length; j++)
+                    {
+                        OrderPayment p = sameDaySettledOrder.orders[i].order.payments[j];
+                        if (p.pay_method.Trim().Equals("微信支付") && p.status.Trim().Equals("支付成功")
+                            && p.mch_id == key.id)
+                        {
+                            double refund = 0;
+                            for (int k = 0; k < sameDaySettledOrder.orders[i].order.refunds.Length; k++)
+                            {
+                                OrderPaymentRefund refundObj = sameDaySettledOrder.orders[i].order.refunds[k];
+                                if (refundObj.state == 1 || !refundObj.refund_id.Trim().Equals(""))
+                                {
+                                    refund += refundObj.amount;
+                                }
+                            }
 
 
+                            totalRentalToday += (sameDaySettledOrder.orders[i].order.paidAmount - refund);
+                            break;
+                        }
+                    }
+                }
 
+                RentOrderCollection diffDaySettledOrder = (RentOrderCollection)
+                    ((OkObjectResult)
+                    (await rentHelper.GetCurrentDaySettledPlacedBefore(report.biz_date.Date, "SystemInvoke")).Result).Value;
 
+                for (int i = 0; i < diffDaySettledOrder.orders.Length; i++)
+                {
+                    for (int j = 0; j < diffDaySettledOrder.orders[i].order.payments.Length; j++)
+                    {
+                        OrderPayment p = diffDaySettledOrder.orders[i].order.payments[j];
+                        if (p.pay_method.Trim().Equals("微信支付") && p.status.Trim().Equals("支付成功")
+                            && p.mch_id == key.id)
+                        {
+                            double refund = 0;
+                            for (int k = 0; k < diffDaySettledOrder.orders[i].order.refunds.Length; k++)
+                            {
+                                OrderPaymentRefund refundObj = diffDaySettledOrder.orders[i].order.refunds[k];
+                                if (refundObj.state == 1 || !refundObj.refund_id.Trim().Equals(""))
+                                {
+                                    refund += refundObj.amount;
+                                }
+                            }
+                            totalRentalBefore += (diffDaySettledOrder.orders[i].order.paidAmount - refund);
+                            break;
+                        }
+                    }
+                }
 
+                OrderOnlinesController orderHelper = new OrderOnlinesController(_context, _originConfig);
+                var commonOrderList = await _context.OrderOnlines
+                    .Where(o => (o.pay_state == 1 && o.pay_time != null
+                    && ((DateTime)o.pay_time).Date == report.biz_date.Date
+                    && (o.type.Trim().Equals("店销现货") || o.type.Trim().Equals("服务"))))
+                    .AsNoTracking().ToListAsync();
+                double sale = 0;
+                double maintain = 0;
+                for (int i = 0; commonOrderList != null && i < commonOrderList.Count; i++)
+                {
+                    OrderOnline order = (OrderOnline)((OkObjectResult)
+                        (await orderHelper.GetWholeOrderByStaff(commonOrderList[i].id, "SystemInvoke")).Result).Value;
+                    for (int j = 0; j < order.payments.Length; j++)
+                    {
+                        OrderPayment p = order.payments[j];
+                        if (p.pay_method.Trim().Equals("微信支付") && p.mch_id == key.id
+                            && p.status.Trim().Equals("支付成功"))
+                        {
+                            switch (order.type.Trim())
+                            {
+                                case "店销现货":
+                                    sale += order.paidAmount;
+                                    break;
+                                case "服务":
+                                    maintain += order.paidAmount;
+                                    break;
+                                default:
+                                    break;
+                            }
+                        }
+                    }
+                    
+                }
 
+                report.last_deposit = totalDeposit;
+                report.last_receiveable = totalReceiveable;
+                report.rental = totalRentalBefore + totalRentalToday;
+                report.sale = sale;
+                report.maintain = maintain;
 
             }
             else

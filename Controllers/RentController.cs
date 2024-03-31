@@ -974,16 +974,7 @@ namespace SnowmeetApi.Controllers
             {
                 return BadRequest();
             }
-            /*
-            var rentOrderList = await _context.RentOrder
-                .Where(r => (r.create_date.Date < date.Date && r.create_date.Date >= startDate
-                    && (r.end_date == null || ((DateTime)r.end_date).Date >= date.Date)
-                    && r.order_id != 0 && (shop.Trim().Equals("") || shop.Trim().Equals(r.shop.Trim())) ))
-                .Join(_context.OrderOnlines, r => r.order_id, o => o.id,
-                    (r, o) => new {r.id, r.start_date, r.end_date, o.pay_state, o.final_price, r.deposit_final, r.refund})
-                .Where(o => o.pay_state == 1)
-                .ToListAsync();
-            */
+            
             var rentOrderList = await _context.RentOrder.FromSqlRaw(" select  * from rent_list  "
                 + " where create_date < '" + date.ToShortDateString() + "' and create_date > '" + startDate.ToShortDateString() + "' "
                 + " and exists ( select 'a' from rent_list_detail  where rent_list_detail.rent_list_id = rent_list.id and "

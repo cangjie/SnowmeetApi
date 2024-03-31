@@ -183,7 +183,23 @@ namespace SnowmeetApi.Models.Users
             user.unionId = unionId.Trim();
             if (miniAppOpenId.Trim().Equals("") && officialOpenId.Trim().Equals(""))
             {
-                return null;
+                if (sessionKey.Equals("SystemInvoke"))
+                {
+                    return new UnicUser()
+                    {
+                        miniAppOpenId = "system",
+                        miniAppUser = new MiniAppUser()
+                        {
+                            open_id = "system",
+                            is_admin = 1,
+                            is_manager = 1
+                        }
+                    };
+                }
+                else
+                {
+                    return null;
+                }
             }
             if (!miniAppOpenId.Trim().Equals(""))
             {
@@ -258,7 +274,21 @@ namespace SnowmeetApi.Models.Users
             user.unionId = unionId.Trim();
             if (miniAppOpenId.Trim().Equals("") && officialOpenId.Trim().Equals(""))
             {
-                return null;
+                if (sessionKey.Equals("SystemInvoke"))
+                {
+                    return new UnicUser()
+                    {
+                        miniAppUser = new MiniAppUser()
+                        {
+                            open_id = "system",
+                            is_admin = 1
+                        }
+                    };
+                }
+                else
+                {
+                    return null;
+                }
             }
             if (!miniAppOpenId.Trim().Equals(""))
             {
