@@ -1029,40 +1029,34 @@ namespace SnowmeetApi.Controllers
             return NoContent();
         }
 
-        // POST: api/OrderOnlines
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
-        [HttpPost]
-        public async Task<ActionResult<OrderOnline>> PostOrderOnline(OrderOnline orderOnline)
+        [HttpGet("{orderId}")]
+        public async Task SetOrderMemo(int orderId, string memo, string sessionKey)
         {
-            _context.OrderOnlines.Add(orderOnline);
-            await _context.SaveChangesAsync();
-
-            return CreatedAtAction("GetOrderOnline", new { id = orderOnline.id }, orderOnline);
-        }
-
-        // DELETE: api/OrderOnlines/5
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteOrderOnline(int id)
-        {
-            var orderOnline = await _context.OrderOnlines.FindAsync(id);
-            if (orderOnline == null)
+            memo = Util.UrlDecode(memo);
+            sessionKey = Util.UrlDecode(sessionKey);
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            if (user == null || !user.isAdmin)
             {
-                return NotFound();
+                return;
+                //return NotFound();
             }
-
-            _context.OrderOnlines.Remove(orderOnline);
+            OrderOnline? order = await _context.OrderOnlines.FindAsync(orderId);
+            if (order == null)
+            {
+                return;
+            }
+            order.memo = memo;
+            _context.OrderOnlines.Entry(order).State = EntityState.Modified;
             await _context.SaveChangesAsync();
-
-            return NoContent();
         }
 
-        
 
+        [NonAction]
         private bool OrderOnlineExists(int id)
         {
             return _context.OrderOnlines.Any(e => e.id == id);
         }
-
+        [NonAction]
         private int GetMchId(OrderOnline order)
         {
             int mchId = 3;
