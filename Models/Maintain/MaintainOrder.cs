@@ -18,6 +18,7 @@ namespace SnowmeetApi.Models.Maintain
         public int orderId { get; set; } = 0;
         public string customerOpenId { get; set; } = "";
         public string cell { get; set; } = "";
+        public string memo { get; set; } = "";
         public MaintainLive[] items
         {
             get

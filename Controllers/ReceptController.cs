@@ -646,7 +646,8 @@ namespace SnowmeetApi.Controllers
                     staff_open_id = recept.update_staff,
                     score_rate = 0,
                     generate_score = 0,
-                    code = recept.code.Trim()
+                    code = recept.code.Trim(),
+                    memo = maintainOrder.memo
 
                 };
                 await _context.AddAsync(order);
