@@ -890,6 +890,36 @@ namespace SnowmeetApi.Controllers
             return Ok(await CreateEPaymentDailyReport(reportDate, mchId.ToString()));
         }
 
+        [HttpGet]
+        public async Task<ActionResult<int>> CreateAllReport()
+        {
+            int i = 0;
+            int[] mchId = new int[] { 1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 15, 17 };
+            for (DateTime currentDate = DateTime.Parse("2023-12-27"); currentDate < DateTime.Now.AddDays(-1).Date; currentDate = currentDate.AddDays(1))
+            {
+                for (int j = 0; j < mchId.Length; j++)
+                {
+                    EPaymentDailyReport report = await CreateEPaymentDailyReport(currentDate.Date, mchId[j].ToString());
+                    await SaveReport(report);
+                    i++;
+                }
+            }
+            return Ok(i);
+        }
+
+        [NonAction]
+        public async Task SaveReport(EPaymentDailyReport report)
+        {
+            EPaymentDailyReport? oriReport = await _context.ePaymentDailyReport.FindAsync(report.biz_date, report.mch_id, report.pay_method);
+            if (oriReport != null)
+            {
+                _context.ePaymentDailyReport.Remove((EPaymentDailyReport)report);
+                await _context.SaveChangesAsync();
+            }
+            await _context.ePaymentDailyReport.AddAsync(report);
+            await _context.SaveChangesAsync();
+        }
+
 
         [NonAction]
         public async Task<EPaymentDailyReport> CreateEPaymentDailyReport(DateTime reportDate, string mchId, string payMehtod = "微信支付")

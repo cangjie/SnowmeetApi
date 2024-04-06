@@ -39,6 +39,8 @@ namespace SnowmeetApi.Data
             modelBuilder.Entity<SnowmeetApi.Models.Maintain.MaintainReport>().HasNoKey();
 
             modelBuilder.Entity<Models.Order.SaleReport>().HasNoKey();
+
+            modelBuilder.Entity<Models.Order.EPaymentDailyReport>().HasKey(e => new { e.biz_date, e.mch_id, e.pay_method });
             
 
             //OrderOnline
@@ -173,6 +175,8 @@ namespace SnowmeetApi.Data
         public DbSet<Models.Rent.RentOrderDetailLog> rentOrderDetailLog { get; set; }
 
         public DbSet<Models.Order.WepayFlowBill> wepayFlowBill { get; set; }
+
+        public DbSet<Models.Order.EPaymentDailyReport> ePaymentDailyReport { get; set; }
 
     }
 }
