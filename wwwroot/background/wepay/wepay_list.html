@@ -31,7 +31,11 @@
         <h1 style="text-align:center">微信支付订单</h1>
     </div>
     <div class="row_view" style="align-items:center;justify-content:center; margin-top:20px">
-        日期：从&nbsp;<input type="date" id="date_from" oninput="setDate()" />&nbsp;到&nbsp;<input type="date" id="date_to" oninput="setDate()" />
+        商户：
+            <select id="mchList" onchange="changeMchId()" >
+                <option value="" >全部</option>
+            </select>
+         日期：从&nbsp;<input type="date" id="date_from" oninput="setDate()" />&nbsp;到&nbsp;<input type="date" id="date_to" oninput="setDate()" />
         &nbsp;<button id="btn" onclick="getData()"> 查 询 </button>&nbsp;<button onclick="download()"> 下 载 </button>
     </div>
     <div style="text-align:center;display:flex;justify-content:left;width:4000px">
@@ -74,10 +78,40 @@
     var tHeadTemplate = ['序号', '门店', '日序号', '星期','订单日期', '支付时间', '订单号', '状态', '免押金', '押金', '招待','姓名', '电话', '备注','开单人', '支付方式', '商户订单号', '租金合计'];
     var tHead = tHeadTemplate;
     var tData = [];
+    var mchId = ''
+    
+    fillMchIdList();
+
+    function changeMchId(e) {
+        var mchIdList = document.getElementById('mchList');
+        mchId = mchIdList.options[mchIdList.selectedIndex].value;
+
+    }
+
+    function fillMchIdList() {
+        var getUrl = '../../core/WepayOrder/GetWepayKey';
+        $.ajax({
+            url: getUrl,
+            type: 'GET',
+            success: function (msg, status) {
+                var mchIdList = document.getElementById('mchList');
+                console.log(mchIdList);
+                for (var i = 0; i < msg.length; i++) {
+                    var option = document.createElement('option');
+                    var valueAttr = document.createAttribute('value');
+                    valueAttr.value = msg[i].mch_id;
+                    option.attributes.setNamedItem(valueAttr);
+                    option.innerText = msg[i].mch_name + '-' + msg[i].mch_id
+                    mchIdList.appendChild(option);
+                }
+            }
+        })
+    }
+
     function getData() {
 
 
-        tHeadTemplate = ['序号', '日期', '时间', '星期', '账户号', '账户名称', '门店', '商户订单号', '业务', '业务订单号', '姓名', '性别', '电话', '支付金额', '退款金额', '结余金额'];
+        tHeadTemplate = ['序号', '日期', '时间', '星期', '账户号', '账户名称', '门店', '商户订单号', '业务', '业务订单号', '姓名', '性别', '电话', '支付金额', '支付手续费', '到账金额',  '退款金额', '退还手续费', '实际退款', '结余金额','提现金额','开单人'];
         tHead = tHeadTemplate;
         tData = [];
 
@@ -86,7 +120,7 @@
         btnCtrl.disabled = true;
         btnCtrl.innerText = "查询中……";
         var getUrl = '../../core/WepayOrder/GetWepayBalance?sessionKey=' + encodeURIComponent(sessionKey)
-            + '&startDate=' + formatDate(startDate) + '&endDate=' + formatDate(endDate);
+            + '&startDate=' + formatDate(startDate) + '&endDate=' + formatDate(endDate) + '&mchId=' + mchId;
         $.ajax({
             url: getUrl,
             type: 'GET',
@@ -102,14 +136,18 @@
                 for (var i = 0; i < msg.maxRefundLength; i++) {
                     tHead.push('退款单号' + (i + 1).toString());
                     tHead.push('退款金额' + (i + 1).toString());
+                    tHead.push('退还手续费' + (i + 1).toString());
+                    tHead.push('实际退款' + (i + 1).toString());
                     tHead.push('退款日期' + (i + 1).toString());
                     tHead.push('退款时间' + (i + 1).toString());
                     //tHead.push('退款人' + (i + 1).toString());
 
                 }
 
+            
 
                 for (var i = 0; i < msg.items.length; i++) {
+                    var isDraw = false;
                     var lineData = [];
                     var data = msg.items[i];
                     for (var j = 0; j < tHead.length; j++) {
@@ -140,6 +178,9 @@
                                 break;
                             case '业务':
                                 lineData[j] = data.orderType;
+                                if (data.orderType == '提现') {
+                                    isDraw = true;
+                                }
                                 break;
                             case '业务订单号':
                                 lineData[j] = data.orderId;
@@ -156,9 +197,15 @@
                             case '备注':
                                 lineData[j] = data.memo;
                                 break;
-                            
+
                             case '支付金额':
                                 lineData[j] = formatAmount(data.settle_amount);
+                                break;
+                            case '支付手续费':
+                                lineData[j] = formatAmount(data.fee);
+                                break;
+                            case '到账金额':
+                                lineData[j] = formatAmount(data.receiveable_amount);
                                 break;
                             case '退款金额':
                                 lineData[j] = formatAmount(data.totalRefundAmount);
@@ -166,6 +213,15 @@
                             case '结余金额':
                                 lineData[j] = formatAmount(data.netAmount);
                                 break;
+                            case '提现金额':
+                                if (!isDraw) {
+                                    lineData[j] = '--';
+                                }
+                                else {
+                                    lineData[j] = formatAmount(data.drawAmount);
+                                }
+                                break;
+
                             default:
                                 var colName = tHead[j];
                                 var realColName = '';
@@ -177,6 +233,12 @@
                                 }
                                 else if (colName.indexOf('退款单号') >= 0) {
                                     realColName = '退款单号';
+                                }
+                                else if (colName.indexOf('退还手续费') >= 0) {
+                                    realColName = '退还手续费';
+                                }
+                                else if (colName.indexOf('实际退款') >= 0){
+                                    realColName = '实际退款';
                                 }
                                 else {
                                     realColName = '退款时间';
@@ -228,14 +290,60 @@
                                             lineData[j] = '--';
                                         }
                                         break;
-                                    
+                                    case '退还手续费':
+                                        if (data.refunds != undefined && data.refunds != null && data.refunds.length > 0
+                                            && data.refunds[colIndex] != null) {
+                                            lineData[j] = formatAmount(Math.abs(data.refunds[colIndex].fee));
+                                        }
+                                        else {
+                                            lineData[j] = '--';
+                                        }
+                                        break;
+                                    case '实际退款':
+                                        if (data.refunds != undefined && data.refunds != null && data.refunds.length > 0
+                                            && data.refunds[colIndex] != null) {
+                                            lineData[j] = formatAmount(data.refunds[colIndex].real_refund_amount);
+                                        }
+                                        else {
+                                            lineData[j] = '--';
+                                        }
+                                        break;
                                     default:
                                         break;
                                 }
                                 break;
                         }
+                        
                     }
+
                     console.log('line data', lineData);
+                    if (isDraw) {
+                        for (var j = 0; j < tHead.length; j++) {
+                            switch (tHead[j]) {
+                                case '门店':
+                                case '商户订单号':
+                                case '业务订单号':
+                                case '姓名':
+                                case '性别':
+                                case '电话':
+                                case '支付金额':
+                                case '支付手续费':
+                                case '到账金额':
+                                case '退款金额':
+                                case '退还手续费':
+                                case '实际退款':
+                                case '结余金额':
+                                case '开单人':
+                                    lineData[j] = '--';
+                                    break;
+                                default:
+                                    if (tHead[j].indexOf("退") >= 0) {
+                                        lineData[j] = '--';
+                                    }
+                                    break;
+                            }
+                        }
+                    }
                     tData.push(lineData);
                 }
                 console.log('get head', tHead);

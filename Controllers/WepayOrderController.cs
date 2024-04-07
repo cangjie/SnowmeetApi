@@ -467,7 +467,7 @@ namespace SnowmeetApi.Controllers
 
         /*
         [HttpGet]
-        public async Task DownloadCurrentSeason()
+        public async Task DownloadCurGrentSeason()
         {
             int[] mchId = new int[] { 1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 15, 17 };
 
@@ -755,12 +755,26 @@ namespace SnowmeetApi.Controllers
             }
         }
 
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<WepayKey>>> GetWepayKey()
+        {
+            var list = await _context.WepayKeys.Where(w => w.valid == 1)
+                .AsNoTracking().ToListAsync();
+            for (int i = 0; list != null && i < list.Count; i++)
+            {
+                list[i].private_key = "";
+                list[i].key_serial = "";
+                list[i].api_key = "";
+            }
+            return Ok(list);
+        }
+
 
         [HttpGet]
-        public async Task<ActionResult<WepayReport>> GetWepayBalance(DateTime startDate, DateTime endDate, string sessionKey)
+        public async Task<ActionResult<WepayReport>> GetWepayBalance(DateTime startDate, DateTime endDate, string sessionKey, string mchId = "")
         {
             sessionKey = Util.UrlDecode(sessionKey);
-
+            mchId = Util.UrlDecode(mchId);
             UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
             if (user == null || !user.isAdmin)
             {
@@ -768,8 +782,12 @@ namespace SnowmeetApi.Controllers
             }
 
             var paidArr = await _context.wepayBalance.Where(b => b.trans_date.Date >= startDate.Date
-                && b.trans_date.Date <= endDate.Date && b.pay_status.Trim().Equals("SUCCESS"))
+                && b.trans_date.Date <= endDate.Date && b.pay_status.Trim().Equals("SUCCESS")
+                && (mchId.Equals("") || b.mch_id.Trim().Equals(mchId)))
                 .OrderByDescending(b => b.trans_date).AsNoTracking().ToListAsync();
+
+            
+            
             
             var wepayKeyList = await _context.WepayKeys.ToListAsync();
 
@@ -863,8 +881,9 @@ namespace SnowmeetApi.Controllers
                 for (int j = 0; j < b.refunds.Count; j++)
                 {
                     b.totalRefundAmount += b.refunds[j].refund_amount;
+                    b.totalRefundAmountReal += b.refunds[j].real_refund_amount;
                 }
-                b.netAmount = b.settle_amount - b.totalRefundAmount;
+                b.netAmount = b.receiveable_amount - b.totalRefundAmountReal ;
                 b.shop = shop;
                 b.orderType = orderType;
                 b.real_name = realName;
@@ -872,14 +891,46 @@ namespace SnowmeetApi.Controllers
                 b.gender = gender;
                 b.mchName = mchName;
                 b.dayOfWeek = Util.GetDayOfWeek(b.trans_date.Date);
+                //b.fee = Math.Abs(b.fee);
+                //b.receiveable_amount = b.settle_amount - b.fee;
                 retList.Add(b);
 
             }
 
+            var withDraw = await _context.wepayFlowBill.Where(b => (b.bill_date_time.Date >= startDate.Date
+                && b.bill_date_time.Date <= endDate.Date && b.biz_type.Trim().Equals("提现")
+                && b.bill_type.Trim().Equals("支出")
+                && (mchId.Trim().Equals("") || b.mch_id.Trim().Equals(mchId))))
+                .AsNoTracking().ToListAsync();
+
+            for (int i = 0; withDraw != null && i < withDraw.Count; i++)
+            {
+                WepayBalance b = new WepayBalance();
+                b.trans_date = withDraw[i].bill_date_time;
+                b.orderType = "提现";
+                b.mch_id = withDraw[i].mch_id;
+                b.mchName = "";
+                for (int j = 0; j < wepayKeyList.Count; j++)
+                {
+                    if (wepayKeyList[j].mch_id.Trim().Equals(b.mch_id))
+                    {
+                        b.mchName = wepayKeyList[j].mch_name.Trim();
+                        break;
+                    }
+                }
+                b.drawAmount = withDraw[i].amount;
+                b.dayOfWeek = Util.GetDayOfWeek(b.trans_date);
+                retList.Add(b);
+
+            }
+
+            List<WepayBalance> ret = retList.OrderByDescending(b => b.trans_date).ToList();
+
+
 
             WepayReport report = new WepayReport();
             report.maxRefundLength = maxLen;
-            report.items = retList;
+            report.items = ret;
 
             return Ok(report);
         }
