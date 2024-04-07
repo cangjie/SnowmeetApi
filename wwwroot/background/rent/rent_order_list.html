@@ -25,21 +25,22 @@
     </style>
 
 </head>
-<body >
+<body>
+    <div id="menu" style="display:flex; flex-direction:row; width:100%"></div>
     <div style="margin-top: 20px">
         <h1 style="text-align:center">租赁订单报表</h1>
     </div>
     <div class="row_view" style="align-items:center;justify-content:center; margin-top:20px">
         日期：从&nbsp;<input type="date" id="date_from" oninput="setDate()" />&nbsp;到&nbsp;<input type="date" id="date_to" oninput="setDate()" />
-        &nbsp;<button id="btn" onclick="getData()"> 查 询 </button>&nbsp;<button  onclick="download()"> 下 载 </button>
+        &nbsp;<button id="btn" onclick="getData()"> 查 询 </button>&nbsp;<button onclick="download()"> 下 载 </button>
     </div>
     <div style="text-align:center;display:flex;justify-content:left;width:4000px">
-        <table style="border:solid;border-width:1px" >
+        <table style="border:solid;border-width:1px">
             <thead>
                 <tr id="tHead">
                 </tr>
             </thead>
-            <tbody id="tBody" class="table_body_row" >
+            <tbody id="tBody" class="table_body_row">
             </tbody>
         </table>
     </div>
@@ -340,3 +341,4 @@
     }
 </script>
 <script type="text/javascript" src="../../js/date_selector.js"></script>
+<script type="text/javascript" src="../js/menu.js"></script>

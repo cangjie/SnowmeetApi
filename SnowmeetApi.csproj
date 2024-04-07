@@ -91,6 +91,7 @@
     <Folder Include="wwwroot\background\sale\" />
     <Folder Include="wwwroot\background\rent\" />
     <Folder Include="wwwroot\background\wepay\" />
+    <Folder Include="wwwroot\background\js\" />
   </ItemGroup>
   <ItemGroup>
     <Content Remove="wwwroot\upload\" />
@@ -108,5 +109,6 @@
     <Content Remove="wwwroot\background\sale\" />
     <Content Remove="wwwroot\background\rent\" />
     <Content Remove="wwwroot\background\wepay\" />
+    <Content Remove="wwwroot\background\js\" />
   </ItemGroup>
 </Project>
