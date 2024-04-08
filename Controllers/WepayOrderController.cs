@@ -889,6 +889,7 @@ namespace SnowmeetApi.Controllers
                 {
                     b.totalRefundAmount += b.refunds[j].refund_amount;
                     b.totalRefundAmountReal += b.refunds[j].real_refund_amount;
+                    b.totalRefundFee += Math.Abs(b.refunds[j].fee);
                 }
                 b.netAmount = b.receiveable_amount - b.totalRefundAmountReal ;
                 b.shop = shop;

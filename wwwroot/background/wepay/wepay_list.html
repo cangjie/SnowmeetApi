@@ -111,7 +111,7 @@
     function getData() {
 
 
-        tHeadTemplate = ['序号', '日期', '时间', '星期', '账户号', '账户名称', '门店', '商户订单号', '业务', '业务订单号', '姓名', '性别', '电话', '支付金额', '支付手续费', '到账金额',  '退款金额', '退还手续费', '实际退款', '结余金额','提现金额','开单人'];
+        tHeadTemplate = ['序号', '日期', '时间', '星期', '账户号', '账户名称', '门店', '商户订单号', '业务', '业务订单号', '姓名', '性别', '电话', '支付金额', '支付手续费', '到账金额', '退款金额合计', '退还手续费合计', '实际退款合计', '结余金额','提现金额','开单人'];
         tHead = tHeadTemplate;
         tData = [];
 
@@ -207,8 +207,14 @@
                             case '到账金额':
                                 lineData[j] = formatAmount(data.receiveable_amount);
                                 break;
-                            case '退款金额':
-                                lineData[j] = formatAmount(data.totalRefundAmount);
+                            case '退款金额合计':
+                                
+                                if (data.refunds == null || data.refunds == undefined || data.refunds.length == 0) {
+                                    lineData[j] = '--';
+                                }
+                                else {
+                                    lineData[j] = formatAmount(data.totalRefundFee);
+                                }
                                 break;
                             case '结余金额':
                                 lineData[j] = formatAmount(data.netAmount);
@@ -221,7 +227,22 @@
                                     lineData[j] = formatAmount(data.drawAmount);
                                 }
                                 break;
-
+                            case '退还手续费合计':
+                                if (data.refunds == null || data.refunds == undefined || data.refunds.length == 0) {
+                                    lineData[j] = '--';
+                                }
+                                else {
+                                    lineData[j] = formatAmount(data.totalRefundFee);
+                                }
+                                break;
+                            case '实际退款合计':
+                                if (data.refunds == null || data.refunds == undefined || data.refunds.length == 0) {
+                                    lineData[j] = '--';
+                                }
+                                else {
+                                    lineData[j] = formatAmount(data.totalRefundAmountReal);
+                                }
+                                break;
                             default:
                                 var colName = tHead[j];
                                 var realColName = '';

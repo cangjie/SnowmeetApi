@@ -66,7 +66,8 @@ namespace SnowmeetApi.Models.Order
         public double totalRefundAmount { get; set; } = 0;
         [NotMapped]
         public double totalRefundAmountReal { get; set; } = 0;
-        
+        [NotMapped]
+        public double totalRefundFee { get; set; } = 0;
         [NotMapped]
         public string dayOfWeek { get; set; } = "";
         [NotMapped]
