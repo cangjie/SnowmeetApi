@@ -45,10 +45,12 @@ function formatAmount(n) {
     if (isNaN(amount)) {
         return '--';
     }
-    amount = Math.round(amount, 2);
+    amount = Math.round(100 * amount, 2)/100;
     var amountStrArr = amount.toString().split('.');
     var amountStr = amountStrArr[0] + (amountStrArr.length == 1 ? '.00'
         : (amountStrArr[1] + '00'.substring(0, 2 - amountStrArr[1].length)))
-
+    if (amountStr.indexOf('.') < 0) {
+        amountStr = amount.toString();
+    }
     return '¥' + amountStr;
 }

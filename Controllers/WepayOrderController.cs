@@ -29,6 +29,9 @@ using System.Reflection.PortableExecutable;
 using System.Threading;
 using Newtonsoft.Json.Converters;
 using SnowmeetApi.Models.Rent;
+using System.IO;
+using SixLabors.ImageSharp.Drawing;
+using Aop.Api.Domain;
 
 namespace SnowmeetApi.Controllers
 {
@@ -681,6 +684,10 @@ namespace SnowmeetApi.Controllers
             }
         }
 
+
+
+
+
         [HttpGet]
         public async Task RequestFlowBill(int mchId, DateTime billDate)
         {
@@ -1198,6 +1205,292 @@ namespace SnowmeetApi.Controllers
             }
 
             return report;
+        }
+
+
+        [HttpGet]
+        public async Task ImportWepayData(string path= "/Users/cangjie/Desktop/wepay/5183")
+        {
+            string[] fileNameArr = Directory.GetFiles(path);
+            Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+            foreach (string fileName in fileNameArr)
+            {
+
+                string[] fileNamePathArr = fileName.Split('/');
+                string fn = fileNamePathArr[fileNamePathArr.Length - 1];
+                if (fn.IndexOf(".D") >= 0)
+                {
+                    continue;
+                }
+                string mchId = fn.Substring(0, 10);
+                var keyList = await _context.WepayKeys.Where(m => m.mch_id.Trim().Equals(mchId))
+                    .AsNoTracking().ToListAsync();
+                int nMchId = 0;
+                if (keyList != null && keyList.Count > 0)
+                {
+                    nMchId = keyList[0].id;
+                }
+                bool isBalance = false;
+                if (fn.IndexOf("All") >= 0)
+                {
+                    isBalance = true;
+                }
+                else
+                {
+                    isBalance = false;
+                }
+
+                System.IO.StreamReader sr = new StreamReader(fileName, System.Text.Encoding.GetEncoding("gb2312"));
+                string content = sr.ReadToEnd().Trim();
+                sr.Close();
+                if (isBalance)
+                {
+                    string[] lineArr = content.Split('\n');
+                    string[] summaryFields = lineArr[lineArr.Length - 1].Split(',');
+
+
+                    WepaySummary summary = new WepaySummary()
+                    {
+                        id = 0,
+                        mch_id = nMchId,
+                        trans_date = DateTime.Now,
+                        trans_num = (int)double.Parse(summaryFields[0].Replace("`", "")),
+                        total_settle_amount = double.Parse(summaryFields[1].Replace("`", "")),
+                        total_refund_amount = double.Parse(summaryFields[2].Replace("`", "")),
+                        coupon_refund_amount = double.Parse(summaryFields[3].Replace("`", "")),
+                        total_fee = double.Parse(summaryFields[4].Replace("`", "")),
+                        total_order_amount = (summaryFields.Length > 5) ? double.Parse(summaryFields[5].Replace("`", "")) : 0,
+                        total_request_refund_amount = (summaryFields.Length > 6) ? double.Parse(summaryFields[6].Replace("`", "")) : 0
+                    };
+
+
+                    WepayBalance[] balanceArr = new WepayBalance[lineArr.Length - 3];
+
+
+                    for (int i = 1; i < lineArr.Length - 2; i++)
+                    {
+                        WepayBalance b = new WepayBalance();
+                        string[] fieldArr = lineArr[i].Split(',');
+                        Console.WriteLine(lineArr[i]);
+                        for (int j = 0; j < fieldArr.Length; j++)
+                        {
+                            string v = fieldArr[j].Trim().Replace("`", "");
+                            switch (j)
+                            {
+                                case 0:
+                                    b.trans_date = DateTime.Parse(v);
+                                    break;
+                                case 1:
+                                    b.app_id = v.Trim();
+                                    break;
+                                case 2:
+                                    b.mch_id = v.Trim();
+                                    break;
+                                case 3:
+                                    b.spc_mch_id = v.Trim();
+                                    break;
+                                case 4:
+                                    b.device_id = v.Trim();
+                                    break;
+                                case 5:
+                                    b.wepay_order_num = v.Trim();
+                                    break;
+                                case 6:
+                                    b.out_trade_no = v.Trim();
+                                    break;
+                                case 7:
+                                    b.open_id = v.Trim();
+                                    break;
+                                case 8:
+                                    b.trans_type = v.Trim();
+                                    break;
+                                case 9:
+                                    b.pay_status = v.Trim();
+                                    break;
+                                case 10:
+                                    b.bank = v.Trim();
+                                    break;
+                                case 11:
+                                    b.currency = v.Trim();
+                                    break;
+                                case 12:
+                                    b.settle_amount = double.Parse(v.Trim());
+                                    break;
+                                case 13:
+                                    b.coupon_amount = double.Parse(v.Trim());
+                                    break;
+                                case 14:
+                                    b.refund_no = v.Trim();
+                                    break;
+                                case 15:
+                                    b.out_refund_no = v.Trim();
+                                    break;
+                                case 16:
+                                    b.refund_amount = double.Parse(v.Trim());
+                                    break;
+                                case 17:
+                                    b.coupon_refund_amount = double.Parse(v.Trim());
+                                    break;
+                                case 18:
+                                    b.refund_type = v.Trim();
+                                    break;
+                                case 19:
+                                    b.refund_status = v.Trim();
+                                    break;
+                                case 20:
+                                    b.product_name = v.Trim();
+                                    break;
+                                case 21:
+                                    b.product_package = v.Trim();
+                                    break;
+                                case 22:
+                                    b.fee = double.Parse(v.Trim());
+                                    break;
+                                case 23:
+                                    b.fee_rate = v.Trim();
+                                    break;
+                                case 24:
+                                    b.order_amount = double.Parse(v.Trim());
+                                    break;
+                                case 25:
+                                    b.request_refund_amount = double.Parse(v.Trim());
+                                    break;
+                                case 26:
+                                    b.fee_rate_memo = v.Trim();
+                                    break;
+                                default:
+                                    break;
+                            }
+                        }
+                        balanceArr[i - 1] = b;
+                    }
+
+                    if (summary.trans_num == balanceArr.Length)
+                    {
+                        try
+                        {
+                            await _context.wepaySummary.AddAsync(summary);
+                            await _context.SaveChangesAsync();
+                        }
+                        catch (Exception err)
+                        {
+                            //Console.WriteLine("")
+                        }
+                        if (summary.id > 0)
+                        {
+                            try
+                            {
+                                for (int i = 0; i < balanceArr.Length; i++)
+                                {
+                                    balanceArr[i].summary_id = summary.id;
+                                    try
+                                    {
+                                        var l = await _context.wepayBalance.Where(b =>
+                                        (
+                                            b.mch_id.Trim().Equals(balanceArr[i].mch_id.Trim())
+                                            && b.trans_date == balanceArr[i].trans_date
+                                            && b.pay_status.Trim().Equals(balanceArr[i].pay_status.Trim())
+                                            && b.settle_amount == balanceArr[i].settle_amount
+                                            && b.refund_amount == balanceArr[i].refund_amount
+                                        )).AsNoTracking().ToListAsync();
+                                        if (l == null || l.Count == 0)
+                                        {
+                                            await _context.wepayBalance.AddAsync(balanceArr[i]);
+                                            await _context.SaveChangesAsync();
+                                        }
+                                    }
+                                    catch (Exception err)
+                                    {
+                                        string errStr = err.ToString();
+                                        if (err.InnerException.Message.IndexOf("Cannot insert duplicate key row") >= 0)
+                                        {
+                                            errStr = "";
+                                        }
+                                        Console.WriteLine("add fail " + errStr.ToString() + " " + balanceArr[i].mch_id + " " + balanceArr[i].trans_date.ToString());
+                                    }
+                                }
+
+
+                                
+                            }
+                            catch
+                            {
+                                //_context.wepaySummary.Remove(summary);
+                                //await _context.SaveChangesAsync();
+                            }
+                        }
+
+                    }
+
+                }
+                else
+                {
+                    string[] lineArr = content.Split('\r');
+                    for (int i = 1; i < lineArr.Length - 2; i++)
+                    {
+                        Console.WriteLine(lineArr[i].Trim());
+                        string[] fields = lineArr[i].Trim().Split(',');
+                        for (int j = 0; j < fields.Length; j++)
+                        {
+                            fields[j] = fields[j].Replace("`", "");
+                        }
+                        WepayFlowBill bill = new WepayFlowBill()
+                        {
+                            mch_id = mchId,
+                            bill_date_time = DateTime.Parse(fields[0]),
+                            biz_no = fields[1].Trim(),
+                            flow_no = fields[2].Trim(),
+                            biz_name = fields[3].Trim(),
+                            biz_type = fields[4].Trim(),
+                            bill_type = fields[5].Trim(),
+                            amount = double.Parse(fields[6].Trim()),
+                            surplus = double.Parse(fields[7].Trim()),
+                            oper = fields[8].Trim(),
+                            memo = fields[9].Trim(),
+                            invoice_id = fields[10].Trim()
+                        };
+                        //await _context.wepayFlowBill.AddAsync(bill);
+                        
+                        try
+                        {
+                            var l = await _context.wepayFlowBill.Where(f => (
+                                f.mch_id.Trim().Equals(bill.mch_id.Trim())
+                                && f.bill_date_time == bill.bill_date_time
+                                && f.biz_type.Trim().Equals(bill.biz_type.Trim())
+                                && f.bill_type.Trim().Equals(bill.bill_type.Trim())
+                                && f.amount == bill.amount
+                            )).AsNoTracking().ToListAsync();
+                            if (l == null || l.Count == 0)
+                            {
+                                await _context.wepayFlowBill.AddAsync(bill);
+                                await _context.SaveChangesAsync();
+                            }
+                        }
+                        catch(Exception err)
+                        {
+                            string errStr = err.ToString();
+                            if (err.InnerException.Message.IndexOf("Cannot insert duplicate key row") >= 0)
+                            {
+                                errStr = "";
+                            }
+                            Console.WriteLine("add fail " + errStr.ToString() + " " +  bill.mch_id + " " + bill.bill_date_time.ToString());
+                        }
+                        
+                    }
+                    //await _context.SaveChangesAsync();
+                    /*
+                    try
+                    {
+                        await _context.SaveChangesAsync();
+                    }
+                    catch(Exception err)
+                    {
+                        Console.WriteLine(err.ToString());
+                    }
+                    */
+                }
+            }
+
         }
        
 
