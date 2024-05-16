@@ -28,6 +28,7 @@ using System.IO.Pipelines;
 using Aop.Api;
 using Aop.Api.Request;
 using Aop.Api.Response;
+using Aop.Api.Domain;
 
 namespace SnowmeetApi.Controllers
 {
@@ -127,6 +128,50 @@ namespace SnowmeetApi.Controllers
             await Response.WriteAsync("success");
         }
 
+
+        [HttpGet("{appId}")]
+        public async Task GetBill(string appId, DateTime billDate)
+        {
+            string certPath = Util.workingPath + "/AlipayCertificate/" + appId;
+            string privateKey = await System.IO.File.ReadAllTextAsync(certPath + "/private_key_" + appId + ".txt");
+            
+            string publicKey = await System.IO.File.ReadAllTextAsync(certPath + "/alipayCertPublicKey_RSA2.crt");
+
+            /*
+            AlipayConfig alipayConfig = new AlipayConfig();
+            alipayConfig.ServerUrl = "https://openapi.alipay.com/gateway.do";
+            alipayConfig.AppId = appId;
+            alipayConfig.PrivateKey = privateKey;
+            alipayConfig.Format = "json";
+            alipayConfig.AlipayPublicKey = publicKey;
+            alipayConfig.Charset = "UTF-8";
+            alipayConfig.SignType = "RSA2";
+            */
+            
+            CertParams certParams = new CertParams
+            {
+                AlipayPublicCertPath = Util.workingPath + "/AlipayCertificate/" + appId + "/alipayCertPublicKey_RSA2.crt",
+                AppCertPath = Util.workingPath + "/AlipayCertificate/" + appId + "/appCertPublicKey_" + appId + ".crt",
+                RootCertPath = Util.workingPath + "/AlipayCertificate/" + appId + "/alipayRootCert.crt"
+            };
+            IAopClient alipayClient = new DefaultAopClient("https://openapi.alipay.com/gateway.do", appId, privateKey, "json", "1.0", "RSA2", "utf-8", false, certParams);
+            
+            //IAopClient alipayClient = new DefaultAopClient(alipayConfig);
+            AlipayDataDataserviceBillDownloadurlQueryRequest request = new AlipayDataDataserviceBillDownloadurlQueryRequest();
+            AlipayDataDataserviceBillDownloadurlQueryModel model = new AlipayDataDataserviceBillDownloadurlQueryModel();
+            //model.Smid = "2088123412341234";
+            model.BillType = "trade";
+            model.BillDate = billDate.ToString("yyyy-MM-dd");
+            request.SetBizModel(model);
+            AlipayDataDataserviceBillDownloadurlQueryResponse response = alipayClient.CertificateExecute(request);
+             if(!response.IsError){
+             	Console.WriteLine("调用成功");
+             }
+             else{
+             	Console.WriteLine("调用失败");
+             }
+
+        }
 
 	}
 }
