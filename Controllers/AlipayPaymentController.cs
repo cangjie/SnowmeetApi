@@ -3,32 +3,24 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using SnowmeetApi.Data;
-/*
-using AlipaySDKNet.OpenAPI.Api;
-using AlipaySDKNet.OpenAPI.Client;
-using AlipaySDKNet.OpenAPI.Model;
-using AlipaySDKNet.OpenAPI.Util;
-using AlipaySDKNet.OpenAPI.Util.Model;
-*/
+
 using System.Linq;
 using System.Threading.Tasks;
 using System.Diagnostics;
-/*
-using Aop.Api.Request;
-using Aop.Api;
-using Aop.Api.Response;
-*/
-
-
 using Newtonsoft.Json;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.IO.Pipelines;
+
 using Aop.Api;
 using Aop.Api.Request;
 using Aop.Api.Response;
 using Aop.Api.Domain;
+<<<<<<< HEAD
+=======
+using Aop.Api.Util;
+>>>>>>> 91607831defe5af4e54e68abb66774cb95da23b8
 
 namespace SnowmeetApi.Controllers
 {
@@ -88,6 +80,36 @@ namespace SnowmeetApi.Controllers
             sOut.Close();
         }
 
+        [HttpGet]
+        public async Task Query(string appId, string out_trade_no)
+        {
+            string certPath = Util.workingPath + "/AlipayCertificate/" + appId;
+            string appCertPublicKeyPath = certPath + "/appCertPublicKey_" + appId + ".crt";
+            
+
+            string privateKey = System.IO.File.OpenText(certPath + "/private_key_" + appId + ".txt").ReadToEnd().Trim();
+
+            CertParams certParams = new CertParams
+            {
+                AlipayPublicCertPath = Util.workingPath + "/AlipayCertificate/" + appId + "/alipayCertPublicKey_RSA2.crt",
+                AppCertPath = appCertPublicKeyPath,
+                RootCertPath = Util.workingPath + "/AlipayCertificate/" + appId + "/alipayRootCert.crt"
+            };
+            IAopClient client = new DefaultAopClient("https://openapi.alipay.com/gateway.do", appId, privateKey, "json", "1.0", "RSA2", "utf-8", false, certParams);
+            AlipayTradeQueryRequest request = new AlipayTradeQueryRequest();
+            AlipayTradeQueryModel model = new AlipayTradeQueryModel();
+            model.OutTradeNo = out_trade_no;
+            
+            // 设置查询选项
+            List<String> queryOptions = new List<String>();
+            queryOptions.Add("trade_settle_info");
+            model.QueryOptions = queryOptions;
+            request.SetBizModel(model);
+
+            AlipayTradeQueryResponse response = client.CertificateExecute(request);
+
+        }
+
         [HttpGet("{appId}")]
         public async Task  Test(string appId, double amount)
         {
@@ -108,14 +130,76 @@ namespace SnowmeetApi.Controllers
             request.SetNotifyUrl("https://mini.snowmeet.top/core/AlipayPayment/callback");
             string outTradeNo = DateTime.Now.Year.ToString() + DateTime.Now.Month.ToString().PadLeft(2, '0') + DateTime.Now.Day.ToString().PadLeft(2, '0') + DateTime.Now.Hour.ToString().PadLeft(2, '0')
                 + DateTime.Now.Minute.ToString().PadLeft(2, '0') + DateTime.Now.Second.ToString().PadLeft(2, '0');
-            Dictionary<string, object> bizContent = new Dictionary<string, object>();
-            bizContent.Add("out_trade_no", outTradeNo);
-            bizContent.Add("total_amount", amount);
-            bizContent.Add("subject", "测试商品");
+            
+            
+            
+            AlipayTradePrecreateModel model = new AlipayTradePrecreateModel();
+            
+            model.StoreId = "NJ_001";
+            
+            // 设置业务扩展参数
+            /*
+            ExtendParams extendParams = new ExtendParams();
+            extendParams.SysServiceProviderId = "2088511833207846";
+            extendParams.SpecifiedSellerName = "XXX的跨境小铺";
+            extendParams.CardType = "S0JP0000";
+            model.ExtendParams = extendParams;
+            */
+            // 设置订单标题
+            model.Subject = "Iphone6 16G";
+            
+            // 设置商户操作员编号
+            model.OperatorId = "yx_001";
+            
+            // 设置产品码
+            model.ProductCode = "FACE_TO_FACE_PAYMENT";
+            
+            // 设置订单附加信息
+            model.Body = "Iphone6 16G";
+            
+            // 设置订单包含的商品列表信息
+            List<GoodsDetail> goodsDetail = new List<GoodsDetail>();
+            GoodsDetail goodsDetail0 = new GoodsDetail();
+            goodsDetail0.GoodsName = "ipad";
+            goodsDetail0.Quantity = 1;
+            goodsDetail0.Price = "2000";
+            goodsDetail0.GoodsId = "apple-01";
+            goodsDetail0.GoodsCategory = "34543238";
+            goodsDetail0.CategoriesTree = "124868003|126232002|126252004";
+            goodsDetail0.ShowUrl = "http://www.alipay.com/xxx.jpg";
+            goodsDetail.Add(goodsDetail0);
+            model.GoodsDetail = goodsDetail;
+            
+            // 设置商户的原始订单号
+            model.MerchantOrderNo = "20161008001";
+            
+            // 设置可打折金额
+            model.DiscountableAmount = amount.ToString();
+            
+            // 设置商户订单号
+            model.OutTradeNo = outTradeNo;
+            
+            // 设置订单总金额
+            model.TotalAmount = amount.ToString();
+            
+            // 设置商户传入业务信息
+            BusinessParams businessParams = new BusinessParams();
+            businessParams.McCreateTradeIp = "127.0.0.1";
+            model.BusinessParams = businessParams;
+            
+            // 设置卖家支付宝用户ID
+            model.SellerId = "2088640272285174";
+            
+            // 设置商户机具终端编号
+            model.TerminalId = "NJ_T_001";
 
 
-            string Contentjson = JsonConvert.SerializeObject(bizContent);
-            request.BizContent = Contentjson;
+
+
+
+            request.SetBizModel(model);
+
+
             //AlipayTradePrecreateResponse response = client.Execute(request);
             AlipayTradePrecreateResponse response = client.CertificateExecute(request);
             string responseStr = response.Body.Trim();

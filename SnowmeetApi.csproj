@@ -55,7 +55,7 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.0.4" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="QRCoder" Version="1.4.3" />
-    <PackageReference Include="AlipaySDKNet.OpenAPI" Version="1.0.2" />
+    <PackageReference Include="AlipaySDKNet.OpenAPI" Version="2.4.*" />
     <PackageReference Include="AlipaySDKNet.Standard" Version="4.8.50" />
     <PackageReference Include="SixLabors.ImageSharp" Version="3.0.2" />
     <PackageReference Include="SixLabors.ImageSharp.Drawing" Version="2.0.0" />
