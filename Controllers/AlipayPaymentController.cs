@@ -17,11 +17,8 @@ using Aop.Api;
 using Aop.Api.Request;
 using Aop.Api.Response;
 using Aop.Api.Domain;
-<<<<<<< HEAD
-=======
-using Aop.Api.Util;
->>>>>>> 91607831defe5af4e54e68abb66774cb95da23b8
 
+using Aop.Api.Util;
 namespace SnowmeetApi.Controllers
 {
     [Route("core/[controller]/[action]")]
