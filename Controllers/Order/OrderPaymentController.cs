@@ -493,7 +493,7 @@ namespace SnowmeetApi.Controllers.Order
         }
 
         [NonAction]
-        private int GetMchId(OrderOnline order)
+        public int GetMchId(OrderOnline order)
         {
             int mchId = 3;
             /*

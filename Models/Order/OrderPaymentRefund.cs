@@ -18,6 +18,7 @@ namespace SnowmeetApi.Models.Order
         public double RefundFee { get; set; } = 0;
         public string TransactionId { get; set; } = "";
         public DateTime create_date { get; set; } = DateTime.Now;
+        public string reason {get; set;} = "";
 
         
         public bool refundSuccess

@@ -1,3 +1,4 @@
+/*
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -315,7 +316,7 @@ namespace SnowmeetApi.Controllers
                     var callbackModel = client.DeserializeEvent(postJson);
                     if ("TRANSACTION.SUCCESS".Equals(callbackModel.EventType))
                     {
-                        /* 根据事件类型，解密得到支付通知敏感数据 */
+                      
                 
                         var callbackResource = client.DecryptEventResource<SKIT.FlurlHttpClient.Wechat.TenpayV3.Events.TransactionResource>(callbackModel);
                         string outTradeNumber = callbackResource.OutTradeNumber;
@@ -483,7 +484,7 @@ namespace SnowmeetApi.Controllers
             }
         }
         */
-
+/*
         [HttpGet]
         public async Task DownloadToday()
         {
@@ -1489,6 +1490,7 @@ namespace SnowmeetApi.Controllers
                         Console.WriteLine(err.ToString());
                     }
                     */
+                    /*
                 }
             }
 
@@ -1497,3 +1499,4 @@ namespace SnowmeetApi.Controllers
 
     }
 }
+*/
