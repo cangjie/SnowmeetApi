@@ -21,6 +21,7 @@ using System.IO;
 using System.Net.Http.Headers;
 using SnowmeetApi.Models.Rent;
 using System.Text;
+using Microsoft.CodeAnalysis.Elfie.Model.Strings;
 
 namespace SnowmeetApi.Controllers.Order
 {
@@ -186,7 +187,7 @@ namespace SnowmeetApi.Controllers.Order
 
             string notifyUrl = "https://mini.snowmeet.top/core/OrderPayment/TenpayPaymentCallBack/" + mchid.ToString();
             string? outTradeNo = payment.out_trade_no;
-            if (outTradeNo == null || outTradeNo.Length != 20)
+            if (outTradeNo == null )
             { 
                 outTradeNo = order.id.ToString().PadLeft(6, '0') + payment.id.ToString().PadLeft(2, '0') + timeStamp.Substring(3, 10);
             }
@@ -727,10 +728,65 @@ namespace SnowmeetApi.Controllers.Order
                 payment.pay_method = payMethod.Trim();
                 payment.amount = amount;
                 payment.status = "待支付";
+                payment.out_trade_no = await GetOutTradeNo(payment.order_id);
                 await _context.OrderPayment.AddAsync(payment);
             }
             await _context.SaveChangesAsync();
             return Ok(payment);
+        }
+
+
+        [NonAction]
+        public async Task<string> GetOutTradeNo(int orderId)
+        {
+            OrderOnline order = await _context.OrderOnlines.FindAsync(orderId);
+            if (order == null)
+            {
+                return "";
+            }
+            
+            var shops = await _context.Shop.Where(s=>s.name.Trim().Equals(order.shop.Trim()))
+                .AsNoTracking().ToListAsync();
+            if (shops == null || shops.Count == 0)
+            {
+                return "";
+            }
+            string shopCode = shops[0].code.Trim();
+            string bizCode = "";
+            switch(order.type.Trim())
+            {
+                case "雪票":
+                    bizCode = "SKIP";
+                    break;
+                case "店销现货":
+                    bizCode = "SALE";
+                    break;
+                case "押金":
+                    bizCode = "RENT";
+                    break;
+                case "服务":
+                    bizCode = "MTNC";
+                    break;
+                default:
+                    bizCode = "OTHS";    
+                    break;            
+
+            }
+            string dateStr = DateTime.Now.ToString("yyyyMMdd");
+            var payments = await _context.OrderPayment.Where(o => o.order_id == orderId)
+                .AsNoTracking().ToListAsync();
+            if (payments == null && payments.Count >= 100)
+            {
+                return "";
+            }
+            string outTradeNo = shopCode + "_" + bizCode + "_" + dateStr + "_" + order.id.ToString().PadLeft(6, '0')  + "_" + payments.Count.ToString().PadLeft(2,'0');
+            var paymentDepList = await _context.OrderPayment.Where(p=>p.out_trade_no.Trim().Equals(outTradeNo))
+                .AsNoTracking().ToListAsync();
+            if (paymentDepList == null || paymentDepList.Count == 0)
+            {
+                return outTradeNo;
+            }
+            return "";
         }
 
        
