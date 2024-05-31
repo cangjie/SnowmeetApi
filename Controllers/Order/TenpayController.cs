@@ -441,6 +441,7 @@ namespace SnowmeetApi.Controllers
 
             string notifyUrl = payment.notify.Trim().Replace("https://", "").Split('/')[0].Trim();
             notifyUrl = "https://" + notifyUrl + "/core/Tenpay/RefundCallback/" + payment.mch_id.ToString();
+            refund.notify_url = notifyUrl.Trim();
 
             _db.OrderPaymentRefund.Entry(refund).State = EntityState.Modified;
             await _db.SaveChangesAsync();
