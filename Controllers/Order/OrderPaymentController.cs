@@ -485,7 +485,7 @@ namespace SnowmeetApi.Controllers.Order
                 return BadRequest();
             }
             OrderPayment payment = await _context.OrderPayment.FindAsync(paymentId);
-            if (payment.status.Equals("支付成功"))
+            if (!payment.status.Equals("支付成功"))
             {
                 return BadRequest();
             }
