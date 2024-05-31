@@ -323,6 +323,8 @@ namespace SnowmeetApi.Controllers.Order
         [HttpGet("{orderId}")]
         public async Task<ActionResult<OrderOnline>> CancelOrder(int orderId, string sessionKey)
         {
+            sessionKey = Util.UrlDecode(sessionKey);
+
             UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
             
            
@@ -373,6 +375,30 @@ namespace SnowmeetApi.Controllers.Order
             //OrderOnline orderNew1 = (await orderController.GetOrderOnline(orderId, sessionKey)).Value;
             return Ok((await orderController.GetOrderOnline(orderId, sessionKey)).Value);
 
+        }
+
+        [HttpGet("{paymentId}")]
+        public async Task<ActionResult<OrderPayment>> Pay(int paymentId, string sessionKey)
+        {
+            sessionKey = Util.UrlDecode(sessionKey);            
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            OrderPayment payment = await _context.OrderPayment.FindAsync(paymentId);
+            payment.open_id = user.miniAppOpenId.Trim();
+
+            switch(payment.pay_method.Trim())
+            {
+                case "微信支付":
+                    TenpayController tenpayHelper = new TenpayController(_context, _originConfig, _httpContextAccessor);
+                    payment = await tenpayHelper.TenpayRequest(paymentId, sessionKey);
+                    break;
+                default:
+                    payment.status = "支付成功";
+                    break;
+
+            }
+
+            payment.open_id = "";
+            return Ok(payment);
         }
 
         [HttpGet("{orderId}")]

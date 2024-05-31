@@ -42,33 +42,33 @@ namespace SnowmeetApi.Controllers
             _rentHelper = new RentController(_db, _oriConfig, _http);
         }
 
-         [HttpGet("{paymentId}")]
-        public async Task<ActionResult<TenpaySet>> TenpayRequest(int paymentId, string sessionKey)
+        [NonAction]
+        public async Task<OrderPayment> TenpayRequest(int paymentId, string sessionKey)
         {
 
             sessionKey = Util.UrlDecode(sessionKey.Trim());
             UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _db)).Value;
             if (user == null)
             {
-                return BadRequest();
+                return null;
             }
             OrderPayment payment = await _db.OrderPayment.FindAsync(paymentId);
             if (payment == null)
             {
-                return BadRequest();
+                return null;
             }
             OrderOnline order = await _db.OrderOnlines.FindAsync(payment.order_id);
             if (order == null)
             {
-                return BadRequest();
+                return null;
             }
             if (!payment.pay_method.Trim().Equals("微信支付") || !payment.status.Trim().Equals("待支付"))
             {
-                return BadRequest();
+                return null;
             }
             if (order.status.Trim().Equals("支付完成") || order.status.Trim().Equals("订单关闭"))
             {
-                return BadRequest();
+                return null;
             }
             string timeStamp = Util.getTime13().ToString();
             int mchid = _orderPaymentHelper.GetMchId(order);
@@ -189,9 +189,9 @@ namespace SnowmeetApi.Controllers
                 payment.timestamp = set.timeStamp.Trim();
                 _db.Entry(payment).State = EntityState.Modified;
                 await _db.SaveChangesAsync();
-                return set;
+                return payment;
             }
-            return BadRequest();
+            return null;
         }
 
         
