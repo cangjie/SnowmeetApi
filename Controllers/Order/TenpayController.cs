@@ -433,15 +433,26 @@ namespace SnowmeetApi.Controllers
         public async Task<OrderPaymentRefund> Refund(int refundId)
         {
 
+
             OrderPaymentRefund refund = await _db.OrderPaymentRefund.FindAsync(refundId);
 
 
 
             OrderPayment payment = await _db.OrderPayment.FindAsync(refund.payment_id);
 
+
+            var refunds = await _db.OrderPaymentRefund
+                .Where(r => r.payment_id == payment.id)
+                .AsNoTracking().ToListAsync();
+            
+
             string notifyUrl = payment.notify.Trim().Replace("https://", "").Split('/')[0].Trim();
             notifyUrl = "https://" + notifyUrl + "/core/Tenpay/RefundCallback/" + payment.mch_id.ToString();
             refund.notify_url = notifyUrl.Trim();
+            string outRefundNo = payment.out_trade_no + "_" + DateTime.Now.ToString("yyyyMMdd")
+                +"_" + refunds.Count.ToString().PadLeft(2, '0');
+            refund.out_refund_no = outRefundNo;
+
 
             _db.OrderPaymentRefund.Entry(refund).State = EntityState.Modified;
             await _db.SaveChangesAsync();
@@ -461,13 +472,8 @@ namespace SnowmeetApi.Controllers
                 PlatformCertificateManager = certManager
             };
 
-            var refunds = await _db.OrderPaymentRefund
-                .Where(r => r.payment_id == payment.id)
-                .AsNoTracking().ToListAsync();
             
-            string outRefundNo = payment.out_trade_no + "_" + DateTime.Now.ToString("yyyyMMdd")
-                +"_" + refunds.Count.ToString().PadLeft(2, '0');
-
+            
             var client = new WechatTenpayClient(options);
             var request = new CreateRefundDomesticRefundRequest()
             {
@@ -592,7 +598,7 @@ namespace SnowmeetApi.Controllers
                 {
                     try
                     {
-                        var callbackResource = client.DecryptEventResource<SKIT.FlurlHttpClient.Wechat.TenpayV3.Events.TransactionResource>(callbackModel);
+                        var callbackResource = client.DecryptEventResource<SKIT.FlurlHttpClient.Wechat.TenpayV3.Events.RefundResource>(callbackModel);
                         OrderPayment payment = await _db.OrderPayment
                             .Where(p => p.out_trade_no.Trim().Equals(callbackResource.OutTradeNumber)
                             && p.pay_method.Trim().Equals("微信支付") && p.status.Trim().Equals("支付成功"))
@@ -600,8 +606,8 @@ namespace SnowmeetApi.Controllers
 
 
                         double refundAmount = Math.Round(((double)callbackResource.Amount.Total) / 100, 2);
-                        OrderPaymentRefund refund = await _db.OrderPaymentRefund.Where(r => (r.payment_id == payment.id
-                         && r.amount == refundAmount && r.state == 0)).FirstAsync();
+                        OrderPaymentRefund refund = await _db.OrderPaymentRefund
+                            .Where(r => (r.refund_id.Trim().Equals(callbackResource.RefundId.Trim()))).FirstAsync();
 
                         refund.state = 1;
                         refund.memo = callbackResource.TransactionId;

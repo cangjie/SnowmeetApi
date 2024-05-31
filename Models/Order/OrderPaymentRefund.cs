@@ -20,6 +20,8 @@ namespace SnowmeetApi.Models.Order
         public DateTime create_date { get; set; } = DateTime.Now;
         public string reason {get; set;} = "";
 
+        public string out_refund_no {get; set;} = "";
+
         
         public bool refundSuccess
         {
