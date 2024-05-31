@@ -434,7 +434,17 @@ namespace SnowmeetApi.Controllers
         {
 
             OrderPaymentRefund refund = await _db.OrderPaymentRefund.FindAsync(refundId);
+
+
+
             OrderPayment payment = await _db.OrderPayment.FindAsync(refund.payment_id);
+
+            string notifyUrl = payment.notify.Trim().Replace("https://", "").Split('/')[0].Trim();
+            notifyUrl = "https://" + notifyUrl + "/core/Tenpay/RefundCallback/" + payment.mch_id.ToString();
+
+            _db.OrderPaymentRefund.Entry(refund).State = EntityState.Modified;
+            await _db.SaveChangesAsync();
+
 
             //var client = new WechatTenpayClient(options);
            
@@ -450,20 +460,28 @@ namespace SnowmeetApi.Controllers
                 PlatformCertificateManager = certManager
             };
 
+            var refunds = await _db.OrderPaymentRefund
+                .Where(r => r.payment_id == payment.id)
+                .AsNoTracking().ToListAsync();
+            
+            string outRefundNo = payment.out_trade_no + "_" + DateTime.Now.ToString("yyyyMMdd")
+                +"_" + refunds.Count.ToString().PadLeft(2, '0');
+
             var client = new WechatTenpayClient(options);
             var request = new CreateRefundDomesticRefundRequest()
             {
                 OutTradeNumber = payment.out_trade_no.Trim(),
-                OutRefundNumber = refund.id.ToString(),
+                OutRefundNumber = outRefundNo.Trim(),
                 Amount = new CreateRefundDomesticRefundRequest.Types.Amount()
                 {
                     Total = (int)Math.Round(payment.amount * 100, 0),
                     Refund = (int)(Math.Round(refund.amount * 100))
                 },
                 Reason = refund.reason,
-
-                NotifyUrl = refund.notify_url.Trim()
+                NotifyUrl = refund.notify_url.Trim(),
+                
             };
+            
             var response = await client.ExecuteCreateRefundDomesticRefundAsync(request);
             try
             {
@@ -488,6 +506,119 @@ namespace SnowmeetApi.Controllers
             }
 
             return null;
+        }
+
+        [HttpPost("{mchid}")]
+        public async Task<ActionResult<string>> RefundCallback(int mchid, [FromBody]object postData)
+        {
+            string paySign = _http.HttpContext.Request.Headers["Wechatpay-Signature"].ToString();
+            string nonce = _http.HttpContext.Request.Headers["Wechatpay-Nonce"].ToString();
+            string serial = _http.HttpContext.Request.Headers["Wechatpay-Serial"].ToString();
+            string timeStamp = _http.HttpContext.Request.Headers["Wechatpay-Timestamp"].ToString();
+
+
+            string path = $"{Environment.CurrentDirectory}";
+            if (path.StartsWith("/"))
+            {
+                path = path + "/WepayCertificate/";
+            }
+            else
+            {
+                path = path + "\\WepayCertificate\\";
+            }
+            string dateStr = DateTime.Now.Year.ToString() + DateTime.Now.Month.ToString().PadLeft(2, '0')
+                + DateTime.Now.Day.ToString().PadLeft(2, '0');
+            //string postJson = Newtonsoft.Json.JsonConvert.SerializeObject(postData);
+            //path = path + "callback_" +  + ".txt";
+            // 此文本只添加到文件一次。
+            using (StreamWriter fw = new StreamWriter(path + "callback_origin_refund_" + dateStr + ".txt", true))
+            {
+                await fw.WriteLineAsync(DateTimeOffset.Now.ToString());
+
+
+                await fw.WriteLineAsync(paySign);
+                await fw.WriteLineAsync(nonce);
+                await fw.WriteLineAsync(serial);
+                await fw.WriteLineAsync(timeStamp);
+                await fw.WriteLineAsync(postData.ToString());
+                await fw.WriteLineAsync("--------------------------------------------------------");
+                await fw.WriteLineAsync("");
+                fw.Close();
+            }
+
+
+            
+
+            string cerStr = "";
+            using (StreamReader sr = new StreamReader(path + serial.Trim() + ".pem", true))
+            {
+                cerStr = sr.ReadToEnd();
+                sr.Close();
+            }
+
+
+            string apiKey = "";
+            WepayKey key = _db.WepayKeys.Find(mchid);
+
+            if (key == null)
+            {
+                return NotFound();
+            }
+
+            apiKey = key.api_key.Trim();
+
+            var certManager = new InMemoryCertificateManager();
+
+            CertificateEntry ce = new CertificateEntry("RSA", serial, cerStr, DateTimeOffset.MinValue, DateTimeOffset.MaxValue);
+
+
+            certManager.AddEntry(ce);
+            //certManager.SetCertificate(serial, cerStr);
+            var options = new WechatTenpayClientOptions()
+            {
+                MerchantV3Secret = apiKey,
+                PlatformCertificateManager = certManager
+
+            };
+
+            var client = new WechatTenpayClient(options);
+            bool valid = client.VerifyEventSignature(timeStamp, nonce, postData.ToString(), paySign, serial);
+
+            if (valid)
+            {
+                var callbackModel = client.DeserializeEvent(postData.ToString());
+                if ("REFUND.SUCCESS".Equals(callbackModel.EventType))
+                {
+                    try
+                    {
+                        var callbackResource = client.DecryptEventResource<SKIT.FlurlHttpClient.Wechat.TenpayV3.Events.TransactionResource>(callbackModel);
+                        OrderPayment payment = await _db.OrderPayment
+                            .Where(p => p.out_trade_no.Trim().Equals(callbackResource.OutTradeNumber)
+                            && p.pay_method.Trim().Equals("微信支付") && p.status.Trim().Equals("支付成功"))
+                            .OrderByDescending(p => p.id).FirstAsync();
+
+
+                        double refundAmount = Math.Round(((double)callbackResource.Amount.Total) / 100, 2);
+                        OrderPaymentRefund refund = await _db.OrderPaymentRefund.Where(r => (r.payment_id == payment.id
+                         && r.amount == refundAmount && r.state == 0)).FirstAsync();
+
+                        refund.state = 1;
+                        refund.memo = callbackResource.TransactionId;
+                        _db.Entry(refund).State = EntityState.Modified;
+                        await _db.SaveChangesAsync();
+                    }
+                    catch
+                    {
+
+                    }
+                    
+                        
+                    
+
+                }
+
+            }
+            return "{ \r\n \"code\": \"SUCCESS\", \r\n \"message\": \"成功\" \r\n}";
         }
     }
 }

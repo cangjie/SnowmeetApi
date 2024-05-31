@@ -22,6 +22,7 @@ using System.Net.Http.Headers;
 using SnowmeetApi.Models.Rent;
 using System.Text;
 using Microsoft.CodeAnalysis.Elfie.Model.Strings;
+using Aop.Api.Domain;
 
 namespace SnowmeetApi.Controllers.Order
 {
@@ -75,178 +76,7 @@ namespace SnowmeetApi.Controllers.Order
 
 
 
-        [HttpGet("{id}")]
-        public async Task<ActionResult<TenpaySet>> TenpayRequest(int id, string sessionKey)
-        {
-            sessionKey = Util.UrlDecode(sessionKey.Trim());
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
-            if (user == null)
-            {
-                return BadRequest();
-            }
-            OrderPayment payment = await _context.OrderPayment.FindAsync(id);
-            if (payment == null)
-            {
-                return BadRequest();
-            }
-            OrderOnline order = await _context.OrderOnlines.FindAsync(payment.order_id);
-            if (order == null)
-            {
-                return BadRequest();
-            }
-            if (!payment.pay_method.Trim().Equals("微信支付") || !payment.status.Trim().Equals("待支付"))
-            {
-                return BadRequest();
-            }
-            if (order.status.Trim().Equals("支付完成") || order.status.Trim().Equals("订单关闭"))
-            {
-                return BadRequest();
-            }
-            string timeStamp = Util.getTime13().ToString();
-            int mchid = GetMchId(order);
-            WepayKey key = await _context.WepayKeys.FindAsync(mchid);
-
-            var certManager = new InMemoryCertificateManager();
-            var options = new WechatTenpayClientOptions()
-            {
-                MerchantId = key.mch_id.Trim(),
-                MerchantV3Secret = "",
-                MerchantCertificateSerialNumber = key.key_serial.Trim(),
-                MerchantCertificatePrivateKey = key.private_key.Trim(),
-                PlatformCertificateManager = certManager
-            };
-
-            string desc = "未知商品";
-
-            if (order.type.Trim().StartsWith("店销"))
-            {
-                desc = order.shop.Trim() + order.type.Trim();
-                var mi7Orders = await _context.mi7Order
-                    .Where(o => o.order_id == order.id).ToArrayAsync();
-                string mi7Nos = "";
-                for (int i = 0; i < mi7Orders.Length; i++)
-                {
-                    mi7Nos = mi7Nos.Trim() + " " + mi7Orders[i].mi7_order_id.Trim();
-                }
-                desc = desc + mi7Nos.Trim();
-            }
-            else if (order.type.Trim().StartsWith("服务"))
-            {
-                desc = "养护";
-            }
-            else
-            {
-                desc = "租赁";
-            }
-
-            CreatePayTransactionJsapiRequest.Types.Detail dtl = new CreatePayTransactionJsapiRequest.Types.Detail();
-
-            CreatePayTransactionJsapiRequest.Types.Detail.Types.GoodsDetail goodDtl
-                = new CreatePayTransactionAppRequest.Types.Detail.Types.GoodsDetail();
-            goodDtl.GoodsName = "测试商品明细1";
-            goodDtl.Quantity = 1;
-            goodDtl.UnitPrice = 10000;
-            goodDtl.MerchantGoodsId = "unknown";
-
-            dtl.GoodsList = new List<CreatePayTransactionAppRequest.Types.Detail.Types.GoodsDetail>();
-            dtl.GoodsList.Add(goodDtl);
-
-            goodDtl = new CreatePayTransactionAppRequest.Types.Detail.Types.GoodsDetail();
-            goodDtl.GoodsName = "测试商品明细2";
-            goodDtl.Quantity = 2;
-            goodDtl.UnitPrice = 20000;
-            goodDtl.MerchantGoodsId = "unknown";
-
-            dtl.GoodsList.Add(goodDtl);
-
-            //goodDtl
-
-            if (order.type.Trim().Equals("服务"))
-            {
-                string name = "";
-                var details = await _context.OrderOnlineDetails
-                    .Where(d => d.OrderOnlineId == order.id).ToListAsync();
-                for (int i = 0; i < details.Count; i++)
-                {
-                    Product p = await _context.Product.FindAsync(details[i].product_id);
-                    if (p != null)
-                    {
-                        name = name + " " + p.name.Trim();
-                    }
-                }
-                name = name.Trim();
-                if (!name.Equals(""))
-                {
-                    desc = name;
-                }
-            }
-
-            order.open_id = user.miniAppOpenId.Trim();
-            _context.Entry(order).State = EntityState.Modified;
-            await _context.SaveChangesAsync();
-
-            string notifyUrl = "https://mini.snowmeet.top/core/OrderPayment/TenpayPaymentCallBack/" + mchid.ToString();
-            string? outTradeNo = payment.out_trade_no;
-            if (outTradeNo == null )
-            { 
-                outTradeNo = order.id.ToString().PadLeft(6, '0') + payment.id.ToString().PadLeft(2, '0') + timeStamp.Substring(3, 10);
-            }
-
-            //CreatePayTransactionAppRequest.Types.Detail.Types.GoodsDetail  dtl = new CreatePayTransactionAppRequest.Types.Detail.Types.GoodsDetail();
-            //dtl.
-
-             //order.id.ToString().PadLeft(6, '0') + payment.id.ToString().PadLeft(2, '0') + timeStamp.Substring(3, 10);
-            var client = new WechatTenpayClient(options);
-            var request = new CreatePayTransactionJsapiRequest()
-            {
-                OutTradeNumber = outTradeNo,
-                AppId = _appId,
-                Description = desc.Trim(),//wepayOrder.description.Trim().Equals("") ? "测试商品" : wepayOrder.description.Trim(),
-                ExpireTime = DateTimeOffset.Now.AddMinutes(30),
-                NotifyUrl = notifyUrl,//wepayOrder.notify.Trim() + "/" + mchid.ToString(),
-                Amount = new CreatePayTransactionJsapiRequest.Types.Amount()
-                {
-                    Total = (int)Math.Round(payment.amount * 100, 0)
-                },
-                Payer = new CreatePayTransactionJsapiRequest.Types.Payer()
-                {
-                    OpenId = user.miniAppOpenId.Trim()
-                },
-                GoodsTag = "testing goods tag",
-                Detail = dtl
-                
-            };
-            
-            
-            var response = await client.ExecuteCreatePayTransactionJsapiAsync(request);
-            var paraMap = client.GenerateParametersForJsapiPayRequest(request.AppId, response.PrepayId);
-            if (response != null && response.PrepayId != null && !response.PrepayId.Trim().Equals(""))
-            {
-                TenpaySet set = new TenpaySet()
-                {
-                    prepay_id = response.PrepayId.Trim(),
-                    timeStamp = paraMap["timeStamp"].Trim(),
-                    nonce = paraMap["nonceStr"].Trim(),
-                    sign = paraMap["paySign"].Trim()
-
-                };
-
-                //payment.out_trade_no = order.id.ToString().PadLeft(6, '0') + payment.id.ToString().PadLeft(2, '0') + timeStamp;
-                payment.mch_id = mchid;
-                payment.open_id = user.miniAppOpenId.Trim();
-                payment.app_id = _appId;
-                payment.notify = notifyUrl.Trim();
-                payment.nonce = set.nonce.Trim();
-                payment.sign = set.sign.Trim();
-                payment.out_trade_no = outTradeNo;
-                payment.prepay_id = set.prepay_id.Trim();
-                payment.timestamp = set.timeStamp.Trim();
-                _context.Entry(payment).State = EntityState.Modified;
-                await _context.SaveChangesAsync();
-                return set;
-            }
-            return BadRequest();
-        }
+       
         /*
         [NonAction]
         public async Task<OrderPayment> TenpayRefund(int id, double amount, string sessionKey)
@@ -258,152 +88,7 @@ namespace SnowmeetApi.Controllers.Order
         }
         */
 
-        [HttpPost("{mchid}")]
-        public async Task<ActionResult<string>> TenpayPaymentCallback(int mchid,
-            [FromHeader(Name = "Wechatpay-Timestamp")] string timeStamp,
-            [FromHeader(Name = "Wechatpay-Nonce")] string nonce,
-            [FromHeader(Name = "Wechatpay-Signature")] string paySign,
-            [FromHeader(Name = "Wechatpay-Serial")] string serial)
-        {
-            using var reader = new StreamReader(Request.Body, Encoding.UTF8);
-            string postJson = await reader.ReadToEndAsync();
-
-            string apiKey = "";
-            WepayKey key = _context.WepayKeys.Find(mchid);
-
-            if (key == null)
-            {
-                return NotFound();
-            }
-
-            apiKey = key.api_key.Trim();
-
-            if (apiKey == null || apiKey.Trim().Equals(""))
-            {
-                return NotFound();
-            }
-            string path = $"{Environment.CurrentDirectory}";
-            /*
-            string postJson = Newtonsoft.Json.JsonConvert.SerializeObject(postData);
-            
-            string paySign = "no sign";
-            string nonce = "no nonce";
-            string serial = "no serial";
-            string timeStamp = "no time";
-            try
-            {
-                paySign = _httpContextAccessor.HttpContext.Request.Headers["Wechatpay-Signature"].ToString();
-                nonce = _httpContextAccessor.HttpContext.Request.Headers["Wechatpay-Nonce"].ToString();
-                serial = _httpContextAccessor.HttpContext.Request.Headers["Wechatpay-Serial"].ToString();
-                timeStamp = _httpContextAccessor.HttpContext.Request.Headers["Wechatpay-Timestamp"].ToString();
-            }
-            catch
-            {
-
-            }
-            */
-            if (path.StartsWith("/"))
-            {
-                path = path + "/WepayCertificate/";
-            }
-            else
-            {
-                path = path + "\\WepayCertificate\\";
-            }
-            string dateStr = DateTime.Now.Year.ToString() + DateTime.Now.Month.ToString().PadLeft(2, '0')
-                + DateTime.Now.Day.ToString().PadLeft(2, '0');
-            //path = path + "callback_" +  + ".txt";
-            // 此文本只添加到文件一次。
-            using (StreamWriter fw = new StreamWriter(path + "callback_origin_" + dateStr + ".txt", true))
-            {
-                fw.WriteLine(DateTimeOffset.Now.ToString());
-                fw.WriteLine(serial);
-                fw.WriteLine(timeStamp);
-                fw.WriteLine(nonce);
-                fw.WriteLine(paySign);
-                fw.WriteLine(postJson);
-                fw.WriteLine("");
-                fw.WriteLine("--------------------------------------------------------");
-                fw.WriteLine("");
-                fw.Close();
-            }
-
-            try
-            {
-                string cerStr = "";
-                using (StreamReader sr = new StreamReader(path + serial.Trim() + ".pem", true))
-                {
-                    cerStr = sr.ReadToEnd();
-                    sr.Close();
-                }
-                CertificateEntry ce = new CertificateEntry("RSA", cerStr);
-
-                //CertificateEntry ce = new CertificateEntry()
-
-                var manager = new InMemoryCertificateManager();
-                manager.AddEntry(ce);
-                var options = new WechatTenpayClientOptions()
-                {
-                    MerchantId = key.mch_id.Trim(),
-                    MerchantV3Secret = apiKey,
-                    MerchantCertificateSerialNumber = key.key_serial,
-                    MerchantCertificatePrivateKey = key.private_key,
-                    PlatformCertificateManager = manager
-
-                };
-
-                var client = new WechatTenpayClient(options);
-                Exception? verifyErr;
-                bool valid = client.VerifyEventSignature(timeStamp, nonce, postJson, paySign, serial, out verifyErr);
-                //valid = client.VerifyEventSignature()
-                /*
-                bool valid = client.VerifyEventSignature(
-                    callbackTimestamp: timeStamp,
-                    callbackNonce: nonce,
-                    callbackBody: postJson,
-                    callbackSignature: paySign,
-                    callbackSerialNumber: serial
-                );
-                */
-                if (valid)
-                {
-                    var callbackModel = client.DeserializeEvent(postJson);
-                    if ("TRANSACTION.SUCCESS".Equals(callbackModel.EventType))
-                    {
-                        /* 根据事件类型，解密得到支付通知敏感数据 */
-
-                        var callbackResource = client.DecryptEventResource<SKIT.FlurlHttpClient.Wechat.TenpayV3.Events.TransactionResource>(callbackModel);
-                        string outTradeNumber = callbackResource.OutTradeNumber;
-                        string transactionId = callbackResource.TransactionId;
-                        string callbackStr = Newtonsoft.Json.JsonConvert.SerializeObject(callbackResource);
-                        try
-                        {
-                            using (StreamWriter sw = new StreamWriter(path + "callback_decrypt_" + dateStr + ".txt", true))
-                            {
-                                sw.WriteLine(DateTimeOffset.Now.ToString());
-                                sw.WriteLine(callbackStr);
-                                sw.WriteLine("");
-                                sw.Close();
-                            }
-                        }
-                        catch
-                        {
-
-                        }
-                        await SetTenpayPaymentSuccess(outTradeNumber);
-
-                        //Console.WriteLine("订单 {0} 已完成支付，交易单号为 {1}", outTradeNumber, transactionId);
-                    }
-                }
-
-            }
-            catch (Exception err)
-            {
-                Console.WriteLine(err.ToString());
-            }
-            return "{ \r\n \"code\": \"SUCCESS\", \r\n \"message\": \"成功\" \r\n}";
-        }
-
+        
         [HttpGet]
         public  async Task<ActionResult<OrderOnline>> SetTenpayPaymentSuccess(string outTradeNumber)
         {
@@ -788,6 +473,404 @@ namespace SnowmeetApi.Controllers.Order
             }
             return "";
         }
+
+        [HttpGet("{paymentId}")]
+        public async Task<ActionResult<OrderPaymentRefund>> Refund(int paymentId, double amount, string reason, string sessionKey)
+        {
+            reason = Util.UrlDecode(reason);
+            sessionKey = Util.UrlDecode(sessionKey);
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            if (!user.isAdmin)
+            {
+                return BadRequest();
+            }
+            OrderPayment payment = await _context.OrderPayment.FindAsync(paymentId);
+            if (payment.status.Equals("支付成功"))
+            {
+                return BadRequest();
+            }
+            var refunds = await _context.OrderPaymentRefund
+                .Where(r => r.payment_id == paymentId && (!r.refund_id.Trim().Equals("") || r.state == 1))
+                .AsNoTracking().ToListAsync();
+            double totalRefundAmount = 0;
+            for(int i = 0; refunds != null && i < refunds.Count; i++)
+            {
+                totalRefundAmount += refunds[i].amount;
+            }
+            if (Math.Round(amount, 2) > Math.Round(payment.amount - totalRefundAmount, 2))
+            {
+                return BadRequest();
+            }
+            OrderPaymentRefund refund = new OrderPaymentRefund()
+            {
+                payment_id = paymentId,
+                reason = reason,
+                refund_id = "",
+                state = 0,
+                amount = amount,
+                TransactionId = "",
+                RefundFee = 0,
+                oper = user.miniAppOpenId.Trim(),
+                memo = "",
+                notify_url = ""
+            };
+            await _context.OrderPaymentRefund.AddAsync(refund);
+            await _context.SaveChangesAsync();
+
+            switch(payment.pay_method.Trim())
+            {
+                case "微信支付":
+                    TenpayController tenpayHelper = new TenpayController(_context, _originConfig, _httpContextAccessor);
+                    refund = await tenpayHelper.Refund(refund.id);
+                    break;
+                default:
+                    refund.state = 1;
+                    _context.OrderPaymentRefund.Entry(refund).State = EntityState.Modified;
+                    await _context.SaveChangesAsync();
+                    break;
+            }
+            refund.oper = "";
+            return Ok(refund);
+
+        }
+
+
+
+
+
+
+
+
+        /// <summary>
+        /// ///////////////////////////////////
+        /// </summary>
+        /// <param name="mchid"></param>
+        /// <param name="timeStamp"></param>
+        /// <param name="nonce"></param>
+        /// <param name="paySign"></param>
+        /// <param name="serial"></param>
+        /// <returns></returns>
+        //Ready to remove
+
+        [HttpPost("{mchid}")]
+        public async Task<ActionResult<string>> TenpayPaymentCallback(int mchid,
+            [FromHeader(Name = "Wechatpay-Timestamp")] string timeStamp,
+            [FromHeader(Name = "Wechatpay-Nonce")] string nonce,
+            [FromHeader(Name = "Wechatpay-Signature")] string paySign,
+            [FromHeader(Name = "Wechatpay-Serial")] string serial)
+        {
+            using var reader = new StreamReader(Request.Body, Encoding.UTF8);
+            string postJson = await reader.ReadToEndAsync();
+
+            string apiKey = "";
+            WepayKey key = _context.WepayKeys.Find(mchid);
+
+            if (key == null)
+            {
+                return NotFound();
+            }
+
+            apiKey = key.api_key.Trim();
+
+            if (apiKey == null || apiKey.Trim().Equals(""))
+            {
+                return NotFound();
+            }
+            string path = $"{Environment.CurrentDirectory}";
+            /*
+            string postJson = Newtonsoft.Json.JsonConvert.SerializeObject(postData);
+            
+            string paySign = "no sign";
+            string nonce = "no nonce";
+            string serial = "no serial";
+            string timeStamp = "no time";
+            try
+            {
+                paySign = _httpContextAccessor.HttpContext.Request.Headers["Wechatpay-Signature"].ToString();
+                nonce = _httpContextAccessor.HttpContext.Request.Headers["Wechatpay-Nonce"].ToString();
+                serial = _httpContextAccessor.HttpContext.Request.Headers["Wechatpay-Serial"].ToString();
+                timeStamp = _httpContextAccessor.HttpContext.Request.Headers["Wechatpay-Timestamp"].ToString();
+            }
+            catch
+            {
+
+            }
+            */
+            if (path.StartsWith("/"))
+            {
+                path = path + "/WepayCertificate/";
+            }
+            else
+            {
+                path = path + "\\WepayCertificate\\";
+            }
+            string dateStr = DateTime.Now.Year.ToString() + DateTime.Now.Month.ToString().PadLeft(2, '0')
+                + DateTime.Now.Day.ToString().PadLeft(2, '0');
+            //path = path + "callback_" +  + ".txt";
+            // 此文本只添加到文件一次。
+            using (StreamWriter fw = new StreamWriter(path + "callback_origin_" + dateStr + ".txt", true))
+            {
+                fw.WriteLine(DateTimeOffset.Now.ToString());
+                fw.WriteLine(serial);
+                fw.WriteLine(timeStamp);
+                fw.WriteLine(nonce);
+                fw.WriteLine(paySign);
+                fw.WriteLine(postJson);
+                fw.WriteLine("");
+                fw.WriteLine("--------------------------------------------------------");
+                fw.WriteLine("");
+                fw.Close();
+            }
+
+            try
+            {
+                string cerStr = "";
+                using (StreamReader sr = new StreamReader(path + serial.Trim() + ".pem", true))
+                {
+                    cerStr = sr.ReadToEnd();
+                    sr.Close();
+                }
+                CertificateEntry ce = new CertificateEntry("RSA", cerStr);
+
+                //CertificateEntry ce = new CertificateEntry()
+
+                var manager = new InMemoryCertificateManager();
+                manager.AddEntry(ce);
+                var options = new WechatTenpayClientOptions()
+                {
+                    MerchantId = key.mch_id.Trim(),
+                    MerchantV3Secret = apiKey,
+                    MerchantCertificateSerialNumber = key.key_serial,
+                    MerchantCertificatePrivateKey = key.private_key,
+                    PlatformCertificateManager = manager
+
+                };
+
+                var client = new WechatTenpayClient(options);
+                Exception? verifyErr;
+                bool valid = client.VerifyEventSignature(timeStamp, nonce, postJson, paySign, serial, out verifyErr);
+                //valid = client.VerifyEventSignature()
+                /*
+                bool valid = client.VerifyEventSignature(
+                    callbackTimestamp: timeStamp,
+                    callbackNonce: nonce,
+                    callbackBody: postJson,
+                    callbackSignature: paySign,
+                    callbackSerialNumber: serial
+                );
+                */
+                if (valid)
+                {
+                    var callbackModel = client.DeserializeEvent(postJson);
+                    if ("TRANSACTION.SUCCESS".Equals(callbackModel.EventType))
+                    {
+                        /* 根据事件类型，解密得到支付通知敏感数据 */
+
+                        var callbackResource = client.DecryptEventResource<SKIT.FlurlHttpClient.Wechat.TenpayV3.Events.TransactionResource>(callbackModel);
+                        string outTradeNumber = callbackResource.OutTradeNumber;
+                        string transactionId = callbackResource.TransactionId;
+                        string callbackStr = Newtonsoft.Json.JsonConvert.SerializeObject(callbackResource);
+                        try
+                        {
+                            using (StreamWriter sw = new StreamWriter(path + "callback_decrypt_" + dateStr + ".txt", true))
+                            {
+                                sw.WriteLine(DateTimeOffset.Now.ToString());
+                                sw.WriteLine(callbackStr);
+                                sw.WriteLine("");
+                                sw.Close();
+                            }
+                        }
+                        catch
+                        {
+
+                        }
+                        await SetTenpayPaymentSuccess(outTradeNumber);
+
+                        //Console.WriteLine("订单 {0} 已完成支付，交易单号为 {1}", outTradeNumber, transactionId);
+                    }
+                }
+
+            }
+            catch (Exception err)
+            {
+                Console.WriteLine(err.ToString());
+            }
+            return "{ \r\n \"code\": \"SUCCESS\", \r\n \"message\": \"成功\" \r\n}";
+        }
+
+        [HttpGet("{id}")]
+        public async Task<ActionResult<TenpaySet>> TenpayRequest(int id, string sessionKey)
+        {
+            sessionKey = Util.UrlDecode(sessionKey.Trim());
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            if (user == null)
+            {
+                return BadRequest();
+            }
+            OrderPayment payment = await _context.OrderPayment.FindAsync(id);
+            if (payment == null)
+            {
+                return BadRequest();
+            }
+            OrderOnline order = await _context.OrderOnlines.FindAsync(payment.order_id);
+            if (order == null)
+            {
+                return BadRequest();
+            }
+            if (!payment.pay_method.Trim().Equals("微信支付") || !payment.status.Trim().Equals("待支付"))
+            {
+                return BadRequest();
+            }
+            if (order.status.Trim().Equals("支付完成") || order.status.Trim().Equals("订单关闭"))
+            {
+                return BadRequest();
+            }
+            string timeStamp = Util.getTime13().ToString();
+            int mchid = GetMchId(order);
+            WepayKey key = await _context.WepayKeys.FindAsync(mchid);
+
+            var certManager = new InMemoryCertificateManager();
+            var options = new WechatTenpayClientOptions()
+            {
+                MerchantId = key.mch_id.Trim(),
+                MerchantV3Secret = "",
+                MerchantCertificateSerialNumber = key.key_serial.Trim(),
+                MerchantCertificatePrivateKey = key.private_key.Trim(),
+                PlatformCertificateManager = certManager
+            };
+
+            string desc = "未知商品";
+
+            if (order.type.Trim().StartsWith("店销"))
+            {
+                desc = order.shop.Trim() + order.type.Trim();
+                var mi7Orders = await _context.mi7Order
+                    .Where(o => o.order_id == order.id).ToArrayAsync();
+                string mi7Nos = "";
+                for (int i = 0; i < mi7Orders.Length; i++)
+                {
+                    mi7Nos = mi7Nos.Trim() + " " + mi7Orders[i].mi7_order_id.Trim();
+                }
+                desc = desc + mi7Nos.Trim();
+            }
+            else if (order.type.Trim().StartsWith("服务"))
+            {
+                desc = "养护";
+            }
+            else
+            {
+                desc = "租赁";
+            }
+
+            CreatePayTransactionJsapiRequest.Types.Detail dtl = new CreatePayTransactionJsapiRequest.Types.Detail();
+
+            CreatePayTransactionJsapiRequest.Types.Detail.Types.GoodsDetail goodDtl
+                = new CreatePayTransactionAppRequest.Types.Detail.Types.GoodsDetail();
+            goodDtl.GoodsName = "测试商品明细1";
+            goodDtl.Quantity = 1;
+            goodDtl.UnitPrice = 10000;
+            goodDtl.MerchantGoodsId = "unknown";
+
+            dtl.GoodsList = new List<CreatePayTransactionAppRequest.Types.Detail.Types.GoodsDetail>();
+            dtl.GoodsList.Add(goodDtl);
+
+            goodDtl = new CreatePayTransactionAppRequest.Types.Detail.Types.GoodsDetail();
+            goodDtl.GoodsName = "测试商品明细2";
+            goodDtl.Quantity = 2;
+            goodDtl.UnitPrice = 20000;
+            goodDtl.MerchantGoodsId = "unknown";
+
+            dtl.GoodsList.Add(goodDtl);
+
+            //goodDtl
+
+            if (order.type.Trim().Equals("服务"))
+            {
+                string name = "";
+                var details = await _context.OrderOnlineDetails
+                    .Where(d => d.OrderOnlineId == order.id).ToListAsync();
+                for (int i = 0; i < details.Count; i++)
+                {
+                    SnowmeetApi.Models.Product.Product p = await _context.Product.FindAsync(details[i].product_id);
+                    if (p != null)
+                    {
+                        name = name + " " + p.name.Trim();
+                    }
+                }
+                name = name.Trim();
+                if (!name.Equals(""))
+                {
+                    desc = name;
+                }
+            }
+
+            order.open_id = user.miniAppOpenId.Trim();
+            _context.Entry(order).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
+
+            string notifyUrl = "https://mini.snowmeet.top/core/OrderPayment/TenpayPaymentCallBack/" + mchid.ToString();
+            string? outTradeNo = payment.out_trade_no;
+            if (outTradeNo == null )
+            { 
+                outTradeNo = order.id.ToString().PadLeft(6, '0') + payment.id.ToString().PadLeft(2, '0') + timeStamp.Substring(3, 10);
+            }
+
+            //CreatePayTransactionAppRequest.Types.Detail.Types.GoodsDetail  dtl = new CreatePayTransactionAppRequest.Types.Detail.Types.GoodsDetail();
+            //dtl.
+
+             //order.id.ToString().PadLeft(6, '0') + payment.id.ToString().PadLeft(2, '0') + timeStamp.Substring(3, 10);
+            var client = new WechatTenpayClient(options);
+            var request = new CreatePayTransactionJsapiRequest()
+            {
+                OutTradeNumber = outTradeNo,
+                AppId = _appId,
+                Description = desc.Trim(),//wepayOrder.description.Trim().Equals("") ? "测试商品" : wepayOrder.description.Trim(),
+                ExpireTime = DateTimeOffset.Now.AddMinutes(30),
+                NotifyUrl = notifyUrl,//wepayOrder.notify.Trim() + "/" + mchid.ToString(),
+                Amount = new CreatePayTransactionJsapiRequest.Types.Amount()
+                {
+                    Total = (int)Math.Round(payment.amount * 100, 0)
+                },
+                Payer = new CreatePayTransactionJsapiRequest.Types.Payer()
+                {
+                    OpenId = user.miniAppOpenId.Trim()
+                },
+                GoodsTag = "testing goods tag",
+                Detail = dtl
+                
+            };
+            
+            
+            var response = await client.ExecuteCreatePayTransactionJsapiAsync(request);
+            var paraMap = client.GenerateParametersForJsapiPayRequest(request.AppId, response.PrepayId);
+            if (response != null && response.PrepayId != null && !response.PrepayId.Trim().Equals(""))
+            {
+                TenpaySet set = new TenpaySet()
+                {
+                    prepay_id = response.PrepayId.Trim(),
+                    timeStamp = paraMap["timeStamp"].Trim(),
+                    nonce = paraMap["nonceStr"].Trim(),
+                    sign = paraMap["paySign"].Trim()
+
+                };
+
+                //payment.out_trade_no = order.id.ToString().PadLeft(6, '0') + payment.id.ToString().PadLeft(2, '0') + timeStamp;
+                payment.mch_id = mchid;
+                payment.open_id = user.miniAppOpenId.Trim();
+                payment.app_id = _appId;
+                payment.notify = notifyUrl.Trim();
+                payment.nonce = set.nonce.Trim();
+                payment.sign = set.sign.Trim();
+                payment.out_trade_no = outTradeNo;
+                payment.prepay_id = set.prepay_id.Trim();
+                payment.timestamp = set.timeStamp.Trim();
+                _context.Entry(payment).State = EntityState.Modified;
+                await _context.SaveChangesAsync();
+                return set;
+            }
+            return BadRequest();
+        }
+
 
        
         private bool OrderPaymentExists(int id)
