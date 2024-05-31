@@ -503,6 +503,7 @@ namespace SnowmeetApi.Controllers.Order
             }
             OrderPaymentRefund refund = new OrderPaymentRefund()
             {
+                order_id = payment.order_id,
                 payment_id = paymentId,
                 reason = reason,
                 refund_id = "",
