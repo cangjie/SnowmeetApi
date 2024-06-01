@@ -100,7 +100,7 @@ namespace SnowmeetApi.Controllers
             StreamReader sr = new StreamReader(Request.Body);
             string postStr = await sr.ReadToEndAsync();
             sr.Close();
-            System.IO.File.AppendAllText( certPath + "alipay_callback_" + DateTime.Now.ToString("yyyyMMdd") + ".txt", DateTime.Now.ToString() + "\t" + postStr + "\r\n");
+            System.IO.File.AppendAllText( certPath + "/alipay_callback_" + DateTime.Now.ToString("yyyyMMdd") + ".txt", DateTime.Now.ToString() + "\t" + postStr + "\r\n");
             string[] postArr = postStr.Split('&');
             for(int i = 0; i < postArr.Length; i++)
             {
