@@ -110,6 +110,7 @@ namespace SnowmeetApi.Controllers
                     string outTradeNo = field.Split('=')[1];
                     TenpayController tenHelper = new TenpayController(_db, _oriConfig, _http);
                     await tenHelper.SetTenpayPaymentSuccess(outTradeNo);
+                    break;
                 }
 
             }
