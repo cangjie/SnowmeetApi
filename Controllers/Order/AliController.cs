@@ -80,11 +80,8 @@ namespace SnowmeetApi.Controllers
             model.OutTradeNo = payment.out_trade_no.Trim();
             model.Subject = "test";
             model.Body = "test1";
-
+            model.TotalAmount = payment.amount.ToString();
             request.SetBizModel(model);
-
-
-            //AlipayTradePrecreateResponse response = client.Execute(request);
             AlipayTradePrecreateResponse response = client.CertificateExecute(request);
             string responseStr = response.Body.Trim();
             Console.WriteLine(responseStr);
@@ -94,6 +91,29 @@ namespace SnowmeetApi.Controllers
             _db.OrderPayment.Entry(payment).State = EntityState.Modified;
             await _db.SaveChangesAsync();
             return respObj.alipay_trade_precreate_response.qr_code.Trim();
+        }
+
+        [HttpPost]
+        public async Task<ActionResult<string>>  Callback()
+        {
+            string certPath = Util.workingPath + "/AlipayCertificate/" + appId;
+            StreamReader sr = new StreamReader(Request.Body);
+            string postStr = await sr.ReadToEndAsync();
+            sr.Close();
+            System.IO.File.AppendAllText( certPath + "alipay_callback_" + DateTime.Now.ToString("yyyyMMdd") + ".txt", DateTime.Now.ToString() + "\t" + postStr + "\r\n");
+            string[] postArr = postStr.Split('&');
+            for(int i = 0; i < postArr.Length; i++)
+            {
+                string field = postArr[i].Trim();
+                if (field.StartsWith("out_trade_no"))
+                {
+                    string outTradeNo = field.Split('=')[1];
+                    TenpayController tenHelper = new TenpayController(_db, _oriConfig, _http);
+                    await tenHelper.SetTenpayPaymentSuccess(outTradeNo);
+                }
+
+            }
+            return Ok("success");
         }
 
     }
