@@ -38,6 +38,8 @@ namespace SnowmeetApi.Models.Order
         public string staff_open_id { get; set; } = "";
         public DateTime create_date { get; set; } = DateTime.Now;
 
+        public string? ali_qr_code { get; set; }
+
         [NotMapped]
         public string staffName
         {

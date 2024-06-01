@@ -391,6 +391,10 @@ namespace SnowmeetApi.Controllers.Order
                     TenpayController tenpayHelper = new TenpayController(_context, _originConfig, _httpContextAccessor);
                     payment = await tenpayHelper.TenpayRequest(paymentId, sessionKey);
                     break;
+                case "支付宝":
+                    AliController aliHelper = new AliController(_context, _originConfig, _httpContextAccessor);
+                    payment.ali_qr_code = await aliHelper.GetPaymentQrCodeUrl(payment.id);
+                    break;
                 default:
                     payment.status = "支付成功";
                     break;
