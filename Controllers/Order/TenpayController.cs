@@ -429,7 +429,9 @@ namespace SnowmeetApi.Controllers
             
         }
 
-        [HttpGet]
+        
+
+        [NonAction]
         public async Task<OrderPaymentRefund> Refund(int refundId)
         {
 

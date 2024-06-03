@@ -49,21 +49,15 @@ namespace SnowmeetApi.Controllers
 
         public string appId = "2021004143665722";
 
+        public IAopClient client;
+
         public AliController(ApplicationDBContext context, IConfiguration config, IHttpContextAccessor httpContextAccessor)
         {
             _db = context;
             _oriConfig = config;
             _http = httpContextAccessor;
-        }
-
-        [NonAction]
-        public async Task<string> GetPaymentQrCodeUrl(int paymentId)
-        {
-            OrderPayment payment = await _db.OrderPayment.FindAsync(paymentId);
             string certPath = Util.workingPath + "/AlipayCertificate/" + appId;
             string appCertPublicKeyPath = certPath + "/appCertPublicKey_" + appId + ".crt";
-            
-
             string privateKey = System.IO.File.OpenText(certPath + "/private_key_" + appId + ".txt").ReadToEnd().Trim();
 
             CertParams certParams = new CertParams
@@ -72,8 +66,19 @@ namespace SnowmeetApi.Controllers
                 AppCertPath = appCertPublicKeyPath,
                 RootCertPath = Util.workingPath + "/AlipayCertificate/" + appId + "/alipayRootCert.crt"
             };
+            client = new DefaultAopClient("https://openapi.alipay.com/gateway.do", appId, privateKey, "json", "1.0", "RSA2", "utf-8", false, certParams);
+        }
+
+        [NonAction]
+        public async Task<string> GetPaymentQrCodeUrl(int paymentId)
+        {
+            OrderPayment payment = await _db.OrderPayment.FindAsync(paymentId);
+            
+
+            
+            
             string notify = "https://mini.snowmeet.top/core/Ali/Callback";
-            IAopClient client = new DefaultAopClient("https://openapi.alipay.com/gateway.do", appId, privateKey, "json", "1.0", "RSA2", "utf-8", false, certParams);
+            
             AlipayTradePrecreateRequest request = new AlipayTradePrecreateRequest();
             request.SetNotifyUrl(notify);
             AlipayTradePrecreateModel model = new AlipayTradePrecreateModel();
@@ -117,5 +122,63 @@ namespace SnowmeetApi.Controllers
             return Ok("success");
         }
 
+        [NonAction]
+        public async Task<OrderPaymentRefund> Refund(int refundId)
+        {
+            OrderPaymentRefund refund = await _db.OrderPaymentRefund.FindAsync(refundId);
+            if (refund == null)
+            {
+                return null;
+            }
+            OrderPayment payment = await _db.OrderPayment.FindAsync(refund.payment_id);
+            if (payment == null)
+            {
+                return null;
+            }
+            var refunds = await _db.OrderPaymentRefund.Where(r => r.payment_id == payment.id)
+                .AsNoTracking().ToListAsync();
+            string outRefundNo = payment.out_trade_no.Trim() + "_" + DateTime.Now.ToString("yyyyMMdd") 
+                + "_" + refunds.Count.ToString();
+            refund.out_refund_no = outRefundNo;
+            try
+            {
+                AlipayTradeRefundResponse res = Refund(payment.out_trade_no.Trim(), outRefundNo, refund.amount, refund.reason.Trim());
+                if (res.FundChange.ToUpper() == "Y")
+                {
+                    refund.state = 1;
+                }
+                refund.memo = res.Msg.Trim();
+                refund.refund_id = res.TradeNo;
+            }
+            catch(Exception ex)
+            {
+                refund.memo = ex.ToString().Length > 500? ex.ToString().Substring(0, 500) : ex.ToString();
+            }
+            
+            _db.OrderPaymentRefund.Entry(refund).State = EntityState.Modified;
+            await _db.SaveChangesAsync();
+            return refund;
+        }
+
+
+        [HttpGet]
+        public AlipayTradeRefundResponse Refund(string outTradeNo, string outRefundNo, double amount, string reason="")
+        {
+            
+            AlipayTradeRefundRequest req = new AlipayTradeRefundRequest();
+            AlipayTradeRefundModel model = new AlipayTradeRefundModel();
+            model.OutTradeNo = outTradeNo;
+            model.OutRequestNo = outRefundNo;
+            model.RefundAmount = amount.ToString();
+            model.RefundReason = reason.Trim();
+            req.SetBizModel(model);
+
+            AlipayTradeRefundResponse res = client.CertificateExecute(req);
+            Console.WriteLine(res);
+
+            return res;
+
+
+        }
     }
 }

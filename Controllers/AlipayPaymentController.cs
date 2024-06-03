@@ -224,16 +224,7 @@ namespace SnowmeetApi.Controllers
             
             string publicKey = await System.IO.File.ReadAllTextAsync(certPath + "/alipayCertPublicKey_RSA2.crt");
 
-            /*
-            AlipayConfig alipayConfig = new AlipayConfig();
-            alipayConfig.ServerUrl = "https://openapi.alipay.com/gateway.do";
-            alipayConfig.AppId = appId;
-            alipayConfig.PrivateKey = privateKey;
-            alipayConfig.Format = "json";
-            alipayConfig.AlipayPublicKey = publicKey;
-            alipayConfig.Charset = "UTF-8";
-            alipayConfig.SignType = "RSA2";
-            */
+
             
             CertParams certParams = new CertParams
             {
