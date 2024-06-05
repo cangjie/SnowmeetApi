@@ -69,6 +69,70 @@ namespace SnowmeetApi.Controllers
             client = new DefaultAopClient("https://openapi.alipay.com/gateway.do", appId, privateKey, "json", "1.0", "RSA2", "utf-8", false, certParams);
         }
 
+        [HttpGet]
+        public async Task BindRoyaltiRelation(string login, string name, string memo)
+        {
+            login = Util.UrlDecode(login);
+            name = Util.UrlDecode(name);
+            memo = Util.UrlDecode(memo);
+            AlipayTradeRoyaltyRelationBindRequest req = new AlipayTradeRoyaltyRelationBindRequest();
+            AlipayTradeRoyaltyRelationBindModel model = new AlipayTradeRoyaltyRelationBindModel();
+            model.OutRequestNo = Util.GetLongTimeStamp(DateTime.Now);
+            List<RoyaltyEntity> receiverList = new List<RoyaltyEntity>();
+            RoyaltyEntity receiverList0 = new RoyaltyEntity();
+            receiverList0.Type = "loginName";
+            receiverList0.BindLoginName = login;
+            //receiverList0.LoginName = login;
+            receiverList0.Name = name;
+            receiverList0.Memo = memo.Trim();
+            receiverList0.Account = login;
+            receiverList.Add(receiverList0);
+            model.ReceiverList = receiverList;
+            req.SetBizModel(model);
+            AlipayTradeRoyaltyRelationBindResponse response = client.CertificateExecute(req);
+             if(!response.IsError){
+             	Console.WriteLine("调用成功");
+             }
+             else{
+             	Console.WriteLine("调用失败");
+             } 
+        }
+
+        [HttpGet]
+        public async Task Settle(string tradeNo, double amount, string login, string name,  string memo)
+        {
+            login = Util.UrlDecode(login);
+            memo = Util.UrlDecode(memo);
+            name = Util.UrlDecode(name);
+            AlipayTradeOrderSettleRequest req = new AlipayTradeOrderSettleRequest();
+            AlipayTradeOrderSettleModel model = new AlipayTradeOrderSettleModel();
+            model.OutRequestNo = Util.GetLongTimeStamp(DateTime.Now);
+            model.TradeNo = tradeNo;
+            
+            List<OpenApiRoyaltyDetailInfoPojo> royaltyParameters = new List<OpenApiRoyaltyDetailInfoPojo>();
+            OpenApiRoyaltyDetailInfoPojo royaltyParameters0 = new OpenApiRoyaltyDetailInfoPojo();
+            royaltyParameters0.RoyaltyType = "transfer";
+            royaltyParameters0.TransInType = "loginName";
+            royaltyParameters0.TransIn = login;
+            royaltyParameters0.TransInName = name;
+            royaltyParameters0.Amount = amount.ToString();
+            royaltyParameters0.Desc = memo;
+            royaltyParameters.Add(royaltyParameters0);
+            model.RoyaltyParameters = royaltyParameters;
+            req.SetBizModel(model);
+            AlipayTradeOrderSettleResponse response = client.CertificateExecute(req);
+
+            if(!response.IsError)
+            {
+                Console.WriteLine("调用成功");
+            }
+            else
+            {
+                Console.WriteLine("调用失败");
+            }
+
+        }
+
         [NonAction]
         public async Task<string> GetPaymentQrCodeUrl(int paymentId)
         {
@@ -138,7 +202,7 @@ namespace SnowmeetApi.Controllers
             var refunds = await _db.OrderPaymentRefund.Where(r => r.payment_id == payment.id)
                 .AsNoTracking().ToListAsync();
             string outRefundNo = payment.out_trade_no.Trim() + "_" + DateTime.Now.ToString("yyyyMMdd") 
-                + "_" + refunds.Count.ToString();
+                + "_" + refunds.Count.ToString().PadLeft(2, '0');
             refund.out_refund_no = outRefundNo;
             try
             {
