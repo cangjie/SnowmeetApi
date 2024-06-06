@@ -149,6 +149,10 @@ namespace SnowmeetApi.Controllers
             
             RoyaltyInfo rInfo = new RoyaltyInfo();
             rInfo.RoyaltyType = "ROYALTY";
+            RoyaltyDetailInfos dtl = new RoyaltyDetailInfos();
+            dtl.AmountPercentage = "30";
+            rInfo.RoyaltyDetailInfos = new List<RoyaltyDetailInfos>();
+            rInfo.RoyaltyDetailInfos.Add(dtl);
             AlipayTradePrecreateModel model = new AlipayTradePrecreateModel();
             model.OutTradeNo = payment.out_trade_no.Trim();
             model.Subject = "test";
