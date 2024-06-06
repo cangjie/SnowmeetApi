@@ -13,6 +13,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Newtonsoft.Json;
+using Org.BouncyCastle.Asn1.Cmp;
 using SnowmeetApi.Controllers.Order;
 using SnowmeetApi.Data;
 using SnowmeetApi.Models;
@@ -145,11 +146,19 @@ namespace SnowmeetApi.Controllers
             
             AlipayTradePrecreateRequest request = new AlipayTradePrecreateRequest();
             request.SetNotifyUrl(notify);
+            ExtendParams extendParams = new ExtendParams();
+            RoyaltyInfo rInfo = new RoyaltyInfo();
+            
+            rInfo.RoyaltyType = "ROYALTY";
+
+
+
             AlipayTradePrecreateModel model = new AlipayTradePrecreateModel();
             model.OutTradeNo = payment.out_trade_no.Trim();
             model.Subject = "test";
             model.Body = "test1";
             model.TotalAmount = payment.amount.ToString();
+            model.RoyaltyInfo = rInfo;
             request.SetBizModel(model);
             AlipayTradePrecreateResponse response = client.CertificateExecute(request);
             string responseStr = response.Body.Trim();
