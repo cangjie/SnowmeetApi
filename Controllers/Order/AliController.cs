@@ -146,19 +146,16 @@ namespace SnowmeetApi.Controllers
             
             AlipayTradePrecreateRequest request = new AlipayTradePrecreateRequest();
             request.SetNotifyUrl(notify);
-            ExtendParams extendParams = new ExtendParams();
-            RoyaltyInfo rInfo = new RoyaltyInfo();
             
+            RoyaltyInfo rInfo = new RoyaltyInfo();
             rInfo.RoyaltyType = "ROYALTY";
-
-
-
             AlipayTradePrecreateModel model = new AlipayTradePrecreateModel();
             model.OutTradeNo = payment.out_trade_no.Trim();
             model.Subject = "test";
             model.Body = "test1";
             model.TotalAmount = payment.amount.ToString();
             model.RoyaltyInfo = rInfo;
+            model.ExtendParams = new ExtendParams{ RoyaltyFreeze = "true" };
             request.SetBizModel(model);
             AlipayTradePrecreateResponse response = client.CertificateExecute(request);
             string responseStr = response.Body.Trim();
