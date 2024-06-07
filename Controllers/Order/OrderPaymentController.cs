@@ -380,20 +380,24 @@ namespace SnowmeetApi.Controllers.Order
         [HttpGet("{paymentId}")]
         public async Task<ActionResult<OrderPayment>> Pay(int paymentId, string sessionKey)
         {
-            sessionKey = Util.UrlDecode(sessionKey);            
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            
             OrderPayment payment = await _context.OrderPayment.FindAsync(paymentId);
-            payment.open_id = user.miniAppOpenId.Trim();
+            
 
             switch(payment.pay_method.Trim())
             {
                 case "微信支付":
+                    sessionKey = Util.UrlDecode(sessionKey);            
+                    UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+                    payment.open_id = user.miniAppOpenId.Trim();
+                    _context.OrderPayment.Entry(payment).State = EntityState.Modified;
+                    await _context.SaveChangesAsync();
                     TenpayController tenpayHelper = new TenpayController(_context, _originConfig, _httpContextAccessor);
                     payment = await tenpayHelper.TenpayRequest(paymentId, sessionKey);
                     break;
                 case "支付宝":
                     AliController aliHelper = new AliController(_context, _originConfig, _httpContextAccessor);
-                    payment.ali_qr_code = await aliHelper.GetPaymentQrCodeUrl(payment.id);
+                    payment = await aliHelper.CreateOrder(payment.id);
                     break;
                 default:
                     payment.status = "支付成功";

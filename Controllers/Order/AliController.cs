@@ -32,9 +32,12 @@ namespace SnowmeetApi.Controllers
         public class AlipayRequestResult
         {
             public AlipayTradeResponse alipay_trade_precreate_response { get; set; }
+            public AlipayOrderCreateResponse alipay_trade_create_response {get; set;} 
+
             public string sign { get; set; }
             public string alipay_cert_sn { get; set; }
         }
+
 
         public class AlipayTradeResponse
         {
@@ -44,11 +47,20 @@ namespace SnowmeetApi.Controllers
             public string qr_code { get; set; }
         }
 
+        public class AlipayOrderCreateResponse
+        {
+            public string code { get; set; }
+            public string msg { get; set; }
+            public string out_trade_no { get; set; }
+            public string trade_no { get; set; }
+        }
+
         public ApplicationDBContext _db;
         public IConfiguration _oriConfig;
         public IHttpContextAccessor _http;
 
-        public string appId = "2021004143665722";
+        //public string appId = "2021004143665722";
+        public string appId = "2021004150619003";
 
         public IAopClient client;
 
@@ -133,8 +145,58 @@ namespace SnowmeetApi.Controllers
             }
 
         }
+        
+        [HttpGet]
+        public async Task<OrderPayment> CreateOrder(int paymentId)
+        {
+            OrderPayment payment = await _db.OrderPayment.FindAsync(paymentId);
+            string notify = "https://mini.snowmeet.top/core/Ali/Callback";
+            AlipayTradeCreateRequest req = new AlipayTradeCreateRequest();
+            req.SetNotifyUrl(notify);
+            AlipayTradeCreateModel model = new AlipayTradeCreateModel();
+            model.OutTradeNo = payment.out_trade_no.Trim();
 
-        [NonAction]
+            ////////////////////////////////////
+            //////等待从订单获取//////////////////
+            model.Subject = "test";
+            model.Body = "test1";
+            /////////////////////////////////////
+            model.TotalAmount = payment.amount.ToString();
+
+            RoyaltyInfo rInfo = new RoyaltyInfo();
+            rInfo.RoyaltyType = "ROYALTY";
+            RoyaltyDetailInfos dtl = new RoyaltyDetailInfos();
+            dtl.AmountPercentage = "30";
+            dtl.BatchNo = Util.GetLongTimeStamp(DateTime.Now).ToString();
+            dtl.TransOutType = "userId";
+            dtl.TransOut = "2088640272285174";
+            dtl.TransIn = "2088002319285895";
+            rInfo.RoyaltyDetailInfos = new List<RoyaltyDetailInfos>();
+            rInfo.RoyaltyDetailInfos.Add(dtl);
+
+            model.RoyaltyInfo = rInfo;
+            model.ExtendParams = new ExtendParams{ RoyaltyFreeze = "true" };
+            model.BuyerId = "2088002319285895";
+            req.SetBizModel(model);
+
+            AlipayTradeCreateResponse res = client.CertificateExecute(req);
+            if (res.IsError)
+            {
+                return null;
+
+            }
+            else
+            {
+                AlipayRequestResult respObj = JsonConvert.DeserializeObject<AlipayRequestResult>(res.Body.Trim());
+                payment.ali_trade_no = respObj.alipay_trade_create_response.trade_no.Trim();
+                _db.OrderPayment.Entry(payment).State = EntityState.Modified;
+                await _db.SaveChangesAsync();
+                return payment;
+            }
+            
+        }
+
+        [HttpGet]
         public async Task<string> GetPaymentQrCodeUrl(int paymentId)
         {
             OrderPayment payment = await _db.OrderPayment.FindAsync(paymentId);
@@ -147,19 +209,36 @@ namespace SnowmeetApi.Controllers
             AlipayTradePrecreateRequest request = new AlipayTradePrecreateRequest();
             request.SetNotifyUrl(notify);
             
+
+            /*
             RoyaltyInfo rInfo = new RoyaltyInfo();
             rInfo.RoyaltyType = "ROYALTY";
             RoyaltyDetailInfos dtl = new RoyaltyDetailInfos();
             dtl.AmountPercentage = "30";
+            dtl.BatchNo = Util.GetLongTimeStamp(DateTime.Now).ToString();
+            dtl.TransOutType = "userId";
+            dtl.TransOut = "2088640272285174";
+            dtl.TransIn = "2088002319285895";
             rInfo.RoyaltyDetailInfos = new List<RoyaltyDetailInfos>();
             rInfo.RoyaltyDetailInfos.Add(dtl);
+            */
+
+
+
             AlipayTradePrecreateModel model = new AlipayTradePrecreateModel();
             model.OutTradeNo = payment.out_trade_no.Trim();
+
+            ////////////////////////////////////
+            //////等待从订单获取//////////////////
             model.Subject = "test";
             model.Body = "test1";
+            /////////////////////////////////////
+
+
+
             model.TotalAmount = payment.amount.ToString();
-            model.RoyaltyInfo = rInfo;
-            model.ExtendParams = new ExtendParams{ RoyaltyFreeze = "true" };
+            //model.RoyaltyInfo = rInfo;
+            //model.ExtendParams = new ExtendParams{ RoyaltyFreeze = "true" };
             request.SetBizModel(model);
             AlipayTradePrecreateResponse response = client.CertificateExecute(request);
             string responseStr = response.Body.Trim();

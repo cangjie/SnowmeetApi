@@ -40,6 +40,8 @@ namespace SnowmeetApi.Models.Order
 
         public string? ali_qr_code { get; set; }
 
+        public string? ali_trade_no {get; set;}
+
         [NotMapped]
         public string staffName
         {
