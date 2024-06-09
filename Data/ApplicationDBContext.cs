@@ -178,5 +178,7 @@ namespace SnowmeetApi.Data
 
         public DbSet<Models.Order.EPaymentDailyReport> ePaymentDailyReport { get; set; }
 
+        public DbSet<Models.Order.AlipayMchId> alipayMchId { get; set; }
+
     }
 }

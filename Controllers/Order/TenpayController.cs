@@ -351,6 +351,7 @@ namespace SnowmeetApi.Controllers
             }
             OrderPayment payment = paymentList[0];
             payment.status = "支付成功";
+            //payment.ali_trade_no = tradeNo.Trim();
             _db.Entry(payment).State = EntityState.Modified;
             await _db.SaveChangesAsync();
 

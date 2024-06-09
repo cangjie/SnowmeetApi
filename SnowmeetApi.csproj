@@ -67,7 +67,6 @@
     <Folder Include="Models\Users\" />
     <Folder Include="Models\Product\" />
     <Folder Include="Models\Card\" />
-    <Folder Include="Models\Order\" />
     <Folder Include="Controllers\Order\" />
     <Folder Include="Controllers\User\" />
     <Folder Include="wwwroot\upload\" />

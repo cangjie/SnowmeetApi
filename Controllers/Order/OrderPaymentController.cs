@@ -397,7 +397,8 @@ namespace SnowmeetApi.Controllers.Order
                     break;
                 case "支付宝":
                     AliController aliHelper = new AliController(_context, _originConfig, _httpContextAccessor);
-                    payment = await aliHelper.CreateOrder(payment.id);
+                    //payment = await aliHelper.CreateOrder(payment.id);
+                    payment.ali_qr_code = await aliHelper.GetPaymentQrCodeUrl(payment.id);
                     break;
                 default:
                     payment.status = "支付成功";

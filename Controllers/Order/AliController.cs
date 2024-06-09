@@ -92,6 +92,29 @@ namespace SnowmeetApi.Controllers
             client = new DefaultAopClient("https://openapi.alipay.com/gateway.do", appId, privateKey, "json", "1.0", "RSA2", "utf-8", false, certParams);
         }
 
+        [NonAction]
+        public IAopClient  GetClient(string appId)
+        {
+            string certPath = Util.workingPath + "/AlipayCertificate/" + appId;
+            string appCertPublicKeyPath = certPath + "/appCertPublicKey_" + appId + ".crt";
+            string privateKey = System.IO.File.OpenText(certPath + "/private_key_" + appId + ".txt").ReadToEnd().Trim();
+            CertParams certParams = new CertParams
+            {
+                AlipayPublicCertPath = Util.workingPath + "/AlipayCertificate/" + appId + "/alipayCertPublicKey_RSA2.crt",
+                AppCertPath = appCertPublicKeyPath,
+                RootCertPath = Util.workingPath + "/AlipayCertificate/" + appId + "/alipayRootCert.crt"
+            };
+            return new DefaultAopClient("https://openapi.alipay.com/gateway.do", appId, privateKey, "json", "1.0", "RSA2", "utf-8", false, certParams);
+        }
+
+        [NonAction]
+        public async Task<AlipayMchId> GetMch(OrderOnline order)
+        {
+            int mchId = 2;
+            AlipayMchId mch = await _db.alipayMchId.FindAsync(mchId);
+            return mch;
+        }
+
         [HttpGet]
         public async Task BindRoyaltiRelation(string login, string name, string memo)
         {
@@ -346,6 +369,11 @@ namespace SnowmeetApi.Controllers
         [HttpGet]
         public async Task<string> GetPaymentQrCodeUrl(int paymentId)
         {
+
+            AlipayMchId mch = await GetMch(null);
+
+            client = GetClient(mch.app_id.Trim());
+
             OrderPayment payment = await _db.OrderPayment.FindAsync(paymentId);
             
 
@@ -393,6 +421,8 @@ namespace SnowmeetApi.Controllers
             AlipayRequestResult respObj = JsonConvert.DeserializeObject<AlipayRequestResult>(responseStr);
             payment.notify = notify;
             payment.ali_qr_code = respObj.alipay_trade_precreate_response.qr_code.Trim();
+            payment.mch_id = mch.id;
+            payment.pay_method = "支付宝";
             _db.OrderPayment.Entry(payment).State = EntityState.Modified;
             await _db.SaveChangesAsync();
             return respObj.alipay_trade_precreate_response.qr_code.Trim();
@@ -407,14 +437,34 @@ namespace SnowmeetApi.Controllers
             sr.Close();
             System.IO.File.AppendAllText( certPath + "/alipay_callback_" + DateTime.Now.ToString("yyyyMMdd") + ".txt", DateTime.Now.ToString() + "\t" + postStr + "\r\n");
             string[] postArr = postStr.Split('&');
+            string outTradeNo = "";
+            string tradeNo = "";
             for(int i = 0; i < postArr.Length; i++)
             {
                 string field = postArr[i].Trim();
                 if (field.StartsWith("out_trade_no"))
                 {
-                    string outTradeNo = field.Split('=')[1];
+                    outTradeNo = field.Split('=')[1];
                     TenpayController tenHelper = new TenpayController(_db, _oriConfig, _http);
                     await tenHelper.SetTenpayPaymentSuccess(outTradeNo);
+                    //break;
+                }
+                if (field.StartsWith("trade_no"))
+                {
+                    tradeNo = field.Split('=')[1];
+                    
+                    //break;
+                }
+                if (!tradeNo.Trim().Equals("") && !outTradeNo.Trim().Equals(""))
+                {
+                    OrderPayment payment = await _db.OrderPayment.Where(p => p.out_trade_no.Trim().Equals(outTradeNo.Trim()))
+                        .OrderByDescending(p => p.id).FirstAsync();
+                    if (payment != null)
+                    {
+                        payment.ali_trade_no = tradeNo.Trim();
+                        _db.OrderPayment.Entry(payment).State = EntityState.Modified;
+                        await _db.SaveChangesAsync();
+                    }
                     break;
                 }
 
