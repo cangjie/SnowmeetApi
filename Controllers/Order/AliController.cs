@@ -493,7 +493,7 @@ namespace SnowmeetApi.Controllers
             try
             {
                 AlipayTradeRefundResponse res = Refund(payment.out_trade_no.Trim(), outRefundNo, refund.amount, refund.reason.Trim());
-                if (res.FundChange.ToUpper() == "Y")
+                if (res.FundChange != null && res.FundChange.ToUpper() == "Y")
                 {
                     refund.state = 1;
                 }

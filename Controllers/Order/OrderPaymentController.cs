@@ -525,7 +525,7 @@ namespace SnowmeetApi.Controllers.Order
                 return BadRequest();
             }
             var refunds = await _context.OrderPaymentRefund
-                .Where(r => r.payment_id == paymentId && (!r.refund_id.Trim().Equals("") || r.state == 1))
+                .Where(r => r.payment_id == paymentId && ((!r.refund_id.Trim().Equals("") && r.refund_id != null ) || r.state == 1))
                 .AsNoTracking().ToListAsync();
             double totalRefundAmount = 0;
             for(int i = 0; refunds != null && i < refunds.Count; i++)

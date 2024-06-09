@@ -28,7 +28,7 @@ namespace SnowmeetApi.Models.Order
             get
             {
                 bool suc = false;
-                if (!refund_id.Trim().Equals("") || state == 1)
+                if (refund_id != null && !refund_id.Trim().Equals("") || state == 1)
                 {
                     suc = true;
                 }
