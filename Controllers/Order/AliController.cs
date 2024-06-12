@@ -140,6 +140,9 @@ namespace SnowmeetApi.Controllers
             AlipayTradeRoyaltyRelationBindResponse response = client.CertificateExecute(req);
              if(!response.IsError){
              	Console.WriteLine("调用成功");
+                kol.ali_bind = 1;
+                _db.kol.Entry(kol).State = EntityState.Modified;
+                await _db.SaveChangesAsync();
                 return "true";
              }
              else{

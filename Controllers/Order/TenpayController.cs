@@ -628,7 +628,14 @@ namespace SnowmeetApi.Controllers
             };
             var client = await GetClient(mchId);
             var res = await client.ExecuteAddProfitSharingReceiverAsync(req);
-            return res.IsSuccessful().ToString().ToLower();
+            ret = res.IsSuccessful().ToString().ToLower();
+            if (ret.Equals("true"))
+            {
+                kol.wechat_bind = 1;
+                _db.kol.Entry(kol).State = EntityState.Modified;
+                await _db.SaveChangesAsync();
+            }
+            return ret;
         }
 
         [NonAction]
