@@ -116,11 +116,13 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet]
-        public async Task BindRoyaltiRelation(string login, string name, string memo)
+        //public async Task BindRoyaltiRelation(string login, string name, string memo)
+        public async Task<string> BindRoyaltiRelation(int kolId)
         {
-            login = Util.UrlDecode(login);
-            name = Util.UrlDecode(name);
-            memo = Util.UrlDecode(memo);
+            Kol kol = await _db.kol.FindAsync(kolId);
+            string login = Util.UrlDecode(kol.ali_login_name);
+            string name = Util.UrlDecode(kol.real_name);
+            string memo = Util.UrlDecode(kol.memo);
             AlipayTradeRoyaltyRelationBindRequest req = new AlipayTradeRoyaltyRelationBindRequest();
             AlipayTradeRoyaltyRelationBindModel model = new AlipayTradeRoyaltyRelationBindModel();
             model.OutRequestNo = Util.GetLongTimeStamp(DateTime.Now);
@@ -138,9 +140,11 @@ namespace SnowmeetApi.Controllers
             AlipayTradeRoyaltyRelationBindResponse response = client.CertificateExecute(req);
              if(!response.IsError){
              	Console.WriteLine("调用成功");
+                return "true";
              }
              else{
              	Console.WriteLine("调用失败");
+                return "false";
              } 
         }
 

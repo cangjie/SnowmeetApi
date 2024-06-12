@@ -72,17 +72,7 @@ namespace SnowmeetApi.Controllers
             }
             string timeStamp = Util.getTime13().ToString();
             int mchid = _orderPaymentHelper.GetMchId(order);
-            WepayKey key = await _db.WepayKeys.FindAsync(mchid);
-
-            var certManager = new InMemoryCertificateManager();
-            var options = new WechatTenpayClientOptions()
-            {
-                MerchantId = key.mch_id.Trim(),
-                MerchantV3Secret = "",
-                MerchantCertificateSerialNumber = key.key_serial.Trim(),
-                MerchantCertificatePrivateKey = key.private_key.Trim(),
-                PlatformCertificateManager = certManager
-            };
+            
 
             string desc = "未知商品";
 
@@ -144,7 +134,7 @@ namespace SnowmeetApi.Controllers
             //dtl.
 
              //order.id.ToString().PadLeft(6, '0') + payment.id.ToString().PadLeft(2, '0') + timeStamp.Substring(3, 10);
-            var client = new WechatTenpayClient(options);
+            var client = await GetClient(mchid);
             var request = new CreatePayTransactionJsapiRequest()
             {
                 OutTradeNumber = outTradeNo,
@@ -463,21 +453,11 @@ namespace SnowmeetApi.Controllers
 
             //var client = new WechatTenpayClient(options);
            
-            WepayKey key = await _db.WepayKeys.FindAsync(payment.mch_id);
-
-            var certManager = new InMemoryCertificateManager();
-            var options = new WechatTenpayClientOptions()
-            {
-                MerchantId = key.mch_id.Trim(),
-                MerchantV3Secret = "",
-                MerchantCertificateSerialNumber = key.key_serial.Trim(),
-                MerchantCertificatePrivateKey = key.private_key.Trim(),
-                PlatformCertificateManager = certManager
-            };
+            
 
             
             
-            var client = new WechatTenpayClient(options);
+            var client = await GetClient((int)payment.mch_id);
             var request = new CreateRefundDomesticRefundRequest()
             {
                 OutTradeNumber = payment.out_trade_no.Trim(),
@@ -630,6 +610,41 @@ namespace SnowmeetApi.Controllers
 
             }
             return "{ \r\n \"code\": \"SUCCESS\", \r\n \"message\": \"成功\" \r\n}";
+        }
+
+        [HttpGet("{mchId}")]
+        public async Task<string> BindKol(int mchId, int kolId)
+        {
+            string ret = "";
+            
+            Kol kol = await _db.kol.FindAsync(kolId);
+            
+            var req = new AddProfitSharingReceiverRequest()
+            {
+                AppId = _appId,
+                Type = "PERSONAL_OPENID",
+                Account = kol.wechat_open_id.Trim(),
+                RelationType = "USER"
+            };
+            var client = await GetClient(mchId);
+            var res = await client.ExecuteAddProfitSharingReceiverAsync(req);
+            return res.IsSuccessful().ToString().ToLower();
+        }
+
+        [NonAction]
+        private async Task<WechatTenpayClient> GetClient(int mchId)
+        {
+            WepayKey key = await _db.WepayKeys.FindAsync(mchId);
+            var certManager = new InMemoryCertificateManager();
+            var options = new WechatTenpayClientOptions()
+            {
+                MerchantId = key.mch_id.Trim(),
+                MerchantV3Secret = "",
+                MerchantCertificateSerialNumber = key.key_serial.Trim(),
+                MerchantCertificatePrivateKey = key.private_key.Trim(),
+                PlatformCertificateManager = certManager
+            };
+            return new WechatTenpayClient(options);
         }
     }
 }
