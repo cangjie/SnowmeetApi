@@ -240,14 +240,45 @@ namespace SnowmeetApi.Controllers
         /**获取接口调用结果，如果调用失败，可根据返回错误信息到该文档寻找排查方案：https://opensupport.alipay.com/support/helpcenter/108 **/
        // Console.WriteLine(response.Body);
        // }
+        [NonAction]
+        public async Task<PaymentShare> Share(int shareId)
+        {
+            PaymentShare share = await _db.paymentShare.FindAsync(shareId);
+            if (share == null)
+            {
+                return null;
+            }
+            OrderPayment payment = await _db.OrderPayment.FindAsync(share.payment_id);
+            if (payment == null)
+            {
+                return null;
+            }
+            Kol kol = await _db.kol.FindAsync(share.kol_id);
+            share.submit_date = DateTime.Now;
+            AlipayTradeOrderSettleResponse settle = Settle(payment.ali_trade_no.Trim(), share.amount, kol.ali_login_name, kol.real_name, share.memo, share.out_trade_no.Trim());
+            if (settle.IsError)
+            {
+                share.ret_msg = settle.SubMsg.Trim();
+                share.state = -1;
+            }
+            else
+            {
+                share.state = 1;
+            }
+            _db.paymentShare.Entry(share).State = EntityState.Modified;
+            await _db.SaveChangesAsync();
+            return share;   
+        }
 
-        [HttpGet]
-        public async Task Settle(string tradeNo, double amount, string login, string name,  string memo)
+        [NonAction]
+        public AlipayTradeOrderSettleResponse Settle(string tradeNo, double amount, string login, string name,  string memo, string outTradeNo)
         {
             login = Util.UrlDecode(login);
             memo = Util.UrlDecode(memo);
             name = Util.UrlDecode(name);
             AlipayTradeOrderSettleRequest req = new AlipayTradeOrderSettleRequest();
+
+            /*
             AlipayTradeOrderSettleModel model = new AlipayTradeOrderSettleModel();
             model.OutRequestNo = Util.GetLongTimeStamp(DateTime.Now);
             model.TradeNo = tradeNo;
@@ -263,11 +294,12 @@ namespace SnowmeetApi.Controllers
             royaltyParameters.Add(royaltyParameters0);
             model.RoyaltyParameters = royaltyParameters;
             //req.SetBizModel(model);
-            
+            */
+
             req.BizContent = "{" +
 
                 /** 结算请求流水号 开发者自行生成并保证唯一性  **/
-                "\"out_request_no\":\"" + Util.GetLongTimeStamp(DateTime.Now) + "\"," +
+                "\"out_request_no\":\"" + outTradeNo.Trim() + "\"," +
 
                 /** 支付宝订单号  **/
                 "\"trade_no\":\"" + tradeNo.Trim() + "\"," +
@@ -290,24 +322,26 @@ namespace SnowmeetApi.Controllers
                           //"\"trans_out_type\":\"userId\"," +
 
                           /** 收入方账户  **/
-                          "\"trans_in\":\"13501177897\"," +
+                          "\"trans_in\":\"" + login + "\"," +
 
                            /** 收入方账户类型。userId表示是支付宝账号对应的支付宝唯一用户号;loginName表示是支付宝登录号   **/
                            "\"trans_in_type\":\"loginName\"," +
 
+                           "\"trans_in_name\":\"" + name + "\"," +
+
                           /** 分账的金额，单位为元  **/
-                          "\"amount\":0.01," +
+                          "\"amount\":" + amount.ToString() + ", " + 
 
                           /** 设分账描述  **/
                           "\"desc\":\"" + memo + "\"" +
-                      "}" +
-              "]" +
-        "}";
+                        "}" +
+                    "]" +
+                "}";
 
 
 
-            AlipayTradeOrderSettleResponse response = client.CertificateExecute(req);
-
+            return client.CertificateExecute(req);
+            /*
             if(!response.IsError)
             {
                 Console.WriteLine("调用成功");
@@ -316,7 +350,7 @@ namespace SnowmeetApi.Controllers
             {
                 Console.WriteLine("调用失败");
             }
-
+            */
         }
         
         [HttpGet]
@@ -494,7 +528,7 @@ namespace SnowmeetApi.Controllers
             }
             var refunds = await _db.OrderPaymentRefund.Where(r => r.payment_id == payment.id)
                 .AsNoTracking().ToListAsync();
-            string outRefundNo = payment.out_trade_no.Trim() + "_" + DateTime.Now.ToString("yyyyMMdd") 
+            string outRefundNo = payment.out_trade_no.Trim() + "_REFND_" + DateTime.Now.ToString("yyyyMMdd") 
                 + "_" + refunds.Count.ToString().PadLeft(2, '0');
             refund.out_refund_no = outRefundNo;
             try

@@ -915,7 +915,7 @@ namespace SnowmeetApi.Controllers.Order
         public async Task<PaymentShare> CreateShare(int paymentId, double amount, string memo, int kolId)
         {
             OrderPayment payment = await _context.OrderPayment.FindAsync(paymentId);
-            string outTradeNo = payment.out_trade_no.Trim() + "_share_" + kolId.ToString().PadLeft(3, '0') + "_";
+            string outTradeNo = payment.out_trade_no.Trim() + "_SHARE_" + DateTime.Now.ToString("yyyyMMdd") + "_"+ kolId.ToString().PadLeft(3, '0') + "_";
             var shareList = await _context.paymentShare.Where(s => s.payment_id == paymentId).AsNoTracking().ToListAsync();
             int shareCount = 0;
             if (shareList != null)
@@ -948,16 +948,21 @@ namespace SnowmeetApi.Controllers.Order
                 return BadRequest();
             }
             OrderPayment payment = await _context.OrderPayment.FindAsync(share.payment_id);
+            //PaymentShare share = new PaymentShare();
             switch(payment.pay_method.Trim())
             {
                 case "支付宝":
+                    AliController aliHelper = new AliController(_context, _originConfig, _httpContextAccessor);
+                    share = await aliHelper.Share(shareId);
                     break;
                 case "微信":
+                    TenpayController tenHelper = new TenpayController(_context, _originConfig, _httpContextAccessor);
+                    share = await tenHelper.Share(shareId);
                     break;
                 default:
                     break;
             }
-            return BadRequest();
+            return Ok(share);
         }
        
         private bool OrderPaymentExists(int id)
