@@ -911,7 +911,54 @@ namespace SnowmeetApi.Controllers.Order
             return BadRequest();
         }
 
+        [HttpGet]
+        public async Task<PaymentShare> CreateShare(int paymentId, double amount, string memo, int kolId)
+        {
+            OrderPayment payment = await _context.OrderPayment.FindAsync(paymentId);
+            string outTradeNo = payment.out_trade_no.Trim() + "_share_" + kolId.ToString().PadLeft(3, '0') + "_";
+            var shareList = await _context.paymentShare.Where(s => s.payment_id == paymentId).AsNoTracking().ToListAsync();
+            int shareCount = 0;
+            if (shareList != null)
+            {
+                shareCount = shareList.Count;
+            }
+            outTradeNo = outTradeNo + shareCount.ToString().PadLeft(2, '0');
+            int orderId = payment.order_id;
+            PaymentShare share = new PaymentShare()
+            {
+                id = 0,
+                order_id = orderId,
+                payment_id = payment.id,
+                kol_id = kolId,
+                amount = amount,
+                memo = memo,
+                out_trade_no = outTradeNo.Trim()
+            };
+            await _context.paymentShare.AddAsync(share);
+            await _context.SaveChangesAsync();
+            return share;
+        }
 
+        [HttpGet]
+        public async Task<ActionResult<PaymentShare>> SubmitShare(int shareId)
+        {
+            PaymentShare share = await _context.paymentShare.FindAsync(shareId);
+            if (share == null)
+            {
+                return BadRequest();
+            }
+            OrderPayment payment = await _context.OrderPayment.FindAsync(share.payment_id);
+            switch(payment.pay_method.Trim())
+            {
+                case "支付宝":
+                    break;
+                case "微信":
+                    break;
+                default:
+                    break;
+            }
+            return BadRequest();
+        }
        
         private bool OrderPaymentExists(int id)
         {

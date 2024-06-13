@@ -639,6 +639,48 @@ namespace SnowmeetApi.Controllers
         }
 
         [NonAction]
+        public async Task<PaymentShare> Share(int paymentShareId)
+        {
+            PaymentShare share = await _db.paymentShare.FindAsync(paymentShareId);
+            if (share == null)
+            {
+                return null;
+            }
+            Kol kol = await _db.kol.FindAsync(share.kol_id);
+            if (kol.wechat_bind == 0)
+            {
+                string bindRet = await BindKol(share.payment_id, share.kol_id);
+                if (!bindRet.Trim().Equals("true"))
+                {
+                    return null;
+                }
+            }
+            OrderPayment payment = await _db.OrderPayment.FindAsync(share.payment_id);
+            WechatTenpayClient client = await GetClient((int)payment.mch_id);
+            List<CreateProfitSharingOrderRequest.Types.Receiver> rl = new List<CreateProfitSharingOrderRequest.Types.Receiver>();
+            CreateProfitSharingOrderRequest.Types.Receiver r = new CreateProfitSharingOrderRequest.Types.Receiver()
+            {
+                Type = "PERSONAL_OPENID",
+                Account = kol.wechat_open_id,
+                Amount =  (int)Math.Round(share.amount * 100),
+                Description = share.memo.Trim()
+            };
+            rl.Add(r);
+            WepayKey key = await _db.WepayKeys.FindAsync(payment.mch_id);
+            var req = new CreateProfitSharingOrderRequest()
+            {
+                AppId = _appId,
+                TransactionId = (string)payment.wepay_trans_id,
+                OutOrderNumber = share.out_trade_no.Trim(),
+                ReceiverList = rl,
+                WechatpayCertificateSerialNumber = key.key_serial.Trim()
+            };
+            var res = await client.ExecuteCreateProfitSharingOrderAsync(req);
+
+            return share; 
+        }
+
+        [NonAction]
         private async Task<WechatTenpayClient> GetClient(int mchId)
         {
             WepayKey key = await _db.WepayKeys.FindAsync(mchId);

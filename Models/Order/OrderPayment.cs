@@ -42,6 +42,8 @@ namespace SnowmeetApi.Models.Order
 
         public string? ali_trade_no {get; set;}
 
+        public string? wepay_trans_id {get; set;}
+
         [NotMapped]
         public string staffName
         {

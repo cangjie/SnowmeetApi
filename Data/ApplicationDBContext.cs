@@ -182,5 +182,7 @@ namespace SnowmeetApi.Data
 
         public DbSet<Models.Order.Kol> kol {get; set;}
 
+        public DbSet<Models.Order.PaymentShare> paymentShare {get; set;}
+
     }
 }
