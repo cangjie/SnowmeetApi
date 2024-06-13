@@ -319,6 +319,14 @@ namespace SnowmeetApi.Controllers
                         }
                         await SetTenpayPaymentSuccess(outTradeNumber);
 
+                        OrderPayment sucPay = await _db.OrderPayment.Where(p => (p.out_trade_no.Trim().Equals(outTradeNumber.Trim()) && p.status.Trim().Equals("支付成功")))
+                            .OrderByDescending(p => p.id).FirstAsync();
+                        if (sucPay != null)
+                        {
+                            sucPay.wepay_trans_id = transactionId.Trim();
+                            _db.OrderPayment.Entry(sucPay).State = EntityState.Modified;
+                            await _db.SaveChangesAsync();
+                        }
                         //Console.WriteLine("订单 {0} 已完成支付，交易单号为 {1}", outTradeNumber, transactionId);
                     }
                 }
@@ -675,8 +683,18 @@ namespace SnowmeetApi.Controllers
                 ReceiverList = rl,
                 WechatpayCertificateSerialNumber = key.key_serial.Trim()
             };
+            share.submit_date = DateTime.Now;
             var res = await client.ExecuteCreateProfitSharingOrderAsync(req);
-
+            if (res.IsSuccessful())
+            {
+                share.state = 1;
+            }
+            else
+            {
+                share.ret_msg = res.ErrorMessage.Trim();
+            }
+            _db.paymentShare.Entry(share).State = EntityState.Modified;
+            await _db.SaveChangesAsync();
             return share; 
         }
 
