@@ -23,7 +23,9 @@ using SnowmeetApi.Models.Rent;
 using SnowmeetApi.Models.Users;
 using wechat_miniapp_base.Models;
 using Org.BouncyCastle.X509;
-
+using System.IO.Compression;
+using System.Net;
+using Flurl.Http;
 namespace SnowmeetApi.Controllers
 {
     [Route("core/[controller]/[action]")]
@@ -615,7 +617,47 @@ namespace SnowmeetApi.Controllers
             AlipayDataDataserviceBillDownloadurlQueryResponse response = alipayClient.CertificateExecute(request);
             AlipayRequestResult respObj = JsonConvert.DeserializeObject<AlipayRequestResult>(response.Body.Trim());
             System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
-            string billStr = Util.GetWebContent(respObj.alipay_data_dataservice_bill_downloadurl_query_response.bill_download_url.Trim(), Encoding.GetEncoding("GB2312"));
+            //string billStr = Util.GetWebContent(respObj.alipay_data_dataservice_bill_downloadurl_query_response.bill_download_url.Trim(), Encoding.GetEncoding("GB2312"));
+            string downloadPath = Util.workingPath + "/AlipayCertificate/" + appId + "/downloads";
+            if (!Directory.Exists(downloadPath))
+            {
+                Directory.CreateDirectory(downloadPath);
+            }
+            string tempFileName = billDate.ToString("yyyyMMdd") + "_" + Util.GetLongTimeStamp(DateTime.Now).ToString() + ".zip";
+            HttpWebRequest req = (HttpWebRequest)WebRequest.Create(respObj.alipay_data_dataservice_bill_downloadurl_query_response.bill_download_url.Trim());
+            HttpWebResponse res = (HttpWebResponse)req.GetResponse();
+            Stream s = res.GetResponseStream();
+            if (System.IO.File.Exists(downloadPath + "/" + tempFileName))
+            {
+                System.IO.File.Delete(downloadPath + "/" + tempFileName);
+
+            }
+            using (var zipFileStream = System.IO.File.Create(downloadPath + "/" + tempFileName))
+            {
+                await s.CopyToAsync(zipFileStream);
+            }
+            s.Close();
+            res.Close();
+            req.Abort();
+            
+            using (var zip = ZipFile.Open(downloadPath + "/" + tempFileName, ZipArchiveMode.Read, Encoding.GetEncoding("GB2312")))
+            {
+                
+                foreach (var entry in zip.Entries)
+                {
+                    
+                    string fileName =  entry.FullName.Trim();
+                    fileName = Util.UrlDecode(fileName);
+                   
+                    Console.WriteLine("文件名：{0}", entry.FullName);
+                    using (var stream = entry.Open())
+                    using (var reader = new StreamReader(stream, Encoding.GetEncoding("GB2312")))
+                    {
+                        var str = reader.ReadToEnd();
+                        Console.WriteLine(str);
+                    }
+                }
+            }
 
             if(!response.IsError){
              	Console.WriteLine("调用成功");
