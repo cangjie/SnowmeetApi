@@ -43,7 +43,7 @@ namespace SnowmeetApi.Controllers
         }
 
         [NonAction]
-        public async Task<OrderPayment> TenpayRequest(int paymentId, string sessionKey)
+        public async Task<OrderPayment> TenpayRequest(int paymentId, string sessionKey, bool profitShare = true)
         {
 
             sessionKey = Util.UrlDecode(sessionKey.Trim());
@@ -149,6 +149,10 @@ namespace SnowmeetApi.Controllers
                 Payer = new CreatePayTransactionJsapiRequest.Types.Payer()
                 {
                     OpenId = user.miniAppOpenId.Trim()
+                },
+                Settlement = new CreatePayTransactionJsapiRequest.Types.Settlement()
+                {
+                    IsProfitSharing = profitShare
                 }
                 
             };
@@ -655,15 +659,14 @@ namespace SnowmeetApi.Controllers
                 return null;
             }
             Kol kol = await _db.kol.FindAsync(share.kol_id);
-            if (kol.wechat_bind == 0)
-            {
-                string bindRet = await BindKol(share.payment_id, share.kol_id);
-                if (!bindRet.Trim().Equals("true"))
-                {
-                    return null;
-                }
-            }
             OrderPayment payment = await _db.OrderPayment.FindAsync(share.payment_id);
+            string bindRet = await BindKol((int)payment.mch_id, share.kol_id);
+            if (!bindRet.Trim().Equals("true"))
+            {
+                return null;
+            }
+            
+            
             WechatTenpayClient client = await GetClient((int)payment.mch_id);
             List<CreateProfitSharingOrderRequest.Types.Receiver> rl = new List<CreateProfitSharingOrderRequest.Types.Receiver>();
             CreateProfitSharingOrderRequest.Types.Receiver r = new CreateProfitSharingOrderRequest.Types.Receiver()

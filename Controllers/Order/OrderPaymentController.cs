@@ -955,7 +955,7 @@ namespace SnowmeetApi.Controllers.Order
                     AliController aliHelper = new AliController(_context, _originConfig, _httpContextAccessor);
                     share = await aliHelper.Share(shareId);
                     break;
-                case "微信":
+                case "微信支付":
                     TenpayController tenHelper = new TenpayController(_context, _originConfig, _httpContextAccessor);
                     share = await tenHelper.Share(shareId);
                     break;
