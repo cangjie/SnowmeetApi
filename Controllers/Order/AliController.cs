@@ -34,9 +34,22 @@ namespace SnowmeetApi.Controllers
         {
             public AlipayTradeResponse alipay_trade_precreate_response { get; set; }
             public AlipayOrderCreateResponse alipay_trade_create_response {get; set;} 
-            //public AlipayTradeOrderOnsettleQueryResponse alipay_trade_order_onsettle_query_response {get; set;}
+
+            //public AlipayDataDataserviceBillDownloadurlQueryResponse alipay_data_dataservice_bill_downloadurl_query_response {get; set;}
+
+            public AlipayTradeOrderOnsettleQueryResponse alipay_trade_order_onsettle_query_response {get; set;}
+
+            public AlipayDataDataserviceBillDownloadurlQueryResponseObj alipay_data_dataservice_bill_downloadurl_query_response {get; set;}
+
             public string sign { get; set; }
             public string alipay_cert_sn { get; set; }
+        }
+
+        public class AlipayDataDataserviceBillDownloadurlQueryResponseObj
+        {
+            public string code {get; set;}
+            public string msg {get; set;}
+            public string bill_download_url {get; set;}
         }
 
 
@@ -569,6 +582,47 @@ namespace SnowmeetApi.Controllers
 
             return res;
 
+
+        }
+
+        [HttpGet("{appId}")]
+        public async Task GetBill(string appId, DateTime billDate)
+        {
+            /*
+            string certPath = Util.workingPath + "/AlipayCertificate/" + appId;
+            string privateKey = await System.IO.File.ReadAllTextAsync(certPath + "/private_key_" + appId + ".txt");
+            
+            string publicKey = await System.IO.File.ReadAllTextAsync(certPath + "/alipayCertPublicKey_RSA2.crt");
+
+
+            
+            CertParams certParams = new CertParams
+            {
+                AlipayPublicCertPath = Util.workingPath + "/AlipayCertificate/" + appId + "/alipayCertPublicKey_RSA2.crt",
+                AppCertPath = Util.workingPath + "/AlipayCertificate/" + appId + "/appCertPublicKey_" + appId + ".crt",
+                RootCertPath = Util.workingPath + "/AlipayCertificate/" + appId + "/alipayRootCert.crt"
+            };
+            */
+            //IAopClient alipayClient = new DefaultAopClient("https://openapi.alipay.com/gateway.do", appId, privateKey, "json", "1.0", "RSA2", "utf-8", false, certParams);
+            
+            IAopClient alipayClient = GetClient(appId);
+            AlipayDataDataserviceBillDownloadurlQueryRequest request = new AlipayDataDataserviceBillDownloadurlQueryRequest();
+            AlipayDataDataserviceBillDownloadurlQueryModel model = new AlipayDataDataserviceBillDownloadurlQueryModel();
+            //model.Smid = "2088123412341234";
+            model.BillType = "trade";
+            model.BillDate = billDate.ToString("yyyy-MM-dd");
+            request.SetBizModel(model);
+            AlipayDataDataserviceBillDownloadurlQueryResponse response = alipayClient.CertificateExecute(request);
+            AlipayRequestResult respObj = JsonConvert.DeserializeObject<AlipayRequestResult>(response.Body.Trim());
+            System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
+            string billStr = Util.GetWebContent(respObj.alipay_data_dataservice_bill_downloadurl_query_response.bill_download_url.Trim(), Encoding.GetEncoding("GB2312"));
+
+            if(!response.IsError){
+             	Console.WriteLine("调用成功");
+             }
+             else{
+             	Console.WriteLine("调用失败");
+             }
 
         }
     }

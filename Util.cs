@@ -125,6 +125,27 @@ namespace SnowmeetApi
                 return "";
             }
         }
+        public static string GetWebContent(string url, Encoding encoding)
+        {
+            try
+            {
+                HttpWebRequest req = (HttpWebRequest)WebRequest.Create(url);
+                req.Method = "GET";
+                HttpWebResponse res = (HttpWebResponse)req.GetResponse();
+                Stream s = res.GetResponseStream();
+                StreamReader sr = new StreamReader(s, encoding);
+                string str = sr.ReadToEnd();
+                sr.Close();
+                s.Close();
+                res.Close();
+                req.Abort();
+                return str;
+            }
+            catch
+            {
+                return "";
+            }
+        }
         public static string GetWebContent(string url, string postData)
         {
             HttpWebRequest req = (HttpWebRequest)WebRequest.Create(url);
