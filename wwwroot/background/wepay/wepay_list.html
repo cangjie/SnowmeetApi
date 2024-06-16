@@ -119,7 +119,7 @@
         var btnCtrl = document.getElementById('btn');
         btnCtrl.disabled = true;
         btnCtrl.innerText = "查询中……";
-        var getUrl = '../../core/WepayOrder/GetWepayBalance?sessionKey=' + encodeURIComponent(sessionKey)
+        var getUrl = '../../core/Tenpay/GetWepayBalance?sessionKey=' + encodeURIComponent(sessionKey)
             + '&startDate=' + formatDate(startDate) + '&endDate=' + formatDate(endDate) + '&mchId=' + mchId;
         $.ajax({
             url: getUrl,

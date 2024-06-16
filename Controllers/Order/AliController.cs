@@ -667,5 +667,95 @@ namespace SnowmeetApi.Controllers
              }
 
         }
+        [HttpGet]
+        public async Task GetFlow(DateTime startDate, DateTime endDate)
+        {
+            IAopClient client = GetClient(appId);
+            AlipayDataBillAccountlogQueryRequest req = new AlipayDataBillAccountlogQueryRequest();
+            req.BizContent="{" +
+                "  \"start_time\":\"" + startDate.ToString("yyyy-MM-dd HH:mm:ss") + "\"," +
+                "  \"end_time\":\"" + endDate.ToString("yyyy-MM-dd HH:mm:ss") + "\"," +
+                "  \"page_no\":\"1\"," +
+                "  \"page_size\":\"2000\" }";
+            AlipayDataBillAccountlogQueryResponse response=client.CertificateExecute(req);
+            Console.WriteLine(response.Body);
+        }
+
+        [HttpGet]
+        public async Task GetBalance(string type, DateTime startDate, DateTime endDate)
+        {
+            
+            IAopClient client = GetClient(appId);
+            AlipayDataBillTransferQueryRequest  req = new AlipayDataBillTransferQueryRequest() ;
+            req.BizContent="{" +
+                "  \"start_time\":\"" + startDate.ToString("yyyy-MM-dd HH:mm:ss") + "\"," +
+                "  \"end_time\":\"" + endDate.ToString("yyyy-MM-dd HH:mm:ss") + "\"," +
+                "  \"type\":\"" + type + "\"," +
+                "  \"page_no\":\"1\"," +
+                "  \"page_size\":\"2000\" }";
+            AlipayDataBillTransferQueryResponse response=client.CertificateExecute(req);
+            Console.WriteLine(response.Body);
+        }
+
+        [HttpGet]
+        public async Task DataAll(DateTime billDate, string type = "trade")
+        {
+            IAopClient client = GetClient(appId);
+            AlipayDataDataserviceBillDownloadurlQueryModel model = new AlipayDataDataserviceBillDownloadurlQueryModel();
+            //model.setSmid("2088123412341234");
+            model.BillType =  type;
+            model.BillDate =  billDate.ToString("yyyy-MM-dd");
+            AlipayDataDataserviceBillDownloadurlQueryRequest req = new AlipayDataDataserviceBillDownloadurlQueryRequest();
+            req.SetBizModel(model);
+            AlipayDataDataserviceBillDownloadurlQueryResponse res = client.CertificateExecute(req); 
+            Console.WriteLine(res.Body);
+            AlipayRequestResult respObj = JsonConvert.DeserializeObject<AlipayRequestResult>(res.Body.Trim());
+            Console.WriteLine(respObj.alipay_data_dataservice_bill_downloadurl_query_response.bill_download_url);
+            System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
+            //string billStr = Util.GetWebContent(respObj.alipay_data_dataservice_bill_downloadurl_query_response.bill_download_url.Trim(), Encoding.GetEncoding("GB2312"));
+            string downloadPath = Util.workingPath + "/AlipayCertificate/" + appId + "/downloads";
+            if (!Directory.Exists(downloadPath))
+            {
+                Directory.CreateDirectory(downloadPath);
+            }
+            string tempFileName = billDate.ToString("yyyyMMdd") + "_" + Util.GetLongTimeStamp(DateTime.Now).ToString() + ".zip";
+            HttpWebRequest reqWeb = (HttpWebRequest)WebRequest.Create(respObj.alipay_data_dataservice_bill_downloadurl_query_response.bill_download_url.Trim());
+            HttpWebResponse resWeb = (HttpWebResponse)reqWeb.GetResponse();
+            Stream s = resWeb.GetResponseStream();
+            if (System.IO.File.Exists(downloadPath + "/" + tempFileName))
+            {
+                System.IO.File.Delete(downloadPath + "/" + tempFileName);
+
+            }
+            using (var zipFileStream = System.IO.File.Create(downloadPath + "/" + tempFileName))
+            {
+                await s.CopyToAsync(zipFileStream);
+            }
+            s.Close();
+            resWeb.Close();
+            reqWeb.Abort();
+            
+            using (var zip = ZipFile.Open(downloadPath + "/" + tempFileName, ZipArchiveMode.Read, Encoding.GetEncoding("GB2312")))
+            {
+                
+                foreach (var entry in zip.Entries)
+                {
+                    
+                    string fileName =  entry.FullName.Trim();
+                    fileName = Util.UrlDecode(fileName);
+                   
+                    Console.WriteLine("文件名：{0}", entry.FullName);
+                    using (var stream = entry.Open())
+                    using (var reader = new StreamReader(stream, Encoding.GetEncoding("GB2312")))
+                    {
+                        var str = reader.ReadToEnd();
+                        Console.WriteLine(str);
+                    }
+                }
+            }
+
+           
+
+        }
     }
 }

@@ -2,8 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
+using HttpHandlerDemo;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -26,6 +29,12 @@ namespace SnowmeetApi.Controllers
     [ApiController]
     public class TenpayController : ControllerBase
     {
+        private struct DownloadUrl
+        {
+            public string download_url { get; set; }
+        }
+
+
         public ApplicationDBContext _db;
         public IConfiguration _oriConfig;
         public IHttpContextAccessor _http;
@@ -716,6 +725,454 @@ namespace SnowmeetApi.Controllers
                 PlatformCertificateManager = certManager
             };
             return new WechatTenpayClient(options);
+        }
+
+        [HttpGet]
+        public async Task DownloadToday()
+        {
+            int[] mchId = new int[] { 1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 15, 17 };
+            for (int j = 0; j < mchId.Length; j++)
+            {
+                await RequestTradeBill(mchId[j], DateTime.Now.Date.AddDays(-1));
+                await RequestFlowBill(mchId[j], DateTime.Now.Date.AddDays(-1));
+            }
+
+        }
+
+        [HttpGet]
+        public async Task DownloadHistoryData(DateTime date)
+        {
+            int[] mchId = new int[] { 1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 15, 17 };
+            for (int j = 0; j < mchId.Length; j++)
+            {
+                await RequestTradeBill(mchId[j], date);
+                await RequestFlowBill(mchId[j], date);
+            }
+
+        }
+
+        [HttpGet("{mchId}")]
+        public async Task  RequestTradeBill(int mchId, DateTime billDate)
+        {
+            Console.WriteLine(mchId.ToString() + "\t" + billDate.ToShortDateString());
+            var summaryList = await _db.wepaySummary.Where(s => s.trans_date.Date == billDate.Date && s.mch_id == mchId)
+                .AsNoTracking().ToListAsync();
+            if (summaryList != null && summaryList.Count > 0)
+            {
+                return;
+            }
+
+            WepayKey k = await _db.WepayKeys.FindAsync(mchId);
+
+            string getUrl = "https://api.mch.weixin.qq.com/v3/bill/tradebill?bill_date=" + billDate.ToString("yyyy-MM-dd");
+
+            HttpHandler handle = new HttpHandler(k.mch_id.Trim(), k.key_serial.Trim(), k.private_key.Trim());
+
+            HttpRequestMessage req = new HttpRequestMessage();
+            req.RequestUri = new Uri(getUrl);
+            CancellationToken cancel = new CancellationToken();
+            HttpResponseMessage res = await handle.GetWebContent(req, cancel);
+            StreamReader sr = new StreamReader(await res.Content.ReadAsStreamAsync());
+            string str = await sr.ReadToEndAsync();
+            sr.Close();
+            DownloadUrl downloadUrl = Newtonsoft.Json.JsonConvert.DeserializeObject<DownloadUrl>(str);
+
+            if (downloadUrl.download_url == null)
+            {
+                return;
+            }
+            Console.WriteLine(downloadUrl.download_url.Trim());
+            handle = new HttpHandler(k.mch_id.Trim(), k.key_serial.Trim(), k.private_key.Trim());
+            req = new HttpRequestMessage();
+            req.RequestUri = new Uri(downloadUrl.download_url.Trim());
+            res = await handle.GetWebContent(req, cancel);
+            sr = new StreamReader(await res.Content.ReadAsStreamAsync());
+            str = (await sr.ReadToEndAsync()).Trim();
+            sr.Close();
+            Console.WriteLine(str);
+
+            string[] lineArr = str.Split('\n');
+            string[] summaryFields = lineArr[lineArr.Length - 1].Split(',');
+
+
+            WepaySummary summary = new WepaySummary()
+            {
+                id = 0,
+                mch_id = mchId,
+                trans_date = billDate.Date,
+                trans_num = int.Parse(summaryFields[0].Replace("`", "")),
+                total_settle_amount = double.Parse(summaryFields[1].Replace("`", "")),
+                total_refund_amount = double.Parse(summaryFields[2].Replace("`", "")),
+                coupon_refund_amount = double.Parse(summaryFields[3].Replace("`", "")),
+                total_fee = double.Parse(summaryFields[4].Replace("`", "")),
+                total_order_amount = double.Parse(summaryFields[5].Replace("`", "")),
+                total_request_refund_amount = double.Parse(summaryFields[6].Replace("`", ""))
+            };
+
+
+            WepayBalance[] balanceArr = new WepayBalance[lineArr.Length - 3];
+
+
+            for (int i = 1; i < lineArr.Length - 2; i++)
+            {
+                WepayBalance b = new WepayBalance();
+                string[] fieldArr = lineArr[i].Split(',');
+                for (int j = 0; j < fieldArr.Length; j++)
+                {
+                    string v = fieldArr[j].Trim().Replace("`", "");
+                    switch (j)
+                    {
+                        case 0:
+                            b.trans_date = DateTime.Parse(v);
+                            break;
+                        case 1:
+                            b.app_id = v.Trim();
+                            break;
+                        case 2:
+                            b.mch_id = v.Trim();
+                            break;
+                        case 3:
+                            b.spc_mch_id = v.Trim();
+                            break;
+                        case 4:
+                            b.device_id = v.Trim();
+                            break;
+                        case 5:
+                            b.wepay_order_num = v.Trim();
+                            break;
+                        case 6:
+                            b.out_trade_no = v.Trim();
+                            break;
+                        case 7:
+                            b.open_id = v.Trim();
+                            break;
+                        case 8:
+                            b.trans_type = v.Trim();
+                            break;
+                        case 9:
+                            b.pay_status = v.Trim();
+                            break;
+                        case 10:
+                            b.bank = v.Trim();
+                            break;
+                        case 11:
+                            b.currency = v.Trim();
+                            break;
+                        case 12:
+                            b.settle_amount = double.Parse(v.Trim());
+                            break;
+                        case 13:
+                            b.coupon_amount = double.Parse(v.Trim());
+                            break;
+                        case 14:
+                            b.refund_no = v.Trim();
+                            break;
+                        case 15:
+                            b.out_refund_no = v.Trim();
+                            break;
+                        case 16:
+                            b.refund_amount = double.Parse(v.Trim());
+                            break;
+                        case 17:
+                            b.coupon_refund_amount = double.Parse(v.Trim());
+                            break;
+                        case 18:
+                            b.refund_type = v.Trim();
+                            break;
+                        case 19:
+                            b.refund_status = v.Trim();
+                            break;
+                        case 20:
+                            b.product_name = v.Trim();
+                            break;
+                        case 21:
+                            b.product_package = v.Trim();
+                            break;
+                        case 22:
+                            b.fee = double.Parse(v.Trim());
+                            break;
+                        case 23:
+                            b.fee_rate = v.Trim();
+                            break;
+                        case 24:
+                            b.order_amount = double.Parse(v.Trim());
+                            break;
+                        case 25:
+                            b.request_refund_amount = double.Parse(v.Trim());
+                            break;
+                        case 26:
+                            b.fee_rate_memo = v.Trim();
+                            break;
+                        default:
+                            break;
+                    }
+                }
+                balanceArr[i-1] = b;
+            }
+
+            if (summary.trans_num == balanceArr.Length)
+            {
+                await _db.wepaySummary.AddAsync(summary);
+                await _db.SaveChangesAsync();
+                if (summary.id > 0)
+                {
+                    try
+                    {
+                        for (int i = 0; i < balanceArr.Length; i++)
+                        {
+                            balanceArr[i].summary_id = summary.id;
+                            await _db.wepayBalance.AddAsync(balanceArr[i]);
+                        }
+                        await _db.SaveChangesAsync();
+                    }
+                    catch
+                    {
+                        _db.wepaySummary.Remove(summary);
+                        await _db.SaveChangesAsync();
+                    }
+                }
+
+            }
+        }
+
+        [HttpGet]
+        public async Task RequestFlowBill(int mchId, DateTime billDate)
+        {
+            WepayKey k = await _db.WepayKeys.FindAsync(mchId);
+
+            string getUrl = "https://api.mch.weixin.qq.com/v3/bill/fundflowbill?bill_date=" + billDate.ToString("yyyy-MM-dd");
+
+            HttpHandler handle = new HttpHandler(k.mch_id.Trim(), k.key_serial.Trim(), k.private_key.Trim());
+
+            HttpRequestMessage req = new HttpRequestMessage();
+            req.RequestUri = new Uri(getUrl);
+            CancellationToken cancel = new CancellationToken();
+            HttpResponseMessage res = await handle.GetWebContent(req, cancel);
+            StreamReader sr = new StreamReader(await res.Content.ReadAsStreamAsync());
+            string str = await sr.ReadToEndAsync();
+            sr.Close();
+            DownloadUrl downloadUrl = Newtonsoft.Json.JsonConvert.DeserializeObject<DownloadUrl>(str);
+
+            if (downloadUrl.download_url == null)
+            {
+                return;
+            }
+            Console.WriteLine(downloadUrl.download_url.Trim());
+            handle = new HttpHandler(k.mch_id.Trim(), k.key_serial.Trim(), k.private_key.Trim());
+            req = new HttpRequestMessage();
+            req.RequestUri = new Uri(downloadUrl.download_url.Trim());
+            res = await handle.GetWebContent(req, cancel);
+            sr = new StreamReader(await res.Content.ReadAsStreamAsync());
+            str = (await sr.ReadToEndAsync()).Trim();
+            sr.Close();
+            Console.WriteLine(str);
+            string[] lineArr = str.Split('\r');
+            for (int i = 1; i < lineArr.Length - 2; i++)
+            {
+                Console.WriteLine(lineArr[i].Trim());
+                string[] fields = lineArr[i].Trim().Split(',');
+                for (int j = 0; j < fields.Length; j++)
+                {
+                    fields[j] = fields[j].Replace("`", "");
+                }
+                WepayFlowBill bill = new WepayFlowBill()
+                {
+                    mch_id = k.mch_id,
+                    bill_date_time = DateTime.Parse(fields[0]),
+                    biz_no = fields[1].Trim(),
+                    flow_no = fields[2].Trim(),
+                    biz_name = fields[3].Trim(),
+                    biz_type = fields[4].Trim(),
+                    bill_type = fields[5].Trim(),
+                    amount = double.Parse(fields[6].Trim()),
+                    surplus = double.Parse(fields[7].Trim()),
+                    oper = fields[8].Trim(),
+                    memo = fields[9].Trim(),
+                    invoice_id = fields[10].Trim()
+                };
+                try
+                {
+                    await _db.wepayFlowBill.AddAsync(bill);
+                }
+                catch
+                {
+
+                }
+            }
+            try
+            {
+                await _db.SaveChangesAsync();
+            }
+            catch
+            {
+
+            }
+        }
+
+        [HttpGet]
+        public async Task<ActionResult<WepayReport>> GetWepayBalance(DateTime startDate, DateTime endDate, string sessionKey, string mchId = "")
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            mchId = Util.UrlDecode(mchId);
+            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _db)).Value;
+            if (user == null || !user.isAdmin)
+            {
+                return NotFound();
+            }
+
+            var paidArr = await _db.wepayBalance.Where(b => b.trans_date.Date >= startDate.Date
+                && b.trans_date.Date <= endDate.Date && b.pay_status.Trim().Equals("SUCCESS")
+                && (mchId.Equals("") || b.mch_id.Trim().Equals(mchId)))
+                .OrderByDescending(b => b.trans_date).AsNoTracking().ToListAsync();
+
+            
+            
+            
+            var wepayKeyList = await _db.WepayKeys.ToListAsync();
+
+            List<WepayBalance> retList = new List<WepayBalance>();
+            int maxLen = 0;
+            for (int i = 0; i < paidArr.Count; i++)
+            {
+                WepayBalance b = paidArr[i];
+                string orderId = "";
+                int orderOnlineId = 0;
+                string shop = "";
+                string orderType = "";
+                string mchName = "";
+                string cell = "";
+                string realName = "";
+                string gender = "";
+
+                var pList = await _db.OrderPayment.Where(p => p.status.Equals("支付成功")
+                    && p.out_trade_no.Trim().Equals(b.out_trade_no.Trim())).ToListAsync();
+                if (pList != null && pList.Count > 0)
+                {
+                    orderOnlineId = pList[0].order_id;
+                }
+
+                OrderOnline? orderOnline = await _db.OrderOnlines.FindAsync(orderOnlineId);
+                if (orderOnline != null)
+                {
+                    shop = orderOnline.shop.Trim();
+                    switch (orderOnline.type.Trim())
+                    {
+                        case "服务":
+                            orderType = "养护";
+                            var maintailList = await _db.MaintainLives.Where(m => m.order_id == orderOnlineId)
+                                .AsNoTracking().ToListAsync();
+                            for (int j = 0; j < maintailList.Count; j++)
+                            {
+                                orderId = orderId + (j == 0 ? "" : ",") + maintailList[j].task_flow_num.Trim();
+                            }
+                            break;
+                        case "押金":
+                            orderType = "租赁";
+                            var rentOrderList = await _db.RentOrder.Where(r => r.order_id == orderOnlineId)
+                                .AsNoTracking().ToListAsync();
+                            if (rentOrderList != null && rentOrderList.Count > 0)
+                            {
+                                orderId = rentOrderList[0].id.ToString();
+                                
+                            }
+                            break;
+                        case "店销现货":
+                            orderType = "店销现货";
+                            orderId = orderOnlineId.ToString();
+                            break;
+                        case "雪票":
+                            orderType = "雪票";
+                            var skiPassList = await _db.OrderOnlineDetails
+                                .Where(d => d.OrderOnlineId == orderOnlineId)
+                                .AsNoTracking().ToListAsync();
+                            for (int j = 0; skiPassList != null && j < skiPassList.Count; j++)
+                            {
+                                orderId = orderId + (j == 0 ? "" : ",") + skiPassList[j].product_name
+                                    + "x" + skiPassList[j].count.ToString();
+                            }
+                            break;
+                        default:
+                            break;
+                    }
+                    MiniAppUser mUser = await _db.MiniAppUsers.FindAsync(orderOnline.open_id);
+                    if (mUser != null)
+                    {
+                        cell = mUser.cell_number.Trim();
+                        realName = mUser.real_name.Trim();
+                        gender = mUser.gender.Trim();
+                    }
+                }
+
+                for (int j = 0; j < wepayKeyList.Count; j++)
+                {
+                    if (wepayKeyList[j].mch_id.Trim().Equals(b.mch_id))
+                    {
+                        mchName = wepayKeyList[j].mch_name.Trim();
+                        break;
+                    }
+                }
+                b.orderId = orderId.Trim();
+                b.refunds = await _db.wepayBalance.Where(c =>  c.pay_status.Trim().Equals("REFUND")
+                    && c.out_trade_no.Trim().Equals(b.out_trade_no)
+                    && c.refund_status.Trim().Equals("SUCCESS"))
+                    .OrderBy(b => b.id).AsNoTracking().ToListAsync();
+                maxLen = Math.Max(maxLen, b.refunds.Count);
+                for (int j = 0; j < b.refunds.Count; j++)
+                {
+                    b.totalRefundAmount += b.refunds[j].refund_amount;
+                    b.totalRefundAmountReal += b.refunds[j].real_refund_amount;
+                    b.totalRefundFee += Math.Abs(b.refunds[j].fee);
+                }
+                b.netAmount = b.receiveable_amount - b.totalRefundAmountReal ;
+                b.shop = shop;
+                b.orderType = orderType;
+                b.real_name = realName;
+                b.cell = cell;
+                b.gender = gender;
+                b.mchName = mchName;
+                b.dayOfWeek = Util.GetDayOfWeek(b.trans_date.Date);
+                //b.fee = Math.Abs(b.fee);
+                //b.receiveable_amount = b.settle_amount - b.fee;
+                retList.Add(b);
+
+            }
+
+            var withDraw = await _db.wepayFlowBill.Where(b => (b.bill_date_time.Date >= startDate.Date
+                && b.bill_date_time.Date <= endDate.Date && b.biz_type.Trim().Equals("提现")
+                && b.bill_type.Trim().Equals("支出")
+                && (mchId.Trim().Equals("") || b.mch_id.Trim().Equals(mchId))))
+                .AsNoTracking().ToListAsync();
+
+            for (int i = 0; withDraw != null && i < withDraw.Count; i++)
+            {
+                WepayBalance b = new WepayBalance();
+                b.trans_date = withDraw[i].bill_date_time;
+                b.orderType = "提现";
+                b.mch_id = withDraw[i].mch_id;
+                b.mchName = "";
+                for (int j = 0; j < wepayKeyList.Count; j++)
+                {
+                    if (wepayKeyList[j].mch_id.Trim().Equals(b.mch_id))
+                    {
+                        b.mchName = wepayKeyList[j].mch_name.Trim();
+                        break;
+                    }
+                }
+                b.drawAmount = withDraw[i].amount;
+                b.dayOfWeek = Util.GetDayOfWeek(b.trans_date);
+                retList.Add(b);
+
+            }
+
+            List<WepayBalance> ret = retList.OrderByDescending(b => b.trans_date).ToList();
+
+
+
+            WepayReport report = new WepayReport();
+            report.maxRefundLength = maxLen;
+            report.items = ret;
+
+            return Ok(report);
         }
     }
 }
