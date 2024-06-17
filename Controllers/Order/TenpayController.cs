@@ -463,9 +463,9 @@ namespace SnowmeetApi.Controllers
             string notifyUrl = payment.notify.Trim().Replace("https://", "").Split('/')[0].Trim();
             notifyUrl = "https://" + notifyUrl + "/core/Tenpay/RefundCallback/" + payment.mch_id.ToString();
             refund.notify_url = notifyUrl.Trim();
-            string outRefundNo = payment.out_trade_no + "_REFND_" + DateTime.Now.ToString("yyyyMMdd")
-                +"_" + refunds.Count.ToString().PadLeft(2, '0');
-            refund.out_refund_no = outRefundNo;
+            //string outRefundNo = payment.out_trade_no + "_REFND_" + DateTime.Now.ToString("yyyyMMdd")
+            //    +"_" + refunds.Count.ToString().PadLeft(2, '0');
+            //refund.out_refund_no = outRefundNo;
 
 
             _db.OrderPaymentRefund.Entry(refund).State = EntityState.Modified;
@@ -482,7 +482,7 @@ namespace SnowmeetApi.Controllers
             var request = new CreateRefundDomesticRefundRequest()
             {
                 OutTradeNumber = payment.out_trade_no.Trim(),
-                OutRefundNumber = outRefundNo.Trim(),
+                OutRefundNumber = refund.out_refund_no.Trim(),  
                 Amount = new CreateRefundDomesticRefundRequest.Types.Amount()
                 {
                     Total = (int)Math.Round(payment.amount * 100, 0),

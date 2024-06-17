@@ -543,12 +543,12 @@ namespace SnowmeetApi.Controllers
             }
             var refunds = await _db.OrderPaymentRefund.Where(r => r.payment_id == payment.id)
                 .AsNoTracking().ToListAsync();
-            string outRefundNo = payment.out_trade_no.Trim() + "_REFND_" + DateTime.Now.ToString("yyyyMMdd") 
-                + "_" + refunds.Count.ToString().PadLeft(2, '0');
-            refund.out_refund_no = outRefundNo;
+            //string outRefundNo = payment.out_trade_no.Trim() + "_REFND_" + DateTime.Now.ToString("yyyyMMdd") 
+            //    + "_" + refunds.Count.ToString().PadLeft(2, '0');
+            //refund.out_refund_no = outRefundNo;
             try
             {
-                AlipayTradeRefundResponse res = Refund(payment.out_trade_no.Trim(), outRefundNo, refund.amount, refund.reason.Trim());
+                AlipayTradeRefundResponse res = Refund(payment.out_trade_no.Trim(), refund.out_refund_no.Trim(), refund.amount, refund.reason.Trim());
                 if (res.FundChange != null && res.FundChange.ToUpper() == "Y")
                 {
                     refund.state = 1;
@@ -698,7 +698,7 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet]
-        public async Task DataAll(DateTime billDate, string type = "trade")
+        public async Task DataAll(DateTime billDate, string type = "signcustomer")
         {
             IAopClient client = GetClient(appId);
             AlipayDataDataserviceBillDownloadurlQueryModel model = new AlipayDataDataserviceBillDownloadurlQueryModel();
@@ -711,6 +711,10 @@ namespace SnowmeetApi.Controllers
             Console.WriteLine(res.Body);
             AlipayRequestResult respObj = JsonConvert.DeserializeObject<AlipayRequestResult>(res.Body.Trim());
             Console.WriteLine(respObj.alipay_data_dataservice_bill_downloadurl_query_response.bill_download_url);
+            if (respObj.alipay_data_dataservice_bill_downloadurl_query_response.bill_download_url == null)
+            {
+                return;
+            }
             System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
             //string billStr = Util.GetWebContent(respObj.alipay_data_dataservice_bill_downloadurl_query_response.bill_download_url.Trim(), Encoding.GetEncoding("GB2312"));
             string downloadPath = Util.workingPath + "/AlipayCertificate/" + appId + "/downloads";
@@ -749,13 +753,67 @@ namespace SnowmeetApi.Controllers
                     using (var reader = new StreamReader(stream, Encoding.GetEncoding("GB2312")))
                     {
                         var str = reader.ReadToEnd();
+                        if (entry.FullName.Trim().EndsWith(billDate.ToString("yyyyMMdd") + "_TRANSFER_DETAILS.csv"))
+                        {
+                            await DealTrans(str.Trim());
+                        }
+                        if (entry.FullName.Trim().EndsWith(billDate.ToString("yyyyMMdd") + "_账务明细.csv"))
+                        {
+                            await DealTrans(str.Trim());
+                        }
+                        
                         Console.WriteLine(str);
                     }
                 }
             }
+        }
+        [NonAction]
+        private async Task DealTrans(string content)
+        {
+            string[] lineArr = content.Split('\r');
+            for(int i = 0; i < lineArr.Length; i++)
+            {
+                string lineStr = lineArr[i].Trim();
+                if (lineStr.StartsWith("#") || lineStr.StartsWith("账务流水号"))
+                {
+                    continue;
+                }
 
-           
+                string[] fieldsArr = lineStr.Split(',');
+
+                AliDownloadFlowBill b = await _db.aliDownloadFlowBill.FindAsync(fieldsArr[0]);
+                if (b != null)
+                {
+                    continue;
+                }
+                b = new AliDownloadFlowBill()
+                {
+                    id = fieldsArr[0].Trim(),
+                    biz_num = fieldsArr[1].Trim(),
+                    out_trade_num = fieldsArr[2].Trim(),
+                    prod_name = fieldsArr[3].Trim(),
+                    trans_date =  DateTime.Parse(fieldsArr[4].Trim()),
+                    receiver_ali_account = fieldsArr[5].Trim(),
+                    income = double.Parse(fieldsArr[6].Trim()),
+                    outcome = double.Parse(fieldsArr[7].Trim()),
+                    remainder = double.Parse(fieldsArr[8].Trim()),
+                    trans_channel = fieldsArr[9].Trim(),
+                    biz_type =  fieldsArr[10].Trim(),
+                    memo = fieldsArr[11].Trim() 
+                };
+                await _db.aliDownloadFlowBill.AddAsync(b);
+            }
+            await _db.SaveChangesAsync();
+        }
+
+        /*
+        [NonAction]
+        private async Task DealBalance(string content)
+        {
+
 
         }
+        */
+        
     }
 }

@@ -184,5 +184,7 @@ namespace SnowmeetApi.Data
 
         public DbSet<Models.Order.PaymentShare> paymentShare {get; set;}
 
+        public DbSet<Models.Order.AliDownloadFlowBill> aliDownloadFlowBill {get; set; }
+
     }
 }

@@ -499,7 +499,7 @@ namespace SnowmeetApi.Controllers.Order
             {
                 return "";
             }
-            string outTradeNo = shopCode + "_" + bizCode + "_" + dateStr + "_" + order.id.ToString().PadLeft(6, '0')  + "_" + payments.Count.ToString().PadLeft(2,'0');
+            string outTradeNo = shopCode + "_" + bizCode + "_" + dateStr + "_" + order.id.ToString().PadLeft(6, '0')  + "_" + (payments.Count + 1).ToString().PadLeft(2,'0');
             var paymentDepList = await _context.OrderPayment.Where(p=>p.out_trade_no.Trim().Equals(outTradeNo))
                 .AsNoTracking().ToListAsync();
             if (paymentDepList == null || paymentDepList.Count == 0)
@@ -536,6 +536,8 @@ namespace SnowmeetApi.Controllers.Order
             {
                 return BadRequest();
             }
+            string outRefundNo = payment.out_trade_no + "_REFND_" + (refunds.Count + 1).ToString().PadLeft(2, '0') 
+                + "_" + DateTime.Now.ToString("yyyyMMdd");
             OrderPaymentRefund refund = new OrderPaymentRefund()
             {
                 order_id = payment.order_id,
@@ -548,7 +550,8 @@ namespace SnowmeetApi.Controllers.Order
                 RefundFee = 0,
                 oper = user.miniAppOpenId.Trim(),
                 memo = "",
-                notify_url = ""
+                notify_url = "",
+                out_refund_no = outRefundNo.Trim()
             };
             await _context.OrderPaymentRefund.AddAsync(refund);
             await _context.SaveChangesAsync();
@@ -915,13 +918,15 @@ namespace SnowmeetApi.Controllers.Order
         public async Task<PaymentShare> CreateShare(int paymentId, double amount, string memo, int kolId)
         {
             OrderPayment payment = await _context.OrderPayment.FindAsync(paymentId);
-            string outTradeNo = payment.out_trade_no.Trim() + "_SHARE_" + DateTime.Now.ToString("yyyyMMdd") + "_"+ kolId.ToString().PadLeft(3, '0') + "_";
+            
             var shareList = await _context.paymentShare.Where(s => s.payment_id == paymentId).AsNoTracking().ToListAsync();
             int shareCount = 0;
             if (shareList != null)
             {
                 shareCount = shareList.Count;
             }
+            string outTradeNo = payment.out_trade_no.Trim() + "_SHARE_" + (shareCount + 1).ToString().PadLeft(2, '0') 
+                + "_" + DateTime.Now.ToString("yyyyMMdd") + "_"+ kolId.ToString().PadLeft(3, '0') + "_";
             outTradeNo = outTradeNo + shareCount.ToString().PadLeft(2, '0');
             int orderId = payment.order_id;
             PaymentShare share = new PaymentShare()
