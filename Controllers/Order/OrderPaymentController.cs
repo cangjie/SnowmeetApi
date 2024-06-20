@@ -926,8 +926,8 @@ namespace SnowmeetApi.Controllers.Order
                 shareCount = shareList.Count;
             }
             string outTradeNo = payment.out_trade_no.Trim() + "_SHARE_" + (shareCount + 1).ToString().PadLeft(2, '0') 
-                + "_" + DateTime.Now.ToString("yyyyMMdd") + "_"+ kolId.ToString().PadLeft(3, '0') + "_";
-            outTradeNo = outTradeNo + shareCount.ToString().PadLeft(2, '0');
+                + "_" + DateTime.Now.ToString("yyyyMMdd") + "_"+ kolId.ToString().PadLeft(3, '0');// + "_";
+            //outTradeNo = outTradeNo + shareCount.ToString().PadLeft(2, '0');
             int orderId = payment.order_id;
             PaymentShare share = new PaymentShare()
             {
