@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using SnowmeetApi.Models;
 using SnowmeetApi.Models.Users;
 using wechat_miniapp_base.Models;
@@ -41,7 +41,16 @@ namespace SnowmeetApi.Data
             modelBuilder.Entity<Models.Order.SaleReport>().HasNoKey();
 
             modelBuilder.Entity<Models.Order.EPaymentDailyReport>().HasKey(e => new { e.biz_date, e.mch_id, e.pay_method });
-            
+
+
+
+            //modelBuilder.Entity<Member>().HasMany<MemberSocialAccount>().WithOne(m => m.).HasForeignKey(m => m.MemberId);
+
+            modelBuilder.Entity<MemberSocialAccount>().HasOne<Member>().WithMany(m => m.memberSocialAccounts).HasForeignKey(m => m.member_id);
+
+            modelBuilder.Entity<Member>().Navigation(m => m.memberSocialAccounts).UsePropertyAccessMode(PropertyAccessMode.Property);
+
+            //modelBuilder.Entity<MemberSocialAccount>().Navigation(m => m.member).UsePropertyAccessMode(PropertyAccessMode.Property);
 
             //OrderOnline
             //modelBuilder.Entity<OrderOnline>().HasKey(c => c.id);
@@ -183,8 +192,9 @@ namespace SnowmeetApi.Data
         public DbSet<Models.Order.Kol> kol {get; set;}
 
         public DbSet<Models.Order.PaymentShare> paymentShare {get; set;}
-
         public DbSet<Models.Order.AliDownloadFlowBill> aliDownloadFlowBill {get; set; }
+        public DbSet<SnowmeetApi.Models.Users.Member> member { get; set; }
+        public DbSet<SnowmeetApi.Models.Users.MemberSocialAccount> memberSocialAccount { get; set; }
 
     }
 }

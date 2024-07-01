@@ -8,7 +8,8 @@ namespace SnowmeetApi.Models.Users
     {
         [Key]
         public int id { get; set; }
-        
+
+        //[Column("member_id")]
         public int member_id { get; set; }
 
         public string type {get; set;}
@@ -19,7 +20,7 @@ namespace SnowmeetApi.Models.Users
 
         public string memo {get; set; }
 
-        public Member member { get; set; }
+       // public Member member { get; set; }
 
     }
 }

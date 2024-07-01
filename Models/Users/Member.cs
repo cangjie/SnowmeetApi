@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 namespace SnowmeetApi.Models.Users
@@ -14,6 +15,12 @@ namespace SnowmeetApi.Models.Users
         public int? merge_id {get; set;}
         public string source {get; set; }
 
+        public int is_staff { get; set; }
+        public int is_manager { get; set;}
+        public int is_admin { get; set; }
+
+        
+        public ICollection<MemberSocialAccount> memberSocialAccounts { get;  } = new List<MemberSocialAccount>();
         
 
     }
