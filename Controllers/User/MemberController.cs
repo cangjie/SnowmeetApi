@@ -23,33 +23,53 @@ namespace SnowmeetApi.Controllers.User
 
             
         }
+        /*
 
-        [HttpGet]
+        [NonAction]
         public async Task<ActionResult<Member>> GetMember(int id)
         {
             //MemberSocialAccount ma = await _db.memberSocialAccount.Where(m => m.MemberId == id).FirstAsync();
             Member m = await _db.member.Include(m => m.memberSocialAccounts).Where(m => m.id == id).FirstAsync();
             
-            return Ok(m);
+            return m;
         }
-
+        */
         [NonAction]
         public async Task<Member> GetMember(string sessionKey, string type)
         {
             sessionKey = Util.UrlDecode(sessionKey.Trim());
+            type = type.Trim();
+            int memberId = 0;
+            string num = "";
             switch (type.Trim())
             {
-                case "mini":
+                case "wechat_mini_openid":
                     UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _db)).Value;
                     if (user != null)
-                    { 
-                        
+                    {
+                        return null;
                     }
+                    num = user.miniAppOpenId.Trim();
                     break;
                 default:
                     break;
             }
-            return null;
+            if (num.Trim().Equals(""))
+            {
+                return null;
+            }
+            MemberSocialAccount msa = await _db.memberSocialAccount
+                        .Where(a => (a.valid == 1 && a.num.Trim().Equals(num) && a.type.Trim().Equals(type)))
+                        .FirstAsync();
+
+            memberId = msa.member_id;
+            if (memberId == 0)
+            {
+                return null;
+            }
+            Member member = await _db.member.Include(m => m.memberSocialAccounts)
+                .Where(m => m.id == memberId).FirstAsync();
+            return member;
         }
 
         /*

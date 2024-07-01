@@ -3,6 +3,7 @@ using SnowmeetApi.Models;
 using SnowmeetApi.Models.Users;
 using wechat_miniapp_base.Models;
 using SnowmeetApi.Models.UTV;
+using SnowmeetApi.Models.Rent;
 namespace SnowmeetApi.Data
 {
     public class ApplicationDBContext : DbContext
@@ -48,7 +49,7 @@ namespace SnowmeetApi.Data
 
             modelBuilder.Entity<MemberSocialAccount>().HasOne<Member>().WithMany(m => m.memberSocialAccounts).HasForeignKey(m => m.member_id);
 
-            modelBuilder.Entity<Member>().Navigation(m => m.memberSocialAccounts).UsePropertyAccessMode(PropertyAccessMode.Property);
+            //modelBuilder.Entity<Member>().Navigation(m => m.memberSocialAccounts).UsePropertyAccessMode(PropertyAccessMode.Property);
 
             //modelBuilder.Entity<MemberSocialAccount>().Navigation(m => m.member).UsePropertyAccessMode(PropertyAccessMode.Property);
 
@@ -195,6 +196,7 @@ namespace SnowmeetApi.Data
         public DbSet<Models.Order.AliDownloadFlowBill> aliDownloadFlowBill {get; set; }
         public DbSet<SnowmeetApi.Models.Users.Member> member { get; set; }
         public DbSet<SnowmeetApi.Models.Users.MemberSocialAccount> memberSocialAccount { get; set; }
+        public DbSet<SnowmeetApi.Models.Rent.RentCategory> rentCategory { get; set; }
 
     }
 }

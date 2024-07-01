@@ -78,7 +78,6 @@
     <Folder Include="Controllers\Background\" />
     <Folder Include="wwwroot\background\mi7_upload\" />
     <Folder Include="upload\" />
-    <Folder Include="Models\Rent\" />
     <Folder Include="wwwroot\mapp\tickets\" />
     <Folder Include="Models\DD\" />
     <Folder Include="Controllers\Tiktok\" />
