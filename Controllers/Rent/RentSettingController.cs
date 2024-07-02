@@ -15,7 +15,7 @@ using SnowmeetApi.Models.Users;
 
 namespace SnowmeetApi.Controllers.Rent
 {
-    [Route("api/[controller]/[action]")]
+    [Route("core/[controller]/[action]")]
     [ApiController]
     public class RentSettingController : ControllerBase
     {
