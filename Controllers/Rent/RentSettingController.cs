@@ -118,6 +118,20 @@ namespace SnowmeetApi.Controllers.Rent
             return Ok(rc);
         }
 
+        [HttpGet("{code}")]
+        public async Task<ActionResult> DeleteCategory(string code, string sessionKey, string sessionType)
+        {
+            RentCategory rc = (RentCategory)((OkObjectResult)(await GetCategory(code)).Result).Value;
+            if (rc.children != null)
+            {
+                return BadRequest();
+            }
+            _db.rentCategory.Remove(rc);
+            await _db.SaveChangesAsync();
+            return Ok();
+        }
+
+
 
         /*
 
