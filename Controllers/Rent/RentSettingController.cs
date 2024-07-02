@@ -59,7 +59,7 @@ namespace SnowmeetApi.Controllers.Rent
             }
             else
             {
-                RentCategory lastRc = rcL[rcL.Count - 1];
+                RentCategory lastRc = rcL[0];
                 int maxV = int.Parse(lastRc.code.Substring(lastRc.code.Length - 2, 2));
                 newCode = newCode + (maxV+1).ToString().PadLeft(2, '0');
             }
