@@ -90,7 +90,7 @@ namespace SnowmeetApi.Controllers.Rent
             return Ok(rl);
         }
 
-        [HttpGet("code")]
+        [HttpGet("{code}")]
         public async Task<ActionResult<RentCategory>> GetCategory(string code = "")
         {
             code = code.Trim();
