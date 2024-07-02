@@ -17,23 +17,23 @@ namespace SnowmeetApi.Controllers.User
     {
         private readonly ApplicationDBContext _db;
 
+        
+
         public MemberController(ApplicationDBContext db, IConfiguration config)
         {
             _db = db;
 
-            
         }
-        /*
 
-        [NonAction]
-        public async Task<ActionResult<Member>> GetMember(int id)
+        [HttpGet]
+        public async Task<ActionResult<Member>> GetMemberInfoSimple(string sessionKey, string sessionType)
         {
-            //MemberSocialAccount ma = await _db.memberSocialAccount.Where(m => m.MemberId == id).FirstAsync();
-            Member m = await _db.member.Include(m => m.memberSocialAccounts).Where(m => m.id == id).FirstAsync();
-            
-            return m;
+            Member member = await GetMember(sessionKey.Trim(), sessionType.Trim());
+            member.id = 0;
+            member.memberSocialAccounts = new List<MemberSocialAccount>();
+            return Ok(member);
         }
-        */
+
         [NonAction]
         public async Task<Member> GetMember(string sessionKey, string type)
         {
@@ -45,7 +45,7 @@ namespace SnowmeetApi.Controllers.User
             {
                 case "wechat_mini_openid":
                     UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _db)).Value;
-                    if (user != null)
+                    if (user == null)
                     {
                         return null;
                     }

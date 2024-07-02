@@ -20,7 +20,7 @@ namespace SnowmeetApi.Models.Users
         public int is_admin { get; set; }
 
         
-        public ICollection<MemberSocialAccount> memberSocialAccounts { get;  } = new List<MemberSocialAccount>();
+        public ICollection<MemberSocialAccount> memberSocialAccounts { get; set; } = new List<MemberSocialAccount>();
         
 
     }
