@@ -50,7 +50,7 @@ namespace SnowmeetApi.Controllers.Rent
                 return BadRequest();
             }
             List<RentCategory> rcL = await _db.rentCategory
-                .Where(c => c.name.Trim().Length == code.Length + 2)
+                .Where(c => (c.code.Trim().Length == code.Length + 2 && c.code.Trim().StartsWith(code)))
                 .OrderByDescending(c => c.code).ToListAsync();
             string newCode = code;
             if (rcL == null || rcL.Count == 0)
