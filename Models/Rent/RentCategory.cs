@@ -10,7 +10,7 @@ namespace SnowmeetApi.Models.Rent
         [Key]
         public string code { get; set; }
         public string name { get; set; }
-        public DateTime update_date { get; set; }
+        public DateTime update_date { get; set; } = DateTime.Now;
 
         [NotMapped]
         public ICollection<RentCategory> children { get; set; }

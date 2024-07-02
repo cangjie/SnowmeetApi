@@ -2,12 +2,16 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Aop.Api.Domain;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using SKIT.FlurlHttpClient.Wechat.TenpayV3.Models;
+using SnowmeetApi.Controllers.User;
 using SnowmeetApi.Data;
 using SnowmeetApi.Models.Rent;
+using SnowmeetApi.Models.Users;
 
 namespace SnowmeetApi.Controllers.Rent
 {
@@ -21,6 +25,8 @@ namespace SnowmeetApi.Controllers.Rent
         private IConfiguration _oriConfig;
         private readonly IHttpContextAccessor _httpContextAccessor;
 
+        private MemberController _memberHelper;
+
         public RentSettingController(ApplicationDBContext db, IConfiguration config, IHttpContextAccessor httpContextAccessor)
         {
             _db = db;
@@ -28,6 +34,43 @@ namespace SnowmeetApi.Controllers.Rent
             _config = config.GetSection("Settings");
             _appId = _config.GetSection("AppId").Value.Trim();
             _httpContextAccessor = httpContextAccessor;
+            _memberHelper = new MemberController(db, config);
+        }
+
+        [HttpGet]
+        public async Task<ActionResult<RentCategory>> AddCategory(string code, string name, string sessionKey, string sessionType)
+        {
+            name = Util.UrlDecode(name);
+            code = code == null? "": code.Trim();
+            sessionKey = Util.UrlDecode(sessionKey);
+            sessionType = Util.UrlDecode(sessionType);
+            SnowmeetApi.Models.Users.Member member = await _memberHelper.GetMember(sessionKey, sessionType);
+            if (member.is_admin != 1)
+            {
+                return BadRequest();
+            }
+            List<RentCategory> rcL = await _db.rentCategory
+                .Where(c => c.name.Trim().Length == code.Length + 2)
+                .OrderByDescending(c => c.code).ToListAsync();
+            string newCode = code;
+            if (rcL == null || rcL.Count == 0)
+            {
+                newCode = newCode + "01";
+            }
+            else
+            {
+                RentCategory lastRc = rcL[rcL.Count - 1];
+                int maxV = int.Parse(lastRc.code.Substring(lastRc.code.Length - 2, 2));
+                newCode = newCode + (maxV+1).ToString().PadLeft(2, '0');
+            }
+            RentCategory rcNew = new RentCategory()
+            {
+                name = name,
+                code = newCode
+            };
+            await _db.rentCategory.AddAsync(rcNew);
+            await _db.SaveChangesAsync();
+            return Ok(rcNew);
         }
 
         [HttpGet]
