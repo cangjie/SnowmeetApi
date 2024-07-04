@@ -131,6 +131,167 @@ namespace SnowmeetApi.Controllers.Rent
             return Ok();
         }
 
+        [HttpGet("{code}")]
+        public async Task<ActionResult<RentPrice>> SetRentCategoryPrice(string code, string shop, string dayType, string scene, double price, string sessionKey, string sessionType="wchat_mini_openid")
+        {
+            RentCategory category = await _db.rentCategory.FindAsync(code);
+            if (category==null)
+            {
+                return NotFound();
+            }
+            sessionKey = Util.UrlDecode(sessionKey);
+            sessionType = Util.UrlDecode(sessionType);
+            shop = Util.UrlDecode(shop);
+            dayType = Util.UrlDecode(dayType);
+            scene = Util.UrlDecode(scene);
+            SnowmeetApi.Models.Users.Member member = await _memberHelper.GetMember(sessionKey, sessionType);
+            if (member.is_admin != 1)
+            {
+                return BadRequest();
+            }
+            if (!dayType.Trim().Equals("平日") && !dayType.Trim().Equals("周末") && !dayType.Trim().Equals("节假日"))
+            {
+                return BadRequest();
+            }
+            if (!scene.Equals("门市") && !scene.Equals("会员") && !scene.Equals("预约"))
+            {
+                return BadRequest();
+            }
+
+            List<RentPrice> rpL = await _db.rentPrice
+                .Where(r => (r.type.Trim().Equals("分类") && r.category_code.Trim().Equals(code.Trim())
+                && r.shop.Trim().Equals(shop.Trim()) && r.day_type.Trim().Equals(dayType.Trim() ) 
+                && r.scene.Trim().Equals(scene.Trim()))).ToListAsync();
+            if (rpL.Count == 0)
+            {
+                RentPrice rp = new RentPrice()
+                {
+                    id = 0,
+                    type = "分类",
+                    shop = shop.Trim(),
+                    category_code = code.Trim(),
+                    day_type = dayType.Trim(),
+                    price = price,
+                    scene = scene
+                };
+                await _db.rentPrice.AddAsync(rp);
+                await _db.SaveChangesAsync();
+                return Ok(rp);
+            }
+            else
+            {
+                RentPrice rp = rpL[0];
+                if (price == 0)
+                {
+                    _db.rentPrice.Remove(rp);
+                }
+                else
+                {
+                    rp.price = price;
+                    rp.update_date = DateTime.Now;
+                    _db.rentPrice.Entry(rp).State = EntityState.Modified;
+                }
+                await _db.SaveChangesAsync();
+                return Ok(rp);
+            }
+        }
+
+        
+        [HttpGet("{code}")]
+        public async Task<ActionResult<RentPrice>> GetCategoryPrice(string code, string shop, DateTime date, string scene="门市")
+        {
+            string dayType = (date.DayOfWeek == DayOfWeek.Sunday || date.DayOfWeek == DayOfWeek.Saturday)? "周末" : "平日";
+            List<RentPrice> rentPriceList = await GetRentPriceList(code);
+            RentPrice rp = GetCorrectRentPrice(rentPriceList, shop, dayType, scene);
+            if (rp != null)
+            {
+                return Ok(rp);
+            }
+            return NotFound();
+        }
+        
+        [NonAction]
+        public RentPrice GetCorrectRentPrice(List<RentPrice> rentPriceList, string shop, string dayType, string scene)
+        {
+            List<RentPrice> rentPriceShop = new List<RentPrice>();
+            for(int i = 0; i < rentPriceList.Count; i++)
+            {
+                if (rentPriceList[i].shop.Trim().Equals(shop.Trim()))
+                {
+                    rentPriceShop.Add(rentPriceList[i]);
+                }
+            }
+            if (rentPriceShop.Count == 0)
+            {
+                for(int i = 0; i < rentPriceList.Count; i++)
+                {
+                    if (rentPriceList[i].shop.Trim().Equals(""))
+                    {
+                        rentPriceShop.Add(rentPriceList[i]);
+                    }
+                }
+
+            }
+            List<RentPrice> rentPriceDay = new List<RentPrice>();
+            for(int i = 0; i < rentPriceShop.Count; i++)
+            {
+                if (rentPriceShop[i].day_type.Trim().Equals(dayType.Trim()))
+                {
+                    rentPriceDay.Add(rentPriceShop[i]);
+                }
+            }
+            if (rentPriceDay.Count == 0)
+            {
+                for(int i = 0; i < rentPriceShop.Count; i++)
+                {
+                    if (rentPriceShop[i].day_type.Trim().Equals("平日"))
+                    {
+                        rentPriceDay.Add(rentPriceShop[i]);
+                    }
+                }
+            }
+            //bool find = false;
+            for(int i = 0; i < rentPriceDay.Count; i++)
+            {
+                if (rentPriceDay[i].scene.Trim().Equals(scene.Trim()))
+                {
+                    return rentPriceDay[i];
+                }
+            }
+            for(int i = 0; i < rentPriceDay.Count; i++)
+            {
+                if (rentPriceDay[i].scene.Trim().Equals("门市"))
+                {
+                    return rentPriceDay[i];
+                }
+            }
+            return null;
+        }
+
+        [NonAction]
+        public async Task<List<RentPrice>> GetRentPriceList(string code)
+        {
+            code = code.Trim();
+            List<RentPrice> pList = await _db.rentPrice
+                .Where(r => r.type.Trim().Equals("分类") && r.category_code.Trim().Equals(code.Trim()))
+                .AsNoTracking().ToListAsync();
+            if (pList.Count == 0)
+            {
+                if (code.Length <= 2)
+                {
+                    return new List<RentPrice>();
+                }
+                code = code.Substring(0, code.Length-2).Trim();
+                return await GetRentPriceList(code);
+            }
+            else
+            {
+                return pList;
+            }
+
+        }
+        
+
 
 
         /*

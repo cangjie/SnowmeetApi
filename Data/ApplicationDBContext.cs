@@ -198,5 +198,7 @@ namespace SnowmeetApi.Data
         public DbSet<SnowmeetApi.Models.Users.MemberSocialAccount> memberSocialAccount { get; set; }
         public DbSet<SnowmeetApi.Models.Rent.RentCategory> rentCategory { get; set; }
 
+        public DbSet<SnowmeetApi.Models.Rent.RentPrice> rentPrice {get; set;}
+
     }
 }
