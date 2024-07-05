@@ -94,10 +94,10 @@ namespace SnowmeetApi.Controllers.Rent
         public async Task<ActionResult<RentCategory>> GetCategory(string code = "")
         {
             code = code.Trim();
-            RentCategory rc = await _db.rentCategory.FindAsync(code);
+            RentCategory rc = await _db.rentCategory.Include(r => r.priceList).Where(r => r.code.Trim().Equals(code.Trim())).FirstAsync();
             if (rc == null)
             {
-                return null;
+                return NotFound();
             }
             var rcL = await _db.rentCategory.Include(r => r.priceList).Where(r => r.code.Trim().Length == code.Length + 2
                 && r.code.StartsWith(code)).ToListAsync();
