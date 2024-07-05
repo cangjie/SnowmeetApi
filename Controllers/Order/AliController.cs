@@ -806,6 +806,53 @@ namespace SnowmeetApi.Controllers
             await _db.SaveChangesAsync();
         }
 
+        [HttpGet]
+        public void TransTest(string outTradeNo, double amount)
+        {
+            IAopClient client = GetClient(appId);
+            AlipayFundTransUniTransferRequest request = new AlipayFundTransUniTransferRequest();
+            AlipayFundTransUniTransferModel model = new AlipayFundTransUniTransferModel();
+            model.OrderTitle = "TRANS_ACCOUNT_NO_PWD";
+            
+            // 设置描述特定的业务场景
+            model.BizScene = "DIRECT_TRANSFER";
+            
+            // 设置转账业务请求的扩展参数
+            model.BusinessParams = "{\"payer_show_name_use_alias\":\"true\"}";
+            
+            // 设置业务备注
+            model.Remark = "订单分账转账";
+            
+            // 设置商家侧唯一订单号
+            model.OutBizNo = outTradeNo.Trim();//"HBI_MTNC_20240619_040557_01_SHARE_03_20240619_001_TRANS";
+            
+            // 设置订单总金额
+            model.TransAmount = amount.ToString();
+            
+            // 设置业务产品码
+            model.ProductCode = "TRANS_ACCOUNT_NO_PWD";
+            
+            // 设置收款方信息
+            Participant payeeInfo = new Participant();
+            payeeInfo.Identity = "13501177897";
+            payeeInfo.Name = "苍杰";
+            payeeInfo.IdentityType = "ALIPAY_LOGON_ID";
+            model.PayeeInfo = payeeInfo;
+            
+            request.SetBizModel(model);
+            AlipayFundTransUniTransferResponse response = client.CertificateExecute(request);
+
+            if(!response.IsError)
+            {
+                Console.WriteLine("调用成功");
+            }
+            else
+            {
+                Console.WriteLine("调用失败");
+            }
+
+        }
+
         /*
         [NonAction]
         private async Task DealBalance(string content)

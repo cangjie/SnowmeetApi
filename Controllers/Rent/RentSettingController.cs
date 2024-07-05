@@ -201,7 +201,7 @@ namespace SnowmeetApi.Controllers.Rent
         public async Task<ActionResult<RentPrice>> GetCategoryPrice(string code, string shop, DateTime date, string scene="门市")
         {
             string dayType = (date.DayOfWeek == DayOfWeek.Sunday || date.DayOfWeek == DayOfWeek.Saturday)? "周末" : "平日";
-            List<RentPrice> rentPriceList = await GetRentPriceList(code);
+            List<RentPrice> rentPriceList = (List<RentPrice>)((OkObjectResult)(await GetRentPriceList(code)).Result).Value;
             RentPrice rp = GetCorrectRentPrice(rentPriceList, shop, dayType, scene);
             if (rp != null)
             {
@@ -268,13 +268,20 @@ namespace SnowmeetApi.Controllers.Rent
             return null;
         }
 
-        [NonAction]
-        public async Task<List<RentPrice>> GetRentPriceList(string code)
+        [HttpGet("{code}")]
+        public async Task<ActionResult<List<RentPrice>>> GetRentPriceList(string code)
         {
             code = code.Trim();
+            RentCategory rentCat = (RentCategory)((OkObjectResult)(await GetCategory(code)).Result).Value;
+            if (rentCat == null || rentCat.children != null)
+            {
+                return NotFound();
+            }
             List<RentPrice> pList = await _db.rentPrice
                 .Where(r => r.type.Trim().Equals("分类") && r.category_code.Trim().Equals(code.Trim()))
                 .AsNoTracking().ToListAsync();
+            return Ok(pList);
+            /*
             if (pList.Count == 0)
             {
                 if (code.Length <= 2)
@@ -286,9 +293,9 @@ namespace SnowmeetApi.Controllers.Rent
             }
             else
             {
-                return pList;
+                return Ok(pList);
             }
-
+            */
         }
         
 
