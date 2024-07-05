@@ -17,5 +17,8 @@ namespace SnowmeetApi.Models.Rent
         [NotMapped]
         public ICollection<RentCategory> children { get; set; }
 
+        [NotMapped]
+        public ICollection<RentPrice>? priceList {get; set;}
+
     }
 }

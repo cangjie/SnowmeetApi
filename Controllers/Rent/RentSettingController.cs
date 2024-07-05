@@ -99,7 +99,7 @@ namespace SnowmeetApi.Controllers.Rent
             {
                 return null;
             }
-            var rcL = await _db.rentCategory.Where(r => r.code.Trim().Length == code.Length + 2
+            var rcL = await _db.rentCategory.Include(r => r.priceList).Where(r => r.code.Trim().Length == code.Length + 2
                 && r.code.StartsWith(code)).ToListAsync();
             if (rcL != null && rcL.Count > 0)
             {
@@ -114,6 +114,10 @@ namespace SnowmeetApi.Controllers.Rent
 
                 }
                 rc.children = children;
+            }
+            if (rc.children != null)
+            {
+                rc.priceList = null;
             }
             return Ok(rc);
         }
@@ -196,7 +200,7 @@ namespace SnowmeetApi.Controllers.Rent
             }
         }
 
-        
+        /*
         [HttpGet("{code}")]
         public async Task<ActionResult<RentPrice>> GetCategoryPrice(string code, string shop, DateTime date, string scene="门市")
         {
@@ -267,7 +271,8 @@ namespace SnowmeetApi.Controllers.Rent
             }
             return null;
         }
-
+        */
+        /*
         [HttpGet("{code}")]
         public async Task<ActionResult<List<RentPrice>>> GetRentPriceList(string code)
         {
@@ -281,24 +286,10 @@ namespace SnowmeetApi.Controllers.Rent
                 .Where(r => r.type.Trim().Equals("分类") && r.category_code.Trim().Equals(code.Trim()))
                 .AsNoTracking().ToListAsync();
             return Ok(pList);
-            /*
-            if (pList.Count == 0)
-            {
-                if (code.Length <= 2)
-                {
-                    return new List<RentPrice>();
-                }
-                code = code.Substring(0, code.Length-2).Trim();
-                return await GetRentPriceList(code);
-            }
-            else
-            {
-                return Ok(pList);
-            }
-            */
+            
         }
         
-
+        */
 
 
         /*
@@ -395,7 +386,7 @@ namespace SnowmeetApi.Controllers.Rent
 
             return NoContent();
         }
-
+        
         private bool RentCategoryExists(string id)
         {
             return _context.RentCategory.Any(e => e.code == id);
