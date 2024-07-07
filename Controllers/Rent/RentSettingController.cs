@@ -200,6 +200,78 @@ namespace SnowmeetApi.Controllers.Rent
             }
         }
 
+        [HttpGet("code")]
+        public async Task<ActionResult<RentCategory>> SetShopCategoryRentPrice(string code, string shop, string dayType, string scene, double price, string sessionKey, string sessionType)
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            sessionType = Util.UrlDecode(sessionType);
+            SnowmeetApi.Models.Users.Member member = await _memberHelper.GetMember(sessionKey, sessionType);
+            if (member.is_admin != 1)
+            {
+                return BadRequest();
+            }
+            shop = Util.UrlDecode(shop);
+            dayType = Util.UrlDecode(dayType);
+            scene = Util.UrlDecode(scene);
+
+            RentCategory cate = await _db.rentCategory.FindAsync(code);
+            if (cate == null || (cate.children != null && cate.children.Count > 0))
+            {
+                return NotFound();
+            }
+
+            var priceL = await _db.rentPrice.Where(p => (p.type.Trim().Equals("分类")
+                && p.category_code.Trim().Equals(code) && p.day_type.Trim().Equals(dayType)
+                && p.scene.Trim().Equals(scene) && p.shop.Trim().Equals(shop))).ToListAsync();
+            if (priceL == null || priceL.Count == 0)
+            {
+                RentPrice rp = new RentPrice()
+                {
+                    shop = shop,
+                    type = "分类",
+                    category_code = code,
+                    day_type = dayType,
+                    scene = scene,
+                    price = price,
+                    update_date = DateTime.Now
+                };
+                await _db.rentPrice.AddAsync(rp);
+            }
+            else
+            {
+                RentPrice rp = priceL[0];
+                rp.price = price;
+                rp.update_date = DateTime.Now;
+                _db.rentPrice.Entry(rp).State = EntityState.Modified;
+            }
+            await _db.SaveChangesAsync();
+            RentCategory rc = (RentCategory)((OkObjectResult)(await GetCategory(code)).Result).Value;
+            return Ok(rc);
+        }
+
+        [HttpGet("{code}")]
+        public async Task<ActionResult<RentCategory>> UpdateCategory(string code, string name, double deposit, string sessionKey, string sessionType)
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            sessionType = Util.UrlDecode(sessionType);
+            SnowmeetApi.Models.Users.Member member = await _memberHelper.GetMember(sessionKey, sessionType);
+            if (member.is_admin != 1)
+            {
+                return BadRequest();
+            }
+            RentCategory cate = await _db.rentCategory.FindAsync(code.Trim());
+            if (cate == null)
+            {
+                return NotFound();
+            }
+            cate.update_date = DateTime.Now;
+            cate.name = name.Trim();
+            cate.deposit = deposit;
+            _db.Entry(cate).State = EntityState.Modified;
+            await _db.SaveChangesAsync();
+            return Ok(cate);
+        }
+
         /*
         [HttpGet("{code}")]
         public async Task<ActionResult<RentPrice>> GetCategoryPrice(string code, string shop, DateTime date, string scene="门市")
