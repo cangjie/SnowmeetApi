@@ -200,7 +200,7 @@ namespace SnowmeetApi.Controllers.Rent
             }
         }
 
-        [HttpGet("code")]
+        [HttpGet("{code}")]
         public async Task<ActionResult<RentCategory>> SetShopCategoryRentPrice(string code, string shop, string dayType, string scene, double price, string sessionKey, string sessionType)
         {
             sessionKey = Util.UrlDecode(sessionKey);
