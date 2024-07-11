@@ -47,6 +47,10 @@ namespace SnowmeetApi.Data
 
             modelBuilder.Entity<RentPrice>().HasOne<RentCategory>().WithMany(r => r.priceList).HasForeignKey(r => r.category_code);
 
+            modelBuilder.Entity<RentPackageCategory>().HasKey(e => new {e.package_id, e.category_code});
+
+            modelBuilder.Entity<RentPackageCategory>().HasOne<RentPackage>().WithMany(r => r.rentPackageCategoryList).HasForeignKey(r => r.package_id);
+
         }
 
         public DbSet<MaintainLive> MaintainLives {get; set;}
@@ -188,6 +192,8 @@ namespace SnowmeetApi.Data
         public DbSet<SnowmeetApi.Models.Rent.RentCategory> rentCategory { get; set; }
 
         public DbSet<SnowmeetApi.Models.Rent.RentPrice> rentPrice {get; set;}
+        public DbSet<SnowmeetApi.Models.Rent.RentPackage> rentPackage {get; set;}
+        public DbSet<SnowmeetApi.Models.Rent.RentPackageCategory> rentPackageCategory {get; set; }
 
     }
 }
