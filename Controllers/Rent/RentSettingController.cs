@@ -350,6 +350,30 @@ namespace SnowmeetApi.Controllers.Rent
             return Ok(list);
         }
 
+        [HttpGet("{packageId}")]
+        public async Task<ActionResult<RentPackage>> UpdateRentPackageBaseInfo(int packageId, string name, string description, double deposit, string sessionKey, string sessionType)
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            sessionType = Util.UrlDecode(sessionType);
+            SnowmeetApi.Models.Users.Member member = await _memberHelper.GetMember(sessionKey, sessionType);
+            if (member.is_admin != 1)
+            {
+                return BadRequest();
+            }
+            RentPackage p = await _db.rentPackage.FindAsync(packageId);
+            if (p == null)
+            {
+                return NotFound();
+            }
+            p.name = Util.UrlDecode(name);
+            p.description = Util.UrlDecode(description);
+            p.deposit = deposit;
+            _db.rentPackage.Entry(p).State = EntityState.Modified;
+            await _db.SaveChangesAsync();
+            return await GetRentPackage(packageId);
+        }
+
+
         /*
         [HttpGet("{code}")]
         public async Task<ActionResult<RentPrice>> GetCategoryPrice(string code, string shop, DateTime date, string scene="门市")
