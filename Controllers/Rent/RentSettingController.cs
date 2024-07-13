@@ -373,6 +373,55 @@ namespace SnowmeetApi.Controllers.Rent
             await _db.SaveChangesAsync();
             return await GetRentPackage(packageId);
         }
+        [HttpGet("{packageId}")]
+        public async Task<ActionResult<RentPackage>> SetPackageRentPrice(int packageId, string shop, string dayType, string scene, double price, string sessionKey, string sessionType)
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            sessionType = Util.UrlDecode(sessionType);
+            SnowmeetApi.Models.Users.Member member = await _memberHelper.GetMember(sessionKey, sessionType);
+            if (member.is_admin != 1)
+            {
+                return BadRequest();
+            }
+            shop = Util.UrlDecode(shop);
+            dayType = Util.UrlDecode(dayType);
+            scene = Util.UrlDecode(scene);
+
+            //RentCategory cate = await _db.rentCategory.FindAsync(code);
+            RentPackage rentPackage = await _db.rentPackage.FindAsync(packageId);
+            if (rentPackage == null)
+            {
+                return NotFound();
+            }
+
+            var priceL = await _db.rentPrice.Where(p => (p.type.Trim().Equals("套餐")
+                && p.package_id == packageId && p.day_type.Trim().Equals(dayType)
+                && p.scene.Trim().Equals(scene) && p.shop.Trim().Equals(shop))).ToListAsync();
+            if (priceL == null || priceL.Count == 0)
+            {
+                RentPrice rp = new RentPrice()
+                {
+                    shop = shop,
+                    type = "分类",
+                    package_id = packageId,
+                    day_type = dayType,
+                    scene = scene,
+                    price = price,
+                    update_date = DateTime.Now
+                };
+                await _db.rentPrice.AddAsync(rp);
+            }
+            else
+            {
+                RentPrice rp = priceL[0];
+                rp.price = price;
+                rp.update_date = DateTime.Now;
+                _db.rentPrice.Entry(rp).State = EntityState.Modified;
+            }
+            await _db.SaveChangesAsync();
+            return await GetRentPackage(packageId);
+        }
+
 
 
         /*
