@@ -347,6 +347,7 @@ namespace SnowmeetApi.Controllers.Rent
         public async Task<ActionResult<List<RentPackage>>> GetRentPackageList()
         {
             List<RentPackage> list = await _db.rentPackage.Include(r => r.rentPackageCategoryList)
+                .Include(r => r.rentPackagePriceList).Where(r => r.is_delete == 0)
                 .OrderByDescending(r => r.id).ToListAsync();
             return Ok(list);
         }
