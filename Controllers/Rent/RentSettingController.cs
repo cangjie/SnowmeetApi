@@ -402,7 +402,7 @@ namespace SnowmeetApi.Controllers.Rent
                 RentPrice rp = new RentPrice()
                 {
                     shop = shop,
-                    type = "分类",
+                    type = "套餐",
                     package_id = packageId,
                     day_type = dayType,
                     scene = scene,
