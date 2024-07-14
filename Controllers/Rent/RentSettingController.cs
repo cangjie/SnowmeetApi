@@ -37,6 +37,59 @@ namespace SnowmeetApi.Controllers.Rent
             _memberHelper = new MemberController(db, config);
         }
 
+        [HttpGet("{code}")]
+        public async Task<ActionResult<RentCategory>> ModCategory(string code, string name, string sessionKey, string sessionType)
+        {
+            name = Util.UrlDecode(name);
+            sessionKey = Util.UrlDecode(sessionKey);
+            sessionType = Util.UrlDecode(sessionType);
+            SnowmeetApi.Models.Users.Member member = await _memberHelper.GetMember(sessionKey, sessionType);
+            if (member.is_admin != 1)
+            {
+                return BadRequest();
+            }
+            RentCategory rc = await _db.rentCategory.FindAsync(code);
+            if (rc == null)
+            {
+                return NotFound();
+            }
+            rc.name = name;
+            _db.rentCategory.Entry(rc).State = EntityState.Modified;
+            await _db.SaveChangesAsync();
+            return Ok(rc);
+        }
+
+        [HttpGet("{code}")]
+        public async Task<ActionResult<RentCategory>> AddCategoryManual(string code, string name, string sessionKey, string sessionType)
+        {
+            name = Util.UrlDecode(name);
+            sessionKey = Util.UrlDecode(sessionKey);
+            sessionType = Util.UrlDecode(sessionType);
+            SnowmeetApi.Models.Users.Member member = await _memberHelper.GetMember(sessionKey, sessionType);
+            if (member.is_admin != 1)
+            {
+                return BadRequest();
+            }
+            RentCategory rc = await _db.rentCategory.FindAsync(code);
+            if (rc != null)
+            {
+                return NoContent();
+            }
+            RentCategory rcFather = await _db.rentCategory.FindAsync(code.Substring(0, code.Length - 2));
+            if (rcFather == null)
+            {
+                return NotFound();
+            }
+            RentCategory rcNew = new RentCategory()
+            {
+                name = name,
+                code = code
+            };
+            await _db.rentCategory.AddAsync(rcNew);
+            await _db.SaveChangesAsync();
+            return Ok(rcNew);
+        }
+
         [HttpGet]
         public async Task<ActionResult<RentCategory>> AddCategory(string code, string name, string sessionKey, string sessionType)
         {
