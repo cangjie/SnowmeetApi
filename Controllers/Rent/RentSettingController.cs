@@ -76,7 +76,7 @@ namespace SnowmeetApi.Controllers.Rent
             {
                 return NoContent();
             }
-            if (code.Length >= 2)
+            if (code.Length > 2)
             {
                 RentCategory rcFather = await _db.rentCategory.FindAsync(code.Substring(0, code.Length - 2));
                 if (rcFather == null)
