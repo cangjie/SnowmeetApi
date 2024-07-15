@@ -65,6 +65,7 @@ namespace SnowmeetApi.Controllers.Rent
             name = Util.UrlDecode(name);
             sessionKey = Util.UrlDecode(sessionKey);
             sessionType = Util.UrlDecode(sessionType);
+            code = code.Trim();
             SnowmeetApi.Models.Users.Member member = await _memberHelper.GetMember(sessionKey, sessionType);
             if (member.is_admin != 1)
             {
@@ -75,10 +76,13 @@ namespace SnowmeetApi.Controllers.Rent
             {
                 return NoContent();
             }
-            RentCategory rcFather = await _db.rentCategory.FindAsync(code.Substring(0, code.Length - 2));
-            if (rcFather == null)
+            if (code.Length >= 2)
             {
-                return NotFound();
+                RentCategory rcFather = await _db.rentCategory.FindAsync(code.Substring(0, code.Length - 2));
+                if (rcFather == null)
+                {
+                    return NotFound();
+                }
             }
             RentCategory rcNew = new RentCategory()
             {
