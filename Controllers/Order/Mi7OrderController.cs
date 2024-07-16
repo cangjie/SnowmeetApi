@@ -41,7 +41,7 @@ namespace SnowmeetApi.Controllers.Order
             var l = await _context.saleReport.FromSqlRaw(" select mi7_order_id, barCode, sale_price, real_charge, order_id,  "
                 + " case  [name] when '' then customer.real_name  else [name] end as [name],  "
                 + " case [order_online].cell_number when '' then customer.cell_number  else [order_online].cell_number end as cell_number , "
-                + " final_price, shop, staff.real_name as staff, pay_time, pay_method from mi7_order "
+                + " final_price, shop, staff.real_name as staff, pay_time, pay_method, order_online.memo as memo from mi7_order "
                 + " left join order_online on order_id = order_online.[id] "
                 + " left join mini_users staff on staff.open_id = staff_open_id "
                 + " left join mini_users customer on customer.open_id =  order_online.open_id "

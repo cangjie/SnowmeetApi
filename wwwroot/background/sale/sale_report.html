@@ -43,13 +43,11 @@
                 <td class="table_head">姓名</td>
                 <td class="table_head">电话</td>
                 <td class="table_head">订单金额</td>
-
                 <td class="table_head">日期</td>
                 <td class="table_head">时间</td>
-
                 <td class="table_head">收款方式</td>
                 <td class="table_head">销售</td>
-
+                <td class="table_head">备注</td>
 
             </tr>
         </thead>
@@ -182,6 +180,10 @@
             var td_staff = document.createElement('td');
             td_staff.innerText = item.staff;
             newRow.appendChild(td_staff);
+
+            var td_memo = document.createElement('td');
+            td_staff.innerText = item.memo;
+            newRow.appendChild(td_memo);
            
         }
         newRow.style.backgroundColor = currentColor;

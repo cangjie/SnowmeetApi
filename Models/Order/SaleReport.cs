@@ -16,6 +16,8 @@ namespace SnowmeetApi.Models.Order
         public string staff { get; set; } = "";
         public DateTime? pay_time { get; set; }
         public string pay_method { get; set; } = "";
+
+        public string memo {get; set; } = "";
     }
 }
 
