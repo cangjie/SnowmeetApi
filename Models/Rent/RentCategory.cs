@@ -8,10 +8,14 @@ namespace SnowmeetApi.Models.Rent
     public class RentCategory
     {
         [Key]
+        public int id {get; set;}
+        
         public string code { get; set; }
         public string name { get; set; }
 
         public double deposit {get; set;}
+
+       
         public DateTime update_date { get; set; } = DateTime.Now;
 
         [NotMapped]

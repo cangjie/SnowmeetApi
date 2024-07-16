@@ -13,7 +13,10 @@ namespace SnowmeetApi.Models.Rent
         public string type {get; set; }
         public string shop {get;set; }
 
-        public string? category_code {get; set; }    
+        //public string? category_code {get; set; }    
+
+        public int? category_id { get; set; }
+
         public int? rent_item_id { get; set; }
 
         public int? package_id { get; set; }

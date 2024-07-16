@@ -48,7 +48,8 @@ namespace SnowmeetApi.Controllers.Rent
             {
                 return BadRequest();
             }
-            RentCategory rc = await _db.rentCategory.FindAsync(code);
+            RentCategory rc = await _db.rentCategory
+                .Where(r => r.code.Trim().Equals(code.Trim())).FirstOrDefaultAsync();
             if (rc == null)
             {
                 return NotFound();
@@ -71,14 +72,16 @@ namespace SnowmeetApi.Controllers.Rent
             {
                 return BadRequest();
             }
-            RentCategory rc = await _db.rentCategory.FindAsync(code);
+            RentCategory rc = await _db.rentCategory.Where(r => r.code.Trim().Equals(code.Trim())).FirstOrDefaultAsync();
             if (rc != null)
             {
                 return NoContent();
             }
             if (code.Length > 2)
             {
-                RentCategory rcFather = await _db.rentCategory.FindAsync(code.Substring(0, code.Length - 2));
+                //RentCategory rcFather = await _db.rentCategory.FindAsync(code.Substring(0, code.Length - 2));
+                RentCategory rcFather = await _db.rentCategory
+                    .Where(r => r.code.Trim().Equals(code.Substring(0, code.Length - 2))).FirstOrDefaultAsync();
                 if (rcFather == null)
                 {
                     return NotFound();
@@ -195,7 +198,7 @@ namespace SnowmeetApi.Controllers.Rent
         [HttpGet("{code}")]
         public async Task<ActionResult<RentPrice>> SetRentCategoryPrice(string code, string shop, string dayType, string scene, double price, string sessionKey, string sessionType="wchat_mini_openid")
         {
-            RentCategory category = await _db.rentCategory.FindAsync(code);
+            RentCategory category = await _db.rentCategory.Where(r => r.code.Trim().Equals(code.Trim())).FirstAsync();
             if (category==null)
             {
                 return NotFound();
@@ -219,8 +222,10 @@ namespace SnowmeetApi.Controllers.Rent
                 return BadRequest();
             }
 
+            RentCategory rc = await _db.rentCategory.Where(rc => rc.code.Trim().Equals(code.Trim())).FirstAsync();
+
             List<RentPrice> rpL = await _db.rentPrice
-                .Where(r => (r.type.Trim().Equals("分类") && r.category_code.Trim().Equals(code.Trim())
+                .Where(r => (r.type.Trim().Equals("分类") && r.category_id == rc.id
                 && r.shop.Trim().Equals(shop.Trim()) && r.day_type.Trim().Equals(dayType.Trim() ) 
                 && r.scene.Trim().Equals(scene.Trim()))).ToListAsync();
             if (rpL.Count == 0)
@@ -230,7 +235,7 @@ namespace SnowmeetApi.Controllers.Rent
                     id = 0,
                     type = "分类",
                     shop = shop.Trim(),
-                    category_code = code.Trim(),
+                    category_id = rc.id,
                     day_type = dayType.Trim(),
                     price = price,
                     scene = scene
@@ -271,14 +276,16 @@ namespace SnowmeetApi.Controllers.Rent
             dayType = Util.UrlDecode(dayType);
             scene = Util.UrlDecode(scene);
 
-            RentCategory cate = await _db.rentCategory.FindAsync(code);
+            RentCategory cate = await _db.rentCategory.Where(r => r.code.Trim().Equals(code.Trim())).FirstOrDefaultAsync();
             if (cate == null || (cate.children != null && cate.children.Count > 0))
             {
                 return NotFound();
             }
 
+            
+
             var priceL = await _db.rentPrice.Where(p => (p.type.Trim().Equals("分类")
-                && p.category_code.Trim().Equals(code) && p.day_type.Trim().Equals(dayType)
+                && p.category_id == cate.id && p.day_type.Trim().Equals(dayType)
                 && p.scene.Trim().Equals(scene) && p.shop.Trim().Equals(shop))).ToListAsync();
             if (priceL == null || priceL.Count == 0)
             {
@@ -286,7 +293,7 @@ namespace SnowmeetApi.Controllers.Rent
                 {
                     shop = shop,
                     type = "分类",
-                    category_code = code,
+                    category_id = cate.id,
                     day_type = dayType,
                     scene = scene,
                     price = price,
@@ -316,7 +323,8 @@ namespace SnowmeetApi.Controllers.Rent
             {
                 return BadRequest();
             }
-            RentCategory cate = await _db.rentCategory.FindAsync(code.Trim());
+            RentCategory cate = await _db.rentCategory
+                .Where(r => r.code.Trim().Equals(code.Trim())).FirstOrDefaultAsync();
             if (cate == null)
             {
                 return NotFound();
@@ -361,10 +369,12 @@ namespace SnowmeetApi.Controllers.Rent
             {
                 return BadRequest();
             }
+            RentCategory rentCategory = await _db.rentCategory
+                .Where(r => r.code.Trim().Equals(code.Trim())).FirstOrDefaultAsync();
             RentPackageCategory rpc = new RentPackageCategory()
             {
                 package_id = packageId,
-                category_code = code,
+                category_id = rentCategory.id,
                 update_date = DateTime.Now
             };
             await _db.rentPackageCategory.AddAsync(rpc);
@@ -383,7 +393,8 @@ namespace SnowmeetApi.Controllers.Rent
             {
                 return BadRequest();
             }
-            RentPackageCategory rpc = await _db.rentPackageCategory.FindAsync(packageId, code);
+            RentCategory category = await _db.rentCategory.Where(r => r.code.Trim().Equals(code.Trim())).FirstOrDefaultAsync();
+            RentPackageCategory rpc = await _db.rentPackageCategory.FindAsync(packageId, category.id);
             _db.rentPackageCategory.Remove(rpc);
             await _db.SaveChangesAsync();
 
