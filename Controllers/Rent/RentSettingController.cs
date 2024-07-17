@@ -37,6 +37,7 @@ namespace SnowmeetApi.Controllers.Rent
             _memberHelper = new MemberController(db, config);
         }
 
+        /*
         [HttpGet("{code}")]
         public async Task<ActionResult<RentCategory>> ModCategory(string code, string name, string sessionKey, string sessionType)
         {
@@ -58,6 +59,74 @@ namespace SnowmeetApi.Controllers.Rent
             _db.rentCategory.Entry(rc).State = EntityState.Modified;
             await _db.SaveChangesAsync();
             return Ok(rc);
+        }
+        */
+        [HttpGet("{id}")]
+        public async Task<ActionResult<RentCategory>> ModCategory(int id, string code, string name, string sessionKey, string sessionType)
+        {
+            name = Util.UrlDecode(name);
+            sessionKey = Util.UrlDecode(sessionKey);
+            sessionType = Util.UrlDecode(sessionType);
+            SnowmeetApi.Models.Users.Member member = await _memberHelper.GetMember(sessionKey, sessionType);
+            if (member.is_admin != 1)
+            {
+                return BadRequest();
+            }
+            RentCategory rentCate = await _db.rentCategory.Where(r => r.code.Trim().Equals(code.Trim())).FirstOrDefaultAsync();
+            if (rentCate != null)
+            {
+                return NotFound();
+            }
+            rentCate = await _db.rentCategory.FindAsync(id);
+            if (rentCate == null)
+            {
+                return NotFound();
+            }
+            if (rentCate.code.Trim().Length == code.Trim().Length && !rentCate.code.Trim().Equals(code.Trim()))
+            {
+                rentCate = await MoveCategory(rentCate.id, code.Trim());
+                if (rentCate == null)
+                {
+                    return NotFound();
+                }
+            }
+            if (!rentCate.name.Trim().Equals(name.Trim()))
+            {
+                rentCate.name = name;
+                rentCate.update_date = DateTime.Now;
+                _db.rentCategory.Entry(rentCate).State = EntityState.Modified;
+                await _db.SaveChangesAsync();
+            }
+            return Ok(rentCate);
+        }
+
+        [NonAction]
+        public async Task<RentCategory> MoveCategory(int id, string code)
+        {
+            RentCategory rentCategory = await _db.rentCategory.FindAsync(id);
+            if (rentCategory == null)
+            {
+                return null;
+            }
+            if (rentCategory.code.Length != code.Length
+                || !rentCategory.code.Substring(0, code.Length - 2).Equals(code.Substring(0, code.Length - 2)))
+            {
+                return null;
+            }
+            var nodeList = await _db.rentCategory
+                .Where(r => r.code.Trim().StartsWith(rentCategory.code.Trim()))
+                .ToListAsync();
+            for(int i = 0; nodeList != null && i < nodeList.Count; i++)
+            {
+                RentCategory rc = nodeList[i];
+                string currentCode = rc.code;
+                currentCode = code + currentCode.Substring(code.Length, currentCode.Length - code.Length);
+                rc.code = currentCode;
+                rc.update_date = DateTime.Now;
+                _db.rentCategory.Entry(rc).State = EntityState.Modified;
+            }
+            await _db.SaveChangesAsync();
+            return (RentCategory)((OkObjectResult)(await GetCategory(code)).Result).Value;
         }
 
         [HttpGet("{code}")]
