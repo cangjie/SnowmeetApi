@@ -73,7 +73,7 @@ namespace SnowmeetApi.Controllers.Rent
                 return BadRequest();
             }
             RentCategory rentCate = await _db.rentCategory.Where(r => r.code.Trim().Equals(code.Trim())).FirstOrDefaultAsync();
-            if (rentCate != null)
+            if (rentCate != null && !code.Equals(rentCate.code.Trim()))
             {
                 return NotFound();
             }
