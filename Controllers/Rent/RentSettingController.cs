@@ -205,7 +205,8 @@ namespace SnowmeetApi.Controllers.Rent
         [HttpGet]
         public async Task<ActionResult<ICollection<RentCategory>>> GetAllCategories()
         {
-            var topL = await _db.rentCategory.Where(r => (r.code.Trim().Length == 2)).ToListAsync();
+            var topL = await _db.rentCategory.Where(r => (r.code.Trim().Length == 2))
+                .OrderBy(r => r.code).ToListAsync();
             if (topL == null || topL.Count == 0)
             {
                 return BadRequest();
@@ -229,7 +230,7 @@ namespace SnowmeetApi.Controllers.Rent
                 return NotFound();
             }
             var rcL = await _db.rentCategory.Include(r => r.priceList).Where(r => r.code.Trim().Length == code.Length + 2
-                && r.code.StartsWith(code)).ToListAsync();
+                && r.code.StartsWith(code)).OrderBy(r => r.code).ToListAsync();
             if (rcL != null && rcL.Count > 0)
             {
                 List<RentCategory> children = new List<RentCategory>();
