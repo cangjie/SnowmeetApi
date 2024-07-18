@@ -433,7 +433,7 @@ namespace SnowmeetApi.Controllers.Rent
         }
 
         [HttpGet("{packageId}")]
-        public async Task<ActionResult<RentPackage>> RentPackageCategoryAdd(int packageId, string code, string sessionKey, string sessionType)
+        public async Task<ActionResult<RentPackage>> RentPackageCategoryAdd(int packageId, int categoryId, string sessionKey, string sessionType)
         {
             sessionKey = Util.UrlDecode(sessionKey);
             sessionType = Util.UrlDecode(sessionType);
@@ -442,8 +442,11 @@ namespace SnowmeetApi.Controllers.Rent
             {
                 return BadRequest();
             }
-            RentCategory rentCategory = await _db.rentCategory
-                .Where(r => r.code.Trim().Equals(code.Trim())).FirstOrDefaultAsync();
+            RentCategory rentCategory = await _db.rentCategory.FindAsync(categoryId);
+            if (rentCategory == null)
+            {
+                return NotFound();
+            }
             RentPackageCategory rpc = new RentPackageCategory()
             {
                 package_id = packageId,
@@ -457,7 +460,7 @@ namespace SnowmeetApi.Controllers.Rent
         }
 
         [HttpGet("{packageId}")]
-        public async Task<ActionResult<RentPackage>> RentPackageCategoryDel(int packageId, string code, string sessionKey, string sessionType)
+        public async Task<ActionResult<RentPackage>> RentPackageCategoryDel(int packageId, int categoryId, string sessionKey, string sessionType)
         {
             sessionKey = Util.UrlDecode(sessionKey);
             sessionType = Util.UrlDecode(sessionType);
@@ -466,7 +469,11 @@ namespace SnowmeetApi.Controllers.Rent
             {
                 return BadRequest();
             }
-            RentCategory category = await _db.rentCategory.Where(r => r.code.Trim().Equals(code.Trim())).FirstOrDefaultAsync();
+            RentCategory category = await _db.rentCategory.FindAsync(categoryId);
+            if (category == null)
+            {
+                return NotFound();
+            }
             RentPackageCategory rpc = await _db.rentPackageCategory.FindAsync(packageId, category.id);
             _db.rentPackageCategory.Remove(rpc);
             await _db.SaveChangesAsync();
@@ -487,8 +494,10 @@ namespace SnowmeetApi.Controllers.Rent
         [HttpGet]
         public async Task<ActionResult<List<RentPackage>>> GetRentPackageList()
         {
-            List<RentPackage> list = await _db.rentPackage.Include(r => r.rentPackageCategoryList)
-                .Include(r => r.rentPackagePriceList).Where(r => r.is_delete == 0)
+            List<RentPackage> list = await _db.rentPackage
+                .Include(r => r.rentPackageCategoryList)
+                .Include(r => r.rentPackagePriceList)
+                .Where(r => r.is_delete == 0)
                 .OrderByDescending(r => r.id).ToListAsync();
             return Ok(list);
         }
