@@ -332,8 +332,8 @@ namespace SnowmeetApi.Controllers.Rent
             }
         }
 
-        [HttpGet("{code}")]
-        public async Task<ActionResult<RentCategory>> SetShopCategoryRentPrice(string code, string shop, string dayType, string scene, double price, string sessionKey, string sessionType)
+        [HttpGet("{id}")]
+        public async Task<ActionResult<RentCategory>> SetShopCategoryRentPrice(int id, string shop, string dayType, string scene, string price, string sessionKey, string sessionType)
         {
             sessionKey = Util.UrlDecode(sessionKey);
             sessionType = Util.UrlDecode(sessionType);
@@ -346,7 +346,8 @@ namespace SnowmeetApi.Controllers.Rent
             dayType = Util.UrlDecode(dayType);
             scene = Util.UrlDecode(scene);
 
-            RentCategory cate = await _db.rentCategory.Where(r => r.code.Trim().Equals(code.Trim())).FirstOrDefaultAsync();
+            RentCategory cate = await _db.rentCategory.Include(r => r.priceList)     
+                .Where(r => r.id==id).FirstOrDefaultAsync();
             if (cate == null || (cate.children != null && cate.children.Count > 0))
             {
                 return NotFound();
@@ -357,8 +358,10 @@ namespace SnowmeetApi.Controllers.Rent
             var priceL = await _db.rentPrice.Where(p => (p.type.Trim().Equals("分类")
                 && p.category_id == cate.id && p.day_type.Trim().Equals(dayType)
                 && p.scene.Trim().Equals(scene) && p.shop.Trim().Equals(shop))).ToListAsync();
+            double? numPrice = price.Equals("-")? null : double.Parse(price);
             if (priceL == null || priceL.Count == 0)
             {
+                
                 RentPrice rp = new RentPrice()
                 {
                     shop = shop,
@@ -366,7 +369,7 @@ namespace SnowmeetApi.Controllers.Rent
                     category_id = cate.id,
                     day_type = dayType,
                     scene = scene,
-                    price = price,
+                    price = numPrice,
                     update_date = DateTime.Now
                 };
                 await _db.rentPrice.AddAsync(rp);
@@ -374,12 +377,12 @@ namespace SnowmeetApi.Controllers.Rent
             else
             {
                 RentPrice rp = priceL[0];
-                rp.price = price;
+                rp.price = numPrice;
                 rp.update_date = DateTime.Now;
                 _db.rentPrice.Entry(rp).State = EntityState.Modified;
             }
             await _db.SaveChangesAsync();
-            RentCategory rc = (RentCategory)((OkObjectResult)(await GetCategory(code)).Result).Value;
+            RentCategory rc = (RentCategory)((OkObjectResult)(await GetCategory(cate.code.Trim())).Result).Value;
             return Ok(rc);
         }
 

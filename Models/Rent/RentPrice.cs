@@ -23,7 +23,7 @@ namespace SnowmeetApi.Models.Rent
 
         public string day_type {get; set;}
 
-        public double price {get; set;}
+        public double? price {get; set;}
 
         public string scene {get; set;}
 
