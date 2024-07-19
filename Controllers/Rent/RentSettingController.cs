@@ -240,6 +240,7 @@ namespace SnowmeetApi.Controllers.Rent
                 for (int i = 0; i < rcL.Count; i++)
                 {
                     RentCategory child = (RentCategory)((OkObjectResult)(await GetCategory(rcL[i].code)).Result).Value;
+                    child.infoFields = rc.infoFields;
                     if (child != null)
                     {
                         children.Add(child);
