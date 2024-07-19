@@ -578,7 +578,8 @@ namespace SnowmeetApi.Controllers.Rent
             await _db.SaveChangesAsync();
             return await GetRentPackage(packageId);
         }
-        public async Task<ActionResult<RentCategoryInfoField>> CategoryInfoFieldSet(int categoryId, string fieldName, int sort, bool delete, string sessionKey, string sessionType)
+        [HttpGet]
+        public async Task<ActionResult<RentCategoryInfoField>> CategoryInfoFieldAdd(int categoryId, string fieldName, int sort, string sessionKey, string sessionType)
         {
             sessionKey = Util.UrlDecode(sessionKey);
             sessionType = Util.UrlDecode(sessionType);
@@ -587,7 +588,55 @@ namespace SnowmeetApi.Controllers.Rent
             {
                 return BadRequest();
             }
-            
+            fieldName = Util.UrlDecode(fieldName);  
+            RentCategoryInfoField field = await _db.rentCategoryInfoField
+                .Where(f => f.category_id == categoryId && f.field_name.Trim().Equals(fieldName.Trim()))
+                .FirstOrDefaultAsync();
+            if (field == null)
+            {
+             
+                field = new RentCategoryInfoField()
+                {
+                    id = 0,
+                    category_id = categoryId,
+                    field_name = fieldName,
+                    is_delete = 0,
+                    sort = sort,
+                    update_date = DateTime.Now
+                };
+                await _db.rentCategoryInfoField.AddAsync(field);
+               
+            }
+            else
+            {
+                field.sort = sort;
+                field.is_delete = 0;
+                _db.rentCategoryInfoField.Entry(field).State = EntityState.Modified;
+            }
+            await _db.SaveChangesAsync();
+            return Ok(field);  
+        }
+        [HttpGet("{fieldId}")]
+        public async Task<ActionResult<RentCategoryInfoField>> CategoryInfoFieldMod(int fieldId, string fieldName, int sort, bool delete, string sessionKey, string sessionType)
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            sessionType = Util.UrlDecode(sessionType);
+            SnowmeetApi.Models.Users.Member member = await _memberHelper.GetMember(sessionKey, sessionType);
+            if (member.is_admin != 1)
+            {
+                return BadRequest();
+            }
+            RentCategoryInfoField field = await _db.rentCategoryInfoField.FindAsync(fieldId);
+            if (field == null)
+            {
+                return NotFound();
+            }
+            field.field_name = Util.UrlDecode(fieldName);
+            field.sort = sort;
+            field.is_delete = delete ? 1 : 0;
+            _db.rentCategoryInfoField.Entry(field).State = EntityState.Modified;   
+            await _db.SaveChangesAsync();
+            return Ok(field);
         }
         /*
         [HttpGet("{code}")]
