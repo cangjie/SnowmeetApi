@@ -232,6 +232,14 @@ namespace SnowmeetApi.Controllers.Rent
             {
                 return NotFound();
             }
+            if ((rc.infoFields == null || rc.infoFields.Count == 0) && code.Length > 2)
+            {
+                RentCategory rcInfo = await _db.rentCategory
+                .Include(r => r.priceList)
+                .Include(r => r.infoFields)
+                .Where(r => r.code.Trim().Equals(code.Trim().Substring(0, 2))).FirstAsync();
+                rc.infoFields = rcInfo.infoFields;
+            }
             var rcL = await _db.rentCategory.Include(r => r.priceList).Where(r => r.code.Trim().Length == code.Length + 2
                 && r.code.StartsWith(code)).OrderBy(r => r.code).ToListAsync();
             if (rcL != null && rcL.Count > 0)
