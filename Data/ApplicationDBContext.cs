@@ -4,6 +4,7 @@ using SnowmeetApi.Models.Users;
 using wechat_miniapp_base.Models;
 using SnowmeetApi.Models.UTV;
 using SnowmeetApi.Models.Rent;
+using System;
 namespace SnowmeetApi.Data
 {
     public class ApplicationDBContext : DbContext
@@ -54,6 +55,8 @@ namespace SnowmeetApi.Data
             modelBuilder.Entity<RentPrice>().HasOne<RentPackage>().WithMany( r => r.rentPackagePriceList).HasForeignKey(r => r.package_id);
 
             modelBuilder.Entity<RentCategory>().HasMany<RentPackageCategory>().WithOne(r => r.rentCategory).HasForeignKey(r => r.category_id);
+
+            modelBuilder.Entity<RentCategoryInfoField>().HasOne<RentCategory>().WithMany(r => r.infoFields).HasForeignKey(r => r.category_id);
 
         }
 

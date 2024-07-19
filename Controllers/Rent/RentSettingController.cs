@@ -224,7 +224,10 @@ namespace SnowmeetApi.Controllers.Rent
         public async Task<ActionResult<RentCategory>> GetCategory(string code = "")
         {
             code = code.Trim();
-            RentCategory rc = await _db.rentCategory.Include(r => r.priceList).Where(r => r.code.Trim().Equals(code.Trim())).FirstAsync();
+            RentCategory rc = await _db.rentCategory
+                .Include(r => r.priceList)
+                .Include(r => r.infoFields)
+                .Where(r => r.code.Trim().Equals(code.Trim())).FirstAsync();
             if (rc == null)
             {
                 return NotFound();
@@ -575,9 +578,17 @@ namespace SnowmeetApi.Controllers.Rent
             await _db.SaveChangesAsync();
             return await GetRentPackage(packageId);
         }
-
-
-
+        public async Task<ActionResult<RentCategoryInfoField>> CategoryInfoFieldSet(int categoryId, string fieldName, int sort, bool delete, string sessionKey, string sessionType)
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            sessionType = Util.UrlDecode(sessionType);
+            SnowmeetApi.Models.Users.Member member = await _memberHelper.GetMember(sessionKey, sessionType);
+            if (member.is_admin != 1)
+            {
+                return BadRequest();
+            }
+            
+        }
         /*
         [HttpGet("{code}")]
         public async Task<ActionResult<RentPrice>> GetCategoryPrice(string code, string shop, DateTime date, string scene="门市")
