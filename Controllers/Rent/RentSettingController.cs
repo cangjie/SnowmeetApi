@@ -528,7 +528,7 @@ namespace SnowmeetApi.Controllers.Rent
             return await GetRentPackage(packageId);
         }
         [HttpGet("{packageId}")]
-        public async Task<ActionResult<RentPackage>> SetPackageRentPrice(int packageId, string shop, string dayType, string scene, double price, string sessionKey, string sessionType)
+        public async Task<ActionResult<RentPackage>> SetPackageRentPrice(int packageId, string shop, string dayType, string scene, string price, string sessionKey, string sessionType)
         {
             sessionKey = Util.UrlDecode(sessionKey);
             sessionType = Util.UrlDecode(sessionType);
@@ -560,7 +560,7 @@ namespace SnowmeetApi.Controllers.Rent
                     package_id = packageId,
                     day_type = dayType,
                     scene = scene,
-                    price = price,
+                    price = price.Trim().Equals("-")?null:double.Parse(price),
                     update_date = DateTime.Now
                 };
                 await _db.rentPrice.AddAsync(rp);
@@ -568,7 +568,7 @@ namespace SnowmeetApi.Controllers.Rent
             else
             {
                 RentPrice rp = priceL[0];
-                rp.price = price;
+                rp.price = price.Trim().Equals("-")?null:double.Parse(price);
                 rp.update_date = DateTime.Now;
                 _db.rentPrice.Entry(rp).State = EntityState.Modified;
             }
