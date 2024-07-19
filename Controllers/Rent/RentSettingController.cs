@@ -485,7 +485,9 @@ namespace SnowmeetApi.Controllers.Rent
         [HttpGet("{packageId}")]
         public async Task<ActionResult<RentPackage>> GetRentPackage(int packageId)
         {
-            RentPackage rp = await _db.rentPackage.Include(r => r.rentPackageCategoryList)
+            RentPackage rp = await _db.rentPackage
+                .Include(r => r.rentPackageCategoryList)
+                    .ThenInclude(r => r.rentCategory)
                 .Include( r => r.rentPackagePriceList)
                 .Where(r => r.id == packageId).FirstAsync();
             return Ok(rp);
@@ -496,6 +498,7 @@ namespace SnowmeetApi.Controllers.Rent
         {
             List<RentPackage> list = await _db.rentPackage
                 .Include(r => r.rentPackageCategoryList)
+                    .ThenInclude(r => r.rentCategory)   
                 .Include(r => r.rentPackagePriceList)
                 .Where(r => r.is_delete == 0)
                 .OrderByDescending(r => r.id).ToListAsync();

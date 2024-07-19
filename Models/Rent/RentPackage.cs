@@ -30,5 +30,8 @@ namespace SnowmeetApi.Models.Rent
         //public string category_code {get; set; }
         public int category_id {get; set;}
         public DateTime update_date {get; set;}
+
+        [NotMapped]
+        public RentCategory rentCategory { get; set; }
     }
 }
