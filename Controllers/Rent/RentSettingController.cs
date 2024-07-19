@@ -587,7 +587,7 @@ namespace SnowmeetApi.Controllers.Rent
             await _db.SaveChangesAsync();
             return await GetRentPackage(packageId);
         }
-        [HttpGet]
+        [HttpGet("{categoryId}")]
         public async Task<ActionResult<RentCategoryInfoField>> CategoryInfoFieldAdd(int categoryId, string fieldName, int sort, string sessionKey, string sessionType)
         {
             sessionKey = Util.UrlDecode(sessionKey);
