@@ -44,6 +44,8 @@ namespace SnowmeetApi.Data
             modelBuilder.Entity<RentProductDetailInfo>().HasOne<RentProduct>().WithMany(r => r.detailInfos).HasForeignKey(r => r.product_id);
             modelBuilder.Entity<RentProductImage>().HasOne<RentProduct>().WithMany(r => r.images).HasForeignKey(r => r.product_id);
             modelBuilder.Entity<RentCategoryInfoField>().HasMany<RentProductDetailInfo>().WithOne(r => r.field).HasForeignKey(r => r.field_id);
+            //modelBuilder.Entity<RentCategory>().HasMany<RentProduct>().WithOne(r => r.category).HasForeignKey(r => r.category_id);
+            modelBuilder.Entity<RentProduct>().HasOne<RentCategory>().WithMany(r => r.productList).HasForeignKey(r => r.category_id);
         }
 
         public DbSet<MaintainLive> MaintainLives {get; set;}
@@ -99,7 +101,6 @@ namespace SnowmeetApi.Data
         public DbSet<UTVReserve> utvReserve { get; set; }
         public DbSet<UTVRentItem> utvrentItem { get; set;}
         public DbSet<UTVUserGroup> uTVUserGroups { get; set; }
-        //public DbSet<WepayTransaction> wepayTransaction { get; set; }
         public DbSet<BusinessReport> businessReport { get; set; }
         public DbSet<Models.Order.OldWeixinPaymentOrder> oldWeixinPaymentOrder { get; set; }
         public DbSet<Models.OldWeixinReceive> oldWxReceive { get; set; }

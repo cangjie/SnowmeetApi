@@ -29,6 +29,7 @@ namespace SnowmeetApi.Models.Rent
         public ICollection<RentProductImage> images { get; set; }
         [NotMapped]
         public ICollection<RentProductDetailInfo> detailInfos { get; set; }
+       
 
     }
 

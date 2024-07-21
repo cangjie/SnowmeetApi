@@ -37,30 +37,7 @@ namespace SnowmeetApi.Controllers.Rent
             _memberHelper = new MemberController(db, config);
         }
 
-        /*
-        [HttpGet("{code}")]
-        public async Task<ActionResult<RentCategory>> ModCategory(string code, string name, string sessionKey, string sessionType)
-        {
-            name = Util.UrlDecode(name);
-            sessionKey = Util.UrlDecode(sessionKey);
-            sessionType = Util.UrlDecode(sessionType);
-            SnowmeetApi.Models.Users.Member member = await _memberHelper.GetMember(sessionKey, sessionType);
-            if (member.is_admin != 1)
-            {
-                return BadRequest();
-            }
-            RentCategory rc = await _db.rentCategory
-                .Where(r => r.code.Trim().Equals(code.Trim())).FirstOrDefaultAsync();
-            if (rc == null)
-            {
-                return NotFound();
-            }
-            rc.name = name;
-            _db.rentCategory.Entry(rc).State = EntityState.Modified;
-            await _db.SaveChangesAsync();
-            return Ok(rc);
-        }
-        */
+        
         [HttpGet("{id}")]
         public async Task<ActionResult<RentCategory>> ModCategory(int id, string code, string name, string sessionKey, string sessionType)
         {
@@ -225,8 +202,8 @@ namespace SnowmeetApi.Controllers.Rent
         {
             code = code.Trim();
             RentCategory rc = await _db.rentCategory
-                .Include(r => r.priceList)
-                .Include(r => r.infoFields)
+                .Include(r => r.priceList).Include(r => r.infoFields)
+                .Include(r => r.productList)
                 .Where(r => r.code.Trim().Equals(code.Trim())).FirstAsync();
             if (rc == null)
             {
@@ -237,6 +214,7 @@ namespace SnowmeetApi.Controllers.Rent
                 RentCategory rcInfo = await _db.rentCategory
                 .Include(r => r.priceList)
                 .Include(r => r.infoFields)
+                .Include(r => r.productList)
                 .Where(r => r.code.Trim().Equals(code.Trim().Substring(0, 2))).FirstAsync();
                 rc.infoFields = rcInfo.infoFields;
             }
@@ -261,6 +239,11 @@ namespace SnowmeetApi.Controllers.Rent
             {
                 rc.priceList = null;
             }
+
+            var pList = from product in rc.productList
+                        where product.is_delete == 0
+                        select product;
+            rc.productList = pList;
             return Ok(rc);
         }
 
@@ -647,6 +630,9 @@ namespace SnowmeetApi.Controllers.Rent
             await _db.SaveChangesAsync();
             return Ok(field);
         }
+
+       
+
         /*
         [HttpGet("{code}")]
         public async Task<ActionResult<RentPrice>> GetCategoryPrice(string code, string shop, DateTime date, string scene="门市")
