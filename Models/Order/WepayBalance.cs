@@ -42,6 +42,8 @@ namespace SnowmeetApi.Models.Order
         public double request_refund_amount { get; set; } = 0;
         public string fee_rate_memo { get; set; } = "";
 
+        public int statement_id {get; set;} = 0;
+
         [NotMapped]
         public double drawAmount { get; set; } = 0;
         [NotMapped]

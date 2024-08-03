@@ -125,5 +125,6 @@ namespace SnowmeetApi.Data
         public DbSet<SnowmeetApi.Models.Rent.RentPackage> rentPackage {get; set;}
         public DbSet<SnowmeetApi.Models.Rent.RentPackageCategory> rentPackageCategory {get; set; }
         public DbSet<SnowmeetApi.Models.Rent.RentCategoryInfoField> rentCategoryInfoField {get; set; }
+        public DbSet<SnowmeetApi.Models.Order.FinancialStatement> financialStatement {get; set;}
     }
 }

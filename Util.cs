@@ -358,6 +358,29 @@ namespace SnowmeetApi
             return ret;
         }
 
+        public static string GetSeason(DateTime date)
+        {
+            string season = "【雪季】";
+            int year = date.Year;
+            int month = date.Month;
+            if (month <=5)
+            {
+                season = (year-1-2000).ToString() + "-" + (year-2000).ToString() + season;
+            }
+            else if (month >= 10)
+            {
+                season = (year-2000).ToString() + "-" + (year+1-2000).ToString() + season;
+            }
+            else
+            {
+                season = year.ToString() + "【夏季】";
+
+            }
+            return season;
+        }
+
+      
+
         
     }
 

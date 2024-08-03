@@ -23,6 +23,8 @@ namespace SnowmeetApi.Models.Order
         public string memo { get; set; }
         public string invoice_id {get; set;}
 
+        public int statement_id {get; set;}
+
     }
 }
 

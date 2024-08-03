@@ -6,6 +6,7 @@ using System.Net.Http;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Aop.Api.Domain;
 using HttpHandlerDemo;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -115,7 +116,7 @@ namespace SnowmeetApi.Controllers
                     .Where(d => d.OrderOnlineId == order.id).ToListAsync();
                 for (int i = 0; i < details.Count; i++)
                 {
-                    Product p = await _db.Product.FindAsync(details[i].product_id);
+                    Models.Product.Product p = await _db.Product.FindAsync(details[i].product_id);
                     if (p != null)
                     {
                         name = name + " " + p.name.Trim();
@@ -751,6 +752,137 @@ namespace SnowmeetApi.Controllers
 
         }
 
+        [HttpGet]
+        public async Task<ActionResult<int>> ImportTrans(string path = "/Users/cangjie/Desktop/trans.csv")
+        {
+            System.IO.StreamReader sr = new StreamReader(path);
+            string content = sr.ReadToEnd().Trim();
+            sr.Close();
+            string[] lineArr = content.Split('\n');
+            string[] summaryFields = lineArr[lineArr.Length - 1].Split(',');
+            int count = 0;
+            for (int i = 1; i < lineArr.Length - 1; i++)
+            {
+                string[] fieldArr = lineArr[i].Split(',');
+                string transDateStr = fieldArr[1].Trim().Replace("`", "");
+                if (transDateStr.Equals(""))
+                {
+                    continue;
+                }
+                try
+                {
+                    DateTime transDate = DateTime.Parse(transDateStr);
+                        
+
+                }
+                catch
+                {
+                    continue;
+                }
+                WepayBalance b = new WepayBalance();
+                for (int j = 0; j < fieldArr.Length-1; j++)
+                {
+
+                    string v = fieldArr[j+1].Trim().Replace("`", "");
+                    
+                    switch (j)
+                    {
+                        case 0:
+                            b.trans_date = DateTime.Parse(v);
+                            break;
+                        case 1:
+                            b.app_id = v.Trim();
+                            break;
+                        case 2:
+                            b.mch_id = v.Trim();
+                            break;
+                        case 3:
+                            b.spc_mch_id = v.Trim();
+                            break;
+                        case 4:
+                            b.device_id = v.Trim();
+                            break;
+                        case 5:
+                            b.wepay_order_num = v.Trim();
+                            break;
+                        case 6:
+                            b.out_trade_no = v.Trim();
+                            break;
+                        case 7:
+                            b.open_id = v.Trim();
+                            break;
+                        case 8:
+                            b.trans_type = v.Trim();
+                            break;
+                        case 9:
+                            b.pay_status = v.Trim();
+                            break;
+                        case 10:
+                            b.bank = v.Trim();
+                            break;
+                        case 11:
+                            b.currency = v.Trim();
+                            break;
+                        case 12:
+                            b.settle_amount = double.Parse(v.Trim());
+                            break;
+                        case 13:
+                            b.coupon_amount = double.Parse(v.Trim());
+                            break;
+                        case 14:
+                            b.refund_no = v.Trim();
+                            break;
+                        case 15:
+                            b.out_refund_no = v.Trim();
+                            break;
+                        case 16:
+                            b.refund_amount = double.Parse(v.Trim());
+                            break;
+                        case 17:
+                            b.coupon_refund_amount = double.Parse(v.Trim());
+                            break;
+                        case 18:
+                            b.refund_type = v.Trim();
+                            break;
+                        case 19:
+                            b.refund_status = v.Trim();
+                            break;
+                        case 20:
+                            b.product_name = v.Trim();
+                            break;
+                        case 21:
+                            b.product_package = v.Trim();
+                            break;
+                        case 22:
+                            b.fee = double.Parse(v.Trim());
+                            break;
+                        case 23:
+                            b.fee_rate = v.Trim();
+                            break;
+                        case 24:
+                            b.order_amount = double.Parse(v.Trim());
+                            break;
+                        case 25:
+                            b.request_refund_amount = double.Parse(v.Trim());
+                            break;
+                        case 26:
+                            b.fee_rate_memo = v.Trim();
+                            break;
+                        default:
+                            break;
+                    }
+                    
+                    //count += await _db.SaveChangesAsync();
+                }
+                await _db.wepayBalance.AddAsync(b);
+                count++;
+
+            }
+            int rowsCount = await _db.SaveChangesAsync();
+
+            return Ok(count);
+        }
+
         [HttpGet("{mchId}")]
         public async Task  RequestTradeBill(int mchId, DateTime billDate)
         {
@@ -933,6 +1065,57 @@ namespace SnowmeetApi.Controllers
                 }
 
             }
+        }
+
+        [HttpGet]
+        public async Task<ActionResult<int>> ImportFlow(string mchId = "1604236346", string path = "/Users/cangjie/Desktop/flow.csv")
+        {
+            System.IO.StreamReader sr = new StreamReader(path);
+            string content = sr.ReadToEnd().Trim();
+            sr.Close();
+            string[] lineArr = content.Split('\r');
+            int count = 0;
+            for (int i = 1; i < lineArr.Length - 1; i++)
+            {
+                string[] fields = lineArr[i].Trim().Split(',');
+                string billDateStr = fields[1].Trim().Replace("`", "");
+                if (billDateStr.Equals(""))
+                {
+                    continue;
+                }
+                try
+                {
+                    DateTime.Parse(billDateStr);
+                }
+                catch
+                {
+                    continue;
+                }
+                //string[] fields = lineArr[i].Trim().Split(',');
+                for (int j = 0; j < fields.Length; j++)
+                {
+                    fields[j] = fields[j].Replace("`", "");
+                }
+                WepayFlowBill bill = new WepayFlowBill()
+                {
+                    mch_id = mchId,
+                    bill_date_time = DateTime.Parse(fields[1]),
+                    biz_no = fields[2].Trim(),
+                    flow_no = fields[3].Trim(),
+                    biz_name = fields[4].Trim(),
+                    biz_type = fields[5].Trim(),
+                    bill_type = fields[6].Trim(),
+                    amount = double.Parse(fields[7].Trim()),
+                    surplus = double.Parse(fields[8].Trim()),
+                    oper = fields[9].Trim(),
+                    memo = fields[10].Trim(),
+                    invoice_id = fields[11].Trim()
+                };
+                await _db.wepayFlowBill.AddAsync(bill);
+                //count++;
+            }
+            count = await _db.SaveChangesAsync();
+            return Ok(count);
         }
 
         [HttpGet]
@@ -1173,6 +1356,280 @@ namespace SnowmeetApi.Controllers
             report.items = ret;
 
             return Ok(report);
+        }
+
+        [HttpGet]
+        public async Task<ActionResult<int>> CreateStatement(string mchId = "1604236346")
+        {
+            var bList = await _db.wepayBalance.Where(b => (b.statement_id == 0 && b.mch_id.Trim().Equals(mchId.Trim()) ))
+                .OrderBy(b => b.trans_date).ToListAsync();
+            for(int i = 0; i < bList.Count; i++)
+            {
+                
+                switch(bList[i].pay_status.Trim())
+                {
+                    case "SUCCESS":
+                        var flowList = await _db.wepayFlowBill
+                            .Where(b => b.biz_no.Trim().Equals(bList[i].wepay_order_num.Trim()))
+                            .ToListAsync();
+                        DateTime billDate = DateTime.MinValue;
+                        string flow_no = "";
+                        string opType = "";
+                        string oper = "";
+                        string oper_account = "";
+                        double platFormRemain = 0;
+                        for(int j = 0; j < flowList.Count; j++)
+                        {
+                            if (flowList[j].biz_name.Trim().Equals("交易") && flowList[j].biz_type.Trim().Equals("交易")
+                                && flowList[j].bill_type.Trim().Equals("收入"))
+                            {
+                                flow_no = flowList[j].flow_no.Trim();
+                                opType = "系统";
+                                billDate = flowList[j].bill_date_time;
+                            }
+                            if (flowList[j].biz_name.Trim().Equals("交易") && flowList[j].biz_type.Trim().Equals("扣除交易手续费")
+                                && flowList[j].bill_type.Trim().Equals("支出"))
+                            {
+                                platFormRemain = flowList[j].surplus;
+                            }
+                                
+                        }
+                        FinancialStatement s = new FinancialStatement()
+                        {
+                            id = 0,
+                            pay_type = "微信支付",
+                            mch_id = mchId.Trim(),
+                            season = Util.GetSeason(bList[i].trans_date),
+                            month = bList[i].trans_date.Year.ToString() + "-" + bList[i].trans_date.Month.ToString().PadLeft(2, '0'),
+                            order_type = "收款",
+                            day_of_week = Util.GetDayOfWeek(bList[i].trans_date),
+                            trans_date = bList[i].trans_date,
+                            bill_date = billDate,
+                            platform_order_no = bList[i].wepay_order_num.Trim(),
+                            out_trade_no = bList[i].out_trade_no.Trim(),
+                            flow_no = flow_no,
+                            open_id = bList[i].open_id.Trim(),
+                            op_type = opType,
+                            oper = oper.Trim(),
+                            oper_account = oper_account,
+                            amount = bList[i].settle_amount,
+                            fee = bList[i].fee,
+                            settle = bList[i].settle_amount - bList[i].fee,
+                            amount_sum = 0,
+                            fee_sum = 0,
+                            settle_sum = 0,
+                            platform_remain = platFormRemain,
+                            coming = 0,
+                            bank_remain = 0,
+                            can_withdraw = 0,
+                            withdraw = null,
+                            refund_amount = null,
+                            refund_fee = null,
+                            refund_settle = null,
+                            charge = null
+
+                        };  
+                        await _db.financialStatement.AddAsync(s);
+                        await _db.SaveChangesAsync();
+                        bList[i].statement_id = s.id;
+                        _db.wepayBalance.Entry(bList[i]).State = EntityState.Modified;
+                        for(int j = 0; j < flowList.Count; j++)
+                        {
+                            flowList[j].statement_id = s.id;
+                            _db.wepayFlowBill.Entry(flowList[j]).State = EntityState.Modified;
+
+                        }
+                        await _db.SaveChangesAsync();
+                        break;
+                    case "REFUND":
+                        var fList = await _db.wepayFlowBill
+                            .Where(f => f.biz_no.Trim().Equals(bList[i].wepay_order_num))
+                            .ToListAsync();
+                        DateTime rBillDate = DateTime.MinValue;
+                        string rFlowNo = "";
+                        for(int j = 0; j < fList.Count; j++)
+                        {
+                            rFlowNo = fList[j].flow_no.Trim();
+                            if (!rFlowNo.Trim().Equals(""))
+                            {
+                                break;
+                            }
+                        }
+
+                        fList = await _db.wepayFlowBill
+                            .Where(f => f.flow_no.Trim().Equals(rFlowNo) && f.biz_name.Equals("退款") && f.biz_type.Trim().Equals("退款") && f.bill_type.Trim().Equals("支出"))
+                            .ToListAsync();
+                        
+
+
+
+
+                        string rOpType = "系统";
+                        string rOperName = "";
+                        string rOperAccount = "";
+                        double rPlatformRemain = 0;
+                        double rRealRefund = 0;
+                        string rPlatformNo = "";
+                        for(int j = 0; j < fList.Count; j++)
+                        {
+                            rBillDate = fList[j].bill_date_time;
+                            rFlowNo = fList[j].flow_no.Trim();
+                            string rOper = fList[j].oper;
+                            rPlatformRemain = fList[j].surplus;
+                            rRealRefund = fList[j].amount;
+                            rPlatformNo = fList[j].biz_no;
+                            if (rOper.IndexOf("(")>=0 || rOper.IndexOf("@")>=0)
+                            {
+                                rOpType = "人工";
+                                if (rOper.ToLower().Trim().IndexOf("kou")>=0)
+                                {
+                                    rOperName = "寇芳";
+                                    rOperAccount = rOper;
+                                }
+                                else if (rOper.ToLower().Trim().IndexOf("buguai")>=0)
+                                {
+                                    rOperName = "舒娟";
+                                    rOperAccount = rOper;
+                                }
+                                else
+                                {
+                                    rOperName = "管理员";
+                                    rOperAccount = rOper;
+                                }
+
+                            }
+                            else if (rOper.ToUpper().IndexOf("API") >= 0)
+                            {
+                                rOperName = "API";
+                                rOperAccount = rOper.Trim();
+                            }
+                            else
+                            {
+
+                            }
+
+
+                        }
+                        FinancialStatement r = new FinancialStatement()
+                        {
+                            id = 0,
+                            pay_type = "微信支付",
+                            mch_id = mchId.Trim(),
+                            season = Util.GetSeason(bList[i].trans_date),
+                            month = bList[i].trans_date.Year.ToString() + "-" + bList[i].trans_date.Month.ToString().PadLeft(2, '0'),
+                            order_type = "退款",
+                            day_of_week = Util.GetDayOfWeek(bList[i].trans_date),
+                            trans_date = bList[i].trans_date,
+                            bill_date = rBillDate,
+                            platform_order_no = rPlatformNo,
+                            out_trade_no = bList[i].out_refund_no,
+                            flow_no = rFlowNo,
+                            open_id = bList[i].open_id.Trim(),
+                            op_type =  rOpType,
+                            oper = rOperName,
+                            oper_account = rOperAccount,
+                            amount = null,
+                            fee = null,
+                            settle = null,
+                            amount_sum = 0,
+                            fee_sum = 0,
+                            settle_sum = 0,
+                            platform_remain = rPlatformRemain,
+                            coming = 0,
+                            bank_remain = 0,
+                            can_withdraw = 0,
+                            withdraw = null,
+                            refund_amount = rRealRefund,
+                            refund_fee = -1 * bList[i].fee,
+                            refund_settle = bList[i].request_refund_amount,
+                            charge = null
+
+                        };  
+                        await _db.financialStatement.AddAsync(r);
+                        await _db.SaveChangesAsync();
+                        for(int j = 0; j < fList.Count; j++)
+                        {
+                            fList[j].statement_id = r.id;
+                            _db.wepayFlowBill.Entry(fList[j]).State = EntityState.Modified;
+
+                        }
+                        bList[i].statement_id = r.id;
+                        _db.wepayBalance.Entry(bList[i]).State = EntityState.Modified;
+                        await _db.SaveChangesAsync();
+                        break;
+                    default:
+                        break;
+                }
+
+                
+                
+
+            }
+
+
+            var asFlowList = await _db.wepayFlowBill
+                .Where(f => (f.biz_name.Trim().Equals("充值/提现") && f.statement_id == 0 && f.mch_id.Trim().Equals(mchId.Trim())))
+                .ToListAsync();
+            for(int i = 0; i < asFlowList.Count; i++)
+            {
+                string opName = "";
+                string opAccount = asFlowList[i].oper.Trim();
+                if (opAccount.ToLower().IndexOf("buguai") >= 0)
+                {
+                    opName = "舒娟";
+                }
+                else if (opAccount.ToLower().IndexOf("kou") >= 0)
+                {
+                    opName = "寇芳";
+                }
+                else
+                {
+                    opName = "管理员";
+                }
+                FinancialStatement fs = new FinancialStatement()
+                {
+                    id = 0,
+                    pay_type = "微信支付",
+                    mch_id = mchId.Trim(),
+                    season = Util.GetSeason(asFlowList[i].bill_date_time),
+                    month = asFlowList[i].bill_date_time.Year.ToString() + "-" + asFlowList[i].bill_date_time.Month.ToString().PadLeft(2, '0'),
+                    order_type = asFlowList[i].biz_type,
+                    day_of_week = Util.GetDayOfWeek(asFlowList[i].bill_date_time),
+                    trans_date = asFlowList[i].bill_date_time,
+                    bill_date = asFlowList[i].bill_date_time,
+                    platform_order_no = asFlowList[i].biz_no,
+                    out_trade_no = "",
+                    flow_no = asFlowList[i].flow_no,
+                    open_id = "",
+                    op_type =  "人工",
+                    oper = opName.Trim(),
+                    oper_account = asFlowList[i].oper,
+                    amount = null,
+                    fee = null,
+                    settle = null,
+                    amount_sum = 0,
+                    fee_sum = 0,
+                    settle_sum = 0,
+                    platform_remain = asFlowList[i].surplus,
+                    coming = 0,
+                    bank_remain = 0,
+                    can_withdraw = 0,
+                    withdraw = asFlowList[i].biz_type.Trim().Equals("提现")? asFlowList[i].amount: null,
+                    refund_amount = null,
+                    refund_fee = null,
+                    refund_settle = null,
+                    charge = asFlowList[i].biz_type.Trim().Equals("网银充值")? asFlowList[i].amount: null
+                };
+                await _db.financialStatement.AddAsync(fs);
+                await _db.SaveChangesAsync();
+                asFlowList[i].statement_id = fs.id;
+                _db.wepayFlowBill.Entry(asFlowList[i]).State = EntityState.Modified;
+                await _db.SaveChangesAsync();
+            }
+
+
+
+            return Ok(0);
         }
     }
 }
