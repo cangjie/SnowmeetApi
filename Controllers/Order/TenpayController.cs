@@ -863,7 +863,21 @@ namespace SnowmeetApi.Controllers
                             b.order_amount = double.Parse(v.Trim());
                             break;
                         case 25:
-                            b.request_refund_amount = double.Parse(v.Trim());
+                            try
+                            {
+                                if (v.Trim().Equals(""))
+                                {
+                                    b.request_refund_amount = 0;
+                                }
+                                else
+                                {
+                                    b.request_refund_amount = double.Parse(v.Trim());
+                                }
+                            }
+                            catch(Exception err)
+                            {
+                                Console.WriteLine(err.ToString());
+                            }
                             break;
                         case 26:
                             b.fee_rate_memo = v.Trim();
@@ -1068,7 +1082,7 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<int>> ImportFlow(string mchId = "1604236346", string path = "/Users/cangjie/Desktop/flow.csv")
+        public async Task<ActionResult<int>> ImportFlow(string mchId = "1636404775", string path = "/Users/cangjie/Desktop/flow.csv")
         {
             System.IO.StreamReader sr = new StreamReader(path);
             string content = sr.ReadToEnd().Trim();
@@ -1112,7 +1126,7 @@ namespace SnowmeetApi.Controllers
                     invoice_id = fields[11].Trim()
                 };
                 await _db.wepayFlowBill.AddAsync(bill);
-                //count++;
+                count++;
             }
             count = await _db.SaveChangesAsync();
             return Ok(count);
@@ -1359,7 +1373,7 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<int>> CreateStatement(string mchId = "1604236346")
+        public async Task<ActionResult<int>> CreateStatement(string mchId = "1636404775")
         {
             var bList = await _db.wepayBalance.Where(b => (b.statement_id == 0 && b.mch_id.Trim().Equals(mchId.Trim()) ))
                 .OrderBy(b => b.trans_date).ToListAsync();
