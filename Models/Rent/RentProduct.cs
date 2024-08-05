@@ -25,7 +25,7 @@ namespace SnowmeetApi.Models.Rent
         public int is_valid {get; set; } = 1;
         public int is_online {get;set;} = 0;
 
-        public int is_destoryed {get; set;} = 0;
+        public int is_destroyed {get; set;} = 0;
 
         [NotMapped]
         public ICollection<RentProductImage> images { get; set; }
