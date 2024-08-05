@@ -631,6 +631,51 @@ namespace SnowmeetApi.Controllers.Rent
             return Ok(field);
         }
 
+        [HttpGet("{categoryId}")]
+        public async Task<ActionResult<RentProduct>> AddRentProduct(int categoryId, string shop, string name, string sessionKey, string sessionType)
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            sessionType = Util.UrlDecode(sessionType);
+            SnowmeetApi.Models.Users.Member member = await _memberHelper.GetMember(sessionKey, sessionType);
+            if (member.is_admin != 1)
+            {
+                return BadRequest();
+            }
+            RentProduct p = new RentProduct()
+            {
+                id = 0,
+                category_id = categoryId,
+                shop = shop,
+                name = name.Trim()
+            };
+            await _db.rentProduct.AddAsync(p);
+            await _db.SaveChangesAsync();
+            return Ok(p);
+        }
+
+        [HttpPost]
+        public async Task<ActionResult<RentProduct>> ModRentProduct(RentProduct rentProduct, 
+            [FromQuery] string sessionKey, [FromQuery] string sessionType)
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            sessionType = Util.UrlDecode(sessionType);
+            SnowmeetApi.Models.Users.Member member = await _memberHelper.GetMember(sessionKey, sessionType);
+            if (member.is_admin != 1)
+            {
+                return BadRequest();
+            }
+            _db.rentProduct.Entry(rentProduct).State = EntityState.Modified;
+            int i = await _db.SaveChangesAsync();
+            if (i == 0)
+            {
+                return NotFound();
+            }
+            else
+            {
+                return Ok(rentProduct);
+            }
+        }
+
        
 
         /*

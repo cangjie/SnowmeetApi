@@ -11,7 +11,7 @@ namespace SnowmeetApi.Models.Rent
     {
         [Key]
         public int id { get; set; }
-        public string owner { get; set; }
+        public string owner { get; set; } = "自有";
         public string name { get; set; }
         public string description { get; set; } 
         public string? brand { get; set; }
@@ -24,6 +24,8 @@ namespace SnowmeetApi.Models.Rent
         public int is_delete {get; set; } = 0;
         public int is_valid {get; set; } = 1;
         public int is_online {get;set;} = 0;
+
+        public int is_destoryed {get; set;} = 0;
 
         [NotMapped]
         public ICollection<RentProductImage> images { get; set; }
