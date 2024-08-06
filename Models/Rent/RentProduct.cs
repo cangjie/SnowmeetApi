@@ -13,12 +13,12 @@ namespace SnowmeetApi.Models.Rent
         public int id { get; set; }
         public string owner { get; set; } = "自有";
         public string name { get; set; }
-        public string description { get; set; } 
+        public string? description { get; set; } 
         public string? brand { get; set; }
-        public string shop {get; set;}
+        public string? shop {get; set;}
         public int category_id { get; set; }
         public string? barcode { get; set; }
-        public int count {get; set;} = 1;
+        public int? count {get; set;}
         public double? deposit {get; set; }
         public int is_common_price {get; set; } = 1;
         public int is_delete {get; set; } = 0;
@@ -26,6 +26,8 @@ namespace SnowmeetApi.Models.Rent
         public int is_online {get;set;} = 0;
 
         public int is_destroyed {get; set;} = 0;
+
+        public int creator_memberid {get; set;}
 
         [NotMapped]
         public ICollection<RentProductImage> images { get; set; }

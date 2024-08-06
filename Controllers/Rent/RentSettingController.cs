@@ -632,7 +632,7 @@ namespace SnowmeetApi.Controllers.Rent
         }
 
         [HttpGet("{categoryId}")]
-        public async Task<ActionResult<RentProduct>> AddRentProduct(int categoryId, string shop, string name, string sessionKey, string sessionType)
+        public async Task<ActionResult<RentProduct>> AddRentProduct(int categoryId, string? shop, string name, string sessionKey, string sessionType)
         {
             sessionKey = Util.UrlDecode(sessionKey);
             sessionType = Util.UrlDecode(sessionType);
@@ -646,7 +646,8 @@ namespace SnowmeetApi.Controllers.Rent
                 id = 0,
                 category_id = categoryId,
                 shop = shop,
-                name = name.Trim()
+                name = name.Trim(),
+                creator_memberid = member.id
             };
             await _db.rentProduct.AddAsync(p);
             await _db.SaveChangesAsync();
