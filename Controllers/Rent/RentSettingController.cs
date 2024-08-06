@@ -677,6 +677,12 @@ namespace SnowmeetApi.Controllers.Rent
             }
         }
 
+        [HttpGet("{productId}")]
+        public async Task<ActionResult<RentProduct>> GetRentProduct(int productId)
+        {
+            return Ok(await _db.rentProduct.FindAsync(productId));
+        }
+
        
 
         /*
