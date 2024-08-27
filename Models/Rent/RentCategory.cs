@@ -25,7 +25,7 @@ namespace SnowmeetApi.Models.Rent
         public ICollection<RentPrice>? priceList {get; set;}
 
         [NotMapped]
-        public ICollection<RentCategoryInfoField>? infoFields { get; set; }
+        public List<RentCategoryInfoField>? infoFields { get; set; }
 
         [NotMapped]
         public IEnumerable<RentProduct> productList { get; set; }

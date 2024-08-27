@@ -32,7 +32,7 @@ namespace SnowmeetApi.Models.Rent
         [NotMapped]
         public ICollection<RentProductImage> images { get; set; }
         [NotMapped]
-        public ICollection<RentProductDetailInfo> detailInfos { get; set; }
+        public List<RentProductDetailInfo> detailInfo { get; set; }
        
 
     }
@@ -55,7 +55,8 @@ namespace SnowmeetApi.Models.Rent
         public int field_id {get; set;}
         public string info {get; set;}
         public DateTime update_date {get; set;}
-
+        [NotMapped]
+        public string fieldName {get; set;} = "";
         [NotMapped]
         public RentCategoryInfoField field {get; set;}
     }

@@ -687,7 +687,50 @@ namespace SnowmeetApi.Controllers.Rent
         [HttpGet("{productId}")]
         public async Task<ActionResult<RentProduct>> GetRentProduct(int productId)
         {
-            return Ok(await _db.rentProduct.FindAsync(productId));
+            /*
+            RentProduct product = await _db.rentProduct.FindAsync(productId);
+            if (product == null)
+            {
+                return NotFound();
+            }
+            */
+
+            var productList = await _db.rentProduct.Where(p => p.id == productId)
+                .Include(p => p.detailInfo).ToListAsync();
+            if (productList == null || productList.Count == 0)
+            {
+                return NotFound();
+            }    
+            RentProduct product = productList[0];
+            RentCategory category = (RentCategory)((OkObjectResult)((await GetCategoryById(product.category_id)).Result)).Value;
+            for(int i = 0; i < category.infoFields.Count; i++)
+            {
+                bool exists = false;
+                for(int j = 0; j < product.detailInfo.Count; j++)
+                {
+                    if (product.detailInfo[j].field_id == category.infoFields[i].id)
+                    {
+                        exists = true;
+                        product.detailInfo[j].fieldName = category.infoFields[i].field_name.Trim();
+                        product.detailInfo[j].field = category.infoFields[i];
+                    }
+                }
+                if (!exists)
+                {
+                    RentProductDetailInfo info = new RentProductDetailInfo()
+                    {
+                        product_id = product.id,
+                        field_id = category.infoFields[i].id,
+                        info = "",
+                        update_date = DateTime.Now,
+                        fieldName = category.infoFields[i].field_name.Trim(),
+                        field = category.infoFields[i]
+
+                    };
+                    product.detailInfo.Add(info);
+                }
+            }
+            return Ok(product);
         }
 
        
