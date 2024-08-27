@@ -752,6 +752,8 @@ namespace SnowmeetApi.Controllers.Rent
                 if (oriInfo != null)
                 {
                     oriInfo.info = info.info.Trim();
+                    _db.rentProductDetailInfo.Entry(oriInfo).State = EntityState.Modified;
+                    await _db.SaveChangesAsync();
 
                 }
                 else
