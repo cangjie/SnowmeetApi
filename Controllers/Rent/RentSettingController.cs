@@ -733,5 +733,35 @@ namespace SnowmeetApi.Controllers.Rent
             return Ok(product);
         }
 
+        [HttpPost("{productId}")]
+        public async Task<ActionResult<RentProduct>> UpdateRentProductDetailInfo(int productId, 
+            [FromQuery] string sessionKey, [FromQuery] string sessionType, List<RentProductDetailInfo> details )
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            sessionType = Util.UrlDecode(sessionType);
+            SnowmeetApi.Models.Users.Member member = await _memberHelper.GetMember(sessionKey, sessionType);
+            if (member.is_admin != 1)
+            {
+                return BadRequest();
+            }
+            for(int i = 0; i < details.Count; i++)
+            {
+                RentProductDetailInfo info = details[i];
+                
+                RentProductDetailInfo oriInfo = await _db.rentProductDetailInfo.FindAsync(productId, info.field_id);
+                if (oriInfo != null)
+                {
+                    oriInfo.info = info.info.Trim();
+                }
+                else
+                {
+                    await _db.rentProductDetailInfo.AddAsync(info);
+                    await _db.SaveChangesAsync();
+                }
+                
+            }
+            return await GetRentProduct(productId);
+        }
+
     }
 }
