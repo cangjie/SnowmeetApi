@@ -752,9 +752,11 @@ namespace SnowmeetApi.Controllers.Rent
                 if (oriInfo != null)
                 {
                     oriInfo.info = info.info.Trim();
+
                 }
                 else
                 {
+                    info.update_date = DateTime.Now;
                     await _db.rentProductDetailInfo.AddAsync(info);
                     await _db.SaveChangesAsync();
                 }
