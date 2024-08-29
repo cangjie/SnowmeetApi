@@ -696,7 +696,7 @@ namespace SnowmeetApi.Controllers.Rent
             */
 
             var productList = await _db.rentProduct.Where(p => p.id == productId)
-                .Include(p => p.detailInfo).ToListAsync();
+                .Include(p => p.images).Include(p => p.detailInfo).ToListAsync();
             if (productList == null || productList.Count == 0)
             {
                 return NotFound();
