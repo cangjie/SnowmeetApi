@@ -767,5 +767,38 @@ namespace SnowmeetApi.Controllers.Rent
             return await GetRentProduct(productId);
         }
 
+        [HttpPost("{productId}")]
+        public async Task<ActionResult<RentProduct>> SetRentProductImage(int productId, [FromQuery] string sessionKey, 
+            [FromQuery] string sessionType, string[] images)
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            sessionType = Util.UrlDecode(sessionType);
+            SnowmeetApi.Models.Users.Member member = await _memberHelper.GetMember(sessionKey, sessionType);
+            if (member.is_admin != 1)
+            {
+                return BadRequest();
+            }
+            var imageList = await _db.rentProductImage.Where(i => i.product_id == productId).ToListAsync();
+            for(int i = 0; i < imageList.Count; i++)
+            {
+                _db.rentProductImage.Remove(imageList[i]);
+            }
+            await _db.SaveChangesAsync();
+            for(int i = 0; i < images.Length; i++)
+            {
+                RentProductImage img = new RentProductImage()
+                {
+                    id = 0,
+                    product_id = productId,
+                    image_url = images[i].Trim(),
+                    sort = i,
+                    update_date = DateTime.Now
+                };
+                await _db.rentProductImage.AddAsync(img);
+            }
+            await _db.SaveChangesAsync();
+            return await GetRentProduct(productId);
+        }
+
     }
 }
