@@ -105,6 +105,7 @@ namespace SnowmeetApi
                 {
                     if (context.WebSockets.IsWebSocketRequest)
                     {
+                        
                         using var webSocket = await context.WebSockets.AcceptWebSocketAsync();
                         await Echo(webSocket);
                         Console.WriteLine(webSocket);
@@ -125,15 +126,16 @@ namespace SnowmeetApi
         {
             var buffer = new byte[1024 * 4];
             var receiveResult = await webSocket.ReceiveAsync(
-            new ArraySegment<byte>(buffer), CancellationToken.None);
+                new ArraySegment<byte>(buffer), CancellationToken.None);
 
             while (!receiveResult.CloseStatus.HasValue)
             {
+                System.Threading.Thread.Sleep(2000);
                 await webSocket.SendAsync(
                     new ArraySegment<byte>(buffer, 0, receiveResult.Count),
                     receiveResult.MessageType,
                     receiveResult.EndOfMessage,
-                    CancellationToken.None);
+                    CancellationToken.None); 
 
                 receiveResult = await webSocket.ReceiveAsync(
                 new ArraySegment<byte>(buffer), CancellationToken.None);
