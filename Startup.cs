@@ -130,7 +130,7 @@ namespace SnowmeetApi
 
             while (!receiveResult.CloseStatus.HasValue)
             {
-                System.Threading.Thread.Sleep(2000);
+                System.Threading.Thread.Sleep(5000);
                 await webSocket.SendAsync(
                     new ArraySegment<byte>(buffer, 0, receiveResult.Count),
                     receiveResult.MessageType,
