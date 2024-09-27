@@ -10,7 +10,6 @@ namespace SnowmeetApi.Models
         [Key]
         public int id { get; set; }
         public string name { get; set; }
-
         public string code {get; set;}
         public int sort { get; set; }
         public double lat_from { get; set; }
