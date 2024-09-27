@@ -415,6 +415,7 @@ SnowmeetApi
 SnowmeetApi.deps.json
 SnowmeetApi.runtimeconfig.json
 createdump
+<<<<<<< HEAD
 upload
 republish.sh
 wwwroot/bidata/*.csv
