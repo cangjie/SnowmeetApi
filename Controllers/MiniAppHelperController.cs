@@ -188,7 +188,7 @@ namespace LuqinMiniAppBase.Controllers
             {
                 openId = sessionList[0].open_id.Trim();
             }
-            Member member = await _memberHelper.GetMember(openId, "wechat_mini_openid");
+            Member member = await _memberHelper.GetMember(openId, "wl_wechat_mini_openid");
             if (member == null)
             {
                 member = new Member()
@@ -199,7 +199,7 @@ namespace LuqinMiniAppBase.Controllers
                 };
                 MemberSocialAccount msa = new MemberSocialAccount()
                 {
-                    type = "wechat_mini_openid",
+                    type = "wl_wechat_mini_openid",
                     num = openId.Trim(),
                     valid = 1,
                     memo = ""
