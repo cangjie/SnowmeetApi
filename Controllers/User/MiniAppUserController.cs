@@ -8,6 +8,7 @@ using Microsoft.EntityFrameworkCore;
 using SnowmeetApi.Data;
 using Microsoft.Extensions.Configuration;
 using SnowmeetApi.Models.Users;
+using SnowmeetApi.Controllers.User;
 
 namespace SnowmeetApi.Controllers
 {
@@ -19,11 +20,14 @@ namespace SnowmeetApi.Controllers
         private IConfiguration _config;
         public string _appId = "";
 
+        public MemberController _memberHelper;
+
         public MiniAppUserController(ApplicationDBContext context, IConfiguration config)
         {
             _context = context;
             _config = config.GetSection("Settings");
             _appId = _config.GetSection("AppId").Value.Trim();
+            _memberHelper = new MemberController(context, config);
             UnicUser._context = context;
         }
 
@@ -263,6 +267,76 @@ namespace SnowmeetApi.Controllers
             _context.Entry(trackUser).State = EntityState.Modified;
             await _context.SaveChangesAsync();
             return Ok(trackUser);
+        }
+
+        [HttpGet]
+        public async Task<ActionResult<Member>> UpdateWechatMemberInfo(string sessionKey, string encData, string iv)
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            encData = Util.UrlDecode(encData);
+            iv = Util.UrlDecode(iv);   
+            string json = Util.AES_decrypt(encData.Trim(), sessionKey, iv);
+            Newtonsoft.Json.Linq.JToken jsonObj = (Newtonsoft.Json.Linq.JToken)Newtonsoft.Json.JsonConvert.DeserializeObject(json);
+            string cell = "";
+            string gender = "";
+            string unionId = "";
+
+            try
+            {
+                if (jsonObj["phoneNumber"] != null)
+                {
+                    cell = jsonObj["phoneNumber"].ToString().Trim();
+                }
+            }
+            catch
+            {
+
+            }
+
+            try
+            {
+                if (jsonObj["gender"] != null)
+                {
+                    if (jsonObj["gender"].ToString().Equals("0"))
+                    {
+                        gender = "男";
+                    }
+                    else
+                    {
+                        gender = "女";
+                    }
+                }
+            }
+            catch
+            {
+
+            }
+
+            try
+            {
+                if (jsonObj["unionId"] != null && jsonObj["unionId"].ToString().Trim().Equals(""))
+                {
+                    unionId = jsonObj["unionId"].ToString().Trim();
+                }
+            }
+            catch
+            {
+
+            }
+            Member member = await _memberHelper.GetMember(sessionKey, "wechat_mini_openid");
+            if (member != null)
+            {
+                if (member.gender.Trim().Equals("") && !gender.Trim().Equals(""))
+                {
+                    member.gender = gender.Trim();
+                    _context.member.Entry(member).State = EntityState.Modified;
+                    await _context.SaveChangesAsync();
+                }
+
+            }
+            
+
+            return BadRequest();
         }
 
         [HttpGet]

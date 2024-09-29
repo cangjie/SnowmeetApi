@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+//using Aop.Api.Domain;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -35,12 +36,12 @@ namespace SnowmeetApi.Controllers.User
         }
 
         [NonAction]
-        public async Task<Member> GetMember(string sessionKey, string type)
+        public async Task<Member> GetMember(string num, string type)
         {
-            sessionKey = Util.UrlDecode(sessionKey.Trim());
+            
             type = type.Trim();
             int memberId = 0;
-            string num = "";
+            /*
             switch (type.Trim())
             {
                 case "wechat_mini_openid":
@@ -58,11 +59,15 @@ namespace SnowmeetApi.Controllers.User
             {
                 return null;
             }
-            MemberSocialAccount msa = await _db.memberSocialAccount
+            */
+            var msaList = await _db.memberSocialAccount
                         .Where(a => (a.valid == 1 && a.num.Trim().Equals(num) && a.type.Trim().Equals(type)))
-                        .FirstAsync();
-
-            memberId = msa.member_id;
+                        .OrderByDescending(a => a.id).ToListAsync();
+            if (msaList.Count == 0)
+            {
+                return null;
+            }
+            memberId = msaList[0].member_id;
             if (memberId == 0)
             {
                 return null;
@@ -72,6 +77,39 @@ namespace SnowmeetApi.Controllers.User
             return member;
         }
 
+        [NonAction]
+        public async Task<Member> CreateMember(Member member)
+        {
+            if (member.memberSocialAccounts.Count == 0)
+            {
+                return null;
+            }
+            await _db.member.AddAsync(member);
+            await _db.SaveChangesAsync();
+            return member;
+        }
+        
+
+        /*
+        [HttpGet]
+        public async Task<ActionResult<Member>> TestCreateMember(string openId)
+        {
+            Member member = new Models.Users.Member();
+            member.real_name = "";
+            member.gender = "";
+            MemberSocialAccount msa = new MemberSocialAccount()
+            {
+                type = "wechat_mini_openid",
+                num = openId,
+                valid = 1,
+                memo = ""
+            };
+            member.memberSocialAccounts.Add(msa);
+            await CreateMember(member);
+            return Ok(member);
+
+        }
+        */
         /*
 
         // GET: api/Member

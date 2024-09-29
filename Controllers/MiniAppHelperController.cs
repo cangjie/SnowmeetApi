@@ -21,6 +21,7 @@ using System.Xml;
 using System.Security.Cryptography;
 using SnowmeetApi.Data;
 using SnowmeetApi;
+using SnowmeetApi.Controllers.User;
 
 namespace LuqinMiniAppBase.Controllers
 {
@@ -35,11 +36,14 @@ namespace LuqinMiniAppBase.Controllers
 
         private readonly Settings _settings;
 
+        public MemberController _memberHelper;
+
         public MiniAppHelperController(ApplicationDBContext db, IConfiguration config)
         {
             _db = db;
             _config = config;
             _settings = Settings.GetSettings(_config);
+            _memberHelper = new MemberController(db, config);
         }
 
         [HttpGet]
@@ -152,6 +156,74 @@ namespace LuqinMiniAppBase.Controllers
             return "success";
         }
 
+        [HttpGet]
+        public async Task<ActionResult<Code2Session>> MemberLogin(string code)
+        {
+            string appId = _settings.appId;
+            string appSecret = _settings.appSecret;
+            string checkUrl = "https://api.weixin.qq.com/sns/jscode2session?appid=" + appId.Trim()
+                + "&secret=" + appSecret.Trim() + "&js_code=" + code.Trim()
+                + "&grant_type=authorization_code";
+            string jsonResult = Util.GetWebContent(checkUrl);
+            Code2Session sessionObj = JsonConvert.DeserializeObject<Code2Session>(jsonResult);
+            if (!sessionObj.errcode.ToString().Equals(""))
+            {
+                return BadRequest();
+            }
+            string openId = "";
+            var sessionList = await _db.MiniSessons.Where(m => (m.session_key.Trim().Equals(sessionObj.session_key.Trim())
+                    && m.open_id.Trim().Equals(sessionObj.openid.Trim()))).ToListAsync();
+            if (sessionList.Count == 0)
+            {
+                MiniSession mSession = new MiniSession()
+                {
+                    session_key = sessionObj.session_key.Trim(),
+                    open_id = sessionObj.openid.Trim()
+                };
+                await _db.MiniSessons.AddAsync(mSession);
+                await _db.SaveChangesAsync();
+                openId = mSession.open_id.Trim();
+            }
+            else
+            {
+                openId = sessionList[0].open_id.Trim();
+            }
+            Member member = await _memberHelper.GetMember(openId, "wechat_mini_openid");
+            if (member == null)
+            {
+                member = new Member()
+                {
+                    id = 0,
+                    real_name = "",
+                    gender = ""
+                };
+                MemberSocialAccount msa = new MemberSocialAccount()
+                {
+                    type = "wechat_mini_openid",
+                    num = openId.Trim(),
+                    valid = 1,
+                    memo = ""
+                };
+                member.memberSocialAccounts.Add(msa);
+                if (sessionObj.unionid != null && !sessionObj.unionid.Trim().Equals(""))
+                {
+                    msa = new MemberSocialAccount()
+                    {
+                        type = "wechat_unionid",
+                        num = sessionObj.unionid.Trim(),
+                        valid = 1,
+                        memo = ""
+                    };
+                    member.memberSocialAccounts.Add(msa);
+                }
+                await _memberHelper.CreateMember(member);
+            }
+            member.memberSocialAccounts = null;
+            sessionObj.member = member;
+            sessionObj.openid = "";
+            sessionObj.unionid = "";
+            return Ok(sessionObj);
+        }
 
 
         [HttpGet]
@@ -300,9 +372,11 @@ namespace LuqinMiniAppBase.Controllers
         {
             public string openid { get; set; } = "";
             public string session_key { get; set; } = "";
-            public string unionid { get; set; } = "";
+            public string unionid { get; set; } = null;
             public string errcode { get; set; } = "";
             public string errmsg { get; set; } = "";
+
+            public Member member {get; set;} = null;
         }
 
         protected class AccessToken
