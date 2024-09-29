@@ -157,7 +157,7 @@ namespace LuqinMiniAppBase.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<Code2Session>> MemberLogin(string code, string opneIdType)
+        public async Task<ActionResult<Code2Session>> MemberLogin(string code, string openIdType)
         {
             string appId = _settings.appId;
             string appSecret = _settings.appSecret;
@@ -180,7 +180,7 @@ namespace LuqinMiniAppBase.Controllers
             }
             if ((member == null || member.id == 0) && sessionObj.openid != null && !sessionObj.openid.Trim().Equals(""))
             {
-                member = await _memberHelper.GetMember(sessionObj.unionid.Trim(), opneIdType.Trim());
+                member = await _memberHelper.GetMember(sessionObj.unionid.Trim(), openIdType.Trim());
             }
             if (member == null)
             {
@@ -205,7 +205,7 @@ namespace LuqinMiniAppBase.Controllers
                 {
                     MemberSocialAccount msa = new MemberSocialAccount()
                     {
-                        type = opneIdType.Trim(),
+                        type = openIdType.Trim(),
                         num = sessionObj.openid.Trim(),
                         valid = 1,
                         memo = ""
@@ -237,7 +237,7 @@ namespace LuqinMiniAppBase.Controllers
             }
             var sessionList = await _db.MiniSessons.Where(m => (m.session_key.Trim().Equals(sessionObj.session_key.Trim())
                     && m.open_id.Trim().Equals(sessionObj.openid.Trim()) 
-                    && m.session_type.Trim().Equals(opneIdType.Trim())  )).ToListAsync();
+                    && m.session_type.Trim().Equals(openIdType.Trim())  )).ToListAsync();
             MiniSession session = new MiniSession();
             if (sessionList.Count > 0)
             {
@@ -248,7 +248,7 @@ namespace LuqinMiniAppBase.Controllers
                 session = new MiniSession()
                 {
                     session_key = sessionObj.session_key,
-                    session_type = opneIdType.Trim(),
+                    session_type = openIdType.Trim(),
                     open_id = sessionObj.openid.Trim(),
                     member_id = member.id
                 };
