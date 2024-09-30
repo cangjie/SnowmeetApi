@@ -215,12 +215,17 @@ namespace LuqinMiniAppBase.Controllers
                 member = await _memberHelper.CreateMember(member);
             }
             bool existsUnionid = false;
+            bool existsOpneId = false;
             foreach(MemberSocialAccount msa in member.memberSocialAccounts)
             {
                 if (msa.type.Trim().Equals("wechat_unionid"))
                 {
                     existsUnionid = true;
-                    break;
+                    
+                }
+                if (msa.type.Trim().Equals(openIdType.Trim()))
+                {
+                    existsOpneId = true;
                 }
             }
             if (!existsUnionid && sessionObj.unionid != null && !sessionObj.unionid.Trim().Equals(""))
@@ -229,6 +234,18 @@ namespace LuqinMiniAppBase.Controllers
                 {
                     type = "wechat_unionid",
                     num = sessionObj.unionid,
+                    valid = 1,
+                    memo = ""
+                };
+                await _db.memberSocialAccount.AddAsync(newMsa);
+                await _db.SaveChangesAsync();
+            }
+            if (!existsOpneId && sessionObj.openid != null && !sessionObj.openid.Trim().Equals(""))
+            {
+                MemberSocialAccount newMsa = new MemberSocialAccount()
+                {
+                    type = openIdType.Trim(),
+                    num = sessionObj.openid,
                     valid = 1,
                     memo = ""
                 };
