@@ -157,7 +157,7 @@ namespace LuqinMiniAppBase.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<Code2Session>> MemberLogin(string code)
+        public async Task<ActionResult<Code2Session>> MemberLogin(string code, string openIdType)
         {
             string appId = _settings.appId;
             string appSecret = _settings.appSecret;
@@ -170,25 +170,18 @@ namespace LuqinMiniAppBase.Controllers
             {
                 return BadRequest();
             }
-            string openId = "";
-            var sessionList = await _db.MiniSessons.Where(m => (m.session_key.Trim().Equals(sessionObj.session_key.Trim())
-                    && m.open_id.Trim().Equals(sessionObj.openid.Trim()))).ToListAsync();
-            if (sessionList.Count == 0)
+            Member member = new Member()
             {
-                MiniSession mSession = new MiniSession()
-                {
-                    session_key = sessionObj.session_key.Trim(),
-                    open_id = sessionObj.openid.Trim()
-                };
-                await _db.MiniSessons.AddAsync(mSession);
-                await _db.SaveChangesAsync();
-                openId = mSession.open_id.Trim();
-            }
-            else
+                id = 0
+            };
+            if (sessionObj.unionid != null && !sessionObj.unionid.Trim().Equals(""))
             {
-                openId = sessionList[0].open_id.Trim();
+                member = await _memberHelper.GetMember(sessionObj.unionid.Trim(), "wechat_unionid");
             }
-            Member member = await _memberHelper.GetMember(openId, "wl_wechat_mini_openid");
+            if ((member == null || member.id == 0) && sessionObj.openid != null && !sessionObj.openid.Trim().Equals(""))
+            {
+                member = await _memberHelper.GetMember(sessionObj.unionid.Trim(), openIdType.Trim());
+            }
             if (member == null)
             {
                 member = new Member()
@@ -197,17 +190,9 @@ namespace LuqinMiniAppBase.Controllers
                     real_name = "",
                     gender = ""
                 };
-                MemberSocialAccount msa = new MemberSocialAccount()
-                {
-                    type = "wl_wechat_mini_openid",
-                    num = openId.Trim(),
-                    valid = 1,
-                    memo = ""
-                };
-                member.memberSocialAccounts.Add(msa);
                 if (sessionObj.unionid != null && !sessionObj.unionid.Trim().Equals(""))
                 {
-                    msa = new MemberSocialAccount()
+                    MemberSocialAccount msa = new MemberSocialAccount()
                     {
                         type = "wechat_unionid",
                         num = sessionObj.unionid.Trim(),
@@ -216,10 +201,98 @@ namespace LuqinMiniAppBase.Controllers
                     };
                     member.memberSocialAccounts.Add(msa);
                 }
-                await _memberHelper.CreateMember(member);
+                if (sessionObj.openid != null && !sessionObj.openid.Trim().Equals(""))
+                {
+                    MemberSocialAccount msa = new MemberSocialAccount()
+                    {
+                        type = openIdType.Trim(),
+                        num = sessionObj.openid.Trim(),
+                        valid = 1,
+                        memo = ""
+                    };
+                    member.memberSocialAccounts.Add(msa);
+                }
+                member = await _memberHelper.CreateMember(member);
             }
-            member.memberSocialAccounts = null;
-            sessionObj.member = member;
+            bool existsUnionid = false;
+            bool existsOpneId = false;
+            foreach(MemberSocialAccount msa in member.memberSocialAccounts)
+            {
+                if (msa.type.Trim().Equals("wechat_unionid"))
+                {
+                    existsUnionid = true;
+                    
+                }
+                if (msa.type.Trim().Equals(openIdType.Trim()))
+                {
+                    existsOpneId = true;
+                }
+            }
+            if (!existsUnionid && sessionObj.unionid != null && !sessionObj.unionid.Trim().Equals(""))
+            {
+                MemberSocialAccount newMsa = new MemberSocialAccount()
+                {
+                    type = "wechat_unionid",
+                    num = sessionObj.unionid,
+                    valid = 1,
+                    memo = ""
+                };
+                await _db.memberSocialAccount.AddAsync(newMsa);
+                await _db.SaveChangesAsync();
+            }
+            if (!existsOpneId && sessionObj.openid != null && !sessionObj.openid.Trim().Equals(""))
+            {
+                MemberSocialAccount newMsa = new MemberSocialAccount()
+                {
+                    type = openIdType.Trim(),
+                    num = sessionObj.openid,
+                    valid = 1,
+                    memo = ""
+                };
+                await _db.memberSocialAccount.AddAsync(newMsa);
+                await _db.SaveChangesAsync();
+            }
+            var sessionList = await _db.MiniSessons.Where(m => (m.session_key.Trim().Equals(sessionObj.session_key.Trim())
+                    && m.open_id.Trim().Equals(sessionObj.openid.Trim()) 
+                    && m.session_type.Trim().Equals(openIdType.Trim())  )).ToListAsync();
+            MiniSession session = new MiniSession();
+            if (sessionList.Count > 0)
+            {
+                session = sessionList[0];
+            }
+            else
+            {
+                session = new MiniSession()
+                {
+                    session_key = sessionObj.session_key,
+                    session_type = openIdType.Trim(),
+                    open_id = sessionObj.openid.Trim(),
+                    member_id = member.id
+                };
+                await _db.MiniSessons.AddAsync(session);
+                await _db.SaveChangesAsync();
+            }
+            Member memberNew = new Member()
+            {
+                id = 0,
+                real_name = member.real_name,
+                gender = member.gender,
+                is_admin = member.is_admin,
+                is_manager = member.is_manager,
+                is_staff = member.is_staff,
+                memberSocialAccounts = new List<MemberSocialAccount>()
+            };
+
+            foreach(MemberSocialAccount msadd in member.memberSocialAccounts)
+            {
+                if (msadd.type.Trim().Equals("cell"))
+                {
+                    memberNew.memberSocialAccounts.Add(msadd);
+                }
+            }
+
+
+            sessionObj.member = memberNew;
             sessionObj.openid = "";
             sessionObj.unionid = "";
             return Ok(sessionObj);
@@ -375,6 +448,8 @@ namespace LuqinMiniAppBase.Controllers
             public string unionid { get; set; } = null;
             public string errcode { get; set; } = "";
             public string errmsg { get; set; } = "";
+
+            public int? member_id {get; set;} = null;
 
             public Member member {get; set;} = null;
         }
