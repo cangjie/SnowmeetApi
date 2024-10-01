@@ -17,49 +17,47 @@ namespace SnowmeetApi.Controllers.User
     public class MemberController : ControllerBase
     {
         private readonly ApplicationDBContext _db;
-
+        private readonly IConfiguration _config;
         
 
         public MemberController(ApplicationDBContext db, IConfiguration config)
         {
             _db = db;
-
-        }
-
-        [HttpGet]
-        public async Task<ActionResult<Member>> GetMemberInfoSimple(string sessionKey, string sessionType)
-        {
-            Member member = await GetMember(sessionKey.Trim(), sessionType.Trim());
-            member.id = 0;
-            member.memberSocialAccounts = new List<MemberSocialAccount>();
-            return Ok(member);
+            _config = config;
         }
 
         [NonAction]
-        public async Task<Member> GetMember(string num, string type)
+        public async Task<Member> GetMemberBySessionKey(string sessionKey, string sessionType="wechat_mini_openid")
+        {
+            var sessions = await _db.MiniSessons.Where(s => s.session_key.Trim().Equals(sessionKey.Trim()) 
+                && s.session_type.Trim().Equals(sessionType.Trim())).OrderByDescending(s => s.create_date)
+                .AsNoTracking().ToListAsync();
+            if (sessions.Count <= 0)
+            {
+                return null;
+            }
+            int memberId = sessions[0].member_id != null ? (int)sessions[0].member_id:0;
+            string openId = sessions[0].open_id.Trim();
+            if (memberId == 0)
+            {
+                return await GetMember(openId, sessionType);
+            }
+            else
+            {
+                return await _db.member.Include(m => m.memberSocialAccounts)
+                    .Where(m => m.id == memberId).FirstAsync();
+            }
+        }
+
+
+       
+        [NonAction]
+        public async Task<Member> GetMember(string num, string type="")
         {
             
             type = type.Trim();
             int memberId = 0;
-            /*
-            switch (type.Trim())
-            {
-                case "wechat_mini_openid":
-                    UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _db)).Value;
-                    if (user == null)
-                    {
-                        return null;
-                    }
-                    num = user.miniAppOpenId.Trim();
-                    break;
-                default:
-                    break;
-            }
-            if (num.Trim().Equals(""))
-            {
-                return null;
-            }
-            */
+  
             var msaList = await _db.memberSocialAccount
                         .Where(a => (a.valid == 1 && a.num.Trim().Equals(num) && a.type.Trim().Equals(type)))
                         .OrderByDescending(a => a.id).ToListAsync();
@@ -90,110 +88,23 @@ namespace SnowmeetApi.Controllers.User
         }
         
 
-        /*
-        [HttpGet]
-        public async Task<ActionResult<Member>> TestCreateMember(string openId)
-        {
-            Member member = new Models.Users.Member();
-            member.real_name = "";
-            member.gender = "";
-            MemberSocialAccount msa = new MemberSocialAccount()
-            {
-                type = "wechat_mini_openid",
-                num = openId,
-                valid = 1,
-                memo = ""
-            };
-            member.memberSocialAccounts.Add(msa);
-            await CreateMember(member);
-            return Ok(member);
-
-        }
-        */
-        /*
-
-        // GET: api/Member
-        [HttpGet]
-        public async Task<ActionResult<IEnumerable<Member>>> GetMember()
-        {
-            return await _context.Member.ToListAsync();
-        }
-
-        // GET: api/Member/5
-        [HttpGet("{id}")]
-        public async Task<ActionResult<Member>> GetMember(int id)
-        {
-            var member = await _context.Member.FindAsync(id);
-
-            if (member == null)
-            {
-                return NotFound();
-            }
-
-            return member;
-        }
-
-        // PUT: api/Member/5
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
-        [HttpPut("{id}")]
-        public async Task<IActionResult> PutMember(int id, Member member)
-        {
-            if (id != member.id)
-            {
-                return BadRequest();
-            }
-
-            _context.Entry(member).State = EntityState.Modified;
-
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!MemberExists(id))
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
-            }
-
-            return NoContent();
-        }
-
-        // POST: api/Member
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
-        [HttpPost]
-        public async Task<ActionResult<Member>> PostMember(Member member)
-        {
-            _context.Member.Add(member);
-            await _context.SaveChangesAsync();
-
-            return CreatedAtAction("GetMember", new { id = member.id }, member);
-        }
-
-        // DELETE: api/Member/5
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteMember(int id)
-        {
-            var member = await _context.Member.FindAsync(id);
-            if (member == null)
-            {
-                return NotFound();
-            }
-
-            _context.Member.Remove(member);
-            await _context.SaveChangesAsync();
-
-            return NoContent();
-        }
-        */
         private bool MemberExists(int id)
         {
             return _db.member.Any(e => e.id == id);
+        }
+
+         [NonAction]
+        public Member RemoveSensitiveInfo(Member member)
+        {
+            member.id = 0;
+            foreach(MemberSocialAccount msa in member.memberSocialAccounts)
+            {
+                if (msa.type.Trim().IndexOf("openid") >= 0)
+                {
+                    member.memberSocialAccounts.Remove(msa);
+                }
+            }
+            return member;
         }
     }
 }

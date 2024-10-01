@@ -4,6 +4,7 @@ using SnowmeetApi.Models.Users;
 using wechat_miniapp_base.Models;
 using SnowmeetApi.Models.UTV;
 using SnowmeetApi.Models.Rent;
+using SnowmeetApi.Models.School;
 using System;
 namespace SnowmeetApi.Data
 {
@@ -22,9 +23,7 @@ namespace SnowmeetApi.Data
             //MaintainLive
             modelBuilder.Entity<MaintainLive>().HasKey(c => c.id);
             //SchoolStaff
-            modelBuilder.Entity<SchoolStaff>().HasKey(c => c.open_id);
-            //SchoolLesson
-            modelBuilder.Entity<SchoolLesson>().HasKey(c => c.id);
+            
             modelBuilder.Entity<SnowmeetApi.Models.Maintain.Brand>().HasNoKey();
             modelBuilder.Entity<SnowmeetApi.Models.Users.UnionId>().HasKey(u => new { u.union_id, u.open_id });
             modelBuilder.Entity<SnowmeetApi.Models.DD.ExtendedProperties>().HasNoKey();
@@ -50,8 +49,7 @@ namespace SnowmeetApi.Data
         }
 
         public DbSet<MaintainLive> MaintainLives {get; set;}
-        public DbSet<SchoolStaff> SchoolStaffs { get; set; }
-        public DbSet<SchoolLesson> SchoolLessons { get; set; }
+       
         public DbSet<MiniSession> MiniSessons { get; set; }
         public DbSet<MToken> MTokens { get; set; }
         public DbSet<UnionId> UnionIds { get; set; }
@@ -130,5 +128,9 @@ namespace SnowmeetApi.Data
         public DbSet<SnowmeetApi.Models.Rent.RentProduct> rentProduct {get; set;}
         public DbSet<SnowmeetApi.Models.Rent.RentProductDetailInfo> rentProductDetailInfo {get;set;}
         public DbSet<RentProductImage> rentProductImage {get; set;}
+
+        public DbSet<Staff> schoolStaff {get; set;}
+        public DbSet<Course> schoolCourse {get; set;}
+        public DbSet<CourseStudent> courseStudent {get; set;}
     }
 }
