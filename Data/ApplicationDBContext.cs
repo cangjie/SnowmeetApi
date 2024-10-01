@@ -4,6 +4,7 @@ using SnowmeetApi.Models.Users;
 using wechat_miniapp_base.Models;
 using SnowmeetApi.Models.UTV;
 using SnowmeetApi.Models.Rent;
+using SnowmeetApi.Models.School;
 using System;
 namespace SnowmeetApi.Data
 {
@@ -127,5 +128,9 @@ namespace SnowmeetApi.Data
         public DbSet<SnowmeetApi.Models.Rent.RentProduct> rentProduct {get; set;}
         public DbSet<SnowmeetApi.Models.Rent.RentProductDetailInfo> rentProductDetailInfo {get;set;}
         public DbSet<RentProductImage> rentProductImage {get; set;}
+
+        public DbSet<Staff> schoolStaff {get; set;}
+        public DbSet<Course> schoolCourse {get; set;}
+        public DbSet<CourseStudent> courseStudent {get; set;}
     }
 }
