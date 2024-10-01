@@ -13,6 +13,10 @@ namespace SnowmeetApi.Models.School
 	    public string school_name {get; set;}
 	    public string? sub_school_name {get; set;}
 	    public string? team {get; set;}
+
+        public string? temp_filled_name {get; set;} 
+        public string? temp_filled_cell {get; set;}
+        public string? temp_filled_gender {get; set;}
 	    public string role {get; set;}
 	    public DateTime create_date {get; set;}
     }
