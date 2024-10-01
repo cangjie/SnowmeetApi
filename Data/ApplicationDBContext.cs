@@ -22,9 +22,7 @@ namespace SnowmeetApi.Data
             //MaintainLive
             modelBuilder.Entity<MaintainLive>().HasKey(c => c.id);
             //SchoolStaff
-            modelBuilder.Entity<SchoolStaff>().HasKey(c => c.open_id);
-            //SchoolLesson
-            modelBuilder.Entity<SchoolLesson>().HasKey(c => c.id);
+            
             modelBuilder.Entity<SnowmeetApi.Models.Maintain.Brand>().HasNoKey();
             modelBuilder.Entity<SnowmeetApi.Models.Users.UnionId>().HasKey(u => new { u.union_id, u.open_id });
             modelBuilder.Entity<SnowmeetApi.Models.DD.ExtendedProperties>().HasNoKey();
@@ -50,8 +48,7 @@ namespace SnowmeetApi.Data
         }
 
         public DbSet<MaintainLive> MaintainLives {get; set;}
-        public DbSet<SchoolStaff> SchoolStaffs { get; set; }
-        public DbSet<SchoolLesson> SchoolLessons { get; set; }
+       
         public DbSet<MiniSession> MiniSessons { get; set; }
         public DbSet<MToken> MTokens { get; set; }
         public DbSet<UnionId> UnionIds { get; set; }
