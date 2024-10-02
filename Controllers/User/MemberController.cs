@@ -105,18 +105,30 @@ namespace SnowmeetApi.Controllers.User
             return _db.member.Any(e => e.id == id);
         }
 
-         [NonAction]
+        [NonAction]
         public Member RemoveSensitiveInfo(Member member)
         {
-            //member.id = 0;
-            foreach(MemberSocialAccount msa in member.memberSocialAccounts)
+            member.id = 0;
+            IList<MemberSocialAccount> msaList = member.memberSocialAccounts.ToList();
+
+            for(int i = 0; i < msaList.Count; i++)
             {
+                MemberSocialAccount msa = msaList[i];
+                msa.member_id = 0;
                 if (msa.type.Trim().IndexOf("openid") >= 0)
                 {
-                    member.memberSocialAccounts.Remove(msa);
+                    msaList.Remove(msa);
+                    i--;
+                }
+                if (msa.type.Trim().IndexOf("unionid") >= 0)
+                {
+                    msaList.Remove(msa);
+                    i--;
                 }
             }
+            member.memberSocialAccounts = msaList;
             return member;
         }
+
     }
 }
