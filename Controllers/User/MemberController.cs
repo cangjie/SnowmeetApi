@@ -29,10 +29,10 @@ namespace SnowmeetApi.Controllers.User
         [HttpGet]
         public async Task<ActionResult<Member>> GetMemberInfoSimple(string sessionKey, string sessionType)
         {
-            Member member = await GetMember(sessionKey.Trim(), sessionType.Trim());
-            member.id = 0;
-            member.memberSocialAccounts = new List<MemberSocialAccount>();
-            return Ok(member);
+            Member member = await GetMemberBySessionKey(sessionKey.Trim(), sessionType.Trim());
+            //member.id = 0;
+            //member.memberSocialAccounts = new List<MemberSocialAccount>();
+            return Ok(RemoveSensitiveInfo(member));
         }
 
 
