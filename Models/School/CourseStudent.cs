@@ -15,11 +15,11 @@ namespace SnowmeetApi.Models.School
         public string name {get; set;}
         public string gender {get; set;}
         public string adult_type {get; set;}
-        public string video_url {get; set;}
-        public string trainer_remark {get; set;}
-        public string student_comment {get; set;}
-        public string update_date {get; set;}
-        public string create_date {get; set;}
+        public string video_url {get; set;} = "";
+        public string trainer_remark {get; set;} = "";
+        public string student_comment {get; set;} = "";
+        public DateTime update_date {get; set;} = DateTime.Now;
+        public DateTime create_date {get; set;} = DateTime.Now;
 
         
     }

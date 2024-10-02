@@ -110,10 +110,13 @@ namespace SnowmeetApi.Controllers
             course.oper_member_id = (int)staff.member_id;
             course.oper_cell = staff.temp_filled_cell.Trim();
             course.oper_name = staff.temp_filled_name.Trim();
+            course.course_content = course.course_content == null ? "" : course.course_content.Trim();
+            
             if (course.courseStudents.Count == 0)
             {
                 return NoContent();
             }
+            
             await _db.schoolCourse.AddAsync(course);
             await _db.SaveChangesAsync();
             return Ok(course);
@@ -131,7 +134,7 @@ namespace SnowmeetApi.Controllers
         [NonAction]
         public Staff RemoveSensitiveInfo(Staff staff)
         {
-            staff.member_id = 0;
+            //staff.member_id = 0;
             return staff;
         }
 

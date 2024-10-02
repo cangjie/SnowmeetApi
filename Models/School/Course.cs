@@ -22,8 +22,8 @@ namespace SnowmeetApi.Models.School
         public string time_length {get; set;}
         public string course_content {get; set;}
         public string? wanlong_no {get; set;}
-        public DateTime update_date {get; set;}
-        public DateTime create_date {get; set;}
+        public DateTime update_date {get; set;} = DateTime.Now;
+        public DateTime create_date {get; set;} = DateTime.Now;
 
         [NotMapped]
         public List<CourseStudent> courseStudents  {get; set;}
