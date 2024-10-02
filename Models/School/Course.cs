@@ -2,6 +2,7 @@ using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Collections.Generic;
+using SnowmeetApi.Models.School;
 namespace SnowmeetApi.Models.School
 {
     [Table("school_course")]
@@ -23,5 +24,8 @@ namespace SnowmeetApi.Models.School
         public string? wanlong_no {get; set;}
         public DateTime update_date {get; set;}
         public DateTime create_date {get; set;}
+
+        [NotMapped]
+        public List<CourseStudent> courseStudents  {get; set;}
     }
 }

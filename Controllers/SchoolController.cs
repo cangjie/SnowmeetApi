@@ -97,6 +97,27 @@ namespace SnowmeetApi.Controllers
             }
         }
 
+        [HttpPost]
+        public async Task<ActionResult<Course>> NewCourse([FromBody] Course course, 
+            [FromQuery]string sessionKey, [FromQuery]string sessionType = "wl_wechat_mini_openid")
+        {
+            Staff staff = (Staff)((OkObjectResult)(await GetStaffInfo(sessionKey, sessionType)).Result).Value ;
+            if (staff == null || staff.member_id == null || staff.member_id == 0)
+            {
+                return BadRequest();
+            }
+            course.oper_member_id = (int)staff.member_id;
+            course.oper_cell = staff.temp_filled_cell.Trim();
+            course.oper_name = staff.temp_filled_name.Trim();
+            if (course.courseStudents.Count == 0)
+            {
+                return NoContent();
+            }
+            await _db.schoolCourse.AddAsync(course);
+            await _db.SaveChangesAsync();
+            return Ok(course);
+        }
+
         [NonAction]
         public Staff RemoveSensitiveInfo(Staff staff)
         {
