@@ -29,6 +29,8 @@ namespace SnowmeetApi.Controllers.User
         [HttpGet]
         public async Task<ActionResult<Member>> GetMemberInfoSimple(string sessionKey, string sessionType)
         {
+            sessionKey = Util.UrlDecode(sessionKey);
+            sessionType = Util.UrlDecode(sessionType);
             Member member = await GetMemberBySessionKey(sessionKey.Trim(), sessionType.Trim());
             //member.id = 0;
             //member.memberSocialAccounts = new List<MemberSocialAccount>();
@@ -106,7 +108,7 @@ namespace SnowmeetApi.Controllers.User
          [NonAction]
         public Member RemoveSensitiveInfo(Member member)
         {
-            member.id = 0;
+            //member.id = 0;
             foreach(MemberSocialAccount msa in member.memberSocialAccounts)
             {
                 if (msa.type.Trim().IndexOf("openid") >= 0)
