@@ -1,0 +1,113 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <BuildWithMSBuildOnMono>false</BuildWithMSBuildOnMono>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Remove="Microsoft.EntityFrameworkCore" />
+    <None Remove="Models\" />
+    <None Remove="Data\" />
+    <None Remove="Microsoft.EntityFrameworkCore.SqlServer" />
+    <None Remove="Microsoft.EntityFrameworkCore.Design" />
+    <None Remove="Microsoft.VisualStudio.Web.CodeGeneration.Design" />
+    <None Remove="Models\User\" />
+    <None Remove="Swashbuckle.AspNetCore.SwaggerGen" />
+    <None Remove="Swashbuckle.AspNetCore" />
+    <None Remove="Microsoft.EntityFrameworkCore.Sqlite" />
+    <None Remove="System.IO.FileSystem" />
+    <None Remove="WepayCertificate\" />
+    <None Remove="Models\Product\" />
+    <None Remove="Models\Card\" />
+    <None Remove="Models\Order\" />
+    <None Remove="Controllers\Order\" />
+    <None Remove="Controllers\User\" />
+    <None Remove="ThoughtWorks.QRCode" />
+    <None Remove="QRCoder" />
+    <None Remove="QrCode.Net" />
+    <None Remove="Net.Codecrete.QrCodeGenerator" />
+    <None Remove="Models\Background\" />
+    <None Remove="Controllers\Background\" />
+    <None Remove="upload\" />
+    <None Remove="Microsoft.Extensions.FileSystemGlobbing" />
+    <None Remove="Microsoft.EntityFrameworkCore.Tools" />
+    <None Remove="Models\Rent\" />
+    <None Remove="Models\DD\" />
+    <None Remove="Controllers\Tiktok\" />
+    <None Remove="AlipayCertificate\" />
+    <None Remove="AlipayCertificate\2023082515454\" />
+    <None Remove="AlipayCertificate\2021004112603265\" />
+    <None Remove="AlipayCertificate\2021004108630187\" />
+    <None Remove="Models\WanLong\" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="SKIT.FlurlHttpClient.Wechat.TenpayV3" Version="2.20.0" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.5.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.4" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.4" />
+    <PackageReference Include="Microsoft.VisualStudio.Web.CodeGeneration.Design" Version="8.0.2" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="8.0.4">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.0.4" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="QRCoder" Version="1.4.3" />
+    <PackageReference Include="AlipaySDKNet.OpenAPI" Version="2.4.*" />
+    <PackageReference Include="AlipaySDKNet.Standard" Version="4.8.50" />
+    <PackageReference Include="SixLabors.ImageSharp" Version="3.0.2" />
+    <PackageReference Include="SixLabors.ImageSharp.Drawing" Version="2.0.0" />
+    <PackageReference Include="System.Text.Encoding.CodePages" Version="8.0.0" />
+    
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Data\" />
+    <Folder Include="Models\Users\" />
+    <Folder Include="Models\Product\" />
+    <Folder Include="Models\Card\" />
+    <Folder Include="Controllers\Order\" />
+    <Folder Include="wwwroot\upload\" />
+    <Folder Include="wwwroot\mapp\" />
+    <Folder Include="wwwroot\mapp\admin\" />
+    <Folder Include="wwwroot\mapp\admin\maintain\" />
+    <Folder Include="wwwroot\mapp\admin\maintain\task\" />
+    <Folder Include="wwwroot\js\" />
+    <Folder Include="Models\Background\" />
+    <Folder Include="Controllers\Background\" />
+    <Folder Include="wwwroot\background\mi7_upload\" />
+    <Folder Include="upload\" />
+    <Folder Include="wwwroot\mapp\tickets\" />
+    <Folder Include="Models\DD\" />
+    <Folder Include="Controllers\Tiktok\" />
+    <Folder Include="AlipayCertificate\" />
+    <Folder Include="AlipayCertificate\2023082515454\" />
+    <Folder Include="AlipayCertificate\2021004112603265\" />
+    <Folder Include="AlipayCertificate\2021004108630187\" />
+    <Folder Include="Models\WanLong\" />
+    <Folder Include="wwwroot\background\maintain\" />
+    <Folder Include="wwwroot\background\sale\" />
+    <Folder Include="wwwroot\background\rent\" />
+    <Folder Include="wwwroot\background\wepay\" />
+    <Folder Include="wwwroot\background\js\" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Remove="wwwroot\upload\" />
+    <Content Remove="wwwroot\mapp\" />
+    <Content Remove="wwwroot\mapp\admin\" />
+    <Content Remove="wwwroot\mapp\admin\maintain\" />
+    <Content Remove="wwwroot\mapp\admin\maintain\task\" />
+    <Content Remove="wwwroot\js\" />
+    <Content Remove="wwwroot\background\" />
+    <Content Remove="wwwroot\background\mi7_upload\" />
+    <Content Remove="wwwroot\css\" />
+    <Content Remove="wwwroot\mapp\tickets\" />
+    <Content Remove="wwwroot\hcCmTXvtQ0.txt" />
+    <Content Remove="wwwroot\background\maintain\" />
+    <Content Remove="wwwroot\background\sale\" />
+    <Content Remove="wwwroot\background\rent\" />
+    <Content Remove="wwwroot\background\wepay\" />
+    <Content Remove="wwwroot\background\js\" />
+  </ItemGroup>
+</Project>
