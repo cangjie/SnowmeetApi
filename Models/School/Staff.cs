@@ -23,6 +23,8 @@ namespace SnowmeetApi.Models.School
 	    public string role {get; set;}
 	    public DateTime create_date {get; set;}
 
+        public string? grade {get; set;}
+
         [NotMapped]
         public Member member {get; set;}
     }
