@@ -47,6 +47,7 @@ namespace SnowmeetApi.Data
             modelBuilder.Entity<RentProduct>().HasOne<RentCategory>().WithMany(r => r.productList).HasForeignKey(r => r.category_id);
             modelBuilder.Entity<RentProductDetailInfo>().HasKey(i => new {i.product_id, i.field_id});
             modelBuilder.Entity<CourseStudent>().HasOne<Course>().WithMany(c => c.courseStudents).HasForeignKey(c => c.course_id);
+            
         }
 
         public DbSet<MaintainLive> MaintainLives {get; set;}

@@ -20,5 +20,7 @@ namespace SnowmeetApi.Models.School
         public string student_comment {get; set;}
         public string update_date {get; set;}
         public string create_date {get; set;}
+
+        
     }
 }

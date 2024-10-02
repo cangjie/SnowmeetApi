@@ -14,6 +14,7 @@ using SnowmeetApi.Models.Users;
 using SnowmeetApi.Models.School;
 using System.Collections;
 using System.Text.RegularExpressions;
+using Flurl.Util;
 namespace SnowmeetApi.Controllers
 {
     [Route("core/[controller]/[action]")]
@@ -116,6 +117,15 @@ namespace SnowmeetApi.Controllers
             await _db.schoolCourse.AddAsync(course);
             await _db.SaveChangesAsync();
             return Ok(course);
+        }
+
+        [HttpGet]
+        public async Task<ActionResult<List<Course>>> GetCoursesByStudentInfo(string cell, string name)
+        {
+            name = Util.UrlEncode(name);
+            return Ok(await _db.courseStudent.Where(s => s.cell.Trim().Equals(cell.Trim()) 
+                && s.name.Trim().Equals(name)).OrderByDescending(s => s.id)
+                .AsNoTracking().ToListAsync());
         }
 
         [NonAction]
