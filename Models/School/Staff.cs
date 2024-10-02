@@ -2,6 +2,7 @@ using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Collections.Generic;
+using SnowmeetApi.Models.Users;
 namespace SnowmeetApi.Models.School
 {
     [Table("school_staff")]
@@ -21,5 +22,8 @@ namespace SnowmeetApi.Models.School
         public string avatar {get; set;}
 	    public string role {get; set;}
 	    public DateTime create_date {get; set;}
+
+        [NotMapped]
+        public Member member {get; set;}
     }
 }

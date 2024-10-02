@@ -13,6 +13,7 @@ using SnowmeetApi.Models.Rent;
 using SnowmeetApi.Models.Users;
 using SnowmeetApi.Models.School;
 using System.Collections;
+using System.Text.RegularExpressions;
 namespace SnowmeetApi.Controllers
 {
     [Route("core/[controller]/[action]")]
@@ -54,6 +55,46 @@ namespace SnowmeetApi.Controllers
                 return Ok(RemoveSensitiveInfo(staffList[0]));
             }
 
+        }
+
+        [HttpGet]
+        public async Task<ActionResult<Staff>> FindTrainer(string key)
+        {
+            bool isCell = false;
+            if (Regex.IsMatch(key, @"1\d{10}"))
+            {
+                isCell = true;
+            }
+            var staffList = await _db.schoolStaff.Where(s => (s.member_id != null && s.member_id > 0))
+                .AsNoTracking().ToListAsync();
+            Staff staff = new Staff();
+            bool find = false;
+            for(int i = 0; i < staffList.Count; i++)
+            {
+                if ((staffList[i].temp_filled_cell.ToString().Trim().Equals(key) && isCell)
+                    || (staffList[i].temp_filled_name.ToString().Trim().Equals(key) && !isCell))
+                {
+                    staff = staffList[i];
+                    find = true;
+                    break;
+                }
+            }
+            var members = await _db.member.Where(m => m.id == staff.member_id)
+                .Include(m => m.memberSocialAccounts).AsNoTracking().ToListAsync();
+            if (members.Count > 0)
+            {
+                staff.member = _memberHelper.RemoveSensitiveInfo(members[0]);
+                
+            }
+            
+            if (!find)
+            {
+                return NotFound();
+            }
+            else
+            {
+                return Ok(staff);
+            }
         }
 
         [NonAction]
