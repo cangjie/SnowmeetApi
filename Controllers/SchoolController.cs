@@ -127,8 +127,64 @@ namespace SnowmeetApi.Controllers
         {
             name = Util.UrlEncode(name);
             return Ok(await _db.courseStudent.Where(s => s.cell.Trim().Equals(cell.Trim()) 
-                && s.name.Trim().Equals(name)).OrderByDescending(s => s.id)
+                && s.name.Trim().Equals(name) && s.del == 0).OrderByDescending(s => s.id)
                 .AsNoTracking().ToListAsync());
+        }
+
+        [HttpGet]
+        public async Task<ActionResult<List<Course>>> GetMyCourses(string sessionKey, string sessionType="wl_wechat_mini_openid")
+        {
+            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
+            if (member == null)
+            {
+                return BadRequest();
+            }
+            var courses = await GetCourses(DateTime.Parse("2024-10-1"), DateTime.Parse("2100-10-1"), member.id, 0);
+            return Ok(courses);
+        }
+
+        [HttpGet]
+        public async Task<ActionResult<List<Course>>> GetMyFilledCourses(string sessionKey, string sessionType="wl_wechat_mini_openid")
+        {
+            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
+            if (member == null)
+            {
+                return BadRequest();
+            }
+            var courses = await GetCourses(DateTime.Parse("2024-10-1"), DateTime.Parse("2100-10-1"), 0, member.id);
+            return Ok(courses);
+        }
+
+        [HttpGet("{id}")]
+        public async Task<ActionResult<Course>> GetCourse(int id, string sessionKey, string sessionType="wl_wechat_mini_openid")
+        {
+            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
+            if (member == null)
+            {
+                return BadRequest();
+            }
+            var courses = await _db.schoolCourse.Where(c => c.id == id).Include(c => c.courseStudents)
+                .AsNoTracking().ToListAsync();
+            if (courses != null && courses.Count > 0)
+            {
+                return Ok(courses[0]);
+            }
+            else
+            {
+                return NotFound();
+            }
+        }
+
+
+        [NonAction]
+        public async Task<List<Course>> GetCourses(DateTime start, DateTime end, int trainerId, int operId)
+        {
+            var courses = await _db.schoolCourse
+                .Where(c => (c.course_date.Date >= start.Date && c.course_date.Date <= end.Date
+                && (trainerId == 0 || c.trainer_member_id == trainerId)
+                && (operId == 0 || c.oper_member_id == operId))).OrderByDescending(c => c.id)
+                .Include(c => c.courseStudents).AsNoTracking().ToListAsync();
+            return courses;
         }
 
         [NonAction]

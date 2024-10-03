@@ -18,6 +18,8 @@ namespace SnowmeetApi.Models.School
         public string video_url {get; set;} = "";
         public string trainer_remark {get; set;} = "";
         public string student_comment {get; set;} = "";
+
+        public int del {get; set;} = 0;
         public DateTime update_date {get; set;} = DateTime.Now;
         public DateTime create_date {get; set;} = DateTime.Now;
 
