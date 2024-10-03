@@ -23,6 +23,9 @@ namespace SnowmeetApi.Models.School
         public DateTime update_date {get; set;} = DateTime.Now;
         public DateTime create_date {get; set;} = DateTime.Now;
 
+        [NotMapped]
+        public Course course {get; set;} = null;
+
         
     }
 }

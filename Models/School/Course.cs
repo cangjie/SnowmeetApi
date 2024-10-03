@@ -39,5 +39,8 @@ namespace SnowmeetApi.Models.School
 
         [NotMapped]
         public List<CourseStudent> courseStudents  {get; set;}
+        
+        [NotMapped]
+        public int studentCount {get; set;} = 0;
     }
 }

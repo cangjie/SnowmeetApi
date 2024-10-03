@@ -210,6 +210,22 @@ namespace SnowmeetApi.Controllers
             }
         }
 
+        [HttpGet("{id}")]
+        public async Task<ActionResult<CourseStudent>> GetCourseStudent(int id, string sessionKey, string sessionType = "wl_wechat_mini_openid")
+        {
+            CourseStudent cs = await _db.courseStudent.FindAsync(id);
+            if (cs == null)
+            {
+                return NotFound();
+            }
+            cs.course = await _db.schoolCourse.FindAsync(cs.course_id);
+            cs.course.courseStudents = null;
+            var csl = await _db.courseStudent.Where(s => s.course_id == cs.course_id && cs.del == 0).AsNoTracking().ToListAsync();
+            cs.course.studentCount = csl.Count;
+            
+            return Ok(cs);
+        }
+
         [HttpDelete("{id}")]
         public async Task<ActionResult> DeleteCourse(int id, string sessionKey, string sessionType = "wl_wechat_mini_openid")
         {
