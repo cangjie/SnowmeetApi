@@ -180,6 +180,40 @@ namespace SnowmeetApi.Controllers
             }
         }
 
+        [HttpDelete("{id}")]
+        public async Task<ActionResult> DeleteCourse(int id, string sessionKey, string sessionType = "wl_wechat_mini_openid")
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            sessionType = Util.UrlDecode(sessionType);
+    
+            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
+            if (member == null)
+            {
+                return BadRequest();
+            }
+
+            Course c = (Course)((OkObjectResult)(await GetCourse(id, sessionKey, sessionType)).Result).Value;
+            if (c.oper_member_id != member.id && c.trainer_member_id != member.id)
+            {
+                return BadRequest();
+            }
+            
+            for(int i = 0; i < c.courseStudents.Count; i++)
+            {
+                CourseStudent student = c.courseStudents[i];
+                student.update_date = DateTime.Now;
+                student.del = 1;
+                _db.courseStudent.Entry(student).State = EntityState.Modified;
+            }
+
+            c.update_date = DateTime.Now;
+            c.del = 1;
+            _db.schoolCourse.Entry(c).State = EntityState.Modified;
+            await _db.SaveChangesAsync();
+            return Ok();
+
+        }
+
 
         [NonAction]
         public async Task<List<Course>> GetCourses(DateTime start, DateTime end, int trainerId, int operId)
@@ -187,7 +221,8 @@ namespace SnowmeetApi.Controllers
             var courses = await _db.schoolCourse
                 .Where(c => (c.course_date.Date >= start.Date && c.course_date.Date <= end.Date
                 && (trainerId == 0 || c.trainer_member_id == trainerId)
-                && (operId == 0 || c.oper_member_id == operId))).OrderByDescending(c => c.id)
+                && (operId == 0 || c.oper_member_id == operId) && c.del == 0))
+                .OrderByDescending(c => c.id)
                 .Include(c => c.courseStudents).AsNoTracking().ToListAsync();
             return courses;
         }
