@@ -294,6 +294,16 @@ namespace SnowmeetApi.Controllers
             return sl;
         }
 
+        [HttpGet]
+        public async Task<ActionResult<List<Course>>> GetStudentCourses(string cell, string name)
+        {
+            var courseList = await _db.schoolCourse.FromSqlRaw(" select * from school_course c where del = 0 and exists ( "
+                + " select * from school_course_student where name = '" + name.Replace("'", "") + "' "
+                + " and  cell = '" + cell.Replace("'","") + "' and c.id = course_id and del = 0 ) " )
+                .Include(c => c.courseStudents).OrderByDescending(c => c.id).AsNoTracking().ToListAsync();
+            return Ok(courseList);
+        }
+
         [NonAction]
         public async Task<List<Course>> GetCourses(DateTime start, DateTime end, int trainerId, int operId)
         {
