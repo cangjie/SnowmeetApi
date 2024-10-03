@@ -33,7 +33,8 @@ namespace SnowmeetApi.Controllers
             public int? member_id {get; set;} = null;
             public string cell {get; set;}
             public string name {get; set;}
-
+            public string gender {get; set;}
+            public string adult_type {get; set;}
             public int count {get; set;}
 
             public DateTime lastCourseTime {get; set;}
@@ -274,6 +275,8 @@ namespace SnowmeetApi.Controllers
                             cell = cell.Trim(),
                             lastCourseTime = course.course_date,
                             count = 1,
+                            gender = courseStudent.gender,
+                            adult_type = courseStudent.adult_type,
                             couses = (new List<Course>())
                         };
                         s.couses.Add(course);
