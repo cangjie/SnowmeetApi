@@ -28,6 +28,21 @@ namespace SnowmeetApi.Controllers
 
         private readonly User.MemberController _memberHelper;
 
+        public class Student
+        {
+            public int? member_id {get; set;} = null;
+            public string cell {get; set;}
+            public string name {get; set;}
+
+            public int count {get; set;}
+
+            public DateTime lastCourseTime {get; set;}
+
+            public List<Course> couses {get; set;} = null;
+
+            
+        }
+
         public SchoolController(ApplicationDBContext context, IConfiguration config, IHttpContextAccessor httpContextAccessor)
         {
             _db = context;
@@ -144,6 +159,20 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet]
+        public async Task<ActionResult<List<Student>>> GetMyStudents(string sessionKey, string sessionType="wl_wechat_mini_openid")
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            sessionType = Util.UrlDecode(sessionType);
+            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
+            if (member == null)
+            {
+                return BadRequest();
+            }
+            var courses = await GetCourses(DateTime.Parse("2024-10-1"), DateTime.Parse("2100-10-1"), member.id, 0);
+            return Ok(GetStudents(courses));
+        }
+
+        [HttpGet]
         public async Task<ActionResult<List<Course>>> GetMyFilledCourses(string sessionKey, string sessionType="wl_wechat_mini_openid")
         {
             Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
@@ -214,6 +243,53 @@ namespace SnowmeetApi.Controllers
 
         }
 
+        [NonAction]
+        public List<Student> GetStudents(List<Course> courses)
+        {
+            List<Student> sl = new List<Student>();
+            foreach (Course course in courses)
+            {
+                foreach(CourseStudent courseStudent in course.courseStudents)
+                {
+                    string name = courseStudent.name.Trim();
+                    string cell = courseStudent.cell.Trim();
+                    bool exists = false;
+                    foreach(Student student in sl)
+                    {
+                        if (student.name.Trim().Equals(name.Trim())
+                            && student.cell.Trim().Equals(cell.Trim()))
+                        {
+                            exists = true;
+                            student.couses.Add(course);
+
+                            student.count = student.couses.Count;
+                            break;
+                        }
+                    }
+                    if (!exists)
+                    {
+                        Student s = new Student()
+                        {
+                            name = name.Trim(),
+                            cell = cell.Trim(),
+                            lastCourseTime = course.course_date,
+                            count = 1,
+                            couses = (new List<Course>())
+                        };
+                        s.couses.Add(course);
+                        sl.Add(s);
+                    }
+                }
+            }
+            for(int i = 0; i < sl.Count; i++)
+            {
+                for(int j = 0; j < sl[i].couses.Count; j++)
+                {
+                    sl[i].couses[j].courseStudents = null;
+                }
+            }
+            return sl;
+        }
 
         [NonAction]
         public async Task<List<Course>> GetCourses(DateTime start, DateTime end, int trainerId, int operId)
