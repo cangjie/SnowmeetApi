@@ -222,7 +222,7 @@ namespace SnowmeetApi.Controllers
             cs.course.courseStudents = null;
             var csl = await _db.courseStudent.Where(s => s.course_id == cs.course_id && cs.del == 0).AsNoTracking().ToListAsync();
             cs.course.studentCount = csl.Count;
-            
+            cs.course.staff = (Staff)((OkObjectResult)(await FindTrainer(cs.course.trainer_cell)).Result).Value;
             return Ok(cs);
         }
 
