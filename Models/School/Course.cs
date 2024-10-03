@@ -29,6 +29,15 @@ namespace SnowmeetApi.Models.School
         public DateTime create_date {get; set;} = DateTime.Now;
 
         [NotMapped]
+        public string? oper_role {get; set;} = null;
+
+        [NotMapped]
+        public Staff oper {get; set;} = null;
+
+        [NotMapped]
+        public Staff staff {get; set;} = null;
+
+        [NotMapped]
         public List<CourseStudent> courseStudents  {get; set;}
     }
 }

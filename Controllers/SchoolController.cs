@@ -158,6 +158,7 @@ namespace SnowmeetApi.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<Course>> GetCourse(int id, string sessionKey, string sessionType="wl_wechat_mini_openid")
         {
+            sessionKey = Util.UrlDecode(sessionKey);
             Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
             if (member == null)
             {
@@ -165,8 +166,12 @@ namespace SnowmeetApi.Controllers
             }
             var courses = await _db.schoolCourse.Where(c => c.id == id).Include(c => c.courseStudents)
                 .AsNoTracking().ToListAsync();
+            
             if (courses != null && courses.Count > 0)
             {
+                Course course = courses[0];
+                course.staff = (Staff)((OkObjectResult)(await FindTrainer(course.trainer_cell)).Result).Value;
+                course.oper = (Staff)((OkObjectResult)(await FindTrainer(course.oper_cell)).Result).Value;
                 return Ok(courses[0]);
             }
             else
