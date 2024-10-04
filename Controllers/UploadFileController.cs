@@ -95,7 +95,7 @@ namespace SnowmeetApi.Controllers
 
 
         [HttpPost("{sessionKey}")]
-        public async Task<ActionResult<string>> Upload([FromQuery]string sessionKey, [FromForm]IFormFile file, [FromQuery]string purpose = "")
+        public async Task<ActionResult<string>> Upload([FromRoute]string sessionKey, [FromForm]IFormFile file, [FromQuery]string purpose = "")
         {
             sessionKey = Util.UrlDecode(sessionKey);
             purpose = Util.UrlDecode(purpose);
