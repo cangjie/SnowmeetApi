@@ -16,7 +16,17 @@ namespace SnowmeetApi.Models.School
         public string gender {get; set;}
         public string adult_type {get; set;}
         public string video_url {get; set;} = "";
-        public string trainer_remark {get; set;} = "";
+        public string before_level {get; set;} = "";
+
+        public string after_level {get; set;} = "";
+        public string background {get; set;} = "";
+        public string progress {get; set;} = "";
+        public string emotion {get; set;} = "";
+        public string next_plan {get; set;} = "";
+        
+
+
+
         public string student_comment {get; set;} = "";
 
         public int del {get; set;} = 0;
