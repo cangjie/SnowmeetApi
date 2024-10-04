@@ -95,9 +95,10 @@ namespace SnowmeetApi.Controllers
 
 
         [HttpPost("{sessionKey}")]
-        public async Task<ActionResult<string>> Upload(string sessionKey, IFormFile file)
+        public async Task<ActionResult<string>> Upload([FromQuery]string sessionKey, [FromForm]IFormFile file, [FromQuery]string purpose = "")
         {
             sessionKey = Util.UrlDecode(sessionKey);
+            purpose = Util.UrlDecode(purpose);
             UnicUser._context = _db;
             UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _db)).Value;
             
@@ -121,7 +122,8 @@ namespace SnowmeetApi.Controllers
             {
                 id = 0,
                 owner = user.miniAppOpenId.Trim(),
-                file_path_name = returnFileName
+                file_path_name = returnFileName,
+                purpose = purpose.Trim()
             };
             await _db.UploadFile.AddAsync(fileSave);
             await _db.SaveChangesAsync();
