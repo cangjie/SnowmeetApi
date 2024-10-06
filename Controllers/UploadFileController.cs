@@ -1,15 +1,22 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SnowmeetApi.Data;
 using SnowmeetApi.Models;
-using System.IO;
 using Microsoft.Extensions.Configuration;
 using SnowmeetApi.Models.Users;
+
+
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.WebUtilities;
+using Microsoft.Extensions.Logging;
+using Microsoft.Net.Http.Headers;
+using System.IO;
+using System.Threading.Tasks;
+using RestSharp.Extensions;
+using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace SnowmeetApi.Controllers
 {
@@ -26,6 +33,71 @@ namespace SnowmeetApi.Controllers
             _db = context;
             _config = config.GetSection("Settings");
             UnicUser._context = context;
+        }
+
+        [HttpPost("{sessionKey}")]
+        //[Route(nameof(UploadFile))]
+        public async Task<ActionResult<string>> UploadLargeFile()
+        {
+            var request = HttpContext.Request;
+
+            // validation of Content-Type
+            // 1. first, it must be a form-data request
+            // 2. a boundary should be found in the Content-Type
+            bool tryParse = System.Net.Http.Headers.MediaTypeHeaderValue.TryParse(request.ContentType, out var mediaTypeHeader) ;
+            string bStr = "";
+            foreach(System.Net.Http.Headers.NameValueHeaderValue nvhv in mediaTypeHeader.Parameters)
+            {
+                if (nvhv.Name.Trim().Equals("boundary"))
+                {
+                    bStr = nvhv.Value.Trim();
+                    break;
+                }
+            }
+            
+            if (!request.HasFormContentType || !tryParse ||  bStr.Equals(""))
+                
+            {
+                return  BadRequest();
+            }
+
+            var boundary = HeaderUtilities.RemoveQuotes(bStr).Value;
+            //var boundary = HeaderUtilities.RemoveQuotes(mediaTypeHeader.CharSet).Value;
+            var reader = new MultipartReader(boundary, request.Body);
+            var section = await reader.ReadNextSectionAsync();
+
+            // This sample try to get the first file from request and save it
+            // Make changes according to your needs in actual use
+            while (section != null)
+            {
+                var hasContentDispositionHeader = System.Net.Http.Headers.ContentDispositionHeaderValue.TryParse(section.ContentDisposition,
+                    out var contentDisposition);
+
+                if (hasContentDispositionHeader && contentDisposition.DispositionType.Equals("form-data") &&
+                    !string.IsNullOrEmpty(contentDisposition.FileName))
+                {
+                    // Don't trust any file name, file extension, and file data from the request unless you trust them completely
+                    // Otherwise, it is very likely to cause problems such as virus uploading, disk filling, etc
+                    // In short, it is necessary to restrict and verify the upload
+                    // Here, we just use the temporary folder and a random file name
+
+                    // Get the temporary folder, and combine a random file name with it
+                    var fileName = Path.GetRandomFileName();
+                    var saveToPath = Path.Combine(Path.GetTempPath(), fileName);
+
+                    using (var targetStream = System.IO.File.Create(saveToPath))
+                    {
+                        await section.Body.CopyToAsync(targetStream);
+                    }
+
+                    return Ok("aa");
+                }
+
+                section = await reader.ReadNextSectionAsync();
+            }
+
+            // If the code runs to this location, it means that no files have been saved
+            return BadRequest("No files data in the request.");
         }
 
         [HttpPost]

@@ -18,6 +18,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using System.IO;
 using System.Net.WebSockets;
 using System.Threading;
+using Microsoft.AspNetCore.Server.Kestrel.Core;
 
 namespace SnowmeetApi
 {
@@ -64,6 +65,10 @@ namespace SnowmeetApi
                 c.SwaggerDoc("v1", new OpenApiInfo { Title = "SnowmeetApi", Version = "v1" });
             });
             services.TryAddSingleton<IHttpContextAccessor, HttpContextAccessor>();
+            services.Configure<KestrelServerOptions>(options =>
+            {
+                options.Limits.MaxRequestBodySize = 1024*1024*500;
+            });
             /*
             services.AddDbContext<AppDBContext>(options =>
                     options.UseSqlite(Configuration.GetConnectionString("AppDBContext")));
