@@ -17,7 +17,7 @@ using System.IO;
 using System.Threading.Tasks;
 using RestSharp.Extensions;
 using Microsoft.AspNetCore.Http.HttpResults;
-
+using System.Text.RegularExpressions;
 namespace SnowmeetApi.Controllers
 {
     [Route("core/[controller]/[action]")]
@@ -26,13 +26,14 @@ namespace SnowmeetApi.Controllers
     {
         private readonly ApplicationDBContext _db;
         private IConfiguration _config;
-        
+        private readonly User.MemberController _memberHelper;
 
         public UploadFileController(ApplicationDBContext context, IConfiguration config)
         {
             _db = context;
             _config = config.GetSection("Settings");
             UnicUser._context = context;
+            _memberHelper = new User.MemberController(_db, _config);
         }
 
         [HttpPost("{sessionKey}")]
@@ -40,6 +41,33 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<string>> UploadLargeFile()
         {
             var request = HttpContext.Request;
+
+            string sessionType="wl_wechat_mini_openid";
+            string[] pathArr = request.Path.ToString().Split('/');
+            string sessionKey = pathArr[pathArr.Length - 1].Trim();
+            sessionKey = Util.UrlDecode(sessionKey);
+
+            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
+            if (member == null)
+            {
+                return NotFound();
+            }
+            var staffList = await _db.schoolStaff.Where(s => s.member_id == member.id).AsNoTracking().ToListAsync();
+            if (staffList.Count <= 0)
+            {
+                return BadRequest();
+            }
+
+            string dateStr = DateTime.Now.Year.ToString() + DateTime.Now.Month.ToString().PadLeft(2, '0') + DateTime.Now.Day.ToString().PadLeft(2, '0');
+            
+            
+
+            
+
+            
+
+
+
 
             // validation of Content-Type
             // 1. first, it must be a form-data request
@@ -65,7 +93,15 @@ namespace SnowmeetApi.Controllers
             //var boundary = HeaderUtilities.RemoveQuotes(mediaTypeHeader.CharSet).Value;
             var reader = new MultipartReader(boundary, request.Body);
             var section = await reader.ReadNextSectionAsync();
+            string disPosition = section.ContentDisposition.Trim();
 
+            Match match = Regex.Match(disPosition, @"filename=\""(.)+\""");
+            string ext = "";
+            if (match.Success)
+            {
+                string[] extArr = match.Value.Trim().Split('.');
+                ext = extArr[extArr.Length - 1].Replace("\"", "").Trim();
+            }
             // This sample try to get the first file from request and save it
             // Make changes according to your needs in actual use
             while (section != null)
@@ -82,15 +118,30 @@ namespace SnowmeetApi.Controllers
                     // Here, we just use the temporary folder and a random file name
 
                     // Get the temporary folder, and combine a random file name with it
-                    var fileName = Path.GetRandomFileName();
-                    var saveToPath = Path.Combine(Path.GetTempPath(), fileName);
+                    string fileName = Util.GetLongTimeStamp(DateTime.Now).Trim() + "." + ext.Trim();
+                    string returnFileName = "/upload/" + dateStr + "/" + fileName.Trim();
+                    //var saveToPath = Path.Combine(Path.GetTempPath(), fileName);
+                    string filePath = Util.workingPath + "/wwwroot/upload/" + dateStr;
+                    if (!Directory.Exists(filePath))
+                    {
+                        Directory.CreateDirectory(filePath);
+                    }
+                    string saveToPath = filePath + "/" + fileName.Trim();
 
                     using (var targetStream = System.IO.File.Create(saveToPath))
                     {
                         await section.Body.CopyToAsync(targetStream);
                     }
-
-                    return Ok("aa");
+                    UploadFile fileSave = new UploadFile()
+                    {
+                        id = 0,
+                        member_id = member.id,
+                        file_path_name = returnFileName,
+                        purpose = "万龙滑雪学校"
+                    };
+                    await _db.UploadFile.AddAsync(fileSave);
+                    await _db.SaveChangesAsync();
+                    return Ok(returnFileName);
                 }
 
                 section = await reader.ReadNextSectionAsync();
@@ -204,86 +255,7 @@ namespace SnowmeetApi.Controllers
         }
 
 
-        /*
-        // GET: api/UploadFile
-        [HttpGet]
-        public async Task<ActionResult<IEnumerable<UploadFile>>> GetUploadFile()
-        {
-            return await _context.UploadFile.ToListAsync();
-        }
-
-        // GET: api/UploadFile/5
-        [HttpGet("{id}")]
-        public async Task<ActionResult<UploadFile>> GetUploadFile(int id)
-        {
-            var uploadFile = await _context.UploadFile.FindAsync(id);
-
-            if (uploadFile == null)
-            {
-                return NotFound();
-            }
-
-            return uploadFile;
-        }
-
-        // PUT: api/UploadFile/5
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
-        [HttpPut("{id}")]
-        public async Task<IActionResult> PutUploadFile(int id, UploadFile uploadFile)
-        {
-            if (id != uploadFile.id)
-            {
-                return BadRequest();
-            }
-
-            _context.Entry(uploadFile).State = EntityState.Modified;
-
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!UploadFileExists(id))
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
-            }
-
-            return NoContent();
-        }
-
-        // POST: api/UploadFile
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
-        [HttpPost]
-        public async Task<ActionResult<UploadFile>> PostUploadFile(UploadFile uploadFile)
-        {
-            _context.UploadFile.Add(uploadFile);
-            await _context.SaveChangesAsync();
-
-            return CreatedAtAction("GetUploadFile", new { id = uploadFile.id }, uploadFile);
-        }
-
-        // DELETE: api/UploadFile/5
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteUploadFile(int id)
-        {
-            var uploadFile = await _context.UploadFile.FindAsync(id);
-            if (uploadFile == null)
-            {
-                return NotFound();
-            }
-
-            _context.UploadFile.Remove(uploadFile);
-            await _context.SaveChangesAsync();
-
-            return NoContent();
-        }
-        */
+       
         private bool UploadFileExists(int id)
         {
             return _db.UploadFile.Any(e => e.id == id);
