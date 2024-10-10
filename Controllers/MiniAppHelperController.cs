@@ -180,7 +180,7 @@ namespace LuqinMiniAppBase.Controllers
             }
             if ((member == null || member.id == 0) && sessionObj.openid != null && !sessionObj.openid.Trim().Equals(""))
             {
-                member = await _memberHelper.GetMember(sessionObj.unionid.Trim(), openIdType.Trim());
+                member = await _memberHelper.GetMember(sessionObj.openid.Trim(), openIdType.Trim());
             }
             if (member == null)
             {
