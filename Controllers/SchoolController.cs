@@ -75,6 +75,28 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet]
+        public async Task<ActionResult<Staff>> FindUnRegisteredTrainer(string key)
+        {
+            bool isCell = false;
+            if (Regex.IsMatch(key, @"1\d{10}"))
+            {
+                isCell = true;
+            }
+            var staffList = await _db.schoolStaff.Where(s => (((isCell && s.temp_filled_cell.Trim().Equals(key))
+                || (!isCell &&  s.temp_filled_name.Trim().IndexOf(key)>= 0)) && (s.member_id == null || s.member_id == 0) ))
+                .AsNoTracking().ToListAsync();
+            if (staffList == null || staffList.Count == 0)
+            {
+                return NotFound();
+            }
+            else
+            {
+                return Ok(staffList[0]);
+            }
+
+        }
+
+        [HttpGet]
         public async Task<ActionResult<Staff>> FindTrainer(string key)
         {
             bool isCell = false;
