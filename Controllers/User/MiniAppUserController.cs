@@ -323,7 +323,8 @@ namespace SnowmeetApi.Controllers
             {
 
             }
-            Member member = await _memberHelper.GetMember(sessionKey, "wechat_mini_openid");
+            
+            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, "wl_wechat_mini_openid");
             if (member != null)
             {
                 if (member.gender.Trim().Equals("") && !gender.Trim().Equals(""))
@@ -332,11 +333,30 @@ namespace SnowmeetApi.Controllers
                     _context.member.Entry(member).State = EntityState.Modified;
                     await _context.SaveChangesAsync();
                 }
+                if (!cell.Trim().Equals(""))
+                {
+                    var msaList = await _context.memberSocialAccount.Where(m => (m.member_id == member.id
+                        && m.type.Trim().Equals("cell") && m.num.Trim().Equals(cell.Trim())))
+                        .AsNoTracking().ToListAsync();
+                    if (msaList == null || msaList.Count == 0)
+                    {
+                        MemberSocialAccount msa = new MemberSocialAccount()
+                        {
+                            id = 0,
+                            member_id = member.id,
+                            type = "cell",
+                            num = cell,
+                            valid = 1
+                        
+                        };
+                        await _context.memberSocialAccount.AddAsync(msa);
+                        await _context.SaveChangesAsync();
+                    }
+
+                }
 
             }
-            
-
-            return BadRequest();
+            return Ok(_memberHelper.RemoveSensitiveInfo(member));
         }
 
         [HttpGet]

@@ -18,7 +18,7 @@ namespace SnowmeetApi.Models.Users
 
         public int valid {get; set;}
 
-        public string memo {get; set; }
+        public string memo {get; set; } = "";
 
        // public Member member { get; set; }
 
