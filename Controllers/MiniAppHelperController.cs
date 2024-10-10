@@ -178,12 +178,16 @@ namespace LuqinMiniAppBase.Controllers
             {
                 member = await _memberHelper.GetMember(sessionObj.unionid.Trim(), "wechat_unionid");
             }
+            /*
             if ((member == null || member.id == 0) && sessionObj.openid != null && !sessionObj.openid.Trim().Equals(""))
             {
                 member = await _memberHelper.GetMember(sessionObj.unionid.Trim(), openIdType.Trim());
             }
+            */
             if (member == null)
             {
+                return BadRequest();
+                /*
                 member = new Member()
                 {
                     id = 0,
@@ -213,6 +217,8 @@ namespace LuqinMiniAppBase.Controllers
                     member.memberSocialAccounts.Add(msa);
                 }
                 member = await _memberHelper.CreateMember(member);
+                */
+
             }
             bool existsUnionid = false;
             bool existsOpneId = false;
