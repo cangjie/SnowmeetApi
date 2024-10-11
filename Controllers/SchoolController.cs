@@ -52,6 +52,27 @@ namespace SnowmeetApi.Controllers
             _memberHelper = new User.MemberController(_db, _config);
         }
 
+        [HttpGet("{staffId}")]
+        public async Task<ActionResult<Staff>> LinkStaffMember(int staffId, string sessionKey, string sessionType = "wl_wechat_mini_openid")
+        {
+            sessionKey = Util.UrlEncode(sessionKey);
+            Staff staff = await _db.schoolStaff.FindAsync(staffId);
+            if (staff == null || staff.member_id != null)
+            {
+                return BadRequest();
+            }
+            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
+            if (member == null)
+            {
+                return NotFound();
+            }
+            staff.member_id = member.id;
+            _db.schoolStaff.Entry(staff).State = EntityState.Modified;
+            await _db.SaveChangesAsync();
+            return Ok(staff);
+
+        }
+
         [HttpGet]
         public async Task<ActionResult<Staff>> GetStaffInfo(string sessionKey, string sessionType="wl_wechat_mini_openid")
         {
