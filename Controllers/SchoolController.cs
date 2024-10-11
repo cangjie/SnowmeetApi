@@ -55,7 +55,7 @@ namespace SnowmeetApi.Controllers
         [HttpGet("{staffId}")]
         public async Task<ActionResult<Staff>> LinkStaffMember(int staffId, string sessionKey, string sessionType = "wl_wechat_mini_openid")
         {
-            sessionKey = Util.UrlEncode(sessionKey);
+            sessionKey = Util.UrlDecode(sessionKey);
             Staff staff = await _db.schoolStaff.FindAsync(staffId);
             if (staff == null || staff.member_id != null)
             {
