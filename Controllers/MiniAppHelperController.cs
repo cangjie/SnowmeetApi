@@ -157,7 +157,7 @@ namespace LuqinMiniAppBase.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<Code2Session>> MemberLogin(string code, string openIdType)
+        public async Task<ActionResult<Code2Session>> MemberLogin(string code, string openIdType = "wl_wchat_mini_openid")
         {
             string appId = _settings.appId;
             string appSecret = _settings.appSecret;
@@ -238,6 +238,7 @@ namespace LuqinMiniAppBase.Controllers
             {
                 MemberSocialAccount newMsa = new MemberSocialAccount()
                 {
+                    member_id = member.id,
                     type = "wechat_unionid",
                     num = sessionObj.unionid,
                     valid = 1,
@@ -250,6 +251,7 @@ namespace LuqinMiniAppBase.Controllers
             {
                 MemberSocialAccount newMsa = new MemberSocialAccount()
                 {
+                    member_id = member.id,
                     type = openIdType.Trim(),
                     num = sessionObj.openid,
                     valid = 1,
@@ -278,6 +280,8 @@ namespace LuqinMiniAppBase.Controllers
                 await _db.MiniSessons.AddAsync(session);
                 await _db.SaveChangesAsync();
             }
+
+            /*
             Member memberNew = new Member()
             {
                 id = 0,
@@ -296,9 +300,9 @@ namespace LuqinMiniAppBase.Controllers
                     memberNew.memberSocialAccounts.Add(msadd);
                 }
             }
+*/
 
-
-            sessionObj.member = memberNew;
+            sessionObj.member = _memberHelper.RemoveSensitiveInfo(member);
             sessionObj.openid = "";
             sessionObj.unionid = "";
             return Ok(sessionObj);
