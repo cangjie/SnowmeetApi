@@ -23,7 +23,7 @@ namespace SnowmeetApi.Models.School
         public string progress {get; set;} = "";
         public string emotion {get; set;} = "";
         public string next_plan {get; set;} = "";
-        
+        public string images {get; set;} = "";
 
 
 
