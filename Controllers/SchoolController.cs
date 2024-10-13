@@ -212,7 +212,17 @@ namespace SnowmeetApi.Controllers
             {
                 return BadRequest();
             }
-            var courses = await GetCourses(DateTime.Parse("2024-10-1"), DateTime.Parse("2100-10-1"), member.id, 0);
+            var staffList = await _db.schoolStaff.Where(s => s.member_id == member.id).AsNoTracking().ToListAsync();
+            if (staffList == null || staffList.Count == 0)
+            {
+                return NoContent();
+            }
+            int memberId = member.id;
+            if (staffList[0].role.Trim().Equals("校长") && staffList[0].sub_school_name.Trim().Equals(""))
+            {
+                memberId = 0;
+            }
+            var courses = await GetCourses(DateTime.Parse("2024-10-1"), DateTime.Parse("2100-10-1"), memberId, 0);
             return Ok(GetStudents(courses));
         }
 
