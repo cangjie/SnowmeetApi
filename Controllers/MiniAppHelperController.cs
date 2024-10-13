@@ -232,6 +232,7 @@ namespace LuqinMiniAppBase.Controllers
             {
                 MemberSocialAccount newMsa = new MemberSocialAccount()
                 {
+                    member_id = member.id,
                     type = "wechat_unionid",
                     num = sessionObj.unionid,
                     valid = 1,
@@ -244,6 +245,7 @@ namespace LuqinMiniAppBase.Controllers
             {
                 MemberSocialAccount newMsa = new MemberSocialAccount()
                 {
+                    member_id = member.id,
                     type = openIdType.Trim(),
                     num = sessionObj.openid,
                     valid = 1,
