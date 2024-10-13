@@ -202,6 +202,32 @@ namespace SnowmeetApi.Controllers
             return Ok(courses);
         }
 
+        [HttpPost]
+        public async Task<ActionResult<CourseStudent>> UpdateCourseStudent([FromBody]CourseStudent courseStudent, 
+            [FromQuery] string sessionKey, [FromQuery] string sessionType = "wl_wechat_mini_openid")
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            sessionType = Util.UrlDecode(sessionType);
+            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
+            if (member == null)
+            {
+                return BadRequest();
+            }
+            var staffList = await _db.schoolStaff.Where(s => s.member_id == member.id).AsNoTracking().ToListAsync();
+            if (staffList == null || staffList.Count == 0)
+            {
+                return BadRequest();
+            }
+            Staff staff = staffList[0];
+            if (courseStudent.course.trainer_member_id != member.id)
+            {
+                return BadRequest();
+            }
+            _db.courseStudent.Entry(courseStudent).State = EntityState.Modified;
+            await _db.SaveChangesAsync();
+            return Ok(courseStudent);
+        }
+
         [HttpGet]
         public async Task<ActionResult<List<Student>>> GetMyStudents(string sessionKey, string sessionType="wl_wechat_mini_openid")
         {
