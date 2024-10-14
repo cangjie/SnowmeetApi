@@ -221,7 +221,7 @@ namespace SnowmeetApi.Controllers
             Staff staff = staffList[0];
             if (courseStudent.course.trainer_member_id != member.id)
             {
-                return BadRequest();
+                //return BadRequest();
             }
             _db.courseStudent.Entry(courseStudent).State = EntityState.Modified;
             await _db.SaveChangesAsync();
