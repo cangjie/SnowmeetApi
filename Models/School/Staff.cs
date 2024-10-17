@@ -25,6 +25,10 @@ namespace SnowmeetApi.Models.School
 
         public string? grade {get; set;}
 
+        public string? ski_level {get; set;}
+
+        public string? board_level {get; set;}
+
         [NotMapped]
         public Member member {get; set;}
     }
