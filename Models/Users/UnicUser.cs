@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
+using NuGet.Packaging.Signing.DerEncoding;
 
 
 namespace SnowmeetApi.Models.Users
@@ -29,6 +30,15 @@ namespace SnowmeetApi.Models.Users
         public string officialAccountOpenId = "";
         public string miniAppOpenId = "";
         public string unionId = "";
+
+        public int memberId = 0;
+
+        public string cell = "";
+
+        public string wlMiniOpenId = "";
+
+        public Member member;
+        
         /*
         public int height = 0;
         public int weight = 0;
@@ -44,6 +54,8 @@ namespace SnowmeetApi.Models.Users
         {
             get
             {
+                /*
+                
                 if (officialAccountUser != null && officialAccountUser.is_admin == 1)
                 {
                     return true;
@@ -53,11 +65,95 @@ namespace SnowmeetApi.Models.Users
                     return true;
                 }
                 return false;
+                */
+                if (member.is_admin == 1 || member.is_manager == 1 || member.is_staff == 1)
+                {
+                    return true;
+                }
+                else
+                {
+                    return false;
+                }
             }
         }
 
+    
+        public static async Task<UnicUser> GetUnicUser(int memberId)
+        {
+            if (memberId == 0)
+            {
+                return null;
+            }
+            var memberList = await _context.member.Where(m => m.id == memberId).Include(m => m.memberSocialAccounts)
+                .AsNoTracking().ToListAsync();
+            if (memberList == null || memberList.Count == 0)
+            {
+                return null;
+            }
+            UnicUser user = new UnicUser();
+            user.member = memberList[0];
+            foreach(MemberSocialAccount msa in memberList[0].memberSocialAccounts)
+            {
+                switch(msa.type.Trim())
+                {
+                    case "wechat_mini_openid":
+                        user.miniAppOpenId = msa.num.Trim();
+                        user.miniAppUser = await  _context.MiniAppUsers.FindAsync(msa.num.Trim());
+                        break;
+                    case "wechat_oa_openid":
+                        user.officialAccountOpenId = msa.num.Trim();
+                        user.officialAccountUser = await _context.officialAccoutUsers.FindAsync(msa.num.Trim());
+                        break;
+                    case "wechat_unionid":
+                        user.unionId = msa.num.Trim();
+                        break;
+                    case "cell":
+                        user.cell = msa.num.Trim();
+                        break;
+                    case "wl_wechat_mini_openid":
+                        user.wlMiniOpenId = msa.num.Trim();
+                        break;
+                    default:
+                        break;
+                }
+            }
+            return user;
+            
+        }
+
+
         public static async Task<UnicUser> GetUnicUser(string openId, string type, Data.ApplicationDBContext _context)
         {
+            _context = _context;
+            switch(type)
+            {
+                case "snowmeet_mini":
+                    type = "wechat_mini_openid";
+                    break;
+                case "snowmeet_official_account_new":
+                    type = "wechat_oa_openid";
+                    break;
+                default:
+                    type = "";
+                    break;
+
+            }
+            if (type.Trim().Equals(""))
+            {
+                return null;
+            }
+            var msaList = await _context.memberSocialAccount.Where(m => (m.num.Trim().Equals(openId.Trim()) && m.type.Trim().Equals(type)))
+                .AsNoTracking().ToListAsync();
+            if (msaList == null || msaList.Count == 0)
+            {
+                return null;
+            }
+            if (msaList[0].member_id == 0)
+            {
+                return null;
+            }
+            return await GetUnicUser(msaList[0].member_id);
+            /*
             var unionIds = await _context.UnionIds.FromSqlRaw(" select * from unionids where open_id = '" + openId.Trim().Replace("'", "") + "' "
                 + " and source = '" + type.Replace("'", "") + "'").ToListAsync();
             if (unionIds.Count > 0)
@@ -123,10 +219,16 @@ namespace SnowmeetApi.Models.Users
             {
                 return null;
             }
+            */
         }
 
         public static async Task<ActionResult<UnicUser>> GetUnicUserAsync(string sessionKey, Data.ApplicationDBContext db)
         {
+            _context = db;
+
+            return await GetUnicUser(sessionKey, "wechat_mini_openid");
+            /*
+
             UnicUser user = new UnicUser();
             string miniAppOpenId = "";
             string officialOpenId = "";
@@ -214,6 +316,7 @@ namespace SnowmeetApi.Models.Users
 
             }
             return user;
+            */
         }
 
         public static async Task<UnicUser> GetUnicUser(string sessionKey, string sessionType = "wechat_mini_openid")
@@ -221,13 +324,18 @@ namespace SnowmeetApi.Models.Users
             sessionKey = Util.UrlDecode(sessionKey);
             sessionType = Util.UrlDecode(sessionType);
             var sL = await _context.MiniSessons.Where(s => s.session_key.Trim().Equals(sessionKey.Trim())
-                && s.session_type.Trim().Equals(sessionType)).AsNoTracking().ToListAsync();
-            return null;
+                && s.session_type.Trim().Equals(sessionType)).OrderByDescending(s => s.create_date).AsNoTracking().ToListAsync();
+            if (sL == null || sL.Count == 0)
+            {
+                return null;
+            }
+            int memberId = ((sL[0].member_id == null)? 0 : (int)sL[0].member_id);
+            return await GetUnicUser(memberId);
         }
 
-        /*
+        
 
-
+/*
         public static UnicUser GetUnicUser_bak(string sessionKey)
         {
             UnicUser user = new UnicUser();
