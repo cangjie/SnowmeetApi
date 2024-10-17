@@ -146,7 +146,7 @@ namespace SnowmeetApi.Controllers
         [HttpGet("{cell}")]
         public async Task<ActionResult<MiniAppUser>> GetUserByCell(string cell, string staffSessionKey)
         {
-            if (!Util.IsAdmin(staffSessionKey, _context))
+            if (!(await Util.IsAdmin(staffSessionKey, _context)))
             {
                 return NoContent();
             }

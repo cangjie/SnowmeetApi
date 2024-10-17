@@ -216,7 +216,19 @@ namespace SnowmeetApi.Models.Users
             return user;
         }
 
-        public static UnicUser GetUnicUser(string sessionKey)
+        public static async Task<UnicUser> GetUnicUser(string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            sessionType = Util.UrlDecode(sessionType);
+            var sL = await _context.MiniSessons.Where(s => s.session_key.Trim().Equals(sessionKey.Trim())
+                && s.session_type.Trim().Equals(sessionType)).AsNoTracking().ToListAsync();
+            return null;
+        }
+
+        /*
+
+
+        public static UnicUser GetUnicUser_bak(string sessionKey)
         {
             UnicUser user = new UnicUser();
             string miniAppOpenId = "";
@@ -304,5 +316,6 @@ namespace SnowmeetApi.Models.Users
             }
             return user;
         }
+        */
     }
 }

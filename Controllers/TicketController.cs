@@ -347,7 +347,7 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<IEnumerable<Ticket>>> GetTicketsByUser(int used, string openId, string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey);
-            if (!Util.IsAdmin(sessionKey, _context))
+            if (!(await Util.IsAdmin(sessionKey, _context)))
             {
                 return NoContent();
             }

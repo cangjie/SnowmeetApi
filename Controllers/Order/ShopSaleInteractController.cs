@@ -42,7 +42,7 @@ namespace SnowmeetApi.Controllers.Order
         {
             sessionKey = Util.UrlDecode(sessionKey.Trim());
             
-            UnicUser staffUser = UnicUser.GetUnicUser(sessionKey);
+            UnicUser staffUser = await UnicUser.GetUnicUser(sessionKey);
             if (!staffUser.isAdmin)
             {
                 return NoContent();
