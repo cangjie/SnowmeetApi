@@ -300,7 +300,7 @@ namespace LuqinMiniAppBase.Controllers
             return Ok(sessionObj);
         }
 
-
+        /*
         [HttpGet]
         public  async Task<ActionResult<Code2Session>> Login(string code)
         {
@@ -359,7 +359,7 @@ namespace LuqinMiniAppBase.Controllers
             }
             return NotFound();
         }
-
+        */
         
 
 

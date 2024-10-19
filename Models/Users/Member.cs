@@ -18,6 +18,8 @@ namespace SnowmeetApi.Models.Users
         public int is_staff { get; set; }
         public int is_manager { get; set;}
         public int is_admin { get; set; }
+        public int in_staff_list {get; set;}
+
 
         
         public ICollection<MemberSocialAccount> memberSocialAccounts { get; set; } = new List<MemberSocialAccount>();
