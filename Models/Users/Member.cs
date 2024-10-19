@@ -20,6 +20,9 @@ namespace SnowmeetApi.Models.Users
         public int is_admin { get; set; }
         public int in_staff_list {get; set;}
 
+        [NotMapped]
+        public string cell {get; set;} = "";
+
 
         
         public ICollection<MemberSocialAccount> memberSocialAccounts { get; set; } = new List<MemberSocialAccount>();

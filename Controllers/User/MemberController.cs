@@ -127,6 +127,85 @@ namespace SnowmeetApi.Controllers.User
             return RemoveSensitiveInfo(member);
         }
 
+        [HttpGet("{memberId}")]
+        public async Task<ActionResult> SetStaffRight(int memberId, int isAdmin, int isManager, int isStaff, int inStaffList,
+            string sessionKey, string sessionType="wechat_mini_openid")
+        {
+            Member admin = await GetMemberBySessionKey(sessionKey, sessionType);
+            if (admin.is_admin == 0)
+            {
+                return BadRequest();
+            }
+            Member staff = await _db.member.FindAsync(memberId);
+            if (staff == null)
+            {
+                return NotFound();
+            }
+            staff.is_admin = isAdmin;
+            staff.is_staff = isStaff;
+            staff.is_manager = isManager;
+            staff.in_staff_list = inStaffList;
+            _db.member.Entry(staff).State = EntityState.Modified;
+            await _db.SaveChangesAsync();
+            return Ok();
+        }
+
+        [HttpGet("{memberId}")]
+        public async Task<ActionResult<Member>> GetWholeStaffInfo(int memberId, 
+            string sessionKey, string sessionType="wechat_mini_openid")
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            sessionType = Util.UrlDecode(sessionType);
+            Member admin = await GetMemberBySessionKey(sessionKey, sessionType);
+            if (admin.is_admin == 0 && admin.is_staff == 0 && admin.is_manager == 0)
+            {
+                return BadRequest();
+            }
+            var memberList = await _db.member.Where(m => m.id == memberId)
+                .Include(m => m.memberSocialAccounts).AsNoTracking().ToListAsync();
+            if (memberList == null || memberList.Count == 0)
+            {
+                return NotFound();
+            }
+            return Ok(memberList[0]);
+        }
+
+        [HttpGet]
+        public async Task<ActionResult<List<Member>>> GetStaffList(string sessionKey, 
+            string sessionType="wechat_mini_openid")
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            sessionType = Util.UrlDecode(sessionType);
+            Member admin = await GetMemberBySessionKey(sessionKey, sessionType);
+            if (admin.is_admin == 0)
+            {
+                return BadRequest();
+            }
+            var memberList = await _db.member.Where(m => (m.in_staff_list == 1))
+                .Include(m => m.memberSocialAccounts).AsNoTracking().ToListAsync();
+            memberList = GetCells(memberList);
+            return Ok(memberList);
+            
+        }
+
+        [NonAction]
+        public List<Member> GetCells(List<Member> memberList)
+        {
+            for(int i = 0; i < memberList.Count; i++)
+            {
+                Member member = memberList[i];
+                foreach(MemberSocialAccount msa in member.memberSocialAccounts)
+                {
+                    if (msa.type.Trim().Equals("cell"))
+                    {
+                        member.cell = msa.num.Trim();
+                        break;
+                    }
+                }
+            }
+            return memberList;
+        }
+
         [NonAction]
         public Member RemoveSensitiveInfo(Member member)
         {
