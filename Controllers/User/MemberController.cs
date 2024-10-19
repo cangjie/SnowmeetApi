@@ -108,6 +108,10 @@ namespace SnowmeetApi.Controllers.User
         [NonAction]
         public Member RemoveSensitiveInfo(Member member)
         {
+            if (member == null)
+            {
+                return member;
+            }
             member.id = 0;
             IList<MemberSocialAccount> msaList = member.memberSocialAccounts.ToList();
 
