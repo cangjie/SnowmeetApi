@@ -270,7 +270,7 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<Member>> UpdateWechatMemberInfo(string sessionKey, string encData, string iv)
+        public async Task<ActionResult<Member>> UpdateWechatMemberCell(string sessionKey, string encData, string iv)
         {
             sessionKey = Util.UrlDecode(sessionKey);
             encData = Util.UrlDecode(encData);
@@ -323,7 +323,20 @@ namespace SnowmeetApi.Controllers
             {
 
             }
-            Member member = await _memberHelper.GetMember(sessionKey, "wechat_mini_openid");
+
+            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, "wechat_mini_openid");
+
+            var cellList = await _context.memberSocialAccount
+                .Where(m => (m.type.Trim().Equals("cell") && m.num.Trim().Equals(cell.Trim()) && m.member_id == member.id))
+                .AsNoTracking().ToListAsync();
+            if (cellList == null || cellList.Count == 0)
+            {
+
+            }
+
+
+
+
             if (member != null)
             {
                 if (member.gender.Trim().Equals("") && !gender.Trim().Equals(""))
