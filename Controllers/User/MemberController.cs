@@ -105,6 +105,24 @@ namespace SnowmeetApi.Controllers.User
             return _db.member.Any(e => e.id == id);
         }
 
+        [HttpGet]
+        public async Task<ActionResult<Member>> RegStaff(string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            sessionType = Util.UrlDecode(sessionType);
+            Member member = await GetMemberBySessionKey(sessionKey, sessionType);
+            if (member == null)
+            {
+                return NotFound();
+            }
+            member = await _db.member.FindAsync(member.id);
+
+            member.in_staff_list = 1;
+            _db.member.Entry(member).State = EntityState.Modified;
+            await _db.SaveChangesAsync();
+            return RemoveSensitiveInfo(member);
+        }
+
         [NonAction]
         public Member RemoveSensitiveInfo(Member member)
         {
