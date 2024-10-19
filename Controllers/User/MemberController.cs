@@ -128,7 +128,9 @@ namespace SnowmeetApi.Controllers.User
         }
 
         [HttpGet("{memberId}")]
-        public async Task<ActionResult> SetStaffRight(int memberId, int isAdmin, int isManager, int isStaff, int inStaffList,
+        public async Task<ActionResult> SetStaffInfo(int memberId,  
+            string name, string gender, string cell,
+            int isAdmin, int isManager, int isStaff, int inStaffList,
             string sessionKey, string sessionType="wechat_mini_openid")
         {
             Member admin = await GetMemberBySessionKey(sessionKey, sessionType);
@@ -145,6 +147,9 @@ namespace SnowmeetApi.Controllers.User
             staff.is_staff = isStaff;
             staff.is_manager = isManager;
             staff.in_staff_list = inStaffList;
+            staff.real_name = name.Trim();
+            staff.gender = gender;
+            await ModMemberCell(memberId, cell.Trim());
             _db.member.Entry(staff).State = EntityState.Modified;
             await _db.SaveChangesAsync();
             return Ok();
@@ -220,6 +225,37 @@ namespace SnowmeetApi.Controllers.User
             }
             return memberList;
         }
+
+        [NonAction]
+        public async Task ModMemberCell(int memberId, string cell)
+        {
+            var list = await _db.memberSocialAccount
+                .Where(m => (m.type.Trim().Equals("cell") && m.num.Trim().Equals(cell.Trim()) 
+                && m.member_id == memberId))
+                .ToListAsync();
+            if (list == null || list.Count == 0)
+            {
+                MemberSocialAccount msa = new MemberSocialAccount()
+                {
+                    id = 0,
+                    member_id = memberId,
+                    type = "cell",
+                    num = cell.Trim(),
+                    valid = 1
+                };
+                await _db.memberSocialAccount.AddAsync(msa);
+                await _db.SaveChangesAsync();
+            }
+            else
+            {
+                MemberSocialAccount msa = list[0];
+                msa.valid = 1;
+                _db.memberSocialAccount.Entry(msa).State = EntityState.Modified;
+                await _db.SaveChangesAsync();
+            }
+
+        }
+
 
         [NonAction]
         public Member RemoveSensitiveInfo(Member member)
