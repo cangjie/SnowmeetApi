@@ -331,25 +331,22 @@ namespace SnowmeetApi.Controllers
                 .AsNoTracking().ToListAsync();
             if (cellList == null || cellList.Count == 0)
             {
-
-            }
-
-
-
-
-            if (member != null)
-            {
-                if (member.gender.Trim().Equals("") && !gender.Trim().Equals(""))
+                MemberSocialAccount msa = new MemberSocialAccount()
                 {
-                    member.gender = gender.Trim();
-                    _context.member.Entry(member).State = EntityState.Modified;
-                    await _context.SaveChangesAsync();
-                }
+                    id = 0,
+                    member_id = member.id,
+                    type = "cell",
+                    num = cell.Trim(),
+                    valid = 1
+                };
+                await _context.memberSocialAccount.AddAsync(msa);
+                await _context.SaveChangesAsync();
 
             }
-            
+            member = await _memberHelper.GetMemberBySessionKey(sessionKey, "wechat_mini_openid");
+            return Ok(_memberHelper.RemoveSensitiveInfo(member));
 
-            return BadRequest();
+
         }
 
         [HttpGet]
