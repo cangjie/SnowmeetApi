@@ -167,6 +167,7 @@ namespace SnowmeetApi.Controllers.User
             {
                 return NotFound();
             }
+            memberList = GetCells(memberList);
             return Ok(memberList[0]);
         }
 
