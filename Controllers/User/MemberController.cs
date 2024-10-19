@@ -151,7 +151,7 @@ namespace SnowmeetApi.Controllers.User
         }
 
         [HttpGet("{memberId}")]
-        public async Task<ActionResult<Member>> GetWholeStaffInfo(int memberId, 
+        public async Task<ActionResult<Member>> GetWholeMemberInfo(int memberId, 
             string sessionKey, string sessionType="wechat_mini_openid")
         {
             sessionKey = Util.UrlDecode(sessionKey);
