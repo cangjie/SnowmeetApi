@@ -147,9 +147,14 @@ namespace SnowmeetApi.Controllers.User
             staff.is_staff = isStaff;
             staff.is_manager = isManager;
             staff.in_staff_list = inStaffList;
-            staff.real_name = name.Trim();
-            staff.gender = gender;
-            await ModMemberCell(memberId, cell.Trim());
+            if (!name.Trim().Equals(""))
+                staff.real_name = name.Trim();
+            if (!gender.Trim().Equals(""))
+                staff.gender = gender.Trim();
+            if (!cell.Trim().Equals(""))
+                await ModMemberCell(memberId, cell.Trim());    
+            
+            
             _db.member.Entry(staff).State = EntityState.Modified;
             await _db.SaveChangesAsync();
             return Ok();
