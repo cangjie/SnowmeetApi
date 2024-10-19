@@ -188,6 +188,20 @@ namespace SnowmeetApi.Controllers.User
             
         }
 
+        [HttpGet("{cell}")]
+        public async Task<ActionResult<Member>> GetMemberByCell(string cell, 
+            string sessionKey, string sessionType="wechat_mini_openid")
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            sessionType = Util.UrlDecode(sessionType);
+            Member admin = await GetMemberBySessionKey(sessionKey, sessionType);
+            if (admin.is_admin == 0 && admin.is_manager == 0 && admin.is_staff == 0)
+            {
+                return BadRequest();
+            }
+            return Ok(await GetMember(cell, "cell"));
+        }
+
         [NonAction]
         public List<Member> GetCells(List<Member> memberList)
         {
