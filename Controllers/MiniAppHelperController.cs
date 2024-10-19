@@ -274,6 +274,8 @@ namespace LuqinMiniAppBase.Controllers
                 await _db.MiniSessons.AddAsync(session);
                 await _db.SaveChangesAsync();
             }
+
+            /*
             Member memberNew = new Member()
             {
                 id = 0,
@@ -282,6 +284,7 @@ namespace LuqinMiniAppBase.Controllers
                 is_admin = member.is_admin,
                 is_manager = member.is_manager,
                 is_staff = member.is_staff,
+                in_staff_list = member.in_staff_list,
                 memberSocialAccounts = new List<MemberSocialAccount>()
             };
 
@@ -293,8 +296,8 @@ namespace LuqinMiniAppBase.Controllers
                 }
             }
 
-
-            sessionObj.member = memberNew;
+            */
+            sessionObj.member = _memberHelper.RemoveSensitiveInfo(member);
             sessionObj.openid = "";
             sessionObj.unionid = "";
             return Ok(sessionObj);
