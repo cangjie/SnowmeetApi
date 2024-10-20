@@ -147,11 +147,11 @@ namespace SnowmeetApi.Controllers.User
             staff.is_staff = isStaff;
             staff.is_manager = isManager;
             staff.in_staff_list = inStaffList;
-            if (!name.Trim().Equals(""))
+            if (name != null)
                 staff.real_name = name.Trim();
-            if (!gender.Trim().Equals(""))
+            if (gender!=null)
                 staff.gender = gender.Trim();
-            if (!cell.Trim().Equals(""))
+            if (cell!=null)
                 await ModMemberCell(memberId, cell.Trim());    
             
             
