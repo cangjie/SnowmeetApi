@@ -28,6 +28,9 @@ namespace SnowmeetApi.Models.Order
                 _miniAppUser = value;
             } 
         }
+
+        [NotMapped]
+        public Member member {get; set;} = null;
     }
 }
 
