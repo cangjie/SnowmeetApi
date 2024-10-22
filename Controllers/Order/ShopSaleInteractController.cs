@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using SnowmeetApi.Controllers.User;
 using SnowmeetApi.Data;
 using SnowmeetApi.Models.Order;
 using SnowmeetApi.Models.Users;
@@ -26,6 +27,8 @@ namespace SnowmeetApi.Controllers.Order
 
         public MiniAppUserController miniAppUserHelper;
 
+        public MemberController _memberController;
+
 
         public ShopSaleInteractController(ApplicationDBContext context, IConfiguration config)
         {
@@ -34,6 +37,7 @@ namespace SnowmeetApi.Controllers.Order
             _appId = _config.GetSection("AppId").Value.Trim();
 
             miniAppUserHelper = new MiniAppUserController(context, config);
+            _memberController = new MemberController(context, config);
 
         }
 
@@ -103,10 +107,13 @@ namespace SnowmeetApi.Controllers.Order
             {
                 return NotFound();
             }
-            UnicUser scanUser = await UnicUser.GetUnicUser(scan.scaner_oa_open_id, "snowmeet_official_account_new", _context);
+            UnicUser scanUser = await UnicUser.GetUnicUser(scan.scaner_oa_open_id, "wechat_oa_openid", _context);
             if (scanUser!= null && !scanUser.miniAppOpenId.Trim().Equals(""))
             {
-                scan.miniAppUser = (await miniAppUserHelper.GetMiniAppUser(scanUser.miniAppOpenId, sessionKey)).Value;
+                //scan.miniAppUser = (await miniAppUserHelper.GetMiniAppUser(scanUser.miniAppOpenId, sessionKey)).Value;
+                //Member member = _memberController.GetMember(scanUser.m)
+                scan.member = scanUser.member;
+                
             }
             if (scan == null)
             {
