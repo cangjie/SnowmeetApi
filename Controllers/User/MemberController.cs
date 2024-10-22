@@ -193,6 +193,7 @@ namespace SnowmeetApi.Controllers.User
                 return BadRequest();
             }
             var memberList = await _db.member.Where(m => (m.in_staff_list == 1))
+                .OrderBy(m => (m.is_admin + m.is_manager + m.is_staff))
                 .Include(m => m.memberSocialAccounts).AsNoTracking().ToListAsync();
             memberList = GetCells(memberList);
             return Ok(memberList);
