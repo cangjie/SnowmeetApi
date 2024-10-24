@@ -128,6 +128,74 @@ namespace SnowmeetApi.Controllers.User
         }
 
         [HttpGet("{memberId}")]
+        public async Task<ActionResult> UpdateUserCell(int memberId, string encData, string iv, 
+            string sessionKey, string sessionType = "wechat_mini_openid" )
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            sessionType = Util.UrlDecode(sessionType);
+            encData = Util.UrlDecode(encData);
+            iv = Util.UrlDecode(iv);
+            string cell = "";
+            string json = Util.AES_decrypt(encData.Trim(), sessionKey, iv);
+            Newtonsoft.Json.Linq.JToken jsonObj = (Newtonsoft.Json.Linq.JToken)Newtonsoft.Json.JsonConvert.DeserializeObject(json);
+            if (jsonObj["phoneNumber"] != null)
+            {
+                cell = jsonObj["phoneNumber"].ToString().Trim();
+            }
+            if (cell.Trim().Equals(""))
+            {
+                return BadRequest();
+            }
+            return (await SetMemberInfo(memberId, "cell", cell.Trim(), sessionKey, sessionType));
+        }
+
+        [HttpGet("{memberId}")]
+        public async Task<ActionResult> SetMemberInfo(int memberId, string type, string num, 
+            string sessionKey, string sessionType)
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            sessionType = Util.UrlDecode(sessionType);
+            type = Util.UrlDecode(type);
+            num = Util.UrlDecode(num);
+            Member member = await GetMemberBySessionKey(sessionKey, sessionType);
+            if (member == null)
+            {
+                return NotFound();
+            }
+            if (member.is_staff == 0 || member.id != memberId)
+            {
+                return BadRequest();
+            }
+            var list = await _db.memberSocialAccount.Where(m => (m.id == memberId && m.type.Trim().Equals(type.Trim())
+                && m.num.Trim().Equals(num))).ToListAsync();
+            if (list == null || list.Count == 0)
+            {
+                MemberSocialAccount msa = new MemberSocialAccount()
+                {
+                    id = 0,
+                    member_id = memberId,
+                    type = type,
+                    num = num,
+                    valid = 1
+                };
+                await _db.memberSocialAccount.AddAsync(msa);
+                await _db.SaveChangesAsync();
+            }
+            else
+            {
+                MemberSocialAccount msa = list[0];
+                if(msa.valid == 0)
+                {
+                    msa.valid = 1;
+                    _db.memberSocialAccount.Entry(msa).State = EntityState.Modified;
+                    await _db.SaveChangesAsync();
+                }
+
+            }
+            return Ok();
+        } 
+
+        [HttpGet("{memberId}")]
         public async Task<ActionResult> SetStaffInfo(int memberId,  
             string name, string gender, string cell,
             int isAdmin, int isManager, int isStaff, int inStaffList,
