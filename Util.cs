@@ -241,7 +241,7 @@ namespace SnowmeetApi
 
         public async static Task<bool> IsAdmin(string staffSessionKey, Data.ApplicationDBContext db)
         {
-            Models.Users.UnicUser._context = db;
+            //Models.Users.UnicUser._context = db;
             staffSessionKey = UrlDecode(staffSessionKey).Trim();
             Models.Users.UnicUser staffUser = await Models.Users.UnicUser.GetUnicUserAsync(staffSessionKey, db);
             return staffUser.isAdmin;
