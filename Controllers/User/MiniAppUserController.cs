@@ -272,19 +272,31 @@ namespace SnowmeetApi.Controllers
                 return BadRequest();
             }
             string openId = miniUser.open_id.Trim();
+
+            
+
+
+
             if (openId.Equals(""))
             {
                 openId = user.miniAppOpenId.Trim();
             }
-            MiniAppUser trackUser = await _context.MiniAppUsers.FindAsync(openId);
-            trackUser.nick = miniUser.nick.Trim();
-            trackUser.real_name = miniUser.real_name.Trim();
-            trackUser.gender = miniUser.gender.Trim();
-            trackUser.cell_number = miniUser.cell_number.Trim();
-            trackUser.wechat_id = miniUser.wechat_id.Trim();
-            _context.Entry(trackUser).State = EntityState.Modified;
+
+            Member member = await _memberHelper.GetMember(openId.Trim(), "wechat_mini_openid");
+            
+            member.real_name = miniUser.real_name.Trim();
+            member.gender = miniUser.gender.Trim();
+            
+            _context.member.Entry(member).State = EntityState.Modified;
             await _context.SaveChangesAsync();
-            return Ok(trackUser);
+
+            await _memberHelper.UpdateDetailInfo(member.id, miniUser.cell_number.Trim(), "cell", true);
+            await _memberHelper.UpdateDetailInfo(member.id, miniUser.wechat_id.Trim(), "wechat_id", false);
+
+            MiniAppUser mUser = (MiniAppUser)((OkObjectResult)(await GetMiniAppUser(member.wechatMiniOpenId, sessionKey)).Result).Value;
+
+            return Ok(mUser);
+
         }
 
         [HttpGet]
