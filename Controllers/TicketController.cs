@@ -62,7 +62,7 @@ namespace SnowmeetApi.Controllers
         {
             sessionKey = Util.UrlDecode(sessionKey);
 
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
 
             Ticket ticket = await _context.Ticket.FindAsync(code);
             if (ticket == null || !ticket.open_id.Trim().Equals(user.miniAppOpenId.Trim()))
@@ -86,7 +86,7 @@ namespace SnowmeetApi.Controllers
             memo = Util.UrlDecode(memo).Trim();
             sessionKey = Util.UrlDecode(sessionKey);
 
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
 
             Ticket ticket = await _context.Ticket.FindAsync(code);
 
@@ -142,7 +142,7 @@ namespace SnowmeetApi.Controllers
         {
             sessionKey = Util.UrlDecode(sessionKey);
             channel = Util.UrlDecode(channel);
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
             /*
             var tList = await _context.Ticket.Where(t => (t.template_id == templateId
                 && t.open_id.Trim().Equals(user.miniAppOpenId)
@@ -206,7 +206,7 @@ namespace SnowmeetApi.Controllers
 
             sessionKey = Util.UrlDecode(sessionKey);
             
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (user == null || !user.isAdmin)
             {
                 return NoContent();
@@ -286,7 +286,7 @@ namespace SnowmeetApi.Controllers
             
             sessionKey = Util.UrlDecode(sessionKey);
             
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (user.isAdmin)
             {
                 Ticket ticket = await _context.Ticket.FindAsync(code);
@@ -306,7 +306,7 @@ namespace SnowmeetApi.Controllers
         {
             
             sessionKey = Util.UrlDecode(sessionKey).Trim();
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (user == null || user.miniAppOpenId == null || user.miniAppOpenId.Trim().Equals(""))
             {
                 return NotFound();
@@ -320,7 +320,7 @@ namespace SnowmeetApi.Controllers
         {
             sessionKey = Util.UrlDecode(sessionKey);
             
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (user == null)
             {
                 return NotFound();
@@ -365,7 +365,7 @@ namespace SnowmeetApi.Controllers
 
             sessionKey = Util.UrlDecode(sessionKey);
 
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (!user.isAdmin)
             {
                 return BadRequest();

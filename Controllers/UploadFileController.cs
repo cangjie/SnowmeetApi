@@ -35,7 +35,7 @@ namespace SnowmeetApi.Controllers
             sessionKey = Util.UrlDecode(sessionKey);
             purpose = Util.UrlDecode(purpose);
             //UnicUser._context = _db;
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _db)).Value;
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _db);
             if (user == null)
             {
                 return BadRequest();
@@ -75,7 +75,7 @@ namespace SnowmeetApi.Controllers
         {
             sessionKey = Util.UrlDecode(sessionKey);
             purpose = Util.UrlDecode(purpose);
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _db)).Value;
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _db);
             if (!user.isAdmin)
             {
                 return BadRequest();
@@ -99,7 +99,7 @@ namespace SnowmeetApi.Controllers
         {
             sessionKey = Util.UrlDecode(sessionKey);
             UnicUser._context = _db;
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _db)).Value;
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _db);
             
 
             string dateStr = DateTime.Now.Year.ToString() + DateTime.Now.Month.ToString().PadLeft(2, '0') + DateTime.Now.Day.ToString().PadLeft(2, '0');

@@ -57,7 +57,7 @@ namespace SnowmeetApi.Controllers
         {
 
             sessionKey = Util.UrlDecode(sessionKey.Trim());
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _db)).Value;
+            UnicUser user = await UnicUser.GetUnicUserAsync(sessionKey, _db);
             if (user == null)
             {
                 return null;
@@ -1211,7 +1211,7 @@ namespace SnowmeetApi.Controllers
         {
             sessionKey = Util.UrlDecode(sessionKey);
             mchId = Util.UrlDecode(mchId);
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _db)).Value;
+            UnicUser user = await UnicUser.GetUnicUserAsync(sessionKey, _db);
             if (user == null || !user.isAdmin)
             {
                 return NotFound();

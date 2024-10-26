@@ -175,7 +175,7 @@ namespace SnowmeetApi.Controllers
         {
             sessionKey = Util.UrlDecode(sessionKey);
             Product product = await _context.Product.FindAsync(productId);
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (user == null || product == null)
             {
                 return BadRequest();
@@ -206,7 +206,7 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<object>> PlaceSkiPassOrderNanshan(int productId, DateTime date, int count, string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey);
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
             Product productTicket = await _context.Product.FindAsync(productId);
             if (user == null || !user.isAdmin || productTicket == null)
             {

@@ -123,7 +123,7 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<IEnumerable<MiniAppUser>>> GetStaffList(string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey);
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (!user.isAdmin)
             {
                 return BadRequest();
@@ -168,7 +168,7 @@ namespace SnowmeetApi.Controllers
             sessionKey = Util.UrlDecode(sessionKey);
             
             UnicUser._context = _context;
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (!user.isAdmin)
             {
                 return NoContent();
@@ -271,7 +271,7 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<MiniAppUser>> UpdateMiniUser([FromQuery] string sessionKey, [FromBody] MiniAppUser miniUser)
         {
             sessionKey = Util.UrlDecode(sessionKey);
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (!user.isAdmin && !miniUser.open_id.Trim().Equals(""))
             {
                 return BadRequest();
@@ -393,7 +393,7 @@ namespace SnowmeetApi.Controllers
                 encData = Util.UrlDecode(encData);
                 iv = Util.UrlDecode(iv);
                 //
-                UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+                UnicUser user = await UnicUser.GetUnicUserAsync(sessionKey, _context);
                 MiniAppUser miniUser = user.miniAppUser;
                 string json = Util.AES_decrypt(encData.Trim(), sessionKey, iv);
                 Newtonsoft.Json.Linq.JToken jsonObj = (Newtonsoft.Json.Linq.JToken)Newtonsoft.Json.JsonConvert.DeserializeObject(json);

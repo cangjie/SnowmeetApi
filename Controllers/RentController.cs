@@ -110,7 +110,7 @@ namespace SnowmeetApi.Controllers
         {
             sessionKey = Util.UrlDecode(sessionKey).Trim();
             shop = Util.UrlDecode(shop).Replace("'", "").Trim();
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (!user.isAdmin)
             {
                 return BadRequest();
@@ -191,7 +191,7 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<RentOrder>> Recept([FromQuery]string sessionKey, [FromBody]RentOrder rentOrder)
         {
             sessionKey = Util.UrlDecode(sessionKey).Trim();
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (!user.isAdmin)
             {
                 return BadRequest();
@@ -304,7 +304,7 @@ namespace SnowmeetApi.Controllers
             shop = Util.UrlDecode(shop).Trim();
             status = Util.UrlDecode(status).Trim();
             sessionKey = Util.UrlDecode(sessionKey).Trim();
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (!user.isAdmin)
             {
                 return BadRequest();
@@ -360,7 +360,7 @@ namespace SnowmeetApi.Controllers
             }
             shop = Util.UrlDecode(shop.Trim());
             sessionKey = Util.UrlDecode(sessionKey).Trim();
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (!user.isAdmin)
             {
                 return BadRequest();
@@ -426,7 +426,7 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<RentOrder>> GetRentOrder(int id, string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey).Trim();
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
 
             RentOrder rentOrder = await _context.RentOrder.FindAsync(id);
             if (rentOrder == null)
@@ -674,7 +674,7 @@ namespace SnowmeetApi.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<RentOrderDetailLog>> SetDetailLog(int id, string status, string sessionKey)
         {
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (!user.isAdmin)
             {
                 return BadRequest();
@@ -720,7 +720,7 @@ namespace SnowmeetApi.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<RentOrderDetail>> SetUnReturn(int id, string sessionKey)
         {
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (!user.isAdmin)
             {
                 return BadRequest();
@@ -741,7 +741,7 @@ namespace SnowmeetApi.Controllers
         {
             sessionKey = Util.UrlDecode(sessionKey).Trim();
             memo = Util.UrlDecode(memo);
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (!user.isAdmin)
             {
                 return BadRequest();
@@ -791,7 +791,7 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<RentOrderDetail>> SetRentStart(int id, string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey).Trim();
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (!user.isAdmin)
             {
                 return BadRequest();
@@ -834,7 +834,7 @@ namespace SnowmeetApi.Controllers
             memo = Util.UrlDecode(memo);
             sessionKey = Util.UrlDecode(sessionKey);
             amount = Math.Round(amount, 2);
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (!user.isAdmin)
             {
                 return BadRequest();
@@ -872,7 +872,7 @@ namespace SnowmeetApi.Controllers
             RentOrder rentOrder = (RentOrder)((OkObjectResult)(await GetRentOrder(id, sessionKey)).Result).Value;
             sessionKey = Util.UrlDecode(sessionKey);
             payMethod = Util.UrlDecode(payMethod);
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (!user.isAdmin)
             {
                 return BadRequest();
@@ -906,7 +906,7 @@ namespace SnowmeetApi.Controllers
         {
             RentOrder rentOrder = (RentOrder)((OkObjectResult)(await GetRentOrder(id, sessionKey)).Result).Value;
             sessionKey = Util.UrlDecode(sessionKey);
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (!user.isAdmin)
             {
                 return BadRequest();
@@ -932,7 +932,7 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<RentOrder>> Bind(int id, string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey);
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
             RentOrder rentOrder = (RentOrder)((OkObjectResult)(await GetRentOrder(id, sessionKey)).Result).Value;
             if (rentOrder == null)
             {
@@ -969,7 +969,7 @@ namespace SnowmeetApi.Controllers
         {
             sessionKey = Util.UrlDecode(sessionKey);
             shop = Util.UrlDecode(shop);
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (!user.isAdmin)
             {
                 return BadRequest();
@@ -1029,7 +1029,7 @@ namespace SnowmeetApi.Controllers
         {
             sessionKey = Util.UrlDecode(sessionKey);
             shop = Util.UrlDecode(shop);
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (!user.isAdmin)
             {
                 return BadRequest();
@@ -1082,7 +1082,7 @@ namespace SnowmeetApi.Controllers
         {
             sessionKey = Util.UrlDecode(sessionKey);
             shop = Util.UrlDecode(shop).Trim();
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (!user.isAdmin)
             {
                 return BadRequest();
@@ -1127,7 +1127,7 @@ namespace SnowmeetApi.Controllers
         {
             sessionKey = Util.UrlDecode(sessionKey);
             shop = Util.UrlDecode(shop).Trim();
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (!user.isAdmin)
             {
                 return BadRequest();
@@ -1182,7 +1182,7 @@ namespace SnowmeetApi.Controllers
         {
             sessionKey = Util.UrlDecode(sessionKey).Trim();
             memo = Util.UrlDecode(memo);
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (!user.isAdmin)
             {
                 return BadRequest();
@@ -1272,7 +1272,7 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<RentOrder>> SetMemo(int orderId, string memo, string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey).Trim();
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (!user.isAdmin)
             {
                 return BadRequest();
@@ -1294,7 +1294,7 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<RentOrderDetail>> AppendDetail(string sessionKey, RentOrderDetail detail)
         {
             sessionKey = Util.UrlDecode(sessionKey).Trim();
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (!user.isAdmin)
             {
                 return BadRequest();
@@ -1309,7 +1309,7 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<RentalDetail>> UpdateDetail(string sessionKey, RentOrderDetail detail)
         {
             sessionKey = Util.UrlDecode(sessionKey).Trim();
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (!user.isAdmin)
             {
                 return BadRequest();
@@ -1325,7 +1325,7 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<RentOrderDetail>> ReserveMore(int detailId, string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey).Trim();
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (!user.isAdmin)
             {
                 return BadRequest();
@@ -1374,7 +1374,7 @@ namespace SnowmeetApi.Controllers
         public async Task<UnicUser> GetUser(string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey).Trim();
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
             return user;
         }
 

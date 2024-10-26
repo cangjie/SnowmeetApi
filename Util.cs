@@ -243,7 +243,7 @@ namespace SnowmeetApi
         {
             Models.Users.UnicUser._context = db;
             staffSessionKey = UrlDecode(staffSessionKey).Trim();
-            Models.Users.UnicUser staffUser = await Models.Users.UnicUser.GetUnicUser(staffSessionKey);
+            Models.Users.UnicUser staffUser = await Models.Users.UnicUser.GetUnicUserAsync(staffSessionKey, db);
             return staffUser.isAdmin;
         }
 
@@ -322,7 +322,7 @@ namespace SnowmeetApi
         public static async Task<UnicUser> GetUser(string sessionKey, Data.ApplicationDBContext db)
         {
             sessionKey = Util.UrlDecode(sessionKey).Trim();
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, db)).Value;
+            UnicUser user = await UnicUser.GetUnicUserAsync(sessionKey, db);
             return user;
         }
 

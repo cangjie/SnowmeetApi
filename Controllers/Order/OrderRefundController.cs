@@ -152,7 +152,7 @@ namespace SnowmeetApi.Controllers.Order
 
             string notify = payment.notify.Trim().Replace("OrderPayment/TenpayPaymentCallBack", "OrderRefund/TenpayRefundCallback"); 
 
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _db)).Value; 
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _db); 
             double refundedAmount = await _db.OrderPaymentRefund.Where(r => (r.payment_id == paymentId && r.state == 1)).SumAsync(s => s.amount); 
             
             

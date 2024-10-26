@@ -30,7 +30,7 @@ namespace SnowmeetApi.Controllers
         protected async Task<ActionResult<List<Point>>> GetUserPointBalance(string openId, string openIdType)
         {
             
-            UnicUser user = await UnicUser.GetUnicUser(openId, openIdType, _context);
+            UnicUser user = await UnicUser.GetUnicUserByDetailInfo(openId, openIdType, _context);
             return _context.Point.Where(p => (p.user_open_id.Trim().Equals(user.miniAppOpenId)
             || p.user_open_id.Trim().Equals(user.officialAccountOpenId) || p.user_open_id.Trim().Equals(user.officialAccountOpenIdOld)))
                 .OrderByDescending(p => p.id).ToList();
@@ -69,7 +69,7 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<int>> GetMyPointsSummary(string sessionKey)
         {
             
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await UnicUser.GetUnicUserAsync(sessionKey, _context);
             return await GetUserPointsSummary(user.miniAppOpenId, "snowmeet_mini");
         }
 
@@ -79,7 +79,7 @@ namespace SnowmeetApi.Controllers
             sessionKey = Util.UrlDecode(sessionKey);
             memo = Util.UrlDecode(memo);
             
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await UnicUser.GetUnicUserAsync(sessionKey, _context);
             Point point = new Point()
             {
                 points = points,
@@ -99,7 +99,7 @@ namespace SnowmeetApi.Controllers
         {
             sessionKey = Util.UrlDecode(sessionKey);
             
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await UnicUser.GetUnicUserAsync(sessionKey, _context);
             List<Point> pointsList = (await GetUserPointBalance(user.miniAppOpenId, "snowmeet_mini")).Value;
             for (int i = 0; i < pointsList.Count; i++)
             {
