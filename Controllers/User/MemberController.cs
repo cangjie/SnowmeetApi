@@ -245,7 +245,7 @@ namespace SnowmeetApi.Controllers.User
             {
                 return NotFound();
             }
-            memberList = GetCells(memberList);
+            //memberList = GetCells(memberList);
             return Ok(memberList[0]);
         }
 
@@ -263,7 +263,7 @@ namespace SnowmeetApi.Controllers.User
             var memberList = await _db.member.Where(m => (m.in_staff_list == 1))
                 .OrderBy(m => (m.is_admin + m.is_manager + m.is_staff))
                 .Include(m => m.memberSocialAccounts).AsNoTracking().ToListAsync();
-            memberList = GetCells(memberList);
+            //memberList = GetCells(memberList);
             return Ok(memberList);
             
         }
@@ -282,6 +282,7 @@ namespace SnowmeetApi.Controllers.User
             return Ok(await GetMember(cell, "cell"));
         }
 
+/*
         [NonAction]
         public List<Member> GetCells(List<Member> memberList)
         {
@@ -299,7 +300,7 @@ namespace SnowmeetApi.Controllers.User
             }
             return memberList;
         }
-
+*/
         [NonAction]
         public async Task ModMemberCell(int memberId, string cell)
         {

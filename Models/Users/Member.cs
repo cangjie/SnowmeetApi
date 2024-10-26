@@ -20,12 +20,79 @@ namespace SnowmeetApi.Models.Users
         public int is_admin { get; set; }
         public int in_staff_list {get; set;}
 
-        [NotMapped]
-        public string cell {get; set;} = "";
-
+       
 
         
         public ICollection<MemberSocialAccount> memberSocialAccounts { get; set; } = new List<MemberSocialAccount>();
+
+        public List<MemberSocialAccount> GetInfo(string type)
+        {
+            List<MemberSocialAccount> msaList = new List<MemberSocialAccount>();
+            foreach(MemberSocialAccount msa in memberSocialAccounts)
+            {
+                if (msa.valid==1 && msa.type.Trim().Equals(type.Trim()))
+                {
+                    msaList.Add(msa);
+                }
+            } 
+            return msaList;
+        }
+
+        public string? wechatMiniOpenId
+        {
+            get
+            {
+                string? v = null;
+                List<MemberSocialAccount> msaList = GetInfo("wechat_mini_openid");
+                if (msaList != null && msaList.Count > 0)
+                {
+                    v = msaList[0].num.Trim();
+                }
+                return v;
+            }
+        }
+
+        public string? wechatUnionId
+        {
+            get
+            {
+                string? v = null;
+                List<MemberSocialAccount> msaList = GetInfo("wechat_unionid");
+                if (msaList != null && msaList.Count > 0)
+                {
+                    v = msaList[0].num.Trim();
+                }
+                return v;
+            }
+        }
+
+        public string? cell
+        {
+            get
+            {
+                string? v = null;
+                List<MemberSocialAccount> msaList = GetInfo("cell");
+                if (msaList != null && msaList.Count > 0)
+                {
+                    v = msaList[0].num.Trim();
+                }
+                return v;
+            }
+        }
+
+        public string? wechatId
+        {
+            get
+            {
+                string? v = null;
+                List<MemberSocialAccount> msaList = GetInfo("wechat_id");
+                if (msaList != null && msaList.Count > 0)
+                {
+                    v = msaList[0].num.Trim();
+                }
+                return v;
+            }
+        }
         
 
     }

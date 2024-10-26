@@ -22,6 +22,7 @@ namespace SnowmeetApi.Controllers
 
         public MemberController _memberHelper;
 
+
         public MiniAppUserController(ApplicationDBContext context, IConfiguration config)
         {
             _context = context;
@@ -150,17 +151,9 @@ namespace SnowmeetApi.Controllers
             {
                 return NoContent();
             }
-            var miniUserList = await _context.MiniAppUsers
-                .Where(u => u.cell_number.Trim().Equals(cell.Trim()))
-                .OrderByDescending(u => u.create_date).ToListAsync();
-            if (miniUserList.Count == 0)
-            {
-                return NotFound();
-            }
-            else
-            {
-                return miniUserList[0];
-            }
+            Member member = (Member)((OkObjectResult)(await _memberHelper.GetMemberByCell(cell, staffSessionKey)).Result).Value;
+            return Ok(await GetMiniAppUser(member.wechatMiniOpenId.Trim()));
+
         }
 
 
@@ -175,6 +168,30 @@ namespace SnowmeetApi.Controllers
             {
                 return NoContent();
             }
+
+           
+            Member member = await _memberHelper.GetMember(openId, "wechat_mini_openid");
+
+            MiniAppUser mUser = new MiniAppUser();
+            mUser.open_id = openId;
+            mUser.union_id = member.wechatUnionId == null? "": member.wechatUnionId.Trim();
+            mUser.cell_number = member.cell == null ? "" : member.cell.Trim();
+            mUser.real_name = member.real_name.Trim();
+            mUser.nick = "";
+            mUser.head_image = "";
+            mUser.gender = member.gender.Trim();
+            mUser.blocked = 0;
+            mUser.is_admin = member.is_staff;
+            mUser.is_manager = member.is_manager;
+            mUser.isMember = !mUser.cell_number.Trim().Equals("");
+            mUser.wechat_id = (member.wechatId == null)? "" : member.wechatId.Trim();
+            return Ok(mUser);
+
+    
+
+            /*
+
+
             MiniAppUser miniUser = await _context.MiniAppUsers.FindAsync(openId);
 
             var orderL = await _context.OrderOnlines.Where(o => o.open_id.Trim().Equals(miniUser.open_id.Trim())
@@ -185,6 +202,7 @@ namespace SnowmeetApi.Controllers
             }
 
             return await _context.MiniAppUsers.FindAsync(openId);
+            */
         }
 
         [HttpGet("{code}")]
