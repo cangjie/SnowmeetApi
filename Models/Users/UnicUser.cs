@@ -78,7 +78,7 @@ namespace SnowmeetApi.Models.Users
         }
 
     
-        public static async Task<UnicUser> GetUnicUser(int memberId)
+        public static async Task<UnicUser> GetUnicUser(int memberId, Data.ApplicationDBContext _context)
         {
             if (memberId == 0)
             {
@@ -152,7 +152,7 @@ namespace SnowmeetApi.Models.Users
             {
                 return null;
             }
-            return await GetUnicUser(msaList[0].member_id);
+            return await GetUnicUser(msaList[0].member_id, _context);
             /*
             var unionIds = await _context.UnionIds.FromSqlRaw(" select * from unionids where open_id = '" + openId.Trim().Replace("'", "") + "' "
                 + " and source = '" + type.Replace("'", "") + "'").ToListAsync();
@@ -330,7 +330,7 @@ namespace SnowmeetApi.Models.Users
                 return null;
             }
             int memberId = ((sL[0].member_id == null)? 0 : (int)sL[0].member_id);
-            return await GetUnicUser(memberId);
+            return await GetUnicUser(memberId, _context);
         }
 
         
