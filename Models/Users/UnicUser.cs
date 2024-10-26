@@ -78,13 +78,13 @@ namespace SnowmeetApi.Models.Users
         }
 
     
-        public static async Task<UnicUser> GetUnicUser(int memberId, Data.ApplicationDBContext _context)
+        public static async Task<UnicUser> GetUnicUser(int memberId, Data.ApplicationDBContext _db)
         {
             if (memberId == 0)
             {
                 return null;
             }
-            var memberList = await _context.member.Where(m => m.id == memberId).Include(m => m.memberSocialAccounts)
+            var memberList = await _db.member.Where(m => m.id == memberId).Include(m => m.memberSocialAccounts)
                 .AsNoTracking().ToListAsync();
             if (memberList == null || memberList.Count == 0)
             {

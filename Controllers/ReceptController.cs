@@ -907,6 +907,7 @@ namespace SnowmeetApi.Controllers
         public async Task<bool> IsAdmin(string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey);
+            
             UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
             return user.isAdmin;
         }
