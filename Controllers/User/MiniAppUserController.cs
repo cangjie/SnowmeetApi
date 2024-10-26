@@ -152,6 +152,10 @@ namespace SnowmeetApi.Controllers
                 return NoContent();
             }
             Member member = (Member)((OkObjectResult)(await _memberHelper.GetMemberByCell(cell, staffSessionKey)).Result).Value;
+            if (member==null)
+            {
+                return NotFound();
+            }
             return Ok(await GetMiniAppUser(member.wechatMiniOpenId.Trim()));
 
         }
