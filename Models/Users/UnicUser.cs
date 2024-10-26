@@ -14,7 +14,7 @@ namespace SnowmeetApi.Models.Users
 
     public class UnicUser
     {
-        public static Data.ApplicationDBContext _context;
+        //public static Data.ApplicationDBContext _context;
 
         public UnicUser()
         {
@@ -98,11 +98,11 @@ namespace SnowmeetApi.Models.Users
                 {
                     case "wechat_mini_openid":
                         user.miniAppOpenId = msa.num.Trim();
-                        user.miniAppUser = await  _context.MiniAppUsers.FindAsync(msa.num.Trim());
+                        user.miniAppUser = await  _db.MiniAppUsers.FindAsync(msa.num.Trim());
                         break;
                     case "wechat_oa_openid":
                         user.officialAccountOpenId = msa.num.Trim();
-                        user.officialAccountUser = await _context.officialAccoutUsers.FindAsync(msa.num.Trim());
+                        user.officialAccountUser = await _db.officialAccoutUsers.FindAsync(msa.num.Trim());
                         break;
                     case "wechat_unionid":
                         user.unionId = msa.num.Trim();

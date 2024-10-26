@@ -25,7 +25,7 @@ namespace SnowmeetApi.Controllers.Background
             _context = context;
             _config = config.GetSection("Settings");
             _originConfig = config;
-            UnicUser._context = context;
+            //UnicUser._context = context;
         }
 
         [HttpGet("{timeStamp}")]

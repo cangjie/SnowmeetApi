@@ -25,7 +25,7 @@ namespace SnowmeetApi.Controllers
         {
             _db = context;
             _config = config.GetSection("Settings");
-            UnicUser._context = context;
+            //UnicUser._context = context;
         }
 
         [HttpPost]
@@ -98,7 +98,7 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<string>> Upload(string sessionKey, IFormFile file)
         {
             sessionKey = Util.UrlDecode(sessionKey);
-            UnicUser._context = _db;
+            //UnicUser._context = _db;
             UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _db);
             
 

@@ -431,7 +431,7 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<OrderOnline>> GetWholeOrderByStaff(int orderId, string staffSessionKey)
         {
             staffSessionKey = Util.UrlDecode(staffSessionKey);
-            UnicUser._context = _context;
+            //UnicUser._context = _context;
             UnicUser user = await UnicUser.GetUnicUserAsync(staffSessionKey, _context);
             if (!user.isAdmin)
             {

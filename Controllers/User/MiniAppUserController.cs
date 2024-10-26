@@ -29,7 +29,7 @@ namespace SnowmeetApi.Controllers
             _config = config.GetSection("Settings");
             _appId = _config.GetSection("AppId").Value.Trim();
             _memberHelper = new MemberController(context, config);
-            UnicUser._context = context;
+            //UnicUser._context = context;
         }
 
         [HttpGet]
@@ -167,7 +167,7 @@ namespace SnowmeetApi.Controllers
             openId = Util.UrlDecode(openId.Trim());
             sessionKey = Util.UrlDecode(sessionKey);
             
-            UnicUser._context = _context;
+            //UnicUser._context = _context;
             UnicUser user = await UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (!user.isAdmin)
             {

@@ -70,7 +70,7 @@ namespace SnowmeetApi.Controllers.Order
             _appId = _config.GetSection("AppId").Value.Trim();
             _httpContextAccessor = httpContextAccessor;
             _rentHelper = new RentController(context, config, httpContextAccessor);
-            UnicUser._context = context;
+            //UnicUser._context = context;
 
         }
 
