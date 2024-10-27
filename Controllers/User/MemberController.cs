@@ -127,6 +127,8 @@ namespace SnowmeetApi.Controllers.User
             return RemoveSensitiveInfo(member);
         }
 
+        /*
+
         [HttpGet("{memberId}")]
         public async Task<ActionResult> UpdateUserCell(int memberId, string encData, string iv, 
             string sessionKey, string sessionType = "wechat_mini_openid" )
@@ -148,6 +150,7 @@ namespace SnowmeetApi.Controllers.User
             }
             return (await SetMemberInfo(memberId, "cell", cell.Trim(), sessionKey, sessionType));
         }
+        */
 
         [HttpGet("{memberId}")]
         public async Task<ActionResult> SetMemberInfo(int memberId, string type, string num, 
