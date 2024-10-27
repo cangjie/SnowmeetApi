@@ -134,7 +134,7 @@ namespace SnowmeetApi.Models.Users
                     type = "wechat_oa_openid";
                     break;
                 default:
-                    type = "";
+                    //type = "";
                     break;
 
             }
