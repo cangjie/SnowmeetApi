@@ -809,7 +809,7 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<Recept>> GetRecept(int id, string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey.Trim());
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await UnicUser.GetUnicUserAsync(sessionKey, _context);
             Recept recept = await _context.Recept.FindAsync(id);
             if (recept.recept_type.Trim().Equals("养护下单") && recept.shop.Trim().Equals("万龙体验中心"))
             {
@@ -907,7 +907,8 @@ namespace SnowmeetApi.Controllers
         public async Task<bool> IsAdmin(string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey);
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            
+            UnicUser user = await UnicUser.GetUnicUserAsync(sessionKey, _context);
             return user.isAdmin;
         }
 
@@ -915,7 +916,7 @@ namespace SnowmeetApi.Controllers
         public async Task<MiniAppUser> GetUser(string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey);
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await UnicUser.GetUnicUserAsync(sessionKey, _context);
             return user.miniAppUser;
         }
 

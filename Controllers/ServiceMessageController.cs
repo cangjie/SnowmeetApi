@@ -62,7 +62,7 @@ namespace SnowmeetApi.Controllers
             remark = Util.UrlDecode(remark);
             url = Util.UrlDecode(url);
             sessionKey = Util.UrlDecode(sessionKey);
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (user == null || !user.isAdmin)
             {
                 return BadRequest();
@@ -106,7 +106,7 @@ namespace SnowmeetApi.Controllers
             miniAppOpenId = Util.UrlDecode(miniAppOpenId).Trim();
             title = Util.UrlDecode(title).Trim();
             string token = GetToken();
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (user == null || !user.isAdmin)
             {
                 return BadRequest();

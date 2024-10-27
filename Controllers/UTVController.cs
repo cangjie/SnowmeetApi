@@ -998,7 +998,7 @@ namespace SnowmeetApi.Controllers
         [NonAction]
         public async Task<bool> IsAdmin(string sessionKey)
         {
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _db)).Value;
+            UnicUser user = await UnicUser.GetUnicUserAsync(sessionKey, _db);
             return user.isAdmin;
         }
 

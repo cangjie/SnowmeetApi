@@ -33,7 +33,7 @@ namespace SnowmeetApi.Controllers.Order
         public async Task<ActionResult<IEnumerable<SaleReport>>> GetSaleReport(DateTime startDate, DateTime endDate, string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey);
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (!user.isAdmin)
             {
                 return NoContent();
@@ -56,7 +56,7 @@ namespace SnowmeetApi.Controllers.Order
         public async Task<ActionResult<Mi7Order>> GetMi7Order(int id, string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey);
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (!user.isAdmin)
             {
                 return BadRequest();

@@ -29,7 +29,7 @@ namespace SnowmeetApi.Controllers.User
         public async Task<ActionResult<Vip>> GetVipInfo(string cell, string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey);
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (!user.isAdmin)
             {
                 return BadRequest();
@@ -50,7 +50,7 @@ namespace SnowmeetApi.Controllers.User
         public async Task<ActionResult<Vip>> UpdateVipInfo([FromBody] Vip vip, [FromQuery] string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey);
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (!user.isAdmin)
             {
                 return BadRequest();

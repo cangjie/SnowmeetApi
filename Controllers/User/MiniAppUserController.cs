@@ -22,13 +22,14 @@ namespace SnowmeetApi.Controllers
 
         public MemberController _memberHelper;
 
+
         public MiniAppUserController(ApplicationDBContext context, IConfiguration config)
         {
             _context = context;
             _config = config.GetSection("Settings");
             _appId = _config.GetSection("AppId").Value.Trim();
             _memberHelper = new MemberController(context, config);
-            UnicUser._context = context;
+            //UnicUser._context = context;
         }
 
         [HttpGet]
@@ -122,7 +123,7 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<IEnumerable<MiniAppUser>>> GetStaffList(string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey);
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (!user.isAdmin)
             {
                 return BadRequest();
@@ -150,17 +151,13 @@ namespace SnowmeetApi.Controllers
             {
                 return NoContent();
             }
-            var miniUserList = await _context.MiniAppUsers
-                .Where(u => u.cell_number.Trim().Equals(cell.Trim()))
-                .OrderByDescending(u => u.create_date).ToListAsync();
-            if (miniUserList.Count == 0)
+            Member member = (Member)((OkObjectResult)(await _memberHelper.GetMemberByCell(cell, staffSessionKey)).Result).Value;
+            if (member==null)
             {
                 return NotFound();
             }
-            else
-            {
-                return miniUserList[0];
-            }
+            return Ok(await GetMiniAppUser(member.wechatMiniOpenId.Trim()));
+
         }
 
 
@@ -170,11 +167,36 @@ namespace SnowmeetApi.Controllers
             openId = Util.UrlDecode(openId.Trim());
             sessionKey = Util.UrlDecode(sessionKey);
             
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            //UnicUser._context = _context;
+            UnicUser user = await UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (!user.isAdmin)
             {
                 return NoContent();
             }
+
+           
+            Member member = await _memberHelper.GetMember(openId, "wechat_mini_openid");
+
+            MiniAppUser mUser = new MiniAppUser();
+            mUser.open_id = openId;
+            mUser.union_id = member.wechatUnionId == null? "": member.wechatUnionId.Trim();
+            mUser.cell_number = member.cell == null ? "" : member.cell.Trim();
+            mUser.real_name = member.real_name.Trim();
+            mUser.nick = "";
+            mUser.head_image = "";
+            mUser.gender = member.gender.Trim();
+            mUser.blocked = 0;
+            mUser.is_admin = member.is_staff;
+            mUser.is_manager = member.is_manager;
+            mUser.isMember = !mUser.cell_number.Trim().Equals("");
+            mUser.wechat_id = (member.wechatId == null)? "" : member.wechatId.Trim();
+            return Ok(mUser);
+
+    
+
+            /*
+
+
             MiniAppUser miniUser = await _context.MiniAppUsers.FindAsync(openId);
 
             var orderL = await _context.OrderOnlines.Where(o => o.open_id.Trim().Equals(miniUser.open_id.Trim())
@@ -185,6 +207,7 @@ namespace SnowmeetApi.Controllers
             }
 
             return await _context.MiniAppUsers.FindAsync(openId);
+            */
         }
 
         [HttpGet("{code}")]
@@ -248,25 +271,37 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<MiniAppUser>> UpdateMiniUser([FromQuery] string sessionKey, [FromBody] MiniAppUser miniUser)
         {
             sessionKey = Util.UrlDecode(sessionKey);
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (!user.isAdmin && !miniUser.open_id.Trim().Equals(""))
             {
                 return BadRequest();
             }
             string openId = miniUser.open_id.Trim();
+
+            
+
+
+
             if (openId.Equals(""))
             {
                 openId = user.miniAppOpenId.Trim();
             }
-            MiniAppUser trackUser = await _context.MiniAppUsers.FindAsync(openId);
-            trackUser.nick = miniUser.nick.Trim();
-            trackUser.real_name = miniUser.real_name.Trim();
-            trackUser.gender = miniUser.gender.Trim();
-            trackUser.cell_number = miniUser.cell_number.Trim();
-            trackUser.wechat_id = miniUser.wechat_id.Trim();
-            _context.Entry(trackUser).State = EntityState.Modified;
+
+            Member member = await _memberHelper.GetMember(openId.Trim(), "wechat_mini_openid");
+            
+            member.real_name = miniUser.real_name.Trim();
+            member.gender = miniUser.gender.Trim();
+            
+            _context.member.Entry(member).State = EntityState.Modified;
             await _context.SaveChangesAsync();
-            return Ok(trackUser);
+
+            await _memberHelper.UpdateDetailInfo(member.id, miniUser.cell_number.Trim(), "cell", true);
+            await _memberHelper.UpdateDetailInfo(member.id, miniUser.wechat_id.Trim(), "wechat_id", false);
+
+            MiniAppUser mUser = (MiniAppUser)((OkObjectResult)(await GetMiniAppUser(member.wechatMiniOpenId, sessionKey)).Result).Value;
+
+            return Ok(mUser);
+
         }
 
         [HttpGet]
@@ -358,7 +393,7 @@ namespace SnowmeetApi.Controllers
                 encData = Util.UrlDecode(encData);
                 iv = Util.UrlDecode(iv);
                 //
-                UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+                UnicUser user = await UnicUser.GetUnicUserAsync(sessionKey, _context);
                 MiniAppUser miniUser = user.miniAppUser;
                 string json = Util.AES_decrypt(encData.Trim(), sessionKey, iv);
                 Newtonsoft.Json.Linq.JToken jsonObj = (Newtonsoft.Json.Linq.JToken)Newtonsoft.Json.JsonConvert.DeserializeObject(json);

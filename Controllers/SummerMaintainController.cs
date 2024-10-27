@@ -163,7 +163,7 @@ namespace SnowmeetApi.Controllers
         {
             sessionKey = Util.UrlDecode(sessionKey);
             
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (!user.isAdmin)
             {
                 return NoContent();
@@ -191,7 +191,7 @@ namespace SnowmeetApi.Controllers
         {
             sessionKey = Util.UrlDecode(sessionKey);
             
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
             string openId = user.miniAppOpenId.Trim();
             if (openId.Trim().Equals(""))
             {
@@ -251,7 +251,7 @@ namespace SnowmeetApi.Controllers
         {
             string sessionKey = Util.UrlDecode(summerMaintain.oper_open_id);
             
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (!user.isAdmin)
             {
                 return NoContent();
@@ -301,7 +301,7 @@ namespace SnowmeetApi.Controllers
         {
             sessionKey = Util.UrlDecode(sessionKey);
             
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (!user.isAdmin)
             {
                 return NotFound();
@@ -314,7 +314,7 @@ namespace SnowmeetApi.Controllers
         {
             
             sessionKey = Util.UrlDecode(sessionKey);
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (!user.isAdmin)
             {
                 return NotFound();
@@ -334,7 +334,7 @@ namespace SnowmeetApi.Controllers
         {
             
             sessionKey = Util.UrlDecode(sessionKey);
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (!user.isAdmin)
             {
                 return NotFound();
@@ -364,7 +364,7 @@ namespace SnowmeetApi.Controllers
             sessionKey = Util.UrlDecode(sessionKey);
             SummerMaintain summerMaintain = await _context.SummerMaintain.FindAsync(id);
             
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (user.isAdmin || user.miniAppOpenId.Trim().Equals(summerMaintain.open_id.Trim())
                 || summerMaintain.open_id.Trim().Equals(""))
             {
@@ -381,7 +381,7 @@ namespace SnowmeetApi.Controllers
         {
             sessionKey = Util.UrlDecode(sessionKey);
             
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
             SummerMaintain summerMaintain = await _context.SummerMaintain.FindAsync(id);
             if (summerMaintain == null
                 || (!summerMaintain.open_id.Trim().Equals("") && !summerMaintain.open_id.Trim().Equals(user.miniAppOpenId))
@@ -468,7 +468,7 @@ namespace SnowmeetApi.Controllers
             string sessionKey = summerMaintain.oper_open_id.Trim();
             sessionKey = Util.UrlDecode(sessionKey);
             
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (!user.isAdmin)
             {
                 return NotFound();
@@ -485,7 +485,7 @@ namespace SnowmeetApi.Controllers
             string sessionKey = summerMaintain.open_id.Trim();
             sessionKey = Util.UrlDecode(sessionKey);
             
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
             summerMaintain.open_id = user.miniAppOpenId.Trim();
 
             int productId = 144;
@@ -546,7 +546,7 @@ namespace SnowmeetApi.Controllers
         {
             sessionKey = Util.UrlDecode(sessionKey);
             
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
 
             List<SummerMaintain> summerMaintainList = await _context.SummerMaintain
                 .Where(s => (s.open_id.Trim().Equals(user.miniAppOpenId.Trim()) && !s.state.Trim().Equals("未支付")))
@@ -561,7 +561,7 @@ namespace SnowmeetApi.Controllers
         {
             sessionKey = Util.UrlDecode(sessionKey);
             
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
 
             bool ret = true;
 
@@ -591,7 +591,7 @@ namespace SnowmeetApi.Controllers
         {
             sessionKey = Util.UrlDecode(sessionKey.Trim());
             
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (!user.isAdmin)
             {
                 return BadRequest();

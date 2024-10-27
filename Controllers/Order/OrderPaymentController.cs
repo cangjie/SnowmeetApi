@@ -70,7 +70,7 @@ namespace SnowmeetApi.Controllers.Order
             _appId = _config.GetSection("AppId").Value.Trim();
             _httpContextAccessor = httpContextAccessor;
             _rentHelper = new RentController(context, config, httpContextAccessor);
-            UnicUser._context = context;
+            //UnicUser._context = context;
 
         }
 
@@ -273,7 +273,7 @@ namespace SnowmeetApi.Controllers.Order
         public async Task<ActionResult<OrderOnline>> GetWholeOrder(int paymentId, string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey.Trim());
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;//.GetUnicUser(sessionKey);
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);//.GetUnicUser(sessionKey);
             OrderPayment payment = await _context.OrderPayment.FindAsync(paymentId);
             if (payment == null || (payment.open_id != null && !payment.open_id.Trim().Equals("") 
                 && !payment.open_id.Trim().Equals(user.miniAppOpenId.Trim()) && !user.isAdmin ))
@@ -298,7 +298,7 @@ namespace SnowmeetApi.Controllers.Order
             sessionKey = Util.UrlDecode(sessionKey.Trim());
             payMethod = Util.UrlDecode(payMethod.Trim());
 
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (!user.isAdmin)
             {
                 return BadRequest();
@@ -325,7 +325,7 @@ namespace SnowmeetApi.Controllers.Order
         {
             sessionKey = Util.UrlDecode(sessionKey);
 
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
             
            
 
@@ -388,7 +388,7 @@ namespace SnowmeetApi.Controllers.Order
             {
                 case "微信支付":
                     sessionKey = Util.UrlDecode(sessionKey);            
-                    UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+                    UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
                     payment.open_id = user.miniAppOpenId.Trim();
                     _context.OrderPayment.Entry(payment).State = EntityState.Modified;
                     await _context.SaveChangesAsync();
@@ -514,7 +514,7 @@ namespace SnowmeetApi.Controllers.Order
         {
             reason = Util.UrlDecode(reason);
             sessionKey = Util.UrlDecode(sessionKey);
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (!user.isAdmin)
             {
                 return BadRequest();
@@ -745,7 +745,7 @@ namespace SnowmeetApi.Controllers.Order
         public async Task<ActionResult<TenpaySet>> TenpayRequest(int id, string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey.Trim());
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (user == null)
             {
                 return BadRequest();

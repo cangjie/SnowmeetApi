@@ -27,7 +27,7 @@ namespace SnowmeetApi.Controllers.Maintain
             _context = context;
             _config = config.GetSection("Settings");
             _originConfig = config;
-            UnicUser._context = context;
+            //UnicUser._context = context;
         }
 
         [HttpGet("{taskId}")]
@@ -35,7 +35,7 @@ namespace SnowmeetApi.Controllers.Maintain
         {
             sessionKey = Util.UrlDecode(sessionKey);
             stepName = Util.UrlDecode(stepName);
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (!user.isAdmin)
             {
                 return BadRequest();
@@ -70,7 +70,7 @@ namespace SnowmeetApi.Controllers.Maintain
         public async Task<ActionResult<IEnumerable<MaintainReport>>> GetReport(DateTime startDate, DateTime endDate, string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey);
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (!user.isAdmin)
             {
                 return BadRequest();
@@ -92,7 +92,7 @@ namespace SnowmeetApi.Controllers.Maintain
         public async Task<ActionResult<IEnumerable<MaintainLog>>> GetStepsByStaff(int taskId, string sessionKey)
         {
             MiniAppUserController mUserController = new MiniAppUserController(_context, _originConfig);
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (!user.isAdmin)
             {
                 return BadRequest();
@@ -115,7 +115,7 @@ namespace SnowmeetApi.Controllers.Maintain
         {
             memo = Util.UrlDecode(memo);
             sessionKey = Util.UrlDecode(sessionKey);
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (!user.isAdmin)
             {
                 return BadRequest();

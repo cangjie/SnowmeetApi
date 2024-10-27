@@ -341,7 +341,7 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<OrderOnline>> OrderChargeByStaff(int orderId, double amount, string payMethod, string staffSessionKey)
         {
 
-            UnicUser user = (await UnicUser.GetUnicUserAsync(staffSessionKey, _context)).Value;
+            UnicUser user = await UnicUser.GetUnicUserAsync(staffSessionKey, _context);
             if (!user.isAdmin)
             {
                 return NoContent();
@@ -393,7 +393,7 @@ namespace SnowmeetApi.Controllers
             endDate = endDate.Date.AddHours(24);
             staffSessionKey = Util.UrlDecode(staffSessionKey);
 
-            UnicUser user = (await UnicUser.GetUnicUserAsync(staffSessionKey, _context)).Value;
+            UnicUser user = await UnicUser.GetUnicUserAsync(staffSessionKey, _context);
             if (!user.isAdmin)
             {
                 return NoContent();
@@ -431,8 +431,8 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<OrderOnline>> GetWholeOrderByStaff(int orderId, string staffSessionKey)
         {
             staffSessionKey = Util.UrlDecode(staffSessionKey);
-            UnicUser._context = _context;
-            UnicUser user = (await UnicUser.GetUnicUserAsync(staffSessionKey, _context)).Value;
+            //UnicUser._context = _context;
+            UnicUser user = await UnicUser.GetUnicUserAsync(staffSessionKey, _context);
             if (!user.isAdmin)
             {
                 return NoContent();
@@ -442,14 +442,14 @@ namespace SnowmeetApi.Controllers
             {
                 try
                 {
-                    UnicUser customerUser = await UnicUser.GetUnicUser(order.open_id, "snowmeet_mini", _context);
+                    UnicUser customerUser = await UnicUser.GetUnicUserByDetailInfo(order.open_id, "snowmeet_mini", _context);
                     if (customerUser == null)
                     {
-                        customerUser = await UnicUser.GetUnicUser(order.open_id, "snowmeet_official_account_new", _context);
+                        customerUser = await UnicUser.GetUnicUserByDetailInfo(order.open_id, "snowmeet_official_account_new", _context);
                     }
                     if (customerUser == null)
                     {
-                        customerUser = await UnicUser.GetUnicUser(order.open_id, "snowmeet_official_account", _context);
+                        customerUser = await UnicUser.GetUnicUserByDetailInfo(order.open_id, "snowmeet_official_account", _context);
                     }
 
                     if (customerUser != null)
@@ -534,7 +534,7 @@ namespace SnowmeetApi.Controllers
             payMethod = Util.UrlDecode(payMethod);
             sessionKey = Util.UrlDecode(sessionKey);
 
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (!user.isAdmin)
             {
                 return NoContent();
@@ -575,7 +575,7 @@ namespace SnowmeetApi.Controllers
         {
             staffSessionKey = Util.UrlDecode(staffSessionKey);
             
-            UnicUser user = (await UnicUser.GetUnicUserAsync(staffSessionKey, _context)).Value;
+            UnicUser user = await UnicUser.GetUnicUserAsync(staffSessionKey, _context);
             if (!user.isAdmin)
             {
                 return NoContent();
@@ -647,7 +647,7 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<OrderOnline>> ConfirmNonPaymentOrder(int orderId, string staffSessionKey)
         {
             
-            UnicUser user = (await UnicUser.GetUnicUserAsync(staffSessionKey, _context)).Value;
+            UnicUser user = await UnicUser.GetUnicUserAsync(staffSessionKey, _context);
             if (!user.isAdmin)
             {
                 return NoContent();
@@ -673,7 +673,7 @@ namespace SnowmeetApi.Controllers
         {
             staffSessionKey = Util.UrlDecode(staffSessionKey);
             
-            UnicUser user = (await  UnicUser.GetUnicUserAsync(staffSessionKey, _context)).Value;
+            UnicUser user = await  UnicUser.GetUnicUserAsync(staffSessionKey, _context);
             if (!user.isAdmin)
             {
                 return NoContent();
@@ -736,7 +736,7 @@ namespace SnowmeetApi.Controllers
         {
             sessionKey = Util.UrlDecode(sessionKey);
             
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await UnicUser.GetUnicUserAsync(sessionKey, _context);
             OrderOnline order = await _context.OrderOnlines.FindAsync(orderId);
             if (!order.open_id.Trim().Equals(user.miniAppOpenId)
                 && !order.open_id.Trim().Equals(user.officialAccountOpenId.Trim())
@@ -797,7 +797,7 @@ namespace SnowmeetApi.Controllers
             }
             else
             {
-                UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+                UnicUser user = await UnicUser.GetUnicUserAsync(sessionKey, _context);
                 order.open_id = user.miniAppOpenId.Trim();
                 _context.Entry(order).State = EntityState.Modified;
                 await _context.SaveChangesAsync();
@@ -820,7 +820,7 @@ namespace SnowmeetApi.Controllers
         {
             sessionKey = Util.UrlDecode(sessionKey);
             //
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;//.GetUnicUser(sessionKey);
+            UnicUser user = await UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (user == null)
             {
                 return NotFound();
@@ -870,7 +870,7 @@ namespace SnowmeetApi.Controllers
             string notify = "http://mini.snowmeet.top/core/WepayOrder/PaymentCallback";
             notify = Util.UrlDecode(notify);
             
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (user == null)
             {
                 return NotFound();
@@ -1034,7 +1034,7 @@ namespace SnowmeetApi.Controllers
         {
             memo = Util.UrlDecode(memo);
             sessionKey = Util.UrlDecode(sessionKey);
-            UnicUser user = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser user = await UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (user == null || !user.isAdmin)
             {
                 return;

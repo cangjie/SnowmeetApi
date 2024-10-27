@@ -46,7 +46,7 @@ namespace SnowmeetApi.Controllers.Order
         {
             sessionKey = Util.UrlDecode(sessionKey.Trim());
             
-            UnicUser staffUser = await UnicUser.GetUnicUser(sessionKey);
+            UnicUser staffUser = await UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (!staffUser.isAdmin)
             {
                 return NoContent();
@@ -97,7 +97,7 @@ namespace SnowmeetApi.Controllers.Order
         {
             sessionKey = Util.UrlDecode(sessionKey);
             
-            UnicUser staffUser = (await UnicUser.GetUnicUserAsync(sessionKey, _context)).Value;
+            UnicUser staffUser = await UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (!staffUser.isAdmin)
             {
                 return NoContent();
@@ -107,7 +107,7 @@ namespace SnowmeetApi.Controllers.Order
             {
                 return NotFound();
             }
-            UnicUser scanUser = await UnicUser.GetUnicUser(scan.scaner_oa_open_id, "wechat_oa_openid", _context);
+            UnicUser scanUser = await UnicUser.GetUnicUserByDetailInfo(scan.scaner_oa_open_id, "wechat_oa_openid", _context);
             if (scanUser!= null && !scanUser.miniAppOpenId.Trim().Equals(""))
             {
                 //scan.miniAppUser = (await miniAppUserHelper.GetMiniAppUser(scanUser.miniAppOpenId, sessionKey)).Value;
