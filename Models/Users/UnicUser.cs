@@ -98,7 +98,7 @@ namespace SnowmeetApi.Models.Users
                 {
                     case "wechat_mini_openid":
                         user.miniAppOpenId = msa.num.Trim();
-                        user.miniAppUser = await  _db.MiniAppUsers.FindAsync(msa.num.Trim());
+                        //user.miniAppUser = await  _db.MiniAppUsers.FindAsync(msa.num.Trim());
                         break;
                     case "wechat_oa_openid":
                         user.officialAccountOpenId = msa.num.Trim();
@@ -117,6 +117,19 @@ namespace SnowmeetApi.Models.Users
                         break;
                 }
             }
+            if (user.miniAppUser == null)
+            {
+                MiniAppUser mUser = new MiniAppUser()
+                {
+                    open_id = user.member.wechatMiniOpenId.Trim(),
+                    real_name = user.member.real_name,
+                    gender = user.member.gender,
+                    is_admin = user.member.is_staff,
+                    is_manager = user.member.is_manager
+                };
+                user.miniAppUser = mUser;
+            }
+           
             return user;
             
         }
