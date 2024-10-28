@@ -49,6 +49,7 @@ namespace SnowmeetApi.Controllers
             _httpContextAccessor = httpContextAccessor;
             _maintainHelper = new MaintainLiveController(context, config);
             _rentHelper = new RentController(context, config, httpContextAccessor);
+            _memberHelper = new MemberController(context, config);
         }
 
         [HttpGet]
