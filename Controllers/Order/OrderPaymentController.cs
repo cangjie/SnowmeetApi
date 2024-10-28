@@ -476,19 +476,19 @@ namespace SnowmeetApi.Controllers.Order
             switch(order.type.Trim())
             {
                 case "雪票":
-                    bizCode = "SKIP";
+                    bizCode = "XP";
                     break;
                 case "店销现货":
-                    bizCode = "SALE";
+                    bizCode = "XS";
                     break;
                 case "押金":
-                    bizCode = "RENT";
+                    bizCode = "ZL";
                     break;
                 case "服务":
-                    bizCode = "MTNC";
+                    bizCode = "YH";
                     break;
                 default:
-                    bizCode = "OTHS";    
+                    bizCode = "QT";    
                     break;            
 
             }
@@ -499,7 +499,7 @@ namespace SnowmeetApi.Controllers.Order
             {
                 return "";
             }
-            string outTradeNo = shopCode + "_" + bizCode + "_" + dateStr + "_" + order.id.ToString().PadLeft(6, '0')  + "_" + (payments.Count + 1).ToString().PadLeft(2,'0');
+            string outTradeNo = shopCode + "_" + bizCode + "_" + dateStr + "_" + order.id.ToString().PadLeft(6, '0')  + "_ZF_" + (payments.Count + 1).ToString().PadLeft(2,'0');
             var paymentDepList = await _context.OrderPayment.Where(p=>p.out_trade_no.Trim().Equals(outTradeNo))
                 .AsNoTracking().ToListAsync();
             if (paymentDepList == null || paymentDepList.Count == 0)
@@ -536,7 +536,7 @@ namespace SnowmeetApi.Controllers.Order
             {
                 return BadRequest();
             }
-            string outRefundNo = payment.out_trade_no + "_REFND_" + (refunds.Count + 1).ToString().PadLeft(2, '0') 
+            string outRefundNo = payment.out_trade_no + "_TK_" + (refunds.Count + 1).ToString().PadLeft(2, '0') 
                 + "_" + DateTime.Now.ToString("yyyyMMdd");
             OrderPaymentRefund refund = new OrderPaymentRefund()
             {
