@@ -11,9 +11,11 @@ using Newtonsoft.Json;
 using Microsoft.Extensions.Configuration;
 using SnowmeetApi.Models.Users;
 using SnowmeetApi.Models.Rent;
+using SnowmeetApi.Controllers.User;
 using Org.BouncyCastle.Asn1.X509;
 using System.Security.Cryptography;
 using Aop.Api.Domain;
+
 namespace SnowmeetApi.Controllers
 {
     [Route("core/[controller]/[action]")]
@@ -35,6 +37,8 @@ namespace SnowmeetApi.Controllers
         private readonly MaintainLiveController _maintainHelper;
 
         private readonly RentController _rentHelper;
+
+        private readonly MemberController _memberHelper;
 
         public ReceptController(ApplicationDBContext context, IConfiguration config, IHttpContextAccessor httpContextAccessor)
         {
@@ -351,7 +355,8 @@ namespace SnowmeetApi.Controllers
             string cell = "";
             if (!openId.Trim().Equals(""))
             {
-                MiniAppUser user = await _context.MiniAppUsers.FindAsync(openId);
+                //MiniAppUser user = await _context.MiniAppUsers.FindAsync(openId);
+                SnowmeetApi.Models.Users.Member  user =await  _memberHelper.GetMember(openId, "wechat_mini_openid");
                 realName = user.real_name.Trim();
                 switch (user.gender.Trim())
                 {
@@ -364,7 +369,7 @@ namespace SnowmeetApi.Controllers
                     default:
                         break;
                 }
-                cell = user.cell_number.Trim();
+                cell = user.cell.Trim();
                 gender = user.gender.Trim();
             }
             

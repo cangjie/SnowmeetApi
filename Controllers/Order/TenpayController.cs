@@ -23,6 +23,7 @@ using SnowmeetApi.Models.Product;
 using SnowmeetApi.Models.Rent;
 using SnowmeetApi.Models.Users;
 using wechat_miniapp_base.Models;
+using SnowmeetApi.Controllers.User;
 
 namespace SnowmeetApi.Controllers
 {
@@ -42,6 +43,8 @@ namespace SnowmeetApi.Controllers
         public OrderPaymentController _orderPaymentHelper;
         public RentController _rentHelper;
         public string _appId = "";
+
+        public MemberController _memberHelper;
         public TenpayController(ApplicationDBContext context, IConfiguration config, IHttpContextAccessor httpContextAccessor)
         {
             _db = context;
@@ -50,6 +53,7 @@ namespace SnowmeetApi.Controllers
             _orderPaymentHelper = new OrderPaymentController(context, config, httpContextAccessor);
             _appId = _oriConfig.GetSection("Settings").GetSection("AppId").Value.Trim();
             _rentHelper = new RentController(_db, _oriConfig, _http);
+            _memberHelper = new MemberController(context, config);
         }
 
         [NonAction]
@@ -1291,10 +1295,11 @@ namespace SnowmeetApi.Controllers
                         default:
                             break;
                     }
-                    MiniAppUser mUser = await _db.MiniAppUsers.FindAsync(orderOnline.open_id);
+                    //MiniAppUser mUser = await _db.MiniAppUsers.FindAsync(orderOnline.open_id);
+                    SnowmeetApi.Models.Users.Member mUser = await _memberHelper.GetMember(orderOnline.open_id, "wechat_mini_openid");
                     if (mUser != null)
                     {
-                        cell = mUser.cell_number.Trim();
+                        cell = mUser.cell.Trim();
                         realName = mUser.real_name.Trim();
                         gender = mUser.gender.Trim();
                     }
