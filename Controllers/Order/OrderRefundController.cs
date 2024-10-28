@@ -198,7 +198,7 @@ namespace SnowmeetApi.Controllers.Order
             var request = new CreateRefundDomesticRefundRequest()
             {
                 OutTradeNumber = payment.out_trade_no.Trim(),
-                OutRefundNumber = refund.id.ToString(),
+                OutRefundNumber = await GetOutRefundNo(payment), //refund.id.ToString(),
                 Amount = new CreateRefundDomesticRefundRequest.Types.Amount()
                 {
                     Total = (int)Math.Round(payment.amount * 100, 0),
@@ -232,6 +232,24 @@ namespace SnowmeetApi.Controllers.Order
             }
 
             
+        }
+
+        [NonAction]
+        public async Task<string> GetOutRefundNo(OrderPayment payment)
+        {
+            var refundList = await _db.OrderPaymentRefund.Where(r => r.payment_id == payment.id)
+                .AsNoTracking().ToListAsync();
+            string outNo = payment.out_trade_no.Trim() + "_TK_";
+            if (refundList == null || refundList.Count == 0)
+            {
+                outNo = outNo + "01";
+            }
+            else
+            {
+                outNo = outNo + (refundList.Count + 1).ToString();
+            }
+            return outNo;
+
         }
 
         [HttpPost("{mchid}")]
