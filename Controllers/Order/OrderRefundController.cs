@@ -161,6 +161,8 @@ namespace SnowmeetApi.Controllers.Order
                 
                 return null; 
             }
+
+            string outRefundNo = await GetOutRefundNo(payment);
             
 
             OrderPaymentRefund refund = new OrderPaymentRefund()
@@ -171,8 +173,8 @@ namespace SnowmeetApi.Controllers.Order
                 oper = user.miniAppOpenId.Trim(),
                 state = 0,
                 memo = memo,
-                notify_url = notify.Trim()
-
+                notify_url = notify.Trim(),
+                out_refund_no = outRefundNo
 
             }; 
 
@@ -198,7 +200,7 @@ namespace SnowmeetApi.Controllers.Order
             var request = new CreateRefundDomesticRefundRequest()
             {
                 OutTradeNumber = payment.out_trade_no.Trim(),
-                OutRefundNumber = await GetOutRefundNo(payment), //refund.id.ToString(),
+                OutRefundNumber = outRefundNo, //refund.id.ToString(),
                 Amount = new CreateRefundDomesticRefundRequest.Types.Amount()
                 {
                     Total = (int)Math.Round(payment.amount * 100, 0),
@@ -246,7 +248,7 @@ namespace SnowmeetApi.Controllers.Order
             }
             else
             {
-                outNo = outNo + (refundList.Count + 1).ToString();
+                outNo = outNo + (refundList.Count + 1).ToString().PadLeft(2, '0');
             }
             return outNo;
 
