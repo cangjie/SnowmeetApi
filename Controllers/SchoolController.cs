@@ -125,7 +125,9 @@ namespace SnowmeetApi.Controllers
             {
                 isCell = true;
             }
-            var staffList = await _db.schoolStaff.Where(s => (s.member_id != null && s.member_id > 0))
+            key = key.Trim();
+            var staffList = await _db.schoolStaff.Where(s => (s.member_id != null && s.member_id > 0 
+                && ( (s.temp_filled_cell.Trim().Equals(key.Trim()) && key.Length == 11)) || s.temp_filled_name.Trim().IndexOf(key) >= 0  ))
                 .AsNoTracking().ToListAsync();
             Staff staff = new Staff();
             bool find = false;
