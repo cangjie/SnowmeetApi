@@ -129,6 +129,10 @@ namespace SnowmeetApi.Controllers
                 .AsNoTracking().ToListAsync();
             Staff staff = new Staff();
             bool find = false;
+            if (staffList != null && staffList.Count > 1)
+            {
+                return NoContent();
+            }
             for(int i = 0; i < staffList.Count; i++)
             {
                 if ((staffList[i].temp_filled_cell.ToString().Trim().Equals(key) && isCell)
