@@ -52,6 +52,29 @@ namespace SnowmeetApi.Controllers
             _memberHelper = new User.MemberController(_db, _config);
         }
 
+
+        [HttpGet("{isReg}")]
+        public async Task<ActionResult<List<Staff>>> GetRegisteredStaff(int isReg, string sessionKey, string sessionType="wl_wechat_mini_openid")
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            sessionType = Util.UrlDecode(sessionType);
+            Staff me = (Staff)((OkObjectResult)(await GetStaffInfo(sessionKey, sessionType)).Result).Value;
+            if (me == null)
+            {
+                return BadRequest();
+            }
+            string role = me.role.Trim();
+            string sub = me.sub_school_name.Trim();
+            string team = me.team.Trim();
+
+            var list = await _db.schoolStaff.Where(s => ((s.member_id != null && isReg == 1) || (s.member_id == null && isReg == 0))
+                && (role.Trim().Equals("校长") || role.Trim().Equals("客服")
+                || (role.Trim().Equals("分校长") && s.sub_school_name.Trim().Equals(sub.Trim()) ) 
+                || (role.Trim().Equals("队长") && s.sub_school_name.Trim().Equals(sub.Trim()) && s.team.Trim().Equals(team))  ))
+                .AsNoTracking().ToListAsync();
+            return Ok(list);
+        }
+
         [HttpGet("{staffId}")]
         public async Task<ActionResult<Staff>> LinkStaffMember(int staffId, string sessionKey, string sessionType = "wl_wechat_mini_openid")
         {
