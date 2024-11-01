@@ -54,7 +54,7 @@ namespace SnowmeetApi.Controllers
 
 
         [HttpGet("{isReg}")]
-        public async Task<ActionResult<List<Staff>>> GetRegisteredStaff(int isReg, string sessionKey, string sessionType="wl_wechat_mini_openid")
+        public async Task<ActionResult<List<Staff>>> GetStaffList(int isReg, string sessionKey, string sessionType="wl_wechat_mini_openid")
         {
             sessionKey = Util.UrlDecode(sessionKey);
             sessionType = Util.UrlDecode(sessionType);
