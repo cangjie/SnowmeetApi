@@ -483,7 +483,8 @@ namespace SnowmeetApi.Controllers
                 sub_school_name = sub,
                 team = team,
                 temp_filled_gender = gender,
-                role = role
+                role = role,
+                avatar = ""
             };
 
             await _db.schoolStaff.AddAsync(newStaff);
