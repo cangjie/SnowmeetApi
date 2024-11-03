@@ -440,6 +440,52 @@ namespace SnowmeetApi.Controllers
             return courses;
         }
 
+        [HttpGet]
+        public async Task<ActionResult<Staff>> NewStaff(string name, string cell, string gender, string sub, 
+            string team, string role, string sessionKey, string sessionType = "wl_wechat_mini_openid")
+        {
+            name = Util.UrlDecode(name);
+            sub = Util.UrlDecode(sub);
+            team = Util.UrlDecode(team);
+            role = Util.UrlDecode(role);
+            sessionKey = Util.UrlDecode(sessionKey);
+            sessionType = Util.UrlDecode(sessionType);
+            Staff staff = (Staff)((OkObjectResult)(await GetStaffInfo(sessionKey, sessionType)).Result).Value;
+            if (staff == null || staff.role.Trim().Equals("教练") || staff.role.Trim().Equals("客服"))
+            {
+                return BadRequest();
+            }
+
+            var staffList = await _db.schoolStaff.Where(s => s.temp_filled_cell.Trim().Equals(cell.Trim()))
+                .AsNoTracking().ToListAsync();
+
+            if (staffList != null && staffList.Count > 0)
+            {
+                return NotFound();
+            }
+
+
+            Staff newStaff = new Staff()
+            {
+                id = 0, 
+                member_id = null,
+                temp_filled_cell = cell,
+                temp_filled_name = name,
+                school_name = "万龙滑雪学校",
+                sub_school_name = sub,
+                team = team,
+                temp_filled_gender = gender,
+                role = role
+            };
+
+            await _db.schoolStaff.AddAsync(newStaff);
+            await _db.SaveChangesAsync();
+            staffList = await _db.schoolStaff.Where(s => s.temp_filled_cell.Trim().Equals(cell.Trim()))
+                .AsNoTracking().ToListAsync();
+            return Ok(staffList[0]);
+
+        }
+
         [NonAction]
         public Staff RemoveSensitiveInfo(Staff staff)
         {
