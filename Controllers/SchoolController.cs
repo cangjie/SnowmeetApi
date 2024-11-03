@@ -52,6 +52,14 @@ namespace SnowmeetApi.Controllers
             _memberHelper = new User.MemberController(_db, _config);
         }
 
+        [HttpGet("{staffId}")]
+        public async Task<ActionResult<Staff>> GetStaffById(int staffId)
+        {
+
+            return Ok(await _db.schoolStaff.FindAsync(staffId));
+
+        }
+
 
         [HttpGet("{isReg}")]
         public async Task<ActionResult<List<Staff>>> GetStaffList(int isReg, string sessionKey, string sessionType="wl_wechat_mini_openid")
