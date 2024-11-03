@@ -21,7 +21,7 @@ namespace SnowmeetApi.Models.School
 
         public string avatar {get; set;}
 	    public string role {get; set;}
-	    public DateTime create_date {get; set;}
+	    public DateTime create_date {get; set;} = DateTime.Now;
 
         public string? grade {get; set;}
 
