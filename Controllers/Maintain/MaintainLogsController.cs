@@ -104,8 +104,8 @@ namespace SnowmeetApi.Controllers.Maintain
                 {
                     logList[i].isMine = false;
                 }
-                var staffUser = await mUserController.GetMiniAppUser(logList[i].staff_open_id, sessionKey);
-                logList[i].staffName = staffUser.Value.real_name.Trim();
+                MiniAppUser staffUser = (MiniAppUser)((OkObjectResult)(await mUserController.GetMiniAppUser(logList[i].staff_open_id, sessionKey)).Result).Value;
+                logList[i].staffName = staffUser.real_name.Trim();
             }
             return Ok(logList); 
         }
