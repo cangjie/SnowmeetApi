@@ -21,6 +21,7 @@ using System.Collections;
 using System.Text.RegularExpressions;
 
 using static SKIT.FlurlHttpClient.Wechat.TenpayV3.Models.CreateHKTransactionMicroPayRequest.Types;
+using SnowmeetApi.Controllers.User;
 
 namespace SnowmeetApi.Controllers
 {
@@ -42,6 +43,8 @@ namespace SnowmeetApi.Controllers
 
         private IConfiguration _oriConfig;
 
+        private MemberController _memberHelper;
+
 
 
         public OrderOnlinesController(ApplicationDBContext context, IConfiguration config)
@@ -50,6 +53,7 @@ namespace SnowmeetApi.Controllers
             _oriConfig = config;
             _config = config.GetSection("Settings");
             _appId = _config.GetSection("AppId").Value.Trim();
+            _memberHelper = new MemberController(context, config);
         }
 
         [HttpGet]
@@ -508,10 +512,11 @@ namespace SnowmeetApi.Controllers
             string staffRealName = "";
             if (order != null && order.staff_open_id != null && !order.staff_open_id.Trim().Equals(""))
             {
-                MiniAppUser staffUser = await _context.MiniAppUsers.FindAsync(order.staff_open_id);
-                if (staffUser != null)
+                Member staffMember = await _memberHelper.GetMember(order.staff_open_id, "wechat_mini_openid");
+                //MiniAppUser staffUser = await _context.MiniAppUsers.FindAsync(order.staff_open_id);
+                if (staffMember != null)
                 {
-                    staffRealName = staffUser.real_name.Trim();
+                    staffRealName = staffMember.real_name.Trim();
                 }
             }
             if (order != null)

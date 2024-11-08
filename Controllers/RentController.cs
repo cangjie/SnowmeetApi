@@ -12,6 +12,7 @@ using SnowmeetApi.Models.Order;
 using SnowmeetApi.Models.Rent;
 using SnowmeetApi.Models.Users;
 using System.Collections;
+using SnowmeetApi.Controllers.User;
 namespace SnowmeetApi.Controllers
 {
     [Route("core/[controller]/[action]")]
@@ -31,6 +32,8 @@ namespace SnowmeetApi.Controllers
         private readonly IHttpContextAccessor _httpContextAccessor;
 
         private readonly DateTime startDate = DateTime.Parse("2023-10-20");
+
+        private MemberController _memberHelper;
 
         public class Balance
         {
@@ -55,6 +58,7 @@ namespace SnowmeetApi.Controllers
             _config = config.GetSection("Settings");
             _appId = _config.GetSection("AppId").Value.Trim();
             _httpContextAccessor = httpContextAccessor;
+            _memberHelper = new MemberController(context, config);
         }
 
         [NonAction]
@@ -496,12 +500,15 @@ namespace SnowmeetApi.Controllers
 
                 if (!detail.rent_staff.Trim().Equals(""))
                 {
-                    detail.rentStaff = await _context.MiniAppUsers.FindAsync(detail.rent_staff);
+                    //Member member = await _memberHelper.GetMember(detail.rent_staff, "wechat_mini_openid");
+                    //UnicUser.GetUnicUserAsync()
+                    detail.rentStaff = (await UnicUser.GetUnicUserByDetailInfo(detail.rent_staff, "wechat_mini_openid", _context)).miniAppUser;
                     //rentOrder.staff_name = detail.rentStaff.real_name;
                 }
                 else
                 {
-                    detail.rentStaff = await _context.MiniAppUsers.FindAsync(rentOrder.staff_open_id);
+                    
+                    detail.rentStaff = (await UnicUser.GetUnicUserByDetailInfo(rentOrder.staff_open_id, "wechat_mini_openid", _context)).miniAppUser;//await _context.MiniAppUsers.FindAsync(rentOrder.staff_open_id);
 
                 }
 
