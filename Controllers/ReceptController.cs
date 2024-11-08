@@ -928,9 +928,15 @@ namespace SnowmeetApi.Controllers
         {
             sessionKey = Util.UrlDecode(sessionKey);
             UnicUser user = await UnicUser.GetUnicUserAsync(sessionKey, _context);
+            /*
             user.miniAppUser.is_admin = user.member.is_admin;
             user.miniAppUser.is_manager = user.member.is_manager;
             user.miniAppUser.is_staff = user.member.is_staff;
+            */
+            if (user.member.is_admin == 1 || user.member.is_manager == 1 || user.member.is_staff == 1)
+            {
+                user.miniAppUser.is_admin  = 1;
+            }
             return user.miniAppUser;
         }
 
