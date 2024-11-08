@@ -672,6 +672,17 @@ namespace SnowmeetApi.Controllers
                 rentOrder.textColor = "#C0C0C0";
             }
 
+            if (rentOrder.real_name.Trim().Equals(""))
+            {
+                Member member = await _memberHelper.GetMember(rentOrder.open_id.Trim(), "wechat_mini_openid");
+                if (member != null)
+                {
+                    rentOrder.real_name = member.real_name.Trim();
+                }
+            }
+
+            
+
 
             var ret = Ok(rentOrder);
             return ret;
