@@ -344,7 +344,7 @@ namespace SnowmeetApi.Controllers
         {
             sessionKey = Util.UrlDecode(sessionKey);
             MiniAppUser adminUser = await GetUser(sessionKey);
-            if (adminUser.is_admin != 1)
+            if (adminUser.is_admin != 1 && adminUser.is_manager != 1 && adminUser.is_staff != 1)
             {
                 return BadRequest();
             }
@@ -915,7 +915,12 @@ namespace SnowmeetApi.Controllers
             sessionKey = Util.UrlDecode(sessionKey);
             
             UnicUser user = await UnicUser.GetUnicUserAsync(sessionKey, _context);
-            return user.isAdmin;
+            bool isAdmin = true;
+            if (user.member.is_admin == 0 && user.member.is_manager == 0 && user.member.is_staff == 0)
+            {
+                isAdmin = false;
+            }
+            return isAdmin;
         }
 
         [NonAction]
@@ -923,6 +928,9 @@ namespace SnowmeetApi.Controllers
         {
             sessionKey = Util.UrlDecode(sessionKey);
             UnicUser user = await UnicUser.GetUnicUserAsync(sessionKey, _context);
+            user.miniAppUser.is_admin = user.member.is_admin;
+            user.miniAppUser.is_manager = user.member.is_manager;
+            user.miniAppUser.is_staff = user.member.is_staff;
             return user.miniAppUser;
         }
 
