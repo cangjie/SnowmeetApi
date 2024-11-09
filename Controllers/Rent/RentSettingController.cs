@@ -44,7 +44,7 @@ namespace SnowmeetApi.Controllers.Rent
             name = Util.UrlDecode(name);
             sessionKey = Util.UrlDecode(sessionKey);
             sessionType = Util.UrlDecode(sessionType);
-            SnowmeetApi.Models.Users.Member member = await _memberHelper.GetMember(sessionKey, sessionType);
+            SnowmeetApi.Models.Users.Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
             if (member.is_admin != 1)
             {
                 return BadRequest();
@@ -113,7 +113,7 @@ namespace SnowmeetApi.Controllers.Rent
             sessionKey = Util.UrlDecode(sessionKey);
             sessionType = Util.UrlDecode(sessionType);
             code = code.Trim();
-            SnowmeetApi.Models.Users.Member member = await _memberHelper.GetMember(sessionKey, sessionType);
+            SnowmeetApi.Models.Users.Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
             if (member.is_admin != 1)
             {
                 return BadRequest();
@@ -150,7 +150,7 @@ namespace SnowmeetApi.Controllers.Rent
             code = code == null? "": code.Trim();
             sessionKey = Util.UrlDecode(sessionKey);
             sessionType = Util.UrlDecode(sessionType);
-            SnowmeetApi.Models.Users.Member member = await _memberHelper.GetMember(sessionKey, sessionType);
+            SnowmeetApi.Models.Users.Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
             if (member.is_admin != 1)
             {
                 return BadRequest();
@@ -280,7 +280,7 @@ namespace SnowmeetApi.Controllers.Rent
             shop = Util.UrlDecode(shop);
             dayType = Util.UrlDecode(dayType);
             scene = Util.UrlDecode(scene);
-            SnowmeetApi.Models.Users.Member member = await _memberHelper.GetMember(sessionKey, sessionType);
+            SnowmeetApi.Models.Users.Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
             if (member.is_admin != 1)
             {
                 return BadRequest();
@@ -339,7 +339,7 @@ namespace SnowmeetApi.Controllers.Rent
         {
             sessionKey = Util.UrlDecode(sessionKey);
             sessionType = Util.UrlDecode(sessionType);
-            SnowmeetApi.Models.Users.Member member = await _memberHelper.GetMember(sessionKey, sessionType);
+            SnowmeetApi.Models.Users.Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
             if (member.is_admin != 1)
             {
                 return BadRequest();
@@ -393,7 +393,7 @@ namespace SnowmeetApi.Controllers.Rent
         {
             sessionKey = Util.UrlDecode(sessionKey);
             sessionType = Util.UrlDecode(sessionType);
-            SnowmeetApi.Models.Users.Member member = await _memberHelper.GetMember(sessionKey, sessionType);
+            SnowmeetApi.Models.Users.Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
             if (member.is_admin != 1)
             {
                 return BadRequest();
@@ -417,7 +417,7 @@ namespace SnowmeetApi.Controllers.Rent
         {
             sessionKey = Util.UrlDecode(sessionKey);
             sessionType = Util.UrlDecode(sessionType);
-            SnowmeetApi.Models.Users.Member member = await _memberHelper.GetMember(sessionKey, sessionType);
+            SnowmeetApi.Models.Users.Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
             if (member.is_admin != 1)
             {
                 return BadRequest();
@@ -439,7 +439,7 @@ namespace SnowmeetApi.Controllers.Rent
         {
             sessionKey = Util.UrlDecode(sessionKey);
             sessionType = Util.UrlDecode(sessionType);
-            SnowmeetApi.Models.Users.Member member = await _memberHelper.GetMember(sessionKey, sessionType);
+            SnowmeetApi.Models.Users.Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
             if (member.is_admin != 1)
             {
                 return BadRequest();
@@ -466,7 +466,7 @@ namespace SnowmeetApi.Controllers.Rent
         {
             sessionKey = Util.UrlDecode(sessionKey);
             sessionType = Util.UrlDecode(sessionType);
-            SnowmeetApi.Models.Users.Member member = await _memberHelper.GetMember(sessionKey, sessionType);
+            SnowmeetApi.Models.Users.Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
             if (member.is_admin != 1)
             {
                 return BadRequest();
@@ -512,7 +512,7 @@ namespace SnowmeetApi.Controllers.Rent
         {
             sessionKey = Util.UrlDecode(sessionKey);
             sessionType = Util.UrlDecode(sessionType);
-            SnowmeetApi.Models.Users.Member member = await _memberHelper.GetMember(sessionKey, sessionType);
+            SnowmeetApi.Models.Users.Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
             if (member.is_admin != 1)
             {
                 return BadRequest();
@@ -534,7 +534,7 @@ namespace SnowmeetApi.Controllers.Rent
         {
             sessionKey = Util.UrlDecode(sessionKey);
             sessionType = Util.UrlDecode(sessionType);
-            SnowmeetApi.Models.Users.Member member = await _memberHelper.GetMember(sessionKey, sessionType);
+            SnowmeetApi.Models.Users.Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
             if (member.is_admin != 1)
             {
                 return BadRequest();
@@ -582,7 +582,7 @@ namespace SnowmeetApi.Controllers.Rent
         {
             sessionKey = Util.UrlDecode(sessionKey);
             sessionType = Util.UrlDecode(sessionType);
-            SnowmeetApi.Models.Users.Member member = await _memberHelper.GetMember(sessionKey, sessionType);
+            SnowmeetApi.Models.Users.Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
             if (member.is_admin != 1)
             {
                 return BadRequest();
@@ -620,7 +620,7 @@ namespace SnowmeetApi.Controllers.Rent
         {
             sessionKey = Util.UrlDecode(sessionKey);
             sessionType = Util.UrlDecode(sessionType);
-            SnowmeetApi.Models.Users.Member member = await _memberHelper.GetMember(sessionKey, sessionType);
+            SnowmeetApi.Models.Users.Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
             if (member.is_admin != 1)
             {
                 return BadRequest();
@@ -739,7 +739,7 @@ namespace SnowmeetApi.Controllers.Rent
         {
             sessionKey = Util.UrlDecode(sessionKey);
             sessionType = Util.UrlDecode(sessionType);
-            SnowmeetApi.Models.Users.Member member = await _memberHelper.GetMember(sessionKey, sessionType);
+            SnowmeetApi.Models.Users.Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
             if (member.is_admin != 1)
             {
                 return BadRequest();
@@ -773,7 +773,7 @@ namespace SnowmeetApi.Controllers.Rent
         {
             sessionKey = Util.UrlDecode(sessionKey);
             sessionType = Util.UrlDecode(sessionType);
-            SnowmeetApi.Models.Users.Member member = await _memberHelper.GetMember(sessionKey, sessionType);
+            SnowmeetApi.Models.Users.Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
             if (member.is_admin != 1)
             {
                 return BadRequest();
