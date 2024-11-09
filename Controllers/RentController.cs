@@ -514,7 +514,8 @@ namespace SnowmeetApi.Controllers
 
                 if (!detail.return_staff.Trim().Equals(""))
                 {
-                    detail.returnStaff = await _context.MiniAppUsers.FindAsync(detail.return_staff);
+                    //detail.returnStaff = await _context.MiniAppUsers.FindAsync(detail.return_staff);
+                    detail.returnStaff = (await UnicUser.GetUnicUserByDetailInfo(detail.return_staff, "wechat_mini_openid", _context)).miniAppUser;
                 }
                 else
                 {
