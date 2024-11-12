@@ -60,6 +60,7 @@ namespace SnowmeetApi.Controllers
 
         }
 
+       
 
         [HttpGet("{isReg}")]
         public async Task<ActionResult<List<Staff>>> GetStaffList(int isReg, string sessionKey, string sessionType="wl_wechat_mini_openid")
@@ -436,6 +437,25 @@ namespace SnowmeetApi.Controllers
             return Ok(courseList);
         }
 
+        [HttpGet("{trainerId}")]
+        public async Task<ActionResult<List<Course>>> GetCoursesByStaff(int trainerId, string sessionKey, string sessionType)
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            sessionType = Util.UrlDecode(sessionType);
+            Staff staff = (Staff)((OkObjectResult)(await GetStaffInfo(sessionKey, sessionType)).Result).Value;
+            Staff trainer = await _db.schoolStaff.FindAsync(trainerId);
+            if (staff == null || trainer == null)
+            {
+                return BadRequest();
+            }
+            if (!Belong(staff, trainer))
+            {
+                return NoContent();
+            }
+            return Ok(await GetCourses(DateTime.MinValue, DateTime.MaxValue, (int)trainer.member_id, 0));
+
+        }
+
         [NonAction]
         public async Task<List<Course>> GetCourses(DateTime start, DateTime end, int trainerId, int operId)
         {
@@ -502,7 +522,46 @@ namespace SnowmeetApi.Controllers
             return staff;
         }
 
+        [NonAction]
+        public bool Belong(Staff staff, Staff trainer)
+        {
+            bool belong = false;
+            
+            switch(staff.role.Trim())
+            {
+                case "校长":
+                case "客服":
+                    belong = true;
+                    break;
+                case "分校长":
+                    if (trainer.sub_school_name.Trim().Equals(staff.sub_school_name.Trim()))
+                    {
+                        belong = true;
+                    }
+                    else
+                    {
+                        belong = false;
+                    }
+                    break;
+                case "队长":
+                    if (trainer.sub_school_name.Trim().Equals(staff.sub_school_name.Trim())
+                        && trainer.team.Trim().Equals(staff.team.Trim()))
+                    {
+                        belong = true;
+                    }
+                    else
+                    {
+                        belong = false;
+                    }
+                    break;
+                default:
+                    break;
 
+            }
+
+            return belong;
+
+        }
        
 
 
