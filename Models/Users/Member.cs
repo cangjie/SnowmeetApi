@@ -20,6 +20,19 @@ namespace SnowmeetApi.Models.Users
         public int is_admin { get; set; }
         public int in_staff_list {get; set;}
 
+        public MiniAppUser miniAppUser
+        {
+            get
+            {
+                MiniAppUser miniUser = new MiniAppUser()
+                {
+                    open_id = wechatMiniOpenId,
+                    cell_number = cell
+                };
+                return miniUser;
+            }
+        }
+
        
 
         

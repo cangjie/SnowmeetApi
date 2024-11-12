@@ -113,6 +113,7 @@ namespace SnowmeetApi.Controllers.Order
                 //scan.miniAppUser = (await miniAppUserHelper.GetMiniAppUser(scanUser.miniAppOpenId, sessionKey)).Value;
                 //Member member = _memberController.GetMember(scanUser.m)
                 scan.member = scanUser.member;
+                scan.miniAppUser = scan.member.miniAppUser;
                 
             }
             if (scan == null)
