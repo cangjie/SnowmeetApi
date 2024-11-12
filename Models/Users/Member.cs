@@ -27,7 +27,8 @@ namespace SnowmeetApi.Models.Users
                 MiniAppUser miniUser = new MiniAppUser()
                 {
                     open_id = wechatMiniOpenId,
-                    cell_number = cell
+                    cell_number = cell,
+                    real_name = real_name
                 };
                 return miniUser;
             }

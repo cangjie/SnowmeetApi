@@ -723,12 +723,32 @@ namespace SnowmeetApi.Controllers
 
             if (order.user != null && order.user.open_id != null &&  !order.user.open_id.Trim().Equals(""))
             {
-                MiniAppUser customerUser = await _context.MiniAppUsers.FindAsync(order.user.open_id);
-                customerUser.real_name = order.user.real_name.Trim();
-                customerUser.cell_number = order.user.cell_number.Trim();
-                customerUser.gender = order.user.gender.Trim();
-                _context.Entry(customerUser).State = EntityState.Modified;
-                await _context.SaveChangesAsync();
+                //MiniAppUser customerUser = await _context.MiniAppUsers.FindAsync(order.user.open_id);
+                //Member member = await _memberHelper.GetMember(order.user.open_id, "wechat_mini_openiud");
+                //_memberHelper.UpdateDetailInfo()
+                Member member = await _memberHelper.GetMember(order.user.open_id, "wechat_mini_openid");
+                bool memberMod = false;
+                if (member.real_name.Trim().Equals(""))
+                {
+                    member.real_name = order.user.real_name;
+                    memberMod = true;
+                }
+                if (member.gender.Trim().Equals(""))
+                {
+                    member.gender = order.user.gender;
+                    memberMod = true;
+                }
+                if (memberMod)
+                {
+                    _context.member.Entry(member).State = EntityState.Modified;
+                    await _context.SaveChangesAsync();
+                }
+                if (!order.user.cell_number.Trim().Equals("") && !member.cell.Trim().Equals(order.user.cell_number))
+                {
+                    await _memberHelper.UpdateDetailInfo(member.id, order.user.cell_number.Trim(), "cell", false);
+                }
+
+                
 
             }
 
