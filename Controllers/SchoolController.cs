@@ -438,7 +438,7 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet("{trainerId}")]
-        public async Task<ActionResult<List<Course>>> GetCoursesByStaff(int trainerId, string sessionKey, string sessionType)
+        public async Task<ActionResult<List<Course>>> GetCoursesByStaff(int trainerId, string sessionKey, string sessionType = "wl_wechat_mini_openid")
         {
             sessionKey = Util.UrlDecode(sessionKey);
             sessionType = Util.UrlDecode(sessionType);
