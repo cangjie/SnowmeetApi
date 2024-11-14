@@ -121,9 +121,9 @@ namespace SnowmeetApi.Models.Users
             {
                 MiniAppUser mUser = new MiniAppUser()
                 {
-                    open_id = user.member.wechatMiniOpenId.Trim(),
-                    real_name = user.member.real_name,
-                    gender = user.member.gender,
+                    open_id = user.member.wechatMiniOpenId==null?"":user.member.wechatMiniOpenId,
+                    real_name = user.member.real_name==null?"":user.member.real_name,
+                    gender = user.member.gender==null?"":user.member.gender,
                     is_admin = user.member.is_staff,
                     is_manager = user.member.is_manager
                 };
