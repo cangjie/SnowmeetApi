@@ -15,7 +15,7 @@ namespace SnowmeetApi.Models.School
         public string name {get; set;}
         public string gender {get; set;}
         public string adult_type {get; set;}
-        public string video_url {get; set;} = "";
+        public string? video_url {get; set;} = "";
         public string before_level {get; set;} = "";
 
         public string after_level {get; set;} = "";
@@ -23,7 +23,7 @@ namespace SnowmeetApi.Models.School
         public string progress {get; set;} = "";
         public string emotion {get; set;} = "";
         public string next_plan {get; set;} = "";
-        public string images {get; set;} = "";
+        public string? images {get; set;} = "";
 
 
 
@@ -35,6 +35,53 @@ namespace SnowmeetApi.Models.School
 
         [NotMapped]
         public Course course {get; set;} = null;
+
+       
+        public bool haveEvaluated
+        {
+            get
+            {
+                if (background.Trim().Equals("") || progress.Trim().Equals("")
+                || emotion.Trim().Equals("") || next_plan.Trim().Equals(""))
+                {
+                    return false;
+                }
+                else
+                {
+                    return true;
+                }
+            }
+        }
+
+        public bool haveImages
+        {
+            get
+            {
+                if (images.Trim().Equals(""))
+                {
+                    return false;
+                }
+                else
+                {
+                    return true;
+                }
+            }
+        }
+
+        public bool haveVideo
+        {
+            get
+            {
+                if (video_url.Trim().Equals(""))
+                {
+                    return false;
+                }
+                else
+                {
+                    return true;
+                }
+            }
+        }
 
         
     }

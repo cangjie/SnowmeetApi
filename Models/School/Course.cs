@@ -42,5 +42,56 @@ namespace SnowmeetApi.Models.School
         
         [NotMapped]
         public int studentCount {get; set;} = 0;
+
+        public bool haveEvaluated
+        {
+            get
+            {
+                bool ret = true;
+                foreach(CourseStudent student in courseStudents)
+                {
+                    if (!student.haveEvaluated)
+                    {
+                        ret = false;
+                        break;
+                    }
+                }
+                return ret;
+            }
+        }
+
+        public bool haveImages
+        {
+            get
+            {
+                bool ret = true;
+                foreach(CourseStudent student in courseStudents)
+                {
+                    if (!student.haveImages)
+                    {
+                        ret = false;
+                        break;
+                    }
+                }
+                return ret;
+            }
+        }
+
+        public bool haveVideo
+        {
+            get
+            {
+                bool ret = true;
+                foreach(CourseStudent student in courseStudents)
+                {
+                    if (!student.haveVideo)
+                    {
+                        ret = false;
+                        break;
+                    }
+                }
+                return ret;
+            }
+        }
     }
 }
