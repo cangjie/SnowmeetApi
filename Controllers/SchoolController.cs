@@ -515,6 +515,66 @@ namespace SnowmeetApi.Controllers
 
         }
 
+        [HttpGet]
+        public async Task<ActionResult<List<Course>>> GetUnEvaluatedCoursesInMyRange(string sessionKey, string sessionType = "wl_wechat_mini_openid")
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            sessionType = Util.UrlDecode(sessionType);
+            List<Course> courses = (List<Course>)((OkObjectResult)(await GetCoursesInMyRange(sessionKey, sessionType)).Result).Value;
+            List<Course> newCourses = new List<Course>();
+            for(int i = 0; i < courses.Count; i++)
+            {
+                Course course = courses[i];
+                if (!course.haveEvaluated || !course.haveImages || !course.haveVideo)
+                {
+                    newCourses.Add(courses[i]);
+                }
+                
+            }
+            return Ok(newCourses);
+        }
+
+        [HttpGet]
+        public async Task<ActionResult<List<Course>>> GetCoursesInMyRange(string sessionKey, string sessionType = "wl_wechat_mini_openid")
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            sessionType = Util.UrlDecode(sessionType);
+            Staff me = (Staff)((OkObjectResult)(await GetStaffInfo(sessionKey, sessionType)).Result).Value;
+            if (me.role.Trim().Equals("教练"))
+            {
+                return Ok(await _db.schoolCourse.Where(c => (c.del == 0 && (c.trainer_member_id == me.member_id || c.oper_member_id == me.member_id))).AsNoTracking().ToListAsync());
+            }
+            else if (me.role.Trim().Equals("校长") || me.role.Trim().Equals("客服"))
+            {
+                return Ok(await _db.schoolCourse.Where(c => c.del == 0).AsNoTracking().ToListAsync());
+            }
+            List<Course> courses = await _db.schoolCourse.Where(c => c.del == 0).AsNoTracking().ToListAsync();
+            List<Course> newCourses = new List<Course>();
+            List<Staff> staffList = (List<Staff>)((OkObjectResult)(await GetStaffList(1, sessionKey)).Result).Value;
+            for(int i = 0; i < courses.Count; i++)
+            {
+                Course course = courses[i];
+                Staff? staff = null;
+                for(int j = 0; j < staffList.Count; j++)
+                {
+                    if (staffList[j].member_id == course.trainer_member_id 
+                        || staffList[j].member_id == course.oper_member_id)
+                    {
+                        staff = (Staff)staffList[j];
+                    }
+                }
+                if (staff == null || !Belong(me, staff))
+                {
+                    continue;
+                }
+                else
+                {
+                    newCourses.Add(course);
+                }
+            }
+            return Ok(newCourses);
+        }
+
         [NonAction]
         public Staff RemoveSensitiveInfo(Staff staff)
         {
