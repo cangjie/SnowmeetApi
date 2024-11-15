@@ -38,7 +38,7 @@ namespace SnowmeetApi.Models.School
         public Staff staff {get; set;} = null;
 
         [NotMapped]
-        public List<CourseStudent> courseStudents  {get; set;}
+        public List<CourseStudent> courseStudents  {get; set;} 
         
         [NotMapped]
         public int studentCount {get; set;} = 0;
@@ -48,6 +48,10 @@ namespace SnowmeetApi.Models.School
             get
             {
                 bool ret = true;
+                if (courseStudents == null)
+                {
+                    return ret;
+                }
                 foreach(CourseStudent student in courseStudents)
                 {
                     if (!student.haveEvaluated)
@@ -65,6 +69,10 @@ namespace SnowmeetApi.Models.School
             get
             {
                 bool ret = true;
+                if (courseStudents == null)
+                {
+                    return ret;
+                }
                 foreach(CourseStudent student in courseStudents)
                 {
                     if (!student.haveImages)
@@ -82,6 +90,10 @@ namespace SnowmeetApi.Models.School
             get
             {
                 bool ret = true;
+                if (courseStudents == null)
+                {
+                    return ret;
+                }
                 foreach(CourseStudent student in courseStudents)
                 {
                     if (!student.haveVideo)
