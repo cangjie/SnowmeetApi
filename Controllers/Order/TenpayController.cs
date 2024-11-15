@@ -57,7 +57,7 @@ namespace SnowmeetApi.Controllers
         }
 
         [NonAction]
-        public async Task<OrderPayment> TenpayRequest(int paymentId, string sessionKey, bool profitShare = true)
+        public async Task<OrderPayment> TenpayRequest(int paymentId, string sessionKey, bool profitShare = false)
         {
 
             sessionKey = Util.UrlDecode(sessionKey.Trim());
