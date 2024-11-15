@@ -24,6 +24,7 @@ using SnowmeetApi.Models.Rent;
 using SnowmeetApi.Models.Users;
 using wechat_miniapp_base.Models;
 using SnowmeetApi.Controllers.User;
+using Microsoft.VisualStudio.Web.CodeGenerators.Mvc.Templates.Blazor;
 
 namespace SnowmeetApi.Controllers
 {
@@ -662,6 +663,43 @@ namespace SnowmeetApi.Controllers
                 await _db.SaveChangesAsync();
             }
             return ret;
+        }
+
+        [NonAction]
+        public async Task UnFreezeAll()
+        {
+            DateTime startDate = DateTime.Parse("2024-10-15");
+            List<OrderPayment> pList = await _db.OrderPayment
+                .Where(p => p.create_date > startDate && p.status.Trim().Equals("支付成功") )
+                .OrderByDescending(p=>p.id).AsNoTracking().ToListAsync();
+            for(int i = 0; i < pList.Count; i++)
+            {
+                try
+                {
+                    await ShareFinish(pList[i].id);
+                }
+                catch
+                {
+
+                }
+            }
+        }
+
+        [NonAction]
+        public async Task ShareFinish(int paymentId)
+        {
+            OrderPayment payment = await _db.OrderPayment.FindAsync(paymentId);
+            WechatTenpayClient client = await GetClient((int)payment.mch_id);
+            WepayKey key = await _db.WepayKeys.FindAsync(payment.mch_id);
+            //var req = CreateProfitSharingReturnOrderRequest
+            var req = new SetProfitSharingOrderUnfrozenRequest()
+            {
+                TransactionId = payment.wepay_trans_id,
+                OutOrderNumber = payment.out_trade_no.Trim(),
+                Description = "误操作，解除冻结"
+            };
+            var res = await client.ExecuteSetProfitSharingOrderUnfrozenAsync(req);
+
         }
 
         [NonAction]
