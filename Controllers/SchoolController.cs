@@ -39,6 +39,12 @@ namespace SnowmeetApi.Controllers
 
             public DateTime lastCourseTime {get; set;}
 
+            public bool needEvaluated {get; set;}
+
+            public bool needImages {get; set;}
+
+            public bool needVideo {get; set;}
+
             public List<Course> couses {get; set;} = null;
 
             
@@ -395,8 +401,10 @@ namespace SnowmeetApi.Controllers
                         {
                             exists = true;
                             student.couses.Add(course);
-
                             student.count = student.couses.Count;
+                            student.needEvaluated = student.needEvaluated || (!courseStudent.haveEvaluated);
+                            student.needImages = student.needImages || (!courseStudent.haveImages);
+                            student.needVideo = student.needVideo || (!courseStudent.haveVideo);
                             break;
                         }
                     }
@@ -410,11 +418,15 @@ namespace SnowmeetApi.Controllers
                             count = 1,
                             gender = courseStudent.gender,
                             adult_type = courseStudent.adult_type,
+                            needEvaluated = !courseStudent.haveEvaluated,
+                            needImages = !courseStudent.haveImages,
+                            needVideo = !courseStudent.haveVideo,
                             couses = (new List<Course>())
                         };
                         s.couses.Add(course);
                         sl.Add(s);
                     }
+
                 }
             }
             for(int i = 0; i < sl.Count; i++)
