@@ -57,7 +57,8 @@ namespace SnowmeetApi.Models.School
         {
             get
             {
-                if (images.Trim().Equals(""))
+                
+                if (images != null && images.Trim().Equals(""))
                 {
                     return false;
                 }
@@ -72,7 +73,7 @@ namespace SnowmeetApi.Models.School
         {
             get
             {
-                if (video_url.Trim().Equals(""))
+                if (video_url != null && video_url.Trim().Equals(""))
                 {
                     return false;
                 }
