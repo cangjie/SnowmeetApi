@@ -458,7 +458,8 @@ namespace SnowmeetApi.Controllers
 
                     if (customerUser != null)
                     {
-                        order.user = await _context.MiniAppUsers.FindAsync(customerUser.miniAppOpenId);
+                        order.user = (await _memberHelper.GetMember(order.open_id.Trim(), "wechat_mini_openid")).miniAppUser;
+                        //order.user = await _context.MiniAppUsers.FindAsync(customerUser.miniAppOpenId);
 
                     }
                 }

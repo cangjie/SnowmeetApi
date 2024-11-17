@@ -35,6 +35,8 @@ namespace SnowmeetApi.Controllers
 
         private MemberController _memberHelper;
 
+        private OrderOnlinesController _orderHelper;
+
         public class Balance
         {
             public int id { get; set; }
@@ -59,6 +61,7 @@ namespace SnowmeetApi.Controllers
             _appId = _config.GetSection("AppId").Value.Trim();
             _httpContextAccessor = httpContextAccessor;
             _memberHelper = new MemberController(context, config);
+            _orderHelper = new OrderOnlinesController(_context, _oriConfig);
         }
 
         [NonAction]
@@ -329,7 +332,7 @@ namespace SnowmeetApi.Controllers
 
             var orderListTemp = await _context.RentOrder
                 .Where(o => ((o.cell_number.EndsWith(cell) || o.id == orderId ) && (shop.Equals("") || o.shop.Trim().Equals(shop)) )
-                && o.create_date.Date > DateTime.Parse("2022-11-5")    )
+                && o.create_date.Date > DateTime.Parse("2024-10-15")    )
                 .OrderByDescending(o => o.id).ToListAsync();
             if (orderListTemp == null || orderListTemp.Count <= 0)
             {
@@ -419,7 +422,7 @@ namespace SnowmeetApi.Controllers
             if (receptList != null && receptList.Count > 0)
             {
                 order.staff_open_id = receptList[0].update_staff.Trim();
-                MiniAppUser? staffUser = await _context.MiniAppUsers.FindAsync(order.staff_open_id);
+                Member? staffUser = await _memberHelper.GetMember(order.staff_open_id, "wechat_mini_openid");
                 order.staff_name = staffUser == null ? "" : staffUser.real_name;
                 _context.RentOrder.Entry(order);
                 await _context.SaveChangesAsync();
@@ -456,8 +459,8 @@ namespace SnowmeetApi.Controllers
                 .Where(d => d.rent_list_id == rentOrder.id).AsNoTracking().ToArrayAsync();
             if (rentOrder.order_id > 0)
             {
-                OrderOnlinesController orderHelper = new OrderOnlinesController(_context, _oriConfig);
-                rentOrder.order = (OrderOnline)((OkObjectResult)(await orderHelper.GetWholeOrderByStaff(rentOrder.order_id, sessionKey)).Result).Value;
+                
+                rentOrder.order = (OrderOnline)((OkObjectResult)(await _orderHelper.GetWholeOrderByStaff(rentOrder.order_id, sessionKey)).Result).Value;
             }
 
             if (!user.isAdmin)
