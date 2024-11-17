@@ -479,16 +479,18 @@ namespace SnowmeetApi.Controllers
                 Recept r = list[i];
                 if (!r.recept_staff.Trim().Equals(""))
                 {
-                    MiniAppUser user = await _context.MiniAppUsers.FindAsync(r.recept_staff.Trim());
-                    if (user != null)
+                    //MiniAppUser user = await _context.MiniAppUsers.FindAsync(r.recept_staff.Trim());
+                    SnowmeetApi.Models.Users.Member member = await _memberHelper.GetMember(r.recept_staff.Trim(), "wechat_mini_openid");
+                    if (member != null)
                     {
-                        r.recept_staff_name = user.real_name.Trim();
+                        r.recept_staff_name = member.real_name.Trim();
                     }
                     
                 }
                 if (!r.update_staff.Trim().Equals(""))
                 {
-                    MiniAppUser user = await _context.MiniAppUsers.FindAsync(r.update_staff.Trim());
+                    //MiniAppUser user = await _context.MiniAppUsers.FindAsync(r.update_staff.Trim());
+                    SnowmeetApi.Models.Users.Member user = await _memberHelper.GetMember(r.recept_staff.Trim(), "wechat_mini_openid");
                     if (user != null)
                     {
                         r.update_staff_name = user.real_name.Trim();

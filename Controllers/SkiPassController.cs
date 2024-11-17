@@ -14,6 +14,7 @@ using SnowmeetApi.Models.Users;
 using SnowmeetApi.Models.Order;
 using SnowmeetApi.Models.Card;
 using Newtonsoft.Json;
+using SnowmeetApi.Controllers.User;
 namespace SnowmeetApi.Controllers
 {
     [Route("core/[controller]/[action]")]
@@ -24,10 +25,13 @@ namespace SnowmeetApi.Controllers
 
         private IConfiguration _config;
 
+        private MemberController _memberHelper;
+
         public SkiPassController(ApplicationDBContext context, IConfiguration config)
         {
             _context = context;
             _config = config;
+            _memberHelper = new MemberController(context,  config);
         }
 
         [HttpGet("{id}")]
@@ -185,16 +189,18 @@ namespace SnowmeetApi.Controllers
             order.cell_number = cell.Trim();
             order.name = name.Trim();
             _context.Entry(order).State = EntityState.Modified;
-            MiniAppUser miniUser = await _context.MiniAppUsers.FindAsync(order.open_id.Trim());
+            //MiniAppUser miniUser = await _context.MiniAppUsers.FindAsync(order.open_id.Trim());
+            Member miniUser = await _memberHelper.GetMember(order.open_id.Trim(), "wechat_mini_openid");
             if (miniUser != null)
             {
                 if (miniUser.real_name.Trim().Length <= 1)
                 {
                     miniUser.real_name = name;
                 }
-                if (miniUser.cell_number.Length != 11)
+                if (miniUser.cell.Length != 11)
                 {
-                    miniUser.cell_number = cell.Trim();
+                    await _memberHelper.UpdateDetailInfo(miniUser.id, cell.Trim(), "cell", false);
+                    //miniUser.cell = cell.Trim();
                 }
                 _context.Entry(miniUser).State = EntityState.Modified;
             }

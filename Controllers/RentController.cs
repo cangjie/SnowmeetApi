@@ -204,8 +204,8 @@ namespace SnowmeetApi.Controllers
                 return BadRequest();
             }
 
-            MiniAppUser customerUser = await _context.MiniAppUsers.FindAsync(rentOrder.open_id);
-
+            //MiniAppUser customerUser = await _context.MiniAppUsers.FindAsync(rentOrder.open_id);
+            Member customerUser = await _memberHelper.GetMember(rentOrder.open_id, "wechat_mini_openid");
             if (customerUser != null)
             {
                 if (customerUser.real_name.Trim().Equals(""))
@@ -222,7 +222,7 @@ namespace SnowmeetApi.Controllers
                     }
                     customerUser.real_name = realName;
                     customerUser.gender = gender;
-                    _context.Entry(customerUser).State = EntityState.Modified;
+                    _context.member.Entry(customerUser).State = EntityState.Modified;
                     await _context.SaveChangesAsync();
                 }
             }
@@ -627,7 +627,8 @@ namespace SnowmeetApi.Controllers
                         {
                             string staffOpenId = rl[0].update_staff.Trim().Equals("") ?
                                 rl[0].recept_staff.Trim() : rl[0].update_staff.Trim();
-                            MiniAppUser? staffUser = await _context.MiniAppUsers.FindAsync(staffOpenId.Trim());
+                            //MiniAppUser? staffUser = await _context.MiniAppUsers.FindAsync(staffOpenId.Trim());
+                            Member staffUser =  await _memberHelper.GetMember(staffOpenId.Trim(), "wechat_mini_openid");
                             if (staffUser != null)
                             {
                                 rentOrder.staff_name = staffUser.real_name.Trim();
@@ -1553,7 +1554,11 @@ namespace SnowmeetApi.Controllers
                     r.amount = rentOrder.order.refunds[j].amount;
                     r.refund_id = rentOrder.order.refunds[j].refund_id.Trim();
                     string operOpenId = rentOrder.order.refunds[j].oper;
-                    MiniAppUser refundUser = await _context.MiniAppUsers.FindAsync(operOpenId);
+
+
+                    //MiniAppUser refundUser = await _context.MiniAppUsers.FindAsync(operOpenId);
+
+                    Member refundUser = await _memberHelper.GetMember(operOpenId, "wechat_mini_openid");
                     if (refundUser != null)
                     {
                         r.staffName = refundUser.real_name.Trim();

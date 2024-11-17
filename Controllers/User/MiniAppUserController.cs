@@ -84,6 +84,7 @@ namespace SnowmeetApi.Controllers
         [NonAction]
         public async Task<MiniAppUser> GetMiniAppUser(string sessionKey)
         {
+            /*
             var sList = await _context.MiniSessons.Where(s => s.session_key.Trim().Equals(sessionKey))
                 .OrderByDescending(s => s.create_date).AsNoTracking().ToListAsync();
             if (sList == null || sList.Count <= 0)
@@ -91,6 +92,8 @@ namespace SnowmeetApi.Controllers
                 return null;
             }
             return await _context.MiniAppUsers.FindAsync(sList[0].open_id);
+            */
+            return (await _memberHelper.GetMemberBySessionKey(sessionKey)).miniAppUser;
         }
 
         [HttpGet]
@@ -103,7 +106,8 @@ namespace SnowmeetApi.Controllers
             {
                 return NotFound();
             }
-            MiniAppUser user = await _context.MiniAppUsers.FindAsync(openId);
+            //MiniAppUser user = await _context.MiniAppUsers.FindAsync(openId);
+            MiniAppUser user = (await _memberHelper.GetMember(openId, "wechat_mini_openid")).miniAppUser;
             if (isStaff)
             {
                 user.is_admin = 1;
@@ -235,7 +239,8 @@ namespace SnowmeetApi.Controllers
             {
                 return NotFound();
             }
-            MiniAppUser user = await _context.MiniAppUsers.FindAsync(mSessionList[0].open_id);
+            //MiniAppUser user = await _context.MiniAppUsers.FindAsync(mSessionList[0].open_id);
+            MiniAppUser user = (await _memberHelper.GetMember(mSessionList[0].open_id, "wechat_mini_openid")).miniAppUser;
             user.open_id = "";
             if (user != null)
             {
@@ -262,7 +267,8 @@ namespace SnowmeetApi.Controllers
             {
                 return NotFound();
             }
-            MiniAppUser user = await _context.MiniAppUsers.FindAsync(mSessionList[0].open_id);
+            //MiniAppUser user = await _context.MiniAppUsers.FindAsync(mSessionList[0].open_id);
+            MiniAppUser user = (await _memberHelper.GetMember(mSessionList[0].open_id)).miniAppUser;
             return Ok(user);
 
         }
