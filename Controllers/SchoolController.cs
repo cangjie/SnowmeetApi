@@ -467,6 +467,24 @@ namespace SnowmeetApi.Controllers
             return Ok(await GetCourses(DateTime.MinValue, DateTime.MaxValue, (int)trainer.member_id, 0));
 
         }
+        [HttpGet("{trainerId}")]
+        public async Task<ActionResult<List<Student>>> GetCourseStudentsByStaff(int trainerId, string sessionKey, string sessionType = "wl_wechat_mini_openid")
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            sessionType = Util.UrlDecode(sessionType);
+            Staff staff = (Staff)((OkObjectResult)(await GetStaffInfo(sessionKey, sessionType)).Result).Value;
+            Staff trainer = await _db.schoolStaff.FindAsync(trainerId);
+            if (staff == null || trainer == null)
+            {
+                return BadRequest();
+            }
+            if (!Belong(staff, trainer))
+            {
+                return NoContent();
+            }
+            List<Course> courses = (List<Course>)((OkObjectResult)((await GetCoursesByStaff(trainerId, sessionKey, sessionType)).Result)).Value;
+            return Ok(GetStudents(courses));
+        }
 
         [NonAction]
         public async Task<List<Course>> GetCourses(DateTime start, DateTime end, int trainerId, int operId)
