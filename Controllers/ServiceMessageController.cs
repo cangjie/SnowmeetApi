@@ -11,6 +11,7 @@ using Microsoft.Extensions.Configuration;
 using SnowmeetApi.Models.Users;
 using static SKIT.FlurlHttpClient.Wechat.TenpayV3.Models.CreateApplyForSubMerchantApplymentRequest.Types.Business.Types.SaleScene.Types;
 using static System.Net.WebRequestMethods;
+using SnowmeetApi.Controllers.User;
 
 namespace SnowmeetApi.Controllers
 {
@@ -26,11 +27,14 @@ namespace SnowmeetApi.Controllers
 
         private readonly string _appId;
 
+        private readonly MemberController _memberHelper;
+
         public ServiceMessageController(ApplicationDBContext context, IConfiguration config)
         {
             _context = context;
             _config = config;
             _appId = _config.GetSection("Settings").GetSection("AppId").Value.Trim();
+            _memberHelper = new MemberController(context, config);
         }
 
         [NonAction]
@@ -42,8 +46,9 @@ namespace SnowmeetApi.Controllers
         [NonAction]
         public async Task<string> GetOAOpenId(string miniAppOpenId)
         {
-            MiniAppUser miniAppUser = await _context.MiniAppUsers.FindAsync(miniAppOpenId);
-            List<UnionId> uidList = await _context.UnionIds.Where(u => u.union_id.Trim().Equals(miniAppUser.union_id.Trim())
+            //MiniAppUser miniAppUser = await _context.MiniAppUsers.FindAsync(miniAppOpenId);
+            Member member = await _memberHelper.GetMember(miniAppOpenId, "wechat_mini_openid");
+            List<UnionId> uidList = await _context.UnionIds.Where(u => u.union_id.Trim().Equals(member.wechatUnionId.Trim())
                 && u.source.Trim().Equals("snowmeet_official_account_new")).ToListAsync();
             if (uidList == null || uidList.Count < 1)
             {

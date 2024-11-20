@@ -458,7 +458,8 @@ namespace SnowmeetApi.Controllers
 
                     if (customerUser != null)
                     {
-                        order.user = await _context.MiniAppUsers.FindAsync(customerUser.miniAppOpenId);
+                        order.user = (await _memberHelper.GetMember(order.open_id.Trim(), "wechat_mini_openid")).miniAppUser;
+                        //order.user = await _context.MiniAppUsers.FindAsync(customerUser.miniAppOpenId);
 
                     }
                 }
@@ -468,7 +469,8 @@ namespace SnowmeetApi.Controllers
                     {
                         try
                         {
-                            order.user = await _context.MiniAppUsers.FindAsync(order.open_id.Trim());
+                            //order.user = await _context.MiniAppUsers.FindAsync(order.open_id.Trim());
+                            order.user = (await _memberHelper.GetMember(order.open_id.Trim(), "wechat_mini_openid")).miniAppUser;
                         }
                         catch
                         {
@@ -490,10 +492,11 @@ namespace SnowmeetApi.Controllers
                     var payment = payments[i];
                     if (payment.staff_open_id != null && !payment.staff_open_id.Trim().Equals(""))
                     {
-                        var staffUser = await _context.MiniAppUsers.FindAsync(payment.staff_open_id);
-                        if (staffUser != null)
+                        Member member = await _memberHelper.GetMember(payment.staff_open_id, "wechat_mini_openid");
+                        //var staffUser = await _context.MiniAppUsers.FindAsync(payment.staff_open_id);
+                        if (member != null)
                         {
-                            payment.staffRealName = staffUser.real_name.Trim();
+                            payment.staffRealName = member.real_name.Trim();
                         }
                     }
                 }
