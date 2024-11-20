@@ -66,6 +66,21 @@ namespace SnowmeetApi.Controllers
 
         }
 
+        [HttpGet("{cell}")]
+        public async Task<ActionResult<List<Student>>> GetStudentsByCell(string cell, string sessionKey, string sessionType = "wl_wechat_mini_openid")
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            sessionType = Util.UrlDecode(sessionType);
+            Staff me = (Staff)((OkObjectResult)(await GetStaffInfo(sessionKey, sessionType)).Result).Value;
+            if (me == null)
+            {
+                return BadRequest();
+            }
+            List<Course> courses = await GetCourses(DateTime.MinValue, DateTime.MaxValue, (int)me.member_id, 0);
+            List<Student> students = GetStudents(courses);
+            return Ok(students);
+        }
+
        
 
         [HttpGet("{isReg}")]
