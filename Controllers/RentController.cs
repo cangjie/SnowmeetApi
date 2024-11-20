@@ -510,8 +510,11 @@ namespace SnowmeetApi.Controllers
                 }
                 else
                 {
-                    
-                    detail.rentStaff = (await UnicUser.GetUnicUserByDetailInfo(rentOrder.staff_open_id, "wechat_mini_openid", _context)).miniAppUser;//await _context.MiniAppUsers.FindAsync(rentOrder.staff_open_id);
+                    if (!rentOrder.staff_open_id.Trim().Equals(""))
+                    {
+                        detail.rentStaff = (await UnicUser.GetUnicUserByDetailInfo(rentOrder.staff_open_id, "wechat_mini_openid", _context)).miniAppUser;//await _context.MiniAppUsers.FindAsync(rentOrder.staff_open_id);
+                    }
+                  
 
                 }
 
