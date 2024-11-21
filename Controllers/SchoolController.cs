@@ -78,7 +78,15 @@ namespace SnowmeetApi.Controllers
             }
             List<Course> courses = await GetCourses(DateTime.MinValue, DateTime.MaxValue, (int)me.member_id, 0);
             List<Student> students = GetStudents(courses);
-            return Ok(students);
+            List<Student> newStudents = new List<Student>();
+            for(int i = 0; i < students.Count; i++)
+            {
+                if (students[i].cell.Trim().Equals(cell.Trim()))
+                {
+                    newStudents.Add(students[i]);
+                }
+            }
+            return Ok(newStudents);
         }
 
        
