@@ -161,17 +161,27 @@ namespace SnowmeetApi.Models.Rent
         public string payMethod{
             get
             {
-                string ret = "";
-                OrderOnline order = this.order;
-                OrderPayment[] payments = order.payments;
-                foreach(OrderPayment payment in payments)
+                if (order != null && order.payments != null)
                 {
-                    if (payment.status.Trim().Equals("支付成功"))
+
+                    string ret = "";
+                    OrderOnline order = this.order;
+
+                    OrderPayment[] payments = order.payments;
+                    foreach(OrderPayment payment in payments)
                     {
-                        ret = ret +  (ret.Trim().Equals("")? payment.pay_method.Trim() : "," + payment.pay_method.Trim());
+                        if (payment.status.Trim().Equals("支付成功"))
+                        {
+                            ret = ret +  (ret.Trim().Equals("")? payment.pay_method.Trim() : "," + payment.pay_method.Trim());
+                        }
                     }
+                    return ret;
                 }
-                return ret;
+                else
+                {
+                    return "";
+                }
+
             }
         }
 
