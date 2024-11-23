@@ -86,13 +86,15 @@ namespace SnowmeetApi.Controllers
             }
             Recept r = await _context.Recept.FindAsync(id);
             string content = "您有一笔费用需要支付。<a data-miniprogram-appid=\"wxd1310896f2aa68bb\" data-miniprogram-path=\"/pages/payment/pay_recept?id=" + r.id.ToString() + "\" >点击这里查看</a>。";
-            MiniAppUser u = await _context.MiniAppUsers.FindAsync(r.open_id.Trim());
+            //MiniAppUser u = await _context.MiniAppUsers.FindAsync(r.open_id.Trim());
+            //MiniAppUser u = GetUser()
+            UnicUser  u =  (await UnicUser.GetUnicUserByDetailInfo(r.open_id.Trim(), "wechat_mini_openid", _context));
             if (u == null) 
             {
                 return;
             }
             string sendUrl = "https://wxoa.snowmeet.top/api/OfficialAccountApi/SendTextMessage?unionId="
-                + Util.UrlEncode(u.union_id) + "&content=" + Util.UrlEncode(content);
+                + Util.UrlEncode(u.member.wechatUnionId) + "&content=" + Util.UrlEncode(content);
             Util.GetWebContent(sendUrl);
         }
 

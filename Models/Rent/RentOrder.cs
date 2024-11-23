@@ -3,6 +3,7 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Collections;
 using System.Collections.Generic;
+using SnowmeetApi.Models.Order;
 
 namespace SnowmeetApi.Models.Rent
 {
@@ -152,9 +153,27 @@ namespace SnowmeetApi.Models.Rent
         }
 
         
-
+        /*
         [NotMapped]
         public string payMethod { get; set; } = "微信支付";
+        */
+
+        public string payMethod{
+            get
+            {
+                string ret = "";
+                OrderOnline order = this.order;
+                OrderPayment[] payments = order.payments;
+                foreach(OrderPayment payment in payments)
+                {
+                    if (payment.status.Trim().Equals("支付成功"))
+                    {
+                        ret = ret +  (ret.Trim().Equals("")? payment.pay_method.Trim() : "," + payment.pay_method.Trim());
+                    }
+                }
+                return ret;
+            }
+        }
 
         [NotMapped]
         public OrderOnline order
