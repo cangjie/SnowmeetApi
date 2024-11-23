@@ -873,7 +873,7 @@ namespace SnowmeetApi.Controllers
             _context.Entry(rentOrder).State = EntityState.Modified;
             await _context.SaveChangesAsync();
 
-            if (amount > 0 && rentOrder.order_id > 0 && rentOrder.order != null && rentOrder.order.pay_method.Trim().Equals("微信支付")
+            if (amount > 0 && rentOrder.order_id > 0 && rentOrder.order != null && rentOrder.payMethod.Trim().Equals("微信支付")
                 && rentOrder.order.payments != null && rentOrder.order.payments.Length > 0)
             {
                 OrderPayment payment = rentOrder.order.payments[0];
