@@ -35,6 +35,12 @@ namespace SnowmeetApi.Controllers
             return await _context.TicketTemplate.Where<TicketTemplate>(tt => tt.hide == 0).ToListAsync();
         }
 
+        [HttpGet("{templateId}")]
+        public async Task<ActionResult<TicketTemplate>> GetTicketTemplateById(int id)
+        {
+            return Ok(await _context.TicketTemplate.FindAsync(id));
+        }
+
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Ticket>>> GetUnusedTicketsByCode(string ticketCodeArr)
         {
