@@ -36,9 +36,9 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet("{templateId}")]
-        public async Task<ActionResult<TicketTemplate>> GetTicketTemplateById(int id)
+        public async Task<ActionResult<TicketTemplate>> GetTicketTemplateById(int templateId)
         {
-            return Ok(await _context.TicketTemplate.FindAsync(id));
+            return Ok(await _context.TicketTemplate.FindAsync(templateId));
         }
 
         [HttpGet]
