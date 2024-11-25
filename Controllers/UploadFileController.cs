@@ -36,25 +36,24 @@ namespace SnowmeetApi.Controllers
             _memberHelper = new User.MemberController(_db, _config);
         }
 
-        [HttpPost]
+        [HttpPost("{sessionKey}")]
         //[Route(nameof(UploadFile))]
-        public async Task<ActionResult<string>> UploadLargeFile([FromQuery] string sessionKey)
+        public async Task<ActionResult<string>> UploadLargeFile()
         {
             var request = HttpContext.Request;
 
             string sessionType="wl_wechat_mini_openid";
             string[] pathArr = request.Path.ToString().Split('/');
 
-            /*
-            sessionKey = pathArr[pathArr.Length - 1].Trim();
-            sessionKey = Util.UrlDecode(sessionKey);
-            */
-
             
+            string sessionKey = pathArr[pathArr.Length - 1].Trim();
+            sessionKey = Util.UrlDecode(sessionKey);
+            
+
             Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
             if (member == null)
             {
-                return NotFound();
+                return Ok(sessionKey);
             }
             var staffList = await _db.schoolStaff.Where(s => s.member_id == member.id).AsNoTracking().ToListAsync();
             if (staffList.Count <= 0)
