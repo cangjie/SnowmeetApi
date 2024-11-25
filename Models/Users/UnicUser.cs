@@ -6,6 +6,8 @@ using Microsoft.EntityFrameworkCore;
 
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
+using System.Collections.Generic;
+using Microsoft.AspNetCore.Http.HttpResults;
 
 
 namespace SnowmeetApi.Models.Users
@@ -131,16 +133,55 @@ namespace SnowmeetApi.Models.Users
             string miniAppOpenId = "";
             string officialOpenId = "";
             string unionId = "";
+            List<MiniSession> mList = await db.MiniSessons.Where(s => s.session_key.Trim().Equals(sessionKey.Trim())
+                && s.session_type.Trim().Equals("wl_wechat_mini_openid")).AsNoTracking().ToListAsync();
+            if (mList == null || mList.Count <= 0)
+            {
+                return user;
+            }
+            miniAppOpenId = mList[0].open_id.Trim();
+            List<MemberSocialAccount> msaList = await db.memberSocialAccount.Where(m => m.member_id == mList[0].member_id)
+                .AsNoTracking().ToListAsync();
+            foreach(MemberSocialAccount msa in msaList)
+            {
+                switch(msa.type)
+                {
+                    case "wl_wechat_mini_openid":
+                        miniAppOpenId = msa.num.Trim();
+                        break;
+                    case "wechat_offical_openid":
+                        officialOpenId = msa.num.Trim();
+                        break;
+                    case "wechat_unionid":
+                        unionId = msa.num.Trim();
+                        break;
+                    default:
+                        break;
+                }
+            }
+            user.miniAppOpenId = miniAppOpenId;
+            user.officialAccountOpenId = officialOpenId;
+            user.unionId = unionId;
+            return user;
+                
+        }
+
+        public static async Task<ActionResult<UnicUser>> GetUnicUserAsyncBak(string sessionKey, Data.ApplicationDBContext db)
+        {
+            UnicUser user = new UnicUser();
+            string miniAppOpenId = "";
+            string officialOpenId = "";
+            string unionId = "";
 
             MiniSession miniSession = db.MiniSessons.Find(sessionKey);
-            if (miniSession != null)
+            if (miniSession != null && miniSession.session_type.Trim().Equals("wl_wechat_mini_openid"))
             {
-                miniAppOpenId = miniSession.open_id.Trim();
-                user.miniAppOpenId = miniAppOpenId;
+                //miniAppOpenId = miniSession.open_id.Trim();
+                user.miniAppOpenId = miniSession.open_id.Trim();
 
                 //var unionIds = _context.UnionIds.FromSqlRaw(" select * from unionids where  open_id = '"
                 //    + miniAppOpenId.Trim() + "' and source = 'snowmeet_mini' ").ToList();
-
+                /*
                 var unionIds = await db.UnionIds.Where(u => (u.open_id.Trim().Equals(miniAppOpenId.Trim()) && u.source.Trim().Equals("snowmeet_mini"))).AsNoTracking().ToListAsync();
 
                 if (unionIds.Count > 0)
@@ -154,8 +195,9 @@ namespace SnowmeetApi.Models.Users
                         officialOpenId = unionIds[0].open_id.Trim();
                     }
                 }
-
+                */
             }
+            /*
             if (miniAppOpenId.Trim().Equals(""))
             {
                 MToken mToken = db.MTokens.Find(sessionKey);
@@ -180,7 +222,8 @@ namespace SnowmeetApi.Models.Users
                     }
                 }
             }
-            user.unionId = unionId.Trim();
+            */
+            //user.unionId = unionId.Trim();
             if (miniAppOpenId.Trim().Equals("") && officialOpenId.Trim().Equals(""))
             {
                 if (sessionKey.Equals("SystemInvoke"))
