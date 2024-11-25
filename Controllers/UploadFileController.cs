@@ -44,9 +44,13 @@ namespace SnowmeetApi.Controllers
 
             string sessionType="wl_wechat_mini_openid";
             string[] pathArr = request.Path.ToString().Split('/');
+
+            /*
             sessionKey = pathArr[pathArr.Length - 1].Trim();
             sessionKey = Util.UrlDecode(sessionKey);
+            */
 
+            
             Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
             if (member == null)
             {
