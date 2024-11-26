@@ -523,12 +523,14 @@ namespace SnowmeetApi.Controllers
 
         [HttpGet]
         public async Task<ActionResult<Staff>> NewStaff(string name, string cell, string gender, string sub, 
-            string team, string role, string sessionKey, string sessionType = "wl_wechat_mini_openid")
+            string team, string role, string skiLevel, string boardLevel, string sessionKey, string sessionType = "wl_wechat_mini_openid")
         {
             name = Util.UrlDecode(name);
             sub = Util.UrlDecode(sub);
             team = Util.UrlDecode(team);
             role = Util.UrlDecode(role);
+            skiLevel = Util.UrlDecode(skiLevel);
+            boardLevel = Util.UrlDecode(boardLevel);
             sessionKey = Util.UrlDecode(sessionKey);
             sessionType = Util.UrlDecode(sessionType);
             Staff staff = (Staff)((OkObjectResult)(await GetStaffInfo(sessionKey, sessionType)).Result).Value;
@@ -557,7 +559,9 @@ namespace SnowmeetApi.Controllers
                 team = team,
                 temp_filled_gender = gender,
                 role = role,
-                avatar = ""
+                avatar = "",
+                ski_level = skiLevel,
+                board_level = boardLevel
             };
 
             await _db.schoolStaff.AddAsync(newStaff);
