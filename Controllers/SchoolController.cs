@@ -93,7 +93,8 @@ namespace SnowmeetApi.Controllers
             {
                 return BadRequest();
             }
-            List<Course> courses = await GetCourses(DateTime.MinValue, DateTime.MaxValue, (int)me.member_id, 0);
+            //List<Course> courses = await GetCourses(DateTime.MinValue, DateTime.MaxValue, (int)me.member_id, 0);
+            List<Course> courses = await GetCourses(DateTime.MinValue, DateTime.MaxValue, 0, 0);
             List<Student> students = GetStudents(courses);
             List<Student> newStudents = new List<Student>();
             for(int i = 0; i < students.Count; i++)
