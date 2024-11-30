@@ -193,7 +193,8 @@ namespace SnowmeetApi.Controllers
                 miniapp_recept_path = template.miniapp_recept_path.Trim(),
                 open_id = user.miniAppOpenId.Trim(),
                 create_date = DateTime.Now,
-                channel = channel.Trim()
+                channel = channel.Trim(),
+                expire_date = template.expire_date
 
             };
             await _context.Ticket.AddAsync(ticket);

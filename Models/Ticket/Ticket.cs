@@ -31,6 +31,8 @@ namespace SnowmeetApi.Models.Ticket
 
         public string channel { get; set; } = "";
 
+        public DateTime expire_date { get; set; } = DateTime.MaxValue;
+
         [NotMapped]
         public string status
         {
