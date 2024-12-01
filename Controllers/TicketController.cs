@@ -144,10 +144,10 @@ namespace SnowmeetApi.Controllers
 
 
         [HttpGet("{templateId}")]
-        public async Task<ActionResult<Ticket>> GenerateTicketsByUser(int templateId, string sessionKey, string channel = "")
+        public async Task<ActionResult<Ticket>> GenerateTicketsByUser(int templateId, string sessionKey, string source = "")
         {
             sessionKey = Util.UrlDecode(sessionKey);
-            channel = Util.UrlDecode(channel);
+            string channel = Util.UrlDecode(source);
             UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
             /*
             var tList = await _context.Ticket.Where(t => (t.template_id == templateId
@@ -193,7 +193,8 @@ namespace SnowmeetApi.Controllers
                 miniapp_recept_path = template.miniapp_recept_path.Trim(),
                 open_id = user.miniAppOpenId.Trim(),
                 create_date = DateTime.Now,
-                channel = channel.Trim()
+                channel = channel.Trim(),
+                expire_date = template.expire_date
 
             };
             await _context.Ticket.AddAsync(ticket);

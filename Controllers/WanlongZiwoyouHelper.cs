@@ -111,6 +111,12 @@ namespace SnowmeetApi.Controllers
 
         }
 
+        [HttpPost]
+        public ActionResult CallBack()
+        {
+            return Ok();
+        }
+
         
 
 
