@@ -24,9 +24,13 @@ namespace SnowmeetApi.Controllers
 
         public string _appId = "";
 
-        public string custId = "6914348";
+        //public string custId = "6914348";
 
-        public string apiKey = "3951EA4CA7BF7B679787F67E6262E1DD";
+        //public string apiKey = "3951EA4CA7BF7B679787F67E6262E1DD";
+
+        public string custId = "3230671";
+
+        public string apiKey = "B71DD78AE810D436D09380505FF28120";
 
         public WanlongZiwoyouHelper(ApplicationDBContext context, IConfiguration config)
 		{
