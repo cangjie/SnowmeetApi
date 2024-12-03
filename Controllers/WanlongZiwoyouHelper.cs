@@ -11,6 +11,7 @@ using Microsoft.Extensions.Configuration;
 using SnowmeetApi.Models.WanLong;
 using Newtonsoft.Json;
 using Aop.Api.Domain;
+using AlipaySDKNet.OpenAPI.Model;
 
 namespace SnowmeetApi.Controllers
 {
@@ -24,13 +25,17 @@ namespace SnowmeetApi.Controllers
 
         public string _appId = "";
 
-        //public string custId = "6914348";
+        public string wlCustId = "6914348";
 
-        //public string apiKey = "3951EA4CA7BF7B679787F67E6262E1DD";
+        public string wlApiKey = "3951EA4CA7BF7B679787F67E6262E1DD";
 
-        public string custId = "3230671";
+        public string dhhsCustId = "3230671";
 
-        public string apiKey = "B71DD78AE810D436D09380505FF28120";
+        public string dhhsApiKey = "B71DD78AE810D436D09380505FF28120";
+
+        public string apiKey = "";
+
+        public string custId = "";
 
         public WanlongZiwoyouHelper(ApplicationDBContext context, IConfiguration config)
 		{
@@ -40,19 +45,64 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet]
-        public ActionResult<ProductQueryResult> GetProductList(string keyWord)
+        public ActionResult<ProductQueryResult> GetProductList(string keyword)
         {
-            string postJson = "{\"apikey\": \"" + apiKey + "\",\t\"catIds\": \"\",\t\"cityId\": \"\",\t\"cityName\": \"\",\t\"custId\": " + custId + " ,\t\"isConfirm\": \"0\",\t\"isExpress\": \"0\",\t\"isMulti\": \"\",\t\"isPackage\": \"\",\t\"isPay\": \"\",\t\"keyWord\": \"" + keyWord.Trim() + "\",\t\"orderBy\": \"\",\t\"page\": 0,\t\"productNos\": \"\",\t\"resultNum\": 20,\t\"tagIds\": \"\",\t\"treeId\": \"\",\t\"viewId\": \"\"}";
+            int pageSize = 20;
+            string custId = dhhsCustId;
+            string apiKey = dhhsApiKey;
+            if (keyword.IndexOf("万龙") >= 0)
+            {
+                custId = wlCustId;
+                apiKey = wlApiKey;
+            }
+            string postJson = "{\"apikey\": \"" + apiKey + "\",\t\"catIds\": \"\",\t\"cityId\": \"\",\t\"cityName\": \"\",\t\"custId\": " + custId + " ,\t\"isConfirm\": \"0\",\t\"isExpress\": \"0\",\t\"isMulti\": \"\",\t\"isPackage\": \"\",\t\"isPay\": \"\",\t\"keyWord\": \"" + keyword.Trim() + "\",\t\"orderBy\": \"\",\t\"page\": 0,\t\"productNos\": \"\",\t\"resultNum\": " + pageSize.ToString() + ",\t\"tagIds\": \"\",\t\"treeId\": \"\",\t\"viewId\": \"\"}";
             //string ret = Util.GetWebContent("https://task-api-stag.zowoyoo.com/api/thirdPaty/prod/list", postJson,"application/json");
             string ret = Util.GetWebContent("https://task-api.zowoyoo.com/api/thirdPaty/prod/list", postJson,"application/json");
             Console.WriteLine(postJson);
             ProductQueryResult r = JsonConvert.DeserializeObject<ProductQueryResult>(ret);
+            int pageCount = r.data.pageCount;
+            for (int i = 1; i < pageCount; i++)
+            {
+                ProductQueryResult subR = GetProductListByPage(keyword, i);
+                if (subR.state != 1)
+                {
+                    continue;
+                }
+                for (int j = 0; j < subR.data.results.Length; j++)
+                { 
+                    r.data.results.Append(subR.data.results[j]);
+                }
+            }
+            
+            /*
             for (int i = 0; i < r.data.results.Length; i++)
             {
                 r.data.results[i].salePrice = r.data.results[i].salePrice * 0.94 + 10;
             }
+            */
+
 
             return Ok(r);
+        }
+
+
+
+        [NonAction]
+        public ProductQueryResult GetProductListByPage(string keyword, int pageNum)
+        {
+            int pageSize = 20;
+            string custId = dhhsCustId;
+            string apiKey = dhhsApiKey;
+            if (keyword.IndexOf("万龙") >= 0)
+            {
+                custId = wlCustId;
+                apiKey = wlApiKey;            
+            }
+            string postJson = "{\"apikey\": \"" + apiKey + "\",\t\"catIds\": \"\",\t\"cityId\": \"\",\t\"cityName\": \"\",\t\"custId\": " + custId + " ,\t\"isConfirm\": \"0\",\t\"isExpress\": \"0\",\t\"isMulti\": \"\",\t\"isPackage\": \"\",\t\"isPay\": \"\",\t\"keyWord\": \"" + keyword.Trim() + "\",\t\"orderBy\": \"\",\t\"page\": " + pageNum.ToString() + ",\t\"productNos\": \"\",\t\"resultNum\": " + pageSize.ToString() + ",\t\"tagIds\": \"\",\t\"treeId\": \"\",\t\"viewId\": \"\"}";
+            string ret = Util.GetWebContent("https://task-api.zowoyoo.com/api/thirdPaty/prod/list", postJson, "application/json");
+            Console.WriteLine(postJson);
+            ProductQueryResult r = JsonConvert.DeserializeObject<ProductQueryResult>(ret);
+            return r;
         }
 
         [HttpGet]
