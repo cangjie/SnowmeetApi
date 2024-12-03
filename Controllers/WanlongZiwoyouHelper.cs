@@ -62,7 +62,7 @@ namespace SnowmeetApi.Controllers
             Console.WriteLine(postJson);
             ProductQueryResult r = JsonConvert.DeserializeObject<ProductQueryResult>(ret);
             int pageCount = r.data.pageCount;
-            for (int i = 2; i <= pageCount; i++)
+            for (int i = 1; i < pageCount; i++)
             {
                 ProductQueryResult subR = GetProductListByPage(keyword, i);
                 if (subR.state != 1)
