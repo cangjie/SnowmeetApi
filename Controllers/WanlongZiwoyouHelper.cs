@@ -12,6 +12,7 @@ using SnowmeetApi.Models.WanLong;
 using Newtonsoft.Json;
 using Aop.Api.Domain;
 using AlipaySDKNet.OpenAPI.Model;
+using NuGet.Packaging;
 
 namespace SnowmeetApi.Controllers
 {
@@ -68,10 +69,20 @@ namespace SnowmeetApi.Controllers
                 {
                     continue;
                 }
-                for (int j = 0; j < subR.data.results.Length; j++)
-                { 
-                    r.data.results.Append(subR.data.results[j]);
+                //r.data.results.AddRange(subR.data.results.to);
+                SkiPassProduct[] newResults = new SkiPassProduct[r.data.results.Length + subR.data.results.Length];
+                for (int j = 0; j < r.data.results.Length; j++)
+                {
+                    newResults[j] = r.data.results[j];
                 }
+
+                for (int j = r.data.results.Length; j < newResults.Length; j++)
+                {
+                    newResults[j] = subR.data.results[j - r.data.results.Length];
+                }
+                r.data.results = newResults;
+
+
             }
             
             
