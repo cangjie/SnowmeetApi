@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>租赁业务报表</title>
+    <link rel="stylesheet" href="../../css/table.css" />
+    <link rel="stylesheet" href="../../css/bootstrap.css" />
+    <link rel="stylesheet" href="../../css/bootstrap-grid.css" />
+    <link rel="stylesheet" href="../../css/bootstrap-reboot.css" />
+    <link rel="stylesheet" href="../../css/common.css" />
+    <script type="text/javascript" src="../../js/jquery-3.6.1.min.js"></script>
+    <script type="text/javascript" src="../../js/bootstrap.js"></script>
+    <script type="text/javascript" src="../../js/util.js"></script>
+    <script type="text/javascript" src="../../js/get_sessionkey.js"></script>
+    <script type="text/javascript">//alert(sessionKey);</script>
+    <style>
+        td {
+            text-align: center
+        }
+    </style>
+</head>
+<body>
+    
+    <div style="margin-top: 20px">
+        <h1 style="text-align:center">租赁业务报表</h1>
+    </div>
+    <div class="row_view" style="align-items:center;justify-content:center; margin-top:20px">
+        门店：<select id="shop"><option>万龙</option></select> 日期：从&nbsp;<input type="date" id="date_from" oninput="setDate()" />&nbsp;到&nbsp;<input type="date" id="date_to" oninput="setDate()" />&nbsp;<button id="btn" onclick="getData()"> 查 询 </button>
+    </div>
+    <div style="height:20px"></div>
+    <h1></h1>
+    <div style="height:20px" id="total"></div>
+    <table style="width:100%">
+        <thead>
+            <tr>
+                <td class="table_head">订单ID</td>
+                <td class="table_head">门店</td>
+                <td class="table_head">姓名</td>
+                <td class="table_head">电话</td>
+                <td class="table_head">押金</td>
+                <td class="table_head">退款</td>
+                <td class="table_head">结余</td>
+                <td class="table_head">损坏赔偿</td>
+                <td class="table_head">租金</td>
+                <td class="table_head">支付方式</td>
+                <td class="table_head">日期</td>
+                <td class="table_head">时间</td>
+                <td class="table_head">接待</td>
+            </tr>
+        </thead>
+        <tbody id="report_rows">
+        </tbody>
+    </table>
+</body>
+</html>
+<script type="text/javascript">var currentColor = '#DDDDDD';
+    var totalPaid = 0;
+    function FillItem(item) {
+        var totalColNum = 13;
+        var orderIdIndex = 0;
+        var rows = document.getElementById('report_rows');
+        var newRow = document.createElement('tr');
+
+        var lastOrderId = '-1';
+        var lastRow = {};
+        if (rows.childNodes.length > 0) {
+            for (var j = 0; j < rows.childNodes.length; j++) {
+                if (rows.childNodes[rows.childNodes.length - 1 - j].childNodes.length == totalColNum) {
+                    lastRow = rows.childNodes[rows.childNodes.length - 1 - j];
+                    lastOrderId = lastRow.childNodes[orderIdIndex].innerText;
+                    break;
+                }
+            }
+
+        }
+
+        if (item.id.toString() == lastOrderId && item.id > 0) {
+            var lastOrderIdTd = lastRow.childNodes[orderIdIndex];
+
+            //var attrOrderIdTdRowSpan = lastOrderIdTd.attributes["rowspan"];
+            var span = 2;
+            if (attrOrderIdTdRowSpan != null && attrOrderIdTdRowSpan != undefined) {
+                span = parseInt(attrOrderIdTdRowSpan.value);
+                span++;
+            }
+
+            for (var k = orderIdIndex; k < lastRow.childNodes.length; k++) {
+
+                var spanAttr = document.createAttribute("rowspan");
+                spanAttr.value = span.toString();
+
+                lastRow.childNodes[k].attributes.setNamedItem(spanAttr);
+            }
+        }
+        else {
+
+            if (currentColor == '#DDDDDD') {
+                currentColor = 'white';
+            }
+            else {
+                currentColor = '#DDDDDD';
+            }
+            var td_order_id = document.createElement('td');
+            td_order_id.innerText = item.id;
+            newRow.appendChild(td_order_id);
+
+            var td_shop = document.createElement('td');
+            td_shop.innerText = item.shop;
+            newRow.appendChild(td_shop);
+
+            var td_name = document.createElement('td');
+            td_name.innerText = item.name;
+            newRow.appendChild(td_name);
+
+            var td_cell = document.createElement('td');
+            td_cell.innerText = item.cell;
+            newRow.appendChild(td_cell);
+
+            var rightAttr = document.createAttribute('style');
+            rightAttr.value = 'text-align:right';
+            var td_deposit = document.createElement('td');
+            td_deposit.innerText = formatAmount(item.deposit);
+            td_deposit.attributes.setNamedItem(rightAttr)
+            newRow.appendChild(td_deposit);
+
+            rightAttr = document.createAttribute('style');
+            rightAttr.value = 'text-align:right';
+            var td_refund = document.createElement('td');
+            td_refund.innerText = formatAmount(item.refund);
+            td_refund.attributes.setNamedItem(rightAttr)
+            newRow.appendChild(td_refund);
+
+            rightAttr = document.createAttribute('style');
+            rightAttr.value = 'text-align:right';
+            var td_earn = document.createElement('td');
+            td_earn.innerText = formatAmount(item.earn);
+            td_earn.attributes.setNamedItem(rightAttr)
+            newRow.appendChild(td_earn);
+
+            rightAttr = document.createAttribute('style');
+            rightAttr.value = 'text-align:right';
+            var td_reparation = document.createElement('td');
+            td_reparation.innerText = formatAmount(item.reparation);
+            td_reparation.attributes.setNamedItem(rightAttr)
+            newRow.appendChild(td_reparation);
+
+            rightAttr = document.createAttribute('style');
+            rightAttr.value = 'text-align:right';
+            if (item.rental != item.earn) {
+                rightAttr.value = 'text-align:right;color:red';
+            }
+            var td_rental = document.createElement('td');
+            td_rental.innerText = formatAmount(item.rental);
+            td_rental.attributes.setNamedItem(rightAttr)
+            newRow.appendChild(td_rental);
+
+            var td_pay_method = document.createElement('td');
+            td_pay_method.innerText = item.payMethod;
+            //td_pay_method.attributes.setNamedItem(rightAttr)
+            newRow.appendChild(td_pay_method);
+
+
+            totalPaid += item.rental;
+
+            var td_date = document.createElement('td');
+            td_date.innerText = formatDate(item.settleDate);
+            newRow.appendChild(td_date);
+
+            var td_time = document.createElement('td');
+            td_time.innerText = formatTime(item.settleDate);
+            newRow.appendChild(td_time);
+
+            
+
+            var td_staff = document.createElement('td');
+            td_staff.innerText = item.staff;
+            newRow.appendChild(td_staff);
+
+        }
+        newRow.style.backgroundColor = currentColor;
+        rows.appendChild(newRow);
+    }
+
+    function getData() {
+        var selShop = document.getElementById('shop');
+        var shop = encodeURIComponent(selShop.value);
+        
+        totalPaid = 0;
+        var rows = document.getElementById('report_rows');
+        rows.innerHTML = '';
+        var btnCtrl = document.getElementById('btn');
+        btnCtrl.disabled = true;
+        var getUrl = '../../core/Rent/GetBalance?sessionKey=' + encodeURIComponent(sessionKey)
+            + '&startDate=' + formatDate(startDate) + '&endDate=' + formatDate(endDate) + '&shop=' + shop;
+        $.ajax({
+            url: getUrl,
+            type: 'GET',
+            success: function (msg, status) {
+                console.log('get data msg', msg)
+                console.log('get data status', status)
+                if (status != 'success') {
+                    return
+                }
+                //var odd = false;
+                //var totalPaid = 0;
+
+                for (var i = 0; i < msg.length; i++) {
+                   // console.log('report', msg)
+                 /*
+                    if (i > 0 && msg[i].order_id == msg[i - 1].order_id && msg[i].order_id > 0){
+                        msg[i].odd = odd;
+                    }
+                    else {
+                        msg[i].odd = !odd;
+                        odd = !odd;
+                        totalPaid += msg[i].total_paid
+                    }
+                   */
+                    FillItem(msg[i]);
+                }
+
+                var divTotal = document.getElementById('total');
+                divTotal.innerText = '总计：' + formatAmount(totalPaid);
+                //alert(totalPaid);
+            },
+            complete: function (msg, status) {
+                btnCtrl.disabled = false;
+            }
+        })
+
+    }</script>
+<script type="text/javascript" src="../../js/date_selector.js"></script>
