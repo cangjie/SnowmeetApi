@@ -61,7 +61,7 @@ namespace SnowmeetApi.Controllers
             Console.WriteLine(postJson);
             ProductQueryResult r = JsonConvert.DeserializeObject<ProductQueryResult>(ret);
             int pageCount = r.data.pageCount;
-            for (int i = 1; i < pageCount; i++)
+            for (int i = 2; i <= pageCount; i++)
             {
                 ProductQueryResult subR = GetProductListByPage(keyword, i);
                 if (subR.state != 1)
@@ -74,12 +74,7 @@ namespace SnowmeetApi.Controllers
                 }
             }
             
-            /*
-            for (int i = 0; i < r.data.results.Length; i++)
-            {
-                r.data.results[i].salePrice = r.data.results[i].salePrice * 0.94 + 10;
-            }
-            */
+            
 
 
             return Ok(r);
