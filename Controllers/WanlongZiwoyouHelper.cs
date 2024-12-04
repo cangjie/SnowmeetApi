@@ -84,10 +84,6 @@ namespace SnowmeetApi.Controllers
 
 
             }
-            
-            
-
-
             return Ok(r);
         }
 

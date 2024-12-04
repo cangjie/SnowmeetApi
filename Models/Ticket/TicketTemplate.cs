@@ -14,7 +14,7 @@ namespace SnowmeetApi.Models.Ticket
 
         public string miniapp_recept_path { get; set; }
 
-        public DateTime expire_date { get; set; } = DateTime.MaxValue;
+        public DateTime? expire_date { get; set; } = DateTime.MaxValue;
 
         public int hide { get; set; }
     }
