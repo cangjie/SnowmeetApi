@@ -680,12 +680,23 @@ namespace SnowmeetApi.Controllers
                 rentOrder.textColor = "#C0C0C0";
             }
 
-            if (rentOrder.real_name.Trim().Equals(""))
+            if (!rentOrder.real_name.Trim().EndsWith("先生") && !rentOrder.real_name.Trim().EndsWith("女士"))
             {
                 Member member = await _memberHelper.GetMember(rentOrder.open_id.Trim(), "wechat_mini_openid");
                 if (member != null)
                 {
                     rentOrder.real_name = member.real_name.Trim();
+                    switch(member.gender)
+                    {
+                        case "男":
+                            rentOrder.real_name += " 先生";
+                            break;
+                        case "女":
+                            rentOrder.real_name += " 女士";
+                            break;
+                        default:
+                            break;
+                    }
                 }
             }
 

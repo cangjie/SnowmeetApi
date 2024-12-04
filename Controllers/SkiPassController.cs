@@ -35,50 +35,6 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet("{id}")]
-        public async Task<ActionResult<int>> CheckNanshanReserveAvaliabelCount(int id, DateTime date)
-        {
-            /*
-            Product p = await _context.Product.FindAsync(id);
-            if (!p.shop.Trim().Equals("南山"))
-            {
-                return int.MaxValue;
-            }
-            bool isEvening = false;
-            if (p.name.IndexOf("夜场") >= 0 && p.name.IndexOf("下午") < 0)
-            {
-                isEvening = true;
-            }
-            int totalCount = 200000;
-            if (isEvening)
-            {
-                totalCount = 150000;
-            }
-            int reserveCount = 0;
-
-            var orderList = await _context.OrderOnlineDetails
-                .Join(_context.OrderOnlines, d => d.OrderOnlineId, o => o.id, (d, o) => new { o.id, o.pay_state, o.code, o.memo, d.count, d.product_id })
-                .Where(o => o.product_id != 297 && o.pay_state == 1 && o.memo.IndexOf(date.ToShortDateString()) > 0)
-                .Join(_context.Product, o => o.product_id, p => p.id, (o, p) => new { o.id, o.pay_state, o.code, o.count, o.product_id, p.name, o.memo })
-                .ToListAsync();
-            for (int i = 0; i < orderList.Count; i++)
-            {
-                var order = orderList[i];
-                if (isEvening && order.name.IndexOf("夜场") >= 0 && order.name.IndexOf("下午") < 0)
-                {
-                    reserveCount++;
-                }
-                if (!isEvening && (order.name.IndexOf("夜场") < 0 || order.name.IndexOf("下午") >= 0))
-                {
-                    reserveCount++;
-                }
-            }
-            */
-            //return totalCount - reserveCount;
-            return 9999999;
-        }
-
-
-        [HttpGet("{id}")]
         public async Task<ActionResult<object>> GetSkiPassDetailInfo(int id)
         {
             return await _context.Product.Where(p => p.id == id)
@@ -169,9 +125,7 @@ namespace SnowmeetApi.Controllers
 
 
             }
-
-
-            return skiPassProdustList;
+            return Ok(skiPassProdustList);
         }
 
         [HttpGet("{productId}")]
@@ -322,86 +276,7 @@ namespace SnowmeetApi.Controllers
             return "";
         }
 
-        /*
-        // GET: api/SkiPass
-        [HttpGet]
-        public async Task<ActionResult<IEnumerable<SkiPass>>> GetSkiPass()
-        {
-            return await _context.SkiPass.ToListAsync();
-        }
-
-        // GET: api/SkiPass/5
-        [HttpGet("{id}")]
-        public async Task<ActionResult<SkiPass>> GetSkiPass(int id)
-        {
-            var skiPass = await _context.SkiPass.FindAsync(id);
-
-            if (skiPass == null)
-            {
-                return NotFound();
-            }
-
-            return skiPass;
-        }
-
-        // PUT: api/SkiPass/5
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
-        [HttpPut("{id}")]
-        public async Task<IActionResult> PutSkiPass(int id, SkiPass skiPass)
-        {
-            if (id != skiPass.product_id)
-            {
-                return BadRequest();
-            }
-
-            _context.Entry(skiPass).State = EntityState.Modified;
-
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!SkiPassExists(id))
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
-            }
-
-            return NoContent();
-        }
-
-        // POST: api/SkiPass
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
-        [HttpPost]
-        public async Task<ActionResult<SkiPass>> PostSkiPass(SkiPass skiPass)
-        {
-            _context.SkiPass.Add(skiPass);
-            await _context.SaveChangesAsync();
-
-            return CreatedAtAction("GetSkiPass", new { id = skiPass.product_id }, skiPass);
-        }
-
-        // DELETE: api/SkiPass/5
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteSkiPass(int id)
-        {
-            var skiPass = await _context.SkiPass.FindAsync(id);
-            if (skiPass == null)
-            {
-                return NotFound();
-            }
-
-            _context.SkiPass.Remove(skiPass);
-            await _context.SaveChangesAsync();
-
-            return NoContent();
-        }
-        */
+        [NonAction]
         private bool SkiPassExists(int id)
         {
             return _context.SkiPass.Any(e => e.product_id == id);
