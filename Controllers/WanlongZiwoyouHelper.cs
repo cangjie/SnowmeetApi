@@ -43,6 +43,8 @@ namespace SnowmeetApi.Controllers
             _context = context;
             _config = config.GetSection("Settings");
             _appId = _config.GetSection("AppId").Value.Trim();
+            apiKey = dhhsApiKey;
+            custId = dhhsCustId;
         }
 
         [HttpGet]
@@ -110,6 +112,7 @@ namespace SnowmeetApi.Controllers
         [HttpGet]
         public ActionResult<ZiwoyouPlaceOrderResult> PlaceOrder(string productNo, string name, string cell, int count, DateTime date, string memo, int orderId)
         {
+
             string postData = "{\n\t\"apikey\": \"" + apiKey
                 + "\",\n\t\"custId\": " + custId + " ,\n\t\"infoId\": " + productNo
                 + ",\n\t\"isSend\": \"1\",\n\t\"linkMan\": \"" + name
