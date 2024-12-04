@@ -31,8 +31,8 @@ namespace SnowmeetApi.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<TicketTemplate>>> GetTemplateList()
         {
-
-            return await _context.TicketTemplate.Where<TicketTemplate>(tt => tt.hide == 0).ToListAsync();
+            var list = await _context.TicketTemplate.Where<TicketTemplate>(tt => tt.hide == 0).ToListAsync();
+            return Ok(list);
         }
 
         [HttpGet("{templateId}")]
@@ -194,7 +194,7 @@ namespace SnowmeetApi.Controllers
                 open_id = user.miniAppOpenId.Trim(),
                 create_date = DateTime.Now,
                 channel = channel.Trim(),
-                expire_date = template.expire_date
+                expire_date = ((template.expire_date == null)? DateTime.MaxValue : (DateTime)template.expire_date)
 
             };
             await _context.Ticket.AddAsync(ticket);
