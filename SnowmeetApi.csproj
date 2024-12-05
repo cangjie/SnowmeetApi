@@ -60,6 +60,8 @@
     <PackageReference Include="SixLabors.ImageSharp" Version="3.0.2" />
     <PackageReference Include="SixLabors.ImageSharp.Drawing" Version="2.0.0" />
     <PackageReference Include="System.Text.Encoding.CodePages" Version="8.0.0" />
+    <PackageReference Include="TencentCloudSDK.Common" Version="3.0.1136" />
+    <PackageReference Include="TencentCloudSDK.Ocr" Version="3.0.1136" />
     
   </ItemGroup>
   <ItemGroup>
