@@ -12,13 +12,22 @@ using TencentCloud.Common.Profile;
 using TencentCloud.Ocr.V20181119.Models;
 using TencentCloud.Ocr.V20181119;
 using System.IO;
+using Newtonsoft.Json;
 namespace SnowmeetApi.Controllers
 {
     [Route("core/[controller]/[action]")]
     [ApiController]
     public class OcrController : ControllerBase
-
     {
+        public class DetectedTextClass
+        { 
+            public string DetectedText { get; set; }
+        }
+        public class OcrResult
+        { 
+            public DetectedTextClass[] TextDetections { get; set; }
+        }
+
         private readonly ApplicationDBContext _db;
         private readonly IConfiguration _config;
         private readonly IHttpContextAccessor _http;
@@ -40,7 +49,7 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpPost]
-        public async Task<ActionResult<string>> GeneralBasicOCR([FromQuery] string sessionKey)
+        public async Task<ActionResult<string[]>> GeneralBasicOCR([FromQuery] string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey.Trim());
             Member member = await _memberHelper.GetMemberBySessionKey(sessionKey);
@@ -51,11 +60,21 @@ namespace SnowmeetApi.Controllers
             StreamReader sr = new StreamReader(_http.HttpContext.Request.Body);
             string img = await sr.ReadToEndAsync();
             sr.Close();
+            /*
             Credential cred = new Credential
             {
                 SecretId = "AKIDwiJhroX4lETWMyMWS9cu15vXu40iCRSE",
                 SecretKey = "b0TjndO8raHuRvUt5BB2hHk3AFD1c1WD"
             };
+            */
+
+            Credential cred = new Credential
+            {
+                SecretId = tcAppId,
+                SecretKey = tcSecret
+            };
+
+
             ClientProfile clientProfile = new ClientProfile();
             // 实例化一个http选项，可选的，没有特殊需求可以跳过
             HttpProfile httpProfile = new HttpProfile();
@@ -68,8 +87,14 @@ namespace SnowmeetApi.Controllers
             GeneralBasicOCRRequest req = new GeneralBasicOCRRequest();
             req.ImageBase64 = img;
             GeneralBasicOCRResponse resp = client.GeneralBasicOCRSync(req);
-
-            return Ok(AbstractModel.ToJsonString(resp));
+            string json = AbstractModel.ToJsonString(resp);
+            OcrResult r = JsonConvert.DeserializeObject<OcrResult>(json);
+            string[] ret = new string[r.TextDetections.Length];
+            for (int i = 0; i < ret.Length; i++)
+            {
+                ret[i] = r.TextDetections[i].DetectedText.Trim();
+            }
+            return Ok(ret);
         }
 
     }
