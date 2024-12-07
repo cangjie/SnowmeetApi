@@ -19,10 +19,17 @@ namespace SnowmeetApi.Models.SkiPass
         public double? refund_amount {get; set;}
         public int? valid {get; set;}
         public int? have_refund {get; set;}
+
+        public string? card_no {get; set;}
+
+        public string? card_image_url {get; set;}
+
+
         public string? out_order_no {get; set;}
-        public string? invoice_no {get; set;}
+        public string? reserve_no {get; set;}
         public string? qr_code_url {get; set;}
         public DateTime? reserve_date {get; set;}
+        
         public int? contact_name {get; set;}
         public int? contact_cell {get; set;}
         public int? contact_id_type {get; set;}
