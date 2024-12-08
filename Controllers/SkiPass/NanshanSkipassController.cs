@@ -43,7 +43,7 @@ namespace SnowmeetApi.Controllers.SkiPass
         public class ReserveProduct
         {
             public int product_id {get; set; }
-            public string produt_name {get; set;}
+            public string product_name {get; set;}
             public DateTime reserveDate {get; set;}
             //public int memberCount {get; set;}
             public int skiPassCount {get; set;}
@@ -141,7 +141,7 @@ namespace SnowmeetApi.Controllers.SkiPass
             ReserveProduct ret = new ReserveProduct()
             {
                 product_id = productId,
-                produt_name = p.name.Trim(),
+                product_name = p.name.Trim(),
                 skiPassCount = skiPassList.Count(),
                 reserveDate = reserveDate
             };
