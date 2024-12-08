@@ -25,6 +25,8 @@ namespace SnowmeetApi.Models.SkiPass
         public string? card_no {get; set;}
 
         public string? card_image_url {get; set;}
+        public DateTime? card_member_pick_time {get; set;}
+
 
 
         public string? out_order_no {get; set;}

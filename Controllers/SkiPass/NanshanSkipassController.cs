@@ -171,6 +171,18 @@ namespace SnowmeetApi.Controllers.SkiPass
 
         }
         
+        [HttpPost]
+        public async Task<ActionResult<Models.SkiPass.SkiPass>> UpdateSkiPass([FromBody] Models.SkiPass.SkiPass skipass, 
+            [FromQuery] string sessionKey, [FromQuery] string sessionType = "wechat_mini_openid")
+        {
+            if (!(await _memberHelper.isStaff(sessionKey, sessionType)))
+            {
+                return BadRequest();
+            }
+            _db.skiPass.Entry(skipass).State = EntityState.Modified;
+            await _db.SaveChangesAsync();
+            return Ok(skipass);
+        }
 
     }
 }
