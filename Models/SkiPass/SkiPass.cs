@@ -8,9 +8,11 @@ namespace SnowmeetApi.Models.SkiPass
     {
         public int id {get; set;}
         public int member_id {get; set;}
+        public string? wechat_mini_openid {get; set;}
         public int product_id {get; set;}
         public string resort {get; set;}
         public string product_name {get; set;}
+        public int count {get; set;}
         public int? order_id {get; set;}
         public double? deal_price {get; set;}
         public double? ticket_price {get; set;}
@@ -30,10 +32,10 @@ namespace SnowmeetApi.Models.SkiPass
         public string? qr_code_url {get; set;}
         public DateTime? reserve_date {get; set;}
         
-        public int? contact_name {get; set;}
-        public int? contact_cell {get; set;}
-        public int? contact_id_type {get; set;}
-        public int? contact_id_no {get; set;}
+        public string? contact_name {get; set;}
+        public string? contact_cell {get; set;}
+        public string? contact_id_type {get; set;}
+        public string? contact_id_no {get; set;}
         public DateTime update_date {get; set;}
         public DateTime create_date {get; set;}
     }

@@ -15,6 +15,7 @@ using SnowmeetApi.Models.Order;
 using SnowmeetApi.Models.Card;
 using Newtonsoft.Json;
 using SnowmeetApi.Controllers.User;
+using Microsoft.EntityFrameworkCore.Metadata.Internal;
 namespace SnowmeetApi.Controllers
 {
     [Route("core/[controller]/[action]")]
@@ -98,7 +99,7 @@ namespace SnowmeetApi.Controllers
             for (int i = 0; i < skiPassProdustList.Count; i++)
             {
                 var r = skiPassProdustList[i];
-                SkiPass skiPass = new SkiPass()
+                Models.Product.SkiPass skiPass = new Models.Product.SkiPass()
                 {
                     product_id = r.product_id,
                     resort = r.resort.Trim(),

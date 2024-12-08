@@ -423,5 +423,19 @@ namespace SnowmeetApi.Controllers.User
             return member;
         }
 
+        [NonAction]
+        public async Task<bool> isStaff(string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            bool ret = false;
+            sessionKey = Util.UrlDecode(sessionKey);
+            sessionType = Util.UrlDecode(sessionType);
+            Member member = await GetMemberBySessionKey(sessionKey, sessionType);
+            if (member.is_admin == 1 || member.is_manager == 1 || member.is_staff == 1)
+            {
+                ret = true;
+            }
+            return ret;
+        }
+
     }
 }
