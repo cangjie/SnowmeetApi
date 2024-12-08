@@ -127,6 +127,46 @@ namespace SnowmeetApi.Models.Users
             }
         }
 
+        public static async Task<ActionResult<UnicUser>> GetUnicUserAsync(Data.ApplicationDBContext db, string sessionKey, string sessionType = "wl_wechat_mini_openid")
+        {
+            UnicUser user = new UnicUser();
+            string miniAppOpenId = "";
+            string officialOpenId = "";
+            string unionId = "";
+            List<MiniSession> mList = await db.MiniSessons.Where(s => s.session_key.Trim().Equals(sessionKey.Trim())
+                && s.session_type.Trim().Equals("wl_wechat_mini_openid")).AsNoTracking().ToListAsync();
+            if (mList == null || mList.Count <= 0)
+            {
+                return user;
+            }
+            miniAppOpenId = mList[0].open_id.Trim();
+            List<MemberSocialAccount> msaList = await db.memberSocialAccount.Where(m => m.member_id == mList[0].member_id)
+                .AsNoTracking().ToListAsync();
+            foreach(MemberSocialAccount msa in msaList)
+            {
+                switch(msa.type)
+                {
+                    case "wl_wechat_mini_openid":
+                        miniAppOpenId = msa.num.Trim();
+                        break;
+                    case "wechat_offical_openid":
+                        officialOpenId = msa.num.Trim();
+                        break;
+                    case "wechat_unionid":
+                        unionId = msa.num.Trim();
+                        break;
+                    default:
+                        break;
+                }
+            }
+            user.miniAppOpenId = miniAppOpenId;
+            user.officialAccountOpenId = officialOpenId;
+            user.unionId = unionId;
+            return user;
+                
+        }
+
+
         public static async Task<ActionResult<UnicUser>> GetUnicUserAsync(string sessionKey, Data.ApplicationDBContext db)
         {
             UnicUser user = new UnicUser();

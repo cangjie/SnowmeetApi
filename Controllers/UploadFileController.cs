@@ -294,6 +294,44 @@ namespace SnowmeetApi.Controllers
         }
 
 
+        [HttpPost("{sessionKey}")]
+        public async Task<ActionResult<string>> SnowmeetUpload([FromRoute]string sessionKey, [FromForm]IFormFile file, [FromQuery]string purpose = "")
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            purpose = Util.UrlDecode(purpose);
+            UnicUser._context = _db;
+            UnicUser user = (await UnicUser.GetUnicUserAsync(_db, sessionKey, "wechat_mini_openid")).Value;
+            
+
+            string dateStr = DateTime.Now.Year.ToString() + DateTime.Now.Month.ToString().PadLeft(2, '0') + DateTime.Now.Day.ToString().PadLeft(2, '0');
+            string filePath = Util.workingPath + "/wwwroot/upload/" + dateStr;
+            if (!Directory.Exists(filePath))
+            {
+                Directory.CreateDirectory(filePath);
+            }
+            string[] fileNameArr = file.FileName.Split('.');
+            string ext = fileNameArr[fileNameArr.Length - 1].Trim();
+            string fileName = Util.GetLongTimeStamp(DateTime.Now).Trim() + "." + ext.Trim();
+            string returnFileName = "/upload/" + dateStr + "/" + fileName.Trim();
+            using (Stream s = System.IO.File.Create(filePath + "/" + fileName.Trim()))
+            {
+                await file.CopyToAsync(s);
+            }
+
+            UploadFile fileSave = new UploadFile()
+            {
+                id = 0,
+                owner = user.miniAppOpenId.Trim(),
+                file_path_name = returnFileName,
+                purpose = purpose.Trim()
+            };
+            await _db.UploadFile.AddAsync(fileSave);
+            await _db.SaveChangesAsync();
+
+            return returnFileName.Trim();
+        }
+
+
        
         private bool UploadFileExists(int id)
         {
