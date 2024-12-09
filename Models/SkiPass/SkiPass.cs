@@ -28,6 +28,7 @@ namespace SnowmeetApi.Models.SkiPass
         public DateTime? card_member_pick_time {get; set;} = null;
         public DateTime? card_member_return_time {get; set;} = null;
 
+        public int? card_lost {get; set;}
 
         public string? out_order_no {get; set;}
         public string? reserve_no {get; set;}
