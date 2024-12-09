@@ -179,6 +179,16 @@ namespace SnowmeetApi.Controllers.SkiPass
             {
                 return BadRequest();
             }
+
+            var l = await _db.skiPass.Where(s => (s.card_no.Trim().Equals(skipass.card_no.Trim())
+                && ((DateTime)s.reserve_date).Date == ((DateTime)skipass.reserve_date).Date))
+                .AsNoTracking().ToListAsync();
+            if (l != null && l.Count > 0 && l[0].id != skipass.id)
+            {
+                return NoContent();
+            }
+
+
             _db.skiPass.Entry(skipass).State = EntityState.Modified;
             await _db.SaveChangesAsync();
             return Ok(skipass);
