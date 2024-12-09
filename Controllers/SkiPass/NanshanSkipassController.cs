@@ -50,6 +50,16 @@ namespace SnowmeetApi.Controllers.SkiPass
             public List<ReserveMemberProduct> memberList {get; set;} = new List<ReserveMemberProduct>();
         }
 
+        public class ReserveDateProduct
+        {
+            public DateTime reserveDate { get; set; }
+            public int product_id {get; set; }
+            public string product_name {get; set;}
+            public string name {get; set;}
+            public string cell {get; set;}
+            public List<Models.SkiPass.SkiPass> skiPasses {get; set;} = new List<Models.SkiPass.SkiPass>();
+        }
+
         /*
         public class NanshanSkiReserveDetailKey
         {
@@ -170,7 +180,16 @@ namespace SnowmeetApi.Controllers.SkiPass
             return Ok(ret);
 
         }
-        
+
+        [NonAction]
+        public async Task<List<Models.SkiPass.SkiPass>> GetSkipassesByMember(int memberId, string num = "")
+        {
+            return await _db.skiPass.Where(s => (((memberId != 0 && s.member_id == memberId) 
+                || (!num.Trim().Equals("") && s.wechat_mini_openid.Trim().Equals(num))) && s.resort.Trim().Equals("南山")))
+                .AsNoTracking().ToListAsync();
+        }
+
+       
         [HttpPost]
         public async Task<ActionResult<Models.SkiPass.SkiPass>> UpdateSkiPass([FromBody] Models.SkiPass.SkiPass skipass, 
             [FromQuery] string sessionKey, [FromQuery] string sessionType = "wechat_mini_openid")
@@ -194,5 +213,44 @@ namespace SnowmeetApi.Controllers.SkiPass
             return Ok(skipass);
         }
 
+        [HttpGet]
+        public async Task<ActionResult<List<ReserveDateProduct>>> GetMemberCard(int memberId, 
+            string wechatMiniOpenId, string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            if (!(await _memberHelper.isStaff(sessionKey, sessionType)))
+            {
+                return BadRequest();
+            }
+            List<Models.SkiPass.SkiPass> skipasses = await GetSkipassesByMember(memberId, wechatMiniOpenId);
+            var reserveList = (from s in skipasses where s.valid == 1 group s by 
+                new {s.reserve_date, s.product_id, s.product_name, s.contact_cell, s.contact_name}
+                into rl select new {rl.Key}).OrderByDescending(r => r.Key.reserve_date).ToList();
+            List<ReserveDateProduct> ret = new List<ReserveDateProduct>();
+            for(int i = 0; i < reserveList.Count; i++)
+            {
+                ReserveDateProduct item = new ReserveDateProduct()
+                {
+                    name = reserveList[i].Key.contact_name,
+                    cell = reserveList[i].Key.contact_cell,
+                    reserveDate = (DateTime)reserveList[i].Key.reserve_date,
+                    product_id = reserveList[i].Key.product_id,
+                    product_name = reserveList[i].Key.product_name
+                };
+                for(int j = 0; j < skipasses.Count; j++)
+                {
+                    Models.SkiPass.SkiPass skp = skipasses[j];
+                    if (skp.contact_cell.Trim().Equals(item.cell.Trim()) 
+                        && skp.contact_name.Trim().Equals(item.name.Trim())
+                        && ((DateTime)skp.reserve_date).Date == item.reserveDate.Date
+                        && skp.product_id == item.product_id
+                        && skp.product_name.Trim().Equals(item.product_name.Trim()))
+                    {
+                        item.skiPasses.Add(skp);
+                    }
+                }
+                ret.Add(item);
+            }
+            return Ok(ret);
+        }
     }
 }
