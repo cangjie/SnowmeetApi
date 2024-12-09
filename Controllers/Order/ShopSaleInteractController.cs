@@ -121,8 +121,7 @@ namespace SnowmeetApi.Controllers.Order
             UnicUser scanUser = await UnicUser.GetUnicUserByDetailInfo(scan.scaner_oa_open_id, "wechat_oa_openid", _context);
             if (scanUser!= null && !scanUser.miniAppOpenId.Trim().Equals(""))
             {
-                //scan.miniAppUser = (await miniAppUserHelper.GetMiniAppUser(scanUser.miniAppOpenId, sessionKey)).Value;
-                //Member member = _memberController.GetMember(scanUser.m)
+                
                 scan.member = scanUser.member;
                 scan.miniAppUser = scan.member.miniAppUser;
                 
@@ -136,89 +135,7 @@ namespace SnowmeetApi.Controllers.Order
                 return scan;
             }
         }
-        
-        /*
-
-        // GET: api/ShopSaleInteract
-        [HttpGet]
-        public async Task<ActionResult<IEnumerable<ShopSaleInteract>>> GetShopSaleInteract()
-        {
-            return await _context.ShopSaleInteract.ToListAsync();
-        }
-
-        // GET: api/ShopSaleInteract/5
-        [HttpGet("{id}")]
-        public async Task<ActionResult<ShopSaleInteract>> GetShopSaleInteract(int id)
-        {
-            var shopSaleInteract = await _context.ShopSaleInteract.FindAsync(id);
-
-            if (shopSaleInteract == null)
-            {
-                return NotFound();
-            }
-
-            return shopSaleInteract;
-        }
-
-        // PUT: api/ShopSaleInteract/5
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
-        [HttpPut("{id}")]
-        public async Task<IActionResult> PutShopSaleInteract(int id, ShopSaleInteract shopSaleInteract)
-        {
-            if (id != shopSaleInteract.id)
-            {
-                return BadRequest();
-            }
-
-            _context.Entry(shopSaleInteract).State = EntityState.Modified;
-
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!ShopSaleInteractExists(id))
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
-            }
-
-            return NoContent();
-        }
-
-        // POST: api/ShopSaleInteract
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
-        [HttpPost]
-        public async Task<ActionResult<ShopSaleInteract>> PostShopSaleInteract(ShopSaleInteract shopSaleInteract)
-        {
-            _context.ShopSaleInteract.Add(shopSaleInteract);
-            await _context.SaveChangesAsync();
-
-            return CreatedAtAction("GetShopSaleInteract", new { id = shopSaleInteract.id }, shopSaleInteract);
-        }
-
-        // DELETE: api/ShopSaleInteract/5
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteShopSaleInteract(int id)
-        {
-            var shopSaleInteract = await _context.ShopSaleInteract.FindAsync(id);
-            if (shopSaleInteract == null)
-            {
-                return NotFound();
-            }
-
-            _context.ShopSaleInteract.Remove(shopSaleInteract);
-            await _context.SaveChangesAsync();
-
-            return NoContent();
-        }
-        */
-        [NonAction]
+                [NonAction]
         private bool ShopSaleInteractExists(int id)
         {
             return _context.ShopSaleInteract.Any(e => e.id == id);
