@@ -46,7 +46,7 @@ namespace SnowmeetApi.Controllers.Order
         {
             int retId = (int)((OkObjectResult)(await GetInterviewId(sessionKey)).Result).Value;
             ShopSaleInteract ssi = await _context.ShopSaleInteract.FindAsync(retId);
-            ssi.scan_type = "nanshanskipass";
+            ssi.scan_type = scene.Trim();
             _context.ShopSaleInteract.Entry(ssi).State = EntityState.Modified;
             await _context.SaveChangesAsync();
             return Ok(retId);
