@@ -144,6 +144,10 @@ namespace SnowmeetApi.Controllers
             order.cell_number = cell.Trim();
             order.name = name.Trim();
             _context.Entry(order).State = EntityState.Modified;
+
+            
+
+
             //MiniAppUser miniUser = await _context.MiniAppUsers.FindAsync(order.open_id.Trim());
             Member miniUser = await _memberHelper.GetMember(order.open_id.Trim(), "wechat_mini_openid");
             if (miniUser != null)
