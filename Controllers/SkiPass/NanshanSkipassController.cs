@@ -334,6 +334,16 @@ namespace SnowmeetApi.Controllers.SkiPass
             };
             await _db.OrderOnlines.AddAsync(order);
             await _db.SaveChangesAsync();
+            string outTradeNo = "";
+            if (order.shop.Trim().Equals("南山"))
+            {
+                outTradeNo = "NS";
+            }
+            else
+            {
+                outTradeNo = "QJ";
+            }
+            outTradeNo += "_XP_" + DateTime.Now.ToString("yyyyMMdd") + "_" + order.id.ToString().PadLeft(6, '0') + "_ZF_01";
 
             OrderPayment payment = new OrderPayment()
             {
@@ -341,7 +351,8 @@ namespace SnowmeetApi.Controllers.SkiPass
                 pay_method = order.pay_method.Trim(),
                 amount = order.final_price,
                 status = "待支付",
-                staff_open_id = ""
+                staff_open_id = "",
+                out_trade_no = outTradeNo
             };
             await _db.OrderPayment.AddAsync(payment);
 
@@ -375,7 +386,7 @@ namespace SnowmeetApi.Controllers.SkiPass
                 (isNum && (s.card_no.Trim().IndexOf(key)>=0 || s.contact_cell.IndexOf(key)>=0))
                 ||
                 (!isNum && s.contact_name.IndexOf(key) >= 0)
-            ) && s.valid == 1)).AsNoTracking().ToListAsync();
+            ) && s.valid == 1 && s.resort.Trim().Equals("南山"))).AsNoTracking().ToListAsync();
             var strucList = (from s in skipasses group s 
                 by new {s.product_id, s.product_name, reserveDate = ((DateTime)s.reserve_date).Date, s.contact_name, s.contact_cell, s.member_id, s.wechat_mini_openid}
                 into sl select new {sl.Key}).OrderByDescending(s => s.Key.reserveDate).ToList();
