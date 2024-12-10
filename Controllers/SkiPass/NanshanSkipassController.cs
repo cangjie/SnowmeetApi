@@ -18,12 +18,26 @@ using SnowmeetApi.Models.Order;
 using SnowmeetApi.Models.Product;
 using SnowmeetApi.Models.SkiPass;
 using SnowmeetApi.Models.Users;
+using System.Text.RegularExpressions;
 namespace SnowmeetApi.Controllers.SkiPass
 {
     [Route("core/[controller]/[action]")]
     [ApiController]
     public class NanshanSkipassController : ControllerBase
     {
+
+        /*
+        public class ReserveProductDateSummary
+        {
+            public int product_id {get; set;}
+            public string product_name {get; set;}
+            public DateTime reserveDate {get; set;}
+            public double totalAmount {get; set;}
+            public int totalCount {get; set;}
+            public int pickCount {get; set;}
+            public List<Models.SkiPass.SkiPass> skipasses {get; set; } = new List<Models.SkiPass.SkiPass>();
+        }
+        */
       
         public class ReserveSummary
         {
@@ -64,6 +78,18 @@ namespace SnowmeetApi.Controllers.SkiPass
             public List<Models.SkiPass.SkiPass> skiPasses {get; set;} = new List<Models.SkiPass.SkiPass>();
         }
 
+        public class ReserveDateProductMember
+        {
+            public DateTime reserveDate { get; set;}
+            public int product_id {get; set; }
+            public string product_name { get; set;}
+            public int memberId {get; set; }
+            public string wechatMiniOpenId {get; set;}
+            public string name {get; set;}
+            public string cell {get; set;}
+            public List<Models.SkiPass.SkiPass> skipasses {get; set;} = new List<Models.SkiPass.SkiPass>();
+        }
+
         /*
         public class NanshanSkiReserveDetailKey
         {
@@ -93,8 +119,9 @@ namespace SnowmeetApi.Controllers.SkiPass
             _memberHelper = new MemberController(context, config);
         }
 
+       
         [HttpGet]
-        public async Task<ActionResult<List<object>>> GetReserve(DateTime date, string sessionKey, string sessionType = "wechat_mini_openid")
+        public async Task<ActionResult<List<ReserveSummary>>> GetReserve(DateTime date, string sessionKey, string sessionType = "wechat_mini_openid")
         {
             if (!(await _memberHelper.isStaff(sessionKey, sessionType)))
             {
@@ -334,6 +361,54 @@ namespace SnowmeetApi.Controllers.SkiPass
 
             return Ok(order);
         }
+        [HttpGet]
+        public async Task<ActionResult<List<ReserveDateProductMember>>> SearchSkipass(
+            string key, string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            if (!(await _memberHelper.isStaff(sessionKey, sessionType)))
+            {
+                return BadRequest();
+            }
+            key = Util.UrlDecode(key);
+            bool isNum = Regex.IsMatch(key, @"\d+");
+            List<Models.SkiPass.SkiPass> skipasses = await _db.skiPass.Where(s => ((
+                (isNum && (s.card_no.Trim().IndexOf(key)>=0 || s.contact_cell.IndexOf(key)>=0))
+                ||
+                (!isNum && s.contact_name.IndexOf(key) >= 0)
+            ) && s.valid == 1)).AsNoTracking().ToListAsync();
+            var strucList = (from s in skipasses group s 
+                by new {s.product_id, s.product_name, reserveDate = ((DateTime)s.reserve_date).Date, s.contact_name, s.contact_cell, s.member_id, s.wechat_mini_openid}
+                into sl select new {sl.Key}).OrderByDescending(s => s.Key.reserveDate).ToList();
+            List<ReserveDateProductMember> ret = new List<ReserveDateProductMember>();
+            foreach(var item in strucList)
+            {
+                ReserveDateProductMember struc = new ReserveDateProductMember()
+                {
+                    product_id = item.Key.product_id,
+                    product_name = item.Key.product_name,
+                    reserveDate = item.Key.reserveDate,
+                    name = item.Key.contact_name,
+                    cell = item.Key.contact_cell,
+                    memberId = item.Key.member_id,
+                    wechatMiniOpenId = item.Key.wechat_mini_openid
+                };
+                for(int i = 0; i < skipasses.Count; i++)
+                {
+                    Models.SkiPass.SkiPass skipass = skipasses[i];
+                    if (((DateTime)skipass.reserve_date).Date == struc.reserveDate.Date
+                        && skipass.product_id == struc.product_id
+                        && (skipass.wechat_mini_openid.Trim().Equals(struc.wechatMiniOpenId.Trim()) || skipass.member_id == struc.memberId))
+                    {
+                        struc.skipasses.Add(skipass);
+                    }
+                }
+                ret.Add(struc);
+            }
+
+            return Ok(ret);
+        }
+
+
     }
 
     
