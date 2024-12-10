@@ -145,7 +145,7 @@ namespace SnowmeetApi.Controllers
             order.name = name.Trim();
             _context.Entry(order).State = EntityState.Modified;
 
-            
+
 
 
             //MiniAppUser miniUser = await _context.MiniAppUsers.FindAsync(order.open_id.Trim());
@@ -254,31 +254,18 @@ namespace SnowmeetApi.Controllers
         }
 
         [NonAction]
-        public async Task<ActionResult<string>> CreateSkiPass(OrderOnline order)
+        public async Task CreateSkiPass(OrderOnline order)
         {
-            //OrderOnline order = await _context.OrderOnlines.FindAsync(orderId);
-            string memo = order.memo.Trim();
-            try
+            List<Models.SkiPass.SkiPass> skipassList = await _context.skiPass
+                .Where(s => s.order_id == order.id).ToListAsync();
+            for(int i = 0; i < skipassList.Count; i++)
             {
-                var objMemo = JsonConvert.DeserializeObject<Dictionary<string, object>>(memo);
-                DateTime reserveDate = DateTime.Parse(objMemo["use_date"].ToString());
-                CardController cardHelper = new CardController(_context, _config);
-                string code = cardHelper.CreateCard("雪票");
-                Card card = await _context.Card.FindAsync(code);
-                card.use_date = reserveDate;
-                card.used = 0;
-                order.code = code;
-                _context.Entry(card).State = EntityState.Modified;
-                _context.Entry(order).State = EntityState.Modified;
-                await _context.SaveChangesAsync();
-                return code;
+                Models.SkiPass.SkiPass skipass = skipassList[i];
+                skipass.valid = 1;
+                _context.skiPass.Entry(skipass).State = EntityState.Modified;
             }
-            catch(Exception err)
-            {
-                Console.WriteLine(err.ToString());
-            }
-
-            return "";
+            await _context.SaveChangesAsync();
+            
         }
 
         [NonAction]
