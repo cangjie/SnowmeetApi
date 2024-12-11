@@ -53,6 +53,8 @@ namespace SnowmeetApi.Controllers.SkiPass
             public int returnCount{get; set;} = 0;
             public double sumRefunded {get; set;} = 0;
             public double sumNeedRefund {get; set;} = 0;
+
+            public ReserveProduct productDetail {get; set;}
         }
 
         public class ReserveMemberProduct
@@ -440,7 +442,7 @@ namespace SnowmeetApi.Controllers.SkiPass
                     sum[i].isDaylight = true;
                 }
                 ReserveProduct p = (ReserveProduct)((OkObjectResult)(await GetReserveProductDetail(sum[i].product_id, date, sessionKey, sessionType)).Result).Value;
-                
+                sum[i].productDetail = p;
                 for(int k = 0; k < p.memberList.Count; k++)
                 {
                     for(int l = 0; l < p.memberList[k].skiPasses.Count; l++)
