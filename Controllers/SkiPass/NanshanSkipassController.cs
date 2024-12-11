@@ -475,7 +475,7 @@ namespace SnowmeetApi.Controllers.SkiPass
             return Ok(sum);
         }
 
-        [HttpGet("skiPassId")]
+        [HttpGet("{skiPassId}")]
         public async Task<ActionResult<OrderPaymentRefund>> SkipassRefundDeposit(int skiPassId, 
             string sessionKey, string sessionType = "wechat_mini_openid")
         {
