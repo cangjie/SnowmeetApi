@@ -424,7 +424,7 @@ namespace SnowmeetApi.Controllers.SkiPass
 
             return Ok(ret);
         }
-
+        [HttpGet]
         public async Task<ActionResult<List<ReserveSummary>>> GetDailyRefundSummary
             (DateTime date, string sessionKey, string sessionType = "wechat_mini_openid")
         {
@@ -439,33 +439,31 @@ namespace SnowmeetApi.Controllers.SkiPass
                 {
                     sum[i].isDaylight = true;
                 }
-                List<ReserveProduct> pList = (List<ReserveProduct>)((OkObjectResult)(await GetReserveProductDetail(sum[i].product_id, date, sessionKey, sessionType)).Result).Value;
-                for(int j = 0; j < pList.Count; j++)
+                ReserveProduct p = (ReserveProduct)((OkObjectResult)(await GetReserveProductDetail(sum[i].product_id, date, sessionKey, sessionType)).Result).Value;
+                
+                for(int k = 0; k < p.memberList.Count; k++)
                 {
-                    ReserveProduct p = pList[j];
-                    for(int k = 0; k < p.memberList.Count; k++)
+                    for(int l = 0; l < p.memberList[k].skiPasses.Count; l++)
                     {
-                        for(int l = 0; l < p.memberList[l].skiPasses.Count; l++)
+                        Models.SkiPass.SkiPass skipass = p.memberList[k].skiPasses[l];
+                        sum[i].count++;
+                        sum[i].sumDealPrice += (double)skipass.deal_price;
+                        if (skipass.card_member_pick_time != null)
                         {
-                            Models.SkiPass.SkiPass skipass = p.memberList[l].skiPasses[l];
-                            sum[i].count++;
-                            sum[i].sumDealPrice += (double)skipass.deal_price;
-                            if (skipass.card_member_pick_time != null)
-                            {
-                                sum[i].pickCount++;
-                            }
-                            if (skipass.card_member_return_time != null)
-                            {
-                                sum[i].returnCount++;
-                                sum[i].sumNeedRefund += skipass.needRefund;
-                            }
-                            if (skipass.refund_amount!=null)
-                            {
-                                sum[i].sumRefunded += (double)skipass.refund_amount;
-                            }
+                            sum[i].pickCount++;
+                        }
+                        if (skipass.card_member_return_time != null)
+                        {
+                            sum[i].returnCount++;
+                            sum[i].sumNeedRefund += skipass.needRefund;
+                        }
+                        if (skipass.refund_amount!=null)
+                        {
+                            sum[i].sumRefunded += (double)skipass.refund_amount;
                         }
                     }
                 }
+                
             }
             return Ok(sum);
         }
