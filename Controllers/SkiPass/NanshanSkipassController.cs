@@ -166,7 +166,7 @@ namespace SnowmeetApi.Controllers.SkiPass
                     deal_price = (double)l.Key.deal_price,
                     count = l.count,
                     sumDealPrice = (double)l.sumDealPrice,
-                    pickCount = 0
+                    pickCount = pickCount
                 };
                 newList.Add(s);
             }
