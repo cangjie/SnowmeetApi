@@ -44,13 +44,15 @@ namespace SnowmeetApi.Controllers.SkiPass
             public int product_id { get; set; }
             public string product_name {get; set;}
             public double deal_price  {get; set;}
-            public int count {get; set; }
-            public double sumDealPrice {get; set;}
-            public int pickCount {get; set;}
-
             public bool isDaylight {get; set;}
 
-            public double sumRefund {get; set;} = 0;
+
+            public int count {get; set; } = 0;
+            public double sumDealPrice {get; set;} = 0;
+            public int pickCount {get; set;} = 0;
+            public int returnCount{get; set;} = 0;
+            public double sumRefunded {get; set;} = 0;
+            public double sumNeedRefund {get; set;} = 0;
         }
 
         public class ReserveMemberProduct
@@ -436,6 +438,33 @@ namespace SnowmeetApi.Controllers.SkiPass
                 else
                 {
                     sum[i].isDaylight = true;
+                }
+                List<ReserveProduct> pList = (List<ReserveProduct>)((OkObjectResult)(await GetReserveProductDetail(sum[i].product_id, date, sessionKey, sessionType)).Result).Value;
+                for(int j = 0; j < pList.Count; j++)
+                {
+                    ReserveProduct p = pList[j];
+                    for(int k = 0; k < p.memberList.Count; k++)
+                    {
+                        for(int l = 0; l < p.memberList[l].skiPasses.Count; l++)
+                        {
+                            Models.SkiPass.SkiPass skipass = p.memberList[l].skiPasses[l];
+                            sum[i].count++;
+                            sum[i].sumDealPrice += (double)skipass.deal_price;
+                            if (skipass.card_member_pick_time != null)
+                            {
+                                sum[i].pickCount++;
+                            }
+                            if (skipass.card_member_return_time != null)
+                            {
+                                sum[i].returnCount++;
+                                sum[i].sumNeedRefund += skipass.needRefund;
+                            }
+                            if (skipass.refund_amount!=null)
+                            {
+                                sum[i].sumRefunded += (double)skipass.refund_amount;
+                            }
+                        }
+                    }
                 }
             }
             return Ok(sum);
