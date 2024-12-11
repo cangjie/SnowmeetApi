@@ -50,6 +50,7 @@ namespace SnowmeetApi.Controllers.SkiPass
             public int count {get; set; } = 0;
             public double sumDealPrice {get; set;} = 0;
             public int pickCount {get; set;} = 0;
+            public int memberPickCount {get; set;} = 0;
             public int returnCount{get; set;} = 0;
             public double sumRefunded {get; set;} = 0;
             public double sumNeedRefund {get; set;} = 0;
@@ -147,6 +148,7 @@ namespace SnowmeetApi.Controllers.SkiPass
             for(int i = 0; i < retList.Count; i++)
             {
                 var l =  retList[i];
+                
                 int pickCount = 0;
                 for(int j = 0; j < skiPassList.Count; j++)
                 {
@@ -156,7 +158,7 @@ namespace SnowmeetApi.Controllers.SkiPass
                         pickCount++;
                     }
                 }
-              
+                
                 ReserveSummary s = new ReserveSummary()
                 {
                     product_id = l.Key.product_id,
@@ -164,7 +166,7 @@ namespace SnowmeetApi.Controllers.SkiPass
                     deal_price = (double)l.Key.deal_price,
                     count = l.count,
                     sumDealPrice = (double)l.sumDealPrice,
-                    pickCount = pickCount
+                    pickCount = 0
                 };
                 newList.Add(s);
             }
@@ -452,7 +454,7 @@ namespace SnowmeetApi.Controllers.SkiPass
                         sum[i].sumDealPrice += (double)skipass.deal_price;
                         if (skipass.card_member_pick_time != null)
                         {
-                            sum[i].pickCount++;
+                            sum[i].memberPickCount++;
                         }
                         if (skipass.card_member_return_time != null)
                         {
