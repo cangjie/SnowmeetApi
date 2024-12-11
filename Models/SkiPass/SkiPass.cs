@@ -55,5 +55,20 @@ namespace SnowmeetApi.Models.SkiPass
                 }
             }
         }
+
+        public double needRefund
+        {
+            get
+            {
+                if (resort.Trim().Equals("南山"))
+                {
+                    return (double)deposit + (double)ticket_price - (fee==null?0:(double)fee) - cardFee;
+                }
+                else
+                {
+                    return 0;
+                }
+            }
+        }
     }
 }
