@@ -506,6 +506,22 @@ namespace SnowmeetApi.Controllers.SkiPass
             return NoContent();
         }
 
+        [HttpGet]
+        public async Task<ActionResult<List<Models.SkiPass.SkiPass>>> GetMySkipass
+            (string sessionKey, string sessionType)
+        {
+            Models.Users.Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
+            if (member == null)
+            {
+                return BadRequest();
+            }
+            List<Models.SkiPass.SkiPass> l = await _db.skiPass.Where(s => (s.resort.Trim().Equals("南山") && s.valid == 1
+                && (s.member_id == member.id || s.wechat_mini_openid.Trim().Equals(member.wechatMiniOpenId.Trim())  )))
+                .OrderByDescending(s => s.reserve_date).AsNoTracking().ToListAsync();
+            
+            return Ok(l);
+        }
+
 
     }
 

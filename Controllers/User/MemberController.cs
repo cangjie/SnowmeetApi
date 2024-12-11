@@ -42,6 +42,8 @@ namespace SnowmeetApi.Controllers.User
         [NonAction]
         public async Task<Member> GetMemberBySessionKey(string sessionKey, string sessionType="wechat_mini_openid")
         {
+            sessionKey = Util.UrlDecode(sessionKey);
+            sessionType = Util.UrlDecode(sessionType);
             var sessions = await _db.MiniSessons.Where(s => s.session_key.Trim().Equals(sessionKey.Trim()) 
                 && s.session_type.Trim().Equals(sessionType.Trim())).OrderByDescending(s => s.create_date)
                 .AsNoTracking().ToListAsync();
