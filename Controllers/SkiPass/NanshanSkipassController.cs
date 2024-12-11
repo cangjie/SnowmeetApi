@@ -508,7 +508,7 @@ namespace SnowmeetApi.Controllers.SkiPass
 
         [HttpGet]
         public async Task<ActionResult<List<Models.SkiPass.SkiPass>>> GetMySkipass
-            (string sessionKey, string sessionType)
+            (string sessionKey, string sessionType = "wechat_mini_openid")
         {
             Models.Users.Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
             if (member == null)
