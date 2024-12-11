@@ -23,6 +23,7 @@ using SnowmeetApi.Models.Rent;
 using System.Text;
 using Microsoft.CodeAnalysis.Elfie.Model.Strings;
 using Aop.Api.Domain;
+using SnowmeetApi.Controllers.User;
 
 namespace SnowmeetApi.Controllers.Order
 {
@@ -41,6 +42,7 @@ namespace SnowmeetApi.Controllers.Order
         private readonly IHttpContextAccessor _httpContextAccessor;
 
         private readonly RentController _rentHelper;
+        private readonly MemberController _memberHelper;
 
         public class TenpayResource
         {
@@ -70,6 +72,7 @@ namespace SnowmeetApi.Controllers.Order
             _appId = _config.GetSection("AppId").Value.Trim();
             _httpContextAccessor = httpContextAccessor;
             _rentHelper = new RentController(context, config, httpContextAccessor);
+            _memberHelper = new MemberController(context, config);
             //UnicUser._context = context;
 
         }
@@ -510,15 +513,29 @@ namespace SnowmeetApi.Controllers.Order
         }
 
         [HttpGet("{paymentId}")]
-        public async Task<ActionResult<OrderPaymentRefund>> Refund(int paymentId, double amount, string reason, string sessionKey)
+        public async Task<ActionResult<OrderPaymentRefund>> Refund(int paymentId, double amount, 
+            string reason, string sessionKey, string sessionType = "wechat_mini_openid")
         {
             reason = Util.UrlDecode(reason);
             sessionKey = Util.UrlDecode(sessionKey);
+            
+            if (!(await _memberHelper.isStaff(sessionKey, sessionType)))
+            {
+                return BadRequest();
+            }
+            Models.Users.Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
+
+            
+
+            /*
             UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (!user.isAdmin)
             {
                 return BadRequest();
             }
+            */
+
+
             OrderPayment payment = await _context.OrderPayment.FindAsync(paymentId);
             if (!payment.status.Equals("支付成功"))
             {
@@ -548,7 +565,7 @@ namespace SnowmeetApi.Controllers.Order
                 amount = amount,
                 TransactionId = "",
                 RefundFee = 0,
-                oper = user.miniAppOpenId.Trim(),
+                oper = member.wechatMiniOpenId,
                 memo = "",
                 notify_url = "",
                 out_refund_no = outRefundNo.Trim()

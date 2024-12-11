@@ -19,6 +19,7 @@ using SnowmeetApi.Models.Product;
 using SnowmeetApi.Models.SkiPass;
 using SnowmeetApi.Models.Users;
 using System.Text.RegularExpressions;
+using SnowmeetApi.Controllers.Order;
 namespace SnowmeetApi.Controllers.SkiPass
 {
     [Route("core/[controller]/[action]")]
@@ -118,14 +119,16 @@ namespace SnowmeetApi.Controllers.SkiPass
         private readonly ApplicationDBContext _db;
         private readonly IConfiguration _config;
         private readonly IHttpContextAccessor _http;
-
         private readonly MemberController _memberHelper;
+        //private readonly OrderOnlinesController _orderHelper;
+        private readonly OrderPaymentController _paymentHelper;
         public NanshanSkipassController(ApplicationDBContext context, IConfiguration config, IHttpContextAccessor httpContextAccessor)
         {
             _db = context;
             _config = config;
             _http = httpContextAccessor;
             _memberHelper = new MemberController(context, config);
+            _paymentHelper = new OrderPaymentController(context, config, httpContextAccessor);
         }
 
        
@@ -470,6 +473,37 @@ namespace SnowmeetApi.Controllers.SkiPass
                 
             }
             return Ok(sum);
+        }
+
+        [HttpGet]
+        public async Task<ActionResult<OrderPaymentRefund>> SkipassRefundDeposit(int skiPassId, 
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            Models.SkiPass.SkiPass skipass = await _db.skiPass.FindAsync(skiPassId);
+            if (skipass.valid == 0 || skipass.card_member_return_time == null)
+            {
+                return BadRequest();
+            }
+            List<Models.Order.OrderPayment> payments = await _db.OrderPayment
+                .Where(p => (p.order_id == skipass.order_id && p.status.Trim().Equals("支付成功") ))
+                .AsNoTracking().ToListAsync();
+            //double paidAmount = 0;
+            foreach(OrderPayment payment in payments)
+            {
+                //paidAmount += payment.amount;
+                if (payment.amount >= skipass.needRefund)
+                {
+                    skipass.have_refund = 1;
+                    skipass.refund_amount = skipass.needRefund;
+                    _db.skiPass.Entry(skipass).State = EntityState.Modified;
+                    await _db.SaveChangesAsync();
+                    OrderPaymentRefund refund = (OrderPaymentRefund)((OkObjectResult)(
+                        await _paymentHelper.Refund(payment.id, skipass.needRefund, "退押金", sessionKey, sessionType)).Result).Value;
+                    return Ok(refund);
+                    
+                }
+            }
+            return NoContent();
         }
 
 
