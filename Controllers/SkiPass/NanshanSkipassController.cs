@@ -47,6 +47,10 @@ namespace SnowmeetApi.Controllers.SkiPass
             public int count {get; set; }
             public double sumDealPrice {get; set;}
             public int pickCount {get; set;}
+
+            public bool isDaylight {get; set;}
+
+            public double sumRefund {get; set;} = 0;
         }
 
         public class ReserveMemberProduct
@@ -417,6 +421,24 @@ namespace SnowmeetApi.Controllers.SkiPass
             }
 
             return Ok(ret);
+        }
+
+        public async Task<ActionResult<List<ReserveSummary>>> GetDailyRefundSummary
+            (DateTime date, string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            List<ReserveSummary> sum = (List<ReserveSummary>)((OkObjectResult)(await GetReserve(date, sessionKey, sessionType)).Result).Value;
+            for(int i = 0; i < sum.Count; i++)
+            {
+                if (sum[i].product_name.IndexOf("夜") >= 0)
+                {
+                    sum[i].isDaylight = false;
+                }
+                else
+                {
+                    sum[i].isDaylight = true;
+                }
+            }
+            return Ok(sum);
         }
 
 
