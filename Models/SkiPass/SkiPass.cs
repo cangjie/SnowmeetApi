@@ -42,5 +42,18 @@ namespace SnowmeetApi.Models.SkiPass
         public string? contact_id_no {get; set;} = null;
         public DateTime update_date {get; set;} = DateTime.Now;
         public DateTime create_date {get; set;} = DateTime.Now;
+        public double cardFee
+        {
+            get
+            {
+                if (card_lost==1 && resort.Trim().Equals("南山")){
+                    return 20;
+                }
+                else
+                {
+                    return 0;
+                }
+            }
+        }
     }
 }
