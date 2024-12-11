@@ -70,5 +70,41 @@ namespace SnowmeetApi.Models.SkiPass
                 }
             }
         }
+
+        public string status
+        {
+            get
+            {
+                string status = "";
+                if (resort.Trim().Equals("南山"))
+                {
+                    status = "未付款";
+                    if (valid == 1)
+                    {
+                        status = "已付款";
+                        if (card_no!=null)
+                        {
+                            status = "已出票";
+                            if (card_member_pick_time != null)
+                            {
+                                status = "已取卡";
+                                if (card_member_return_time != null)
+                                {
+                                    status = "已还卡";
+                                    if (have_refund == 1)
+                                    {
+                                        status = "已退押金";
+                                    }
+                                }
+                            }
+                        }
+
+                    }
+
+                }
+                return status;
+            }
+
+        }
     }
 }
