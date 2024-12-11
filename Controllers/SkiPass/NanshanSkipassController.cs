@@ -448,7 +448,7 @@ namespace SnowmeetApi.Controllers.SkiPass
                     for(int l = 0; l < p.memberList[k].skiPasses.Count; l++)
                     {
                         Models.SkiPass.SkiPass skipass = p.memberList[k].skiPasses[l];
-                        sum[i].count++;
+                        //sum[i].count++;
                         sum[i].sumDealPrice += (double)skipass.deal_price;
                         if (skipass.card_member_pick_time != null)
                         {
