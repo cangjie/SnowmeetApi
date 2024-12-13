@@ -372,6 +372,37 @@ namespace SnowmeetApi.Controllers
             return returnFileName.Trim();
         }
 
+        [HttpGet]
+        public async Task<ActionResult<UploadFile>> SetThumb(string oriPath, string thumPath,
+            string sessionKey, string sessionType = "wl_wechat_mini_openid")
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            sessionType = Util.UrlDecode(sessionType);
+            oriPath = Util.UrlDecode(oriPath);
+            thumPath = Util.UrlDecode(thumPath);
+
+            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
+            if (member == null)
+            {
+                return BadRequest();
+            }
+            List<UploadFile> l = await _db.UploadFile
+                .Where(u => u.file_path_name.Trim().Equals(oriPath)).ToListAsync();
+            for (int i = 0; l != null && i < l.Count; i++)
+            {
+                l[i].thumb = thumPath.Trim();
+                _db.UploadFile.Entry(l[i]).State = EntityState.Modified;
+            }
+            await _db.SaveChangesAsync();
+            if (l != null && l.Count > 0)
+            {
+                return Ok(l[0]);
+            }
+            else
+            {
+                return NotFound();
+            }
+        }
 
        
         private bool UploadFileExists(int id)
