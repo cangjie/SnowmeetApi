@@ -688,7 +688,7 @@ namespace SnowmeetApi.Controllers
                 m.shop = recept.shop.Trim();
                 m.open_id = recept.open_id.Trim();
                 m.service_open_id = recept.recept_staff.Trim();
-                m.task_id = 0;
+                m.task_id = recept.id;
                 m.confirmed_serial = m.confirmed_serial == null ? "" : m.confirmed_serial.Trim();
                 /*
                 if (m.confirmed_urgent == 1)
