@@ -673,6 +673,7 @@ namespace SnowmeetApi.Controllers
             }
             else
             {
+                realPayAmount = 0;
                 recept.submit_return_id = -1;
                 recept.submit_date = DateTime.Now;
 
@@ -712,7 +713,7 @@ namespace SnowmeetApi.Controllers
                 m.confirmed_name = recept.real_name;
                 m.confirmed_cell = recept.cell;
                 m.ticket_code = recept.code.Trim();
-                m.batch_id = recept.id;
+                //m.batch_id = recept.id;
                 
                 await _context.MaintainLives.AddAsync(m);
             }
