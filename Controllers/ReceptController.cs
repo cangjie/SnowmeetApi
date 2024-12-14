@@ -950,6 +950,19 @@ namespace SnowmeetApi.Controllers
             return user.miniAppUser;
         }
 
+        [HttpGet]
+        public async Task<ActionResult<int>> GetFirstMaintainId(int receptId)
+        {
+            var l = await _context.MaintainLives
+                .Where(m => (!m.task_flow_num.Trim().Equals("") && m.batch_id == receptId))
+                .OrderByDescending(m => m.id).AsNoTracking().ToListAsync();
+            if (l == null || l.Count == 0)
+            {
+                return NotFound();
+            }
+            return Ok(l[0].id);
+        }
+
      
         private bool ReceptExists(int id)
         {
