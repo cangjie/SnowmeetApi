@@ -404,6 +404,23 @@ namespace SnowmeetApi.Controllers
             }
         }
 
+        [HttpGet]
+        public async Task<ActionResult<UploadFile>> GetUploadFile(string fileName)
+        {
+            fileName = Util.UrlDecode(fileName);
+            List<UploadFile> fileArr = await _db.UploadFile.Where(u => u.file_path_name.Trim().Equals(fileName))
+                .OrderByDescending(f => f.create_date).AsNoTracking().ToListAsync();
+            if (fileArr == null || fileArr.Count == 0)
+            {
+                return NotFound();
+            }
+            else
+            {
+                return Ok(fileArr[0]);
+            }
+
+        }
+
        
         private bool UploadFileExists(int id)
         {
