@@ -13,6 +13,7 @@ using TencentCloud.Ocr.V20181119.Models;
 using TencentCloud.Ocr.V20181119;
 using System.IO;
 using Newtonsoft.Json;
+using System.Text.RegularExpressions;
 namespace SnowmeetApi.Controllers
 {
     [Route("core/[controller]/[action]")]
@@ -90,12 +91,50 @@ namespace SnowmeetApi.Controllers
             string json = AbstractModel.ToJsonString(resp);
             OcrResult r = JsonConvert.DeserializeObject<OcrResult>(json);
             string[] ret = new string[r.TextDetections.Length];
+            //Regex rgx = new Regex(@"\d{5,9}");
             for (int i = 0; i < ret.Length; i++)
             {
-                ret[i] = r.TextDetections[i].DetectedText.Trim();
+                string s = r.TextDetections[i].DetectedText.Trim();
+                if (!s.ToUpper().StartsWith("N") && isCardNo(s))
+                {
+                    s = "NO." + s; 
+                }
+                ret[i] = s;
             }
             return Ok(ret);
         }
 
+        [NonAction]
+        public bool isCardNo(string s)
+        {
+            Regex r = new Regex(@"\d{5,9}");
+            Match m = r.Match(s);
+            if (m.Success)
+            {
+                if (m.Value.Trim().Equals(s.Trim()))
+                {
+                    return true;
+                }
+            }
+            return false;
+
+        }
+
+        [NonAction]
+        public ActionResult<string> testReg(string s)
+        {
+            Regex r = new Regex(@"\d{5,9}");
+            Match m = r.Match(s);
+            if (m.Success)
+            {
+                if (m.Value.Trim().Equals(s.Trim()))
+                {
+                    return Ok("No." + s.Trim());
+                }
+            }
+            return Ok(s);
+        }
     }
+
+    
 }
