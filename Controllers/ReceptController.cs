@@ -37,6 +37,7 @@ namespace SnowmeetApi.Controllers
         private readonly MaintainLiveController _maintainHelper;
 
         private readonly RentController _rentHelper;
+        //private readonly MaintainLiveController _maintainHelper;
 
         private readonly MemberController _memberHelper;
 
@@ -50,6 +51,7 @@ namespace SnowmeetApi.Controllers
             _maintainHelper = new MaintainLiveController(context, config);
             _rentHelper = new RentController(context, config, httpContextAccessor);
             _memberHelper = new MemberController(context, config);
+        
         }
 
         [HttpGet]
@@ -688,7 +690,7 @@ namespace SnowmeetApi.Controllers
                 m.shop = recept.shop.Trim();
                 m.open_id = recept.open_id.Trim();
                 m.service_open_id = recept.recept_staff.Trim();
-                m.task_id = recept.id;
+                m.task_id = 0;
                 m.confirmed_serial = m.confirmed_serial == null ? "" : m.confirmed_serial.Trim();
                 /*
                 if (m.confirmed_urgent == 1)
@@ -710,11 +712,14 @@ namespace SnowmeetApi.Controllers
                 m.confirmed_name = recept.real_name;
                 m.confirmed_cell = recept.cell;
                 m.ticket_code = recept.code.Trim();
-                //m.batch_id = recept.id;
+                m.batch_id = recept.id;
                 
                 await _context.MaintainLives.AddAsync(m);
             }
             await _context.SaveChangesAsync();
+
+
+
 
 
             if (realPayAmount == 0)
