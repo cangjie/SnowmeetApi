@@ -6,6 +6,7 @@ using SnowmeetApi.Models.UTV;
 using SnowmeetApi.Models.Rent;
 using SnowmeetApi.Models.School;
 using System;
+using wl_schoool_core.Models.School;
 namespace SnowmeetApi.Data
 {
     public class ApplicationDBContext : DbContext
@@ -134,5 +135,6 @@ namespace SnowmeetApi.Data
         public DbSet<Staff> schoolStaff {get; set;}
         public DbSet<Course> schoolCourse {get; set;}
         public DbSet<CourseStudent> courseStudent {get; set;}
+        public DbSet<CourseInteractLog> courseInteractLog { get; set; }
     }
 }

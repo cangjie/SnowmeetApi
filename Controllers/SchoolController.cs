@@ -15,6 +15,7 @@ using SnowmeetApi.Models.School;
 using System.Collections;
 using System.Text.RegularExpressions;
 using Flurl.Util;
+using wl_schoool_core.Models.School;
 namespace SnowmeetApi.Controllers
 {
     [Route("core/[controller]/[action]")]
@@ -699,6 +700,17 @@ namespace SnowmeetApi.Controllers
         [HttpGet("{courseStudentId}")]
         public async Task Share(int courseStudentId, string sessionKey, string sessionType = "wl_wechat_mini_openid")
         {
+            sessionKey = Util.UrlDecode(sessionKey);
+            sessionType = Util.UrlEncode(sessionType);
+
+            var sl = await _db.MiniSessons.Where(s => (s.session_type.Trim().Equals(sessionType) && s.session_key.Trim().Equals(sessionKey)))
+                .OrderByDescending(s => s.create_date).AsNoTracking().ToListAsync();
+            if (sl == null || sl.Count < 0)
+            {
+                return;
+            }
+
+
             Staff staff = (Staff)((OkObjectResult)(await GetStaffInfo(sessionKey, sessionType)).Result).Value;
             if (staff == null)
             {
@@ -711,6 +723,16 @@ namespace SnowmeetApi.Controllers
             }
             cs.share_times++;
             _db.courseStudent.Entry(cs).State = EntityState.Modified;
+            CourseInteractLog log = new CourseInteractLog()
+            {
+                id = 0,
+                open_id = sl[0].open_id.Trim(),
+                act = "share",
+                create_date = DateTime.Now,
+                course_student_id = courseStudentId
+            };
+            await _db.courseInteractLog.AddAsync(log);
+
             await _db.SaveChangesAsync();
         }
        
