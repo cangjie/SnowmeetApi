@@ -696,6 +696,23 @@ namespace SnowmeetApi.Controllers
             return belong;
 
         }
+        [HttpGet("{courseStudentId}")]
+        public async Task Share(int courseStudentId, string sessionKey, string sessionType = "wl_wechat_mini_openid")
+        {
+            Staff staff = (Staff)((OkObjectResult)(await GetStaffInfo(sessionKey, sessionType)).Result).Value;
+            if (staff == null)
+            {
+                return;
+            }
+            CourseStudent cs = await _db.courseStudent.FindAsync(courseStudentId);
+            if (cs == null)
+            {
+                return;
+            }
+            cs.share_times++;
+            _db.courseStudent.Entry(cs).State = EntityState.Modified;
+            await _db.SaveChangesAsync();
+        }
        
 
 

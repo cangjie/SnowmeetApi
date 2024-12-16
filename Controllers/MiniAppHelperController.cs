@@ -22,6 +22,7 @@ using System.Security.Cryptography;
 using SnowmeetApi.Data;
 using SnowmeetApi;
 using SnowmeetApi.Controllers.User;
+using Aop.Api.Domain;
 
 namespace LuqinMiniAppBase.Controllers
 {
@@ -307,6 +308,45 @@ namespace LuqinMiniAppBase.Controllers
             sessionObj.unionid = "";
             return Ok(sessionObj);
         }
+
+        [HttpGet]
+        public async Task<ActionResult<Code2Session>> VisitorLogin(string code, string openIdType = "wl_wchat_mini_openid")
+        {
+            string appId = _settings.appId;
+            string appSecret = _settings.appSecret;
+            string checkUrl = "https://api.weixin.qq.com/sns/jscode2session?appid=" + appId.Trim()
+                + "&secret=" + appSecret.Trim() + "&js_code=" + code.Trim()
+                + "&grant_type=authorization_code";
+            string jsonResult = Util.GetWebContent(checkUrl);
+            Code2Session sessionObj = JsonConvert.DeserializeObject<Code2Session>(jsonResult);
+            if (!sessionObj.errcode.ToString().Equals(""))
+            {
+                return BadRequest();
+            }
+            var sessionList = await _db.MiniSessons.Where(m => (m.session_key.Trim().Equals(sessionObj.session_key.Trim())
+                    && m.open_id.Trim().Equals(sessionObj.openid.Trim())
+                    && m.session_type.Trim().Equals(openIdType.Trim()))).ToListAsync();
+            MiniSession session = new MiniSession();
+            if (sessionList.Count > 0)
+            {
+                session = sessionList[0];
+            }
+            else
+            {
+                session = new MiniSession()
+                {
+                    session_key = sessionObj.session_key,
+                    session_type = openIdType.Trim(),
+                    open_id = sessionObj.openid.Trim(),
+                    member_id = 0
+                };
+                await _db.MiniSessons.AddAsync(session);
+                await _db.SaveChangesAsync();
+            }
+            return Ok(session);
+        }
+
+
 
 
         [HttpGet]

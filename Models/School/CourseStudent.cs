@@ -24,12 +24,10 @@ namespace SnowmeetApi.Models.School
         public string emotion {get; set;} = "";
         public string next_plan {get; set;} = "";
         public string? images {get; set;} = "";
-
-
-
         public string student_comment {get; set;} = "";
-
         public int del {get; set;} = 0;
+        public int share_times { get; set; } = 0;
+        public int read_times { get; set;} = 0;
         public DateTime update_date {get; set;} = DateTime.Now;
         public DateTime create_date {get; set;} = DateTime.Now;
 
