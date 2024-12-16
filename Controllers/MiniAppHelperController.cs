@@ -310,7 +310,7 @@ namespace LuqinMiniAppBase.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<Code2Session>> VisitorLogin(string code, string openIdType = "wl_wchat_mini_openid")
+        public async Task<ActionResult<Code2Session>> VisitorLogin(string code, string openIdType = "wl_wechat_mini_openid")
         {
             string appId = _settings.appId;
             string appSecret = _settings.appSecret;

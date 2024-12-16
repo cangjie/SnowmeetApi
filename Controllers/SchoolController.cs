@@ -706,7 +706,7 @@ namespace SnowmeetApi.Controllers
             act = Util.UrlDecode(act);
             var sl = await _db.MiniSessons.Where(s => (s.session_type.Trim().Equals(sessionType) && s.session_key.Trim().Equals(sessionKey)))
                 .OrderByDescending(s => s.create_date).AsNoTracking().ToListAsync();
-            if (sl == null || sl.Count < 0)
+            if (sl == null || sl.Count <= 0)
             {
                 return;
             }
@@ -726,7 +726,6 @@ namespace SnowmeetApi.Controllers
                 default:
                     break;
             }
-            cs.share_times++;
             _db.courseStudent.Entry(cs).State = EntityState.Modified;
             CourseInteractLog log = new CourseInteractLog()
             {
