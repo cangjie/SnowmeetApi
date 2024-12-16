@@ -8,7 +8,7 @@ namespace wl_schoool_core.Models.School
     public class CourseInteractLog
     {
         [Key]
-        public int id { get; set; }
+        public long id { get; set; }
         public int course_student_id { get; set; }
         public string act { get; set; }
         public string open_id { get; set; }
