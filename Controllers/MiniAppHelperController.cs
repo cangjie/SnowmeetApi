@@ -171,7 +171,7 @@ namespace LuqinMiniAppBase.Controllers
             {
                 return BadRequest();
             }
-            Member member = new Member()
+            SnowmeetApi.Models.Users.Member member = new SnowmeetApi.Models.Users.Member()
             {
                 id = 0
             };
@@ -501,7 +501,7 @@ namespace LuqinMiniAppBase.Controllers
 
             public int? member_id {get; set;} = null;
 
-            public Member member {get; set;} = null;
+            public SnowmeetApi.Models.Users.Member member {get; set;} = null;
         }
 
         protected class AccessToken
