@@ -16,7 +16,9 @@ namespace SnowmeetApi.Models.Product
 		public string unavailable_days { get; set; }
 		public string  tags { get; set; }
 		public string? source { get; set; } = null;
-		public string? third_party_no {get; set;} = null;
+		public string? third_party_no { get; set; } = null;
+
+		[NotMapped]
 		public Product product {get; set;}
 
 		public bool TagMatch(string[] userTags)
