@@ -30,8 +30,6 @@ namespace SnowmeetApi.Models.SkiPass
         public DateTime? card_member_return_time {get; set;} = null;
 
         public int? card_lost {get; set;} = null;
-
-        public string? out_order_no {get; set;} = null;
         public string? reserve_no {get; set;} = null;
         public string? qr_code_url {get; set;} = null;
         public DateTime? reserve_date {get; set;} = null;
@@ -40,8 +38,11 @@ namespace SnowmeetApi.Models.SkiPass
         public string? contact_cell {get; set;} = null;
         public string? contact_id_type {get; set;} = null;
         public string? contact_id_no {get; set;} = null;
+        public int is_cancel {get; set;}
+        public int? cancel_member_id {get; set;}
         public DateTime update_date {get; set;} = DateTime.Now;
         public DateTime create_date {get; set;} = DateTime.Now;
+        
         public double cardFee
         {
             get

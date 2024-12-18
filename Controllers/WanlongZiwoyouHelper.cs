@@ -15,6 +15,7 @@ using AlipaySDKNet.OpenAPI.Model;
 using NuGet.Packaging;
 using Microsoft.EntityFrameworkCore.Internal;
 using static SKIT.FlurlHttpClient.Wechat.TenpayV3.Models.AddHKSubMerchantRequest.Types;
+using SnowmeetApi.Models.Order;
 
 namespace SnowmeetApi.Controllers
 {
@@ -114,20 +115,66 @@ namespace SnowmeetApi.Controllers
             return r;
         }
 
-        [HttpGet]
-        public ActionResult<ZiwoyouPlaceOrderResult> PlaceOrder(string productNo, string name, string cell, int count, DateTime date, string memo, int orderId)
+        [HttpGet("skiPassId")]
+        public async Task<ActionResult<ZiwoyouPlaceOrderResult>> Book(int skiPassId)
+        {
+            Models.SkiPass.SkiPass skipass = await _context.skiPass.FindAsync(skiPassId);
+            if (skipass == null)
+            {
+                return NotFound();
+            }
+            if (skipass.card_member_pick_time != null && skipass.valid != 1)
+            {
+                return BadRequest();
+            }
+            List<OrderPayment> payList = await _context.OrderPayment.Where(p => (p.status.Trim().Equals("支付成功") && p.order_id == skipass.order_id))
+                .AsNoTracking().ToListAsync();
+            string outOrderNo = "";
+            foreach(OrderPayment payment in payList)
+            {
+                if (!payment.out_trade_no.Trim().Equals(""))
+                {
+                    outOrderNo = payment.out_trade_no;
+                    break;
+                }
+            }
+            if (outOrderNo.Trim().Equals(""))
+            {
+                return NoContent();
+            }
+            
+            Models.Product.SkiPass skipassProduct = await _context.SkiPass.FindAsync(skipass.product_id);
+            if (skipassProduct.source.Trim().Equals("大好河山"))
+            {
+                apiKey = dhhsApiKey;
+                custId = dhhsCustId;
+            }
+            else
+            {
+                apiKey = wlApiKey;
+                custId = wlCustId;
+            }
+            ZiwoyouPlaceOrderResult bookResult = PlaceOrder(skipassProduct.third_party_no, skipass.contact_name, skipass.contact_cell, skipass.contact_id_type, 
+                skipass.contact_id_no,skipass.count, (DateTime)skipass.reserve_date, "", outOrderNo);
+            skipass.reserve_no = bookResult.data.orderId.Trim();
+            return Ok(bookResult);
+        }
+
+        [NonAction]
+        public ZiwoyouPlaceOrderResult PlaceOrder(string productNo, string name, string cell, 
+            string idType, string idNo, int count, DateTime date, string memo, string orderId)
         {
 
             string postData = "{\n\t\"apikey\": \"" + apiKey
                 + "\",\n\t\"custId\": " + custId + " ,\n\t\"infoId\": " + productNo
-                + ",\n\t\"isSend\": \"1\",\n\t\"linkMan\": \"" + name
+                + ",\n\t\"isSend\": \"1\",\n\t\"linkMan\": \"" + name + "\", \"linkCreditType\": 0, \"linkCreditNo\": \"" + idNo.Trim()
                 + "\",\n\t\"linkPhone\": \"" + cell + "\",\n\t\"num\": " + count.ToString()
-                + ",\n\t\"orderMemo\": \"" + memo + "\",\n\t\"orderSourceId\": \"" + orderId.ToString()
+                + ",\n\t\"orderMemo\": \"" + memo + "\",\n\t\"orderSourceId\": \"" + orderId.Trim()
                 + "\",\n\t\"travelDate\": \"" + date.ToString("yyyy-MM-dd") + "\"\n}";
             string ret = Util.GetWebContent("https://task-api-stag.zowoyoo.com/api/thirdPaty/order/add",
                 postData, "application/json");
             ZiwoyouPlaceOrderResult r = JsonConvert.DeserializeObject<ZiwoyouPlaceOrderResult>(ret);
-            return Ok(r);
+            return r;
 
         }
 
