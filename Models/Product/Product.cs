@@ -12,6 +12,8 @@ namespace SnowmeetApi.Models.Product
         public int id { get; set; }
         public string name { get; set; }
         public double sale_price { get; set; }
+        public double? market_price { get; set; } = null;
+        public double? cost { get; set; } = null;
         public string type { get; set; }
         public string shop { get; set; }
         

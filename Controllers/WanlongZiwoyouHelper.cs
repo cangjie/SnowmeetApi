@@ -37,6 +37,7 @@ namespace SnowmeetApi.Controllers
         public string apiKey = "";
 
         public string custId = "";
+        public string source = "大好河山";
 
         public WanlongZiwoyouHelper(ApplicationDBContext context, IConfiguration config)
 		{
@@ -169,6 +170,69 @@ namespace SnowmeetApi.Controllers
             string ret = Util.GetWebContent("https://task-api-stag.zowoyoo.com/api/thirdPaty/order/cancel",
                 postData, "application/json");
             return Ok(ret);
+
+        }
+
+        [NonAction]
+        public async Task<Models.Product.SkiPass> GetSkipassProductByCode(string code)
+        {
+            var l = await _context.SkiPass.Where(s => s.third_party_no.Trim().Equals(code.Trim()))
+                .AsNoTracking().ToListAsync();
+            if (l==null || l.Count <= 0)
+            {
+                return null;
+            }
+            Models.Product.SkiPass skipass = l[0];
+            skipass.product = await _context.Product.FindAsync(skipass.product_id);
+            return skipass;
+
+        }
+
+        [HttpGet]
+        public async Task UpdateSkipassProduct(string keyword)
+        {
+            ProductQueryResult originProductInfo = (ProductQueryResult)((OkObjectResult)GetProductList(keyword).Result).Value;
+            for(int i = 0; i < originProductInfo.data.results.Length; i++)
+            {
+                SkiPassProduct skipassProduct = originProductInfo.data.results[i];
+                Models.Product.SkiPass skipass = await GetSkipassProductByCode(skipassProduct.productNo);
+                if (skipass != null)
+                {
+                    skipass.product.market_price = skipassProduct.salePrice;
+                    skipass.product.cost = skipassProduct.settlementPrice;
+                    _context.Entry<Models.Product.Product>(skipass.product).State = EntityState.Modified;
+                    await _context.SaveChangesAsync();
+                }
+                else
+                {
+                    Models.Product.Product p = new Models.Product.Product()
+                    {
+                        id = 0,
+                        name = skipassProduct.productName.Trim(),
+                        sale_price = skipassProduct.salePrice,
+                        market_price = skipassProduct.salePrice,
+                        cost = skipassProduct.settlementPrice,
+                        type = "雪票",
+                        shop = "崇礼旗舰店",
+                        hidden = 0,
+                        start_date = DateTime.Parse("2024-10-1"),
+                        end_date = DateTime.Parse("2025-6-1")
+                    };
+                    await _context.Product.AddAsync(p);
+                    await _context.SaveChangesAsync();
+                    Models.Product.SkiPass ski = new Models.Product.SkiPass()
+                    {
+                        product_id = p.id,
+                        resort = keyword.Trim(),
+                        rules = skipassProduct.orderDesc.Trim(),
+                        source = this.source.Trim(),
+                        third_party_no = skipassProduct.productNo
+                    };
+                    await _context.SkiPass.AddAsync(ski);
+                    await _context.SaveChangesAsync();
+
+                }
+            }
 
         }
 
