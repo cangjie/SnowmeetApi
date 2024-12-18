@@ -268,6 +268,8 @@ namespace SnowmeetApi.Controllers
             
         }
 
+        
+
         [NonAction]
         private bool SkiPassExists(int id)
         {
