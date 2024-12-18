@@ -14,6 +14,7 @@ using Aop.Api.Domain;
 using AlipaySDKNet.OpenAPI.Model;
 using NuGet.Packaging;
 using Microsoft.EntityFrameworkCore.Internal;
+using static SKIT.FlurlHttpClient.Wechat.TenpayV3.Models.AddHKSubMerchantRequest.Types;
 
 namespace SnowmeetApi.Controllers
 {
@@ -210,14 +211,17 @@ namespace SnowmeetApi.Controllers
                     {
                         id = 0,
                         name = skipassProduct.productName.Trim(),
-                        sale_price = skipassProduct.salePrice,
+                        sale_price = skipassProduct.settlementPrice + 15,
                         market_price = skipassProduct.salePrice,
                         cost = skipassProduct.settlementPrice,
                         type = "雪票",
                         shop = "崇礼旗舰店",
                         hidden = 0,
                         start_date = DateTime.Parse("2024-10-1"),
-                        end_date = DateTime.Parse("2025-6-1")
+                        end_date = DateTime.Parse("2025-6-1"),
+                        intro = skipassProduct.orderDesc.Trim(),
+                        principal = ""
+
                     };
                     await _context.Product.AddAsync(p);
                     await _context.SaveChangesAsync();
