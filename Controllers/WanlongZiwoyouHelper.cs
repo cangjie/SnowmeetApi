@@ -190,6 +190,8 @@ namespace SnowmeetApi.Controllers
 
         }
 
+        
+
         [HttpGet]
         public async Task UpdateSkipassProduct(string keyword)
         {
@@ -253,6 +255,22 @@ namespace SnowmeetApi.Controllers
                 .AsNoTracking().ToListAsync();
             return Ok(l);
         }
+        [HttpGet("{id}")]
+        public async Task<ActionResult<object>> GetProductById(int id)
+        {
+            var l = await _context.SkiPass
+                .Join(_context.Product, s=>s.product_id, p=>p.id,
+                (s, p)=> new {s.product_id, s.resort, s.rules, s.source, s.third_party_no, p.name, p.shop, p.sale_price, p.market_price, p.cost, p.type})
+                .Where(p => p.type.Trim().Equals("雪票") && p.name.IndexOf("【") >= 0 && p.name.IndexOf("】") >= 0 && p.product_id == id
+                && p.third_party_no != null)
+                .AsNoTracking().ToListAsync();
+            if (l == null || l.Count <= 0)
+            {
+                return NotFound();
+            }
+            return Ok(l[0]);
+        }
+
 
 
         [HttpPost]
