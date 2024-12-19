@@ -378,6 +378,7 @@ namespace SnowmeetApi.Controllers
                     skipass.send_content = sendContent.Trim();
                 }
                 skipass.update_date = DateTime.Now;
+                skipass.card_member_pick_time = DateTime.Now;
                 _context.skiPass.Entry(skipass).State = EntityState.Modified;
                 await _context.SaveChangesAsync();
             }
@@ -480,6 +481,18 @@ namespace SnowmeetApi.Controllers
             await _memberHelper.UpdateDetailInfo(member.id, cell, "cell", false);
 
             return Ok(order);
+        }
+        [HttpGet]
+        public async Task<ActionResult<List<object>>> GetProductsByResort(string resort)
+        {
+            resort = Util.UrlDecode(resort);
+            var l = await _context.SkiPass
+                .Join(_context.Product, s=>s.product_id, p=>p.id,
+                (s, p)=> new {s.product_id, s.resort, s.rules, s.source, s.third_party_no, p.name, p.shop, p.sale_price, p.market_price, p.cost, p.type})
+                .Where(p => p.type.Trim().Equals("雪票") && p.name.IndexOf("【") >= 0 && p.name.IndexOf("】") >= 0 && p.name.IndexOf(resort) >= 0
+                && p.third_party_no != null)
+                .AsNoTracking().ToListAsync();
+            return Ok(l);
         }
     }
 }
