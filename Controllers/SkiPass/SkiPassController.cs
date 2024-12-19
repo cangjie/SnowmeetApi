@@ -329,9 +329,9 @@ namespace SnowmeetApi.Controllers
                     "", outTradeNo);
                 orderId = orderResult.data.orderId;
             }
-            catch
+            catch(Exception err)
             {
-                skipass.memo += "预定失败";
+                skipass.memo += "预定失败 " + err.ToString() ;
                 _context.skiPass.Entry(skipass).State = EntityState.Modified;
                 await _context.SaveChangesAsync();
                 return;
