@@ -16,6 +16,7 @@ using SnowmeetApi.Models.Card;
 using Newtonsoft.Json;
 using SnowmeetApi.Controllers.User;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
+using SixLabors.ImageSharp;
 namespace SnowmeetApi.Controllers
 {
     [Route("core/[controller]/[action]")]
@@ -28,11 +29,14 @@ namespace SnowmeetApi.Controllers
 
         private MemberController _memberHelper;
 
+        //private WanlongZiwoyouHelper _zwHelper;
+
         public SkiPassController(ApplicationDBContext context, IConfiguration config)
         {
             _context = context;
             _config = config;
             _memberHelper = new MemberController(context,  config);
+            //_zwHelper = new WanlongZiwoyouHelper(context, config);
         }
 
         [HttpGet("{id}")]
@@ -268,6 +272,62 @@ namespace SnowmeetApi.Controllers
                 _context.skiPass.Entry(skipass).State = EntityState.Modified;
             }
             await _context.SaveChangesAsync();
+            for (int i = 0; i < skipassList.Count; i++)
+            {
+                Models.SkiPass.SkiPass skipass = skipassList[i];
+                if (!skipass.resort.Trim().Equals("南山"))
+                {
+                    await AutoReserve(skipass.id);
+                }
+            }
+        }
+
+        [HttpGet]
+        public async Task AutoReserve(int skipassId)
+        {
+            
+            Models.SkiPass.SkiPass skipass = await _context.skiPass.FindAsync(skipassId);
+            if (!skipass.status.Equals("已付款"))
+            {
+                return;
+            }
+            Models.Product.SkiPass skipassProduct = await _context.SkiPass.FindAsync(skipass.product_id);
+            WanlongZiwoyouHelper _zwHelper = new WanlongZiwoyouHelper(_context, _config, skipassProduct.source);
+            List<OrderPayment> pList = await _context.OrderPayment
+                .Where(p => (p.order_id == skipass.order_id && p.status.Trim().Equals("支付成功")))
+                .AsNoTracking().ToListAsync();
+            string outTradeNo = "";
+            foreach (OrderPayment payment in pList)
+            {
+                if (!payment.out_trade_no.Trim().Equals(""))
+                {
+                    outTradeNo = payment.out_trade_no.Trim();
+                    break;
+                }
+            }
+            if (outTradeNo.Trim().Equals(""))
+            {
+                outTradeNo = skipass.id.ToString() + Util.GetLongTimeStamp(DateTime.Now);
+            }
+            double balance = _zwHelper.GetBalance();
+            if (balance <= skipass.deal_price)
+            {
+                return;
+            }
+            Models.WanLong.ZiwoyouPlaceOrderResult orderResult = 
+                _zwHelper.PlaceOrder(skipassProduct.third_party_no, skipass.contact_name, skipass.contact_cell,
+                skipass.contact_id_type, skipass.contact_id_no, skipass.count, (DateTime)skipass.reserve_date, 
+                "", outTradeNo);
+            string orderId = orderResult.data.orderId;
+            Models.WanLong.PayResult payResult = _zwHelper.Pay(int.Parse(orderId));
+            if (payResult.state != 1 || !payResult.msg.Trim().Equals("支付成功"))
+            {
+                return;
+            }
+            skipass.reserve_no = payResult.data.orderId.ToString();
+            _context.skiPass.Entry(skipass).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
+            _zwHelper.GetOrder(int.Parse(orderId));
             
         }
         

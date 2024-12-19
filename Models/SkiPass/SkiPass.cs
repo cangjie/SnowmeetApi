@@ -1,6 +1,7 @@
 using System;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Data;
+using Microsoft.DotNet.Scaffolding.Shared.Messaging;
 
 namespace SnowmeetApi.Models.SkiPass
 {
@@ -38,7 +39,9 @@ namespace SnowmeetApi.Models.SkiPass
         public string? contact_cell {get; set;} = null;
         public string? contact_id_type {get; set;} = null;
         public string? contact_id_no {get; set;} = null;
-        public int is_cancel {get; set;}
+        public int is_cancel { get; set; } = 0;
+        public string? send_content { get; set; } = null;
+
         public int? cancel_member_id {get; set;}
         public DateTime update_date {get; set;} = DateTime.Now;
         public DateTime create_date {get; set;} = DateTime.Now;
@@ -83,7 +86,7 @@ namespace SnowmeetApi.Models.SkiPass
                     if (valid == 1)
                     {
                         status = "已付款";
-                        if (card_no!=null)
+                        if (card_no != null)
                         {
                             status = "已出票";
                             if (card_member_pick_time != null)
@@ -102,6 +105,21 @@ namespace SnowmeetApi.Models.SkiPass
 
                     }
 
+                }
+                else
+                {
+                    if (valid == 1)
+                    {
+                        status = "已付款";
+                        if (reserve_no != null)
+                        {
+                            status = "已确认";
+                            if (card_member_pick_time != null)
+                            {
+                                status = "已出票";
+                            }
+                        }
+                    }
                 }
                 return status;
             }

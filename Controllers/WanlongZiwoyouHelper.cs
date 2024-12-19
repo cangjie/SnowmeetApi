@@ -85,13 +85,15 @@ namespace SnowmeetApi.Controllers
 
        
 
-        public WanlongZiwoyouHelper(ApplicationDBContext context, IConfiguration config)
+        public WanlongZiwoyouHelper(ApplicationDBContext context, IConfiguration config, string source)
 		{
             _context = context;
             _config = config.GetSection("Settings");
             _appId = _config.GetSection("AppId").Value.Trim();
             apiKey = dhhsApiKey;
             custId = dhhsCustId;
+            this.source = source;
+            SetParam(source);
         }
 
         [HttpGet]
@@ -232,14 +234,14 @@ namespace SnowmeetApi.Controllers
         }
         */
 
-        [HttpGet("{orderId}")]
-        public ActionResult<PayResult> Pay(int orderId)
+        [NonAction]
+        public PayResult Pay(int orderId)
         {
             string postData = "{\"apikey\": \"" + apiKey + "\",\"custId\": " + custId.Trim() + ",\"orderId\": " + orderId.ToString() + "}";
             string ret = Util.GetWebContent("https://task-api.zowoyoo.com/api/thirdPaty/order/pay",
                 postData, "application/json");
             PayResult p = JsonConvert.DeserializeObject<PayResult>(ret);
-            return Ok(p);
+            return p;
 
         }
 
@@ -374,7 +376,7 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet]
-        public double GetBalance(string source="大好河山")
+        public double GetBalance()
         {
             SetParam(source);
             string postData = "{\"apikey\": \"" + apiKey + "\", \"custId\": " + custId + "}";
