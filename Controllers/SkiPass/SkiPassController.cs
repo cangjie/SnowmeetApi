@@ -128,7 +128,7 @@ namespace SnowmeetApi.Controllers
             }
             return Ok(skiPassProdustList);
         }
-
+        /*
         [HttpGet("{productId}")]
         public async Task<ActionResult<object>> ReserveSkiPass(int productId, DateTime date, int count, string cell, string name, string sessionKey)
         {
@@ -166,7 +166,8 @@ namespace SnowmeetApi.Controllers
             await _context.SaveChangesAsync();
             return order;
         }
-
+        */
+        /*
         [HttpGet("{productId}")]
         public async Task<ActionResult<object>> PlaceSkiPassOrderNanshan(int productId, DateTime date, int count, string sessionKey)
         {
@@ -181,7 +182,8 @@ namespace SnowmeetApi.Controllers
             return (await CreateSkiPassOrder(new Product[] { productTicket, productService }, null, user, date, count));
         }
 
-
+        */
+        /*
         [NonAction]
         public async Task<OrderOnline> CreateSkiPassOrder(Product[] prodctArr, UnicUser? user, UnicUser? staff, DateTime date, int count)
         {
@@ -252,7 +254,8 @@ namespace SnowmeetApi.Controllers
             order.payments = new OrderPayment[] { payment };
             return order;
         }
-
+        */
+        
         [NonAction]
         public async Task CreateSkiPass(OrderOnline order)
         {
@@ -267,15 +270,15 @@ namespace SnowmeetApi.Controllers
             await _context.SaveChangesAsync();
             
         }
-
         
-
+        
+        /*
         [NonAction]
         private bool SkiPassExists(int id)
         {
             return _context.SkiPass.Any(e => e.product_id == id);
         }
-
+        */
         [HttpGet("{productId}")]
         public async Task<ActionResult<object>> ReserveSkiPass(int productId, DateTime date, 
             int count, string cell, string name, string sessionKey, string sessionType = "wechat_mini_openid", string idNo = "")
@@ -289,29 +292,30 @@ namespace SnowmeetApi.Controllers
             }
             Models.Users.Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
             double totalPrice = 0;
-            Models.SkiPass.SkiPass[] skipassArr = new Models.SkiPass.SkiPass[count];
-            for(int i = 0; i < count; i++)
+            //Models.SkiPass.SkiPass[] skipassArr = new Models.SkiPass.SkiPass[count];
+           
+            Models.SkiPass.SkiPass skipass = new Models.SkiPass.SkiPass()
             {
-                Models.SkiPass.SkiPass skipass = new Models.SkiPass.SkiPass()
-                {
-                    member_id = member.id,
-                    wechat_mini_openid = member.wechatMiniOpenId,
-                    product_id = productId,
-                    resort = skipassProduct.resort.Trim(),
-                    product_name = product.name,
-                    count = 1,
-                    //order_id = orderId,
-                    deal_price = product.sale_price + product.deposit,
-                    ticket_price = product.sale_price,
-                    deposit = product.deposit,
-                    valid = 0,
-                    contact_cell = cell,
-                    contact_name = name,
-                    reserve_date = date.Date
-                };
-                skipassArr[i] = skipass;
-                totalPrice += (double)skipass.deal_price;
-            }
+                member_id = member.id,
+                wechat_mini_openid = member.wechatMiniOpenId,
+                product_id = productId,
+                resort = skipassProduct.resort.Trim(),
+                product_name = product.name,
+                count = count,
+                //order_id = orderId,
+                deal_price = (product.sale_price + product.deposit) * count,
+                ticket_price = product.sale_price,
+                deposit = product.deposit,
+                valid = 0,
+                contact_cell = cell,
+                contact_name = name,
+                contact_id_no = idNo.Trim(),
+                contact_id_type = "身份证",
+                reserve_date = date.Date
+            };
+                //skipassArr[i] = skipass;
+                //totalPrice += (double)skipass.deal_price;
+            
 
             OrderOnline order = new OrderOnline()
             {
@@ -319,7 +323,7 @@ namespace SnowmeetApi.Controllers
                 shop = product.shop.Trim(),
                 order_price = totalPrice,
                 order_real_pay_price = totalPrice,
-                final_price = totalPrice,
+                final_price = (double)skipass.deal_price,
                 open_id = member.wechatMiniOpenId,
                 staff_open_id = "",
                 memo = "",
@@ -349,12 +353,9 @@ namespace SnowmeetApi.Controllers
             };
             await _context.OrderPayment.AddAsync(payment);
 
-            for(int i = 0; i < skipassArr.Length; i++)
-            {
-                Models.SkiPass.SkiPass skipass = skipassArr[i];
-                skipass.order_id = order.id;
-                await _context.skiPass.AddAsync(skipass);
-            }
+            skipass.order_id = order.id;
+            await _context.skiPass.AddAsync(skipass);
+            
             await _context.SaveChangesAsync();
             order.payments = new OrderPayment[] { payment };
 

@@ -42,6 +42,49 @@ namespace SnowmeetApi.Controllers
         public string custId = "";
         public string source = "大好河山";
 
+        public class Voucher
+        { 
+            public string code { get; set; }
+            public string qrcodeUrl { get; set; }
+            public int type { get; set; }
+            public int voucherStatus { get; set; }
+
+        }
+
+        public class ZiwoyouOrder
+        {
+            public int? orderId { get; set; } = null;
+            public string? orderSourceId { get; set; } = null;
+            public int? orderState { get; set; } = null;
+            public string? orderState2 { get; set; } = null;
+            public int? productNo { get; set; } = null;
+            public string? productName { get; set; } = null;
+            public int? num { get; set; } = null;
+            public double? settlementPrice { get; set; } = null;
+            public double? salePrice { get; set; } = null;
+            public double? marketPrice { get; set; } = null;
+            public double? orderMoney { get; set; } = null;
+            public double? memOrderMoney { get; set; } = null; 
+            public string? sendContent1 { get; set; } = null;
+            public string? sendContent2 { get; set; } = null;
+            public string? sendContent3 { get; set; } = null;
+            public Voucher[]? vouchers { get; set; } = null;
+        }
+
+        public class ZiwoyouQueryResult
+        {
+            public string msg { get; set; }
+            public int state { get; set; }
+            public object data {get; set;}
+        }
+
+        public class ZiwoyouAccountBalance
+        { 
+            public double accountBalance { get; set; }
+        }
+
+       
+
         public WanlongZiwoyouHelper(ApplicationDBContext context, IConfiguration config)
 		{
             _context = context;
@@ -123,11 +166,11 @@ namespace SnowmeetApi.Controllers
             {
                 return NotFound();
             }
-            if (skipass.card_member_pick_time != null && skipass.valid != 1)
+            if (skipass.card_member_pick_time != null || skipass.valid != 1)
             {
                 return BadRequest();
             }
-            List<OrderPayment> payList = await _context.OrderPayment.Where(p => (p.status.Trim().Equals("支付成功") && p.order_id == skipass.order_id))
+            List<OrderPayment> payList = await _context.OrderPayment.Where(p => p.order_id == skipass.order_id)
                 .AsNoTracking().ToListAsync();
             string outOrderNo = "";
             foreach(OrderPayment payment in payList)
@@ -171,7 +214,7 @@ namespace SnowmeetApi.Controllers
                 + "\",\n\t\"linkPhone\": \"" + cell + "\",\n\t\"num\": " + count.ToString()
                 + ",\n\t\"orderMemo\": \"" + memo + "\",\n\t\"orderSourceId\": \"" + orderId.Trim()
                 + "\",\n\t\"travelDate\": \"" + date.ToString("yyyy-MM-dd") + "\"\n}";
-            string ret = Util.GetWebContent("https://task-api-stag.zowoyoo.com/api/thirdPaty/order/add",
+            string ret = Util.GetWebContent("https://task-api.zowoyoo.com/api/thirdPaty/order/add",
                 postData, "application/json");
             ZiwoyouPlaceOrderResult r = JsonConvert.DeserializeObject<ZiwoyouPlaceOrderResult>(ret);
             return r;
@@ -193,7 +236,7 @@ namespace SnowmeetApi.Controllers
         public ActionResult<PayResult> Pay(int orderId)
         {
             string postData = "{\"apikey\": \"" + apiKey + "\",\"custId\": " + custId.Trim() + ",\"orderId\": " + orderId.ToString() + "}";
-            string ret = Util.GetWebContent("https://task-api-stag.zowoyoo.com/api/thirdPaty/order/pay",
+            string ret = Util.GetWebContent("https://task-api.zowoyoo.com/api/thirdPaty/order/pay",
                 postData, "application/json");
             PayResult p = JsonConvert.DeserializeObject<PayResult>(ret);
             return Ok(p);
@@ -201,22 +244,26 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet("{orderId}")]
-        public ActionResult<string> GetOrder(int orderId)
+        public ActionResult<ZiwoyouOrder> GetOrder(int orderId)
         {
             string postData = "{\"apikey\": \"" + apiKey + "\",\"custId\": " + custId.Trim()
                 + ",\"orderId\": " + orderId.ToString() + "}";
-            string ret = Util.GetWebContent("https://task-api-stag.zowoyoo.com/api/thirdPaty/order/detail",
+            string ret = Util.GetWebContent("https://task-api.zowoyoo.com/api/thirdPaty/order/detail",
                 postData, "application/json");
-            return Ok(ret);
+            ZiwoyouQueryResult r = JsonConvert.DeserializeObject<ZiwoyouQueryResult>(ret);
+            ZiwoyouOrder order = JsonConvert.DeserializeObject<ZiwoyouOrder>(r.data.ToString());
+
+            return Ok(order);
 
         }
 
         [HttpGet("{orderId}")]
         public ActionResult<string> CancelOrder(int orderId)
         {
+            ZiwoyouOrder order = (ZiwoyouOrder)((OkObjectResult)GetOrder(orderId).Result).Value;
             string postData = "{\"apikey\": \"" + apiKey + "\",\"custId\": " + custId.Trim()
-                + ",\"orderId\": " + orderId.ToString() + "}";
-            string ret = Util.GetWebContent("https://task-api-stag.zowoyoo.com/api/thirdPaty/order/cancel",
+                + ",\"orderId\": " + orderId.ToString() + ", \"cancelNum\": " + order.num.ToString() + "}";
+            string ret = Util.GetWebContent("https://task-api.zowoyoo.com/api/thirdPaty/order/cancel",
                 postData, "application/json");
             return Ok(ret);
 
@@ -324,6 +371,34 @@ namespace SnowmeetApi.Controllers
         public ActionResult CallBack()
         {
             return Ok();
+        }
+
+        [HttpGet]
+        public double GetBalance(string source="大好河山")
+        {
+            SetParam(source);
+            string postData = "{\"apikey\": \"" + apiKey + "\", \"custId\": " + custId + "}";
+            string ret = Util.GetWebContent("https://task-api.zowoyoo.com/api/thirdPaty/order/balance",
+               postData, "application/json");
+            ZiwoyouQueryResult r = JsonConvert.DeserializeObject<ZiwoyouQueryResult>(ret);
+            ZiwoyouAccountBalance b = JsonConvert.DeserializeObject<ZiwoyouAccountBalance>(r.data.ToString());
+            return b.accountBalance;
+        }
+
+        [NonAction]
+        public void SetParam(string source)
+        {
+            switch (source)
+            {
+                case "大好河山":
+                    apiKey = dhhsApiKey;
+                    custId = dhhsCustId;
+                    break;
+                default:
+                    apiKey = wlApiKey;
+                    custId = wlCustId;
+                    break;
+            }
         }
 
         
