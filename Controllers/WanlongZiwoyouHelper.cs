@@ -227,7 +227,7 @@ namespace SnowmeetApi.Controllers
             //string postJson = Newtonsoft.Json.JsonConvert.SerializeObject(postData);
             //path = path + "callback_" +  + ".txt";
             // 此文本只添加到文件一次。
-            using (StreamWriter fw = new StreamWriter(path + "booking_" + dateStr + ".txt", true))
+            using (StreamWriter fw = new StreamWriter(path + "/booking_" + dateStr + ".txt", true))
             {
                 fw.WriteLine(DateTime.Now.ToString());
                 fw.WriteLine(postData);
@@ -389,9 +389,32 @@ namespace SnowmeetApi.Controllers
             string postData = "{\"apikey\": \"" + apiKey + "\", \"custId\": " + custId + "}";
             string ret = Util.GetWebContent("https://task-api.zowoyoo.com/api/thirdPaty/order/balance",
                postData, "application/json");
-            ZiwoyouQueryResult r = JsonConvert.DeserializeObject<ZiwoyouQueryResult>(ret);
-            ZiwoyouAccountBalance b = JsonConvert.DeserializeObject<ZiwoyouAccountBalance>(r.data.ToString());
-            return b.accountBalance;
+            string path = $"{Environment.CurrentDirectory}";
+            
+            string dateStr = DateTime.Now.Year.ToString() + DateTime.Now.Month.ToString().PadLeft(2, '0')
+                + DateTime.Now.Day.ToString().PadLeft(2, '0');
+            //string postJson = Newtonsoft.Json.JsonConvert.SerializeObject(postData);
+            //path = path + "callback_" +  + ".txt";
+            // 此文本只添加到文件一次。
+            
+            try
+            {
+                ZiwoyouQueryResult r = JsonConvert.DeserializeObject<ZiwoyouQueryResult>(ret);
+                ZiwoyouAccountBalance b = JsonConvert.DeserializeObject<ZiwoyouAccountBalance>(r.data.ToString());
+                return b.accountBalance;
+            }
+            catch
+            {
+                using (StreamWriter fw = new StreamWriter(path + "/booking_" + dateStr + ".txt", true))
+                {
+                    fw.WriteLine(DateTime.Now.ToString());
+                    fw.WriteLine(postData);
+                    fw.WriteLine(ret);
+                    fw.WriteLine("");
+
+                }
+                return 0;
+            }
         }
 
         [NonAction]
