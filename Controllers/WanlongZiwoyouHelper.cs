@@ -85,7 +85,7 @@ namespace SnowmeetApi.Controllers
 
        
 
-        public WanlongZiwoyouHelper(ApplicationDBContext context, IConfiguration config, string source)
+        public WanlongZiwoyouHelper(ApplicationDBContext context, IConfiguration config, string source="大好河山")
 		{
             _context = context;
             _config = config.GetSection("Settings");
@@ -339,18 +339,7 @@ namespace SnowmeetApi.Controllers
 
         }
 
-        [HttpGet]
-        public async Task<ActionResult<List<object>>> GetProductsByResort(string resort)
-        {
-            resort = Util.UrlDecode(resort);
-            var l = await _context.SkiPass
-                .Join(_context.Product, s=>s.product_id, p=>p.id,
-                (s, p)=> new {s.product_id, s.resort, s.rules, s.source, s.third_party_no, p.name, p.shop, p.sale_price, p.market_price, p.cost, p.type})
-                .Where(p => p.type.Trim().Equals("雪票") && p.name.IndexOf("【") >= 0 && p.name.IndexOf("】") >= 0 && p.name.IndexOf(resort) >= 0
-                && p.third_party_no != null)
-                .AsNoTracking().ToListAsync();
-            return Ok(l);
-        }
+        
         [HttpGet("{id}")]
         public async Task<ActionResult<object>> GetProductById(int id)
         {
