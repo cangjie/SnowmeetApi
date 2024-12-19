@@ -16,6 +16,7 @@ using NuGet.Packaging;
 using Microsoft.EntityFrameworkCore.Internal;
 using static SKIT.FlurlHttpClient.Wechat.TenpayV3.Models.AddHKSubMerchantRequest.Types;
 using SnowmeetApi.Models.Order;
+using System.IO;
 
 namespace SnowmeetApi.Controllers
 {
@@ -218,6 +219,23 @@ namespace SnowmeetApi.Controllers
                 + "\",\n\t\"travelDate\": \"" + date.ToString("yyyy-MM-dd") + "\"\n}";
             string ret = Util.GetWebContent("https://task-api.zowoyoo.com/api/thirdPaty/order/add",
                 postData, "application/json");
+            
+            string path = $"{Environment.CurrentDirectory}";
+            
+            string dateStr = DateTime.Now.Year.ToString() + DateTime.Now.Month.ToString().PadLeft(2, '0')
+                + DateTime.Now.Day.ToString().PadLeft(2, '0');
+            //string postJson = Newtonsoft.Json.JsonConvert.SerializeObject(postData);
+            //path = path + "callback_" +  + ".txt";
+            // 此文本只添加到文件一次。
+            using (StreamWriter fw = new StreamWriter(path + "booking_" + dateStr + ".txt", true))
+            {
+                fw.WriteLine(DateTime.Now.ToString());
+                fw.WriteLine(postData);
+                fw.WriteLine(ret);
+                fw.WriteLine("");
+
+            }
+
             ZiwoyouPlaceOrderResult r = JsonConvert.DeserializeObject<ZiwoyouPlaceOrderResult>(ret);
             return r;
 
