@@ -327,8 +327,38 @@ namespace SnowmeetApi.Controllers
             skipass.reserve_no = payResult.data.orderId.ToString();
             _context.skiPass.Entry(skipass).State = EntityState.Modified;
             await _context.SaveChangesAsync();
-            _zwHelper.GetOrder(int.Parse(orderId));
-            
+            WanlongZiwoyouHelper.ZiwoyouOrder order = _zwHelper.GetOrder(int.Parse(orderId));
+            if (order.orderState != 1 || order.vouchers == null || order.vouchers.Length <= 0)
+            {
+                return;
+            }
+            if (order.vouchers[0].code != null && !order.vouchers[0].code.Trim().Equals(""))
+            {
+                skipass.card_no = order.vouchers[0].code.Trim();
+            }
+            if (order.vouchers[0].qrcodeUrl != null && !order.vouchers[0].qrcodeUrl.Trim().Equals(""))
+            {
+                skipass.qr_code_url = order.vouchers[0].qrcodeUrl.Trim();
+            }
+            string sendContent = "";
+            if (order.sendContent1 != null)
+            {
+                sendContent += order.sendContent1;
+            }
+            if (order.sendContent2 != null)
+            {
+                sendContent += order.sendContent2;
+            }
+            if (order.sendContent3 != null)
+            {
+                sendContent += order.sendContent3;
+            }
+            if (!sendContent.Trim().Equals(""))
+            {
+                skipass.send_content = sendContent.Trim();
+            }
+            _context.skiPass.Entry(skipass).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
         }
         
         

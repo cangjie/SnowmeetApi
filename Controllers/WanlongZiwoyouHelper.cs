@@ -245,8 +245,8 @@ namespace SnowmeetApi.Controllers
 
         }
 
-        [HttpGet("{orderId}")]
-        public ActionResult<ZiwoyouOrder> GetOrder(int orderId)
+        [NonAction]
+        public ZiwoyouOrder GetOrder(int orderId)
         {
             string postData = "{\"apikey\": \"" + apiKey + "\",\"custId\": " + custId.Trim()
                 + ",\"orderId\": " + orderId.ToString() + "}";
@@ -255,19 +255,19 @@ namespace SnowmeetApi.Controllers
             ZiwoyouQueryResult r = JsonConvert.DeserializeObject<ZiwoyouQueryResult>(ret);
             ZiwoyouOrder order = JsonConvert.DeserializeObject<ZiwoyouOrder>(r.data.ToString());
 
-            return Ok(order);
+            return order;
 
         }
 
-        [HttpGet("{orderId}")]
-        public ActionResult<string> CancelOrder(int orderId)
+        [NonAction]
+        public string CancelOrder(int orderId)
         {
-            ZiwoyouOrder order = (ZiwoyouOrder)((OkObjectResult)GetOrder(orderId).Result).Value;
+            ZiwoyouOrder order = GetOrder(orderId);
             string postData = "{\"apikey\": \"" + apiKey + "\",\"custId\": " + custId.Trim()
                 + ",\"orderId\": " + orderId.ToString() + ", \"cancelNum\": " + order.num.ToString() + "}";
             string ret = Util.GetWebContent("https://task-api.zowoyoo.com/api/thirdPaty/order/cancel",
                 postData, "application/json");
-            return Ok(ret);
+            return ret;
 
         }
 
