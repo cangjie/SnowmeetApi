@@ -312,6 +312,9 @@ namespace SnowmeetApi.Controllers
             double balance = _zwHelper.GetBalance();
             if (balance <= skipass.deal_price)
             {
+                skipass.memo += "账户余额不足";
+                _context.skiPass.Entry(skipass).State = EntityState.Modified;
+                await _context.SaveChangesAsync();
                 return;
             }
             Models.WanLong.ZiwoyouPlaceOrderResult orderResult = 
@@ -322,6 +325,9 @@ namespace SnowmeetApi.Controllers
             Models.WanLong.PayResult payResult = _zwHelper.Pay(int.Parse(orderId));
             if (payResult.state != 1 || !payResult.msg.Trim().Equals("支付成功"))
             {
+                skipass.memo += "账户支付不成功";
+                _context.skiPass.Entry(skipass).State = EntityState.Modified;
+                await _context.SaveChangesAsync();
                 return;
             }
             skipass.reserve_no = payResult.data.orderId.ToString();
