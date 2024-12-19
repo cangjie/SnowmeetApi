@@ -289,6 +289,9 @@ namespace SnowmeetApi.Controllers
             Models.SkiPass.SkiPass skipass = await _context.skiPass.FindAsync(skipassId);
             if (!skipass.status.Equals("已付款"))
             {
+                skipass.memo += "雪票状态不对。";
+                _context.skiPass.Entry(skipass).State = EntityState.Modified;
+                await _context.SaveChangesAsync();
                 return;
             }
             Models.Product.SkiPass skipassProduct = await _context.SkiPass.FindAsync(skipass.product_id);
@@ -426,8 +429,6 @@ namespace SnowmeetApi.Controllers
             }
             Models.Users.Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
             double totalPrice = 0;
-            //Models.SkiPass.SkiPass[] skipassArr = new Models.SkiPass.SkiPass[count];
-           
             Models.SkiPass.SkiPass skipass = new Models.SkiPass.SkiPass()
             {
                 member_id = member.id,
