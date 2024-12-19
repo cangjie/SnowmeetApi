@@ -327,38 +327,63 @@ namespace SnowmeetApi.Controllers
             skipass.reserve_no = payResult.data.orderId.ToString();
             _context.skiPass.Entry(skipass).State = EntityState.Modified;
             await _context.SaveChangesAsync();
-            WanlongZiwoyouHelper.ZiwoyouOrder order = _zwHelper.GetOrder(int.Parse(orderId));
-            if (order.orderState != 1 || order.vouchers == null || order.vouchers.Length <= 0)
+
+
+            
+        }
+
+        [HttpGet]
+        public async Task RefreshAutoReserve()
+        {
+            List<Models.SkiPass.SkiPass> skipassList = await _context.skiPass
+                .Where(s => (s.valid == 1 && s.reserve_no != null && !s.resort.Trim().Equals("南山")
+                && s.card_no == null && s.qr_code_url == null && s.send_content == null)).ToListAsync();
+            for(int i = 0; i < skipassList.Count; i++)
             {
-                return;
+                Models.SkiPass.SkiPass skipass = skipassList[i];
+                Models.Product.SkiPass skipassProduct = await _context.SkiPass.FindAsync(skipass.product_id);
+                if (skipassProduct == null)
+                {
+                    continue;
+                }
+                WanlongZiwoyouHelper _zwHelper = new WanlongZiwoyouHelper(_context, _config, skipassProduct.source.Trim());
+                WanlongZiwoyouHelper.ZiwoyouOrder order = _zwHelper.GetOrder(int.Parse(skipass.reserve_no));
+                if (order.orderState != 1 || order.vouchers == null || order.vouchers.Length <= 0)
+                {
+                    return;
+                }
+                if (order.vouchers[0].code != null && !order.vouchers[0].code.Trim().Equals(""))
+                {
+                    skipass.card_no = order.vouchers[0].code.Trim();
+                }
+                if (order.vouchers[0].qrcodeUrl != null && !order.vouchers[0].qrcodeUrl.Trim().Equals(""))
+                {
+                    skipass.qr_code_url = order.vouchers[0].qrcodeUrl.Trim();
+                }
+                string sendContent = "";
+                if (order.sendContent1 != null)
+                {
+                    sendContent += order.sendContent1;
+                }
+                if (order.sendContent2 != null)
+                {
+                    sendContent += order.sendContent2;
+                }
+                if (order.sendContent3 != null)
+                {
+                    sendContent += order.sendContent3;
+                }
+                if (!sendContent.Trim().Equals(""))
+                {
+                    skipass.send_content = sendContent.Trim();
+                }
+                skipass.update_date = DateTime.Now;
+                _context.skiPass.Entry(skipass).State = EntityState.Modified;
+                await _context.SaveChangesAsync();
             }
-            if (order.vouchers[0].code != null && !order.vouchers[0].code.Trim().Equals(""))
-            {
-                skipass.card_no = order.vouchers[0].code.Trim();
-            }
-            if (order.vouchers[0].qrcodeUrl != null && !order.vouchers[0].qrcodeUrl.Trim().Equals(""))
-            {
-                skipass.qr_code_url = order.vouchers[0].qrcodeUrl.Trim();
-            }
-            string sendContent = "";
-            if (order.sendContent1 != null)
-            {
-                sendContent += order.sendContent1;
-            }
-            if (order.sendContent2 != null)
-            {
-                sendContent += order.sendContent2;
-            }
-            if (order.sendContent3 != null)
-            {
-                sendContent += order.sendContent3;
-            }
-            if (!sendContent.Trim().Equals(""))
-            {
-                skipass.send_content = sendContent.Trim();
-            }
-            _context.skiPass.Entry(skipass).State = EntityState.Modified;
-            await _context.SaveChangesAsync();
+
+
+
         }
         
         
