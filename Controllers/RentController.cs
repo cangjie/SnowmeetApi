@@ -1249,6 +1249,14 @@ namespace SnowmeetApi.Controllers
             list.Add("雪服");
             list.Add("雪裤");
             list.Add("连体雪服");
+            list.Add("手套");
+            list.Add("护具");
+            list.Add("电加热马甲");
+            list.Add("运动相机");
+            list.Add("无人机");
+            list.Add("对讲机");
+
+
             var oriList = await _context.RentItem.Select(r => r.@class)
                 .AsNoTracking().Distinct().ToListAsync();
             
@@ -1263,7 +1271,9 @@ namespace SnowmeetApi.Controllers
                         break;
                     }
                 }
-                if (!exists && !ori.ToString().Equals("其他"))
+                if (!exists && !ori.ToString().Equals("其他")
+                    && ori.ToString().IndexOf("电子") < 0
+                    && ori.ToString().IndexOf("雪服上衣") < 0)
                 {
                     list.Add(ori.ToString());
                 }
