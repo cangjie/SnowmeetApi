@@ -1261,11 +1261,12 @@ namespace SnowmeetApi.Controllers
                         break;
                     }
                 }
-                if (!exists)
+                if (!exists && !ori.ToString().Equals("其他"))
                 {
                     list.Add(ori.ToString());
                 }
             }
+            list.Add("其他");
             return Ok(list); 
         }
 
