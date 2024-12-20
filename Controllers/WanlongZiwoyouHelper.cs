@@ -221,12 +221,8 @@ namespace SnowmeetApi.Controllers
                 postData, "application/json");
             
             string path = $"{Environment.CurrentDirectory}";
-            
             string dateStr = DateTime.Now.Year.ToString() + DateTime.Now.Month.ToString().PadLeft(2, '0')
                 + DateTime.Now.Day.ToString().PadLeft(2, '0');
-            //string postJson = Newtonsoft.Json.JsonConvert.SerializeObject(postData);
-            //path = path + "callback_" +  + ".txt";
-            // 此文本只添加到文件一次。
             using (StreamWriter fw = new StreamWriter(path + "/booking_" + dateStr + ".txt", true))
             {
                 fw.WriteLine(DateTime.Now.ToString());
@@ -258,6 +254,20 @@ namespace SnowmeetApi.Controllers
             string postData = "{\"apikey\": \"" + apiKey + "\",\"custId\": " + custId.Trim() + ",\"orderId\": " + orderId.ToString() + "}";
             string ret = Util.GetWebContent("https://task-api.zowoyoo.com/api/thirdPaty/order/pay",
                 postData, "application/json");
+
+            string path = $"{Environment.CurrentDirectory}";
+            string dateStr = DateTime.Now.Year.ToString() + DateTime.Now.Month.ToString().PadLeft(2, '0')
+                + DateTime.Now.Day.ToString().PadLeft(2, '0');
+            using (StreamWriter fw = new StreamWriter(path + "/booking_" + dateStr + ".txt", true))
+            {
+                fw.WriteLine(DateTime.Now.ToString());
+                fw.WriteLine(postData);
+                fw.WriteLine(ret);
+                fw.WriteLine("");
+
+            }
+            
+
             PayResult p = JsonConvert.DeserializeObject<PayResult>(ret);
             return p;
 
@@ -270,6 +280,20 @@ namespace SnowmeetApi.Controllers
                 + ",\"orderId\": " + orderId.ToString() + "}";
             string ret = Util.GetWebContent("https://task-api.zowoyoo.com/api/thirdPaty/order/detail",
                 postData, "application/json");
+
+            string path = $"{Environment.CurrentDirectory}";
+            string dateStr = DateTime.Now.Year.ToString() + DateTime.Now.Month.ToString().PadLeft(2, '0')
+                + DateTime.Now.Day.ToString().PadLeft(2, '0');
+            using (StreamWriter fw = new StreamWriter(path + "/booking_" + dateStr + ".txt", true))
+            {
+                fw.WriteLine(DateTime.Now.ToString());
+                fw.WriteLine(postData);
+                fw.WriteLine(ret);
+                fw.WriteLine("");
+
+            }
+
+            
             ZiwoyouQueryResult r = JsonConvert.DeserializeObject<ZiwoyouQueryResult>(ret);
             ZiwoyouOrder order = JsonConvert.DeserializeObject<ZiwoyouOrder>(r.data.ToString());
 
@@ -285,6 +309,20 @@ namespace SnowmeetApi.Controllers
                 + ",\"orderId\": " + orderId.ToString() + ", \"cancelNum\": " + order.num.ToString() + "}";
             string ret = Util.GetWebContent("https://task-api.zowoyoo.com/api/thirdPaty/order/cancel",
                 postData, "application/json");
+            
+            string path = $"{Environment.CurrentDirectory}";
+            string dateStr = DateTime.Now.Year.ToString() + DateTime.Now.Month.ToString().PadLeft(2, '0')
+                + DateTime.Now.Day.ToString().PadLeft(2, '0');
+            using (StreamWriter fw = new StreamWriter(path + "/booking_" + dateStr + ".txt", true))
+            {
+                fw.WriteLine(DateTime.Now.ToString());
+                fw.WriteLine(postData);
+                fw.WriteLine(ret);
+                fw.WriteLine("");
+
+            }
+
+
             return ret;
 
         }
