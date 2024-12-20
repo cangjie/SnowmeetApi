@@ -1236,9 +1236,37 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<object>>> GetClassList()
+        public async Task<ActionResult<List<string>>> GetClassList()
         {
-            return await _context.RentItem.Select(r => r.@class).Distinct().ToListAsync();
+            List<string> list = new List<string>();
+            list.Add("双板");
+            list.Add("双板鞋");
+            list.Add("雪杖");
+            list.Add("单板");
+            list.Add("单板鞋");
+            list.Add("头盔");
+            list.Add("雪镜");
+
+            var oriList = await _context.RentItem.Select(r => r.@class)
+                .AsNoTracking().Distinct().ToListAsync();
+            
+            foreach(var ori in oriList)
+            {
+                bool exists = false;
+                foreach(var l in list)
+                {
+                    if (ori.ToString().Equals(l.ToString()))
+                    {
+                        exists = true;
+                        break;
+                    }
+                }
+                if (!exists)
+                {
+                    list.Add(ori.ToString());
+                }
+            }
+            return Ok(list); 
         }
 
 
