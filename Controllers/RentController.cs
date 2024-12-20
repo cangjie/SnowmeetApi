@@ -1246,7 +1246,9 @@ namespace SnowmeetApi.Controllers
             list.Add("单板鞋");
             list.Add("头盔");
             list.Add("雪镜");
-
+            list.Add("雪服");
+            list.Add("雪裤");
+            list.Add("连体雪服");
             var oriList = await _context.RentItem.Select(r => r.@class)
                 .AsNoTracking().Distinct().ToListAsync();
             
