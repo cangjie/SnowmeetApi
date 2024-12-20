@@ -226,6 +226,7 @@ namespace SnowmeetApi.Controllers
             using (StreamWriter fw = new StreamWriter(path + "/booking_" + dateStr + ".txt", true))
             {
                 fw.WriteLine(DateTime.Now.ToString());
+                fw.WriteLine("https://task-api.zowoyoo.com/api/thirdPaty/order/add");
                 fw.WriteLine(postData);
                 fw.WriteLine(ret);
                 fw.WriteLine("");
@@ -261,6 +262,7 @@ namespace SnowmeetApi.Controllers
             using (StreamWriter fw = new StreamWriter(path + "/booking_" + dateStr + ".txt", true))
             {
                 fw.WriteLine(DateTime.Now.ToString());
+                fw.WriteLine("https://task-api.zowoyoo.com/api/thirdPaty/order/pay");
                 fw.WriteLine(postData);
                 fw.WriteLine(ret);
                 fw.WriteLine("");
@@ -287,6 +289,7 @@ namespace SnowmeetApi.Controllers
             using (StreamWriter fw = new StreamWriter(path + "/booking_" + dateStr + ".txt", true))
             {
                 fw.WriteLine(DateTime.Now.ToString());
+                fw.WriteLine("https://task-api.zowoyoo.com/api/thirdPaty/order/detail");
                 fw.WriteLine(postData);
                 fw.WriteLine(ret);
                 fw.WriteLine("");
@@ -316,6 +319,7 @@ namespace SnowmeetApi.Controllers
             using (StreamWriter fw = new StreamWriter(path + "/booking_" + dateStr + ".txt", true))
             {
                 fw.WriteLine(DateTime.Now.ToString());
+                fw.WriteLine("https://task-api.zowoyoo.com/api/thirdPaty/order/cancel");
                 fw.WriteLine(postData);
                 fw.WriteLine(ret);
                 fw.WriteLine("");
