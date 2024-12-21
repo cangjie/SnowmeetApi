@@ -84,6 +84,12 @@ namespace SnowmeetApi.Controllers
             public double accountBalance { get; set; }
         }
 
+        public class ZiwoyouCancel
+        {
+            public int orderId {get; set;}
+            public int cancelState {get; set;}
+        }
+
        
 
         public WanlongZiwoyouHelper(ApplicationDBContext context, IConfiguration config, string source="大好河山")
@@ -305,7 +311,7 @@ namespace SnowmeetApi.Controllers
         }
 
         [NonAction]
-        public string CancelOrder(int orderId)
+        public ZiwoyouCancel CancelOrder(int orderId)
         {
             ZiwoyouOrder order = GetOrder(orderId);
             string postData = "{\"apikey\": \"" + apiKey + "\",\"custId\": " + custId.Trim()
@@ -326,8 +332,10 @@ namespace SnowmeetApi.Controllers
 
             }
 
-
-            return ret;
+            ZiwoyouQueryResult r = JsonConvert.DeserializeObject<ZiwoyouQueryResult>(ret);
+            ZiwoyouCancel cancel = JsonConvert.DeserializeObject<ZiwoyouCancel>(r.data.ToString());
+            
+            return cancel;
 
         }
 

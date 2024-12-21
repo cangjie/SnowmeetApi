@@ -148,6 +148,31 @@ namespace SnowmeetApi.Controllers
             
             return Ok(l);
         }
+
+        [HttpGet("{skipassId}")]
+        public async Task<ActionResult<Models.SkiPass.SkiPass>> Cancel(int skipassId, string sessionKey, string sessionType)
+        {
+            Models.Users.Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
+            if (member == null)
+            {
+                return BadRequest();
+            }
+            Models.SkiPass.SkiPass skipass = await _context.skiPass.FindAsync(skipassId);
+            if (member.id != skipass.member_id && member.wechatMiniOpenId.Trim().Equals(skipass.wechat_mini_openid)
+                && member.is_admin == 0 && member.is_staff == 0 && member.is_manager == 0)
+            {
+                return BadRequest();
+            }
+            Models.Product.SkiPass product = await _context.SkiPass.FindAsync(skipass.product_id);
+            WanlongZiwoyouHelper _wlHelper = new WanlongZiwoyouHelper(_context, _config, product.source.Trim());
+            WanlongZiwoyouHelper.ZiwoyouCancel cancel = _wlHelper.CancelOrder(int.Parse(skipass.reserve_no));
+            skipass.is_cancel = cancel.cancelState;
+            _context.skiPass.Entry(skipass).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
+            return Ok(skipass);
+        }
+
+
         /*
         [HttpGet("{productId}")]
         public async Task<ActionResult<object>> ReserveSkiPass(int productId, DateTime date, int count, string cell, string name, string sessionKey)
