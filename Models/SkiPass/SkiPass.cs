@@ -39,6 +39,14 @@ namespace SnowmeetApi.Models.SkiPass
         public string? contact_cell {get; set;} = null;
         public string? contact_id_type {get; set;} = null;
         public string? contact_id_no {get; set;} = null;
+
+        /*
+        0:未取消
+        1:已取消
+        2:取消未确认
+        -1:取消失败
+        -2:出票失败，自动取消
+        */
         public int is_cancel { get; set; } = 0;
         public string? send_content { get; set; } = null;
 
