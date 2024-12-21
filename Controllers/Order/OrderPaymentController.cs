@@ -43,6 +43,7 @@ namespace SnowmeetApi.Controllers.Order
 
         private readonly RentController _rentHelper;
         private readonly MemberController _memberHelper;
+        //private SkiPassController _skipassHelper;
 
         public class TenpayResource
         {
@@ -61,6 +62,7 @@ namespace SnowmeetApi.Controllers.Order
             public string event_type { get; set; }
             public string summary { get; set; }
             public TenpayResource resource { get; set; }
+            
         }
 
         public OrderPaymentController(ApplicationDBContext context, IConfiguration config, IHttpContextAccessor httpContextAccessor)
@@ -73,6 +75,7 @@ namespace SnowmeetApi.Controllers.Order
             _httpContextAccessor = httpContextAccessor;
             _rentHelper = new RentController(context, config, httpContextAccessor);
             _memberHelper = new MemberController(context, config);
+            //_skipassHelper = new SkiPassController(context, config, httpContextAccessor);
             //UnicUser._context = context;
 
         }
@@ -146,7 +149,7 @@ namespace SnowmeetApi.Controllers.Order
                     await maintainHelper.MaitainOrderPaySuccess(order.id);
                     break;
                 case "雪票":
-                    SkiPassController skiPassHelper = new SkiPassController(_context, _originConfig);
+                    SkiPassController skiPassHelper = new SkiPassController(_context, _originConfig, _httpContextAccessor);
                     await skiPassHelper.CreateSkiPass(order);
                     break;
                 case "押金":
@@ -595,6 +598,28 @@ namespace SnowmeetApi.Controllers.Order
         }
 
 
+        [HttpGet]
+        public async Task SetPaymentRefundSuccess(int paymentId)
+        {
+            OrderPayment payment = await _context.OrderPayment.FindAsync(paymentId);
+            if (payment == null)
+            {
+                return;
+            } 
+            OrderOnline order = await _context.OrderOnlines.FindAsync(payment.order_id);
+            if (order == null)
+            {
+                return;
+            }
+            
+            
+            if (order.type.Trim().Equals("雪票"))
+            {
+                SkiPassController _skipassHelper = new SkiPassController(_context, _originConfig, _httpContextAccessor);
+                await _skipassHelper.RefundCallBack(paymentId);
+            }
+            
+        }
 
 
 

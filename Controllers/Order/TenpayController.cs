@@ -413,7 +413,7 @@ namespace SnowmeetApi.Controllers
                     await maintainHelper.MaitainOrderPaySuccess(order.id);
                     break;
                 case "雪票":
-                    SkiPassController skiPassHelper = new SkiPassController(_db, _oriConfig);
+                    SkiPassController skiPassHelper = new SkiPassController(_db, _oriConfig, _http);
                     await skiPassHelper.CreateSkiPass(order);
                     break;
                 case "押金":
@@ -522,7 +522,6 @@ namespace SnowmeetApi.Controllers
                 return refund;
             }
 
-            return null;
         }
 
         [HttpPost("{mchid}")]
@@ -624,6 +623,8 @@ namespace SnowmeetApi.Controllers
                         refund.TransactionId = callbackResource.TransactionId.Trim();
                         _db.Entry(refund).State = EntityState.Modified;
                         await _db.SaveChangesAsync();
+
+                        await _orderPaymentHelper.SetPaymentRefundSuccess(payment.id);
                     }
                     catch
                     {

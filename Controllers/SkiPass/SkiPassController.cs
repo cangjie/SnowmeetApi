@@ -17,6 +17,7 @@ using Newtonsoft.Json;
 using SnowmeetApi.Controllers.User;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using SixLabors.ImageSharp;
+using SnowmeetApi.Controllers.Order;
 namespace SnowmeetApi.Controllers
 {
     [Route("core/[controller]/[action]")]
@@ -28,14 +29,16 @@ namespace SnowmeetApi.Controllers
         private IConfiguration _config;
 
         private MemberController _memberHelper;
+        private OrderPaymentController _refundHelper;
 
         //private WanlongZiwoyouHelper _zwHelper;
 
-        public SkiPassController(ApplicationDBContext context, IConfiguration config)
+        public SkiPassController(ApplicationDBContext context, IConfiguration config, IHttpContextAccessor http)
         {
             _context = context;
             _config = config;
             _memberHelper = new MemberController(context,  config);
+            _refundHelper = new OrderPaymentController(context, config, http);
             //_zwHelper = new WanlongZiwoyouHelper(context, config);
         }
 
@@ -203,6 +206,34 @@ namespace SnowmeetApi.Controllers
             _context.skiPass.Entry(skipass).State = EntityState.Modified;
             await _context.SaveChangesAsync();
             return Ok(skipass);
+        }
+
+        [HttpGet]
+        public async Task<ActionResult<Models.SkiPass.SkiPass>> Refund(int skipassId, string reason, string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            
+            Models.SkiPass.SkiPass skipass = await _context.skiPass.FindAsync(skipassId);
+            if (skipass.refund_amount != null || skipass.have_refund != null)
+            {
+                return NotFound();
+            }
+            List<OrderPayment> pL = (await _context.OrderPayment.Where(p => p.order_id == skipass.order_id && p.status.Trim().Equals("支付成功")).AsNoTracking().ToListAsync());
+            if (pL == null || pL.Count == 0 )
+            {
+                return NotFound();
+            }
+            int paymentId = pL[0].id;
+            double amount = pL[0].amount;
+            OrderPaymentRefund refund = (OrderPaymentRefund)((OkObjectResult)(await _refundHelper.Refund(paymentId, amount, reason, sessionKey, sessionType)).Result).Value;
+            if (!refund.refund_id.Equals(""))
+            {
+                skipass.have_refund = 1;
+                _context.skiPass.Entry(skipass).State = EntityState.Modified;
+                await _context.SaveChangesAsync();
+            }
+            return Ok(skipass);
+           
+           
         }
 
 
@@ -437,6 +468,25 @@ namespace SnowmeetApi.Controllers
 
 
             
+        }
+
+        [NonAction]
+        public async Task RefundCallBack(int paymentId)
+        {
+            OrderPayment payment = await _context.OrderPayment.FindAsync(paymentId);
+            Models.SkiPass.SkiPass skipass = await _context.skiPass
+                .Where(s => (s.valid == 1 && s.order_id == payment.order_id))
+                .OrderByDescending(s => s.id).FirstAsync();
+            OrderPaymentRefund refund = await _context.OrderPaymentRefund
+                .Where(p => p.order_id == payment.order_id && p.state == 1)
+                .AsNoTracking().FirstAsync();
+            if (!skipass.resort.Trim().Equals("南山"))
+            {
+                skipass.refund_amount = refund.amount;
+                skipass.update_date = DateTime.Now;
+                _context.skiPass.Entry(skipass).State = EntityState.Modified;
+                await _context.SaveChangesAsync();
+            }
         }
 
         [HttpGet]
