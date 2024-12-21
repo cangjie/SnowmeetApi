@@ -43,9 +43,12 @@ namespace SnowmeetApi.Models.SkiPass
         /*
         0:未取消
         1:已取消
-        2:取消未确认
+        2:取消中
+        100: 已经申请退款
+        200: 退款成功
         -1:取消失败
         -2:出票失败，自动取消
+
         */
         public int is_cancel { get; set; } = 0;
         public string? send_content { get; set; } = null;
@@ -127,6 +130,34 @@ namespace SnowmeetApi.Models.SkiPass
                             if (card_member_pick_time != null)
                             {
                                 status = "已出票";
+                            }
+                            else
+                            {
+                                switch(is_cancel)
+                                {
+                                    case 1:
+                                        status = "已取消";
+                                        break;
+                                    case 2:
+                                        status = "取消中";
+                                        break;
+                                    case 100:
+                                        status = "已申请退款";
+                                        break;
+                                    case 200:
+                                        status = "已退款";
+                                        break;
+                                    case -1:
+                                        status = "取消失败";
+                                        break;
+                                    case -2:
+                                        status = "出票失败";
+                                        break;
+                                    default:
+                                        break;
+                                }
+
+                                //status = "出票失败";
                             }
                         }
                     }
