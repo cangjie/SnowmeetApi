@@ -165,6 +165,8 @@ namespace SnowmeetApi.Controllers
             return Ok(l);
         }
 
+        
+
         [HttpGet("{skipassId}")]
         public async Task<ActionResult<Models.SkiPass.SkiPass>> Cancel(int skipassId, string sessionKey, string sessionType = "wechat_mini_openid")
         {
@@ -181,6 +183,9 @@ namespace SnowmeetApi.Controllers
             }
             skipass.card_member_return_time = DateTime.Now;
             skipass.cancel_member_id = member.id;
+            skipass.is_cancel = 3;
+            _context.skiPass.Entry(skipass).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
             try
             {
                 Models.Product.SkiPass product = await _context.SkiPass.FindAsync(skipass.product_id);

@@ -44,8 +44,7 @@ namespace SnowmeetApi.Models.SkiPass
         0:未取消
         1:已取消
         2:取消中
-        100: 已经申请退款
-        200: 退款成功
+        3:人工申请取消
         -1:取消失败
         -2:出票失败，自动取消
 
@@ -131,41 +130,39 @@ namespace SnowmeetApi.Models.SkiPass
                             {
                                 status = "已出票";
                             }
-                            else
-                            {
-                                switch(is_cancel)
-                                {
-                                    case 1:
-                                        status = "已取消";
-                                        break;
-                                    case 2:
-                                        status = "取消中";
-                                        break;
-                                    case 100:
-                                        status = "已申请退款";
-                                        break;
-                                    case 200:
-                                        status = "已退款";
-                                        break;
-                                    case -1:
-                                        status = "取消失败";
-                                        break;
-                                    case -2:
-                                        status = "出票失败";
-                                        break;
-                                    default:
-                                        break;
-                                }
-
-                                //status = "出票失败";
-                            }
                         }
-                        else if (is_cancel == -2)
+                        switch(is_cancel)
                         {
-                            status = "出票失败";
+                            case 1:
+                                status = "已取消";
+                                break;
+                            case 2:
+                                status = "取消中";
+                                break;
+                            case 3:
+                                status = "申请取消";
+                                break;
+                            case -1:
+                                status = "取消失败";
+                                break;
+                            case -2:
+                                status = "出票失败";
+                                break;
+                            default:
+                                break;
                         }
+                        if (have_refund == 1)
+                        {
+                            status = "已申请退款";
+                        }
+                        if (refund_amount != null)
+                        {
+                            status = "退款成功";
+                        }
+
                     }
                 }
+
                 return status;
             }
 
