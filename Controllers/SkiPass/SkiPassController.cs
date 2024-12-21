@@ -503,6 +503,39 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet]
+        public async Task RefreshCancel()
+        {
+            List<Models.SkiPass.SkiPass> skipassList = await _context.skiPass
+                .Where(s => (s.valid == 1 && s.reserve_no != null && !s.resort.Trim().Equals("南山")
+                && s.is_cancel == 2)).ToListAsync();
+            for(int i = 0; i < skipassList.Count; i++)
+            {
+                Models.SkiPass.SkiPass skipass = skipassList[i];
+                Models.Product.SkiPass skipassProduct = await _context.SkiPass.FindAsync(skipass.product_id);
+                if (skipassProduct == null)
+                {
+                    continue;
+                }
+                try
+                {
+                    WanlongZiwoyouHelper _zwHelper = new WanlongZiwoyouHelper(_context, _config, skipassProduct.source.Trim());
+                    WanlongZiwoyouHelper.ZiwoyouOrder order = _zwHelper.GetOrder(int.Parse(skipass.reserve_no));
+                    if (order.orderState == 3)
+                    {
+                        skipass.is_cancel = 1;
+                        _context.skiPass.Entry(skipass).State = EntityState.Modified;
+                        await _context.SaveChangesAsync();
+                    }
+                    
+                }
+                catch
+                {
+
+                }
+            }
+        }
+
+        [HttpGet]
         public async Task RefreshAutoReserve()
         {
             List<Models.SkiPass.SkiPass> skipassList = await _context.skiPass
