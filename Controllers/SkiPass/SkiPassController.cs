@@ -327,7 +327,18 @@ namespace SnowmeetApi.Controllers
                     _zwHelper.PlaceOrder(skipassProduct.third_party_no, skipass.contact_name, skipass.contact_cell,
                     skipass.contact_id_type, skipass.contact_id_no, skipass.count, (DateTime)skipass.reserve_date, 
                     "", outTradeNo);
-                orderId = orderResult.data.orderId;
+                if (orderResult.state == 1)
+                {
+                    orderId = orderResult.data.orderId;
+                }
+                else
+                {
+                    skipass.memo += orderResult.msg.Trim() ;
+                    _context.skiPass.Entry(skipass).State = EntityState.Modified;
+                    await _context.SaveChangesAsync();
+                return;
+                }
+                
             }
             catch(Exception err)
             {
@@ -340,7 +351,7 @@ namespace SnowmeetApi.Controllers
             Models.WanLong.PayResult payResult = _zwHelper.Pay(int.Parse(orderId));
             if (payResult.state != 1 || !payResult.msg.Trim().Equals("支付成功"))
             {
-                skipass.memo += "账户支付不成功";
+                skipass.memo += payResult.msg;
                 _context.skiPass.Entry(skipass).State = EntityState.Modified;
                 await _context.SaveChangesAsync();
                 return;
