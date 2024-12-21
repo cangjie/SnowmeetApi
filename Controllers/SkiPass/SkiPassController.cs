@@ -184,11 +184,16 @@ namespace SnowmeetApi.Controllers
             {
                 return BadRequest();
             }
+            if (skipass.status.Trim().Equals("出票失败"))
+            {
+                return await Refund(skipassId, "出票失败退款", sessionKey, sessionType);
+            }
             skipass.card_member_return_time = DateTime.Now;
             skipass.cancel_member_id = member.id;
             skipass.is_cancel = 3;
             _context.skiPass.Entry(skipass).State = EntityState.Modified;
             await _context.SaveChangesAsync();
+
             try
             {
                 Models.Product.SkiPass product = await _context.SkiPass.FindAsync(skipass.product_id);
