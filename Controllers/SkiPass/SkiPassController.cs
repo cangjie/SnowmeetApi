@@ -197,6 +197,10 @@ namespace SnowmeetApi.Controllers
                 WanlongZiwoyouHelper.ZiwoyouCancel cancel = (WanlongZiwoyouHelper.ZiwoyouCancel)r.data;
                 skipass.is_cancel = cancel.cancelState;
                 skipass.memo += " " + r.msg.Trim();
+                if (cancel.cancelState == 1)
+                {
+                    return await Refund(skipassId, "退票即时确认退款", sessionKey, sessionType);
+                }
                 
             }
             catch
@@ -213,6 +217,10 @@ namespace SnowmeetApi.Controllers
         {
             
             Models.SkiPass.SkiPass skipass = await _context.skiPass.FindAsync(skipassId);
+            if (skipass.resort.Trim().Equals("南山"))
+            {
+                return BadRequest();
+            }
             if (skipass.refund_amount != null || skipass.have_refund != null)
             {
                 return NotFound();
