@@ -160,6 +160,10 @@ namespace SnowmeetApi.Models.SkiPass
                                 //status = "出票失败";
                             }
                         }
+                        else if (is_cancel == -2)
+                        {
+                            status = "出票失败";
+                        }
                     }
                 }
                 return status;

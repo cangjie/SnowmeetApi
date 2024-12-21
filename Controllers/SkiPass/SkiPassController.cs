@@ -132,6 +132,22 @@ namespace SnowmeetApi.Controllers
             }
             return Ok(skiPassProdustList);
         }
+        [HttpGet("{skipassId}")]
+        public async Task<ActionResult<Models.SkiPass.SkiPass>> GetSkipass(int skipassId, string sessionKey, string sessionType="wechat_mini_openid")
+        {
+            Models.Users.Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
+            if (member == null)
+            {
+                return BadRequest();
+            }
+            Models.SkiPass.SkiPass skipass = await _context.skiPass.FindAsync(skipassId);
+            if (member.id != skipass.member_id && member.wechatMiniOpenId.Trim().Equals(skipass.wechat_mini_openid)
+                && member.is_admin == 0 && member.is_staff == 0 && member.is_manager == 0)
+            {
+                return BadRequest();
+            }
+            return Ok(skipass);
+        }
 
         [HttpGet]
         public async Task<ActionResult<List<Models.SkiPass.SkiPass>>> GetMySkipass
@@ -144,7 +160,7 @@ namespace SnowmeetApi.Controllers
             }
             List<Models.SkiPass.SkiPass> l = await _context.skiPass.Where(s => ( s.valid == 1
                 && (s.member_id == member.id || s.wechat_mini_openid.Trim().Equals(member.wechatMiniOpenId.Trim())  )))
-                .OrderByDescending(s => s.reserve_date).AsNoTracking().ToListAsync();
+                .OrderByDescending(s => s.create_date).AsNoTracking().ToListAsync();
             
             return Ok(l);
         }
