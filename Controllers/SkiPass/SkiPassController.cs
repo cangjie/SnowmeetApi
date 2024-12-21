@@ -163,13 +163,22 @@ namespace SnowmeetApi.Controllers
             {
                 return BadRequest();
             }
-            Models.Product.SkiPass product = await _context.SkiPass.FindAsync(skipass.product_id);
-            WanlongZiwoyouHelper _wlHelper = new WanlongZiwoyouHelper(_context, _config, product.source.Trim());
-            WanlongZiwoyouHelper.ZiwoyouQueryResult r = _wlHelper.CancelOrder(int.Parse(skipass.reserve_no));
-            WanlongZiwoyouHelper.ZiwoyouCancel cancel = (WanlongZiwoyouHelper.ZiwoyouCancel)r.data;
-            skipass.is_cancel = cancel.cancelState;
-            skipass.memo += " " + r.msg.Trim();
             skipass.card_member_return_time = DateTime.Now;
+            skipass.cancel_member_id = member.id;
+            try
+            {
+                Models.Product.SkiPass product = await _context.SkiPass.FindAsync(skipass.product_id);
+                WanlongZiwoyouHelper _wlHelper = new WanlongZiwoyouHelper(_context, _config, product.source.Trim());
+                WanlongZiwoyouHelper.ZiwoyouQueryResult r = _wlHelper.CancelOrder(int.Parse(skipass.reserve_no));
+                WanlongZiwoyouHelper.ZiwoyouCancel cancel = (WanlongZiwoyouHelper.ZiwoyouCancel)r.data;
+                skipass.is_cancel = cancel.cancelState;
+                skipass.memo += " " + r.msg.Trim();
+                
+            }
+            catch
+            {
+                skipass.is_cancel = -1;
+            }
             _context.skiPass.Entry(skipass).State = EntityState.Modified;
             await _context.SaveChangesAsync();
             return Ok(skipass);
@@ -413,7 +422,8 @@ namespace SnowmeetApi.Controllers
         {
             List<Models.SkiPass.SkiPass> skipassList = await _context.skiPass
                 .Where(s => (s.valid == 1 && s.reserve_no != null && !s.resort.Trim().Equals("南山")
-                && s.card_no == null && s.qr_code_url == null && s.send_content == null)).ToListAsync();
+                && s.card_no == null && s.qr_code_url == null && s.send_content == null
+                && s.create_date > DateTime.Now.AddHours(-1))).ToListAsync();
             for(int i = 0; i < skipassList.Count; i++)
             {
                 Models.SkiPass.SkiPass skipass = skipassList[i];
