@@ -549,7 +549,11 @@ namespace SnowmeetApi.Controllers
                 {
                     case "南山":
                         TimeSpan ts = endDate - rentOrder.start_date;
-                        
+                        detail._suggestRental = detail.unit_rental * (ts.Days + 1);
+                        detail._timeLength = (ts.Days + 1).ToString() + "天";
+
+
+                        /*
                         if (ts.Hours < 4)
                         {
                             detail._suggestRental = detail.unit_rental;
@@ -565,7 +569,7 @@ namespace SnowmeetApi.Controllers
                             detail._suggestRental = detail.unit_rental;
                             detail._timeLength = "1场";
                         }
-                        
+                        */
                         break;
                     default:
 
