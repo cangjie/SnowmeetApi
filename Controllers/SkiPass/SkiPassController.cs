@@ -434,6 +434,15 @@ namespace SnowmeetApi.Controllers
                 }
                 WanlongZiwoyouHelper _zwHelper = new WanlongZiwoyouHelper(_context, _config, skipassProduct.source.Trim());
                 WanlongZiwoyouHelper.ZiwoyouOrder order = _zwHelper.GetOrder(int.Parse(skipass.reserve_no));
+                if (order == null)
+                {
+                    skipass.is_cancel = -2;
+                    skipass.update_date = DateTime.Now;
+                    
+                    _context.skiPass.Entry(skipass).State = EntityState.Modified;
+                    await _context.SaveChangesAsync();
+                    continue;
+                }
                 if (order.orderState != 2 || order.vouchers == null || order.vouchers.Length <= 0)
                 {
                     continue;
