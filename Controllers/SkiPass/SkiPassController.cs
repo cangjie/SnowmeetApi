@@ -150,7 +150,7 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet("{skipassId}")]
-        public async Task<ActionResult<Models.SkiPass.SkiPass>> Cancel(int skipassId, string sessionKey, string sessionType)
+        public async Task<ActionResult<Models.SkiPass.SkiPass>> Cancel(int skipassId, string sessionKey, string sessionType = "wechat_mini_openid")
         {
             Models.Users.Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
             if (member == null)
@@ -165,8 +165,17 @@ namespace SnowmeetApi.Controllers
             }
             Models.Product.SkiPass product = await _context.SkiPass.FindAsync(skipass.product_id);
             WanlongZiwoyouHelper _wlHelper = new WanlongZiwoyouHelper(_context, _config, product.source.Trim());
-            WanlongZiwoyouHelper.ZiwoyouCancel cancel = _wlHelper.CancelOrder(int.Parse(skipass.reserve_no));
-            skipass.is_cancel = cancel.cancelState;
+            WanlongZiwoyouHelper.ZiwoyouQueryResult r = _wlHelper.CancelOrder(int.Parse(skipass.reserve_no));
+            WanlongZiwoyouHelper.ZiwoyouCancel cancel = (WanlongZiwoyouHelper.ZiwoyouCancel)r.data;
+            if (cancel.cancelState == 0)
+            {
+                skipass.is_cancel = cancel.cancelState;
+                
+            }
+            else
+            {
+                skipass.memo += " " + r.msg.Trim();
+            }
             _context.skiPass.Entry(skipass).State = EntityState.Modified;
             await _context.SaveChangesAsync();
             return Ok(skipass);
@@ -330,7 +339,7 @@ namespace SnowmeetApi.Controllers
             Models.SkiPass.SkiPass skipass = await _context.skiPass.FindAsync(skipassId);
             if (!skipass.status.Equals("已付款"))
             {
-                skipass.memo += "雪票状态不对。";
+                skipass.memo += " 雪票状态不对。";
                 _context.skiPass.Entry(skipass).State = EntityState.Modified;
                 await _context.SaveChangesAsync();
                 return;
@@ -356,7 +365,7 @@ namespace SnowmeetApi.Controllers
             double balance = _zwHelper.GetBalance();
             if (balance <= skipass.deal_price)
             {
-                skipass.memo += "账户余额不足";
+                skipass.memo += " 账户余额不足";
                 _context.skiPass.Entry(skipass).State = EntityState.Modified;
                 await _context.SaveChangesAsync();
                 return;
@@ -374,7 +383,7 @@ namespace SnowmeetApi.Controllers
                 }
                 else
                 {
-                    skipass.memo += orderResult.msg.Trim() ;
+                    skipass.memo += (" " + orderResult.msg.Trim()) ;
                     _context.skiPass.Entry(skipass).State = EntityState.Modified;
                     await _context.SaveChangesAsync();
                 return;
@@ -383,7 +392,7 @@ namespace SnowmeetApi.Controllers
             }
             catch(Exception err)
             {
-                skipass.memo += "预定失败 " + err.ToString() ;
+                skipass.memo += (" 预定失败 " + err.ToString()) ;
                 _context.skiPass.Entry(skipass).State = EntityState.Modified;
                 await _context.SaveChangesAsync();
                 return;
@@ -392,7 +401,7 @@ namespace SnowmeetApi.Controllers
             Models.WanLong.PayResult payResult = _zwHelper.Pay(int.Parse(orderId));
             if (payResult.state != 1 || !payResult.msg.Trim().Equals("支付成功"))
             {
-                skipass.memo += payResult.msg;
+                skipass.memo += (" " + payResult.msg);
                 _context.skiPass.Entry(skipass).State = EntityState.Modified;
                 await _context.SaveChangesAsync();
                 return;

@@ -311,7 +311,7 @@ namespace SnowmeetApi.Controllers
         }
 
         [NonAction]
-        public ZiwoyouCancel CancelOrder(int orderId)
+        public ZiwoyouQueryResult CancelOrder(int orderId)
         {
             ZiwoyouOrder order = GetOrder(orderId);
             string postData = "{\"apikey\": \"" + apiKey + "\",\"custId\": " + custId.Trim()
@@ -334,8 +334,8 @@ namespace SnowmeetApi.Controllers
 
             ZiwoyouQueryResult r = JsonConvert.DeserializeObject<ZiwoyouQueryResult>(ret);
             ZiwoyouCancel cancel = JsonConvert.DeserializeObject<ZiwoyouCancel>(r.data.ToString());
-            
-            return cancel;
+            r.data = cancel;
+            return r;
 
         }
 
