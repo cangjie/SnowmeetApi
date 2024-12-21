@@ -132,6 +132,22 @@ namespace SnowmeetApi.Controllers
             }
             return Ok(skiPassProdustList);
         }
+
+        [HttpGet]
+        public async Task<ActionResult<List<Models.SkiPass.SkiPass>>> GetMySkipass
+            (string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            Models.Users.Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
+            if (member == null)
+            {
+                return BadRequest();
+            }
+            List<Models.SkiPass.SkiPass> l = await _context.skiPass.Where(s => ( s.valid == 1
+                && (s.member_id == member.id || s.wechat_mini_openid.Trim().Equals(member.wechatMiniOpenId.Trim())  )))
+                .OrderByDescending(s => s.reserve_date).AsNoTracking().ToListAsync();
+            
+            return Ok(l);
+        }
         /*
         [HttpGet("{productId}")]
         public async Task<ActionResult<object>> ReserveSkiPass(int productId, DateTime date, int count, string cell, string name, string sessionKey)
