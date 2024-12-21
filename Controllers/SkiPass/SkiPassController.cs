@@ -167,15 +167,9 @@ namespace SnowmeetApi.Controllers
             WanlongZiwoyouHelper _wlHelper = new WanlongZiwoyouHelper(_context, _config, product.source.Trim());
             WanlongZiwoyouHelper.ZiwoyouQueryResult r = _wlHelper.CancelOrder(int.Parse(skipass.reserve_no));
             WanlongZiwoyouHelper.ZiwoyouCancel cancel = (WanlongZiwoyouHelper.ZiwoyouCancel)r.data;
-            if (cancel.cancelState == 0)
-            {
-                skipass.is_cancel = cancel.cancelState;
-                
-            }
-            else
-            {
-                skipass.memo += " " + r.msg.Trim();
-            }
+            skipass.is_cancel = cancel.cancelState;
+            skipass.memo += " " + r.msg.Trim();
+            skipass.card_member_return_time = DateTime.Now;
             _context.skiPass.Entry(skipass).State = EntityState.Modified;
             await _context.SaveChangesAsync();
             return Ok(skipass);
