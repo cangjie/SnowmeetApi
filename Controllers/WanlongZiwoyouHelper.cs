@@ -325,6 +325,17 @@ namespace SnowmeetApi.Controllers
             return ret;
         }
 
+        [HttpGet]
+        public string GetProductPrice(int productId, DateTime date)
+        {
+            string postData = "{\"apikey\": \"" + apiKey + "\",\"custId\": " + custId.Trim() + ",\"productNo\": " 
+                + productId.ToString() + ", \"travelDate\": \"" + date.ToShortDateString() + "\" }";
+            string ret = Util.GetWebContent("https://task-api.zowoyoo.com/api/thirdPaty/prod/price",
+                postData, "application/json");
+
+            return ret;
+        }
+
         [NonAction]
         public ZiwoyouOrder GetOrder(int orderId)
         {
