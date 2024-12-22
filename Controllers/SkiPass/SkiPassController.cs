@@ -623,6 +623,10 @@ namespace SnowmeetApi.Controllers
         {
             Models.Product.Product product = await _context.Product.FindAsync(productId);
             Models.Product.SkiPass skipassProduct = await _context.SkiPass.FindAsync(productId);
+            SkipassDailyPrice dailyPrice = await _context.skipassDailyPrice
+                .Where(s => s.product_id == productId && s.valid == 1 && s.reserve_date.Date == date.Date)
+                .OrderBy(s => s.reserve_date).AsNoTracking().FirstAsync();
+            
             UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (user == null || product == null)
             {
@@ -639,8 +643,8 @@ namespace SnowmeetApi.Controllers
                 product_name = product.name,
                 count = count,
                 //order_id = orderId,
-                deal_price = (product.sale_price + product.deposit) * count,
-                ticket_price = product.sale_price,
+                deal_price = dailyPrice.deal_price * count,
+                ticket_price = dailyPrice.marketPrice,
                 deposit = product.deposit,
                 valid = 0,
                 contact_cell = cell,
@@ -657,8 +661,8 @@ namespace SnowmeetApi.Controllers
             {
                 type = "雪票",
                 shop = product.shop.Trim(),
-                order_price = totalPrice,
-                order_real_pay_price = totalPrice,
+                order_price = (double)skipass.deal_price,
+                order_real_pay_price = (double)skipass.deal_price,
                 final_price = (double)skipass.deal_price,
                 open_id = member.wechatMiniOpenId,
                 staff_open_id = "",
