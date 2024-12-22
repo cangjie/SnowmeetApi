@@ -708,9 +708,9 @@ namespace SnowmeetApi.Controllers
             resort = Util.UrlDecode(resort);
             var l = await _context.SkiPass
                 .Join(_context.Product, s=>s.product_id, p=>p.id,
-                (s, p)=> new {s.product_id, s.resort, s.rules, s.source, s.third_party_no, p.name, p.shop, p.sale_price, p.market_price, p.cost, p.type})
+                (s, p)=> new {s.product_id, s.resort, s.rules, s.source, s.third_party_no, p.name, p.shop, p.sale_price, p.market_price, p.cost, p.type, p.hidden })
                 .Where(p => p.type.Trim().Equals("雪票") && p.name.IndexOf("【") >= 0 && p.name.IndexOf("】") >= 0 && p.name.IndexOf(resort) >= 0
-                && p.third_party_no != null).OrderBy(p => p.sale_price).AsNoTracking().ToListAsync();
+                && p.third_party_no != null && p.hidden == 0).OrderBy(p => p.sale_price).AsNoTracking().ToListAsync();
             return Ok(l);
         }
     }
