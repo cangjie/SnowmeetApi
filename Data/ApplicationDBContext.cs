@@ -133,7 +133,7 @@ namespace SnowmeetApi.Data
         public DbSet<Staff> schoolStaff {get; set;}
         public DbSet<Course> schoolCourse {get; set;}
         public DbSet<CourseStudent> courseStudent {get; set;}
-
         public DbSet<Models.SkiPass.SkiPass> skiPass {get; set;}
+        public DbSet<Models.Product.SkipassDailyPrice> skipassDailyPrice {get; set;}
     }
 }

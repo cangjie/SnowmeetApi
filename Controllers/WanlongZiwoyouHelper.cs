@@ -89,6 +89,20 @@ namespace SnowmeetApi.Controllers
             public int orderId {get; set;}
             public int cancelState {get; set;}
         }
+        public class ZiwoyouDailyPrice
+        {
+            public DateTime date {get; set;}
+            public double settlementPrice {get; set;}
+            public double salePrice {get; set;}
+            public double marketPrice {get; set;}
+            public int? num {get; set;}
+            public int? seats {get; set;}
+        }
+        public class ZiwoyouProductDailyPrice
+        {
+            public int infoId {get; set;}
+            public ZiwoyouDailyPrice[] ticketPrices {get; set;}
+        }
 
        
 
@@ -328,8 +342,10 @@ namespace SnowmeetApi.Controllers
         [HttpGet]
         public string GetProductPrice(int productId, DateTime date)
         {
+            //string postData = "{\"apikey\": \"" + apiKey + "\",\"custId\": " + custId.Trim() + ",\"productNo\": " 
+            //    + productId.ToString() + ", \"travelDate\": \"" + date.ToString("yyyy-MM-dd") + "\" }";
             string postData = "{\"apikey\": \"" + apiKey + "\",\"custId\": " + custId.Trim() + ",\"productNo\": " 
-                + productId.ToString() + ", \"travelDate\": \"" + date.ToString("yyyy-MM-dd") + "\" }";
+                + productId.ToString() + " }";
             string ret = Util.GetWebContent("https://task-api.zowoyoo.com/api/thirdPaty/prod/price",
                 postData, "application/json");
 
