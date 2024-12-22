@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 namespace SnowmeetApi.Models.Product
@@ -17,7 +18,8 @@ namespace SnowmeetApi.Models.Product
 		public string  tags { get; set; }
 		public string? source { get; set; } = null;
 		public string? third_party_no { get; set; } = null;
-
+		[NotMapped]
+		public List<SkipassDailyPrice> dailyPrice {get; set;}
 		[NotMapped]
 		public Product product {get; set;}
 

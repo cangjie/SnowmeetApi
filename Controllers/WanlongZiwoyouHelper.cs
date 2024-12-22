@@ -17,6 +17,7 @@ using Microsoft.EntityFrameworkCore.Internal;
 using static SKIT.FlurlHttpClient.Wechat.TenpayV3.Models.AddHKSubMerchantRequest.Types;
 using SnowmeetApi.Models.Order;
 using System.IO;
+using SnowmeetApi.Models.Product;
 
 namespace SnowmeetApi.Controllers
 {
@@ -424,6 +425,76 @@ namespace SnowmeetApi.Controllers
 
         }
 
+        [HttpGet]
+        public async Task UpdateSkipassProductPrice()
+        {
+            var l = await _context.SkiPass.Where(s => s.third_party_no != null).AsNoTracking().ToListAsync();
+            foreach(var item in l)
+            {
+                try
+                {
+                    //ZiwoyouProductDailyPrice price = GetProductPrice(int.Parse((string)item.third_party_no), DateTime.Now.Date);
+
+                    string priceStr = Util.GetWebContent("https://mini.snowmeet.top/core/WanlongZiwoyouHelper/GetProductPrice?productId=" + item.third_party_no.Trim() + "&date=" + DateTime.Now.ToString("yyyy-MM-dd"));
+                    ZiwoyouProductDailyPrice price = JsonConvert.DeserializeObject<ZiwoyouProductDailyPrice>(priceStr);
+
+
+                    ZiwoyouDailyPrice[] priceArr = price.ticketPrices;
+                    if (priceArr.Length == 0)
+                    {
+                        continue;
+                    }
+                    var oriPriceList = await _context.skipassDailyPrice
+                        .Where(s => int.Parse(s.third_party_id) == price.infoId && s.valid == 1 && s.reserve_date.Date >= priceArr[0].date.Date).ToListAsync();
+                    for(int i = 0; i < priceArr.Length; i++)
+                    {
+                        var priceObj = priceArr[i];
+                        bool changed = false;
+                        bool exists = false;
+                        for(int j = 0; j < oriPriceList.Count; j++)
+                        {
+                            var oriPrice = oriPriceList[j];
+                            if (oriPrice.reserve_date.Date == priceObj.date.Date)
+                            {
+                                exists = true;
+                                if (oriPrice.salePrice != priceObj.salePrice 
+                                    || oriPrice.settlementPrice != priceObj.settlementPrice
+                                    || oriPrice.marketPrice != priceObj.marketPrice)
+                                {
+                                    changed = true;
+                                    oriPrice.valid = 0;
+                                    _context.skipassDailyPrice.Entry(oriPrice).State = EntityState.Modified;
+                                    break;
+                                }
+                            }
+                        }
+                        if (changed || !exists)
+                        {
+                            SkipassDailyPrice newPrice = new SkipassDailyPrice()
+                            {
+                                product_id = item.product_id,
+                                third_party_id = item.third_party_no,
+                                salePrice = priceObj.salePrice,
+                                settlementPrice = priceObj.settlementPrice,
+                                marketPrice = priceObj.marketPrice,
+                                valid = 1,
+                                deal_price = priceObj.settlementPrice + 20,
+                                reserve_date = priceObj.date.Date,
+                                day_type = ((priceObj.date.Date.DayOfWeek == DayOfWeek.Sunday || priceObj.date.Date.DayOfWeek == DayOfWeek.Saturday)? "周末" : "平日")
+                            };
+                            await _context.skipassDailyPrice.AddAsync(newPrice);
+                            await _context.SaveChangesAsync();
+                        } 
+                        
+                    }
+                }
+                catch
+                {
+
+                }
+            }
+        }
+
         
 
         [HttpGet]
@@ -481,16 +552,19 @@ namespace SnowmeetApi.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<object>> GetProductById(int id)
         {
-            var l = await _context.SkiPass
+            //var p = await _context.SkiPass.Include(s => s.dailyPrice).AsNoTracking().ToListAsync();
+            var l = await _context.SkiPass.Include(s => s.dailyPrice)
                 .Join(_context.Product, s=>s.product_id, p=>p.id,
-                (s, p)=> new {s.product_id, s.resort, s.rules, s.source, s.third_party_no, p.name, p.shop, p.sale_price, p.market_price, p.cost, p.type})
-                .Where(p => p.type.Trim().Equals("雪票") && p.name.IndexOf("【") >= 0 && p.name.IndexOf("】") >= 0 && p.product_id == id
+                (s, p)=> new {s.product_id, s.resort, s.rules, s.source, s.third_party_no, p.name, p.shop, p.sale_price, p.market_price, p.cost, p.type, s.dailyPrice})
+                .Where(p => p.type.Trim().Equals("雪票")  && p.product_id == id
                 && p.third_party_no != null)
                 .AsNoTracking().ToListAsync();
             if (l == null || l.Count <= 0)
             {
                 return NotFound();
             }
+            //l[0].dailyPrice = await _context.skipassDailyPrice.Where(s => s.product_id == l[0].product_id && s.valid == 1 )
+                //.OrderBy(s => s.reserve_date).AsNoTracking().ToListAsync();
             return Ok(l[0]);
         }
 
