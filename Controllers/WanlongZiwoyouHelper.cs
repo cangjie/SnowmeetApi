@@ -329,7 +329,7 @@ namespace SnowmeetApi.Controllers
         public string GetProductPrice(int productId, DateTime date)
         {
             string postData = "{\"apikey\": \"" + apiKey + "\",\"custId\": " + custId.Trim() + ",\"productNo\": " 
-                + productId.ToString() + ", \"travelDate\": \"" + date.ToShortDateString() + "\" }";
+                + productId.ToString() + ", \"travelDate\": \"" + date.ToString("yyyy-MM-dd") + "\" }";
             string ret = Util.GetWebContent("https://task-api.zowoyoo.com/api/thirdPaty/prod/price",
                 postData, "application/json");
 
