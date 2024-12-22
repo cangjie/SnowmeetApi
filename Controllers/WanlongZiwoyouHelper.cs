@@ -120,6 +120,23 @@ namespace SnowmeetApi.Controllers
             //string ret = Util.GetWebContent("https://task-api-stag.zowoyoo.com/api/thirdPaty/prod/list", postJson,"application/json");
             string ret = Util.GetWebContent("https://task-api.zowoyoo.com/api/thirdPaty/prod/list", postJson,"application/json");
             Console.WriteLine(postJson);
+            
+            string path = $"{Environment.CurrentDirectory}";
+            string dateStr = DateTime.Now.Year.ToString() + DateTime.Now.Month.ToString().PadLeft(2, '0')
+                + DateTime.Now.Day.ToString().PadLeft(2, '0');
+            using (StreamWriter fw = new StreamWriter(path + "/booking_" + dateStr + ".txt", true))
+            {
+                fw.WriteLine(DateTime.Now.ToString());
+                fw.WriteLine("https://task-api.zowoyoo.com/api/thirdPaty/prod/list");
+                fw.WriteLine(postJson);
+                fw.WriteLine(ret);
+                fw.WriteLine("");
+
+            }
+
+
+
+
             ProductQueryResult r = JsonConvert.DeserializeObject<ProductQueryResult>(ret);
             int pageCount = r.data.pageCount;
             for (int i = 1; i < pageCount; i++)
@@ -162,6 +179,21 @@ namespace SnowmeetApi.Controllers
             }
             string postJson = "{\"apikey\": \"" + apiKey + "\",\t\"catIds\": \"\",\t\"cityId\": \"\",\t\"cityName\": \"\",\t\"custId\": " + custId + " ,\t\"isConfirm\": \"0\",\t\"isExpress\": \"0\",\t\"isMulti\": \"\",\t\"isPackage\": \"\",\t\"isPay\": \"\",\t\"keyWord\": \"" + keyword.Trim() + "\",\t\"orderBy\": \"\",\t\"page\": " + pageNum.ToString() + ",\t\"productNos\": \"\",\t\"resultNum\": " + pageSize.ToString() + ",\t\"tagIds\": \"\",\t\"treeId\": \"\",\t\"viewId\": \"\"}";
             string ret = Util.GetWebContent("https://task-api.zowoyoo.com/api/thirdPaty/prod/list", postJson, "application/json");
+
+            string path = $"{Environment.CurrentDirectory}";
+            string dateStr = DateTime.Now.Year.ToString() + DateTime.Now.Month.ToString().PadLeft(2, '0')
+                + DateTime.Now.Day.ToString().PadLeft(2, '0');
+            using (StreamWriter fw = new StreamWriter(path + "/booking_" + dateStr + ".txt", true))
+            {
+                fw.WriteLine(DateTime.Now.ToString());
+                fw.WriteLine("https://task-api.zowoyoo.com/api/thirdPaty/prod/list");
+                fw.WriteLine(postJson);
+                fw.WriteLine(ret);
+                fw.WriteLine("");
+
+            }
+
+
             Console.WriteLine(postJson);
             ProductQueryResult r = JsonConvert.DeserializeObject<ProductQueryResult>(ret);
             return r;

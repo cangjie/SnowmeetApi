@@ -525,6 +525,7 @@ namespace SnowmeetApi.Controllers
                         skipass.is_cancel = 1;
                         _context.skiPass.Entry(skipass).State = EntityState.Modified;
                         await _context.SaveChangesAsync();
+                        
                     }
                     
                 }
