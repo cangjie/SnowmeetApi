@@ -340,16 +340,15 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet]
-        public string GetProductPrice(int productId, DateTime date)
+        public ZiwoyouProductDailyPrice GetProductPrice(int productId, DateTime date)
         {
-            //string postData = "{\"apikey\": \"" + apiKey + "\",\"custId\": " + custId.Trim() + ",\"productNo\": " 
-            //    + productId.ToString() + ", \"travelDate\": \"" + date.ToString("yyyy-MM-dd") + "\" }";
             string postData = "{\"apikey\": \"" + apiKey + "\",\"custId\": " + custId.Trim() + ",\"productNo\": " 
-                + productId.ToString() + " }";
+                + productId.ToString() + ", \"travelDate\": \"" + date.ToString("yyyy-MM-dd") + "\" }";
             string ret = Util.GetWebContent("https://task-api.zowoyoo.com/api/thirdPaty/prod/price",
                 postData, "application/json");
-
-            return ret;
+            ZiwoyouQueryResult r = JsonConvert.DeserializeObject<ZiwoyouQueryResult>(ret);
+            ZiwoyouProductDailyPrice price = JsonConvert.DeserializeObject<ZiwoyouProductDailyPrice>(r.data.ToString());
+            return price;
         }
 
         [NonAction]
