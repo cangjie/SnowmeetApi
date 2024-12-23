@@ -18,6 +18,7 @@ namespace SnowmeetApi.Models.Product
 		public string  tags { get; set; }
 		public string? source { get; set; } = null;
 		public string? third_party_no { get; set; } = null;
+		
 		[NotMapped]
 		public List<SkipassDailyPrice> dailyPrice {get; set;}
 		[NotMapped]
@@ -112,6 +113,71 @@ namespace SnowmeetApi.Models.Product
 			
 
 			return valid;
+		}
+		[NotMapped]
+		public List<SkipassDailyPrice> avaliablePriceList
+		{
+			get
+			{
+				List<SkipassDailyPrice> list = new List<SkipassDailyPrice>();
+				for(int i = 0; dailyPrice != null && i < dailyPrice.Count; i++)
+				{
+					if (dailyPrice[i].reserve_date.Date >= DateTime.Now.Date)
+					{
+						list.Add(dailyPrice[i]);
+					}
+				}
+				return list;
+			}
+		}
+		[NotMapped]
+		public double commonDayDealPrice
+		{
+			get
+			{
+				if (avaliablePriceList == null || avaliablePriceList.Count == 0)
+				{
+					return 0;
+				}
+				else
+				{
+					double ret = 0;
+					for(int i = 0; i < avaliablePriceList.Count; i++)
+					{
+						if (avaliablePriceList[i].reserve_date.Date >= DateTime.Now.Date
+							&& avaliablePriceList[i].day_type.Trim().Equals("平日"))
+						{
+							ret = avaliablePriceList[i].deal_price;
+							break;
+						}
+					}
+					return ret;
+				}
+			}
+		}
+		[NotMapped]
+		public double weekendDealPrice
+		{
+			get
+			{
+				if (avaliablePriceList == null || avaliablePriceList.Count == 0)
+				{
+					return 0;
+				}
+				else
+				{
+					double ret = 0;
+					for(int i = 0; i < avaliablePriceList.Count; i++)
+					{
+						if (avaliablePriceList[i].day_type.Trim().Equals("周末"))
+						{
+							ret = avaliablePriceList[i].deal_price;
+							break;
+						}
+					}
+					return ret;
+				}
+			}
 		}
 
     }
