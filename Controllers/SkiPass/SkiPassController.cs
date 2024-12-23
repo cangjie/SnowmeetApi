@@ -644,7 +644,7 @@ namespace SnowmeetApi.Controllers
                 count = count,
                 //order_id = orderId,
                 deal_price = dailyPrice.deal_price * count,
-                ticket_price = dailyPrice.marketPrice,
+                ticket_price = dailyPrice.settlementPrice,
                 deposit = product.deposit,
                 valid = 0,
                 contact_cell = cell,
