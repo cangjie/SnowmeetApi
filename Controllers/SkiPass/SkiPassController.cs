@@ -737,5 +737,27 @@ namespace SnowmeetApi.Controllers
                 .Where(p => p.product_id == productId).AsNoTracking().FirstAsync();
             return Ok(l);
         }
+
+        [HttpGet("{priceId}")]
+        public async Task<ActionResult<SkipassDailyPrice>> ModDailyPrice(int priceId, double price, 
+            string dayType, string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            MemberController _memberHelper = new MemberController(_context, _config);
+            SnowmeetApi.Models.Users.Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
+            if (member.is_admin != 1)
+            {
+                return BadRequest();
+            }
+            SkipassDailyPrice priceObj = await _context.skipassDailyPrice.FindAsync(priceId);
+            if (priceObj == null)
+            {
+                return NotFound();
+            }
+            priceObj.day_type = Util.UrlDecode(dayType);
+            priceObj.deal_price = price;
+            _context.skipassDailyPrice.Entry(priceObj).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
+            return Ok(priceObj);
+        }
     }
 }
