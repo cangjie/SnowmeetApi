@@ -707,9 +707,26 @@ namespace SnowmeetApi.Controllers
             return Ok(order);
         }
         [HttpGet]
-        public async Task<ActionResult<List<object>>> GetProductsByResort(string resort)
+        public async Task<ActionResult<List<object>>> GetProductsByResort(string resort, int showHidden = 0)
         {
             resort = Util.UrlDecode(resort);
+            var l = await _context.SkiPass.Include(s => s.dailyPrice)
+                .Join(_context.Product, s=>s.product_id, p=>p.id,
+                (s, p)=> new {s.product_id, s.resort, s.rules, s.source, s.third_party_no, p.name, p.shop, 
+                s.commonDayDealPrice, s.weekendDealPrice, 
+                //s.dailyPrice, 
+                s.avaliablePriceList,
+                p.sale_price, p.market_price, p.cost, p.type, p.hidden })
+                .Where(p => p.type.Trim().Equals("雪票") && p.name.IndexOf("【") >= 0 && p.name.IndexOf("】") >= 0 && p.name.IndexOf(resort) >= 0
+                && p.third_party_no != null 
+                && ((p.hidden == 0 && showHidden == 0) || (showHidden == 1))
+                ).OrderBy(p => p.market_price).AsNoTracking().ToListAsync();
+            return Ok(l);
+        }
+
+        [HttpGet("{productId}")]
+        public async Task<ActionResult<object>> GetProduct(int productId)
+        {
             var l = await _context.SkiPass.Include(s => s.dailyPrice)
                 .Join(_context.Product, s=>s.product_id, p=>p.id,
                 (s, p)=> new {s.product_id, s.resort, s.rules, s.source, s.third_party_no, p.name, p.shop, 
@@ -717,8 +734,7 @@ namespace SnowmeetApi.Controllers
                 s.dailyPrice, 
                 s.avaliablePriceList,
                 p.sale_price, p.market_price, p.cost, p.type, p.hidden })
-                .Where(p => p.type.Trim().Equals("雪票") && p.name.IndexOf("【") >= 0 && p.name.IndexOf("】") >= 0 && p.name.IndexOf(resort) >= 0
-                && p.third_party_no != null && p.hidden == 0).OrderBy(p => p.market_price).AsNoTracking().ToListAsync();
+                .Where(p => p.product_id == productId).AsNoTracking().FirstAsync();
             return Ok(l);
         }
     }
