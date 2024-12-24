@@ -7,6 +7,7 @@ using SnowmeetApi.Models.Rent;
 using SnowmeetApi.Models.School;
 using System;
 using SKIT.FlurlHttpClient.Wechat.TenpayV3.Models;
+using SnowmeetApi.Models.Product;
 namespace SnowmeetApi.Data
 {
     public class ApplicationDBContext : DbContext
@@ -47,6 +48,7 @@ namespace SnowmeetApi.Data
             //modelBuilder.Entity<RentCategory>().HasMany<RentProduct>().WithOne(r => r.category).HasForeignKey(r => r.category_id);
             modelBuilder.Entity<RentProduct>().HasOne<RentCategory>().WithMany(r => r.productList).HasForeignKey(r => r.category_id);
             modelBuilder.Entity<RentProductDetailInfo>().HasKey(i => new {i.product_id, i.field_id});
+            modelBuilder.Entity<SkipassDailyPrice>().HasOne<Models.Product.SkiPass>().WithMany(s => s.dailyPrice).HasForeignKey(s => s.product_id);
         }
 
         public DbSet<MaintainLive> MaintainLives {get; set;}
@@ -129,11 +131,10 @@ namespace SnowmeetApi.Data
         public DbSet<SnowmeetApi.Models.Rent.RentProduct> rentProduct {get; set;}
         public DbSet<SnowmeetApi.Models.Rent.RentProductDetailInfo> rentProductDetailInfo {get;set;}
         public DbSet<RentProductImage> rentProductImage {get; set;}
-
         public DbSet<Staff> schoolStaff {get; set;}
         public DbSet<Course> schoolCourse {get; set;}
         public DbSet<CourseStudent> courseStudent {get; set;}
-
         public DbSet<Models.SkiPass.SkiPass> skiPass {get; set;}
+        public DbSet<Models.Product.SkipassDailyPrice> skipassDailyPrice {get; set;}
     }
 }

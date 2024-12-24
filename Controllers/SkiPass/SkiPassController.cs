@@ -16,6 +16,8 @@ using SnowmeetApi.Models.Card;
 using Newtonsoft.Json;
 using SnowmeetApi.Controllers.User;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
+using SixLabors.ImageSharp;
+using SnowmeetApi.Controllers.Order;
 namespace SnowmeetApi.Controllers
 {
     [Route("core/[controller]/[action]")]
@@ -27,12 +29,17 @@ namespace SnowmeetApi.Controllers
         private IConfiguration _config;
 
         private MemberController _memberHelper;
+        private OrderPaymentController _refundHelper;
 
-        public SkiPassController(ApplicationDBContext context, IConfiguration config)
+        //private WanlongZiwoyouHelper _zwHelper;
+
+        public SkiPassController(ApplicationDBContext context, IConfiguration config, IHttpContextAccessor http)
         {
             _context = context;
             _config = config;
             _memberHelper = new MemberController(context,  config);
+            _refundHelper = new OrderPaymentController(context, config, http);
+            //_zwHelper = new WanlongZiwoyouHelper(context, config);
         }
 
         [HttpGet("{id}")]
@@ -128,7 +135,122 @@ namespace SnowmeetApi.Controllers
             }
             return Ok(skiPassProdustList);
         }
+        [HttpGet("{skipassId}")]
+        public async Task<ActionResult<Models.SkiPass.SkiPass>> GetSkipass(int skipassId, string sessionKey, string sessionType="wechat_mini_openid")
+        {
+            Models.Users.Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
+            if (member == null)
+            {
+                return BadRequest();
+            }
+            Models.SkiPass.SkiPass skipass = await _context.skiPass.FindAsync(skipassId);
+            if (member.id != skipass.member_id && member.wechatMiniOpenId.Trim().Equals(skipass.wechat_mini_openid)
+                && member.is_admin == 0 && member.is_staff == 0 && member.is_manager == 0)
+            {
+                return BadRequest();
+            }
+            return Ok(skipass);
+        }
 
+        [HttpGet]
+        public async Task<ActionResult<List<Models.SkiPass.SkiPass>>> GetMySkipass
+            (string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            Models.Users.Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
+            if (member == null)
+            {
+                return BadRequest();
+            }
+            List<Models.SkiPass.SkiPass> l = await _context.skiPass.Where(s => ( s.valid == 1
+                && (s.member_id == member.id || s.wechat_mini_openid.Trim().Equals(member.wechatMiniOpenId.Trim())  )))
+                .OrderByDescending(s => s.create_date).AsNoTracking().ToListAsync();
+            
+            return Ok(l);
+        }
+
+        
+
+        [HttpGet("{skipassId}")]
+        public async Task<ActionResult<Models.SkiPass.SkiPass>> Cancel(int skipassId, string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            Models.Users.Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
+            if (member == null)
+            {
+                return BadRequest();
+            }
+            Models.SkiPass.SkiPass skipass = await _context.skiPass.FindAsync(skipassId);
+            if (member.id != skipass.member_id && member.wechatMiniOpenId.Trim().Equals(skipass.wechat_mini_openid)
+                && member.is_admin == 0 && member.is_staff == 0 && member.is_manager == 0)
+            {
+                return BadRequest();
+            }
+            if (skipass.status.Trim().Equals("出票失败"))
+            {
+                return await Refund(skipassId, "出票失败退款", sessionKey, sessionType);
+            }
+            skipass.card_member_return_time = DateTime.Now;
+            skipass.cancel_member_id = member.id;
+            skipass.is_cancel = 3;
+            _context.skiPass.Entry(skipass).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
+
+            try
+            {
+                Models.Product.SkiPass product = await _context.SkiPass.FindAsync(skipass.product_id);
+                WanlongZiwoyouHelper _wlHelper = new WanlongZiwoyouHelper(_context, _config, product.source.Trim());
+                WanlongZiwoyouHelper.ZiwoyouQueryResult r = _wlHelper.CancelOrder(int.Parse(skipass.reserve_no));
+                WanlongZiwoyouHelper.ZiwoyouCancel cancel = (WanlongZiwoyouHelper.ZiwoyouCancel)r.data;
+                skipass.is_cancel = cancel.cancelState;
+                skipass.memo += " " + r.msg.Trim();
+                if (cancel.cancelState == 1)
+                {
+                    return await Refund(skipassId, "退票即时确认退款", sessionKey, sessionType);
+                }
+                
+            }
+            catch
+            {
+                skipass.is_cancel = -1;
+            }
+            _context.skiPass.Entry(skipass).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
+            return Ok(skipass);
+        }
+
+        [HttpGet]
+        public async Task<ActionResult<Models.SkiPass.SkiPass>> Refund(int skipassId, string reason, string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            
+            Models.SkiPass.SkiPass skipass = await _context.skiPass.FindAsync(skipassId);
+            if (skipass.resort.Trim().Equals("南山"))
+            {
+                return BadRequest();
+            }
+            if (skipass.refund_amount != null || skipass.have_refund != null)
+            {
+                return NotFound();
+            }
+            List<OrderPayment> pL = (await _context.OrderPayment.Where(p => p.order_id == skipass.order_id && p.status.Trim().Equals("支付成功")).AsNoTracking().ToListAsync());
+            if (pL == null || pL.Count == 0 )
+            {
+                return NotFound();
+            }
+            int paymentId = pL[0].id;
+            double amount = pL[0].amount;
+            OrderPaymentRefund refund = (OrderPaymentRefund)((OkObjectResult)(await _refundHelper.Refund(paymentId, amount, reason, sessionKey, sessionType)).Result).Value;
+            if (!refund.refund_id.Equals(""))
+            {
+                skipass.have_refund = 1;
+                _context.skiPass.Entry(skipass).State = EntityState.Modified;
+                await _context.SaveChangesAsync();
+            }
+            return Ok(skipass);
+           
+           
+        }
+
+
+        /*
         [HttpGet("{productId}")]
         public async Task<ActionResult<object>> ReserveSkiPass(int productId, DateTime date, int count, string cell, string name, string sessionKey)
         {
@@ -166,7 +288,8 @@ namespace SnowmeetApi.Controllers
             await _context.SaveChangesAsync();
             return order;
         }
-
+        */
+        /*
         [HttpGet("{productId}")]
         public async Task<ActionResult<object>> PlaceSkiPassOrderNanshan(int productId, DateTime date, int count, string sessionKey)
         {
@@ -181,7 +304,8 @@ namespace SnowmeetApi.Controllers
             return (await CreateSkiPassOrder(new Product[] { productTicket, productService }, null, user, date, count));
         }
 
-
+        */
+        /*
         [NonAction]
         public async Task<OrderOnline> CreateSkiPassOrder(Product[] prodctArr, UnicUser? user, UnicUser? staff, DateTime date, int count)
         {
@@ -252,7 +376,8 @@ namespace SnowmeetApi.Controllers
             order.payments = new OrderPayment[] { payment };
             return order;
         }
-
+        */
+        
         [NonAction]
         public async Task CreateSkiPass(OrderOnline order)
         {
@@ -265,13 +390,374 @@ namespace SnowmeetApi.Controllers
                 _context.skiPass.Entry(skipass).State = EntityState.Modified;
             }
             await _context.SaveChangesAsync();
+            for (int i = 0; i < skipassList.Count; i++)
+            {
+                Models.SkiPass.SkiPass skipass = skipassList[i];
+                if (!skipass.resort.Trim().Equals("南山"))
+                {
+                    await AutoReserve(skipass.id);
+                }
+            }
+        }
+
+        [HttpGet]
+        public async Task AutoReserve(int skipassId)
+        {
+            
+            Models.SkiPass.SkiPass skipass = await _context.skiPass.FindAsync(skipassId);
+            if (!skipass.status.Equals("已付款"))
+            {
+                skipass.memo += " 雪票状态不对。";
+                _context.skiPass.Entry(skipass).State = EntityState.Modified;
+                await _context.SaveChangesAsync();
+                return;
+            }
+            Models.Product.SkiPass skipassProduct = await _context.SkiPass.FindAsync(skipass.product_id);
+            WanlongZiwoyouHelper _zwHelper = new WanlongZiwoyouHelper(_context, _config, skipassProduct.source);
+            List<OrderPayment> pList = await _context.OrderPayment
+                .Where(p => (p.order_id == skipass.order_id && p.status.Trim().Equals("支付成功")))
+                .AsNoTracking().ToListAsync();
+            string outTradeNo = "";
+            foreach (OrderPayment payment in pList)
+            {
+                if (!payment.out_trade_no.Trim().Equals(""))
+                {
+                    outTradeNo = payment.out_trade_no.Trim();
+                    break;
+                }
+            }
+            if (outTradeNo.Trim().Equals(""))
+            {
+                outTradeNo = skipass.id.ToString() + Util.GetLongTimeStamp(DateTime.Now);
+            }
+            double balance = _zwHelper.GetBalance();
+            if (balance <= skipass.deal_price)
+            {
+                skipass.memo += " 账户余额不足";
+                _context.skiPass.Entry(skipass).State = EntityState.Modified;
+                await _context.SaveChangesAsync();
+                return;
+            }
+            string orderId = "";
+            try
+            {
+                Models.WanLong.ZiwoyouPlaceOrderResult orderResult = 
+                    _zwHelper.PlaceOrder(skipassProduct.third_party_no, skipass.contact_name, skipass.contact_cell,
+                    skipass.contact_id_type, skipass.contact_id_no, skipass.count, (DateTime)skipass.reserve_date, 
+                    "", outTradeNo);
+                if (orderResult.state == 1)
+                {
+                    orderId = orderResult.data.orderId;
+                }
+                else
+                {
+                    skipass.memo += (" " + orderResult.msg.Trim()) ;
+                    skipass.is_cancel = -2;
+                    _context.skiPass.Entry(skipass).State = EntityState.Modified;
+                    await _context.SaveChangesAsync();
+                return;
+                }
+                
+            }
+            catch(Exception err)
+            {
+                skipass.memo += (" 预定失败 " + err.ToString()) ;
+                _context.skiPass.Entry(skipass).State = EntityState.Modified;
+                await _context.SaveChangesAsync();
+                return;
+
+            }
+            Models.WanLong.PayResult payResult = _zwHelper.Pay(int.Parse(orderId));
+            if (payResult.state != 1 || !payResult.msg.Trim().Equals("支付成功"))
+            {
+                skipass.memo += (" " + payResult.msg);
+                _context.skiPass.Entry(skipass).State = EntityState.Modified;
+                await _context.SaveChangesAsync();
+                return;
+            }
+            skipass.reserve_no = payResult.data.orderId.ToString();
+            _context.skiPass.Entry(skipass).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
+
+
             
         }
 
         [NonAction]
+        public async Task RefundCallBack(int paymentId)
+        {
+            OrderPayment payment = await _context.OrderPayment.FindAsync(paymentId);
+            Models.SkiPass.SkiPass skipass = await _context.skiPass
+                .Where(s => (s.valid == 1 && s.order_id == payment.order_id))
+                .OrderByDescending(s => s.id).FirstAsync();
+            OrderPaymentRefund refund = await _context.OrderPaymentRefund
+                .Where(p => p.order_id == payment.order_id && p.state == 1)
+                .AsNoTracking().FirstAsync();
+            if (!skipass.resort.Trim().Equals("南山"))
+            {
+                skipass.refund_amount = refund.amount;
+                skipass.update_date = DateTime.Now;
+                _context.skiPass.Entry(skipass).State = EntityState.Modified;
+                await _context.SaveChangesAsync();
+            }
+        }
+
+        [HttpGet]
+        public async Task RefreshCancel()
+        {
+            List<Models.SkiPass.SkiPass> skipassList = await _context.skiPass
+                .Where(s => (s.valid == 1 && s.reserve_no != null && !s.resort.Trim().Equals("南山")
+                && s.is_cancel == 2)).ToListAsync();
+            for(int i = 0; i < skipassList.Count; i++)
+            {
+                Models.SkiPass.SkiPass skipass = skipassList[i];
+                Models.Product.SkiPass skipassProduct = await _context.SkiPass.FindAsync(skipass.product_id);
+                if (skipassProduct == null)
+                {
+                    continue;
+                }
+                try
+                {
+                    WanlongZiwoyouHelper _zwHelper = new WanlongZiwoyouHelper(_context, _config, skipassProduct.source.Trim());
+                    WanlongZiwoyouHelper.ZiwoyouOrder order = _zwHelper.GetOrder(int.Parse(skipass.reserve_no));
+                    if (order.orderState == 3)
+                    {
+                        skipass.is_cancel = 1;
+                        _context.skiPass.Entry(skipass).State = EntityState.Modified;
+                        await _context.SaveChangesAsync();
+                        
+                    }
+                    
+                }
+                catch
+                {
+
+                }
+            }
+        }
+
+        [HttpGet]
+        public async Task RefreshAutoReserve()
+        {
+            List<Models.SkiPass.SkiPass> skipassList = await _context.skiPass
+                .Where(s => (s.valid == 1 && s.reserve_no != null && !s.resort.Trim().Equals("南山")
+                && s.card_no == null && s.qr_code_url == null && s.send_content == null && s.is_cancel == 0
+                && s.create_date > DateTime.Now.AddHours(-1))).ToListAsync();
+            for(int i = 0; i < skipassList.Count; i++)
+            {
+                Models.SkiPass.SkiPass skipass = skipassList[i];
+                Models.Product.SkiPass skipassProduct = await _context.SkiPass.FindAsync(skipass.product_id);
+                if (skipassProduct == null)
+                {
+                    continue;
+                }
+                try
+                {
+                    WanlongZiwoyouHelper _zwHelper = new WanlongZiwoyouHelper(_context, _config, skipassProduct.source.Trim());
+                    WanlongZiwoyouHelper.ZiwoyouOrder order = _zwHelper.GetOrder(int.Parse(skipass.reserve_no));
+                    if (order == null)
+                    {
+                        skipass.is_cancel = -2;
+                        skipass.update_date = DateTime.Now;
+                        
+                        _context.skiPass.Entry(skipass).State = EntityState.Modified;
+                        await _context.SaveChangesAsync();
+                        continue;
+                    }
+                    if (order.orderState != 2 || order.vouchers == null || order.vouchers.Length <= 0)
+                    {
+                        continue;
+                    }
+                    if (order.vouchers[0].code != null && !order.vouchers[0].code.Trim().Equals(""))
+                    {
+                        skipass.card_no = order.vouchers[0].code.Trim();
+                    }
+                    if (order.vouchers[0].qrcodeUrl != null && !order.vouchers[0].qrcodeUrl.Trim().Equals(""))
+                    {
+                        skipass.qr_code_url = order.vouchers[0].qrcodeUrl.Trim();
+                    }
+                    string sendContent = "";
+                    if (order.sendContent1 != null)
+                    {
+                        sendContent += order.sendContent1;
+                    }
+                    if (order.sendContent2 != null)
+                    {
+                        sendContent += order.sendContent2;
+                    }
+                    if (order.sendContent3 != null)
+                    {
+                        sendContent += order.sendContent3;
+                    }
+                    if (!sendContent.Trim().Equals(""))
+                    {
+                        skipass.send_content = sendContent.Trim();
+                    }
+                    skipass.update_date = DateTime.Now;
+                    skipass.card_member_pick_time = DateTime.Now;
+                }
+                catch
+                {
+                    skipass.is_cancel = -2;
+                    skipass.update_date = DateTime.Now;
+                }
+                _context.skiPass.Entry(skipass).State = EntityState.Modified;
+                await _context.SaveChangesAsync();
+            }
+
+
+
+        }
+        
+        
+        /*
+        [NonAction]
         private bool SkiPassExists(int id)
         {
             return _context.SkiPass.Any(e => e.product_id == id);
+        }
+        */
+        [HttpGet("{productId}")]
+        public async Task<ActionResult<object>> ReserveSkiPass(int productId, DateTime date, 
+            int count, string cell, string name, string sessionKey, string sessionType = "wechat_mini_openid", string idNo = "")
+        {
+            Models.Product.Product product = await _context.Product.FindAsync(productId);
+            Models.Product.SkiPass skipassProduct = await _context.SkiPass.FindAsync(productId);
+            SkipassDailyPrice dailyPrice = await _context.skipassDailyPrice
+                .Where(s => s.product_id == productId && s.valid == 1 && s.reserve_date.Date == date.Date)
+                .OrderBy(s => s.reserve_date).AsNoTracking().FirstAsync();
+            
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
+            if (user == null || product == null)
+            {
+                return BadRequest();
+            }
+            Models.Users.Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
+            double totalPrice = 0;
+            Models.SkiPass.SkiPass skipass = new Models.SkiPass.SkiPass()
+            {
+                member_id = member.id,
+                wechat_mini_openid = member.wechatMiniOpenId,
+                product_id = productId,
+                resort = skipassProduct.resort.Trim(),
+                product_name = product.name,
+                count = count,
+                //order_id = orderId,
+                deal_price = dailyPrice.deal_price * count,
+                ticket_price = dailyPrice.settlementPrice,
+                deposit = product.deposit,
+                valid = 0,
+                contact_cell = cell,
+                contact_name = name,
+                contact_id_no = idNo.Trim(),
+                contact_id_type = "身份证",
+                reserve_date = date.Date
+            };
+                //skipassArr[i] = skipass;
+                //totalPrice += (double)skipass.deal_price;
+            
+
+            OrderOnline order = new OrderOnline()
+            {
+                type = "雪票",
+                shop = product.shop.Trim(),
+                order_price = (double)skipass.deal_price,
+                order_real_pay_price = (double)skipass.deal_price,
+                final_price = (double)skipass.deal_price,
+                open_id = member.wechatMiniOpenId,
+                staff_open_id = "",
+                memo = "",
+                pay_method = "微信支付"
+            };
+            await _context.OrderOnlines.AddAsync(order);
+            await _context.SaveChangesAsync();
+            string outTradeNo = "";
+            if (order.shop.Trim().Equals("南山"))
+            {
+                outTradeNo = "NS";
+            }
+            else
+            {
+                outTradeNo = "QJ";
+            }
+            outTradeNo += "_XP_" + DateTime.Now.ToString("yyyyMMdd") + "_" + order.id.ToString().PadLeft(6, '0') + "_ZF_01";
+
+            OrderPayment payment = new OrderPayment()
+            {
+                order_id = order.id,
+                pay_method = order.pay_method.Trim(),
+                amount = order.final_price,
+                status = "待支付",
+                staff_open_id = "",
+                out_trade_no = outTradeNo
+            };
+            await _context.OrderPayment.AddAsync(payment);
+
+            skipass.order_id = order.id;
+            await _context.skiPass.AddAsync(skipass);
+            
+            await _context.SaveChangesAsync();
+            order.payments = new OrderPayment[] { payment };
+
+            member.real_name = name;
+            _context.member.Entry(member).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
+            await _memberHelper.UpdateDetailInfo(member.id, cell, "cell", false);
+
+            return Ok(order);
+        }
+        [HttpGet]
+        public async Task<ActionResult<List<object>>> GetProductsByResort(string resort, int showHidden = 0)
+        {
+            resort = Util.UrlDecode(resort);
+            var l = await _context.SkiPass.Include(s => s.dailyPrice)
+                .Join(_context.Product, s=>s.product_id, p=>p.id,
+                (s, p)=> new {s.product_id, s.resort, s.rules, s.source, s.third_party_no, p.name, p.shop, 
+                s.commonDayDealPrice, s.weekendDealPrice, 
+                //s.dailyPrice, 
+                s.avaliablePriceList,
+                p.sale_price, p.market_price, p.cost, p.type, p.hidden })
+                .Where(p => p.type.Trim().Equals("雪票") && p.name.IndexOf("【") >= 0 && p.name.IndexOf("】") >= 0 && p.name.IndexOf(resort) >= 0
+                && p.third_party_no != null 
+                && ((p.hidden == 0 && showHidden == 0) || (showHidden == 1))
+                ).OrderBy(p => p.market_price).AsNoTracking().ToListAsync();
+            return Ok(l);
+        }
+
+        [HttpGet("{productId}")]
+        public async Task<ActionResult<object>> GetProduct(int productId)
+        {
+            var l = await _context.SkiPass.Include(s => s.dailyPrice)
+                .Join(_context.Product, s=>s.product_id, p=>p.id,
+                (s, p)=> new {s.product_id, s.resort, s.rules, s.source, s.third_party_no, p.name, p.shop, 
+                s.commonDayDealPrice, s.weekendDealPrice, 
+                s.dailyPrice, 
+                s.avaliablePriceList,
+                p.sale_price, p.market_price, p.cost, p.type, p.hidden })
+                .Where(p => p.product_id == productId).AsNoTracking().FirstAsync();
+            return Ok(l);
+        }
+
+        [HttpGet("{priceId}")]
+        public async Task<ActionResult<SkipassDailyPrice>> ModDailyPrice(int priceId, double price, 
+            string dayType, string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            MemberController _memberHelper = new MemberController(_context, _config);
+            SnowmeetApi.Models.Users.Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
+            if (member.is_admin != 1)
+            {
+                return BadRequest();
+            }
+            SkipassDailyPrice priceObj = await _context.skipassDailyPrice.FindAsync(priceId);
+            if (priceObj == null)
+            {
+                return NotFound();
+            }
+            priceObj.day_type = Util.UrlDecode(dayType);
+            priceObj.deal_price = price;
+            _context.skipassDailyPrice.Entry(priceObj).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
+            return Ok(priceObj);
         }
     }
 }

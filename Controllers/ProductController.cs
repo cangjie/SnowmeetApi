@@ -9,6 +9,7 @@ using Microsoft.Extensions.Configuration;
 using SnowmeetApi.Data;
 using SnowmeetApi.Models.Product;
 using Newtonsoft.Json;
+using SnowmeetApi.Controllers.User;
 namespace SnowmeetApi.Controllers
 {
     [Route("core/[controller]/[action]")]
@@ -21,12 +22,14 @@ namespace SnowmeetApi.Controllers
         private readonly ApplicationDBContext _context;
 
         private IConfiguration _config;
+        private IConfiguration _oriConfig;
 
         public string _appId = "";
 
         public ProductController(ApplicationDBContext context, IConfiguration config)
         {
             _context = context;
+            _oriConfig = config;
             _config = config.GetSection("Settings");
             _appId = _config.GetSection("AppId").Value.Trim();
 
@@ -53,6 +56,26 @@ namespace SnowmeetApi.Controllers
             return await _context.Product
                 .Where(p => (p.id == 137 || p.id == 138 || p.id == 139 || p.id == 140 || p.id == 142 || p.id == 143 || p.id == 202))
                 .ToListAsync();
+        }
+
+        [HttpGet("{productId}")]
+        public async Task<ActionResult<Product>> SetHidden(int productId, int hidden, string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            MemberController _memberHelper = new MemberController(_context, _oriConfig);
+            SnowmeetApi.Models.Users.Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
+            if (member.is_admin != 1)
+            {
+                return BadRequest();
+            }
+            Product product = await _context.Product.FindAsync(productId);
+            if (product == null)
+            {
+                return NotFound();
+            }
+            product.hidden = hidden;
+            _context.Product.Entry(product).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
+            return Ok(product);
         }
         /*
         [HttpGet]

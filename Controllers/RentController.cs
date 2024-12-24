@@ -118,6 +118,10 @@ namespace SnowmeetApi.Controllers
             sessionKey = Util.UrlDecode(sessionKey).Trim();
             shop = Util.UrlDecode(shop).Replace("'", "").Trim();
             UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
+            if (!shop.Trim().Equals("万龙") && user.member.is_admin != 1 && user.member.is_manager != 1 )
+            {
+                return NoContent();
+            }
             if (!user.isAdmin)
             {
                 return BadRequest();
@@ -312,6 +316,12 @@ namespace SnowmeetApi.Controllers
             status = Util.UrlDecode(status).Trim();
             sessionKey = Util.UrlDecode(sessionKey).Trim();
             UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
+            /*
+            if (user.member.is_admin != 1 && user.member.is_manager != 1)
+            {
+                return NoContent();
+            }
+            */
             if (!user.isAdmin)
             {
                 return BadRequest();
@@ -549,7 +559,11 @@ namespace SnowmeetApi.Controllers
                 {
                     case "南山":
                         TimeSpan ts = endDate - rentOrder.start_date;
-                        
+                        detail._suggestRental = detail.unit_rental * (ts.Days + 1);
+                        detail._timeLength = (ts.Days + 1).ToString() + "天";
+
+
+                        /*
                         if (ts.Hours < 4)
                         {
                             detail._suggestRental = detail.unit_rental;
@@ -565,7 +579,7 @@ namespace SnowmeetApi.Controllers
                             detail._suggestRental = detail.unit_rental;
                             detail._timeLength = "1场";
                         }
-                        
+                        */
                         break;
                     default:
 
@@ -1236,9 +1250,50 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<object>>> GetClassList()
+        public async Task<ActionResult<List<string>>> GetClassList()
         {
-            return await _context.RentItem.Select(r => r.@class).Distinct().ToListAsync();
+            List<string> list = new List<string>();
+            list.Add("双板");
+            list.Add("双板鞋");
+            list.Add("雪杖");
+            list.Add("单板");
+            list.Add("单板鞋");
+            list.Add("头盔");
+            list.Add("雪镜");
+            list.Add("雪服");
+            list.Add("雪裤");
+            list.Add("连体雪服");
+            list.Add("手套");
+            list.Add("护具");
+            list.Add("电加热马甲");
+            list.Add("运动相机");
+            list.Add("无人机");
+            list.Add("对讲机");
+
+
+            var oriList = await _context.RentItem.Select(r => r.@class)
+                .AsNoTracking().Distinct().ToListAsync();
+            
+            foreach(var ori in oriList)
+            {
+                bool exists = false;
+                foreach(var l in list)
+                {
+                    if (ori.ToString().Equals(l.ToString()))
+                    {
+                        exists = true;
+                        break;
+                    }
+                }
+                if (!exists && !ori.ToString().Equals("其他")
+                    && ori.ToString().IndexOf("电子") < 0
+                    && ori.ToString().IndexOf("雪服上衣") < 0)
+                {
+                    list.Add(ori.ToString());
+                }
+            }
+            list.Add("其他");
+            return Ok(list); 
         }
 
 
@@ -1488,6 +1543,10 @@ namespace SnowmeetApi.Controllers
         {
             sessionKey = Util.UrlDecode(sessionKey).Trim();
             UnicUser user = await Util.GetUser(sessionKey, _context);
+            if (user.member.is_admin != 1 && user.member.is_manager != 1)
+            {
+                return NoContent();
+            }
             if (!user.isAdmin)
             {
                 return BadRequest();

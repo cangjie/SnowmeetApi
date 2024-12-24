@@ -34,10 +34,12 @@ namespace SnowmeetApi.Controllers.Order
         {
             sessionKey = Util.UrlDecode(sessionKey);
             UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
-            if (!user.isAdmin)
+            if (user.member.is_admin != 1 && user.member.is_manager != 1)
             {
                 return NoContent();
             }
+
+            
             var l = await _context.saleReport.FromSqlRaw(" select mi7_order_id, barCode, sale_price, real_charge, order_id,  "
                 + " case  [name] when '' then customer.real_name  else [name] end as [name],  "
                 + " case [order_online].cell_number when '' then customer.cell_number  else [order_online].cell_number end as cell_number , "

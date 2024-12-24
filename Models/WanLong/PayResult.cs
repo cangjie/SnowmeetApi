@@ -5,7 +5,7 @@ namespace SnowmeetApi.Models.WanLong
 	{
 		public int state { get; set; }
 		public string msg { get; set; }
-		public PayResultData date {get; set;}
+		public PayResultData data {get; set;}
 	}
 
 	public class PayResultData

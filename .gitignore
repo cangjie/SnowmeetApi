@@ -1,3 +1,4 @@
+booking*.txt
 # globs
 AlipayCertificate/*/downloads
 access_token.*

@@ -1,6 +1,7 @@
 using System;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Data;
+using Microsoft.DotNet.Scaffolding.Shared.Messaging;
 
 namespace SnowmeetApi.Models.SkiPass
 {
@@ -30,8 +31,6 @@ namespace SnowmeetApi.Models.SkiPass
         public DateTime? card_member_return_time {get; set;} = null;
 
         public int? card_lost {get; set;} = null;
-
-        public string? out_order_no {get; set;} = null;
         public string? reserve_no {get; set;} = null;
         public string? qr_code_url {get; set;} = null;
         public DateTime? reserve_date {get; set;} = null;
@@ -40,8 +39,25 @@ namespace SnowmeetApi.Models.SkiPass
         public string? contact_cell {get; set;} = null;
         public string? contact_id_type {get; set;} = null;
         public string? contact_id_no {get; set;} = null;
+
+        /*
+        0:未取消
+        1:已取消
+        2:取消中
+        3:人工申请取消
+        -1:取消失败
+        -2:出票失败，自动取消
+
+        */
+        public int is_cancel { get; set; } = 0;
+        public string? send_content { get; set; } = null;
+
+        public int? cancel_member_id {get; set;}
+
+        public string memo {get; set;} = "";
         public DateTime update_date {get; set;} = DateTime.Now;
         public DateTime create_date {get; set;} = DateTime.Now;
+        
         public double cardFee
         {
             get
@@ -82,7 +98,7 @@ namespace SnowmeetApi.Models.SkiPass
                     if (valid == 1)
                     {
                         status = "已付款";
-                        if (card_no!=null)
+                        if (card_no != null)
                         {
                             status = "已出票";
                             if (card_member_pick_time != null)
@@ -102,6 +118,51 @@ namespace SnowmeetApi.Models.SkiPass
                     }
 
                 }
+                else
+                {
+                    if (valid == 1)
+                    {
+                        status = "已付款";
+                        if (reserve_no != null)
+                        {
+                            status = "已确认";
+                            if (card_member_pick_time != null)
+                            {
+                                status = "已出票";
+                            }
+                        }
+                        switch(is_cancel)
+                        {
+                            case 1:
+                                status = "已取消";
+                                break;
+                            case 2:
+                                status = "取消中";
+                                break;
+                            case 3:
+                                status = "申请取消";
+                                break;
+                            case -1:
+                                status = "取消失败";
+                                break;
+                            case -2:
+                                status = "出票失败";
+                                break;
+                            default:
+                                break;
+                        }
+                        if (have_refund == 1)
+                        {
+                            status = "已申请退款";
+                        }
+                        if (refund_amount != null)
+                        {
+                            status = "退款成功";
+                        }
+
+                    }
+                }
+
                 return status;
             }
 
