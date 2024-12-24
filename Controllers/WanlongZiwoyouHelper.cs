@@ -444,13 +444,16 @@ namespace SnowmeetApi.Controllers
                     {
                         continue;
                     }
+                    DateTime startDate = priceArr[0].date.Date;
                     var oriPriceList = await _context.skipassDailyPrice
-                        .Where(s => int.Parse(s.third_party_id) == price.infoId && s.valid == 1 && s.reserve_date.Date >= priceArr[0].date.Date).ToListAsync();
+                        .Where(s => s.third_party_id.Trim().Equals(price.infoId.ToString())  && s.valid == 1 && s.reserve_date.Date >= startDate).ToListAsync();
                     for(int i = 0; i < priceArr.Length; i++)
                     {
                         var priceObj = priceArr[i];
                         bool changed = false;
                         bool exists = false;
+                        double revenu = 0;
+                        string dayType = "";
                         for(int j = 0; j < oriPriceList.Count; j++)
                         {
                             var oriPrice = oriPriceList[j];
@@ -463,6 +466,8 @@ namespace SnowmeetApi.Controllers
                                 {
                                     changed = true;
                                     oriPrice.valid = 0;
+                                    revenu = oriPrice.deal_price - oriPrice.settlementPrice;
+                                    dayType = oriPrice.day_type.Trim();
                                     _context.skipassDailyPrice.Entry(oriPrice).State = EntityState.Modified;
                                     break;
                                 }
@@ -470,6 +475,24 @@ namespace SnowmeetApi.Controllers
                         }
                         if (changed || !exists)
                         {
+                            if (dayType.Trim().Equals(""))
+                            {
+                                dayType = ((priceObj.date.Date.DayOfWeek == DayOfWeek.Sunday || priceObj.date.Date.DayOfWeek == DayOfWeek.Saturday)? "周末" : "平日");
+                            }
+                            if (revenu == 0)
+                            {
+                                SkipassDailyPrice lastPrice = await _context.skipassDailyPrice
+                                    .Where(s => (s.product_id == item.product_id && s.day_type.Trim().Equals(dayType.Trim()) 
+                                    && s.valid == 1 )).OrderByDescending(s => s.id).FirstAsync();
+                                if (lastPrice != null)
+                                {
+                                    revenu = lastPrice.deal_price - lastPrice.settlementPrice;
+                                }
+                                else
+                                {
+
+                                }
+                            }
                             SkipassDailyPrice newPrice = new SkipassDailyPrice()
                             {
                                 product_id = item.product_id,
@@ -478,7 +501,7 @@ namespace SnowmeetApi.Controllers
                                 settlementPrice = priceObj.settlementPrice,
                                 marketPrice = priceObj.marketPrice,
                                 valid = 1,
-                                deal_price = priceObj.settlementPrice + 20,
+                                deal_price = priceObj.settlementPrice + revenu,
                                 reserve_date = priceObj.date.Date,
                                 day_type = ((priceObj.date.Date.DayOfWeek == DayOfWeek.Sunday || priceObj.date.Date.DayOfWeek == DayOfWeek.Saturday)? "周末" : "平日")
                             };
@@ -488,9 +511,9 @@ namespace SnowmeetApi.Controllers
                         
                     }
                 }
-                catch
+                catch(Exception ex)
                 {
-
+                    Console.WriteLine(ex.ToString());
                 }
             }
         }

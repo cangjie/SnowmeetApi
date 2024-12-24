@@ -316,10 +316,12 @@ namespace SnowmeetApi.Controllers
             status = Util.UrlDecode(status).Trim();
             sessionKey = Util.UrlDecode(sessionKey).Trim();
             UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
+            /*
             if (user.member.is_admin != 1 && user.member.is_manager != 1)
             {
                 return NoContent();
             }
+            */
             if (!user.isAdmin)
             {
                 return BadRequest();
