@@ -469,8 +469,9 @@ namespace SnowmeetApi.Controllers
                                     revenu = oriPrice.deal_price - oriPrice.settlementPrice;
                                     dayType = oriPrice.day_type.Trim();
                                     _context.skipassDailyPrice.Entry(oriPrice).State = EntityState.Modified;
-                                    break;
+                                    
                                 }
+                                break;
                             }
                         }
                         if (changed || !exists)
