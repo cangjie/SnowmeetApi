@@ -730,8 +730,9 @@ namespace SnowmeetApi.Controllers
             var l = await _context.SkiPass.Include(s => s.dailyPrice)
                 .Join(_context.Product, s=>s.product_id, p=>p.id,
                 (s, p)=> new {s.product_id, s.resort, s.rules, s.source, s.third_party_no, p.name, p.shop, 
-                s.commonDayDealPrice, s.weekendDealPrice, 
-                s.dailyPrice, 
+                s.commonDayDealPrice, 
+                s.weekendDealPrice, 
+                //s.dailyPrice, 
                 s.avaliablePriceList,
                 p.sale_price, p.market_price, p.cost, p.type, p.hidden })
                 .Where(p => p.product_id == productId).AsNoTracking().FirstAsync();
