@@ -709,7 +709,7 @@ namespace SnowmeetApi.Controllers
             return Ok(order);
         }
         [HttpGet]
-        public async Task<ActionResult<List<object>>> GetProductsByResort(string resort, int showHidden = 0)
+        public async Task<ActionResult<List<SkipassWithPrice>>> GetProductsByResort(string resort, int showHidden = 0)
         {
             resort = Util.UrlDecode(resort);
             var l = await _context.SkiPass//.Include(s => s.dailyPrice)
@@ -723,7 +723,45 @@ namespace SnowmeetApi.Controllers
                 && p.third_party_no != null 
                 && ((p.hidden == 0 && showHidden == 0) || (showHidden == 1))
                 ).OrderBy(p => p.market_price).AsNoTracking().ToListAsync();
-            return Ok(l);
+            
+            List<SkipassWithPrice> ret = new List<SkipassWithPrice>();
+            for(int i = 0; i < l.Count; i++)
+            {
+                var p = l[i];
+                Models.Product.SkiPass skipass = new Models.Product.SkiPass()
+                {
+                    resort = p.resort,
+                    rules = p.rules,
+                    third_party_no = p.third_party_no,
+                    source = p.source,
+                    dailyPrice = await _context.skipassDailyPrice.Where(s => s.product_id == p.product_id && s.valid == 1)
+                        .OrderBy(s => s.reserve_date).AsNoTracking().ToListAsync(),
+                    
+                };
+                SkipassWithPrice sp = new SkipassWithPrice()
+                {
+                    product_id = p.product_id,
+                    resort = skipass.resort,
+                    rules = skipass.rules,
+                    source = skipass.source,
+                    third_party_no = skipass.third_party_no,
+                    name = p.name,
+                    shop = p.shop,
+                    commonDayDealPrice = skipass.commonDayDealPrice,
+                    weekendDealPrice = skipass.weekendDealPrice,
+                    dailyPrice = skipass.dailyPrice,
+                    avaliablePriceList = skipass.avaliablePriceList,
+                    sale_price = p.sale_price,
+                    market_price = p.market_price,
+                    cost = p.cost,
+                    type = p.type,
+                    hidden = p.hidden
+                };
+                ret.Add(sp);
+            }
+
+
+            return Ok(ret);
         }
 
         public class SkipassWithPrice
@@ -751,7 +789,7 @@ namespace SnowmeetApi.Controllers
         {
             Product p = await _context.Product.FindAsync(productId);
             Models.Product.SkiPass skipass = await _context.SkiPass.FindAsync(productId);
-            skipass.dailyPrice = await _context.skipassDailyPrice.Where(s => s.product_id == productId)
+            skipass.dailyPrice = await _context.skipassDailyPrice.Where(s => s.product_id == productId && s.valid == 1)
                 .OrderBy(s => s.reserve_date).AsNoTracking().ToListAsync();
             
             SkipassWithPrice ret = new SkipassWithPrice()
