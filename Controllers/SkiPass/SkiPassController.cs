@@ -18,6 +18,8 @@ using SnowmeetApi.Controllers.User;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using SixLabors.ImageSharp;
 using SnowmeetApi.Controllers.Order;
+using Org.BouncyCastle.Asn1.Crmf;
+using System.Runtime.CompilerServices;
 namespace SnowmeetApi.Controllers
 {
     [Route("core/[controller]/[action]")]
@@ -724,19 +726,72 @@ namespace SnowmeetApi.Controllers
             return Ok(l);
         }
 
-        [HttpGet("{productId}")]
-        public async Task<ActionResult<object>> GetProduct(int productId)
+        public class SkipassWithPrice
         {
-            var l = await _context.SkiPass.Include(s => s.dailyPrice)
+            public int product_id {get; set;}
+            public string resort {get; set;}
+            public string rules {get; set;}
+            public string source {get; set;}
+            public string third_party_no {get; set;}
+            public string name {get; set;}
+            public string shop {get;set;}
+            public double commonDayDealPrice {get; set;}
+            public double weekendDealPrice {get; set;}
+            public List<SkipassDailyPrice> dailyPrice {get; set;}
+            public List<SkipassDailyPrice> avaliablePriceList {get; set;}
+            public double sale_price {get; set;}
+            public double? market_price {get ;set;}
+            public double? cost {get; set;}
+            public string type {get; set;}
+            public int hidden {get; set;}
+        }
+
+        [HttpGet("{productId}")]
+        public async Task<ActionResult<SkipassWithPrice>> GetProduct(int productId)
+        {
+            Product p = await _context.Product.FindAsync(productId);
+            Models.Product.SkiPass skipass = await _context.SkiPass.FindAsync(productId);
+            skipass.dailyPrice = await _context.skipassDailyPrice.Where(s => s.product_id == productId)
+                .OrderBy(s => s.reserve_date).AsNoTracking().ToListAsync();
+            
+            SkipassWithPrice ret = new SkipassWithPrice()
+            {
+                product_id = p.id,
+                resort = skipass.resort,
+                rules = skipass.rules,
+                source = skipass.source,
+                third_party_no = skipass.third_party_no,
+                name = p.name,
+                shop = p.shop,
+                commonDayDealPrice = skipass.commonDayDealPrice,
+                weekendDealPrice = skipass.weekendDealPrice,
+                dailyPrice = skipass.dailyPrice,
+                avaliablePriceList = skipass.avaliablePriceList,
+                sale_price = p.sale_price,
+                market_price = p.market_price,
+                cost = p.cost,
+                type = p.type,
+                hidden = p.hidden
+            };
+            return Ok(ret);
+
+/*
+
+
+            var l = await _context.SkiPass//.Include(s => s.dailyPrice)
                 .Join(_context.Product, s=>s.product_id, p=>p.id,
                 (s, p)=> new {s.product_id, s.resort, s.rules, s.source, s.third_party_no, p.name, p.shop, 
                 s.commonDayDealPrice, 
                 s.weekendDealPrice, 
-                //s.dailyPrice, 
+                s.dailyPrice, 
                 s.avaliablePriceList,
                 p.sale_price, p.market_price, p.cost, p.type, p.hidden })
                 .Where(p => p.product_id == productId).AsNoTracking().FirstAsync();
+            /*l.dailyPrice = await _context.skipassDailyPrice
+                .Where(s => s.product_id == l.product_id).OrderBy(l => l.reserve_date)
+                .AsNoTracking().ToListAsync();
             return Ok(l);
+            */
         }
 
         [HttpGet("{priceId}")]
