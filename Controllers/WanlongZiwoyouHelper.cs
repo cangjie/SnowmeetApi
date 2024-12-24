@@ -429,13 +429,13 @@ namespace SnowmeetApi.Controllers
         public async Task UpdateSkipassProductPrice()
         {
             var l = await _context.SkiPass.Where(s => s.third_party_no != null).AsNoTracking().ToListAsync();
+            //var l = await _context.SkiPass.Where(s => s.third_party_no.Equals("80018099")).AsNoTracking().ToListAsync();
             foreach(var item in l)
             {
                 try
                 {
                     //ZiwoyouProductDailyPrice price = GetProductPrice(int.Parse((string)item.third_party_no), DateTime.Now.Date);
-
-                    string priceStr = Util.GetWebContent("https://mini.snowmeet.top/core/WanlongZiwoyouHelper/GetProductPrice?productId=" + item.third_party_no.Trim() + "&date=" + DateTime.Now.ToString("yyyy-MM-dd"));
+                    string priceStr = Util.GetWebContent("https://mini.snowmeet.top/core/WanlongZiwoyouHelper/GetProductPrice?productId=" + item.third_party_no.Trim() + "&date=2025-1-1" );//+ DateTime.Now.ToString("yyyy-MM-dd"));
                     ZiwoyouProductDailyPrice price = JsonConvert.DeserializeObject<ZiwoyouProductDailyPrice>(priceStr);
 
 
@@ -460,9 +460,7 @@ namespace SnowmeetApi.Controllers
                             if (oriPrice.reserve_date.Date == priceObj.date.Date)
                             {
                                 exists = true;
-                                if (oriPrice.salePrice != priceObj.salePrice 
-                                    || oriPrice.settlementPrice != priceObj.settlementPrice
-                                    || oriPrice.marketPrice != priceObj.marketPrice)
+                                if (oriPrice.settlementPrice != priceObj.settlementPrice)
                                 {
                                     changed = true;
                                     oriPrice.valid = 0;
@@ -484,7 +482,7 @@ namespace SnowmeetApi.Controllers
                             {
                                 SkipassDailyPrice lastPrice = await _context.skipassDailyPrice
                                     .Where(s => (s.product_id == item.product_id && s.day_type.Trim().Equals(dayType.Trim()) 
-                                    && s.valid == 1 )).OrderByDescending(s => s.id).FirstAsync();
+                                    && s.valid == 1 )).OrderByDescending(s => s.reserve_date).FirstAsync();
                                 if (lastPrice != null)
                                 {
                                     revenu = lastPrice.deal_price - lastPrice.settlementPrice;
