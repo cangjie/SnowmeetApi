@@ -398,6 +398,18 @@ namespace SnowmeetApi.Controllers
                 {
                     await AutoReserve(skipass.id);
                 }
+                //买雪票送打蜡
+                try
+                {
+                    TicketController _tHelper = new TicketController(_context, _config);
+                    await _tHelper.GenerateTicketByAction(12, skipass.member_id, 
+                            skipass.order_id == null? 0: (int)skipass.order_id , "");
+                    
+                }
+                catch
+                {
+
+                }
             }
         }
 
