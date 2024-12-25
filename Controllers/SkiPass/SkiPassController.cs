@@ -33,7 +33,7 @@ namespace SnowmeetApi.Controllers
         private MemberController _memberHelper;
         private OrderPaymentController _refundHelper;
 
-        //private WanlongZiwoyouHelper _zwHelper;
+        private WanlongZiwoyouHelper _zwHelper;
 
         public SkiPassController(ApplicationDBContext context, IConfiguration config, IHttpContextAccessor http)
         {
@@ -41,7 +41,7 @@ namespace SnowmeetApi.Controllers
             _config = config;
             _memberHelper = new MemberController(context,  config);
             _refundHelper = new OrderPaymentController(context, config, http);
-            //_zwHelper = new WanlongZiwoyouHelper(context, config);
+            _zwHelper = new WanlongZiwoyouHelper(context, config);
         }
 
         [HttpGet("{id}")]
@@ -553,6 +553,37 @@ namespace SnowmeetApi.Controllers
                 }
             }
         }
+        [HttpGet]
+        public async Task RefreshUsedAll()
+        {
+            TicketController _tHelper = new TicketController(_context, _config);
+
+            List<Models.SkiPass.SkiPass> skipassList = await _context.skiPass
+                .Where(s => (s.valid == 1 && s.is_cancel == 0 
+                && s.is_used == 0 && !s.resort.Trim().Equals("南山"))).ToListAsync();
+            for(int i = 0; i < skipassList.Count; i++)
+            {
+                Models.SkiPass.SkiPass skipass = skipassList[i];
+
+                string url = "https://mini.snowmeet.top/core/WanlongZiwoyouHelper/GetOrder?orderId=" + skipass.reserve_no.ToString();
+                string ret = Util.GetWebContent(url);
+                WanlongZiwoyouHelper.ZiwoyouOrder order = JsonConvert.DeserializeObject<WanlongZiwoyouHelper.ZiwoyouOrder>(ret);
+
+                //WanlongZiwoyouHelper.ZiwoyouOrder order =  _zwHelper.GetOrder(int.Parse(skipass.reserve_no.Trim()));
+
+                if (order.orderState == 4)
+                {
+                    skipass.is_used = 1;
+                    _context.skiPass.Entry(skipass).State = EntityState.Modified;
+
+                    //雪场取票后，发放打蜡券
+                    await _tHelper.GenerateTicketByAction(12, skipass.member_id, (int)skipass.order_id, "");
+                }
+            }
+            await _context.SaveChangesAsync();
+        }
+
+        
 
         [HttpGet]
         public async Task RefreshAutoReserve()
@@ -622,9 +653,6 @@ namespace SnowmeetApi.Controllers
                 _context.skiPass.Entry(skipass).State = EntityState.Modified;
                 await _context.SaveChangesAsync();
             }
-
-
-
         }
         
         

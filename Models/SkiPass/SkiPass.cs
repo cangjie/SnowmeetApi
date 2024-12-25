@@ -51,12 +51,11 @@ namespace SnowmeetApi.Models.SkiPass
         */
         public int is_cancel { get; set; } = 0;
         public string? send_content { get; set; } = null;
-
         public int? cancel_member_id {get; set;}
-
         public string memo {get; set;} = "";
         public DateTime update_date {get; set;} = DateTime.Now;
         public DateTime create_date {get; set;} = DateTime.Now;
+        public int is_used {get; set;} = 0;
         
         public double cardFee
         {
