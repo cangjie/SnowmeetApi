@@ -234,7 +234,7 @@ namespace SnowmeetApi.Controllers.SkiPass
         }
 
        
-        [NonAction]
+        [HttpPost]
         public async Task<ActionResult<Models.SkiPass.SkiPass>> UpdateSkiPass([FromBody] Models.SkiPass.SkiPass skipass, 
             [FromQuery] string sessionKey, [FromQuery] string sessionType = "wechat_mini_openid")
         {
