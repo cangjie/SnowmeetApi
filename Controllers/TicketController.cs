@@ -419,7 +419,7 @@ namespace SnowmeetApi.Controllers
             return code;
         }
 
-        [NonAction]
+        [HttpGet]
         public async Task<Ticket> GenerateTicketByAction(int templateId, int memberId, int orderId = 0, string createMemo = "")
         {
             TicketTemplate template = await _context.TicketTemplate.FindAsync(templateId);
@@ -443,9 +443,10 @@ namespace SnowmeetApi.Controllers
                     createMemo = "买雪票增券";
                 }
             }
+            string code = await GetNewTicketCode();
             Ticket ticket = new Ticket()
             {
-                code = await GetNewTicketCode(),
+                code = code,
                 template_id = templateId,
                 open_id = member.wechatMiniOpenId.Trim(),
                 used = 0,
@@ -476,7 +477,7 @@ namespace SnowmeetApi.Controllers
                 Ticket ticket = ticketArr[i];
                 ticket.used = 0;
                 ticket.used_time = DateTime.Now;
-                ticket.user_memo = "订单取消";
+                ticket.use_memo = "订单取消";
                 _context.Ticket.Entry(ticket).State = EntityState.Modified;
             }
             await _context.SaveChangesAsync();
