@@ -37,7 +37,7 @@ namespace SnowmeetApi.Models.Ticket
         public int? order_id {get; set;}
         public DateTime accepted_time {get; set;} = DateTime.Now;
         public string use_memo {get; set;} = "";
-        
+        public int is_active {get; set;} = 1;
 
         [NotMapped]
         public string status
