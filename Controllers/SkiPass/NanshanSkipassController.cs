@@ -242,23 +242,22 @@ namespace SnowmeetApi.Controllers.SkiPass
             {
                 return BadRequest();
             }
-            /*
+            
             try
             {
                 TicketController _tHelper = new TicketController(_db, _config);
                 Models.SkiPass.SkiPass oriSkipass = await _db.skiPass.Where(s => s.id == skipass.id).AsNoTracking().FirstAsync();
                 if ((oriSkipass.card_no == null || oriSkipass.card_no.Trim().Equals("")) && !skipass.card_no.Trim().Equals(""))
                 {
-                    //南山出票后送打蜡券
-                    await _tHelper.GenerateTicketByAction(12, oriSkipass.member_id, 
-                        oriSkipass.order_id == null? 0: (int)oriSkipass.order_id , "");
+                    //南山出票后激活
+                    await _tHelper.ActiveTicket((int)oriSkipass.order_id);
                 }
             }
             catch
             {
 
             }
-            */
+            
 
             var l = await _db.skiPass.Where(s => (s.card_no.Trim().Equals(skipass.card_no.Trim())
                 && ((DateTime)s.reserve_date).Date == ((DateTime)skipass.reserve_date).Date))

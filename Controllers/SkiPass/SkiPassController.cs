@@ -590,9 +590,7 @@ namespace SnowmeetApi.Controllers
                 {
                     skipass.is_used = 1;
                     _context.skiPass.Entry(skipass).State = EntityState.Modified;
-
-                    //雪场取票后，发放打蜡券
-                    //await _tHelper.GenerateTicketByAction(12, skipass.member_id, (int)skipass.order_id, "");
+                    await _tHelper.ActiveTicket((int)skipass.order_id);
                 }
             }
             await _context.SaveChangesAsync();
