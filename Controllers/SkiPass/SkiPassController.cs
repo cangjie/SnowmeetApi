@@ -246,9 +246,7 @@ namespace SnowmeetApi.Controllers
                 _context.skiPass.Entry(skipass).State = EntityState.Modified;
                 await _context.SaveChangesAsync();
             }
-            return Ok(skipass);
-           
-           
+            return Ok(skipass);    
         }
 
 
@@ -395,11 +393,27 @@ namespace SnowmeetApi.Controllers
             for (int i = 0; i < skipassList.Count; i++)
             {
                 Models.SkiPass.SkiPass skipass = skipassList[i];
+                await SendTicket(skipass);
                 if (!skipass.resort.Trim().Equals("南山"))
                 {
                     await AutoReserve(skipass.id);
                 }
             }
+            
+
+        }
+
+        [NonAction]
+        public async Task SendTicket(Models.SkiPass.SkiPass skipass)
+        {
+            if (skipass.product_name.Trim().IndexOf("租板") >= 0)
+            {
+                return;
+            }
+
+            TicketController _ticketHelper = new TicketController(_context, _config);
+            Models.Ticket.Ticket ticket = await _ticketHelper.GenerateTicketByAction(12, 
+                skipass.member_id, skipass.order_id == null? 0 : (int)skipass.order_id, "");
         }
 
         [HttpGet]
@@ -489,6 +503,10 @@ namespace SnowmeetApi.Controllers
         public async Task RefundCallBack(int paymentId)
         {
             OrderPayment payment = await _context.OrderPayment.FindAsync(paymentId);
+
+            TicketController _ticketHelper = new TicketController(_context, _config);
+            await _ticketHelper.Cancel(payment.order_id);
+
             Models.SkiPass.SkiPass skipass = await _context.skiPass
                 .Where(s => (s.valid == 1 && s.order_id == payment.order_id))
                 .OrderByDescending(s => s.id).FirstAsync();

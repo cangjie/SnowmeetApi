@@ -33,6 +33,12 @@ namespace SnowmeetApi.Models.Ticket
 
         public DateTime expire_date { get; set; } = DateTime.MaxValue;
 
+        public string create_memo {get; set;} = "";
+        public int? order_id {get; set;}
+        public DateTime accepted_time {get; set;} = DateTime.Now;
+        public string user_memo {get; set;} = "";
+        
+
         [NotMapped]
         public string status
         {
