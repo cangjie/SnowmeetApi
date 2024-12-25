@@ -246,7 +246,7 @@ namespace SnowmeetApi.Controllers.SkiPass
             try
             {
                 TicketController _tHelper = new TicketController(_db, _config);
-                Models.SkiPass.SkiPass oriSkipass = await _db.skiPass.FindAsync(skipass.id);
+                Models.SkiPass.SkiPass oriSkipass = await _db.skiPass.Where(s => s.id == skipass.id).AsNoTracking().FirstAsync();
                 if ((oriSkipass.card_no == null || oriSkipass.card_no.Trim().Equals("")) && !skipass.card_no.Trim().Equals(""))
                 {
                     //南山出票后送打蜡券
