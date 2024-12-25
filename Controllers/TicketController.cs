@@ -420,7 +420,7 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet]
-        public async Task<Ticket> GenerateTicketByAction(int templateId, int memberId, int orderId = 0, string createMemo = "")
+        public async Task<Ticket> GenerateTicketByAction(int templateId, int memberId, int isActive = 1, int orderId = 0, string createMemo = "")
         {
             TicketTemplate template = await _context.TicketTemplate.FindAsync(templateId);
             if (template == null)
@@ -460,7 +460,8 @@ namespace SnowmeetApi.Controllers
                 create_date = DateTime.Now,
                 channel = "",
                 order_id = orderId == 0 ? null : orderId,
-                create_memo = createMemo
+                create_memo = createMemo,
+                is_active = isActive
             };
             await _context.Ticket.AddAsync(ticket);
             await _context.SaveChangesAsync();

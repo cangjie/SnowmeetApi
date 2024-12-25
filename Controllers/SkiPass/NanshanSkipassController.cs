@@ -242,7 +242,7 @@ namespace SnowmeetApi.Controllers.SkiPass
             {
                 return BadRequest();
             }
-
+            /*
             try
             {
                 TicketController _tHelper = new TicketController(_db, _config);
@@ -258,7 +258,7 @@ namespace SnowmeetApi.Controllers.SkiPass
             {
 
             }
-
+            */
 
             var l = await _db.skiPass.Where(s => (s.card_no.Trim().Equals(skipass.card_no.Trim())
                 && ((DateTime)s.reserve_date).Date == ((DateTime)skipass.reserve_date).Date))

@@ -401,9 +401,12 @@ namespace SnowmeetApi.Controllers
                 //买雪票送打蜡
                 try
                 {
+                    /*
                     TicketController _tHelper = new TicketController(_context, _config);
-                    await _tHelper.GenerateTicketByAction(12, skipass.member_id, 
+                    await _tHelper.GenerateTicketByAction(12, skipass.member_id, 0,
                             skipass.order_id == null? 0: (int)skipass.order_id , "");
+                    */
+                    await SendTicket(skipass);
                     
                 }
                 catch
@@ -423,7 +426,7 @@ namespace SnowmeetApi.Controllers
 
             TicketController _ticketHelper = new TicketController(_context, _config);
             Models.Ticket.Ticket ticket = await _ticketHelper.GenerateTicketByAction(12, 
-                skipass.member_id, skipass.order_id == null? 0 : (int)skipass.order_id, "");
+                skipass.member_id, 0, skipass.order_id == null? 0 : (int)skipass.order_id, "");
         }
 
         [HttpGet]
@@ -589,7 +592,7 @@ namespace SnowmeetApi.Controllers
                     _context.skiPass.Entry(skipass).State = EntityState.Modified;
 
                     //雪场取票后，发放打蜡券
-                    await _tHelper.GenerateTicketByAction(12, skipass.member_id, (int)skipass.order_id, "");
+                    //await _tHelper.GenerateTicketByAction(12, skipass.member_id, (int)skipass.order_id, "");
                 }
             }
             await _context.SaveChangesAsync();
