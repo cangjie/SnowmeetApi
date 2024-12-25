@@ -382,7 +382,7 @@ namespace SnowmeetApi.Controllers
             
 
             Ticket ticket = await _context.Ticket.FindAsync(code);
-            if (ticket == null)
+            if (ticket == null || ticket.is_active != 1)
             {
                 return NotFound();
             }
