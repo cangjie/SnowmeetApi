@@ -393,14 +393,12 @@ namespace SnowmeetApi.Controllers
             for (int i = 0; i < skipassList.Count; i++)
             {
                 Models.SkiPass.SkiPass skipass = skipassList[i];
-                await SendTicket(skipass);
+                //await SendTicket(skipass);
                 if (!skipass.resort.Trim().Equals("南山"))
                 {
                     await AutoReserve(skipass.id);
                 }
             }
-            
-
         }
 
         [NonAction]
@@ -830,24 +828,6 @@ namespace SnowmeetApi.Controllers
                 hidden = p.hidden
             };
             return Ok(ret);
-
-/*
-
-
-            var l = await _context.SkiPass//.Include(s => s.dailyPrice)
-                .Join(_context.Product, s=>s.product_id, p=>p.id,
-                (s, p)=> new {s.product_id, s.resort, s.rules, s.source, s.third_party_no, p.name, p.shop, 
-                s.commonDayDealPrice, 
-                s.weekendDealPrice, 
-                s.dailyPrice, 
-                s.avaliablePriceList,
-                p.sale_price, p.market_price, p.cost, p.type, p.hidden })
-                .Where(p => p.product_id == productId).AsNoTracking().FirstAsync();
-            /*l.dailyPrice = await _context.skipassDailyPrice
-                .Where(s => s.product_id == l.product_id).OrderBy(l => l.reserve_date)
-                .AsNoTracking().ToListAsync();
-            return Ok(l);
-            */
         }
 
         [HttpGet("{priceId}")]

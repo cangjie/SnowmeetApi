@@ -352,7 +352,7 @@ namespace SnowmeetApi.Controllers
             return price;
         }
 
-        [NonAction]
+        [HttpGet]
         public ZiwoyouOrder GetOrder(int orderId)
         {
             string postData = "{\"apikey\": \"" + apiKey + "\",\"custId\": " + custId.Trim()
