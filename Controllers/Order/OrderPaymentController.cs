@@ -388,7 +388,12 @@ namespace SnowmeetApi.Controllers.Order
         {
             
             OrderPayment payment = await _context.OrderPayment.FindAsync(paymentId);
-            
+            OrderOnline order = await _context.OrderOnlines.FindAsync(payment.order_id);
+            bool share = false;
+            if (order.referee_member_id > 0)
+            {
+                share = true;
+            }
 
             switch(payment.pay_method.Trim())
             {
@@ -399,7 +404,7 @@ namespace SnowmeetApi.Controllers.Order
                     _context.OrderPayment.Entry(payment).State = EntityState.Modified;
                     await _context.SaveChangesAsync();
                     TenpayController tenpayHelper = new TenpayController(_context, _originConfig, _httpContextAccessor);
-                    payment = await tenpayHelper.TenpayRequest(paymentId, sessionKey);
+                    payment = await tenpayHelper.TenpayRequest(paymentId, sessionKey, share);
                     break;
                 case "支付宝":
                     AliController aliHelper = new AliController(_context, _originConfig, _httpContextAccessor);
@@ -521,12 +526,18 @@ namespace SnowmeetApi.Controllers.Order
         {
             reason = Util.UrlDecode(reason);
             sessionKey = Util.UrlDecode(sessionKey);
-            
-            if (!(await _memberHelper.isStaff(sessionKey, sessionType)))
+
+            OrderPayment payment = await _context.OrderPayment.FindAsync(paymentId);
+
+
+            Models.Users.Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);        
+
+            if (!(await _memberHelper.isStaff(sessionKey, sessionType)) 
+                && !payment.open_id.Trim().Equals(member.wechatMiniOpenId.Trim()))
             {
                 return BadRequest();
             }
-            Models.Users.Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
+            
 
             
 
@@ -539,7 +550,7 @@ namespace SnowmeetApi.Controllers.Order
             */
 
 
-            OrderPayment payment = await _context.OrderPayment.FindAsync(paymentId);
+            
             if (!payment.status.Equals("支付成功"))
             {
                 return BadRequest();

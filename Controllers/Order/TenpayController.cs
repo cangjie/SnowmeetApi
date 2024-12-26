@@ -60,7 +60,6 @@ namespace SnowmeetApi.Controllers
         [NonAction]
         public async Task<OrderPayment> TenpayRequest(int paymentId, string sessionKey, bool profitShare = false)
         {
-
             sessionKey = Util.UrlDecode(sessionKey.Trim());
             UnicUser user = await UnicUser.GetUnicUserAsync(sessionKey, _db);
             if (user == null)
