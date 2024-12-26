@@ -315,7 +315,7 @@ namespace SnowmeetApi.Controllers.SkiPass
 
         [HttpGet("{productId}")]
         public async Task<ActionResult<object>> ReserveSkiPass(int productId, DateTime date, 
-            int count, string cell, string name, string sessionKey, string sessionType = "wechat_mini_openid")
+            int count, string cell, string name, string sessionKey, int refereeMemberId = 0, string sessionType = "wechat_mini_openid")
         {
             Models.Product.Product product = await _db.Product.FindAsync(productId);
             UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _db);
@@ -359,7 +359,8 @@ namespace SnowmeetApi.Controllers.SkiPass
                 open_id = member.wechatMiniOpenId,
                 staff_open_id = "",
                 memo = "",
-                pay_method = "微信支付"
+                pay_method = "微信支付",
+                referee_member_id = refereeMemberId
             };
             await _db.OrderOnlines.AddAsync(order);
             await _db.SaveChangesAsync();
