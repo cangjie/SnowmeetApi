@@ -998,12 +998,12 @@ namespace SnowmeetApi.Controllers.Order
         }
 
         [NonAction]
-        public async Task<ActionResult<PaymentShare>> SubmitShare(int shareId)
+        public async Task<PaymentShare> SubmitShare(int shareId)
         {
             PaymentShare share = await _context.paymentShare.FindAsync(shareId);
             if (share == null)
             {
-                return BadRequest();
+                return null;
             }
             OrderPayment payment = await _context.OrderPayment.FindAsync(share.payment_id);
             //PaymentShare share = new PaymentShare();
@@ -1020,8 +1020,27 @@ namespace SnowmeetApi.Controllers.Order
                 default:
                     break;
             }
-            return Ok(share);
+            return share;
         }
+        [NonAction]
+        public async Task ShareFinish(int paymentId, string description)
+        {
+            OrderPayment payment = await _context.OrderPayment.FindAsync(paymentId);
+            if (payment == null)
+            {
+                return;
+            }
+            switch(payment.pay_method)
+            {
+                case "微信支付":
+                    TenpayController _tenHelper = new TenpayController(_context, _originConfig, _httpContextAccessor);
+                    await _tenHelper.ShareFinish(paymentId, description);
+                    break;
+                default:
+                    break;
+            }
+        }
+
        
         private bool OrderPaymentExists(int id)
         {

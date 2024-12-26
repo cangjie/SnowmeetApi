@@ -34,6 +34,7 @@ namespace SnowmeetApi.Controllers
         private OrderPaymentController _refundHelper;
 
         private WanlongZiwoyouHelper _zwHelper;
+        private IHttpContextAccessor _http;
 
         public SkiPassController(ApplicationDBContext context, IConfiguration config, IHttpContextAccessor http)
         {
@@ -42,6 +43,7 @@ namespace SnowmeetApi.Controllers
             _memberHelper = new MemberController(context,  config);
             _refundHelper = new OrderPaymentController(context, config, http);
             _zwHelper = new WanlongZiwoyouHelper(context, config);
+            _http = http;
         }
 
         [HttpGet("{id}")]
@@ -672,6 +674,46 @@ namespace SnowmeetApi.Controllers
 
             return Ok(order);
         }
+        [NonAction]
+        public async Task CommitSkipass(int skipassId)
+        {
+            Models.SkiPass.SkiPass skipass = await _context.skiPass.FindAsync(skipassId);
+           
+            if (skipass == null)
+            {
+                return;
+            }
+             List<Models.Order.OrderPayment> pl = await _context.OrderPayment
+                .Where(p => p.order_id == skipass.order_id && p.status.Trim().Equals("支付成功"))
+                .AsNoTracking().ToListAsync(); 
+            if (skipass.order_id != null)
+            {
+                TicketController _tHelper = new TicketController(_context, _config);
+                await _tHelper.ActiveTicket((int)skipass.order_id);
+
+                var shareList = await _context.paymentShare
+                    .Where(s => s.order_id == (int)skipass.order_id && s.state == 0 && s.submit_date == null)
+                    .AsNoTracking().ToListAsync();
+                if (shareList != null && shareList.Count > 0)
+                {
+                    OrderPaymentController _paymentHelper = new OrderPaymentController(_context, _config, _http);
+                    for(int i = 0; i < shareList.Count; i++)
+                    {
+                        Models.Order.PaymentShare share = shareList[i];
+                         
+                        await _paymentHelper.SubmitShare(share.id);
+                        await _paymentHelper.ShareFinish(share.payment_id, "雪票分账结束");
+
+                    }
+                    
+                }
+            }
+
+            
+            
+        }
+
+
         [HttpGet]
         public async Task<ActionResult<List<SkipassWithPrice>>> GetProductsByResort(string resort, int showHidden = 0)
         {
