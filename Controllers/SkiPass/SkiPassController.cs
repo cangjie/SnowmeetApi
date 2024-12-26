@@ -678,7 +678,8 @@ namespace SnowmeetApi.Controllers
         [NonAction]
         public async Task CommitSkipass(int skipassId)
         {
-            Models.SkiPass.SkiPass skipass = await _context.skiPass.FindAsync(skipassId);
+            Models.SkiPass.SkiPass skipass = await _context.skiPass.Where(s => s.id == skipassId)
+                .AsNoTracking().FirstAsync();
            
             if (skipass == null)
             {
