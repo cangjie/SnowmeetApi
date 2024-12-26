@@ -640,6 +640,17 @@ namespace SnowmeetApi.Controllers
 
             
 
+            
+            
+
+
+            order.payments = new OrderPayment[] { payment };
+
+            member.real_name = name;
+            _context.member.Entry(member).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
+            await _memberHelper.UpdateDetailInfo(member.id, cell, "cell", false);
+
             if (refereeMemberId > 0)
             {
                 Models.Order.Kol k = await _memberHelper.GetKol(refereeMemberId);
@@ -658,15 +669,6 @@ namespace SnowmeetApi.Controllers
                 await _context.paymentShare.AddAsync(share);
                 await _context.SaveChangesAsync();
             }
-            
-
-
-            order.payments = new OrderPayment[] { payment };
-
-            member.real_name = name;
-            _context.member.Entry(member).State = EntityState.Modified;
-            await _context.SaveChangesAsync();
-            await _memberHelper.UpdateDetailInfo(member.id, cell, "cell", false);
 
             return Ok(order);
         }

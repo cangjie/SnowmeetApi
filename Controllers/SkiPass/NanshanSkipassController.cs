@@ -404,6 +404,27 @@ namespace SnowmeetApi.Controllers.SkiPass
             await _db.SaveChangesAsync();
             await _memberHelper.UpdateDetailInfo(member.id, cell, "cell", false);
 
+
+            if (refereeMemberId > 0)
+            {
+                Models.Order.Kol k = await _memberHelper.GetKol(refereeMemberId);
+                PaymentShare share = new PaymentShare()
+                {
+                    id = 0,
+                    payment_id = payment.id,
+                    order_id = payment.order_id,
+                    kol_id = k.id,
+                    amount = 1,
+                    memo = "南山雪票佣金",
+                    state = 0,
+                    ret_msg = "",
+                    out_trade_no = payment.out_trade_no + "_FZ_" + DateTime.Now.ToString("yyyyMMdd") + "_01"
+                };
+                await _db.paymentShare.AddAsync(share);
+                await _db.SaveChangesAsync();
+            }
+
+
             return Ok(order);
         }
         [HttpGet]
