@@ -233,6 +233,7 @@ namespace SnowmeetApi.Controllers.SkiPass
                 .AsNoTracking().ToListAsync();
         }
 
+
        
         [HttpPost]
         public async Task<ActionResult<Models.SkiPass.SkiPass>> UpdateSkiPass([FromBody] Models.SkiPass.SkiPass skipass, 
@@ -251,6 +252,9 @@ namespace SnowmeetApi.Controllers.SkiPass
                 {
                     //南山出票后激活
                     await _tHelper.ActiveTicket((int)oriSkipass.order_id);
+
+
+
                 }
             }
             catch

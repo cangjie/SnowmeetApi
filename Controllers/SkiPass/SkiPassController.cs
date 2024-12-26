@@ -250,133 +250,7 @@ namespace SnowmeetApi.Controllers
         }
 
 
-        /*
-        [HttpGet("{productId}")]
-        public async Task<ActionResult<object>> ReserveSkiPass(int productId, DateTime date, int count, string cell, string name, string sessionKey)
-        {
-            sessionKey = Util.UrlDecode(sessionKey);
-            Product product = await _context.Product.FindAsync(productId);
-            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
-            if (user == null || product == null)
-            {
-                return BadRequest();
-            }
-            OrderOnline order = (await CreateSkiPassOrder(new Product[] { product }, user, null, date, count));
-
-            order.cell_number = cell.Trim();
-            order.name = name.Trim();
-            _context.Entry(order).State = EntityState.Modified;
-
-
-
-
-            //MiniAppUser miniUser = await _context.MiniAppUsers.FindAsync(order.open_id.Trim());
-            Member miniUser = await _memberHelper.GetMember(order.open_id.Trim(), "wechat_mini_openid");
-            if (miniUser != null)
-            {
-                if (miniUser.real_name.Trim().Length <= 1)
-                {
-                    miniUser.real_name = name;
-                }
-                if (miniUser.cell.Length != 11)
-                {
-                    await _memberHelper.UpdateDetailInfo(miniUser.id, cell.Trim(), "cell", false);
-                    //miniUser.cell = cell.Trim();
-                }
-                _context.Entry(miniUser).State = EntityState.Modified;
-            }
-            await _context.SaveChangesAsync();
-            return order;
-        }
-        */
-        /*
-        [HttpGet("{productId}")]
-        public async Task<ActionResult<object>> PlaceSkiPassOrderNanshan(int productId, DateTime date, int count, string sessionKey)
-        {
-            sessionKey = Util.UrlDecode(sessionKey);
-            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
-            Product productTicket = await _context.Product.FindAsync(productId);
-            if (user == null || !user.isAdmin || productTicket == null)
-            {
-                return BadRequest();
-            }
-            Product productService = await _context.Product.FindAsync(297);
-            return (await CreateSkiPassOrder(new Product[] { productTicket, productService }, null, user, date, count));
-        }
-
-        */
-        /*
-        [NonAction]
-        public async Task<OrderOnline> CreateSkiPassOrder(Product[] prodctArr, UnicUser? user, UnicUser? staff, DateTime date, int count)
-        {
-            double totalPrice = 0;
-            string openId = "";
-            string staffOpenId = "";
-            bool needRent = false;
-
-            if (user != null)
-            {
-                openId = user.miniAppOpenId.Trim();
-            }
-            if (staff != null)
-            {
-                staffOpenId = staff.miniAppOpenId.Trim();
-            }
-            for (int i = 0; i < prodctArr.Length; i++)
-            {
-                totalPrice = totalPrice + (prodctArr[i].deposit + prodctArr[i].sale_price) * count;
-                if (prodctArr[i].name.IndexOf("租") >= 0)
-                {
-                    needRent = true;
-                }
-                
-            }
-            OrderOnline order = new OrderOnline()
-            {
-                type = "雪票",
-                shop = prodctArr[0].shop.Trim(),
-                order_price = totalPrice,
-                order_real_pay_price = totalPrice,
-                final_price = totalPrice,
-                open_id = openId.Trim(),
-                staff_open_id = staffOpenId.Trim(),
-                memo = "{ \"use_date\": \"" + date.Year.ToString() + "-" + date.Month.ToString().PadLeft(2, '0') + "-" + date.Day.ToString().PadLeft(2, '0') + "\", \"rent\" : \"" + (needRent? "1" : "0") + "\"}"
-            };
-            await _context.AddAsync(order);
-            await _context.SaveChangesAsync();
-            if (order.id > 0)
-            {
-                for (int i = 0; i < prodctArr.Length; i++)
-                {
-                    OrderOnlineDetail detail = new OrderOnlineDetail()
-                    {
-                        OrderOnlineId = order.id,
-                        product_id = prodctArr[i].id,
-                        count = count,
-                        product_name = prodctArr[i].name.Trim(),
-                        retail_price = prodctArr[i].sale_price,
-                        price = prodctArr[i].sale_price
-                    };
-                    await _context.AddAsync(detail);
-                    await _context.SaveChangesAsync();
-                }
-                
-            }
-
-            OrderPayment payment = new OrderPayment()
-            {
-                order_id = order.id,
-                pay_method = order.pay_method.Trim(),
-                amount = order.final_price,
-                status = "待支付",
-                staff_open_id = (staff != null) ? staff.miniAppOpenId : ""
-            };
-            await _context.OrderPayment.AddAsync(payment);
-            await _context.SaveChangesAsync();
-            order.payments = new OrderPayment[] { payment };
-            return order;
-        }
-        */
+       
         
         [NonAction]
         public async Task CreateSkiPass(OrderOnline order)
@@ -757,10 +631,36 @@ namespace SnowmeetApi.Controllers
             };
             await _context.OrderPayment.AddAsync(payment);
 
+            
+
             skipass.order_id = order.id;
             await _context.skiPass.AddAsync(skipass);
             
             await _context.SaveChangesAsync();
+
+            
+
+            if (refereeMemberId > 0)
+            {
+                Models.Order.Kol k = await _memberHelper.GetKol(refereeMemberId);
+                PaymentShare share = new PaymentShare()
+                {
+                    id = 0,
+                    payment_id = payment.id,
+                    order_id = payment.order_id,
+                    kol_id = k.id,
+                    amount = 1,
+                    memo = "雪票佣金",
+                    state = 0,
+                    ret_msg = "",
+                    out_trade_no = payment.out_trade_no + "_FZ_" + DateTime.Now.ToString("yyyyMMdd") + "_01"
+                };
+                await _context.paymentShare.AddAsync(share);
+                await _context.SaveChangesAsync();
+            }
+            
+
+
             order.payments = new OrderPayment[] { payment };
 
             member.real_name = name;

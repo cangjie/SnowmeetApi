@@ -967,7 +967,7 @@ namespace SnowmeetApi.Controllers.Order
             return BadRequest();
         }
 
-        [HttpGet]
+        [NonAction]
         public async Task<PaymentShare> CreateShare(int paymentId, double amount, string memo, int kolId)
         {
             OrderPayment payment = await _context.OrderPayment.FindAsync(paymentId);
@@ -997,7 +997,7 @@ namespace SnowmeetApi.Controllers.Order
             return share;
         }
 
-        [HttpGet]
+        [NonAction]
         public async Task<ActionResult<PaymentShare>> SubmitShare(int shareId)
         {
             PaymentShare share = await _context.paymentShare.FindAsync(shareId);

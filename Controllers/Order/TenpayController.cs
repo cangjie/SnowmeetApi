@@ -676,7 +676,7 @@ namespace SnowmeetApi.Controllers
             {
                 try
                 {
-                    await ShareFinish(pList[i].id);
+                    await ShareFinish(pList[i].id, "");
                 }
                 catch
                 {
@@ -686,7 +686,7 @@ namespace SnowmeetApi.Controllers
         }
 
         [NonAction]
-        public async Task ShareFinish(int paymentId)
+        public async Task ShareFinish(int paymentId, string description)
         {
             OrderPayment payment = await _db.OrderPayment.FindAsync(paymentId);
             WechatTenpayClient client = await GetClient((int)payment.mch_id);
@@ -696,7 +696,7 @@ namespace SnowmeetApi.Controllers
             {
                 TransactionId = payment.wepay_trans_id,
                 OutOrderNumber = payment.out_trade_no.Trim(),
-                Description = "误操作，解除冻结"
+                Description = description
             };
             var res = await client.ExecuteSetProfitSharingOrderUnfrozenAsync(req);
 
