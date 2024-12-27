@@ -685,9 +685,11 @@ namespace SnowmeetApi.Controllers
             {
                 return;
             }
+            /*
              List<Models.Order.OrderPayment> pl = await _context.OrderPayment
                 .Where(p => p.order_id == skipass.order_id && p.status.Trim().Equals("支付成功"))
                 .AsNoTracking().ToListAsync(); 
+            */
             if (skipass.order_id != null)
             {
                 TicketController _tHelper = new TicketController(_context, _config);
@@ -699,13 +701,12 @@ namespace SnowmeetApi.Controllers
                 if (shareList != null && shareList.Count > 0)
                 {
                     OrderPaymentController _paymentHelper = new OrderPaymentController(_context, _config, _http);
+                    int paymentId = 0;
                     for(int i = 0; i < shareList.Count; i++)
                     {
                         Models.Order.PaymentShare share = shareList[i];
-                         
                         await _paymentHelper.SubmitShare(share.id);
-                        //await _paymentHelper.ShareFinish(share.payment_id, "雪票分账结束");
-
+                        await _paymentHelper.ShareFinish(share.payment_id, "雪票分账结束"); 
                     }
                     
                 }
