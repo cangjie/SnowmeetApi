@@ -29,7 +29,7 @@ namespace SnowmeetApi.Controllers.User
         {
             var rl = await _db.referee.Where(r => r.consume_type.Trim().Equals(cosumeType.Trim()) && r.member_id == memberId)
                 .AsNoTracking().ToListAsync();
-            if (rl == null && rl.Count == 0)
+            if (rl == null || rl.Count == 0)
             {
                 return null;
             }
