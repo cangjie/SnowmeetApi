@@ -388,9 +388,16 @@ namespace SnowmeetApi.Controllers.Order
         {
             
             OrderPayment payment = await _context.OrderPayment.FindAsync(paymentId);
-            OrderOnline order = await _context.OrderOnlines.FindAsync(payment.order_id);
+            if (payment == null)
+            {
+                return NotFound();
+            }
+
+            var shareList = await _context.paymentShare.Where(s => s.payment_id == payment.id && s.state == 0)
+                .AsNoTracking().ToListAsync();
+
             bool share = false;
-            if (order.referee_member_id > 0)
+            if (shareList != null && shareList.Count > 0)
             {
                 share = true;
             }
@@ -797,6 +804,10 @@ namespace SnowmeetApi.Controllers.Order
         [HttpGet("{id}")]
         public async Task<ActionResult<TenpaySet>> TenpayRequest(int id, string sessionKey)
         {
+
+
+
+            
             sessionKey = Util.UrlDecode(sessionKey.Trim());
             UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (user == null)

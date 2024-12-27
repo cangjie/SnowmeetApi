@@ -254,8 +254,8 @@ namespace SnowmeetApi.Controllers.SkiPass
                 {
                     //南山出票后激活
                     //await _tHelper.ActiveTicket((int)oriSkipass.order_id);
-                    //SkiPassController _skpHelper = new SkiPassController(_db, _config, _http);
-                    //await _skpHelper.CommitSkipass(skipass.id);
+                    SkiPassController _skpHelper = new SkiPassController(_db, _config, _http);
+                    await _skpHelper.CommitSkipass(skipass.id);
 
                 }
             }
