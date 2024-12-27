@@ -633,20 +633,9 @@ namespace SnowmeetApi.Controllers
                 out_trade_no = outTradeNo
             };
             await _context.OrderPayment.AddAsync(payment);
-
-            
-
             skipass.order_id = order.id;
             await _context.skiPass.AddAsync(skipass);
-            
             await _context.SaveChangesAsync();
-
-            
-
-            
-            
-
-
             order.payments = new OrderPayment[] { payment };
 
             member.real_name = name;
@@ -706,7 +695,19 @@ namespace SnowmeetApi.Controllers
                     {
                         Models.Order.PaymentShare share = shareList[i];
                         await _paymentHelper.SubmitShare(share.id);
-                        await _paymentHelper.ShareFinish(share.payment_id, "雪票分账结束"); 
+                        if (paymentId != share.payment_id)
+                        {
+                            if (paymentId != 0)
+                            {
+                                await _paymentHelper.ShareFinish(paymentId, "雪票分账结束"); 
+                            }
+                            paymentId = share.payment_id;
+                        }
+                        
+                    }
+                    if (paymentId != 0)
+                    {
+                        await _paymentHelper.ShareFinish(paymentId, "雪票分账结束"); 
                     }
                     
                 }
