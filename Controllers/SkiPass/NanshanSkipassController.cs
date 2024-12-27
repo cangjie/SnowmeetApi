@@ -407,17 +407,23 @@ namespace SnowmeetApi.Controllers.SkiPass
             await _db.SaveChangesAsync();
             await _memberHelper.UpdateDetailInfo(member.id, cell, "cell", false);
 
+            RefereeController _refHelper = new RefereeController(_db, _config);
+            Models.Users.Referee referee = await  _refHelper.GetReferee(member.id, "雪票");
+            if (referee != null)
+            {
+                refereeMemberId = referee.channel_member_id;
+            }
 
             if (refereeMemberId > 0)
             {
-                Models.Order.Kol k = await _memberHelper.GetKol(refereeMemberId);
+                Models.Order.Kol k = await _refHelper.GetKol(refereeMemberId);
                 PaymentShare share = new PaymentShare()
                 {
                     id = 0,
                     payment_id = payment.id,
                     order_id = payment.order_id,
                     kol_id = k.id,
-                    amount = 1,
+                    amount = 1 * count,
                     memo = "南山雪票佣金",
                     state = 0,
                     ret_msg = "",

@@ -12,6 +12,7 @@ namespace SnowmeetApi.Models.Users
         public string consume_type {get; set;}
         public int order_id {get; set;}
         public int biz_id {get; set;}
-        public int staff_member_id {get; set;}
+        public int valid {get; set;}
+        public int channel_member_id {get; set;}
     }
 }

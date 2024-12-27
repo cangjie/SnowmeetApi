@@ -14,5 +14,6 @@ namespace SnowmeetApi.Models.Order
         public int wechat_bind {get; set;}
         public int ali_bind{get;set;}
         public string memo {get; set;}
+        public int member_id {get; set;}
     }
 }

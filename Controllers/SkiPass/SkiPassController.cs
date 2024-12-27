@@ -304,8 +304,13 @@ namespace SnowmeetApi.Controllers
             if (l == null || l.Count == 0 )
             {
                 TicketController _ticketHelper = new TicketController(_context, _config);
-                Models.Ticket.Ticket ticket = await _ticketHelper.GenerateTicketByAction(12, 
-                    skipass.member_id, 0, skipass.order_id == null? 0 : (int)skipass.order_id, "");
+                for(int i = 0; i < skipass.count; i++)
+                {
+                    
+                    Models.Ticket.Ticket ticket = await _ticketHelper.GenerateTicketByAction(12, 
+                        skipass.member_id, 0, skipass.order_id == null? 0 : (int)skipass.order_id, "");
+                }
+                
             }
         }
 
@@ -643,16 +648,22 @@ namespace SnowmeetApi.Controllers
             await _context.SaveChangesAsync();
             await _memberHelper.UpdateDetailInfo(member.id, cell, "cell", false);
 
+            RefereeController _refHelper = new RefereeController(_context, _config);
+            Models.Users.Referee referee = await  _refHelper.GetReferee(member.id, "雪票");
+            if (referee != null)
+            {
+                refereeMemberId = referee.channel_member_id;
+            }
             if (refereeMemberId > 0)
             {
-                Models.Order.Kol k = await _memberHelper.GetKol(refereeMemberId);
+                Models.Order.Kol k = await _refHelper.GetKol(refereeMemberId);
                 PaymentShare share = new PaymentShare()
                 {
                     id = 0,
                     payment_id = payment.id,
                     order_id = payment.order_id,
                     kol_id = k.id,
-                    amount = 1,
+                    amount = 1 * count,
                     memo = "雪票佣金",
                     state = 0,
                     ret_msg = "",
@@ -710,12 +721,19 @@ namespace SnowmeetApi.Controllers
                         await _paymentHelper.ShareFinish(paymentId, "雪票分账结束"); 
                     }
                     
+                    OrderOnline order = await _context.OrderOnlines.FindAsync(skipass.order_id);
+                    if (order != null)
+                    {
+                        RefereeController _refHelper = new RefereeController(_context, _config);
+                        await _refHelper.SetReferee(skipass.member_id, order.referee_member_id, "雪票", order.id, skipass.id);
+                    }
+
+
                 }
             }
-
-            
-            
         }
+
+
 
 
         [HttpGet]

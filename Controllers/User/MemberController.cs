@@ -38,6 +38,7 @@ namespace SnowmeetApi.Controllers.User
             return Ok(RemoveSensitiveInfo(member));
         }
 
+        /*
         [NonAction]
         public async Task<Models.Order.Kol> GetKol(int memberId)
         {
@@ -81,7 +82,7 @@ namespace SnowmeetApi.Controllers.User
 
             return null;
         } 
-
+        */
 
         [NonAction]
         public async Task<Member> GetMemberBySessionKey(string sessionKey, string sessionType="wechat_mini_openid")
