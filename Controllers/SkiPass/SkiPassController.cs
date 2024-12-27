@@ -704,7 +704,7 @@ namespace SnowmeetApi.Controllers
                         Models.Order.PaymentShare share = shareList[i];
                          
                         await _paymentHelper.SubmitShare(share.id);
-                        await _paymentHelper.ShareFinish(share.payment_id, "雪票分账结束");
+                        //await _paymentHelper.ShareFinish(share.payment_id, "雪票分账结束");
 
                     }
                     
