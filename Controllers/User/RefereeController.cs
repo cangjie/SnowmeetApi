@@ -67,6 +67,7 @@ namespace SnowmeetApi.Controllers.User
             if (l == null || l.Count == 0)
             {
                 string openId = "";
+                
                 try
                 {
                     MemberSocialAccount msa = await _db.memberSocialAccount
@@ -80,6 +81,12 @@ namespace SnowmeetApi.Controllers.User
                 }
                 if(!openId.Trim().Equals(""))
                 {
+                    Member member = await _db.member.FindAsync(memberId);
+                     
+                    if(member == null)
+                    {
+                        return null;
+                    }
                     Models.Order.Kol k = new Models.Order.Kol()
                     {
                         id = 0,
@@ -87,7 +94,9 @@ namespace SnowmeetApi.Controllers.User
                         wechat_bind = 1,
                         wechat_open_id = openId,
                         ali_bind = 0,
-                        ali_login_name = ""
+                        ali_login_name = "",
+                        memo = "",
+                        real_name = member.real_name.Trim()
                     };
                     await _db.kol.AddAsync(k);
                     await _db.SaveChangesAsync();

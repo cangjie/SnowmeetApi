@@ -359,19 +359,14 @@ namespace SnowmeetApi.Controllers
             {
                 return;
             }
-            var l = await _context.Ticket.Where(t => t.order_id == (int)skipass.order_id)
-                .AsNoTracking().ToListAsync();
-            if (l != null && l.Count > 0 )
+            
+            TicketController _ticketHelper = new TicketController(_context, _config);
+            for(int i = 0; i < skipass.count; i++)
             {
-                TicketController _ticketHelper = new TicketController(_context, _config);
-                for(int i = 0; i < skipass.count; i++)
-                {
                     
-                    Models.Ticket.Ticket ticket = await _ticketHelper.GenerateTicketByAction(12, 
+                Models.Ticket.Ticket ticket = await _ticketHelper.GenerateTicketByAction(12, 
                         skipass.member_id, 0, skipass.order_id == null? 0 : (int)skipass.order_id, "");
-                }
-                
-            }
+            } 
         }
 
         [HttpGet]
