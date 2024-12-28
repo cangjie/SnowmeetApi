@@ -45,6 +45,14 @@ namespace SnowmeetApi.Controllers
             _zwHelper = new WanlongZiwoyouHelper(context, config);
             _http = http;
         }
+        [HttpGet]
+        public  ActionResult<List<string>> GetResorts()
+        {
+            List<string> ret = new List<string>();
+            ret.Add("万龙");
+            ret.Add("南山");
+            return Ok(ret);
+        }
 
         [HttpGet("{id}")]
         public async Task<ActionResult<object>> GetSkiPassDetailInfo(int id)
