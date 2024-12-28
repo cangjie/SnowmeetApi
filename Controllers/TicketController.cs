@@ -491,8 +491,8 @@ namespace SnowmeetApi.Controllers
                 && t.used == 0 && t.is_active == 0).ToListAsync(); 
             for(int i = 0; i < tl.Count; i++)
             {
-                tl[i].is_active = 1;
-                _context.Ticket.Entry(tl[i]).State = EntityState.Modified;
+                tl[0].is_active = 1;
+                _context.Ticket.Entry(tl[0]).State = EntityState.Modified;
             }
             await _context.SaveChangesAsync();
         }

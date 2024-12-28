@@ -254,9 +254,14 @@ namespace SnowmeetApi.Controllers
 
        
         
-        [NonAction]
-        public async Task CreateSkiPass(OrderOnline order)
+        [HttpGet]
+        public async Task CreateSkiPass(int orderId)
         {
+            OrderOnline order = await _context.OrderOnlines.FindAsync(orderId);
+            if (order == null)
+            {
+                return;
+            }
             List<Models.SkiPass.SkiPass> skipassList = await _context.skiPass
                 .Where(s => s.order_id == order.id).ToListAsync();
             for(int i = 0; i < skipassList.Count; i++)
@@ -266,6 +271,8 @@ namespace SnowmeetApi.Controllers
                 _context.skiPass.Entry(skipass).State = EntityState.Modified;
             }
             await _context.SaveChangesAsync();
+
+            //雪票生效后附赠以及分账
             for (int i = 0; i < skipassList.Count; i++)
             {
                 Models.SkiPass.SkiPass skipass = skipassList[i];
@@ -274,22 +281,75 @@ namespace SnowmeetApi.Controllers
                 {
                     await AutoReserve(skipass.id);
                 }
-                //买雪票送打蜡
                 try
                 {
-                    /*
-                    TicketController _tHelper = new TicketController(_context, _config);
-                    await _tHelper.GenerateTicketByAction(12, skipass.member_id, 0,
-                            skipass.order_id == null? 0: (int)skipass.order_id , "");
-                    */
                     await SendTicket(skipass);
-                    
                 }
                 catch
                 {
 
                 }
             }
+            await CreateShare(orderId);
+        }
+
+        [NonAction]
+        public async Task CreateShare(int orderId)
+        {
+            OrderOnline order = await _context.OrderOnlines.FindAsync(orderId);
+            if (order == null)
+            {
+                return;
+            }
+            Member member = await _memberHelper.GetMember(order.open_id.Trim(), "wechat_mini_openid");
+            if (member == null)
+            {
+                return;
+            }
+
+            RefereeController _refHelper = new RefereeController(_context, _config);
+            Models.Users.Referee referee = await  _refHelper.GetReferee(member.id, "雪票");
+            int refereeMemberId = 0;
+            if (referee != null)
+            {
+                refereeMemberId = referee.channel_member_id;
+            }
+            else
+            {
+                refereeMemberId = order.referee_member_id;
+            }
+            if (refereeMemberId == 0)
+            {
+                return;
+            }
+            List<Models.SkiPass.SkiPass> skipasses = await _context.skiPass
+                .Where(s => s.valid == 1 && s.order_id == orderId)
+                .AsNoTracking().ToListAsync();
+            Models.Order.Kol kol = await _refHelper.GetKol(refereeMemberId);
+            List<OrderPayment> payments = await _context.OrderPayment
+                .Where(p => p.status.Trim().Equals("支付成功") && p.order_id == orderId)
+                .AsNoTracking().ToListAsync();
+            if (payments == null || payments.Count <= 0)
+            {
+                return;
+            }
+            for(int i = 0; i<skipasses.Count; i++)
+            {
+                PaymentShare share = new PaymentShare()
+                {
+                    id = 0,
+                    payment_id = payments[0].id,
+                    order_id = orderId,
+                    kol_id = kol.id,
+                    amount = 1 * skipasses[i].count,
+                    memo = skipasses[i].product_name + "佣金",
+                    state = 0,
+                    ret_msg = "",
+                    out_trade_no = payments[0].out_trade_no + "_FZ_" + DateTime.Now.ToString("yyyyMMdd") + "_01"
+                };
+                await _context.paymentShare.AddAsync(share);
+            }
+            await _context.SaveChangesAsync();
         }
 
         [NonAction]
@@ -301,7 +361,7 @@ namespace SnowmeetApi.Controllers
             }
             var l = await _context.Ticket.Where(t => t.order_id == (int)skipass.order_id)
                 .AsNoTracking().ToListAsync();
-            if (l == null || l.Count == 0 )
+            if (l != null && l.Count > 0 )
             {
                 TicketController _ticketHelper = new TicketController(_context, _config);
                 for(int i = 0; i < skipass.count; i++)
@@ -648,6 +708,7 @@ namespace SnowmeetApi.Controllers
             await _context.SaveChangesAsync();
             await _memberHelper.UpdateDetailInfo(member.id, cell, "cell", false);
 
+            /*
             RefereeController _refHelper = new RefereeController(_context, _config);
             Models.Users.Referee referee = await  _refHelper.GetReferee(member.id, "雪票");
             if (referee != null)
@@ -672,9 +733,84 @@ namespace SnowmeetApi.Controllers
                 await _context.paymentShare.AddAsync(share);
                 await _context.SaveChangesAsync();
             }
+            */
 
             return Ok(order);
         }
+
+        
+
+        [HttpGet]
+        public async Task CommitSkipassOrder(int orderId)
+        {
+            List<Models.SkiPass.SkiPass> skipasses = await _context.skiPass
+                .Where(s => s.valid == 1 && s.order_id == orderId)
+                .AsNoTracking().ToListAsync();
+            bool allFinish = true;
+            int memberId = 0;
+            int skipassId = 0;
+            for(int i = 0; i < skipasses.Count; i++)
+            {
+                if (memberId == 0)
+                {
+                    memberId = skipasses[i].member_id;
+                }
+                if (skipassId == 0)
+                {
+                    skipassId = skipasses[i].id;
+                }
+                if (skipasses[i].CanRefund)
+                {
+                    allFinish = false;
+                    break;
+                }
+            }
+            if (allFinish)
+            {
+                TicketController _tHelper = new TicketController(_context, _config);
+                await _tHelper.ActiveTicket((int)orderId);
+                var shareList = await _context.paymentShare
+                    .Where(s => s.order_id == orderId && s.state == 0 && s.submit_date == null)
+                    .AsNoTracking().ToListAsync();
+
+
+
+                if (shareList != null && shareList.Count > 0)
+                {
+                    OrderPaymentController _paymentHelper = new OrderPaymentController(_context, _config, _http);
+                    int paymentId = 0;
+                    for(int i = 0; i < shareList.Count; i++)
+                    {
+                        Models.Order.PaymentShare share = shareList[i];
+                        await _paymentHelper.SubmitShare(share.id);
+                        if (paymentId != share.payment_id)
+                        {
+                            if (paymentId != 0)
+                            {
+                                await _paymentHelper.ShareFinish(paymentId, "雪票分账结束"); 
+                            }
+                            paymentId = share.payment_id;
+                        }
+                        
+                    }
+                    if (paymentId != 0)
+                    {
+                        await _paymentHelper.ShareFinish(paymentId, "雪票分账结束"); 
+                    }
+                    
+                    OrderOnline order = await _context.OrderOnlines.FindAsync(orderId);
+                    if (order != null)
+                    {
+                        RefereeController _refHelper = new RefereeController(_context, _config);
+                        await _refHelper.SetReferee(memberId, order.referee_member_id, "雪票", order.id, skipassId);
+                    }
+                }
+
+            }
+        }
+
+
+        
         [NonAction]
         public async Task CommitSkipass(int skipassId)
         {
@@ -695,9 +831,14 @@ namespace SnowmeetApi.Controllers
                 TicketController _tHelper = new TicketController(_context, _config);
                 await _tHelper.ActiveTicket((int)skipass.order_id);
 
+                
+
                 var shareList = await _context.paymentShare
                     .Where(s => s.order_id == (int)skipass.order_id && s.state == 0 && s.submit_date == null)
                     .AsNoTracking().ToListAsync();
+
+
+
                 if (shareList != null && shareList.Count > 0)
                 {
                     OrderPaymentController _paymentHelper = new OrderPaymentController(_context, _config, _http);
@@ -727,8 +868,6 @@ namespace SnowmeetApi.Controllers
                         RefereeController _refHelper = new RefereeController(_context, _config);
                         await _refHelper.SetReferee(skipass.member_id, order.referee_member_id, "雪票", order.id, skipass.id);
                     }
-
-
                 }
             }
         }

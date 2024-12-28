@@ -166,5 +166,21 @@ namespace SnowmeetApi.Models.SkiPass
             }
 
         }
+
+        public bool CanRefund
+        {
+            get
+            {
+                bool ret = true;
+                if (resort.Trim().Equals("南山"))
+                {
+                    if (status.Trim().Equals("已出票"))
+                    {
+                        ret = false;
+                    }
+                }
+                return ret;
+            }
+        }
     }
 }

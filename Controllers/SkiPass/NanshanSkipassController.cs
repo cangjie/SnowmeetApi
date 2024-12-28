@@ -255,7 +255,10 @@ namespace SnowmeetApi.Controllers.SkiPass
                     //南山出票后激活
                     //await _tHelper.ActiveTicket((int)oriSkipass.order_id);
                     SkiPassController _skpHelper = new SkiPassController(_db, _config, _http);
-                    await _skpHelper.CommitSkipass(skipass.id);
+                    if (skipass.order_id != null)
+                    {
+                        await _skpHelper.CommitSkipassOrder((int)skipass.order_id);
+                    }
 
                 }
             }
@@ -407,6 +410,8 @@ namespace SnowmeetApi.Controllers.SkiPass
             await _db.SaveChangesAsync();
             await _memberHelper.UpdateDetailInfo(member.id, cell, "cell", false);
 
+            /*
+
             RefereeController _refHelper = new RefereeController(_db, _config);
             Models.Users.Referee referee = await  _refHelper.GetReferee(member.id, "雪票");
             if (referee != null)
@@ -432,7 +437,7 @@ namespace SnowmeetApi.Controllers.SkiPass
                 await _db.paymentShare.AddAsync(share);
                 await _db.SaveChangesAsync();
             }
-
+            */
 
             return Ok(order);
         }

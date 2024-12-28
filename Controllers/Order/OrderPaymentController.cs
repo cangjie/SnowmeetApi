@@ -150,7 +150,7 @@ namespace SnowmeetApi.Controllers.Order
                     break;
                 case "雪票":
                     SkiPassController skiPassHelper = new SkiPassController(_context, _originConfig, _httpContextAccessor);
-                    await skiPassHelper.CreateSkiPass(order);
+                    await skiPassHelper.CreateSkiPass(order.id);
                     break;
                 case "押金":
                     List<RentOrder> rentOrderList = await _context.RentOrder
