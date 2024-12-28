@@ -244,7 +244,7 @@ namespace SnowmeetApi.Controllers.SkiPass
                 return BadRequest();
             }
             
-
+            bool needFinish = false;
             
             try
             {
@@ -254,10 +254,11 @@ namespace SnowmeetApi.Controllers.SkiPass
                 {
                     //南山出票后激活
                     //await _tHelper.ActiveTicket((int)oriSkipass.order_id);
-                    SkiPassController _skpHelper = new SkiPassController(_db, _config, _http);
+                    //SkiPassController _skpHelper = new SkiPassController(_db, _config, _http);
                     if (skipass.order_id != null)
                     {
-                        await _skpHelper.CommitSkipassOrder((int)skipass.order_id);
+                        needFinish = true;
+                        //await _skpHelper.CommitSkipassOrder((int)skipass.order_id);
                     }
 
                 }
@@ -280,6 +281,11 @@ namespace SnowmeetApi.Controllers.SkiPass
 
             _db.skiPass.Entry(skipass).State = EntityState.Modified;
             await _db.SaveChangesAsync();
+            if (needFinish)
+            {
+                SkiPassController _skpHelper = new SkiPassController(_db, _config, _http);
+                await _skpHelper.CommitSkipassOrder((int)skipass.order_id);
+            }
             return Ok(skipass);
         }
 
