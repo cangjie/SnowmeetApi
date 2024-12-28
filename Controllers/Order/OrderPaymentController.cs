@@ -392,12 +392,16 @@ namespace SnowmeetApi.Controllers.Order
             {
                 return NotFound();
             }
-
-            var shareList = await _context.paymentShare.Where(s => s.payment_id == payment.id && s.state == 0)
-                .AsNoTracking().ToListAsync();
+            OrderOnline order = await _context.OrderOnlines.FindAsync(payment.order_id);
+            if (order == null)
+            {
+                return NotFound();
+            }
+            //var shareList = await _context.paymentShare.Where(s => s.payment_id == payment.id && s.state == 0)
+            //    .AsNoTracking().ToListAsync();
 
             bool share = false;
-            if (shareList != null && shareList.Count > 0)
+            if (order.referee_member_id > 0)
             {
                 share = true;
             }
