@@ -378,7 +378,7 @@ namespace SnowmeetApi.Controllers
             shop = Util.UrlDecode(shop.Trim());
             sessionKey = Util.UrlDecode(sessionKey).Trim();
             UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
-            if (!user.isAdmin)
+            if (user == null || !user.isAdmin)
             {
                 return BadRequest();
             }
