@@ -178,7 +178,7 @@ namespace SnowmeetApi.Controllers.User
   
             var msaList = await _db.memberSocialAccount
                         .Where(a => (a.valid == 1 && a.num.Trim().Equals(num) && a.type.Trim().Equals(type)))
-                        .OrderByDescending(a => a.id).ToListAsync();
+                        .OrderByDescending(a => a.member_id).ToListAsync();
             if (msaList.Count == 0)
             {
                 return null;
