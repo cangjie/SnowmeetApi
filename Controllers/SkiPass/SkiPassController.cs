@@ -314,6 +314,15 @@ namespace SnowmeetApi.Controllers
                 return;
             }
 
+            List<OrderOnline> prevSkipassList = await _context.OrderOnlines
+                .Where(o => o.open_id.Trim().Equals(order.open_id.Trim()) && o.pay_state == 1 
+                && o.type.Trim().Equals("雪票") && o.id < order.id )
+                .AsNoTracking().ToListAsync();
+            if (prevSkipassList != null && prevSkipassList.Count > 0)
+            {
+                return;
+            }
+
             RefereeController _refHelper = new RefereeController(_context, _config);
             Models.Users.Referee referee = await  _refHelper.GetReferee(member.id, "雪票");
             int refereeMemberId = 0;
