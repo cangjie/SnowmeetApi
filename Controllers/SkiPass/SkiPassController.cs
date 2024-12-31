@@ -538,7 +538,10 @@ namespace SnowmeetApi.Controllers
                     skipass.is_used = 1;
                     _context.skiPass.Entry(skipass).State = EntityState.Modified;
                     //await _tHelper.ActiveTicket((int)skipass.order_id);
-                    await CommitSkipassOrder(skipass.id);
+                    if (skipass.order_id != null)
+                    {
+                        await CommitSkipassOrder((int)skipass.order_id);
+                    }
                 }
             }
             await _context.SaveChangesAsync();
