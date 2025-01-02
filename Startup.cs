@@ -98,6 +98,7 @@ namespace SnowmeetApi
             });
 
             app.UseWebSockets();
+            
 
             app.Use(async (context, next) =>
             {
