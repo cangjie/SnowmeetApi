@@ -95,7 +95,7 @@ namespace SnowmeetApi.Controllers.Order
                 };
                 await _context.AddAsync(scanNew);
                 await _context.SaveChangesAsync();
-                return scanNew.id;
+                return Ok(scanNew.id);
             }
             else
             {

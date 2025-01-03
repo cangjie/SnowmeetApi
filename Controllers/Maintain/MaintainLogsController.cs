@@ -11,6 +11,8 @@ using SnowmeetApi.Models.Maintain;
 using SnowmeetApi.Models.Users;
 using SnowmeetApi.Models;
 using SnowmeetApi.Models.Ticket;
+using SnowmeetApi.Models.Order;
+using SnowmeetApi.Controllers.User;
 
 namespace SnowmeetApi.Controllers.Maintain
 {
@@ -40,6 +42,20 @@ namespace SnowmeetApi.Controllers.Maintain
             {
                 return BadRequest();
             }
+            string customerOpenId = "";
+            try
+            {
+                ShopSaleInteract scan = await _context.ShopSaleInteract.Where(s => s.biz_id == taskId && s.scan_type.Trim().Equals("发板"))
+                    .OrderByDescending(s => s.id).AsNoTracking().FirstAsync();
+                MemberController _memberHelper = new MemberController(_context, _originConfig);
+                Member member = await _memberHelper.GetMember(scan.scaner_oa_open_id, "wechat_oa_openid");
+                customerOpenId = member.wechatMiniOpenId.Trim();
+            }
+            catch
+            {
+                
+            }
+            
             MaintainLog log = new MaintainLog()
             {
                 id = 0,
@@ -50,6 +66,7 @@ namespace SnowmeetApi.Controllers.Maintain
                 status = "已开始",
                 stop_open_id = "",
                 memo = "",
+                customer_open_id = customerOpenId.Trim(),
                 staffName = user.miniAppUser.real_name.Trim()
             };
             await _context.MaintainLog.AddAsync(log);
@@ -204,6 +221,34 @@ namespace SnowmeetApi.Controllers.Maintain
             }
 
             return log;
+        }
+
+        [HttpGet("{shopInterActId}")]
+        public async Task<ActionResult<bool>> CheckReturnScan(int shopInterActId, int taskId)
+        {
+            ShopSaleInteract scan = await _context.ShopSaleInteract.FindAsync(shopInterActId);
+            if (scan == null)
+            {
+                return NotFound();
+            }
+            MemberController _memberHelper = new MemberController(_context, _originConfig);
+            Models.Users.Member member = await _memberHelper.GetMember(scan.scaner_oa_open_id, "wechat_oa_openid");
+            if (member == null)
+            {
+                return NoContent();
+            }
+            MaintainLive task = await _context.MaintainLives.FindAsync(taskId);
+            if (task == null)
+            {
+                return NotFound();
+            }
+            if (task.open_id.Trim().Equals(member.wechatMiniOpenId.Trim()))
+            {
+                return Ok(true);
+            }
+            else{
+                return Ok(false);
+            }
         }
 
         /*
