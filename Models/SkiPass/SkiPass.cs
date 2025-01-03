@@ -128,6 +128,10 @@ namespace SnowmeetApi.Models.SkiPass
                             if (card_member_pick_time != null)
                             {
                                 status = "已出票";
+                                if (is_used == 1)
+                                {
+                                    status = "已取卡";
+                                }
                             }
                         }
                         switch(is_cancel)
@@ -175,6 +179,13 @@ namespace SnowmeetApi.Models.SkiPass
                 if (resort.Trim().Equals("南山"))
                 {
                     if (status.Trim().Equals("已出票"))
+                    {
+                        ret = false;
+                    }
+                }
+                else 
+                {
+                    if (status.Trim().Equals("已取卡"))
                     {
                         ret = false;
                     }
