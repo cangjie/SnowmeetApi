@@ -76,7 +76,7 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<object>>> GetSkiPassProduct(string resort, DateTime date, string tags)
+        public async Task<ActionResult<IEnumerable<object>>> GetSkiPassProduct(string resort, DateTime date, string tags, int showAll = 0)
         {
 
             if (date == DateTime.Parse("2025-1-1"))
@@ -138,8 +138,11 @@ namespace SnowmeetApi.Controllers
                 }
                 else if (!skiPass.DateMatch(date) || !skiPass.TagMatch(tagArr))
                 {
-                    skiPassProdustList.RemoveAt(i);
-                    i--;
+                    if (showAll == 0)
+                    {
+                        skiPassProdustList.RemoveAt(i);
+                        i--;
+                    }
                 }
 
 
