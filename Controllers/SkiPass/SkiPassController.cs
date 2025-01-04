@@ -549,6 +549,7 @@ namespace SnowmeetApi.Controllers
                 {
                     skipass.is_used = 1;
                     _context.skiPass.Entry(skipass).State = EntityState.Modified;
+                    await _context.SaveChangesAsync();
                     //await _tHelper.ActiveTicket((int)skipass.order_id);
                     if (skipass.order_id != null)
                     {
@@ -556,7 +557,7 @@ namespace SnowmeetApi.Controllers
                     }
                 }
             }
-            await _context.SaveChangesAsync();
+            
         }
 
         
