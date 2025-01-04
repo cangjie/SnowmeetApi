@@ -434,8 +434,12 @@ namespace SnowmeetApi.Controllers
             {
                 try
                 {
+                    if (item.product_id == 561)
+                    {
+                        string aa = "aa";
+                    }
                     //ZiwoyouProductDailyPrice price = GetProductPrice(int.Parse((string)item.third_party_no), DateTime.Now.Date);
-                    string priceStr = Util.GetWebContent("https://mini.snowmeet.top/core/WanlongZiwoyouHelper/GetProductPrice?productId=" + item.third_party_no.Trim() + "&date=2025-1-1" );//+ DateTime.Now.ToString("yyyy-MM-dd"));
+                    string priceStr = Util.GetWebContent("https://mini.snowmeet.top/core/WanlongZiwoyouHelper/GetProductPrice?productId=" + item.third_party_no.Trim() + "&date=" + DateTime.Now.ToString("yyyy-MM-dd") );//+ DateTime.Now.ToString("yyyy-MM-dd"));
                     ZiwoyouProductDailyPrice price = JsonConvert.DeserializeObject<ZiwoyouProductDailyPrice>(priceStr);
 
 
@@ -480,16 +484,23 @@ namespace SnowmeetApi.Controllers
                             }
                             if (revenu == 0)
                             {
-                                SkipassDailyPrice lastPrice = await _context.skipassDailyPrice
-                                    .Where(s => (s.product_id == item.product_id && s.day_type.Trim().Equals(dayType.Trim()) 
-                                    && s.valid == 1 )).OrderByDescending(s => s.reserve_date).FirstAsync();
-                                if (lastPrice != null)
+                                try
                                 {
-                                    revenu = lastPrice.deal_price - lastPrice.settlementPrice;
-                                }
-                                else
-                                {
+                                    SkipassDailyPrice lastPrice = await _context.skipassDailyPrice
+                                        .Where(s => (s.product_id == item.product_id && s.day_type.Trim().Equals(dayType.Trim()) 
+                                        && s.valid == 1 )).OrderByDescending(s => s.reserve_date).FirstAsync();
+                                    if (lastPrice != null)
+                                    {
+                                        revenu = lastPrice.deal_price - lastPrice.settlementPrice;
+                                    }
+                                    else
+                                    {
 
+                                    }
+                                }
+                                catch
+                                {
+                                    revenu = 20;
                                 }
                             }
                             SkipassDailyPrice newPrice = new SkipassDailyPrice()
