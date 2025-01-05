@@ -68,7 +68,7 @@ namespace SnowmeetApi.Models
         public string pay_memo { get; set; } = "";
 
         [NotMapped]
-        public Maintain.MaintainLog[] taskLog { get; set; }
+        public List<Maintain.MaintainLog> taskLog { get; set; }
 
         [NotMapped]
         public string status { get; set; }

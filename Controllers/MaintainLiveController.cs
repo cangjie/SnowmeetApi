@@ -14,6 +14,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Org.BouncyCastle.Asn1.X509;
 using SnowmeetApi.Controllers.Maintain;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace SnowmeetApi.Controllers
 {
@@ -39,6 +40,53 @@ namespace SnowmeetApi.Controllers
         }
 
 
+        [NonAction]
+        public async Task UpdateBrand(string brand, string type)
+        {
+            string[] brandArr = brand.Split('/');
+            string brandName = brandArr[0].Trim();
+            string brandChineseName = brandArr.Length == 2? brandArr[1].Trim() : "";
+            List<Brand> brands = await _context.Brand
+                .Where(b => b.brand_type.Trim().Equals(type.Trim()) && b.brand_name.Trim().Equals(brandName.Trim()))
+                .AsNoTracking().ToListAsync();
+            if (brands != null && brands.Count > 0)
+            {
+                return;
+            }
+            Brand newBrand = new Brand()
+            {
+                brand_type = type.Trim(),
+                brand_name = brandName.Trim(),
+                chinese_name = brandChineseName.Trim(),
+                origin = ""
+
+            };
+            await _context.Brand.AddAsync(newBrand);
+            await _context.SaveChangesAsync();
+        }
+
+        [NonAction]
+        public async Task UpdateSerial(string serial, string brand, string type)
+        {
+            List<Serial> sList = await _context.Serial
+                .Where(s => s.brand_name.Trim().Equals(brand.Trim()) 
+                && s.type.Trim().Equals(type.Trim()) && s.serial_name.Trim().Equals(serial.Trim()))
+                .AsNoTracking().ToListAsync();
+            if (sList != null && sList.Count > 0)
+            {
+                return;
+            }
+            Serial newSerial = new Serial()
+            {
+                id = 0,
+                brand_name = brand.Trim(),
+                type = type.Trim(),
+                serial_name = serial.Trim()
+            };
+            await _context.Serial.AddAsync(newSerial);
+            await _context.SaveChangesAsync();
+        }
+
 
         [HttpPost]
         public async Task<ActionResult<MaintainLive>> UpdateTask(MaintainLive task, string sessionKey)
@@ -50,6 +98,13 @@ namespace SnowmeetApi.Controllers
             {
                 return NoContent();
             }
+            MaintainLive oriTask = await _context.MaintainLives.Where(t => t.id == task.id)
+                .AsNoTracking().FirstAsync();
+            if (oriTask == null)
+            {
+                return NotFound();
+            }
+            /*
             if (!task.confirmed_serial.Trim().Equals("") && !task.confirmed_brand.Trim().Equals(""))
             {
                 var serialList = await _context.Serial.Where(s => (s.brand_name.Trim().Equals(task.confirmed_brand.Trim()) && s.serial_name.Trim().Equals(task.confirmed_serial.Trim()))).ToListAsync();
@@ -66,11 +121,27 @@ namespace SnowmeetApi.Controllers
                     await _context.SaveChangesAsync();
                 }
             }
-
-          
-
+            */
+            
+            
+            MaintainLog log = new MaintainLog()
+            {
+                id = 0,
+                task_id = oriTask.id,
+                step_name = "修改装备信息",
+                memo = "",
+                start_time = DateTime.Now,
+                end_time = DateTime.Now,
+                staff_open_id = user.member.wechatMiniOpenId.Trim(),
+                status = "",
+                stop_open_id = user.member.wechatMiniOpenId.Trim(),
+                backup_data = Newtonsoft.Json.JsonConvert.SerializeObject(oriTask)
+            };
+            await _context.MaintainLog.AddAsync(log);
             _context.Entry(task).State = EntityState.Modified;
             await _context.SaveChangesAsync();
+            await UpdateBrand(task.confirmed_brand, task.confirmed_equip_type.Trim());
+            await UpdateSerial(task.confirmed_serial, task.confirmed_brand.Split('/')[0].Trim(), task.confirmed_equip_type);
             return task;
         }
 
@@ -243,12 +314,13 @@ namespace SnowmeetApi.Controllers
             
             UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
             
-            MaintainLive[] items = await _context.MaintainLives.Where(m => m.order_id == orderId).ToArrayAsync();
+            MaintainLive[] items = await _context.MaintainLives.Where(m => m.order_id == orderId)
+                .Include(m => m.taskLog).ToArrayAsync();
             double itemPriceSummary = 0;
 
             foreach (MaintainLive item in items)
             {
-                item.taskLog = await _context.MaintainLog.Where(l => l.task_id == item.id).AsNoTracking().OrderBy(l => l.id).ToArrayAsync();
+                //item.taskLog = await _context.MaintainLog.Where(l => l.task_id == item.id).AsNoTracking().OrderBy(l => l.id).ToArrayAsync();
                 Models.Product.Product p = await _context.Product.FindAsync(item.confirmed_product_id);
                 itemPriceSummary = itemPriceSummary + (p!=null?p.sale_price:0) + item.confirmed_additional_fee;
             }
@@ -325,21 +397,21 @@ namespace SnowmeetApi.Controllers
             }
             start = start.Date;
             end = end.Date.AddDays(1);
-            var liveArr = await _context.MaintainLives
+            var liveArr = await _context.MaintainLives.Include(m => m.taskLog).Include(m => m.order)
                 .Where(m => (!m.task_flow_num.Trim().Equals("") && m.create_date >= start && m.create_date < end
                 && (shop.Equals("") || m.shop.Equals(shop)) && (openId.Trim().Equals("") || m.open_id.Trim().Equals(openId)) ))
-                .OrderByDescending(m => m.id).ToListAsync();
+                .AsNoTracking().OrderByDescending(m => m.id).ToListAsync();
 
             for (int i = 0; i < liveArr.Count; i++)
             {
                 MaintainLive m = (MaintainLive)liveArr[i];
                 //var logs = 
-                m.taskLog = ((IEnumerable<MaintainLog>)((OkObjectResult)(await _logHelper.GetStepsByStaff(m.id, sessionKey)).Result).Value).ToArray();
-                string lastStep = m.taskLog.Length == 0 ? ""
-                    : m.taskLog[m.taskLog.Length - 1].step_name.Trim();
+                //m.taskLog = ((IEnumerable<MaintainLog>)((OkObjectResult)(await _logHelper.GetStepsByStaff(m.id, sessionKey)).Result).Value).ToArray();
+                string lastStep = m.taskLog.Count == 0 ? ""
+                    : m.taskLog[m.taskLog.Count - 1].step_name.Trim();
                 
                 //lastStep = m.taskLog[m.taskLog.Length - 1].step_name.Trim();
-                if (m.taskLog == null || m.taskLog.Length == 0)
+                if (m.taskLog == null || m.taskLog.Count == 0)
                 {
                     m.status = "未开始";
                 }
@@ -368,10 +440,12 @@ namespace SnowmeetApi.Controllers
                 desc += m.confirmed_memo;
                 m.description = desc;
 
+                /*
                 if (m.order_id > 0)
                 {
                     m.order = (OrderOnline)((OkObjectResult)(await _orderHelper.GetWholeOrderByStaff(m.order_id, sessionKey)).Result).Value;
                 }
+                */
             }
 
             return Ok(liveArr);
@@ -390,18 +464,18 @@ namespace SnowmeetApi.Controllers
             var liveArr = await _context.MaintainLives.FromSqlRaw(" select top 300 * from maintain_in_shop_request "
                 + " where not exists ( select 'a' from maintain_log where maintain_log.task_id = maintain_in_shop_request.[id] and step_name in ('发板','强行索回') ) "
                 + (shop.Trim().Equals("")? " " : " and shop = '" + shop.Trim().Replace("'", "") + "'  ")
-                + " and task_flow_num <> '' order by [id] desc ").AsNoTracking().ToListAsync();
+                + " and task_flow_num <> '' order by [id] desc ").Include(m => m.taskLog).AsNoTracking().ToListAsync();
 
             for (int i = 0; i < liveArr.Count; i++)
             {
                 MaintainLive m = (MaintainLive)liveArr[i];
                 //var logs = 
-                m.taskLog = ((IEnumerable<MaintainLog>)((OkObjectResult)(await _logHelper.GetStepsByStaff(m.id, sessionKey)).Result).Value).ToArray();
-                string lastStep = m.taskLog.Length == 0 ? ""
-                    : m.taskLog[m.taskLog.Length - 1].step_name.Trim();
+                //m.taskLog = ((IEnumerable<MaintainLog>)((OkObjectResult)(await _logHelper.GetStepsByStaff(m.id, sessionKey)).Result).Value).ToArray();
+                string lastStep = m.taskLog.Count == 0 ? ""
+                    : m.taskLog[m.taskLog.Count - 1].step_name.Trim();
 
                 //lastStep = m.taskLog[m.taskLog.Length - 1].step_name.Trim();
-                if (m.taskLog == null || m.taskLog.Length == 0)
+                if (m.taskLog == null || m.taskLog.Count == 0)
                 {
                     m.status = "未开始";
                 }
