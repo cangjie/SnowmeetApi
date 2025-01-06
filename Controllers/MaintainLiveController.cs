@@ -379,7 +379,7 @@ namespace SnowmeetApi.Controllers
             }
             var liveArr = await _context.MaintainLives.Include(m => m.taskLog).Include(m => m.order)
                 .Where(m => ((shop.Equals("") || m.shop.Equals(shop)) &&  
-                (m.order_id.ToString().StartsWith(key) || m.order_id.ToString().EndsWith(key) || m.confirmed_cell.IndexOf(key) >= 0) ))
+                (m.order_id.ToString().StartsWith(key) || m.order_id.ToString().EndsWith(key) || m.confirmed_cell.EndsWith(key)) ))
                 .OrderByDescending(m => m.id).AsNoTracking().ToListAsync();
                 /*
                     && ((m.order_id != null && m.order_id.ToString().IndexOf(key) >= 0 )
