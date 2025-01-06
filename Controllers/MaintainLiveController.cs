@@ -104,24 +104,7 @@ namespace SnowmeetApi.Controllers
             {
                 return NotFound();
             }
-            /*
-            if (!task.confirmed_serial.Trim().Equals("") && !task.confirmed_brand.Trim().Equals(""))
-            {
-                var serialList = await _context.Serial.Where(s => (s.brand_name.Trim().Equals(task.confirmed_brand.Trim()) && s.serial_name.Trim().Equals(task.confirmed_serial.Trim()))).ToListAsync();
-                if (serialList.Count == 0 && !task.confirmed_serial.Equals("未知"))
-                {
-                    Serial s = new Serial()
-                    {
-                        id = 0,
-                        type = task.confirmed_equip_type.Trim(),
-                        brand_name = task.confirmed_brand.Trim(),
-                        serial_name = task.confirmed_serial.Trim()
-                    };
-                    await _context.Serial.AddAsync(s);
-                    await _context.SaveChangesAsync();
-                }
-            }
-            */
+            
             
             
             MaintainLog log = new MaintainLog()
@@ -383,6 +366,74 @@ namespace SnowmeetApi.Controllers
             task.order = (OrderOnline)((OkObjectResult)(await _orderHelper.GetWholeOrderByStaff(task.order_id, sessionKey)).Result).Value;
             task.log = await _context.MaintainLog.Where(l => l.task_id == id).OrderBy(m => m.id).AsNoTracking().ToArrayAsync();
             return Ok(task);
+        }
+        [HttpGet("{key}")]
+        public async Task<ActionResult<List<MaintainLive>>> GetTasksQuick(string key, string shop = "", string sessionKey = "")
+        {
+            shop = Util.UrlDecode(shop.Trim());
+            sessionKey = Util.UrlDecode(sessionKey.Trim());
+            UnicUser user = await UnicUser.GetUnicUserAsync(sessionKey, _context);
+            if (!user.isAdmin)
+            {
+                return NoContent();
+            }
+            var liveArr = await _context.MaintainLives.Include(m => m.taskLog).Include(m => m.order)
+                .Where(m => ((shop.Equals("") || m.shop.Equals(shop)) &&  
+                (m.order_id.ToString().StartsWith(key) || m.order_id.ToString().EndsWith(key) || m.confirmed_cell.IndexOf(key) >= 0) )).AsNoTracking().ToListAsync();
+                /*
+                    && ((m.order_id != null && m.order_id.ToString().IndexOf(key) >= 0 )
+                    || m.confirmed_cell.IndexOf(key) >= 0 
+                    
+                    )
+                    ))
+                .AsNoTracking().OrderByDescending(m => m.id).ToListAsync();
+                */
+            for (int i = 0; i < liveArr.Count; i++)
+            {
+                MaintainLive m = (MaintainLive)liveArr[i];
+                //var logs = 
+                //m.taskLog = ((IEnumerable<MaintainLog>)((OkObjectResult)(await _logHelper.GetStepsByStaff(m.id, sessionKey)).Result).Value).ToArray();
+                string lastStep = m.taskLog.Count == 0 ? ""
+                    : m.taskLog[m.taskLog.Count - 1].step_name.Trim();
+                
+                //lastStep = m.taskLog[m.taskLog.Length - 1].step_name.Trim();
+                if (m.taskLog == null || m.taskLog.Count == 0)
+                {
+                    m.status = "未开始";
+                }
+                else if (lastStep.Trim().Equals("发板") || lastStep.Trim().Equals("强行索回"))
+                {
+                    m.status = "已完成";
+                }
+                else
+                {
+                    m.status = "进行中";
+                }
+
+                string desc = "";
+                if (m.confirmed_edge == 1)
+                {
+                    desc += "修刃：" + m.confirmed_degree.ToString();
+                }
+                if (m.confirmed_candle == 1)
+                {
+                    desc += " 打蜡 ";
+                }
+                if (!m.confirmed_more.Trim().Equals(""))
+                {
+                    desc += " " + m.confirmed_more.Trim() + " ";
+                }
+                desc += m.confirmed_memo;
+                m.description = desc;
+
+                /*
+                if (m.order_id > 0)
+                {
+                    m.order = (OrderOnline)((OkObjectResult)(await _orderHelper.GetWholeOrderByStaff(m.order_id, sessionKey)).Result).Value;
+                }
+                */
+            }
+            return Ok(liveArr);
         }
 
         [HttpGet]
