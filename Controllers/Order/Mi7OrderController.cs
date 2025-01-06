@@ -30,9 +30,10 @@ namespace SnowmeetApi.Controllers.Order
 
 
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<SaleReport>>> GetSaleReport(DateTime startDate, DateTime endDate, string sessionKey)
+        public async Task<ActionResult<IEnumerable<SaleReport>>> GetSaleReport(DateTime startDate, DateTime endDate, string sessionKey, string shop = "")
         {
             sessionKey = Util.UrlDecode(sessionKey);
+            shop = Util.UrlDecode(shop);
             UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (user.member.is_admin != 1 && user.member.is_manager != 1)
             {
@@ -49,6 +50,7 @@ namespace SnowmeetApi.Controllers.Order
                 + " left join mini_users customer on customer.open_id =  order_online.open_id "
                 + " where [type] = '店销现货' and pay_state = 1 and pay_time >= '"
                 + startDate.ToShortDateString() + "' and pay_time < '" + endDate.AddDays(1).ToShortDateString() + "' "
+                + (shop.Equals("")? "  " : (" and order_online.shop  = '" + shop.Trim().Replace("'", "") + "'  "))
                 + " order by order_id desc ")
                 .AsNoTracking().ToListAsync();
             return Ok(l);

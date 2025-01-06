@@ -25,7 +25,7 @@
         <h1 style="text-align:center">销售业务报表</h1>
     </div>
     <div class="row_view" style="align-items:center;justify-content:center; margin-top:20px">
-        日期：从&nbsp;<input type="date" id="date_from" oninput="setDate()" />&nbsp;到&nbsp;<input type="date" id="date_to" oninput="setDate()" />&nbsp;<button id="btn" onclick="getData()"> 查 询 </button>
+        门店：<select id="shop"><option value='' >全部</option><option>万龙体验中心</option><option>万龙服务中心</option><option>崇礼旗舰店</option><option>南山</option><option>怀北</option><option>渔阳</option></select>日期：从&nbsp;<input type="date" id="date_from" oninput="setDate()" />&nbsp;到&nbsp;<input type="date" id="date_to" oninput="setDate()" />&nbsp;<button id="btn" onclick="getData()"> 查 询 </button>
     </div>
     <div style="height:20px"></div>
     <h1></h1>
@@ -196,8 +196,10 @@
         rows.innerHTML = '';
         var btnCtrl = document.getElementById('btn');
         btnCtrl.disabled = true;
+        var shop = document.getElementById('shop')
         var getUrl = '../../core/Mi7Order/GetSaleReport?sessionKey=' + encodeURIComponent(sessionKey)
-            + '&startDate=' + formatDate(startDate) + '&endDate=' + formatDate(endDate);
+            + '&startDate=' + formatDate(startDate) + '&endDate=' + formatDate(endDate) + (shop.value == ''? '' : '&shop=' + encodeURIComponent(shop.value));
+        console.log('shop', shop);
         $.ajax({
             url: getUrl,
             type: 'GET',

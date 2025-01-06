@@ -138,12 +138,18 @@ namespace SnowmeetApi.Controllers
             for (int i = 0; i < idList.Count; i++)
             {
                 
+                if (idList[i].id != 5781)
+                {
+                    continue;
+                }
+
                 RentOrder order = (RentOrder)((OkObjectResult)(await GetRentOrder(idList[i].id, sessionKey)).Result).Value;
                 
                 if (!order.status.Trim().Equals("已退款"))
                 {
                     continue;
                 }
+                
                 double totalPayment = 0;
                 double totalRefund = 0;
                 for (int j = 0; j < order.order.payments.Length; j++)
