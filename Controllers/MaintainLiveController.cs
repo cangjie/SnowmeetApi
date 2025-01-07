@@ -449,14 +449,16 @@ namespace SnowmeetApi.Controllers
             }
             start = start.Date;
             end = end.Date.AddDays(1);
-            var liveArr = await _context.MaintainLives.Include(m => m.taskLog).Include(m => m.order)
+            var liveArr = await _context.MaintainLives.Include(m => m.taskLog)
                 .Where(m => (!m.task_flow_num.Trim().Equals("") && m.create_date >= start && m.create_date < end
                 && (shop.Equals("") || m.shop.Equals(shop)) && (openId.Trim().Equals("") || m.open_id.Trim().Equals(openId)) ))
                 .AsNoTracking().OrderByDescending(m => m.id).ToListAsync();
 
             for (int i = 0; i < liveArr.Count; i++)
             {
+                
                 MaintainLive m = (MaintainLive)liveArr[i];
+                await _context.Entry(m).Reference(m => m.order).LoadAsync();
                 //var logs = 
                 //m.taskLog = ((IEnumerable<MaintainLog>)((OkObjectResult)(await _logHelper.GetStepsByStaff(m.id, sessionKey)).Result).Value).ToArray();
                 string lastStep = m.taskLog.Count == 0 ? ""
