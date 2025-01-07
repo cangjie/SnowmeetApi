@@ -137,11 +137,7 @@ namespace SnowmeetApi.Controllers
             List<Balance> bList = new List<Balance>();
             for (int i = 0; i < idList.Count; i++)
             {
-                
-                if (idList[i].id != 5781)
-                {
-                    continue;
-                }
+               
 
                 RentOrder order = (RentOrder)((OkObjectResult)(await GetRentOrder(idList[i].id, sessionKey)).Result).Value;
                 
