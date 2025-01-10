@@ -45,9 +45,12 @@ namespace SnowmeetApi.Controllers
         public RentController _rentHelper;
         public string _appId = "";
 
+        public string _domain = "";
+
         public MemberController _memberHelper;
         public TenpayController(ApplicationDBContext context, IConfiguration config, IHttpContextAccessor httpContextAccessor)
         {
+            _domain = _http.HttpContext.Request.Host.ToString();
             _db = context;
             _oriConfig = config;
             _http = httpContextAccessor;
@@ -55,6 +58,7 @@ namespace SnowmeetApi.Controllers
             _appId = _oriConfig.GetSection("Settings").GetSection("AppId").Value.Trim();
             _rentHelper = new RentController(_db, _oriConfig, _http);
             _memberHelper = new MemberController(context, config);
+            
         }
 
         [NonAction]
@@ -137,7 +141,7 @@ namespace SnowmeetApi.Controllers
             _db.Entry(order).State = EntityState.Modified;
             await _db.SaveChangesAsync();
 
-            string notifyUrl = "https://mini.snowmeet.top/core/Tenpay/TenpayPaymentCallBack/" + mchid.ToString();
+            string notifyUrl = "https://" + _domain.Trim() + "/core/Tenpay/TenpayPaymentCallBack/" + mchid.ToString();
             string? outTradeNo = payment.out_trade_no;
             if (outTradeNo == null )
             { 

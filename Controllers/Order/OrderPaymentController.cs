@@ -43,6 +43,7 @@ namespace SnowmeetApi.Controllers.Order
 
         private readonly RentController _rentHelper;
         private readonly MemberController _memberHelper;
+        public string _domain = "";
         //private SkiPassController _skipassHelper;
 
         public class TenpayResource
@@ -67,12 +68,14 @@ namespace SnowmeetApi.Controllers.Order
 
         public OrderPaymentController(ApplicationDBContext context, IConfiguration config, IHttpContextAccessor httpContextAccessor)
         {
+            
             _originConfig = config;
             _context = context;
             _originConfig = config;
             _config = config.GetSection("Settings");
             _appId = _config.GetSection("AppId").Value.Trim();
             _httpContextAccessor = httpContextAccessor;
+            _domain = _httpContextAccessor.HttpContext.Request.Host.ToString();
             _rentHelper = new RentController(context, config, httpContextAccessor);
             _memberHelper = new MemberController(context, config);
             //_skipassHelper = new SkiPassController(context, config, httpContextAccessor);
