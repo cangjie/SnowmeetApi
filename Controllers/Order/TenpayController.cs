@@ -149,6 +149,11 @@ namespace SnowmeetApi.Controllers
                 outTradeNo = order.id.ToString().PadLeft(6, '0') + payment.id.ToString().PadLeft(2, '0') + timeStamp.Substring(3, 10);
             }
 
+            if (!_domain.Trim().Equals("mini.snowmeet.top"))
+            {
+                outTradeNo = "TEST_" + outTradeNo.Trim();
+            }
+
             //CreatePayTransactionAppRequest.Types.Detail.Types.GoodsDetail  dtl = new CreatePayTransactionAppRequest.Types.Detail.Types.GoodsDetail();
             //dtl.
 
