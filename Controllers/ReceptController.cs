@@ -843,10 +843,12 @@ namespace SnowmeetApi.Controllers
 
             bool isAdmin = await IsAdmin(sessionKey);
             
+            /*
             if (!isAdmin && !recept.open_id.Trim().Equals(user.miniAppOpenId.Trim()))
             {
                 return BadRequest();
             }
+            */
             
             if (!isAdmin)
             {
