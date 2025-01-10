@@ -287,7 +287,7 @@ namespace SnowmeetApi.Controllers
 
 
         [HttpGet("{orderId}")]
-        public async Task<ActionResult<MaintainOrder>> GetMaintainOrder(int orderId, string sessionKey)
+        public async Task<ActionResult<MaintainOrder>> GetMaintainOrder(int orderId, string sessionKey, bool needValid = true)
         {
             sessionKey = Util.UrlDecode(sessionKey);
             if (orderId <= 0)
@@ -308,12 +308,15 @@ namespace SnowmeetApi.Controllers
                 itemPriceSummary = itemPriceSummary + (p!=null?p.sale_price:0) + item.confirmed_additional_fee;
             }
             OrderOnlinesController orderController = new OrderOnlinesController(_context, _originConfig);
-            OrderOnline order = (await orderController.GetOrderOnline(orderId, sessionKey)).Value; //await _context.OrderOnlines.FindAsync(orderId);   //(await orderController.GetWholeOrderByStaff(orderId, sessionKey)).Value;
+            OrderOnline order = (await orderController.GetOrderOnline(orderId, sessionKey, false)).Value; //await _context.OrderOnlines.FindAsync(orderId);   //(await orderController.GetWholeOrderByStaff(orderId, sessionKey)).Value;
 
             if (!order.open_id.Trim().Equals(user.miniAppOpenId.Trim()) && !order.open_id.Equals(user.officialAccountOpenId.Trim())
                 && !order.open_id.Trim().Equals(user.officialAccountOpenIdOld.Trim()) && !user.isAdmin)
             {
-                return BadRequest();
+                if (needValid)
+                {
+                    return BadRequest();
+                }
             }
 
             MaintainOrder mOrder = new MaintainOrder()

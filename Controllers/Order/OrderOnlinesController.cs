@@ -844,7 +844,7 @@ namespace SnowmeetApi.Controllers
         // GET: api/OrderOnlines/5
         [ActionName("GetOrderOnline")]
         [HttpGet("{id}")]
-        public async Task<ActionResult<OrderOnline>> GetOrderOnline(int id, string sessionKey)
+        public async Task<ActionResult<OrderOnline>> GetOrderOnline(int id, string sessionKey, bool needValid = true)
         {
             sessionKey = Util.UrlDecode(sessionKey);
             //
@@ -861,7 +861,7 @@ namespace SnowmeetApi.Controllers
                 return NotFound();
             }
 
-            if (user.isAdmin
+            if (user.isAdmin || !needValid
                 || orderOnline.open_id.Trim().Equals(user.officialAccountOpenId.Trim())
                 || orderOnline.open_id.Trim().Equals(user.miniAppOpenId.Trim())
                 || orderOnline.open_id.Trim().Equals(""))

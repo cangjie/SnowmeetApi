@@ -873,7 +873,7 @@ namespace SnowmeetApi.Controllers
                     case "养护招待":
                     case "养护下单":
                         MaintainLiveController mc = new MaintainLiveController(_context, _oriConfig);
-                        Models.Maintain.MaintainOrder mOrder = (Models.Maintain.MaintainOrder)((OkObjectResult)(await mc.GetMaintainOrder(recept.submit_return_id, sessionKey)).Result).Value;
+                        Models.Maintain.MaintainOrder mOrder = (Models.Maintain.MaintainOrder)((OkObjectResult)(await mc.GetMaintainOrder(recept.submit_return_id, sessionKey, false)).Result).Value;
                         if (!isAdmin)
                         {
                             mOrder.order.open_id = "";
