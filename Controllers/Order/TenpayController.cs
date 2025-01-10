@@ -50,10 +50,11 @@ namespace SnowmeetApi.Controllers
         public MemberController _memberHelper;
         public TenpayController(ApplicationDBContext context, IConfiguration config, IHttpContextAccessor httpContextAccessor)
         {
-            _domain = _http.HttpContext.Request.Host.ToString();
+            
             _db = context;
             _oriConfig = config;
             _http = httpContextAccessor;
+            _domain = _http.HttpContext.Request.Host.ToString();
             _orderPaymentHelper = new OrderPaymentController(context, config, httpContextAccessor);
             _appId = _oriConfig.GetSection("Settings").GetSection("AppId").Value.Trim();
             _rentHelper = new RentController(_db, _oriConfig, _http);
