@@ -78,9 +78,10 @@ namespace SnowmeetApi.Models.Rent
         [NotMapped]
         public OrderOnline _order;
 
+        /*
         [NotMapped]
         public RentOrderDetail[]? _details;
-
+        */
         [NotMapped]
         public string textColor { get; set; } = "black";
 
@@ -94,7 +95,7 @@ namespace SnowmeetApi.Models.Rent
             {
                 
                 double discount = 0;
-                for (int i = 0; details != null && i < details.Length; i++)
+                for (int i = 0; details != null && i < details.Count; i++)
                 {
                     discount += details[i].rental_discount;
                 }
@@ -108,7 +109,7 @@ namespace SnowmeetApi.Models.Rent
             get
             {
                 double discount = 0;
-                for (int i = 0; details != null && i < details.Length; i++)
+                for (int i = 0; details != null && i < details.Count; i++)
                 {
                     discount += details[i].rental_ticket_discount;
                 }
@@ -122,7 +123,7 @@ namespace SnowmeetApi.Models.Rent
             get
             {
                 double rental = 0;
-                for (int i = 0; details != null &&  i < details.Length; i++)
+                for (int i = 0; details != null &&  i < details.Count; i++)
                 {
                     rental += details[i].real_rental;
                 }
@@ -139,6 +140,7 @@ namespace SnowmeetApi.Models.Rent
         }
 
 
+        /*
         [NotMapped]
         public RentOrderDetail[] details
         {
@@ -151,7 +153,9 @@ namespace SnowmeetApi.Models.Rent
                 _details = value;
             }
         }
-
+        */
+        [NotMapped]
+        public List<RentOrderDetail> details {get; set;}
         
         /*
         [NotMapped]
@@ -227,7 +231,7 @@ namespace SnowmeetApi.Models.Rent
                 }
                 bool finish = true;
                 double totalRental = 0;
-                for (int i = 0; details != null && i < details.Length; i++)
+                for (int i = 0; details != null && i < details.Count; i++)
                 {
                     string status = details[i].status.Trim();
                     //if (details[i].real_end_date == null && details[i].start_date != null)
@@ -284,7 +288,7 @@ namespace SnowmeetApi.Models.Rent
                 List<RentalDetail> detailList = new List<RentalDetail>();
 
 
-                for (int i = 0; details != null && i < details.Length; i++)
+                for (int i = 0; details != null && i < details.Count; i++)
                 {
                     RentOrderDetail rentOrderDetail = details[i];
                     DateTime endDate = rentOrderDetail.real_end_date == null ? DateTime.Now : (DateTime)rentOrderDetail.real_end_date;

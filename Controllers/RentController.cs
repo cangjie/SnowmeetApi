@@ -162,7 +162,7 @@ namespace SnowmeetApi.Controllers
                 }
                 double totalReparation = 0;
                 double totalRental = 0;
-                for (int j = 0; j < order.details.Length; j++)
+                for (int j = 0; j < order.details.Count; j++)
                 {
                     totalReparation += order.details[j].reparation;
                     RentOrderDetail detail = order.details[j];
@@ -283,7 +283,7 @@ namespace SnowmeetApi.Controllers
             await _context.RentOrder.AddAsync(rentOrder);
             await _context.SaveChangesAsync();
 
-            for (int i = 0; i < rentOrder.details.Length; i++)
+            for (int i = 0; i < rentOrder.details.Count; i++)
             {
                 RentOrderDetail detail = rentOrder.details[i];
                 /*
@@ -449,6 +449,8 @@ namespace SnowmeetApi.Controllers
             UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
 
             RentOrder rentOrder = await _context.RentOrder.FindAsync(id);
+            //RentOrder rentOrder = await _context.RentOrder.Where(r => r.id == id)
+            //    .Include(r => r.details).FirstAsync();
             if (rentOrder == null)
             {
                 return NotFound();
@@ -468,8 +470,13 @@ namespace SnowmeetApi.Controllers
                     
                 }
             }
+            
+            
             rentOrder.details = await _context.RentOrderDetail
-                .Where(d => d.rent_list_id == rentOrder.id).AsNoTracking().ToArrayAsync();
+                .Include(d => d.log).Where(d => d.rent_list_id == rentOrder.id)
+                .AsNoTracking().ToListAsync();
+            
+
             if (rentOrder.order_id > 0)
             {
                 
@@ -486,7 +493,7 @@ namespace SnowmeetApi.Controllers
             }
             bool allReturned = true;
             DateTime returnTime = rentOrder.create_date;
-            for (int i = 0; i < rentOrder.details.Length; i++)
+            for (int i = 0; i < rentOrder.details.Count; i++)
             {
                 DateTime endDate = DateTime.Now;
                 RentOrderDetail detail = rentOrder.details[i];
@@ -553,10 +560,10 @@ namespace SnowmeetApi.Controllers
                     }
                 }
 
-                
+                /*
                 detail.log = await _context.rentOrderDetailLog.Where(r => r.detail_id == detail.id)
                     .OrderByDescending(d => d.id).AsNoTracking().ToListAsync();
-
+                */
                 
                 switch (rentOrder.shop.Trim())
                 {
@@ -822,7 +829,7 @@ namespace SnowmeetApi.Controllers
 
             RentOrder rentOrder = (RentOrder)((OkObjectResult)(await GetRentOrder(detail.rent_list_id, sessionKey)).Result).Value;
 
-            for (int i = 0; i < rentOrder.details.Length; i++)
+            for (int i = 0; i < rentOrder.details.Count; i++)
             {
                 RentOrderDetail item = rentOrder.details[i];
                 rentalTotal = rentalTotal + item.real_rental + item.overtime_charge + item.reparation;
@@ -1525,7 +1532,7 @@ namespace SnowmeetApi.Controllers
                         .Where(r => r.order_id == rentOrder.order_id).ToArrayAsync();
                     
                 }
-                rentOrder.details = new RentOrderDetail[] { item };
+                rentOrder.details = (new RentOrderDetail[] { item }).ToList();
                 if (!rentOrder.status.Equals("已关闭")
                     && !rentOrder.status.Equals("未支付")
                     && !rentOrder.status.Equals("已退款")

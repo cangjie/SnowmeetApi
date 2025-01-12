@@ -762,7 +762,7 @@ namespace SnowmeetApi.Controllers
             recept.submit_date = DateTime.Now;
             _context.Entry(recept).State = EntityState.Modified;
             await _context.SaveChangesAsync();
-            for (int i = 0; i < rentOrder.details.Length; i++)
+            for (int i = 0; i < rentOrder.details.Count; i++)
             {
                 RentOrderDetail detail = rentOrder.details[i];
                 /*
@@ -894,7 +894,7 @@ namespace SnowmeetApi.Controllers
 
             if (recept.rentOrder != null && recept.rentOrder.details != null)
             {
-                for (int i = 0; i < recept.rentOrder.details.Length; i++)
+                for (int i = 0; i < recept.rentOrder.details.Count; i++)
                 {
                     RentOrder rOrder = recept.rentOrder;
                     RentOrderDetail dtl = rOrder.details[i];
