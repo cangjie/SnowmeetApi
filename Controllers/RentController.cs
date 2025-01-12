@@ -13,6 +13,7 @@ using SnowmeetApi.Models.Rent;
 using SnowmeetApi.Models.Users;
 using System.Collections;
 using SnowmeetApi.Controllers.User;
+using SnowmeetApi.Controllers.Order;
 namespace SnowmeetApi.Controllers
 {
     [Route("core/[controller]/[action]")]
@@ -1734,6 +1735,75 @@ namespace SnowmeetApi.Controllers
             await _context.rentAdditionalPayment.AddAsync(addPay);
             await _context.SaveChangesAsync();
             return Ok(addPay);
+        }
+        [HttpGet("{rentListId}")]
+        public async Task<ActionResult<OrderOnline>> PlaceAdditionalOrder(int rentListId, string payMethod, 
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            sessionKey = Util.UrlDecode(sessionKey).Trim();
+            payMethod = Util.UrlDecode(payMethod).Trim();
+            UnicUser user = await Util.GetUser(sessionKey, _context);
+            RentAdditionalPayment addPay = await _context.rentAdditionalPayment.FindAsync(rentListId);
+            if (addPay == null || addPay.order_id != null)
+            {
+                return NotFound();
+            }
+            RentOrder rentOrder = await _context.RentOrder.FindAsync(addPay.rent_list_id);
+            if (rentOrder == null)
+            {
+                return NotFound();
+            }
+            OrderOnline order = new OrderOnline()
+            {
+                id = 0,
+                type = "押金",
+                shop = rentOrder.shop.Trim(),
+                open_id = user.wlMiniOpenId.Trim(),
+                name = rentOrder.real_name.Trim(),
+                cell_number = rentOrder.cell_number.Trim(),
+                pay_method = payMethod.Trim(),
+                pay_memo = "追加押金",
+                pay_state = 0,
+                order_price = addPay.amount,
+                order_real_pay_price = addPay.amount,
+                ticket_amount = 0,
+                other_discount = 0,
+                final_price = addPay.amount,
+                ticket_code = rentOrder.ticket_code.Trim(),
+                staff_open_id = addPay.staff_open_id,
+                score_rate = 0,
+                generate_score = 0
+
+            };
+            await _context.OrderOnlines.AddAsync(order);
+            await _context.SaveChangesAsync();
+            addPay.order_id = order.id;
+            addPay.order = order;
+            addPay.update_date = DateTime.Now;
+            _context.rentAdditionalPayment.Entry(addPay).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
+            if (order.id == 0)
+            {
+                return BadRequest();
+            }
+            OrderPaymentController _orderHelper = new OrderPaymentController(_context, _oriConfig, _httpContextAccessor);
+            OrderPayment payment = (OrderPayment)((OkObjectResult)(await _orderHelper.CreatePayment(order.id, payMethod, order.final_price)).Result).Value;
+            order.payments = new OrderPayment[] {payment};
+            return Ok(order);
+        }
+
+        [NonAction]
+        public async Task AdditionalOrderPaid(int orderId)
+        {
+            List<RentAdditionalPayment> addPayList = await _context.rentAdditionalPayment
+                .Where(r => r.order_id == orderId).ToListAsync();
+            for(int i = 0; i < addPayList.Count; i++)
+            {
+                RentAdditionalPayment addPay = addPayList[i];
+                addPay.is_paid = 1;
+                _context.rentAdditionalPayment.Entry(addPay).State = EntityState.Modified;
+            }
+            await _context.SaveChangesAsync();
         }
 
        

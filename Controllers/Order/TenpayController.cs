@@ -149,10 +149,13 @@ namespace SnowmeetApi.Controllers
                 outTradeNo = order.id.ToString().PadLeft(6, '0') + payment.id.ToString().PadLeft(2, '0') + timeStamp.Substring(3, 10);
             }
 
+
+            /*
             if (!_domain.Trim().Equals("mini.snowmeet.top"))
             {
                 outTradeNo = "TEST_" + outTradeNo.Trim();
             }
+            */
 
             //CreatePayTransactionAppRequest.Types.Detail.Types.GoodsDetail  dtl = new CreatePayTransactionAppRequest.Types.Detail.Types.GoodsDetail();
             //dtl.
@@ -426,16 +429,25 @@ namespace SnowmeetApi.Controllers
                     await skiPassHelper.CreateSkiPass(order.id);
                     break;
                 case "押金":
-                    List<RentOrder> rentOrderList = await _db.RentOrder
-                        .Where(o => o.order_id == order.id).OrderByDescending(o => o.id).ToListAsync();
-                    if (rentOrderList != null && rentOrderList.Count > 0)
+                    switch(order.pay_memo.Trim())
                     {
-                        RentOrder rentOrder = rentOrderList[0];
-                        rentOrder.open_id = order.open_id;
-                        _db.Entry(rentOrder).State = EntityState.Modified;
-                        await _db.SaveChangesAsync();
-                        await _rentHelper.StartRent(rentOrder.id);
+                        case "追加押金":
+                            await _rentHelper.AdditionalOrderPaid(order.id);
+                            break;
+                        default:
+                            List<RentOrder> rentOrderList = await _db.RentOrder
+                                .Where(o => o.order_id == order.id).OrderByDescending(o => o.id).ToListAsync();
+                            if (rentOrderList != null && rentOrderList.Count > 0)
+                            {
+                                RentOrder rentOrder = rentOrderList[0];
+                                rentOrder.open_id = order.open_id;
+                                _db.Entry(rentOrder).State = EntityState.Modified;
+                                await _db.SaveChangesAsync();
+                                await _rentHelper.StartRent(rentOrder.id);
+                            }
+                            break;
                     }
+                    
 
                     break;
                 case "UTV押金":

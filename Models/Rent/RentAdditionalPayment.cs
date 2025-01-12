@@ -15,6 +15,7 @@ namespace SnowmeetApi.Models.Rent
         public int? order_id {get; set;}
         public double amount {get; set;}
         public string reason {get; set;}
+        public int is_paid {get; set;}
         public DateTime? update_date {get; set;}
         public DateTime create_date {get; set;} 
         public string staff_open_id {get; set;}
