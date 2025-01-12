@@ -390,7 +390,7 @@ namespace SnowmeetApi.Controllers
                 return NotFound();
             }
             OrderPayment[] paymentsArr = await _db.OrderPayment.Where(p => p.order_id == order.id).ToArrayAsync();
-            order.payments = paymentsArr;
+            order.payments = paymentsArr.ToList();
             if (order.final_price <= order.paidAmount)
             {
                 order.pay_state = 1;

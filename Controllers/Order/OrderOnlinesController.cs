@@ -408,7 +408,7 @@ namespace SnowmeetApi.Controllers
 
             for (int i = 0; i < list.Count; i++)
             {
-                list[i].payments = await _context.OrderPayment.Where(p => p.order_id == list[i].id).ToArrayAsync();
+                list[i].payments = await _context.OrderPayment.Where(p => p.order_id == list[i].id).ToListAsync();
             }
 
 
@@ -500,7 +500,7 @@ namespace SnowmeetApi.Controllers
                         }
                     }
                 }
-                order.payments = payments;
+                order.payments = payments.ToList();
 
                 var refunds = await _context.OrderPaymentRefund.Where(r => r.order_id == order.id
                     && (r.state == 1 || !r.refund_id.Trim().Equals(""))).ToArrayAsync();
@@ -713,7 +713,7 @@ namespace SnowmeetApi.Controllers
                 }
                 await _context.SaveChangesAsync();
             }
-            if (order.payments != null && order.payments.Length == 1 && !(order.pay_memo.Trim().Equals("无需付款") || order.pay_memo.Trim().Equals("暂缓支付")))
+            if (order.payments != null && order.payments.Count == 1 && !(order.pay_memo.Trim().Equals("无需付款") || order.pay_memo.Trim().Equals("暂缓支付")))
             {
                 var payment = order.payments[0];
                 payment.order_id = order.id;
@@ -871,7 +871,7 @@ namespace SnowmeetApi.Controllers
                     orderOnline.open_id = "";
                 }
                 orderOnline.payments = await _context.OrderPayment.Where(p => (p.order_id == orderOnline.id))
-                    .OrderByDescending(p => p.id).ToArrayAsync();
+                    .OrderByDescending(p => p.id).ToListAsync();
 
                 orderOnline.refunds = await _context.OrderPaymentRefund.Where(r => r.order_id == orderOnline.id &&  (!r.refund_id.Trim().Equals("") || r.state == 1))
                     .OrderByDescending(r => r.id).ToArrayAsync();

@@ -53,9 +53,12 @@ namespace SnowmeetApi.Models
         public DateTime? crt { get; set; } = DateTime.Now;
 
         public int referee_member_id { get; set; } = 0;
-        
+        /*
         [NotMapped]
         public OrderPayment[]? payments { get; set; }
+        */
+        [NotMapped]
+        public List<OrderPayment> payments {get; set;}
         [NotMapped]
         public OrderPaymentRefund[]? refunds { get; set; }
         [NotMapped]
@@ -109,7 +112,7 @@ namespace SnowmeetApi.Models
                 double amount = 0;
                 if (payments != null)
                 {
-                    for (int i = 0; i < payments.Length; i++)
+                    for (int i = 0; i < payments.Count; i++)
                     {
                         if (payments[i].status.Trim().Equals("支付成功"))
                         {

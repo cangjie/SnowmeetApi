@@ -736,7 +736,7 @@ namespace SnowmeetApi.Controllers
                 {
                     order = (await orderController.GetWholeOrderByStaff(orderId, sessionKey)).Value;
                 }
-                if (order.payments.Length > 0)
+                if (order.payments.Count > 0)
                 {
                     int paymentId = order.payments[0].id;
                     order = (await orderController.SetPaymentSuccess(paymentId, sessionKey)).Value;

@@ -149,7 +149,7 @@ namespace SnowmeetApi.Controllers
                 
                 double totalPayment = 0;
                 double totalRefund = 0;
-                for (int j = 0; j < order.order.payments.Length; j++)
+                for (int j = 0; j < order.order.payments.Count; j++)
                 {
                     totalPayment += order.order.payments[j].amount;
                 }
@@ -449,8 +449,10 @@ namespace SnowmeetApi.Controllers
             UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
 
             RentOrder rentOrder = await _context.RentOrder.FindAsync(id);
-            //RentOrder rentOrder = await _context.RentOrder.Where(r => r.id == id)
-            //    .Include(r => r.details).FirstAsync();
+            
+            //RentOrder rentOrder = await _context.RentOrder
+            // .Include(r => r.order).Where(r => r.id == id)
+            //   .FirstAsync();
             if (rentOrder == null)
             {
                 return NotFound();
@@ -476,13 +478,13 @@ namespace SnowmeetApi.Controllers
                 .Include(d => d.log).Where(d => d.rent_list_id == rentOrder.id)
                 .AsNoTracking().ToListAsync();
             
-
+            
             if (rentOrder.order_id > 0)
             {
                 
                 rentOrder.order = (OrderOnline)((OkObjectResult)(await _orderHelper.GetWholeOrderByStaff(rentOrder.order_id, sessionKey)).Result).Value;
             }
-
+            
             if (!user.isAdmin)
             {
                 rentOrder.open_id = "";
@@ -909,7 +911,7 @@ namespace SnowmeetApi.Controllers
             await _context.SaveChangesAsync();
 
             if (amount > 0 && rentOrder.order_id > 0 && rentOrder.order != null && rentOrder.payMethod.Trim().Equals("微信支付")
-                && rentOrder.order.payments != null && rentOrder.order.payments.Length > 0)
+                && rentOrder.order.payments != null && rentOrder.order.payments.Count > 0)
             {
                 OrderPayment payment = rentOrder.order.payments[0];
                 
@@ -942,7 +944,7 @@ namespace SnowmeetApi.Controllers
             {
                 return NotFound();
             }
-            if (rentOrder.order.payments == null || rentOrder.order.payments.Length == 0)
+            if (rentOrder.order.payments == null || rentOrder.order.payments.Count == 0)
             {
                 OrderPayment payment = new OrderPayment()
                 {
@@ -974,7 +976,7 @@ namespace SnowmeetApi.Controllers
             }
 
             if (rentOrder == null || rentOrder.order == null
-                || rentOrder.order.payments == null || rentOrder.order.payments.Length <= 0)
+                || rentOrder.order.payments == null || rentOrder.order.payments.Count <= 0)
             {
                 return NotFound();
             }
@@ -1009,7 +1011,7 @@ namespace SnowmeetApi.Controllers
                 OrderOnline order = rentOrder.order;
                 order.open_id = user.miniAppOpenId.Trim();
                 _context.Entry(order).State = EntityState.Modified;
-                if (order.payments != null && order.payments.Length > 0)
+                if (order.payments != null && order.payments.Count > 0)
                 {
                     OrderPayment pay = order.payments[0];
                     if (pay.open_id.Trim().Equals(""))
@@ -1527,7 +1529,7 @@ namespace SnowmeetApi.Controllers
                 {
                     rentOrder.order = await _context.OrderOnlines.FindAsync(rentOrder.order_id);
                     rentOrder.order.payments = await _context.OrderPayment
-                        .Where(p => p.order_id == rentOrder.order_id).ToArrayAsync();
+                        .Where(p => p.order_id == rentOrder.order_id).ToListAsync();
                     rentOrder.order.refunds = await _context.OrderPaymentRefund
                         .Where(r => r.order_id == rentOrder.order_id).ToArrayAsync();
                     
@@ -1601,7 +1603,7 @@ namespace SnowmeetApi.Controllers
                 item.memo = rentOrder.memo;
                 item.entertain = rentOrder.pay_option.IndexOf("招待") >= 0 ? "是" : "否";
                 for (int j = 0; rentOrder.order_id > 0
-                    && rentOrder.order != null && j < rentOrder.order.payments.Length; j++)
+                    && rentOrder.order != null && j < rentOrder.order.payments.Count; j++)
                 {
                     if (rentOrder.order.payments[j].status.Trim().Equals("支付成功")
                         && rentOrder.order.payments[j].out_trade_no != null)
@@ -1612,7 +1614,7 @@ namespace SnowmeetApi.Controllers
                 }
                 //item.out_trade_no = rentOrder.order.payments
                 for (int j = 0; rentOrder.order_id != 0 && rentOrder.order != null
-                    &&  j < rentOrder.order.payments.Length; j++)
+                    &&  j < rentOrder.order.payments.Count; j++)
                 {
                     if (rentOrder.order.payments[j].status.Trim().Equals("支付成功"))
                     {
@@ -1795,7 +1797,7 @@ namespace SnowmeetApi.Controllers
             }
             OrderPaymentController _orderHelper = new OrderPaymentController(_context, _oriConfig, _httpContextAccessor);
             OrderPayment payment = (OrderPayment)((OkObjectResult)(await _orderHelper.CreatePayment(order.id, payMethod, order.final_price)).Result).Value;
-            order.payments = new OrderPayment[] {payment};
+            order.payments = (new OrderPayment[] {payment}).ToList();
             return Ok(order);
         }
 

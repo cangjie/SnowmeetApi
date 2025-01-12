@@ -53,6 +53,7 @@ namespace SnowmeetApi.Data
             modelBuilder.Entity<RentAdditionalPayment>().HasOne<RentOrder>().WithMany(r => r.additionalPayments).HasForeignKey(r => r.rent_list_id);
             modelBuilder.Entity<RentOrderDetail>().HasOne<RentOrder>().WithMany(r => r.details).HasForeignKey(r => r.rent_list_id);
             modelBuilder.Entity<RentOrderDetailLog>().HasOne<RentOrderDetail>().WithMany(r => r.log).HasForeignKey(r => r.detail_id);
+            modelBuilder.Entity<RentOrder>().HasOne(r => r.order).WithOne().HasForeignKey<RentOrder>(r => r.order_id);
         }
 
         public DbSet<MaintainLive> MaintainLives {get; set;}

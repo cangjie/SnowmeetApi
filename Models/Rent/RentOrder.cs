@@ -75,8 +75,10 @@ namespace SnowmeetApi.Models.Rent
 
         public DateTime create_date { get; set; } = DateTime.Now;
 
+        /*
         [NotMapped]
         public OrderOnline _order;
+        */
 
         /*
         [NotMapped]
@@ -171,7 +173,7 @@ namespace SnowmeetApi.Models.Rent
                     string ret = "";
                     OrderOnline order = this.order;
 
-                    OrderPayment[] payments = order.payments;
+                    OrderPayment[] payments = order.payments.ToArray();
                     foreach(OrderPayment payment in payments)
                     {
                         if (payment.status.Trim().Equals("支付成功"))
@@ -190,7 +192,8 @@ namespace SnowmeetApi.Models.Rent
         }
 
         [NotMapped]
-        public OrderOnline order
+        public OrderOnline? order {get; set;}
+        /*
         {
             get
             {
@@ -201,7 +204,7 @@ namespace SnowmeetApi.Models.Rent
                 _order = value;
             }
         }
-
+        */
         [NotMapped]
         public string status
         {
@@ -381,7 +384,7 @@ namespace SnowmeetApi.Models.Rent
             {
                 string ret = "";
                 if (this.order != null && this.order.pay_state == 1
-                    && this.order.payments != null && this.order.payments.Length > 0)
+                    && this.order.payments != null && this.order.payments.Count > 0)
                 {
                     if (this.order.payments[0].create_date.Date >= date.Date)
                     {

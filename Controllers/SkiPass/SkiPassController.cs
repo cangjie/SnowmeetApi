@@ -719,7 +719,7 @@ namespace SnowmeetApi.Controllers
             skipass.order_id = order.id;
             await _context.skiPass.AddAsync(skipass);
             await _context.SaveChangesAsync();
-            order.payments = new OrderPayment[] { payment };
+            order.payments = (new OrderPayment[] { payment }).ToList();
 
             member.real_name = name;
             _context.member.Entry(member).State = EntityState.Modified;
