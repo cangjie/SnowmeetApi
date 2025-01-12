@@ -23,10 +23,7 @@ namespace SnowmeetApi.Data
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
-            //MaintainLive
             modelBuilder.Entity<MaintainLive>().HasKey(c => c.id);
-            //SchoolStaff
-            
             modelBuilder.Entity<SnowmeetApi.Models.Maintain.Brand>().HasNoKey();
             modelBuilder.Entity<SnowmeetApi.Models.Users.UnionId>().HasKey(u => new { u.union_id, u.open_id });
             modelBuilder.Entity<SnowmeetApi.Models.DD.ExtendedProperties>().HasNoKey();
@@ -46,13 +43,14 @@ namespace SnowmeetApi.Data
             modelBuilder.Entity<RentProductDetailInfo>().HasOne<RentProduct>().WithMany(r => r.detailInfo).HasForeignKey(r => r.product_id);
             modelBuilder.Entity<RentProductImage>().HasOne<RentProduct>().WithMany(r => r.images).HasForeignKey(r => r.product_id);
             modelBuilder.Entity<RentCategoryInfoField>().HasMany<RentProductDetailInfo>().WithOne(r => r.field).HasForeignKey(r => r.field_id);
-            //modelBuilder.Entity<RentCategory>().HasMany<RentProduct>().WithOne(r => r.category).HasForeignKey(r => r.category_id);
             modelBuilder.Entity<RentProduct>().HasOne<RentCategory>().WithMany(r => r.productList).HasForeignKey(r => r.category_id);
             modelBuilder.Entity<RentProductDetailInfo>().HasKey(i => new {i.product_id, i.field_id});
             modelBuilder.Entity<SkipassDailyPrice>().HasOne<Models.Product.SkiPass>().WithMany(s => s.dailyPrice).HasForeignKey(s => s.product_id);
             modelBuilder.Entity<MaintainLog>().HasOne<Models.MaintainLive>().WithMany(m => m.taskLog).HasForeignKey(m => m.task_id);
             modelBuilder.Entity<OrderOnline>().HasMany<MaintainLive>().WithOne(m => m.order).HasForeignKey(m => m.order_id);
             modelBuilder.Entity<Brand>().HasKey(b => new {b.brand_name, b.brand_type});
+            modelBuilder.Entity<RentAdditionalPayment>().HasOne(r => r.order).WithOne().HasForeignKey<RentAdditionalPayment>(r => r.order_id);
+            modelBuilder.Entity<RentAdditionalPayment>().HasOne<RentOrder>().WithMany(r => r.additionalPayments).HasForeignKey(r => r.rent_list_id);
         }
 
         public DbSet<MaintainLive> MaintainLives {get; set;}
@@ -141,5 +139,6 @@ namespace SnowmeetApi.Data
         public DbSet<Models.SkiPass.SkiPass> skiPass {get; set;}
         public DbSet<Models.Product.SkipassDailyPrice> skipassDailyPrice {get; set;}
         public DbSet<Models.Users.Referee> referee {get; set;}
+        public DbSet<Models.Rent.RentAdditionalPayment> rentAdditionalPayment {get; set;}
     }
 }

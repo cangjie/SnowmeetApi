@@ -364,6 +364,9 @@ namespace SnowmeetApi.Models.Rent
             }
         }
 
+        [NotMapped]
+        public List<RentAdditionalPayment> additionalPayments {get; set;}
+
         public string GetPastStatus(DateTime date)
         {
             if (date.Date < create_date.Date)

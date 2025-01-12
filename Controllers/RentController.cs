@@ -1709,6 +1709,33 @@ namespace SnowmeetApi.Controllers
             return Ok(list);
         }
 
+        [HttpGet("{rentListId}")]
+        public async Task<ActionResult<RentAdditionalPayment>> CreateAdditionalPayment(int rentListId, double amount, string reason, 
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            sessionKey = Util.UrlDecode(sessionKey).Trim();
+            UnicUser user = await Util.GetUser(sessionKey, _context);
+            if (!user.isAdmin)
+            {
+                return NoContent();
+            }
+            if (!user.isStaff)
+            {
+                return BadRequest();
+            }
+            RentAdditionalPayment addPay = new RentAdditionalPayment()
+            {
+                rent_list_id = rentListId,
+                amount = amount,
+                reason = Util.UrlDecode(reason),
+                staff_open_id = user.member.wechatMiniOpenId.Trim(),
+                create_date = DateTime.Now
+            };
+            await _context.rentAdditionalPayment.AddAsync(addPay);
+            await _context.SaveChangesAsync();
+            return Ok(addPay);
+        }
+
        
         private bool RentOrderExists(int id)
         {
