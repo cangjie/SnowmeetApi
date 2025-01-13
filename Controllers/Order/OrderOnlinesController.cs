@@ -432,14 +432,18 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet("{orderId}")]
-        public async Task<ActionResult<OrderOnline>> GetWholeOrderByStaff(int orderId, string staffSessionKey)
+        public async Task<ActionResult<OrderOnline>> GetWholeOrderByStaff(int orderId, string staffSessionKey, bool needAuth = true)
         {
+
             staffSessionKey = Util.UrlDecode(staffSessionKey);
             //UnicUser._context = _context;
-            UnicUser user = await UnicUser.GetUnicUserAsync(staffSessionKey, _context);
-            if (!user.isAdmin)
+            if (needAuth)
             {
-                return NoContent();
+                UnicUser user = await UnicUser.GetUnicUserAsync(staffSessionKey, _context);
+                if (!user.isAdmin)
+                {
+                    return NoContent();
+                }
             }
             OrderOnline order = await _context.OrderOnlines.FindAsync(orderId);
             if (order != null && !order.open_id.Trim().Equals(""))
