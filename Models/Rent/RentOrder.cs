@@ -73,7 +73,6 @@ namespace SnowmeetApi.Models.Rent
 
         public int closed { get; set; } = 0;
         public int finished { get; set; } = 0;
-
         public DateTime create_date { get; set; } = DateTime.Now;
 
         /*

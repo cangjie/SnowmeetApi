@@ -32,7 +32,7 @@ namespace SnowmeetApi.Controllers
 
         private readonly IHttpContextAccessor _httpContextAccessor;
 
-        private readonly DateTime startDate = DateTime.Parse("2024-10-20");
+        private readonly DateTime startDate = DateTime.Parse("2020-10-20");
 
         private MemberController _memberHelper;
 
@@ -131,7 +131,7 @@ namespace SnowmeetApi.Controllers
             var idList = await _context.idList.FromSqlRaw(" select distinct rent_list_id as id from rent_list_detail  "
                 + "left join rent_list on rent_list.[id] = rent_list_id"
                 + " where real_end_date >= '" + startDate.ToShortDateString() + "' "
-                + " and real_end_date <= '" + endDate.AddDays(1).ToShortDateString() + "' and shop like '" + shop + "%' "
+                + " and real_end_date <= '" + endDate.AddDays(1).ToShortDateString() + "' and shop like '" + shop + "%'  "
                 //+ " and rent_list.[id] = 2434"
                 )
                 .AsNoTracking().ToListAsync();
@@ -1045,8 +1045,8 @@ namespace SnowmeetApi.Controllers
                 + " where create_date < '" + date.ToShortDateString() + "' and create_date > '" + startDate.ToShortDateString() + "' "
                 + " and exists ( select 'a' from rent_list_detail  where rent_list_detail.rent_list_id = rent_list.id and "
                 + " (real_end_date is null or real_end_date >= '" + date.ToShortDateString() + "' )) "
-                + (shop.Trim().Equals("")? " " : " and shop = '" + shop.Replace("'", "").Trim() + "'  " ) )
-                .AsNoTracking().ToListAsync();
+                + (shop.Trim().Equals("")? " " : " and shop = '" + shop.Replace("'", "").Trim() + "' and closed = 0 and finished = 0  " ) )
+                .ToListAsync();
 
             RentOrder[] orderArr = new RentOrder[rentOrderList.Count];
             double totalDeposit = 0;
@@ -1063,10 +1063,18 @@ namespace SnowmeetApi.Controllers
                 }
                 else
                 {
+                    rentOrderList[i].finished = 1;
+                    _context.RentOrder.Entry(rentOrderList[i]).State = EntityState.Modified;
+                    try
+                    {
+                        await _context.SaveChangesAsync();
+                    }
+                    catch(Exception err)
+                    {
+                        Console.WriteLine(err.ToString());
+                    }
                     continue;
                 }
-
-                //orderArr[i] = (RentOrder)((OkObjectResult)(await GetRentOrder(rentOrderList[i].id, sessionKey)).Result).Value;
                 totalDeposit = order.deposit_final + totalDeposit;
                 double subTotalRental = 0;
                 for (int j = 0; j < order.rentalDetails.Count; j++)
@@ -1080,6 +1088,7 @@ namespace SnowmeetApi.Controllers
                 }
                 totalRental = totalRental + subTotalRental;
             }
+            
             RentOrderCollection sum = new RentOrderCollection();
             sum.date = date.Date;
             sum.type = "当日前未完结";
