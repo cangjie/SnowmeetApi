@@ -7,6 +7,7 @@ namespace SnowmeetApi.Models.Order
     public class OrderPaymentRefund
     {
         public int id { get; set; }
+        [ForeignKey(nameof(Rent.RentOrder))]
         public int order_id { get; set; }
         public int payment_id { get; set; }
         public double amount { get; set; }

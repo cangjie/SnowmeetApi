@@ -9,6 +9,7 @@ using System;
 using SKIT.FlurlHttpClient.Wechat.TenpayV3.Models;
 using SnowmeetApi.Models.Product;
 using SnowmeetApi.Models.Maintain;
+using SnowmeetApi.Models.Order;
 namespace SnowmeetApi.Data
 {
     public class ApplicationDBContext : DbContext
@@ -53,7 +54,11 @@ namespace SnowmeetApi.Data
             modelBuilder.Entity<RentAdditionalPayment>().HasOne<RentOrder>().WithMany(r => r.additionalPayments).HasForeignKey(r => r.rent_list_id);
             modelBuilder.Entity<RentOrderDetail>().HasOne<RentOrder>().WithMany(r => r.details).HasForeignKey(r => r.rent_list_id);
             modelBuilder.Entity<RentOrderDetailLog>().HasOne<RentOrderDetail>().WithMany(r => r.log).HasForeignKey(r => r.detail_id);
+
             modelBuilder.Entity<RentOrder>().HasOne(r => r.order).WithOne().HasForeignKey<RentOrder>(r => r.order_id);
+
+            modelBuilder.Entity<OrderPaymentRefund>().HasOne<RentOrder>().WithMany(r => r.refunds)
+                .HasPrincipalKey(r => r.order_id).HasForeignKey(r => r.order_id);
         }
 
         public DbSet<MaintainLive> MaintainLives {get; set;}

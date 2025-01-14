@@ -72,7 +72,7 @@ namespace SnowmeetApi.Models.Rent
         public string staff_name { get; set; } = "";
 
         public int closed { get; set; } = 0;
-        public int finished { get; set; } = 0;
+        public DateTime? finish_date { get; set; }
         public DateTime create_date { get; set; } = DateTime.Now;
 
         /*
@@ -373,6 +373,9 @@ namespace SnowmeetApi.Models.Rent
 
         [NotMapped]
         public List<RentAdditionalPayment> additionalPayments {get; set;}
+
+        [NotMapped]
+        public List<Models.Order.OrderPaymentRefund> refunds {get; set;}
 
         public string GetPastStatus(DateTime date)
         {

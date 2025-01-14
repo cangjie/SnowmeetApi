@@ -130,8 +130,9 @@ namespace SnowmeetApi.Controllers
 
             var idList = await _context.idList.FromSqlRaw(" select distinct rent_list_id as id from rent_list_detail  "
                 + "left join rent_list on rent_list.[id] = rent_list_id"
-                + " where real_end_date >= '" + startDate.ToShortDateString() + "' "
-                + " and real_end_date <= '" + endDate.AddDays(1).ToShortDateString() + "' and shop like '" + shop + "%'  "
+                + " where finish_date >= '" + startDate.ToShortDateString() + "' "
+                + " and finish_date <= '" + endDate.AddDays(1).ToShortDateString() + "' and shop like '" + shop + "%'  "
+                + " and finish_date is not null and closed = 0 "
                 //+ " and rent_list.[id] = 2434"
                 )
                 .AsNoTracking().ToListAsync();
@@ -176,7 +177,7 @@ namespace SnowmeetApi.Controllers
                     shop = order.shop,
                     name = order.real_name.Trim(),
                     cell = order.cell_number.Trim(),
-                    settleDate = order.end_date,
+                    settleDate = order.finish_date,
                     deposit = totalPayment,
                     refund = totalRefund,
                     earn = totalPayment - totalRefund,
@@ -1045,7 +1046,10 @@ namespace SnowmeetApi.Controllers
                 + " where create_date < '" + date.ToShortDateString() + "' and create_date > '" + startDate.ToShortDateString() + "' "
                 + " and exists ( select 'a' from rent_list_detail  where rent_list_detail.rent_list_id = rent_list.id and "
                 + " (real_end_date is null or real_end_date >= '" + date.ToShortDateString() + "' )) "
-                + (shop.Trim().Equals("")? " " : " and shop = '" + shop.Replace("'", "").Trim() + "' and closed = 0 and finished = 0  " ) )
+                + (shop.Trim().Equals("")? " " : " and shop = '" + shop.Replace("'", "").Trim() 
+                + "' and closed = 0  and (finish_date >  '" + date.ToShortDateString() + "' or finish_date is null) " 
+                //+ " and [id] = 6290 "
+                ) )
                 .ToListAsync();
 
             RentOrder[] orderArr = new RentOrder[rentOrderList.Count];
@@ -1063,6 +1067,8 @@ namespace SnowmeetApi.Controllers
                 }
                 else
                 {
+                    Console.WriteLine(order.id.ToString() + " " + order.status);
+                    /*
                     rentOrderList[i].finished = 1;
                     _context.RentOrder.Entry(rentOrderList[i]).State = EntityState.Modified;
                     try
@@ -1073,6 +1079,7 @@ namespace SnowmeetApi.Controllers
                     {
                         Console.WriteLine(err.ToString());
                     }
+                    */
                     continue;
                 }
                 totalDeposit = order.deposit_final + totalDeposit;
