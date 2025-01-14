@@ -479,11 +479,11 @@ namespace SnowmeetApi.Controllers
                     }
                 }
             }
-            
+            /*
             rentOrder.details = await _context.RentOrderDetail
                 .Include(d => d.log).Where(d => d.rent_list_id == rentOrder.id)
                 .AsNoTracking().ToListAsync();
-            
+            */
             
             if (rentOrder.order_id > 0)
             {
