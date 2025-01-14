@@ -449,11 +449,14 @@ namespace SnowmeetApi.Controllers
             sessionKey = Util.UrlDecode(sessionKey).Trim();
             UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
 
-            RentOrder rentOrder = await _context.RentOrder.FindAsync(id);
+            //RentOrder rentOrder = await _context.RentOrder.FindAsync(id);
 
-            //RentOrder rentOrder = await _context.RentOrder
-            // .Include(r => r.order).Where(r => r.id == id)
-            //   .FirstAsync();
+            RentOrder rentOrder = await _context.RentOrder
+                //.Include(r => r.order)
+                .Include(r => r.details)
+                    .ThenInclude(d => d.log)
+                .Where(r => r.id == id)
+                .FirstAsync();
             if (needAuth)
             {
                 if (rentOrder == null)
