@@ -449,14 +449,28 @@ namespace SnowmeetApi.Controllers
             sessionKey = Util.UrlDecode(sessionKey).Trim();
             UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
 
-            //RentOrder rentOrder = await _context.RentOrder.FindAsync(id);
+            RentOrder rentOrder = await _context.RentOrder.FindAsync(id);
 
-            RentOrder rentOrder = await _context.RentOrder
-                //.Include(r => r.order)
+            if (rentOrder.order_id == 0)
+            {
+                rentOrder = await _context.RentOrder
                 .Include(r => r.details)
                     .ThenInclude(d => d.log)
                 .Where(r => r.id == id)
                 .FirstAsync();
+            }
+            else
+            {
+                rentOrder = await _context.RentOrder
+                .Include(r => r.details)
+                    .ThenInclude(d => d.log)
+                .Include(r => r.order)
+                    .ThenInclude(o => o.payments)
+                .Include(o => o.refunds)
+                .Where(r => r.id == id)
+                .FirstAsync();
+            }
+            
             if (needAuth)
             {
                 if (rentOrder == null)
@@ -484,12 +498,13 @@ namespace SnowmeetApi.Controllers
                 .Include(d => d.log).Where(d => d.rent_list_id == rentOrder.id)
                 .AsNoTracking().ToListAsync();
             */
-            
+            /*
             if (rentOrder.order_id > 0)
             {
                 
                 rentOrder.order = (OrderOnline)((OkObjectResult)(await _orderHelper.GetWholeOrderByStaff(rentOrder.order_id, sessionKey, needAuth)).Result).Value;
             }
+            */
             /*
             if (!user.isAdmin)
             {
