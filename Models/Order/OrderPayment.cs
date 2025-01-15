@@ -21,6 +21,7 @@ namespace SnowmeetApi.Models.Order
         [Key]
         public int id { get; set; }
 
+        
         public int order_id { get; set; }
         public string pay_method { get; set; }
         public double amount { get; set; }

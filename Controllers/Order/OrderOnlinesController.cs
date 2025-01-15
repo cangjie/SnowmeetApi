@@ -432,14 +432,18 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet("{orderId}")]
-        public async Task<ActionResult<OrderOnline>> GetWholeOrderByStaff(int orderId, string staffSessionKey)
+        public async Task<ActionResult<OrderOnline>> GetWholeOrderByStaff(int orderId, string staffSessionKey, bool needAuth = true)
         {
+
             staffSessionKey = Util.UrlDecode(staffSessionKey);
             //UnicUser._context = _context;
-            UnicUser user = await UnicUser.GetUnicUserAsync(staffSessionKey, _context);
-            if (!user.isAdmin)
+            if (needAuth)
             {
-                return NoContent();
+                UnicUser user = await UnicUser.GetUnicUserAsync(staffSessionKey, _context);
+                if (!user.isAdmin)
+                {
+                    return NoContent();
+                }
             }
             OrderOnline order = await _context.OrderOnlines.FindAsync(orderId);
             if (order != null && !order.open_id.Trim().Equals(""))
@@ -503,7 +507,7 @@ namespace SnowmeetApi.Controllers
                 order.payments = payments.ToList();
 
                 var refunds = await _context.OrderPaymentRefund.Where(r => r.order_id == order.id
-                    && (r.state == 1 || !r.refund_id.Trim().Equals(""))).ToArrayAsync();
+                    && (r.state == 1 || !r.refund_id.Trim().Equals(""))).ToListAsync();
                 if (refunds != null)
                 {
 
@@ -874,7 +878,7 @@ namespace SnowmeetApi.Controllers
                     .OrderByDescending(p => p.id).ToListAsync();
 
                 orderOnline.refunds = await _context.OrderPaymentRefund.Where(r => r.order_id == orderOnline.id &&  (!r.refund_id.Trim().Equals("") || r.state == 1))
-                    .OrderByDescending(r => r.id).ToArrayAsync();
+                    .OrderByDescending(r => r.id).ToListAsync();
 
                 if (orderOnline.ticket_code != null && !orderOnline.ticket_code.ToString().Trim().Equals(""))
                 {

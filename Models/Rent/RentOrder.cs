@@ -72,7 +72,7 @@ namespace SnowmeetApi.Models.Rent
         public string staff_name { get; set; } = "";
 
         public int closed { get; set; } = 0;
-
+        public DateTime? finish_date { get; set; }
         public DateTime create_date { get; set; } = DateTime.Now;
 
         /*
@@ -255,7 +255,7 @@ namespace SnowmeetApi.Models.Rent
                     {
                         s = "已退款";
                     }
-                    else if (order != null && ((order.refunds != null && order.refunds.Length > 0) || (Math.Round(totalRental, 2) >= Math.Round(deposit_final, 2))))
+                    else if (order != null && ((order.refunds != null && order.refunds.Count > 0) || (Math.Round(totalRental, 2) >= Math.Round(deposit_final, 2))))
                     {
                         s = "已退款";
                     }
@@ -374,6 +374,9 @@ namespace SnowmeetApi.Models.Rent
         [NotMapped]
         public List<RentAdditionalPayment> additionalPayments {get; set;}
 
+        [NotMapped]
+        public List<Models.Order.OrderPaymentRefund> refunds {get; set;}
+
         public string GetPastStatus(DateTime date)
         {
             if (date.Date < create_date.Date)
@@ -389,7 +392,7 @@ namespace SnowmeetApi.Models.Rent
                     if (this.order.payments[0].create_date.Date >= date.Date)
                     {
                         ret = "已付押金";
-                        if (this.order.refunds != null && this.order.refunds.Length > 0)
+                        if (this.order.refunds != null && this.order.refunds.Count > 0)
                         {
                             if (this.order.refunds[0].create_date.Date >= date.Date)
                             {
