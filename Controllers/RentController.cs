@@ -1875,7 +1875,7 @@ namespace SnowmeetApi.Controllers
             await _context.SaveChangesAsync();
         }
         [HttpGet("{orderId}")]
-        public async Task<ActionResult<RentOrder>> SetFinish(int orderId, DateTime finishDate,
+        public async Task<ActionResult<RentOrder>> SetFinish(int orderId, DateTime? finishDate,
             string sessionKey, string sessionType = "wechat_mini_openid")
         {
             sessionKey = Util.UrlDecode(sessionKey).Trim();
@@ -1884,9 +1884,40 @@ namespace SnowmeetApi.Controllers
             {
                 return BadRequest();
             }
+            if (finishDate == null)
+            {
+                if (user.member.is_manager == 0 || user.member.is_admin == 0)
+                {
+                    return BadRequest();
+                }
+            }
             RentOrder rentOrder = (RentOrder)((OkObjectResult)(await GetRentOrder(orderId, sessionKey)).Result).Value;
-            //if (rentOrder.finish_date)
-            return BadRequest();
+            if (rentOrder == null)
+            {
+                return NotFound();
+            }
+            if (rentOrder.finish_date != null)
+            {
+                return NoContent();
+            }
+            if (!rentOrder.status.Trim().Equals("已退款") && !rentOrder.status.Trim().Equals("全部归还"))
+            {
+                return NoContent();
+            }
+            RentOrderLog log = new RentOrderLog()
+            {
+                id = 0,
+                rent_list_id = rentOrder.id,
+                memo = finishDate == null ? "订单重开" : "订单完成",
+                field_name = "finish_date",
+                prev_value = rentOrder.finish_date==null? null: rentOrder.finish_date.ToString(),
+                oper_member_id = user.memberId
+            };
+            await _context.rentOrderLog.AddAsync(log);
+            rentOrder.finish_date = finishDate;
+            _context.RentOrder.Entry(rentOrder).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
+            return Ok(rentOrder);
         }
 
        

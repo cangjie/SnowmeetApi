@@ -61,6 +61,8 @@ namespace SnowmeetApi.Data
                 .HasPrincipalKey(r => r.order_id).HasForeignKey(r => r.order_id);
             modelBuilder.Entity<OrderPayment>().HasOne<OrderOnline>().WithMany(o => o.payments).HasForeignKey(p => p.order_id);
             modelBuilder.Entity<OrderPaymentRefund>().HasOne<OrderOnline>().WithMany( o => o.refunds).HasForeignKey(o => o.order_id);
+            modelBuilder.Entity<Member>().HasMany<RentOrderLog>().WithOne(m => m.member).HasForeignKey(r => r.oper_member_id);
+
         }
 
         public DbSet<MaintainLive> MaintainLives {get; set;}
@@ -150,5 +152,6 @@ namespace SnowmeetApi.Data
         public DbSet<Models.Product.SkipassDailyPrice> skipassDailyPrice {get; set;}
         public DbSet<Models.Users.Referee> referee {get; set;}
         public DbSet<Models.Rent.RentAdditionalPayment> rentAdditionalPayment {get; set;}
+        public DbSet<Models.Rent.RentOrderLog> rentOrderLog { get; set; }
     }
 }
