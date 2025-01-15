@@ -210,6 +210,14 @@ namespace SnowmeetApi.Models.Rent
         {
             get
             {
+                if (finish_date != null)
+                {
+                    return "已完成";
+                }
+                if (closed == 1)
+                {
+                    return "已关闭";
+                }
                 if (_forceTerminate)
                 {
                     return "强行终止";

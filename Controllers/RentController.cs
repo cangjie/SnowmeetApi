@@ -742,7 +742,7 @@ namespace SnowmeetApi.Controllers
                 rentOrder.backColor = "yellow";
             }
 
-            if (rentOrder.status.Equals("已退款"))
+            if (rentOrder.status.Equals("已退款") || rentOrder.status.Equals("已完成"))
             {
                 rentOrder.textColor = "red";
             }
@@ -1896,11 +1896,8 @@ namespace SnowmeetApi.Controllers
             {
                 return NotFound();
             }
-            if (rentOrder.finish_date != null)
-            {
-                return NoContent();
-            }
-            if (!rentOrder.status.Trim().Equals("已退款") && !rentOrder.status.Trim().Equals("全部归还"))
+            
+            if (rentOrder.finish_date == null && !rentOrder.status.Trim().Equals("已退款") && !rentOrder.status.Trim().Equals("全部归还"))
             {
                 return NoContent();
             }

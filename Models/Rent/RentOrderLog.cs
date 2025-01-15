@@ -13,7 +13,7 @@ namespace SnowmeetApi.Models.Rent
         public string? field_name { get;set; }
         public string? prev_value { get; set; }
         public int? oper_member_id { get; set; }
-        public DateTime create_date { get; set; }
+        public DateTime create_date { get; set; } = DateTime.Now;
         [NotMapped]
         public Models.Users.Member? member { get; set; }
 
