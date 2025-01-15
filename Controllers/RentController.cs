@@ -1814,6 +1814,20 @@ namespace SnowmeetApi.Controllers
             }
             await _context.SaveChangesAsync();
         }
+        [HttpGet("{orderId}")]
+        public async Task<ActionResult<RentOrder>> SetFinish(int orderId, DateTime finishDate,
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            sessionKey = Util.UrlDecode(sessionKey).Trim();
+            UnicUser user = await Util.GetUser(sessionKey, _context);
+            if (!user.isAdmin)
+            {
+                return BadRequest();
+            }
+            RentOrder rentOrder = (RentOrder)((OkObjectResult)(await GetRentOrder(orderId, sessionKey)).Result).Value;
+            //if (rentOrder.finish_date)
+            return BadRequest();
+        }
 
        
         private bool RentOrderExists(int id)
