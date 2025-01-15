@@ -154,7 +154,7 @@ namespace SnowmeetApi.Controllers
                 {
                     totalPayment += order.order.payments[j].amount;
                 }
-                for (int j = 0; j < order.order.refunds.Length; j++)
+                for (int j = 0; j < order.order.refunds.Count; j++)
                 {
                     if (!order.order.refunds[j].refund_id.Trim().Equals("") || order.order.refunds[j].state == 1)
                     {
@@ -449,6 +449,8 @@ namespace SnowmeetApi.Controllers
             sessionKey = Util.UrlDecode(sessionKey).Trim();
             UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
 
+            /*
+
             RentOrder rentOrder = await _context.RentOrder.FindAsync(id);
 
             if (rentOrder.order_id == 0)
@@ -470,6 +472,27 @@ namespace SnowmeetApi.Controllers
                 .Where(r => r.id == id)
                 .FirstAsync();
             }
+            */
+            List<RentOrder> rentOrderList =  await _context.RentOrder
+                .Include(r => r.details)
+                    .ThenInclude(d => d.log)
+                .Include(r => r.order)
+                    .ThenInclude(o => o.payments)
+                    .Include( o => o.refunds)
+                .Where(r => r.id == id).ToListAsync();
+            if (rentOrderList.Count == 0)
+            {
+                rentOrderList =  await _context.RentOrder
+                .Include(r => r.details)
+                    .ThenInclude(d => d.log)
+                .Where(r => r.id == id).ToListAsync();
+            }
+            if (rentOrderList.Count == 0)
+            {
+                return NotFound();
+            }
+            RentOrder rentOrder = rentOrderList[0];
+
             
             if (needAuth)
             {
@@ -1568,7 +1591,7 @@ namespace SnowmeetApi.Controllers
                     rentOrder.order.payments = await _context.OrderPayment
                         .Where(p => p.order_id == rentOrder.order_id).ToListAsync();
                     rentOrder.order.refunds = await _context.OrderPaymentRefund
-                        .Where(r => r.order_id == rentOrder.order_id).ToArrayAsync();
+                        .Where(r => r.order_id == rentOrder.order_id).ToListAsync();
                     
                 }
                 rentOrder.details = (new RentOrderDetail[] { item }).ToList();
@@ -1667,7 +1690,7 @@ namespace SnowmeetApi.Controllers
                 List<RentOrderList.RentRefund> refundList = new List<RentOrderList.RentRefund>();
                 //item.refunds = new RentOrderList.RentRefund[rentOrder.order.refunds.Length];
                 for (int j = 0; rentOrder.order_id != 0 && rentOrder.order != null
-                    && j < rentOrder.order.refunds.Length; j++)
+                    && j < rentOrder.order.refunds.Count; j++)
                 {
                     RentOrderList.RentRefund r = new RentOrderList.RentRefund();
                     r.id = rentOrder.order.refunds[j].id;

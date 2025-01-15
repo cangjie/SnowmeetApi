@@ -308,7 +308,7 @@ namespace SnowmeetApi.Controllers
             exp.return_memo = memo.Trim();
             _context.Entry(exp).State = EntityState.Modified;
             await _context.SaveChangesAsync();
-            if ((exp.order.refunds == null || exp.order.refunds.Length == 0) && exp.order.payments != null && exp.order.paidAmount >= amount )
+            if ((exp.order.refunds == null || exp.order.refunds.Count == 0) && exp.order.payments != null && exp.order.paidAmount >= amount )
             {
                 Order.OrderRefundController refundHelper = new Order.OrderRefundController(_context, _originConfig, _httpContextAccessor);
                 for (int i = 0; i < exp.order.payments.Count; i++)

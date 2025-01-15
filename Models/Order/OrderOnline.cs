@@ -60,7 +60,7 @@ namespace SnowmeetApi.Models
         [NotMapped]
         public List<OrderPayment> payments {get; set;}
         [NotMapped]
-        public OrderPaymentRefund[]? refunds { get; set; }
+        public List<OrderPaymentRefund> refunds { get; set; }
         [NotMapped]
         public MiniAppUser? user { get; set; }
         [NotMapped]
