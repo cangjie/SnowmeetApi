@@ -1,6 +1,7 @@
 ﻿using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using SnowmeetApi.Models.Users;
 namespace SnowmeetApi.Models.Order
 {
     [Table("order_online_refund")]
@@ -23,6 +24,8 @@ namespace SnowmeetApi.Models.Order
 
         public string out_refund_no {get; set;} = "";
 
+        [NotMapped]
+        public MemberSocialAccount msa {get; set;}
         
         public bool refundSuccess
         {

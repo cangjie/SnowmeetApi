@@ -10,6 +10,7 @@ namespace SnowmeetApi.Models.Users
         public int id { get; set; }
 
         //[Column("member_id")]
+        [ForeignKey(nameof(Member))]
         public int member_id { get; set; }
 
         public string type {get; set;}
@@ -19,8 +20,9 @@ namespace SnowmeetApi.Models.Users
         public int valid {get; set;} = 1;
 
         public string memo {get; set; } = "";
-
-       // public Member member { get; set; }
+        
+        [NotMapped]
+        public Member member { get; set; }
 
     }
 }

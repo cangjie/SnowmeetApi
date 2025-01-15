@@ -1908,13 +1908,26 @@ namespace SnowmeetApi.Controllers
                 memo = finishDate == null ? "订单重开" : "订单完成",
                 field_name = "finish_date",
                 prev_value = rentOrder.finish_date==null? null: rentOrder.finish_date.ToString(),
-                oper_member_id = user.memberId
+                oper_member_id = user.member.id
             };
             await _context.rentOrderLog.AddAsync(log);
             rentOrder.finish_date = finishDate;
             _context.RentOrder.Entry(rentOrder).State = EntityState.Modified;
             await _context.SaveChangesAsync();
             return Ok(rentOrder);
+        }
+        [HttpGet("{orderId}")]
+        public async Task<ActionResult<List<RentOrderLog>>> GetRentOrderLogs(int orderId,
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            sessionKey = Util.UrlDecode(sessionKey).Trim();
+            UnicUser user = await Util.GetUser(sessionKey, _context);
+            if (!user.isAdmin)
+            {
+                return BadRequest();
+            }
+            return await _context.rentOrderLog.Where(l => l.rent_list_id == orderId)
+                .Include(l => l.member).OrderByDescending(l => l.id).ToListAsync();
         }
 
        

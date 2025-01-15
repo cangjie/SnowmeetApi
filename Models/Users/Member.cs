@@ -36,8 +36,8 @@ namespace SnowmeetApi.Models.Users
 
        
 
-        
-        public ICollection<MemberSocialAccount> memberSocialAccounts { get; set; } = new List<MemberSocialAccount>();
+        [NotMapped]
+        public List<MemberSocialAccount> memberSocialAccounts { get; set; } = new List<MemberSocialAccount>();
 
         public List<MemberSocialAccount> GetInfo(string type)
         {

@@ -46,6 +46,9 @@ namespace SnowmeetApi.Models.Order
         public string? wepay_trans_id {get; set;}
 
         [NotMapped]
+        public OrderOnline order {get; set;}
+
+        [NotMapped]
         public string staffName
         {
             get
