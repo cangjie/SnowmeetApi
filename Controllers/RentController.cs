@@ -154,7 +154,7 @@ namespace SnowmeetApi.Controllers
                 {
                     totalPayment += order.order.payments[j].amount;
                 }
-                for (int j = 0; j < order.order.refunds.Count; j++)
+                for (int j = 0; order.order.refunds != null && j < order.order.refunds.Count; j++)
                 {
                     if (!order.order.refunds[j].refund_id.Trim().Equals("") || order.order.refunds[j].state == 1)
                     {
