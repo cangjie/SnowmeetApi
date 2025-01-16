@@ -38,7 +38,7 @@ namespace SnowmeetApi.Models.Users
 
         
         [ForeignKey("member_id")]
-        public List<MemberSocialAccount> memberSocialAccounts { get; set; }// = new List<MemberSocialAccount>();
+        public List<MemberSocialAccount> memberSocialAccounts { get; set; } = new List<MemberSocialAccount>();
 
         public List<MemberSocialAccount> GetInfo(string type)
         {

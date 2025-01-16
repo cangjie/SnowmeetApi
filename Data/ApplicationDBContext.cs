@@ -33,11 +33,6 @@ namespace SnowmeetApi.Data
             modelBuilder.Entity<SnowmeetApi.Models.Maintain.MaintainReport>().HasNoKey();
             modelBuilder.Entity<Models.Order.SaleReport>().HasNoKey();
             modelBuilder.Entity<Models.Order.EPaymentDailyReport>().HasKey(e => new { e.biz_date, e.mch_id, e.pay_method });
-
-            //modelBuilder.Entity<Member>().HasMany<MemberSocialAccount>().WithOne().HasForeignKey(m => m.member_id);
-            //modelBuilder.Entity<MemberSocialAccount>().HasOne( m => m.member).WithMany(m => m.memberSocialAccounts).HasForeignKey(m => m.member_id);
-            
-
             modelBuilder.Entity<RentPrice>().HasOne<RentCategory>().WithMany(r => r.priceList).HasForeignKey(r => r.category_id);
             modelBuilder.Entity<RentPackageCategory>().HasKey(e => new {e.package_id, e.category_id});
             modelBuilder.Entity<RentPackageCategory>().HasOne<RentPackage>().WithMany(r => r.rentPackageCategoryList).HasForeignKey(r => r.package_id);
