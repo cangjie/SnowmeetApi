@@ -10,7 +10,7 @@ namespace SnowmeetApi.Models.Users
         public int id { get; set; }
 
         //[Column("member_id")]
-        [ForeignKey(nameof(Member))]
+        
         public int member_id { get; set; }
 
         public string type {get; set;}
