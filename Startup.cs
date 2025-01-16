@@ -18,6 +18,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using System.IO;
 using System.Net.WebSockets;
 using System.Threading;
+//using Microsoft.AspNetCore.Mvc.NewtonsoftJson;
 
 namespace SnowmeetApi
 {
@@ -64,6 +65,8 @@ namespace SnowmeetApi
                 c.SwaggerDoc("v1", new OpenApiInfo { Title = "SnowmeetApi", Version = "v1" });
             });
             services.TryAddSingleton<IHttpContextAccessor, HttpContextAccessor>();
+            services.AddControllers().AddNewtonSoftJson(option => 
+                option.SerializerSettings.ReferenceLoopHandling = ReferenceLoopHandling.Ignore);
             /*
             services.AddDbContext<AppDBContext>(options =>
                     options.UseSqlite(Configuration.GetConnectionString("AppDBContext")));

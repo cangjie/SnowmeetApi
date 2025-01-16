@@ -200,7 +200,9 @@ namespace SnowmeetApi.Controllers
         {
             MemberSocialAccount msa = await _context.memberSocialAccount
                 .Where(m => m.num.Trim().Equals("18601197897") && m.type.Trim().Equals("cell"))
-                .Include(m => m.member).FirstAsync();
+                .Include(m => m.member)
+                .FirstAsync();
+            //await _context.memberSocialAccount.Entry(msa).Reference(m => m.member).LoadAsync();
             return Ok(msa);
         }
         
