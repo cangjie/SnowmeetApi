@@ -189,7 +189,7 @@ namespace SnowmeetApi.Controllers
         [HttpGet]
         public async Task<ActionResult<Models.Users.Member>> GetMember()
         {
-            Models.Users.Member  member = await _context.member.Where(m => m.id == 15506).Include(m => m.memberSocialAccounts)
+            Models.Users.Member  member = await _context.member.Where(m => m.id == 15506)//.Include(m => m.memberSocialAccounts)
                 .FirstAsync();
             return Ok(member);
         }
