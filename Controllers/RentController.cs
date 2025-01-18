@@ -516,6 +516,27 @@ namespace SnowmeetApi.Controllers
                     }
                 }
             }
+            if (rentOrder.order != null)
+            {
+                List<MemberSocialAccount> msaList = await _context.memberSocialAccount
+                    .Where(m => (m.num.Trim().Equals(rentOrder.staff_open_id) && m.type.Trim().Equals("wechat_mini_openid")))
+                    .Include(m => m.member).ToListAsync();
+                if (msaList != null && msaList.Count > 0)
+                {
+                    rentOrder.order.msa = msaList[0];
+                }
+                for(var i = 0; i < rentOrder.order.refunds.Count; i++)
+                {
+                    OrderPaymentRefund refund = rentOrder.order.refunds[i];
+                    msaList = await _context.memberSocialAccount
+                        .Where(m => (m.num.Trim().Equals(refund.oper) && m.type.Trim().Equals("wechat_mini_openid")))
+                        .Include(m => m.member).ToListAsync();
+                    if (msaList != null && msaList.Count > 0)
+                    {
+                        refund.msa = msaList[0];
+                    }
+                }
+            }
             /*
             rentOrder.details = await _context.RentOrderDetail
                 .Include(d => d.log).Where(d => d.rent_list_id == rentOrder.id)
