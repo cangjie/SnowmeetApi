@@ -16,11 +16,15 @@ namespace SnowmeetApi.Models.Rent
         public double amount {get; set;}
         public string reason {get; set;}
         public int is_paid {get; set;}
+        public string pay_method {get; set;}
         public DateTime? update_date {get; set;}
         public DateTime create_date {get; set;} 
         public string staff_open_id {get; set;}
-        [NotMapped]
+
+        [ForeignKey("order_id")]
         public OrderOnline? order {get; set;}
+        [ForeignKey("rent_list_id")]
+        public RentOrder rentOrder {get; set;}
 
     }
 }

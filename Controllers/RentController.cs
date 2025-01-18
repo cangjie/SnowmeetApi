@@ -1820,19 +1820,33 @@ namespace SnowmeetApi.Controllers
                 amount = amount,
                 reason = Util.UrlDecode(reason),
                 staff_open_id = user.member.wechatMiniOpenId.Trim(),
+                pay_method = "微信支付",
                 create_date = DateTime.Now
             };
             await _context.rentAdditionalPayment.AddAsync(addPay);
             await _context.SaveChangesAsync();
             return Ok(addPay);
         }
-        [HttpGet("{rentListId}")]
-        public async Task<ActionResult<OrderOnline>> PlaceAdditionalOrder(int rentListId, string payMethod, 
+        [HttpGet("{rentAddPayId}")]
+        public async Task<ActionResult<OrderOnline>> PlaceAdditionalOrder(int rentAddPayId, 
             string sessionKey, string sessionType = "wechat_mini_openid")
         {
+            List<RentAdditionalPayment> rentAddPayList = await _context.rentAdditionalPayment
+                .Where(r => r.id == rentAddPayId).Include(r => r.rentOrder).AsNoTracking().ToListAsync();
+            if (rentAddPayList == null || rentAddPayList.Count == 0)
+            {
+                return BadRequest();
+            }
+            RentAdditionalPayment payment = rentAddPayList[0];
             sessionKey = Util.UrlDecode(sessionKey).Trim();
-            payMethod = Util.UrlDecode(payMethod).Trim();
+            string payMethod = payment.pay_method;
             UnicUser user = await Util.GetUser(sessionKey, _context);
+            RentOrder rentOrder = payment.rentOrder;
+            if (rentOrder == null)
+            {
+                return NotFound();
+            }
+            /*
             RentAdditionalPayment addPay = await _context.rentAdditionalPayment.FindAsync(rentListId);
             if (addPay == null || addPay.order_id != null)
             {
@@ -1843,6 +1857,7 @@ namespace SnowmeetApi.Controllers
             {
                 return NotFound();
             }
+            */
             OrderOnline order = new OrderOnline()
             {
                 id = 0,
@@ -1854,31 +1869,32 @@ namespace SnowmeetApi.Controllers
                 pay_method = payMethod.Trim(),
                 pay_memo = "追加押金",
                 pay_state = 0,
-                order_price = addPay.amount,
-                order_real_pay_price = addPay.amount,
+                order_price = payment.amount,
+                order_real_pay_price = payment.amount,
                 ticket_amount = 0,
                 other_discount = 0,
-                final_price = addPay.amount,
+                final_price = payment.amount,
                 ticket_code = rentOrder.ticket_code.Trim(),
-                staff_open_id = addPay.staff_open_id,
+                staff_open_id = payment.staff_open_id,
                 score_rate = 0,
                 generate_score = 0
 
             };
             await _context.OrderOnlines.AddAsync(order);
             await _context.SaveChangesAsync();
-            addPay.order_id = order.id;
-            addPay.order = order;
-            addPay.update_date = DateTime.Now;
-            _context.rentAdditionalPayment.Entry(addPay).State = EntityState.Modified;
+            payment.order_id = order.id;
+            payment.order = order;
+            payment.update_date = DateTime.Now;
+            _context.rentAdditionalPayment.Entry(payment).State = EntityState.Modified;
             await _context.SaveChangesAsync();
             if (order.id == 0)
             {
                 return BadRequest();
             }
             OrderPaymentController _orderHelper = new OrderPaymentController(_context, _oriConfig, _httpContextAccessor);
-            OrderPayment payment = (OrderPayment)((OkObjectResult)(await _orderHelper.CreatePayment(order.id, payMethod, order.final_price)).Result).Value;
-            order.payments = (new OrderPayment[] {payment}).ToList();
+            OrderPayment paymentReal = (OrderPayment)((OkObjectResult)(await _orderHelper.CreatePayment(order.id, payMethod, order.final_price)).Result).Value;
+            paymentReal.staff_open_id = order.staff_open_id;
+            order.payments = (new OrderPayment[] {paymentReal}).ToList();
             return Ok(order);
         }
 
