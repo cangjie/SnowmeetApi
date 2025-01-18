@@ -1841,6 +1841,10 @@ namespace SnowmeetApi.Controllers
             sessionKey = Util.UrlDecode(sessionKey).Trim();
             string payMethod = payment.pay_method;
             UnicUser user = await Util.GetUser(sessionKey, _context);
+            if (user == null)
+            {
+                return NoContent();
+            }
             RentOrder rentOrder = payment.rentOrder;
             if (rentOrder == null)
             {
@@ -1897,7 +1901,29 @@ namespace SnowmeetApi.Controllers
             order.payments = (new OrderPayment[] {paymentReal}).ToList();
             return Ok(order);
         }
-
+        [HttpGet("addPayId")]
+        public async Task<ActionResult<RentAdditionalPayment>> GetAddPayment(int addPayId, string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            sessionKey = Util.UrlDecode(sessionKey).Trim();
+            UnicUser user = await Util.GetUser(sessionKey, _context);
+            if (!user.isAdmin)
+            {
+                return BadRequest();
+            }
+            List<RentAdditionalPayment> addPayList = await _context.rentAdditionalPayment.Where(r => r.id == addPayId)
+            /*
+                .Include(a => a.rentOrder)
+                    .ThenInclude(r => r.details)
+                .Include(a => a.order)
+                    .ThenInclude(o => o.payments)
+            */
+                .AsNoTracking().ToListAsync();
+            if (addPayList == null || addPayList.Count == 0)
+            {
+                return NotFound();
+            }
+            return Ok(addPayList[0]);
+        }
         [NonAction]
         public async Task AdditionalOrderPaid(int orderId)
         {
