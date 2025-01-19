@@ -789,7 +789,9 @@ namespace SnowmeetApi.Controllers
                     await _rentHelper.StartRent(rentOrder.id);
                 }
             }
-            
+            recept.submit_return_id = rentOrder.id;
+            _context.Recept.Entry(recept).State = EntityState.Modified;
+            await _context.SaveChangesAsync(); 
             return recept;
         }
 
