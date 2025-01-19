@@ -27,7 +27,7 @@ namespace SnowmeetApi.Models.Rent
 
         public string shop { get; set; } = "";
 
-        public int order_id { get; set; } = 0;
+        public int? order_id { get; set; } = 0;
 
         public double deposit { get; set; } = 0;
 

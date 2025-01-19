@@ -895,7 +895,7 @@ namespace SnowmeetApi.Controllers
 
             double rentalTotal = 0;
 
-            RentOrder rentOrder = (RentOrder)((OkObjectResult)(await GetRentOrder(detail.rent_list_id, sessionKey, false)).Result).Value;
+            RentOrder rentOrder = (RentOrder)((OkObjectResult)(await GetRentOrder((int)detail.rent_list_id, sessionKey, false)).Result).Value;
 
             for (int i = 0; i < rentOrder.details.Count; i++)
             {
@@ -1499,7 +1499,7 @@ namespace SnowmeetApi.Controllers
             {
                 return BadRequest();
             }
-            RentOrder order = (RentOrder)((OkObjectResult)(await GetRentOrder(detail.rent_list_id, sessionKey, false)).Result).Value;
+            RentOrder order = (RentOrder)((OkObjectResult)(await GetRentOrder((int)detail.rent_list_id, sessionKey, false)).Result).Value;
             detail.rental_count = order.rentalDetails.Count;
             _context.Entry(detail).State = EntityState.Modified;
             await _context.SaveChangesAsync();

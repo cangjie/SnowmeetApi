@@ -10,7 +10,7 @@ namespace SnowmeetApi.Models.Rent
 	{
         public int id { get; set; } = 0;
 
-        public int rent_list_id { get; set; } = 0;
+        public int? rent_list_id { get; set; } = 0;
 
         //public int rent_item_id { get; set; }
 
