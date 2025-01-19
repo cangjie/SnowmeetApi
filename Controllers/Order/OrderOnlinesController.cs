@@ -458,7 +458,61 @@ namespace SnowmeetApi.Controllers
 
                     if (customerUser != null)
                     {
-                        order.user = (await _memberHelper.GetMember(order.open_id.Trim(), "wechat_mini_openid")).miniAppUser;
+                        Member orderMember =  await _memberHelper.GetMember(order.open_id.Trim(), "wechat_mini_openid");
+                        order.user = orderMember.miniAppUser;
+                        
+                        bool needUpdateMemberInfo = false;
+                        string updateCellNum = "";
+                        if (orderMember.real_name.Trim().Equals("") && !order.name.Trim().Equals(""))
+                        {
+                            orderMember.real_name = order.name.Trim().Replace("先生", "").Replace("女士", "");
+                            needUpdateMemberInfo = true;
+                        }
+                        if (orderMember.cell == null && !order.cell_number.Trim().Equals(""))
+                        {
+                            updateCellNum = order.cell_number.Trim();
+                            needUpdateMemberInfo = true;
+                        }
+                        if (orderMember.gender.Trim().Equals(""))
+                        {
+                            if (order.name.Trim().IndexOf("先生") >= 0)
+                            {
+                                orderMember.gender = "男";
+                            }
+                            if (order.name.Trim().IndexOf("女士") >= 0)
+                            {
+                                orderMember.gender = "女";
+                            }
+                            needUpdateMemberInfo = true;
+                        }
+                        if (needUpdateMemberInfo)
+                        {
+                            Member newMember = await _context.member.FindAsync(orderMember.id);
+                            newMember.real_name = orderMember.real_name.Trim();
+                            newMember.gender = orderMember.gender.Trim();
+                            _context.member.Entry(newMember).State = EntityState.Modified;
+                            if (!updateCellNum.Trim().Equals(""))
+                            {
+                                List<MemberSocialAccount> msaList = await _context.memberSocialAccount
+                                    .Where(m => m.member_id == newMember.id && m.type.Trim().Equals("cell"))
+                                    .AsNoTracking().ToListAsync();
+                                if (msaList == null || msaList.Count == 0)
+                                {
+                                    MemberSocialAccount msa = new MemberSocialAccount()
+                                    {
+                                        id = 0,
+                                        member_id = newMember.id,
+                                        type = "cell",
+                                        num = updateCellNum.Trim(),
+                                        valid = 1,
+                                        memo = "店销订单同步"
+                                    };
+                                    await _context.memberSocialAccount.AddAsync(msa);
+                                }
+                            }
+                            await _context.SaveChangesAsync();
+                        }
+
                         //order.user = await _context.MiniAppUsers.FindAsync(customerUser.miniAppOpenId);
 
                     }
@@ -471,6 +525,57 @@ namespace SnowmeetApi.Controllers
                         {
                             //order.user = await _context.MiniAppUsers.FindAsync(order.open_id.Trim());
                             order.user = (await _memberHelper.GetMember(order.open_id.Trim(), "wechat_mini_openid")).miniAppUser;
+                            bool needUpdateMemberInfo = false;
+                            string updateCellNum = "";
+                            if (user.member.real_name.Trim().Equals("") && !order.name.Trim().Equals(""))
+                            {
+                                user.member.real_name = order.name.Trim().Replace("先生", "").Replace("女士", "");
+                                needUpdateMemberInfo = true;
+                            }
+                            if (user.member.cell.Trim().Equals("") && !order.cell_number.Trim().Equals(""))
+                            {
+                                updateCellNum = order.cell_number.Trim();
+                                needUpdateMemberInfo = true;
+                            }
+                            if (user.member.gender.Trim().Equals(""))
+                            {
+                                if (order.name.Trim().IndexOf("先生")>=0)
+                                {
+                                    user.member.gender = "男";
+                                }
+                                if (order.name.Trim().IndexOf("女士")>=0)
+                                {
+                                    user.member.gender = "女";
+                                }
+                                needUpdateMemberInfo = true;
+                            }
+                            if (needUpdateMemberInfo)
+                            {
+                                Member newMember = await _context.member.FindAsync(user.member.id);
+                                newMember.real_name = user.member.real_name.Trim();
+                                newMember.gender = user.member.gender.Trim();
+                                _context.member.Entry(newMember).State = EntityState.Modified;
+                                if (!updateCellNum.Trim().Equals(""))
+                                {
+                                    List<MemberSocialAccount> msaList = await _context.memberSocialAccount
+                                        .Where(m => m.member_id == user.member.id && m.type.Trim().Equals("cell"))
+                                        .AsNoTracking().ToListAsync();
+                                    if (msaList == null || msaList.Count == 0)
+                                    {
+                                        MemberSocialAccount msa = new MemberSocialAccount()
+                                        {
+                                            id = 0,
+                                            member_id = newMember.id,
+                                            type = "cell",
+                                            num = updateCellNum.Trim(),
+                                            valid = 1,
+                                            memo = "店销订单同步"
+                                        };
+                                        await _context.memberSocialAccount.AddAsync(msa);
+                                    }
+                                }
+                                await _context.SaveChangesAsync();
+                            }
                         }
                         catch
                         {
