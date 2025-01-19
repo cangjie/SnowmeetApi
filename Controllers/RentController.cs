@@ -525,7 +525,8 @@ namespace SnowmeetApi.Controllers
                 {
                     rentOrder.order.msa = msaList[0];
                 }
-                for(var i = 0; i < rentOrder.order.refunds.Count; i++)
+                for(var i = 0; rentOrder.order != null && rentOrder.order.refunds != null 
+                    && i < rentOrder.order.refunds.Count; i++)
                 {
                     OrderPaymentRefund refund = rentOrder.order.refunds[i];
                     msaList = await _context.memberSocialAccount
