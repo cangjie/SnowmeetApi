@@ -191,8 +191,7 @@ namespace SnowmeetApi.Models.Rent
             }
         }
 
-        [NotMapped]
-        public OrderOnline? order {get; set;}
+        
         /*
         {
             get
@@ -378,8 +377,9 @@ namespace SnowmeetApi.Models.Rent
                 return detailList;
             }
         }
-
-        [NotMapped]
+        [ForeignKey("order_id")]
+        public OrderOnline? order {get; set;}
+        [ForeignKey("rent_list_id")]
         public List<RentAdditionalPayment> additionalPayments {get; set;}
 
         [NotMapped]

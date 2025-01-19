@@ -479,6 +479,9 @@ namespace SnowmeetApi.Controllers
                 .Include(r => r.order)
                     .ThenInclude(o => o.payments)
                     .Include( o => o.refunds)
+                .Include(r => r.additionalPayments)
+                    .ThenInclude(a => a.order)
+                        .ThenInclude(o => o.payments)
                 .Where(r => r.id == id).ToListAsync();
             if (rentOrderList.Count == 0)
             {
