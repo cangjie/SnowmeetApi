@@ -3,6 +3,7 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Collections.Generic;
 using NuGet.Common;
+using SnowmeetApi.Models.Users;
 
 namespace SnowmeetApi.Models.Rent
 {
@@ -26,6 +27,8 @@ namespace SnowmeetApi.Models.Rent
         public OrderOnline? order {get; set;}
         //[ForeignKey("rent_list_id")]
         public RentOrder rentOrder {get; set;}
+        [NotMapped]
+        public Member? staffMember {get; set;}
 
     }
 }

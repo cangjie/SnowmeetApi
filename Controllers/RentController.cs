@@ -798,6 +798,18 @@ namespace SnowmeetApi.Controllers
                 }
             }
 
+            for(int i = 0; rentOrder.additionalPayments != null 
+                && i < rentOrder.additionalPayments.Count; i++)
+            {
+                RentAdditionalPayment p = rentOrder.additionalPayments[i];
+                List<MemberSocialAccount> msaL = await _context.memberSocialAccount
+                    .Where(m => m.type.Trim().Equals("wechat_mini_openid") && m.num.Trim().Equals(p.staff_open_id.Trim()))
+                    .Include(m => m.member).AsNoTracking().ToListAsync();
+                if (msaL != null && msaL.Count > 0)
+                {
+                    p.staffMember = msaL[0].member;
+                }
+            }
             
 
 
