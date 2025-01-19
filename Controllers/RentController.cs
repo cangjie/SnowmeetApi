@@ -473,6 +473,8 @@ namespace SnowmeetApi.Controllers
                 .FirstAsync();
             }
             */
+            //var l = await _context.rentAdditionalPayment.Include(r => r.rentOrder)
+            //    .Where(r => r.id == 16) .AsNoTracking().ToListAsync();
             List<RentOrder> rentOrderList =  await _context.RentOrder
                 .Include(r => r.details)
                     .ThenInclude(d => d.log)
