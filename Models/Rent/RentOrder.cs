@@ -381,7 +381,22 @@ namespace SnowmeetApi.Models.Rent
         public OrderOnline? order {get; set;}
         [ForeignKey("rent_list_id")]
         public List<RentAdditionalPayment> additionalPayments {get; set;}
-
+        [NotMapped]
+        public double additionalPaidAmount
+        {
+            get
+            {
+                double amount = 0;
+                for(int i = 0; i < additionalPayments.Count; i++)
+                {
+                    if (additionalPayments[i].is_paid == 1)
+                    {
+                        amount += additionalPayments[i].amount;
+                    }
+                }
+                return amount;
+            }
+        }
         [NotMapped]
         public List<Models.Order.OrderPaymentRefund> refunds {get; set;}
 
