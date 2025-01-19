@@ -448,33 +448,6 @@ namespace SnowmeetApi.Controllers
         {
             sessionKey = Util.UrlDecode(sessionKey).Trim();
             UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
-
-            /*
-
-            RentOrder rentOrder = await _context.RentOrder.FindAsync(id);
-
-            if (rentOrder.order_id == 0)
-            {
-                rentOrder = await _context.RentOrder
-                .Include(r => r.details)
-                    .ThenInclude(d => d.log)
-                .Where(r => r.id == id)
-                .FirstAsync();
-            }
-            else
-            {
-                rentOrder = await _context.RentOrder
-                .Include(r => r.details)
-                    .ThenInclude(d => d.log)
-                .Include(r => r.order)
-                    .ThenInclude(o => o.payments)
-                .Include(o => o.refunds)
-                .Where(r => r.id == id)
-                .FirstAsync();
-            }
-            */
-            //var l = await _context.rentAdditionalPayment.Include(r => r.rentOrder)
-            //    .Where(r => r.id == 16) .AsNoTracking().ToListAsync();
             List<RentOrder> rentOrderList =  await _context.RentOrder
                 .Include(r => r.details)
                     .ThenInclude(d => d.log)
@@ -496,9 +469,7 @@ namespace SnowmeetApi.Controllers
             {
                 return NotFound();
             }
-            RentOrder rentOrder = rentOrderList[0];
-
-            
+            RentOrder rentOrder = rentOrderList[0];            
             if (needAuth)
             {
                 if (rentOrder == null)
@@ -1518,8 +1489,15 @@ namespace SnowmeetApi.Controllers
                 return BadRequest();
             }
             RentOrder order = (RentOrder)((OkObjectResult)(await GetRentOrder((int)detail.rent_list_id, sessionKey, false)).Result).Value;
+            for(int i = 0; i < order.details.Count; i++)
+            {
+                _context.RentOrderDetail.Entry(order.details[i]).State = EntityState.Detached;
+            }
+            _context.RentOrder.Entry(order).State = EntityState.Detached;
+            await _context.SaveChangesAsync();
             detail.rental_count = order.rentalDetails.Count;
-            _context.Entry(detail).State = EntityState.Modified;
+            _context.RentOrderDetail.Entry(detail).State = EntityState.Modified;
+            _context.RentOrder.Entry(order).State = EntityState.Modified;
             await _context.SaveChangesAsync();
             return Ok(detail);
         }
