@@ -1225,19 +1225,8 @@ namespace SnowmeetApi.Controllers
                     */
                     continue;
                 }
-                double orderDeposit = 0;
-                //totalDeposit = order.deposit_final + totalDeposit;
-                foreach(OrderPayment p in order.payments)
-                {
-                    if (p.status.Trim().Equals("支付成功"))
-                    {
-                        if (p.create_date.Date < date.Date)
-                        {
-                            orderDeposit += p.amount;
-                        }
-                    }
-                }
-                totalDeposit += orderDeposit;
+                
+                totalDeposit += order.GetChargedDeposit(date);
                 double subTotalRental = 0;
                 for (int j = 0; j < order.rentalDetails.Count; j++)
                 {
@@ -1295,7 +1284,7 @@ namespace SnowmeetApi.Controllers
                     
                 }
                 orderArr.Add(order);
-                totalDeposit = order.deposit_final + totalDeposit;
+                totalDeposit = order.GetChargedDeposit(date) + totalDeposit;
                 double subTotalRental = 0;
                 for (int j = 0; j < order.rentalDetails.Count; j++)
                 {

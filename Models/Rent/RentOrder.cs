@@ -505,6 +505,18 @@ namespace SnowmeetApi.Models.Rent
                 return ret;
             }
         }
+        public double GetChargedDeposit(DateTime date)
+        {
+            double ret = 0;
+            foreach(OrderPayment payment in payments)
+            {
+                if (payment.status.Equals("支付成功") && payment.create_date.Date < date.Date)
+                {
+                    ret += payment.amount;
+                }
+            }
+            return ret;
+        }
 
         
 
