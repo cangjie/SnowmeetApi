@@ -220,6 +220,10 @@ namespace SnowmeetApi.Controllers.Order
                 }
                 //refund.status = refundId;
                 refund.refund_id = refundId;
+                if (!refundId.Trim().Equals(""))
+                {
+                    refund.state = 1;
+                }
                 _db.Entry<OrderPaymentRefund>(refund).State = EntityState.Modified;
                 await _db.SaveChangesAsync();
                 //await Response.WriteAsync("SUCCESS");
