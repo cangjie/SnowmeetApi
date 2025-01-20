@@ -428,6 +428,22 @@ namespace SnowmeetApi.Models.Rent
             }
         }
         [NotMapped]
+        public double totalCharge
+        {
+            get
+            {
+                double charge = 0;
+                for(int i = 0; i < payments.Count; i++)
+                {
+                    if (payments[i].status.Trim().Equals("支付成功"))
+                    {
+                        charge += payments[i].amount;
+                    }
+                }
+                return charge;
+            }
+        }
+        [NotMapped]
         public List<Models.Order.OrderPaymentRefund> refunds
         {
             get
