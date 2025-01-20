@@ -1284,7 +1284,7 @@ namespace SnowmeetApi.Controllers
                     
                 }
                 orderArr.Add(order);
-                totalDeposit = order.GetChargedDeposit(date) + totalDeposit;
+                totalDeposit = order.GetChargedDeposit(date.AddDays(1)) + totalDeposit;
                 double subTotalRental = 0;
                 for (int j = 0; j < order.rentalDetails.Count; j++)
                 {
@@ -1327,7 +1327,7 @@ namespace SnowmeetApi.Controllers
             for (int i = 0; i < orderArr.Length; i++)
             {
                 orderArr[i] = (RentOrder)((OkObjectResult)(await GetRentOrder(rentOrderList[i].id, sessionKey, false)).Result).Value;
-                totalDeposit = orderArr[i].GetChargedDeposit(date) + totalDeposit;
+                totalDeposit = orderArr[i].GetChargedDeposit(date.AddDays(1)) + totalDeposit;
                 double subTotalRental = 0;
                 for (int j = 0; j < orderArr[i].rentalDetails.Count; j++)
                 {
