@@ -260,7 +260,7 @@ namespace SnowmeetApi.Models.Rent
                 }
                 if (finish)
                 {
-                    if (order != null && !order.pay_method.Trim().Equals("微信支付") && (order.refunds == null || order.refunds.Count == 0))
+                    if (order != null && !order.pay_method.Trim().Equals("微信支付") && (refunds == null || refunds.Count == 0))
                     {
                         s = "全部归还";
                     }
