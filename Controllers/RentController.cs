@@ -1327,7 +1327,7 @@ namespace SnowmeetApi.Controllers
             for (int i = 0; i < orderArr.Length; i++)
             {
                 orderArr[i] = (RentOrder)((OkObjectResult)(await GetRentOrder(rentOrderList[i].id, sessionKey, false)).Result).Value;
-                totalDeposit = orderArr[i].deposit_final + totalDeposit;
+                totalDeposit = orderArr[i].GetChargedDeposit(date) + totalDeposit;
                 double subTotalRental = 0;
                 for (int j = 0; j < orderArr[i].rentalDetails.Count; j++)
                 {
