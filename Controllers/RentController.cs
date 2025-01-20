@@ -503,6 +503,18 @@ namespace SnowmeetApi.Controllers
                 {
                     rentOrder.order.msa = msaList[0];
                 }
+                for(int i = 0; i < rentOrder.refunds.Count; i++)
+                {
+                    OrderPaymentRefund r = rentOrder.refunds[i];
+                    msaList = await _context.memberSocialAccount
+                        .Where(m => (m.num.Trim().Equals(r.oper) && m.type.Trim().Equals("wechat_mini_openid")))
+                        .Include(m => m.member).ToListAsync();
+                    if (msaList != null && msaList.Count > 0)
+                    {
+                        r.msa = msaList[0];
+                    }
+                }
+                /*
                 for(var i = 0; rentOrder.order != null && rentOrder.order.refunds != null 
                     && i < rentOrder.order.refunds.Count; i++)
                 {
@@ -515,6 +527,7 @@ namespace SnowmeetApi.Controllers
                         refund.msa = msaList[0];
                     }
                 }
+                */
             }
             /*
             rentOrder.details = await _context.RentOrderDetail
