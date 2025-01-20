@@ -14,6 +14,7 @@ using SnowmeetApi.Models.Users;
 using System.Collections;
 using SnowmeetApi.Controllers.User;
 using SnowmeetApi.Controllers.Order;
+using Mono.TextTemplating;
 namespace SnowmeetApi.Controllers
 {
     [Route("core/[controller]/[action]")]
@@ -452,11 +453,13 @@ namespace SnowmeetApi.Controllers
                 .Include(r => r.details)
                     .ThenInclude(d => d.log)
                 .Include(r => r.order)
-                    .ThenInclude(o => o.payments)
-                    .Include( o => o.refunds)
+                    .ThenInclude(o => o.payments.Where(p => p.status.Trim().Equals("支付成功")).OrderByDescending(p => p.id))
+                        .ThenInclude(p => p.refunds.Where(r => r.state == 1).OrderByDescending(r => r.id))                   
+                    //.Include( o => o.refunds)
                 .Include(r => r.additionalPayments)
                     .ThenInclude(a => a.order)
-                        .ThenInclude(o => o.payments)
+                        .ThenInclude(o => o.payments.Where(p => p.status.Equals("支付成功")).OrderByDescending(p => p.id))
+                            .ThenInclude(p => p.refunds.Where(r => r.state == 1).OrderByDescending(r => r.id))
                 .Where(r => r.id == id).ToListAsync();
             if (rentOrderList.Count == 0)
             {
@@ -964,6 +967,9 @@ namespace SnowmeetApi.Controllers
             rentOrder.rental_reduce_ticket = rentalReduceTicket;
             _context.Entry(rentOrder).State = EntityState.Modified;
             await _context.SaveChangesAsync();
+
+            //List<OrderPayment> payments = rentOrder
+
 
             if (amount > 0 && rentOrder.order_id > 0 && rentOrder.order != null && rentOrder.payMethod.Trim().Equals("微信支付")
                 && rentOrder.order.payments != null && rentOrder.order.payments.Count > 0)
