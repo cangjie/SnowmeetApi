@@ -22,7 +22,7 @@ namespace SnowmeetApi.Models.Order
         [Key]
         public int id { get; set; }
 
-        
+        //[ForeignKey(nameof(OrderOnline))]
         public int order_id { get; set; }
         public string pay_method { get; set; }
         public double amount { get; set; }
@@ -55,11 +55,22 @@ namespace SnowmeetApi.Models.Order
                 double amount = 0;
                 for (int i = 0; i < refunds.Count; i++)
                 {
-                    amount += refunds[i].amount;
+                    if (refunds[i].state == 1)
+                    {
+                        amount += refunds[i].amount;
+                    }
                 }
                 return amount;
             }
 
+        }
+        [NotMapped]
+        public double unRefundedAmount
+        {
+            get
+            {
+                return amount - refundedAmount;
+            }
         }
 
         [NotMapped]

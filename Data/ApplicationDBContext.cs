@@ -49,16 +49,6 @@ namespace SnowmeetApi.Data
             modelBuilder.Entity<MaintainLog>().HasOne<Models.MaintainLive>().WithMany(m => m.taskLog).HasForeignKey(m => m.task_id);
             modelBuilder.Entity<OrderOnline>().HasMany<MaintainLive>().WithOne(m => m.order).HasForeignKey(m => m.order_id);
             modelBuilder.Entity<Brand>().HasKey(b => new {b.brand_name, b.brand_type});
-            
-            modelBuilder.Entity<RentOrderDetail>().HasOne<RentOrder>().WithMany(r => r.details).HasForeignKey(r => r.rent_list_id);
-            modelBuilder.Entity<RentOrderDetailLog>().HasOne<RentOrderDetail>().WithMany(r => r.log).HasForeignKey(r => r.detail_id);
-
-            modelBuilder.Entity<RentOrder>().HasOne(r => r.order).WithOne().HasForeignKey<RentOrder>(r => r.order_id);
-
-            modelBuilder.Entity<OrderPaymentRefund>().HasOne<RentOrder>().WithMany(r => r.refunds)
-                .HasPrincipalKey(r => r.order_id).HasForeignKey(r => r.order_id);
-            modelBuilder.Entity<OrderPayment>().HasOne<OrderOnline>().WithMany(o => o.payments).HasForeignKey(p => p.order_id);
-            modelBuilder.Entity<OrderPaymentRefund>().HasOne<OrderOnline>().WithMany( o => o.refunds).HasForeignKey(o => o.order_id);
             modelBuilder.Entity<Member>().HasMany<RentOrderLog>().WithOne(m => m.member).HasForeignKey(r => r.oper_member_id);
 
         }

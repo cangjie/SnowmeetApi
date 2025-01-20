@@ -59,8 +59,8 @@ namespace SnowmeetApi.Models
         [NotMapped]
         public OrderPayment[]? payments { get; set; }
         */
-        [NotMapped]
-        public List<OrderPayment> payments {get; set;}
+        [ForeignKey("order_id")]
+        public List<OrderPayment> payments {get; set;} = new List<OrderPayment>();
         [NotMapped]
         public List<OrderPaymentRefund> refunds { get; set; }
         [NotMapped]

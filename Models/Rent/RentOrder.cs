@@ -4,6 +4,8 @@ using System.ComponentModel.DataAnnotations.Schema;
 using System.Collections;
 using System.Collections.Generic;
 using SnowmeetApi.Models.Order;
+using Microsoft.EntityFrameworkCore.Metadata.Internal;
+using System.IdentityModel.Tokens.Jwt;
 
 namespace SnowmeetApi.Models.Rent
 {
@@ -156,8 +158,8 @@ namespace SnowmeetApi.Models.Rent
             }
         }
         */
-        [NotMapped]
-        public List<RentOrderDetail> details {get; set;}
+        [ForeignKey("rent_list_id")]
+        public List<RentOrderDetail> details {get; set;} = new List<RentOrderDetail>();
         
         /*
         [NotMapped]
@@ -397,9 +399,53 @@ namespace SnowmeetApi.Models.Rent
                 return amount;
             }
         }
-        [NotMapped]
-        public List<Models.Order.OrderPaymentRefund> refunds {get; set;}
 
+        [NotMapped]
+        public List<OrderPayment> payments 
+        {
+            get
+            {
+                List<OrderPayment> pL = new List<OrderPayment>();
+                for(int i = 0; order != null && order.payments != null && i < order.payments.Count; i++)
+                {
+                    OrderPayment p = order.payments[i];
+                    if (p.status.Trim().Equals("支付成功"))
+                    {
+                        pL.Add(p);
+                    }
+                }
+                for(int i = 0; i < additionalPayments.Count; i++)
+                {
+                    for(int j = 0; additionalPayments[i].order != null && j < additionalPayments[i].order.payments.Count; j++)
+                    {
+                        if (additionalPayments[i].order.payments[j].status.Equals("支付成功"))
+                        {
+                            pL.Add(additionalPayments[i].order.payments[j]);
+                        }
+                    }
+                }
+                return pL;
+            }
+        }
+        [NotMapped]
+        public List<Models.Order.OrderPaymentRefund> refunds
+        {
+            get
+            {
+                List<OrderPaymentRefund> refunds = new List<OrderPaymentRefund>();
+                for(int i = 0; i < payments.Count; i++)
+                {
+                    for(int j = 0; j < payments[i].refunds.Count; j++)
+                    {
+                        if (payments[i].refunds[j].state == 1)
+                        {
+                            refunds.Add(payments[i].refunds[j]);
+                        }
+                    }
+                }
+                return refunds;
+            }
+        }
         public string GetPastStatus(DateTime date)
         {
             if (date.Date < create_date.Date)

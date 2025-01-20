@@ -50,8 +50,8 @@ namespace SnowmeetApi.Models.Rent
 
         public string return_staff { get; set; } = "";
 
-        [NotMapped]
-        public List<RentOrderDetailLog>? log { get; set; } = null;
+        [ForeignKey("detail_id")]
+        public List<RentOrderDetailLog> log { get; set; } = new List<RentOrderDetailLog>();
 
         [NotMapped]
         public RentItem _item;

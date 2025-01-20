@@ -455,7 +455,6 @@ namespace SnowmeetApi.Controllers
                 .Include(r => r.order)
                     .ThenInclude(o => o.payments.Where(p => p.status.Trim().Equals("支付成功")).OrderByDescending(p => p.id))
                         .ThenInclude(p => p.refunds.Where(r => r.state == 1).OrderByDescending(r => r.id))                   
-                    //.Include( o => o.refunds)
                 .Include(r => r.additionalPayments)
                     .ThenInclude(a => a.order)
                         .ThenInclude(o => o.payments.Where(p => p.status.Equals("支付成功")).OrderByDescending(p => p.id))
@@ -945,12 +944,25 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<RentOrder>> Refund(int id, double amount,
             double rentalReduce, double rentalReduceTicket, string memo, string sessionKey)
         {
-            
+            Order.OrderRefundController refundHelper = new Order.OrderRefundController(
+                    _context, _oriConfig, _httpContextAccessor);
             RentOrder rentOrder = (RentOrder)((OkObjectResult)(await GetRentOrder(id, sessionKey, false)).Result).Value;
             if (rentOrder == null)
             {
                 return NotFound();
             }
+            List<OrderPayment> payments = rentOrder.payments.OrderByDescending(p => p.unRefundedAmount).ToList();
+            double unRefundAmount = 0;
+            for(int i = 0; i < payments.Count; i++)
+            {
+                unRefundAmount += payments[i].unRefundedAmount;
+            }
+            if (amount > unRefundAmount)
+            {
+                return BadRequest();
+            }
+
+
 
             memo = Util.UrlDecode(memo);
             sessionKey = Util.UrlDecode(sessionKey);
@@ -967,8 +979,68 @@ namespace SnowmeetApi.Controllers
             rentOrder.rental_reduce_ticket = rentalReduceTicket;
             _context.Entry(rentOrder).State = EntityState.Modified;
             await _context.SaveChangesAsync();
+            
+            double needRefundAmount = amount;
+            for(int i = 0; needRefundAmount > 0 && i < payments.Count; i++)
+            {
+                OrderPayment payment = payments[i];
+                if (payment.unRefundedAmount >= needRefundAmount)
+                {
+                    if (payment.pay_method.Trim().Equals("微信支付"))
+                    {
+                        await refundHelper.TenpayRefund(payment.id, needRefundAmount,memo, sessionKey);
+                    }
+                    else
+                    {
+                        OrderPaymentRefund r = new OrderPaymentRefund()
+                        {
+                            id = 0,
+                            payment_id = payment.id,
+                            order_id = payment.order_id,
+                            memo = memo,
+                            amount = needRefundAmount,
+                            state = 1,
+                            create_date = DateTime.Now,
+                            oper = user.miniAppOpenId.Trim()
+                        };
+                        await _context.OrderPaymentRefund.AddAsync(r);
+                        await _context.SaveChangesAsync();
+                    }
+                    needRefundAmount = 0;
+                }
+                else
+                {
+                    if (payment.pay_method.Trim().Equals("微信支付"))
+                    {
+                        await refundHelper.TenpayRefund(payment.id, payment.unRefundedAmount,memo, sessionKey);
+                    }
+                    else
+                    {
+                        needRefundAmount = needRefundAmount - payment.unRefundedAmount;
+                        OrderPaymentRefund r = new OrderPaymentRefund()
+                        {
+                            id = 0,
+                            payment_id = payment.id,
+                            order_id = payment.order_id,
+                            memo = memo,
+                            amount = payment.unRefundedAmount,
+                            state = 1,
+                            create_date = DateTime.Now,
+                            oper = user.miniAppOpenId.Trim()
+                        };
+                        await _context.OrderPaymentRefund.AddAsync(r);
+                        await _context.SaveChangesAsync();
+                    }
+                    
+                }
+
+            }
+
+
+
 
             //List<OrderPayment> payments = rentOrder
+            /*
 
 
             if (amount > 0 && rentOrder.order_id > 0 && rentOrder.order != null && rentOrder.payMethod.Trim().Equals("微信支付")
@@ -984,7 +1056,7 @@ namespace SnowmeetApi.Controllers
                     await refundHelper.TenpayRefund(payment.id, amount,memo, sessionKey);
                 }
             }
-
+            */
             return Ok(rentOrder);
 
 
