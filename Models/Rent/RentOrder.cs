@@ -380,7 +380,7 @@ namespace SnowmeetApi.Models.Rent
         [ForeignKey("order_id")]
         public OrderOnline? order {get; set;}
         [ForeignKey("rent_list_id")]
-        public List<RentAdditionalPayment> additionalPayments {get; set;}
+        public List<RentAdditionalPayment> additionalPayments {get; set;} = new List<RentAdditionalPayment>();
         [NotMapped]
         public double additionalPaidAmount
         {
