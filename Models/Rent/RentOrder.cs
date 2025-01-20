@@ -258,9 +258,9 @@ namespace SnowmeetApi.Models.Rent
                 }
                 if (finish)
                 {
-                    if (order != null && !order.pay_method.Trim().Equals("微信支付"))
+                    if (order != null && !order.pay_method.Trim().Equals("微信支付") && (order.refunds == null || order.refunds.Count == 0))
                     {
-                        s = "已退款";
+                        s = "全部归还";
                     }
                     else if (order != null && ((order.refunds != null && order.refunds.Count > 0) || (Math.Round(totalRental, 2) >= Math.Round(deposit_final, 2))))
                     {
