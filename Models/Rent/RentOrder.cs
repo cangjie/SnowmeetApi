@@ -76,7 +76,9 @@ namespace SnowmeetApi.Models.Rent
         public int closed { get; set; } = 0;
         public DateTime? finish_date { get; set; }
         public DateTime create_date { get; set; } = DateTime.Now;
-
+        
+        [ForeignKey("submit_return_id")]
+        public List<Recept> recept {get; set;} = new List<Recept>();
         /*
         [NotMapped]
         public OrderOnline _order;

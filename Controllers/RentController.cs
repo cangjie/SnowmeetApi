@@ -450,6 +450,7 @@ namespace SnowmeetApi.Controllers
             sessionKey = Util.UrlDecode(sessionKey).Trim();
             UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
             List<RentOrder> rentOrderList =  await _context.RentOrder
+                .Include(r => r.recept)
                 .Include(r => r.details)
                     .ThenInclude(d => d.log)
                 .Include(r => r.order)
@@ -459,6 +460,7 @@ namespace SnowmeetApi.Controllers
                     .ThenInclude(a => a.order)
                         .ThenInclude(o => o.payments.Where(p => p.status.Equals("支付成功")).OrderByDescending(p => p.id))
                             .ThenInclude(p => p.refunds.Where(r => r.state == 1).OrderByDescending(r => r.id))
+                
                 .Where(r => r.id == id).ToListAsync();
             if (rentOrderList.Count == 0)
             {
@@ -514,43 +516,7 @@ namespace SnowmeetApi.Controllers
                         r.msa = msaList[0];
                     }
                 }
-                /*
-                for(var i = 0; rentOrder.order != null && rentOrder.order.refunds != null 
-                    && i < rentOrder.order.refunds.Count; i++)
-                {
-                    OrderPaymentRefund refund = rentOrder.order.refunds[i];
-                    msaList = await _context.memberSocialAccount
-                        .Where(m => (m.num.Trim().Equals(refund.oper) && m.type.Trim().Equals("wechat_mini_openid")))
-                        .Include(m => m.member).ToListAsync();
-                    if (msaList != null && msaList.Count > 0)
-                    {
-                        refund.msa = msaList[0];
-                    }
-                }
-                */
             }
-            /*
-            rentOrder.details = await _context.RentOrderDetail
-                .Include(d => d.log).Where(d => d.rent_list_id == rentOrder.id)
-                .AsNoTracking().ToListAsync();
-            */
-            /*
-            if (rentOrder.order_id > 0)
-            {
-                
-                rentOrder.order = (OrderOnline)((OkObjectResult)(await _orderHelper.GetWholeOrderByStaff(rentOrder.order_id, sessionKey, needAuth)).Result).Value;
-            }
-            */
-            /*
-            if (!user.isAdmin)
-            {
-                rentOrder.open_id = "";
-                if (rentOrder.order != null)
-                {
-                    rentOrder.order.open_id = "";
-                }
-            }
-            */
             bool allReturned = true;
             DateTime returnTime = rentOrder.create_date;
             for (int i = 0; i < rentOrder.details.Count; i++)
@@ -583,10 +549,8 @@ namespace SnowmeetApi.Controllers
 
                 if (!detail.rent_staff.Trim().Equals(""))
                 {
-                    //Member member = await _memberHelper.GetMember(detail.rent_staff, "wechat_mini_openid");
-                    //UnicUser.GetUnicUserAsync()
                     detail.rentStaff = (await UnicUser.GetUnicUserByDetailInfo(detail.rent_staff, "wechat_mini_openid", _context)).miniAppUser;
-                    //rentOrder.staff_name = detail.rentStaff.real_name;
+                    
                 }
                 else
                 {
@@ -600,7 +564,6 @@ namespace SnowmeetApi.Controllers
 
                 if (!detail.return_staff.Trim().Equals(""))
                 {
-                    //detail.returnStaff = await _context.MiniAppUsers.FindAsync(detail.return_staff);
                     detail.returnStaff = (await UnicUser.GetUnicUserByDetailInfo(detail.return_staff, "wechat_mini_openid", _context)).miniAppUser;
                 }
                 else
@@ -619,37 +582,12 @@ namespace SnowmeetApi.Controllers
                         returnTime = detail.real_end_date > returnTime ? (DateTime)detail.real_end_date : returnTime;
                     }
                 }
-
-                /*
-                detail.log = await _context.rentOrderDetailLog.Where(r => r.detail_id == detail.id)
-                    .OrderByDescending(d => d.id).AsNoTracking().ToListAsync();
-                */
-                
                 switch (rentOrder.shop.Trim())
                 {
                     case "南山":
                         TimeSpan ts = endDate - rentOrder.start_date;
                         detail._suggestRental = detail.unit_rental * (ts.Days + 1);
                         detail._timeLength = (ts.Days + 1).ToString() + "天";
-
-
-                        /*
-                        if (ts.Hours < 4)
-                        {
-                            detail._suggestRental = detail.unit_rental;
-                            detail._timeLength = "1场";
-                        }
-                        else if (endDate.Hour > 8)
-                        {
-                            detail._suggestRental = detail.unit_rental * 1.5;
-                            detail._timeLength = "1.5场";
-                        }
-                        else
-                        {
-                            detail._suggestRental = detail.unit_rental;
-                            detail._timeLength = "1场";
-                        }
-                        */
                         break;
                     default:
 
@@ -668,21 +606,12 @@ namespace SnowmeetApi.Controllers
                             {
                                 TimeSpan ts1 = endDate.Date - ((DateTime)detail.start_date).Date;
                                 int days = ts1.Days;
-                                /*
-                                if (rentOrder.start_date.Hour < 16)
-                                {
-                                    days++;
-                                }
-                                */
                                 days++;
                                 detail._suggestRental = detail.unit_rental * days;
                                 detail._timeLength = days.ToString() + "天";
                             }
 
                         }
-                        //
-                        
-
                         break;
                 }
             }
@@ -700,20 +629,17 @@ namespace SnowmeetApi.Controllers
             }
             if (rentOrder.staff_name.Trim().Equals(""))
             {
-                var rl = await _context.Recept
-                    .Where(r => (r.recept_type.Trim().Equals("租赁下单") && r.submit_return_id == rentOrder.id))
-                    .AsNoTracking().ToListAsync();
-                if (rl != null && rl.Count > 0)
+                if (rentOrder.recept != null && rentOrder.recept.Count > 0)
                 {
                     
-                    rentOrder.staff_name = rl[0].update_staff_name.Trim().Equals("") ?
-                        rl[0].recept_staff_name : rl[0].update_staff_name.Trim();
+                    rentOrder.staff_name = rentOrder.recept[0].update_staff_name.Trim().Equals("") ?
+                        rentOrder.recept[0].recept_staff_name : rentOrder.recept[0].update_staff_name.Trim();
                     if (rentOrder.staff_name.Trim().Equals(""))
                     {
                         try
                         {
-                            string staffOpenId = rl[0].update_staff.Trim().Equals("") ?
-                                rl[0].recept_staff.Trim() : rl[0].update_staff.Trim();
+                            string staffOpenId = rentOrder.recept[0].update_staff.Trim().Equals("") ?
+                                rentOrder.recept[0].recept_staff.Trim() : rentOrder.recept[0].update_staff.Trim();
                             //MiniAppUser? staffUser = await _context.MiniAppUsers.FindAsync(staffOpenId.Trim());
                             Member staffUser =  await _memberHelper.GetMember(staffOpenId.Trim(), "wechat_mini_openid");
                             if (staffUser != null)
@@ -783,7 +709,6 @@ namespace SnowmeetApi.Controllers
                     }
                 }
             }
-
             for(int i = 0; rentOrder.additionalPayments != null 
                 && i < rentOrder.additionalPayments.Count; i++)
             {
@@ -796,12 +721,8 @@ namespace SnowmeetApi.Controllers
                     p.staffMember = msaL[0].member;
                 }
             }
-            
-
-
             var ret = Ok(rentOrder);
             return ret;
-
         }
 
         [HttpGet("{id}")]
