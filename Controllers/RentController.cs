@@ -1010,13 +1010,14 @@ namespace SnowmeetApi.Controllers
                 }
                 else
                 {
+                    needRefundAmount = needRefundAmount - payment.unRefundedAmount;
                     if (payment.pay_method.Trim().Equals("微信支付"))
                     {
                         await refundHelper.TenpayRefund(payment.id, payment.unRefundedAmount,memo, sessionKey);
                     }
                     else
                     {
-                        needRefundAmount = needRefundAmount - payment.unRefundedAmount;
+                        
                         OrderPaymentRefund r = new OrderPaymentRefund()
                         {
                             id = 0,
