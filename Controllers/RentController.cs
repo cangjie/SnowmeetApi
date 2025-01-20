@@ -1381,7 +1381,7 @@ namespace SnowmeetApi.Controllers
 
                 }
                 orderArr.Add(order);
-                totalDeposit = order.deposit_final + totalDeposit;
+                totalDeposit = order.totalCharge + totalDeposit;
                 double subTotalRental = 0;
                 for (int j = 0; j < order.rentalDetails.Count; j++)
                 {
