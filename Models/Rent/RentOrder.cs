@@ -462,6 +462,22 @@ namespace SnowmeetApi.Models.Rent
                 return refunds;
             }
         }
+        [NotMapped]
+        public double totalRefund
+        {
+            get
+            {
+                double refund = 0;
+                for(int i = 0; i < refunds.Count; i++)
+                {
+                    if (refunds[i].state==1)
+                    {
+                        refund += refunds[i].amount;
+                    }
+                }
+                return refund;
+            }
+        }
         public string GetPastStatus(DateTime date)
         {
             if (date.Date < create_date.Date)
