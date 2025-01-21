@@ -20,12 +20,13 @@ namespace SnowmeetApi.Controllers
     {
         private readonly ApplicationDBContext _context;
         private IConfiguration _config;
-
+        private IConfiguration _oriConfig;
         public string _appId = "";
 
         public TicketController(ApplicationDBContext context, IConfiguration config)
         {
             _context = context;
+            _oriConfig = config;
             _config = config.GetSection("Settings");
             _appId = _config.GetSection("AppId").Value.Trim();
         }
@@ -419,8 +420,8 @@ namespace SnowmeetApi.Controllers
             return code;
         }
 
-        [HttpGet]
-        public async Task<Ticket> GenerateTicketByAction(int templateId, int memberId, int isActive = 1, int orderId = 0, string createMemo = "")
+        [NonAction]
+        public async Task<Ticket> GenerateTicketByAction(int templateId, int memberId, int isActive = 1, int orderId = 0, string createMemo = "", string channel = "")
         {
             TicketTemplate template = await _context.TicketTemplate.FindAsync(templateId);
             if (template == null)
@@ -458,10 +459,11 @@ namespace SnowmeetApi.Controllers
                 printed = 0,
                 miniapp_recept_path = "",
                 create_date = DateTime.Now,
-                channel = "",
+                channel = channel.Trim(),
                 order_id = orderId == 0 ? null : orderId,
                 create_memo = createMemo,
-                is_active = isActive
+                is_active = isActive,
+            
             };
             await _context.Ticket.AddAsync(ticket);
             await _context.SaveChangesAsync();
@@ -496,6 +498,45 @@ namespace SnowmeetApi.Controllers
             }
             await _context.SaveChangesAsync();
         }
+        [HttpGet]
+        public async Task<ActionResult<List<Ticket>>>MeGetTickListBy(int templateId, 
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            MemberController _memberHelper = new MemberController(_context, _oriConfig);
+            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
+            List<Ticket> tl = await _context.Ticket.Where(t => t.open_id.Trim().Equals(member.wechatMiniOpenId.Trim())
+                && t.template_id == templateId).OrderByDescending(t => t.create_date).AsNoTracking().ToListAsync();
+            return Ok(tl);
+        }
+        [HttpGet]
+        public async Task<ActionResult<Ticket>> MePickTicket(int templateId,
+            string sessionKey, string sessionType = "wechat_mini_openid", string channel = "")
+        {
+            int count = (int)((OkObjectResult)(await MeGetPickCount(templateId)).Result).Value;
+            if (count >= 0)
+            {
+                return NoContent();
+            }
+            sessionKey = Util.UrlDecode(sessionKey);
+            MemberController _memberHelper = new MemberController(_context, _oriConfig);
+            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
+            Ticket ticket = await GenerateTicketByAction(templateId, member.id, 1, 0, "海报或公众号群发", channel);
+            return Ok(ticket);
+            //return BadRequest();
+
+        }
+
+        [HttpGet]
+        public async Task<ActionResult<int>> MeGetPickCount(int templateId)
+        {
+            List<Ticket> tl = await _context.Ticket.Where(t => (t.template_id == templateId
+                && (t.channel.Trim().StartsWith("pick") || t.channel.Trim().Equals(""))))
+                .AsNoTracking().ToListAsync();
+            return (Ok(tl.Count));
+        }
+
+
 
        
         private bool TicketExists(string id)
