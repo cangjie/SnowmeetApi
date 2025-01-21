@@ -516,28 +516,7 @@ namespace SnowmeetApi.Controllers
                     }
                 }
             }
-            /*
-            rentOrder.details = await _context.RentOrderDetail
-                .Include(d => d.log).Where(d => d.rent_list_id == rentOrder.id)
-                .AsNoTracking().ToListAsync();
-            */
-            /*
-            if (rentOrder.order_id > 0)
-            {
-                
-                rentOrder.order = (OrderOnline)((OkObjectResult)(await _orderHelper.GetWholeOrderByStaff(rentOrder.order_id, sessionKey, needAuth)).Result).Value;
-            }
-            */
-            /*
-            if (!user.isAdmin)
-            {
-                rentOrder.open_id = "";
-                if (rentOrder.order != null)
-                {
-                    rentOrder.order.open_id = "";
-                }
-            }
-            */
+          
             bool allReturned = true;
             DateTime returnTime = rentOrder.create_date;
             for (int i = 0; i < rentOrder.details.Count; i++)

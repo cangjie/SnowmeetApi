@@ -192,13 +192,6 @@ namespace SnowmeetApi.Controllers
             Models.Users.Member  member = await _context.member.Where(m => m.id == 15506)
                 .Include(m => m.memberSocialAccounts)
                 .FirstAsync();
-            /*
-            for(int i = 0; i < member.memberSocialAccounts.Count; i++)
-            {
-                member.memberSocialAccounts[i].member = null;
-            }
-            */
-            //await _context.member.Entry(member).Collection(m => m.memberSocialAccounts).LoadAsync();
             return Ok(member);
         }
 
@@ -209,7 +202,6 @@ namespace SnowmeetApi.Controllers
                 .Where(m => m.num.Trim().Equals("18601197897") && m.type.Trim().Equals("cell"))
                 .Include(m => m.member)
                 .FirstAsync();
-            //await _context.memberSocialAccount.Entry(msa).Reference(m => m.member).LoadAsync();
             return Ok(msa);
         }
         
