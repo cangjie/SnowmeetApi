@@ -48,6 +48,8 @@ namespace SnowmeetApi.Models
         public double other_discount { get; set; } = 0;
         public double final_price { get; set; } = 0;
         public string? staff_open_id { get; set; }
+
+       
         public int have_score { get; set; } = 0;
         public DateTime create_date { get; set; } = DateTime.Now;
         public DateTime? crt { get; set; } = DateTime.Now;
@@ -57,8 +59,8 @@ namespace SnowmeetApi.Models
         [NotMapped]
         public OrderPayment[]? payments { get; set; }
         */
-        [NotMapped]
-        public List<OrderPayment> payments {get; set;}
+        [ForeignKey("order_id")]
+        public List<OrderPayment> payments {get; set;} = new List<OrderPayment>();
         [NotMapped]
         public List<OrderPaymentRefund> refunds { get; set; }
         [NotMapped]

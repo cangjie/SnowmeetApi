@@ -123,7 +123,7 @@ namespace SnowmeetApi.Controllers
             {
                 case "租赁下单":
                     RentOrder rentOrder = await _context.RentOrder.FindAsync(recept.submit_return_id);
-                    orderId = rentOrder.order_id;
+                    orderId = (int)rentOrder.order_id;
                     await _rentHelper.StartRent(recept.submit_return_id);
                     break;
                 case "养护下单":
@@ -195,7 +195,7 @@ namespace SnowmeetApi.Controllers
                     rent.open_id = openId.Trim();
                     _context.Entry(rent).State = EntityState.Modified;
                     await _context.SaveChangesAsync();
-                    orderId = rent.order_id;
+                    orderId = (int)rent.order_id;
                     break;
                 case "养护下单":
                     int maintainId = recept.submit_return_id;
@@ -751,34 +751,8 @@ namespace SnowmeetApi.Controllers
             rentOrder.ticket_code = recept.code;
             rentOrder.staff_open_id = recept.recept_staff;
             rentOrder.staff_name = recept.recept_staff_name;
-            await _context.RentOrder.AddAsync(rentOrder);
-            await _context.SaveChangesAsync();
-            recept.rentOrder = rentOrder;
-            if (rentOrder.id <= 0)
-            {
-                return recept;
-            }
-            recept.submit_return_id = rentOrder.id;
-            recept.submit_date = DateTime.Now;
-            _context.Entry(recept).State = EntityState.Modified;
-            await _context.SaveChangesAsync();
-            for (int i = 0; i < rentOrder.details.Count; i++)
-            {
-                RentOrderDetail detail = rentOrder.details[i];
-                /*
-                if (detail.deposit_type.Trim().Equals("立即租赁"))
-                {
-                    detail.start_date = DateTime.Now;
-                }
-                */
-                detail.rent_list_id = rentOrder.id;
-                await _context.RentOrderDetail.AddAsync(detail);
-            }
-            await _context.SaveChangesAsync();
-
             if (rentOrder.pay_option.Trim().Equals("现场支付") && rentOrder.deposit_final != 0)
             {
-
                 OrderOnline order = new OrderOnline()
                 {
                     id = 0,
@@ -801,21 +775,23 @@ namespace SnowmeetApi.Controllers
                     staff_open_id = recept.update_staff.Trim().Equals("") ? recept.recept_staff.Trim() : recept.update_staff.Trim(),
                     code = recept.code
                 };
-                await _context.OrderOnlines.AddAsync(order);
+                rentOrder.order = order;
+                await _context.RentOrder.AddAsync(rentOrder);
                 await _context.SaveChangesAsync();
-                rentOrder.order_id = order.id;
-
-                _context.Entry(rentOrder).State = EntityState.Modified;
-                await _context.SaveChangesAsync();
+                
             }
             else
             {
+                await _context.RentOrder.AddAsync(rentOrder);
+                await _context.SaveChangesAsync();
                 if (rentOrder.pay_option.Trim().Equals("招待") || rentOrder.deposit_final == 0)
                 {
                     await _rentHelper.StartRent(rentOrder.id);
                 }
             }
-            
+            recept.submit_return_id = rentOrder.id;
+            _context.Recept.Entry(recept).State = EntityState.Modified;
+            await _context.SaveChangesAsync(); 
             return recept;
         }
 

@@ -4,6 +4,8 @@ using System.ComponentModel.DataAnnotations.Schema;
 using System.Collections;
 using System.Collections.Generic;
 using SnowmeetApi.Models.Order;
+using Microsoft.EntityFrameworkCore.Metadata.Internal;
+using System.IdentityModel.Tokens.Jwt;
 
 namespace SnowmeetApi.Models.Rent
 {
@@ -27,7 +29,7 @@ namespace SnowmeetApi.Models.Rent
 
         public string shop { get; set; } = "";
 
-        public int order_id { get; set; } = 0;
+        public int? order_id { get; set; } = 0;
 
         public double deposit { get; set; } = 0;
 
@@ -74,7 +76,9 @@ namespace SnowmeetApi.Models.Rent
         public int closed { get; set; } = 0;
         public DateTime? finish_date { get; set; }
         public DateTime create_date { get; set; } = DateTime.Now;
-
+        
+        [ForeignKey("submit_return_id")]
+        public List<Recept> recept {get; set;} = new List<Recept>();
         /*
         [NotMapped]
         public OrderOnline _order;
@@ -156,8 +160,8 @@ namespace SnowmeetApi.Models.Rent
             }
         }
         */
-        [NotMapped]
-        public List<RentOrderDetail> details {get; set;}
+        [ForeignKey("rent_list_id")]
+        public List<RentOrderDetail> details {get; set;} = new List<RentOrderDetail>();
         
         /*
         [NotMapped]
@@ -191,8 +195,7 @@ namespace SnowmeetApi.Models.Rent
             }
         }
 
-        [NotMapped]
-        public OrderOnline? order {get; set;}
+        
         /*
         {
             get
@@ -259,9 +262,9 @@ namespace SnowmeetApi.Models.Rent
                 }
                 if (finish)
                 {
-                    if (order != null && !order.pay_method.Trim().Equals("微信支付"))
+                    if (order != null && !order.pay_method.Trim().Equals("微信支付") && (refunds == null || refunds.Count == 0))
                     {
-                        s = "已退款";
+                        s = "全部归还";
                     }
                     else if (order != null && ((order.refunds != null && order.refunds.Count > 0) || (Math.Round(totalRental, 2) >= Math.Round(deposit_final, 2))))
                     {
@@ -378,13 +381,105 @@ namespace SnowmeetApi.Models.Rent
                 return detailList;
             }
         }
+        [ForeignKey("order_id")]
+        public OrderOnline? order {get; set;}
+        [ForeignKey("rent_list_id")]
+        public List<RentAdditionalPayment> additionalPayments {get; set;} = new List<RentAdditionalPayment>();
+        [NotMapped]
+        public double additionalPaidAmount
+        {
+            get
+            {
+                double amount = 0;
+                for(int i = 0; i < additionalPayments.Count; i++)
+                {
+                    if (additionalPayments[i].is_paid == 1)
+                    {
+                        amount += additionalPayments[i].amount;
+                    }
+                }
+                return amount;
+            }
+        }
 
         [NotMapped]
-        public List<RentAdditionalPayment> additionalPayments {get; set;}
-
+        public List<OrderPayment> payments 
+        {
+            get
+            {
+                List<OrderPayment> pL = new List<OrderPayment>();
+                for(int i = 0; order != null && order.payments != null && i < order.payments.Count; i++)
+                {
+                    OrderPayment p = order.payments[i];
+                    if (p.status.Trim().Equals("支付成功"))
+                    {
+                        pL.Add(p);
+                    }
+                }
+                for(int i = 0; i < additionalPayments.Count; i++)
+                {
+                    for(int j = 0; additionalPayments[i].order != null && j < additionalPayments[i].order.payments.Count; j++)
+                    {
+                        if (additionalPayments[i].order.payments[j].status.Equals("支付成功"))
+                        {
+                            pL.Add(additionalPayments[i].order.payments[j]);
+                        }
+                    }
+                }
+                return pL;
+            }
+        }
         [NotMapped]
-        public List<Models.Order.OrderPaymentRefund> refunds {get; set;}
-
+        public double totalCharge
+        {
+            get
+            {
+                double charge = 0;
+                for(int i = 0; i < payments.Count; i++)
+                {
+                    if (payments[i].status.Trim().Equals("支付成功"))
+                    {
+                        charge += payments[i].amount;
+                    }
+                }
+                return charge;
+            }
+        }
+        [NotMapped]
+        public List<Models.Order.OrderPaymentRefund> refunds
+        {
+            get
+            {
+                List<OrderPaymentRefund> refunds = new List<OrderPaymentRefund>();
+                for(int i = 0; i < payments.Count; i++)
+                {
+                    for(int j = 0; j < payments[i].refunds.Count; j++)
+                    {
+                        if (payments[i].refunds[j].state == 1)
+                        {
+                            refunds.Add(payments[i].refunds[j]);
+                        }
+                    }
+                }
+                return refunds;
+            }
+        }
+        [NotMapped]
+        public double totalRefund
+        {
+            get
+            {
+                double refund = 0;
+                for(int i = 0; i < refunds.Count; i++)
+                {
+                    if (refunds[i].state==1)
+                    {
+                        refund += refunds[i].amount;
+                    }
+                }
+                return refund;
+            }
+        }
         public string GetPastStatus(DateTime date)
         {
             if (date.Date < create_date.Date)
@@ -411,6 +506,18 @@ namespace SnowmeetApi.Models.Rent
                 }
                 return ret;
             }
+        }
+        public double GetChargedDeposit(DateTime date)
+        {
+            double ret = 0;
+            foreach(OrderPayment payment in payments)
+            {
+                if (payment.status.Equals("支付成功") && payment.create_date.Date < date.Date)
+                {
+                    ret += payment.amount;
+                }
+            }
+            return ret;
         }
 
         

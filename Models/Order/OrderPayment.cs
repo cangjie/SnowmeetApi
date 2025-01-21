@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Threading.Tasks;
@@ -21,7 +22,7 @@ namespace SnowmeetApi.Models.Order
         [Key]
         public int id { get; set; }
 
-        
+        //[ForeignKey(nameof(OrderOnline))]
         public int order_id { get; set; }
         public string pay_method { get; set; }
         public double amount { get; set; }
@@ -44,6 +45,33 @@ namespace SnowmeetApi.Models.Order
         public string? ali_trade_no {get; set;}
 
         public string? wepay_trans_id {get; set;}
+        [ForeignKey("payment_id")]
+        public List<OrderPaymentRefund> refunds { get; set; } = new List<OrderPaymentRefund>();
+        [NotMapped]
+        public double refundedAmount
+        {
+            get
+            {
+                double amount = 0;
+                for (int i = 0; i < refunds.Count; i++)
+                {
+                    if (refunds[i].state == 1)
+                    {
+                        amount += refunds[i].amount;
+                    }
+                }
+                return amount;
+            }
+
+        }
+        [NotMapped]
+        public double unRefundedAmount
+        {
+            get
+            {
+                return amount - refundedAmount;
+            }
+        }
 
         [NotMapped]
         public OrderOnline order {get; set;}
