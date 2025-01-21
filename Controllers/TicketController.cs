@@ -499,7 +499,7 @@ namespace SnowmeetApi.Controllers
             await _context.SaveChangesAsync();
         }
         [HttpGet]
-        public async Task<ActionResult<List<Ticket>>>MeGetTickListBy(int templateId, 
+        public async Task<ActionResult<List<Ticket>>>MeGetTickListByMember(int templateId, 
             string sessionKey, string sessionType = "wechat_mini_openid")
         {
             sessionKey = Util.UrlDecode(sessionKey);
