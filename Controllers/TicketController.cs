@@ -498,7 +498,7 @@ namespace SnowmeetApi.Controllers
             }
             await _context.SaveChangesAsync();
         }
-        [HttpGet]
+        [HttpGet("{templateId}")]
         public async Task<ActionResult<List<Ticket>>>MeGetTickListByMember(int templateId, 
             string sessionKey, string sessionType = "wechat_mini_openid")
         {
@@ -509,24 +509,21 @@ namespace SnowmeetApi.Controllers
                 && t.template_id == templateId).OrderByDescending(t => t.create_date).AsNoTracking().ToListAsync();
             return Ok(tl);
         }
-        [HttpGet]
-        public async Task<ActionResult<Ticket>> MePickTicket(int templateId,
-            string sessionKey, string sessionType = "wechat_mini_openid", string channel = "")
+        [HttpGet("{templateId}")]
+        public async Task<ActionResult<Ticket>> MePickTicket(int templateId, string channel,
+            string sessionKey, string sessionType = "wechat_mini_openid")
         {
             int count = (int)((OkObjectResult)(await MeGetPickCount(templateId)).Result).Value;
-            if (count >= 0)
+            if (count > 0)
             {
                 return NoContent();
             }
             sessionKey = Util.UrlDecode(sessionKey);
             MemberController _memberHelper = new MemberController(_context, _oriConfig);
             Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
-            Ticket ticket = await GenerateTicketByAction(templateId, member.id, 1, 0, "海报或公众号群发", channel);
+            Ticket ticket = await GenerateTicketByAction(templateId, member.id, 1, 0, "扫码领取", channel);
             return Ok(ticket);
-            //return BadRequest();
-
         }
-
         [HttpGet]
         public async Task<ActionResult<int>> MeGetPickCount(int templateId)
         {
@@ -535,10 +532,6 @@ namespace SnowmeetApi.Controllers
                 .AsNoTracking().ToListAsync();
             return (Ok(tl.Count));
         }
-
-
-
-       
         private bool TicketExists(string id)
         {
             return _context.Ticket.Any(e => e.code == id);

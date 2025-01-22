@@ -16,7 +16,6 @@ namespace SnowmeetApi.Models.Order
         public int scan { get; set; } = 0;
         public string scan_type { get; set; } = "";
         public int? biz_id {get; set;} = null;
-        //public string scan_type { get; set; } = "recept";
         public DateTime create_date { get; set; } = DateTime.Now;
 
         [NotMapped]

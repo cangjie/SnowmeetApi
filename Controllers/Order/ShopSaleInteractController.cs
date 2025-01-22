@@ -42,12 +42,14 @@ namespace SnowmeetApi.Controllers.Order
         }
 
         [HttpGet]
-        public async Task<ActionResult<int>> GetInterviewIdByScene(string scene, string sessionKey, string sessionType = "wechat_mini_openid", int? bizId = null)
+        public async Task<ActionResult<int>> GetInterviewIdByScene(string scene, string sessionKey, 
+            string sessionType = "wechat_mini_openid", int? bizId = null)
         {
             int retId = (int)((OkObjectResult)(await GetInterviewId(sessionKey)).Result).Value;
             ShopSaleInteract ssi = await _context.ShopSaleInteract.FindAsync(retId);
             ssi.scan_type = scene.Trim();
             ssi.biz_id = bizId;
+            //ssi.biz_memo = bizMemo;
             _context.ShopSaleInteract.Entry(ssi).State = EntityState.Modified;
             await _context.SaveChangesAsync();
             return Ok(retId);
