@@ -361,7 +361,8 @@ namespace SnowmeetApi.Controllers
             {
                 return NoContent();
             }
-            var ticketList = await _context.Ticket.Where(t => (t.open_id.Trim().Equals(openId.Trim()) && t.used == used)).ToListAsync();
+            var ticketList = await _context.Ticket.Where(t => (t.open_id.Trim().Equals(openId.Trim()) && t.used == used))
+            .OrderByDescending(t => t.create_date).ToListAsync();
             return ticketList;
         }
 
