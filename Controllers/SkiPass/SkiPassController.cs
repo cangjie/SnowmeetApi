@@ -317,23 +317,25 @@ namespace SnowmeetApi.Controllers
                 return;
             }
 
+            int refereeMemberId = 0;
             List<OrderOnline> prevSkipassList = await _context.OrderOnlines
                 .Where(o => o.open_id.Trim().Equals(order.open_id.Trim()) && o.pay_state == 1 
-                && o.type.Trim().Equals("雪票") && o.id < order.id )
-                .AsNoTracking().ToListAsync();
+                && o.type.Trim().Equals("雪票") && o.id < order.id && o.referee_member_id !=0 )
+                .OrderByDescending(o => o.id).AsNoTracking().ToListAsync();
             if (prevSkipassList != null && prevSkipassList.Count > 0)
             {
-                return;
+                refereeMemberId = prevSkipassList[0].referee_member_id;
             }
+            
 
             RefereeController _refHelper = new RefereeController(_context, _config);
             Models.Users.Referee referee = await  _refHelper.GetReferee(member.id, "雪票");
-            int refereeMemberId = 0;
+            
             if (referee != null)
             {
                 refereeMemberId = referee.channel_member_id;
             }
-            else
+            else if (refereeMemberId == 0)
             {
                 refereeMemberId = order.referee_member_id;
             }
@@ -725,34 +727,6 @@ namespace SnowmeetApi.Controllers
             _context.member.Entry(member).State = EntityState.Modified;
             await _context.SaveChangesAsync();
             await _memberHelper.UpdateDetailInfo(member.id, cell, "cell", false);
-
-            /*
-            RefereeController _refHelper = new RefereeController(_context, _config);
-            Models.Users.Referee referee = await  _refHelper.GetReferee(member.id, "雪票");
-            if (referee != null)
-            {
-                refereeMemberId = referee.channel_member_id;
-            }
-            if (refereeMemberId > 0)
-            {
-                Models.Order.Kol k = await _refHelper.GetKol(refereeMemberId);
-                PaymentShare share = new PaymentShare()
-                {
-                    id = 0,
-                    payment_id = payment.id,
-                    order_id = payment.order_id,
-                    kol_id = k.id,
-                    amount = 1 * count,
-                    memo = "雪票佣金",
-                    state = 0,
-                    ret_msg = "",
-                    out_trade_no = payment.out_trade_no + "_FZ_" + DateTime.Now.ToString("yyyyMMdd") + "_01"
-                };
-                await _context.paymentShare.AddAsync(share);
-                await _context.SaveChangesAsync();
-            }
-            */
-
             return Ok(order);
         }
 
@@ -790,9 +764,6 @@ namespace SnowmeetApi.Controllers
                 var shareList = await _context.paymentShare
                     .Where(s => s.order_id == orderId && s.state == 0 && s.submit_date == null)
                     .AsNoTracking().ToListAsync();
-
-
-
                 if (shareList != null && shareList.Count > 0)
                 {
                     OrderPaymentController _paymentHelper = new OrderPaymentController(_context, _config, _http);
@@ -808,8 +779,7 @@ namespace SnowmeetApi.Controllers
                                 await _paymentHelper.ShareFinish(paymentId, "雪票分账结束"); 
                             }
                             paymentId = share.payment_id;
-                        }
-                        
+                        }           
                     }
                     if (paymentId != 0)
                     {
@@ -839,11 +809,6 @@ namespace SnowmeetApi.Controllers
             {
                 return;
             }
-            /*
-             List<Models.Order.OrderPayment> pl = await _context.OrderPayment
-                .Where(p => p.order_id == skipass.order_id && p.status.Trim().Equals("支付成功"))
-                .AsNoTracking().ToListAsync(); 
-            */
             if (skipass.order_id != null)
             {
                 TicketController _tHelper = new TicketController(_context, _config);
@@ -854,8 +819,6 @@ namespace SnowmeetApi.Controllers
                 var shareList = await _context.paymentShare
                     .Where(s => s.order_id == (int)skipass.order_id && s.state == 0 && s.submit_date == null)
                     .AsNoTracking().ToListAsync();
-
-
 
                 if (shareList != null && shareList.Count > 0)
                 {
