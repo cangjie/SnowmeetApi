@@ -318,10 +318,16 @@ namespace SnowmeetApi.Controllers
             }
 
             int refereeMemberId = 0;
+
+            //分账系统上线后，有推荐人ID并且支付成功的雪票订单
             List<OrderOnline> prevSkipassList = await _context.OrderOnlines
                 .Where(o => o.open_id.Trim().Equals(order.open_id.Trim()) && o.pay_state == 1 
-                && o.type.Trim().Equals("雪票") && o.id < order.id && o.referee_member_id !=0 )
+                && o.type.Trim().Equals("雪票") && o.id < order.id && o.referee_member_id !=0 
+                && o.pay_time >= DateTime.Parse("2024-12-15"))
                 .OrderByDescending(o => o.id).AsNoTracking().ToListAsync();
+
+      
+
             if (prevSkipassList != null && prevSkipassList.Count > 0)
             {
                 refereeMemberId = prevSkipassList[0].referee_member_id;
@@ -330,14 +336,28 @@ namespace SnowmeetApi.Controllers
 
             RefereeController _refHelper = new RefereeController(_context, _config);
             Models.Users.Referee referee = await  _refHelper.GetReferee(member.id, "雪票");
-            
+            //确认分过账的kol
             if (referee != null)
             {
                 refereeMemberId = referee.channel_member_id;
             }
+            //上一笔支付成功的并且带推荐人用户ID的
             else if (refereeMemberId == 0)
             {
-                refereeMemberId = order.referee_member_id;
+                
+                List<OrderOnline> prevSkipassListOld = await _context.OrderOnlines
+                .Where(o => o.open_id.Trim().Equals(order.open_id.Trim()) && o.pay_state == 1 
+                && o.type.Trim().Equals("雪票") && o.id < order.id   && o.pay_time < DateTime.Parse("2024-12-15"))
+                .OrderByDescending(o => o.id).AsNoTracking().ToListAsync();
+                //是否是今年的新用户
+                if (prevSkipassListOld == null || prevSkipassListOld.Count == 0)
+                {
+                    refereeMemberId = order.referee_member_id;
+                }
+                else
+                {
+                    refereeMemberId = 0;
+                }
             }
             if (refereeMemberId == 0)
             {
