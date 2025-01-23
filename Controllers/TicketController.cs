@@ -322,7 +322,7 @@ namespace SnowmeetApi.Controllers
                 return NotFound();
             }
 
-            return await _context.Ticket.Where<Ticket>(t => (t.open_id == user.miniAppOpenId && t.used == used)).OrderBy(t=>t.create_date).ToListAsync();
+            return await _context.Ticket.Where<Ticket>(t => (t.open_id == user.miniAppOpenId && t.used == used)).OrderByDescending(t=>t.create_date).ToListAsync();
         }
 
         [HttpGet("{code}")]
