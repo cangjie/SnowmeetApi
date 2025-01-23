@@ -391,7 +391,7 @@ namespace SnowmeetApi.Models.Rent
             get
             {
                 double amount = 0;
-                for(int i = 0; i < additionalPayments.Count; i++)
+                for(int i = 0; additionalPayments != null && i < additionalPayments.Count; i++)
                 {
                     if (additionalPayments[i].is_paid == 1)
                     {
@@ -416,7 +416,7 @@ namespace SnowmeetApi.Models.Rent
                         pL.Add(p);
                     }
                 }
-                for(int i = 0; i < additionalPayments.Count; i++)
+                for(int i = 0; additionalPayments != null && i < additionalPayments.Count; i++)
                 {
                     for(int j = 0; additionalPayments[i].order != null && j < additionalPayments[i].order.payments.Count; j++)
                     {
