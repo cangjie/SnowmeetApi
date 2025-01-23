@@ -318,12 +318,12 @@ namespace SnowmeetApi.Controllers
             }
 
             int refereeMemberId = 0;
-
+            DateTime onlineDate = DateTime.Parse("2024-12-15");
             //分账系统上线后，有推荐人ID并且支付成功的雪票订单
             List<OrderOnline> prevSkipassList = await _context.OrderOnlines
                 .Where(o => o.open_id.Trim().Equals(order.open_id.Trim()) && o.pay_state == 1 
                 && o.type.Trim().Equals("雪票") && o.id < order.id && o.referee_member_id !=0 
-                && o.pay_time >= DateTime.Parse("2024-12-15"))
+                && (DateTime)o.pay_time >= onlineDate)
                 .OrderByDescending(o => o.id).AsNoTracking().ToListAsync();
 
       
@@ -347,7 +347,7 @@ namespace SnowmeetApi.Controllers
                 
                 List<OrderOnline> prevSkipassListOld = await _context.OrderOnlines
                 .Where(o => o.open_id.Trim().Equals(order.open_id.Trim()) && o.pay_state == 1 
-                && o.type.Trim().Equals("雪票") && o.id < order.id   && o.pay_time < DateTime.Parse("2024-12-15"))
+                && o.type.Trim().Equals("雪票") && o.id < order.id   && (DateTime)o.pay_time < onlineDate)
                 .OrderByDescending(o => o.id).AsNoTracking().ToListAsync();
                 //是否是今年的新用户
                 if (prevSkipassListOld == null || prevSkipassListOld.Count == 0)
