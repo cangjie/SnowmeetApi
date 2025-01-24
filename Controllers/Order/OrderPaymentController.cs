@@ -408,6 +408,21 @@ namespace SnowmeetApi.Controllers.Order
             {
                 share = true;
             }
+            else
+            {
+                Models.Users.Member member = await _memberHelper.GetMember(order.open_id.Trim(), "wechat_mini_openid");
+                if (member != null)
+                {
+                    List<Referee> refList = await _context.referee
+                        .Where(r => r.member_id == member.id && r.consume_type.Trim().Equals("雪票"))
+                        .AsNoTracking().ToListAsync();
+                    if (refList != null && refList.Count > 0)
+                    {
+                        share = true;
+                    }
+                }
+
+            }
 
             switch(payment.pay_method.Trim())
             {
