@@ -85,31 +85,38 @@ namespace SnowmeetApi.Models.Product
 				
 			}
 
-			if ((date >= DateTime.Parse("2023-12-30") && date <= DateTime.Parse("2024-1-1"))
-				|| (date >= DateTime.Parse("2024-2-9") && date <= DateTime.Parse("2024-2-18")))
+
+	
+			if (!valid)
 			{
-				if (tags.IndexOf("节假日") <= 0)
+				if (tags.IndexOf("周六") >= 0)
 				{
-					valid = false;
+					
+				}
+				else if (tags.IndexOf("周六") >= 0)
+				{
+
+				}
+				else if (tags.IndexOf("节假日") >= 0)
+				{
+					if (date.Date >= DateTime.Parse("2025-1-28") && date.Date <= DateTime.Parse("2025-2-4").Date)
+					{
+						valid = true;
+					}
+				}
+				else if (tags.IndexOf("平日") >= 0)
+				{
+					if (date.Date == DateTime.Parse("2025-1-26").Date)
+					{
+						valid = true;
+					}
 				}
 				else
 				{
 
-					valid = true;
 				}
 			}
-			if (date.Date == DateTime.Parse("2024-2-19") )
-			{
-                if (tags.IndexOf("平日") >= 0)
-                {
-                    valid = true;
-                }
-                else
-                {
-
-                    valid = false;
-                }
-            }
+			
 			
 
 			return valid;
