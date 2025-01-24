@@ -97,6 +97,7 @@ namespace SnowmeetApi.Models.SkiPass
                     if (valid == 1)
                     {
                         status = "已付款";
+                        
                         if (card_no != null)
                         {
                             status = "已出票";
@@ -115,7 +116,10 @@ namespace SnowmeetApi.Models.SkiPass
                         }
 
                     }
-
+                    if (is_cancel == 1)
+                    {
+                        return "已退票";
+                    }
                 }
                 else
                 {
@@ -178,7 +182,7 @@ namespace SnowmeetApi.Models.SkiPass
                 bool ret = true;
                 if (resort.Trim().Equals("南山"))
                 {
-                    if (status.Trim().Equals("已出票"))
+                    if (!status.Trim().Equals("已付款"))
                     {
                         ret = false;
                     }

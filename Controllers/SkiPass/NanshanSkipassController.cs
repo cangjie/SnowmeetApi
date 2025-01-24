@@ -140,7 +140,7 @@ namespace SnowmeetApi.Controllers.SkiPass
                 return BadRequest();
             }
             List<Models.SkiPass.SkiPass> skiPassList = await _db.skiPass
-                .Where(sp => (sp.resort.Trim().Equals("南山") && sp.valid == 1 && ((DateTime)sp.reserve_date).Date == date.Date ))
+                .Where(sp => (sp.resort.Trim().Equals("南山") && sp.valid == 1 && sp.is_cancel == 0 && ((DateTime)sp.reserve_date).Date == date.Date ))
                 .AsNoTracking().ToListAsync();
             var summary = from skiPass in skiPassList group skiPass by new {skiPass.product_id, skiPass.product_name , skiPass.deal_price}
                 into sum
@@ -175,7 +175,46 @@ namespace SnowmeetApi.Controllers.SkiPass
             }
             return Ok(newList);
         }
+        [HttpGet("{skiPassId}")]
+        public async Task CancelByStaff(int skiPassId, string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            if (!(await _memberHelper.isStaff(sessionKey, sessionType)))
+            {
+                return;
+            }
+            await Cancel(skiPassId, sessionKey, sessionType);
+        }
 
+        [NonAction]
+        public async Task Cancel(int skiPassId, string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            sessionType = Util.UrlDecode(sessionType);
+            Models.Users.Member member = await _memberHelper.GetMemberBySessionKey(sessionKey,sessionType);
+            int canelMemberId = member.id;
+            Models.SkiPass.SkiPass sp = await _db.skiPass.FindAsync(skiPassId);
+            sp.cancel_member_id = canelMemberId;
+            sp.is_cancel = 1;
+            _db.skiPass.Entry(sp).State = EntityState.Modified;
+            await _db.SaveChangesAsync();
+            double? dealPrice = sp.deal_price;
+            int? orderId = sp.order_id;
+            if (dealPrice == null || orderId == null)
+            {
+                return;
+            }
+            List<OrderPayment> payments = await _db.OrderPayment
+                .Where(p => p.order_id == orderId && p.status.Equals("支付成功"))
+                .AsNoTracking().ToListAsync();
+            if (payments.Count == 0)
+            {
+                return;
+            }
+            await _paymentHelper.Refund(payments[0].id, (double)dealPrice, "退票", sessionKey, sessionType);
+            return;
+                
+    
+        }
         
         [HttpGet("{productId}")]
         public async Task<ActionResult<ReserveProduct>> GetReserveProductDetail(int productId, DateTime reserveDate, string sessionKey, string sessionType = "wechat_mini_openid")
@@ -185,7 +224,7 @@ namespace SnowmeetApi.Controllers.SkiPass
                 return BadRequest();
             }
             List<Models.SkiPass.SkiPass> skiPassList = await _db.skiPass
-                .Where(sp => (sp.resort.Trim().Equals("南山") && sp.valid == 1 
+                .Where(sp => (sp.resort.Trim().Equals("南山") && sp.valid == 1 && sp.is_cancel == 0
                 && ((DateTime)sp.reserve_date).Date == reserveDate.Date && sp.product_id == productId ))
                 .AsNoTracking().ToListAsync();
             var l = (from reserveDetail in skiPassList group reserveDetail 

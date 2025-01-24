@@ -491,6 +491,11 @@ namespace SnowmeetApi.Controllers.Order
                 payment.out_trade_no = await GetOutTradeNo(payment.order_id);
                 await _context.OrderPayment.AddAsync(payment);
             }
+            else if (payment.out_trade_no.Trim().Equals(""))
+            {
+                payment.out_trade_no = await GetOutTradeNo(payment.order_id);
+                _context.OrderPayment.Entry(payment).State = EntityState.Modified;
+            }
             await _context.SaveChangesAsync();
             return Ok(payment);
         }
