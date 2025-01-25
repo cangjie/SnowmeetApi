@@ -23,6 +23,7 @@ namespace SnowmeetApi.Models
         //public Ticket.Ticket[] ticketArray = new Ticket.Ticket[0];
    
         [Key]
+        //[ForeignKey(nameof(Models.SkiPass.SkiPass.order))]
         public int id { get; set; }
 
         public string type { get; set; }
@@ -56,6 +57,13 @@ namespace SnowmeetApi.Models
        
         [NotMapped]
         public OrderPayment[]? payments { get; set; }
+        /// <summary>
+        /// temp propertyies before merge
+        /// </summary>order_id
+        /// 
+        [ForeignKey(nameof(OrderPayment.order_id))]
+        public List<Models.Order.OrderPayment> paymentList {get; set;}
+
         [NotMapped]
         public OrderPaymentRefund[]? refunds { get; set; }
         [NotMapped]

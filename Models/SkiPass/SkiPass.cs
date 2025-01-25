@@ -15,6 +15,7 @@ namespace SnowmeetApi.Models.SkiPass
         public string resort {get; set;}
         public string product_name {get; set;}
         public int count {get; set;}
+        
         public int? order_id {get; set;}
         public double? deal_price {get; set;}
         public double? ticket_price {get; set;}
@@ -56,7 +57,40 @@ namespace SnowmeetApi.Models.SkiPass
         public DateTime update_date {get; set;} = DateTime.Now;
         public DateTime create_date {get; set;} = DateTime.Now;
         public int is_used {get; set;} = 0;
-        
+        [ForeignKey("order_id")]
+        public OrderOnline? order {get;set;}
+        [NotMapped]
+        public string cancelStatus
+        {
+            get
+            {
+                string status = "未知状态";
+                switch(is_cancel)
+                {
+                    case 0:
+                        status = "未取消";
+                        break;
+                    case 1:
+                        status = "已取消";
+                        break;
+                    case 2:
+                        status = "取消中";
+                        break;
+                    case 3:
+                        status = "人工申请取消";
+                        break;
+                    case -1:
+                        status = "取消失败";
+                        break;
+                    case -2:
+                        status = "出票失败，自动取消";
+                        break;
+                    default:
+                        break;
+                }
+                return status;
+            }
+        }
         public double cardFee
         {
             get

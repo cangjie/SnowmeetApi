@@ -1006,5 +1006,23 @@ namespace SnowmeetApi.Controllers
             await _context.SaveChangesAsync();
             return Ok(priceObj);
         }
+        [HttpGet]
+        public async Task<ActionResult<List<Models.SkiPass.SkiPass>>> GetDHHSReservedSkipasses(DateTime start,
+            DateTime end, string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            MemberController _memberHelper = new MemberController(_context, _config);
+            SnowmeetApi.Models.Users.Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
+            if (member.is_admin != 1)
+            {
+                return BadRequest();
+            }
+            List<Models.SkiPass.SkiPass> sList = await _context.skiPass.Where(s => s.valid == 1 && !s.resort.Trim().Equals("南山")
+                && s.create_date.Date >= start.Date && s.create_date.Date <= end.Date )
+                .Include(s => s.order).ThenInclude(o => o.paymentList).AsNoTracking().ToListAsync();
+            return Ok(sList);
+        }
     }
+
+    
+    
 }
