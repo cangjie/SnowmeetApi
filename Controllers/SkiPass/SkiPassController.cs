@@ -1017,8 +1017,11 @@ namespace SnowmeetApi.Controllers
                 return BadRequest();
             }
             List<Models.SkiPass.SkiPass> sList = await _context.skiPass.Where(s => s.valid == 1 && !s.resort.Trim().Equals("南山")
-                && s.create_date.Date >= start.Date && s.create_date.Date <= end.Date )
-                .Include(s => s.order).ThenInclude(o => o.paymentList).AsNoTracking().ToListAsync();
+                && s.create_date.Date >= start.Date && s.create_date.Date <= end.Date ).OrderByDescending(s => s.id)
+                .Include(s => s.order)
+                    .ThenInclude(o => o.paymentList.Where(p => p.status.Equals("支付成功")))
+                       .ThenInclude(p => p.refunds.Where(r => r.state == 1))
+                .AsNoTracking().ToListAsync();
             return Ok(sList);
         }
     }
