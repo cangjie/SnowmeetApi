@@ -684,7 +684,15 @@ namespace SnowmeetApi.Controllers
             }
             else
             {
-                rentOrder.backColor = "yellow";
+                if (rentOrder.pay_option.Trim().Equals("招待"))
+                {
+                    rentOrder.backColor = "yellow";
+                }
+                else
+                {
+                    rentOrder.backColor = "pink";
+                }
+                
             }
 
             if (rentOrder.status.Equals("已退款"))
