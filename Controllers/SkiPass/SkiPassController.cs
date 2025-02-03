@@ -228,6 +228,7 @@ namespace SnowmeetApi.Controllers
             catch
             {
                 skipass.is_cancel = -1;
+                skipass.memo = "取消出错";
             }
             _context.skiPass.Entry(skipass).State = EntityState.Modified;
             await _context.SaveChangesAsync();
@@ -247,6 +248,15 @@ namespace SnowmeetApi.Controllers
             {
                 return NotFound();
             }
+            if (skipass.reserve_no != null && !skipass.reserve_no.Trim().Equals(""))
+            {
+                string json = Util.GetWebContent("https://mini.snowmeet.top/core/WanlongZiwoyouHelper/GetOrder?orderId=" + skipass.reserve_no);
+                WanlongZiwoyouHelper.ZiwoyouOrder order = JsonConvert.DeserializeObject<WanlongZiwoyouHelper.ZiwoyouOrder>(json);
+                if (order.orderState != 3)
+                {
+                    return BadRequest();
+                }
+            }
             List<OrderPayment> pL = (await _context.OrderPayment.Where(p => p.order_id == skipass.order_id && p.status.Trim().Equals("支付成功")).AsNoTracking().ToListAsync());
             if (pL == null || pL.Count == 0 )
             {
@@ -258,6 +268,7 @@ namespace SnowmeetApi.Controllers
             if (!refund.refund_id.Equals(""))
             {
                 skipass.have_refund = 1;
+                skipass.update_date = DateTime.Now;
                 _context.skiPass.Entry(skipass).State = EntityState.Modified;
                 await _context.SaveChangesAsync();
             }
@@ -606,28 +617,48 @@ namespace SnowmeetApi.Controllers
                 }
                 try
                 {
-                    WanlongZiwoyouHelper _zwHelper = new WanlongZiwoyouHelper(_context, _config, skipassProduct.source.Trim());
-                    WanlongZiwoyouHelper.ZiwoyouOrder order = _zwHelper.GetOrder(int.Parse(skipass.reserve_no));
+                    //WanlongZiwoyouHelper _zwHelper = new WanlongZiwoyouHelper(_context, _config, skipassProduct.source.Trim());
+                    //WanlongZiwoyouHelper.ZiwoyouOrder order = _zwHelper.GetOrder(int.Parse(skipass.reserve_no));
+                    string json = Util.GetWebContent("https://mini.snowmeet.top/core/WanlongZiwoyouHelper/GetOrder?orderId=" + skipass.reserve_no);
+                    WanlongZiwoyouHelper.ZiwoyouOrder order = JsonConvert.DeserializeObject<WanlongZiwoyouHelper.ZiwoyouOrder>(json);
                     if (order == null)
                     {
                         skipass.is_cancel = -2;
+                        skipass.memo = "未获取到大好河山订单号";
                         skipass.update_date = DateTime.Now;
                         
                         _context.skiPass.Entry(skipass).State = EntityState.Modified;
                         await _context.SaveChangesAsync();
                         continue;
                     }
+                    /*
                     if (order.orderState != 2 || order.vouchers == null || order.vouchers.Length <= 0)
                     {
                         continue;
                     }
-                    if (order.vouchers[0].code != null && !order.vouchers[0].code.Trim().Equals(""))
+                    */
+                    if (order.vouchers.Length > 0)
                     {
-                        skipass.card_no = order.vouchers[0].code.Trim();
+                        if (order.vouchers[0].code != null && !order.vouchers[0].code.Trim().Equals(""))
+                        {
+                            skipass.card_no = order.vouchers[0].code.Trim();
+                        }
+                        if (order.vouchers[0].qrcodeUrl != null && !order.vouchers[0].qrcodeUrl.Trim().Equals(""))
+                        {
+                            skipass.qr_code_url = order.vouchers[0].qrcodeUrl.Trim();
+                        }
                     }
-                    if (order.vouchers[0].qrcodeUrl != null && !order.vouchers[0].qrcodeUrl.Trim().Equals(""))
+                    switch(order.orderState)
                     {
-                        skipass.qr_code_url = order.vouchers[0].qrcodeUrl.Trim();
+                        case 3:
+                            skipass.is_cancel = -3;
+                            break;
+                        case 4:
+                            skipass.is_used = 1;
+                            skipass.update_date = DateTime.Now;
+                            break;
+                        default:
+                            break;
                     }
                     string sendContent = "";
                     if (order.sendContent1 != null)
@@ -651,8 +682,6 @@ namespace SnowmeetApi.Controllers
                 }
                 catch
                 {
-                    //skipass.is_cancel = -2;
-                    //skipass.update_date = DateTime.Now;
                     continue;
                 }
                 _context.skiPass.Entry(skipass).State = EntityState.Modified;
