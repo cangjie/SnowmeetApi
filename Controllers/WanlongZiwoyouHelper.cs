@@ -639,8 +639,8 @@ namespace SnowmeetApi.Controllers
         public async Task UpdateZiwoyouOrder(DateTime start, DateTime end)
         {
             int page = 0;
-            string ret = Util.GetWebContent("https://mini.snowmeet.top/core/WanlongZiwoyouHelper/GetOrderListByPage?start=" + start.ToShortDateString() 
-                + "&end=" + end.ToShortDateString() );
+            string ret = Util.GetWebContent("https://mini.snowmeet.top/core/WanlongZiwoyouHelper/GetOrderListByPage?start=" + start.ToString("yyyy-MM-dd") 
+                + "&end=" + end.ToString("yyyy-MM-dd") + "&page=" + page.ToString() );
             ZiwoyouQueryList list = JsonConvert.DeserializeObject<ZiwoyouQueryList>(ret);
             List<ZiwoyouOrder> orders = new List<ZiwoyouOrder>();
             int pageCount = list.pageCount;
@@ -657,7 +657,11 @@ namespace SnowmeetApi.Controllers
                     }
                     else
                     {
-                        dbOrder = order;
+                        //dbOrder = order;
+                        dbOrder.cancelDate = order.cancelDate;
+                        dbOrder.orderState = order.orderState;
+                        dbOrder.orderState2 = order.orderState2;
+                        dbOrder.orderMemo = order.orderMemo;
                         dbOrder.update_date = DateTime.Now;
                         _context.ziwoyouOrder.Entry(dbOrder).State = EntityState.Modified;
                         
