@@ -48,6 +48,7 @@ namespace SnowmeetApi.Models.SkiPass
         3:人工申请取消
         -1:取消失败
         -2:出票失败，自动取消
+        -3:轮训发现已经取消
 
         */
         public int is_cancel { get; set; } = 0;

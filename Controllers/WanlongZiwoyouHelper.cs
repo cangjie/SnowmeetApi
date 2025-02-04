@@ -80,6 +80,17 @@ namespace SnowmeetApi.Controllers
             public object data {get; set;}
         }
 
+        public class ZiwoyouQueryList
+        {
+            public int page {get; set;}
+            public int pageCount {get; set;}
+            public int resultNum {get; set;}
+            public List<object> results {get; set;}
+            public int size {get; set;}
+            public int sizeAll {get; set;}
+            public int startIndex {get; set;}
+        }
+
         public class ZiwoyouAccountBalance
         { 
             public double accountBalance { get; set; }
@@ -609,6 +620,18 @@ namespace SnowmeetApi.Controllers
         {
             return Ok();
         }
+        [HttpGet]
+        public ActionResult<ZiwoyouQueryResult> GetOrderList(DateTime start, DateTime end, int page = 0)
+        {
+            string postData = "{\"apikey\": \"" + apiKey + "\", \"custId\": " + custId + ", \"resultNum\": 20, \"page\": " + page.ToString() 
+                + ", \"startDate\": \"" + start.ToShortDateString() + "\", \"endDate\": \"" + end.ToShortDateString() + "\" }";
+            string ret = Util.GetWebContent("https://task-api.zowoyoo.com/api/thirdPaty/order/list",
+               postData, "application/json");
+            ZiwoyouQueryResult r = JsonConvert.DeserializeObject<ZiwoyouQueryResult>(ret);
+            return Ok(r);
+        }
+
+        
 
         [HttpGet]
         public double GetBalance()
