@@ -621,15 +621,15 @@ namespace SnowmeetApi.Controllers
             return Ok();
         }
         [HttpGet]
-        public ActionResult<ZiwoyouQueryList> GetOrderList(DateTime start, DateTime end, int page = 0)
+        public ActionResult<string> GetOrderList(DateTime start, DateTime end, int page = 0)
         {
             string postData = "{\"apikey\": \"" + apiKey + "\", \"custId\": " + custId + ", \"resultNum\": 20, \"page\": " + page.ToString() 
                 + ", \"startDate\": \"" + start.ToString("yyyy-MM-dd HH:mm:ss") + "\", \"endDate\": \"" + end.ToString("yyyy-MM-dd HH:mm:ss") + "\" }";
             string ret = Util.GetWebContent("https://task-api.zowoyoo.com/api/thirdPaty/order/list",
                postData, "application/json");
-            ZiwoyouQueryResult r = JsonConvert.DeserializeObject<ZiwoyouQueryResult>(ret);
-            ZiwoyouQueryList l = (ZiwoyouQueryList)r.data;
-            return Ok(l);
+            //ZiwoyouQueryResult r = JsonConvert.DeserializeObject<ZiwoyouQueryResult>(ret);
+            //ZiwoyouQueryList l = (ZiwoyouQueryList)r.data;
+            return Ok(ret);
         }
 
         
