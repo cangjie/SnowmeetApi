@@ -18,6 +18,7 @@ using static SKIT.FlurlHttpClient.Wechat.TenpayV3.Models.AddHKSubMerchantRequest
 using SnowmeetApi.Models.Order;
 using System.IO;
 using SnowmeetApi.Models.Product;
+using SnowmeetApi.Models.SkiPass;
 
 namespace SnowmeetApi.Controllers
 {
@@ -85,41 +86,13 @@ namespace SnowmeetApi.Controllers
             public int page {get; set;}
             public int pageCount {get; set;}
             public int resultNum {get; set;}
-            public List<ZiwoyouQueryListOrder> results {get; set;}
+            public List<SnowmeetApi.Models.SkiPass.ZiwoyouListOrder> results {get; set;}
             public int size {get; set;}
             public int sizeAll {get; set;}
             public int startIndex {get; set;}
         }
 
-        public class ZiwoyouQueryListOrder
-        {
-            public string cancelDate {get; set;}
-            public string endTravelDate {get; set;}
-            public int finishNum {get; set;}
-            public int isConfirm {get; set;}
-            public int isOnlinepay {get; set;}
-            public string linkAddress {get; set;}
-            public string linkCreditNo {get; set;}
-            public int linkCreditType {get; set;}
-            public string linkEmail {get; set;}
-            public string linkMan {get; set;}
-            public string linkPhone {get; set;}
-            public double marketPrice {get; set;}
-            public double memOrderMoney {get; set;}
-            public int num {get; set;}
-            public string orderDate {get; set;}
-            public int orderId {get; set;}
-            public string orderMemo {get; set;}
-            public string orderSourceId {get; set;}
-            public int orderState {get; set;}
-            public string orderState2 {get; set;}
-            public string productName {get; set;}
-            public int productNo {get; set;}
-            public double salePrice {get; set;}
-            public double settlementPrice {get; set;}
-            public string travelDate {get; set;}
-        }
-
+        
         public class ZiwoyouAccountBalance
         { 
             public double accountBalance { get; set; }
@@ -650,7 +623,7 @@ namespace SnowmeetApi.Controllers
             return Ok();
         }
         [HttpGet]
-        public ActionResult<string> GetOrderList(DateTime start, DateTime end, int page = 0)
+        public ActionResult<ZiwoyouQueryList> GetOrderListByPage(DateTime start, DateTime end, int page = 0)
         {
             string postData = "{\"apikey\": \"" + apiKey + "\", \"custId\": " + custId + ", \"resultNum\": 20, \"page\": " + page.ToString() 
                 + ", \"startDate\": \"" + start.ToString("yyyy-MM-dd HH:mm:ss") + "\", \"endDate\": \"" + end.ToString("yyyy-MM-dd HH:mm:ss") + "\" }";
@@ -662,6 +635,48 @@ namespace SnowmeetApi.Controllers
             return Ok(l);
         }
 
+        [HttpGet]
+        public async Task UpdateZiwoyouOrder(DateTime start, DateTime end)
+        {
+            int page = 0;
+            string ret = Util.GetWebContent("https://mini.snowmeet.top/core/WanlongZiwoyouHelper/GetOrderListByPage?start=" + start.ToShortDateString() 
+                + "&end=" + end.ToShortDateString() );
+            ZiwoyouQueryList list = JsonConvert.DeserializeObject<ZiwoyouQueryList>(ret);
+            List<ZiwoyouOrder> orders = new List<ZiwoyouOrder>();
+            int pageCount = list.pageCount;
+            for(; ; )
+            {
+                for(int i = 0; i < list.results.Count; i++)
+                {
+                    ZiwoyouListOrder order = list.results[i];
+                    ZiwoyouListOrder dbOrder = await _context.ziwoyouOrder.FindAsync(order.orderId);
+                    if (dbOrder == null)
+                    {
+                        order.create_date = DateTime.Now;
+                        await _context.ziwoyouOrder.AddAsync(order);
+                    }
+                    else
+                    {
+                        dbOrder = order;
+                        dbOrder.update_date = DateTime.Now;
+                        _context.ziwoyouOrder.Entry(dbOrder).State = EntityState.Modified;
+                        
+                    }
+                    await _context.SaveChangesAsync();
+                }
+                page++;
+                if (page >= pageCount)
+                {
+                    break;
+                }
+                else
+                {
+                    ret = ret = Util.GetWebContent("https://mini.snowmeet.top/core/WanlongZiwoyouHelper/GetOrderListByPage?start=" + start.ToShortDateString() 
+                        + "&end=" + end.ToShortDateString() + "&page=" + page.ToString());
+                    list = JsonConvert.DeserializeObject<ZiwoyouQueryList>(ret);
+                }
+            }
+        }
         
 
         [HttpGet]
@@ -697,6 +712,19 @@ namespace SnowmeetApi.Controllers
                 }
                 return 0;
             }
+        }
+
+        [HttpGet]
+        public async Task<ActionResult<List<ZiwoyouListOrder>>> GetOrderBills(DateTime start, DateTime end)
+        {
+            var l = await _context.ziwoyouOrder
+            .Include(z => z.skipasses)
+                .ThenInclude(s => s.order)
+                    .ThenInclude(o => o.paymentList.Where(p => p.status.Equals("支付成功")))
+                       .ThenInclude(p => p.refunds.Where(r => r.state == 1))
+            .Where(z => (z.orderDate.Date >= start.Date && z.orderDate.Date <= end.Date ))
+            .ToListAsync();
+            return Ok(l);
         }
 
         [NonAction]
