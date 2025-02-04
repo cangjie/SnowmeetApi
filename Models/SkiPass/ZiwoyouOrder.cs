@@ -10,8 +10,8 @@ namespace SnowmeetApi.Models.SkiPass
     [Table("ziwoyou_order")]
     public class ZiwoyouListOrder
     {
-        public DateTime cancelDate { get; set; }
-        public DateTime endTravelDate { get; set; }
+        public DateTime? cancelDate { get; set; }
+        public DateTime? endTravelDate { get; set; }
         public int finishNum { get; set; }
         public int isConfirm { get; set; }
         public int isOnlinepay { get; set; }
@@ -35,7 +35,7 @@ namespace SnowmeetApi.Models.SkiPass
         public int productNo { get; set; }
         public double salePrice { get; set; }
         public double settlementPrice { get; set; }
-        public DateTime travelDate { get; set; }
+        public DateTime? travelDate { get; set; }
         public DateTime? update_date{get; set;}
         public DateTime? create_date {get; set;}
         [ForeignKey(nameof(Models.SkiPass.SkiPass.reserve_no))]
