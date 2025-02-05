@@ -54,17 +54,27 @@ namespace SnowmeetApi.Models
         public DateTime? crt { get; set; } = DateTime.Now;
 
         public int referee_member_id { get; set; } = 0;
-       
+
+        [NotMapped]
+        public OrderPayment[]? _payments; 
+
         [NotMapped]
         public OrderPayment[]? payments 
         { 
             get
             {
-                return paymentList.ToArray();
+                if (paymentList == null || paymentList.Count == 0)
+                {
+                    return _payments;
+                }
+                else
+                {
+                    return paymentList.ToArray();
+                }
             }
             set
             {
-
+                _payments = value;
             } 
         }
         /// <summary>
