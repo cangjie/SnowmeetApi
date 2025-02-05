@@ -19,5 +19,7 @@ namespace SnowmeetApi.Models.Order
         public DateTime? submit_date {get; set; }
 
         public string out_trade_no {get; set;}
+        [ForeignKey("kol_id")]
+        public Kol kol {get; set;}
     }
 }

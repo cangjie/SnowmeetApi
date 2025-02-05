@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>大好河山对账单</title>
+    <link rel="stylesheet" href="../../css/table.css" />
+    <link rel="stylesheet" href="../../css/bootstrap.css" />
+    <link rel="stylesheet" href="../../css/bootstrap-grid.css" />
+    <link rel="stylesheet" href="../../css/bootstrap-reboot.css" />
+    <link rel="stylesheet" href="../../css/common.css" />
+    <script type="text/javascript" src="../../js/jquery-3.6.1.min.js"></script>
+    <script type="text/javascript" src="../../js/bootstrap.js"></script>
+    <script type="text/javascript" src="../../js/util.js"></script>
+    <script type="text/javascript" src="../../js/get_sessionkey.js"></script>
+    <script type="text/javascript">//alert(sessionKey);</script>
+    <style>
+        td {
+            text-align: center
+        }
+    </style>
+</head>
+<body>
+    <div id="menu" style="display:flex; flex-direction:row; width:100%"></div>
+    <div style="margin-top: 20px">
+        <h1 style="text-align:center">大好河山对账单</h1>
+    </div>
+    <div>
+        <span style="color: black;" > 已出票但未核销雪票 </span><span style="color: green;"  > 已核销雪票 </span>
+        <span style="color: #E2C08E"  > 已取消雪票 </span><span style="color:#0000FF"  > 已取消但未退款雪票 </span>
+        <span style="color:#FF0000" > 收退款问题雪票 </span><span style="color:#c0c0c0" > 大好河山后台直接预订雪票（不计算在系统内，仅展示） </span>
+    </div>
+    <div class="row_view" style="align-items:center;justify-content:center; margin-top:20px">
+        日期：从&nbsp;<input type="date" id="date_from" oninput="setDate()" />&nbsp;到&nbsp;<input type="date" id="date_to" oninput="setDate()" />&nbsp;<button id="btn" onclick="getData()"> 查 询 </button>
+    </div>
+    <div style="height:20px"></div>
+    <h1></h1>
+    <div style="height:20px" id="total">
+        
+    </div>
+    <table style="width:100%">
+        <thead>
+            <tr>
+                <td class="table_head">自我游单号</td>
+                <td class="table_head">日期</td>
+                <td class="table_head">时间</td>
+                <td class="table_head">名称</td>
+                <td class="table_head">数量</td>
+                <td class="table_head">状态</td>
+                <td class="table_head">结算价</td>
+                <td class="table_head">收款</td>
+                <td class="table_head">退款</td>
+                <td class="table_head">利润</td>
+                <td class="table_head">联系人</td>
+                <td class="table_head">联系电话</td>
+                <td class="table_head">客服</td>
+                <td class="table_head">分账</td>
+            </tr>
+        </thead>
+        <tbody id="report_rows">
+        </tbody>
+    </table>
+</body>
+</html>
+<script type="text/javascript">
+    var currentColor = '#DDDDDD';
+    var totalPaid = 0;
+    var totalSettle = 0;
+    var totalCharge = 0;
+    var totalRefund = 0;
+    var totalCount = 0;
+    //var totalShare = 0;
+
+    function FillItem(item) {
+        var color = '#000000';
+        var totalColNum = 11;
+        var orderIdIndex = 4;
+        var rows = document.getElementById('report_rows');
+        var newRow = document.createElement('tr');
+        var td_order_id = document.createElement('td');
+        var share = undefined;
+        td_order_id.innerText = item.orderId;
+        newRow.appendChild(td_order_id);
+        if (item.orderDate == '——'){
+            var orderDate = new Date(item.orderDate)
+            
+            var td_date = document.createElement('td');
+            td_date.innerText = '——';
+            newRow.appendChild(td_date);
+            var td_time = document.createElement('td');
+            td_time.innerText = '——';
+            newRow.appendChild(td_time);
+        }
+        else {
+            var orderDate = new Date(item.orderDate)
+            var dateStr = formatDate(orderDate)
+            var timeStr = formatTime(orderDate)
+            var td_date = document.createElement('td');
+            td_date.innerText = dateStr;
+            newRow.appendChild(td_date);
+            var td_time = document.createElement('td');
+            td_time.innerText = timeStr;
+            newRow.appendChild(td_time);
+        }
+        
+        var td_name = document.createElement('td');
+        td_name.innerText = item.productName;
+        newRow.appendChild(td_name);
+        var td_num = document.createElement('td');
+        if (item.orderDate == '——'){
+            td_num.innerText = totalCount;
+        }
+        else{
+            td_num.innerText = item.num;
+        }
+        
+        newRow.appendChild(td_num);
+        var settlePrice = item.settlementPrice * item.num;
+        var status = '——';
+        switch(item.orderState){
+            case 1:
+                status = '已预订';
+                break;
+            case 2:
+                status = '已出票';
+                break;
+            case 3:
+                status = '已取消';
+                settlePrice = 0;
+                break;
+            case 4:
+                status = '已核销';
+                break;
+            default:
+                break;
+        }
+        var td_status = document.createElement('td');
+        td_status.innerText = status;
+        newRow.appendChild(td_status);
+        var rightAttr = document.createAttribute('style');
+        rightAttr.value = 'text-align:right';
+        var td_settle = document.createElement('td');
+        td_settle.innerText = formatAmount(settlePrice);
+        //totalSettle += settlePrice;
+        td_settle.attributes.setNamedItem(rightAttr);
+        newRow.appendChild(td_settle);
+        var chargeAmount = 0;
+        var refundAmount = 0;
+        var revenu = 0;
+        if (item.skipasses != undefined && item.skipasses.length > 0 && item.skipasses[0].order != null){
+            
+            chargeAmount = item.skipasses[0].order.paidAmount;
+            totalCharge += chargeAmount;
+            refundAmount = item.skipasses[0].order.refundAmount;
+            totalRefund += refundAmount;
+            totalSettle += settlePrice;
+            totalCount += item.num;
+            if (item.skipasses[0].order.paymentList.length > 0 && item.skipasses[0].order.paymentList[0].shares.length > 0){
+                share = item.skipasses[0].order.paymentList[0].shares[0];
+            }
+        }
+        else if (item.orderId == '总计'){
+            chargeAmount = totalCharge;
+            refundAmount = totalRefund;
+        }
+
+        rightAttr = document.createAttribute('style');
+        rightAttr.value = 'text-align:right';
+        var td_charege = document.createElement('td');
+        td_charege.innerText = formatAmount(chargeAmount);
+        td_charege.attributes.setNamedItem(rightAttr);
+        newRow.appendChild(td_charege);
+
+        rightAttr = document.createAttribute('style');
+        rightAttr.value = 'text-align:right';
+        var td_refund = document.createElement('td');
+        td_refund.innerText = formatAmount(refundAmount);
+        td_refund.attributes.setNamedItem(rightAttr);
+        newRow.appendChild(td_refund);
+
+        revenu = chargeAmount - settlePrice - refundAmount;
+        rightAttr = document.createAttribute('style');
+        rightAttr.value = 'text-align:right';
+        var td_revenu = document.createElement('td');
+        td_revenu.innerText = formatAmount(revenu);
+        td_revenu.attributes.setNamedItem(rightAttr);
+        newRow.appendChild(td_revenu);
+
+        var td_contact_name = document.createElement('td');
+        td_contact_name.innerText = item.linkMan;
+        newRow.appendChild(td_contact_name);
+
+        var td_contact_cell = document.createElement('td');
+        td_contact_cell.innerText = item.linkPhone;
+        newRow.appendChild(td_contact_cell);
+
+        
+        
+
+        var td_staff = document.createElement('td');
+        if (share != undefined && share.kol ){
+            td_staff.innerText = share.kol.real_name
+        }
+        else {
+            td_staff.innerText = '——';
+        }
+        
+        newRow.appendChild(td_staff);
+
+        var td_share  = document.createElement('td');
+        if (share != undefined && share.kol ){
+            var shareAmount = share.amount * share.state;
+            td_share.innerText = formatAmount(shareAmount);
+        }
+        else {
+            td_share.innerText = '——';
+        }
+        //td_share.innerText = '——';
+        newRow.appendChild(td_share);
+        newRow.style.backgroundColor = currentColor;
+        
+        if (currentColor == '#DDDDDD'){
+            currentColor = '#FFFFFF';
+        }
+        else{
+            currentColor = '#DDDDDD'
+        }
+
+        if (item.skipasses != undefined && item.skipasses.length == 0){
+            color = '#c0c0c0';
+        }
+        else{
+            if (revenu < 0){
+                color = 'red';
+            }
+            else if(item.orderState == 3){
+                color = '#E2C08E';
+                if (refundAmount <= 0){
+                    color = '#0000FF';
+                }
+            }
+            else if (item.orderState == 4){
+                color = '#00FF00';
+            }
+
+        }
+        newRow.style.color = color;
+
+        
+        //newRow.attributes.setNamedItem(rightAttr);
+        rows.appendChild(newRow);
+    }
+
+    function getData() {
+        totalCount = 0;
+        totalSettle = 0;
+        totalCharge = 0;
+        totalRefund = 0;
+        totalPaid = 0;
+        var rows = document.getElementById('report_rows');
+        rows.innerHTML = '';
+        var btnCtrl = document.getElementById('btn');
+        btnCtrl.disabled = true;
+        var shop = document.getElementById('shop')
+        var getUrl = '../../core/WanlongZiwoyouHelper/GetOrderBills?sessionKey=' + encodeURIComponent(sessionKey)
+            + '&start=' + formatDate(startDate) + '&end=' + formatDate(endDate);
+        console.log('shop', shop);
+        $.ajax({
+            url: getUrl,
+            type: 'GET',
+            success: function (msg, status) {
+                console.log('get data msg', msg)
+                console.log('get data status', status)
+                if (status != 'success') {
+                    return
+                }
+                //var odd = false;
+                //var totalPaid = 0;
+
+                for (var i = 0; i < msg.length; i++) {
+                   // console.log('report', msg)
+                 /*
+                    if (i > 0 && msg[i].order_id == msg[i - 1].order_id && msg[i].order_id > 0){
+                        msg[i].odd = odd;
+                    }
+                    else {
+                        msg[i].odd = !odd;
+                        odd = !odd;
+                        totalPaid += msg[i].total_paid
+                    }
+                   */
+                    FillItem(msg[i]);
+                }
+                var item = {
+                    orderId: '总计',
+                    orderDate: '——',
+                    productName: '——',
+                    settlementPrice: totalSettle,
+                    skipasses: undefined,
+                    linkMan: '——',
+                    linkPhone: '——',
+                    num: 1
+
+                };
+                FillItem(item);
+                //var divTotal = document.getElementById('total');
+                //divTotal.innerText = '总计：' + formatAmount(totalPaid);
+                //alert(totalPaid);
+            },
+            complete: function (msg, status) {
+                btnCtrl.disabled = false;
+            }
+        })
+
+    }</script>
+<script type="text/javascript" src="../../js/date_selector.js"></script>
+<script type="text/javascript" src="../js/menu.js"></script>

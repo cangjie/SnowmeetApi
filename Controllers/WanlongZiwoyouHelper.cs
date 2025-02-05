@@ -725,7 +725,14 @@ namespace SnowmeetApi.Controllers
             .Include(z => z.skipasses)
                 .ThenInclude(s => s.order)
                     .ThenInclude(o => o.paymentList.Where(p => p.status.Equals("支付成功")))
-                       .ThenInclude(p => p.refunds.Where(r => r.state == 1))
+                        .ThenInclude(p => p.refunds.Where(r => r.state == 1))
+            .Include(z => z.skipasses)
+                .ThenInclude(s => s.order)
+                    .ThenInclude(o => o.paymentList.Where(p => p.status.Equals("支付成功")))
+                        .ThenInclude(p => p.shares)
+                            .ThenInclude(s => s.kol)
+                       
+                       
             .Where(z => (z.orderDate.Date >= start.Date && z.orderDate.Date <= end.Date ))
             .ToListAsync();
             return Ok(l);

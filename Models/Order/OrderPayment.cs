@@ -47,6 +47,8 @@ namespace SnowmeetApi.Models.Order
         public string? wepay_trans_id {get; set;}
         [ForeignKey(nameof(OrderPaymentRefund.payment_id))]
         public List<Models.Order.OrderPaymentRefund> refunds {get; set;}
+        [ForeignKey(nameof(Models.Order.PaymentShare.payment_id))]
+        public List<Models.Order.PaymentShare> shares {get;set;}
 
 
         [NotMapped]

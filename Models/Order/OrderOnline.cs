@@ -56,7 +56,17 @@ namespace SnowmeetApi.Models
         public int referee_member_id { get; set; } = 0;
        
         [NotMapped]
-        public OrderPayment[]? payments { get; set; }
+        public OrderPayment[]? payments 
+        { 
+            get
+            {
+                return paymentList.ToArray();
+            }
+            set
+            {
+
+            } 
+        }
         /// <summary>
         /// temp propertyies before merge
         /// </summary>order_id
@@ -128,7 +138,28 @@ namespace SnowmeetApi.Models
                 return amount;
             }
         }
-
+        [NotMapped]
+        public double refundAmount
+        {
+            get
+            {
+                double refund = 0;
+                for(int i = 0; i < paymentList.Count; i++)
+                {
+                    if (paymentList[i].status.Trim().Equals("支付成功"))
+                    {
+                        for(int j = 0; j < paymentList[i].refunds.Count; j++)
+                        {
+                            if (paymentList[i].refunds[j].state == 1)
+                            {
+                                refund += paymentList[i].refunds[j].amount;
+                            }
+                        }
+                    }
+                }
+                return refund;
+            }
+        }
         [NotMapped]
         public string staffName
         {
