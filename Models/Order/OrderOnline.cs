@@ -144,11 +144,11 @@ namespace SnowmeetApi.Models
             get
             {
                 double refund = 0;
-                for(int i = 0; i < paymentList.Count; i++)
+                for(int i = 0; paymentList != null && i < paymentList.Count; i++)
                 {
                     if (paymentList[i].status.Trim().Equals("支付成功"))
                     {
-                        for(int j = 0; j < paymentList[i].refunds.Count; j++)
+                        for(int j = 0;paymentList[i].refunds != null && j < paymentList[i].refunds.Count; j++)
                         {
                             if (paymentList[i].refunds[j].state == 1)
                             {
