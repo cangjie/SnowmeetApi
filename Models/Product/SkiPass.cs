@@ -106,7 +106,8 @@ namespace SnowmeetApi.Models.Product
 				}
 				else if (tags.IndexOf("平日") >= 0)
 				{
-					if (date.Date == DateTime.Parse("2025-1-26").Date)
+					if (date.Date == DateTime.Parse("2025-1-26").Date
+					|| date.Date == DateTime.Parse("2025-2-8").Date)
 					{
 						valid = true;
 					}

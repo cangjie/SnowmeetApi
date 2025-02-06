@@ -99,23 +99,6 @@ namespace SnowmeetApi.Controllers.SkiPass
             public string cell {get; set;}
             public List<Models.SkiPass.SkiPass> skipasses {get; set;} = new List<Models.SkiPass.SkiPass>();
         }
-
-        /*
-        public class NanshanSkiReserveDetailKey
-        {
-            public int member_id { get; set; }
-            public string wechat_mini_openid {get; set;}
-
-            public string realName {get; set;}
-
-            public string cell {get; set;}
-
-            public int count {get;set;}
-
-            //public List<Models.SkiPass.SkiPass> skiPassList {get; set;} = new List<Models.SkiPass.SkiPass>();
-            //public DateTime reserveDate {get; set;}
-        }
-        */
         private readonly ApplicationDBContext _db;
         private readonly IConfiguration _config;
         private readonly IHttpContextAccessor _http;
@@ -454,36 +437,6 @@ namespace SnowmeetApi.Controllers.SkiPass
             _db.member.Entry(member).State = EntityState.Modified;
             await _db.SaveChangesAsync();
             await _memberHelper.UpdateDetailInfo(member.id, cell, "cell", false);
-
-            /*
-
-            RefereeController _refHelper = new RefereeController(_db, _config);
-            Models.Users.Referee referee = await  _refHelper.GetReferee(member.id, "雪票");
-            if (referee != null)
-            {
-                refereeMemberId = referee.channel_member_id;
-            }
-
-            if (refereeMemberId > 0)
-            {
-                Models.Order.Kol k = await _refHelper.GetKol(refereeMemberId);
-                PaymentShare share = new PaymentShare()
-                {
-                    id = 0,
-                    payment_id = payment.id,
-                    order_id = payment.order_id,
-                    kol_id = k.id,
-                    amount = 1 * count,
-                    memo = "南山雪票佣金",
-                    state = 0,
-                    ret_msg = "",
-                    out_trade_no = payment.out_trade_no + "_FZ_" + DateTime.Now.ToString("yyyyMMdd") + "_01"
-                };
-                await _db.paymentShare.AddAsync(share);
-                await _db.SaveChangesAsync();
-            }
-            */
-
             return Ok(order);
         }
         [HttpGet]

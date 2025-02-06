@@ -87,6 +87,7 @@ namespace SnowmeetApi.Controllers
 
             if (date.Date == DateTime.Parse("2024-2-19")
             || date.Date == DateTime.Parse("2025-1-26")
+            || date.Date == DateTime.Parse("2025-2-8")
             )
             {
                 tags = "平日";
