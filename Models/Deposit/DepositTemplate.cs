@@ -3,6 +3,7 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 namespace SnowmeetApi.Models.Deposit
 {
+    [Table("deposit_template")]
     public class DepositTemplate
     {
         [Key]
