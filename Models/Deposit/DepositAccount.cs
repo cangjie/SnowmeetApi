@@ -26,6 +26,14 @@ namespace SnowmeetApi.Models.Deposit
         public DateTime? update_date { get; set; }
         public DateTime create_date { get; set; }
 
+        public double avaliableAmount
+        {
+            get
+            {
+                return income_amount - consume_amount;
+            }
+        }
+
         
 
     }
