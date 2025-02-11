@@ -51,7 +51,7 @@ namespace SnowmeetApi.Controllers
         }
         [HttpGet("{memberId}")]
         public async Task<ActionResult<double>> GetMemberAvaliableAmount(int memberId, string depositType, string depositSubType,
-            string sessionKey, string sessionType)
+            string sessionKey, string sessionType = "wechat_mini_openid")
         {
             MemberController _memberHelper = new MemberController(_db, _config);
             Models.Users.Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
@@ -69,12 +69,11 @@ namespace SnowmeetApi.Controllers
             {
                 sum += accountList[i].avaliableAmount;
             }
-
             return Ok(sum);
         }
-        [HttpGet("{memberId}")]
+        [HttpGet("{paymentId}")]
         public async Task<ActionResult<List<DepositBalance>>> DepositCosume(int paymentId, 
-            string depositType, string depositSubType, string sessionKey, string sessionType)
+            string depositType, string depositSubType, string sessionKey, string sessionType = "wechat_mini_openid")
         {
             MemberController _memberHelper = new MemberController(_db, _config);
             Models.Users.Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
@@ -138,7 +137,8 @@ namespace SnowmeetApi.Controllers
                     if (accountList[j].id == balance.deposit_id)
                     {
                         DepositAccount account = accountList[j];
-                        account.consume_amount += balance.amount;
+                        account.consume_amount += balance.amount * -1;
+                        account.update_date = DateTime.Now;
                         _db.depositAccount.Entry(account).State = EntityState.Modified;
                     }
                 }

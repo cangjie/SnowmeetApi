@@ -905,6 +905,7 @@ namespace SnowmeetApi.Controllers
             rentOrder.end_date = DateTime.Now;
             rentOrder.rental_reduce = rentalReduce;
             rentOrder.rental_reduce_ticket = rentalReduceTicket;
+            rentOrder.update_date = DateTime.Now;
             _context.Entry(rentOrder).State = EntityState.Modified;
             await _context.SaveChangesAsync();
 

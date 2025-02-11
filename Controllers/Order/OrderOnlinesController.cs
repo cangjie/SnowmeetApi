@@ -459,6 +459,7 @@ namespace SnowmeetApi.Controllers
                     if (customerUser != null)
                     {
                         Member orderMember =  await _memberHelper.GetMember(order.open_id.Trim(), "wechat_mini_openid");
+                        order.member = orderMember;
                         order.user = orderMember.miniAppUser;
                         
                         bool needUpdateMemberInfo = false;
@@ -512,9 +513,6 @@ namespace SnowmeetApi.Controllers
                             }
                             await _context.SaveChangesAsync();
                         }
-
-                        //order.user = await _context.MiniAppUsers.FindAsync(customerUser.miniAppOpenId);
-
                     }
                 }
                 catch
@@ -523,8 +521,9 @@ namespace SnowmeetApi.Controllers
                     {
                         try
                         {
-                            //order.user = await _context.MiniAppUsers.FindAsync(order.open_id.Trim());
-                            order.user = (await _memberHelper.GetMember(order.open_id.Trim(), "wechat_mini_openid")).miniAppUser;
+                            Member member = (await _memberHelper.GetMember(order.open_id.Trim(), "wechat_mini_openid"));
+                            order.member = member;
+                            order.user = member.miniAppUser;
                             bool needUpdateMemberInfo = false;
                             string updateCellNum = "";
                             if (user.member.real_name.Trim().Equals("") && !order.name.Trim().Equals(""))

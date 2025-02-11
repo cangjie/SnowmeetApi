@@ -74,6 +74,7 @@ namespace SnowmeetApi.Models.Rent
         public int closed { get; set; } = 0;
 
         public DateTime create_date { get; set; } = DateTime.Now;
+        public DateTime? update_date {get; set;} = null;
 
         [NotMapped]
         public OrderOnline _order;
