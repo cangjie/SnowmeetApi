@@ -75,6 +75,27 @@ namespace SnowmeetApi.Models.Rent
 
         public DateTime create_date { get; set; } = DateTime.Now;
         public DateTime? update_date {get; set;} = null;
+        [NotMapped]
+        public bool isDepositPaid
+        {
+            get
+            {
+                bool paid = false;
+                if (order != null && order.paymentList != null)
+                {
+                    for(int i = 0; i < order.paymentList.Count; i++)
+                    {
+                        OrderPayment payment = order.paymentList[i];
+                        if (payment.status.Equals(OrderPayment.PaymentStatus.支付成功.ToString()) && payment.pay_method.Trim().Equals("储值支付"))
+                        {
+                            paid = true;
+                            break;
+                        }
+                    }
+                }
+                return paid;
+            }
+        }
 
         [NotMapped]
         public OrderOnline _order;

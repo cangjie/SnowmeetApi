@@ -150,7 +150,11 @@ namespace SnowmeetApi.Controllers
                 double totalRefund = 0;
                 for (int j = 0; j < order.order.payments.Length; j++)
                 {
-                    totalPayment += order.order.payments[j].amount;
+                    OrderPayment payment = order.order.payments[j];
+                    if (payment.status.Equals("支付成功") && !payment.pay_method.Equals("储值支付"))
+                    {
+                        totalPayment += order.order.payments[j].amount;
+                    }
                 }
                 for (int j = 0; j < order.order.refunds.Length; j++)
                 {

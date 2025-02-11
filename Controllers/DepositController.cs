@@ -4,12 +4,15 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using Microsoft.Extensions.Configuration;
 using SnowmeetApi.Controllers.User;
 using SnowmeetApi.Data;
 using SnowmeetApi.Models.Deposit;
 using SnowmeetApi.Models.Order;
 using SnowmeetApi.Models.Users;
+using SnowmeetApi.Models.Rent;
+using SnowmeetApi.Models;
 namespace SnowmeetApi.Controllers
 {
     [Route("core/[controller]/[action]")]
@@ -71,9 +74,54 @@ namespace SnowmeetApi.Controllers
             }
             return Ok(sum);
         }
+        [HttpGet("{rentOrderId}")]
+        public async Task<ActionResult<List<DepositBalance>>> RentOderPay(int rentOrderId, double amount, 
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            RentOrder rentOrder = await _db.RentOrder.FindAsync(rentOrderId);
+            if (rentOrder == null || rentOrder.order_id == 0)
+            {
+                return NotFound();
+            }
+            OrderPayment payment = await CreateDepositPayment(rentOrder.order_id, amount, sessionKey, sessionType);
+            if (payment == null)
+            {
+                return BadRequest();
+            }
+
+            return await DepositCosume(payment.id, sessionKey, sessionType);
+        }
+        [NonAction]
+        public async Task<OrderPayment> CreateDepositPayment(int orderId, double amount, 
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            MemberController _memberHelper = new MemberController(_db, _config);
+            Models.Users.Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
+            if (member == null || member.wechatMiniOpenId == null)
+            {
+                return null;
+            }
+            OrderOnline order = await _db.OrderOnlines.FindAsync(orderId);
+            OrderPayment payment = new OrderPayment()
+            {
+                id = 0,
+                order_id = orderId,
+                open_id = order.open_id,
+                amount = amount,
+                status = OrderPayment.PaymentStatus.待支付.ToString(),
+                deposit_type = "服务储值",
+                deposit_sub_type = "",
+                staff_open_id = member.wechatMiniOpenId.Trim(),
+                pay_method = "储值支付",
+                create_date = DateTime.Now
+            };
+            await _db.OrderPayment.AddAsync(payment);
+            await _db.SaveChangesAsync();
+            return payment;
+        }
         [HttpGet("{paymentId}")]
         public async Task<ActionResult<List<DepositBalance>>> DepositCosume(int paymentId, 
-            string depositType, string depositSubType, string sessionKey, string sessionType = "wechat_mini_openid")
+            string sessionKey, string sessionType = "wechat_mini_openid")
         {
             MemberController _memberHelper = new MemberController(_db, _config);
             Models.Users.Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
@@ -92,7 +140,8 @@ namespace SnowmeetApi.Controllers
                 return NoContent();
             }
             int memberId = customer.id;
-            List<DepositAccount> accountList = await GetMemberAccountAvaliable(memberId, depositType, depositSubType);
+            List<DepositAccount> accountList = await GetMemberAccountAvaliable(memberId, 
+                payment.deposit_type, payment.deposit_sub_type);
             List<DepositBalance> balanceList = new List<DepositBalance>();
             double paidAmount = 0;
             double unPaidAmount = payment.amount;
