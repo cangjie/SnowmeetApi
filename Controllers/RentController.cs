@@ -137,10 +137,11 @@ namespace SnowmeetApi.Controllers
             List<Balance> bList = new List<Balance>();
             for (int i = 0; i < idList.Count; i++)
             {
-               
-
                 RentOrder order = (RentOrder)((OkObjectResult)(await GetRentOrder(idList[i].id, sessionKey)).Result).Value;
-                
+                if (order.isDepositPaid)
+                {
+                    continue;
+                }
                 if (!order.status.Trim().Equals("已退款"))
                 {
                     continue;
