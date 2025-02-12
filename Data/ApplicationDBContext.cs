@@ -142,5 +142,8 @@ namespace SnowmeetApi.Data
         public DbSet<Models.Product.SkipassDailyPrice> skipassDailyPrice {get; set;}
         public DbSet<Models.Users.Referee> referee {get; set;}
         public DbSet<Models.SkiPass.ZiwoyouListOrder> ziwoyouOrder {get; set;}
+        public DbSet<Models.Deposit.DepositAccount> depositAccount {get; set;}
+        public DbSet<Models.Deposit.DepositBalance> depositBalance {get; set;}
+        public DbSet<Models.Deposit.DepositTemplate> depositTemplate {get; set;}
     }
 }

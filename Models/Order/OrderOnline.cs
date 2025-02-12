@@ -185,6 +185,8 @@ namespace SnowmeetApi.Models
 
         [NotMapped]
         public OrderOnlineDetail[]? details { get; set; }
+        [NotMapped]
+        public Member? member {get; set;}
         /*
         [NotMapped]
         public Ticket.Ticket[] tickets

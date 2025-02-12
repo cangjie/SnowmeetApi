@@ -137,10 +137,11 @@ namespace SnowmeetApi.Controllers
             List<Balance> bList = new List<Balance>();
             for (int i = 0; i < idList.Count; i++)
             {
-               
-
                 RentOrder order = (RentOrder)((OkObjectResult)(await GetRentOrder(idList[i].id, sessionKey)).Result).Value;
-                
+                if (order.isDepositPaid)
+                {
+                    continue;
+                }
                 if (!order.status.Trim().Equals("已退款"))
                 {
                     continue;
@@ -150,7 +151,11 @@ namespace SnowmeetApi.Controllers
                 double totalRefund = 0;
                 for (int j = 0; j < order.order.payments.Length; j++)
                 {
-                    totalPayment += order.order.payments[j].amount;
+                    OrderPayment payment = order.order.payments[j];
+                    if (payment.status.Equals("支付成功") && !payment.pay_method.Equals("储值支付"))
+                    {
+                        totalPayment += order.order.payments[j].amount;
+                    }
                 }
                 for (int j = 0; j < order.order.refunds.Length; j++)
                 {
@@ -905,6 +910,7 @@ namespace SnowmeetApi.Controllers
             rentOrder.end_date = DateTime.Now;
             rentOrder.rental_reduce = rentalReduce;
             rentOrder.rental_reduce_ticket = rentalReduceTicket;
+            rentOrder.update_date = DateTime.Now;
             _context.Entry(rentOrder).State = EntityState.Modified;
             await _context.SaveChangesAsync();
 

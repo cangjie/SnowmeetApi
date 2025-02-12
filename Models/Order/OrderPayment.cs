@@ -49,6 +49,8 @@ namespace SnowmeetApi.Models.Order
         public List<Models.Order.OrderPaymentRefund> refunds {get; set;}
         [ForeignKey(nameof(Models.Order.PaymentShare.payment_id))]
         public List<Models.Order.PaymentShare> shares {get;set;}
+        public string? deposit_type { get; set; } = null;
+        public string? deposit_sub_type {get; set; } = null;
 
 
         [NotMapped]
@@ -59,28 +61,7 @@ namespace SnowmeetApi.Models.Order
                 return staffRealName.Trim();
             }
         }
-        /*
-        public async Task<ActionResult<bool>> GetStaffRealName(SnowmeetApi.Data.ApplicationDBContext db)
-        {
-            if (!staff_open_id.Trim().Equals(""))
-            {
-                var staffUser = await db.MiniAppUsers.FindAsync(staff_open_id.Trim());
-                if (staffUser != null)
-                {
-                    staffRealName = staffUser.real_name.Trim();
-                    return true;
-                }
-                else
-                {
-                    return false;
-                }
-            }
-            else
-            {
-                return false;
-            }
-        }
-        */
+ 
     }
 }
 
