@@ -15,6 +15,8 @@ using SnowmeetApi.Controllers.User;
 using Org.BouncyCastle.Asn1.X509;
 using System.Security.Cryptography;
 using Aop.Api.Domain;
+using SnowmeetApi.Models.Order;
+using SnowmeetApi.Models.Deposit;
 
 namespace SnowmeetApi.Controllers
 {
@@ -51,7 +53,7 @@ namespace SnowmeetApi.Controllers
             _maintainHelper = new MaintainLiveController(context, config);
             _rentHelper = new RentController(context, config, httpContextAccessor);
             _memberHelper = new MemberController(context, config);
-        
+
         }
 
         [HttpGet]
@@ -90,8 +92,8 @@ namespace SnowmeetApi.Controllers
             string content = "您有一笔费用需要支付。<a data-miniprogram-appid=\"wxd1310896f2aa68bb\" data-miniprogram-path=\"/pages/payment/pay_recept?id=" + r.id.ToString() + "\" >点击这里查看</a>。";
             //MiniAppUser u = await _context.MiniAppUsers.FindAsync(r.open_id.Trim());
             //MiniAppUser u = GetUser()
-            UnicUser  u =  (await UnicUser.GetUnicUserByDetailInfo(r.open_id.Trim(), "wechat_mini_openid", _context));
-            if (u == null) 
+            UnicUser u = (await UnicUser.GetUnicUserByDetailInfo(r.open_id.Trim(), "wechat_mini_openid", _context));
+            if (u == null)
             {
                 return;
             }
@@ -118,7 +120,7 @@ namespace SnowmeetApi.Controllers
             int orderId = 0;
 
             OrderOnlinesController orderHelper = new OrderOnlinesController(_context, _oriConfig);
-            
+
             switch (recept.recept_type)
             {
                 case "租赁下单":
@@ -143,7 +145,7 @@ namespace SnowmeetApi.Controllers
                         {
                             await maintainHelper.GenerateFlowNum(ml[i].id);
                         }
-                        
+
                     }
                     break;
                 default:
@@ -161,7 +163,7 @@ namespace SnowmeetApi.Controllers
                 TicketController tHelper = new TicketController(_context, _oriConfig);
                 await tHelper.Use(recept.code, sessionKey);
             }
-            
+
             return Ok(recept);
         }
 
@@ -208,7 +210,7 @@ namespace SnowmeetApi.Controllers
                 default:
                     break;
             }
-            if (orderId>0)
+            if (orderId > 0)
             {
                 OrderOnline order = await _context.OrderOnlines.FindAsync(orderId);
                 order.open_id = openId;
@@ -279,7 +281,7 @@ namespace SnowmeetApi.Controllers
 
         [HttpGet]
         public async Task<ActionResult<Recept>> NewVipRecept(int vipId,
-            string shop,  string scene, string sessionKey)
+            string shop, string scene, string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey);
             shop = Util.UrlDecode(shop.Trim());
@@ -361,7 +363,7 @@ namespace SnowmeetApi.Controllers
             if (!openId.Trim().Equals(""))
             {
                 //MiniAppUser user = await _context.MiniAppUsers.FindAsync(openId);
-                SnowmeetApi.Models.Users.Member  user =await  _memberHelper.GetMember(openId, "wechat_mini_openid");
+                SnowmeetApi.Models.Users.Member user = await _memberHelper.GetMember(openId, "wechat_mini_openid");
                 realName = user.real_name.Trim();
                 switch (user.gender.Trim())
                 {
@@ -377,13 +379,13 @@ namespace SnowmeetApi.Controllers
                 cell = user.cell.Trim();
                 gender = user.gender.Trim();
             }
-            
+
             string entityJson = "";
 
             switch (scene)
             {
                 case "租赁下单":
-                    
+
                     RentOrder order = new RentOrder()
                     {
                         open_id = openId,
@@ -466,13 +468,13 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<IEnumerable<Recept>>> GetUnSubmitRecept(string shop, string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey);
-            if (! await IsAdmin(sessionKey))
+            if (!await IsAdmin(sessionKey))
             {
                 return BadRequest();
             }
             shop = Util.UrlDecode(shop).Trim();
             var list = await _context.Recept
-                .Where(r => (r.submit_return_id == 0 && r.create_date.Date == DateTime.Now.Date && (r.shop.Trim().Equals(shop) || shop.Trim().Equals("") ) ))
+                .Where(r => (r.submit_return_id == 0 && r.create_date.Date == DateTime.Now.Date && (r.shop.Trim().Equals(shop) || shop.Trim().Equals(""))))
                 .OrderByDescending(r => r.id).AsNoTracking().ToListAsync();
             if (list == null)
             {
@@ -489,7 +491,7 @@ namespace SnowmeetApi.Controllers
                     {
                         r.recept_staff_name = member.real_name.Trim();
                     }
-                    
+
                 }
                 if (!r.update_staff.Trim().Equals(""))
                 {
@@ -517,7 +519,7 @@ namespace SnowmeetApi.Controllers
             switch (r.recept_type)
             {
                 case "养护招待":
-                    r = await CreateMaintainOrder(r);
+                    r = await CreateMaintainOrder(r, sessionKey);
                     var mList = await _context.MaintainLives.Where(l => l.batch_id == r.id)
                         .AsNoTracking().ToListAsync();
                     for (int i = 0; i < mList.Count; i++)
@@ -551,7 +553,7 @@ namespace SnowmeetApi.Controllers
             bool needVerriTicket = false;
             switch (r.recept_type)
             {
-                
+
                 case "租赁下单":
                     r = await CreateRentOrder(r);
                     if (r.rentOrder.order_id == 0)
@@ -561,9 +563,9 @@ namespace SnowmeetApi.Controllers
 
 
                     break;
-                
+
                 case "养护下单":
-                    r = await CreateMaintainOrder(r);
+                    r = await CreateMaintainOrder(r, sessionKey);
                     if (r.submit_return_id == -1)
                     {
                         needVerriTicket = true;
@@ -572,7 +574,7 @@ namespace SnowmeetApi.Controllers
                 default:
                     break;
             }
-            if (r == null) 
+            if (r == null)
             {
                 return NotFound();
             }
@@ -581,16 +583,16 @@ namespace SnowmeetApi.Controllers
                 TicketController tHelper = new TicketController(_context, _oriConfig);
                 await tHelper.Use(r.code, sessionKey);
             }
-            
+
             return Ok(r);
         }
 
         [NonAction]
-        public async Task<Recept> CreateMaintainOrder(Recept recept)
+        public async Task<Recept> CreateMaintainOrder(Recept recept, string sessionKey, string sessionType = "wechat_mini_openid")
         {
             string jsonStr = recept.submit_data.Trim();
             Models.Maintain.MaintainOrder maintainOrder = JsonConvert.DeserializeObject<Models.Maintain.MaintainOrder>(jsonStr);
-
+            bool paySuc = false;
             int productId = 0;
             double totalAmount = 0;
             for (int i = 0; i < maintainOrder.items.Length; i++)
@@ -628,14 +630,14 @@ namespace SnowmeetApi.Controllers
                 }
                 item.confirmed_product_id = productId;
                 Models.Product.Product p = await _context.Product.FindAsync(productId);
-                totalAmount = totalAmount + ((p!=null)?p.sale_price:0) + item.confirmed_additional_fee;
+                totalAmount = totalAmount + ((p != null) ? p.sale_price : 0) + item.confirmed_additional_fee;
                 item.batch_id = recept.id;
             }
 
 
             double realPayAmount = totalAmount - maintainOrder.discount - maintainOrder.ticketDiscount;
             int orderId = 0;
-            if (realPayAmount > 0 && (maintainOrder.payOption.Trim().Equals("现场支付") || maintainOrder.payOption.Trim().Equals(""))
+            if (realPayAmount > 0 && (maintainOrder.payOption.Trim().Equals("现场支付") || maintainOrder.payOption.Trim().Equals("储值支付") || maintainOrder.payOption.Trim().Equals(""))
                 && recept.recept_type.Trim().Equals("养护下单"))
             {
                 OrderOnline order = new OrderOnline()
@@ -663,12 +665,24 @@ namespace SnowmeetApi.Controllers
 
                 };
                 await _context.AddAsync(order);
-
-
                 await _context.SaveChangesAsync();
+                if (maintainOrder.payOption.Trim().Equals("储值支付"))
+                {
+                    DepositController _depositHelper = new DepositController(_context, _oriConfig);
+                    OrderPayment payment = await _depositHelper.CreateDepositPayment(order.id, order.final_price, sessionKey);
+                    List<DepositBalance> bList =  (List<DepositBalance>)((OkObjectResult)(await _depositHelper.DepositCosume(payment.id, sessionKey)).Result).Value;
+                    if (bList.Count > 0)
+                    {
+                        paySuc = true;
+                    }
+                    order.pay_state = 1;
+                    order.pay_time = DateTime.Now;
+                    _context.OrderOnlines.Entry(order).State = EntityState.Modified;
+                    await _context.SaveChangesAsync();
+                }
                 recept.submit_return_id = order.id;
                 recept.submit_date = DateTime.Now;
-                
+
                 orderId = order.id;
             }
             else
@@ -714,7 +728,7 @@ namespace SnowmeetApi.Controllers
                 m.confirmed_cell = recept.cell;
                 m.ticket_code = recept.code.Trim();
                 //m.batch_id = recept.id;
-                
+
                 await _context.MaintainLives.AddAsync(m);
             }
             await _context.SaveChangesAsync();
@@ -723,7 +737,7 @@ namespace SnowmeetApi.Controllers
 
 
 
-            if (realPayAmount == 0)
+            if (realPayAmount == 0 || paySuc)
             {
                 var ml = await _context.MaintainLives.Where(m => m.batch_id == recept.id)
                     .AsNoTracking().ToListAsync();
@@ -746,7 +760,7 @@ namespace SnowmeetApi.Controllers
             {
                 rentOrder.deposit_real = rentOrder.deposit;
             }
-            rentOrder.deposit_final = rentOrder.deposit_real 
+            rentOrder.deposit_final = rentOrder.deposit_real
                 - rentOrder.deposit_reduce - rentOrder.deposit_reduce_ticket;
             rentOrder.ticket_code = recept.code;
             rentOrder.staff_open_id = recept.recept_staff;
@@ -815,12 +829,12 @@ namespace SnowmeetApi.Controllers
                     await _rentHelper.StartRent(rentOrder.id);
                 }
             }
-            
+
             return recept;
         }
 
 
-      
+
         [HttpGet("{id}")]
         public async Task<ActionResult<Recept>> GetRecept(int id, string sessionKey)
         {
@@ -842,14 +856,14 @@ namespace SnowmeetApi.Controllers
             }
 
             bool isAdmin = await IsAdmin(sessionKey);
-            
+
             /*
             if (!isAdmin && !recept.open_id.Trim().Equals(user.miniAppOpenId.Trim()))
             {
                 return BadRequest();
             }
             */
-            
+
             if (!isAdmin)
             {
                 recept.open_id = "";
@@ -868,7 +882,7 @@ namespace SnowmeetApi.Controllers
                             rOrder.open_id = "";
                         }
                         recept.rentOrder = rOrder;
-                       
+
                         break;
                     case "养护招待":
                     case "养护下单":
@@ -898,25 +912,28 @@ namespace SnowmeetApi.Controllers
                 {
                     RentOrder rOrder = recept.rentOrder;
                     RentOrderDetail dtl = rOrder.details[i];
-                    
+
                     if (dtl.rent_item_code != null && !dtl.rent_item_code.Trim().Equals(""))
                     {
-                        
+
                         var riL = await _context.RentItem
                             .Where(r => r.code.Trim().Equals(dtl.rent_item_code.Trim()))
                             .ToListAsync();
-                        
+
                         if (riL != null && riL.Count > 0)
                         {
                             rOrder.details[i].item = riL[0];
                             recept.rentOrder = rOrder;
                         }
-                        
+
                     }
-                    
+
                 }
             }
 
+            MemberController _memeberHelper = new MemberController(_context, _oriConfig);
+            Models.Users.Member member = await _memberHelper.GetMember(recept.open_id.Trim(), "wechat_mini_openid");
+            recept.member = member;
             return Ok(recept);
         }
 
@@ -925,7 +942,7 @@ namespace SnowmeetApi.Controllers
         public async Task<bool> IsAdmin(string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey);
-            
+
             UnicUser user = await UnicUser.GetUnicUserAsync(sessionKey, _context);
             bool isAdmin = true;
             if (user.member.is_admin == 0 && user.member.is_manager == 0 && user.member.is_staff == 0)
@@ -947,7 +964,7 @@ namespace SnowmeetApi.Controllers
             */
             if (user.member.is_admin == 1 || user.member.is_manager == 1 || user.member.is_staff == 1)
             {
-                user.miniAppUser.is_admin  = 1;
+                user.miniAppUser.is_admin = 1;
             }
             return user.miniAppUser;
         }
@@ -965,7 +982,7 @@ namespace SnowmeetApi.Controllers
             return Ok(l[0].id);
         }
 
-     
+
         private bool ReceptExists(int id)
         {
             return _context.Recept.Any(e => e.id == id);
