@@ -395,15 +395,25 @@ namespace SnowmeetApi.Controllers
                 return BadRequest();
             }
             RentOrder[] orderArr = await _context.RentOrder
+                .Include(r => r.order)
+                    .ThenInclude(o => o.paymentList.Where(p => p.status.Equals("支付成功")))
+                        .ThenInclude(p => p.refunds.Where(r => r.state == 1))
                 .Where(o => (o.create_date >= start && o.create_date < end.Date.AddDays(1)  && (shop.Trim().Equals("") || o.shop.Trim().Equals(shop))))
                 .OrderByDescending(o => o.id).ToArrayAsync();
+            
             for (int i = 0; i < orderArr.Length; i++)
             {
                 try
                 {
                    
-                    RentOrder order = (RentOrder)((OkObjectResult)(await GetRentOrder(orderArr[i].id, sessionKey, false)).Result).Value;
-                    orderArr[i] = order;
+                    //RentOrder order = (RentOrder)((OkObjectResult)(await GetRentOrder(orderArr[i].id, sessionKey, false)).Result).Value;
+                    if (orderArr[i].staff_name == null || orderArr[i].staff_name.Trim().Equals(""))
+                    {
+                        orderArr[i].staffMember = (await _memberHelper.GetMember(orderArr[i].staff_open_id, "wechat_mini_openid"));
+                        orderArr[i].staff_name = orderArr[i].staffMember == null? "" : (orderArr[i].staffMember.real_name.Trim());
+                        _context.RentOrder.Entry(orderArr[i]).State = EntityState.Modified;
+                    }
+
                 }
                 catch 
                 { 
@@ -411,6 +421,7 @@ namespace SnowmeetApi.Controllers
                 }
                 
             }
+            await _context.SaveChangesAsync();
             if (status == null)
             {
                 return Ok(orderArr);
@@ -461,13 +472,12 @@ namespace SnowmeetApi.Controllers
                 .Include(r => r.details)
                     .ThenInclude(d => d.log)
                 .Include(r => r.order)
-                    .ThenInclude(o => o.payments.Where(p => p.status.Trim().Equals("支付成功")).OrderByDescending(p => p.id))
-                        .ThenInclude(p => p.refunds.Where(r => r.state == 1).OrderByDescending(r => r.id))                   
+                    .ThenInclude(o => o.paymentList.Where(p => p.status.Trim().Equals("支付成功")).OrderByDescending(p => p.id))
+                        .ThenInclude(p => p.refunds.Where(r => (r.state == 1 || !r.refund_id.Trim().Equals(""))).OrderByDescending(r => r.id))                   
                 .Include(r => r.additionalPayments)
                     .ThenInclude(a => a.order)
-                        .ThenInclude(o => o.payments.Where(p => p.status.Equals("支付成功")).OrderByDescending(p => p.id))
+                        .ThenInclude(o => o.paymentList.Where(p => p.status.Equals("支付成功")).OrderByDescending(p => p.id))
                             .ThenInclude(p => p.refunds.Where(r => r.state == 1).OrderByDescending(r => r.id))
-                
                 .Where(r => r.id == id).ToListAsync();
             if (rentOrderList.Count == 0)
             {
@@ -491,7 +501,7 @@ namespace SnowmeetApi.Controllers
                 {
                     return BadRequest();
                 }
-                if (rentOrder.staff_open_id.Trim().Equals("") || rentOrder.staff_name.Trim().Equals(""))
+                if (rentOrder.staff_open_id.Trim().Equals("") || rentOrder.staff_name == null || rentOrder.staff_name.Trim().Equals(""))
                 {
                     try
                     {
@@ -523,6 +533,7 @@ namespace SnowmeetApi.Controllers
                         r.msa = msaList[0];
                     }
                 }
+                rentOrder.order.member = await (_memberHelper.GetMember(rentOrder.open_id, "wechat_mini_openid"));
             }
             bool allReturned = true;
             DateTime returnTime = rentOrder.create_date;

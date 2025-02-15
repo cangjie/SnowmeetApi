@@ -190,6 +190,7 @@ namespace SnowmeetApi.Models
         public OrderOnlineDetail[]? details { get; set; }
         [NotMapped]
         public Member? member {get; set;}
+        [NotMapped]
         public MemberSocialAccount? msa {get; set;}
         /*
         [NotMapped]

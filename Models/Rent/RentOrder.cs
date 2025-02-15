@@ -71,7 +71,10 @@ namespace SnowmeetApi.Models.Rent
 
         public string staff_open_id { get; set; } = "";
 
-        public string staff_name { get; set; } = "";
+        
+        public string staff_name { get; set; }
+        [NotMapped]
+        public Models.Users.Member? staffMember {get; set;}
 
         public int closed { get; set; } = 0;
         public DateTime? finish_date { get; set; }
@@ -478,10 +481,8 @@ namespace SnowmeetApi.Models.Rent
                 {
                     for(int j = 0; j < payments[i].refunds.Count; j++)
                     {
-                        if (payments[i].refunds[j].state == 1)
-                        {
-                            refunds.Add(payments[i].refunds[j]);
-                        }
+                        refunds.Add(payments[i].refunds[j]);
+                        
                     }
                 }
                 return refunds;
