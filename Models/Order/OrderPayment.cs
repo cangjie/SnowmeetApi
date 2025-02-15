@@ -22,7 +22,6 @@ namespace SnowmeetApi.Models.Order
         [Key]
         public int id { get; set; }
 
-        
         public int order_id { get; set; }
         public string pay_method { get; set; }
         public double amount { get; set; }
@@ -45,12 +44,43 @@ namespace SnowmeetApi.Models.Order
         public string? ali_trade_no {get; set;}
 
         public string? wepay_trans_id {get; set;}
+
         [ForeignKey(nameof(OrderPaymentRefund.payment_id))]
-        public List<Models.Order.OrderPaymentRefund> refunds {get; set;}
+        public List<Models.Order.OrderPaymentRefund> refunds {get; set;} = new List<OrderPaymentRefund>();
         [ForeignKey(nameof(Models.Order.PaymentShare.payment_id))]
         public List<Models.Order.PaymentShare> shares {get;set;}
         public string? deposit_type { get; set; } = null;
         public string? deposit_sub_type {get; set; } = null;
+
+
+        [NotMapped]
+        public double refundedAmount
+        {
+            get
+            {
+                double amount = 0;
+                for (int i = 0; i < refunds.Count; i++)
+                {
+                    if (refunds[i].state == 1)
+                    {
+                        amount += refunds[i].amount;
+                    }
+                }
+                return amount;
+            }
+
+        }
+        [NotMapped]
+        public double unRefundedAmount
+        {
+            get
+            {
+                return amount - refundedAmount;
+            }
+        }
+
+        [NotMapped]
+        public OrderOnline order {get; set;}
 
 
         [NotMapped]

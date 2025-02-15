@@ -431,7 +431,7 @@ namespace SnowmeetApi.Controllers.SkiPass
                 await _db.skiPass.AddAsync(skipass);
             }
             await _db.SaveChangesAsync();
-            order.payments = new OrderPayment[] { payment };
+            order.payments = (new OrderPayment[] { payment }).ToList();
 
             member.real_name = name;
             _db.member.Entry(member).State = EntityState.Modified;

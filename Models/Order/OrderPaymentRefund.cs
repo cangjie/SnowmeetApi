@@ -1,12 +1,14 @@
 ﻿using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using SnowmeetApi.Models.Users;
 namespace SnowmeetApi.Models.Order
 {
     [Table("order_online_refund")]
     public class OrderPaymentRefund
     {
         public int id { get; set; }
+        [ForeignKey(nameof(Rent.RentOrder))]
         public int order_id { get; set; }
         public int payment_id { get; set; }
         public double amount { get; set; }
@@ -22,6 +24,8 @@ namespace SnowmeetApi.Models.Order
 
         public string out_refund_no {get; set;} = "";
 
+        [NotMapped]
+        public MemberSocialAccount msa {get; set;}
         
         public bool refundSuccess
         {

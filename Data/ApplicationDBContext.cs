@@ -9,6 +9,7 @@ using System;
 using SKIT.FlurlHttpClient.Wechat.TenpayV3.Models;
 using SnowmeetApi.Models.Product;
 using SnowmeetApi.Models.Maintain;
+using SnowmeetApi.Models.Order;
 namespace SnowmeetApi.Data
 {
     public class ApplicationDBContext : DbContext
@@ -19,14 +20,9 @@ namespace SnowmeetApi.Data
 
         }
 
-        
-
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
-            //MaintainLive
             modelBuilder.Entity<MaintainLive>().HasKey(c => c.id);
-            //SchoolStaff
-            
             modelBuilder.Entity<SnowmeetApi.Models.Maintain.Brand>().HasNoKey();
             modelBuilder.Entity<SnowmeetApi.Models.Users.UnionId>().HasKey(u => new { u.union_id, u.open_id });
             modelBuilder.Entity<SnowmeetApi.Models.DD.ExtendedProperties>().HasNoKey();
@@ -35,7 +31,6 @@ namespace SnowmeetApi.Data
             modelBuilder.Entity<SnowmeetApi.Models.Maintain.MaintainReport>().HasNoKey();
             modelBuilder.Entity<Models.Order.SaleReport>().HasNoKey();
             modelBuilder.Entity<Models.Order.EPaymentDailyReport>().HasKey(e => new { e.biz_date, e.mch_id, e.pay_method });
-            modelBuilder.Entity<MemberSocialAccount>().HasOne<Member>().WithMany(m => m.memberSocialAccounts).HasForeignKey(m => m.member_id);
             modelBuilder.Entity<RentPrice>().HasOne<RentCategory>().WithMany(r => r.priceList).HasForeignKey(r => r.category_id);
             modelBuilder.Entity<RentPackageCategory>().HasKey(e => new {e.package_id, e.category_id});
             modelBuilder.Entity<RentPackageCategory>().HasOne<RentPackage>().WithMany(r => r.rentPackageCategoryList).HasForeignKey(r => r.package_id);
@@ -46,13 +41,15 @@ namespace SnowmeetApi.Data
             modelBuilder.Entity<RentProductDetailInfo>().HasOne<RentProduct>().WithMany(r => r.detailInfo).HasForeignKey(r => r.product_id);
             modelBuilder.Entity<RentProductImage>().HasOne<RentProduct>().WithMany(r => r.images).HasForeignKey(r => r.product_id);
             modelBuilder.Entity<RentCategoryInfoField>().HasMany<RentProductDetailInfo>().WithOne(r => r.field).HasForeignKey(r => r.field_id);
-            //modelBuilder.Entity<RentCategory>().HasMany<RentProduct>().WithOne(r => r.category).HasForeignKey(r => r.category_id);
             modelBuilder.Entity<RentProduct>().HasOne<RentCategory>().WithMany(r => r.productList).HasForeignKey(r => r.category_id);
             modelBuilder.Entity<RentProductDetailInfo>().HasKey(i => new {i.product_id, i.field_id});
             modelBuilder.Entity<SkipassDailyPrice>().HasOne<Models.Product.SkiPass>().WithMany(s => s.dailyPrice).HasForeignKey(s => s.product_id);
             modelBuilder.Entity<MaintainLog>().HasOne<Models.MaintainLive>().WithMany(m => m.taskLog).HasForeignKey(m => m.task_id);
             modelBuilder.Entity<OrderOnline>().HasMany<MaintainLive>().WithOne(m => m.order).HasForeignKey(m => m.order_id);
             modelBuilder.Entity<Brand>().HasKey(b => new {b.brand_name, b.brand_type});
+            modelBuilder.Entity<Member>().HasMany<RentOrderLog>().WithOne(m => m.member).HasForeignKey(r => r.oper_member_id);
+            //modelBuilder.Entity<RentOrder>().HasOne<Recept>().WithOne().HasForeignKey<Recept>(r => r.submit_return_id);
+
         }
 
         public DbSet<MaintainLive> MaintainLives {get; set;}
@@ -145,5 +142,7 @@ namespace SnowmeetApi.Data
         public DbSet<Models.Deposit.DepositAccount> depositAccount {get; set;}
         public DbSet<Models.Deposit.DepositBalance> depositBalance {get; set;}
         public DbSet<Models.Deposit.DepositTemplate> depositTemplate {get; set;}
+        public DbSet<Models.Rent.RentAdditionalPayment> rentAdditionalPayment {get; set;}
+        public DbSet<Models.Rent.RentOrderLog> rentOrderLog { get; set; }
     }
 }

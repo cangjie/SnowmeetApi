@@ -466,7 +466,7 @@ namespace SnowmeetApi.Controllers.User
                     i--;
                 }
             }
-            member.memberSocialAccounts = msaList;
+            member.memberSocialAccounts = msaList.ToList();
             return member;
         }
 

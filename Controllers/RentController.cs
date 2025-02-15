@@ -13,6 +13,8 @@ using SnowmeetApi.Models.Rent;
 using SnowmeetApi.Models.Users;
 using System.Collections;
 using SnowmeetApi.Controllers.User;
+using SnowmeetApi.Controllers.Order;
+using Mono.TextTemplating;
 namespace SnowmeetApi.Controllers
 {
     [Route("core/[controller]/[action]")]
@@ -31,7 +33,7 @@ namespace SnowmeetApi.Controllers
 
         private readonly IHttpContextAccessor _httpContextAccessor;
 
-        private readonly DateTime startDate = DateTime.Parse("2023-10-20");
+        private readonly DateTime startDate = DateTime.Parse("2020-10-20");
 
         private MemberController _memberHelper;
 
@@ -129,19 +131,22 @@ namespace SnowmeetApi.Controllers
 
             var idList = await _context.idList.FromSqlRaw(" select distinct rent_list_id as id from rent_list_detail  "
                 + "left join rent_list on rent_list.[id] = rent_list_id"
-                + " where real_end_date >= '" + startDate.ToShortDateString() + "' "
-                + " and real_end_date <= '" + endDate.AddDays(1).ToShortDateString() + "' and shop like '" + shop + "%' "
+                + " where finish_date >= '" + startDate.ToShortDateString() + "' "
+                + " and finish_date <= '" + endDate.AddDays(1).ToShortDateString() + "' and shop like '" + shop + "%'  "
+                + " and finish_date is not null and closed = 0 "
                 //+ " and rent_list.[id] = 2434"
                 )
                 .AsNoTracking().ToListAsync();
             List<Balance> bList = new List<Balance>();
             for (int i = 0; i < idList.Count; i++)
             {
-                RentOrder order = (RentOrder)((OkObjectResult)(await GetRentOrder(idList[i].id, sessionKey)).Result).Value;
+
+                RentOrder order = (RentOrder)((OkObjectResult)(await GetRentOrder(idList[i].id, sessionKey, false)).Result).Value;
                 if (order.isDepositPaid)
                 {
                     continue;
                 }
+
                 if (!order.status.Trim().Equals("已退款"))
                 {
                     continue;
@@ -149,7 +154,7 @@ namespace SnowmeetApi.Controllers
                 
                 double totalPayment = 0;
                 double totalRefund = 0;
-                for (int j = 0; j < order.order.payments.Length; j++)
+                for (int j = 0; j < order.order.paymentList.Count; j++)
                 {
                     OrderPayment payment = order.order.payments[j];
                     if (payment.status.Equals("支付成功") && !payment.pay_method.Equals("储值支付"))
@@ -157,7 +162,7 @@ namespace SnowmeetApi.Controllers
                         totalPayment += order.order.payments[j].amount;
                     }
                 }
-                for (int j = 0; j < order.order.refunds.Length; j++)
+                for (int j = 0; order.order.refunds != null && j < order.order.refunds.Count; j++)
                 {
                     if (!order.order.refunds[j].refund_id.Trim().Equals("") || order.order.refunds[j].state == 1)
                     {
@@ -166,7 +171,7 @@ namespace SnowmeetApi.Controllers
                 }
                 double totalReparation = 0;
                 double totalRental = 0;
-                for (int j = 0; j < order.details.Length; j++)
+                for (int j = 0; j < order.details.Count; j++)
                 {
                     totalReparation += order.details[j].reparation;
                     RentOrderDetail detail = order.details[j];
@@ -180,7 +185,7 @@ namespace SnowmeetApi.Controllers
                     shop = order.shop,
                     name = order.real_name.Trim(),
                     cell = order.cell_number.Trim(),
-                    settleDate = order.end_date,
+                    settleDate = order.finish_date,
                     deposit = totalPayment,
                     refund = totalRefund,
                     earn = totalPayment - totalRefund,
@@ -287,7 +292,7 @@ namespace SnowmeetApi.Controllers
             await _context.RentOrder.AddAsync(rentOrder);
             await _context.SaveChangesAsync();
 
-            for (int i = 0; i < rentOrder.details.Length; i++)
+            for (int i = 0; i < rentOrder.details.Count; i++)
             {
                 RentOrderDetail detail = rentOrder.details[i];
                 /*
@@ -359,7 +364,7 @@ namespace SnowmeetApi.Controllers
             List<RentOrder> orderList = new List<RentOrder>();
             for (int i = 0; i < orderListTemp.Count; i++)
             {
-                RentOrder order = (RentOrder)((OkObjectResult)(await GetRentOrder(orderListTemp[i].id, sessionKey)).Result).Value;
+                RentOrder order = (RentOrder)((OkObjectResult)(await GetRentOrder(orderListTemp[i].id, sessionKey, false)).Result).Value;
                 if (status.Equals("") || order.status.Trim().Equals(status))
                 {
                     orderList.Add(order);
@@ -397,7 +402,7 @@ namespace SnowmeetApi.Controllers
                 try
                 {
                    
-                    RentOrder order = (RentOrder)((OkObjectResult)(await GetRentOrder(orderArr[i].id, sessionKey)).Result).Value;
+                    RentOrder order = (RentOrder)((OkObjectResult)(await GetRentOrder(orderArr[i].id, sessionKey, false)).Result).Value;
                     orderArr[i] = order;
                 }
                 catch 
@@ -447,50 +452,81 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet("{id}")]
-        public async Task<ActionResult<RentOrder>> GetRentOrder(int id, string sessionKey)
+        public async Task<ActionResult<RentOrder>> GetRentOrder(int id, string sessionKey, bool needAuth = true)
         {
             sessionKey = Util.UrlDecode(sessionKey).Trim();
             UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
-
-            RentOrder rentOrder = await _context.RentOrder.FindAsync(id);
-            if (rentOrder == null)
+            List<RentOrder> rentOrderList =  await _context.RentOrder
+                .Include(r => r.recept)
+                .Include(r => r.details)
+                    .ThenInclude(d => d.log)
+                .Include(r => r.order)
+                    .ThenInclude(o => o.payments.Where(p => p.status.Trim().Equals("支付成功")).OrderByDescending(p => p.id))
+                        .ThenInclude(p => p.refunds.Where(r => r.state == 1).OrderByDescending(r => r.id))                   
+                .Include(r => r.additionalPayments)
+                    .ThenInclude(a => a.order)
+                        .ThenInclude(o => o.payments.Where(p => p.status.Equals("支付成功")).OrderByDescending(p => p.id))
+                            .ThenInclude(p => p.refunds.Where(r => r.state == 1).OrderByDescending(r => r.id))
+                
+                .Where(r => r.id == id).ToListAsync();
+            if (rentOrderList.Count == 0)
+            {
+                rentOrderList =  await _context.RentOrder
+                .Include(r => r.details)
+                    .ThenInclude(d => d.log)
+                .Where(r => r.id == id).ToListAsync();
+            }
+            if (rentOrderList.Count == 0)
             {
                 return NotFound();
             }
-            if (!user.isAdmin && !rentOrder.open_id.Trim().Equals(user.miniAppOpenId.Trim()))
+            RentOrder rentOrder = rentOrderList[0];            
+            if (needAuth)
             {
-                return BadRequest();
-            }
-            if (rentOrder.staff_open_id.Trim().Equals("") || rentOrder.staff_name.Trim().Equals(""))
-            {
-                try
+                if (rentOrder == null)
                 {
-                    await RestoreStaffInfo(rentOrder);
+                    return NotFound();
                 }
-                catch
+                if (!user.isAdmin && !rentOrder.open_id.Trim().Equals(user.miniAppOpenId.Trim()))
                 {
-                    
+                    return BadRequest();
                 }
-            }
-            rentOrder.details = await _context.RentOrderDetail
-                .Where(d => d.rent_list_id == rentOrder.id).AsNoTracking().ToArrayAsync();
-            if (rentOrder.order_id > 0)
-            {
-                
-                rentOrder.order = (OrderOnline)((OkObjectResult)(await _orderHelper.GetWholeOrderByStaff(rentOrder.order_id, sessionKey)).Result).Value;
-            }
+                if (rentOrder.staff_open_id.Trim().Equals("") || rentOrder.staff_name.Trim().Equals(""))
+                {
+                    try
+                    {
+                        await RestoreStaffInfo(rentOrder);
+                    }
+                    catch
+                    {
 
-            if (!user.isAdmin)
+                    }
+                }
+            }
+            if (rentOrder.order != null)
             {
-                rentOrder.open_id = "";
-                if (rentOrder.order != null)
+                List<MemberSocialAccount> msaList = await _context.memberSocialAccount
+                    .Where(m => (m.num.Trim().Equals(rentOrder.staff_open_id) && m.type.Trim().Equals("wechat_mini_openid")))
+                    .Include(m => m.member).ToListAsync();
+                if (msaList != null && msaList.Count > 0)
                 {
-                    rentOrder.order.open_id = "";
+                    rentOrder.order.msa = msaList[0];
+                }
+                for(int i = 0; i < rentOrder.refunds.Count; i++)
+                {
+                    OrderPaymentRefund r = rentOrder.refunds[i];
+                    msaList = await _context.memberSocialAccount
+                        .Where(m => (m.num.Trim().Equals(r.oper) && m.type.Trim().Equals("wechat_mini_openid")))
+                        .Include(m => m.member).ToListAsync();
+                    if (msaList != null && msaList.Count > 0)
+                    {
+                        r.msa = msaList[0];
+                    }
                 }
             }
             bool allReturned = true;
             DateTime returnTime = rentOrder.create_date;
-            for (int i = 0; i < rentOrder.details.Length; i++)
+            for (int i = 0; i < rentOrder.details.Count; i++)
             {
                 DateTime endDate = DateTime.Now;
                 RentOrderDetail detail = rentOrder.details[i];
@@ -520,10 +556,8 @@ namespace SnowmeetApi.Controllers
 
                 if (!detail.rent_staff.Trim().Equals(""))
                 {
-                    //Member member = await _memberHelper.GetMember(detail.rent_staff, "wechat_mini_openid");
-                    //UnicUser.GetUnicUserAsync()
                     detail.rentStaff = (await UnicUser.GetUnicUserByDetailInfo(detail.rent_staff, "wechat_mini_openid", _context)).miniAppUser;
-                    //rentOrder.staff_name = detail.rentStaff.real_name;
+                    
                 }
                 else
                 {
@@ -537,7 +571,6 @@ namespace SnowmeetApi.Controllers
 
                 if (!detail.return_staff.Trim().Equals(""))
                 {
-                    //detail.returnStaff = await _context.MiniAppUsers.FindAsync(detail.return_staff);
                     detail.returnStaff = (await UnicUser.GetUnicUserByDetailInfo(detail.return_staff, "wechat_mini_openid", _context)).miniAppUser;
                 }
                 else
@@ -556,37 +589,12 @@ namespace SnowmeetApi.Controllers
                         returnTime = detail.real_end_date > returnTime ? (DateTime)detail.real_end_date : returnTime;
                     }
                 }
-
-                
-                detail.log = await _context.rentOrderDetailLog.Where(r => r.detail_id == detail.id)
-                    .OrderByDescending(d => d.id).AsNoTracking().ToListAsync();
-
-                
                 switch (rentOrder.shop.Trim())
                 {
                     case "南山":
                         TimeSpan ts = endDate - rentOrder.start_date;
                         detail._suggestRental = detail.unit_rental * (ts.Days + 1);
                         detail._timeLength = (ts.Days + 1).ToString() + "天";
-
-
-                        /*
-                        if (ts.Hours < 4)
-                        {
-                            detail._suggestRental = detail.unit_rental;
-                            detail._timeLength = "1场";
-                        }
-                        else if (endDate.Hour > 8)
-                        {
-                            detail._suggestRental = detail.unit_rental * 1.5;
-                            detail._timeLength = "1.5场";
-                        }
-                        else
-                        {
-                            detail._suggestRental = detail.unit_rental;
-                            detail._timeLength = "1场";
-                        }
-                        */
                         break;
                     default:
 
@@ -605,21 +613,12 @@ namespace SnowmeetApi.Controllers
                             {
                                 TimeSpan ts1 = endDate.Date - ((DateTime)detail.start_date).Date;
                                 int days = ts1.Days;
-                                /*
-                                if (rentOrder.start_date.Hour < 16)
-                                {
-                                    days++;
-                                }
-                                */
                                 days++;
                                 detail._suggestRental = detail.unit_rental * days;
                                 detail._timeLength = days.ToString() + "天";
                             }
 
                         }
-                        //
-                        
-
                         break;
                 }
             }
@@ -637,20 +636,17 @@ namespace SnowmeetApi.Controllers
             }
             if (rentOrder.staff_name.Trim().Equals(""))
             {
-                var rl = await _context.Recept
-                    .Where(r => (r.recept_type.Trim().Equals("租赁下单") && r.submit_return_id == rentOrder.id))
-                    .AsNoTracking().ToListAsync();
-                if (rl != null && rl.Count > 0)
+                if (rentOrder.recept != null && rentOrder.recept.Count > 0)
                 {
                     
-                    rentOrder.staff_name = rl[0].update_staff_name.Trim().Equals("") ?
-                        rl[0].recept_staff_name : rl[0].update_staff_name.Trim();
+                    rentOrder.staff_name = rentOrder.recept[0].update_staff_name.Trim().Equals("") ?
+                        rentOrder.recept[0].recept_staff_name : rentOrder.recept[0].update_staff_name.Trim();
                     if (rentOrder.staff_name.Trim().Equals(""))
                     {
                         try
                         {
-                            string staffOpenId = rl[0].update_staff.Trim().Equals("") ?
-                                rl[0].recept_staff.Trim() : rl[0].update_staff.Trim();
+                            string staffOpenId = rentOrder.recept[0].update_staff.Trim().Equals("") ?
+                                rentOrder.recept[0].recept_staff.Trim() : rentOrder.recept[0].update_staff.Trim();
                             //MiniAppUser? staffUser = await _context.MiniAppUsers.FindAsync(staffOpenId.Trim());
                             Member staffUser =  await _memberHelper.GetMember(staffOpenId.Trim(), "wechat_mini_openid");
                             if (staffUser != null)
@@ -700,7 +696,7 @@ namespace SnowmeetApi.Controllers
                 
             }
 
-            if (rentOrder.status.Equals("已退款"))
+            if (rentOrder.status.Equals("已退款") || rentOrder.status.Equals("已完成"))
             {
                 rentOrder.textColor = "red";
             }
@@ -728,13 +724,20 @@ namespace SnowmeetApi.Controllers
                     }
                 }
             }
-
-            
-
-
+            for(int i = 0; rentOrder.additionalPayments != null 
+                && i < rentOrder.additionalPayments.Count; i++)
+            {
+                RentAdditionalPayment p = rentOrder.additionalPayments[i];
+                List<MemberSocialAccount> msaL = await _context.memberSocialAccount
+                    .Where(m => m.type.Trim().Equals("wechat_mini_openid") && m.num.Trim().Equals(p.staff_open_id.Trim()))
+                    .Include(m => m.member).AsNoTracking().ToListAsync();
+                if (msaL != null && msaL.Count > 0)
+                {
+                    p.staffMember = msaL[0].member;
+                }
+            }
             var ret = Ok(rentOrder);
             return ret;
-
         }
 
         [HttpGet("{id}")]
@@ -832,9 +835,9 @@ namespace SnowmeetApi.Controllers
 
             double rentalTotal = 0;
 
-            RentOrder rentOrder = (RentOrder)((OkObjectResult)(await GetRentOrder(detail.rent_list_id, sessionKey)).Result).Value;
+            RentOrder rentOrder = (RentOrder)((OkObjectResult)(await GetRentOrder((int)detail.rent_list_id, sessionKey, false)).Result).Value;
 
-            for (int i = 0; i < rentOrder.details.Length; i++)
+            for (int i = 0; i < rentOrder.details.Count; i++)
             {
                 RentOrderDetail item = rentOrder.details[i];
                 rentalTotal = rentalTotal + item.real_rental + item.overtime_charge + item.reparation;
@@ -890,12 +893,25 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<RentOrder>> Refund(int id, double amount,
             double rentalReduce, double rentalReduceTicket, string memo, string sessionKey)
         {
-            
-            RentOrder rentOrder = (RentOrder)((OkObjectResult)(await GetRentOrder(id, sessionKey)).Result).Value;
+            Order.OrderRefundController refundHelper = new Order.OrderRefundController(
+                    _context, _oriConfig, _httpContextAccessor);
+            RentOrder rentOrder = (RentOrder)((OkObjectResult)(await GetRentOrder(id, sessionKey, false)).Result).Value;
             if (rentOrder == null)
             {
                 return NotFound();
             }
+            List<OrderPayment> payments = rentOrder.payments.OrderByDescending(p => p.unRefundedAmount).ToList();
+            double unRefundAmount = 0;
+            for(int i = 0; i < payments.Count; i++)
+            {
+                unRefundAmount += payments[i].unRefundedAmount;
+            }
+            if (amount > unRefundAmount)
+            {
+                return BadRequest();
+            }
+
+
 
             memo = Util.UrlDecode(memo);
             sessionKey = Util.UrlDecode(sessionKey);
@@ -913,9 +929,73 @@ namespace SnowmeetApi.Controllers
             rentOrder.update_date = DateTime.Now;
             _context.Entry(rentOrder).State = EntityState.Modified;
             await _context.SaveChangesAsync();
+            
+            double needRefundAmount = amount;
+            for(int i = 0; needRefundAmount > 0 && i < payments.Count; i++)
+            {
+                OrderPayment payment = payments[i];
+                if (payment.unRefundedAmount >= needRefundAmount)
+                {
+                    if (payment.pay_method.Trim().Equals("微信支付"))
+                    {
+                        await refundHelper.TenpayRefund(payment.id, needRefundAmount,memo, sessionKey);
+                    }
+                    else
+                    {
+                        OrderPaymentRefund r = new OrderPaymentRefund()
+                        {
+                            id = 0,
+                            payment_id = payment.id,
+                            order_id = payment.order_id,
+                            memo = memo,
+                            amount = needRefundAmount,
+                            state = 1,
+                            create_date = DateTime.Now,
+                            oper = user.miniAppOpenId.Trim()
+                        };
+                        await _context.OrderPaymentRefund.AddAsync(r);
+                        await _context.SaveChangesAsync();
+                    }
+                    needRefundAmount = 0;
+                }
+                else
+                {
+                    needRefundAmount = needRefundAmount - payment.unRefundedAmount;
+                    if (payment.pay_method.Trim().Equals("微信支付"))
+                    {
+                        await refundHelper.TenpayRefund(payment.id, payment.unRefundedAmount,memo, sessionKey);
+                    }
+                    else
+                    {
+                        
+                        OrderPaymentRefund r = new OrderPaymentRefund()
+                        {
+                            id = 0,
+                            payment_id = payment.id,
+                            order_id = payment.order_id,
+                            memo = memo,
+                            amount = payment.unRefundedAmount,
+                            state = 1,
+                            create_date = DateTime.Now,
+                            oper = user.miniAppOpenId.Trim()
+                        };
+                        await _context.OrderPaymentRefund.AddAsync(r);
+                        await _context.SaveChangesAsync();
+                    }
+                    
+                }
+
+            }
+
+
+
+
+            //List<OrderPayment> payments = rentOrder
+            /*
+
 
             if (amount > 0 && rentOrder.order_id > 0 && rentOrder.order != null && rentOrder.payMethod.Trim().Equals("微信支付")
-                && rentOrder.order.payments != null && rentOrder.order.payments.Length > 0)
+                && rentOrder.order.payments != null && rentOrder.order.payments.Count > 0)
             {
                 OrderPayment payment = rentOrder.order.payments[0];
                 
@@ -927,7 +1007,7 @@ namespace SnowmeetApi.Controllers
                     await refundHelper.TenpayRefund(payment.id, amount,memo, sessionKey);
                 }
             }
-
+            */
             return Ok(rentOrder);
 
 
@@ -936,7 +1016,7 @@ namespace SnowmeetApi.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<RentOrder>> SetPaidManual(int id, string payMethod, string sessionKey)
         {
-            RentOrder rentOrder = (RentOrder)((OkObjectResult)(await GetRentOrder(id, sessionKey)).Result).Value;
+            RentOrder rentOrder = (RentOrder)((OkObjectResult)(await GetRentOrder(id, sessionKey, false)).Result).Value;
             sessionKey = Util.UrlDecode(sessionKey);
             payMethod = Util.UrlDecode(payMethod);
             UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
@@ -948,7 +1028,7 @@ namespace SnowmeetApi.Controllers
             {
                 return NotFound();
             }
-            if (rentOrder.order.payments == null || rentOrder.order.payments.Length == 0)
+            if (rentOrder.order.payments == null || rentOrder.order.paymentList.Count == 0)
             {
                 OrderPayment payment = new OrderPayment()
                 {
@@ -971,7 +1051,7 @@ namespace SnowmeetApi.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<RentOrder>>SetPaid(int id, string sessionKey)
         {
-            RentOrder rentOrder = (RentOrder)((OkObjectResult)(await GetRentOrder(id, sessionKey)).Result).Value;
+            RentOrder rentOrder = (RentOrder)((OkObjectResult)(await GetRentOrder(id, sessionKey, false)).Result).Value;
             sessionKey = Util.UrlDecode(sessionKey);
             UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (!user.isAdmin)
@@ -980,7 +1060,7 @@ namespace SnowmeetApi.Controllers
             }
 
             if (rentOrder == null || rentOrder.order == null
-                || rentOrder.order.payments == null || rentOrder.order.payments.Length <= 0)
+                || rentOrder.order.payments == null || rentOrder.order.paymentList.Count <= 0)
             {
                 return NotFound();
             }
@@ -1000,7 +1080,7 @@ namespace SnowmeetApi.Controllers
         {
             sessionKey = Util.UrlDecode(sessionKey);
             UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
-            RentOrder rentOrder = (RentOrder)((OkObjectResult)(await GetRentOrder(id, sessionKey)).Result).Value;
+            RentOrder rentOrder = (RentOrder)((OkObjectResult)(await GetRentOrder(id, sessionKey, false)).Result).Value;
             if (rentOrder == null)
             {
                 return NotFound();
@@ -1015,7 +1095,7 @@ namespace SnowmeetApi.Controllers
                 OrderOnline order = rentOrder.order;
                 order.open_id = user.miniAppOpenId.Trim();
                 _context.Entry(order).State = EntityState.Modified;
-                if (order.payments != null && order.payments.Length > 0)
+                if (order.payments != null && order.paymentList.Count > 0)
                 {
                     OrderPayment pay = order.payments[0];
                     if (pay.open_id.Trim().Equals(""))
@@ -1046,8 +1126,11 @@ namespace SnowmeetApi.Controllers
                 + " where create_date < '" + date.ToShortDateString() + "' and create_date > '" + startDate.ToShortDateString() + "' "
                 + " and exists ( select 'a' from rent_list_detail  where rent_list_detail.rent_list_id = rent_list.id and "
                 + " (real_end_date is null or real_end_date >= '" + date.ToShortDateString() + "' )) "
-                + (shop.Trim().Equals("")? " " : " and shop = '" + shop.Replace("'", "").Trim() + "'  " ) )
-                .AsNoTracking().ToListAsync();
+                + (shop.Trim().Equals("")? " " : " and shop = '" + shop.Replace("'", "").Trim() 
+                + "' and closed = 0  and (finish_date >  '" + date.ToShortDateString() + "' or finish_date is null) " 
+                //+ " and [id] = 6290 "
+                ) )
+                .ToListAsync();
 
             RentOrder[] orderArr = new RentOrder[rentOrderList.Count];
             double totalDeposit = 0;
@@ -1056,7 +1139,7 @@ namespace SnowmeetApi.Controllers
             
             for (int i = 0; i < orderArr.Length; i++)
             {
-                RentOrder order = (RentOrder)((OkObjectResult)(await GetRentOrder(rentOrderList[i].id, sessionKey)).Result).Value;
+                RentOrder order = (RentOrder)((OkObjectResult)(await GetRentOrder(rentOrderList[i].id, sessionKey, false)).Result).Value;
                 if (order.status.Equals("已付押金") || order.status.Equals("已退款"))
                 {
                     list.Add(order);
@@ -1064,11 +1147,23 @@ namespace SnowmeetApi.Controllers
                 }
                 else
                 {
+                    Console.WriteLine(order.id.ToString() + " " + order.status);
+                    /*
+                    rentOrderList[i].finished = 1;
+                    _context.RentOrder.Entry(rentOrderList[i]).State = EntityState.Modified;
+                    try
+                    {
+                        await _context.SaveChangesAsync();
+                    }
+                    catch(Exception err)
+                    {
+                        Console.WriteLine(err.ToString());
+                    }
+                    */
                     continue;
                 }
-
-                //orderArr[i] = (RentOrder)((OkObjectResult)(await GetRentOrder(rentOrderList[i].id, sessionKey)).Result).Value;
-                totalDeposit = order.deposit_final + totalDeposit;
+                
+                totalDeposit += order.GetChargedDeposit(date);
                 double subTotalRental = 0;
                 for (int j = 0; j < order.rentalDetails.Count; j++)
                 {
@@ -1081,6 +1176,7 @@ namespace SnowmeetApi.Controllers
                 }
                 totalRental = totalRental + subTotalRental;
             }
+            
             RentOrderCollection sum = new RentOrderCollection();
             sum.date = date.Date;
             sum.type = "当日前未完结";
@@ -1116,7 +1212,7 @@ namespace SnowmeetApi.Controllers
             //RentOrder[] orderArr = new RentOrder[rentOrderList.Count];
             for (int i = 0; i < rentOrderList.Count; i++)
             {
-                RentOrder order = (RentOrder)((OkObjectResult)(await GetRentOrder(rentOrderList[i].id, sessionKey)).Result).Value;
+                RentOrder order = (RentOrder)((OkObjectResult)(await GetRentOrder(rentOrderList[i].id, sessionKey, false)).Result).Value;
                 //orderArr[i] = (RentOrder)((OkObjectResult)(await GetRentOrder(rentOrderList[i].id, sessionKey)).Result).Value;
                 if (!order.status.Trim().Equals("已退款")
                     && !order.status.Trim().Equals("全部归还"))
@@ -1125,7 +1221,7 @@ namespace SnowmeetApi.Controllers
                     
                 }
                 orderArr.Add(order);
-                totalDeposit = order.deposit_final + totalDeposit;
+                totalDeposit = order.GetChargedDeposit(date.AddDays(1)) + totalDeposit;
                 double subTotalRental = 0;
                 for (int j = 0; j < order.rentalDetails.Count; j++)
                 {
@@ -1167,8 +1263,8 @@ namespace SnowmeetApi.Controllers
             RentOrder[] orderArr = new RentOrder[rentOrderList.Count];
             for (int i = 0; i < orderArr.Length; i++)
             {
-                orderArr[i] = (RentOrder)((OkObjectResult)(await GetRentOrder(rentOrderList[i].id, sessionKey)).Result).Value;
-                totalDeposit = orderArr[i].deposit_final + totalDeposit;
+                orderArr[i] = (RentOrder)((OkObjectResult)(await GetRentOrder(rentOrderList[i].id, sessionKey, false)).Result).Value;
+                totalDeposit = orderArr[i].GetChargedDeposit(date.AddDays(1)) + totalDeposit;
                 double subTotalRental = 0;
                 for (int j = 0; j < orderArr[i].rentalDetails.Count; j++)
                 {
@@ -1214,7 +1310,7 @@ namespace SnowmeetApi.Controllers
 
             for (int i = 0; i < rentOrderList.Count; i++)
             {
-                RentOrder order = (RentOrder)((OkObjectResult)(await GetRentOrder(rentOrderList[i].id, sessionKey)).Result).Value;
+                RentOrder order = (RentOrder)((OkObjectResult)(await GetRentOrder(rentOrderList[i].id, sessionKey, false)).Result).Value;
                 if (!order.status.Trim().Equals("已退款")
                     && !order.status.Trim().Equals("全部归还"))
                 {
@@ -1222,7 +1318,7 @@ namespace SnowmeetApi.Controllers
 
                 }
                 orderArr.Add(order);
-                totalDeposit = order.deposit_final + totalDeposit;
+                totalDeposit = order.totalCharge + totalDeposit;
                 double subTotalRental = 0;
                 for (int j = 0; j < order.rentalDetails.Count; j++)
                 {
@@ -1346,7 +1442,7 @@ namespace SnowmeetApi.Controllers
                 .Where(o => o.pay_state == 1).ToListAsync();
             for (int i = 0; i < rentOrderIdList.Count; i++)
             {
-                RentOrder order = (RentOrder)((OkObjectResult)(await GetRentOrder(rentOrderIdList[i].id, sessionKey)).Result).Value;
+                RentOrder order = (RentOrder)((OkObjectResult)(await GetRentOrder(rentOrderIdList[i].id, sessionKey, false)).Result).Value;
                 
                 for (int j = 0; j < order.rentalDetails.Count; j++)
                 {
@@ -1422,9 +1518,16 @@ namespace SnowmeetApi.Controllers
             {
                 return BadRequest();
             }
-            RentOrder order = (RentOrder)((OkObjectResult)(await GetRentOrder(detail.rent_list_id, sessionKey)).Result).Value;
+            RentOrder order = (RentOrder)((OkObjectResult)(await GetRentOrder((int)detail.rent_list_id, sessionKey, false)).Result).Value;
+            for(int i = 0; i < order.details.Count; i++)
+            {
+                _context.RentOrderDetail.Entry(order.details[i]).State = EntityState.Detached;
+            }
+            _context.RentOrder.Entry(order).State = EntityState.Detached;
+            await _context.SaveChangesAsync();
             detail.rental_count = order.rentalDetails.Count;
-            _context.Entry(detail).State = EntityState.Modified;
+            _context.RentOrderDetail.Entry(detail).State = EntityState.Modified;
+            _context.RentOrder.Entry(order).State = EntityState.Modified;
             await _context.SaveChangesAsync();
             return Ok(detail);
         }
@@ -1461,7 +1564,7 @@ namespace SnowmeetApi.Controllers
                 return BadRequest();
             }
 
-            var result = (await GetRentOrder(id, sessionKey)).Result;
+            var result = (await GetRentOrder(id, sessionKey, false)).Result;
             if (!result.GetType().Name.Trim().Equals("OkObjectResult"))
             {
                 return NotFound();
@@ -1532,13 +1635,13 @@ namespace SnowmeetApi.Controllers
                 if (rentOrder.order_id > 0)
                 {
                     rentOrder.order = await _context.OrderOnlines.FindAsync(rentOrder.order_id);
-                    rentOrder.order.payments = await _context.OrderPayment
-                        .Where(p => p.order_id == rentOrder.order_id).ToArrayAsync();
+                    rentOrder.order.paymentList = await _context.OrderPayment
+                        .Where(p => p.order_id == rentOrder.order_id).ToListAsync();
                     rentOrder.order.refunds = await _context.OrderPaymentRefund
-                        .Where(r => r.order_id == rentOrder.order_id).ToArrayAsync();
+                        .Where(r => r.order_id == rentOrder.order_id).ToListAsync();
                     
                 }
-                rentOrder.details = new RentOrderDetail[] { item };
+                rentOrder.details = (new RentOrderDetail[] { item }).ToList();
                 if (!rentOrder.status.Equals("已关闭")
                     && !rentOrder.status.Equals("未支付")
                     && !rentOrder.status.Equals("已退款")
@@ -1581,7 +1684,7 @@ namespace SnowmeetApi.Controllers
                 .AsNoTracking().ToListAsync();
             for (int i = 0; i < rentList.Count; i++)
             {
-                RentOrder rentOrder = (RentOrder)((OkObjectResult)(await GetRentOrder(rentList[i].id, sessionKey)).Result).Value;
+                RentOrder rentOrder = (RentOrder)((OkObjectResult)(await GetRentOrder(rentList[i].id, sessionKey, false)).Result).Value;
                 if (!rentOrder.pay_option.Trim().Equals("招待")
                     && (rentOrder.order_id == 0 || rentOrder.order == null || rentOrder.order.pay_state != 1))
                 {
@@ -1607,7 +1710,7 @@ namespace SnowmeetApi.Controllers
                 item.memo = rentOrder.memo;
                 item.entertain = rentOrder.pay_option.IndexOf("招待") >= 0 ? "是" : "否";
                 for (int j = 0; rentOrder.order_id > 0
-                    && rentOrder.order != null && j < rentOrder.order.payments.Length; j++)
+                    && rentOrder.order != null && j < rentOrder.order.paymentList.Count; j++)
                 {
                     if (rentOrder.order.payments[j].status.Trim().Equals("支付成功")
                         && rentOrder.order.payments[j].out_trade_no != null)
@@ -1618,7 +1721,7 @@ namespace SnowmeetApi.Controllers
                 }
                 //item.out_trade_no = rentOrder.order.payments
                 for (int j = 0; rentOrder.order_id != 0 && rentOrder.order != null
-                    &&  j < rentOrder.order.payments.Length; j++)
+                    &&  j < rentOrder.order.paymentList.Count; j++)
                 {
                     if (rentOrder.order.payments[j].status.Trim().Equals("支付成功"))
                     {
@@ -1634,7 +1737,7 @@ namespace SnowmeetApi.Controllers
                 List<RentOrderList.RentRefund> refundList = new List<RentOrderList.RentRefund>();
                 //item.refunds = new RentOrderList.RentRefund[rentOrder.order.refunds.Length];
                 for (int j = 0; rentOrder.order_id != 0 && rentOrder.order != null
-                    && j < rentOrder.order.refunds.Length; j++)
+                    && j < rentOrder.order.refunds.Count; j++)
                 {
                     RentOrderList.RentRefund r = new RentOrderList.RentRefund();
                     r.id = rentOrder.order.refunds[j].id;
@@ -1721,6 +1824,199 @@ namespace SnowmeetApi.Controllers
                     (list.items[i].rental != null) ? list.items[i].rental.Length : 0);
             }
             return Ok(list);
+        }
+
+        [HttpGet("{rentListId}")]
+        public async Task<ActionResult<RentAdditionalPayment>> CreateAdditionalPayment(int rentListId, double amount, string reason, 
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            sessionKey = Util.UrlDecode(sessionKey).Trim();
+            UnicUser user = await Util.GetUser(sessionKey, _context);
+            if (!user.isAdmin)
+            {
+                return NoContent();
+            }
+            if (!user.isStaff)
+            {
+                return BadRequest();
+            }
+            RentAdditionalPayment addPay = new RentAdditionalPayment()
+            {
+                rent_list_id = rentListId,
+                amount = amount,
+                reason = Util.UrlDecode(reason),
+                staff_open_id = user.member.wechatMiniOpenId.Trim(),
+                pay_method = "微信支付",
+                create_date = DateTime.Now
+            };
+            await _context.rentAdditionalPayment.AddAsync(addPay);
+            await _context.SaveChangesAsync();
+            return Ok(addPay);
+        }
+        [HttpGet("{rentAddPayId}")]
+        public async Task<ActionResult<OrderOnline>> PlaceAdditionalOrder(int rentAddPayId, 
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            List<RentAdditionalPayment> rentAddPayList = await _context.rentAdditionalPayment
+                .Where(r => r.id == rentAddPayId).Include(r => r.rentOrder).AsNoTracking().ToListAsync();
+            if (rentAddPayList == null || rentAddPayList.Count == 0)
+            {
+                return BadRequest();
+            }
+            RentAdditionalPayment payment = rentAddPayList[0];
+            sessionKey = Util.UrlDecode(sessionKey).Trim();
+            string payMethod = payment.pay_method;
+            UnicUser user = await Util.GetUser(sessionKey, _context);
+            if (user == null)
+            {
+                return NoContent();
+            }
+            RentOrder rentOrder = payment.rentOrder;
+            if (rentOrder == null)
+            {
+                return NotFound();
+            }
+            /*
+            RentAdditionalPayment addPay = await _context.rentAdditionalPayment.FindAsync(rentListId);
+            if (addPay == null || addPay.order_id != null)
+            {
+                return NotFound();
+            }
+            RentOrder rentOrder = await _context.RentOrder.FindAsync(addPay.rent_list_id);
+            if (rentOrder == null)
+            {
+                return NotFound();
+            }
+            */
+            OrderOnline order = new OrderOnline()
+            {
+                id = 0,
+                type = "押金",
+                shop = rentOrder.shop.Trim(),
+                open_id = user.wlMiniOpenId.Trim(),
+                name = rentOrder.real_name.Trim(),
+                cell_number = rentOrder.cell_number.Trim(),
+                pay_method = payMethod.Trim(),
+                pay_memo = "追加押金",
+                pay_state = 0,
+                order_price = payment.amount,
+                order_real_pay_price = payment.amount,
+                ticket_amount = 0,
+                other_discount = 0,
+                final_price = payment.amount,
+                ticket_code = rentOrder.ticket_code.Trim(),
+                staff_open_id = payment.staff_open_id,
+                score_rate = 0,
+                generate_score = 0
+
+            };
+            await _context.OrderOnlines.AddAsync(order);
+            await _context.SaveChangesAsync();
+            payment.order_id = order.id;
+            payment.order = order;
+            payment.update_date = DateTime.Now;
+            _context.rentAdditionalPayment.Entry(payment).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
+            if (order.id == 0)
+            {
+                return BadRequest();
+            }
+            OrderPaymentController _orderHelper = new OrderPaymentController(_context, _oriConfig, _httpContextAccessor);
+            OrderPayment paymentReal = (OrderPayment)((OkObjectResult)(await _orderHelper.CreatePayment(order.id, payMethod, order.final_price)).Result).Value;
+            paymentReal.staff_open_id = order.staff_open_id;
+            order.paymentList = (new OrderPayment[] {paymentReal}).ToList();
+            return Ok(order);
+        }
+        [HttpGet("addPayId")]
+        public async Task<ActionResult<RentAdditionalPayment>> GetAddPayment(int addPayId, string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            sessionKey = Util.UrlDecode(sessionKey).Trim();
+            UnicUser user = await Util.GetUser(sessionKey, _context);
+            if (!user.isAdmin)
+            {
+                return BadRequest();
+            }
+            List<RentAdditionalPayment> addPayList = await _context.rentAdditionalPayment.Where(r => r.id == addPayId)
+            /*
+                .Include(a => a.rentOrder)
+                    .ThenInclude(r => r.details)
+                .Include(a => a.order)
+                    .ThenInclude(o => o.payments)
+            */
+                .AsNoTracking().ToListAsync();
+            if (addPayList == null || addPayList.Count == 0)
+            {
+                return NotFound();
+            }
+            return Ok(addPayList[0]);
+        }
+        [NonAction]
+        public async Task AdditionalOrderPaid(int orderId)
+        {
+            List<RentAdditionalPayment> addPayList = await _context.rentAdditionalPayment
+                .Where(r => r.order_id == orderId).ToListAsync();
+            for(int i = 0; i < addPayList.Count; i++)
+            {
+                RentAdditionalPayment addPay = addPayList[i];
+                addPay.is_paid = 1;
+                _context.rentAdditionalPayment.Entry(addPay).State = EntityState.Modified;
+            }
+            await _context.SaveChangesAsync();
+        }
+        [HttpGet("{orderId}")]
+        public async Task<ActionResult<RentOrder>> SetFinish(int orderId, DateTime? finishDate,
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            sessionKey = Util.UrlDecode(sessionKey).Trim();
+            UnicUser user = await Util.GetUser(sessionKey, _context);
+            if (!user.isAdmin)
+            {
+                return BadRequest();
+            }
+            if (finishDate == null)
+            {
+                if (user.member.is_manager == 0 || user.member.is_admin == 0)
+                {
+                    return BadRequest();
+                }
+            }
+            RentOrder rentOrder = (RentOrder)((OkObjectResult)(await GetRentOrder(orderId, sessionKey)).Result).Value;
+            if (rentOrder == null)
+            {
+                return NotFound();
+            }
+            
+            if (rentOrder.finish_date == null && !rentOrder.status.Trim().Equals("已退款") && !rentOrder.status.Trim().Equals("全部归还"))
+            {
+                return NoContent();
+            }
+            RentOrderLog log = new RentOrderLog()
+            {
+                id = 0,
+                rent_list_id = rentOrder.id,
+                memo = finishDate == null ? "订单重开" : "订单完成",
+                field_name = "finish_date",
+                prev_value = rentOrder.finish_date==null? null: rentOrder.finish_date.ToString(),
+                oper_member_id = user.member.id
+            };
+            await _context.rentOrderLog.AddAsync(log);
+            rentOrder.finish_date = finishDate;
+            _context.RentOrder.Entry(rentOrder).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
+            return Ok(rentOrder);
+        }
+        [HttpGet("{orderId}")]
+        public async Task<ActionResult<List<RentOrderLog>>> GetRentOrderLogs(int orderId,
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            sessionKey = Util.UrlDecode(sessionKey).Trim();
+            UnicUser user = await Util.GetUser(sessionKey, _context);
+            if (!user.isAdmin)
+            {
+                return BadRequest();
+            }
+            return await _context.rentOrderLog.Where(l => l.rent_list_id == orderId)
+                .Include(l => l.member).OrderByDescending(l => l.id).ToListAsync();
         }
 
        

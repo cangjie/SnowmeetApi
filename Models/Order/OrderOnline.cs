@@ -49,6 +49,8 @@ namespace SnowmeetApi.Models
         public double other_discount { get; set; } = 0;
         public double final_price { get; set; } = 0;
         public string? staff_open_id { get; set; }
+
+       
         public int have_score { get; set; } = 0;
         public DateTime create_date { get; set; } = DateTime.Now;
         public DateTime? crt { get; set; } = DateTime.Now;
@@ -84,8 +86,9 @@ namespace SnowmeetApi.Models
         [ForeignKey(nameof(OrderPayment.order_id))]
         public List<Models.Order.OrderPayment> paymentList {get; set;}
 
+
         [NotMapped]
-        public OrderPaymentRefund[]? refunds { get; set; }
+        public List<OrderPaymentRefund> refunds { get; set; }
         [NotMapped]
         public MiniAppUser? user { get; set; }
         [NotMapped]
@@ -137,7 +140,7 @@ namespace SnowmeetApi.Models
                 double amount = 0;
                 if (payments != null)
                 {
-                    for (int i = 0; i < payments.Length; i++)
+                    for (int i = 0; i < paymentList.Count; i++)
                     {
                         if (payments[i].status.Trim().Equals("支付成功"))
                         {
@@ -187,6 +190,7 @@ namespace SnowmeetApi.Models
         public OrderOnlineDetail[]? details { get; set; }
         [NotMapped]
         public Member? member {get; set;}
+        public MemberSocialAccount? msa {get; set;}
         /*
         [NotMapped]
         public Ticket.Ticket[] tickets

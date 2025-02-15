@@ -38,6 +38,7 @@ namespace SnowmeetApi.Models
 
         [NotMapped]
         public string update_staff_name { get; set; } = "";
+        //[ForeignKey(nameof(RentOrder))]
         public int submit_return_id { get; set; } = 0;
         public string code { get; set; } = "";
         public DateTime create_date { get; set; }

@@ -50,6 +50,14 @@ namespace SnowmeetApi.Models.Users
         //public bool isAdmin = false;
         //public bool isSchoolStaff = false;
 
+        public bool isStaff
+        {
+            get
+            {
+                return isAdmin;
+            }
+        }
+
         public bool isAdmin
         {
             get

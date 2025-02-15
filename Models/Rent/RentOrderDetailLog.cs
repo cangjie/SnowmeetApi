@@ -1,6 +1,7 @@
 ﻿using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using SnowmeetApi.Models.Users;
 namespace SnowmeetApi.Models.Rent
 {
 	[Table("rent_list_detail_log")]

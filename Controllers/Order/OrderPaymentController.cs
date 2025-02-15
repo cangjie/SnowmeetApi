@@ -75,6 +75,7 @@ namespace SnowmeetApi.Controllers.Order
             _config = config.GetSection("Settings");
             _appId = _config.GetSection("AppId").Value.Trim();
             _httpContextAccessor = httpContextAccessor;
+
             _domain = _httpContextAccessor.HttpContext.Request.Host.ToString();
             _rentHelper = new RentController(context, config, httpContextAccessor);
             _memberHelper = new MemberController(context, config);
@@ -117,7 +118,7 @@ namespace SnowmeetApi.Controllers.Order
                 return NotFound();
             }
             OrderPayment[] paymentsArr = await _context.OrderPayment.Where(p => p.order_id == order.id).ToArrayAsync();
-            order.payments = paymentsArr;
+            order.payments = paymentsArr.ToList();
             if (order.final_price <= order.paidAmount)
             {
                 order.pay_state = 1;
@@ -547,6 +548,10 @@ namespace SnowmeetApi.Controllers.Order
             string outTradeNo = shopCode + "_" + bizCode + "_" + dateStr + "_" + order.id.ToString().PadLeft(6, '0')  + "_ZF_" + (payments.Count + 1).ToString().PadLeft(2,'0');
             var paymentDepList = await _context.OrderPayment.Where(p=>p.out_trade_no.Trim().Equals(outTradeNo))
                 .AsNoTracking().ToListAsync();
+            if (!_domain.Trim().Equals("mini.snowmeet.top"))
+            {
+                outTradeNo = "TEST_" + outTradeNo.Trim();
+            }
             if (paymentDepList == null || paymentDepList.Count == 0)
             {
                 return outTradeNo;
