@@ -83,7 +83,7 @@ namespace SnowmeetApi.Controllers
             {
                 return NotFound();
             }
-            OrderPayment payment = await CreateDepositPayment(rentOrder.order_id, amount, sessionKey, sessionType);
+            OrderPayment payment = await CreateDepositPayment((int)rentOrder.order_id, amount, sessionKey, sessionType);
             if (payment == null)
             {
                 return BadRequest();

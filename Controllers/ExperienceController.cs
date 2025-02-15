@@ -48,7 +48,7 @@ namespace SnowmeetApi.Controllers
                 if (exp.guarantee_order_id > 0)
                 {
                     OrderOnline order = (await orderHelper.GetOrderOnline(exp.guarantee_order_id, sessionKey)).Value;
-                    if (order != null && order.payments.Count > 0 && order.payments[0].status.Trim().Equals("支付成功"))
+                    if (order != null && order.paymentList.Count > 0 && order.payments[0].status.Trim().Equals("支付成功"))
                     {
                         paid = true;
                         exp.order = order;
@@ -311,7 +311,7 @@ namespace SnowmeetApi.Controllers
             if ((exp.order.refunds == null || exp.order.refunds.Count == 0) && exp.order.payments != null && exp.order.paidAmount >= amount )
             {
                 Order.OrderRefundController refundHelper = new Order.OrderRefundController(_context, _originConfig, _httpContextAccessor);
-                for (int i = 0; i < exp.order.payments.Count; i++)
+                for (int i = 0; i < exp.order.paymentList.Count; i++)
                 {
                     OrderPayment payment = exp.order.payments[i];
                     if (payment.amount >= amount)
