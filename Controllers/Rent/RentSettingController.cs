@@ -802,7 +802,10 @@ namespace SnowmeetApi.Controllers.Rent
         [HttpGet]
         public async Task UpdateFinishDateByRefund()
         {
-            List<RentOrder> rentList = await _db.RentOrder.Include(r => r.refunds)
+            List<RentOrder> rentList = await _db.RentOrder
+                .Include(r => r.order)
+                    .ThenInclude(o => o.paymentList.Where(p => p.status.Trim().Equals("支付成功")))
+                        .ThenInclude(p => p.refunds.Where(r => (!r.refund_id.Trim().Equals("") || r.state == 1)))
                 .Where(r => r.finish_date == null && r.closed == 0 && r.order_id != 0)
                 .ToListAsync();
             for(int i = 0; i < rentList.Count; i++)
@@ -825,7 +828,9 @@ namespace SnowmeetApi.Controllers.Rent
         {
             List<RentOrder> rentList = await _db.RentOrder
                 .Include(r => r.details)
-                .Include(r => r.refunds)
+                .Include(r => r.order)
+                    .ThenInclude(o => o.paymentList.Where(p => p.status.Trim().Equals("支付成功")))
+                        .ThenInclude(p => p.refunds.Where(r => (!r.refund_id.Trim().Equals("") || r.state == 1)))
                 .Where(r => r.finish_date == null && r.closed == 0 
                 ).OrderByDescending(r => r.id).ToListAsync();
             for(int i = 0; i < rentList.Count; i++)
@@ -878,52 +883,5 @@ namespace SnowmeetApi.Controllers.Rent
             }
             await _db.SaveChangesAsync();
         }
-
-        /*
-        [HttpGet]
-        public async Task UpdateClose()
-        {
-            List<RentOrder> rentList = await _db.RentOrder.Include(r => r.details)
-                .Include(r => r.order)
-                .Where(r => r.finish_date == null && r.closed == 0 )
-                .ToListAsync();
-            for(int i = 0; i < rentList.Count; i++)
-            {
-                RentOrder order = rentList[i];
-                if (order.order != null && order.order.pay_state == 0 && order.order.create_date < DateTime.Now.AddHours(-4))
-                {
-                    order.closed = 1;
-                    _db.RentOrder.Entry(order).State = EntityState.Modified;
-                }
-                if (order.order == null)
-                {
-                    var l = (from detail in order.details where !detail.status.Trim().Equals("未发放") select detail.id ).ToList();
-                    if (l.Count == 0 && order.create_date < DateTime.Now.AddHours(-4))
-                    {
-                        order.closed = 1;
-                        _db.RentOrder.Entry(order).State = EntityState.Modified;
-                    }
-                    
-                }
-            }
-            await _db.SaveChangesAsync();
-        }
-
-        [HttpGet]
-        public async Task TestRentOrder()
-        {
-            var l = await _db.RentOrder.Where(r => r.closed == 0 && r.order_id != 0)
-                .Include(r => r.refunds).OrderByDescending(r => r.id).ToListAsync();
-            for(int i = 0; i < l.Count; i++)
-            {
-                if (l[i].refunds.Count != 0)
-                {
-                    Console.WriteLine(l[i].id);
-                }
-            }
-            return;
-        }
-        */
-
     }
 }
