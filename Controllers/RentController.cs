@@ -147,14 +147,18 @@ namespace SnowmeetApi.Controllers
                     continue;
                 }
 
-                if (!order.status.Trim().Equals("已退款"))
+                if (!order.status.Trim().Equals("已完成"))
+                {
+                    continue;
+                }
+                if (order.order == null)
                 {
                     continue;
                 }
                 
                 double totalPayment = 0;
                 double totalRefund = 0;
-                for (int j = 0; j < order.order.paymentList.Count; j++)
+                for (int j = 0; order.order != null && j < order.order.paymentList.Count; j++)
                 {
                     OrderPayment payment = order.order.payments[j];
                     if (payment.status.Equals("支付成功") && !payment.pay_method.Equals("储值支付"))
@@ -162,7 +166,7 @@ namespace SnowmeetApi.Controllers
                         totalPayment += order.order.payments[j].amount;
                     }
                 }
-                for (int j = 0; order.order.refunds != null && j < order.order.refunds.Count; j++)
+                for (int j = 0; order.order != null && order.order.refunds != null && j < order.order.refunds.Count; j++)
                 {
                     if (!order.order.refunds[j].refund_id.Trim().Equals("") || order.order.refunds[j].state == 1)
                     {
@@ -179,6 +183,7 @@ namespace SnowmeetApi.Controllers
                         - Math.Round(detail.rental_discount , 2) + Math.Round(detail.overtime_charge, 2) ;
                     totalRental += subRental;
                 }
+
                 Balance b = new Balance()
                 {
                     id = order.id,
