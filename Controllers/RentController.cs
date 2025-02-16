@@ -166,11 +166,11 @@ namespace SnowmeetApi.Controllers
                         totalPayment += order.order.payments[j].amount;
                     }
                 }
-                for (int j = 0; order.order != null && order.order.refunds != null && j < order.order.refunds.Count; j++)
+                for (int j = 0;  order.refunds != null && j < order.refunds.Count; j++)
                 {
-                    if (!order.order.refunds[j].refund_id.Trim().Equals("") || order.order.refunds[j].state == 1)
+                    if (!order.refunds[j].refund_id.Trim().Equals("") || order.refunds[j].state == 1)
                     {
-                        totalRefund += order.order.refunds[j].amount;
+                        totalRefund += order.refunds[j].amount;
                     }
                 }
                 double totalReparation = 0;
