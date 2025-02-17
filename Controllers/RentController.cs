@@ -485,6 +485,8 @@ namespace SnowmeetApi.Controllers
                 .Include(r => r.order)
                     .ThenInclude(o => o.paymentList.Where(p => p.status.Equals("支付成功")))
                         .ThenInclude(p => p.refunds.Where(r => r.state == 1))
+                .Include(o => o.details.Where(d => d.valid == 1))
+                    .ThenInclude(d => d.log)
                 .Where(o => (o.create_date >= start && o.create_date < end.Date.AddDays(1)  && (shop.Trim().Equals("") || o.shop.Trim().Equals(shop))))
                 .OrderByDescending(o => o.id).ToArrayAsync();
             
@@ -839,7 +841,8 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet("{id}")]
-        public async Task<ActionResult<RentOrderDetailLog>> SetDetailLog(int id, string status, string sessionKey)
+        public async Task<ActionResult<RentOrderDetailLog>> SetDetailLog(int id, string status, 
+            string sessionKey, string sessionType = "wechat_mini_openid")
         {
             UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (!user.isAdmin)
@@ -847,38 +850,18 @@ namespace SnowmeetApi.Controllers
                 return BadRequest();
             }
             status = Util.UrlDecode(status);
-            if (status.Trim().Equals("已发放"))
-            {
-                RentOrderDetail? detail = await _context.RentOrderDetail.FindAsync(id);
-                if (detail != null)
-                {
-                    if (detail.start_date == null)
-                    {
-                        detail.start_date = DateTime.Now;
-                    }
-                    else
-                    {
-                        DateTime startDate = (DateTime)detail.start_date;
-                        if (startDate.Hour == 0 && startDate.Minute == 0 && startDate.Second == 0 && startDate.Millisecond == 0)
-                        {
-                            startDate = startDate.AddHours(DateTime.Now.Hour).AddMinutes(DateTime.Now.Minute);
-                        }
-                        detail.start_date = startDate;
-                        _context.RentOrderDetail.Entry(detail);
-                        await _context.SaveChangesAsync();
-
-                    }
-                }
-            }
+            RentOrderDetail detail = await _context.RentOrderDetail.FindAsync(id);
             RentOrderDetailLog log = new RentOrderDetailLog()
             {
                 id = 0,
                 detail_id = id,
                 status = status,
                 staff_open_id = user.miniAppOpenId,
+                prev_value = detail.rent_status.Trim(),
                 create_date = DateTime.Now
             };
-            
+            detail.rent_status = status.Trim();
+            _context.RentOrderDetail.Entry(detail).State = EntityState.Modified;
             await _context.rentOrderDetailLog.AddAsync(log);
             await _context.SaveChangesAsync();
             return Ok(log);
@@ -953,7 +936,35 @@ namespace SnowmeetApi.Controllers
             }
             return Ok(detail);
         }
-
+        [HttpGet("{id}")]
+        public async Task<ActionResult<RentOrderDetail>> SetPick(int id, 
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            sessionKey = Util.UrlDecode(sessionKey).Trim();
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
+            if (!user.isAdmin)
+            {
+                return BadRequest();
+            }
+            RentOrderDetail detail = await _context.RentOrderDetail.FindAsync(id);
+            
+            RentOrderDetailLog log = new RentOrderDetailLog()
+            {
+                id = 0,
+                detail_id = detail.id,
+                status = RentOrderDetail.RentStatus.已发放.ToString(),
+                prev_value = detail.rent_status.Trim(),
+                staff_open_id = user.miniAppOpenId.Trim(),
+                create_date = DateTime.Now
+            };
+            await _context.rentOrderDetailLog.AddAsync(log);
+            detail.rent_status = RentOrderDetail.RentStatus.已发放.ToString();
+            detail.update_date = DateTime.Now;
+            _context.RentOrderDetail.Entry(detail).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
+            return Ok(detail);
+        }
+        /*
         [HttpGet("{id}")]
         public async Task<ActionResult<RentOrderDetail>> SetRentStart(int id, string sessionKey)
         {
@@ -986,7 +997,7 @@ namespace SnowmeetApi.Controllers
 
             return Ok(detail);
         }
-
+        */
         [HttpGet("{id}")]
         public async Task<ActionResult<RentOrder>> Refund(int id, double amount,
             double rentalReduce, double rentalReduceTicket, string memo, string sessionKey)

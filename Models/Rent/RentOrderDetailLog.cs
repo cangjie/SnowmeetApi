@@ -13,6 +13,7 @@ namespace SnowmeetApi.Models.Rent
 		public int detail_id { get; set; }
 		public string status { get; set; }
 		public string staff_open_id { get; set; }
+		public string? prev_value {get; set; }
 		public DateTime create_date { get; set; } = DateTime.Now;
 	}
 }
