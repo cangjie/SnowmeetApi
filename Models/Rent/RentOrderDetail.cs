@@ -8,6 +8,7 @@ namespace SnowmeetApi.Models.Rent
 	[Table("rent_list_detail")]
 	public class RentOrderDetail
 	{
+        public enum RentStatus { 未领取, 已发放, 已暂存, 已归还 }
         public int id { get; set; } = 0;
 
         public int? rent_list_id { get; set; } = 0;
@@ -49,7 +50,9 @@ namespace SnowmeetApi.Models.Rent
         public string rent_staff { get; set; } = "";
 
         public string return_staff { get; set; } = "";
-
+        public string? rent_status {get; set;}
+        public int valid {get; set;} = 1;
+        public DateTime? update_date {get; set;} = null;
         [ForeignKey("detail_id")]
         public List<RentOrderDetailLog> log { get; set; } = new List<RentOrderDetailLog>();
 
@@ -67,10 +70,10 @@ namespace SnowmeetApi.Models.Rent
         {
             get
             {
+                if (rent_status != null){
+                    return rent_status;
+                }
                 var status = "";
-
-
-
                 if (real_end_date != null)
                 {
                     status = "已归还";
@@ -115,9 +118,7 @@ namespace SnowmeetApi.Models.Rent
                                     status = "已发放";
                                 }
                             }
-                            
                             break;
-                        
                     }
                 }
                 if (log != null && log.Count > 0)

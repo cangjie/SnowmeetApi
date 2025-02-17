@@ -65,9 +65,91 @@ namespace SnowmeetApi.Controllers
             _memberHelper = new MemberController(context, config);
             _orderHelper = new OrderOnlinesController(_context, _oriConfig);
         }
-
         [NonAction]
         public async Task StartRent(int rentId)
+        {
+            RentOrder order = await _context.RentOrder.FindAsync(rentId);
+            
+            List<RentOrderDetail> rentItemList = await _context.RentOrderDetail
+                .Where(i => i.rent_list_id == rentId && i.valid == 1).ToListAsync();
+            for (int i = 0; rentItemList != null && i < rentItemList.Count; i++)
+            {
+                RentOrderDetail detail = rentItemList[i];
+                RentOrderDetailLog log;
+                switch(detail.deposit_type.Trim())
+                {
+                    case "立即租赁":
+                        detail.start_date = DateTime.Now;
+                        detail.rent_status = RentOrderDetail.RentStatus.已发放.ToString();
+                        detail.update_date = DateTime.Now;
+                        _context.RentOrderDetail.Entry(detail).State = EntityState.Modified;
+                        log = new RentOrderDetailLog()
+                        {
+                            id = 0,
+                            detail_id = detail.id,
+                            status = RentOrderDetailLog.Status.已发放.ToString(),
+                            staff_open_id = order.staff_open_id,
+                            create_date = DateTime.Now
+                        };
+                        await _context.rentOrderDetailLog.AddAsync(log);
+                        log = new RentOrderDetailLog()
+                        {
+                            id = 0,
+                            detail_id = detail.id,
+                            status = RentOrderDetailLog.Status.开始计费.ToString(),
+                            staff_open_id = order.staff_open_id,
+                            create_date = DateTime.Now
+                        };
+                        await _context.rentOrderDetailLog.AddAsync(log);
+                        break;
+                    case "延时租赁":
+                        detail.update_date = DateTime.Now;
+                        detail.rent_status = RentOrderDetail.RentStatus.已发放.ToString();
+                        _context.RentOrderDetail.Entry(detail).State = EntityState.Modified;
+                        log = new RentOrderDetailLog()
+                        {
+                            id = 0,
+                            detail_id = detail.id,
+                            status = RentOrderDetailLog.Status.已发放.ToString(),
+                            staff_open_id = order.staff_open_id,
+                            create_date = DateTime.Now
+                        };
+                        await _context.rentOrderDetailLog.AddAsync(log);
+                        break;
+                    case "预约租赁":
+                        detail.rent_status = RentOrderDetail.RentStatus.未领取.ToString();
+                        detail.update_date = DateTime.Now;
+                        _context.RentOrderDetail.Entry(detail).State = EntityState.Modified;
+                        break;
+                    case "先租后取":
+                        detail.start_date = DateTime.Now;
+                        detail.update_date = DateTime.Now;
+                        detail.rent_status = RentOrderDetail.RentStatus.未领取.ToString();
+                        _context.RentOrderDetail.Entry(detail).State = EntityState.Modified;
+                        log = new RentOrderDetailLog()
+                        {
+                            id = 0,
+                            detail_id = detail.id,
+                            status = RentOrderDetailLog.Status.开始计费.ToString(),
+                            staff_open_id = order.staff_open_id,
+                            create_date = DateTime.Now
+                        };
+                        await _context.rentOrderDetailLog.AddAsync(log);
+                        break;
+                    case "预付押金" :
+                        detail.update_date = DateTime.Now;
+                        detail.rent_status = RentOrderDetail.RentStatus.未领取.ToString();
+                        _context.RentOrderDetail.Entry(detail).State = EntityState.Modified;
+                        break;
+                    default:
+                        break;
+                }
+            }
+            await _context.SaveChangesAsync();
+        }
+
+        [NonAction]
+        public async Task StartRent_bak(int rentId)
         {
             var rentItemList = await _context.RentOrderDetail.Where(i => i.rent_list_id == rentId).ToListAsync();
             for (int i = 0; rentItemList != null && i < rentItemList.Count; i++)
