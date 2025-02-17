@@ -1627,16 +1627,42 @@ namespace SnowmeetApi.Controllers
             {
                 return BadRequest();
             }
+
+            RentOrderDetailLog log = new RentOrderDetailLog()
+            {
+                id = 0,
+                detail_id = detail.id,
+                status = "修改",
+                staff_open_id = user.miniAppOpenId.Trim(),
+                create_date = DateTime.Now
+            };
+
             RentOrder order = (RentOrder)((OkObjectResult)(await GetRentOrder((int)detail.rent_list_id, sessionKey, false)).Result).Value;
             for(int i = 0; i < order.details.Count; i++)
             {
+                if (order.details[i].id == detail.id)
+                {
+                    if (order.details[i].start_date != null && order.details[i].start_date != detail.start_date)
+                    {
+                        log.status = "修改起租时间";
+                        log.prev_value = order.details[i].start_date.ToString();
+                    }
+                    if (order.details[i].real_end_date != null && order.details[i].real_end_date != detail.real_end_date)
+                    {
+                        log.status = "修改退租时间";
+                        log.prev_value = order.details[i].start_date.ToString();
+                    }
+                }
                 _context.RentOrderDetail.Entry(order.details[i]).State = EntityState.Detached;
             }
             _context.RentOrder.Entry(order).State = EntityState.Detached;
             await _context.SaveChangesAsync();
             detail.rental_count = order.rentalDetails.Count;
+            detail.update_date = DateTime.Now;
             _context.RentOrderDetail.Entry(detail).State = EntityState.Modified;
             _context.RentOrder.Entry(order).State = EntityState.Modified;
+            
+            await _context.rentOrderDetailLog.AddAsync(log);
             await _context.SaveChangesAsync();
             return Ok(detail);
         }
