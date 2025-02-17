@@ -140,7 +140,7 @@ namespace SnowmeetApi.Models
                 double amount = 0;
                 if (payments != null)
                 {
-                    for (int i = 0; i < paymentList.Count; i++)
+                    for (int i = 0; paymentList != null && i < paymentList.Count; i++)
                     {
                         if (payments[i].status.Trim().Equals("支付成功"))
                         {
