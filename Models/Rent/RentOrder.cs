@@ -434,9 +434,9 @@ namespace SnowmeetApi.Models.Rent
             get
             {
                 List<OrderPayment> pL = new List<OrderPayment>();
-                for(int i = 0; order != null && order.payments != null && i < order.paymentList.Count; i++)
+                for(int i = 0; order != null && order.paymentList != null && i < order.paymentList.Count; i++)
                 {
-                    OrderPayment p = order.payments[i];
+                    OrderPayment p = order.paymentList[i];
                     if (p.status.Trim().Equals("支付成功"))
                     {
                         pL.Add(p);
@@ -446,9 +446,9 @@ namespace SnowmeetApi.Models.Rent
                 {
                     for(int j = 0; additionalPayments[i].order != null && j < additionalPayments[i].order.paymentList.Count; j++)
                     {
-                        if (additionalPayments[i].order.payments[j].status.Equals("支付成功"))
+                        if (additionalPayments[i].order.paymentList[j].status.Equals("支付成功"))
                         {
-                            pL.Add(additionalPayments[i].order.payments[j]);
+                            pL.Add(additionalPayments[i].order.paymentList[j]);
                         }
                     }
                 }
@@ -496,7 +496,7 @@ namespace SnowmeetApi.Models.Rent
                 double refund = 0;
                 for(int i = 0; i < refunds.Count; i++)
                 {
-                    if (refunds[i].state==1)
+                    if (refunds[i].state==1 || !refunds[i].refund_id.Trim().Equals(""))
                     {
                         refund += refunds[i].amount;
                     }
