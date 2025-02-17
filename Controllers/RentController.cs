@@ -1231,7 +1231,8 @@ namespace SnowmeetApi.Controllers
                 RentOrder order = (RentOrder)((OkObjectResult)(await GetRentOrder(rentOrderList[i].id, sessionKey, false)).Result).Value;
                 //orderArr[i] = (RentOrder)((OkObjectResult)(await GetRentOrder(rentOrderList[i].id, sessionKey)).Result).Value;
                 if (!order.status.Trim().Equals("已退款")
-                    && !order.status.Trim().Equals("全部归还"))
+                    && !order.status.Trim().Equals("全部归还")
+                    && !order.status.Trim().Equals("已完成") )
                 {
                     continue;
                     
@@ -1311,12 +1312,25 @@ namespace SnowmeetApi.Controllers
             {
                 return BadRequest();
             }
+
+            /*
+
             var rentOrderList = await _context.RentOrder
                 .Where(r => (r.create_date.Date < date.Date && r.create_date >= startDate
                     && (shop.Equals("") || shop.Equals(r.shop.Trim()))
                     && (r.end_date != null && ((DateTime)r.end_date).Date == date.Date)))
                 .Join(_context.OrderOnlines, r => r.order_id, o => o.id,
                     (r, o) => new { r.id, r.start_date, r.end_date, o.pay_state, o.final_price, r.deposit_final, r.refund })
+                .Where(o => o.pay_state == 1)
+                .ToListAsync();
+
+            */
+            var rentOrderList = await _context.RentOrder
+                .Where(r => ((shop.Equals("") || shop.Equals(r.shop.Trim()))
+                    && r.finish_date != null && ((DateTime)r.finish_date).Date == date.Date)
+                    && r.create_date.Date < date.Date)
+                .Join(_context.OrderOnlines, r => r.order_id, o => o.id,
+                    (r, o) => new { r.id, r.start_date, r.finish_date, o.pay_state, o.final_price, r.deposit_final, r.refund })
                 .Where(o => o.pay_state == 1)
                 .ToListAsync();
 
@@ -1328,7 +1342,8 @@ namespace SnowmeetApi.Controllers
             {
                 RentOrder order = (RentOrder)((OkObjectResult)(await GetRentOrder(rentOrderList[i].id, sessionKey, false)).Result).Value;
                 if (!order.status.Trim().Equals("已退款")
-                    && !order.status.Trim().Equals("全部归还"))
+                    && !order.status.Trim().Equals("全部归还")
+                    && !order.status.Trim().Equals("已完成"))
                 {
                     continue;
 
