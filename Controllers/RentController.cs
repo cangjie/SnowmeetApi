@@ -82,6 +82,7 @@ namespace SnowmeetApi.Controllers
                         detail.start_date = DateTime.Now;
                         detail.rent_status = RentOrderDetail.RentStatus.已发放.ToString();
                         detail.update_date = DateTime.Now;
+                        detail.pick_date = DateTime.Now;
                         _context.RentOrderDetail.Entry(detail).State = EntityState.Modified;
                         log = new RentOrderDetailLog()
                         {
@@ -105,6 +106,8 @@ namespace SnowmeetApi.Controllers
                     case "延时租赁":
                         detail.update_date = DateTime.Now;
                         detail.rent_status = RentOrderDetail.RentStatus.已发放.ToString();
+                        detail.pick_date = DateTime.Now;
+                        detail.update_date = DateTime.Now;
                         _context.RentOrderDetail.Entry(detail).State = EntityState.Modified;
                         log = new RentOrderDetailLog()
                         {
@@ -851,6 +854,24 @@ namespace SnowmeetApi.Controllers
             }
             status = Util.UrlDecode(status);
             RentOrderDetail detail = await _context.RentOrderDetail.FindAsync(id);
+            switch(status)
+            {
+                case "已发放":
+                    if (detail.pick_date == null)
+                    {
+                        detail.pick_date = DateTime.Now;
+                    }
+                    break;
+                case "已归还":
+                    if (detail.return_date == null)
+                    {
+                        detail.return_date = DateTime.Now;
+                    }
+                    break;
+                default:
+                    break;
+            }
+            
             RentOrderDetailLog log = new RentOrderDetailLog()
             {
                 id = 0,
@@ -861,6 +882,7 @@ namespace SnowmeetApi.Controllers
                 create_date = DateTime.Now
             };
             detail.rent_status = status.Trim();
+            detail.update_date = DateTime.Now;
             _context.RentOrderDetail.Entry(detail).State = EntityState.Modified;
             await _context.rentOrderDetailLog.AddAsync(log);
             await _context.SaveChangesAsync();

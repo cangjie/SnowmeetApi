@@ -52,6 +52,9 @@ namespace SnowmeetApi.Models.Rent
         public string return_staff { get; set; } = "";
         public string? rent_status {get; set;}
         public int valid {get; set;} = 1;
+        public DateTime? pick_date {get; set;} = null;
+        public DateTime? return_date {get; set;} = null;
+
         public DateTime? update_date {get; set;} = null;
         [ForeignKey("detail_id")]
         public List<RentOrderDetailLog> log { get; set; } = new List<RentOrderDetailLog>();
