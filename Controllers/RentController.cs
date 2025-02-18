@@ -878,7 +878,7 @@ namespace SnowmeetApi.Controllers
                 detail_id = id,
                 status = status,
                 staff_open_id = user.miniAppOpenId,
-                prev_value = detail.rent_status.Trim(),
+                prev_value = detail.rent_status == null? "" : detail.rent_status.Trim(),
                 create_date = DateTime.Now
             };
             detail.rent_status = status.Trim();
