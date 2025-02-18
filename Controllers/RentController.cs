@@ -1674,6 +1674,16 @@ namespace SnowmeetApi.Controllers
                         log.status = "修改退租时间";
                         log.prev_value = order.details[i].start_date.ToString();
                     }
+                    if (order.details[i].pick_date != null && order.details[i].pick_date != detail.pick_date)
+                    {
+                        log.status = "修改发放时间";
+                        log.prev_value = order.details[i].pick_date.ToString();
+                    }
+                    if (order.details[i].return_date != null && order.details[i].return_date != detail.return_date)
+                    {
+                        log.status = "修改归还时间";
+                        log.prev_value = order.details[i].return_date.ToString();
+                    }
                 }
                 _context.RentOrderDetail.Entry(order.details[i]).State = EntityState.Detached;
             }
