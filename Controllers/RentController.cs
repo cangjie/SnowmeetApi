@@ -227,7 +227,7 @@ namespace SnowmeetApi.Controllers
             {
 
                 RentOrder order = (RentOrder)((OkObjectResult)(await GetRentOrder(idList[i].id, sessionKey, false)).Result).Value;
-                if (order.isDepositPaid)
+                if (order.totalDepositPaidAmount>0)
                 {
                     continue;
                 }

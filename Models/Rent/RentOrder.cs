@@ -80,6 +80,7 @@ namespace SnowmeetApi.Models.Rent
         public DateTime? finish_date { get; set; }
         public DateTime create_date { get; set; } = DateTime.Now;
         public DateTime? update_date {get; set;} = null;
+        /*
         [NotMapped]
         public bool isDepositPaid
         {
@@ -101,8 +102,24 @@ namespace SnowmeetApi.Models.Rent
                 return paid;
             }
         }
-
-        
+        */
+        [NotMapped]
+        public double totalDepositPaidAmount
+        {
+            get
+            {
+                double amount = 0;
+                for(int i = 0; order != null && order.paymentList != null && i < order.paymentList.Count; i++)
+                {
+                    OrderPayment payment = order.paymentList[i];
+                    if (payment.pay_method.Trim().Equals("储值支付") 
+                        && payment.status.Trim().Equals(OrderPayment.PaymentStatus.支付成功.ToString())){
+                        amount += payment.amount;
+                    }
+                }
+                return amount;
+            }
+        }
         [ForeignKey("submit_return_id")]
         public List<Recept> recept {get; set;} = new List<Recept>();
         /*
