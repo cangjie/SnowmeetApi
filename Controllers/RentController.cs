@@ -931,7 +931,7 @@ namespace SnowmeetApi.Controllers
 
             await SetDetailLog(id, "已归还", sessionKey);
             detail.log = await _context.rentOrderDetailLog.Where(l => l.detail_id == detail.id)
-                .OrderByDescending(l => l.id).AsNoTracking().ToListAsync();
+                .OrderByDescending(l => l.id).ToListAsync();
 
 
             bool allReturned = true;
@@ -1031,7 +1031,8 @@ namespace SnowmeetApi.Controllers
             {
                 return NotFound();
             }
-            List<OrderPayment> payments = rentOrder.payments.OrderByDescending(p => p.unRefundedAmount).ToList();
+            List<OrderPayment> payments = rentOrder.payments.Where(p => !p.pay_method.Trim().Equals("储值支付"))
+                .OrderByDescending(p => p.unRefundedAmount).ToList();
             double unRefundAmount = 0;
             for(int i = 0; i < payments.Count; i++)
             {
