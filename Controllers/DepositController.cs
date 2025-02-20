@@ -356,7 +356,7 @@ namespace SnowmeetApi.Controllers
         {
            
             UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _db);
-            return await GetAccounts(user.memberId, type, subType, sessionKey, sessionType);
+            return await GetAccounts(user.member.id, type, subType, sessionKey, sessionType);
         }
         [NonAction]
         public async Task<int?> GetMi7OrderId(string mi7OrderId)
