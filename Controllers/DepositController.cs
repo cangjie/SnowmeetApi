@@ -26,6 +26,7 @@ namespace SnowmeetApi.Controllers
             _db = context;
             _config = config;
         }
+        
         [NonAction]
         public async Task<List<DepositAccount>> GetMemberAccountAvaliable(int memberId, string type, string subType)
         {
@@ -229,13 +230,24 @@ namespace SnowmeetApi.Controllers
         [HttpGet("{cell}")]
         public async Task<ActionResult<DepositAccount>> DepositCharge(int accountId, string cell, double chargeAmount, 
             DateTime expireDate, string sessionKey, string sessionType = "wechat_mini_openid", 
-            string mi7Order = "", string type = "服务储值", string subType = "")
+            string mi7OrderId = "", string type = "服务储值", string subType = "")
         {
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _db);
+            if (!user.isAdmin)
+            {
+                return BadRequest();
+            }
+
             MemberController _memberHelper = new MemberController(_db, _config);
             Member member = await _memberHelper.GetMember(cell.Trim(), "cell");
             if (member == null)
             {
                 return BadRequest();
+            }
+            int? orderId = null;
+            if (!mi7OrderId.Trim().Equals(""))
+            {
+                orderId = await GetMi7OrderId(mi7OrderId);
             }
             DepositAccount? account = null;
             if (accountId != 0)
@@ -246,23 +258,93 @@ namespace SnowmeetApi.Controllers
                     return BadRequest();
                 }
             }
-            if (accountId == 0)
+            else
             {
-                account = new DepositAccount()
+                List<DepositAccount> accList = await _db.depositAccount
+                    .Where(a => a.valid == 1 && a.member_id ==  member.id 
+                    && a.type.Trim().Equals(type.Trim()) && a.sub_type.Trim().Equals(subType.Trim()) )
+                    .ToListAsync();
+                if (accList == null || accList.Count == 0)
                 {
-                    id = 0,
-                    member_id = member.id,
-                    type = "服务储值",
-                    sub_type = "",
-                    expire_date = expireDate,
-                    income_amount = 0,
-                    consume_amount = 0,
-                    memo = "",
-                    create_date = DateTime.Now
-                };
+                    account = new DepositAccount()
+                    {
+                        id = 0,
+                        member_id = member.id,
+                        type = "服务储值",
+                        sub_type = "",
+                        expire_date = expireDate,
+                        income_amount = 0,
+                        consume_amount = 0,
+                        memo = "",
+                        order_id = orderId,
+                        create_date = DateTime.Now,
+                        create_member_id = user.member.id
+                    };
+                    await _db.depositAccount.AddAsync(account);
+                    await _db.SaveChangesAsync();
+                }
+                else
+                {
+                    account = accList[0];
+                }
             }
+            if (account == null || account.id == 0)
+            {
+                return NoContent();
+            }
+            double sumIncome = await _db.depositBalance
+                .Where(b => b.valid == 1 && b.amount > 0 && b.deposit_id == account.id)
+                .SumAsync(b => b.amount);
+            double sumConsume = await _db.depositBalance.Where(b => b.valid == 1 && b.amount < 0 && b.deposit_id == account.id )
+                .SumAsync(b => b.amount);
+            DepositBalance b = new DepositBalance()
+            {
+                id = 0,
+                deposit_id = account.id,
+                amount = chargeAmount,
+                member_id = user.member.id,
+                order_id = orderId,
+                valid = 1,
+                create_date = DateTime.Now
+            };
+            await _db.depositBalance.AddAsync(b);
+            sumIncome += chargeAmount;
+            account.income_amount = sumIncome;
+            account.consume_amount = -1 * sumConsume;
+            _db.depositAccount.Entry(account).State = EntityState.Modified;
+            await _db.SaveChangesAsync();
+            account = (await _db.depositAccount.Where(a => a.id == account.id)
+                .Include(a => a.balances.Where(b => b.valid == 1)).AsNoTracking().ToListAsync())[0];
+            return Ok(account);
+        }
+        [NonAction]
+        public async Task<DepositAccount> DepositAccountCharge(DepositAccount account, double amount, int operMemberId)
+        {
+            DepositBalance b = new DepositBalance()
+            {
+                id = 0,
+                deposit_id = account.id,
+                amount = amount,
+                member_id = operMemberId,
+                create_date = DateTime.Now
+            };
 
-            return BadRequest();
+            return null;
+        }
+        [NonAction]
+        public async Task<int?> GetMi7OrderId(string mi7OrderId)
+        {
+            List<Mi7Order> mi7OrderList = await _db
+                .mi7Order.Where(o => o.mi7_order_id.Trim().Equals(mi7OrderId.Trim()) && o.order_id > 0)
+                .AsNoTracking().ToListAsync();
+            if (mi7OrderList != null && mi7OrderList.Count > 0)
+            {
+                return mi7OrderList[0].order_id;
+            }
+            else
+            {
+                return null;
+            }
         }
 
     }   

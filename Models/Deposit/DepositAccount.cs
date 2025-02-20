@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 namespace SnowmeetApi.Models.Deposit
@@ -20,11 +21,15 @@ namespace SnowmeetApi.Models.Deposit
         public int? biz_id { get; set; }
         public string? source { get; set; }
         public string memo { get; set; }
+        public int valid {get; set;} = 1;
         public double income_amount { get; set; }
         public double consume_amount { get; set; }
+        public int? create_member_id {get; set;} = null;
         public DateTime? expire_date { get; set; }
         public DateTime? update_date { get; set; }
         public DateTime create_date { get; set; }
+        [ForeignKey("deposit_id")]
+        public List<DepositBalance> balances { get; set; }
 
         public double avaliableAmount
         {
