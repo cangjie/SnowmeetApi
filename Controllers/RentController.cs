@@ -1281,18 +1281,6 @@ namespace SnowmeetApi.Controllers
                 else
                 {
                     Console.WriteLine(order.id.ToString() + " " + order.status);
-                    /*
-                    rentOrderList[i].finished = 1;
-                    _context.RentOrder.Entry(rentOrderList[i]).State = EntityState.Modified;
-                    try
-                    {
-                        await _context.SaveChangesAsync();
-                    }
-                    catch(Exception err)
-                    {
-                        Console.WriteLine(err.ToString());
-                    }
-                    */
                     continue;
                 }
                 

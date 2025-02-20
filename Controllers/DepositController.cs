@@ -26,19 +26,6 @@ namespace SnowmeetApi.Controllers
             _db = context;
             _config = config;
         }
-        /*
-        [HttpGet]
-        public async Task<ActionResult<List<DepositAccount>>> GetAccounts()
-        {
-            var l = await _db.depositAccount.ToListAsync();
-            for(int i = 0; i < l.Count; i++)
-            {
-                l[i].type = DepositType.现金预存.ToString();
-            }
-            return Ok(l);
-        }
-        */
-
         [NonAction]
         public async Task<List<DepositAccount>> GetMemberAccountAvaliable(int memberId, string type, string subType)
         {
@@ -238,6 +225,44 @@ namespace SnowmeetApi.Controllers
             }
             
             return null;
+        }
+        [HttpGet("{cell}")]
+        public async Task<ActionResult<DepositAccount>> DepositCharge(int accountId, string cell, double chargeAmount, 
+            DateTime expireDate, string sessionKey, string sessionType = "wechat_mini_openid", 
+            string mi7Order = "", string type = "服务储值", string subType = "")
+        {
+            MemberController _memberHelper = new MemberController(_db, _config);
+            Member member = await _memberHelper.GetMember(cell.Trim(), "cell");
+            if (member == null)
+            {
+                return BadRequest();
+            }
+            DepositAccount? account = null;
+            if (accountId != 0)
+            {
+                account = await _db.depositAccount.FindAsync(accountId);
+                if (account == null || account.member_id != member.id)
+                {
+                    return BadRequest();
+                }
+            }
+            if (accountId == 0)
+            {
+                account = new DepositAccount()
+                {
+                    id = 0,
+                    member_id = member.id,
+                    type = "服务储值",
+                    sub_type = "",
+                    expire_date = expireDate,
+                    income_amount = 0,
+                    consume_amount = 0,
+                    memo = "",
+                    create_date = DateTime.Now
+                };
+            }
+
+            return BadRequest();
         }
 
     }   
