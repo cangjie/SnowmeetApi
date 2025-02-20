@@ -2,7 +2,9 @@
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Linq;
 using System.Runtime.InteropServices.Marshalling;
+using System.Security.Cryptography;
 namespace SnowmeetApi.Models.Rent
 {
 	[Table("rent_list_detail")]
@@ -126,7 +128,30 @@ namespace SnowmeetApi.Models.Rent
                 }
                 if (log != null && log.Count > 0)
                 {
-                    status = log[0].status.Trim();
+                    //log.OrderByDescending(l => l.id)
+                    List<RentOrderDetailLog> logArr = log.OrderByDescending(l => l.id).ToList();
+                    for (int i = 0; i < logArr.Count; i++)
+                    {
+                        RentOrderDetailLog l = logArr[i];
+                        switch (l.status)
+                        {
+                            case "已发放":
+                                status = RentOrderDetail.RentStatus.已发放.ToString();
+                                break;
+                            case "已归还":
+                                status = RentOrderDetail.RentStatus.已归还.ToString();
+                                break;
+                            case "已暂存":
+                                status = RentOrderDetail.RentStatus.已暂存.ToString();
+                                break;
+                            case "未领取":
+                                status = RentOrderDetail.RentStatus.未领取.ToString();
+                                break;
+                            default:
+                                break;
+                        }
+                    }
+                    //status = log[0].status.Trim();
                 }
                 return status.Trim();
             }
