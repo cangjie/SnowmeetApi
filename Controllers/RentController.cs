@@ -15,6 +15,7 @@ using System.Collections;
 using SnowmeetApi.Controllers.User;
 using SnowmeetApi.Controllers.Order;
 using Mono.TextTemplating;
+using TencentCloud.Ocr.V20181119.Models;
 namespace SnowmeetApi.Controllers
 {
     [Route("core/[controller]/[action]")]
@@ -1650,7 +1651,33 @@ namespace SnowmeetApi.Controllers
             {
                 return BadRequest();
             }
+            switch (detail.deposit_type.Trim())
+            {
+                case "立即租赁":
+                    detail.start_date = DateTime.Now;
+                    detail.pick_date = DateTime.Now;
+                    detail.rent_status = RentOrderDetail.RentStatus.已发放.ToString();
+                    break;
+                case "延时租赁":
+                    detail.pick_date = DateTime.Now;
+                    detail.start_date = ((DateTime)detail.pick_date).Date.AddDays(1);
+                    detail.rent_status = RentOrderDetail.RentStatus.已发放.ToString();
+                    break;
+                case "先租后取":
+                    detail.pick_date = null;
+                    detail.start_date = DateTime.Now;
+                    detail.rent_status = RentOrderDetail.RentStatus.未领取.ToString();
+                    break;
+                case "预约租赁":
+                    detail.pick_date = null;
+                    detail.start_date = null;
+                    detail.rent_status = RentOrderDetail.RentStatus.未领取.ToString();
+                    break;
+                default:
+                    break;
+            }
             detail.memo = DateTime.Now.ToString() + " " + user.miniAppUser.real_name + " 追加";
+
             await _context.RentOrderDetail.AddAsync(detail);
             await _context.SaveChangesAsync();
             return Ok(detail);
