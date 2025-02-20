@@ -151,7 +151,6 @@ namespace SnowmeetApi.Models.Rent
                                 break;
                         }
                     }
-                    //status = log[0].status.Trim();
                 }
                 return status.Trim();
             }
