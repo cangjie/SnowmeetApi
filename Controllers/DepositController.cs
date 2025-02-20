@@ -13,6 +13,7 @@ using SnowmeetApi.Models.Order;
 using SnowmeetApi.Models.Users;
 using SnowmeetApi.Models.Rent;
 using SnowmeetApi.Models;
+using System.Security;
 namespace SnowmeetApi.Controllers
 {
     [Route("core/[controller]/[action]")]
@@ -34,9 +35,12 @@ namespace SnowmeetApi.Controllers
             subType = Util.UrlDecode(subType);
             List<DepositAccount> list = await _db.depositAccount
                 .Where(a => ( (a.expire_date == null || ((DateTime)a.expire_date).Date >= DateTime.Now.Date)
-                && a.consume_amount < a.income_amount && a.member_id == memberId)
+                && a.valid == 1 && a.member_id == memberId)
                 && (type.Trim().Equals("") || a.type.Trim().Equals(type))
-                && (subType.Trim().Equals("") || subType.Trim().Equals(a.sub_type.Trim())))
+                && (subType.Trim().Equals("") || subType.Trim().Equals(a.sub_type.Trim()))
+                && (a.expire_date == null || ((DateTime)a.expire_date).Date >= DateTime.Now.Date))
+                .Include(a => a.balances.Where(b => b.valid == 1).OrderByDescending(b => b.id))
+                    .ThenInclude(b => b.order)
                 .OrderBy(a => a.expire_date).AsNoTracking().ToListAsync();
             return list;
         }
@@ -230,7 +234,7 @@ namespace SnowmeetApi.Controllers
         [HttpGet("{cell}")]
         public async Task<ActionResult<DepositAccount>> DepositCharge(int accountId, string cell, double chargeAmount, 
             DateTime expireDate, string sessionKey, string sessionType = "wechat_mini_openid", 
-            string mi7OrderId = "", string type = "服务储值", string subType = "")
+             string type = "服务储值", string subType = "", string? mi7OrderId = null, string? memo = null)
         {
             UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _db);
             if (!user.isAdmin)
@@ -244,11 +248,7 @@ namespace SnowmeetApi.Controllers
             {
                 return BadRequest();
             }
-            int? orderId = null;
-            if (!mi7OrderId.Trim().Equals(""))
-            {
-                orderId = await GetMi7OrderId(mi7OrderId);
-            }
+            
             DepositAccount? account = null;
             if (accountId != 0)
             {
@@ -275,8 +275,8 @@ namespace SnowmeetApi.Controllers
                         expire_date = expireDate,
                         income_amount = 0,
                         consume_amount = 0,
-                        memo = "",
-                        order_id = orderId,
+                        biz_id = mi7OrderId.Trim(),
+                        memo = memo,
                         create_date = DateTime.Now,
                         create_member_id = user.member.id
                     };
@@ -303,7 +303,8 @@ namespace SnowmeetApi.Controllers
                 deposit_id = account.id,
                 amount = chargeAmount,
                 member_id = user.member.id,
-                order_id = orderId,
+                biz_id = mi7OrderId,
+                memo = memo,
                 valid = 1,
                 create_date = DateTime.Now
             };
@@ -330,6 +331,22 @@ namespace SnowmeetApi.Controllers
             };
 
             return null;
+        }
+        [HttpGet("{memberId}")]
+        public async Task<ActionResult<List<DepositAccount>>> GetAccounts(int memberId, string type, 
+            string subType, string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            if (subType == null)
+            {
+                subType = "";
+            }
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _db);
+            if (memberId != user.memberId && !user.isAdmin)
+            {
+                return BadRequest();
+            }
+            List<DepositAccount> al = await GetMemberAccountAvaliable(memberId, type.Trim(), subType.Trim());
+            return Ok(al);
         }
         [NonAction]
         public async Task<int?> GetMi7OrderId(string mi7OrderId)

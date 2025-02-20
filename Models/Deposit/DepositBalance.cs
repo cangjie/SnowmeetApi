@@ -15,10 +15,12 @@ namespace SnowmeetApi.Models.Deposit
         public int? order_id { get; set; }
         public DateTime? extend_expire_date { get; set; }
         public string? memo { get; set; }
-        public int? biz_id { get; set; }
+        public string? biz_id { get; set; }
         public string? source { get; set; }
         public int valid {get; set;} = 1;
         public DateTime? update_date {get; set;} = null;
         public DateTime create_date { get; set; }
+        [ForeignKey("order_id")]
+        public OrderOnline? order {get; set;}
     }
 }

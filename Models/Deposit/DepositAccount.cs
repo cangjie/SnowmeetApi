@@ -18,9 +18,9 @@ namespace SnowmeetApi.Models.Deposit
         public string sub_type { get; set; }
         public string deposit_no { get; set; }
         public int? order_id { get; set; }
-        public int? biz_id { get; set; }
+        public string? biz_id { get; set; }
         public string? source { get; set; }
-        public string memo { get; set; }
+        public string? memo { get; set; }
         public int valid {get; set;} = 1;
         public double income_amount { get; set; }
         public double consume_amount { get; set; }
