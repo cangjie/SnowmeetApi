@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using SnowmeetApi.Models.Deposit;
 namespace SnowmeetApi.Models.Users
 {
     [Table("member")]
@@ -108,6 +109,8 @@ namespace SnowmeetApi.Models.Users
                 return v;
             }
         }
+        [ForeignKey("member_id")]
+        public List<DepositAccount> depositAccounts {get; set;}
         
 
     }

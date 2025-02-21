@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using Aop.Api.Domain;
 namespace SnowmeetApi.Models.Deposit
 {
     public enum DepositType
@@ -30,7 +31,7 @@ namespace SnowmeetApi.Models.Deposit
         public DateTime create_date { get; set; }
         [ForeignKey("deposit_id")]
         public List<DepositBalance> balances { get; set; }
-
+        public Models.Users.Member member {get; set;}
         public double avaliableAmount
         {
             get

@@ -358,6 +358,46 @@ namespace SnowmeetApi.Controllers
             UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _db);
             return await GetAccounts(user.member.id, type, subType, sessionKey, sessionType);
         }
+        [HttpGet]
+        public async Task<ActionResult<List<DepositAccount>>> SearchDepositAccounts(string key, 
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            if (key == null)
+            {
+                key = "";
+            }
+            key = Util.UrlDecode(key);
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _db);
+            if (!user.isAdmin)
+            {
+                return BadRequest();
+            }
+            if (key.Trim().Equals(""))
+            {
+                return Ok(await _db.depositAccount.Where(a => a.valid == 1)
+                    .Include(d => d.member)
+                        .ThenInclude(m => m.memberSocialAccounts)
+                    .OrderByDescending(a => a.id).AsNoTracking().ToListAsync());
+            }
+            MemberController _memberHelper = new MemberController(_db, _config);
+            List<Member> members = await _memberHelper.SearchMember(key);
+            List<DepositAccount> ret = new List<DepositAccount>();
+            for(int i = 0; members != null && i < members.Count; i++)
+            {
+                Member member = members[i];
+                member.depositAccounts = await _db.member.Entry(member)
+                    .Collection(m => m.depositAccounts)
+                    .Query().Where(d => d.valid == 1)
+                    .ToListAsync();
+                for(int j = 0; j < member.depositAccounts.Count; j++)
+                {
+                    DepositAccount account = member.depositAccounts[j];
+                    account.member = member;
+                    ret.Add(account);
+                }
+            }
+            return Ok(ret);
+        }
         [NonAction]
         public async Task<int?> GetMi7OrderId(string mi7OrderId)
         {

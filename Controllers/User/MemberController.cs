@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 //using Aop.Api.Domain;
+
+//using Aop.Api.Domain;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -482,6 +484,29 @@ namespace SnowmeetApi.Controllers.User
                 ret = true;
             }
             return ret;
+        }
+
+        [NonAction]
+        public async Task<List<Models.Users.Member>> SearchMember(string key)
+        {
+            List<Models.Users.Member> mList = await _db.member.Where(m => (m.real_name.IndexOf(key) >= 0))
+                .Include(m => m.memberSocialAccounts.Where(msa => msa.valid == 1)).AsNoTracking().ToListAsync();
+
+            List<MemberSocialAccount> cellList = await _db.memberSocialAccount
+                .Where(msa => (msa.valid == 1 && msa.num.EndsWith(key) && key.Length >= 4 && msa.type.Trim().Equals("cell")))
+                .Include(msa => msa.member).AsNoTracking().ToListAsync();
+
+
+            List<Models.Users.Member> ret = new List<Models.Users.Member>();
+            for(int i = 0; i < cellList.Count; i++)
+            {
+                Member member = cellList[i].member;
+                if (mList.Where(m => m.id == member.id).ToList().Count == 0)
+                {
+                    mList.Add(member);
+                }
+            }
+            return mList;
         }
 
     }
