@@ -111,6 +111,8 @@ namespace SnowmeetApi.Models.Users
         }
         [ForeignKey("member_id")]
         public List<DepositAccount> depositAccounts {get; set;}
+        [NotMapped]
+        public List<OrderOnline> orders {get; set;}
         
 
     }
