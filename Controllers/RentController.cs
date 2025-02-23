@@ -1417,19 +1417,6 @@ namespace SnowmeetApi.Controllers
             {
                 return BadRequest();
             }
-
-            /*
-
-            var rentOrderList = await _context.RentOrder
-                .Where(r => (r.create_date.Date < date.Date && r.create_date >= startDate
-                    && (shop.Equals("") || shop.Equals(r.shop.Trim()))
-                    && (r.end_date != null && ((DateTime)r.end_date).Date == date.Date)))
-                .Join(_context.OrderOnlines, r => r.order_id, o => o.id,
-                    (r, o) => new { r.id, r.start_date, r.end_date, o.pay_state, o.final_price, r.deposit_final, r.refund })
-                .Where(o => o.pay_state == 1)
-                .ToListAsync();
-
-            */
             var rentOrderList = await _context.RentOrder
                 .Where(r => ((shop.Equals("") || shop.Equals(r.shop.Trim()))
                     && r.finish_date != null && ((DateTime)r.finish_date).Date == date.Date)
@@ -1521,7 +1508,6 @@ namespace SnowmeetApi.Controllers
 
             var oriList = await _context.RentItem.Select(r => r.@class)
                 .AsNoTracking().Distinct().ToListAsync();
-            
             foreach(var ori in oriList)
             {
                 bool exists = false;
