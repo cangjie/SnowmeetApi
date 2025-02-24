@@ -56,6 +56,7 @@ namespace SnowmeetApi.Models.Rent
         public int valid {get; set;} = 1;
         public DateTime? pick_date {get; set;} = null;
         public DateTime? return_date {get; set;} = null;
+        public string? package_code {get; set;} = null;
 
         public DateTime? update_date {get; set;} = null;
         [ForeignKey("detail_id")]

@@ -562,7 +562,7 @@ namespace SnowmeetApi.Controllers
             UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
             List<RentOrder> rentOrderList =  await _context.RentOrder
                 .Include(r => r.recept)
-                .Include(r => r.details)
+                .Include(r => r.details.OrderBy(d => d.package_code).OrderBy(d => d.id))
                     .ThenInclude(d => d.log)
                 .Include(r => r.order)
                     .ThenInclude(o => o.paymentList.Where(p => p.status.Trim().Equals("支付成功")).OrderByDescending(p => p.id))
