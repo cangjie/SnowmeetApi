@@ -214,6 +214,10 @@ namespace SnowmeetApi.Controllers
             {
                 return BadRequest();
             }
+            if (shop.Trim().Equals("万龙"))
+            {
+                endDate = endDate.Date.AddDays(-5);
+            }
 
             var idList = await _context.idList.FromSqlRaw(" select distinct rent_list_id as id from rent_list_detail  "
                 + "left join rent_list on rent_list.[id] = rent_list_id"
