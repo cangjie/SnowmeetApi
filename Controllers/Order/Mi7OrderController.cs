@@ -46,24 +46,33 @@ namespace SnowmeetApi.Controllers.Order
                 Mi7Order mi7Order = miList[i];
                 Models.Users.Member customer = await _memberHelper.GetMember(mi7Order.order.open_id.Trim(), "wechat_mini_openid");
                 Models.Users.Member staff = await _memberHelper.GetMember(mi7Order.order.staff_open_id, "wechat_mini_openid");
-
+                
+                //try
+                //{
                 SaleReport r = new SaleReport()
                 {
-                    mi7_order_id = mi7Order.mi7_order_id.Trim(),
+                    mi7_order_id = mi7Order.mi7_order_id == null? "" : mi7Order.mi7_order_id.Trim(),
                     barCode = mi7Order.barCode.Trim(),
                     sale_price = mi7Order.sale_price,
                     real_charge = mi7Order.real_charge,
                     order_id = mi7Order.order_id,
                     name = customer == null? "" : customer.title.Trim(),
-                    cell_number = customer == null? "" : customer.cell.Trim(),
+                    cell_number = customer == null || customer.cell == null ? "" : customer.cell.Trim(),
                     final_price = mi7Order.order.paidAmount,
                     refund_price = mi7Order.order.refundAmount,
                     shop = mi7Order.order.shop,
                     staff = staff == null? "" : staff.real_name,
                     pay_time = mi7Order.order.pay_time,
-                    pay_method = mi7Order.order != null ?  mi7Order.order.paymentList[0].pay_method.Trim() : ""
+                    pay_method = mi7Order.order != null && mi7Order.order.paymentList.Count > 0  ?  mi7Order.order.paymentList[0].pay_method.Trim() : ""
                 };
                 ret.Add(r);
+                /*
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine(ex.Message);
+                }
+                */
             }
             return Ok(ret);
         }
