@@ -50,7 +50,9 @@
                 <td class="table_head">日期</td>
                 <td class="table_head">时间</td>
                 <td class="table_head">订单号</td>
-                <td class="table_head">金额</td>
+                <td class="table_head">支付金额</td>
+                <td class="table_head">退款</td>
+                <td class="table_head">结余金额</td>
             </tr>
         </thead>
         <tbody id="report_rows">
@@ -186,11 +188,26 @@
             newRow.appendChild(td_order_id);
 
             var td_paid = document.createElement('td');
-            td_paid.innerText = formatAmount(item.total_paid);
+            td_paid.innerText = formatAmount(item.order.paidAmount);
             attr = document.createAttribute('style');
             attr.value = 'text-align:right';
             td_paid.attributes.setNamedItem(attr);
             newRow.appendChild(td_paid);
+
+            var td_refund = document.createElement('td');
+            td_refund.innerText = formatAmount(item.order.refundAmount);
+            attr = document.createAttribute('style');
+            attr.value = 'text-align:right';
+            td_refund.attributes.setNamedItem(attr);
+            newRow.appendChild(td_refund);
+
+            var td_earn = document.createElement('td');
+            td_refund.innerText = formatAmount(tem.order.paidAmount - item.order.refundAmount);
+            attr = document.createAttribute('style');
+            attr.value = 'text-align:right';
+            td_earn.attributes.setNamedItem(attr);
+            newRow.appendChild(td_earn);
+
             totalPaid += item.total_paid;
         }
         newRow.style.backgroundColor = currentColor;

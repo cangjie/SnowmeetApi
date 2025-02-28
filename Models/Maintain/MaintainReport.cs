@@ -23,7 +23,8 @@ namespace SnowmeetApi.Models.Maintain
 		public double additional_fee { get; set; }
 		public string staff { get; set; }
 		public DateTime create_date { get; set; }
-
+		[ForeignKey("order_id")]
+		public OrderOnline? order {get; set;}
 	}
 }
 

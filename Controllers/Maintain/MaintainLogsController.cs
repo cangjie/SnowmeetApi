@@ -84,7 +84,7 @@ namespace SnowmeetApi.Controllers.Maintain
         }
 
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<MaintainReport>>> GetReport(DateTime startDate, DateTime endDate, string sessionKey)
+        public async Task<ActionResult<List<MaintainReport>>> GetReport(DateTime startDate, DateTime endDate, string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey);
             UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
@@ -96,10 +96,40 @@ namespace SnowmeetApi.Controllers.Maintain
             {
                 return BadRequest();
             }
-            var list = await _context.maintainReport.FromSqlRaw(" select * from dbo.func_maintain_report('"
+            List<MaintainReport> list = await _context.maintainReport.FromSqlRaw(" select * from dbo.func_maintain_report('"
                 + startDate.ToShortDateString() + "', '" + endDate.AddDays(1).ToShortDateString() + "')  "
-                + "  order by create_date desc , order_id desc ")
-                .AsNoTracking().ToListAsync();
+                + "  order by create_date desc , order_id desc "
+                )
+
+                //.Include(m => m.order)
+                //    .ThenInclude(o => o.paymentList.Where(p => p.status.Equals("支付成功")))
+                //        .ThenInclude(p => p.refunds.Where(r => (r.state == 1 || r.refund_id.Trim().Equals(""))))
+                //.OrderByDescending(l => l.create_date).OrderByDescending(l => l.order_id)
+                .ToListAsync();
+            for(int i = 0; i < list.Count; i++)
+            {
+                MaintainReport r = list[i];
+                if (r.order_id == null)
+                {
+                    continue;
+                }
+                r.order = await _context.OrderOnlines.FindAsync(r.order_id);
+                if (r.order == null)
+                {
+                    continue;
+                }
+                r.order.paymentList = await _context.OrderOnlines.Entry(r.order).Collection(o => o.paymentList)
+                    .Query().Where(p => p.status.Trim().Equals("支付成功"))
+                    .Include(r => r.refunds.Where(r => r.state == 1 || !r.refund_id.Trim().Equals("")))
+                    .AsNoTracking().ToListAsync();
+
+                //r.order.paymentList = await _context.OrderOnlines.Entry(r.order)
+                //    .Collection(o => o.paymentList.Where(p => p.status.Equals("支付成功"))).Query().ToListAsync();
+
+                    //.Include(p => p.refunds.Where(r => (r.state == 1 || !r.refund_id.Trim().Equals(""))))
+                    //.AsNoTracking().ToListAsync();
+            }
+            
             return Ok(list);
         }
 
@@ -251,87 +281,7 @@ namespace SnowmeetApi.Controllers.Maintain
             }
         }
 
-        /*
-
-        // GET: api/MaintainLogs
-        [HttpGet]
-        public async Task<ActionResult<IEnumerable<MaintainLog>>> GetMaintainLog()
-        {
-            return await _context.MaintainLog.ToListAsync();
-        }
-
-        // GET: api/MaintainLogs/5
-        [HttpGet("{id}")]
-        public async Task<ActionResult<MaintainLog>> GetMaintainLog(int id)
-        {
-            var maintainLog = await _context.MaintainLog.FindAsync(id);
-
-            if (maintainLog == null)
-            {
-                return NotFound();
-            }
-
-            return maintainLog;
-        }
-
-        // PUT: api/MaintainLogs/5
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
-        [HttpPut("{id}")]
-        public async Task<IActionResult> PutMaintainLog(int id, MaintainLog maintainLog)
-        {
-            if (id != maintainLog.id)
-            {
-                return BadRequest();
-            }
-
-            _context.Entry(maintainLog).State = EntityState.Modified;
-
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!MaintainLogExists(id))
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
-            }
-
-            return NoContent();
-        }
-
-        // POST: api/MaintainLogs
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
-        [HttpPost]
-        public async Task<ActionResult<MaintainLog>> PostMaintainLog(MaintainLog maintainLog)
-        {
-            _context.MaintainLog.Add(maintainLog);
-            await _context.SaveChangesAsync();
-
-            return CreatedAtAction("GetMaintainLog", new { id = maintainLog.id }, maintainLog);
-        }
-
-        // DELETE: api/MaintainLogs/5
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteMaintainLog(int id)
-        {
-            var maintainLog = await _context.MaintainLog.FindAsync(id);
-            if (maintainLog == null)
-            {
-                return NotFound();
-            }
-
-            _context.MaintainLog.Remove(maintainLog);
-            await _context.SaveChangesAsync();
-
-            return NoContent();
-        }
-        */
+       
         private bool MaintainLogExists(int id)
         {
             return _context.MaintainLog.Any(e => e.id == id);
