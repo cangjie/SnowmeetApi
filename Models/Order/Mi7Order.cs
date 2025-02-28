@@ -13,6 +13,8 @@ namespace SnowmeetApi.Models.Order
         public double sale_price { get; set; }
         public double real_charge { get; set; }
         public string barCode { get; set; } = "";
+        [ForeignKey("order_id")]
+        public OrderOnline? order {get; set;}
 
     }
 }

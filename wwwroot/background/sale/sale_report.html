@@ -42,6 +42,8 @@
                 <td class="table_head">门店</td>
                 <td class="table_head">姓名</td>
                 <td class="table_head">电话</td>
+                <td class="table_head">支付总计</td>
+                <td class="table_head">退款</td>
                 <td class="table_head">订单金额</td>
                 <td class="table_head">日期</td>
                 <td class="table_head">时间</td>
@@ -163,7 +165,22 @@
             td_final_price.attributes.setNamedItem(rightAttr)
             newRow.appendChild(td_final_price);
 
-            totalPaid += item.final_price;
+            rightAttr = document.createAttribute('style');
+            rightAttr.value = 'text-align:right';
+            var td_refund_price = document.createElement('td');
+            td_refund_price.innerText = formatAmount(item.refund_price);
+            td_refund_price.attributes.setNamedItem(rightAttr)
+            newRow.appendChild(td_refund_price);
+
+            rightAttr = document.createAttribute('style');
+            rightAttr.value = 'text-align:right';
+            var td_real_price = document.createElement('td');
+            td_real_price.innerText = formatAmount(item.final_price - item.refund_price);
+            td_real_price.attributes.setNamedItem(rightAttr)
+            newRow.appendChild(td_real_price);
+
+
+            totalPaid += (item.final_price - item.refund_price);
 
             var td_date = document.createElement('td');
             td_date.innerText = formatDate(item.pay_time);

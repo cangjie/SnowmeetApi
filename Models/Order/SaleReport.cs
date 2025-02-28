@@ -12,6 +12,7 @@ namespace SnowmeetApi.Models.Order
         public string? name { get; set; } = "";
         public string? cell_number { get; set; } = "";
         public double final_price { get; set; } = 0;
+        public double refund_price {get; set; } = 0;
         public string shop { get; set; } = "";
         public string staff { get; set; } = "";
         public DateTime? pay_time { get; set; }

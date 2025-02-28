@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using SnowmeetApi.Controllers.User;
 using SnowmeetApi.Data;
 using SnowmeetApi.Models.Order;
 using SnowmeetApi.Models.Users;
@@ -28,9 +29,49 @@ namespace SnowmeetApi.Controllers.Order
             _config = config;
         }
 
+        [HttpGet]
+        public async Task<ActionResult<List<SaleReport>>> GetSaleReport(DateTime startDate, DateTime endDate, string sessionKey, string shop = "")
+        {
+            MemberController _memberHelper = new MemberController(_context, _config);
+            List<Mi7Order> miList = await _context.mi7Order
+                .Include(m => m.order)
+                    .ThenInclude(o => o.paymentList.Where(p => p.status.Trim().Equals("支付成功")))
+                        .ThenInclude(p => p.refunds.Where(r => (r.state == 1 || !r.refund_id.Trim().Equals(""))))
+                .Where(m => (m.order != null && m.order.pay_state == 1 
+                && ((DateTime)m.order.pay_time).Date >= startDate.Date && ((DateTime)m.order.pay_time).Date <= endDate.Date))
+                .AsNoTracking().ToListAsync();
+            List<SaleReport> ret = new List<SaleReport>();
+            for(int i = 0; i < miList.Count; i++)
+            {
+                Mi7Order mi7Order = miList[i];
+                Models.Users.Member customer = await _memberHelper.GetMember(mi7Order.order.open_id.Trim(), "wechat_mini_openid");
+                Models.Users.Member staff = await _memberHelper.GetMember(mi7Order.order.staff_open_id, "wechat_mini_openid");
+
+                SaleReport r = new SaleReport()
+                {
+                    mi7_order_id = mi7Order.mi7_order_id.Trim(),
+                    barCode = mi7Order.barCode.Trim(),
+                    sale_price = mi7Order.sale_price,
+                    real_charge = mi7Order.real_charge,
+                    order_id = mi7Order.order_id,
+                    name = customer == null? "" : customer.title.Trim(),
+                    cell_number = customer == null? "" : customer.cell.Trim(),
+                    final_price = mi7Order.order.paidAmount,
+                    refund_price = mi7Order.order.refundAmount,
+                    shop = mi7Order.order.shop,
+                    staff = staff == null? "" : staff.real_name,
+                    pay_time = mi7Order.order.pay_time,
+                    pay_method = mi7Order.order != null ?  mi7Order.order.paymentList[0].pay_method.Trim() : ""
+                };
+                ret.Add(r);
+            }
+            return Ok(ret);
+        }
+
+
 
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<SaleReport>>> GetSaleReport(DateTime startDate, DateTime endDate, string sessionKey, string shop = "")
+        public async Task<ActionResult<IEnumerable<SaleReport>>> GetSaleReportTest(DateTime startDate, DateTime endDate, string sessionKey, string shop = "")
         {
             sessionKey = Util.UrlDecode(sessionKey);
             shop = Util.UrlDecode(shop);

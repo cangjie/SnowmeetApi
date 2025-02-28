@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using Org.BouncyCastle.Tsp;
 using SnowmeetApi.Models.Deposit;
 namespace SnowmeetApi.Models.Users
 {
@@ -20,6 +21,15 @@ namespace SnowmeetApi.Models.Users
         public int is_manager { get; set;}
         public int is_admin { get; set; }
         public int in_staff_list {get; set;}
+        public string title
+        {
+            get
+            {
+                string title = real_name + " ";
+                title += gender.Trim().Equals("男")? "先生" : (gender.Trim().Equals("女")? "女士" : "");
+                return title.Trim();
+            }
+        }
 
         public MiniAppUser miniAppUser
         {
