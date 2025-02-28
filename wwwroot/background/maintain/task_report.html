@@ -188,21 +188,21 @@
             newRow.appendChild(td_order_id);
 
             var td_paid = document.createElement('td');
-            td_paid.innerText = formatAmount(item.order.paidAmount);
+            td_paid.innerText = item.order == null? "¥0.00" : formatAmount(item.order.paidAmount);
             attr = document.createAttribute('style');
             attr.value = 'text-align:right';
             td_paid.attributes.setNamedItem(attr);
             newRow.appendChild(td_paid);
 
             var td_refund = document.createElement('td');
-            td_refund.innerText = formatAmount(item.order.refundAmount);
+            td_refund.innerText = item.order == null? "¥0.00" : formatAmount(item.order.refundAmount);
             attr = document.createAttribute('style');
             attr.value = 'text-align:right';
             td_refund.attributes.setNamedItem(attr);
             newRow.appendChild(td_refund);
 
             var td_earn = document.createElement('td');
-            td_earn.innerText = formatAmount(item.order.paidAmount - item.order.refundAmount);
+            td_earn.innerText = item.order == null? "¥0.00" : formatAmount(item.order.paidAmount - item.order.refundAmount);
             attr = document.createAttribute('style');
             attr.value = 'text-align:right';
             td_earn.attributes.setNamedItem(attr);
