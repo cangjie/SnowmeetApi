@@ -202,7 +202,7 @@
             newRow.appendChild(td_refund);
 
             var td_earn = document.createElement('td');
-            td_refund.innerText = formatAmount(tem.order.paidAmount - item.order.refundAmount);
+            td_refund.innerText = formatAmount(item.order.paidAmount - item.order.refundAmount);
             attr = document.createAttribute('style');
             attr.value = 'text-align:right';
             td_earn.attributes.setNamedItem(attr);
