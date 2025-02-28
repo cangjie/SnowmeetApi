@@ -39,7 +39,7 @@ namespace SnowmeetApi.Controllers.Order
                         .ThenInclude(p => p.refunds.Where(r => (r.state == 1 || !r.refund_id.Trim().Equals(""))))
                 .Where(m => (m.order != null && m.order.pay_state == 1 
                 && ((DateTime)m.order.pay_time).Date >= startDate.Date && ((DateTime)m.order.pay_time).Date <= endDate.Date))
-                .AsNoTracking().ToListAsync();
+                .OrderByDescending(m => m.order.create_date).AsNoTracking().ToListAsync();
             List<SaleReport> ret = new List<SaleReport>();
             for(int i = 0; i < miList.Count; i++)
             {
