@@ -571,7 +571,7 @@ namespace SnowmeetApi.Controllers.Order
 
             Models.Users.Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);        
 
-            if (!(await _memberHelper.isStaff(sessionKey, sessionType)) 
+            if (member.is_manager == 0 && member.is_admin == 0
                 && !payment.open_id.Trim().Equals(member.wechatMiniOpenId.Trim()))
             {
                 return BadRequest();
