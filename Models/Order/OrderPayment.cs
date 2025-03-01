@@ -61,7 +61,7 @@ namespace SnowmeetApi.Models.Order
                 double amount = 0;
                 for (int i = 0; i < refunds.Count; i++)
                 {
-                    if (refunds[i].state == 1)
+                    if (refunds[i].state == 1 || !refunds[i].refund_id.Trim().Equals(""))
                     {
                         amount += refunds[i].amount;
                     }

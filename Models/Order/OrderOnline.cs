@@ -163,7 +163,7 @@ namespace SnowmeetApi.Models
                     {
                         for(int j = 0;paymentList[i].refunds != null && j < paymentList[i].refunds.Count; j++)
                         {
-                            if (paymentList[i].refunds[j].state == 1)
+                            if (paymentList[i].refunds[j].state == 1 || !paymentList[i].refunds[j].refund_id.Trim().Equals(""))
                             {
                                 refund += paymentList[i].refunds[j].amount;
                             }
