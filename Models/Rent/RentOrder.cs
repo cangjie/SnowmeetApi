@@ -5,7 +5,6 @@ using System.Collections;
 using System.Collections.Generic;
 using SnowmeetApi.Models.Order;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
-using System.IdentityModel.Tokens.Jwt;
 
 namespace SnowmeetApi.Models.Rent
 {
@@ -80,29 +79,7 @@ namespace SnowmeetApi.Models.Rent
         public DateTime? finish_date { get; set; }
         public DateTime create_date { get; set; } = DateTime.Now;
         public DateTime? update_date {get; set;} = null;
-        /*
-        [NotMapped]
-        public bool isDepositPaid
-        {
-            get
-            {
-                bool paid = false;
-                if (order != null && order.paymentList != null)
-                {
-                    for(int i = 0; i < order.paymentList.Count; i++)
-                    {
-                        OrderPayment payment = order.paymentList[i];
-                        if (payment.status.Equals(OrderPayment.PaymentStatus.支付成功.ToString()) && payment.pay_method.Trim().Equals("储值支付"))
-                        {
-                            paid = true;
-                            break;
-                        }
-                    }
-                }
-                return paid;
-            }
-        }
-        */
+        
         [NotMapped]
         public double totalDepositPaidAmount
         {
@@ -428,6 +405,7 @@ namespace SnowmeetApi.Models.Rent
         public OrderOnline? order {get; set;}
         [ForeignKey("rent_list_id")]
         public List<RentAdditionalPayment> additionalPayments {get; set;} = new List<RentAdditionalPayment>();
+
         [NotMapped]
         public double additionalPaidAmount
         {
@@ -521,6 +499,7 @@ namespace SnowmeetApi.Models.Rent
                 return refund;
             }
         }
+        
         public string GetPastStatus(DateTime date)
         {
             if (date.Date < create_date.Date)

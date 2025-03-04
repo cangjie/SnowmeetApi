@@ -642,7 +642,7 @@ namespace SnowmeetApi.Controllers.Order
                     await _context.SaveChangesAsync();
                     break;
             }
-            refund.oper = "";
+            //refund.oper = "";
             return Ok(refund);
 
         }

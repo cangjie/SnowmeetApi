@@ -2206,6 +2206,41 @@ namespace SnowmeetApi.Controllers
             return await _context.rentOrderLog.Where(l => l.rent_list_id == orderId)
                 .Include(l => l.member).OrderByDescending(l => l.id).ToListAsync();
         }
+        [HttpPost("{rentOrderId}")]
+        public async Task<ActionResult<RentOrder>> Refund([FromRoute]int rentOrderId, 
+            [FromBody]List<OrderPaymentRefund> refundList, string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            sessionKey = Util.UrlDecode(sessionKey).Trim();
+            UnicUser user = await Util.GetUser(sessionKey, _context);
+            if (!user.isAdmin)
+            {
+                return BadRequest();
+            }
+            RentOrder rentOrder = await _context.RentOrder.FindAsync(rentOrderId);
+            if (rentOrder==null || rentOrder.order_id == null || rentOrder.order_id <= 0)
+            {
+                return NotFound();
+            }
+           
+            OrderPaymentController _refunder = new OrderPaymentController(_context, _oriConfig, _httpContextAccessor);
+            for(int i = 0; i < refundList.Count; i++)
+            {
+                OrderPaymentRefund refund = refundList[i];
+                try
+                {
+                    await _refunder.Refund(refund.payment_id, refund.amount, "租赁退押金", sessionKey, sessionType);
+                }
+                catch
+                {
+
+                }
+            }
+            
+            RentOrder order = (RentOrder)((OkObjectResult)(await GetRentOrder(rentOrderId, sessionKey, false)).Result).Value;
+            //OrderOnline order = await _context.OrderOnlines.FindAsync()
+            return Ok(order);
+        }
+
 
        
         private bool RentOrderExists(int id)
