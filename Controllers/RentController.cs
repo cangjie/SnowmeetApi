@@ -1614,8 +1614,19 @@ namespace SnowmeetApi.Controllers
             {
                 return BadRequest();
             }
+            string prevMemo = order.memo.Trim();
             order.memo = memo;
             _context.RentOrder.Entry(order).State = EntityState.Modified;
+            RentOrderLog log = new RentOrderLog()
+            {
+                id = 0,
+                rent_list_id = order.id,
+                memo = "修改备注",
+                field_name = "memo",
+                prev_value = prevMemo.Trim(),
+                oper_member_id = user.member.id
+            };
+            await _context.rentOrderLog.AddAsync(log);
             await _context.SaveChangesAsync();
             return Ok(order);
         }
