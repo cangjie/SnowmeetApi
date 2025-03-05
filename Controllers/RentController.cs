@@ -2163,7 +2163,7 @@ namespace SnowmeetApi.Controllers
             }
             if (finishDate == null)
             {
-                if (user.member.is_manager == 0 || user.member.is_admin == 0)
+                if (user.member.is_manager == 0 && user.member.is_admin == 0)
                 {
                     return BadRequest();
                 }
