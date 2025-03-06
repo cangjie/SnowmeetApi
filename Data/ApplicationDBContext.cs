@@ -10,6 +10,7 @@ using SKIT.FlurlHttpClient.Wechat.TenpayV3.Models;
 using SnowmeetApi.Models.Product;
 using SnowmeetApi.Models.Maintain;
 using SnowmeetApi.Models.Order;
+using Aop.Api.Domain;
 namespace SnowmeetApi.Data
 {
     public class ApplicationDBContext : DbContext
@@ -47,7 +48,7 @@ namespace SnowmeetApi.Data
             modelBuilder.Entity<MaintainLog>().HasOne<Models.MaintainLive>().WithMany(m => m.taskLog).HasForeignKey(m => m.task_id);
             modelBuilder.Entity<OrderOnline>().HasMany<MaintainLive>().WithOne(m => m.order).HasForeignKey(m => m.order_id);
             modelBuilder.Entity<Brand>().HasKey(b => new {b.brand_name, b.brand_type});
-            modelBuilder.Entity<Member>().HasMany<RentOrderLog>().WithOne(m => m.member).HasForeignKey(r => r.oper_member_id);
+            modelBuilder.Entity<Models.Users.Member>().HasMany<RentOrderLog>().WithOne(m => m.member).HasForeignKey(r => r.oper_member_id);
             //modelBuilder.Entity<RentOrder>().HasOne<Recept>().WithOne().HasForeignKey<Recept>(r => r.submit_return_id);
 
         }
@@ -144,5 +145,7 @@ namespace SnowmeetApi.Data
         public DbSet<Models.Deposit.DepositTemplate> depositTemplate {get; set;}
         public DbSet<Models.Rent.RentAdditionalPayment> rentAdditionalPayment {get; set;}
         public DbSet<Models.Rent.RentOrderLog> rentOrderLog { get; set; }
+        public DbSet<Models.Rent.RentReward> rentReward { get; set; }
+        public DbSet<Models.Rent.RentRewardRefund> rentRewardRefund { get; set; }
     }
 }

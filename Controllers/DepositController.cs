@@ -322,7 +322,7 @@ namespace SnowmeetApi.Controllers
             return Ok(account);
         }
         [NonAction]
-        public async Task<DepositAccount> DepositAccountCharge(DepositAccount account, double amount, int operMemberId)
+        public DepositAccount DepositAccountCharge(DepositAccount account, double amount, int operMemberId)
         {
             DepositBalance b = new DepositBalance()
             {

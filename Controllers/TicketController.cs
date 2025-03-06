@@ -264,7 +264,7 @@ namespace SnowmeetApi.Controllers
                     await _context.SaveChangesAsync();
                     tickets[i] = ticket;
                 }
-                catch(DbUpdateException exp1)
+                catch
                 {
                     insertTicketSuccess = false;
                     _context.Ticket.Remove(ticket);

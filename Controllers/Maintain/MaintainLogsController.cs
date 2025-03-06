@@ -109,7 +109,7 @@ namespace SnowmeetApi.Controllers.Maintain
             for(int i = 0; i < list.Count; i++)
             {
                 MaintainReport r = list[i];
-                if (r.order_id == null)
+                if (r.order_id == 0)
                 {
                     continue;
                 }

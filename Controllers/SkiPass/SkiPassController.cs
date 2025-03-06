@@ -714,7 +714,7 @@ namespace SnowmeetApi.Controllers
                 return BadRequest();
             }
             Models.Users.Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
-            double totalPrice = 0;
+            //double totalPrice = 0;
             Models.SkiPass.SkiPass skipass = new Models.SkiPass.SkiPass()
             {
                 member_id = member.id,

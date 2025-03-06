@@ -668,7 +668,7 @@ namespace SnowmeetApi.Controllers
 
         }
         [HttpGet]
-        public async Task GetFlow(DateTime startDate, DateTime endDate)
+        public void GetFlow(DateTime startDate, DateTime endDate)
         {
             IAopClient client = GetClient(appId);
             AlipayDataBillAccountlogQueryRequest req = new AlipayDataBillAccountlogQueryRequest();
@@ -682,7 +682,7 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet]
-        public async Task GetBalance(string type, DateTime startDate, DateTime endDate)
+        public void GetBalance(string type, DateTime startDate, DateTime endDate)
         {
             
             IAopClient client = GetClient(appId);

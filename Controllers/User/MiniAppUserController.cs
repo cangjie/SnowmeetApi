@@ -319,7 +319,7 @@ namespace SnowmeetApi.Controllers
             string json = Util.AES_decrypt(encData.Trim(), sessionKey, iv);
             Newtonsoft.Json.Linq.JToken jsonObj = (Newtonsoft.Json.Linq.JToken)Newtonsoft.Json.JsonConvert.DeserializeObject(json);
             string cell = "";
-            string gender = "";
+            //string gender = "";
             string unionId = "";
 
             try
@@ -340,11 +340,11 @@ namespace SnowmeetApi.Controllers
                 {
                     if (jsonObj["gender"].ToString().Equals("0"))
                     {
-                        gender = "男";
+                        //gender = "男";
                     }
                     else
                     {
-                        gender = "女";
+                        //gender = "女";
                     }
                 }
             }
@@ -442,7 +442,7 @@ namespace SnowmeetApi.Controllers
                 await _context.SaveChangesAsync();
                 return user.miniAppUser;
             }
-            catch (Exception err)
+            catch
             {
 
                 return BadRequest();

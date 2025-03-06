@@ -78,7 +78,7 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet]
-        public async Task Query(string appId, string out_trade_no)
+        public void Query(string appId, string out_trade_no)
         {
             string certPath = Util.workingPath + "/AlipayCertificate/" + appId;
             string appCertPublicKeyPath = certPath + "/appCertPublicKey_" + appId + ".crt";
@@ -108,7 +108,7 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet("{appId}")]
-        public async Task  Test(string appId, double amount)
+        public void Test(string appId, double amount)
         {
             string certPath = Util.workingPath + "/AlipayCertificate/" + appId;
             string appCertPublicKeyPath = certPath + "/appCertPublicKey_" + appId + ".crt";
