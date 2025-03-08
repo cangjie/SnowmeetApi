@@ -575,6 +575,9 @@ namespace SnowmeetApi.Controllers
                     .ThenInclude(a => a.order)
                         .ThenInclude(o => o.paymentList.Where(p => p.status.Equals("支付成功")).OrderByDescending(p => p.id))
                             .ThenInclude(p => p.refunds.Where(r => r.state == 1).OrderByDescending(r => r.id))
+                .Include(r => r.rewards.OrderByDescending(r => r.id))
+                    .ThenInclude(r => r.rentRewardRefunds.OrderByDescending(r => r.id))
+                        .ThenInclude(r => r.refund)
                 .Where(r => r.id == id).ToListAsync();
             if (rentOrderList.Count == 0)
             {
@@ -843,6 +846,16 @@ namespace SnowmeetApi.Controllers
                 {
                     p.staffMember = msaL[0].member;
                 }
+            }
+            Mi7OrderController _mi7Helper = new Mi7OrderController(_context, _oriConfig);
+            for(int i = 0; rentOrder.rewards != null && i < rentOrder.rewards.Count; i++)
+            {
+                if (rentOrder.rewards[i].mi7_order_id != null && !rentOrder.rewards[i].mi7_order_id.Trim().Equals(""))
+                {
+                    Mi7Order mi7Order = (Mi7Order)((OkObjectResult)(await _mi7Helper.GetMi7Order(rentOrder.rewards[i].mi7_order_id, sessionKey)).Result).Value;
+                    rentOrder.rewards[i].mi7Order = mi7Order;
+                }
+                
             }
             var ret = Ok(rentOrder);
             return ret;

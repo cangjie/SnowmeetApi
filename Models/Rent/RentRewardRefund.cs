@@ -22,5 +22,17 @@ namespace SnowmeetApi.Models.Rent
         public OrderPayment? payment {get; set;} = null;
         [ForeignKey("refund_id")]
         public OrderPaymentRefund? refund {get; set;} = null;
+        public double refundAmount
+        {
+            get
+            {
+                double amount = 0;
+                if (refund != null && (refund.state == 1 || !refund.refund_id.Trim().Equals("")))
+                {
+                    amount = refund.amount;
+                }
+                return amount;
+            }
+        }
     }
 }

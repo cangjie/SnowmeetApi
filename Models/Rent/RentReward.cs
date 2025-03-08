@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using SnowmeetApi.Models.Order;
 
 namespace SnowmeetApi.Models.Rent
 {
@@ -23,6 +24,19 @@ namespace SnowmeetApi.Models.Rent
         public DateTime create_date { get; set; } = DateTime.Now;
         [ForeignKey(nameof(RentRewardRefund.rent_reward_id))]
         public List<RentRewardRefund> rentRewardRefunds { get; set; } = new List<RentRewardRefund>();
-
+        public double totalRefundAmount
+        {
+            get
+            {
+                double amount = 0;
+                for(int i = 0; i < rentRewardRefunds.Count; i++)
+                {
+                    amount += rentRewardRefunds[i].refundAmount;
+                }
+                return amount;
+            }
+        }
+        [NotMapped]
+        public Mi7Order? mi7Order {get; set;} = null;
     }
 }

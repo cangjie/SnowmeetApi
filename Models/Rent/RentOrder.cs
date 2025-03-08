@@ -539,6 +539,21 @@ namespace SnowmeetApi.Models.Rent
             }
             return ret;
         }
+        [ForeignKey(nameof(RentReward.rent_list_id))]
+        public List<RentReward> rewards {get; set;} = new List<RentReward>();
+        public double totalRewardAmount
+        {
+            get
+            {
+                double amount = 0;
+                for(int i = 0; i < rewards.Count; i++)
+                {
+                    amount += rewards[i].totalRefundAmount;
+                }
+                return amount;
+            }
+        }
+        
 
         
 
