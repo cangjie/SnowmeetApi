@@ -2252,6 +2252,58 @@ namespace SnowmeetApi.Controllers
             return Ok(order);
         }
 
+        [HttpPost]
+        public async Task<ActionResult<RentReward>> RewardRefund([FromBody] RentReward reward, 
+            [FromQuery] string sessionKey, [FromQuery] string sessionType = "wechat_mini_openid")
+        {
+            sessionKey = Util.UrlDecode(sessionKey).Trim();
+            UnicUser user = await Util.GetUser(sessionKey, _context);
+            if (!user.isAdmin)
+            {
+                return BadRequest();
+            }
+            reward.oper_member_id = user.member.id;
+            await _context.rentReward.AddAsync(reward);
+            await _context.SaveChangesAsync();
+            OrderPaymentController _refunder = new OrderPaymentController(_context, _oriConfig, _httpContextAccessor);
+            bool allSuccess = true;
+            for(int i = 0; i < reward.rentRewardRefunds.Count; i++)
+            {
+                RentRewardRefund r = reward.rentRewardRefunds[i];
+                try
+                {
+                    OrderPaymentRefund refund = (OrderPaymentRefund)((OkObjectResult)(await _refunder.Refund(r.payment_id, r.amount, "销售抵扣租赁", sessionKey, sessionType)).Result).Value;
+                    r.refund_id = refund.id;
+                    r.update_date = DateTime.Now;
+                    _context.rentRewardRefund.Entry(r).State = EntityState.Modified;
+                    if (refund.refund_id.Trim().Equals(""))
+                    {
+                        allSuccess = false;
+                    }
+                }
+                catch
+                {
+                    allSuccess = false;
+                }
+            }
+            if (allSuccess)
+            {
+                reward.refund_finish = 1;
+                reward.update_date = DateTime.Now;
+                _context.rentReward.Entry(reward).State = EntityState.Modified;
+            }
+            await _context.SaveChangesAsync();
+
+            for(int i = 0; i < reward.rentRewardRefunds.Count; i++)
+            {
+                RentRewardRefund rewardRefund = reward.rentRewardRefunds[i];
+                await _context.rentRewardRefund.Entry(rewardRefund).Reference(r => r.payment).LoadAsync();
+                await _context.rentRewardRefund.Entry(rewardRefund).Reference(r => r.refund).LoadAsync();
+            }
+
+            return Ok(reward);
+        }
+
 
        
         private bool RentOrderExists(int id)

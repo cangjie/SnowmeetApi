@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
@@ -13,12 +14,15 @@ namespace SnowmeetApi.Models.Rent
         public string? mi7_order_id { get; set; }
         public string? memo { get; set; }
         public double amount { get; set; }
-        public int valid { get; set; }
-        public int refund_finish { get; set; }
-        public int need_correct { get; set; }
+        public int valid { get; set; } = 1;
+        public int refund_finish { get; set; } = 0;
+        public int need_correct { get; set; } = 1;
         public int? correct_rent_list_id { get; set; }
+        public int? oper_member_id {get; set;}
         public DateTime? update_date { get; set; }
         public DateTime create_date { get; set; } = DateTime.Now;
+        [ForeignKey(nameof(RentRewardRefund.rent_reward_id))]
+        public List<RentRewardRefund> rentRewardRefunds { get; set; } = new List<RentRewardRefund>();
 
     }
 }

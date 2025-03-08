@@ -106,7 +106,7 @@ namespace SnowmeetApi.Controllers.Order
             return Ok(l);
         }
 */
-        [HttpGet("mi7OrderId")]
+        [HttpGet("{mi7OrderId}")]
         public async Task<ActionResult<Mi7Order>> GetMi7Order(string mi7OrderId, 
             string sessionKey, string sessionType = "wechat_mini_openid")
         {
@@ -116,7 +116,10 @@ namespace SnowmeetApi.Controllers.Order
             {
                 return BadRequest();
             }
-            List<Mi7Order> orders = await _context.mi7Order.Include(m => m.order)
+            List<Mi7Order> orders = await _context.mi7Order
+                .Include(m => m.order)
+                    .ThenInclude(o => o.paymentList.Where(p => p.status.Trim().Equals("支付成功")))
+                        .ThenInclude(p => p.refunds.Where(r => r.state == 1 || !r.refund_id.Trim().Equals("")))
                 .Where(m => m.mi7_order_id.Trim().Equals(mi7OrderId) && m.order.pay_state == 1)
                 .OrderByDescending(m => m.order.pay_time).AsNoTracking().ToListAsync();
             if (orders.Count == 0)
@@ -125,7 +128,10 @@ namespace SnowmeetApi.Controllers.Order
             }
             else
             {
-                return Ok(orders[0]);
+                Models.Order.Mi7Order mi7Order = orders[0];
+                MemberController _memberHelper = new MemberController(_context, _config);
+                mi7Order.order.member = await _memberHelper.GetMember(mi7Order.order.open_id, "wechat_mini_openid");
+                return Ok(mi7Order);
             }
         }
 
