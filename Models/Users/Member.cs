@@ -98,10 +98,20 @@ namespace SnowmeetApi.Models.Users
             {
                 string? v = null;
                 List<MemberSocialAccount> msaList = GetInfo("cell");
+                for(int i = 0; i < msaList.Count;i++)
+                {
+                    if (!msaList[i].num.Trim().Equals(""))
+                    {
+                        v = msaList[i].num.Trim();
+                        break;
+                    }
+                }
+                /*
                 if (msaList != null && msaList.Count > 0)
                 {
                     v = msaList[0].num.Trim();
                 }
+                */
                 return v;
             }
         }
