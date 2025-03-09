@@ -576,10 +576,6 @@ namespace SnowmeetApi.Controllers.Order
             {
                 return BadRequest();
             }
-            
-
-            
-            
             if (!payment.status.Equals("支付成功"))
             {
                 return BadRequest();
