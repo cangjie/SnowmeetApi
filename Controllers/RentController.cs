@@ -419,6 +419,12 @@ namespace SnowmeetApi.Controllers
             {
                 return BadRequest();
             }
+            if (cell.Length > 4)
+            {
+                RentOrder rentOrder = (RentOrder)((OkObjectResult)(await GetRentOrder(int.Parse(cell), sessionKey, false)).Result).Value;
+                return Ok(new RentOrder[] {rentOrder});
+
+            }
             shop = Util.UrlDecode(shop).Trim();
             status = Util.UrlDecode(status).Trim();
             sessionKey = Util.UrlDecode(sessionKey).Trim();
