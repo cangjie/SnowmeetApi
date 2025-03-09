@@ -571,7 +571,7 @@ namespace SnowmeetApi.Controllers.Order
 
             Models.Users.Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);        
 
-            if (member.is_manager == 0 && member.is_admin == 0
+            if (member.is_manager == 0 && member.is_admin == 0 && member.is_staff == 0
                 && !payment.open_id.Trim().Equals(member.wechatMiniOpenId.Trim()))
             {
                 return BadRequest();
@@ -579,16 +579,6 @@ namespace SnowmeetApi.Controllers.Order
             
 
             
-
-            /*
-            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
-            if (!user.isAdmin)
-            {
-                return BadRequest();
-            }
-            */
-
-
             
             if (!payment.status.Equals("支付成功"))
             {
