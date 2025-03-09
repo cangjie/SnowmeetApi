@@ -2303,6 +2303,20 @@ namespace SnowmeetApi.Controllers
             {
                 reward.refund_finish = 1;
                 reward.update_date = DateTime.Now;
+                RentOrder rentOrder = await _context.RentOrder.FindAsync(reward.rent_list_id);
+                if (rentOrder.finish_date != null)
+                {
+                    DateTime fDate = (DateTime)rentOrder.finish_date;
+                    if (fDate.Year == reward.create_date.Year
+                        && fDate.Month == reward.create_date.Month)
+                    {
+                        reward.need_correct = 0;
+                    }
+                }
+                else
+                {
+                    reward.need_correct = 0;
+                }
                 _context.rentReward.Entry(reward).State = EntityState.Modified;
             }
             await _context.SaveChangesAsync();
