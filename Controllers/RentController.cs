@@ -2225,8 +2225,10 @@ namespace SnowmeetApi.Controllers
                     r.update_date = DateTime.Now;
                     _context.rentReward.Entry(r).State = EntityState.Modified;
                     rentOrder.hide = 1;
+                    
                 }
             }
+            rentOrder.update_date = DateTime.Now;
             _context.RentOrder.Entry(rentOrder).State = EntityState.Modified;
             await _context.SaveChangesAsync();
             return Ok(rentOrder);
