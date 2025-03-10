@@ -176,41 +176,17 @@ namespace SnowmeetApi.Controllers.Order
                     {
                         await uCtl.SetReservePaySuccess(utvList[0].id);
                     }
-                    //await uCtl.SetReservePaySuccess()
                     break;
                 default:
                     break;
             }
-
-
             return order;
-            
         }
 
         [NonAction]
         public int GetMchId(OrderOnline order)
         {
             int mchId = 3;
-            /*
-
-            if (order.type == "押金" || order.type == "UTV押金")
-            {
-                mchId = 5;
-                //mchId = 3;
-            }
-            if (order.type != "雪票" && order.shop == "南山")
-            {
-                mchId = 6;
-            }
-            if (order.type == "雪票" && order.shop == "南山")
-            {
-                mchId = 7;
-            }
-            */
-
-            //test
-            //mchId = 9;
-
             if (order.shop.Trim().IndexOf("南山") >= 0)
             {
                 switch (order.type.Trim())

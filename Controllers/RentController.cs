@@ -220,10 +220,10 @@ namespace SnowmeetApi.Controllers
             }
 
             var idList = await _context.idList.FromSqlRaw(" select distinct rent_list_id as id from rent_list_detail  "
-                + "left join rent_list on rent_list.[id] = rent_list_id"
+                + " left join rent_list on rent_list.[id] = rent_list_id "
                 + " where finish_date >= '" + startDate.ToShortDateString() + "' "
                 + " and finish_date <= '" + endDate.AddDays(1).ToShortDateString() + "' and shop like '" + shop + "%'  "
-                + " and finish_date is not null and closed = 0 "
+                + " and finish_date is not null and closed = 0 and hide = 0 "
                 //+ " and rent_list.[id] = 2434"
                 )
                 .AsNoTracking().ToListAsync();
@@ -2222,6 +2222,22 @@ namespace SnowmeetApi.Controllers
             };
             await _context.rentOrderLog.AddAsync(log);
             rentOrder.finish_date = finishDate;
+            if (rentOrder.hide == 0 && finishDate != null && rentOrder.shop.Trim().Equals("万龙体验中心"))
+            {
+                List<RentReward> rentRewards = await _context.rentReward
+                    .Where(r => r.need_correct == 1 && r.correct_rent_list_id == null)
+                    .OrderBy(r => r.id).ToListAsync();
+                if (rentRewards.Count > 0)
+                {
+                    RentReward r = rentRewards[0];
+                    r.correct_rent_list_id = rentOrder.id;
+                    r.update_date = DateTime.Now;
+                    _context.rentReward.Entry(r).State = EntityState.Modified;
+                    rentOrder.hide = 1;
+                    
+                }
+            }
+            rentOrder.update_date = DateTime.Now;
             _context.RentOrder.Entry(rentOrder).State = EntityState.Modified;
             await _context.SaveChangesAsync();
             return Ok(rentOrder);
