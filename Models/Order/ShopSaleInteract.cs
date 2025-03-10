@@ -16,7 +16,35 @@ namespace SnowmeetApi.Models.Order
         public int scan { get; set; } = 0;
         public string scan_type { get; set; } = "";
         public int? biz_id {get; set;} = null;
+        public string? scaner_mini_open_id {get; set;} = null;
+        public string? cell {get; set;}
+        public int? auth_manager_member_id {get; set;} = null;
         public DateTime create_date { get; set; } = DateTime.Now;
+        public bool needAuth
+        {
+            get
+            {
+                bool need = false;
+                if (cell != null && cell.Length == 11 && scaner_mini_open_id != null)
+                {
+                    need = true;
+                }
+                return need;
+            }
+        }
+        public bool haveAuthed
+        {
+            get
+            {
+                bool authed = false;
+                if (needAuth && auth_manager_member_id != null)
+                {
+                    authed = true;
+                }
+                return authed;
+            }
+        }
+
 
         [NotMapped]
         public MiniAppUser miniAppUser 
@@ -32,6 +60,7 @@ namespace SnowmeetApi.Models.Order
 
         [NotMapped]
         public Member member {get; set;} = null;
+        
     }
 }
 

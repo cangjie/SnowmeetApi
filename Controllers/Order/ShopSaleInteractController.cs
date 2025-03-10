@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Aop.Api.Domain;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -117,7 +118,7 @@ namespace SnowmeetApi.Controllers.Order
                 return NoContent();
             }
             var scan = await _context.ShopSaleInteract.FindAsync(id);
-            if (scan.scaner_oa_open_id.Trim().Equals(""))
+            if (scan.scaner_oa_open_id.Trim().Equals("") && scan.auth_manager_member_id == null)
             {
                 return NotFound();
             }
@@ -138,7 +139,39 @@ namespace SnowmeetApi.Controllers.Order
                 return scan;
             }
         }
-                [NonAction]
+        [HttpGet("{interactId}")]
+        public async Task<ActionResult<ShopSaleInteract>> SetOpenIdByCell(int interactId, string cell, string openId,
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
+            if (!user.isAdmin)
+            {
+                return BadRequest();
+            }
+
+            ShopSaleInteract interact = await _context.ShopSaleInteract.FindAsync(interactId);
+            interact.scaner_mini_open_id = openId.Trim();
+            interact.cell = cell.Trim();
+            _context.ShopSaleInteract.Entry(interact).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
+            return Ok(interact);
+        }
+        [HttpGet]
+        public async Task<ActionResult<List<ShopSaleInteract>>> GetAuthList(string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
+            if (!user.isAdmin)
+            {
+                return BadRequest();
+            }
+            List<ShopSaleInteract> authList = (await _context.ShopSaleInteract
+                .Where(s => s.create_date >= DateTime.Now.AddDays(-7).Date)
+                .ToListAsync()).Where(a => a.needAuth).ToList();
+            return Ok(authList);
+        }
+        [NonAction]
         private bool ShopSaleInteractExists(int id)
         {
             return _context.ShopSaleInteract.Any(e => e.id == id);
