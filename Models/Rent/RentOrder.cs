@@ -79,7 +79,7 @@ namespace SnowmeetApi.Models.Rent
         public DateTime? finish_date { get; set; }
         public DateTime create_date { get; set; } = DateTime.Now;
         public DateTime? update_date {get; set;} = null;
-        
+        public int hide {get; set;} = 0;
         [NotMapped]
         public double totalDepositPaidAmount
         {
