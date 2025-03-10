@@ -687,18 +687,18 @@ namespace SnowmeetApi.Controllers
             return ret;
         }
 
-        [NonAction]
-        public async Task UnFreezeAll()
+        [HttpGet]
+        public async Task UnFreezeAll(int mchId)
         {
             DateTime startDate = DateTime.Parse("2024-10-15");
             List<OrderPayment> pList = await _db.OrderPayment
-                .Where(p => p.create_date > startDate && p.status.Trim().Equals("支付成功") )
+                .Where(p => p.create_date > startDate && p.status.Trim().Equals("支付成功") && p.mch_id == mchId )
                 .OrderByDescending(p=>p.id).AsNoTracking().ToListAsync();
             for(int i = 0; i < pList.Count; i++)
             {
                 try
                 {
-                    await ShareFinish(pList[i].id, "");
+                    await ShareFinish(pList[i].id, "雪季结束");
                 }
                 catch
                 {
