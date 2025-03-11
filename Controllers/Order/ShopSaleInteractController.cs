@@ -137,7 +137,7 @@ namespace SnowmeetApi.Controllers.Order
             if (scanUser == null || scanUser.member == null)
             {
                 await _context.ShopSaleInteract.Entry(scan).Reference(s => s.scanMember).LoadAsync();
-                await _context.member.Entry(scan.member).Collection(m => m.memberSocialAccounts).LoadAsync();
+                await _context.member.Entry(scan.scanMember).Collection(m => m.memberSocialAccounts).LoadAsync();
                 scan.member = scan.scanMember;
             }
             if (scan == null)
