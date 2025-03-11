@@ -18,6 +18,8 @@ namespace SnowmeetApi.Models.Order
         public int? biz_id {get; set;} = null;
         public string? scaner_mini_open_id {get; set;} = null;
         public string? cell {get; set;}
+        public int? scaner_member_id {get; set;}
+        public int? staff_member_id {get; set;}
         public int? auth_manager_member_id {get; set;} = null;
         public DateTime create_date { get; set; } = DateTime.Now;
         public bool needAuth
@@ -59,7 +61,11 @@ namespace SnowmeetApi.Models.Order
         }
 
         [NotMapped]
-        public Member member {get; set;} = null;
+        public Member? member {get; set;} = null;
+        [ForeignKey("scaner_member_id")]
+        public Member? scanMember {get; set;} = null;
+        [ForeignKey("staff_member_id")]
+        public Member? staffMember {get; set;} = null;
         
     }
 }

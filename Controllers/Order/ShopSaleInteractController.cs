@@ -67,6 +67,7 @@ namespace SnowmeetApi.Controllers.Order
                 return NoContent();
             }
             bool needCreateNew = false;
+                    
             int retId = 0;
             try
             {
@@ -74,7 +75,7 @@ namespace SnowmeetApi.Controllers.Order
                     .ShopSaleInteract
                     .Where(s => (s.staff_mapp_open_id == staffUser.miniAppOpenId.Trim()))
                     .OrderByDescending(s => s.id).FirstAsync();
-                if (scan == null || scan.scan == 1 || scan.create_date < DateTime.Now.AddMinutes(-600))
+                if (scan == null || scan.scan == 1 || scan.create_date < DateTime.Now.AddMinutes(-600) || scan.needAuth)
                 {
                     needCreateNew = true;
                 }
@@ -90,11 +91,13 @@ namespace SnowmeetApi.Controllers.Order
             
             if (needCreateNew)
             {
+               
                 var scanNew = new ShopSaleInteract()
                 {
                     id = 0,
                     staff_mapp_open_id = staffUser.miniAppOpenId.Trim(),
-                    scan = 0
+                    scan = 0,
+                    staff_member_id = staffUser.member.id
                 };
                 await _context.AddAsync(scanNew);
                 await _context.SaveChangesAsync();
@@ -103,6 +106,7 @@ namespace SnowmeetApi.Controllers.Order
             else
             {
                 return Ok(retId);
+                //return BadRequest();
             }
             //return NotFound();
         }
@@ -149,10 +153,19 @@ namespace SnowmeetApi.Controllers.Order
             {
                 return BadRequest();
             }
+            List<MemberSocialAccount> msaList = await _context.memberSocialAccount
+                .Where(m => m.num.Trim().Equals(cell) && m.type.Trim().Equals("cell") && m.valid == 1)
+                .OrderByDescending(m => m.id).AsNoTracking().ToListAsync();
+            int? memberId = null;
+            if (msaList.Count > 0)
+            {
+                memberId = msaList[0].member_id;
+            }
 
             ShopSaleInteract interact = await _context.ShopSaleInteract.FindAsync(interactId);
             interact.scaner_mini_open_id = openId.Trim();
             interact.cell = cell.Trim();
+            interact.scaner_member_id = memberId;
             _context.ShopSaleInteract.Entry(interact).State = EntityState.Modified;
             await _context.SaveChangesAsync();
             return Ok(interact);
@@ -167,9 +180,27 @@ namespace SnowmeetApi.Controllers.Order
                 return BadRequest();
             }
             List<ShopSaleInteract> authList = (await _context.ShopSaleInteract
-                .Where(s => s.create_date >= DateTime.Now.AddDays(-7).Date)
-                .ToListAsync()).Where(a => a.needAuth).ToList();
+                .Include(s => s.scanMember).ThenInclude(m => m.memberSocialAccounts.Where(s => s.valid == 1))
+                .Include(s => s.staffMember).ThenInclude(m => m.memberSocialAccounts.Where(s => s.valid == 1))
+                .Where(s => s.create_date >= DateTime.Now.AddDays(-7).Date && s.scaner_member_id != null)
+                .OrderByDescending(s=>s.id).ToListAsync()).Where(a => a.needAuth).ToList();
             return Ok(authList);
+        }
+        [HttpGet("{id}")]
+        public async Task<ActionResult<ShopSaleInteract>> Auth(int id, string sessionKey, 
+            string sessionType = "wechat_mini_openid")
+        {
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
+            if (user.member.is_admin == 0 && user.member.is_manager == 0)
+            {
+                return BadRequest();
+            }
+            ShopSaleInteract scan = await _context.ShopSaleInteract.FindAsync(id);
+            scan.scan = 1;
+            scan.auth_manager_member_id = user.member.id;
+            _context.ShopSaleInteract.Entry(scan).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
+            return Ok(scan);
         }
         [NonAction]
         private bool ShopSaleInteractExists(int id)
