@@ -134,7 +134,7 @@ namespace SnowmeetApi.Controllers.Order
                 scan.miniAppUser = scan.member.miniAppUser;
                 
             }
-            if (scanUser.member == null)
+            if (scanUser == null || scanUser.member == null)
             {
                 await _context.ShopSaleInteract.Entry(scan).Reference(s => s.scanMember).LoadAsync();
                 await _context.member.Entry(scan.member).Collection(m => m.memberSocialAccounts).LoadAsync();
