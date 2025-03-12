@@ -128,10 +128,14 @@ namespace SnowmeetApi.Controllers.Order
                 List<ShopSaleInteract> scanList = await _context.ShopSaleInteract
                     .Where(s => s.cell.Trim().Equals(scan.cell) && s.create_date >= scan.create_date.AddHours(-1)
                     && s.auth_manager_member_id != null).OrderByDescending(s => s.id).AsNoTracking().ToListAsync();
-                scan.auth_manager_member_id = scan.auth_manager_member_id;
-                _context.ShopSaleInteract.Entry(scan).State = EntityState.Modified;
-                await _context.SaveChangesAsync();
-                haveAuthed = true;
+                if (scanList.Count > 0)
+                {
+                    scan.auth_manager_member_id = scanList[0].auth_manager_member_id;
+                    _context.ShopSaleInteract.Entry(scan).State = EntityState.Modified;
+                    await _context.SaveChangesAsync();
+                    haveAuthed = true;
+                }
+                
                 //return Ok(scan);
 
 
