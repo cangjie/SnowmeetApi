@@ -142,6 +142,18 @@ namespace SnowmeetApi.Controllers.Order
             }
             if (scan == null)
             {
+                if (scan.cell != null)
+                {
+                    List<ShopSaleInteract> scanList = await _context.ShopSaleInteract
+                        .Where(s => s.cell.Trim().Equals(scan.cell) && s.create_date >= scan.create_date.AddHours(-1)
+                        && s.auth_manager_member_id != null).OrderByDescending(s => s.id).AsNoTracking().ToListAsync();
+                    scan.auth_manager_member_id = scan.auth_manager_member_id;
+                    _context.ShopSaleInteract.Entry(scan).State = EntityState.Modified;
+                    await _context.SaveChangesAsync();
+                    return Ok(scan);
+
+
+                }
                 return NotFound();
             }
             else
