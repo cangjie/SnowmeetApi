@@ -131,6 +131,7 @@ namespace SnowmeetApi.Controllers.Order
                 if (scanList.Count > 0)
                 {
                     scan.auth_manager_member_id = scanList[0].auth_manager_member_id;
+                    scan.scan = 1;
                     _context.ShopSaleInteract.Entry(scan).State = EntityState.Modified;
                     await _context.SaveChangesAsync();
                     haveAuthed = true;
