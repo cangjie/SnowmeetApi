@@ -50,7 +50,6 @@ namespace SnowmeetApi.Controllers.Order
             ShopSaleInteract ssi = await _context.ShopSaleInteract.FindAsync(retId);
             ssi.scan_type = scene.Trim();
             ssi.biz_id = bizId;
-            //ssi.biz_memo = bizMemo;
             _context.ShopSaleInteract.Entry(ssi).State = EntityState.Modified;
             await _context.SaveChangesAsync();
             return Ok(retId);
