@@ -159,6 +159,8 @@ namespace SnowmeetApi.Controllers.Order
             {
                 return BadRequest();
             }
+            Models.Users.CellWhiteList cellWhite = await _context.cellWhiteList.FindAsync(cell.Trim());
+
             List<MemberSocialAccount> msaList = await _context.memberSocialAccount
                 .Where(m => m.num.Trim().Equals(cell) && m.type.Trim().Equals("cell") && m.valid == 1)
                 .OrderByDescending(m => m.id).AsNoTracking().ToListAsync();
@@ -172,6 +174,15 @@ namespace SnowmeetApi.Controllers.Order
             interact.scaner_mini_open_id = openId.Trim();
             interact.cell = cell.Trim();
             interact.scaner_member_id = memberId;
+
+            if (cellWhite != null)
+            {
+                interact.scan = 1;
+                interact.auth_manager_member_id = 0;
+            }
+
+
+
             _context.ShopSaleInteract.Entry(interact).State = EntityState.Modified;
             await _context.SaveChangesAsync();
             return Ok(interact);

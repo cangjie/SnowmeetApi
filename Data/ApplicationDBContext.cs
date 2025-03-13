@@ -147,5 +147,6 @@ namespace SnowmeetApi.Data
         public DbSet<Models.Rent.RentOrderLog> rentOrderLog { get; set; }
         public DbSet<Models.Rent.RentReward> rentReward { get; set; }
         public DbSet<Models.Rent.RentRewardRefund> rentRewardRefund { get; set; }
+        public DbSet<Models.Users.CellWhiteList> cellWhiteList {get; set;}
     }
 }
