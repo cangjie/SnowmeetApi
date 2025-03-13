@@ -50,7 +50,6 @@ namespace SnowmeetApi.Controllers.Order
             ShopSaleInteract ssi = await _context.ShopSaleInteract.FindAsync(retId);
             ssi.scan_type = scene.Trim();
             ssi.biz_id = bizId;
-            //ssi.biz_memo = bizMemo;
             _context.ShopSaleInteract.Entry(ssi).State = EntityState.Modified;
             await _context.SaveChangesAsync();
             return Ok(retId);
@@ -122,8 +121,28 @@ namespace SnowmeetApi.Controllers.Order
                 return NoContent();
             }
             var scan = await _context.ShopSaleInteract.FindAsync(id);
-            if (scan.scaner_oa_open_id.Trim().Equals("") && scan.auth_manager_member_id == null)
+            bool haveAuthed = false;
+            if (scan.cell != null)
             {
+                List<ShopSaleInteract> scanList = await _context.ShopSaleInteract
+                    .Where(s => s.cell.Trim().Equals(scan.cell) && s.create_date >= scan.create_date.AddHours(-1)
+                    && s.auth_manager_member_id != null).OrderByDescending(s => s.id).AsNoTracking().ToListAsync();
+                if (scanList.Count > 0)
+                {
+                    scan.auth_manager_member_id = scanList[0].auth_manager_member_id;
+                    scan.scan = 1;
+                    _context.ShopSaleInteract.Entry(scan).State = EntityState.Modified;
+                    await _context.SaveChangesAsync();
+                    haveAuthed = true;
+                }
+                
+                //return Ok(scan);
+
+
+            }
+            if (scan.scaner_oa_open_id.Trim().Equals("") && scan.auth_manager_member_id == null && !haveAuthed)
+            {
+
                 return NotFound();
             }
             UnicUser scanUser = await UnicUser.GetUnicUserByDetailInfo(scan.scaner_oa_open_id, "wechat_oa_openid", _context);
@@ -142,6 +161,7 @@ namespace SnowmeetApi.Controllers.Order
             }
             if (scan == null)
             {
+              
                 return NotFound();
             }
             else
