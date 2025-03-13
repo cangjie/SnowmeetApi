@@ -29,15 +29,10 @@ namespace LuqinMiniAppBase.Controllers
     [ApiController]
     public class MiniAppHelperController : ControllerBase
     {
-
         private readonly ApplicationDBContext _db;
-
         private readonly IConfiguration _config;
-
         private readonly Settings _settings;
-
         public MemberController _memberHelper;
-
         public MiniAppHelperController(ApplicationDBContext db, IConfiguration config)
         {
             _db = db;
@@ -45,16 +40,12 @@ namespace LuqinMiniAppBase.Controllers
             _settings = Settings.GetSettings(_config);
             _memberHelper = new MemberController(db, config);
         }
-
         [HttpGet]
         public ActionResult<string> PushMessage(string signature,
             string timestamp, string nonce, string echostr)
         {
             return echostr.Trim();
         }
-
-
-        
         [HttpPost]
         public async Task<ActionResult<string>> PushMessage([FromQuery] string signature,
             [FromQuery] string timestamp, [FromQuery] string nonce)
@@ -82,7 +73,6 @@ namespace LuqinMiniAppBase.Controllers
                 using (var reader = new StreamReader(stream, Encoding.UTF8, true, 1024, true))
                 {
                     body = await reader.ReadToEndAsync();
-
                     string path = $"{Environment.CurrentDirectory}";
                     string dateStr = DateTime.Now.Year.ToString() + DateTime.Now.Month.ToString().PadLeft(2, '0')
                         + DateTime.Now.Day.ToString().PadLeft(2, '0');
@@ -101,20 +91,17 @@ namespace LuqinMiniAppBase.Controllers
                         fw.Close();
                     }
                 }
-
             }
             try
             {
                 XmlDocument xmlD = new XmlDocument();
                 xmlD.LoadXml(body);
                 XmlNode root = xmlD.SelectSingleNode("//xml");
-
                 string eventStr = "";
                 string eventKey = "";
                 string content = "";
                 string msgId = "";
                 string msgType = root.SelectSingleNode("MsgType").InnerText.Trim();
-
                 if (msgType.Trim().Equals("event"))
                 {
                     eventStr = root.SelectSingleNode("Event").InnerText.Trim();
@@ -126,8 +113,6 @@ namespace LuqinMiniAppBase.Controllers
                     msgId = root.SelectSingleNode("MsgId").InnerText.Trim();
                     msgType = root.SelectSingleNode("MsgType").InnerText.Trim();
                 }
-
-                
                 OAReceive msg = new OAReceive()
                 {
                     id = 0,
@@ -143,19 +128,13 @@ namespace LuqinMiniAppBase.Controllers
                 };
                 await _db.oAReceive.AddAsync(msg);
                 await _db.SaveChangesAsync();
-                /*
-                OfficailAccountReply reply = new OfficailAccountReply(_db, _config, msg);
-                return reply.Reply().Trim();
-                */
                 return "success";
             }
             catch
             {
-
             }
             return "success";
         }
-
         [HttpGet]
         public async Task<ActionResult<Code2Session>> MemberLogin(string code, string openIdType)
         {
@@ -274,104 +253,16 @@ namespace LuqinMiniAppBase.Controllers
                 await _db.MiniSessons.AddAsync(session);
                 await _db.SaveChangesAsync();
             }
-
-            /*
-            Member memberNew = new Member()
-            {
-                id = 0,
-                real_name = member.real_name,
-                gender = member.gender,
-                is_admin = member.is_admin,
-                is_manager = member.is_manager,
-                is_staff = member.is_staff,
-                in_staff_list = member.in_staff_list,
-                memberSocialAccounts = new List<MemberSocialAccount>()
-            };
-
-            foreach(MemberSocialAccount msadd in member.memberSocialAccounts)
-            {
-                if (msadd.type.Trim().Equals("cell"))
-                {
-                    memberNew.memberSocialAccounts.Add(msadd);
-                }
-            }
-
-            */
             sessionObj.member = _memberHelper.RemoveSensitiveInfo(member);
             sessionObj.openid = "";
             sessionObj.unionid = "";
             return Ok(sessionObj);
         }
-
-        /*
-        [HttpGet]
-        public  async Task<ActionResult<Code2Session>> Login(string code)
-        {
-            string appId = _settings.appId;
-            string appSecret = _settings.appSecret;
-            string checkUrl = "https://api.weixin.qq.com/sns/jscode2session?appid=" + appId.Trim()
-                + "&secret=" + appSecret.Trim() + "&js_code=" + code.Trim()
-                + "&grant_type=authorization_code";
-            string jsonResult = Util.GetWebContent(checkUrl);
-            Code2Session sessionObj = JsonConvert.DeserializeObject<Code2Session>(jsonResult);
-            
-            if (sessionObj.errcode.ToString().Equals(""))
-            {
-                var sessionList = await _db.MiniSessons.Where(m => (m.session_key.Trim().Equals(sessionObj.session_key.Trim())
-                    && m.open_id.Trim().Equals(sessionObj.openid.Trim()))).ToListAsync();
-
-                
-
-                if (sessionList.Count == 0)
-                {
-                    MiniSession mSession = new MiniSession()
-                    {
-                        session_key = sessionObj.session_key.Trim(),
-                        open_id = sessionObj.openid.Trim()
-                    };
-                    await _db.MiniSessons.AddAsync(mSession);
-                    await _db.SaveChangesAsync();
-                }
-                MiniAppUser user = await _db.MiniAppUsers.FindAsync(sessionObj.openid);
-                if (user == null)
-                {
-                    user = new MiniAppUser()
-                    {
-                        open_id = sessionObj.openid,
-                        union_id = sessionObj.unionid.Trim()
-                        
-                    };
-                    await _db.MiniAppUsers.AddAsync(user);
-                    await _db.SaveChangesAsync();
-                }
-                var uidList = await _db.UnionIds.Where(u => (u.open_id.Trim().Equals(sessionObj.openid.Trim())
-                    && u.source.Trim().Equals("snowmeet_mini") && u.union_id.Trim().Equals(sessionObj.unionid.Trim()))).ToListAsync();
-                if (uidList.Count == 0)
-                {
-                    UnionId uid = new UnionId()
-                    {
-                        source = "snowmeet_mini",
-                        open_id = sessionObj.openid,
-                        union_id = sessionObj.unionid.Trim()
-                    };
-                    await _db.UnionIds.AddAsync(uid);
-                    await _db.SaveChangesAsync();
-                }
-                sessionObj.openid = "";
-                return sessionObj;
-            }
-            return NotFound();
-        }
-        */
-        
-
-
         [HttpGet]
         public void RefreshAccessToken()
         {
             GetAccessToken();
         }
-
         [NonAction]
         public string GetAccessToken()
         {
@@ -406,7 +297,6 @@ namespace LuqinMiniAppBase.Controllers
                 }
                 long timeDiff = long.Parse(nowTime) - long.Parse(tokenTime);
                 TimeSpan ts = new TimeSpan(0, 0, 0, 0, (int)timeDiff);
-                //TimeSpan ts = new TimeSpan()
                 if (ts.TotalSeconds > 3600)
                 {
                     token = "";
@@ -418,7 +308,6 @@ namespace LuqinMiniAppBase.Controllers
                 else
                 {
                     return token.Trim();
-                    //return "";
                 }
             }
             string getTokenUrl = "https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid="
