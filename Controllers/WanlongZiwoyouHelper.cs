@@ -290,53 +290,22 @@ namespace SnowmeetApi.Controllers
                 + ",\n\t\"orderMemo\": \"" + memo + "\",\n\t\"orderSourceId\": \"" + orderId.Trim()
                 + "\",\n\t\"travelDate\": \"" + date.ToString("yyyy-MM-dd") + "\"\n}";
             string url = "https://task-api.zowoyoo.com/api/thirdPaty/order/add";
-            WebApiLog reqLog = await _miniHelper.PerformRequest(url, "", postData, "POST", "易龙雪聚小程序", "预订雪票", "");
-
-            
-            //string ret = Util.GetWebContent("https://task-api.zowoyoo.com/api/thirdPaty/order/add",
+            WebApiLog reqLog = await _miniHelper.PerformRequest(url, "", postData, "POST", "易龙雪聚小程序", "预订雪票", "大好河山下单");
+            ZiwoyouPlaceOrderResult r = JsonConvert.DeserializeObject<ZiwoyouPlaceOrderResult>(reqLog.response.Trim());
+            return r;
+        }
+        [NonAction]
+        public async Task<PayResult> Pay(int orderId)
+        {
+            MiniAppHelperController _miniHelper = new MiniAppHelperController(_context, _oriConfig);
+            string postData = "{\"apikey\": \"" + apiKey + "\",\"custId\": " + custId.Trim() + ",\"orderId\": " + orderId.ToString() + "}";
+            //string ret = Util.GetWebContent("https://task-api.zowoyoo.com/api/thirdPaty/order/pay",
             //    postData, "application/json");
+            WebApiLog reqLog = await _miniHelper.PerformRequest("https://task-api.zowoyoo.com/api/thirdPaty/order/pay", 
+                "", postData, "POST", "易龙雪聚小程序", "预订雪票", "大好河山支付");
 
             
             /*
-            string path = $"{Environment.CurrentDirectory}";
-            string dateStr = DateTime.Now.Year.ToString() + DateTime.Now.Month.ToString().PadLeft(2, '0')
-                + DateTime.Now.Day.ToString().PadLeft(2, '0');
-
-
-            using (StreamWriter fw = new StreamWriter(path + "/booking_" + dateStr + ".txt", true))
-            {
-                fw.WriteLine(DateTime.Now.ToString());
-                fw.WriteLine("https://task-api.zowoyoo.com/api/thirdPaty/order/add");
-                fw.WriteLine(postData);
-                fw.WriteLine(ret);
-                fw.WriteLine("");
-
-            }
-            */
-
-            ZiwoyouPlaceOrderResult r = JsonConvert.DeserializeObject<ZiwoyouPlaceOrderResult>(reqLog.response.Trim());
-            return r;
-
-        }
-
-        /*
-        [HttpGet("{productNo}")]
-        public ActionResult<string> GetProductDetail(string productNo)
-        {
-            string postData = "{\"apikey\": \"" + apiKey + "\",\"custId\": " + custId.Trim() + ",\"productNo\": " + productNo.ToString() + "}";
-            string ret = Util.GetWebContent("https://task-api-stag.zowoyoo.com/api/thirdPaty/prod/detail",
-                postData, "application/json");
-            return Ok(ret);
-        }
-        */
-
-        [NonAction]
-        public PayResult Pay(int orderId)
-        {
-            string postData = "{\"apikey\": \"" + apiKey + "\",\"custId\": " + custId.Trim() + ",\"orderId\": " + orderId.ToString() + "}";
-            string ret = Util.GetWebContent("https://task-api.zowoyoo.com/api/thirdPaty/order/pay",
-                postData, "application/json");
-
             string path = $"{Environment.CurrentDirectory}";
             string dateStr = DateTime.Now.Year.ToString() + DateTime.Now.Month.ToString().PadLeft(2, '0')
                 + DateTime.Now.Day.ToString().PadLeft(2, '0');
@@ -349,43 +318,54 @@ namespace SnowmeetApi.Controllers
                 fw.WriteLine("");
 
             }
+            */
             
 
-            PayResult p = JsonConvert.DeserializeObject<PayResult>(ret);
+            PayResult p = JsonConvert.DeserializeObject<PayResult>(reqLog.response);
             return p;
 
         }
 
         [HttpGet]
-        public string GetProductDetail(int productId)
+        public async Task<ActionResult<string>> GetProductDetail(int productId)
         {
+            MiniAppHelperController _miniHelper = new MiniAppHelperController(_context, _oriConfig);
             string postData = "{\"apikey\": \"" + apiKey + "\",\"custId\": " + custId.Trim() + ",\"productNo\": " + productId.ToString() + "}";
-            string ret = Util.GetWebContent("https://task-api.zowoyoo.com/api/thirdPaty/prod/detail",
-                postData, "application/json");
+            //string ret = Util.GetWebContent("https://task-api.zowoyoo.com/api/thirdPaty/prod/detail",
+            //    postData, "application/json");
+            WebApiLog log = await _miniHelper.PerformRequest("https://task-api.zowoyoo.com/api/thirdPaty/prod/detail",
+                 "", postData, "POST", "易龙雪聚小程序", "预订雪票", "大好河山产品查询");
 
-            return ret;
+            return Ok(log.response);
         }
 
         [HttpGet]
-        public ZiwoyouProductDailyPrice GetProductPrice(int productId, DateTime date)
+        public async Task<ActionResult<ZiwoyouProductDailyPrice>> GetProductPrice(int productId, DateTime date)
         {
+            MiniAppHelperController _miniHelper = new MiniAppHelperController(_context, _oriConfig);
             string postData = "{\"apikey\": \"" + apiKey + "\",\"custId\": " + custId.Trim() + ",\"productNo\": " 
                 + productId.ToString() + ", \"travelDate\": \"" + date.ToString("yyyy-MM-dd") + "\" }";
-            string ret = Util.GetWebContent("https://task-api.zowoyoo.com/api/thirdPaty/prod/price",
-                postData, "application/json");
-            ZiwoyouQueryResult r = JsonConvert.DeserializeObject<ZiwoyouQueryResult>(ret);
+            WebApiLog log = await _miniHelper.PerformRequest("https://task-api.zowoyoo.com/api/thirdPaty/prod/price",
+                 "", postData, "POST", "易龙雪聚小程序", "预订雪票", "大好河山产品价格查询");
+            //string ret = Util.GetWebContent("https://task-api.zowoyoo.com/api/thirdPaty/prod/price",
+            //    postData, "application/json");
+            ZiwoyouQueryResult r = JsonConvert.DeserializeObject<ZiwoyouQueryResult>(log.response);
             ZiwoyouProductDailyPrice price = JsonConvert.DeserializeObject<ZiwoyouProductDailyPrice>(r.data.ToString());
             return price;
         }
 
         [HttpGet]
-        public ZiwoyouOrder GetOrder(int orderId)
+        public async Task<ActionResult<ZiwoyouOrder>> GetOrder(int orderId)
         {
+            MiniAppHelperController _miniHelper = new MiniAppHelperController(_context, _oriConfig);
             string postData = "{\"apikey\": \"" + apiKey + "\",\"custId\": " + custId.Trim()
                 + ",\"orderId\": " + orderId.ToString() + "}";
-            string ret = Util.GetWebContent("https://task-api.zowoyoo.com/api/thirdPaty/order/detail",
-                postData, "application/json");
-
+            //string ret = Util.GetWebContent("https://task-api.zowoyoo.com/api/thirdPaty/order/detail",
+            //    postData, "application/json");
+            
+            WebApiLog log = await _miniHelper.PerformRequest("https://task-api.zowoyoo.com/api/thirdPaty/order/detail",
+                 "", postData, "POST", "易龙雪聚小程序", "预订雪票", "大好河山订单查询");
+            /*
             string path = $"{Environment.CurrentDirectory}";
             string dateStr = DateTime.Now.Year.ToString() + DateTime.Now.Month.ToString().PadLeft(2, '0')
                 + DateTime.Now.Day.ToString().PadLeft(2, '0');
@@ -398,9 +378,9 @@ namespace SnowmeetApi.Controllers
                 fw.WriteLine("");
 
             }
-
+            */
             
-            ZiwoyouQueryResult r = JsonConvert.DeserializeObject<ZiwoyouQueryResult>(ret);
+            ZiwoyouQueryResult r = JsonConvert.DeserializeObject<ZiwoyouQueryResult>(log.response);
             ZiwoyouOrder order = JsonConvert.DeserializeObject<ZiwoyouOrder>(r.data.ToString());
 
             return order;
@@ -408,14 +388,19 @@ namespace SnowmeetApi.Controllers
         }
 
         [NonAction]
-        public ZiwoyouQueryResult CancelOrder(int orderId)
+        public async Task<ZiwoyouQueryResult> CancelOrder(int orderId)
         {
-            ZiwoyouOrder order = GetOrder(orderId);
+            MiniAppHelperController _miniHelper = new MiniAppHelperController(_context, _oriConfig);
+            ZiwoyouOrder order = (ZiwoyouOrder)((OkObjectResult)(await GetOrder(orderId)).Result).Value;
             string postData = "{\"apikey\": \"" + apiKey + "\",\"custId\": " + custId.Trim()
                 + ",\"orderId\": " + orderId.ToString() + ", \"cancelNum\": " + order.num.ToString() + "}";
-            string ret = Util.GetWebContent("https://task-api.zowoyoo.com/api/thirdPaty/order/cancel",
-                postData, "application/json");
-            
+            //string ret = Util.GetWebContent("https://task-api.zowoyoo.com/api/thirdPaty/order/cancel",
+            //    postData, "application/json");
+            WebApiLog log = await _miniHelper.PerformRequest("https://task-api.zowoyoo.com/api/thirdPaty/order/cancel",
+                 "", postData, "POST", "易龙雪聚小程序", "预订雪票", "大好河山订单取消");
+
+
+            /*
             string path = $"{Environment.CurrentDirectory}";
             string dateStr = DateTime.Now.Year.ToString() + DateTime.Now.Month.ToString().PadLeft(2, '0')
                 + DateTime.Now.Day.ToString().PadLeft(2, '0');
@@ -428,8 +413,8 @@ namespace SnowmeetApi.Controllers
                 fw.WriteLine("");
 
             }
-
-            ZiwoyouQueryResult r = JsonConvert.DeserializeObject<ZiwoyouQueryResult>(ret);
+            */
+            ZiwoyouQueryResult r = JsonConvert.DeserializeObject<ZiwoyouQueryResult>(log.response);
             ZiwoyouCancel cancel = JsonConvert.DeserializeObject<ZiwoyouCancel>(r.data.ToString());
             r.data = cancel;
             return r;
@@ -633,14 +618,17 @@ namespace SnowmeetApi.Controllers
             return Ok();
         }
         [HttpGet]
-        public ActionResult<ZiwoyouQueryList> GetOrderListByPage(DateTime start, DateTime end, int page = 0)
+        public async  Task<ActionResult<ZiwoyouQueryList>> GetOrderListByPage(DateTime start, DateTime end, int page = 0)
         {
+            MiniAppHelperController _miniHelper = new MiniAppHelperController(_context, _oriConfig);
             string postData = "{\"apikey\": \"" + apiKey + "\", \"custId\": " + custId + ", \"resultNum\": 20, \"page\": " + page.ToString() 
                 + ", \"startDate\": \"" + start.ToString("yyyy-MM-dd HH:mm:ss") + "\", \"endDate\": \"" + end.ToString("yyyy-MM-dd HH:mm:ss") + "\" }";
-            string ret = Util.GetWebContent("https://task-api.zowoyoo.com/api/thirdPaty/order/list", 
-               postData, "application/json");
+            WebApiLog log = await _miniHelper.PerformRequest("https://task-api.zowoyoo.com/api/thirdPaty/order/list",
+                 "", postData, "POST", "易龙雪聚小程序", "预订雪票", "大好河山订单获取分页列表");
+            //string ret = Util.GetWebContent("https://task-api.zowoyoo.com/api/thirdPaty/order/list", 
+            //   postData, "application/json");
             //string ret = "{\"state\":1,\"msg\":\"获取订单列表成功\",\"data\":{\"startIndex\":0,\"resultNum\":20,\"size\":20,\"sizeAll\":260,\"page\":0,\"pageCount\":13,\"results\":[{\"orderId\":992161430,\"orderSourceId\":\"QJ_XP_20250204_048200_ZF_01\",\"orderState\":4,\"orderState2\":\"\",\"isOnlinepay\":1,\"isConfirm\":0,\"productNo\":80326017,\"productName\":\"【万龙】节假日全雪区日场6小时雪票\",\"num\":1,\"settlementPrice\":557.0,\"salePrice\":599.0,\"marketPrice\":0.0,\"orderMoney\":557.0,\"memOrderMoney\":599.0,\"linkMan\":\"徐硕\",\"linkPhone\":\"13911302956\",\"linkCreditType\":0,\"linkCreditNo\":\"\",\"linkEmail\":\"\",\"linkAddress\":\"\",\"travelDate\":\"2025-02-04\",\"endTravelDate\":\"2025-02-04\",\"orderDate\":\"2025-02-04 09:44:29\",\"cancelDate\":null,\"finishNum\":1,\"orderMemo\":\"\"},{\"orderId\":992130816,\"orderSourceId\":\"QJ_XP_20250204_048199_ZF_01\",\"orderState\":4,\"orderState2\":\"\",\"isOnlinepay\":1,\"isConfirm\":0,\"productNo\":80326016,\"productName\":\"【万龙】节假日全雪区日场4小时雪票\",\"num\":1,\"settlementPrice\":464.0,\"salePrice\":499.0,\"marketPrice\":0.0,\"orderMoney\":464.0,\"memOrderMoney\":499.0,\"linkMan\":\"张\",\"linkPhone\":\"18813938056\",\"linkCreditType\":0,\"linkCreditNo\":\"\",\"linkEmail\":\"\",\"linkAddress\":\"\",\"travelDate\":\"2025-02-04\",\"endTravelDate\":\"2025-02-04\",\"orderDate\":\"2025-02-04 09:43:32\",\"cancelDate\":null,\"finishNum\":1,\"orderMemo\":\"\"},{\"orderId\":992135689,\"orderSourceId\":\"QJ_XP_20250204_048198_ZF_01\",\"orderState\":4,\"orderState2\":\"\",\"isOnlinepay\":1,\"isConfirm\":0,\"productNo\":80326017,\"productName\":\"【万龙】节假日全雪区日场6小时雪票\",\"num\":1,\"settlementPrice\":557.0,\"salePrice\":599.0,\"marketPrice\":0.0,\"orderMoney\":557.0,\"memOrderMoney\":599.0,\"linkMan\":\"徐硕\",\"linkPhone\":\"13911302956\",\"linkCreditType\":0,\"linkCreditNo\":\"\",\"linkEmail\":\"\",\"linkAddress\":\"\",\"travelDate\":\"2025-02-04\",\"endTravelDate\":\"2025-02-04\",\"orderDate\":\"2025-02-04 09:43:06\",\"cancelDate\":null,\"finishNum\":1,\"orderMemo\":\"\"},{\"orderId\":992061964,\"orderSourceId\":\"QJ_XP_20250204_048193_ZF_01\",\"orderState\":4,\"orderState2\":\"\",\"isOnlinepay\":1,\"isConfirm\":0,\"productNo\":80325669,\"productName\":\"【万龙】节假日全雪区日场1天雪票\",\"num\":1,\"settlementPrice\":650.0,\"salePrice\":699.0,\"marketPrice\":0.0,\"orderMoney\":650.0,\"memOrderMoney\":699.0,\"linkMan\":\"余雷\",\"linkPhone\":\"13345519009\",\"linkCreditType\":0,\"linkCreditNo\":\"\",\"linkEmail\":\"\",\"linkAddress\":\"\",\"travelDate\":\"2025-02-04\",\"endTravelDate\":\"2025-02-04\",\"orderDate\":\"2025-02-04 08:49:45\",\"cancelDate\":null,\"finishNum\":1,\"orderMemo\":\"\"},{\"orderId\":992061846,\"orderSourceId\":\"QJ_XP_20250204_048192_ZF_01\",\"orderState\":4,\"orderState2\":\"\",\"isOnlinepay\":1,\"isConfirm\":0,\"productNo\":80326016,\"productName\":\"【万龙】节假日全雪区日场4小时雪票\",\"num\":1,\"settlementPrice\":464.0,\"salePrice\":499.0,\"marketPrice\":0.0,\"orderMoney\":464.0,\"memOrderMoney\":499.0,\"linkMan\":\"罗\",\"linkPhone\":\"18616021885\",\"linkCreditType\":0,\"linkCreditNo\":\"\",\"linkEmail\":\"\",\"linkAddress\":\"\",\"travelDate\":\"2025-02-04\",\"endTravelDate\":\"2025-02-04\",\"orderDate\":\"2025-02-04 08:35:21\",\"cancelDate\":null,\"finishNum\":1,\"orderMemo\":\"\"},{\"orderId\":992061615,\"orderSourceId\":\"QJ_XP_20250204_048190_ZF_01\",\"orderState\":4,\"orderState2\":\"\",\"isOnlinepay\":1,\"isConfirm\":0,\"productNo\":80326017,\"productName\":\"【万龙】节假日全雪区日场6小时雪票\",\"num\":1,\"settlementPrice\":557.0,\"salePrice\":599.0,\"marketPrice\":0.0,\"orderMoney\":557.0,\"memOrderMoney\":599.0,\"linkMan\":\"高子翔\",\"linkPhone\":\"18510881279\",\"linkCreditType\":0,\"linkCreditNo\":\"\",\"linkEmail\":\"\",\"linkAddress\":\"\",\"travelDate\":\"2025-02-04\",\"endTravelDate\":\"2025-02-04\",\"orderDate\":\"2025-02-04 08:08:28\",\"cancelDate\":null,\"finishNum\":1,\"orderMemo\":\"\"},{\"orderId\":992086308,\"orderSourceId\":\"QJ_XP_20250204_048188_ZF_01\",\"orderState\":4,\"orderState2\":\"\",\"isOnlinepay\":1,\"isConfirm\":0,\"productNo\":80326017,\"productName\":\"【万龙】节假日全雪区日场6小时雪票\",\"num\":1,\"settlementPrice\":557.0,\"salePrice\":599.0,\"marketPrice\":0.0,\"orderMoney\":557.0,\"memOrderMoney\":599.0,\"linkMan\":\"丁丁\",\"linkPhone\":\"17710488896\",\"linkCreditType\":0,\"linkCreditNo\":\"\",\"linkEmail\":\"\",\"linkAddress\":\"\",\"travelDate\":\"2025-02-04\",\"endTravelDate\":\"2025-02-04\",\"orderDate\":\"2025-02-04 07:47:00\",\"cancelDate\":null,\"finishNum\":1,\"orderMemo\":\"\"},{\"orderId\":991975923,\"orderSourceId\":\"QJ_XP_20250203_048187_ZF_01\",\"orderState\":3,\"orderState2\":\"\",\"isOnlinepay\":1,\"isConfirm\":0,\"productNo\":80325669,\"productName\":\"【万龙】节假日全雪区日场1天雪票\",\"num\":1,\"settlementPrice\":650.0,\"salePrice\":699.0,\"marketPrice\":0.0,\"orderMoney\":650.0,\"memOrderMoney\":699.0,\"linkMan\":\"王\",\"linkPhone\":\"17701330061\",\"linkCreditType\":0,\"linkCreditNo\":\"\",\"linkEmail\":\"\",\"linkAddress\":\"\",\"travelDate\":\"2025-02-04\",\"endTravelDate\":\"2025-02-04\",\"orderDate\":\"2025-02-03 22:40:49\",\"cancelDate\":\"2025-02-03 22:41:53\",\"finishNum\":0,\"orderMemo\":\"system于2025-02-03 22:41:53备注：<font color=blue>供应商同意退款</font>\"},{\"orderId\":991975516,\"orderSourceId\":\"QJ_XP_20250203_048186_ZF_01\",\"orderState\":3,\"orderState2\":\"\",\"isOnlinepay\":1,\"isConfirm\":0,\"productNo\":80322076,\"productName\":\"【万龙】节假日夜场滑雪票(不含雪具)\",\"num\":1,\"settlementPrice\":210.0,\"salePrice\":218.0,\"marketPrice\":0.0,\"orderMoney\":210.0,\"memOrderMoney\":218.0,\"linkMan\":\"苍杰\",\"linkPhone\":\"18601197897\",\"linkCreditType\":0,\"linkCreditNo\":\"\",\"linkEmail\":\"\",\"linkAddress\":\"\",\"travelDate\":\"2025-02-04\",\"endTravelDate\":\"2025-02-04\",\"orderDate\":\"2025-02-03 22:12:03\",\"cancelDate\":\"2025-02-03 22:13:45\",\"finishNum\":0,\"orderMemo\":\"system于2025-02-03 22:13:45备注：<font color=blue>供应商同意退款</font>\"},{\"orderId\":991449767,\"orderSourceId\":\"QJ_XP_20250203_048083_ZF_01\",\"orderState\":4,\"orderState2\":\"\",\"isOnlinepay\":1,\"isConfirm\":0,\"productNo\":80325670,\"productName\":\"【万龙】节假日全雪区日场1.5天雪票\",\"num\":1,\"settlementPrice\":976.0,\"salePrice\":1049.0,\"marketPrice\":0.0,\"orderMoney\":976.0,\"memOrderMoney\":1049.0,\"linkMan\":\"罗\",\"linkPhone\":\"18616021885\",\"linkCreditType\":0,\"linkCreditNo\":\"\",\"linkEmail\":\"\",\"linkAddress\":\"\",\"travelDate\":\"2025-02-03\",\"endTravelDate\":\"2025-02-03\",\"orderDate\":\"2025-02-03 10:00:05\",\"cancelDate\":null,\"finishNum\":1,\"orderMemo\":\"\"},{\"orderId\":991441136,\"orderSourceId\":\"QJ_XP_20250203_048071_ZF_01\",\"orderState\":4,\"orderState2\":\"\",\"isOnlinepay\":1,\"isConfirm\":0,\"productNo\":80326017,\"productName\":\"【万龙】节假日全雪区日场6小时雪票\",\"num\":1,\"settlementPrice\":557.0,\"salePrice\":599.0,\"marketPrice\":0.0,\"orderMoney\":557.0,\"memOrderMoney\":599.0,\"linkMan\":\"刘阳\",\"linkPhone\":\"15801020411\",\"linkCreditType\":0,\"linkCreditNo\":\"\",\"linkEmail\":\"\",\"linkAddress\":\"\",\"travelDate\":\"2025-02-03\",\"endTravelDate\":\"2025-02-03\",\"orderDate\":\"2025-02-03 09:13:23\",\"cancelDate\":null,\"finishNum\":1,\"orderMemo\":\"\"},{\"orderId\":991416603,\"orderSourceId\":\"QJ_XP_20250203_048065_ZF_01\",\"orderState\":4,\"orderState2\":\"\",\"isOnlinepay\":1,\"isConfirm\":0,\"productNo\":80326016,\"productName\":\"【万龙】节假日全雪区日场4小时雪票\",\"num\":1,\"settlementPrice\":464.0,\"salePrice\":499.0,\"marketPrice\":0.0,\"orderMoney\":464.0,\"memOrderMoney\":499.0,\"linkMan\":\"邓\",\"linkPhone\":\"13545689980\",\"linkCreditType\":0,\"linkCreditNo\":\"\",\"linkEmail\":\"\",\"linkAddress\":\"\",\"travelDate\":\"2025-02-03\",\"endTravelDate\":\"2025-02-03\",\"orderDate\":\"2025-02-03 08:36:43\",\"cancelDate\":null,\"finishNum\":1,\"orderMemo\":\"\"},{\"orderId\":991280170,\"orderSourceId\":\"QJ_XP_20250202_048060_ZF_01\",\"orderState\":4,\"orderState2\":\"\",\"isOnlinepay\":1,\"isConfirm\":0,\"productNo\":80322079,\"productName\":\"【万龙】节假日全雪区日场2天雪票\",\"num\":1,\"settlementPrice\":1264.0,\"salePrice\":1359.0,\"marketPrice\":0.0,\"orderMoney\":1264.0,\"memOrderMoney\":1359.0,\"linkMan\":\"张璐\",\"linkPhone\":\"13520680789\",\"linkCreditType\":0,\"linkCreditNo\":\"\",\"linkEmail\":\"\",\"linkAddress\":\"\",\"travelDate\":\"2025-02-03\",\"endTravelDate\":\"2025-02-03\",\"orderDate\":\"2025-02-02 21:08:09\",\"cancelDate\":null,\"finishNum\":1,\"orderMemo\":\"\"},{\"orderId\":991264866,\"orderSourceId\":\"QJ_XP_20250202_048059_ZF_01\",\"orderState\":4,\"orderState2\":\"\",\"isOnlinepay\":1,\"isConfirm\":0,\"productNo\":80322079,\"productName\":\"【万龙】节假日全雪区日场2天雪票\",\"num\":1,\"settlementPrice\":1264.0,\"salePrice\":1359.0,\"marketPrice\":0.0,\"orderMoney\":1264.0,\"memOrderMoney\":1359.0,\"linkMan\":\"胡铠烁\",\"linkPhone\":\"13520680789\",\"linkCreditType\":0,\"linkCreditNo\":\"\",\"linkEmail\":\"\",\"linkAddress\":\"\",\"travelDate\":\"2025-02-03\",\"endTravelDate\":\"2025-02-03\",\"orderDate\":\"2025-02-02 21:07:44\",\"cancelDate\":null,\"finishNum\":1,\"orderMemo\":\"\"},{\"orderId\":991258337,\"orderSourceId\":\"QJ_XP_20250202_048055_ZF_01\",\"orderState\":4,\"orderState2\":\"\",\"isOnlinepay\":1,\"isConfirm\":0,\"productNo\":80322079,\"productName\":\"【万龙】节假日全雪区日场2天雪票\",\"num\":1,\"settlementPrice\":1264.0,\"salePrice\":1359.0,\"marketPrice\":0.0,\"orderMoney\":1264.0,\"memOrderMoney\":1359.0,\"linkMan\":\"王欢\",\"linkPhone\":\"13801098683\",\"linkCreditType\":0,\"linkCreditNo\":\"\",\"linkEmail\":\"\",\"linkAddress\":\"\",\"travelDate\":\"2025-02-03\",\"endTravelDate\":\"2025-02-03\",\"orderDate\":\"2025-02-02 20:28:36\",\"cancelDate\":null,\"finishNum\":1,\"orderMemo\":\"\"},{\"orderId\":991132630,\"orderSourceId\":\"QJ_XP_20250202_048021_ZF_01\",\"orderState\":4,\"orderState2\":\"\",\"isOnlinepay\":1,\"isConfirm\":0,\"productNo\":80326017,\"productName\":\"【万龙】节假日全雪区日场6小时雪票\",\"num\":1,\"settlementPrice\":557.0,\"salePrice\":599.0,\"marketPrice\":0.0,\"orderMoney\":557.0,\"memOrderMoney\":599.0,\"linkMan\":\"徐硕\",\"linkPhone\":\"13911302956\",\"linkCreditType\":0,\"linkCreditNo\":\"\",\"linkEmail\":\"\",\"linkAddress\":\"\",\"travelDate\":\"2025-02-03\",\"endTravelDate\":\"2025-02-03\",\"orderDate\":\"2025-02-02 16:55:07\",\"cancelDate\":null,\"finishNum\":1,\"orderMemo\":\"\"},{\"orderId\":991144366,\"orderSourceId\":\"QJ_XP_20250202_048020_ZF_01\",\"orderState\":4,\"orderState2\":\"\",\"isOnlinepay\":1,\"isConfirm\":0,\"productNo\":80326017,\"productName\":\"【万龙】节假日全雪区日场6小时雪票\",\"num\":1,\"settlementPrice\":557.0,\"salePrice\":599.0,\"marketPrice\":0.0,\"orderMoney\":557.0,\"memOrderMoney\":599.0,\"linkMan\":\"徐硕\",\"linkPhone\":\"13911302956\",\"linkCreditType\":0,\"linkCreditNo\":\"\",\"linkEmail\":\"\",\"linkAddress\":\"\",\"travelDate\":\"2025-02-03\",\"endTravelDate\":\"2025-02-03\",\"orderDate\":\"2025-02-02 16:54:35\",\"cancelDate\":null,\"finishNum\":1,\"orderMemo\":\"\"},{\"orderId\":990909642,\"orderSourceId\":\"QJ_XP_20250202_047965_ZF_01\",\"orderState\":4,\"orderState2\":\"\",\"isOnlinepay\":1,\"isConfirm\":0,\"productNo\":80326016,\"productName\":\"【万龙】节假日全雪区日场4小时雪票\",\"num\":1,\"settlementPrice\":464.0,\"salePrice\":499.0,\"marketPrice\":0.0,\"orderMoney\":464.0,\"memOrderMoney\":499.0,\"linkMan\":\"罗\",\"linkPhone\":\"18616021885\",\"linkCreditType\":0,\"linkCreditNo\":\"\",\"linkEmail\":\"\",\"linkAddress\":\"\",\"travelDate\":\"2025-02-02\",\"endTravelDate\":\"2025-02-02\",\"orderDate\":\"2025-02-02 12:16:10\",\"cancelDate\":null,\"finishNum\":1,\"orderMemo\":\"\"},{\"orderId\":990911159,\"orderSourceId\":\"QJ_XP_20250202_047959_ZF_01\",\"orderState\":4,\"orderState2\":\"\",\"isOnlinepay\":1,\"isConfirm\":0,\"productNo\":80326016,\"productName\":\"【万龙】节假日全雪区日场4小时雪票\",\"num\":1,\"settlementPrice\":464.0,\"salePrice\":499.0,\"marketPrice\":0.0,\"orderMoney\":464.0,\"memOrderMoney\":499.0,\"linkMan\":\"张丽\",\"linkPhone\":\"13683199775\",\"linkCreditType\":0,\"linkCreditNo\":\"\",\"linkEmail\":\"\",\"linkAddress\":\"\",\"travelDate\":\"2025-02-02\",\"endTravelDate\":\"2025-02-02\",\"orderDate\":\"2025-02-02 11:57:43\",\"cancelDate\":null,\"finishNum\":1,\"orderMemo\":\"\"},{\"orderId\":990886511,\"orderSourceId\":\"QJ_XP_20250202_047955_ZF_01\",\"orderState\":4,\"orderState2\":\"\",\"isOnlinepay\":1,\"isConfirm\":0,\"productNo\":80326016,\"productName\":\"【万龙】节假日全雪区日场4小时雪票\",\"num\":1,\"settlementPrice\":464.0,\"salePrice\":499.0,\"marketPrice\":0.0,\"orderMoney\":464.0,\"memOrderMoney\":499.0,\"linkMan\":\"白\",\"linkPhone\":\"15010889893\",\"linkCreditType\":0,\"linkCreditNo\":\"\",\"linkEmail\":\"\",\"linkAddress\":\"\",\"travelDate\":\"2025-02-02\",\"endTravelDate\":\"2025-02-02\",\"orderDate\":\"2025-02-02 11:45:20\",\"cancelDate\":null,\"finishNum\":1,\"orderMemo\":\"\"}]}}";
-            ZiwoyouQueryResult r = JsonConvert.DeserializeObject<ZiwoyouQueryResult>(ret);
+            ZiwoyouQueryResult r = JsonConvert.DeserializeObject<ZiwoyouQueryResult>(log.response);
             ZiwoyouQueryList l = JsonConvert.DeserializeObject<ZiwoyouQueryList>(r.data.ToString());
             return Ok(l);
         }

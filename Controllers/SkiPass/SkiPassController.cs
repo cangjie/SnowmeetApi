@@ -217,7 +217,7 @@ namespace SnowmeetApi.Controllers
             {
                 Models.Product.SkiPass product = await _context.SkiPass.FindAsync(skipass.product_id);
                 WanlongZiwoyouHelper _wlHelper = new WanlongZiwoyouHelper(_context, _config, product.source.Trim());
-                WanlongZiwoyouHelper.ZiwoyouQueryResult r = _wlHelper.CancelOrder(int.Parse(skipass.reserve_no));
+                WanlongZiwoyouHelper.ZiwoyouQueryResult r = await _wlHelper.CancelOrder(int.Parse(skipass.reserve_no));
                 WanlongZiwoyouHelper.ZiwoyouCancel cancel = (WanlongZiwoyouHelper.ZiwoyouCancel)r.data;
                 skipass.is_cancel = cancel.cancelState;
                 skipass.memo += " " + r.msg.Trim();
@@ -494,7 +494,7 @@ namespace SnowmeetApi.Controllers
                 return;
 
             }
-            Models.WanLong.PayResult payResult = _zwHelper.Pay(int.Parse(orderId));
+            Models.WanLong.PayResult payResult = await _zwHelper.Pay(int.Parse(orderId));
             if (payResult.state != 1 || !payResult.msg.Trim().Equals("支付成功"))
             {
                 skipass.memo += (" " + payResult.msg);
@@ -505,9 +505,6 @@ namespace SnowmeetApi.Controllers
             skipass.reserve_no = payResult.data.orderId.ToString();
             _context.skiPass.Entry(skipass).State = EntityState.Modified;
             await _context.SaveChangesAsync();
-
-
-            
         }
 
         [NonAction]
@@ -550,7 +547,7 @@ namespace SnowmeetApi.Controllers
                 try
                 {
                     WanlongZiwoyouHelper _zwHelper = new WanlongZiwoyouHelper(_context, _config, skipassProduct.source.Trim());
-                    WanlongZiwoyouHelper.ZiwoyouOrder order = _zwHelper.GetOrder(int.Parse(skipass.reserve_no));
+                    WanlongZiwoyouHelper.ZiwoyouOrder order = (WanlongZiwoyouHelper.ZiwoyouOrder)((OkObjectResult)(await _zwHelper.GetOrder(int.Parse(skipass.reserve_no))).Result).Value;
                     if (order.orderState == 3)
                     {
                         skipass.is_cancel = 1;
