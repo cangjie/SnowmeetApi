@@ -17,9 +17,9 @@ namespace SnowmeetApi.Models
         public string header {get; set;}
         public string payload {get; set;}
         public string response {get; set;}
-        public int status_code {get; set;}
+        //public int status_code {get; set;}
         public int deal {get; set;}
-        public DateTime? update_date {get; set;}
-        public DateTime create_date {get; set;}
+        public DateTime? update_date {get; set;} = null;
+        public DateTime create_date {get; set;} = DateTime.Now;
     }
 }

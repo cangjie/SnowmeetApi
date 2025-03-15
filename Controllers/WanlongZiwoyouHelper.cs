@@ -693,13 +693,17 @@ namespace SnowmeetApi.Controllers
         }
         
 
-        [HttpGet]
-        public double GetBalance()
+        [NonAction]
+        public async Task<double> GetBalance()
         {
             SetParam(source);
             string postData = "{\"apikey\": \"" + apiKey + "\", \"custId\": " + custId + "}";
-            string ret = Util.GetWebContent("https://task-api.zowoyoo.com/api/thirdPaty/order/balance",
-               postData, "application/json");
+            //string ret = Util.GetWebContent("https://task-api.zowoyoo.com/api/thirdPaty/order/balance",
+            //   postData, "application/json");
+            MiniAppHelperController _miniHelper = new MiniAppHelperController(_context, _oriConfig);
+            WebApiLog reqLog = await _miniHelper.PerformRequest("https://task-api.zowoyoo.com/api/thirdPaty/order/balance", 
+                "",postData.Trim(), "POST", "易龙雪聚小程序", "预订雪票", "查询大好河山储值");
+
             string path = $"{Environment.CurrentDirectory}";
             
             string dateStr = DateTime.Now.Year.ToString() + DateTime.Now.Month.ToString().PadLeft(2, '0')
@@ -710,12 +714,13 @@ namespace SnowmeetApi.Controllers
             
             try
             {
-                ZiwoyouQueryResult r = JsonConvert.DeserializeObject<ZiwoyouQueryResult>(ret);
+                ZiwoyouQueryResult r = JsonConvert.DeserializeObject<ZiwoyouQueryResult>(reqLog.response.Trim());
                 ZiwoyouAccountBalance b = JsonConvert.DeserializeObject<ZiwoyouAccountBalance>(r.data.ToString());
                 return b.accountBalance;
             }
             catch
             {
+                /*
                 using (StreamWriter fw = new StreamWriter(path + "/booking_" + dateStr + ".txt", true))
                 {
                     fw.WriteLine(DateTime.Now.ToString());
@@ -724,6 +729,7 @@ namespace SnowmeetApi.Controllers
                     fw.WriteLine("");
 
                 }
+                */
                 return 0;
             }
         }

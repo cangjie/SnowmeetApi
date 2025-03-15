@@ -20,6 +20,7 @@ using SixLabors.ImageSharp;
 using SnowmeetApi.Controllers.Order;
 using Org.BouncyCastle.Asn1.Crmf;
 using System.Runtime.CompilerServices;
+using Microsoft.CodeAnalysis.CSharp;
 namespace SnowmeetApi.Controllers
 {
     [Route("core/[controller]/[action]")]
@@ -455,7 +456,7 @@ namespace SnowmeetApi.Controllers
             {
                 outTradeNo = skipass.id.ToString() + Util.GetLongTimeStamp(DateTime.Now);
             }
-            double balance = _zwHelper.GetBalance();
+            double balance = await _zwHelper.GetBalance();
             if (balance <= skipass.deal_price)
             {
                 skipass.memo += " 账户余额不足";
