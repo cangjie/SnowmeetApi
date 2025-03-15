@@ -457,6 +457,7 @@ namespace SnowmeetApi.Controllers
                 outTradeNo = skipass.id.ToString() + Util.GetLongTimeStamp(DateTime.Now);
             }
             double balance = (double)((OkObjectResult)(await _zwHelper.GetBalance()).Result).Value;
+            balance = 10000;
             if (balance <= skipass.deal_price)
             {
                 skipass.memo += " 账户余额不足";

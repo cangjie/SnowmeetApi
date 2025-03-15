@@ -704,33 +704,18 @@ namespace SnowmeetApi.Controllers
             WebApiLog reqLog = await _miniHelper.PerformRequest("https://task-api.zowoyoo.com/api/thirdPaty/order/balance", 
                 "",postData.Trim(), "POST", "易龙雪聚小程序", "预订雪票", "查询大好河山储值");
 
-            string path = $"{Environment.CurrentDirectory}";
-            
-            string dateStr = DateTime.Now.Year.ToString() + DateTime.Now.Month.ToString().PadLeft(2, '0')
-                + DateTime.Now.Day.ToString().PadLeft(2, '0');
-            //string postJson = Newtonsoft.Json.JsonConvert.SerializeObject(postData);
-            //path = path + "callback_" +  + ".txt";
-            // 此文本只添加到文件一次。
-            
+            //string path = $"{Environment.CurrentDirectory}";   
+            //string dateStr = DateTime.Now.Year.ToString() + DateTime.Now.Month.ToString().PadLeft(2, '0')
+            //    + DateTime.Now.Day.ToString().PadLeft(2, '0');
             try
             {
                 ZiwoyouQueryResult r = JsonConvert.DeserializeObject<ZiwoyouQueryResult>(reqLog.response.Trim());
                 ZiwoyouAccountBalance b = JsonConvert.DeserializeObject<ZiwoyouAccountBalance>(r.data.ToString());
-                return b.accountBalance;
+                return Ok(b.accountBalance);
             }
             catch
             {
-                /*
-                using (StreamWriter fw = new StreamWriter(path + "/booking_" + dateStr + ".txt", true))
-                {
-                    fw.WriteLine(DateTime.Now.ToString());
-                    fw.WriteLine(postData);
-                    fw.WriteLine(ret);
-                    fw.WriteLine("");
-
-                }
-                */
-                return 0;
+                return Ok(double.Parse("0"));
             }
         }
 
