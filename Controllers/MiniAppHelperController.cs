@@ -22,6 +22,7 @@ using System.Security.Cryptography;
 using SnowmeetApi.Data;
 using SnowmeetApi;
 using SnowmeetApi.Controllers.User;
+using System.Net.Http;
 
 namespace LuqinMiniAppBase.Controllers
 {
@@ -333,8 +334,45 @@ namespace LuqinMiniAppBase.Controllers
             }
 
         }
+        [NonAction]
+        public async Task<WebApiLog> PerformRequest(string url, string header, string payload, 
+            string method = "GET", string source = "易龙雪聚小程序", string purpose = "", string memo = "")
+        {
+            WebApiLog log = new WebApiLog()
+            {
+                id = 0,
+                source = source.Trim(),
+                purpose = purpose.Trim(),
+                memo = memo.Trim(),
+                method = method.Trim(),
+                header = header.Trim(),
+                payload = payload.Trim(),
+                request_url = url.Trim()
+            };
+            await _db.webApiLog.AddAsync(log);
+            await _db.SaveChangesAsync();
+            try
+            {
+                switch(method.ToLower())
+                {
+                    case "post":
+                        log.response = Util.GetWebContent(log.request_url, log.payload);
+                    break;
+                    default:
+                        log.response = Util.GetWebContent(log.request_url);
+                    break;
+                }
+            }
+            catch
+            {
 
-
+            }
+            log.deal = 1;
+            log.update_date = DateTime.Now;
+            _db.webApiLog.Entry(log).State = EntityState.Modified;
+            await _db.SaveChangesAsync();
+            return log;
+        }
         public class Code2Session
         {
             public string openid { get; set; } = "";

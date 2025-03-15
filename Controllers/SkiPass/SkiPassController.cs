@@ -632,12 +632,6 @@ namespace SnowmeetApi.Controllers
                         await _context.SaveChangesAsync();
                         continue;
                     }
-                    /*
-                    if (order.orderState != 2 || order.vouchers == null || order.vouchers.Length <= 0)
-                    {
-                        continue;
-                    }
-                    */
                     if (order.vouchers.Length > 0)
                     {
                         if (order.vouchers[0].code != null && !order.vouchers[0].code.Trim().Equals(""))
@@ -653,6 +647,7 @@ namespace SnowmeetApi.Controllers
                     {
                         case 3:
                             skipass.is_cancel = -3;
+                            skipass.update_date = DateTime.Now;
                             break;
                         case 4:
                             skipass.is_used = 1;

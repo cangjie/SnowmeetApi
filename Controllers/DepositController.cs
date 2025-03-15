@@ -28,7 +28,6 @@ namespace SnowmeetApi.Controllers
             _db = context;
             _config = config;
         }
-        
         [NonAction]
         public async Task<List<DepositAccount>> GetMemberAccountAvaliable(int memberId, string type, string subType)
         {
@@ -83,7 +82,6 @@ namespace SnowmeetApi.Controllers
             {
                 return BadRequest();
             }
-
             return await DepositCosume(payment.id, sessionKey, sessionType);
         }
         [NonAction]
@@ -166,7 +164,6 @@ namespace SnowmeetApi.Controllers
                         balanceList.Add(balance);
                     }
                 }
-
             }
             if (unPaidAmount > 0)
             {
@@ -244,14 +241,6 @@ namespace SnowmeetApi.Controllers
             {
                 return BadRequest();
             }
-            /*
-            MemberController _memberHelper = new MemberController(_db, _config);
-            Models.Users.Member member = await _memberHelper.GetMember(cell.Trim(), "cell");
-            if (member == null)
-            {
-                return BadRequest();
-            }
-            */
             DepositAccount? account = null;
             if (accountId != 0)
             {
@@ -332,7 +321,6 @@ namespace SnowmeetApi.Controllers
                 member_id = operMemberId,
                 create_date = DateTime.Now
             };
-
             return null;
         }
         [HttpGet("{memberId}")]
@@ -483,7 +471,6 @@ namespace SnowmeetApi.Controllers
                 = account.member.memberSocialAccounts.Where(a => a.valid == 1)
                 .ToList();
             return Ok(account);
-            
         }
         [HttpGet("{accountId}")]
         public async Task<ActionResult<DepositAccount>> ModAccountInfo(int accountId, string bizId, string memo,
@@ -532,6 +519,5 @@ namespace SnowmeetApi.Controllers
                 return null;
             }
         }
-
     }   
 }
