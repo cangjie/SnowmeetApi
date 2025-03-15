@@ -693,8 +693,8 @@ namespace SnowmeetApi.Controllers
         }
         
 
-        [NonAction]
-        public async Task<double> GetBalance()
+        [HttpGet]
+        public async Task<ActionResult<double>> GetBalance()
         {
             SetParam(source);
             string postData = "{\"apikey\": \"" + apiKey + "\", \"custId\": " + custId + "}";
