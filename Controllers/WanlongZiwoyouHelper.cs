@@ -19,6 +19,8 @@ using SnowmeetApi.Models.Order;
 using System.IO;
 using SnowmeetApi.Models.Product;
 using SnowmeetApi.Models.SkiPass;
+using LuqinMiniAppBase.Controllers;
+using SnowmeetApi.Models;
 
 namespace SnowmeetApi.Controllers
 {
@@ -27,7 +29,7 @@ namespace SnowmeetApi.Controllers
     public class WanlongZiwoyouHelper:ControllerBase
 	{
         private readonly ApplicationDBContext _context;
-
+        private IConfiguration _oriConfig;
         private IConfiguration _config;
 
         public string _appId = "";
@@ -123,6 +125,7 @@ namespace SnowmeetApi.Controllers
         public WanlongZiwoyouHelper(ApplicationDBContext context, IConfiguration config, string source="大好河山")
 		{
             _context = context;
+            _oriConfig = config;
             _config = config.GetSection("Settings");
             _appId = _config.GetSection("AppId").Value.Trim();
             apiKey = dhhsApiKey;
@@ -268,16 +271,17 @@ namespace SnowmeetApi.Controllers
                 apiKey = wlApiKey;
                 custId = wlCustId;
             }
-            ZiwoyouPlaceOrderResult bookResult = PlaceOrder(skipassProduct.third_party_no, skipass.contact_name, skipass.contact_cell, skipass.contact_id_type, 
+            ZiwoyouPlaceOrderResult bookResult = await PlaceOrder(skipassProduct.third_party_no, skipass.contact_name, skipass.contact_cell, skipass.contact_id_type, 
                 skipass.contact_id_no,skipass.count, (DateTime)skipass.reserve_date, "", outOrderNo);
             skipass.reserve_no = bookResult.data.orderId.Trim();
             return Ok(bookResult);
         }
 
         [NonAction]
-        public ZiwoyouPlaceOrderResult PlaceOrder(string productNo, string name, string cell, 
+        public async Task<ZiwoyouPlaceOrderResult> PlaceOrder(string productNo, string name, string cell, 
             string idType, string idNo, int count, DateTime date, string memo, string orderId)
         {
+            MiniAppHelperController _miniHelper = new MiniAppHelperController(_context, _oriConfig);
 
             string postData = "{\n\t\"apikey\": \"" + apiKey
                 + "\",\n\t\"custId\": " + custId + " ,\n\t\"infoId\": " + productNo
@@ -285,12 +289,20 @@ namespace SnowmeetApi.Controllers
                 + "\",\n\t\"linkPhone\": \"" + cell + "\",\n\t\"num\": " + count.ToString()
                 + ",\n\t\"orderMemo\": \"" + memo + "\",\n\t\"orderSourceId\": \"" + orderId.Trim()
                 + "\",\n\t\"travelDate\": \"" + date.ToString("yyyy-MM-dd") + "\"\n}";
-            string ret = Util.GetWebContent("https://task-api.zowoyoo.com/api/thirdPaty/order/add",
-                postData, "application/json");
+            string url = "https://task-api.zowoyoo.com/api/thirdPaty/order/add";
+            WebApiLog reqLog = await _miniHelper.PerformRequest(url, "", postData, "POST", "易龙雪聚小程序", "预订雪票", "");
+
             
+            //string ret = Util.GetWebContent("https://task-api.zowoyoo.com/api/thirdPaty/order/add",
+            //    postData, "application/json");
+
+            
+            /*
             string path = $"{Environment.CurrentDirectory}";
             string dateStr = DateTime.Now.Year.ToString() + DateTime.Now.Month.ToString().PadLeft(2, '0')
                 + DateTime.Now.Day.ToString().PadLeft(2, '0');
+
+
             using (StreamWriter fw = new StreamWriter(path + "/booking_" + dateStr + ".txt", true))
             {
                 fw.WriteLine(DateTime.Now.ToString());
@@ -300,8 +312,9 @@ namespace SnowmeetApi.Controllers
                 fw.WriteLine("");
 
             }
+            */
 
-            ZiwoyouPlaceOrderResult r = JsonConvert.DeserializeObject<ZiwoyouPlaceOrderResult>(ret);
+            ZiwoyouPlaceOrderResult r = JsonConvert.DeserializeObject<ZiwoyouPlaceOrderResult>(reqLog.response.Trim());
             return r;
 
         }

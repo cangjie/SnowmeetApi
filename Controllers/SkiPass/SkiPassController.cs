@@ -467,7 +467,7 @@ namespace SnowmeetApi.Controllers
             try
             {
                 Models.WanLong.ZiwoyouPlaceOrderResult orderResult = 
-                    _zwHelper.PlaceOrder(skipassProduct.third_party_no, skipass.contact_name, skipass.contact_cell,
+                    await _zwHelper.PlaceOrder(skipassProduct.third_party_no, skipass.contact_name, skipass.contact_cell,
                     skipass.contact_id_type, skipass.contact_id_no, skipass.count, (DateTime)skipass.reserve_date, 
                     "", outTradeNo);
                 if (orderResult.state == 1)
