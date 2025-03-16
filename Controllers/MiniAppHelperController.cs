@@ -356,7 +356,7 @@ namespace LuqinMiniAppBase.Controllers
                 switch(method.ToLower())
                 {
                     case "post":
-                        log.response = Util.GetWebContent(log.request_url, log.payload);
+                        log.response = Util.GetWebContent(log.request_url, log.payload, "application/json");
                     break;
                     default:
                         log.response = Util.GetWebContent(log.request_url);

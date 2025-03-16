@@ -20,6 +20,7 @@ using SixLabors.ImageSharp;
 using SnowmeetApi.Controllers.Order;
 using Org.BouncyCastle.Asn1.Crmf;
 using System.Runtime.CompilerServices;
+using Microsoft.CodeAnalysis.CSharp;
 namespace SnowmeetApi.Controllers
 {
     [Route("core/[controller]/[action]")]
@@ -216,7 +217,7 @@ namespace SnowmeetApi.Controllers
             {
                 Models.Product.SkiPass product = await _context.SkiPass.FindAsync(skipass.product_id);
                 WanlongZiwoyouHelper _wlHelper = new WanlongZiwoyouHelper(_context, _config, product.source.Trim());
-                WanlongZiwoyouHelper.ZiwoyouQueryResult r = _wlHelper.CancelOrder(int.Parse(skipass.reserve_no));
+                WanlongZiwoyouHelper.ZiwoyouQueryResult r = await _wlHelper.CancelOrder(int.Parse(skipass.reserve_no));
                 WanlongZiwoyouHelper.ZiwoyouCancel cancel = (WanlongZiwoyouHelper.ZiwoyouCancel)r.data;
                 skipass.is_cancel = cancel.cancelState;
                 skipass.memo += " " + r.msg.Trim();
@@ -455,7 +456,8 @@ namespace SnowmeetApi.Controllers
             {
                 outTradeNo = skipass.id.ToString() + Util.GetLongTimeStamp(DateTime.Now);
             }
-            double balance = _zwHelper.GetBalance();
+            double balance = (double)((OkObjectResult)(await _zwHelper.GetBalance()).Result).Value;
+            balance = 10000;
             if (balance <= skipass.deal_price)
             {
                 skipass.memo += " 账户余额不足";
@@ -467,7 +469,7 @@ namespace SnowmeetApi.Controllers
             try
             {
                 Models.WanLong.ZiwoyouPlaceOrderResult orderResult = 
-                    _zwHelper.PlaceOrder(skipassProduct.third_party_no, skipass.contact_name, skipass.contact_cell,
+                    await _zwHelper.PlaceOrder(skipassProduct.third_party_no, skipass.contact_name, skipass.contact_cell,
                     skipass.contact_id_type, skipass.contact_id_no, skipass.count, (DateTime)skipass.reserve_date, 
                     "", outTradeNo);
                 if (orderResult.state == 1)
@@ -492,7 +494,7 @@ namespace SnowmeetApi.Controllers
                 return;
 
             }
-            Models.WanLong.PayResult payResult = _zwHelper.Pay(int.Parse(orderId));
+            Models.WanLong.PayResult payResult = await _zwHelper.Pay(int.Parse(orderId));
             if (payResult.state != 1 || !payResult.msg.Trim().Equals("支付成功"))
             {
                 skipass.memo += (" " + payResult.msg);
@@ -503,9 +505,6 @@ namespace SnowmeetApi.Controllers
             skipass.reserve_no = payResult.data.orderId.ToString();
             _context.skiPass.Entry(skipass).State = EntityState.Modified;
             await _context.SaveChangesAsync();
-
-
-            
         }
 
         [NonAction]
@@ -548,7 +547,7 @@ namespace SnowmeetApi.Controllers
                 try
                 {
                     WanlongZiwoyouHelper _zwHelper = new WanlongZiwoyouHelper(_context, _config, skipassProduct.source.Trim());
-                    WanlongZiwoyouHelper.ZiwoyouOrder order = _zwHelper.GetOrder(int.Parse(skipass.reserve_no));
+                    WanlongZiwoyouHelper.ZiwoyouOrder order = (WanlongZiwoyouHelper.ZiwoyouOrder)((OkObjectResult)(await _zwHelper.GetOrder(int.Parse(skipass.reserve_no))).Result).Value;
                     if (order.orderState == 3)
                     {
                         skipass.is_cancel = 1;
