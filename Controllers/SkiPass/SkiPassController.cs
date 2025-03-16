@@ -308,6 +308,7 @@ namespace SnowmeetApi.Controllers
                 if (!skipass.resort.Trim().Equals("南山"))
                 {
                     await AutoReserve(skipass.id);
+
                 }
                 try
                 {
@@ -478,6 +479,7 @@ namespace SnowmeetApi.Controllers
                 if (orderResult.state == 1)
                 {
                     orderId = orderResult.data.orderId;
+                    
                 }
                 else
                 {
@@ -503,11 +505,20 @@ namespace SnowmeetApi.Controllers
                 skipass.memo += (" " + payResult.msg);
                 _context.skiPass.Entry(skipass).State = EntityState.Modified;
                 await _context.SaveChangesAsync();
+                
                 return;
             }
             skipass.reserve_no = payResult.data.orderId.ToString();
             _context.skiPass.Entry(skipass).State = EntityState.Modified;
             await _context.SaveChangesAsync();
+            try
+            {
+                await SetNotify(skipassId, 1);
+            }
+            catch
+            {
+
+            }
         }
 
         [NonAction]
@@ -1062,7 +1073,9 @@ namespace SnowmeetApi.Controllers
             skipass.order.paymentList = await _context.OrderPayment
                 .Include(p => p.refunds.Where(r => r.state == 1 || !r.refund_id.Trim().Equals("")).OrderBy(r => r.id))
                 .Where(p => p.order_id == skipass.order_id && p.status.Trim().Equals("支付成功")).OrderBy(p => p.id).AsNoTracking().ToListAsync();
-            if (skipass.order == null || skipass.order.paymentList.Count == 0)
+            if (skipass.order == null || skipass.order.paymentList.Count == 0 
+                || skipass.order.paymentList[0].wepay_trans_id == null
+                || skipass.order.paymentList[0].timestamp == null)
             {
                 return;
             }
@@ -1072,19 +1085,19 @@ namespace SnowmeetApi.Controllers
                 case 1:
                     postJson = "{"
                         + "\"openid\": \"" + skipass.wechat_mini_openid.Trim() + "\", "
-                        + "\"notify_type\": \"2011\", "
+                        + "\"notify_type\": 2011, "
                         + "\"notify_code\": \"" + skipass.order.paymentList[0].wepay_trans_id.Trim() + "\", "
-                        + "\"content_json\" : { "
-                            + "\"cur_status\": " + curState.ToString() + ", "
-                            + "\"product_count\": " + skipass.count.ToString() + ", "
-                            + "\"product_list\": {"
-                                + "\"info_list\": [{"
-                                    + "\"product_img\": \"\", "
-                                    + "\"product_name\": \"" + skipass.product_name.Trim() + "\", "
-                                    + "\"product_path_query\":\"pages/mine/skipass/my_skipass\" }]} ,"
-                                + "\"wxa_path_query\":\"pages/mine/skipass/my_skipass\" } "
-                        + "\"check_json\" : { \"pay_amount\": " + (skipass.order.paymentList[0].amount * 100).ToString() 
-                        + ", \"pay_time\": " + skipass.order.paymentList[0].timestamp.Trim() + " } }" ;
+                        + "\"content_json\" : \"{ "
+                            + "\\\"cur_status\\\": " + curState.ToString() + ", "
+                            + "\\\"product_count\\\": " + skipass.count.ToString() + ", "
+                            + "\\\"product_list\\\": {"
+                                + "\\\"info_list\\\": [{"
+                                    + "\\\"product_img\\\": \\\"https://mini.snowmeet.top/images/snowmeet_logo.png\\\", "
+                                    + "\\\"product_name\\\": \\\"" + skipass.product_name.Trim() + "\\\", "
+                                    + "\\\"product_path_query\\\":\\\"pages/mine/skipass/my_skipass\\\" }]} ,"
+                                + "\\\"wxa_path_query\\\":\\\"pages/mine/skipass/my_skipass\\\" }\", "
+                        + "\"check_json\" : \"{ \\\"pay_amount\\\": " + (skipass.order.paymentList[0].amount * 100).ToString() 
+                        + ", \\\"pay_time\\\": " + skipass.order.paymentList[0].timestamp.Trim() + " }\" }" ;
                 break;
                 default:
                 break;
