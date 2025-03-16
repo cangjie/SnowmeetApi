@@ -335,7 +335,7 @@ namespace SnowmeetApi.Controllers
                         {
 
                         }
-                        await SetTenpayPaymentSuccess(outTradeNumber);
+                        
 
                         OrderPayment sucPay = await _db.OrderPayment.Where(p => (p.out_trade_no.Trim().Equals(outTradeNumber.Trim()) && p.status.Trim().Equals("支付成功")))
                             .OrderByDescending(p => p.id).FirstAsync();
@@ -345,6 +345,7 @@ namespace SnowmeetApi.Controllers
                             _db.OrderPayment.Entry(sucPay).State = EntityState.Modified;
                             await _db.SaveChangesAsync();
                         }
+                        await SetTenpayPaymentSuccess(outTradeNumber);
                         //Console.WriteLine("订单 {0} 已完成支付，交易单号为 {1}", outTradeNumber, transactionId);
                     }
                 }
