@@ -291,16 +291,10 @@ namespace SnowmeetApi.Controllers
             }
             List<Models.SkiPass.SkiPass> skipassList = await _context.skiPass
                 .Where(s => s.order_id == order.id).ToListAsync();
-            bool notified = false;
+            //bool notified = false;
             for(int i = 0; i < skipassList.Count; i++)
             {
                 Models.SkiPass.SkiPass skipass = skipassList[i];
-                if (!notified)
-                {
-                    await SetNotify(skipass.id, 1);
-                    notified = true;
-                }
-                
                 skipass.valid = 1;
                 skipass.update_date = DateTime.Now;
                 _context.skiPass.Entry(skipass).State = EntityState.Modified;
@@ -1069,38 +1063,28 @@ namespace SnowmeetApi.Controllers
             return Ok(sList);
         }
         [HttpGet]
-        public async Task SetNotify(int skiPassId, int curState)
+        public async Task SetNotify(string openId, string transId, int count, string name, int amount, string timeStamp, int curState)
         {
-            Models.SkiPass.SkiPass skipass = await _context.skiPass.FindAsync(skiPassId);
-            await _context.skiPass.Entry(skipass).Reference(s => s.order).LoadAsync();
-            skipass.order.paymentList = await _context.OrderPayment
-                .Include(p => p.refunds.Where(r => r.state == 1 || !r.refund_id.Trim().Equals("")).OrderBy(r => r.id))
-                .Where(p => p.order_id == skipass.order_id && p.status.Trim().Equals("支付成功")).OrderBy(p => p.id).AsNoTracking().ToListAsync();
-            if (skipass.order == null || skipass.order.paymentList.Count == 0 
-                || skipass.order.paymentList[0].wepay_trans_id == null
-                || skipass.order.paymentList[0].timestamp == null)
-            {
-                return;
-            }
+            
             string postJson = "";
             switch(curState)
             {
                 case 1:
                     postJson = "{"
-                        + "\"openid\": \"" + skipass.wechat_mini_openid.Trim() + "\", "
+                        + "\"openid\": \"" + openId.Trim() + "\", "
                         + "\"notify_type\": 2011, "
-                        + "\"notify_code\": \"" + skipass.order.paymentList[0].wepay_trans_id.Trim() + "\", "
+                        + "\"notify_code\": \"" + transId + "\", "
                         + "\"content_json\" : \"{ "
                             + "\\\"cur_status\\\": " + curState.ToString() + ", "
-                            + "\\\"product_count\\\": " + skipass.count.ToString() + ", "
+                            + "\\\"product_count\\\": " + count.ToString() + ", "
                             + "\\\"product_list\\\": {"
                                 + "\\\"info_list\\\": [{"
                                     + "\\\"product_img\\\": \\\"https://mini.snowmeet.top/images/snowmeet_logo.png\\\", "
-                                    + "\\\"product_name\\\": \\\"" + skipass.product_name.Trim() + "\\\", "
+                                    + "\\\"product_name\\\": \\\"" + name + "\\\", "
                                     + "\\\"product_path_query\\\":\\\"pages/mine/skipass/my_skipass\\\" }]} ,"
                                 + "\\\"wxa_path_query\\\":\\\"pages/mine/skipass/my_skipass\\\" }\", "
-                        + "\"check_json\" : \"{ \\\"pay_amount\\\": " + (skipass.order.paymentList[0].amount * 100).ToString() 
-                        + ", \\\"pay_time\\\": " + skipass.order.paymentList[0].timestamp.Trim() + " }\" }" ;
+                        + "\"check_json\" : \"{ \\\"pay_amount\\\": " + (amount * 100).ToString() 
+                        + ", \\\"pay_time\\\": " + timeStamp + " }\" }" ;
                 break;
                 default:
                 break;
