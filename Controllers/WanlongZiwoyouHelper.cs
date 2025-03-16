@@ -135,7 +135,7 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet]
-        public ActionResult<ProductQueryResult> GetProductList(string keyword)
+        public async Task<ActionResult<ProductQueryResult>> GetProductList(string keyword)
         {
             int pageSize = 20;
             string custId = dhhsCustId;
@@ -151,7 +151,11 @@ namespace SnowmeetApi.Controllers
             //string ret = Util.GetWebContent("https://task-api-stag.zowoyoo.com/api/thirdPaty/prod/list", postJson,"application/json");
             string ret = Util.GetWebContent("https://task-api.zowoyoo.com/api/thirdPaty/prod/list", postJson,"application/json");
             Console.WriteLine(postJson);
-            
+            MiniAppHelperController _miniHelper = new MiniAppHelperController(_context, _oriConfig);
+            WebApiLog reqLog = await _miniHelper.PerformRequest("https://task-api.zowoyoo.com/api/thirdPaty/prod/list"
+                , "", postJson, "POST", "易龙雪聚小程序", "预订雪票", "获取产品列表");
+
+            /*
             string path = $"{Environment.CurrentDirectory}";
             string dateStr = DateTime.Now.Year.ToString() + DateTime.Now.Month.ToString().PadLeft(2, '0')
                 + DateTime.Now.Day.ToString().PadLeft(2, '0');
@@ -164,15 +168,12 @@ namespace SnowmeetApi.Controllers
                 fw.WriteLine("");
 
             }
-
-
-
-
-            ProductQueryResult r = JsonConvert.DeserializeObject<ProductQueryResult>(ret);
+            */
+            ProductQueryResult r = JsonConvert.DeserializeObject<ProductQueryResult>(reqLog.response.Trim());
             int pageCount = r.data.pageCount;
             for (int i = 1; i < pageCount; i++)
             {
-                ProductQueryResult subR = GetProductListByPage(keyword, i);
+                ProductQueryResult subR = await GetProductListByPage(keyword, i);
                 if (subR.state != 1)
                 {
                     continue;
@@ -198,7 +199,7 @@ namespace SnowmeetApi.Controllers
 
 
         [NonAction]
-        public ProductQueryResult GetProductListByPage(string keyword, int pageNum)
+        public async Task<ProductQueryResult> GetProductListByPage(string keyword, int pageNum)
         {
             int pageSize = 20;
             string custId = dhhsCustId;
@@ -211,8 +212,14 @@ namespace SnowmeetApi.Controllers
             }
             */
             string postJson = "{\"apikey\": \"" + apiKey + "\",\t\"catIds\": \"\",\t\"cityId\": \"\",\t\"cityName\": \"\",\t\"custId\": " + custId + " ,\t\"isConfirm\": \"0\",\t\"isExpress\": \"0\",\t\"isMulti\": \"\",\t\"isPackage\": \"\",\t\"isPay\": \"\",\t\"keyWord\": \"" + keyword.Trim() + "\",\t\"orderBy\": \"\",\t\"page\": " + pageNum.ToString() + ",\t\"productNos\": \"\",\t\"resultNum\": " + pageSize.ToString() + ",\t\"tagIds\": \"\",\t\"treeId\": \"\",\t\"viewId\": \"\"}";
-            string ret = Util.GetWebContent("https://task-api.zowoyoo.com/api/thirdPaty/prod/list", postJson, "application/json");
+            //string ret = Util.GetWebContent("https://task-api.zowoyoo.com/api/thirdPaty/prod/list", postJson, "application/json");
 
+
+            MiniAppHelperController _miniHelper = new MiniAppHelperController(_context, _oriConfig);
+            WebApiLog reqLog = await _miniHelper.PerformRequest("https://task-api.zowoyoo.com/api/thirdPaty/prod/list"
+                , "", postJson, "POST", "易龙雪聚小程序", "预订雪票", "获取产品分页列表");
+
+            /*
             string path = $"{Environment.CurrentDirectory}";
             string dateStr = DateTime.Now.Year.ToString() + DateTime.Now.Month.ToString().PadLeft(2, '0')
                 + DateTime.Now.Day.ToString().PadLeft(2, '0');
@@ -225,10 +232,10 @@ namespace SnowmeetApi.Controllers
                 fw.WriteLine("");
 
             }
-
+            */
 
             Console.WriteLine(postJson);
-            ProductQueryResult r = JsonConvert.DeserializeObject<ProductQueryResult>(ret);
+            ProductQueryResult r = JsonConvert.DeserializeObject<ProductQueryResult>(reqLog.response.Trim());
             return r;
         }
 
@@ -282,7 +289,6 @@ namespace SnowmeetApi.Controllers
             string idType, string idNo, int count, DateTime date, string memo, string orderId)
         {
             MiniAppHelperController _miniHelper = new MiniAppHelperController(_context, _oriConfig);
-
             string postData = "{\n\t\"apikey\": \"" + apiKey
                 + "\",\n\t\"custId\": " + custId + " ,\n\t\"infoId\": " + productNo
                 + ",\n\t\"isSend\": \"1\",\n\t\"linkMan\": \"" + name + "\", \"linkCreditType\": 0, \"linkCreditNo\": \"" + idNo.Trim()
@@ -542,7 +548,7 @@ namespace SnowmeetApi.Controllers
         [HttpGet]
         public async Task UpdateSkipassProduct(string keyword)
         {
-            ProductQueryResult originProductInfo = (ProductQueryResult)((OkObjectResult)GetProductList(keyword).Result).Value;
+            ProductQueryResult originProductInfo = (ProductQueryResult)((OkObjectResult)(await GetProductList(keyword)).Result).Value;
             for(int i = 0; i < originProductInfo.data.results.Length; i++)
             {
                 SkiPassProduct skipassProduct = originProductInfo.data.results[i];
