@@ -433,7 +433,7 @@ namespace SnowmeetApi.Controllers
         [HttpGet]
         public async Task AutoReserve(int skipassId)
         {
-            
+            await SetNotify(skipassId, 1);
             Models.SkiPass.SkiPass skipass = await _context.skiPass.FindAsync(skipassId);
             if (!skipass.status.Equals("已付款"))
             {
@@ -511,7 +511,7 @@ namespace SnowmeetApi.Controllers
             skipass.reserve_no = payResult.data.orderId.ToString();
             _context.skiPass.Entry(skipass).State = EntityState.Modified;
             await _context.SaveChangesAsync();
-            await SetNotify(skipassId, 1);
+            
             
         }
 
