@@ -302,6 +302,7 @@ namespace SnowmeetApi.Controllers
                 }
                 
                 skipass.valid = 1;
+                skipass.update_date = DateTime.Now;
                 _context.skiPass.Entry(skipass).State = EntityState.Modified;
                 
             }
