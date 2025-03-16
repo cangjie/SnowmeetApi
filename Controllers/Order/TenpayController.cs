@@ -310,7 +310,7 @@ namespace SnowmeetApi.Controllers
                     callbackSerialNumber: serial
                 );
                 */
-                if (!valid)
+                if (valid)
                 {
                     var callbackModel = client.DeserializeEvent(postJson);
                     if ("TRANSACTION.SUCCESS".Equals(callbackModel.EventType))
