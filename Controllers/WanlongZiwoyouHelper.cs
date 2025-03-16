@@ -359,7 +359,7 @@ namespace SnowmeetApi.Controllers
             ZiwoyouProductDailyPrice price = JsonConvert.DeserializeObject<ZiwoyouProductDailyPrice>(r.data.ToString());
             return price;
         }
-
+       
         [HttpGet]
         public async Task<ActionResult<ZiwoyouOrder>> GetOrder(int orderId)
         {
@@ -385,11 +385,12 @@ namespace SnowmeetApi.Controllers
 
             }
             */
-            
-            ZiwoyouQueryResult r = JsonConvert.DeserializeObject<ZiwoyouQueryResult>(log.response);
+            //string responseStr = Util.GetWebContent("https://mini.snowmeet.top/core/WanlongZiwoyouHelper/GetOrder?orderId=" + orderId.ToString());
+            ZiwoyouQueryResult r = JsonConvert.DeserializeObject<ZiwoyouQueryResult>(log.response.Trim());
+
             ZiwoyouOrder order = JsonConvert.DeserializeObject<ZiwoyouOrder>(r.data.ToString());
 
-            return order;
+            return Ok(order);
 
         }
 
