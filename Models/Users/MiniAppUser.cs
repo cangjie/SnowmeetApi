@@ -3,6 +3,7 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using SnowmeetApi.Models.Deposit;
 
 namespace SnowmeetApi.Models.Users
 {
@@ -29,7 +30,8 @@ namespace SnowmeetApi.Models.Users
 
         [NotMapped]
         public bool isMember { get; set; } = false;
-
+        [NotMapped]
+        public DepositAccount serviceDepositAccount {get; set;} = null;
 
 
         /*
@@ -39,8 +41,6 @@ namespace SnowmeetApi.Models.Users
         }
         */
     }
-
-    [NotMapped]
     public class MiniAppUserList
     {
         public int status { get; set; } = 0;

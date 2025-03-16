@@ -9,6 +9,7 @@ using SnowmeetApi.Data;
 using Microsoft.Extensions.Configuration;
 using SnowmeetApi.Models.Users;
 using SnowmeetApi.Controllers.User;
+using SnowmeetApi.Models.Deposit;
 
 namespace SnowmeetApi.Controllers
 {
@@ -180,7 +181,6 @@ namespace SnowmeetApi.Controllers
 
            
             Member member = await _memberHelper.GetMember(openId, "wechat_mini_openid");
-
             MiniAppUser mUser = new MiniAppUser();
             mUser.open_id = openId;
             mUser.union_id = member.wechatUnionId == null? "": member.wechatUnionId.Trim();
@@ -194,6 +194,14 @@ namespace SnowmeetApi.Controllers
             mUser.is_manager = member.is_manager;
             mUser.isMember = !mUser.cell_number.Trim().Equals("");
             mUser.wechat_id = (member.wechatId == null)? "" : member.wechatId.Trim();
+            DepositController _depositHelper = new DepositController(_context, _config);
+            List<DepositAccount> aList = await _depositHelper.GetMemberAccountAvaliable(member.id, "服务储值", "");
+            if (aList.Count > 0)
+            {
+                DepositAccount account = aList[0];
+                account.member = null;
+                mUser.serviceDepositAccount = aList[0];
+            }
             return Ok(mUser);
 
     
