@@ -21,6 +21,7 @@ using SnowmeetApi.Controllers.Order;
 using Org.BouncyCastle.Asn1.Crmf;
 using System.Runtime.CompilerServices;
 using Microsoft.CodeAnalysis.CSharp;
+using LuqinMiniAppBase.Controllers;
 namespace SnowmeetApi.Controllers
 {
     [Route("core/[controller]/[action]")]
@@ -315,6 +316,7 @@ namespace SnowmeetApi.Controllers
                 {
 
                 }
+                await SetNotify(skipass.id, 1);
             }
             await CreateShare(orderId);
         }
@@ -1071,21 +1073,25 @@ namespace SnowmeetApi.Controllers
                         + "\"openid\": \"" + skipass.wechat_mini_openid.Trim() + "\", "
                         + "\"notify_type\": \"2011\", "
                         + "\"notify_code\": \"" + skipass.order.paymentList[0].wepay_trans_id.Trim() + "\", "
-                        + "\"content_json\" : {"
+                        + "\"content_json\" : { "
                             + "\"cur_status\": " + curState.ToString() + ", "
                             + "\"product_count\": " + skipass.count.ToString() + ", "
                             + "\"product_list\": {"
                                 + "\"info_list\": [{"
                                     + "\"product_img\": \"\", "
                                     + "\"product_name\": \"" + skipass.product_name.Trim() + "\", "
-                                    + "\"product_path_query\":\"pages/index/index\""
-
-                        + "";
-
+                                    + "\"product_path_query\":\"pages/mine/skipass/my_skipass\" }]} ,"
+                                + "\"wxa_path_query\":\"pages/mine/skipass/my_skipass\" } "
+                        + "\"check_json\" : { \"pay_amount\": " + (skipass.order.paymentList[0].amount * 100).ToString() 
+                        + ", \"pay_time\": " + skipass.order.paymentList[0].timestamp.Trim() + " } }" ;
+                break;
+                default:
                 break;
             }
-            
-            
+            MiniAppHelperController _helper = new MiniAppHelperController(_context, _config);
+            string token = _helper.GetAccessToken();
+            string url = "https://api.weixin.qq.com/wxa/set_user_notify?access_token=" + token.Trim();
+            await _helper.PerformRequest(url, "", postJson, "POST", "易龙雪聚小程序", "预订雪票", "雪票模版消息-激活");
         }
     }
 
