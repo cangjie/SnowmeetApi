@@ -291,12 +291,19 @@ namespace SnowmeetApi.Controllers
             }
             List<Models.SkiPass.SkiPass> skipassList = await _context.skiPass
                 .Where(s => s.order_id == order.id).ToListAsync();
+            bool notified = false;
             for(int i = 0; i < skipassList.Count; i++)
             {
                 Models.SkiPass.SkiPass skipass = skipassList[i];
+                if (!notified)
+                {
+                    await SetNotify(skipass.id, 1);
+                    notified = true;
+                }
+                
                 skipass.valid = 1;
                 _context.skiPass.Entry(skipass).State = EntityState.Modified;
-                //await SetNotify(skipass.id, 1);
+                
             }
             await _context.SaveChangesAsync();
 
@@ -304,6 +311,7 @@ namespace SnowmeetApi.Controllers
             for (int i = 0; i < skipassList.Count; i++)
             {
                 Models.SkiPass.SkiPass skipass = skipassList[i];
+                //await SetNotify(skipass.id, 1);
                 //await SendTicket(skipass);
                 if (!skipass.resort.Trim().Equals("南山"))
                 {
@@ -433,7 +441,7 @@ namespace SnowmeetApi.Controllers
         [HttpGet]
         public async Task AutoReserve(int skipassId)
         {
-            await SetNotify(skipassId, 1);
+            
             Models.SkiPass.SkiPass skipass = await _context.skiPass.FindAsync(skipassId);
             if (!skipass.status.Equals("已付款"))
             {
