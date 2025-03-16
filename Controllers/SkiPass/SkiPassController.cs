@@ -285,19 +285,28 @@ namespace SnowmeetApi.Controllers
         public async Task CreateSkiPass(int orderId)
         {
             OrderOnline order = await _context.OrderOnlines.FindAsync(orderId);
+            List<OrderPayment> pList = await _context.OrderPayment
+                .Include(p => p.refunds.Where(r => r.state == 1 || !r.refund_id.Trim().Equals("")))
+                .Where(p => p.order_id == orderId && p.status.Trim().Equals("支付成功")).AsNoTracking().ToListAsync();
             if (order == null)
             {
                 return;
             }
             List<Models.SkiPass.SkiPass> skipassList = await _context.skiPass
                 .Where(s => s.order_id == order.id).ToListAsync();
-            //bool notified = false;
+            bool notified = false;
             for(int i = 0; i < skipassList.Count; i++)
             {
                 Models.SkiPass.SkiPass skipass = skipassList[i];
                 skipass.valid = 1;
                 skipass.update_date = DateTime.Now;
                 _context.skiPass.Entry(skipass).State = EntityState.Modified;
+                if (!notified && pList.Count > 0)
+                {
+                    OrderPayment payment = pList[0];
+                    await SetNotify(payment.open_id, payment.wepay_trans_id, 1, skipass.product_name, (int)(payment.amount * 100), payment.timestamp, 1);
+                    notified = false;
+                }
                 
             }
             await _context.SaveChangesAsync();
@@ -310,6 +319,7 @@ namespace SnowmeetApi.Controllers
                 //await SendTicket(skipass);
                 if (!skipass.resort.Trim().Equals("南山"))
                 {
+
                     await AutoReserve(skipass.id);
 
                 }
@@ -514,7 +524,7 @@ namespace SnowmeetApi.Controllers
             skipass.reserve_no = payResult.data.orderId.ToString();
             _context.skiPass.Entry(skipass).State = EntityState.Modified;
             await _context.SaveChangesAsync();
-            
+            //await SetNotify(skipass)
             
         }
 
