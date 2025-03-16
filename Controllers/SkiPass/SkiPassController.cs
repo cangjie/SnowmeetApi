@@ -511,14 +511,8 @@ namespace SnowmeetApi.Controllers
             skipass.reserve_no = payResult.data.orderId.ToString();
             _context.skiPass.Entry(skipass).State = EntityState.Modified;
             await _context.SaveChangesAsync();
-            try
-            {
-                await SetNotify(skipassId, 1);
-            }
-            catch
-            {
-
-            }
+            await SetNotify(skipassId, 1);
+            
         }
 
         [NonAction]
