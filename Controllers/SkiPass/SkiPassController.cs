@@ -227,10 +227,10 @@ namespace SnowmeetApi.Controllers
                 }
                 
             }
-            catch
+            catch(Exception err)
             {
                 skipass.is_cancel = -1;
-                skipass.memo = "取消出错";
+                skipass.memo = "取消出错 " + err.ToString();
             }
             _context.skiPass.Entry(skipass).State = EntityState.Modified;
             await _context.SaveChangesAsync();
