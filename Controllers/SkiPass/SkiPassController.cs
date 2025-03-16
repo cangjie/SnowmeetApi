@@ -296,7 +296,7 @@ namespace SnowmeetApi.Controllers
                 Models.SkiPass.SkiPass skipass = skipassList[i];
                 skipass.valid = 1;
                 _context.skiPass.Entry(skipass).State = EntityState.Modified;
-                await SetNotify(skipass.id, 1);
+                //await SetNotify(skipass.id, 1);
             }
             await _context.SaveChangesAsync();
 
