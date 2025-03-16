@@ -1051,6 +1051,42 @@ namespace SnowmeetApi.Controllers
                 .AsNoTracking().ToListAsync();
             return Ok(sList);
         }
+        [HttpGet]
+        public async Task SetNotify(int skiPassId, int curState)
+        {
+            Models.SkiPass.SkiPass skipass = await _context.skiPass.FindAsync(skiPassId);
+            await _context.skiPass.Entry(skipass).Reference(s => s.order).LoadAsync();
+            skipass.order.paymentList = await _context.OrderPayment
+                .Include(p => p.refunds.Where(r => r.state == 1 || !r.refund_id.Trim().Equals("")).OrderBy(r => r.id))
+                .Where(p => p.order_id == skipass.order_id && p.status.Trim().Equals("支付成功")).OrderBy(p => p.id).AsNoTracking().ToListAsync();
+            if (skipass.order == null || skipass.order.paymentList.Count == 0)
+            {
+                return;
+            }
+            string postJson = "";
+            switch(curState)
+            {
+                case 1:
+                    postJson = "{"
+                        + "\"openid\": \"" + skipass.wechat_mini_openid.Trim() + "\", "
+                        + "\"notify_type\": \"2011\", "
+                        + "\"notify_code\": \"" + skipass.order.paymentList[0].wepay_trans_id.Trim() + "\", "
+                        + "\"content_json\" : {"
+                            + "\"cur_status\": " + curState.ToString() + ", "
+                            + "\"product_count\": " + skipass.count.ToString() + ", "
+                            + "\"product_list\": {"
+                                + "\"info_list\": [{"
+                                    + "\"product_img\": \"\", "
+                                    + "\"product_name\": \"" + skipass.product_name.Trim() + "\", "
+                                    + "\"product_path_query\":\"pages/index/index\""
+
+                        + "";
+
+                break;
+            }
+            
+            
+        }
     }
 
     
