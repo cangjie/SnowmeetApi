@@ -670,7 +670,8 @@ namespace SnowmeetApi.Controllers
                         }
                         if (updated)
                         {
-                            await SetNotify(skipass.wechat_mini_openid, skipass.order.paymentList[0].wepay_trans_id.Trim(), 1, skipass.product_name, (int)(skipass.deal_price * 100), skipass.order.paymentList[0].timestamp, 2);
+                            //await SetNotify(skipass.wechat_mini_openid, skipass.order.paymentList[0].wepay_trans_id.Trim(), 1, skipass.product_name, (int)(skipass.deal_price * 100), skipass.order.paymentList[0].timestamp, 2);
+                            await SetNotify(skipass.wechat_mini_openid, skipass.order.paymentList[0].wepay_trans_id.Trim(), 1, "邀请您体验免费打蜡", (int)(skipass.deal_price * 100), skipass.order.paymentList[0].timestamp, 2);
                             await SetNotify(skipass.wechat_mini_openid, skipass.order.paymentList[0].wepay_trans_id.Trim(), 1, "邀请您体验免费打蜡", (int)(skipass.deal_price * 100), skipass.order.paymentList[0].timestamp, 4);
                         }
                     }
@@ -1128,7 +1129,7 @@ namespace SnowmeetApi.Controllers
                             
                 break;
                 case 4:
-                    memo = "雪票模版消息-出票";
+                    memo = "雪票模版消息-待使用";
                     postJson = "{"
                             + "\"openid\": \"" + openId.Trim() + "\", "
                             + "\"notify_type\": 2011, "
