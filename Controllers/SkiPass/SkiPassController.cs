@@ -671,6 +671,7 @@ namespace SnowmeetApi.Controllers
                         if (updated)
                         {
                             await SetNotify(skipass.wechat_mini_openid, skipass.order.paymentList[0].wepay_trans_id.Trim(), 1, skipass.product_name, (int)(skipass.deal_price * 100), skipass.order.paymentList[0].timestamp, 2);
+                            await SetNotify(skipass.wechat_mini_openid, skipass.order.paymentList[0].wepay_trans_id.Trim(), 1, "邀请您体验免费打蜡", (int)(skipass.deal_price * 100), skipass.order.paymentList[0].timestamp, 4);
                         }
                     }
                     switch(order.orderState)
@@ -1110,6 +1111,23 @@ namespace SnowmeetApi.Controllers
                         + ", \\\"pay_time\\\": " + timeStamp + " }\" }" ;
                 break;
                 case 2:
+                    memo = "雪票模版消息-出票";
+                    postJson = "{"
+                            + "\"openid\": \"" + openId.Trim() + "\", "
+                            + "\"notify_type\": 2011, "
+                            + "\"notify_code\": \"" + transId + "\", "
+                            + "\"content_json\" : \"{ "
+                                + "\\\"cur_status\\\": " + curState.ToString() + ", "
+                                + "\\\"product_count\\\": " + count.ToString() + ", "
+                                + "\\\"product_list\\\": {"
+                                    + "\\\"info_list\\\": [{"
+                                        + "\\\"product_img\\\": \\\"https://mini.snowmeet.top/images/snowmeet_logo.png\\\", "
+                                        + "\\\"product_name\\\": \\\"" + name + "\\\", "
+                                        + "\\\"product_path_query\\\":\\\"pages/mine/skipass/my_skipass\\\" }]} ,"
+                                    + "\\\"wxa_path_query\\\":\\\"pages/mine/skipass/my_skipass\\\" }\" }";
+                            
+                break;
+                case 3:
                     memo = "雪票模版消息-出票";
                     postJson = "{"
                             + "\"openid\": \"" + openId.Trim() + "\", "
