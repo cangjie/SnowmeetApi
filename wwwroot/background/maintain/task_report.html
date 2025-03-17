@@ -51,6 +51,7 @@
                 <td class="table_head">时间</td>
                 <td class="table_head">订单号</td>
                 <td class="table_head">支付金额</td>
+                <td class="table_head">支付方式</td>
                 <td class="table_head">退款</td>
                 <td class="table_head">结余金额</td>
             </tr>
@@ -68,6 +69,10 @@
         var totalColNum = 18;
         var rows = document.getElementById('report_rows');
         var newRow = document.createElement('tr');
+        var payMethod = '——';
+        if (item.order != null && item.order.paymentList != null && item.order.paymentList.length > 0){
+            payMethod = item.order.paymentList[0].pay_method;
+        }
         //newRow.style.backgroundColor = item.odd ? 'white' : '#DDDDDD';
         //newRow.id = item.task_flow_num;
 
@@ -193,6 +198,15 @@
             attr.value = 'text-align:right';
             td_paid.attributes.setNamedItem(attr);
             newRow.appendChild(td_paid);
+
+            var td_pay_method = document.createElement('td');
+            td_pay_method.innerText = payMethod;
+            attr = document.createAttribute('style');
+            attr.value = 'text-align:center';
+            td_pay_method.attributes.setNamedItem(attr);
+            newRow.appendChild(td_pay_method);
+            
+            
 
             var td_refund = document.createElement('td');
             td_refund.innerText = item.order == null? "¥0.00" : formatAmount(item.order.refundAmount);
