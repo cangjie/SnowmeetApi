@@ -1127,7 +1127,7 @@ namespace SnowmeetApi.Controllers
                                     + "\\\"wxa_path_query\\\":\\\"pages/mine/skipass/my_skipass\\\" }\" }";
                             
                 break;
-                case 3:
+                case 4:
                     memo = "雪票模版消息-出票";
                     postJson = "{"
                             + "\"openid\": \"" + openId.Trim() + "\", "
