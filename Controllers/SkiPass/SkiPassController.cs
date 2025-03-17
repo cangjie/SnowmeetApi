@@ -1093,7 +1093,7 @@ namespace SnowmeetApi.Controllers
                                     + "\\\"product_name\\\": \\\"" + name + "\\\", "
                                     + "\\\"product_path_query\\\":\\\"pages/mine/skipass/my_skipass\\\" }]} ,"
                                 + "\\\"wxa_path_query\\\":\\\"pages/mine/skipass/my_skipass\\\" }\", "
-                        + "\"check_json\" : \"{ \\\"pay_amount\\\": " + (amount * 100).ToString() 
+                        + "\"check_json\" : \"{ \\\"pay_amount\\\": " + amount.ToString() 
                         + ", \\\"pay_time\\\": " + timeStamp + " }\" }" ;
                 break;
                 default:
