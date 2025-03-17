@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -1080,6 +1081,7 @@ namespace SnowmeetApi.Controllers
             switch(curState)
             {
                 case 1:
+                    Thread.Sleep(30000);
                     postJson = "{"
                         + "\"openid\": \"" + openId.Trim() + "\", "
                         + "\"notify_type\": 2011, "
