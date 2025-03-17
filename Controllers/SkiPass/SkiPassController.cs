@@ -302,6 +302,7 @@ namespace SnowmeetApi.Controllers
                 skipass.valid = 1;
                 skipass.update_date = DateTime.Now;
                 _context.skiPass.Entry(skipass).State = EntityState.Modified;
+                await _context.SaveChangesAsync();
                 if (!notified && pList.Count > 0)
                 {
                     OrderPayment payment = pList[0];
@@ -310,7 +311,7 @@ namespace SnowmeetApi.Controllers
                 }
                 
             }
-            await _context.SaveChangesAsync();
+            
 
             //雪票生效后附赠以及分账
             for (int i = 0; i < skipassList.Count; i++)
@@ -671,8 +672,8 @@ namespace SnowmeetApi.Controllers
                         if (updated)
                         {
                             //await SetNotify(skipass.wechat_mini_openid, skipass.order.paymentList[0].wepay_trans_id.Trim(), 1, skipass.product_name, (int)(skipass.deal_price * 100), skipass.order.paymentList[0].timestamp, 2);
-                            await SetNotify(skipass.wechat_mini_openid, skipass.order.paymentList[0].wepay_trans_id.Trim(), 1, "邀请您体验免费打蜡", (int)(skipass.deal_price * 100), skipass.order.paymentList[0].timestamp, 2);
-                            await SetNotify(skipass.wechat_mini_openid, skipass.order.paymentList[0].wepay_trans_id.Trim(), 1, "邀请您体验免费打蜡", (int)(skipass.deal_price * 100), skipass.order.paymentList[0].timestamp, 4);
+                            await SetNotify(skipass.wechat_mini_openid, skipass.order.paymentList[0].wepay_trans_id.Trim(), 1, skipass.product_name, (int)(skipass.deal_price * 100), skipass.order.paymentList[0].timestamp, 2);
+                            await SetNotify(skipass.wechat_mini_openid, skipass.order.paymentList[0].wepay_trans_id.Trim(), 1, skipass.product_name, (int)(skipass.deal_price * 100), skipass.order.paymentList[0].timestamp, 4);
                         }
                     }
                     switch(order.orderState)
