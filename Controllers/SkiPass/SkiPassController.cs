@@ -624,6 +624,8 @@ namespace SnowmeetApi.Controllers
         public async Task RefreshAutoReserve()
         {
             List<Models.SkiPass.SkiPass> skipassList = await _context.skiPass
+                .Include(s => s.order)
+                    .ThenInclude(o => o.paymentList.Where(p => p.status.Equals("支付成功")))
                 .Where(s => (s.valid == 1 && s.reserve_no != null && !s.resort.Trim().Equals("南山")
                 && s.card_no == null && s.qr_code_url == null && s.send_content == null && s.is_cancel == 0
                 //&& s.create_date > DateTime.Now.AddHours(-480)
@@ -655,13 +657,20 @@ namespace SnowmeetApi.Controllers
                     }
                     if (order.vouchers.Length > 0)
                     {
+                        bool updated = false;
                         if (order.vouchers[0].code != null && !order.vouchers[0].code.Trim().Equals(""))
                         {
                             skipass.card_no = order.vouchers[0].code.Trim();
+                            updated = true;
                         }
                         if (order.vouchers[0].qrcodeUrl != null && !order.vouchers[0].qrcodeUrl.Trim().Equals(""))
                         {
                             skipass.qr_code_url = order.vouchers[0].qrcodeUrl.Trim();
+                            updated = true;
+                        }
+                        if (updated)
+                        {
+                            await SetNotify(skipass.wechat_mini_openid, skipass.order.paymentList[0].wepay_trans_id.Trim(), 1, skipass.product_name, (int)(skipass.deal_price * 100), skipass.order.paymentList[0].timestamp, 2);
                         }
                     }
                     switch(order.orderState)
@@ -1078,9 +1087,11 @@ namespace SnowmeetApi.Controllers
         {
             
             string postJson = "";
+            string memo = "";
             switch(curState)
             {
                 case 1:
+                    memo = "雪票模版消息-激活";
                     Thread.Sleep(30000);
                     postJson = "{"
                         + "\"openid\": \"" + openId.Trim() + "\", "
@@ -1098,13 +1109,31 @@ namespace SnowmeetApi.Controllers
                         + "\"check_json\" : \"{ \\\"pay_amount\\\": " + amount.ToString() 
                         + ", \\\"pay_time\\\": " + timeStamp + " }\" }" ;
                 break;
+                case 2:
+                    memo = "雪票模版消息-出票";
+                    postJson = "{"
+                            + "\"openid\": \"" + openId.Trim() + "\", "
+                            + "\"notify_type\": 2011, "
+                            + "\"notify_code\": \"" + transId + "\", "
+                            + "\"content_json\" : \"{ "
+                                + "\\\"cur_status\\\": " + curState.ToString() + ", "
+                                + "\\\"product_count\\\": " + count.ToString() + ", "
+                                + "\\\"product_list\\\": {"
+                                    + "\\\"info_list\\\": [{"
+                                        + "\\\"product_img\\\": \\\"https://mini.snowmeet.top/images/snowmeet_logo.png\\\", "
+                                        + "\\\"product_name\\\": \\\"" + name + "\\\", "
+                                        + "\\\"product_path_query\\\":\\\"pages/mine/skipass/my_skipass\\\" }]} ,"
+                                    + "\\\"wxa_path_query\\\":\\\"pages/mine/skipass/my_skipass\\\" }\" }";
+                            
+                break;
                 default:
                 break;
             }
             MiniAppHelperController _helper = new MiniAppHelperController(_context, _config);
             string token = _helper.GetAccessToken();
             string url = "https://api.weixin.qq.com/wxa/set_user_notify?access_token=" + token.Trim();
-            await _helper.PerformRequest(url, "", postJson, "POST", "易龙雪聚小程序", "预订雪票", "雪票模版消息-激活");
+
+            await _helper.PerformRequest(url, "", postJson, "POST", "易龙雪聚小程序", "预订雪票", memo);
         }
     }
 
