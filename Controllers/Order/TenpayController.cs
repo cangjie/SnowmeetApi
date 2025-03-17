@@ -300,16 +300,7 @@ namespace SnowmeetApi.Controllers
                 var client = new WechatTenpayClient(options);
                 Exception? verifyErr;
                 bool valid = client.VerifyEventSignature(timeStamp, nonce, postJson, paySign, serial, out verifyErr);
-                //valid = client.VerifyEventSignature()
-                /*
-                bool valid = client.VerifyEventSignature(
-                    callbackTimestamp: timeStamp,
-                    callbackNonce: nonce,
-                    callbackBody: postJson,
-                    callbackSignature: paySign,
-                    callbackSerialNumber: serial
-                );
-                */
+             
                 if (valid)
                 {
                     var callbackModel = client.DeserializeEvent(postJson);
