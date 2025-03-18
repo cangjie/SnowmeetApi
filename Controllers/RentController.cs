@@ -1685,7 +1685,7 @@ namespace SnowmeetApi.Controllers
                     break;
             }
             detail.memo = DateTime.Now.ToString() + " " + user.miniAppUser.real_name + " 追加";
-
+            detail.rent_staff = user.wlMiniOpenId.Trim();
             await _context.RentOrderDetail.AddAsync(detail);
             await _context.SaveChangesAsync();
             return Ok(detail);
