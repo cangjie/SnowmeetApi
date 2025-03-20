@@ -29,7 +29,6 @@ namespace SnowmeetApi.Models
         public string confirmed_serial { get; set; }
         public string confirmed_scale { get; set; }
         public string confirmed_year { get; set; }
-        
         public int confirmed_edge { get; set; }
         public int confirmed_degree { get; set; }
         public int confirmed_candle { get; set; }
@@ -42,7 +41,6 @@ namespace SnowmeetApi.Models
         public string confirmed_gender { get; set; } = "";
         public int confirmed_product_id { get; set; } = 0;
         public string confirmed_images { get; set; } = "";
-
         public int confirmed_urgent { get; set; } = 0;
         public string confirmed_foot_length { get; set; } = "";
         public string confirmed_front { get; set; } = "";
@@ -62,11 +60,9 @@ namespace SnowmeetApi.Models
         public int finish { get; set; } = 0;
         public string ticket_code { get; set; } = "";
         public DateTime create_date { get; set; } = DateTime.Now;
-
         public string pay_method { get; set; } = "微信支付";
-
         public string pay_memo { get; set; } = "";
-
+        public string? pick_veri_code { get; set;} = null;
         [NotMapped]
         public List<Maintain.MaintainLog> taskLog { get; set; }
 
