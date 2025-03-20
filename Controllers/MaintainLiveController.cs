@@ -442,7 +442,7 @@ namespace SnowmeetApi.Controllers
         [HttpGet("{taskId}")]
         public async Task<ActionResult<bool>> VeriPickCode(int taskId, string code)
         {
-            bool result = false;
+            //bool result = false;
             MaintainLive task = await _context.MaintainLives.FindAsync(taskId);
             if (task == null || code.Trim().Equals(task.pick_veri_code))
             {
