@@ -214,17 +214,17 @@ namespace SnowmeetApi.Controllers
             {
                 return BadRequest();
             }
+            /*
             if (shop.Trim().Equals("万龙"))
             {
                 endDate = endDate.Date.AddDays(-5);
             }
-
+            */
             var idList = await _context.idList.FromSqlRaw(" select distinct rent_list_id as id from rent_list_detail  "
                 + " left join rent_list on rent_list.[id] = rent_list_id "
                 + " where finish_date >= '" + startDate.ToShortDateString() + "' "
                 + " and finish_date <= '" + endDate.AddDays(1).ToShortDateString() + "' and shop like '" + shop + "%'  "
                 + " and finish_date is not null and closed = 0 and hide = 0 "
-                //+ " and rent_list.[id] = 2434"
                 )
                 .AsNoTracking().ToListAsync();
             List<Balance> bList = new List<Balance>();
