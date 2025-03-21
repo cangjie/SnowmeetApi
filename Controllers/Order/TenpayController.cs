@@ -624,6 +624,7 @@ namespace SnowmeetApi.Controllers
                         refund.state = 1;
                         refund.memo = callbackResource.TransactionId;
                         refund.TransactionId = callbackResource.TransactionId.Trim();
+                        refund.update_date = DateTime.Now;
                         _db.Entry(refund).State = EntityState.Modified;
                         await _db.SaveChangesAsync();
 
