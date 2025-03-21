@@ -517,6 +517,11 @@ namespace SnowmeetApi.Controllers
             ZiwoyouQueryList l = JsonConvert.DeserializeObject<ZiwoyouQueryList>(r.data.ToString());
             return Ok(l);
         }
+        [HttpGet]
+        public async Task UpdateZiwoyouOrderHourly()
+        {
+            await UpdateZiwoyouOrder(DateTime.Now.Date.AddDays(-7), DateTime.Now.Date);
+        }
 
         [HttpGet]
         public async Task UpdateZiwoyouOrder(DateTime start, DateTime end)
