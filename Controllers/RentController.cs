@@ -2094,18 +2094,6 @@ namespace SnowmeetApi.Controllers
             {
                 return NotFound();
             }
-            /*
-            RentAdditionalPayment addPay = await _context.rentAdditionalPayment.FindAsync(rentListId);
-            if (addPay == null || addPay.order_id != null)
-            {
-                return NotFound();
-            }
-            RentOrder rentOrder = await _context.RentOrder.FindAsync(addPay.rent_list_id);
-            if (rentOrder == null)
-            {
-                return NotFound();
-            }
-            */
             OrderOnline order = new OrderOnline()
             {
                 id = 0,
@@ -2354,6 +2342,23 @@ namespace SnowmeetApi.Controllers
             }
 
             return Ok(reward);
+        }
+        [HttpGet("{addPayId}")]
+        public async Task<ActionResult<RentAdditionalPayment>> GetAdditionalPayment(int addPayId, 
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            sessionKey = Util.UrlDecode(sessionKey).Trim();
+            UnicUser user = await Util.GetUser(sessionKey, _context);
+            if (!user.isAdmin)
+            {
+                return BadRequest();
+            }
+            RentAdditionalPayment payment = await _context.rentAdditionalPayment.FindAsync(addPayId);
+            if (payment == null)
+            {
+                return NotFound();
+            }
+            return Ok(payment);
         }
 
 
