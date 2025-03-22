@@ -69,7 +69,8 @@ namespace SnowmeetApi.Models
         [NotMapped]
         public string status { get; set; }
 
-        [NotMapped]
+        //[NotMapped]
+        
         public OrderOnline? order { get; set; }
 
         [NotMapped]

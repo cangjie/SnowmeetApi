@@ -532,6 +532,10 @@ namespace SnowmeetApi.Controllers
                 .Include(b => b.depositAccount)
                     .ThenInclude(a => a.member)
                         .ThenInclude(m => m.memberSocialAccounts)
+                .Include(b => b.order)
+                    .ThenInclude(o => o.maintainList)
+                .Include(b => b.order)
+                    .ThenInclude(o => o.rentOrderList)
                 .Where(b => b.valid == 1 && b.create_date.Date >= start.Date && b.create_date.Date <= end.Date 
                 && (type.Trim().Equals("all")? true : (type.Trim().Equals("income")? b.amount > 0 : b.amount < 0) ) )
                 .OrderByDescending(b => b.id).AsNoTracking().ToListAsync();
