@@ -519,5 +519,23 @@ namespace SnowmeetApi.Controllers
                 return null;
             }
         }
+        [HttpGet("{type}")]
+        public async Task<ActionResult<List<DepositBalance>>> GetAllBalance(string type, DateTime start, DateTime end,
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _db);
+            if (!user.isAdmin)
+            {
+                return BadRequest();
+            }
+            List<DepositBalance> bList = await _db.depositBalance
+                .Include(b => b.depositAccount)
+                    .ThenInclude(a => a.member)
+                        .ThenInclude(m => m.memberSocialAccounts)
+                .Where(b => b.valid == 1 && b.create_date.Date >= start.Date && b.create_date.Date <= end.Date 
+                && (type.Trim().Equals("all")? true : (type.Trim().Equals("income")? b.amount > 0 : b.amount < 0) ) )
+                .OrderByDescending(b => b.id).AsNoTracking().ToListAsync();
+            return Ok(bList);
+        }
     }   
 }
