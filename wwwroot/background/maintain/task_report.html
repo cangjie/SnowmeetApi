@@ -280,7 +280,7 @@
                     }
                     lineData.push(payMethod);
                     lineData.push(msg[i].order == null? "¥0.00" : formatAmount(msg[i].order.refundAmount));
-                    lineData.push(msg[i].order == null? "¥0.00" : formatAmount(msg[i].order.paidAmount - item.order.refundAmount));
+                    lineData.push(msg[i].order == null? "¥0.00" : formatAmount(msg[i].order.paidAmount - msg[i].order.refundAmount));
                     tData.push(lineData);
 
                     FillItem(msg[i]);
