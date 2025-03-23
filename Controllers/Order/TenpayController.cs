@@ -1346,9 +1346,16 @@ namespace SnowmeetApi.Controllers
                     SnowmeetApi.Models.Users.Member mUser = await _memberHelper.GetMember(orderOnline.open_id, "wechat_mini_openid");
                     if (mUser != null)
                     {
-                        cell = mUser.cell.Trim();
-                        realName = mUser.real_name.Trim();
-                        gender = mUser.gender.Trim();
+                        try
+                        {
+                            cell = mUser.cell == null? "" : mUser.cell.Trim();
+                            realName = mUser.real_name == null? "" : mUser.real_name.Trim();
+                            gender = mUser.gender == null? "" : mUser.gender.Trim();
+                        }
+                        catch(Exception err)
+                        {
+                            Console.WriteLine(err.ToString());
+                        }
                     }
                 }
 

@@ -454,13 +454,18 @@ namespace SnowmeetApi.Controllers
             string sessionKey, string sessionType = "wechat_mini_openid")
         {
             DepositAccount account = await _db.depositAccount.FindAsync(accountId);
+            _db.depositAccount.Entry(account).State = EntityState.Detached;
             UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _db);
             if (!user.isAdmin && account.member_id != user.member.id)
             {
                 return BadRequest();
             }
-            await _db.depositAccount.Entry(account)
-                .Collection(a => a.balances).LoadAsync();
+            //await _db.depositAccount.Entry(account)
+            //    .Collection(a => a.balances).LoadAsync();
+            account.balances = await _db.depositBalance
+                .Include(b => b.order).ThenInclude(o => o.maintainList)
+                .Include(b => b.order).ThenInclude(o => o.rentOrderList)
+                .Where(b => b.deposit_id == account.id).AsNoTracking().ToListAsync();
             await _db.depositAccount.Entry(account)
                 .Reference(a => a.member).LoadAsync();
             await _db.member.Entry(account.member)
