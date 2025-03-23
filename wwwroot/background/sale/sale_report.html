@@ -33,7 +33,7 @@
     <table style="width:100%">
         <thead>
             <tr>
-
+                <td class="table_head">序号</td>
                 <td class="table_head">七色米订单号</td>
                 <td class="table_head">商品条码</td>
                 <td class="table_head">市场价</td>
@@ -65,10 +65,10 @@
         var orderIdIndex = 4;
         var rows = document.getElementById('report_rows');
         var newRow = document.createElement('tr');
-        //newRow.style.backgroundColor = item.odd ? 'white' : '#DDDDDD';
-        //newRow.id = item.task_flow_num;
-
-
+        var td_id = document.createElement('td');
+        td_id.innerText = item.id.toString();
+        newRow.appendChild(td_id);
+        
         var td_mi7_no = document.createElement('td');
         td_mi7_no.innerText = item.mi7_order_id;
         newRow.appendChild(td_mi7_no);
@@ -226,27 +226,12 @@
                 if (status != 'success') {
                     return
                 }
-                //var odd = false;
-                //var totalPaid = 0;
-
                 for (var i = 0; i < msg.length; i++) {
-                   // console.log('report', msg)
-                 /*
-                    if (i > 0 && msg[i].order_id == msg[i - 1].order_id && msg[i].order_id > 0){
-                        msg[i].odd = odd;
-                    }
-                    else {
-                        msg[i].odd = !odd;
-                        odd = !odd;
-                        totalPaid += msg[i].total_paid
-                    }
-                   */
+                    msg[i].id = i + 1;
                     FillItem(msg[i]);
                 }
-                
                 var divTotal = document.getElementById('total');
                 divTotal.innerText = '总计：' + formatAmount(totalPaid);
-                //alert(totalPaid);
             },
             complete: function (msg, status) {
                 btnCtrl.disabled = false;
