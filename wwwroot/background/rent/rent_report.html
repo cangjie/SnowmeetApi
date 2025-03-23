@@ -25,7 +25,9 @@
         <h1 style="text-align:center">租赁业务报表</h1>
     </div>
     <div class="row_view" style="align-items:center;justify-content:center; margin-top:20px">
-        门店：<select id="shop"><option>万龙</option><option>崇礼旗舰店</option><option>南山</option><option>怀北</option><option>渔阳</option></select> 日期：从&nbsp;<input type="date" id="date_from" oninput="setDate()" />&nbsp;到&nbsp;<input type="date" id="date_to" oninput="setDate()" />&nbsp;<button id="btn" onclick="getData()"> 查 询 </button>
+        门店：<select id="shop"><option>万龙</option><option>崇礼旗舰店</option><option>南山</option><option>怀北</option><option>渔阳</option></select> 日期：从&nbsp;<input type="date" id="date_from" oninput="setDate()" />&nbsp;到&nbsp;<input type="date" id="date_to" oninput="setDate()" />
+        &nbsp;<button id="btn" onclick="getData()"> 查 询 </button>
+        &nbsp;<button id="btn" onclick="download()"> 下 载 </button>
     </div>
     <div style="height:20px"></div>
     <h1></h1>
@@ -33,7 +35,8 @@
     <table style="width:100%">
         <thead>
             <tr>
-                <td class="table_head">订单ID</td>
+                <td class="table_head">序号</td>
+                <td class="table_head">订单号</td>
                 <td class="table_head">门店</td>
                 <td class="table_head">姓名</td>
                 <td class="table_head">电话</td>
@@ -54,6 +57,7 @@
 </body>
 </html>
 <script type="text/javascript">var currentColor = '#DDDDDD';
+    var tHead = ['序号','订单号','门店','姓名','电话','押金','退款','结余','损坏赔偿','租金','支付方式','日期','时间','接待'];
     var totalPaid = 0;
     function FillItem(item) {
         var totalColNum = 13;
@@ -100,26 +104,40 @@
             else {
                 currentColor = '#DDDDDD';
             }
+
+            var lineData = [];
+
+            var td_num = document.createElement('td');
+            td_num.innerText = item.num;
+            0
+            newRow.appendChild(td_order_id);
+
+
             var td_order_id = document.createElement('td');
             td_order_id.innerText = item.id;
+            lineData.push(item.id);
             newRow.appendChild(td_order_id);
 
             var td_shop = document.createElement('td');
             td_shop.innerText = item.shop;
+            lineData.push(item.shop);
             newRow.appendChild(td_shop);
 
             var td_name = document.createElement('td');
             td_name.innerText = item.name;
+            lineData.push(item.name);
             newRow.appendChild(td_name);
 
             var td_cell = document.createElement('td');
             td_cell.innerText = item.cell;
+            lineData.push(item.cell);
             newRow.appendChild(td_cell);
 
             var rightAttr = document.createAttribute('style');
             rightAttr.value = 'text-align:right';
             var td_deposit = document.createElement('td');
             td_deposit.innerText = formatAmount(item.deposit);
+            lineData.push(formatAmount(item.deposit));
             td_deposit.attributes.setNamedItem(rightAttr)
             newRow.appendChild(td_deposit);
 
@@ -127,6 +145,7 @@
             rightAttr.value = 'text-align:right';
             var td_refund = document.createElement('td');
             td_refund.innerText = formatAmount(item.refund);
+            lineData.push(formatAmount(item.refund));
             td_refund.attributes.setNamedItem(rightAttr)
             newRow.appendChild(td_refund);
 
@@ -134,6 +153,7 @@
             rightAttr.value = 'text-align:right';
             var td_earn = document.createElement('td');
             td_earn.innerText = formatAmount(item.earn);
+            lineData.push(formatAmount(item.earn));
             td_earn.attributes.setNamedItem(rightAttr)
             newRow.appendChild(td_earn);
 
@@ -141,6 +161,7 @@
             rightAttr.value = 'text-align:right';
             var td_reparation = document.createElement('td');
             td_reparation.innerText = formatAmount(item.reparation);
+            lineData.push(formatAmount(item.reparation));
             td_reparation.attributes.setNamedItem(rightAttr)
             newRow.appendChild(td_reparation);
 
@@ -151,11 +172,13 @@
             }
             var td_rental = document.createElement('td');
             td_rental.innerText = formatAmount(item.rental);
+            lineData.push(formatAmount(item.rental));
             td_rental.attributes.setNamedItem(rightAttr)
             newRow.appendChild(td_rental);
 
             var td_pay_method = document.createElement('td');
             td_pay_method.innerText = item.payMethod;
+            lineData.push(item.payMethod);
             //td_pay_method.attributes.setNamedItem(rightAttr)
             newRow.appendChild(td_pay_method);
 
@@ -164,17 +187,21 @@
 
             var td_date = document.createElement('td');
             td_date.innerText = formatDate(item.settleDate);
+            lineData.push(formatDate(item.settleDate));
             newRow.appendChild(td_date);
 
             var td_time = document.createElement('td');
             td_time.innerText = formatTime(item.settleDate);
+            lineData.push(formatTime(item.settleDate));
             newRow.appendChild(td_time);
 
             
 
             var td_staff = document.createElement('td');
             td_staff.innerText = item.staff;
+            lineData.push(item.staff);
             newRow.appendChild(td_staff);
+            tData.push(lineData);
 
         }
         newRow.style.backgroundColor = currentColor;
@@ -201,21 +228,8 @@
                 if (status != 'success') {
                     return
                 }
-                //var odd = false;
-                //var totalPaid = 0;
-
                 for (var i = 0; i < msg.length; i++) {
-                   // console.log('report', msg)
-                 /*
-                    if (i > 0 && msg[i].order_id == msg[i - 1].order_id && msg[i].order_id > 0){
-                        msg[i].odd = odd;
-                    }
-                    else {
-                        msg[i].odd = !odd;
-                        odd = !odd;
-                        totalPaid += msg[i].total_paid
-                    }
-                   */
+                    msg[i].num = i + 1;
                     FillItem(msg[i]);
                 }
 
@@ -228,6 +242,33 @@
             }
         })
 
-    }</script>
+    }
+    var tData = []
+    function download() {
+        if (tHead.length <= 0 || tData.length <= 0) {
+            return;
+        }
+        var csvContent = '';
+        var lineContent = '';
+        for (var i = 0; i < tHead.length; i++) {
+            lineContent += (i > 0 ? ',' : '') + tHead[i];
+        }
+        csvContent += lineContent + '\r\n';
+        for (var i = 0; i < tData.length; i++) {
+            lineContent = '';
+            for (var j = 0; j < tHead.length; j++) {
+                lineContent += (j > 0 ? ',' : '') + tData[i][j];
+            }
+            csvContent += lineContent + '\r\n';
+        }
+        csvContent = csvContent.trim();
+        var link = document.createElement('a');
+        link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvContent);
+        link.download = encodeURIComponent('YangHu_' + formatDate(startDate) + '_' + formatDate(endDate) + '.csv');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+    </script>
 <script type="text/javascript" src="../../js/date_selector.js"></script>
 <script type="text/javascript" src="../js/menu.js"></script>
