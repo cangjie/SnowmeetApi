@@ -264,7 +264,7 @@
         csvContent = csvContent.trim();
         var link = document.createElement('a');
         link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvContent);
-        link.download = encodeURIComponent('YangHu_' + formatDate(startDate) + '_' + formatDate(endDate) + '.csv');
+        link.download = encodeURIComponent('ZuLin_' + formatDate(startDate) + '_' + formatDate(endDate) + '.csv');
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
