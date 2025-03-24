@@ -234,7 +234,7 @@ namespace SnowmeetApi.Controllers
         [HttpGet("{memberId}")]
         public async Task<ActionResult<DepositAccount>> DepositCharge(int memberId, int accountId,  double chargeAmount, 
             DateTime expireDate, string sessionKey, string sessionType = "wechat_mini_openid", 
-             string type = "服务储值", string subType = "", string? mi7OrderId = null, string? memo = null)
+             string type = "服务储值", string subType = "", string? mi7OrderId = null, string? bizType = null, string? memo = null)
         {
             UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _db);
             if (!user.isAdmin || user.member.is_manager == 0)
@@ -296,6 +296,7 @@ namespace SnowmeetApi.Controllers
                 amount = chargeAmount,
                 member_id = user.member.id,
                 biz_id = mi7OrderId,
+                biz_type = bizType,
                 memo = memo,
                 valid = 1,
                 create_date = DateTime.Now

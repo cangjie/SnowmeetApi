@@ -32,7 +32,6 @@
                 </tr>
             </thead>
             <tbody id="table_data">
-
             </tbody>
         </table>
     </div>
@@ -46,7 +45,6 @@
         type: 'GET',
         async: true,
         success: function (msg, status) {
-            //console.log(msg);
             var staffList = msg;
             var getUploadHistoryUrl = '../../core/UploadFile/GetUploadList?sessionKey='
                 + encodeURIComponent(sessionKey) + '&purpose=' + encodeURIComponent('7色米订单明细');
@@ -70,26 +68,19 @@
                         item.name = name;
                         var date = formatDate(item.create_date.toString());
                         var time = formatTime(item.create_date.toString());
-
-
                         var tr = document.createElement('tr');
-
                         var td = document.createElement('td');
                         td.innerText = item.id;
                         tr.appendChild(td);
-
                         td = document.createElement('td');
                         td.innerText = date;
                         tr.appendChild(td);
-
                         td = document.createElement('td');
                         td.innerText = time;
                         tr.appendChild(td);
-
                         td = document.createElement('td');
                         td.innerText = item.name;
                         tr.appendChild(td);
-
                         var fileName = item.file_path_name.split('/');
                         td = document.createElement('td');
                         td.innerHTML = "<a href='" + item.file_path_name + "' target='_blank' >"
@@ -97,10 +88,7 @@
                         tr.appendChild(td);
                         tbody.appendChild(tr);
                     }
-                    
-
                     console.log(msg);
-
                 }
             });
         }
