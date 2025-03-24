@@ -30,7 +30,9 @@
         <span style="color:#FF0000" > 收退款问题雪票 </span><span style="color:#c0c0c0" > 大好河山后台直接预订雪票（不计算在系统内，仅展示） </span>
     </div>
     <div class="row_view" style="align-items:center;justify-content:center; margin-top:20px">
-        日期：从&nbsp;<input type="date" id="date_from" oninput="setDate()" />&nbsp;到&nbsp;<input type="date" id="date_to" oninput="setDate()" />&nbsp;<button id="btn" onclick="getData()"> 查 询 </button>
+        日期：从&nbsp;<input type="date" id="date_from" oninput="setDate()" />&nbsp;到&nbsp;<input type="date" id="date_to" oninput="setDate()" />
+        &nbsp;<button id="btn" onclick="getData()"> 查 询 </button>
+        &nbsp;<button id="btn" onclick="download()"> 下 载 </button>
     </div>
     <div style="height:20px"></div>
     <h1></h1>
@@ -40,6 +42,7 @@
     <table style="width:100%">
         <thead>
             <tr>
+                <td class="table_head">序号</td>
                 <td class="table_head">自我游单号</td>
                 <td class="table_head">日期</td>
                 <td class="table_head">时间</td>
@@ -62,6 +65,7 @@
 </body>
 </html>
 <script type="text/javascript">
+    var tHead = ['序号','自我游单号','日期','时间','名称','数量','状态','结算价','收款','退款','利润','联系人','联系电话','客服','分账'];
     var currentColor = '#DDDDDD';
     var totalPaid = 0;
     var totalSettle = 0;
@@ -71,23 +75,35 @@
     //var totalShare = 0;
 
     function FillItem(item) {
+        var lineData = [];
         var color = '#000000';
         var totalColNum = 11;
         var orderIdIndex = 4;
         var rows = document.getElementById('report_rows');
         var newRow = document.createElement('tr');
+
+
+        var td_id = document.createElement('td');
+        td_id.innerText = item.id;
+        lineData.push(item.id);
+        newRow.appendChild(td_id);
+
         var td_order_id = document.createElement('td');
         var share = undefined;
         td_order_id.innerText = item.orderId;
+        lineData.push(item.orderId);
         newRow.appendChild(td_order_id);
+
         if (item.orderDate == '——'){
             var orderDate = new Date(item.orderDate)
             
             var td_date = document.createElement('td');
             td_date.innerText = '——';
+            lineData.push('——');
             newRow.appendChild(td_date);
             var td_time = document.createElement('td');
             td_time.innerText = '——';
+            lineData.push('——');
             newRow.appendChild(td_time);
         }
         else {
@@ -96,14 +112,17 @@
             var timeStr = formatTime(orderDate)
             var td_date = document.createElement('td');
             td_date.innerText = dateStr;
+            lineData.push(dateStr);
             newRow.appendChild(td_date);
             var td_time = document.createElement('td');
             td_time.innerText = timeStr;
+            lineData.push(timeStr);
             newRow.appendChild(td_time);
         }
         
         var td_name = document.createElement('td');
         td_name.innerText = item.productName;
+        lineData.push(item.productName);
         newRow.appendChild(td_name);
         var td_num = document.createElement('td');
         if (item.orderDate == '——'){
@@ -112,6 +131,7 @@
         else{
             td_num.innerText = item.num;
         }
+        lineData.push(td_num.innerText);
         
         newRow.appendChild(td_num);
         var settlePrice = item.settlementPrice * item.num;
@@ -135,11 +155,13 @@
         }
         var td_status = document.createElement('td');
         td_status.innerText = status;
+        lineData.push(status);
         newRow.appendChild(td_status);
         var rightAttr = document.createAttribute('style');
         rightAttr.value = 'text-align:right';
         var td_settle = document.createElement('td');
         td_settle.innerText = formatAmount(settlePrice);
+        lineData.push(td_settle.innerText);
         //totalSettle += settlePrice;
         td_settle.attributes.setNamedItem(rightAttr);
         newRow.appendChild(td_settle);
@@ -167,6 +189,7 @@
         rightAttr.value = 'text-align:right';
         var td_charege = document.createElement('td');
         td_charege.innerText = formatAmount(chargeAmount);
+        lineData.push(td_charege.innerText);
         td_charege.attributes.setNamedItem(rightAttr);
         newRow.appendChild(td_charege);
 
@@ -174,6 +197,7 @@
         rightAttr.value = 'text-align:right';
         var td_refund = document.createElement('td');
         td_refund.innerText = formatAmount(refundAmount);
+        lineData.push(td_refund.innerText);
         td_refund.attributes.setNamedItem(rightAttr);
         newRow.appendChild(td_refund);
 
@@ -182,15 +206,18 @@
         rightAttr.value = 'text-align:right';
         var td_revenu = document.createElement('td');
         td_revenu.innerText = formatAmount(revenu);
+        lineData.push(td_revenu.innerText);
         td_revenu.attributes.setNamedItem(rightAttr);
         newRow.appendChild(td_revenu);
 
         var td_contact_name = document.createElement('td');
         td_contact_name.innerText = item.linkMan;
+        lineData.push(td_contact_name.innerText);
         newRow.appendChild(td_contact_name);
 
         var td_contact_cell = document.createElement('td');
         td_contact_cell.innerText = item.linkPhone;
+        lineData.push(td_contact_cell.innerText);
         newRow.appendChild(td_contact_cell);
 
         
@@ -203,7 +230,7 @@
         else {
             td_staff.innerText = '——';
         }
-        
+        lineData.push(td_staff.innerText);
         newRow.appendChild(td_staff);
 
         var td_share  = document.createElement('td');
@@ -216,6 +243,7 @@
         }
         //td_share.innerText = '——';
         newRow.appendChild(td_share);
+        lineData.push(td_share.innerText);
         newRow.style.backgroundColor = currentColor;
         
         if (currentColor == '#DDDDDD'){
@@ -239,17 +267,17 @@
                 }
             }
             else if (item.orderState == 4){
-                color = '#00FF00';
+                color = 'green';
             }
 
         }
         newRow.style.color = color;
-
+        tData.push(lineData);
         
         //newRow.attributes.setNamedItem(rightAttr);
         rows.appendChild(newRow);
     }
-
+    var tData = [];
     function getData() {
         totalCount = 0;
         totalSettle = 0;
@@ -273,21 +301,10 @@
                 if (status != 'success') {
                     return
                 }
-                //var odd = false;
-                //var totalPaid = 0;
+              
 
                 for (var i = 0; i < msg.length; i++) {
-                   // console.log('report', msg)
-                 /*
-                    if (i > 0 && msg[i].order_id == msg[i - 1].order_id && msg[i].order_id > 0){
-                        msg[i].odd = odd;
-                    }
-                    else {
-                        msg[i].odd = !odd;
-                        odd = !odd;
-                        totalPaid += msg[i].total_paid
-                    }
-                   */
+                    msg[i].id = i + 1;
                     FillItem(msg[i]);
                 }
                 var item = {
@@ -311,6 +328,32 @@
             }
         })
 
-    }</script>
+    }
+    function download() {
+        if (tHead.length <= 0 || tData.length <= 0) {
+            return;
+        }
+        var csvContent = '';
+        var lineContent = '';
+        for (var i = 0; i < tHead.length; i++) {
+            lineContent += (i > 0 ? ',' : '') + tHead[i];
+        }
+        csvContent += lineContent + '\r\n';
+        for (var i = 0; i < tData.length; i++) {
+            lineContent = '';
+            for (var j = 0; j < tHead.length; j++) {
+                lineContent += (j > 0 ? ',' : '') + tData[i][j];
+            }
+            csvContent += lineContent + '\r\n';
+        }
+        csvContent = csvContent.trim();
+        var link = document.createElement('a');
+        link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvContent);
+        link.download = encodeURIComponent('XuePiao_' + formatDate(startDate) + '_' + formatDate(endDate) + '.csv');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+    </script>
 <script type="text/javascript" src="../../js/date_selector.js"></script>
 <script type="text/javascript" src="../js/menu.js"></script>

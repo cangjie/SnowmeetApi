@@ -439,7 +439,19 @@ namespace SnowmeetApi.Controllers
             }
             return Ok(liveArr);
         }
-
+        [HttpGet("{taskId}")]
+        public async Task<ActionResult<bool>> VeriPickCode(int taskId, string code)
+        {
+            MaintainLive task = await _context.MaintainLives.FindAsync(taskId);
+            if (task == null || !code.Trim().Equals(task.pick_veri_code))
+            {
+                return Ok(false);
+            }
+            else
+            {
+                return Ok(true);
+            }
+        }
         [HttpGet]
         public async Task<ActionResult<IEnumerable<MaintainLive>>> GetTasks(DateTime start, DateTime end, string sessionKey, 
             string shop = "", string openId = "", string payOption = "")

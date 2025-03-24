@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.Mvc;
 
 
 using Microsoft.EntityFrameworkCore;
+using SnowmeetApi.Models.Rent;
 
 namespace SnowmeetApi.Models
 {
@@ -181,52 +182,18 @@ namespace SnowmeetApi.Models
                 return staffRealName.Trim();
             }
         }
-
-
         [NotMapped]
         public Ticket.Ticket[] tickets { get; set; }
-
         [NotMapped]
         public OrderOnlineDetail[]? details { get; set; }
         [NotMapped]
         public Member? member {get; set;}
         [NotMapped]
         public MemberSocialAccount? msa {get; set;}
-        /*
-        [NotMapped]
-        public Ticket.Ticket[] tickets
-        {
-            get
-            {
-                return ticketArray;
-            }
-        }
-        */
-        //public SnowmeetApi.Data.ApplicationDBContext db;
-
+        public List<RentOrder> rentOrderList {get; set;}
+        [ForeignKey(nameof(MaintainLive.order_id))]
+        public List<MaintainLive> maintainList {get; set;}
         
-        
-        /*
-        
-        [Key]
-        public int id { get; set; }
-        public string type { get; set; }
-        public int pay_state { get; set; }
-        public DateTime? pay_time { get; set; }
-        public string out_trade_no { get; set; }
-        public string pay_method { get; set; }
-        public string open_id { get; set; }
-        public double order_real_pay_price { get; set; }
-        public double order_price { get; set; }
-        public string cell_number { get; set; }
-        public string shop { get; set; }
-        public string name { get; set; }
-        public string code { get; set; }
-        public string ticket_code { get; set; }
-
-        [DefaultValue("")]
-        public string memo { get; set; } = "";
-        */
-        //public List<OrderOnlineDetail> details { get; set; }
+       
     }
 }

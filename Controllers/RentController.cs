@@ -214,17 +214,17 @@ namespace SnowmeetApi.Controllers
             {
                 return BadRequest();
             }
+            /*
             if (shop.Trim().Equals("万龙"))
             {
                 endDate = endDate.Date.AddDays(-5);
             }
-
+            */
             var idList = await _context.idList.FromSqlRaw(" select distinct rent_list_id as id from rent_list_detail  "
                 + " left join rent_list on rent_list.[id] = rent_list_id "
                 + " where finish_date >= '" + startDate.ToShortDateString() + "' "
                 + " and finish_date <= '" + endDate.AddDays(1).ToShortDateString() + "' and shop like '" + shop + "%'  "
                 + " and finish_date is not null and closed = 0 and hide = 0 "
-                //+ " and rent_list.[id] = 2434"
                 )
                 .AsNoTracking().ToListAsync();
             List<Balance> bList = new List<Balance>();
@@ -1954,8 +1954,8 @@ namespace SnowmeetApi.Controllers
 
                 List<RentOrderList.RentRefund> refundList = new List<RentOrderList.RentRefund>();
                 //item.refunds = new RentOrderList.RentRefund[rentOrder.order.refunds.Length];
-                for (int j = 0; rentOrder.order_id != 0 && rentOrder.order != null
-                    && j < rentOrder.order.refunds.Count; j++)
+                for (int j = 0; rentOrder.order_id != 0 && rentOrder.order != null 
+                    && rentOrder.order.refunds != null && j < rentOrder.order.refunds.Count; j++)
                 {
                     RentOrderList.RentRefund r = new RentOrderList.RentRefund();
                     r.id = rentOrder.order.refunds[j].id;
@@ -1964,10 +1964,6 @@ namespace SnowmeetApi.Controllers
                     r.amount = rentOrder.order.refunds[j].amount;
                     r.refund_id = rentOrder.order.refunds[j].refund_id.Trim();
                     string operOpenId = rentOrder.order.refunds[j].oper;
-
-
-                    //MiniAppUser refundUser = await _context.MiniAppUsers.FindAsync(operOpenId);
-
                     Member refundUser = await _memberHelper.GetMember(operOpenId, "wechat_mini_openid");
                     if (refundUser != null)
                     {
@@ -2094,18 +2090,6 @@ namespace SnowmeetApi.Controllers
             {
                 return NotFound();
             }
-            /*
-            RentAdditionalPayment addPay = await _context.rentAdditionalPayment.FindAsync(rentListId);
-            if (addPay == null || addPay.order_id != null)
-            {
-                return NotFound();
-            }
-            RentOrder rentOrder = await _context.RentOrder.FindAsync(addPay.rent_list_id);
-            if (rentOrder == null)
-            {
-                return NotFound();
-            }
-            */
             OrderOnline order = new OrderOnline()
             {
                 id = 0,
@@ -2354,6 +2338,23 @@ namespace SnowmeetApi.Controllers
             }
 
             return Ok(reward);
+        }
+        [HttpGet("{addPayId}")]
+        public async Task<ActionResult<RentAdditionalPayment>> GetAdditionalPayment(int addPayId, 
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            sessionKey = Util.UrlDecode(sessionKey).Trim();
+            UnicUser user = await Util.GetUser(sessionKey, _context);
+            if (!user.isAdmin)
+            {
+                return BadRequest();
+            }
+            RentAdditionalPayment payment = await _context.rentAdditionalPayment.FindAsync(addPayId);
+            if (payment == null)
+            {
+                return NotFound();
+            }
+            return Ok(payment);
         }
 
 

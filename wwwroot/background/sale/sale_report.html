@@ -25,7 +25,8 @@
         <h1 style="text-align:center">销售业务报表</h1>
     </div>
     <div class="row_view" style="align-items:center;justify-content:center; margin-top:20px">
-        门店：<select id="shop"><option value='' >全部</option><option>万龙体验中心</option><option>万龙服务中心</option><option>崇礼旗舰店</option><option>南山</option><option>怀北</option><option>渔阳</option></select>日期：从&nbsp;<input type="date" id="date_from" oninput="setDate()" />&nbsp;到&nbsp;<input type="date" id="date_to" oninput="setDate()" />&nbsp;<button id="btn" onclick="getData()"> 查 询 </button>
+        门店：<select id="shop"><option value='' >全部</option><option>万龙体验中心</option><option>万龙服务中心</option><option>崇礼旗舰店</option><option>南山</option><option>怀北</option><option>渔阳</option></select>日期：从&nbsp;<input type="date" id="date_from" oninput="setDate()" />&nbsp;到&nbsp;<input type="date" id="date_to" oninput="setDate()" />&nbsp;
+        <button id="btn" onclick="getData()"> 查 询 </button>&nbsp;&nbsp;<button id="download" onclick="download()" > 下 载 </button>
     </div>
     <div style="height:20px"></div>
     <h1></h1>
@@ -33,11 +34,11 @@
     <table style="width:100%">
         <thead>
             <tr>
-
+                <td class="table_head">序号</td>
                 <td class="table_head">七色米订单号</td>
                 <td class="table_head">商品条码</td>
-                <td class="table_head">市场价</td>
-                <td class="table_head">成交价</td>
+                <td class="table_head">零售总价</td>
+                <td class="table_head">成交总价</td>
                 <td class="table_head">订单号</td>
                 <td class="table_head">门店</td>
                 <td class="table_head">姓名</td>
@@ -60,20 +61,25 @@
 </html>
 <script type="text/javascript">var currentColor = '#DDDDDD';
     var totalPaid = 0;
+    var tHead = ['序号','七色米订单号','商品条码','零售总价','成交总价','订单号','门店','姓名','电话','支付总计','退款','订单金额','日期','时间','收款方式','销售','备注']
     function FillItem(item) {
         var totalColNum = 11;
         var orderIdIndex = 4;
         var rows = document.getElementById('report_rows');
         var newRow = document.createElement('tr');
-        //newRow.style.backgroundColor = item.odd ? 'white' : '#DDDDDD';
-        //newRow.id = item.task_flow_num;
-
+        var td_id = document.createElement('td');
+        var lineData = [];
+        td_id.innerText = item.id.toString();
+        lineData.push(item.id);
+        newRow.appendChild(td_id);
 
         var td_mi7_no = document.createElement('td');
+        lineData.push(item.mi7_order_id);
         td_mi7_no.innerText = item.mi7_order_id;
         newRow.appendChild(td_mi7_no);
 
         var td_barCode = document.createElement('td');
+        lineData.push(item.barCode);
         td_barCode.innerText = item.barCode;
         newRow.appendChild(td_barCode);
 
@@ -83,6 +89,7 @@
 
 
         var td_sale_price = document.createElement('td');
+        lineData.push(formatAmount(item.sale_price));
         td_sale_price.innerText = formatAmount(item.sale_price);
         td_sale_price.attributes.setNamedItem(rightAttr);
         newRow.appendChild(td_sale_price);
@@ -92,6 +99,7 @@
         rightAttr.value = 'text-align:right';
         var td_real_charge = document.createElement('td');
         td_real_charge.innerText = formatAmount(item.real_charge);
+        lineData.push(formatAmount(item.real_charge));
         td_real_charge.attributes.setNamedItem(rightAttr);
         newRow.appendChild(td_real_charge);
 
@@ -144,24 +152,29 @@
             }
             var td_order_id = document.createElement('td');
             td_order_id.innerText = item.order_id;
+            lineData.push(item.order_id);
             newRow.appendChild(td_order_id);
 
             var td_shop = document.createElement('td');
             td_shop.innerText = item.shop;
+            lineData.push(item.shop);
             newRow.appendChild(td_shop);
 
             var td_name = document.createElement('td');
             td_name.innerText = item.name;
+            lineData.push(item.name);
             newRow.appendChild(td_name);
 
             var td_cell = document.createElement('td');
             td_cell.innerText = item.cell_number;
+            lineData.push(item.cell_number);
             newRow.appendChild(td_cell);
 
             rightAttr = document.createAttribute('style');
             rightAttr.value = 'text-align:right';
             var td_final_price = document.createElement('td');
             td_final_price.innerText = formatAmount(item.final_price);
+            lineData.push(formatAmount(item.final_price));
             td_final_price.attributes.setNamedItem(rightAttr)
             newRow.appendChild(td_final_price);
 
@@ -169,6 +182,7 @@
             rightAttr.value = 'text-align:right';
             var td_refund_price = document.createElement('td');
             td_refund_price.innerText = formatAmount(item.refund_price);
+            lineData.push(formatAmount(item.refund_price));
             td_refund_price.attributes.setNamedItem(rightAttr)
             newRow.appendChild(td_refund_price);
 
@@ -176,6 +190,7 @@
             rightAttr.value = 'text-align:right';
             var td_real_price = document.createElement('td');
             td_real_price.innerText = formatAmount(item.final_price - item.refund_price);
+            lineData.push(formatAmount(item.final_price - item.refund_price));
             td_real_price.attributes.setNamedItem(rightAttr)
             newRow.appendChild(td_real_price);
 
@@ -184,22 +199,28 @@
 
             var td_date = document.createElement('td');
             td_date.innerText = formatDate(item.pay_time);
+            lineData.push(formatDate(item.pay_time));
             newRow.appendChild(td_date);
 
             var td_time = document.createElement('td');
             td_time.innerText = formatTime(item.pay_time);
+            lineData.push(formatTime(item.pay_time));
             newRow.appendChild(td_time);
 
             var td_pay_method = document.createElement('td');
             td_pay_method.innerText = item.pay_method;
+            lineData.push(item.pay_method);
             newRow.appendChild(td_pay_method);
 
             var td_staff = document.createElement('td');
             td_staff.innerText = item.staff;
+            lineData.push(item.staff);
             newRow.appendChild(td_staff);
 
             var td_memo = document.createElement('td');
             td_memo.innerText = item.memo;
+            lineData.push(item.memo);
+            tData.push(lineData);
             newRow.appendChild(td_memo);
            
         }
@@ -226,33 +247,46 @@
                 if (status != 'success') {
                     return
                 }
-                //var odd = false;
-                //var totalPaid = 0;
-
                 for (var i = 0; i < msg.length; i++) {
-                   // console.log('report', msg)
-                 /*
-                    if (i > 0 && msg[i].order_id == msg[i - 1].order_id && msg[i].order_id > 0){
-                        msg[i].odd = odd;
-                    }
-                    else {
-                        msg[i].odd = !odd;
-                        odd = !odd;
-                        totalPaid += msg[i].total_paid
-                    }
-                   */
+                    msg[i].id = i + 1;
                     FillItem(msg[i]);
+                    //tData.push(msg[i]);
                 }
-                
                 var divTotal = document.getElementById('total');
                 divTotal.innerText = '总计：' + formatAmount(totalPaid);
-                //alert(totalPaid);
             },
             complete: function (msg, status) {
                 btnCtrl.disabled = false;
             }
         })
 
-    }</script>
+    }
+    var tData = []
+    function download() {
+        if (tHead.length <= 0 || tData.length <= 0) {
+            return;
+        }
+        var csvContent = '';
+        var lineContent = '';
+        for (var i = 0; i < tHead.length; i++) {
+            lineContent += (i > 0 ? ',' : '') + tHead[i];
+        }
+        csvContent += lineContent + '\r\n';
+        for (var i = 0; i < tData.length; i++) {
+            lineContent = '';
+            for (var j = 0; j < tHead.length; j++) {
+                lineContent += (j > 0 ? ',' : '') + tData[i][j];
+            }
+            csvContent += lineContent + '\r\n';
+        }
+        csvContent = csvContent.trim();
+        var link = document.createElement('a');
+        link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvContent);
+        link.download = encodeURIComponent('LingShou_' + formatDate(startDate) + '_' + formatDate(endDate) + '.csv');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+    </script>
 <script type="text/javascript" src="../../js/date_selector.js"></script>
 <script type="text/javascript" src="../js/menu.js"></script>

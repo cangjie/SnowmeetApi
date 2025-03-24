@@ -455,13 +455,18 @@ namespace SnowmeetApi.Controllers
             string sessionKey, string sessionType = "wechat_mini_openid")
         {
             DepositAccount account = await _db.depositAccount.FindAsync(accountId);
+            _db.depositAccount.Entry(account).State = EntityState.Detached;
             UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _db);
             if (!user.isAdmin && account.member_id != user.member.id)
             {
                 return BadRequest();
             }
-            await _db.depositAccount.Entry(account)
-                .Collection(a => a.balances).LoadAsync();
+            //await _db.depositAccount.Entry(account)
+            //    .Collection(a => a.balances).LoadAsync();
+            account.balances = await _db.depositBalance
+                .Include(b => b.order).ThenInclude(o => o.maintainList)
+                .Include(b => b.order).ThenInclude(o => o.rentOrderList)
+                .Where(b => b.deposit_id == account.id).AsNoTracking().ToListAsync();
             await _db.depositAccount.Entry(account)
                 .Reference(a => a.member).LoadAsync();
             await _db.member.Entry(account.member)
@@ -519,6 +524,28 @@ namespace SnowmeetApi.Controllers
             {
                 return null;
             }
+        }
+        [HttpGet("{type}")]
+        public async Task<ActionResult<List<DepositBalance>>> GetAllBalance(string type, DateTime start, DateTime end,
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _db);
+            if (!user.isAdmin)
+            {
+                return BadRequest();
+            }
+            List<DepositBalance> bList = await _db.depositBalance
+                .Include(b => b.depositAccount)
+                    .ThenInclude(a => a.member)
+                        .ThenInclude(m => m.memberSocialAccounts)
+                .Include(b => b.order)
+                    .ThenInclude(o => o.maintainList)
+                .Include(b => b.order)
+                    .ThenInclude(o => o.rentOrderList)
+                .Where(b => b.valid == 1 && b.create_date.Date >= start.Date && b.create_date.Date <= end.Date 
+                && (type.Trim().Equals("all")? true : (type.Trim().Equals("income")? b.amount > 0 : b.amount < 0) ) )
+                .OrderByDescending(b => b.id).AsNoTracking().ToListAsync();
+            return Ok(bList);
         }
     }   
 }

@@ -23,6 +23,7 @@ namespace SnowmeetApi.Models.Order
         public string reason {get; set;} = "";
 
         public string out_refund_no {get; set;} = "";
+        public DateTime? update_date {get; set;} = null;
 
         [NotMapped]
         public MemberSocialAccount msa {get; set;}
