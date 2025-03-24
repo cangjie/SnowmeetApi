@@ -81,6 +81,13 @@
         var orderIdIndex = 4;
         var rows = document.getElementById('report_rows');
         var newRow = document.createElement('tr');
+
+
+        var td_id = document.createElement('td');
+        td_id.innerText = item.id;
+        lineData.push(item.id);
+        newRow.appendChild(td_id);
+
         var td_order_id = document.createElement('td');
         var share = undefined;
         td_order_id.innerText = item.orderId;
