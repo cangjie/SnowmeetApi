@@ -610,7 +610,17 @@ namespace SnowmeetApi.Controllers
                     && (r.state == 1 || !r.refund_id.Trim().Equals(""))).ToListAsync();
                 if (refunds != null)
                 {
-
+                    for(int k = 0; k < refunds.Count; k++)
+                    {
+                        List<MemberSocialAccount> msaList = await _context.memberSocialAccount
+                            .Where(msa => (msa.num.Trim().Equals(refunds[k].oper.Trim()) && msa.type.Trim().Equals("wechat_mini_openid")))
+                            .Include(msa => msa.member).AsNoTracking().ToListAsync();
+                        if (msaList != null && msaList.Count > 0)
+                        {
+                            refunds[k].msa = msaList[0];
+                        }
+                        
+                    }
                     order.refunds = refunds;
                 }
 
