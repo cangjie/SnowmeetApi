@@ -391,7 +391,7 @@ namespace SnowmeetApi.Controllers
 
         [HttpGet]
         public async Task<ActionResult<IEnumerable<OrderOnline>>> GetOrdersByStaff(DateTime startDate, DateTime endDate,
-            string shop, string status, string staffSessionKey)
+            string shop, string status, string staffSessionKey, string mi7Num = "")
         {
             startDate = startDate.Date;
             endDate = endDate.Date.AddHours(24);
@@ -402,10 +402,14 @@ namespace SnowmeetApi.Controllers
             {
                 return NoContent();
             }
-            var list = await _context.OrderOnlines
-                .Where(o => (o.create_date >= startDate && o.create_date <= endDate && (shop == null ? true : (o.shop.Trim().Equals(shop.Trim())))))
+            var listOri = await _context.OrderOnlines
+                .Include(o => o.mi7Orders
+                .Where(m => (mi7Num.Trim().Equals("") 
+                    || (mi7Num.Equals("未填") && !m.mi7_order_id.StartsWith("XSD"))
+                    || (mi7Num.Trim().Equals("已填") && m.mi7_order_id.StartsWith("XSD") ))))
+                .Where(o => (  o.create_date >= startDate && o.create_date <= endDate && (shop == null ? true : (o.shop.Trim().Equals(shop.Trim())))))
                 .OrderByDescending(o => o.id).ToListAsync();
-
+            var list = listOri.Where(l => l.mi7Orders.Count > 0).ToList();
             for (int i = 0; i < list.Count; i++)
             {
                 list[i].payments = await _context.OrderPayment.Where(p => p.order_id == list[i].id).ToArrayAsync();
@@ -583,8 +587,8 @@ namespace SnowmeetApi.Controllers
                     }
                 }
             }
-            var mi7Orders = await _context.mi7Order.Where(o => o.order_id == orderId).ToArrayAsync();
-            if (mi7Orders != null && mi7Orders.Length > 0)
+            var mi7Orders = await _context.mi7Order.Where(o => o.order_id == orderId).ToListAsync();
+            if (mi7Orders != null && mi7Orders.Count > 0)
             {
                 order.mi7Orders = mi7Orders;
             }
@@ -820,7 +824,7 @@ namespace SnowmeetApi.Controllers
             }
             if (order.mi7Orders != null)
             {
-                for (int j = 0; j < order.mi7Orders.Length; j++)
+                for (int j = 0; j < order.mi7Orders.Count; j++)
                 {
                     order.mi7Orders[j].order_id = order.id;
                     await _context.mi7Order.AddAsync(order.mi7Orders[j]);

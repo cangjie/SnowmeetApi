@@ -92,8 +92,8 @@ namespace SnowmeetApi.Models
         public List<OrderPaymentRefund> refunds { get; set; }
         [NotMapped]
         public MiniAppUser? user { get; set; }
-        [NotMapped]
-        public Mi7Order[]? mi7Orders { get; set; }
+        
+        public List<Mi7Order>? mi7Orders { get; set; }
         [NotMapped]
         public string status
         {

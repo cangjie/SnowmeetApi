@@ -136,19 +136,6 @@ namespace SnowmeetApi.Controllers.Order
             }
         }
 
-        /*
-        [HttpGet("{id}")]
-        public async Task<ActionResult<Mi7Order>> GetMi7Order(int id, string sessionKey)
-        {
-            sessionKey = Util.UrlDecode(sessionKey);
-            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
-            if (!user.isAdmin)
-            {
-                return BadRequest();
-            }
-            return await _context.mi7Order.FindAsync(id);
-        }
-        */
         [HttpGet("{id}")]
         public async Task<ActionResult<List<Models.StaffModLog>>> GetLogs(int id, string sessionKey,
             string sessionType = "wechat_mini_openid")
