@@ -410,8 +410,12 @@ namespace SnowmeetApi.Controllers
                 .Where(o => (  o.create_date >= startDate && o.create_date <= endDate && (shop == null ? true : (o.shop.Trim().Equals(shop.Trim())))))
                 .OrderByDescending(o => o.id).ToListAsync();
             var list = listOri.Where(l => l.mi7Orders.Count > 0).ToList();
+            
             for (int i = 0; i < list.Count; i++)
             {
+                List<MemberSocialAccount> msaList = await _context.memberSocialAccount.Where(m => m.num.Trim().Equals(list[i].staff_open_id) && m.type.Trim().Equals("wechat_mini_openid"))
+                    .Include(m => m.member).AsNoTracking().ToListAsync();
+                list[i].msa = msaList.Count > 0? msaList[0]:null;
                 list[i].payments = await _context.OrderPayment.Where(p => p.order_id == list[i].id).ToArrayAsync();
             }
 
