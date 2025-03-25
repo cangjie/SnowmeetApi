@@ -8,6 +8,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using SnowmeetApi.Controllers.User;
 using SnowmeetApi.Data;
+using SnowmeetApi.Models;
 using SnowmeetApi.Models.Order;
 using SnowmeetApi.Models.Users;
 
@@ -77,35 +78,35 @@ namespace SnowmeetApi.Controllers.Order
             return Ok(ret);
         }
 
-
-/*
-        [HttpGet]
-        public async Task<ActionResult<IEnumerable<SaleReport>>> GetSaleReportTest(DateTime startDate, DateTime endDate, string sessionKey, string shop = "")
+        [HttpGet("{id}")]
+        public async Task<ActionResult<Mi7Order>> GetMi7OrderById(int id,
+            string sessionKey, string sessionType = "wechat_mini_openid")
         {
             sessionKey = Util.UrlDecode(sessionKey);
-            shop = Util.UrlDecode(shop);
             UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
-            if (user.member.is_admin != 1 && user.member.is_manager != 1)
+            if (!user.isAdmin)
             {
-                return NoContent();
+                return BadRequest();
             }
-
-            
-            var l = await _context.saleReport.FromSqlRaw(" select mi7_order_id, barCode, sale_price, real_charge, order_id,  "
-                + " case  [name] when '' then customer.real_name  else [name] end as [name],  "
-                + " case [order_online].cell_number when '' then customer.cell_number  else [order_online].cell_number end as cell_number , "
-                + " final_price, shop, staff.real_name as staff, pay_time, pay_method, order_online.memo as memo from mi7_order "
-                + " left join order_online on order_id = order_online.[id] "
-                + " left join mini_users staff on staff.open_id = staff_open_id "
-                + " left join mini_users customer on customer.open_id =  order_online.open_id "
-                + " where [type] = '店销现货' and pay_state = 1 and pay_time >= '"
-                + startDate.ToShortDateString() + "' and pay_time < '" + endDate.AddDays(1).ToShortDateString() + "' "
-                + (shop.Equals("")? "  " : (" and order_online.shop  = '" + shop.Trim().Replace("'", "") + "'  "))
-                + " order by order_id desc ")
-                .AsNoTracking().ToListAsync();
-            return Ok(l);
+            List<Mi7Order> orders = await _context.mi7Order
+                .Include(m => m.order)
+                    .ThenInclude(o => o.paymentList.Where(p => p.status.Trim().Equals("支付成功")))
+                        .ThenInclude(p => p.refunds.Where(r => r.state == 1 || !r.refund_id.Trim().Equals("")))
+                .Where(m => (m.id == id && m.order.pay_state == 1))
+                .OrderByDescending(m => m.order.pay_time).AsNoTracking().ToListAsync();
+            if (orders.Count == 0)
+            {
+                return NotFound();
+            }
+            else
+            {
+                Models.Order.Mi7Order mi7Order = orders[0];
+                MemberController _memberHelper = new MemberController(_context, _config);
+                mi7Order.order.member = await _memberHelper.GetMember(mi7Order.order.open_id, "wechat_mini_openid");
+                return Ok(mi7Order);
+            }
         }
-*/
+
         [HttpGet("{mi7OrderId}")]
         public async Task<ActionResult<Mi7Order>> GetMi7Order(string mi7OrderId, 
             string sessionKey, string sessionType = "wechat_mini_openid")
@@ -120,7 +121,7 @@ namespace SnowmeetApi.Controllers.Order
                 .Include(m => m.order)
                     .ThenInclude(o => o.paymentList.Where(p => p.status.Trim().Equals("支付成功")))
                         .ThenInclude(p => p.refunds.Where(r => r.state == 1 || !r.refund_id.Trim().Equals("")))
-                .Where(m => m.mi7_order_id.Trim().Equals(mi7OrderId) && m.order.pay_state == 1)
+                .Where(m => (m.mi7_order_id.Trim().Equals(mi7OrderId) && m.order.pay_state == 1))
                 .OrderByDescending(m => m.order.pay_time).AsNoTracking().ToListAsync();
             if (orders.Count == 0)
             {
@@ -148,17 +149,51 @@ namespace SnowmeetApi.Controllers.Order
             return await _context.mi7Order.FindAsync(id);
         }
         */
+        [HttpGet("{id}")]
+        public async Task<ActionResult<List<Models.StaffModLog>>> GetLogs(int id, string sessionKey,
+            string sessionType = "wechat_mini_openid")
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
+            if (!user.isAdmin)
+            {
+                return BadRequest();
+            }
+            List<Models.StaffModLog> logs = await _context.staffModLog
+                .Include(l => l.staffMember).ThenInclude(m => m.memberSocialAccounts)
+                .Where(l => (l.table_name.Trim().Equals("mi7_order") && l.key_id.Trim().Equals(id.ToString()) ))
+                .OrderByDescending(l => l.id).AsNoTracking().ToListAsync();
+            return Ok(logs); 
+        }
 
         [HttpGet("{id}")]
         public async Task<ActionResult<Mi7Order>> ModMi7Order(int id, string orderNum, string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey);
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
+            if (!user.isAdmin)
+            {
+                return BadRequest();
+            }
             orderNum = Util.UrlDecode(orderNum);
             Mi7Order order = await _context.mi7Order.FindAsync(id);
             if (order == null)
             {
                 return BadRequest();
             }
+            StaffModLog log = new StaffModLog()
+            {
+                id = 0,
+                table_name = "mi7_order",
+                field_name = "mi7_order_id",
+                key_id = id.ToString(),
+                scene = "修改七色米订单号",
+                staff_member_id = user.member.id,
+                prev_value = order.mi7_order_id,
+                current_value = orderNum,
+                create_date = DateTime.Now
+            };
+            await _context.staffModLog.AddAsync(log);
             order.mi7_order_id = orderNum;
             _context.Entry(order).State = EntityState.Modified;
             await _context.SaveChangesAsync();
