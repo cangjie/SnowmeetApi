@@ -598,13 +598,13 @@ namespace SnowmeetApi.Controllers
             for(int i = 0; i < skipassList.Count; i++)
             {
                 Models.SkiPass.SkiPass skipass = skipassList[i];
-
+                if (skipass.reserve_no == null)
+                {
+                    continue;
+                }
                 string url = "https://mini.snowmeet.top/core/WanlongZiwoyouHelper/GetOrder?orderId=" + skipass.reserve_no.ToString();
                 string ret = Util.GetWebContent(url);
                 WanlongZiwoyouHelper.ZiwoyouOrder order = JsonConvert.DeserializeObject<WanlongZiwoyouHelper.ZiwoyouOrder>(ret);
-
-                //WanlongZiwoyouHelper.ZiwoyouOrder order =  _zwHelper.GetOrder(int.Parse(skipass.reserve_no.Trim()));
-
                 if (order != null && order.orderState == 4)
                 {
                     skipass.is_used = 1;
