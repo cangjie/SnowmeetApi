@@ -396,7 +396,7 @@ namespace SnowmeetApi.Controllers
             startDate = startDate.Date;
             endDate = endDate.Date.AddHours(24);
             staffSessionKey = Util.UrlDecode(staffSessionKey);
-
+            mi7Num = Util.UrlDecode(mi7Num);
             UnicUser user = await UnicUser.GetUnicUserAsync(staffSessionKey, _context);
             if (!user.isAdmin)
             {
@@ -406,7 +406,8 @@ namespace SnowmeetApi.Controllers
                 .Include(o => o.mi7Orders
                 .Where(m => (mi7Num.Trim().Equals("") 
                     || (mi7Num.Equals("未填") && !m.mi7_order_id.StartsWith("XSD"))
-                    || (mi7Num.Trim().Equals("已填") && m.mi7_order_id.StartsWith("XSD") ))))
+                    || (mi7Num.Trim().Equals("已填") && m.mi7_order_id.StartsWith("XSD") )
+                    || (mi7Num.Trim().Equals("紧急开单") && m.mi7_order_id.Trim().Equals(mi7Num) ) )))
                 .Where(o => (  o.create_date >= startDate && o.create_date <= endDate && (shop == null ? true : (o.shop.Trim().Equals(shop.Trim())))))
                 .OrderByDescending(o => o.id).ToListAsync();
             var list = listOri.Where(l => l.mi7Orders.Count > 0).ToList();
