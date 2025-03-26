@@ -403,11 +403,14 @@ namespace SnowmeetApi.Controllers
                 return NoContent();
             }
             var listOri = await _context.OrderOnlines
+                .Include(o => o.paymentList.Where(p => p.status.Equals("支付成功")))
+                    .ThenInclude(p => p.refunds.Where(r => r.state == 1 || !r.refund_id.Trim().Equals("")))
                 .Include(o => o.mi7Orders
                 .Where(m => (mi7Num.Trim().Equals("") 
                     || (mi7Num.Equals("未填") && !m.mi7_order_id.StartsWith("XSD"))
                     || (mi7Num.Trim().Equals("已填") && m.mi7_order_id.StartsWith("XSD") )
                     || (mi7Num.Trim().Equals("紧急开单") && m.mi7_order_id.Trim().Equals(mi7Num) ) )))
+                
                 .Where(o => (  o.create_date >= startDate && o.create_date <= endDate && (shop == null ? true : (o.shop.Trim().Equals(shop.Trim())))))
                 .OrderByDescending(o => o.id).ToListAsync();
             var list = listOri.Where(l => l.mi7Orders.Count > 0).ToList();
