@@ -832,6 +832,7 @@ namespace SnowmeetApi.Controllers
                 for (int j = 0; j < order.mi7Orders.Count; j++)
                 {
                     order.mi7Orders[j].order_id = order.id;
+                    order.mi7Orders[j].id = 0;
                     await _context.mi7Order.AddAsync(order.mi7Orders[j]);
                 }
                 await _context.SaveChangesAsync();
