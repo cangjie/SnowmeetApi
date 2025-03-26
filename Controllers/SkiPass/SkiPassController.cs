@@ -593,18 +593,19 @@ namespace SnowmeetApi.Controllers
 
             List<Models.SkiPass.SkiPass> skipassList = await _context.skiPass
                 .Where(s => (s.valid == 1 && s.is_cancel == 0 
-                && s.is_used == 0 && !s.resort.Trim().Equals("南山"))).ToListAsync();
+                && s.is_used == 0 && !s.resort.Trim().Equals("南山")))
+                .OrderByDescending(s => s.id).ToListAsync();
             for(int i = 0; i < skipassList.Count; i++)
             {
                 Models.SkiPass.SkiPass skipass = skipassList[i];
-
+                if (skipass.reserve_no == null)
+                {
+                    continue;
+                }
                 string url = "https://mini.snowmeet.top/core/WanlongZiwoyouHelper/GetOrder?orderId=" + skipass.reserve_no.ToString();
                 string ret = Util.GetWebContent(url);
                 WanlongZiwoyouHelper.ZiwoyouOrder order = JsonConvert.DeserializeObject<WanlongZiwoyouHelper.ZiwoyouOrder>(ret);
-
-                //WanlongZiwoyouHelper.ZiwoyouOrder order =  _zwHelper.GetOrder(int.Parse(skipass.reserve_no.Trim()));
-
-                if (order.orderState == 4)
+                if (order != null && order.orderState == 4)
                 {
                     skipass.is_used = 1;
                     _context.skiPass.Entry(skipass).State = EntityState.Modified;
