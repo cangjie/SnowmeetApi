@@ -827,6 +827,7 @@ namespace SnowmeetApi.Controllers
             {
                 return NoContent();
             }
+            /*
             if (order.mi7Orders != null)
             {
                 for (int j = 0; j < order.mi7Orders.Count; j++)
@@ -837,6 +838,7 @@ namespace SnowmeetApi.Controllers
                 }
                 await _context.SaveChangesAsync();
             }
+            */
             if (order.payments != null && order.payments.Length == 1 && !(order.pay_memo.Trim().Equals("无需付款") || order.pay_memo.Trim().Equals("暂缓支付")))
             {
                 var payment = order.payments[0];
