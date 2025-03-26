@@ -27,18 +27,6 @@ namespace SnowmeetApi.Controllers.SkiPass
     public class NanshanSkipassController : ControllerBase
     {
 
-        /*
-        public class ReserveProductDateSummary
-        {
-            public int product_id {get; set;}
-            public string product_name {get; set;}
-            public DateTime reserveDate {get; set;}
-            public double totalAmount {get; set;}
-            public int totalCount {get; set;}
-            public int pickCount {get; set;}
-            public List<Models.SkiPass.SkiPass> skipasses {get; set; } = new List<Models.SkiPass.SkiPass>();
-        }
-        */
       
         public class ReserveSummary
         {
