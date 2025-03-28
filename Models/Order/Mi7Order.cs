@@ -1,6 +1,8 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using SnowmeetApi.Models.Users;
 namespace SnowmeetApi.Models.Order
 {
     [Table("mi7_order")]
@@ -15,6 +17,10 @@ namespace SnowmeetApi.Models.Order
         public string barCode { get; set; } = "";
         [ForeignKey("order_id")]
         public OrderOnline? order {get; set;}
+        public DateTime create_date { get; set; } = DateTime.Now;
+        [NotMapped]
+        public Member? member { get; set; }
+        //public List<MemberSocialAccount>? msa {get; set;} = null;
 
     }
 }

@@ -391,7 +391,7 @@ namespace SnowmeetApi.Controllers
 
         [HttpGet]
         public async Task<ActionResult<IEnumerable<OrderOnline>>> GetOrdersByStaff(DateTime startDate, DateTime endDate,
-            string shop, string status, string staffSessionKey, string mi7Num = "")
+            string shop, string status, string staffSessionKey, string mi7Num = "", bool onlyMine = false)
         {
             startDate = startDate.Date;
             endDate = endDate.Date.AddHours(24);
@@ -411,7 +411,8 @@ namespace SnowmeetApi.Controllers
                     || (mi7Num.Trim().Equals("已填") && m.mi7_order_id.StartsWith("XSD") )
                     || (mi7Num.Trim().Equals("紧急开单") && m.mi7_order_id.Trim().Equals(mi7Num) ) )))
                 
-                .Where(o => (  o.create_date >= startDate && o.create_date <= endDate && (shop == null ? true : (o.shop.Trim().Equals(shop.Trim())))))
+                .Where(o => (  o.create_date >= startDate && o.create_date <= endDate && (shop == null ? true : (o.shop.Trim().Equals(shop.Trim())))
+                 && (!onlyMine || (onlyMine && o.staff_open_id.Trim().Equals(user.miniAppOpenId.Trim())) ) ))
                 .OrderByDescending(o => o.id).ToListAsync();
             var list = listOri.Where(l => l.mi7Orders.Count > 0).ToList();
             

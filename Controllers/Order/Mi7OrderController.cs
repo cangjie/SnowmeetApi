@@ -186,6 +186,168 @@ namespace SnowmeetApi.Controllers.Order
             await _context.SaveChangesAsync();
             return order;
         }
+        [HttpGet]
+        public async Task PairWithMemo()
+        {
+            List<Mi7ExportedSaleList> list = await _context.mi7ExportedSaleList
+                .Where(m => m.mi7_order_id == null).ToListAsync();
+            List<Mi7Order> mi7OrderListOri = await _context.mi7Order
+                .Include(m => m.order).ThenInclude(o => o.paymentList.Where(p => p.status.Trim().Equals("支付成功")))
+                    .ThenInclude(p => p.refunds.Where(r => r.state == 1 || !r.refund_id.Trim().Equals("")))
+                .Where(o =>  !o.mi7_order_id.StartsWith("XSD"))
+                .ToListAsync();
+            List<Mi7Order> mi7OrderList = mi7OrderListOri.Where(m => m.create_date>DateTime.Parse("2024-9-1")).ToList();
+            for(int i = 0; i < list.Count; i++)
+            {
+                //bool paired = false;
+                Mi7ExportedSaleList mi7e = list[i];
+                if (mi7e.orderIdArr.Length == 0)
+                {
+                    continue;
+                }
+                for(int j = 0; j < mi7OrderList.Count; j++)
+                {
+                    Mi7Order order = mi7OrderList[j];
+                    /*
+                    if (order.member == null)
+                    {
+                        List<MemberSocialAccount> msaList = await _context.memberSocialAccount
+                            .Include(m => m.member).ThenInclude(m => m.memberSocialAccounts)
+                            .Where(m => m.num.Trim().Equals(order.order.open_id.Trim()) && m.type.Trim().Equals("wechat_mini_openid"))
+                            .AsNoTracking().ToListAsync();
+                        if (msaList != null && msaList.Count > 0)
+                        {
+                            order.member = msaList[0].member;
+                        }
+                    }
+                    string cell = order.member != null? order.member.cell.Trim() : "";
+                    if (cell.Trim().Equals(mi7e.cell.Trim()))
+                    {
+                        
+                    }
+                    */
+                    //bool paired = false;
+                    for(int k = 0; k < mi7e.orderIdArr.Length; k++)
+                    {
+                        if (mi7e.orderIdArr[k] == order.order_id)
+                        {
+                            mi7e.mi7_order_id = order.id;
+                            order.mi7_order_id = mi7e.单据编号.Trim();
+                            _context.mi7ExportedSaleList.Entry(mi7e).State = EntityState.Modified;
+                            _context.mi7Order.Entry(order).State = EntityState.Modified;
+                            await _context.SaveChangesAsync();
+                        }
+                    }
+                }
+
+            }
+            
+        }
+        [HttpGet]
+        public async Task PairWithCell()
+        {
+            List<Mi7ExportedSaleList> list = await _context.mi7ExportedSaleList
+                .Where(m => m.mi7_order_id == null).ToListAsync();
+            List<Mi7Order> mi7OrderListOri = await _context.mi7Order
+                .Include(m => m.order).ThenInclude(o => o.paymentList.Where(p => p.status.Trim().Equals("支付成功")))
+                    .ThenInclude(p => p.refunds.Where(r => r.state == 1 || !r.refund_id.Trim().Equals("")))
+                .Where(o =>  !o.mi7_order_id.StartsWith("XSD"))
+                .ToListAsync();
+            List<Mi7Order> mi7OrderList = mi7OrderListOri.Where(m => m.create_date>DateTime.Parse("2024-9-1")).ToList();
+            for(int i = 0; i < mi7OrderList.Count; i++)
+            {
+                Mi7Order order = mi7OrderList[i];
+                if (order.member == null)
+                {
+                    List<MemberSocialAccount> msaList = await _context.memberSocialAccount
+                        .Include(m => m.member).ThenInclude(m => m.memberSocialAccounts)
+                        .Where(m => m.num.Trim().Equals(order.order.open_id.Trim()) && m.type.Trim().Equals("wechat_mini_openid"))
+                        .ToListAsync();
+                    if (msaList != null && msaList.Count > 0)
+                    {
+                        order.member = msaList[0].member;
+                    }
+                }
+                if (order == null || order.member == null || order.member.cell == null || order.member.cell.Trim().Equals(""))
+                {
+                    continue;
+                }
+                List<Mi7ExportedSaleList> subList = list.Where(l => l.cell.Trim().Equals(order.member.cell)).ToList();
+                if (subList == null || subList.Count == 0)
+                {
+                    continue;
+                }
+                for(int j = 0; j < subList.Count; j++)
+                {
+                    if (DateTime.Parse(subList[j].业务日期).Date == order.create_date.Date 
+                        && double.Parse(subList[j].实收金额.ToString()) == order.order.paidAmount)
+                    {
+                        Mi7ExportedSaleList mi7e = subList[j];
+                        mi7e.mi7_order_id = order.id;
+                        order.mi7_order_id = mi7e.单据编号.Trim();
+                        _context.mi7ExportedSaleList.Entry(mi7e).State = EntityState.Modified;
+                        _context.mi7Order.Entry(order).State = EntityState.Modified;
+                        await _context.SaveChangesAsync();
+                    }
+                }
+            }
+        }
+        /*
+        [HttpGet]
+        public async Task PairWithCell()
+        {
+            List<Mi7ExportedSaleList> list = await _context.mi7ExportedSaleList
+                .Where(m => m.mi7_order_id == null).ToListAsync();
+            List<Mi7Order> mi7OrderListOri = await _context.mi7Order
+                .Include(m => m.order).ThenInclude(o => o.paymentList.Where(p => p.status.Trim().Equals("支付成功")))
+                    .ThenInclude(p => p.refunds.Where(r => r.state == 1 || !r.refund_id.Trim().Equals("")))
+                .Where(o =>  !o.mi7_order_id.StartsWith("XSD"))
+                .ToListAsync();
+            List<Mi7Order> mi7OrderList = mi7OrderListOri.Where(m => m.create_date>DateTime.Parse("2024-9-1")).ToList();
+            for(int i = 0; i < list.Count; i++)
+            {
+                //bool paired = false;
+                Mi7ExportedSaleList mi7e = list[i];
+                
+                for(int j = 0; j < mi7OrderList.Count; j++)
+                {
+                    Mi7Order order = mi7OrderList[j];
+                    
+                    if (order.member == null)
+                    {
+                        List<MemberSocialAccount> msaList = await _context.memberSocialAccount
+                            .Include(m => m.member).ThenInclude(m => m.memberSocialAccounts)
+                            .Where(m => m.num.Trim().Equals(order.order.open_id.Trim()) && m.type.Trim().Equals("wechat_mini_openid"))
+                            .ToListAsync();
+                        if (msaList != null && msaList.Count > 0)
+                        {
+                            order.member = msaList[0].member;
+                        }
+                    }
+                    string cell = order.member != null && order.member.cell != null ? order.member.cell.Trim() : "";
+                    if (cell.Equals("") || mi7e.cell.Trim().Equals(""))
+                    {
+                        continue;
+                    }
+                    if (cell.Trim().Equals(mi7e.cell.Trim()) && DateTime.Parse(mi7e.业务日期) == order.create_date.Date 
+                        && double.Parse(mi7e.实收金额) == order.order.paidAmount )
+                    {
+                        mi7e.mi7_order_id = order.id;
+                        order.mi7_order_id = mi7e.单据编号.Trim();
+                        _context.mi7ExportedSaleList.Entry(mi7e).State = EntityState.Modified;
+                        _context.mi7Order.Entry(order).State = EntityState.Modified;
+                        await _context.SaveChangesAsync();
+                    }
+                    
+                    //bool paired = false;
+                    
+                }
+
+            }
+            
+        }
+        */
+
         private bool Mi7OrderExists(int id)
         {
             return _context.mi7Order.Any(e => e.id == id);
