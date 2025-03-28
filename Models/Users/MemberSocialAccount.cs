@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 namespace SnowmeetApi.Models.Users
@@ -22,6 +23,7 @@ namespace SnowmeetApi.Models.Users
 
         //[NotMapped]
         public Models.Users.Member member { get; set; }
+        public List<OrderOnline>? orders {get; set;}
 
     }
 }

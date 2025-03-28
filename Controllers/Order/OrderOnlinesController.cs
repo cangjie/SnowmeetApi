@@ -55,7 +55,15 @@ namespace SnowmeetApi.Controllers
             _appId = _config.GetSection("AppId").Value.Trim();
             _memberHelper = new MemberController(context, config);
         }
-
+        /*
+        [HttpGet("orderId")]
+        public async Task<ActionResult<OrderOnline>> TestPrincipalKey(int orderId)
+        {
+            List<OrderOnline> ol = await _context.OrderOnlines.Include(o => o.msa).ThenInclude(m => m.member)
+            .Where(o => o.id == orderId).AsNoTracking().ToListAsync();
+            return Ok(ol[0]);
+        }
+        */
         [HttpGet]
         public ActionResult<double> GetScoreRate(double orderPrice, double finalPrice)
         {
