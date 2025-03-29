@@ -47,7 +47,7 @@ namespace SnowmeetApi.Controllers
                 List<OrderOnline> orderList = new List<OrderOnline>();
                 for(int j = 0; j < subMi7Orders.Count; j++)
                 {
-                    Mi7Order mi7Order = mi7Orders[j];
+                    Mi7Order mi7Order = subMi7Orders[j];
                     if (mi7Order != null && orderList.Select(o => o.id == mi7Order.order_id).ToList().Count == 0)
                     {
                         orderList.Add(mi7Order.order);

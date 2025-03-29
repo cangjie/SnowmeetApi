@@ -15,6 +15,30 @@ namespace SnowmeetApi.Models.Order
         public int? orderId {get; set;} = null;
         public List<OrderOnline>? orders {get; set;} = null;
         public OrderOnline? order {get; set;} = null;
+        public double paidAmount
+        {
+            get
+            {
+                double amount = 0;
+                for(int i = 0; i < payments.Count; i++)
+                {
+                    amount += payments[i].amount;
+                }
+                return amount;
+            }
+        }
+        public double refundAmount
+        {
+            get
+            {
+                double amount = 0;
+                for(int i = 0; i < refunds.Count; i++)
+                {
+                    amount += refunds[i].amount;
+                }
+                return amount;
+            }
+        }
         public List<OrderPayment> payments
         {
             get

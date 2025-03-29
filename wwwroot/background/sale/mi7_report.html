@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>七色米业务报表</title>
+    <link rel="stylesheet" href="../../css/table.css" />
+    <link rel="stylesheet" href="../../css/bootstrap.css" />
+    <link rel="stylesheet" href="../../css/bootstrap-grid.css" />
+    <link rel="stylesheet" href="../../css/bootstrap-reboot.css" />
+    <link rel="stylesheet" href="../../css/common.css" />
+    <script type="text/javascript" src="../../js/jquery-3.6.1.min.js"></script>
+    <script type="text/javascript" src="../../js/bootstrap.js"></script>
+    <script type="text/javascript" src="../../js/util.js"></script>
+    <style>
+        td {
+            text-align: center
+        }
+    </style>
+</head>
+<body>
+    <div id="menu" style="display:flex; flex-direction:row; width:100%"></div>
+    <div style="margin-top: 20px">
+        <h1 style="text-align:center">24-25雪季 七色米业务报表</h1>
+    </div>
+    <div class="row_view" style="align-items:center;justify-content:center; margin-top:20px">
+        <!--
+        门店：<select id="shop"><option value='' >全部</option><option>万龙体验中心</option><option>万龙服务中心</option><option>崇礼旗舰店</option><option>南山</option><option>怀北</option><option>渔阳</option></select>日期：从&nbsp;<input type="date" id="date_from" oninput="setDate()" />&nbsp;到&nbsp;<input type="date" id="date_to" oninput="setDate()" />&nbsp;
+    -->
+        <button id="btn" onclick="getData()"> 查 询 </button>&nbsp;&nbsp;<button id="download" onclick="download()" > 下 载 </button>
+    </div>
+    <div style="height:20px"></div>
+    <h1></h1>
+    <div style="height:20px" id="total"></div>
+    <table>
+        <thead>
+            <tr id="tHead">
+            </tr>
+        </thead>
+        <tbody id="report_rows">
+        </tbody>
+    </table>
+</body>
+</html>
+<script type="text/javascript">var currentColor = '#DDDDDD';
+    var totalPaid = 0;
+    var tHeadConfirm = ['序号', '七色米订单号', '店铺', '业务类型', '业务日期', '业务时间', '开单日期', '开单时间', '发货日期', '开单明细数', '零售总价', '成交总价', '支付笔数', '支付金额', '退款笔数', '退款金额', '支付方式','商品类别', '商品名称']
+    var tHeadIncome = [];
+    var tHeadRefund = [];
+   
+    var nullStr = '【-】'
+    var maxIncomeNum = 0;
+    var maxRefundNum = 0;
+    var tData = [];
+    drawHead();
+    function drawHead(){
+        var tHead = document.getElementById('tHead');
+        tHead.innerHTML = '';
+        for(var i = 0; i < tHeadConfirm.length; i++){
+            var td = document.createElement('td');
+            td.innerText = tHeadConfirm[i];
+            var classAttr = document.createAttribute('class');
+            classAttr.value = 'table_head';
+            td.attributes.setNamedItem(classAttr);
+            tHead.appendChild(td);
+        }
+        for(var i = 0; i < tHeadIncome.length; i++){
+            var td = document.createElement('td');
+            td.innerText = tHeadIncome[i];
+            var classAttr = document.createAttribute('class');
+            classAttr.value = 'table_head';
+            td.attributes.setNamedItem(classAttr);
+            tHead.appendChild(td);
+        }
+        for(var i = 0; i < tHeadRefund.length; i++){
+            var td = document.createElement('td');
+            td.innerText = tHeadRefund[i];
+            var classAttr = document.createAttribute('class');
+            classAttr.value = 'table_head';
+            td.attributes.setNamedItem(classAttr);
+            tHead.appendChild(td);
+        }
+
+    }
+    
+    function FillItem(item) {
+        var totalColNum = 11;
+        var orderIdIndex = 4;
+        var rows = document.getElementById('report_rows');
+        var newRow = document.createElement('tr');
+        var lineStr = ''
+        for(var i = 0; i < tHeadConfirm.length; i++){
+            var td = document.createElement('td');
+            switch(tHeadConfirm[i].trim()){
+                case '序号':
+                    td.innerText = item.id.toString();
+                    break;
+                case '七色米订单号':
+                    td.innerText = item.mi7OrderId;
+                    break;
+                case '店铺':
+                    td.innerText = item.orders[0].shop;
+                    break;
+                case '开单日期':
+                    var d = new Date(item.orders[0].create_date);
+                    td.innerText = formatDate(d);
+                    break;
+                case '开单时间':
+                    var d = new Date(item.orders[0].create_date);
+                    td.innerText = formatTime(d);
+                    break;
+                case '开单明细数':
+                    td.innerText = item.count;
+                    break;
+                case '零售总价':
+                    td.innerText = formatAmount(item.salePrie);
+                    break;
+                case '成交总价':
+                    td.innerText = formatAmount(item.charge);
+                    break;
+                case '支付笔数':
+                    td.innerText = item.payments.length.toString();
+                    break;
+                case '退款笔数':
+                    td.innerText = item.refunds.length.toString();
+                    break;
+                case '支付金额':
+                    td.innerText = formatAmount(item.paidAmount);
+                    break;
+                case '退款金额':
+                    td.innerText = formatAmount(item.refundAmount);
+                    break;
+                case '支付方式':
+                    td.innerText = item.payments.length > 0 ?item.payments[0].pay_method : nullStr;
+                    break;
+                default:
+                    td.innerText = nullStr;
+                    break;
+            }
+            lineStr += td.innerText + ','
+            newRow.appendChild(td);
+        }
+        for(var i = 0; i < maxIncomeNum; i++){
+            var payment = null;
+            if (i < item.payments.length){
+                payment = item.payments[i];
+            }
+            for(var j = 0; j < tHeadIncome.length; j++){
+                var td = document.createElement('td');
+                td.innerText = nullStr;
+                switch(tHeadIncome[j]){
+                    case '收款单号'+(i+1).toString():
+                        td.innerText = (payment && payment.out_trade_no) ? payment.out_trade_no : nullStr;
+                        break;
+                    case '收款金额'+(i+1).toString():
+                        if (payment){
+                            td.innerText = formatAmount(payment.amount);
+                        }
+                        else{
+                            td.innerText = nullStr;
+                        }
+                        break;
+                    case '收款日期'+(i+1).toString():
+                        if (payment){
+                            var d = new Date(payment.create_date);
+                            td.innerText = formatDate(d);
+                        }
+                        else{
+                            td.innerText = nullStr;
+                        }
+                        break;
+                    case '收款时间'+(i+1).toString():
+                    if (payment){
+                            var d = new Date(payment.create_date);
+                            td.innerText = formatTime(d);
+                        }
+                        else{
+                            td.innerText = nullStr;
+                        }
+                        break;
+                    default:
+                        break;
+                }
+                lineStr += td.innerText + ','
+                newRow.appendChild(td);
+            }
+
+        }
+        for(var i = 0; i < maxRefundNum; i++){
+            var refund = null;
+            if (i < item.refunds.length){
+                refund = item.refunds[i];
+            }
+            for(var j = 0; j < tHeadRefund.length; j++){
+                var td = document.createElement('td');
+                td.innerText = nullStr;
+                switch(tHeadRefund[j]){
+                    case '退款单号'+(i+1).toString():
+                        td.innerText = (refund && refund.refund_id) ? refund.refund_id : nullStr;
+                        break;
+                    case '退款金额'+(i+1).toString():
+                        if (refund){
+                            td.innerText = formatAmount(refund.amount);
+                        }
+                        else{
+                            td.innerText = nullStr;
+                        }
+                        break;
+                    case '退款日期'+(i+1).toString():
+                        if (refund){
+                            var d = new Date(refund.create_date);
+                            td.innerText = formatDate(d);
+                        }
+                        else{
+                            td.innerText = nullStr;
+                        }
+                        break;
+                    case '退款时间'+(i+1).toString():
+                    if (refund){
+                            var d = new Date(refund.create_date);
+                            td.innerText = formatTime(d);
+                        }
+                        else{
+                            td.innerText = nullStr;
+                        }
+                        break;
+                    default:
+                        break;
+                    
+                }
+                lineStr += td.innerText + ','
+                newRow.appendChild(td);
+            }
+        }
+        rows.appendChild(newRow);
+        lineStr = lineStr.substring(0, lineStr.length - 2);
+        tData.push(lineStr);
+        
+    }
+
+    function getData() {
+        totalPaid = 0;
+        var rows = document.getElementById('report_rows');
+        rows.innerHTML = '';
+        var btnCtrl = document.getElementById('btn');
+        btnCtrl.disabled = true;
+        var shop = document.getElementById('shop')
+        
+        var getUrl = '../../core/Retail/ShowMi7Order?startDate=2024-10-01';
+        console.log('shop', shop);
+        $.ajax({
+            url: getUrl,
+            type: 'GET',
+            success: function (msg, status) {
+                console.log('get data msg', msg)
+                console.log('get data status', status)
+                if (status != 'success') {
+                    return
+                }
+                for (var i = 0; i < msg.length; i++) {
+                    msg[i].id = i + 1;
+                    maxIncomeNum = Math.max(maxIncomeNum, msg[i].payments.length);
+                    maxRefundNum = Math.max(maxRefundNum, msg[i].refunds.length);
+                }
+                tHeadIncome = [];
+                for(var i = 0; i < maxIncomeNum; i++){
+                    tHeadIncome.push('收款单号' + (i + 1).toString());
+                    tHeadIncome.push('收款金额' + (i + 1).toString());
+                    tHeadIncome.push('收款日期' + (i + 1).toString());
+                    tHeadIncome.push('收款时间' + (i + 1).toString());
+                }
+                tHeadRefund = []
+                for(var i = 0; i < maxRefundNum; i++){
+                    //tHeadRefund.push('')
+                    tHeadRefund.push('退款单号' + (i + 1).toString());
+                    tHeadRefund.push('退款金额' + (i + 1).toString());
+                    tHeadRefund.push('退款日期' + (i + 1).toString());
+                    tHeadRefund.push('退款时间' + (i + 1).toString());
+                }
+                drawHead();
+                for (var i = 0; i < msg.length; i++) {
+                    FillItem(msg[i]);
+                }
+
+            },
+            complete: function (msg, status) {
+                btnCtrl.disabled = false;
+            }
+        })
+
+    }
+    var tData = []
+    function download() {
+        if (tHeadConfirm.length <= 0 || tHeadConfirm.length <= 0) {
+            return;
+        }
+        var csvContent = '';
+        var lineContent = '';
+        for (var i = 0; i < tHeadConfirm.length; i++) {
+            lineContent += (i > 0 ? ',' : '') + tHeadConfirm[i];
+        }
+        for (var i = 0; i < tHeadIncome.length; i++) {
+            lineContent += (i > 0 ? ',' : '') + tHeadIncome[i];
+        }
+        for (var i = 0; i < tHeadRefund.length; i++) {
+            lineContent += (i > 0 ? ',' : '') + tHeadRefund[i];
+        }
+        csvContent += lineContent + '\r\n';
+        for (var i = 0; i < tData.length; i++) {
+            csvContent += tData[i].trim() + '\r\n';
+        }
+        csvContent = csvContent.trim();
+        var link = document.createElement('a');
+        link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvContent);
+        link.download = encodeURIComponent('mi7.csv');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+    </script>
+<!--script type="text/javascript" src="../../js/date_selector.js"></script-->
+<script type="text/javascript" src="../js/menu.js"></script>
