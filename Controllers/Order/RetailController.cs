@@ -26,7 +26,8 @@ namespace SnowmeetApi.Controllers
         {
             List<Models.Order.Retail> retailList = new List<Retail>();
             var mi7List  =  await (from m in _db.mi7Order
-                .Where(m => m.create_date.Date >= startDate.Date && m.mi7_order_id.Trim().StartsWith("XSD"))
+                .Where(m => m.create_date.Date >= startDate.Date && m.mi7_order_id.Trim().StartsWith("XSD") //&& m.mi7_order_id.Trim().Equals("XSD20250326000A")
+                )
                 group m by m.mi7_order_id into g
                 select new { mi7OrderId = g.Key, salePrie = g.Sum(g => g.sale_price), charge = g.Sum(g => g.real_charge), count = g.Count() })
                 .AsNoTracking().ToListAsync();
@@ -43,18 +44,34 @@ namespace SnowmeetApi.Controllers
                     charge = mi7List[i].charge,
                     count = mi7List[i].count
                 };
+                int count = 0;
+                double charge = 0;
+                double salePrie = 0;
                 List<Mi7Order> subMi7Orders = mi7Orders.Where(m => m.mi7_order_id.Trim().Equals(r.mi7OrderId.Trim())).ToList();
                 List<OrderOnline> orderList = new List<OrderOnline>();
                 for(int j = 0; j < subMi7Orders.Count; j++)
                 {
                     Mi7Order mi7Order = subMi7Orders[j];
-                    if (mi7Order != null && orderList.Select(o => o.id == mi7Order.order_id).ToList().Count == 0)
+                    if (mi7Order == null || mi7Order.order == null || mi7Order.order.paymentList == null || mi7Order.order.paymentList.Count == 0)
+                    {
+                        continue;
+                    }
+                    if (mi7Order != null &&  orderList.Where(o => o.id == mi7Order.order_id).ToList().Count == 0)
                     {
                         orderList.Add(mi7Order.order);
+                        count++;
+                        salePrie += mi7Order.sale_price;
+                        charge += mi7Order.real_charge;
                     }
                 }
+                r.count = count;
                 r.orders = orderList;
-                retailList.Add(r);
+                r.charge = charge;
+                r.salePrie = salePrie;
+                if (orderList.Count > 0)
+                {
+                    retailList.Add(r);
+                }
             }
             List<Retail> newList = retailList.OrderBy(r => r.orders[0].create_date).ToList();
             return Ok(newList);
