@@ -62,6 +62,7 @@
     <PackageReference Include="System.Text.Encoding.CodePages" Version="8.0.0" />
     <PackageReference Include="TencentCloudSDK.Common" Version="3.0.1136" />
     <PackageReference Include="TencentCloudSDK.Ocr" Version="3.0.1136" />
+    <PackageReference Include="NPOI" Version="2.7.3" />
     
   </ItemGroup>
   <ItemGroup>
