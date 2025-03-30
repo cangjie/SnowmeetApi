@@ -54,6 +54,7 @@ namespace SnowmeetApi.Data
 
             modelBuilder.Entity<MemberSocialAccount>().HasAlternateKey(m => m.num);
             modelBuilder.Entity<OrderOnline>().HasOne(o => o.msa).WithMany(m => m.orders).HasForeignKey(o => o.open_id).HasPrincipalKey(m => m.num);
+            modelBuilder.Entity<Mi7ExportedSaleDetail>().HasNoKey();
 
         }
 
@@ -155,5 +156,6 @@ namespace SnowmeetApi.Data
         public DbSet<Models.WebApiLog> webApiLog{get; set;}
         public DbSet<Models.StaffModLog> staffModLog {get; set;}
         public DbSet<Models.Mi7ExportedSaleList> mi7ExportedSaleList {get; set;}
+        public DbSet<Models.Mi7ExportedSaleDetail> mi7ExportedSaleDetail {get; set;}
     }
 }

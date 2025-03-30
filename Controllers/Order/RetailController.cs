@@ -22,6 +22,18 @@ namespace SnowmeetApi.Controllers
             _config = config;
         }
         [HttpGet]
+        public async Task ExportMi7Order(DateTime startDate)
+        {
+            List<Models.Order.Retail> rl = (List<Models.Order.Retail>)((OkObjectResult)(await ShowMi7Order(startDate)).Result).Value;
+            List<Models.Mi7ExportedSaleDetail> details = await _db.mi7ExportedSaleDetail.ToListAsync();
+            for(int i = 0; i < rl.Count; i++)
+            {
+                Retail r = rl[i];
+                r.details = details.Where(d => d.单据编号.Trim().Equals(r.mi7OrderId.Trim())).ToList();
+            }
+    
+        }
+        [HttpGet]
         public async Task<ActionResult<List<Models.Order.Retail>>> ShowMi7Order(DateTime startDate)
         {
             List<Models.Order.Retail> retailList = new List<Retail>();
@@ -35,6 +47,7 @@ namespace SnowmeetApi.Controllers
                 .Include(m => m.order).ThenInclude(o => o.paymentList.Where(p => p.status.Trim().Equals("支付成功")))
                 .ThenInclude(p => p.refunds.Where(r => r.state == 1 || !r.refund_id.Trim().Equals("")))
                 .AsNoTracking().ToListAsync();
+            //List<Models.Mi7ExportedSaleDetail> detail = await _db.mi7ExportedSaleDetail.ToListAsync();
             for(int i = 0; i < mi7List.Count; i++)
             {
                 Retail r = new Retail()

@@ -1,3 +1,6 @@
+*.csv
+*.xls
+*.xlsx
 booking*.txt
 # globs
 AlipayCertificate/*/downloads

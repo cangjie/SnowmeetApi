@@ -15,6 +15,7 @@ namespace SnowmeetApi.Models.Order
         public int? orderId {get; set;} = null;
         public List<OrderOnline>? orders {get; set;} = null;
         public OrderOnline? order {get; set;} = null;
+        public List<Mi7ExportedSaleDetail>? details {get; set;} = null;
         public double paidAmount
         {
             get
