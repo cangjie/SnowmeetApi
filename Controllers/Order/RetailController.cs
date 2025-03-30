@@ -10,6 +10,7 @@ using NPOI.XSSF.UserModel;
 using SnowmeetApi.Data;
 using SnowmeetApi.Models;
 using SnowmeetApi.Models.Order;
+using TencentCloud.Ocr.V20181119.Models;
 namespace SnowmeetApi.Controllers
 {
     [Route("core/[controller]/[action]")]
@@ -41,9 +42,10 @@ namespace SnowmeetApi.Controllers
                 maxRefundNum = Math.Max(r.refunds.Count, maxRefundNum);
             }
             List<string> head = [
-                "序号", "七色米订单号",	"店铺", "业务类型", "业务日期", "业务时间", "开单日期", "开单时间", "发货日期",
+                "序号", "七色米订单号", "地区" ,"出货店铺", "业务类型", "业务日期", "业务时间", "开单日期", "开单时间", "发货日期",
                 "开单明细数", "零售总价", "成交总价", "支付笔数", "支付金额", "退款笔数", "退款金额", "支付方式", "商品类别"];
-            string[] headPayment = ["商品名称支付方式", "收款单号", "收款日期", "收款时间"];
+            int commonFieldsNum = head.Count;
+            string[] headPayment = ["收款门店", "支付方式", "收款单号", "收款日期", "收款时间"];
             string[] headRefund = ["退款单号", "退款金额", "退款日期", "退款时间"];
             for(int i = 0; i < maxPaymentNum; i++)
             {
@@ -71,15 +73,78 @@ namespace SnowmeetApi.Controllers
             headStyle.FillForegroundColor = NPOI.HSSF.Util.HSSFColor.Black.Index;
             headStyle.FillPattern = FillPattern.SolidForeground;
             headStyle.SetFont(headFont);
-            //workbook.get
-            //headStyle.FillPattern = FillPatternType
             for(int i = 0; i < head.Count; i++)
             {
                 ICell headCell = headRow.CreateCell(i);
                 headCell.SetCellValue(head[i].Trim());
                 headCell.SetCellType(CellType.String);
                 headCell.CellStyle = headStyle;
-               
+            }
+            for(int i = 0; i < rl.Count; i++)
+            {
+                Retail r = rl[i];
+                IRow dr = sheet.CreateRow(i + 1);
+                string mi7Shop = nullStr;
+                string region = nullStr;
+                string type = nullStr;
+                string date = "";
+                //string chargeShop = nullStr;
+                if (r.details != null && r.details.Count > 0)
+                {
+                    mi7Shop = r.details[0].所属门店.Replace("】【", "】 【");
+                    string[] shopArr = mi7Shop.Split(' ');
+                    if (shopArr.Length == 2)
+                    {
+                        region = shopArr[0];
+                        mi7Shop = shopArr[1];
+                    }
+                    if (r.details[0].出库仓库.IndexOf("零售") >= 0)
+                    {
+                        type = "零售";
+                    }
+                    if (r.details[0].出库仓库.IndexOf("租赁") >= 0)
+                    {
+                        type = "租赁";
+                    }
+                    date = ((DateTime)r.details[0].业务日期).ToShortDateString();
+                }
+                
+                
+                
+                for(int j = 0; j < commonFieldsNum; j++)
+                {
+                    ICell cell = dr.CreateCell(j);
+                    switch(j)
+                    {
+                        case 0:
+                            cell.SetCellValue((i+1).ToString());
+                            cell.SetCellType(CellType.Numeric);
+                            break;
+                        case 1:
+                            cell.SetCellValue(r.mi7OrderId);
+                            cell.SetCellType(CellType.String);
+                            break;
+                        case 2:
+                            cell.SetCellValue(region.Replace("【", "").Replace("】", "").Trim());
+                            cell.SetCellType(CellType.String);
+                            break;
+                        case 3:
+                            cell.SetCellValue(mi7Shop.Replace("【", "").Replace("】", "").Trim());
+                            cell.SetCellType(CellType.String);
+                            break;
+                        case 4:
+                            cell.SetCellValue(type.Trim());
+                            cell.SetCellType(CellType.String);
+                            break;
+                        case 5:
+                            cell.SetCellValue(date);
+                            cell.SetCellType(CellType.String);
+                            break;
+                        default:
+                            break;
+                    }
+                }
+
             }
             using(var file = System.IO.File.Create("mi7.xlsx"))
             {
