@@ -391,12 +391,14 @@ namespace SnowmeetApi.Controllers
 
         [HttpGet]
         public async Task<ActionResult<IEnumerable<OrderOnline>>> GetOrdersByStaff(string staffSessionKey, DateTime startDate, DateTime endDate,
-            string shop = "", string status = "", string mi7Num = "", bool onlyMine = false, string cell = "")
+            string shop = "", string status = "", string mi7Num = "", bool onlyMine = false, string cell = "", string orderId = "0", string mi7OrderId = "")
         {
             startDate = startDate.Date;
             endDate = endDate.Date.AddHours(24);
             staffSessionKey = Util.UrlDecode(staffSessionKey);
             mi7Num = Util.UrlDecode(mi7Num);
+            
+
             UnicUser user = await UnicUser.GetUnicUserAsync(staffSessionKey, _context);
             if (!user.isAdmin)
             {
@@ -407,15 +409,22 @@ namespace SnowmeetApi.Controllers
                 .Include(o => o.paymentList.Where(p => p.status.Equals("支付成功")))
                     .ThenInclude(p => p.refunds.Where(r => r.state == 1 || !r.refund_id.Trim().Equals("")))
                 .Include(o => o.mi7Orders
-                .Where(m => (mi7Num.Trim().Equals("") 
+                .Where(m => (
+                    (
+                    mi7Num.Trim().Equals("") 
                     || (mi7Num.Equals("未填") && !m.mi7_order_id.StartsWith("XSD"))
                     || (mi7Num.Trim().Equals("已填") && m.mi7_order_id.StartsWith("XSD") )
-                    || (mi7Num.Trim().Equals("紧急开单") && m.mi7_order_id.Trim().Equals(mi7Num) ) )))
+                    || (mi7Num.Trim().Equals("紧急开单") && m.mi7_order_id.Trim().Equals(mi7Num) ) 
+                    )
+                    &&
+                    (mi7OrderId.Equals("") || m.mi7_order_id.Trim().IndexOf(mi7OrderId) >= 0)
+                    )))
                 
                 .Where(o => (  
                 o.create_date >= startDate && o.create_date <= endDate && (shop.Trim().Equals("") ? true : (o.shop.Trim().Equals(shop.Trim())))
                  && (!onlyMine || (onlyMine && o.staff_open_id.Trim().Equals(user.miniAppOpenId.Trim())) ) 
                  && (cell.Length < 4 || o.cell_number.EndsWith(cell.Trim()) ) 
+                 && (orderId.Equals("0") || o.id == int.Parse(orderId))
                  ))
                 .OrderByDescending(o => o.id).ToListAsync();
             var list = listOri.Where(l => l.mi7Orders.Count > 0).ToList();
@@ -427,8 +436,6 @@ namespace SnowmeetApi.Controllers
                 list[i].msa = msaList.Count > 0? msaList[0]:null;
                 list[i].payments = await _context.OrderPayment.Where(p => p.order_id == list[i].id).ToArrayAsync();
             }
-
-
             if (status == null || status.Trim().Equals(""))
             {
                 return Ok(list);
