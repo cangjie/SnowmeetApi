@@ -55,15 +55,7 @@ namespace SnowmeetApi.Controllers
             _appId = _config.GetSection("AppId").Value.Trim();
             _memberHelper = new MemberController(context, config);
         }
-        /*
-        [HttpGet("orderId")]
-        public async Task<ActionResult<OrderOnline>> TestPrincipalKey(int orderId)
-        {
-            List<OrderOnline> ol = await _context.OrderOnlines.Include(o => o.msa).ThenInclude(m => m.member)
-            .Where(o => o.id == orderId).AsNoTracking().ToListAsync();
-            return Ok(ol[0]);
-        }
-        */
+   
         [HttpGet]
         public ActionResult<double> GetScoreRate(double orderPrice, double finalPrice)
         {
@@ -398,8 +390,8 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<OrderOnline>>> GetOrdersByStaff(DateTime startDate, DateTime endDate,
-            string shop, string status, string staffSessionKey, string mi7Num = "", bool onlyMine = false)
+        public async Task<ActionResult<IEnumerable<OrderOnline>>> GetOrdersByStaff(string staffSessionKey, DateTime startDate, DateTime endDate,
+            string shop = "", string status = "", string mi7Num = "", bool onlyMine = false, string cell = "")
         {
             startDate = startDate.Date;
             endDate = endDate.Date.AddHours(24);
@@ -411,6 +403,7 @@ namespace SnowmeetApi.Controllers
                 return NoContent();
             }
             var listOri = await _context.OrderOnlines
+                //.Include(o => o.msa).ThenInclude(m => m.member).ThenInclude(m => m.memberSocialAccounts)
                 .Include(o => o.paymentList.Where(p => p.status.Equals("支付成功")))
                     .ThenInclude(p => p.refunds.Where(r => r.state == 1 || !r.refund_id.Trim().Equals("")))
                 .Include(o => o.mi7Orders
@@ -419,8 +412,11 @@ namespace SnowmeetApi.Controllers
                     || (mi7Num.Trim().Equals("已填") && m.mi7_order_id.StartsWith("XSD") )
                     || (mi7Num.Trim().Equals("紧急开单") && m.mi7_order_id.Trim().Equals(mi7Num) ) )))
                 
-                .Where(o => (  o.create_date >= startDate && o.create_date <= endDate && (shop == null ? true : (o.shop.Trim().Equals(shop.Trim())))
-                 && (!onlyMine || (onlyMine && o.staff_open_id.Trim().Equals(user.miniAppOpenId.Trim())) ) ))
+                .Where(o => (  
+                o.create_date >= startDate && o.create_date <= endDate && (shop.Trim().Equals("") ? true : (o.shop.Trim().Equals(shop.Trim())))
+                 && (!onlyMine || (onlyMine && o.staff_open_id.Trim().Equals(user.miniAppOpenId.Trim())) ) 
+                 && (cell.Length < 4 || o.cell_number.EndsWith(cell.Trim()) ) 
+                 ))
                 .OrderByDescending(o => o.id).ToListAsync();
             var list = listOri.Where(l => l.mi7Orders.Count > 0).ToList();
             
@@ -435,7 +431,7 @@ namespace SnowmeetApi.Controllers
 
             if (status == null || status.Trim().Equals(""))
             {
-                return list;
+                return Ok(list);
             }
             else
             {
@@ -447,7 +443,7 @@ namespace SnowmeetApi.Controllers
                         newList.Add(list[i]);
                     }
                 }
-                return newList;
+                return Ok(newList);
             }
 
         }
