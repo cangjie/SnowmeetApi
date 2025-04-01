@@ -398,6 +398,13 @@ namespace SnowmeetApi.Controllers
             staffSessionKey = Util.UrlDecode(staffSessionKey);
             mi7Num = Util.UrlDecode(mi7Num);
             
+            string openId = "";
+            if (cell.Trim().Length == 11)
+            {
+                MemberController _memberHelper = new MemberController(_context, _oriConfig);
+                Member m = (Member)((OkObjectResult)(await _memberHelper.GetMemberByCell(cell, staffSessionKey)).Result).Value;
+                openId = m.wechatMiniOpenId.Trim();
+            }
 
             UnicUser user = await UnicUser.GetUnicUserAsync(staffSessionKey, _context);
             if (!user.isAdmin)
@@ -423,7 +430,7 @@ namespace SnowmeetApi.Controllers
                 .Where(o => (  
                 o.create_date >= startDate && o.create_date <= endDate && (shop.Trim().Equals("") ? true : (o.shop.Trim().Equals(shop.Trim())))
                  && (!onlyMine || (onlyMine && o.staff_open_id.Trim().Equals(user.miniAppOpenId.Trim())) ) 
-                 && (cell.Length < 4 || o.cell_number.EndsWith(cell.Trim()) ) 
+                 && (cell.Length < 4 || o.cell_number.EndsWith(cell.Trim()) || o.open_id.Trim().Equals(openId) ) 
                  && (orderId.Equals("0") || o.id == int.Parse(orderId))
                  ))
                 .OrderByDescending(o => o.id).ToListAsync();
