@@ -27,7 +27,7 @@ namespace SnowmeetApi.Controllers
         [HttpGet]
         public async Task ExportMi7Order(DateTime startDate)
         {
-
+            
 
             
             List<Models.Order.Retail> rl = (List<Models.Order.Retail>)((OkObjectResult)(await ShowMi7Order(startDate)).Result).Value;
@@ -42,8 +42,8 @@ namespace SnowmeetApi.Controllers
                 maxRefundNum = Math.Max(r.refunds.Count, maxRefundNum);
             }
             List<string> head = [
-                "序号", "七色米订单号", "地区" ,"出货店铺", "业务类型", "业务日期", "业务时间", "开单日期", "开单时间", "发货日期",
-                "开单明细数", "零售总价", "成交总价", "支付笔数", "支付金额", "退款笔数", "退款金额", "支付方式", "商品类别"];
+                "序号", "七色米订单号", "地区" ,"出货店铺", "业务类型", "业务日期", "业务时间", "开单日期", "开单时间", 
+                "商品类别", "商品编号", "商品名称", "零售总价", "成交总价", "支付笔数", "支付金额", "退款笔数", "退款金额", "支付方式", "商品类别"];
             int commonFieldsNum = head.Count;
             string[] headPayment = ["收款门店", "支付方式", "收款单号", "收款日期", "收款时间"];
             string[] headRefund = ["退款单号", "退款金额", "退款日期", "退款时间"];
@@ -73,6 +73,17 @@ namespace SnowmeetApi.Controllers
             headStyle.FillForegroundColor = NPOI.HSSF.Util.HSSFColor.Black.Index;
             headStyle.FillPattern = FillPattern.SolidForeground;
             headStyle.SetFont(headFont);
+
+            IDataFormat format = workbook.CreateDataFormat();
+
+            ICellStyle styleDate = workbook.CreateCellStyle();
+            styleDate.DataFormat = format.GetFormat("YYYY-MM-DD");
+            
+            ICellStyle styleTime = workbook.CreateCellStyle();
+            styleTime.DataFormat = format.GetFormat("HH:mm:ss");
+
+
+
             for(int i = 0; i < head.Count; i++)
             {
                 ICell headCell = headRow.CreateCell(i);
@@ -88,6 +99,8 @@ namespace SnowmeetApi.Controllers
                 string region = nullStr;
                 string type = nullStr;
                 string date = "";
+                string time = "";
+                DateTime? orderDate = null;
                 //string chargeShop = nullStr;
                 if (r.details != null && r.details.Count > 0)
                 {
@@ -106,7 +119,12 @@ namespace SnowmeetApi.Controllers
                     {
                         type = "租赁";
                     }
-                    date = ((DateTime)r.details[0].业务日期).ToShortDateString();
+                    date = ((DateTime)r.details[0].业务日期).ToString("yyyy-MM-dd");
+                    time = ((DateTime)r.details[0].业务日期).ToString("hh:mm:ss");
+                    if (r.orders.Count > 0)
+                    {
+                        orderDate = r.orders[0].create_date;
+                    }
                 }
                 
                 
@@ -138,13 +156,49 @@ namespace SnowmeetApi.Controllers
                             break;
                         case 5:
                             cell.SetCellValue(date);
-                            cell.SetCellType(CellType.String);
+                            cell.CellStyle = styleDate;
+                            break;
+                        case 6:
+                            cell.SetCellValue(time);
+                            cell.CellStyle = styleTime;
+                            break;
+                        case 7:
+                            if (orderDate == null)
+                            {
+                                cell.SetCellValue(nullStr);
+                            }
+                            else
+                            {
+                                cell.SetCellValue(((DateTime)orderDate).ToString("yyyy-MM-dd"));
+                                cell.CellStyle = styleDate;
+                            }
+                            break;
+                        case 8:
+                            if (orderDate == null)
+                            {
+                                cell.SetCellValue(nullStr);
+                            }
+                            else
+                            {
+                                cell.SetCellValue(((DateTime)orderDate).ToString("hh:mm:ss"));
+                                cell.CellStyle = styleTime;
+                            }
+                            break;
+                        case 9:
+                            cell.SetCellValue(r.details.Count == 0? nullStr : r.details[0].商品分类);
+                            break;
+                        case 10:
+                            cell.SetCellValue(r.details.Count == 0? nullStr : r.details[0].商品编号);
+                            break;
+                        case 11:
+                            cell.SetCellValue(r.details.Count == 0? nullStr : r.details[0].商品名称);
                             break;
                         default:
                             break;
                     }
                 }
 
+                
             }
             using(var file = System.IO.File.Create("mi7.xlsx"))
             {
@@ -162,7 +216,7 @@ namespace SnowmeetApi.Controllers
                 select new { mi7OrderId = g.Key, salePrie = g.Sum(g => g.sale_price), charge = g.Sum(g => g.real_charge), count = g.Count() })
                 .AsNoTracking().ToListAsync();
             List<Mi7Order> mi7Orders = await _db.mi7Order.Where(m => m.create_date.Date >= startDate.Date)
-                .Include(m => m.order).ThenInclude(o => o.paymentList.Where(p => p.status.Trim().Equals("支付成功")))
+                .Include(m => m.order).ThenInclude(o => o.paymentList.Where(p => p.status.Trim().Equals("支付成功")).OrderBy(p => p.id))
                 .ThenInclude(p => p.refunds.Where(r => r.state == 1 || !r.refund_id.Trim().Equals("")))
                 .AsNoTracking().ToListAsync();
             //List<Models.Mi7ExportedSaleDetail> detail = await _db.mi7ExportedSaleDetail.ToListAsync();
@@ -178,7 +232,8 @@ namespace SnowmeetApi.Controllers
                 int count = 0;
                 double charge = 0;
                 double salePrie = 0;
-                List<Mi7Order> subMi7Orders = mi7Orders.Where(m => m.mi7_order_id.Trim().Equals(r.mi7OrderId.Trim())).ToList();
+                List<Mi7Order> subMi7Orders = mi7Orders.Where(m => m.mi7_order_id.Trim().Equals(r.mi7OrderId.Trim()))
+                    .OrderBy(o => o.id).ToList();
                 List<OrderOnline> orderList = new List<OrderOnline>();
                 for(int j = 0; j < subMi7Orders.Count; j++)
                 {
