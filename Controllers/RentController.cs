@@ -2039,7 +2039,75 @@ namespace SnowmeetApi.Controllers
             }
             return Ok(list);
         }
+        [HttpGet("{addPayId}")]
+        public async Task<ActionResult<RentAdditionalPayment>> ConfirmAdditionPayment(int addPayId, string payMethod, 
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            if (payMethod.Trim().Equals("微信支付"))
+            {
+                return BadRequest();
+            }
+            sessionKey = Util.UrlDecode(sessionKey).Trim();
+            UnicUser user = await Util.GetUser(sessionKey, _context);
+            if (!user.isAdmin)
+            {
+                return NoContent();
+            }
+            if (!user.isStaff)
+            {
+                return BadRequest();
+            }
+            payMethod = Util.UrlDecode(payMethod);
+            RentAdditionalPayment addPay = await _context.rentAdditionalPayment.FindAsync(addPayId);
+            RentOrder rentOrder = await _context.RentOrder.FindAsync(addPay.rent_list_id);
+            if (addPay == null || rentOrder == null)
+            {
+                return NotFound();
+            }
+            double amount = addPay.amount;
+            OrderOnline order = new OrderOnline()
+            {
+                id = 0,
+                type = "押金",
+                shop = rentOrder.shop.Trim(),
+                open_id = user.wlMiniOpenId.Trim(),
+                name = rentOrder.real_name.Trim(),
+                cell_number = rentOrder.cell_number.Trim(),
+                pay_method = payMethod.Trim(),
+                pay_memo = "追加押金",
+                pay_state = 0,
+                order_price = addPay.amount,
+                order_real_pay_price = amount,
+                ticket_amount = 0,
+                other_discount = 0,
+                final_price = amount,
+                ticket_code = rentOrder.ticket_code.Trim(),
+                staff_open_id = addPay.staff_open_id,
+                score_rate = 0,
+                generate_score = 0
 
+            };
+            await _context.OrderOnlines.AddAsync(order);
+            await _context.SaveChangesAsync();
+            OrderPayment payment = new OrderPayment()
+            {
+                id = 0,
+                order_id = order.id,
+                amount = addPay.amount,
+                pay_method = payMethod.Trim(),
+                staff_open_id = addPay.staff_open_id.Trim(),
+                status = "支付成功"
+            };
+            //order.paymentList.Add(payment);
+            await _context.OrderPayment.AddAsync(payment);
+            await _context.SaveChangesAsync();
+            addPay.order_id = order.id;
+            addPay.is_paid = 1;
+            addPay.pay_method = payMethod.Trim();
+            _context.rentAdditionalPayment.Entry(addPay).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
+            return Ok(addPay);
+        }
         [HttpGet("{rentListId}")]
         public async Task<ActionResult<RentAdditionalPayment>> CreateAdditionalPayment(int rentListId, double amount, string reason, 
             string sessionKey, string sessionType = "wechat_mini_openid")

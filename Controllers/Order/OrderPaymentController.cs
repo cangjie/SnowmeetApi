@@ -514,6 +514,10 @@ namespace SnowmeetApi.Controllers.Order
                     break;            
 
             }
+            if (shopCode.Equals("WF") && bizCode.Equals("ZL"))
+            {
+                shopCode = "WT";
+            }
             string dateStr = DateTime.Now.ToString("yyyyMMdd");
             var payments = await _context.OrderPayment.Where(o => o.order_id == orderId)
                 .AsNoTracking().ToListAsync();
@@ -594,10 +598,12 @@ namespace SnowmeetApi.Controllers.Order
                     TenpayController tenpayHelper = new TenpayController(_context, _originConfig, _httpContextAccessor);
                     refund = await tenpayHelper.Refund(refund.id);
                     break;
+                /*
                 case "支付宝":
                     AliController aliHelper = new AliController(_context, _originConfig, _httpContextAccessor);
                     refund = await aliHelper.Refund(refund.id);
                     break;
+                */
                 default:
                     refund.state = 1;
                     _context.OrderPaymentRefund.Entry(refund).State = EntityState.Modified;
