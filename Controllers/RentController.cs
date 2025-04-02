@@ -2090,6 +2090,11 @@ namespace SnowmeetApi.Controllers
             {
                 return NotFound();
             }
+            string shop = rentOrder.shop.Trim();
+            if (shop.StartsWith("万龙"))
+            {
+                shop = "万龙体验中心";
+            }
             OrderOnline order = new OrderOnline()
             {
                 id = 0,
