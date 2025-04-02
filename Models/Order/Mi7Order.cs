@@ -15,6 +15,7 @@ namespace SnowmeetApi.Models.Order
         public double sale_price { get; set; }
         public double real_charge { get; set; }
         public string barCode { get; set; } = "";
+        public string order_type {get; set;} = "普通";
         [ForeignKey("order_id")]
         public OrderOnline? order {get; set;}
         public DateTime create_date { get; set; } = DateTime.Now;

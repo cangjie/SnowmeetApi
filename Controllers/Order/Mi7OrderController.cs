@@ -154,7 +154,7 @@ namespace SnowmeetApi.Controllers.Order
         }
 
         [HttpGet("{id}")]
-        public async Task<ActionResult<Mi7Order>> ModMi7Order(int id, string orderNum, string sessionKey)
+        public async Task<ActionResult<Mi7Order>> ModMi7Order(int id, string orderNum, string sessionKey, string orderType = "普通")
         {
             sessionKey = Util.UrlDecode(sessionKey);
             UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
@@ -168,20 +168,43 @@ namespace SnowmeetApi.Controllers.Order
             {
                 return BadRequest();
             }
-            StaffModLog log = new StaffModLog()
+            
+            if (!orderNum.Trim().Equals(""))
             {
-                id = 0,
-                table_name = "mi7_order",
-                field_name = "mi7_order_id",
-                key_id = id.ToString(),
-                scene = "修改七色米订单号",
-                staff_member_id = user.member.id,
-                prev_value = order.mi7_order_id,
-                current_value = orderNum,
-                create_date = DateTime.Now
-            };
-            await _context.staffModLog.AddAsync(log);
-            order.mi7_order_id = orderNum;
+                order.mi7_order_id = orderNum;
+                StaffModLog log = new StaffModLog()
+                {
+                    id = 0,
+                    table_name = "mi7_order",
+                    field_name = "mi7_order_id",
+                    key_id = id.ToString(),
+                    scene = "修改七色米订单号",
+                    staff_member_id = user.member.id,
+                    prev_value = order.mi7_order_id,
+                    current_value = orderNum,
+                    create_date = DateTime.Now
+                };
+                await _context.staffModLog.AddAsync(log);
+            }
+            if (!order.order_type.Trim().Equals(orderType.Trim()))
+            {
+                
+                StaffModLog log = new StaffModLog()
+                {
+                    id = 0,
+                    table_name = "mi7_order",
+                    field_name = "order_type",
+                    key_id = id.ToString(),
+                    scene = "修改七色米订单类型",
+                    staff_member_id = user.member.id,
+                    prev_value = order.order_type,
+                    current_value = orderType.Trim(),
+                    create_date = DateTime.Now
+                };
+                await _context.staffModLog.AddAsync(log);
+                order.order_type = orderType.Trim();
+            }
+            
             _context.Entry(order).State = EntityState.Modified;
             await _context.SaveChangesAsync();
             return order;
