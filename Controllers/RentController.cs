@@ -2343,7 +2343,6 @@ namespace SnowmeetApi.Controllers
             }
             
             RentOrder order = (RentOrder)((OkObjectResult)(await GetRentOrder(rentOrderId, sessionKey, false)).Result).Value;
-            //OrderOnline order = await _context.OrderOnlines.FindAsync()
             return Ok(order);
         }
 
