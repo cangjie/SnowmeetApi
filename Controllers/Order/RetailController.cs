@@ -40,7 +40,7 @@ namespace SnowmeetApi.Controllers
             }
             List<string> head = [
                 "序号", "七色米订单号", "地区" ,"出货店铺", "业务类型", "业务日期", "业务时间", "开单日期", "开单时间",
-                "商品类别", "商品编号", "商品名称", "零售单价", "成交总价", "支付笔数", "支付金额", "退款笔数", "退款金额", "支付方式", "商品类别"];
+                "商品类别", "商品编号", "商品名称", "零售单价", "数量", "成交总价", "支付笔数", "支付金额", "退款笔数", "退款金额", "支付方式", "商品类别"];
             int commonFieldsNum = head.Count;
             string[] headPayment = ["收款门店", "支付方式", "收款单号", "收款日期", "收款时间"];
             string[] headRefund = ["退款单号", "退款金额", "退款日期", "退款时间"];
@@ -78,7 +78,7 @@ namespace SnowmeetApi.Controllers
             ICellStyle styleNumber = workbook.CreateCellStyle();
             styleNumber.DataFormat = format.GetFormat("0");
             ICellStyle styleMoney = workbook.CreateCellStyle();
-            styleMoney.DataFormat = format.GetFormat("¥#,##0");
+            styleMoney.DataFormat = format.GetFormat("¥#,##0.00");
             for (int i = 0; i < head.Count; i++)
             {
                 ICell headCell = headRow.CreateCell(i);
@@ -130,6 +130,7 @@ namespace SnowmeetApi.Controllers
                         case 0:
                             cell.SetCellValue((i + 1).ToString());
                             cell.CellStyle = styleNumber;
+                            //cell.SetCellType(CellType.Numeric);
                             break;
                         case 1:
                             cell.SetCellValue(r.mi7OrderId);
@@ -199,18 +200,33 @@ namespace SnowmeetApi.Controllers
                             }
                             if (unitPrice == 0)
                             {
-                                unitPriceStr = "¥0.00";
+                                unitPriceStr = "0.00";
                             }
                             else
                             {
                                 unitPrice = Math.Round(unitPrice * 100, 0);
                                 unitPriceStr = unitPrice.ToString();
-                                unitPriceStr = "¥" + unitPriceStr.Substring(0, unitPriceStr.Length - 2)
+                                unitPriceStr = unitPriceStr.Substring(0, unitPriceStr.Length - 2)
                                     + "." + unitPriceStr.Substring(unitPriceStr.Length - 2, 2);
                             }
                             cell.SetCellValue(unitPriceStr);
-                            
                             cell.CellStyle = styleMoney;
+                            cell.SetCellType(CellType.Numeric);
+                            break;
+                        case 13:
+                            int count = 0;
+                            try
+                            {
+                                count = r.details.Count == 0 ? 0 : int.Parse(r.details[0].数量);
+
+                            }
+                            catch
+                            {
+                                cell.SetCellValue(0);
+                            }
+                            cell.SetCellValue(count);
+                            cell.CellStyle = styleNumber;
+                            cell.SetCellType(CellType.Numeric);
                             break;
                         default:
                             break;
@@ -265,18 +281,34 @@ namespace SnowmeetApi.Controllers
                                 }
                                 if (unitPrice == 0)
                                 {
-                                    unitPriceStr = "¥0.00";
+                                    unitPriceStr = "0.00";
                                 }
                                 else
                                 {
                                     unitPrice = Math.Round(unitPrice * 100, 0);
                                     unitPriceStr = unitPrice.ToString();
-                                    unitPriceStr = "¥" + unitPriceStr.Substring(0, unitPriceStr.Length - 2)
+                                    unitPriceStr = unitPriceStr.Substring(0, unitPriceStr.Length - 2)
                                         + "." + unitPriceStr.Substring(unitPriceStr.Length - 2, 2);
                                 }
                                 cell.SetCellValue(unitPriceStr);
                                 cell.CellStyle = styleMoney;
-                                
+                                //cell.SetCellFormula();
+                                cell.SetCellType(CellType.Numeric);
+                                break;
+                            case 13:
+                                int count = 0;
+                                try
+                                {
+                                    count = r.details.Count == 0 ? 0 : int.Parse(r.details[0].数量);
+
+                                }
+                                catch
+                                {
+                                    cell.SetCellValue(0);
+                                }
+                                cell.SetCellValue(count);
+                                cell.CellStyle = styleNumber;
+                                cell.SetCellType(CellType.Numeric);
                                 break;
                             default:
                                 break;
@@ -286,7 +318,8 @@ namespace SnowmeetApi.Controllers
 
 
             }
-            using (var file = System.IO.File.Create("mi7.xlsx"))
+            string filePath = $"{Environment.CurrentDirectory}" + "/mi7.xlsx";
+            using (var file = System.IO.File.Create(filePath))
             {
                 workbook.Write(file);
             }
