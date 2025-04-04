@@ -40,7 +40,7 @@ namespace SnowmeetApi.Controllers
             }
             List<string> head = [
                 "序号", "七色米订单号", "地区" ,"出货店铺", "业务类型", "业务日期", "业务时间", "开单日期", "开单时间",
-                "商品类别", "商品编号", "商品名称", "零售单价", "数量", "成交总价", "支付笔数", "支付金额", "退款笔数", "退款金额", "支付方式", "商品类别"];
+                "商品类别", "商品编号", "商品名称", "零售单价", "折扣", "折后单价","数量", "总额", "支付笔数", "支付金额", "退款笔数", "退款金额"];
             int commonFieldsNum = head.Count;
             string[] headPayment = ["收款门店", "支付方式", "收款单号", "收款日期", "收款时间"];
             string[] headRefund = ["退款单号", "退款金额", "退款日期", "退款时间"];
@@ -78,7 +78,19 @@ namespace SnowmeetApi.Controllers
             ICellStyle styleNumber = workbook.CreateCellStyle();
             styleNumber.DataFormat = format.GetFormat("0");
             ICellStyle styleMoney = workbook.CreateCellStyle();
-            styleMoney.DataFormat = format.GetFormat("¥#,##0.00");
+            //styleMoney.DataFormat = format.GetFormat("¥#,##0");
+            styleMoney.DataFormat = 59;
+            ICellStyle styleMoneyRed = workbook.CreateCellStyle();
+            //styleMoney.DataFormat = format.GetFormat("¥#,##0");
+            styleMoneyRed.DataFormat = 59;
+            IFont fontRed = workbook.CreateFont();
+            fontRed.Color = NPOI.HSSF.Util.HSSFColor.Red.Index;
+            styleMoneyRed.SetFont(fontRed);
+            ICellStyle stylePercent = workbook.CreateCellStyle();
+            stylePercent.DataFormat = format.GetFormat("0.00%");
+            ICellStyle styleTextRed = workbook.CreateCellStyle();
+            styleTextRed.SetFont(fontRed);
+
             for (int i = 0; i < head.Count; i++)
             {
                 ICell headCell = headRow.CreateCell(i);
@@ -122,7 +134,55 @@ namespace SnowmeetApi.Controllers
                         orderDate = r.orders[0].create_date;
                     }
                 }
-                for (int j = 0; j < commonFieldsNum; j++)
+                string unitPriceStr = (r.details.Count == 0) ? "0" : r.details[0].单价;
+                double unitPrice = 0;
+                try
+                {
+                    unitPrice = double.Parse(unitPriceStr);
+                }
+                catch
+                {
+
+                }
+                double discount = 100;
+                try
+                {
+                    discount = double.Parse(r.details[0].折扣);
+                }
+                catch
+                {
+
+                }
+                int count = 0;
+                try
+                {
+                    count = r.details.Count == 0 ? 0 : int.Parse(r.details[0].数量);
+
+                }
+                catch
+                {
+                    //cell.SetCellValue(0);
+                }
+                double unitPriceAfterDiscount = 0;
+                try
+                {
+                    unitPriceAfterDiscount = double.Parse(r.details[0].折后单价);
+                }
+                catch
+                {
+
+                }
+                double summaryPrice = 0;
+                try
+                {
+                    summaryPrice = double.Parse(r.details[0].总额);
+                }
+                catch
+                {
+
+                }
+
+                for (int j = 0; j < commonFieldsNum + headPayment.Length * maxPaymentNum + headRefund.Length * maxRefundNum; j++)
                 {
                     ICell cell = dr.CreateCell(j);
                     switch (j)
@@ -188,45 +248,111 @@ namespace SnowmeetApi.Controllers
                             cell.SetCellValue(r.details.Count == 0 ? nullStr : r.details[0].商品名称);
                             break;
                         case 12:
-                            string unitPriceStr = (r.details.Count == 0) ? "0" : r.details[0].单价;
-                            double unitPrice = 0;
-                            try
-                            {
-                                unitPrice = double.Parse(unitPriceStr);
-                            }
-                            catch
-                            {
-
-                            }
-                            if (unitPrice == 0)
-                            {
-                                unitPriceStr = "0.00";
-                            }
-                            else
-                            {
-                                unitPrice = Math.Round(unitPrice * 100, 0);
-                                unitPriceStr = unitPrice.ToString();
-                                unitPriceStr = unitPriceStr.Substring(0, unitPriceStr.Length - 2)
-                                    + "." + unitPriceStr.Substring(unitPriceStr.Length - 2, 2);
-                            }
-                            cell.SetCellValue(unitPriceStr);
+                            cell.SetCellValue(unitPrice);
                             cell.CellStyle = styleMoney;
-                            cell.SetCellType(CellType.Numeric);
                             break;
-                        case 13:
-                            int count = 0;
-                            try
-                            {
-                                count = r.details.Count == 0 ? 0 : int.Parse(r.details[0].数量);
-
-                            }
-                            catch
-                            {
-                                cell.SetCellValue(0);
-                            }
+                        case 15:
                             cell.SetCellValue(count);
                             cell.CellStyle = styleNumber;
                             cell.SetCellType(CellType.Numeric);
+                            break;
+                        case 13:
+
+                            cell.SetCellValue(discount / 100);
+                            cell.CellStyle = stylePercent;
+                            break;
+                        case 14:
+                            cell.SetCellValue(unitPriceAfterDiscount);
+                            if (Math.Round(unitPriceAfterDiscount, 0) == Math.Round(unitPrice * discount / 100, 0))
+                            {
+                                cell.CellStyle = styleMoney;
+                            }
+                            else
+                            {
+                                cell.CellStyle = styleMoneyRed;
+                            }
+                            break;
+                        case 16:
+                            cell.SetCellValue(summaryPrice);
+                            if (Math.Round(summaryPrice, 0) == Math.Round(unitPriceAfterDiscount * count, 0))
+                            {
+                                cell.CellStyle = styleMoney;
+                            }
+                            else
+                            {
+                                cell.CellStyle = styleMoneyRed;
+                            }
+                            break;
+                        case 17:
+                            cell.SetCellValue(r.payments.Count);
+                            cell.CellStyle = styleNumber;
+                            break;
+                        case 18:
+                            double totalPaidAmount = 0;
+                            for(int k = 0; k < r.details.Count; k++)
+                            {
+                                try
+                                {
+                                    totalPaidAmount += double.Parse(r.details[k].总额);
+                                }
+                                catch
+                                {
+
+                                }
+                            }
+                            cell.SetCellValue(r.paidAmount);
+                            if (Math.Round(totalPaidAmount, 0) == Math.Round(r.paidAmount, 0))
+                            {
+                                cell.CellStyle = styleMoney;
+                            }
+                            else
+                            {
+                                cell.CellStyle = styleMoneyRed;
+                            }
+                            break;
+                        case 19:
+                            cell.SetCellValue(r.refunds.Count);
+                            cell.CellStyle = styleNumber;
+                            break;
+                        case 20:
+                            cell.SetCellValue(r.refundAmount);
+                            if (r.refundAmount != 0 && r.refundAmount != r.paidAmount)
+                            {
+                                cell.CellStyle = styleMoneyRed;
+                            }
+                            else
+                            {
+                                cell.CellStyle = styleMoney;
+                            }
+                            break;
+                        case 21:
+                            if (r.payments.Count > 0)
+                            {
+                                string chargeShop = "未知";
+                                switch(r.payments[0].mch_id)
+                                {
+                                    case 6:
+                                        chargeShop = "南山店";
+                                        break;
+                                    case 9:
+                                        chargeShop = "旗舰店";
+                                        break;
+                                    case 12:
+                                        chargeShop = "万龙店";
+                                        break;
+                                    default:
+                                        break;
+                                }
+                                cell.SetCellValue(chargeShop);
+                                if (!mi7Shop.Replace("【", "").Replace("】", "").Trim().Equals(chargeShop))
+                                {
+                                    cell.CellStyle = styleTextRed;
+                                }
+                            }
+                            else
+                            {
+                                cell.SetCellValue(nullStr);
+                            }
                             break;
                         default:
                             break;
@@ -238,6 +364,54 @@ namespace SnowmeetApi.Controllers
                 {
                     fixDetailCount++;
                     IRow drDetail = sheet.CreateRow(i + 1 + fixDetailCount);
+
+                    unitPriceStr = (r.details.Count == 0) ? "0" : r.details[k].单价;
+                    unitPrice = 0;
+                    try
+                    {
+                        unitPrice = double.Parse(unitPriceStr);
+                    }
+                    catch
+                    {
+
+                    }
+                    discount = 100;
+                    try
+                    {
+                        discount = double.Parse(r.details[k].折扣);
+                    }
+                    catch
+                    {
+
+                    }
+                    count = 0;
+                    try
+                    {
+                        count = r.details.Count == 0 ? 0 : int.Parse(r.details[k].数量);
+
+                    }
+                    catch
+                    {
+                        //cell.SetCellValue(0);
+                    }
+                    unitPriceAfterDiscount = 0;
+                    try
+                    {
+                        unitPriceAfterDiscount = double.Parse(r.details[k].折后单价);
+                    }
+                    catch
+                    {
+
+                    }
+                    summaryPrice = 0;
+                    try
+                    {
+                        summaryPrice = double.Parse(r.details[k].总额);
+                    }
+                    catch
+                    {
+
+                    }
                     for (int j = 0; j < commonFieldsNum; j++)
                     {
                         ICell cell = drDetail.CreateCell(j);
@@ -252,13 +426,17 @@ namespace SnowmeetApi.Controllers
                             case 6:
                             case 7:
                             case 8:
+                            case 17:
+                            case 18:
+                            case 19:
+                            case 20:
+                            case 21:
                                 if (k == rl[i].details.Count - 1)
                                 {
                                     sheet.AddMergedRegion(new NPOI.SS.Util.CellRangeAddress(
                                         mergeBaseIndex, i + 1 + fixDetailCount, j, j));
                                 }
                                 break;
-
                             case 9:
                                 cell.SetCellValue(r.details.Count == 0 ? nullStr : r.details[k].商品分类);
                                 break;
@@ -269,46 +447,41 @@ namespace SnowmeetApi.Controllers
                                 cell.SetCellValue(r.details.Count == 0 ? nullStr : r.details[k].商品名称);
                                 break;
                             case 12:
-                                string unitPriceStr = (r.details.Count == 0) ? "0" : r.details[k].单价;
-                                double unitPrice = 0;
-                                try
-                                {
-                                    unitPrice = double.Parse(unitPriceStr);
-                                }
-                                catch
-                                {
-
-                                }
-                                if (unitPrice == 0)
-                                {
-                                    unitPriceStr = "0.00";
-                                }
-                                else
-                                {
-                                    unitPrice = Math.Round(unitPrice * 100, 0);
-                                    unitPriceStr = unitPrice.ToString();
-                                    unitPriceStr = unitPriceStr.Substring(0, unitPriceStr.Length - 2)
-                                        + "." + unitPriceStr.Substring(unitPriceStr.Length - 2, 2);
-                                }
-                                cell.SetCellValue(unitPriceStr);
+                                cell.SetCellValue(unitPrice);
                                 cell.CellStyle = styleMoney;
-                                //cell.SetCellFormula();
-                                cell.SetCellType(CellType.Numeric);
                                 break;
-                            case 13:
-                                int count = 0;
-                                try
-                                {
-                                    count = r.details.Count == 0 ? 0 : int.Parse(r.details[0].数量);
-
-                                }
-                                catch
-                                {
-                                    cell.SetCellValue(0);
-                                }
+                            case 15:
                                 cell.SetCellValue(count);
                                 cell.CellStyle = styleNumber;
                                 cell.SetCellType(CellType.Numeric);
+                                break;
+                            case 13:
+                                cell.SetCellValue(discount / 100);
+                                cell.CellStyle = stylePercent;
+                                break;
+                            case 14:
+
+
+                                cell.SetCellValue(unitPriceAfterDiscount);
+                                if (Math.Round(unitPriceAfterDiscount, 0) == Math.Round(unitPrice * discount / 100, 0))
+                                {
+                                    cell.CellStyle = styleMoney;
+                                }
+                                else
+                                {
+                                    cell.CellStyle = styleMoneyRed;
+                                }
+                                break;
+                            case 16:
+                                cell.SetCellValue(summaryPrice);
+                                if (Math.Round(summaryPrice, 0) == Math.Round(unitPriceAfterDiscount * count, 0))
+                                {
+                                    cell.CellStyle = styleMoney;
+                                }
+                                else
+                                {
+                                    cell.CellStyle = styleMoneyRed;
+                                }
                                 break;
                             default:
                                 break;
