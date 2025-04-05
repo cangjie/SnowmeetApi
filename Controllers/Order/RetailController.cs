@@ -61,48 +61,85 @@ namespace SnowmeetApi.Controllers
             string nullStr = "【-】";
             XSSFWorkbook workbook = new XSSFWorkbook();
             ISheet sheet = workbook.CreateSheet("Sheet1");
+            
             IRow headRow = sheet.CreateRow(0);
+            headRow.Height = 500;
+            
             IFont headFont = workbook.CreateFont();
             headFont.Color = NPOI.HSSF.Util.HSSFColor.White.Index;
             headFont.IsBold = true;
+
             ICellStyle headStyle = workbook.CreateCellStyle();
             headStyle.Alignment = HorizontalAlignment.Center;
             headStyle.FillForegroundColor = NPOI.HSSF.Util.HSSFColor.Black.Index;
             headStyle.FillPattern = FillPattern.SolidForeground;
             headStyle.SetFont(headFont);
+            headStyle.VerticalAlignment = VerticalAlignment.Center;
+
             IDataFormat format = workbook.CreateDataFormat();
             ICellStyle styleDate = workbook.CreateCellStyle();
             styleDate.DataFormat = format.GetFormat("yyyy-MM-dd");
+            styleDate.VerticalAlignment = VerticalAlignment.Center;
+
             ICellStyle styleTime = workbook.CreateCellStyle();
             styleTime.DataFormat = format.GetFormat("HH:mm:ss");
+            styleTime.VerticalAlignment = VerticalAlignment.Center;
+
             ICellStyle styleNumber = workbook.CreateCellStyle();
             styleNumber.DataFormat = format.GetFormat("0");
+            styleNumber.VerticalAlignment = VerticalAlignment.Center;
+
             ICellStyle styleMoney = workbook.CreateCellStyle();
             //styleMoney.DataFormat = format.GetFormat("¥#,##0");
             styleMoney.DataFormat = 59;
+            styleMoney.VerticalAlignment = VerticalAlignment.Center;
+
             ICellStyle styleMoneyRed = workbook.CreateCellStyle();
             //styleMoney.DataFormat = format.GetFormat("¥#,##0");
             styleMoneyRed.DataFormat = 59;
+            styleMoneyRed.VerticalAlignment = VerticalAlignment.Center;
+
             IFont fontRed = workbook.CreateFont();
             fontRed.Color = NPOI.HSSF.Util.HSSFColor.Red.Index;
             styleMoneyRed.SetFont(fontRed);
             ICellStyle stylePercent = workbook.CreateCellStyle();
             stylePercent.DataFormat = format.GetFormat("0.00%");
+            stylePercent.VerticalAlignment = VerticalAlignment.Center;
+
             ICellStyle styleTextRed = workbook.CreateCellStyle();
             styleTextRed.SetFont(fontRed);
+            styleTextRed.VerticalAlignment = VerticalAlignment.Center;
 
+            ICellStyle textCenterStyle = workbook.CreateCellStyle();
+            textCenterStyle.Alignment = HorizontalAlignment.Center;
+            textCenterStyle.VerticalAlignment = VerticalAlignment.Center;
+            //textCenterStyle.VerticalAlignment = VerticalAlignment.Center;
             for (int i = 0; i < head.Count; i++)
             {
                 ICell headCell = headRow.CreateCell(i);
                 headCell.SetCellValue(head[i].Trim());
                 headCell.SetCellType(CellType.String);
                 headCell.CellStyle = headStyle;
+                
+                switch(i)
+                {
+                    case 0:
+                        sheet.SetColumnWidth(i, 1500);
+                        break;
+                    case 1:
+                        sheet.SetColumnWidth(i, 5000);
+                        break;
+                    default:
+                        break;
+                }
+                
             }
             int fixDetailCount = 0;
             for (int i = 0; i < rl.Count; i++)
             {
                 Retail r = rl[i];
                 IRow dr = sheet.CreateRow(i + 1 + fixDetailCount);
+                dr.Height = 500;
                 int mergeBaseIndex = i + 1 + fixDetailCount;
                 string mi7Shop = nullStr;
                 string region = nullStr;
@@ -188,25 +225,29 @@ namespace SnowmeetApi.Controllers
                     switch (j)
                     {
                         case 0:
-                            cell.SetCellValue((i + 1).ToString());
+                            cell.SetCellValue(i + 1);
                             cell.CellStyle = styleNumber;
                             //cell.SetCellType(CellType.Numeric);
                             break;
                         case 1:
                             cell.SetCellValue(r.mi7OrderId);
                             cell.SetCellType(CellType.String);
+                            cell.CellStyle = textCenterStyle;
                             break;
                         case 2:
                             cell.SetCellValue(region.Replace("【", "").Replace("】", "").Trim());
                             cell.SetCellType(CellType.String);
+                            cell.CellStyle = textCenterStyle;
                             break;
                         case 3:
                             cell.SetCellValue(mi7Shop.Replace("【", "").Replace("】", "").Trim());
                             cell.SetCellType(CellType.String);
+                            cell.CellStyle = textCenterStyle;
                             break;
                         case 4:
                             cell.SetCellValue(type.Trim());
                             cell.SetCellType(CellType.String);
+                            cell.CellStyle = textCenterStyle;
                             break;
                         case 5:
                             try
@@ -408,13 +449,48 @@ namespace SnowmeetApi.Controllers
                         idxBase++;
                     }
                 }
+                for (int j = 0; j < maxRefundNum; j++)
+                {
+                    for (int k = 0; k < headRefund.Length; k++)
+                    {
+                        ICell cell = dr.CreateCell(commonFieldsNum + idxBase);
+                        if (r.refunds.Count <= j)
+                        {
+                            cell.SetCellValue(nullStr);
+                        }
+                        else
+                        {
+                            switch(k)
+                            {
+                                case 0:
+                                    cell.SetCellValue(r.refunds[j].refund_id);
+                                    break;
+                                case 1:
+                                    cell.SetCellValue(r.refunds[j].amount);
+                                    cell.CellStyle = styleMoney;
+                                    break;
+                                case 2:
+                                    cell.SetCellValue(r.refunds[j].create_date.Date);
+                                    cell.CellStyle = styleDate;
+                                    break;
+                                case 3:
+                                    cell.SetCellValue(r.refunds[j].create_date.ToShortTimeString());
+                                    cell.CellStyle = styleTime;
+                                    break;
+                                default:
+                                    break;
+                            }
+                        }
+                        idxBase++;
+                    }
+                }
 
                 //fixDetailCount++;
                 for (int k = 1; k < rl[i].details.Count; k++)
                 {
                     fixDetailCount++;
                     IRow drDetail = sheet.CreateRow(i + 1 + fixDetailCount);
-
+                    drDetail.Height = 500;
                     unitPriceStr = (r.details.Count == 0) ? "0" : r.details[k].单价;
                     unitPrice = 0;
                     try
@@ -541,6 +617,20 @@ namespace SnowmeetApi.Controllers
                     for (int j = 0; j < maxPaymentNum; j++)
                     {
                         for (int l = 0; l < headPayment.Length; l++)
+                        {
+                            ICell cell = drDetail.CreateCell(commonFieldsNum + idx);
+                            if (k == rl[i].details.Count - 1)
+                            {
+                                sheet.AddMergedRegion(new NPOI.SS.Util.CellRangeAddress(
+                                    mergeBaseIndex, i + 1 + fixDetailCount,
+                                    commonFieldsNum + idx, commonFieldsNum + idx));
+                            }
+                            idx++;
+                        }
+                    }
+                    for (int j = 0; j < maxRefundNum; j++)
+                    {
+                        for (int l = 0; l < headRefund.Length; l++)
                         {
                             ICell cell = drDetail.CreateCell(commonFieldsNum + idx);
                             if (k == rl[i].details.Count - 1)
