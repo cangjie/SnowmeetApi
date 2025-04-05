@@ -61,10 +61,10 @@ namespace SnowmeetApi.Controllers
             string nullStr = "【-】";
             XSSFWorkbook workbook = new XSSFWorkbook();
             ISheet sheet = workbook.CreateSheet("Sheet1");
-            
+
             IRow headRow = sheet.CreateRow(0);
             headRow.Height = 500;
-            
+
             IFont headFont = workbook.CreateFont();
             headFont.Color = NPOI.HSSF.Util.HSSFColor.White.Index;
             headFont.IsBold = true;
@@ -125,44 +125,48 @@ namespace SnowmeetApi.Controllers
                 headCell.CellStyle = headStyle;
                 if (i < commonFieldsNum)
                 {
-                switch(i)
-                {
-                    case 0:
-                        sheet.SetColumnWidth(i, 1500);
-                        break;
-                    case 1:
-                        sheet.SetColumnWidth(i, 5000);
-                        break;
-                    case 5:
-                        sheet.SetColumnWidth(i, 3000);
-                        break;
-                    case 6:
-                        sheet.SetColumnWidth(i, 3000);
-                        break;
-                    case 7:
-                        sheet.SetColumnWidth(i, 3000);
-                        break;
-                    case 8:
-                        sheet.SetColumnWidth(i, 3000);
-                        break;
-                    case 9:
-                        sheet.SetColumnWidth(i, 4000);
-                        break;
-                    case 10:
-                        sheet.SetColumnWidth(i, 5000);
-                        break;
-                    case 11:
-                        sheet.SetColumnWidth(i, 9000);
-                        break;
-                    default:
-                        break;
-                }
-                }
-                else
-                {
-                    int paymentIndex = (i - commonFieldsNum) % headPayment.Length;
-                    switch(paymentIndex)
+                    switch (i)
                     {
+                        case 0:
+                            sheet.SetColumnWidth(i, 1500);
+                            break;
+                        case 1:
+                            sheet.SetColumnWidth(i, 5000);
+                            break;
+                        case 5:
+                            sheet.SetColumnWidth(i, 3000);
+                            break;
+                        case 6:
+                            sheet.SetColumnWidth(i, 3000);
+                            break;
+                        case 7:
+                            sheet.SetColumnWidth(i, 3000);
+                            break;
+                        case 8:
+                            sheet.SetColumnWidth(i, 3000);
+                            break;
+                        case 9:
+                            sheet.SetColumnWidth(i, 4000);
+                            break;
+                        case 10:
+                            sheet.SetColumnWidth(i, 5000);
+                            break;
+                        case 11:
+                            sheet.SetColumnWidth(i, 9000);
+                            break;
+                        default:
+                            break;
+                    }
+                }
+                else if (i < commonFieldsNum + maxPaymentNum * headPayment.Length)
+                {
+                    
+                    int paymentIndex = (i - commonFieldsNum) % headPayment.Length;
+                    switch (paymentIndex)
+                    {
+                        case 0:
+                            sheet.SetColumnWidth(i, 3000);
+                            break;
                         case 2:
                             sheet.SetColumnWidth(i, 5500);
                             break;
@@ -170,12 +174,15 @@ namespace SnowmeetApi.Controllers
                         case 5:
                             sheet.SetColumnWidth(i, 3000);
                             break;
-                        
+
                         default:
                             break;
                     }
-                    int refundIndex = (i - commonFieldsNum - headPayment.Length * maxPaymentNum ) % headRefund.Length;
-                    switch(refundIndex)
+                }
+                else
+                {
+                    int refundIndex = (i - commonFieldsNum - headPayment.Length * maxPaymentNum) % headRefund.Length;
+                    switch (refundIndex)
                     {
                         case 0:
                             sheet.SetColumnWidth(i, 5500);
@@ -188,7 +195,7 @@ namespace SnowmeetApi.Controllers
                             break;
                     }
                 }
-                
+
             }
             int fixDetailCount = 0;
             for (int i = 0; i < rl.Count; i++)
@@ -524,7 +531,7 @@ namespace SnowmeetApi.Controllers
                         }
                         else
                         {
-                            switch(k)
+                            switch (k)
                             {
                                 case 0:
                                     cell.SetCellValue(r.refunds[j].refund_id);
