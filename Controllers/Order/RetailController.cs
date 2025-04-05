@@ -80,10 +80,12 @@ namespace SnowmeetApi.Controllers
             ICellStyle styleDate = workbook.CreateCellStyle();
             styleDate.DataFormat = format.GetFormat("yyyy-MM-dd");
             styleDate.VerticalAlignment = VerticalAlignment.Center;
+            styleDate.Alignment = HorizontalAlignment.Center;
 
             ICellStyle styleTime = workbook.CreateCellStyle();
             styleTime.DataFormat = format.GetFormat("HH:mm:ss");
             styleTime.VerticalAlignment = VerticalAlignment.Center;
+            styleTime.Alignment = HorizontalAlignment.Center;
 
             ICellStyle styleNumber = workbook.CreateCellStyle();
             styleNumber.DataFormat = format.GetFormat("0");
@@ -109,6 +111,7 @@ namespace SnowmeetApi.Controllers
             ICellStyle styleTextRed = workbook.CreateCellStyle();
             styleTextRed.SetFont(fontRed);
             styleTextRed.VerticalAlignment = VerticalAlignment.Center;
+            styleTextRed.Alignment = HorizontalAlignment.Center;
 
             ICellStyle textCenterStyle = workbook.CreateCellStyle();
             textCenterStyle.Alignment = HorizontalAlignment.Center;
@@ -120,7 +123,8 @@ namespace SnowmeetApi.Controllers
                 headCell.SetCellValue(head[i].Trim());
                 headCell.SetCellType(CellType.String);
                 headCell.CellStyle = headStyle;
-                
+                if (i < commonFieldsNum)
+                {
                 switch(i)
                 {
                     case 0:
@@ -129,8 +133,60 @@ namespace SnowmeetApi.Controllers
                     case 1:
                         sheet.SetColumnWidth(i, 5000);
                         break;
+                    case 5:
+                        sheet.SetColumnWidth(i, 3000);
+                        break;
+                    case 6:
+                        sheet.SetColumnWidth(i, 3000);
+                        break;
+                    case 7:
+                        sheet.SetColumnWidth(i, 3000);
+                        break;
+                    case 8:
+                        sheet.SetColumnWidth(i, 3000);
+                        break;
+                    case 9:
+                        sheet.SetColumnWidth(i, 4000);
+                        break;
+                    case 10:
+                        sheet.SetColumnWidth(i, 5000);
+                        break;
+                    case 11:
+                        sheet.SetColumnWidth(i, 9000);
+                        break;
                     default:
                         break;
+                }
+                }
+                else
+                {
+                    int paymentIndex = (i - commonFieldsNum) % headPayment.Length;
+                    switch(paymentIndex)
+                    {
+                        case 2:
+                            sheet.SetColumnWidth(i, 5500);
+                            break;
+                        case 4:
+                        case 5:
+                            sheet.SetColumnWidth(i, 3000);
+                            break;
+                        
+                        default:
+                            break;
+                    }
+                    int refundIndex = (i - commonFieldsNum - headPayment.Length * maxPaymentNum ) % headRefund.Length;
+                    switch(refundIndex)
+                    {
+                        case 0:
+                            sheet.SetColumnWidth(i, 5500);
+                            break;
+                        case 2:
+                        case 3:
+                            sheet.SetColumnWidth(i, 3000);
+                            break;
+                        default:
+                            break;
+                    }
                 }
                 
             }
@@ -386,6 +442,7 @@ namespace SnowmeetApi.Controllers
                         if (r.payments.Count <= j)
                         {
                             cell.SetCellValue(nullStr);
+                            cell.CellStyle = textCenterStyle;
                         }
                         else
                         {
@@ -416,9 +473,14 @@ namespace SnowmeetApi.Controllers
                                     {
                                         cell.CellStyle = styleTextRed;
                                     }
+                                    else
+                                    {
+                                        cell.CellStyle = textCenterStyle;
+                                    }
                                     break;
                                 case 1:
                                     cell.SetCellValue(r.payments[j].pay_method.Trim());
+                                    cell.CellStyle = textCenterStyle;
                                     break;
                                 case 2:
                                     if (r.payments[j].pay_method.Trim().Equals("微信支付"))
@@ -429,6 +491,7 @@ namespace SnowmeetApi.Controllers
                                     {
                                         cell.SetCellValue(nullStr);
                                     }
+                                    cell.CellStyle = textCenterStyle;
                                     break;
                                 case 3:
                                     cell.SetCellValue(r.payments[j].amount);
@@ -457,6 +520,7 @@ namespace SnowmeetApi.Controllers
                         if (r.refunds.Count <= j)
                         {
                             cell.SetCellValue(nullStr);
+                            cell.CellStyle = textCenterStyle;
                         }
                         else
                         {
@@ -464,6 +528,7 @@ namespace SnowmeetApi.Controllers
                             {
                                 case 0:
                                     cell.SetCellValue(r.refunds[j].refund_id);
+                                    cell.CellStyle = textCenterStyle;
                                     break;
                                 case 1:
                                     cell.SetCellValue(r.refunds[j].amount);
