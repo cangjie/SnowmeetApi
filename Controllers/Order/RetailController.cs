@@ -42,7 +42,7 @@ namespace SnowmeetApi.Controllers
                 "序号", "七色米订单号", "地区" ,"出货店铺", "业务类型", "业务日期", "业务时间", "开单日期", "开单时间",
                 "商品类别", "商品编号", "商品名称", "零售单价", "折扣", "折后单价","数量", "总额", "支付笔数", "支付金额", "退款笔数", "退款金额"];
             int commonFieldsNum = head.Count;
-            string[] headPayment = ["收款门店", "支付方式", "收款单号", "收款日期", "收款时间"];
+            string[] headPayment = ["收款门店", "支付方式", "收款单号", "收款金额", "收款日期", "收款时间"];
             string[] headRefund = ["退款单号", "退款金额", "退款日期", "退款时间"];
             for (int i = 0; i < maxPaymentNum; i++)
             {
@@ -72,7 +72,7 @@ namespace SnowmeetApi.Controllers
             headStyle.SetFont(headFont);
             IDataFormat format = workbook.CreateDataFormat();
             ICellStyle styleDate = workbook.CreateCellStyle();
-            styleDate.DataFormat = format.GetFormat("YYYY-MM-DD");
+            styleDate.DataFormat = format.GetFormat("yyyy-MM-dd");
             ICellStyle styleTime = workbook.CreateCellStyle();
             styleTime.DataFormat = format.GetFormat("HH:mm:ss");
             ICellStyle styleNumber = workbook.CreateCellStyle();
@@ -182,7 +182,7 @@ namespace SnowmeetApi.Controllers
 
                 }
 
-                for (int j = 0; j < commonFieldsNum + headPayment.Length * maxPaymentNum + headRefund.Length * maxRefundNum; j++)
+                for (int j = 0; j < commonFieldsNum; j++)
                 {
                     ICell cell = dr.CreateCell(j);
                     switch (j)
@@ -209,8 +209,15 @@ namespace SnowmeetApi.Controllers
                             cell.SetCellType(CellType.String);
                             break;
                         case 5:
-                            cell.SetCellValue(date);
-                            cell.CellStyle = styleDate;
+                            try
+                            {
+                                cell.SetCellValue(DateTime.Parse(date).Date);
+                                cell.CellStyle = styleDate;
+                            }
+                            catch
+                            {
+                                cell.SetCellValue(nullStr);
+                            }
                             break;
                         case 6:
                             cell.SetCellValue(time);
@@ -289,7 +296,7 @@ namespace SnowmeetApi.Controllers
                             break;
                         case 18:
                             double totalPaidAmount = 0;
-                            for(int k = 0; k < r.details.Count; k++)
+                            for (int k = 0; k < r.details.Count; k++)
                             {
                                 try
                                 {
@@ -325,37 +332,80 @@ namespace SnowmeetApi.Controllers
                                 cell.CellStyle = styleMoney;
                             }
                             break;
-                        case 21:
-                            if (r.payments.Count > 0)
-                            {
-                                string chargeShop = "未知";
-                                switch(r.payments[0].mch_id)
-                                {
-                                    case 6:
-                                        chargeShop = "南山店";
-                                        break;
-                                    case 9:
-                                        chargeShop = "旗舰店";
-                                        break;
-                                    case 12:
-                                        chargeShop = "万龙店";
-                                        break;
-                                    default:
-                                        break;
-                                }
-                                cell.SetCellValue(chargeShop);
-                                if (!mi7Shop.Replace("【", "").Replace("】", "").Trim().Equals(chargeShop))
-                                {
-                                    cell.CellStyle = styleTextRed;
-                                }
-                            }
-                            else
-                            {
-                                cell.SetCellValue(nullStr);
-                            }
-                            break;
                         default:
                             break;
+                    }
+                }
+                int idxBase = 0;
+                for (int j = 0; j < maxPaymentNum; j++)
+                {
+                    for (int k = 0; k < headPayment.Length; k++)
+                    {
+                        ICell cell = dr.CreateCell(commonFieldsNum + idxBase);
+                        if (r.payments.Count <= j)
+                        {
+                            cell.SetCellValue(nullStr);
+                        }
+                        else
+                        {
+                            switch (k)
+                            {
+                                case 0:
+                                    string chargeShop = "未知";
+                                    switch (r.payments[j].mch_id)
+                                    {
+                                        case 6:
+                                            chargeShop = "南山店";
+                                            break;
+                                        case 9:
+                                            chargeShop = "旗舰店";
+                                            break;
+                                        case 12:
+                                            chargeShop = "万龙店";
+                                            break;
+                                        default:
+                                            if (r.payments[j].mch_id == null)
+                                            {
+                                                chargeShop = nullStr;
+                                            }
+                                            break;
+                                    }
+                                    cell.SetCellValue(chargeShop);
+                                    if (!mi7Shop.Replace("【", "").Replace("】", "").Trim().Equals(chargeShop) && !chargeShop.Equals(nullStr))
+                                    {
+                                        cell.CellStyle = styleTextRed;
+                                    }
+                                    break;
+                                case 1:
+                                    cell.SetCellValue(r.payments[j].pay_method.Trim());
+                                    break;
+                                case 2:
+                                    if (r.payments[j].pay_method.Trim().Equals("微信支付"))
+                                    {
+                                        cell.SetCellValue(r.payments[j].out_trade_no);
+                                    }
+                                    else
+                                    {
+                                        cell.SetCellValue(nullStr);
+                                    }
+                                    break;
+                                case 3:
+                                    cell.SetCellValue(r.payments[j].amount);
+                                    cell.CellStyle = styleMoney;
+                                    break;
+                                case 4:
+                                    cell.SetCellValue(r.payments[j].create_date.Date);
+                                    cell.CellStyle = styleDate;
+                                    break;
+                                case 5:
+                                    cell.SetCellValue(r.payments[j].create_date.ToShortTimeString());
+                                    cell.CellStyle = styleDate;
+                                    break;
+                                default:
+                                    break;
+                            }
+                        }
+                        idxBase++;
                     }
                 }
 
@@ -485,6 +535,21 @@ namespace SnowmeetApi.Controllers
                                 break;
                             default:
                                 break;
+                        }
+                    }
+                    int idx = 0;
+                    for (int j = 0; j < maxPaymentNum; j++)
+                    {
+                        for (int l = 0; l < headPayment.Length; l++)
+                        {
+                            ICell cell = drDetail.CreateCell(commonFieldsNum + idx);
+                            if (k == rl[i].details.Count - 1)
+                            {
+                                sheet.AddMergedRegion(new NPOI.SS.Util.CellRangeAddress(
+                                    mergeBaseIndex, i + 1 + fixDetailCount,
+                                    commonFieldsNum + idx, commonFieldsNum + idx));
+                            }
+                            idx++;
                         }
                     }
                 }
