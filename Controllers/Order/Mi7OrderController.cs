@@ -33,6 +33,8 @@ namespace SnowmeetApi.Controllers.Order
         public async Task<ActionResult<Mi7Order>> Enterain(string mi7OrderId, string name, 
             string cell, string gender, DateTime date, double price, string sessionKey, string sessionType = "wechat_mini_openid")
         {
+            gender = Util.UrlDecode(gender);
+            name = Util.UrlDecode(name);
             List<Mi7Order> orderList = await _context.mi7Order
                 .Where(m => m.mi7_order_id.Trim().Equals(mi7OrderId.Trim()) && m.valid == 1)
                 .AsNoTracking().ToListAsync();
