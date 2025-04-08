@@ -10,12 +10,16 @@ namespace SnowmeetApi.Models.Order
     {
         [Key]
         public int id { get; set; }
-        public int order_id { get; set; }
+        public int? order_id { get; set; }
         public string mi7_order_id { get; set; }
         public double sale_price { get; set; }
         public double real_charge { get; set; }
         public string barCode { get; set; } = "";
         public string order_type {get; set;} = "普通";
+        public int? enterain_member_id {get; set;} = null;
+        public string? entrain_cell {get; set;} = null;
+        public string? enterain_real_name {get; set;} = null;
+        public string? enterain_gender {get; set;} = null;
         [ForeignKey("order_id")]
         public OrderOnline? order {get; set;}
         public DateTime create_date { get; set; } = DateTime.Now;
