@@ -29,6 +29,50 @@ namespace SnowmeetApi.Controllers.Order
             _context = context;
             _config = config;
         }
+        [HttpGet("{mi7OrderId}")]
+        public async Task<ActionResult<Mi7Order>> Enterain(string mi7OrderId, string name, 
+            string cell, string gender, DateTime date, double price, string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            List<Mi7Order> orderList = await _context.mi7Order
+                .Where(m => m.mi7_order_id.Trim().Equals(mi7OrderId.Trim()) && m.valid == 1)
+                .AsNoTracking().ToListAsync();
+            if (orderList.Count != 0)
+            {
+                return NotFound();
+            }
+            sessionKey = Util.UrlDecode(sessionKey);
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
+            if (!user.isAdmin)
+            {
+                return BadRequest();
+            }
+            int? memberId = null;
+            MemberController _memberHelper = new MemberController(_context, _config);
+            Member member = (Member)((OkObjectResult)(await _memberHelper.GetMemberByCell(cell, sessionKey, sessionType)).Result).Value;
+            if (member != null)
+            {
+                memberId = member.id;
+            }
+            Mi7Order mi7Order = new Mi7Order()
+            {
+                id = 0,
+                order_id = null,
+                mi7_order_id = mi7OrderId.Trim(),
+                sale_price = price,
+                real_charge = 0,
+                barCode = "",
+                order_type = "招待",
+                enterain_member_id = memberId,
+                enterain_date = date.Date,
+                enterain_gender = gender.Trim(),
+                enterain_cell = cell.Trim(),
+                enterain_real_name = name.Trim(),
+                valid = 1
+            };
+            await _context.mi7Order.AddAsync(mi7Order);
+            await _context.SaveChangesAsync();
+            return Ok(mi7Order);
+        }
 
         [HttpGet]
         public async Task<ActionResult<List<SaleReport>>> GetSaleReport(DateTime startDate, DateTime endDate, string sessionKey, string shop = "")

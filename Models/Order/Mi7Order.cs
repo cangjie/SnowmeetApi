@@ -20,6 +20,8 @@ namespace SnowmeetApi.Models.Order
         public string? enterain_cell {get; set;} = null;
         public string? enterain_real_name {get; set;} = null;
         public string? enterain_gender {get; set;} = null;
+        public int valid {get; set;} = 1;
+        public DateTime? enterain_date { get; set;} = null;
         [ForeignKey("order_id")]
         public OrderOnline? order {get; set;}
         public DateTime create_date { get; set; } = DateTime.Now;
