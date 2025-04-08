@@ -10,7 +10,7 @@ namespace SnowmeetApi.Models.Order
     {
         [Key]
         public int id { get; set; }
-        public int? order_id { get; set; }
+        public int order_id { get; set; }
         public string mi7_order_id { get; set; }
         public double sale_price { get; set; }
         public double real_charge { get; set; }

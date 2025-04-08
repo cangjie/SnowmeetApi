@@ -57,7 +57,22 @@ namespace SnowmeetApi.Models
         public DateTime? crt { get; set; } = DateTime.Now;
 
         public int referee_member_id { get; set; } = 0;
-
+        public bool isEnterain
+        {
+            get
+            {
+                bool enterain = false;
+                for(int i = 0; mi7Orders != null && i < mi7Orders.Count; i++)
+                {
+                    if (mi7Orders[i].order_type.Trim().Equals("招待"))
+                    {
+                        enterain = true;
+                        break;
+                    }
+                }
+                return enterain;
+            }
+        }
         [NotMapped]
         public OrderPayment[]? _payments; 
 
@@ -68,7 +83,7 @@ namespace SnowmeetApi.Models
             {
                 if (paymentList == null || paymentList.Count == 0)
                 {
-                    return _payments;
+                    return new OrderPayment[0];
                 }
                 else
                 {
@@ -100,6 +115,7 @@ namespace SnowmeetApi.Models
             get
             {
                 string str = "待支付";
+               
                 if (paidAmount == 0)
                 {
                     switch (pay_memo.Trim())
