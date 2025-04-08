@@ -17,7 +17,7 @@ namespace SnowmeetApi.Models.Order
         public string barCode { get; set; } = "";
         public string order_type {get; set;} = "普通";
         public int? enterain_member_id {get; set;} = null;
-        public string? entrain_cell {get; set;} = null;
+        public string? enterain_cell {get; set;} = null;
         public string? enterain_real_name {get; set;} = null;
         public string? enterain_gender {get; set;} = null;
         [ForeignKey("order_id")]
