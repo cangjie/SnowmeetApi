@@ -83,7 +83,7 @@ namespace SnowmeetApi.Controllers
                     Mi7Order mi7Order = mi7OrderList[0];
                     if (detailOriginList.Count == 0)
                     {
-                        detail.mi7_order_id = mi7Order.order_id;
+                        detail.mi7_order_id = (int)mi7Order.order_id;
                         await _context.AddAsync(detail);
                         await _context.SaveChangesAsync();
                     }

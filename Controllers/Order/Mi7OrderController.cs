@@ -56,7 +56,7 @@ namespace SnowmeetApi.Controllers.Order
                     barCode = mi7Order.barCode.Trim(),
                     sale_price = mi7Order.sale_price,
                     real_charge = mi7Order.real_charge,
-                    order_id = mi7Order.order_id,
+                    order_id = (int)mi7Order.order_id,
                     name = customer == null? "" : customer.title.Trim(),
                     cell_number = customer == null || customer.cell == null ? "" : customer.cell.Trim(),
                     final_price = mi7Order.order.paidAmount,
