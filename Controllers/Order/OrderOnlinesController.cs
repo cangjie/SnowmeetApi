@@ -427,7 +427,7 @@ namespace SnowmeetApi.Controllers
                     )))
                 
                 .Where(o => (  
-                o.create_date >= startDate && o.create_date <= endDate && (shop.Trim().Equals("") ? true : (o.shop.Trim().Equals(shop.Trim())))
+                o.biz_date >= startDate && o.biz_date <= endDate && (shop.Trim().Equals("") ? true : (o.shop.Trim().Equals(shop.Trim())))
                  && (!onlyMine || (onlyMine && o.staff_open_id.Trim().Equals(user.miniAppOpenId.Trim())) ) 
                  && (cell.Length < 4 || o.cell_number.EndsWith(cell.Trim()) || o.open_id.Trim().Equals(openId) ) 
                  && (orderId.Equals("0") || o.id == int.Parse(orderId))
