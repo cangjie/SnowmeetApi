@@ -19,6 +19,13 @@ namespace SnowmeetApi.Models
     [Table("order_online")]
     public class OrderOnline
     {
+        public class EnterainInfo
+        {
+            public string cell {get; set;}
+            public string name {get; set;}
+            public string gender {get; set;}
+            public int? memberId {get; set;} = null;
+        }
         public string staffRealName = "";
 
         //public Ticket.Ticket[] ticketArray = new Ticket.Ticket[0];
@@ -57,6 +64,7 @@ namespace SnowmeetApi.Models
         public DateTime? crt { get; set; } = DateTime.Now;
 
         public int referee_member_id { get; set; } = 0;
+
         public bool isEnterain
         {
             get
@@ -71,6 +79,42 @@ namespace SnowmeetApi.Models
                     }
                 }
                 return enterain;
+            }
+        }
+        public EnterainInfo enterainInfo
+        {
+            get
+            {
+                if (!isEnterain)
+                {
+                    return null;
+                }
+                else
+                {
+                    string name = "";
+                    string cell = "";
+                    string gender = "";
+                    int? memberId = null;
+                    for(int i = 0; i < mi7Orders.Count; i++)
+                    {
+                        Mi7Order mi7Order = mi7Orders[i];
+                        if (mi7Order.order_type.Trim().Equals("招待"))
+                        {
+                            name = mi7Order.enterain_real_name.Trim();
+                            cell = mi7Order.enterain_cell.Trim();
+                            gender = mi7Order.enterain_gender.Trim();
+                            memberId = mi7Order.enterain_member_id;
+                            break;
+                        }
+                    }
+                    return new EnterainInfo()
+                    {
+                        name = name,
+                        cell = cell,
+                        gender = gender,
+                        memberId = memberId
+                    };
+                }
             }
         }
         [NotMapped]
