@@ -62,7 +62,7 @@ namespace SnowmeetApi.Controllers.Order
                 name = name.Trim() + " " + (gender.Trim().Equals("男")? "先生" : (gender.Trim().Equals("女")? "女士": "")),
                 pay_method = "",
                 pay_state = 1,
-                pay_time = date.Date,
+                pay_time = date,
                 order_price = 0,
                 order_real_pay_price = 0,
                 pay_memo = "无需支付",
@@ -71,7 +71,8 @@ namespace SnowmeetApi.Controllers.Order
                 memo = "招待",
                 other_discount = 0,
                 final_price = 0,
-                staff_open_id = user.member.wechatMiniOpenId
+                staff_open_id = user.member.wechatMiniOpenId,
+                biz_date = date
             };
             await _context.OrderOnlines.AddAsync(order);
             await _context.SaveChangesAsync();
