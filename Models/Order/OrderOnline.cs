@@ -19,6 +19,13 @@ namespace SnowmeetApi.Models
     [Table("order_online")]
     public class OrderOnline
     {
+        public class EnterainInfo
+        {
+            public string cell {get; set;}
+            public string name {get; set;}
+            public string gender {get; set;}
+            public int? memberId {get; set;} = null;
+        }
         public string staffRealName = "";
 
         //public Ticket.Ticket[] ticketArray = new Ticket.Ticket[0];
@@ -57,7 +64,60 @@ namespace SnowmeetApi.Models
         public DateTime? crt { get; set; } = DateTime.Now;
 
         public int referee_member_id { get; set; } = 0;
+        public DateTime biz_date {get; set;} = DateTime.Now;
 
+        public bool isEnterain
+        {
+            get
+            {
+                bool enterain = false;
+                for(int i = 0; mi7Orders != null && i < mi7Orders.Count; i++)
+                {
+                    if (mi7Orders[i].order_type.Trim().Equals("招待"))
+                    {
+                        enterain = true;
+                        break;
+                    }
+                }
+                return enterain;
+            }
+        }
+        public EnterainInfo enterainInfo
+        {
+            get
+            {
+                if (!isEnterain)
+                {
+                    return null;
+                }
+                else
+                {
+                    string name = "";
+                    string cell = "";
+                    string gender = "";
+                    int? memberId = null;
+                    for(int i = 0; i < mi7Orders.Count; i++)
+                    {
+                        Mi7Order mi7Order = mi7Orders[i];
+                        if (mi7Order.order_type.Trim().Equals("招待"))
+                        {
+                            name = mi7Order.enterain_real_name.Trim();
+                            cell = mi7Order.enterain_cell.Trim();
+                            gender = mi7Order.enterain_gender.Trim();
+                            memberId = mi7Order.enterain_member_id;
+                            break;
+                        }
+                    }
+                    return new EnterainInfo()
+                    {
+                        name = name,
+                        cell = cell,
+                        gender = gender,
+                        memberId = memberId
+                    };
+                }
+            }
+        }
         [NotMapped]
         public OrderPayment[]? _payments; 
 
@@ -68,7 +128,7 @@ namespace SnowmeetApi.Models
             {
                 if (paymentList == null || paymentList.Count == 0)
                 {
-                    return _payments;
+                    return new OrderPayment[0];
                 }
                 else
                 {
@@ -100,6 +160,7 @@ namespace SnowmeetApi.Models
             get
             {
                 string str = "待支付";
+               
                 if (paidAmount == 0)
                 {
                     switch (pay_memo.Trim())
