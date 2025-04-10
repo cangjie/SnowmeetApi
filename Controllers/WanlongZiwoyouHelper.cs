@@ -598,7 +598,7 @@ namespace SnowmeetApi.Controllers
             .Include(z => z.skipasses)
                 .ThenInclude(s => s.order)
                     .ThenInclude(o => o.paymentList.Where(p => p.status.Equals("支付成功")))
-                        .ThenInclude(p => p.refunds.Where(r => r.state == 1))
+                        .ThenInclude(p => p.refunds.Where(r => (r.state == 1 || r.refund_id.Trim().Equals(""))))
             .Include(z => z.skipasses)
                 .ThenInclude(s => s.order)
                     .ThenInclude(o => o.paymentList.Where(p => p.status.Equals("支付成功")))
@@ -608,7 +608,32 @@ namespace SnowmeetApi.Controllers
                        
             .Where(z => (z.orderDate.Date >= start.Date && z.orderDate.Date <= end.Date ))
             .ToListAsync();
-            return Ok(l);
+            return Ok(l.OrderByDescending(l => l.create_date).ToList());
+        }
+        [HttpGet]
+        public async Task ImportOrderBills()
+        {
+            List<ZiwoyouListOrder> orderList = (List<ZiwoyouListOrder>)((OkObjectResult)(await GetOrderBills(DateTime.Parse("2024-10-01"), DateTime.Parse("2025-05-01"))).Result).Value;
+            int maxPaymentNum = 1;
+            int maxRefundNum = 0;
+            for(int i = 0; i < orderList.Count; i++)
+            {
+                ZiwoyouListOrder order = orderList[i];
+                for(int j = 0; j < order.skipasses.Count; j++)
+                {
+                    if (order.skipasses[j].order != null)
+                    {
+                        maxPaymentNum = Math.Max(maxPaymentNum, order.skipasses[j].order.paymentList.Count);
+                        maxRefundNum = Math.Max(maxRefundNum, order.skipasses[j].order.refunds.Count);
+                    }
+                }
+            }
+            List<string> head = [
+                "序号","下单渠道" ,"自我游单号", "日期" ,"时间", "名称", "数量", "状态", "结算价", "收款",
+                "退款", "利润", "联系人", "联系电话", "客服", "分账金额","分账状态", "分账时间", "分账单号"];
+            int commonFieldsNum = head.Count;
+            string[] headPayment = ["收款门店", "支付方式", "收款单号", "收款金额", "收款日期", "收款时间"];
+            string[] headRefund = ["退款单号", "退款金额", "退款日期", "退款时间"];
         }
 
         [NonAction]
