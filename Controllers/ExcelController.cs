@@ -58,6 +58,26 @@ namespace SnowmeetApi.Controllers
                 
             }
         }
+        [HttpGet]
+        public string GetCellFormat()
+        {
+            MemoryStream stream = new MemoryStream();
+            using (var file = System.IO.File.OpenRead("mi7.xlsx"))
+            {
+                file.CopyTo(stream);
+                stream.Position = 0;
+                using (var workbook = new XSSFWorkbook((Stream)stream))
+                {
+                    var sheet = workbook.GetSheetAt(0);
+                    ICell cell = sheet.GetRow(2).GetCell(12);
+                    //cell.CellType.
+                    Console.Write(cell.StringCellValue.Trim());
+                }
+                
+            }
+            return "";
+        }
+        
 
     }
 }

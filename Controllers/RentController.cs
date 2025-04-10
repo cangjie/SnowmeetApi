@@ -2328,7 +2328,6 @@ namespace SnowmeetApi.Controllers
             {
                 return NotFound();
             }
-           
             OrderPaymentController _refunder = new OrderPaymentController(_context, _oriConfig, _httpContextAccessor);
             for(int i = 0; i < refundList.Count; i++)
             {
@@ -2342,7 +2341,6 @@ namespace SnowmeetApi.Controllers
 
                 }
             }
-            
             RentOrder order = (RentOrder)((OkObjectResult)(await GetRentOrder(rentOrderId, sessionKey, false)).Result).Value;
             return Ok(order);
         }
@@ -2429,9 +2427,6 @@ namespace SnowmeetApi.Controllers
             }
             return Ok(payment);
         }
-
-
-       
         private bool RentOrderExists(int id)
         {
             return _context.RentOrder.Any(e => e.id == id);
