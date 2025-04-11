@@ -224,7 +224,8 @@ namespace SnowmeetApi.Controllers
                 + " left join rent_list on rent_list.[id] = rent_list_id "
                 + " where finish_date >= '" + startDate.ToShortDateString() + "' "
                 + " and finish_date <= '" + endDate.AddDays(1).ToShortDateString() + "' and shop like '" + shop + "%'  "
-                + " and finish_date is not null and closed = 0 and hide = 0 "
+                + " and finish_date is not null and closed = 0 "
+                //+ " and hide = 0 "
                 )
                 .AsNoTracking().ToListAsync();
             List<Balance> bList = new List<Balance>();

@@ -83,7 +83,7 @@ namespace SnowmeetApi.Controllers
                     Mi7Order mi7Order = mi7OrderList[0];
                     if (detailOriginList.Count == 0)
                     {
-                        detail.mi7_order_id = mi7Order.order_id;
+                        detail.mi7_order_id = (int)mi7Order.order_id;
                         await _context.AddAsync(detail);
                         await _context.SaveChangesAsync();
                     }
@@ -427,7 +427,7 @@ namespace SnowmeetApi.Controllers
                     )))
                 
                 .Where(o => (  
-                o.create_date >= startDate && o.create_date <= endDate && (shop.Trim().Equals("") ? true : (o.shop.Trim().Equals(shop.Trim())))
+                o.biz_date >= startDate && o.biz_date <= endDate && (shop.Trim().Equals("") ? true : (o.shop.Trim().Equals(shop.Trim())))
                  && (!onlyMine || (onlyMine && o.staff_open_id.Trim().Equals(user.miniAppOpenId.Trim())) ) 
                  && (cell.Length < 4 || o.cell_number.EndsWith(cell.Trim()) || o.open_id.Trim().Equals(openId) ) 
                  && (orderId.Equals("0") || o.id == int.Parse(orderId))
@@ -1224,7 +1224,33 @@ namespace SnowmeetApi.Controllers
             _context.OrderOnlines.Entry(order).State = EntityState.Modified;
             await _context.SaveChangesAsync();
         }
-
+        [HttpGet("{orderId}")]
+        public async Task<ActionResult<OrderOnline>> UpdateOrderBizDate(int orderId,
+            DateTime bizDate, string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
+            if (!user.isAdmin)
+            {
+                return BadRequest();
+            }
+            OrderOnline order = await _context.OrderOnlines.FindAsync(orderId);
+            StaffModLog log = new StaffModLog()
+            {
+                id = 0,
+                key_id = order.id.ToString(),
+                scene = "修改零售业务时间",
+                table_name = "order_online",
+                field_name = "biz_date",
+                prev_value = order.biz_date.ToString(),
+                current_value = bizDate.ToString(),
+                staff_member_id = user.member.id
+            };
+            await _context.staffModLog.AddAsync(log);
+            order.biz_date = bizDate;
+            _context.OrderOnlines.Entry(order).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
+            return Ok(order);
+        }
 
         [NonAction]
         private bool OrderOnlineExists(int id)

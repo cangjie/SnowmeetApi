@@ -16,7 +16,7 @@ namespace SnowmeetApi.Models
         public int staff_member_id {get; set;}
         public string? prev_value {get; set;}
         public string? current_value {get; set;}
-        public DateTime create_date {get; set;}
+        public DateTime create_date {get; set;} = DateTime.Now;
         [ForeignKey("staff_member_id")]
         public Models.Users.Member? staffMember {get; set;}
     }

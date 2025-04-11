@@ -39,53 +39,6 @@ namespace SnowmeetApi.Controllers.User
             //member.memberSocialAccounts = new List<MemberSocialAccount>();
             return Ok(RemoveSensitiveInfo(member));
         }
-
-        /*
-        [NonAction]
-        public async Task<Models.Order.Kol> GetKol(int memberId)
-        {
-            string wechatMiniOpenId = "";
-            List<Models.Users.MemberSocialAccount> msaList = await _db.memberSocialAccount
-                .Where(m => m.member_id == memberId && m.valid == 1).AsNoTracking().ToListAsync();
-            foreach(Models.Users.MemberSocialAccount msa in msaList)
-            {
-                switch(msa.type)
-                {
-                    case "wechat_mini_openid":
-                        wechatMiniOpenId = msa.num.Trim();
-                        break;
-                    default:
-                        break;
-                }
-            }
-            
-            List<Models.Order.Kol> kolList = await _db.kol.Where(k => k.wechat_open_id.Trim().Equals(wechatMiniOpenId.Trim()))
-                .AsNoTracking().ToListAsync();
-            if (kolList == null || kolList.Count == 0)
-            {
-                Models.Order.Kol k = new Models.Order.Kol()
-                {
-                    id = 0,
-                    wechat_bind = 1,
-                    wechat_open_id = wechatMiniOpenId.Trim(),
-                    ali_bind = 0,
-                    ali_login_name = "",
-                    memo = "雪票员工激励"
-                };
-                await _db.kol.AddAsync(k);
-                await _db.SaveChangesAsync();
-                return k;
-            }
-            else
-            {
-                return kolList[0];
-            }
-
-
-            return null;
-        } 
-        */
-
         [NonAction]
         public async Task<Member> GetMemberBySessionKey(string sessionKey, string sessionType="wechat_mini_openid")
         {

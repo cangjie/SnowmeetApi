@@ -19,15 +19,82 @@ namespace SnowmeetApi.Controllers.Order
     public class Mi7OrderController : ControllerBase
     {
         private readonly ApplicationDBContext _context;
-
         private IConfiguration _config;
-
-        
-
         public Mi7OrderController(ApplicationDBContext context, IConfiguration config)
         {
             _context = context;
             _config = config;
+        }
+        [HttpGet("{mi7OrderId}")]
+        public async Task<ActionResult<Mi7Order>> Enterain(string mi7OrderId, string name, 
+            string cell, string gender, DateTime date, double price, string shop, string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            gender = Util.UrlDecode(gender);
+            name = Util.UrlDecode(name);
+            shop = Util.UrlDecode(shop);
+            List<Mi7Order> orderList = await _context.mi7Order
+                .Where(m => m.mi7_order_id.Trim().Equals(mi7OrderId.Trim()) && m.valid == 1)
+                .AsNoTracking().ToListAsync();
+            if (orderList.Count != 0)
+            {
+                return NotFound();
+            }
+            sessionKey = Util.UrlDecode(sessionKey);
+            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
+            if (!user.isAdmin)
+            {
+                return BadRequest();
+            }
+            int? memberId = null;
+            MemberController _memberHelper = new MemberController(_context, _config);
+            Member member = (Member)((OkObjectResult)(await _memberHelper.GetMemberByCell(cell, sessionKey, sessionType)).Result).Value;
+            if (member != null)
+            {
+                memberId = member.id;
+            }
+            OrderOnline order = new OrderOnline()
+            {
+                id = 0,
+                type = "店销现货",
+                shop = shop.Trim(),
+                open_id = ((member == null)? "": member.wechatMiniOpenId.Trim()),
+                cell_number = cell.Trim(),
+                name = name.Trim() + " " + (gender.Trim().Equals("男")? "先生" : (gender.Trim().Equals("女")? "女士": "")),
+                pay_method = "",
+                pay_state = 1,
+                pay_time = date,
+                order_price = 0,
+                order_real_pay_price = 0,
+                pay_memo = "无需支付",
+                code = "",
+                syssn = "",
+                memo = "招待",
+                other_discount = 0,
+                final_price = 0,
+                staff_open_id = user.member.wechatMiniOpenId,
+                biz_date = date
+            };
+            await _context.OrderOnlines.AddAsync(order);
+            await _context.SaveChangesAsync();
+            Mi7Order mi7Order = new Mi7Order()
+            {
+                id = 0,
+                order_id = order.id,
+                mi7_order_id = mi7OrderId.Trim(),
+                sale_price = price,
+                real_charge = 0,
+                barCode = "",
+                order_type = "招待",
+                enterain_member_id = memberId,
+                enterain_date = date.Date,
+                enterain_gender = gender.Trim(),
+                enterain_cell = cell.Trim(),
+                enterain_real_name = name.Trim(),
+                valid = 1
+            };
+            await _context.mi7Order.AddAsync(mi7Order);
+            await _context.SaveChangesAsync();
+            return Ok(mi7Order);
         }
 
         [HttpGet]
@@ -56,7 +123,7 @@ namespace SnowmeetApi.Controllers.Order
                     barCode = mi7Order.barCode.Trim(),
                     sale_price = mi7Order.sale_price,
                     real_charge = mi7Order.real_charge,
-                    order_id = mi7Order.order_id,
+                    order_id = (int)mi7Order.order_id,
                     name = customer == null? "" : customer.title.Trim(),
                     cell_number = customer == null || customer.cell == null ? "" : customer.cell.Trim(),
                     final_price = mi7Order.order.paidAmount,
@@ -231,25 +298,7 @@ namespace SnowmeetApi.Controllers.Order
                 for(int j = 0; j < mi7OrderList.Count; j++)
                 {
                     Mi7Order order = mi7OrderList[j];
-                    /*
-                    if (order.member == null)
-                    {
-                        List<MemberSocialAccount> msaList = await _context.memberSocialAccount
-                            .Include(m => m.member).ThenInclude(m => m.memberSocialAccounts)
-                            .Where(m => m.num.Trim().Equals(order.order.open_id.Trim()) && m.type.Trim().Equals("wechat_mini_openid"))
-                            .AsNoTracking().ToListAsync();
-                        if (msaList != null && msaList.Count > 0)
-                        {
-                            order.member = msaList[0].member;
-                        }
-                    }
-                    string cell = order.member != null? order.member.cell.Trim() : "";
-                    if (cell.Trim().Equals(mi7e.cell.Trim()))
-                    {
-                        
-                    }
-                    */
-                    //bool paired = false;
+                   
                     for(int k = 0; k < mi7e.orderIdArr.Length; k++)
                     {
                         if (mi7e.orderIdArr[k] == order.order_id)
