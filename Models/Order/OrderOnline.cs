@@ -146,8 +146,26 @@ namespace SnowmeetApi.Models
         /// 
         [ForeignKey(nameof(OrderPayment.order_id))]
         public List<Models.Order.OrderPayment> paymentList {get; set;}
-
-
+        [NotMapped]
+        public List<Models.Order.OrderPaymentRefund> refundList
+        {
+            get
+            {
+                List<OrderPaymentRefund> rL = new List<OrderPaymentRefund>();
+                
+                for(int i = 0; i < paymentList.Count; i++)
+                {
+                    OrderPayment payment = paymentList[i];
+                    for(int j = 0; j <  payment.refunds.Count; j++)
+                    {
+                        rL.Add(payment.refunds[j]);
+                    }
+                }
+                
+                return rL;
+            }
+        }
+        
         [NotMapped]
         public List<OrderPaymentRefund> refunds { get; set; }
         [NotMapped]
