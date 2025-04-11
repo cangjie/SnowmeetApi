@@ -1002,7 +1002,7 @@ namespace SnowmeetApi.Controllers.Order
             return share;
         }
 
-        [NonAction]
+        [HttpGet]
         public async Task<PaymentShare> SubmitShare(int shareId)
         {
             PaymentShare share = await _context.paymentShare.FindAsync(shareId);
