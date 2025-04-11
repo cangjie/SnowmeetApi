@@ -761,10 +761,7 @@ namespace SnowmeetApi.Controllers
             for (int i = 0; i < orderList.Count; i++)
             {
                 ZiwoyouListOrder order = orderList[i];
-                if (order.skipasses.Count <= 0)
-                {
-                    continue;
-                }
+
                 IRow dr = sheet.CreateRow(i + 1);
                 dr.Height = 500;
                 ICellStyle styleText = workbook.CreateCellStyle();
@@ -775,43 +772,55 @@ namespace SnowmeetApi.Controllers
                 ICellStyle styleNum = workbook.CreateCellStyle();
                 styleNum.DataFormat = format.GetFormat("0");
                 ICellStyle styleDate = workbook.CreateCellStyle();
-                styleNum.DataFormat = format.GetFormat("yyyy-MM-dd");
+                styleDate.DataFormat = format.GetFormat("yyyy-MM-dd");
                 ICellStyle styleTime = workbook.CreateCellStyle();
                 styleTime.DataFormat = format.GetFormat("HH:mm:ss");
-                switch(order.skipasses[0].status)
+
+                if (order.skipasses.Count <= 0)
                 {
-                    case "已核销":
-                        styleText.SetFont(fontUsed);
-                        styleMoney.SetFont(fontUsed);
-                        styleNum.SetFont(fontUsed);
-                        styleDate.SetFont(fontUsed);
-                        styleTime.SetFont(fontUsed);
-                        break;
-                    case "已取消":
-                        if (order.skipasses[0].order.refundList.Count == 0)
-                        {
-                            styleText.SetFont(fontUnRefund);
-                            styleMoney.SetFont(fontUnRefund);
-                            styleNum.SetFont(fontUnRefund);
-                            styleDate.SetFont(fontUnRefund);
-                            styleTime.SetFont(fontUnRefund);
-                        }
-                        else
-                        {
-                            styleText.SetFont(fontCanCel);
-                            styleMoney.SetFont(fontCanCel);
-                            styleNum.SetFont(fontCanCel);
-                            styleDate.SetFont(fontCanCel);
-                            styleTime.SetFont(fontCanCel);
-                        }
-                        break;
-                    default:
-                        styleText.SetFont(fontFromWeb);
-                        styleMoney.SetFont(fontFromWeb);
-                        styleNum.SetFont(fontFromWeb);
-                        styleDate.SetFont(fontFromWeb);
-                        styleTime.SetFont(fontFromWeb);
-                        break;
+                    styleText.SetFont(fontFromWeb);
+                    styleMoney.SetFont(fontFromWeb);
+                    styleNum.SetFont(fontFromWeb);
+                    styleDate.SetFont(fontFromWeb);
+                    styleTime.SetFont(fontFromWeb);
+                }
+                else
+                {
+                    switch (order.orderState)
+                    {
+                        case 4:
+                            styleText.SetFont(fontUsed);
+                            styleMoney.SetFont(fontUsed);
+                            styleNum.SetFont(fontUsed);
+                            styleDate.SetFont(fontUsed);
+                            styleTime.SetFont(fontUsed);
+                            break;
+                        case 3:
+                            if (order.skipasses[0].order.refundList.Count == 0)
+                            {
+                                styleText.SetFont(fontUnRefund);
+                                styleMoney.SetFont(fontUnRefund);
+                                styleNum.SetFont(fontUnRefund);
+                                styleDate.SetFont(fontUnRefund);
+                                styleTime.SetFont(fontUnRefund);
+                            }
+                            else
+                            {
+                                styleText.SetFont(fontCanCel);
+                                styleMoney.SetFont(fontCanCel);
+                                styleNum.SetFont(fontCanCel);
+                                styleDate.SetFont(fontCanCel);
+                                styleTime.SetFont(fontCanCel);
+                            }
+                            break;
+                        default:
+                            styleText.SetFont(fontFromWeb);
+                            styleMoney.SetFont(fontFromWeb);
+                            styleNum.SetFont(fontFromWeb);
+                            styleDate.SetFont(fontFromWeb);
+                            styleTime.SetFont(fontFromWeb);
+                            break;
+                    }
                 }
                 for (int j = 0; j < commonFieldsNum; j++)
                 {
@@ -821,6 +830,21 @@ namespace SnowmeetApi.Controllers
                         case 0:
                             cell.SetCellValue((i + 1));
                             cell.CellStyle = styleNum;
+                            break;
+                        case 1:
+                            if (order.skipasses.Count <= 0)
+                            {
+                                cell.SetCellValue("大好河山");
+                            }
+                            else
+                            {
+                                cell.SetCellValue("小程序");
+                            }
+                            cell.CellStyle = styleText;
+                            break;
+                        case 2:
+                            cell.SetCellValue(order.orderId.Trim());
+                            cell.CellStyle = styleText;
                             break;
                         default:
                             break;
