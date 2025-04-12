@@ -99,13 +99,7 @@ namespace SnowmeetApi.Controllers.Maintain
             List<MaintainReport> list = await _context.maintainReport.FromSqlRaw(" select * from dbo.func_maintain_report('"
                 + startDate.ToShortDateString() + "', '" + endDate.AddDays(1).ToShortDateString() + "')  "
                 + "  order by create_date desc , order_id desc "
-                )
-
-                //.Include(m => m.order)
-                //    .ThenInclude(o => o.paymentList.Where(p => p.status.Equals("支付成功")))
-                //        .ThenInclude(p => p.refunds.Where(r => (r.state == 1 || r.refund_id.Trim().Equals(""))))
-                //.OrderByDescending(l => l.create_date).OrderByDescending(l => l.order_id)
-                .ToListAsync();
+                ).AsNoTracking().ToListAsync();
             for(int i = 0; i < list.Count; i++)
             {
                 MaintainReport r = list[i];
@@ -118,16 +112,15 @@ namespace SnowmeetApi.Controllers.Maintain
                 {
                     continue;
                 }
+                r.logs = await _context.MaintainLog.Where(m => m.task_id == r.id)
+                    .Include(m => m.msa).ThenInclude(m => m.member).AsNoTracking().ToListAsync();
+
                 r.order.paymentList = await _context.OrderOnlines.Entry(r.order).Collection(o => o.paymentList)
                     .Query().Where(p => p.status.Trim().Equals("支付成功"))
                     .Include(r => r.refunds.Where(r => r.state == 1 || !r.refund_id.Trim().Equals("")))
                     .ToListAsync();
-
-                //r.order.paymentList = await _context.OrderOnlines.Entry(r.order)
-                //    .Collection(o => o.paymentList.Where(p => p.status.Equals("支付成功"))).Query().ToListAsync();
-
-                    //.Include(p => p.refunds.Where(r => (r.state == 1 || !r.refund_id.Trim().Equals(""))))
-                    //.AsNoTracking().ToListAsync();
+                
+                
             }
             
             return Ok(list);

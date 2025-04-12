@@ -1,6 +1,8 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using SnowmeetApi.Models.Users;
 namespace SnowmeetApi.Models.Maintain
 {
     [Table("maintain_log")]
@@ -18,6 +20,7 @@ namespace SnowmeetApi.Models.Maintain
         public string stop_open_id { get; set; }
         public string? backup_data {get; set;} = null;
         public string customer_open_id { get; set; } = "";
+        public MemberSocialAccount msa {get; set;}
         [NotMapped]
         public bool isMine { get; set; } = true;
         [NotMapped]
