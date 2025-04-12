@@ -23,6 +23,18 @@ namespace SnowmeetApi.Models.Maintain
 		public string unvax { get; set; }
 		public string more { get; set; }
 		public string memo { get; set; }
+		public string orderMemo
+		{
+			get
+			{
+				string m = memo;
+				if (order != null)
+				{
+					memo += (" " + order.memo);
+				}
+				return m;
+			}
+		}
 		public string jishi { get; set; }
 		public double additional_fee { get; set; }
 		public string staff { get; set; }
