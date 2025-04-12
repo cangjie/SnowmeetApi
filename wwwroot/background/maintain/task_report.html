@@ -309,6 +309,7 @@
                     if (msg[i].order != null && msg[i].order.paymentList != null && msg[i].order.paymentList.length > 0){
                         payMethod = msg[i].order.paymentList[0].pay_method;
                     }
+                    lineData.push(payMethod);
                     lineData.push(msg[i].order == null? "¥0.00" : formatAmount(msg[i].order.refundAmount));
                     lineData.push(msg[i].order == null? "¥0.00" : formatAmount(msg[i].order.paidAmount - msg[i].order.refundAmount));
                     tData.push(lineData);
