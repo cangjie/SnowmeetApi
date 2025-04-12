@@ -46,6 +46,7 @@ namespace SnowmeetApi.Models.Maintain
 			get
 			{
 				string name = "——";
+
 				List<MaintainLog> l = logs.Where(l => l.step_name.Trim().Equals("发板"))
 					.OrderByDescending(l => l.id).ToList();
 				if (l.Count > 0)
@@ -62,7 +63,7 @@ namespace SnowmeetApi.Models.Maintain
 				string no = "——";
 				if (order!=null && order.paymentList.Count > 0)
 				{
-					no = order.paymentList[0].out_trade_no.Trim();
+					no = order.paymentList[0].out_trade_no == null? "——" :   order.paymentList[0].out_trade_no.Trim();
 				}
 				return no;
 			}
@@ -70,7 +71,7 @@ namespace SnowmeetApi.Models.Maintain
 		[ForeignKey("order_id")]
 		public OrderOnline? order {get; set;}
 		[ForeignKey(nameof(MaintainLog.task_id))]
-		public List<MaintainLog> logs {get; set;}
+		public List<MaintainLog> logs {get; set;} = new List<MaintainLog>();
 	}
 }
 
