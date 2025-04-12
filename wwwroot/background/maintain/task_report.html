@@ -285,23 +285,30 @@
                     lineData.push(msg[i].equip_brand);
                     lineData.push(msg[i].equip_scale);
                     lineData.push(msg[i].degree);
+                    lineData.push(msg[i].staff);
+                    lineData.push(msg[i].safeCheck);
+
                     lineData.push(msg[i].edge);
                     lineData.push(msg[i].vax);
                     lineData.push(msg[i].unvax);
                     lineData.push(msg[i].more.replace(',','，'));
-                    lineData.push(msg[i].memo);
                     lineData.push(msg[i].jishi);
+                    lineData.push(msg[i].giveOut);
+                    lineData.push(msg[i].orderMemo);
+                    
                     lineData.push(formatAmount(msg[i].additional_fee));
-                    lineData.push(msg[i].staff);
+                    
                     lineData.push(formatDate(msg[i].create_date));
                     lineData.push(formatTime(msg[i].create_date));
                     lineData.push(msg[i].order_id);
+                    
+                    
+                    lineData.push(msg[i].outTradeNo);
                     lineData.push(msg[i].order == null? "¥0.00" : formatAmount(msg[i].order.paidAmount));
                     var payMethod = '——';
                     if (msg[i].order != null && msg[i].order.paymentList != null && msg[i].order.paymentList.length > 0){
                         payMethod = msg[i].order.paymentList[0].pay_method;
                     }
-                    lineData.push(payMethod);
                     lineData.push(msg[i].order == null? "¥0.00" : formatAmount(msg[i].order.refundAmount));
                     lineData.push(msg[i].order == null? "¥0.00" : formatAmount(msg[i].order.paidAmount - msg[i].order.refundAmount));
                     tData.push(lineData);
