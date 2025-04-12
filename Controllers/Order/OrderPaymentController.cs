@@ -680,25 +680,7 @@ namespace SnowmeetApi.Controllers.Order
                 return NotFound();
             }
             string path = $"{Environment.CurrentDirectory}";
-            /*
-            string postJson = Newtonsoft.Json.JsonConvert.SerializeObject(postData);
-            
-            string paySign = "no sign";
-            string nonce = "no nonce";
-            string serial = "no serial";
-            string timeStamp = "no time";
-            try
-            {
-                paySign = _httpContextAccessor.HttpContext.Request.Headers["Wechatpay-Signature"].ToString();
-                nonce = _httpContextAccessor.HttpContext.Request.Headers["Wechatpay-Nonce"].ToString();
-                serial = _httpContextAccessor.HttpContext.Request.Headers["Wechatpay-Serial"].ToString();
-                timeStamp = _httpContextAccessor.HttpContext.Request.Headers["Wechatpay-Timestamp"].ToString();
-            }
-            catch
-            {
-
-            }
-            */
+       
             if (path.StartsWith("/"))
             {
                 path = path + "/WepayCertificate/";

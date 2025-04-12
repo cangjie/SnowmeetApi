@@ -638,9 +638,9 @@ namespace SnowmeetApi.Controllers
             }
             List<string> head = [
                 "序号","下单渠道" ,"自我游单号", "日期" ,"时间", "名称", "数量", "状态", "结算价", "收款",
-                "退款", "利润", "联系人", "联系电话", "客服", "分账金额","分账状态", "分账时间", "分账单号"];
+                "退款", "利润", "联系人", "联系电话", "客服", "分账金额","分账状态","分账日期" ,"分账时间", "分账单号"];
             int commonFieldsNum = head.Count;
-            string[] headPayment = ["收款门店", "支付方式", "收款单号", "收款金额", "收款日期", "收款时间"];
+            string[] headPayment = ["收款单号", "收款金额", "收款日期", "收款时间"];
             string[] headRefund = ["退款单号", "退款金额", "退款日期", "退款时间"];
             //List<string> head = hea
             for (int i = 0; i < maxPaymentNum; i++)
@@ -691,11 +691,36 @@ namespace SnowmeetApi.Controllers
                 {
                     switch (i)
                     {
-                        /*
                         case 0:
+                        case 6:
+                        case 9:
+                        case 10:
+                        case 11:
                             sheet.SetColumnWidth(i, 1500);
                             break;
-                        */
+                        case 2:
+                        case 3:
+                        case 13:
+                            sheet.SetColumnWidth(i, 3000);
+                            break;
+                        case 4:
+                            sheet.SetColumnWidth(i, 2500);
+                            break;
+                        case 5:
+                        
+                            sheet.SetColumnWidth(i, 8000);
+                            break;
+                        case 7:
+                        case 8:
+                            sheet.SetColumnWidth(i, 2000);
+                            break;
+                        case 14:
+                            sheet.SetColumnWidth(i, 3500);
+                            break;
+                        case 19:
+                        
+                            sheet.SetColumnWidth(i, 11000);
+                            break;
                         default:
                             break;
                     }
@@ -707,15 +732,13 @@ namespace SnowmeetApi.Controllers
                     switch (paymentIndex)
                     {
                         case 0:
-                            sheet.SetColumnWidth(i, 3000);
+                            sheet.SetColumnWidth(i, 7000);
                             break;
                         case 2:
-                            sheet.SetColumnWidth(i, 5500);
+                        case 3:
+                            sheet.SetColumnWidth(i, 2600);
                             break;
-                        case 4:
-                        case 5:
-                            sheet.SetColumnWidth(i, 3000);
-                            break;
+                        
 
                         default:
                             break;
@@ -727,7 +750,7 @@ namespace SnowmeetApi.Controllers
                     switch (refundIndex)
                     {
                         case 0:
-                            sheet.SetColumnWidth(i, 5500);
+                            sheet.SetColumnWidth(i, 11000);
                             break;
                         case 2:
                         case 3:
@@ -776,6 +799,32 @@ namespace SnowmeetApi.Controllers
                 ICellStyle styleTime = workbook.CreateCellStyle();
                 styleTime.DataFormat = format.GetFormat("HH:mm:ss");
 
+                double settlePrice = order.settlementPrice * order.num;
+                double charge = 0;
+                double refund = 0;
+
+                if (order.skipasses.Count > 0)
+                {
+                    charge = order.skipasses[0].order.paidAmount;
+                    refund = order.skipasses[0].order.refundAmount;
+                }
+                double revenu = charge - settlePrice - refund;
+                if (order.orderState == 3)
+                {
+                    revenu = 0;
+                }
+                PaymentShare? share = null;
+                bool haveOrder = false;
+                if (order.skipasses.Count > 0 && order.skipasses[0].order != null
+                    && order.skipasses[0].order.paymentList.Count > 0)
+                {
+                    haveOrder = true;
+                }
+                if (haveOrder && order.skipasses[0].order.paymentList[0].shares.Count > 0)
+                {
+                    share = order.skipasses[0].order.paymentList[0].shares[0];
+                }
+
                 if (order.skipasses.Count <= 0)
                 {
                     styleText.SetFont(fontFromWeb);
@@ -821,10 +870,22 @@ namespace SnowmeetApi.Controllers
                             styleTime.SetFont(fontFromWeb);
                             break;
                     }
+                    if (revenu < 0)
+                    {
+                        styleText.SetFont(fontProblem);
+                        styleMoney.SetFont(fontProblem);
+                        styleNum.SetFont(fontProblem);
+                        styleDate.SetFont(fontProblem);
+                        styleTime.SetFont(fontProblem);
+                    }
                 }
+
+
+
                 for (int j = 0; j < commonFieldsNum; j++)
                 {
                     ICell cell = dr.CreateCell(j);
+
                     switch (j)
                     {
                         case 0:
@@ -832,7 +893,7 @@ namespace SnowmeetApi.Controllers
                             cell.CellStyle = styleNum;
                             break;
                         case 1:
-                            if (order.skipasses.Count <= 0)
+                            if (!haveOrder)
                             {
                                 cell.SetCellValue("大好河山");
                             }
@@ -846,13 +907,220 @@ namespace SnowmeetApi.Controllers
                             cell.SetCellValue(order.orderId.Trim());
                             cell.CellStyle = styleText;
                             break;
+                        case 3:
+                            cell.SetCellValue(order.orderDate);
+                            cell.CellStyle = styleDate;
+                            break;
+                        case 4:
+                            cell.SetCellValue(order.orderDate);
+                            cell.CellStyle = styleTime;
+                            break;
+                        case 5:
+                            cell.SetCellValue(order.productName.Trim());
+                            cell.CellStyle = styleText;
+                            break;
+                        case 6:
+                            cell.SetCellValue(order.num);
+                            cell.CellStyle = styleNum;
+                            break;
+                        case 7:
+                            string status = "";
+                            switch (order.orderState)
+                            {
+                                case 1:
+                                    status = "已预订";
+                                    break;
+                                case 2:
+                                    status = "已出票";
+                                    break;
+                                case 3:
+                                    status = "已取消";
+                                    break;
+                                case 4:
+                                    status = "已核销";
+                                    break;
+                                default:
+                                    break;
+                            }
+                            cell.SetCellValue(status);
+                            cell.CellStyle = styleText;
+                            break;
+                        case 8:
+                            cell.SetCellValue(settlePrice);
+                            cell.CellStyle = styleMoney;
+                            break;
+                        case 9:
+                            cell.SetCellValue(charge);
+                            cell.CellStyle = styleMoney;
+                            break;
+                        case 10:
+                            cell.SetCellValue(refund);
+                            cell.CellStyle = styleMoney;
+                            break;
+                        case 11:
+                            cell.SetCellValue(revenu);
+                            cell.CellStyle = styleMoney;
+                            break;
+                        case 12:
+                            cell.SetCellValue(order.linkMan);
+                            cell.CellStyle = styleText;
+                            break;
+                        case 13:
+                            cell.SetCellValue(order.linkPhone);
+                            cell.CellStyle = styleText;
+                            break;
+                        case 14:
+                            if (share != null && share.kol != null && order.orderState == 4)
+                            {
+                                cell.SetCellValue(share.kol.real_name.Trim());
+                            }
+                            else
+                            {
+                                cell.SetCellValue(nullStr);
+                            }
+                            cell.CellStyle = styleText;
+                            break;
+                        case 15:
+                            if (share != null && order.orderState == 4)
+                            {
+                                cell.SetCellValue(share.amount);
+                                cell.CellStyle = styleMoney;
+                            }
+                            else
+                            {
+                                cell.SetCellValue(nullStr);
+                                cell.CellStyle = styleText;
+                            }
+                            break;
+                        case 16:
+                            if (share != null && order.orderState == 4)
+                            {
+                                cell.SetCellValue(share.state == 1 ? "已分" : "未分");
+                            }
+                            else
+                            {
+                                cell.SetCellValue(nullStr);
+                            }
+                            cell.CellStyle = styleText;
+                            break;
+                        case 17:
+                            if (share != null && share.state == 1 && share.submit_date != null && order.orderState == 4)
+                            {
+                                cell.SetCellValue((DateTime)share.submit_date);
+                                cell.CellStyle = styleDate;
+                            }
+                            else
+                            {
+                                cell.SetCellValue(nullStr);
+                                cell.CellStyle = styleText;
+                            }
+                            break;
+                        case 18:
+                            if (share != null && share.state == 1 && share.submit_date != null && order.orderState == 4)
+                            {
+                                cell.SetCellValue((DateTime)share.submit_date);
+                                cell.CellStyle = styleTime;
+                            }
+                            else
+                            {
+                                cell.SetCellValue(nullStr);
+                                cell.CellStyle = styleText;
+                            }
+                            break;
+                        case 19:
+                            if (share != null && share.state == 1 && share.submit_date != null && order.orderState == 4)
+                            {
+                                cell.SetCellValue(share.out_trade_no);
+                            }
+                            else
+                            {
+                                cell.SetCellValue(nullStr);
+                            }
+                            cell.CellStyle = styleText;
+                            break;
                         default:
                             break;
                     }
-
-
-
                 }
+                for (int j = 0; j < maxPaymentNum; j++)
+                {
+                    for (int k = 0; k < headPayment.Length; k++)
+                    {
+                        int index = commonFieldsNum + j * headPayment.Length + k;
+                        ICell cell = dr.CreateCell(index);
+                        if (haveOrder && j < order.skipasses[0].order.paymentList.Count)
+                        {
+                            OrderPayment payment = order.skipasses[0].order.paymentList[0];
+                            switch (k)
+                            {
+                                case 0:
+                                    cell.SetCellValue(payment.out_trade_no.Trim());
+                                    cell.CellStyle = styleText;
+                                    break;
+                                case 1:
+                                    cell.SetCellValue(payment.amount);
+                                    cell.CellStyle = styleMoney;
+                                    break;
+                                case 2:
+                                    cell.SetCellValue(payment.create_date);
+                                    cell.CellStyle = styleDate;
+                                    break;
+                                case 3:
+                                    cell.SetCellValue(payment.create_date);
+                                    cell.CellStyle = styleTime;
+                                    break;
+                                default:
+                                    break;
+                            }
+                        }
+                        else
+                        {
+                            cell.SetCellValue(nullStr);
+                            cell.CellStyle = styleText;
+                        }
+
+
+                    }
+                }
+                for (int j = 0; j < maxRefundNum; j++)
+                {
+                    for (int k = 0; k < headRefund.Length; k++)
+                    {
+                        int index = commonFieldsNum + headPayment.Length * maxPaymentNum + j * headRefund.Length + k;
+                        ICell cell = dr.CreateCell(index);
+                        if (haveOrder && j < order.skipasses[0].order.refundList.Count)
+                        {
+                            OrderPaymentRefund r = order.skipasses[0].order.refundList[j];
+                            switch (k)
+                            {
+                                case 0:
+                                    cell.SetCellValue(r.out_refund_no);
+                                    cell.CellStyle = styleText;
+                                    break;
+                                case 1:
+                                    cell.SetCellValue(r.amount);
+                                    cell.CellStyle = styleMoney;
+                                    break;
+                                case 2:
+                                    cell.SetCellValue(r.create_date);
+                                    cell.CellStyle = styleDate;
+                                    break;
+                                case 3:
+                                    cell.SetCellValue(r.create_date);
+                                    cell.CellStyle = styleTime;
+                                    break;
+                                default:
+                                    break;
+                            }
+                        }
+                        else
+                        {
+                            cell.SetCellValue(nullStr);
+                            cell.CellStyle = styleText;
+                        }
+                    }
+                }
+
             }
 
 
