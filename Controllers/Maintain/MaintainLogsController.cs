@@ -121,7 +121,7 @@ namespace SnowmeetApi.Controllers.Maintain
                 r.order.paymentList = await _context.OrderOnlines.Entry(r.order).Collection(o => o.paymentList)
                     .Query().Where(p => p.status.Trim().Equals("支付成功"))
                     .Include(r => r.refunds.Where(r => r.state == 1 || !r.refund_id.Trim().Equals("")))
-                    .AsNoTracking().ToListAsync();
+                    .ToListAsync();
 
                 //r.order.paymentList = await _context.OrderOnlines.Entry(r.order)
                 //    .Collection(o => o.paymentList.Where(p => p.status.Equals("支付成功"))).Query().ToListAsync();
