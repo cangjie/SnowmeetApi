@@ -266,7 +266,7 @@
                     lineData.push(msg[i].edge);
                     lineData.push(msg[i].vax);
                     lineData.push(msg[i].unvax);
-                    lineData.push(msg[i].more);
+                    lineData.push(msg[i].more.replace(',','，'));
                     lineData.push(msg[i].memo);
                     lineData.push(msg[i].jishi);
                     lineData.push(formatAmount(msg[i].additional_fee));
