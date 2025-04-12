@@ -98,8 +98,8 @@ namespace SnowmeetApi.Controllers.Maintain
             }
             List<MaintainReport> list = await _context.maintainReport.FromSqlRaw(" select * from dbo.func_maintain_report('"
                 + startDate.ToShortDateString() + "', '" + endDate.AddDays(1).ToShortDateString() + "')  "
-                + "  order by create_date desc , order_id desc "
-                ).AsNoTracking().ToListAsync();
+                //+ "  order by create_date desc , order_id desc "
+                ).OrderByDescending(l => l.task_flow_num).AsNoTracking().ToListAsync();
             for(int i = 0; i < list.Count; i++)
             {
                 MaintainReport r = list[i];
