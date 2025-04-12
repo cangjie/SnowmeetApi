@@ -60,7 +60,7 @@ namespace SnowmeetApi.Models.Maintain
 			get
 			{
 				string no = "——";
-				if (order!=null)
+				if (order!=null && order.paymentList.Count > 0)
 				{
 					no = order.paymentList[0].out_trade_no.Trim();
 				}
