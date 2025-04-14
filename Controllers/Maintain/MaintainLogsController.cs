@@ -247,7 +247,7 @@ namespace SnowmeetApi.Controllers.Maintain
                             sheet.SetColumnWidth(i,1500);
                             break;
                         case 2:
-                            sheet.SetColumnWidth(i,2500);
+                            sheet.SetColumnWidth(i,2800);
                             break;
                         case 3:
                             sheet.SetColumnWidth(i, 2000);
@@ -286,7 +286,7 @@ namespace SnowmeetApi.Controllers.Maintain
                             sheet.SetColumnWidth(i, 7000);
                             break;
                         case 5:
-                            sheet.SetColumnWidth(i, 2500);
+                            sheet.SetColumnWidth(i, 2800);
                             break;
                         case 6:
                             sheet.SetColumnWidth(i, 2000);
@@ -311,7 +311,7 @@ namespace SnowmeetApi.Controllers.Maintain
                             sheet.SetColumnWidth(i, 5000);
                             break;
                         case 4:
-                            sheet.SetColumnWidth(i, 2500);
+                            sheet.SetColumnWidth(i, 2800);
                             break;
                         case 5:
                             sheet.SetColumnWidth(i, 2000);
@@ -330,7 +330,7 @@ namespace SnowmeetApi.Controllers.Maintain
                 styleText.Alignment = HorizontalAlignment.Center;
                 styleText.DataFormat = format.GetFormat("General");
                 ICellStyle styleMoney = workbook.CreateCellStyle();
-                styleMoney.DataFormat = format.GetFormat("(¥#,##0.00);(¥#,##0.00)");
+                styleMoney.DataFormat = format.GetFormat("¥#,##0.00");
                 ICellStyle styleNum = workbook.CreateCellStyle();
                 styleNum.DataFormat = format.GetFormat("0");
                 ICellStyle styleDate = workbook.CreateCellStyle();
