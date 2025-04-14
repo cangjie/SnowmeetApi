@@ -1809,7 +1809,7 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<RentOrder>> GetUnReturnedItems(string sessionKey, string shop)
+        public async Task<ActionResult<List<RentOrder>>> GetUnReturnedItems(string sessionKey, string shop)
         {
             sessionKey = Util.UrlDecode(sessionKey);
             shop = Util.UrlDecode(shop);

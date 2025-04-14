@@ -88,18 +88,6 @@ namespace SnowmeetApi.Controllers.Maintain
         [HttpGet]
         public async Task<ActionResult<List<MaintainReport>>> GetReport(DateTime startDate, DateTime endDate, string sessionKey)
         {
-            /*
-            sessionKey = Util.UrlDecode(sessionKey);
-            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
-            if (user.member.is_admin != 1 && user.member.is_manager != 1)
-            {
-                return NoContent();
-            }
-            if (!user.isAdmin)
-            {
-                return BadRequest();
-            }
-            */
             _context.Database.SetCommandTimeout(600);
             List<MaintainReport> list = await _context.maintainReport.FromSqlRaw(" select * from dbo.func_maintain_report('"
                 + startDate.ToShortDateString() + "', '" + endDate.AddDays(1).ToShortDateString() + "')  "
@@ -325,7 +313,6 @@ namespace SnowmeetApi.Controllers.Maintain
 
             for (int i = 0; i < oriList.Count; i++)
             {
-                
                 ICellStyle styleText = workbook.CreateCellStyle();
                 styleText.Alignment = HorizontalAlignment.Center;
                 styleText.DataFormat = format.GetFormat("General");
@@ -706,51 +693,7 @@ namespace SnowmeetApi.Controllers.Maintain
                 }
             }
         }
-        /*
-        [NonAction]
-        private void MergeSheet(ISheet sheet, int keyIndex, int[] avoidMergeColumns )
-        {
-            int columnsCount = 0;
-            int rowCount = sheet.LastRowNum;
-            if (rowCount > 0)
-            {
-                columnsCount = sheet.GetRow(0).Cells.Count;
-            }
-            if (columnsCount == 0)
-            {
-                return ;
-            }
-            for(int i = 0; i < columnsCount; i++)
-            {
-                int mergeBase = -1;
-                for(int j = 2; j < rowCount; j++)
-                {
-                    IRow currentRow = sheet.GetRow(j);
-                    IRow lastRow = sheet.GetRow(j - 1);
-                    ICell currentCell = currentRow.GetCell(i);
-                    ICell lastCell = lastRow.GetCell(i);
-                    if (currentCell.ToString().Equals(lastCell.ToString()))
-                    {
-                        if (mergeBase == -1)
-                        {
-                            mergeBase = j - 1;
-                        }
-                    }
-                    else
-                    {
-                        if (mergeBase != -1)
-                        {
-                            sheet.AddMergedRegion(new NPOI.SS.Util.CellRangeAddress(
-                                mergeBase, j - 1, i, i));
-                            mergeBase = -1;
-                        }
-                    }
-                    
-                }
-            }
-            
-        }
-        */
+        
         [HttpGet("{taskId}")]
         public async Task<ActionResult<IEnumerable<MaintainLog>>> GetSteps(int taskId)
         {
