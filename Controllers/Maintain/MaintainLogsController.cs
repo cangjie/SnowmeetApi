@@ -13,6 +13,8 @@ using SnowmeetApi.Models;
 using SnowmeetApi.Models.Ticket;
 using SnowmeetApi.Models.Order;
 using SnowmeetApi.Controllers.User;
+using NPOI.XSSF.UserModel;
+using NPOI.SS.UserModel;
 
 namespace SnowmeetApi.Controllers.Maintain
 {
@@ -37,7 +39,7 @@ namespace SnowmeetApi.Controllers.Maintain
         {
             sessionKey = Util.UrlDecode(sessionKey);
             stepName = Util.UrlDecode(stepName);
-            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
+            UnicUser user = await UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (!user.isAdmin)
             {
                 return BadRequest();
@@ -53,9 +55,9 @@ namespace SnowmeetApi.Controllers.Maintain
             }
             catch
             {
-                
+
             }
-            
+
             MaintainLog log = new MaintainLog()
             {
                 id = 0,
@@ -86,6 +88,7 @@ namespace SnowmeetApi.Controllers.Maintain
         [HttpGet]
         public async Task<ActionResult<List<MaintainReport>>> GetReport(DateTime startDate, DateTime endDate, string sessionKey)
         {
+            /*
             sessionKey = Util.UrlDecode(sessionKey);
             UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (user.member.is_admin != 1 && user.member.is_manager != 1)
@@ -96,11 +99,13 @@ namespace SnowmeetApi.Controllers.Maintain
             {
                 return BadRequest();
             }
+            */
+            _context.Database.SetCommandTimeout(600);
             List<MaintainReport> list = await _context.maintainReport.FromSqlRaw(" select * from dbo.func_maintain_report('"
                 + startDate.ToShortDateString() + "', '" + endDate.AddDays(1).ToShortDateString() + "')  "
                 //+ "  order by create_date desc , order_id desc "
                 ).OrderByDescending(l => l.task_flow_num).AsNoTracking().ToListAsync();
-            for(int i = 0; i < list.Count; i++)
+            for (int i = 0; i < list.Count; i++)
             {
                 MaintainReport r = list[i];
                 if (r.order_id == 0)
@@ -119,13 +124,633 @@ namespace SnowmeetApi.Controllers.Maintain
                     .Query().Where(p => p.status.Trim().Equals("支付成功"))
                     .Include(r => r.refunds.Where(r => r.state == 1 || !r.refund_id.Trim().Equals("")))
                     .ToListAsync();
-                
-                
+
+
             }
-            
+
             return Ok(list);
         }
+        /*
+        [HttpGet]
+        public async Task ExportExcel()
+        {
+            List<MaintainReport> l = (List<MaintainReport>)((OkObjectResult)(await GetReport(DateTime.Parse("2024-10-01"), DateTime.Parse("2025-12-01"), "")).Result).Value;
+            l = l.OrderByDescending(l => l.task_flow_num).ToList();
+            List<MaintainReport> sortedL = new List<MaintainReport>();
+            for(int i = 0; i < l.Count; i++)
+            {
+                if (sortedL.Where(sl => sl.task_flow_num.Trim().Equals(l[i].task_flow_num.Trim())).ToList().Count > 0)
+                {
+                    continue;
+                }
+                //sortedL.Add(l[i]);
+                List<MaintainReport> subL = l.Where(subL => subL.order_id == l[i].order_id).ToList();
+                for(int j = 0; j < subL.Count; j++)
+                {
+                    sortedL.Add(subL[j]);
+                }
+            }
+            Console.WriteLine("");
+        }
+        */
+        [HttpGet]
+        public async Task ExportExcel()
+        {
+            DateTime start = DateTime.Parse("2024-10-1");
+            DateTime end = DateTime.Parse("2025-5-1");
+            List<MaintainLive> oriList = await _context.MaintainLives
+                .Where(m => m.create_date.Date >= start.Date && m.create_date.Date <= end.Date
+                && m.task_flow_num.IndexOf("-") >= 0
+                //&& m.task_flow_num.Equals("250409-00001")
+                )
+                .Include(m => m.order)
+                    .ThenInclude(o => o.paymentList.Where(p => p.status.Trim().Equals("支付成功")))
+                        .ThenInclude(p => p.refunds.Where(r => r.state == 1 || !r.refund_id.Trim().Equals("")))
+                .Include(m => m.taskLog).ThenInclude(l => l.msa).ThenInclude(m => m.member)
+                .Include(m => m.staffMsa).ThenInclude(m => m.member)
+                .OrderByDescending(m => m.batch_id).ThenByDescending(m => m.order_id)
+                .AsNoTracking().ToListAsync();
 
+            int maxPaymentCount = 1;
+            int maxRefundCount = 0;
+
+            for (int i = 0; i < oriList.Count; i++)
+            {
+                MaintainLive task = oriList[i];
+                if (task.order != null && task.order.paymentList != null)
+                {
+                    maxPaymentCount = Math.Max(maxPaymentCount, task.order.paymentList.Count);
+                    if (task.order.refundList != null && task.order.refundList.Count > 0)
+                    {
+                        maxRefundCount = Math.Max(maxRefundCount, task.order.refundList.Count);
+                    }
+                }
+            }
+            string[] commonHead = ["序号", "订单号", "日期", "时间", "门店", "支付订单号", "支付金额", "退款金额", "结余金额", "流水号", "类型", "品牌", "长度",
+                "角度", "接待", "修刃", "打蜡", "刮蜡", "其他", "维修", "发板", "备注", "附加费用"];
+            string[] paymentHead = ["支付门店", "支付方式" ,"微信支付单号", "商户订单号", "支付金额", "支付日期", "支付时间"];
+            string[] refundHead = ["微信退款单号", "商户退款单号", "退款金额", "退款原因", "退款日期", "退款时间"];
+            string nullStr = "【-】";
+            List<string> realHead = new List<string>();
+            for (int i = 0; i < commonHead.Length; i++)
+            {
+                realHead.Add(commonHead[i].Trim());
+            }
+            for (int i = 0; i < maxPaymentCount; i++)
+            {
+                for (int j = 0; j < paymentHead.Length; j++)
+                {
+                    realHead.Add(paymentHead[j].Trim() + (i + 1).ToString());
+                }
+            }
+            for (int i = 0; i < maxRefundCount; i++)
+            {
+                for (int j = 0; j < refundHead.Length; j++)
+                {
+                    realHead.Add(refundHead[j].Trim() + (i + 1).ToString());
+                }
+            }
+
+            XSSFWorkbook workbook = new XSSFWorkbook();
+
+            IFont fontProblem = workbook.CreateFont();
+            fontProblem.Color = NPOI.HSSF.Util.HSSFColor.Red.Index;
+            ISheet sheet = workbook.CreateSheet("24-25养护");
+            IDataFormat format = workbook.CreateDataFormat();
+            IFont headFont = workbook.CreateFont();
+            headFont.Color = NPOI.HSSF.Util.HSSFColor.White.Index;
+            headFont.IsBold = true;
+            ICellStyle headStyle = workbook.CreateCellStyle();
+            headStyle.Alignment = HorizontalAlignment.Center;
+            headStyle.FillForegroundColor = NPOI.HSSF.Util.HSSFColor.Black.Index;
+            headStyle.FillPattern = FillPattern.SolidForeground;
+            headStyle.SetFont(headFont);
+            headStyle.VerticalAlignment = VerticalAlignment.Center;
+
+            IRow headRow = sheet.CreateRow(0);
+            headRow.Height = 500;
+
+            for (int i = 0; i < realHead.Count; i++)
+            {
+                ICell headCell = headRow.CreateCell(i);
+                headCell.SetCellValue(realHead[i].Trim());
+                headCell.SetCellType(CellType.String);
+                headCell.CellStyle = headStyle;
+                if (i < commonHead.Length)
+                {
+                    switch(i)
+                    {
+                        case 0:
+                            sheet.SetColumnWidth(i, 1000);
+                            break;
+                        case 1:
+                            sheet.SetColumnWidth(i,1500);
+                            break;
+                        case 2:
+                            sheet.SetColumnWidth(i,2500);
+                            break;
+                        case 3:
+                            sheet.SetColumnWidth(i, 2000);
+                            break;
+                        case 4:
+                        case 9:
+                            sheet.SetColumnWidth(i,3000);
+                            break;
+                        case 11:
+                            sheet.SetColumnWidth(i, 4000);
+                            break;
+                        case 14:
+                        case 15:
+                        case 16:
+                        case 17:
+                        case 18:
+                        case 19:
+                        case 20:
+                        case 21:
+                            sheet.SetColumnWidth(i, 4300);
+                            break;
+                        default:
+                            break;
+                    }
+                }
+                else if (i < maxPaymentCount * paymentHead.Length + commonHead.Length)
+                {
+                    int index = (i - commonHead.Length) % commonHead.Length;
+                    switch(index)
+                    {
+                        case 0:
+                            sheet.SetColumnWidth(i, 3000);
+                            break;
+                        case 2:
+                        case 3:
+                            sheet.SetColumnWidth(i, 7000);
+                            break;
+                        case 5:
+                            sheet.SetColumnWidth(i, 2500);
+                            break;
+                        case 6:
+                            sheet.SetColumnWidth(i, 2000);
+                            break;
+                        default:
+                            break;
+                    }
+                }
+                else
+                {
+                    int index = (i - commonHead.Length
+                        - maxPaymentCount * paymentHead.Length) % refundHead.Length;
+                    switch(index)
+                    {
+                        case 0:
+                            sheet.SetColumnWidth(i, 7500);
+                            break;
+                        case 1:
+                            sheet.SetColumnWidth(i,10000);
+                            break;
+                        case 3:
+                            sheet.SetColumnWidth(i, 5000);
+                            break;
+                        case 4:
+                            sheet.SetColumnWidth(i, 2500);
+                            break;
+                        case 5:
+                            sheet.SetColumnWidth(i, 2000);
+                            break;
+                        default:
+                            break;
+                    }
+                        
+                }
+            }
+
+            for (int i = 0; i < oriList.Count; i++)
+            {
+                
+                ICellStyle styleText = workbook.CreateCellStyle();
+                styleText.Alignment = HorizontalAlignment.Center;
+                styleText.DataFormat = format.GetFormat("General");
+                ICellStyle styleMoney = workbook.CreateCellStyle();
+                styleMoney.DataFormat = format.GetFormat("(¥#,##0.00);(¥#,##0.00)");
+                ICellStyle styleNum = workbook.CreateCellStyle();
+                styleNum.DataFormat = format.GetFormat("0");
+                ICellStyle styleDate = workbook.CreateCellStyle();
+                styleDate.DataFormat = format.GetFormat("yyyy-MM-dd");
+                ICellStyle styleTime = workbook.CreateCellStyle();
+                styleTime.DataFormat = format.GetFormat("HH:mm:ss");
+
+                IRow dr = sheet.CreateRow(i + 1);
+                dr.Height = 500;
+                MaintainLive task = oriList[i];
+                if (task.order == null)
+                {
+                    //isEnterain = true;
+                    styleText.FillForegroundColor = NPOI.HSSF.Util.HSSFColor.Yellow.Index;
+                    styleText.FillPattern = FillPattern.SolidForeground;
+
+                    styleMoney.FillForegroundColor = NPOI.HSSF.Util.HSSFColor.Yellow.Index;
+                    styleMoney.FillPattern = FillPattern.SolidForeground;
+
+                    styleNum.FillForegroundColor = NPOI.HSSF.Util.HSSFColor.Yellow.Index;
+                    styleNum.FillPattern = FillPattern.SolidForeground;
+
+                    styleDate.FillForegroundColor = NPOI.HSSF.Util.HSSFColor.Yellow.Index;
+                    styleDate.FillPattern = FillPattern.SolidForeground;
+
+                    styleTime.FillForegroundColor = NPOI.HSSF.Util.HSSFColor.Yellow.Index;
+                    styleTime.FillPattern = FillPattern.SolidForeground;
+                }
+
+                for (int j = 0; j < realHead.Count; j++)
+                {
+                    ICell cell = dr.CreateCell(j);
+                    if (j < commonHead.Length)
+                    {
+                        switch (j)
+                        {
+                            case 0:
+                                cell.SetCellValue((i + 1));
+                                cell.CellStyle = styleNum;
+                                break;
+                            case 1:
+                                cell.SetCellValue(task.batch_id);
+                                cell.CellStyle = styleNum;
+                                break;
+                            case 2:
+                                cell.SetCellValue(task.create_date.Date);
+                                cell.CellStyle = styleDate;
+                                break;
+                            case 3:
+                                cell.SetCellValue(task.create_date);
+                                cell.CellStyle = styleTime;
+                                break;
+                            case 4:
+                                cell.SetCellValue(task.shop);
+                                cell.CellStyle = styleText;
+                                break;
+                            case 5:
+                                if (task.order == null)
+                                {
+                                    cell.SetCellValue(nullStr);
+                                    cell.CellStyle = styleText;
+                                }
+                                else
+                                {
+                                    cell.SetCellValue(task.order.id);
+                                    cell.CellStyle = styleNum;
+                                }
+                                break;
+                            case 6:
+                                if (task.order == null)
+                                {
+                                    cell.SetCellValue(nullStr);
+                                    cell.CellStyle = styleText;
+                                }
+                                else
+                                {
+                                    cell.SetCellValue(task.order.paidAmount);
+                                    cell.CellStyle = styleMoney;
+                                }
+                                break;
+                            case 7:
+                                if (task.order == null)
+                                {
+                                    cell.SetCellValue(nullStr);
+                                    cell.CellStyle = styleText;
+                                }
+                                else
+                                {
+                                    cell.SetCellValue(task.order.refundAmount);
+                                    cell.CellStyle = styleMoney;
+                                }
+                                break;
+                            case 8:
+                                if (task.order == null)
+                                {
+                                    cell.SetCellValue(nullStr);
+                                    cell.CellStyle = styleText;
+                                }
+                                else
+                                {
+                                    cell.SetCellValue(task.order.paidAmount - task.order.refundAmount);
+                                    cell.CellStyle = styleMoney;
+                                }
+                                break;
+                            case 9:
+                                cell.SetCellValue(task.task_flow_num.Trim());
+                                cell.CellStyle = styleText;
+                                break;
+                            case 10:
+                                cell.SetCellValue(task.confirmed_equip_type.Trim());
+                                cell.CellStyle = styleText;
+                                break;
+                            case 11:
+                                cell.SetCellValue(task.confirmed_brand.Trim());
+                                cell.CellStyle = styleText;
+                                break;
+                            case 12:
+                                cell.SetCellValue(task.confirmed_scale.Trim());
+                                cell.CellStyle = styleText;
+                                break;
+                            case 13:
+                                cell.SetCellValue(task.confirmed_degree.ToString());
+                                cell.CellStyle = styleText;
+                                break;
+                            case 14:
+                                cell.SetCellValue(task.staffRecept);
+                                cell.CellStyle = styleText;
+                                break;
+                            case 15:
+                                if (task.confirmed_edge == 1)
+                                {
+                                    if (!task.staffEdge.Trim().Equals(""))
+                                    {
+                                        cell.SetCellValue(task.staffEdge.Trim());
+                                    }
+                                    else
+                                    {
+                                        cell.SetCellValue("——");
+                                    }
+                                }
+                                else
+                                {
+                                    cell.SetCellValue(nullStr);
+                                }
+                                cell.CellStyle = styleText;
+                                break;
+                            case 16:
+                                if (task.confirmed_candle == 1)
+                                {
+                                    if (!task.staffVax.Trim().Equals(""))
+                                    {
+                                        cell.SetCellValue(task.staffVax.Trim());
+                                    }
+                                    else
+                                    {
+                                        cell.SetCellValue("——");
+                                    }
+                                }
+                                else
+                                {
+                                    cell.SetCellValue(nullStr);
+                                }
+                                cell.CellStyle = styleText;
+                                break;
+                            case 17:
+                                if (task.confirmed_candle == 1)
+                                {
+                                    if (!task.staffUnVax.Trim().Equals(""))
+                                    {
+                                        cell.SetCellValue(task.staffUnVax.Trim());
+                                    }
+                                    else
+                                    {
+                                        cell.SetCellValue("——");
+                                    }
+                                }
+                                else
+                                {
+                                    cell.SetCellValue(nullStr);
+                                }
+                                cell.CellStyle = styleText;
+                                break;
+                            case 18:
+                                cell.SetCellValue(task.confirmed_more.Trim().Equals("") ? nullStr : task.confirmed_more.Trim());
+                                cell.CellStyle = styleText;
+                                break;
+                            case 19:
+                                if (task.confirmed_more.Trim().Equals(""))
+                                {
+                                    cell.SetCellValue(nullStr);
+                                }
+                                else
+                                {
+                                    if (task.staffRepair.Trim().Equals(""))
+                                    {
+                                        cell.SetCellValue("——");
+                                    }
+                                    else
+                                    {
+                                        cell.SetCellValue(task.staffRepair.Trim());
+                                    }
+                                }
+                                cell.CellStyle = styleText;
+                                break;
+                            case 20:
+                                cell.SetCellValue(task.staffGiveOut.Trim().Equals("")?"——": task.staffGiveOut);
+                                cell.CellStyle = styleText;
+                                break;
+                            case 21:
+                                string memo = task.confirmed_memo.Trim() + " "
+                                    + ((task.order != null && task.order.memo != "") ? task.order.memo.Trim() : "");
+                                cell.SetCellValue(memo);
+                                cell.CellStyle = styleText;
+                                break;
+                            case 22:
+                                cell.SetCellValue(task.confirmed_additional_fee);
+                                cell.CellStyle = styleMoney;
+                                break;
+                            default:
+                                break;
+                        }
+                    }
+                    else if (j < commonHead.Length + maxPaymentCount * paymentHead.Length)
+                    {
+                        int index = (j - commonHead.Length) / paymentHead.Length;
+                        if (task.order == null || task.order.paymentList.Count <= index)
+                        {
+                            cell.SetCellValue(nullStr);
+                            cell.CellStyle = styleText;
+                        }
+                        else
+                        {
+                            OrderPayment payment = task.order.paymentList[index];
+                            switch ((j - commonHead.Length) % paymentHead.Length)
+                            {
+                                case 0:
+                                    cell.SetCellValue(task.order.shop.Trim());
+                                    cell.CellStyle = styleText;
+                                    break;
+                                case 1:
+                                    cell.SetCellValue(payment.pay_method.Trim());
+                                    break;
+                                case 2:
+                                    cell.SetCellValue(payment.wepay_trans_id==null?nullStr:payment.wepay_trans_id);
+                                    cell.CellStyle = styleText;
+                                    break;
+                                case 3:
+                                    cell.SetCellValue(payment.out_trade_no==null?nullStr:payment.out_trade_no);
+                                    cell.CellStyle = styleText;
+                                    break;
+                                case 4:
+                                    cell.SetCellValue(payment.amount);
+                                    cell.CellStyle = styleMoney;
+                                    break;
+                                case 5:
+                                    cell.SetCellValue(payment.create_date);
+                                    cell.CellStyle = styleDate;
+                                    break;
+                                case 6:
+                                    cell.SetCellValue(payment.create_date);
+                                    cell.CellStyle = styleTime;
+                                    break;
+                                default:
+                                    break;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        int index = (j - commonHead.Length - maxPaymentCount * paymentHead.Length) / refundHead.Length;
+                        if (task.order == null || task.order.refundList.Count <= index)
+                        {
+                            cell.SetCellValue(nullStr);
+                            cell.CellStyle = styleText;
+                        }
+                        else
+                        {
+                            OrderPaymentRefund refund = task.order.refundList[index];
+                            switch ((j - commonHead.Length-maxPaymentCount * paymentHead.Length) % paymentHead.Length)
+                            {
+                                case 0:
+                                    cell.SetCellValue(refund.refund_id);
+                                    cell.CellStyle = styleText;
+                                    break;
+                                case 1:
+                                    cell.SetCellValue(refund.out_refund_no);
+                                    cell.CellStyle = styleText;
+                                    break;
+                                
+                                case 2:
+                                    cell.SetCellValue(refund.amount);
+                                    cell.CellStyle = styleMoney;
+                                    break;
+                                case 3:
+                                    cell.SetCellValue(refund.reason);
+                                    cell.CellStyle = styleText;
+                                    break;
+                                case 4:
+                                    cell.SetCellValue(refund.create_date);
+                                    cell.CellStyle = styleDate;
+                                    break;
+                                case 5:
+                                    cell.SetCellValue(refund.create_date);
+                                    cell.CellStyle = styleTime;
+                            
+                                    break;
+                                default:
+                                    break;
+                            }
+                        }
+                    }
+                }
+            }
+            MergeSheet(sheet, 1, new int[] {0, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22});
+            string filePath = $"{Environment.CurrentDirectory}" + "/maintain.xlsx";
+            using (var file = System.IO.File.Create(filePath))
+            {
+                workbook.Write(file);
+            }
+
+        }
+        [NonAction]
+        private void MergeSheet(ISheet sheet, int keyIndex, int[] avoidMergeColumns )
+        {
+            int columnsCount = 0;
+            int rowCount = sheet.LastRowNum;
+            if (rowCount > 0)
+            {
+                columnsCount = sheet.GetRow(0).Cells.Count;
+            }
+            if (columnsCount == 0)
+            {
+                return ;
+            }
+            int mergeBase = -1;
+            for(int i = 2; i < rowCount; i++)
+            {
+                IRow lastRow = sheet.GetRow(i - 1);
+                IRow currentRow = sheet.GetRow(i);
+                ICell lastKeyCell = lastRow.GetCell(keyIndex);
+                ICell currentKeyCell = currentRow.GetCell(keyIndex);
+                if (lastKeyCell.ToString().Equals(currentKeyCell.ToString()))
+                {
+                    if (mergeBase == -1)
+                    {
+                        mergeBase = i - 1;
+                    }
+                }
+                else
+                {
+                    if (mergeBase != -1)
+                    {
+                        for(int j = 0; j < columnsCount; j++)
+                        {
+                            bool needMerge = true;
+                            for(int k = 0; k < avoidMergeColumns.Length; k++)
+                            {
+                                if (avoidMergeColumns[k] == j)
+                                {
+                                    needMerge = false;
+                                    break;
+                                }
+                            }
+                            if (!needMerge)
+                            {
+                                continue;
+                            }
+                            sheet.AddMergedRegion(
+                                new NPOI.SS.Util.CellRangeAddress(mergeBase, i - 1, j, j));
+                        }
+                        mergeBase = -1;
+                    }
+                }
+            }
+        }
+        /*
+        [NonAction]
+        private void MergeSheet(ISheet sheet, int keyIndex, int[] avoidMergeColumns )
+        {
+            int columnsCount = 0;
+            int rowCount = sheet.LastRowNum;
+            if (rowCount > 0)
+            {
+                columnsCount = sheet.GetRow(0).Cells.Count;
+            }
+            if (columnsCount == 0)
+            {
+                return ;
+            }
+            for(int i = 0; i < columnsCount; i++)
+            {
+                int mergeBase = -1;
+                for(int j = 2; j < rowCount; j++)
+                {
+                    IRow currentRow = sheet.GetRow(j);
+                    IRow lastRow = sheet.GetRow(j - 1);
+                    ICell currentCell = currentRow.GetCell(i);
+                    ICell lastCell = lastRow.GetCell(i);
+                    if (currentCell.ToString().Equals(lastCell.ToString()))
+                    {
+                        if (mergeBase == -1)
+                        {
+                            mergeBase = j - 1;
+                        }
+                    }
+                    else
+                    {
+                        if (mergeBase != -1)
+                        {
+                            sheet.AddMergedRegion(new NPOI.SS.Util.CellRangeAddress(
+                                mergeBase, j - 1, i, i));
+                            mergeBase = -1;
+                        }
+                    }
+                    
+                }
+            }
+            
+        }
+        */
         [HttpGet("{taskId}")]
         public async Task<ActionResult<IEnumerable<MaintainLog>>> GetSteps(int taskId)
         {
@@ -136,12 +761,12 @@ namespace SnowmeetApi.Controllers.Maintain
         public async Task<ActionResult<IEnumerable<MaintainLog>>> GetStepsByStaff(int taskId, string sessionKey)
         {
             MiniAppUserController mUserController = new MiniAppUserController(_context, _originConfig);
-            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
+            UnicUser user = await UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (!user.isAdmin)
             {
                 return BadRequest();
             }
-            var logList = await  _context.MaintainLog.Where(m => m.task_id == taskId).OrderBy(m => m.id).ToListAsync();
+            var logList = await _context.MaintainLog.Where(m => m.task_id == taskId).OrderBy(m => m.id).ToListAsync();
             for (int i = 0; i < logList.Count; i++)
             {
                 if (!user.miniAppOpenId.Trim().Equals(logList[i].staff_open_id.Trim()))
@@ -151,7 +776,7 @@ namespace SnowmeetApi.Controllers.Maintain
                 MiniAppUser staffUser = (MiniAppUser)((OkObjectResult)(await mUserController.GetMiniAppUser(logList[i].staff_open_id, sessionKey)).Result).Value;
                 logList[i].staffName = staffUser.real_name.Trim();
             }
-            return Ok(logList); 
+            return Ok(logList);
         }
 
         [HttpGet("{id}")]
@@ -159,7 +784,7 @@ namespace SnowmeetApi.Controllers.Maintain
         {
             memo = Util.UrlDecode(memo);
             sessionKey = Util.UrlDecode(sessionKey);
-            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
+            UnicUser user = await UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (!user.isAdmin)
             {
                 return BadRequest();
@@ -191,13 +816,13 @@ namespace SnowmeetApi.Controllers.Maintain
                     var ticketLogList = await _context.ticketLog.Where(log => log.memo.IndexOf("养护订单获得，ID:" + taskId.ToString()) >= 0).ToListAsync();
                     if (ticketLogList == null || ticketLogList.Count == 0)
                     {
-                        
+
 
                         MaintainLive task = await _context.MaintainLives.FindAsync(taskId);
                         if (task != null)
                         {
                             OrderOnlinesController orderHelper = new OrderOnlinesController(_context, _originConfig);
-                            OrderOnline order = (await orderHelper.GetWholeOrderByStaff(task.order_id, sessionKey)).Value;
+                            OrderOnline order = (await orderHelper.GetWholeOrderByStaff((int)task.order_id, sessionKey)).Value;
                             if (order != null)
                             {
                                 TicketController ticketHelper = new TicketController(_context, _originConfig);
@@ -230,7 +855,7 @@ namespace SnowmeetApi.Controllers.Maintain
                                     + "|" + Util.GetMoneyStr(orderPrice - paidAmount) + "|" + order.pay_method.Trim() + "|养护券",
                                     "点击下面👇公众号菜单查看", "", sessionKey);
                             }
-                            
+
 
 
 
@@ -269,12 +894,13 @@ namespace SnowmeetApi.Controllers.Maintain
             {
                 return Ok(true);
             }
-            else{
+            else
+            {
                 return Ok(false);
             }
         }
 
-       
+
         private bool MaintainLogExists(int id)
         {
             return _context.MaintainLog.Any(e => e.id == id);

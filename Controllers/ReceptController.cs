@@ -205,7 +205,7 @@ namespace SnowmeetApi.Controllers
                     mOrder.open_id = openId.Trim();
                     _context.Entry(mOrder).State = EntityState.Modified;
                     await _context.SaveChangesAsync();
-                    orderId = mOrder.order_id;
+                    orderId = (int)mOrder.order_id;
                     break;
                 default:
                     break;

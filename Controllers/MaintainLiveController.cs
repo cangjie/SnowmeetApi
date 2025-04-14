@@ -366,7 +366,7 @@ namespace SnowmeetApi.Controllers
             {
                 task.open_id = "";
             }
-            task.order = (OrderOnline)((OkObjectResult)(await _orderHelper.GetWholeOrderByStaff(task.order_id, sessionKey)).Result).Value;
+            task.order = (OrderOnline)((OkObjectResult)(await _orderHelper.GetWholeOrderByStaff((int)task.order_id, sessionKey)).Result).Value;
             task.log = await _context.MaintainLog.Where(l => l.task_id == id).OrderBy(m => m.id).AsNoTracking().ToArrayAsync();
             return Ok(task);
         }
@@ -576,7 +576,7 @@ namespace SnowmeetApi.Controllers
 
                 if (m.order_id > 0)
                 {
-                    m.order = (OrderOnline)((OkObjectResult)(await _orderHelper.GetWholeOrderByStaff(m.order_id, sessionKey)).Result).Value;
+                    m.order = (OrderOnline)((OkObjectResult)(await _orderHelper.GetWholeOrderByStaff((int)m.order_id, sessionKey)).Result).Value;
                 }
             }
 

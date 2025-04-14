@@ -2,6 +2,10 @@
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Linq;
+using Aop.Api.Domain;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion.Internal;
+using SnowmeetApi.Models.Users;
 
 namespace SnowmeetApi.Models
 {
@@ -22,7 +26,7 @@ namespace SnowmeetApi.Models
         public DateTime? pick_date { get; set; } = DateTime.Now;
 
         public int task_id { get; set; } = 0;
-        public int order_id { get; set; } = 0;
+        public int? order_id { get; set; } = 0;
         public string service_open_id { get; set; } = "";
         public string confirmed_equip_type { get; set; }
         public string confirmed_brand { get; set; }
@@ -63,7 +67,7 @@ namespace SnowmeetApi.Models
         public string pay_method { get; set; } = "微信支付";
         public string pay_memo { get; set; } = "";
         public string? pick_veri_code { get; set;} = null;
-        [NotMapped]
+        [ForeignKey(nameof(Maintain.MaintainLog.task_id))]
         public List<Maintain.MaintainLog> taskLog { get; set; }
 
         [NotMapped]
@@ -78,7 +82,8 @@ namespace SnowmeetApi.Models
 
         [NotMapped]
         public Maintain.MaintainLog[] log { get; set; }
-
+        [NotMapped]
+        public MemberSocialAccount staffMsa {get; set;}
         
         public string outStatus
         {
@@ -110,6 +115,74 @@ namespace SnowmeetApi.Models
             {
                 return 146;
             }
+        }
+
+        public string staffRecept
+        {
+            get
+            {
+                string name = "";
+                if (staffMsa != null && staffMsa.member != null)
+                {
+                    name = staffMsa.member.real_name.Trim();
+                }
+                return name.Trim();
+            }
+        }
+        public string staffSafe
+        {
+            get
+            {
+                return getStaffFromLog("安全检查");
+            }
+        }
+        public string staffEdge
+        {
+            get
+            {
+                return getStaffFromLog("修刃");
+            }
+        }
+        public string staffVax
+        {
+            get
+            {
+                return getStaffFromLog("打蜡");
+            }
+        }
+        public string staffUnVax
+        {
+            get
+            {
+                return getStaffFromLog("刮蜡");
+            }
+        }
+        public string staffRepair
+        {
+            get
+            {
+                return getStaffFromLog("维修");
+            }
+        }
+        public string staffGiveOut
+        {
+            get
+            {
+                return getStaffFromLog("发板");
+            }
+        }
+        private string getStaffFromLog(string step)
+        {
+            string name = "";
+            if (taskLog != null)
+            {
+                List<Maintain.MaintainLog> l = taskLog.Where(l => l.step_name.Trim().Equals(step)).ToList();
+                if (l.Count > 0)
+                {
+                    name = l[0].msa.member.real_name.Trim();
+                }
+            }
+            return name.Trim();
         }
 
 
