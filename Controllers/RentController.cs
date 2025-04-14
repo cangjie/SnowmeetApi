@@ -1818,7 +1818,8 @@ namespace SnowmeetApi.Controllers
             {
                 return BadRequest();
             }
-            return Ok(await GetUnReturnedItems(shop));
+            List<RentOrder> list = await GetUnReturnedItems(shop);
+            return Ok(list);
         }
 
 
