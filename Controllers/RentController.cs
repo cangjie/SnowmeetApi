@@ -215,7 +215,7 @@ namespace SnowmeetApi.Controllers
         public async Task ExportExcel()
         {
             List<RentOrder> rL = await GetAllFinishedRentOrder();
-            string[] commonHead = new string[] { "序号", "子序号", "订单号", "门店", "业务日期", "业务时间", "结算日期", "结算时间", "总计押金", "总计租金", "总计赔偿", "总计超时", 
+            string[] commonHead = new string[] { "序号", "子序号", "类型", "隐匿" , "订单号", "门店", "业务日期", "业务时间", "结算日期", "结算时间", "总计押金", "总计租金", "总计赔偿", "总计超时", 
                 "总计减免", "总计实收", "支付方式", "接待", "物品编号", "物品分类", "物品名称", "押金", "租金单价", "租金小计" ,  "赔偿", "超时", "发放日期", "发放时间", "发放人", 
                 "起租日期", "起租时间", "退租日期", "退租时间", "归还日期", "归还时间", "接收人" };
             string[] paymentHead = new string[] {"收款门店", "微信支付单号", "商户订单号", "金额", "收款日期", "收款时间"};
