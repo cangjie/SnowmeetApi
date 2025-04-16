@@ -65,7 +65,7 @@ namespace SnowmeetApi.Models
 
         public int referee_member_id { get; set; } = 0;
         public DateTime biz_date {get; set;} = DateTime.Now;
-
+        public string? payer { get; set; } = null;
         public bool isEnterain
         {
             get
@@ -101,10 +101,10 @@ namespace SnowmeetApi.Models
                         Mi7Order mi7Order = mi7Orders[i];
                         if (mi7Order.order_type.Trim().Equals("招待"))
                         {
-                            name = mi7Order.enterain_real_name.Trim();
-                            cell = mi7Order.enterain_cell.Trim();
-                            gender = mi7Order.enterain_gender.Trim();
-                            memberId = mi7Order.enterain_member_id;
+                            name = mi7Order.enterain_real_name == null? "" : mi7Order.enterain_real_name.Trim();
+                            cell = mi7Order.enterain_cell == null? "" : mi7Order.enterain_cell.Trim();
+                            gender = mi7Order.enterain_gender == null ? "" : mi7Order.enterain_gender.Trim();
+                            memberId = mi7Order.enterain_member_id == null? 0 :  mi7Order.enterain_member_id;
                             break;
                         }
                     }

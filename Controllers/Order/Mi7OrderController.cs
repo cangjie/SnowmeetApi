@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Aop.Api.Domain;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -25,6 +26,123 @@ namespace SnowmeetApi.Controllers.Order
             _context = context;
             _config = config;
         }
+        [HttpGet]
+        public async Task<ActionResult<OrderOnline>> AddSupplementOrder(string shop, string openId, string cell,
+            string? payer, string name, string gender, bool urgent, string? mi7No, DateTime? bizDate, string payMethod,
+            double salePrice, double dealPrice, string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            UnicUser user = await UnicUser.GetUnicUserAsync(sessionKey, _context);
+            if (!user.isAdmin)
+            {
+                return BadRequest();
+            }
+            if (mi7No != null)
+            {
+                List<Mi7Order> mi7List = await _context.mi7Order.Where(m => m.mi7_order_id.Trim().Equals(mi7No))
+                    .AsNoTracking().ToListAsync();
+                if (mi7List.Count > 0)
+                {
+                    return NotFound();
+                }
+            }
+            if (shop.Trim().Equals(""))
+            { 
+                return BadRequest();
+            }
+            name = (name + " " + (gender.Trim().Equals("男")?"先生":(gender.Trim().Equals("女")?"女士":""))).Trim();
+            if (urgent)
+            {
+                if (bizDate == null)
+                {
+                    return BadRequest();
+                }
+                mi7No = null;
+            }
+            else
+            {
+                if (mi7No == null)
+                {
+                    return BadRequest();
+                }
+                bizDate = null;
+            }
+            int payState = 1;
+            DateTime? payTime = DateTime.Now;
+            
+            if (payMethod.Trim().Equals("微信支付"))
+            {
+                payState = 0;
+                payTime = null;
+            }
+            Mi7Order mi7Order = new Mi7Order()
+            {
+                id = 0,
+                order_id = 0,
+                mi7_order_id = mi7No,
+                sale_price = salePrice,
+                real_charge = dealPrice,
+                barCode = "",
+                order_type = "",
+                biz_date = bizDate,
+                supplement = 1,
+                /*
+                enterain_member_id = memberId,
+                enterain_date = date.Date,
+                enterain_gender = gender.Trim(),
+                enterain_cell = cell.Trim(),
+                enterain_real_name = name.Trim(),
+                */
+                valid = 1
+            };
+            OrderOnline order = new OrderOnline()
+            {
+                id = 0,
+                type = "店销现货",
+                shop = shop.Trim(),
+                open_id = openId,
+                cell_number = cell.Trim(),
+                name = name.Trim() + " " + (gender.Trim().Equals("男") ? "先生" : (gender.Trim().Equals("女") ? "女士" : "")),
+                pay_method = payMethod,
+                pay_state = payState,
+                pay_time = payTime,
+                order_price = 0,
+                order_real_pay_price = 0,
+                pay_memo = "",
+                code = "",
+                syssn = "",
+                memo = "补单",
+                other_discount = 0,
+                final_price = 0,
+                staff_open_id = user.member.wechatMiniOpenId,
+                biz_date = bizDate == null ? DateTime.Now : (DateTime.Now),
+                payer = payer
+                
+                //mi7Orders = new List<Mi7Order>() { mi7Order }
+
+            };
+            mi7Order.order_id = order.id;
+            order.mi7Orders = new List<Mi7Order>() { mi7Order };
+            if (!payMethod.Trim().Equals("微信支付"))
+            {
+                OrderPayment payment = new OrderPayment()
+                {
+                    id = 0,
+                    order_id = order.id,
+                    pay_method = payMethod,
+                    amount = dealPrice,
+                    status = "支付成功",
+                    create_date = DateTime.Now,
+                    open_id = openId,
+                    staff_open_id = user.member.wechatMiniOpenId.Trim()
+                };
+                order.paymentList = new List<OrderPayment>() { payment };
+            }
+            await _context.OrderOnlines.AddAsync(order);
+            await _context.SaveChangesAsync();
+            return Ok(order);
+            //return BadRequest();
+        }
         [HttpGet("{mi7OrderId}")]
         public async Task<ActionResult<Mi7Order>> Enterain(string mi7OrderId, string name, 
             string cell, string gender, DateTime date, double price, string shop, string sessionKey, string sessionType = "wechat_mini_openid")
@@ -47,11 +165,12 @@ namespace SnowmeetApi.Controllers.Order
             }
             int? memberId = null;
             MemberController _memberHelper = new MemberController(_context, _config);
-            Member member = (Member)((OkObjectResult)(await _memberHelper.GetMemberByCell(cell, sessionKey, sessionType)).Result).Value;
+            Models.Users.Member member = (Models.Users.Member)((OkObjectResult)(await _memberHelper.GetMemberByCell(cell, sessionKey, sessionType)).Result).Value;
             if (member != null)
             {
                 memberId = member.id;
             }
+
             OrderOnline order = new OrderOnline()
             {
                 id = 0,

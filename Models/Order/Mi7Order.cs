@@ -11,7 +11,7 @@ namespace SnowmeetApi.Models.Order
         [Key]
         public int id { get; set; }
         public int order_id { get; set; }
-        public string mi7_order_id { get; set; }
+        public string? mi7_order_id { get; set; }
         public double sale_price { get; set; }
         public double real_charge { get; set; }
         public string barCode { get; set; } = "";
@@ -21,6 +21,8 @@ namespace SnowmeetApi.Models.Order
         public string? enterain_real_name {get; set;} = null;
         public string? enterain_gender {get; set;} = null;
         public int valid {get; set;} = 1;
+        public int supplement { get; set; } = 1;
+        public DateTime? biz_date { get; set; } = null;
         public DateTime? enterain_date { get; set;} = null;
         [ForeignKey("order_id")]
         public OrderOnline? order {get; set;}
