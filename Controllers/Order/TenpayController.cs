@@ -402,6 +402,10 @@ namespace SnowmeetApi.Controllers
 
             switch (order.type.Trim())
             {
+                case "店销现货":
+                    Mi7OrderController mi7Helper = new Mi7OrderController(_db, _oriConfig, _http);
+                    await mi7Helper.SetMi7OrderPaySuccess(order.id);
+                    break;
                 case "服务":
                     MaintainLiveController maintainHelper = new MaintainLiveController(_db, _oriConfig);
                     await maintainHelper.MaitainOrderPaySuccess(order.id);

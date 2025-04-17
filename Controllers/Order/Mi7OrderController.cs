@@ -21,10 +21,23 @@ namespace SnowmeetApi.Controllers.Order
     {
         private readonly ApplicationDBContext _context;
         private IConfiguration _config;
-        public Mi7OrderController(ApplicationDBContext context, IConfiguration config)
+        private IHttpContextAccessor _http;
+        public Mi7OrderController(ApplicationDBContext context, IConfiguration config, IHttpContextAccessor http)
         {
             _context = context;
             _config = config;
+            _http = http;
+        }
+        [NonAction]
+        public async Task SetMi7OrderPaySuccess(int orderId)
+        {
+            List<Mi7Order> mOrder = await _context.mi7Order.Where(m => m.order_id == orderId).ToListAsync();
+            for (int i = 0; i < mOrder.Count; i++)
+            {
+                mOrder[i].valid = 1;
+                _context.Entry(mOrder[i]).State = EntityState.Modified;
+            }
+            await _context.SaveChangesAsync();
         }
         [HttpGet]
         public async Task<ActionResult<OrderOnline>> AddSupplementOrder(string shop, string openId, string cell,
@@ -39,7 +52,7 @@ namespace SnowmeetApi.Controllers.Order
             }
             if (mi7No != null)
             {
-                List<Mi7Order> mi7List = await _context.mi7Order.Where(m => m.mi7_order_id.Trim().Equals(mi7No))
+                List<Mi7Order> mi7List = await _context.mi7Order.Where(m => m.mi7_order_id.Trim().Equals(mi7No) && m.valid == 1)
                     .AsNoTracking().ToListAsync();
                 if (mi7List.Count > 0)
                 {
@@ -69,11 +82,12 @@ namespace SnowmeetApi.Controllers.Order
             }
             int payState = 1;
             DateTime? payTime = DateTime.Now;
-            
+            int mi7Valid = 1;
             if (payMethod.Trim().Equals("微信支付"))
             {
                 payState = 0;
                 payTime = null;
+                mi7Valid = 0;
             }
             Mi7Order mi7Order = new Mi7Order()
             {
@@ -83,17 +97,9 @@ namespace SnowmeetApi.Controllers.Order
                 sale_price = salePrice,
                 real_charge = dealPrice,
                 barCode = "",
-                order_type = "",
                 biz_date = bizDate,
                 supplement = 1,
-                /*
-                enterain_member_id = memberId,
-                enterain_date = date.Date,
-                enterain_gender = gender.Trim(),
-                enterain_cell = cell.Trim(),
-                enterain_real_name = name.Trim(),
-                */
-                valid = 1
+                valid = mi7Valid
             };
             OrderOnline order = new OrderOnline()
             {
@@ -106,14 +112,14 @@ namespace SnowmeetApi.Controllers.Order
                 pay_method = payMethod,
                 pay_state = payState,
                 pay_time = payTime,
-                order_price = 0,
-                order_real_pay_price = 0,
+                order_price = salePrice,
+                order_real_pay_price = dealPrice,
                 pay_memo = "",
                 code = "",
                 syssn = "",
                 memo = "补单",
                 other_discount = 0,
-                final_price = 0,
+                final_price = dealPrice,
                 staff_open_id = user.member.wechatMiniOpenId,
                 biz_date = bizDate == null ? DateTime.Now : (DateTime.Now),
                 payer = payer
@@ -214,6 +220,21 @@ namespace SnowmeetApi.Controllers.Order
             await _context.mi7Order.AddAsync(mi7Order);
             await _context.SaveChangesAsync();
             return Ok(mi7Order);
+        }
+        [HttpGet("{orderId}")]
+        public async Task<ActionResult<OrderPayment>> PaySupplement(int orderId, string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            OrderOnline order = await _context.OrderOnlines.FindAsync(orderId);
+            if (!order.pay_method.Trim().Equals("微信支付"))
+            {
+                return BadRequest();
+            }
+            OrderPaymentController _payHelper = new OrderPaymentController(_context, _config, _http);
+            OrderPayment payment = (OrderPayment)((OkObjectResult)(await _payHelper.CreatePayment(orderId, order.pay_method, order.final_price)).Result).Value ;
+            payment = (OrderPayment)((OkObjectResult)(await _payHelper.Pay(payment.id, sessionKey)).Result).Value;
+            return Ok(payment);
+            //return BadRequest();
         }
 
         [HttpGet]

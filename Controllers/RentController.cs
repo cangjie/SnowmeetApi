@@ -875,7 +875,7 @@ namespace SnowmeetApi.Controllers
                     p.staffMember = msaL[0].member;
                 }
             }
-            Mi7OrderController _mi7Helper = new Mi7OrderController(_context, _oriConfig);
+            Mi7OrderController _mi7Helper = new Mi7OrderController(_context, _oriConfig, _httpContextAccessor);
             for(int i = 0; rentOrder.rewards != null && i < rentOrder.rewards.Count; i++)
             {
                 if (rentOrder.rewards[i].mi7_order_id != null && !rentOrder.rewards[i].mi7_order_id.Trim().Equals(""))
