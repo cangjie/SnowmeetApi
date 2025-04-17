@@ -22,6 +22,7 @@ using System.Text.RegularExpressions;
 
 using static SKIT.FlurlHttpClient.Wechat.TenpayV3.Models.CreateHKTransactionMicroPayRequest.Types;
 using SnowmeetApi.Controllers.User;
+using AlipaySDKNet.OpenAPI.Model;
 
 namespace SnowmeetApi.Controllers
 {
@@ -830,7 +831,7 @@ namespace SnowmeetApi.Controllers
             {
                 return NoContent();
             }
-            order.staff_open_id = user.miniAppOpenId.Trim();
+            order.staff_open_id = user.member.wechatMiniOpenId.Trim();
             if (order.have_score == 1)
             {
                 order.score_rate = Util.GetScoreRate(order.final_price, order.order_price);
@@ -848,6 +849,25 @@ namespace SnowmeetApi.Controllers
             {
                 return NoContent();
             }
+            
+            if (!order.pay_method.Trim().Equals("微信支付") && order.type.Trim().Equals("店销现货"))
+            {
+                OrderPayment payment = new OrderPayment()
+                {
+                    id = 0,
+                    order_id = order.id,
+                    pay_method = order.pay_method.Trim(),
+                    amount = order.final_price,
+                    status = "待支付",
+                    staff_open_id = order.staff_open_id,
+                    create_date = DateTime.Now
+                };
+                await _context.OrderPayment.AddAsync(payment);
+                await _context.SaveChangesAsync();
+                //order.paymentList.Add(payment);
+            }
+            
+            
             /*
             if (order.mi7Orders != null)
             {
@@ -860,6 +880,7 @@ namespace SnowmeetApi.Controllers
                 await _context.SaveChangesAsync();
             }
             */
+            /*
             if (order.payments != null && order.payments.Length == 1 && !(order.pay_memo.Trim().Equals("无需付款") || order.pay_memo.Trim().Equals("暂缓支付")))
             {
                 var payment = order.payments[0];
@@ -870,7 +891,7 @@ namespace SnowmeetApi.Controllers
                 await _context.SaveChangesAsync();
                 order.payments[0] = payment;
             }
-
+            */
             if (order.user != null && order.user.open_id != null &&  !order.user.open_id.Trim().Equals(""))
             {
                 //MiniAppUser customerUser = await _context.MiniAppUsers.FindAsync(order.user.open_id);
