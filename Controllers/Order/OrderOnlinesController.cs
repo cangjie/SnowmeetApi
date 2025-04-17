@@ -831,7 +831,7 @@ namespace SnowmeetApi.Controllers
             {
                 return NoContent();
             }
-            order.staff_open_id = user.miniAppOpenId.Trim();
+            order.staff_open_id = user.member.wechatMiniOpenId.Trim();
             if (order.have_score == 1)
             {
                 order.score_rate = Util.GetScoreRate(order.final_price, order.order_price);
@@ -859,6 +859,7 @@ namespace SnowmeetApi.Controllers
                     pay_method = order.pay_method.Trim(),
                     amount = order.final_price,
                     status = "待支付",
+                    staff_open_id = order.staff_open_id,
                     create_date = DateTime.Now
                 };
                 await _context.OrderPayment.AddAsync(payment);
