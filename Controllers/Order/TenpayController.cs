@@ -103,7 +103,7 @@ namespace SnowmeetApi.Controllers
                 string mi7Nos = "";
                 for (int i = 0; i < mi7Orders.Length; i++)
                 {
-                    mi7Nos = mi7Nos.Trim() + " " + mi7Orders[i].mi7_order_id.Trim();
+                    mi7Nos = mi7Nos.Trim() + " " + ((mi7Orders[i].mi7_order_id == null)? "紧急开单" : mi7Orders[i].mi7_order_id.Trim());
                 }
                 desc = desc + mi7Nos.Trim();
             }
