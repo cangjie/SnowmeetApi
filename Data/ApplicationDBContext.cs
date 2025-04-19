@@ -57,6 +57,7 @@ namespace SnowmeetApi.Data
             modelBuilder.Entity<Mi7ExportedSaleDetail>().HasNoKey();
             modelBuilder.Entity<MemberSocialAccount>().HasMany<MaintainLog>().WithOne(l => l.msa).HasForeignKey(l => l.staff_open_id).HasPrincipalKey(m => m.num);
             modelBuilder.Entity<MemberSocialAccount>().HasMany<Models.MaintainLive>().WithOne(m => m.staffMsa).HasForeignKey(m => m.service_open_id).HasPrincipalKey(m => m.num);
+            modelBuilder.Entity<MemberSocialAccount>().HasMany<Models.Rent.RentOrder>().WithOne(r => r.receptMsa).HasForeignKey(m => m.staff_open_id).HasPrincipalKey(m => m.num);
 
         }
 

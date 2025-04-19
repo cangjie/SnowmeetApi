@@ -5,6 +5,8 @@ using System.Collections;
 using System.Collections.Generic;
 using SnowmeetApi.Models.Order;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
+using System.Linq;
+using SnowmeetApi.Models.Users;
 
 namespace SnowmeetApi.Models.Rent
 {
@@ -99,15 +101,7 @@ namespace SnowmeetApi.Models.Rent
         }
         [ForeignKey("submit_return_id")]
         public List<Recept> recept {get; set;} = new List<Recept>();
-        /*
-        [NotMapped]
-        public OrderOnline _order;
-        */
-
-        /*
-        [NotMapped]
-        public RentOrderDetail[]? _details;
-        */
+ 
         [NotMapped]
         public string textColor { get; set; } = "black";
 
@@ -302,6 +296,18 @@ namespace SnowmeetApi.Models.Rent
 
         [NotMapped]
         public bool _forceTerminate = false;
+        public double totalRental
+        {
+            get
+            {
+                double totalRental = 0;
+                for (int i = 0; rentalDetails != null && i < rentalDetails.Count; i++)
+                {
+                    totalRental += rentalDetails[i].rental;
+                }
+                return totalRental;
+            }
+        }
 
         [NotMapped]
         public List<RentalDetail> rentalDetails
@@ -554,8 +560,68 @@ namespace SnowmeetApi.Models.Rent
             }
         }
         
-
-        
+        public double totalReparation
+        {
+            get
+            {
+                double r = 0;
+                for(int i = 0; i < details.Count; i++)
+                {
+                    r += details[i].reparation;
+                }
+                return r;
+            }
+        }
+        public double totalOvertimeCharge
+        {
+            get
+            {
+                double r = 0;
+                for(int i = 0; i < details.Count; i++)
+                {
+                    r += details[i].overtime_charge;
+                }
+                return r;
+            }
+        }
+        public double totalDiscount
+        {
+            get
+            {
+                double d = 0;
+                for(int i = 0; i < details.Count; i++)
+                {
+                    d += details[i].rental_discount + details[i].rental_ticket_discount;
+                }
+                return d + this.discount;
+            }
+        }
+        public double totalDeposit
+        {
+            get
+            {
+                double d = 0;
+                for(int i = 0; i < payments.Count; i++)
+                {
+                    if (payments[i].status.Trim().Equals("支付成功") 
+                        && !payments[i].pay_method.Trim().Equals("储值支付"))
+                    {
+                        d += payments[i].amount;
+                    }
+                    
+                }
+                return d;
+            }
+        }
+        public double totalEarn
+        {
+            get
+            {
+                return totalCharge - totalRefund;
+            }
+        }
+        [NotMapped]
+        public MemberSocialAccount? receptMsa {get; set;}
 
     }
 }
