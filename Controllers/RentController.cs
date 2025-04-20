@@ -999,7 +999,7 @@ namespace SnowmeetApi.Controllers
                 }
 
             }
-            return Ok(bList);
+            return Ok(bList.OrderByDescending(b => b.id).ToList());
         }
 
         [HttpPost]
