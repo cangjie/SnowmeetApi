@@ -5,6 +5,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
 using System.Runtime.InteropServices.Marshalling;
 using System.Security.Cryptography;
+using SnowmeetApi.Models.Users;
 namespace SnowmeetApi.Models.Rent
 {
 	[Table("rent_list_detail")]
@@ -209,7 +210,43 @@ namespace SnowmeetApi.Models.Rent
                 _item = value;
             }
         }
+        
+        public string GetLogStaffName(string status)
+        {
+            string name = "";
+            for (int i = 0; i < log.Count; i++)
+            {
+                RentOrderDetailLog l = log[i];
+                if (l.status.Trim().Equals(status.Trim()))
+                {
+                    name = (l.msa != null && l.msa.member != null && l.msa.member.real_name != null) ? l.msa.member.real_name : "";
+                    break;
+                }
+            }
+            return name.Trim();
+        }
+        [NotMapped]
+        public MemberSocialAccount? returnMsa {get; set;} = null;
 
+        public string pickStaffName
+        {
+            get
+            {
+                return GetLogStaffName("已发放");
+            }
+        }
+        public string returnStaffName
+        {
+            get
+            {
+                string returnName = GetLogStaffName("已归还");
+                if (returnName.Trim().Equals(""))
+                {
+                    returnName = (returnMsa != null && returnMsa.member != null) ? returnMsa.member.real_name.Trim() : "";
+                }
+                return returnName;
+            }
+        }
        
 
     }

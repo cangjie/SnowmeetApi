@@ -4,6 +4,7 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
+using SnowmeetApi.Models.Users;
 
 namespace SnowmeetApi.Models.Order
 {
@@ -51,6 +52,37 @@ namespace SnowmeetApi.Models.Order
         public List<Models.Order.PaymentShare> shares {get;set;}
         public string? deposit_type { get; set; } = null;
         public string? deposit_sub_type {get; set; } = null;
+        public string shop
+        {
+            get
+            {
+                string shop = "";
+                if (out_trade_no!=null)
+                {
+                    if (out_trade_no.StartsWith("WT"))
+                    {
+                        shop = "万龙体验中心";
+                    }
+                    else if (out_trade_no.StartsWith("WF"))
+                    {
+                        shop = "万龙服务中心";
+                    }
+                    else if (out_trade_no.StartsWith("NS"))
+                    {
+                        shop = "南山";
+                    }
+                    else if (out_trade_no.StartsWith("YY"))
+                    {
+                        shop = "渔阳";
+                    }
+                    else if (out_trade_no.StartsWith("HB"))
+                    {
+                        shop = "怀北";
+                    }
+                }
+                return shop;
+            }
+        }
 
 
         [NotMapped]
@@ -81,7 +113,8 @@ namespace SnowmeetApi.Models.Order
 
         [NotMapped]
         public OrderOnline order {get; set;}
-
+        [NotMapped]
+        public MemberSocialAccount? msa {get; set;} = null;
 
         [NotMapped]
         public string staffName

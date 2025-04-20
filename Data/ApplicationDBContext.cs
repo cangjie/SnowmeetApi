@@ -58,7 +58,10 @@ namespace SnowmeetApi.Data
             modelBuilder.Entity<MemberSocialAccount>().HasMany<MaintainLog>().WithOne(l => l.msa).HasForeignKey(l => l.staff_open_id).HasPrincipalKey(m => m.num);
             modelBuilder.Entity<MemberSocialAccount>().HasMany<Models.MaintainLive>().WithOne(m => m.staffMsa).HasForeignKey(m => m.service_open_id).HasPrincipalKey(m => m.num);
             modelBuilder.Entity<MemberSocialAccount>().HasMany<Models.Rent.RentOrder>().WithOne(r => r.receptMsa).HasForeignKey(m => m.staff_open_id).HasPrincipalKey(m => m.num);
-
+            modelBuilder.Entity<MemberSocialAccount>().HasMany<Models.Rent.RentOrderDetailLog>().WithOne(r => r.msa).HasForeignKey(m => m.staff_open_id).HasPrincipalKey(m => m.num);
+            modelBuilder.Entity<MemberSocialAccount>().HasMany<Models.Rent.RentOrderDetail>().WithOne(r => r.returnMsa).HasForeignKey(m => m.return_staff).HasPrincipalKey(m => m.num);
+            modelBuilder.Entity<MemberSocialAccount>().HasMany<Models.Order.OrderPaymentRefund>().WithOne(r => r.msa).HasForeignKey(m => m.oper).HasPrincipalKey(m => m.num);
+            modelBuilder.Entity<MemberSocialAccount>().HasMany<Models.Order.OrderPayment>().WithOne(r => r.msa).HasForeignKey(m => m.staff_open_id).HasPrincipalKey(m => m.num);
         }
 
         public DbSet<MaintainLive> MaintainLives {get; set;}

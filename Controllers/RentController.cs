@@ -209,12 +209,25 @@ namespace SnowmeetApi.Controllers
             List<RentOrder> rList = await _context.RentOrder
                 .Where(r => r.finish_date >= startDate.Date && r.finish_date <= endDate.Date && r.closed == 0)
                 .Include(r => r.receptMsa).ThenInclude(m => m.member)
+
+                .Include(r => r.order).ThenInclude(o => o.paymentList.Where(p => p.status.Equals("支付成功")))
+                    .ThenInclude(p => p.msa).ThenInclude(m => m.member)
+
                 .Include(r => r.order).ThenInclude(o => o.paymentList.Where(p => p.status.Equals("支付成功")))
                     .ThenInclude(p => p.refunds.Where(r => r.state == 1 || !r.refund_id.Trim().Equals("")))
+                        .ThenInclude(r => r.msa).ThenInclude(m => m.member)
+
+                .Include(r => r.additionalPayments.Where(a => a.is_paid == 1))
+                    .ThenInclude(a => a.order).ThenInclude(o => o.paymentList.Where(p => p.status.Equals("支付成功")))
+                        .ThenInclude(p => p.msa).ThenInclude(m => m.member)
+
                 .Include(r => r.additionalPayments.Where(a => a.is_paid == 1))
                     .ThenInclude(a => a.order).ThenInclude(o => o.paymentList.Where(p => p.status.Equals("支付成功")))
                         .ThenInclude(p => p.refunds.Where(r => r.state == 1 || !r.refund_id.Trim().Equals("")))
+                            .ThenInclude(r => r.msa).ThenInclude(m => m.member)
                 .Include(r => r.details.Where(d => d.valid == 1).OrderByDescending(d => d.id)).ThenInclude(d => d.log)
+                    .ThenInclude(d => d.msa).ThenInclude(m => m.member)
+
                 .OrderByDescending(o => o.id).AsNoTracking().ToListAsync();
             return rList;
         }
@@ -226,6 +239,7 @@ namespace SnowmeetApi.Controllers
             for (int i = 0; i < commonHead.Length; i++)
             {
                 headList.Add(commonHead[i]);
+
             }
             for (int i = 0; i < maxPaymentCount; i++)
             {
@@ -258,12 +272,106 @@ namespace SnowmeetApi.Controllers
                 headCell.SetCellValue(headList[i].Trim());
                 headCell.SetCellType(CellType.String);
                 headCell.CellStyle = headStyle;
+                if (i < commonHead.Length)
+                {
+                    switch (i)
+                    {
+                        case 0:
+                        case 1:
+                        case 2:
+                        case 16:
+                            sheet.SetColumnWidth(i, 1000);
+                            break;
+                        case 3:
+                        case 21:
+                        case 24:
+                        case 25:
+                            sheet.SetColumnWidth(i, 1500);
+                            break;
+                        
+                        case 5:
+                        case 7:
+                        case 26:
+                        case 29:
+                        case 31:
+                        case 33:
+                            sheet.SetColumnWidth(i, 3000);
+                            break;
+                        case 6:
+                        case 8:
+                        case 27:
+                        case 30:
+                        case 32:
+                        case 34:
+                            sheet.SetColumnWidth(i, 2500);
+                            break;
+                        case 4:
+                        case 17:
+                        case 28:
+                        case 35:
+                        
+                            sheet.SetColumnWidth(i, 3500);
+                            break;
+                        default:
+
+                            break;
+                    }
+                }
+                else if (i < commonHead.Length + maxPaymentCount * paymentHead.Length)
+                {
+                    switch((i - commonHead.Length) % paymentHead.Length)
+                    {
+                        case 0:
+                            sheet.SetColumnWidth(i, 3500);
+                            break;
+                        case 2:
+                        case 3:
+                            sheet.SetColumnWidth(i, 7200);
+                            break;
+                        case 5:
+                            sheet.SetColumnWidth(i, 3000);
+                            break;
+                        case 6:
+                            sheet.SetColumnWidth(i, 2500);
+                            break;
+                        case 7:
+                            sheet.SetColumnWidth(i, 3500);
+                            break;
+                        default:
+                            break;
+                    }
+                }
+                else
+                {
+                    switch((i - commonHead.Length - maxPaymentCount * paymentHead.Length) % refundHead.Length)
+                    {
+                        case 0:
+                            sheet.SetColumnWidth(i, 7200);
+                            break;
+                        case 1:
+                            sheet.SetColumnWidth(i, 11000);
+                            break;
+                        case 3:
+                            sheet.SetColumnWidth(i, 3000);
+                            break;
+                        case 4:
+                            sheet.SetColumnWidth(i, 2500);
+                            break;
+                        case 5:
+                            sheet.SetColumnWidth(i, 3500);
+                            break;
+                        default:
+                            break;
+                    }
+                    
+                }
             }
         }
         [NonAction]
-        public void ExportExcelInsertData(XSSFWorkbook workbook, ISheet sheet, List<RentOrder> l,
+        public async Task ExportExcelInsertData(XSSFWorkbook workbook, ISheet sheet, List<RentOrder> l,
             string[] commonHead, string[] paymentHead, string[] refundHead, int maxPaymentCount, int maxRefundCount)
         {
+            string nullStr = "【-】";
             int index = 0;
             int subIndex = 0;
             IFont fontProblem = workbook.CreateFont();
@@ -279,7 +387,7 @@ namespace SnowmeetApi.Controllers
             fontUseDeposit.Color = NPOI.HSSF.Util.HSSFColor.Green.Index;
 
             IDataFormat format = workbook.CreateDataFormat();
-            for (int i = 0; i < l.Count; i++)
+            for (int i = 0; i < l.Count ; i++)
             {
                 ICellStyle styleText = workbook.CreateCellStyle();
                 styleText.Alignment = HorizontalAlignment.Center;
@@ -352,6 +460,14 @@ namespace SnowmeetApi.Controllers
                 for (int j = 0; j < o.details.Count; j++)
                 {
                     RentOrderDetail detail = o.details[j];
+                    if (detail.returnStaffName.Trim().Equals(""))
+                    {
+                        await _context.RentOrderDetail.Entry(detail).Reference(d => d.returnMsa).LoadAsync();
+                        if (detail.returnMsa != null)
+                        {
+                            await _context.memberSocialAccount.Entry(detail.returnMsa).Reference(m => m.member).LoadAsync();
+                        }
+                    }
                     subIndex++;
                     IRow dr = sheet.CreateRow(subIndex);
                     dr.Height = 500;
@@ -365,7 +481,6 @@ namespace SnowmeetApi.Controllers
                                 cell.SetCellValue(index);
                                 cell.CellStyle = styleNum;
                                 needMerge = true;
-                                
                                 break;
                             case 1:
                                 cell.SetCellValue(subIndex);
@@ -375,79 +490,78 @@ namespace SnowmeetApi.Controllers
                                 cell.SetCellValue(type);
                                 cell.CellStyle = styleText;
                                 needMerge = true;
-                                
                                 break;
                             case 3:
                                 cell.SetCellValue(o.id);
                                 cell.CellStyle = styleNum;
                                 needMerge = true;
-                                
+
                                 break;
                             case 4:
                                 cell.SetCellValue(o.shop.Trim());
                                 cell.CellStyle = styleText;
                                 needMerge = true;
-                                
+
                                 break;
                             case 5:
                                 cell.SetCellValue(o.create_date);
                                 cell.CellStyle = styleDate;
                                 needMerge = true;
-                                
+
                                 break;
                             case 6:
                                 cell.SetCellValue(o.create_date);
                                 cell.CellStyle = styleTime;
                                 needMerge = true;
-                                
+
                                 break;
                             case 7:
                                 cell.SetCellValue((DateTime)o.finish_date);
                                 cell.CellStyle = styleDate;
                                 needMerge = true;
-                                
+
                                 break;
                             case 8:
                                 cell.SetCellValue((DateTime)o.finish_date);
                                 cell.CellStyle = styleTime;
                                 needMerge = true;
-                                
+
                                 break;
                             case 9:
                                 cell.SetCellValue(o.totalDeposit);
                                 cell.CellStyle = styleMoney;
                                 needMerge = true;
-                                
+
                                 break;
                             case 10:
                                 cell.SetCellValue(o.totalRental);
                                 cell.CellStyle = styleMoney;
                                 needMerge = true;
-                                
+
                                 break;
                             case 11:
                                 cell.SetCellValue(o.totalReparation);
                                 cell.CellStyle = styleMoney;
                                 needMerge = true;
-                                
+
                                 break;
                             case 12:
                                 cell.SetCellValue(o.totalOvertimeCharge);
                                 cell.CellStyle = styleMoney;
                                 needMerge = true;
-                                
+
                                 break;
                             case 13:
                                 cell.SetCellValue(o.totalDiscount);
                                 cell.CellStyle = styleMoney;
                                 needMerge = true;
-                                
+
                                 break;
                             case 14:
                                 cell.SetCellValue(o.totalCharge);
                                 cell.CellStyle = styleMoney;
                                 needMerge = true;
-                               
+
                                 break;
                             case 15:
                                 cell.SetCellValue(o.totalRefund);
@@ -460,7 +574,7 @@ namespace SnowmeetApi.Controllers
                                 needMerge = true;
                                 break;
                             case 17:
-                                cell.SetCellValue((o.receptMsa==null)?"":o.receptMsa.member.real_name);
+                                cell.SetCellValue((o.receptMsa == null) ? "" : o.receptMsa.member.real_name);
                                 cell.CellStyle = styleText;
                                 needMerge = true;
                                 break;
@@ -476,6 +590,139 @@ namespace SnowmeetApi.Controllers
                                 cell.SetCellValue(detail.rent_item_name);
                                 cell.CellStyle = styleText;
                                 break;
+                            case 21:
+                                cell.SetCellValue(detail.deposit);
+                                cell.CellStyle = styleMoney;
+                                break;
+                            case 22:
+                                cell.SetCellValue(detail.unit_rental);
+                                cell.CellStyle = styleMoney;
+                                break;
+                            case 23:
+                                double summary = 0;
+                                for (int m = 0; m < o.rentalDetails.Count; m++)
+                                {
+                                    if (o.rentalDetails[m].item.id == detail.id)
+                                    {
+                                        summary += o.rentalDetails[m].rental;
+                                    }
+                                }
+                                cell.SetCellValue(summary);
+                                cell.CellStyle = styleMoney;
+                                break;
+                            case 24:
+                                cell.SetCellValue(detail.reparation);
+                                cell.CellStyle = styleMoney;
+                                break;
+                            case 25:
+                                cell.SetCellValue(detail.overtime_charge);
+                                cell.CellStyle = styleMoney;
+                                break;
+                            case 26:
+                                if (detail.pick_date == null)
+                                {
+                                    cell.SetCellValue(nullStr);
+                                    cell.CellStyle = styleText;
+                                }
+                                else
+                                {
+                                    cell.SetCellValue((DateTime)detail.pick_date);
+                                    cell.CellStyle = styleDate;
+                                }
+
+                                break;
+                            case 27:
+                                if (detail.pick_date == null)
+                                {
+                                    cell.SetCellValue(nullStr);
+                                    cell.CellStyle = styleText;
+                                }
+                                else
+                                {
+                                    cell.SetCellValue((DateTime)detail.pick_date);
+                                    cell.CellStyle = styleTime;
+                                }
+                                break;
+                            case 28:
+                                cell.SetCellValue(detail.pickStaffName);
+                                cell.CellStyle = styleText;
+                                break;
+                            case 29:
+                                if (detail.start_date == null)
+                                {
+                                    cell.SetCellValue(nullStr);
+                                    cell.CellStyle = styleText;
+                                }
+                                else
+                                {
+                                    cell.SetCellValue((DateTime)detail.start_date);
+                                    cell.CellStyle = styleDate;
+                                }
+                                break;
+                            case 30:
+                                if (detail.start_date == null)
+                                {
+                                    cell.SetCellValue(nullStr);
+                                    cell.CellStyle = styleText;
+                                }
+                                else
+                                {
+                                    cell.SetCellValue((DateTime)detail.start_date);
+                                    cell.CellStyle = styleTime;
+                                }
+                                break;
+                            case 31:
+                                if (detail.real_end_date == null)
+                                {
+                                    cell.SetCellValue(nullStr);
+                                    cell.CellStyle = styleText;
+                                }
+                                else
+                                {
+                                    cell.SetCellValue((DateTime)detail.real_end_date);
+                                    cell.CellStyle = styleDate;
+                                }
+                                break;
+                            case 32:
+                                if (detail.real_end_date == null)
+                                {
+                                    cell.SetCellValue(nullStr);
+                                    cell.CellStyle = styleText;
+                                }
+                                else
+                                {
+                                    cell.SetCellValue((DateTime)detail.real_end_date);
+                                    cell.CellStyle = styleTime;
+                                }
+                                break;
+                            case 33:
+                                if (detail.return_date == null)
+                                {
+                                    cell.SetCellValue(nullStr);
+                                    cell.CellStyle = styleText;
+                                }
+                                else
+                                {
+                                    cell.SetCellValue((DateTime)detail.return_date);
+                                    cell.CellStyle = styleDate;
+                                }
+                                break;
+                            case 34:
+                                if (detail.return_date == null)
+                                {
+                                    cell.SetCellValue(nullStr);
+                                    cell.CellStyle = styleText;
+                                }
+                                else
+                                {
+                                    cell.SetCellValue((DateTime)detail.return_date);
+                                    cell.CellStyle = styleTime;
+                                }
+                                break;
+                            case 35:
+                                cell.SetCellValue(detail.returnStaffName);
+                                cell.CellStyle = styleText;
+                                break;
                             default:
                                 break;
                         }
@@ -488,9 +735,135 @@ namespace SnowmeetApi.Controllers
                         }
 
                     }
+                    for (int k = 0; k < maxPaymentCount; k++)
+                    {
+                        if (k < o.payments.Count)
+                        {
+                            OrderPayment payment = o.payments[k];
+                            for (int m = 0; m < paymentHead.Length; m++)
+                            {
+                                int colIndex = commonHead.Length + k * paymentHead.Length + m;
+                                ICell cell = dr.CreateCell(colIndex);
+                                switch ((colIndex - commonHead.Length) % paymentHead.Length)
+                                {
+                                    case 0:
+                                        cell.SetCellValue(payment.shop.Trim());
+                                        cell.CellStyle = styleText;
+                                        break;
+                                    case 1:
+                                        cell.SetCellValue(payment.pay_method.Trim());
+                                        cell.CellStyle = styleText;
+                                        break;
+                                    case 2:
+                                        cell.SetCellValue(payment.wepay_trans_id != null ? payment.wepay_trans_id.Trim() : "");
+                                        cell.CellStyle = styleText;
+                                        break;
+                                    case 3:
+                                        cell.SetCellValue(payment.out_trade_no != null ? payment.out_trade_no.Trim() : "");
+                                        cell.CellStyle = styleText;
+                                        break;
+                                    case 4:
+                                        cell.SetCellValue(payment.amount);
+                                        cell.CellStyle = styleMoney;
+                                        break;
+                                    case 5:
+                                        cell.SetCellValue(payment.create_date);
+                                        cell.CellStyle = styleDate;
+                                        break;
+                                    case 6:
+                                        cell.SetCellValue(payment.create_date);
+                                        cell.CellStyle = styleTime;
+                                        break;
+                                    case 7:
+                                        string staffName = (payment.msa != null && payment.msa.member != null) ? payment.msa.member.real_name : "";
+                                        cell.SetCellValue(staffName);
+                                        cell.CellStyle = styleText;
+                                        break;
+                                    default:
+                                        break;
+                                }
+                                if (o.details.Count > 1 && j == o.details.Count - 1)
+                                {
+                                    sheet.AddMergedRegion(new NPOI.SS.Util.CellRangeAddress(subIndex - o.details.Count + 1, subIndex, colIndex, colIndex));
+                                }
+                            }
+                        }
+                        else
+                        {
+                            for (int m = 0; m < paymentHead.Length; m++)
+                            {
+                                int colIndex = commonHead.Length + k * paymentHead.Length + m;
+                                ICell cell = dr.CreateCell(colIndex);
+                                cell.SetCellValue(nullStr);
+                                cell.CellStyle = styleText;
+                                if (o.details.Count > 1 && j == o.details.Count - 1)
+                                {
+                                    sheet.AddMergedRegion(new NPOI.SS.Util.CellRangeAddress(subIndex - o.details.Count + 1, subIndex, colIndex, colIndex));
+                                }
+                            }
+                        }
+                    }
+                    for (int k = 0; k < maxRefundCount; k++)
+                    {
+                        if (k < o.refunds.Count)
+                        {
+                            OrderPaymentRefund refund = o.refunds[k];
+                            for (int m = 0; m < refundHead.Length; m++)
+                            {
+                                int colIndex = commonHead.Length + maxPaymentCount * paymentHead.Length + k * refundHead.Length + m;
+                                ICell cell = dr.CreateCell(colIndex);
+                                switch ((colIndex - commonHead.Length - maxPaymentCount * paymentHead.Length) % refundHead.Length)
+                                {
+                                    case 0:
+                                        cell.SetCellValue(refund.refund_id != null ? refund.refund_id.Trim() : "");
+                                        cell.CellStyle = styleText;
+                                        break;
+                                    case 1:
+                                        cell.SetCellValue(refund.out_refund_no != null ? refund.out_refund_no.Trim() : "");
+                                        cell.CellStyle = styleText;
+                                        break;
+                                    case 2:
+                                        cell.SetCellValue(refund.amount);
+                                        cell.CellStyle = styleMoney;
+                                        break;
+                                    case 3:
+                                        cell.SetCellValue(refund.create_date);
+                                        cell.CellStyle = styleDate;
+                                        break;
+                                    case 4:
+                                        cell.SetCellValue(refund.create_date);
+                                        cell.CellStyle = styleTime;
+                                        break;
+                                    case 5:
+                                        string staffName = (refund.msa != null && refund.msa.member != null) ? refund.msa.member.real_name : "";
+                                        cell.SetCellValue(staffName);
+                                        cell.CellStyle = styleText;
+                                        break;
+                                    default:
+                                        break;
+                                }
+                                if (o.details.Count > 1 && j == o.details.Count - 1)
+                                {
+                                    sheet.AddMergedRegion(new NPOI.SS.Util.CellRangeAddress(subIndex - o.details.Count + 1, subIndex, colIndex, colIndex));
+                                }
+                            }
+                        }
+                        else
+                        {
+                            for (int m = 0; m < refundHead.Length; m++)
+                            {
+                                int colIndex = commonHead.Length + maxPaymentCount * paymentHead.Length + k * refundHead.Length + m;
+                                ICell cell = dr.CreateCell(colIndex);
+                                cell.SetCellValue(nullStr);
+                                cell.CellStyle = styleText;
+                                if (o.details.Count > 1 && j == o.details.Count - 1)
+                                {
+                                    sheet.AddMergedRegion(new NPOI.SS.Util.CellRangeAddress(subIndex - o.details.Count + 1, subIndex, colIndex, colIndex));
+                                }
+                            }
+                        }
+                    }
                 }
-
-
             }
         }
         [HttpGet]
@@ -509,14 +882,14 @@ namespace SnowmeetApi.Controllers
             string[] commonHead = new string[] { "序号", "子序号", "类型", "订单号", "门店", "业务日期", "业务时间", "结算日期", "结算时间", "总计押金", "总计租金", "总计赔偿", "总计超时",
                 "总计减免", "总计实收", "总计退款", "结余","接待", "物品编号", "物品分类", "物品名称", "押金", "租金单价", "租金小计" ,  "赔偿", "超时", "发放日期", "发放时间", "发放人",
                 "起租日期", "起租时间", "退租日期", "退租时间", "归还日期", "归还时间", "接收人" };
-            string[] paymentHead = new string[] { "收款门店", "微信支付单号", "商户订单号", "金额", "收款日期", "收款时间" };
+            string[] paymentHead = new string[] { "收款门店", "支付方式", "微信支付单号", "商户订单号", "金额", "收款日期", "收款时间", "收款人" };
             string[] refundHead = new string[] { "退款单号", "商户退款单号", "退款金额", "退款日期", "退款时间", "退款人" };
 
 
             XSSFWorkbook workbook = new XSSFWorkbook();
             ISheet sheet = workbook.CreateSheet("24-25租赁");
             ExportExcelCreateHead(workbook, sheet, commonHead, paymentHead, refundHead, maxPaymentCount, maxRefundCount);
-            ExportExcelInsertData(workbook, sheet, rList, commonHead, paymentHead, refundHead, maxPaymentCount, maxRefundCount);
+            await ExportExcelInsertData(workbook, sheet, rList, commonHead, paymentHead, refundHead, maxPaymentCount, maxRefundCount);
             string filePath = $"{Environment.CurrentDirectory}" + "/rent.xlsx";
             using (var file = System.IO.File.Create(filePath))
             {

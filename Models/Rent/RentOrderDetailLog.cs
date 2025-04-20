@@ -15,5 +15,7 @@ namespace SnowmeetApi.Models.Rent
 		public string staff_open_id { get; set; }
 		public string? prev_value {get; set; }
 		public DateTime create_date { get; set; } = DateTime.Now;
+		[NotMapped]
+		public MemberSocialAccount? msa {get; set;}
 	}
 }

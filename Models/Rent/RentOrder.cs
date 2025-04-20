@@ -622,6 +622,7 @@ namespace SnowmeetApi.Models.Rent
         }
         [NotMapped]
         public MemberSocialAccount? receptMsa {get; set;}
+        
 
     }
 }
