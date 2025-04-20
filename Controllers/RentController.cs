@@ -288,7 +288,7 @@ namespace SnowmeetApi.Controllers
                         case 25:
                             sheet.SetColumnWidth(i, 1500);
                             break;
-                        
+
                         case 5:
                         case 7:
                         case 26:
@@ -309,7 +309,7 @@ namespace SnowmeetApi.Controllers
                         case 17:
                         case 28:
                         case 35:
-                        
+
                             sheet.SetColumnWidth(i, 3500);
                             break;
                         default:
@@ -319,7 +319,7 @@ namespace SnowmeetApi.Controllers
                 }
                 else if (i < commonHead.Length + maxPaymentCount * paymentHead.Length)
                 {
-                    switch((i - commonHead.Length) % paymentHead.Length)
+                    switch ((i - commonHead.Length) % paymentHead.Length)
                     {
                         case 0:
                             sheet.SetColumnWidth(i, 3500);
@@ -343,7 +343,7 @@ namespace SnowmeetApi.Controllers
                 }
                 else
                 {
-                    switch((i - commonHead.Length - maxPaymentCount * paymentHead.Length) % refundHead.Length)
+                    switch ((i - commonHead.Length - maxPaymentCount * paymentHead.Length) % refundHead.Length)
                     {
                         case 0:
                             sheet.SetColumnWidth(i, 7200);
@@ -363,7 +363,7 @@ namespace SnowmeetApi.Controllers
                         default:
                             break;
                     }
-                    
+
                 }
             }
         }
@@ -387,7 +387,7 @@ namespace SnowmeetApi.Controllers
             fontUseDeposit.Color = NPOI.HSSF.Util.HSSFColor.Green.Index;
 
             IDataFormat format = workbook.CreateDataFormat();
-            for (int i = 0; i < l.Count ; i++)
+            for (int i = 0; i < l.Count; i++)
             {
                 ICellStyle styleText = workbook.CreateCellStyle();
                 styleText.Alignment = HorizontalAlignment.Center;
@@ -478,8 +478,11 @@ namespace SnowmeetApi.Controllers
                         switch (k)
                         {
                             case 0:
-                                cell.SetCellValue(index);
-                                cell.CellStyle = styleNum;
+                                if (j == 0)
+                                {
+                                    cell.SetCellValue(index);
+                                    cell.CellStyle = styleNum;
+                                }
                                 needMerge = true;
                                 break;
                             case 1:
@@ -487,95 +490,126 @@ namespace SnowmeetApi.Controllers
                                 cell.CellStyle = styleNum;
                                 break;
                             case 2:
-                                cell.SetCellValue(type);
-                                cell.CellStyle = styleText;
+                                if (j == 0)
+                                {
+                                    cell.SetCellValue(type);
+                                    cell.CellStyle = styleText;
+                                }
                                 needMerge = true;
                                 break;
                             case 3:
-                                cell.SetCellValue(o.id);
-                                cell.CellStyle = styleNum;
-                                needMerge = true;
+                                if (j == 0)
+                                {
+                                    cell.SetCellValue(o.id);
+                                    cell.CellStyle = styleNum;
+                                }
 
+                                needMerge = true;
                                 break;
                             case 4:
-                                cell.SetCellValue(o.shop.Trim());
-                                cell.CellStyle = styleText;
+                                if (j == 0)
+                                {
+                                    cell.SetCellValue(o.shop.Trim());
+                                    cell.CellStyle = styleText;
+                                }
+
                                 needMerge = true;
 
                                 break;
                             case 5:
-                                cell.SetCellValue(o.create_date);
-                                cell.CellStyle = styleDate;
+                                if (j == 0)
+                                {
+                                    cell.SetCellValue(o.create_date);
+                                    cell.CellStyle = styleDate;
+                                }
+
                                 needMerge = true;
 
                                 break;
                             case 6:
-                                cell.SetCellValue(o.create_date);
-                                cell.CellStyle = styleTime;
+                                if (j == 0)
+                                {
+                                    cell.SetCellValue(o.create_date);
+                                    cell.CellStyle = styleTime;
+                                }
+
                                 needMerge = true;
 
                                 break;
                             case 7:
-                                cell.SetCellValue((DateTime)o.finish_date);
-                                cell.CellStyle = styleDate;
+                                if (j == 0)
+                                {
+                                    cell.SetCellValue((DateTime)o.finish_date);
+                                    cell.CellStyle = styleDate;
+                                }
+
                                 needMerge = true;
 
                                 break;
                             case 8:
-                                cell.SetCellValue((DateTime)o.finish_date);
-                                cell.CellStyle = styleTime;
+                                if (j == 0)
+                                {
+                                    cell.SetCellValue((DateTime)o.finish_date);
+                                    cell.CellStyle = styleTime;
+                                }
+
                                 needMerge = true;
 
                                 break;
                             case 9:
-                                cell.SetCellValue(o.totalDeposit);
+
+                                cell.SetCellValue(j == 0 ? o.totalDeposit : 0);
                                 cell.CellStyle = styleMoney;
                                 needMerge = true;
 
                                 break;
                             case 10:
-                                cell.SetCellValue(o.totalRental);
+                                cell.SetCellValue(j == 0 ? o.totalRental : 0);
                                 cell.CellStyle = styleMoney;
                                 needMerge = true;
 
                                 break;
                             case 11:
-                                cell.SetCellValue(o.totalReparation);
+                                cell.SetCellValue(j == 0 ? o.totalReparation : 0);
                                 cell.CellStyle = styleMoney;
                                 needMerge = true;
 
                                 break;
                             case 12:
-                                cell.SetCellValue(o.totalOvertimeCharge);
+                                cell.SetCellValue(j == 0 ? o.totalOvertimeCharge : 0);
                                 cell.CellStyle = styleMoney;
                                 needMerge = true;
 
                                 break;
                             case 13:
-                                cell.SetCellValue(o.totalDiscount);
+                                cell.SetCellValue(j == 0 ? o.totalDiscount : 0);
                                 cell.CellStyle = styleMoney;
                                 needMerge = true;
 
                                 break;
                             case 14:
-                                cell.SetCellValue(o.totalCharge);
+                                cell.SetCellValue(j == 0 ? o.totalCharge : 0);
                                 cell.CellStyle = styleMoney;
                                 needMerge = true;
 
                                 break;
                             case 15:
-                                cell.SetCellValue(o.totalRefund);
+                                cell.SetCellValue(j == 0 ? o.totalRefund : 0);
                                 cell.CellStyle = styleMoney;
                                 needMerge = true;
                                 break;
                             case 16:
-                                cell.SetCellValue(o.totalEarn);
+                                cell.SetCellValue(j == 0 ? o.totalEarn : 0);
                                 cell.CellStyle = styleMoney;
                                 needMerge = true;
                                 break;
                             case 17:
-                                cell.SetCellValue((o.receptMsa == null) ? "" : o.receptMsa.member.real_name);
-                                cell.CellStyle = styleText;
+                                if (j == 0)
+                                {
+                                    cell.SetCellValue((o.receptMsa == null) ? "" : o.receptMsa.member.real_name);
+                                    cell.CellStyle = styleText;
+                                }
+
                                 needMerge = true;
                                 break;
                             case 18:
@@ -595,7 +629,7 @@ namespace SnowmeetApi.Controllers
                                 cell.CellStyle = styleMoney;
                                 break;
                             case 22:
-                                cell.SetCellValue(detail.unit_rental);
+                                cell.SetCellValue(j == 0 ? detail.unit_rental : 0);
                                 cell.CellStyle = styleMoney;
                                 break;
                             case 23:
@@ -607,15 +641,15 @@ namespace SnowmeetApi.Controllers
                                         summary += o.rentalDetails[m].rental;
                                     }
                                 }
-                                cell.SetCellValue(summary);
+                                cell.SetCellValue(j == 0 ? summary : 0);
                                 cell.CellStyle = styleMoney;
                                 break;
                             case 24:
-                                cell.SetCellValue(detail.reparation);
+                                cell.SetCellValue(j == 0 ? detail.reparation : 0);
                                 cell.CellStyle = styleMoney;
                                 break;
                             case 25:
-                                cell.SetCellValue(detail.overtime_charge);
+                                cell.SetCellValue(j == 0 ? detail.overtime_charge : 0);
                                 cell.CellStyle = styleMoney;
                                 break;
                             case 26:
@@ -747,37 +781,65 @@ namespace SnowmeetApi.Controllers
                                 switch ((colIndex - commonHead.Length) % paymentHead.Length)
                                 {
                                     case 0:
-                                        cell.SetCellValue(payment.shop.Trim());
-                                        cell.CellStyle = styleText;
+                                        if (j == 0)
+                                        {
+                                            cell.SetCellValue(payment.shop.Trim());
+                                            cell.CellStyle = styleText;
+                                        }
+
                                         break;
                                     case 1:
-                                        cell.SetCellValue(payment.pay_method.Trim());
-                                        cell.CellStyle = styleText;
+                                        if (j == 0)
+                                        {
+                                            cell.SetCellValue(payment.pay_method.Trim());
+                                            cell.CellStyle = styleText;
+                                        }
+
                                         break;
                                     case 2:
-                                        cell.SetCellValue(payment.wepay_trans_id != null ? payment.wepay_trans_id.Trim() : "");
-                                        cell.CellStyle = styleText;
+                                        if (j == 0)
+                                        {
+                                            cell.SetCellValue(payment.wepay_trans_id != null ? payment.wepay_trans_id.Trim() : "");
+                                            cell.CellStyle = styleText;
+                                        }
+
                                         break;
                                     case 3:
-                                        cell.SetCellValue(payment.out_trade_no != null ? payment.out_trade_no.Trim() : "");
-                                        cell.CellStyle = styleText;
+                                        if (j == 0)
+                                        {
+                                            cell.SetCellValue(payment.out_trade_no != null ? payment.out_trade_no.Trim() : "");
+                                            cell.CellStyle = styleText;
+                                        }
+
                                         break;
                                     case 4:
-                                        cell.SetCellValue(payment.amount);
+                                        cell.SetCellValue(j == 0 ? payment.amount : 0);
                                         cell.CellStyle = styleMoney;
                                         break;
                                     case 5:
-                                        cell.SetCellValue(payment.create_date);
-                                        cell.CellStyle = styleDate;
+                                        if (j == 0)
+                                        {
+                                            cell.SetCellValue(payment.create_date);
+                                            cell.CellStyle = styleDate;
+                                        }
+
                                         break;
                                     case 6:
-                                        cell.SetCellValue(payment.create_date);
-                                        cell.CellStyle = styleTime;
+                                        if (j == 0)
+                                        {
+                                            cell.SetCellValue(payment.create_date);
+                                            cell.CellStyle = styleTime;
+                                        }
+
                                         break;
                                     case 7:
-                                        string staffName = (payment.msa != null && payment.msa.member != null) ? payment.msa.member.real_name : "";
-                                        cell.SetCellValue(staffName);
-                                        cell.CellStyle = styleText;
+                                        if (j == 0)
+                                        {
+                                            string staffName = (payment.msa != null && payment.msa.member != null) ? payment.msa.member.real_name : "";
+                                            cell.SetCellValue(staffName);
+                                            cell.CellStyle = styleText;
+                                        }
+
                                         break;
                                     default:
                                         break;
@@ -815,29 +877,50 @@ namespace SnowmeetApi.Controllers
                                 switch ((colIndex - commonHead.Length - maxPaymentCount * paymentHead.Length) % refundHead.Length)
                                 {
                                     case 0:
-                                        cell.SetCellValue(refund.refund_id != null ? refund.refund_id.Trim() : "");
-                                        cell.CellStyle = styleText;
+                                        if (j == 0)
+                                        {
+                                            cell.SetCellValue(refund.refund_id != null ? refund.refund_id.Trim() : "");
+                                            cell.CellStyle = styleText;
+                                        }
+
                                         break;
                                     case 1:
-                                        cell.SetCellValue(refund.out_refund_no != null ? refund.out_refund_no.Trim() : "");
-                                        cell.CellStyle = styleText;
+                                        if (j == 0)
+                                        {
+                                            cell.SetCellValue(refund.out_refund_no != null ? refund.out_refund_no.Trim() : "");
+                                            cell.CellStyle = styleText;
+                                        }
+
                                         break;
                                     case 2:
-                                        cell.SetCellValue(refund.amount);
+
+                                        cell.SetCellValue(j == 0 ? refund.amount : 0);
                                         cell.CellStyle = styleMoney;
                                         break;
                                     case 3:
-                                        cell.SetCellValue(refund.create_date);
-                                        cell.CellStyle = styleDate;
+                                        if (j == 0)
+                                        {
+                                            cell.SetCellValue(refund.create_date);
+                                            cell.CellStyle = styleDate;
+                                        }
+
                                         break;
                                     case 4:
-                                        cell.SetCellValue(refund.create_date);
-                                        cell.CellStyle = styleTime;
+                                        if (j == 0)
+                                        {
+                                            cell.SetCellValue(refund.create_date);
+                                            cell.CellStyle = styleTime;
+                                        }
+
                                         break;
                                     case 5:
-                                        string staffName = (refund.msa != null && refund.msa.member != null) ? refund.msa.member.real_name : "";
-                                        cell.SetCellValue(staffName);
-                                        cell.CellStyle = styleText;
+                                        if (j == 0)
+                                        {
+                                            string staffName = (refund.msa != null && refund.msa.member != null) ? refund.msa.member.real_name : "";
+                                            cell.SetCellValue(staffName);
+                                            cell.CellStyle = styleText;
+                                        }
+
                                         break;
                                     default:
                                         break;
@@ -999,7 +1082,7 @@ namespace SnowmeetApi.Controllers
                 }
 
             }
-            return Ok(bList.OrderByDescending(b => b.settleDate).ToList());
+            return Ok(bList.OrderByDescending(b => b.id).ToList());
         }
 
         [HttpPost]
