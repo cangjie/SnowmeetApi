@@ -214,7 +214,7 @@ namespace SnowmeetApi.Models.Rent
         public string GetLogStaffName(string status)
         {
             string name = "";
-            for (int i = 0; i < log.Count; i++)
+            for (int i = 0; log != null &&  i < log.Count; i++)
             {
                 RentOrderDetailLog l = log[i];
                 if (l.status.Trim().Equals(status.Trim()))
