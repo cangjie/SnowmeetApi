@@ -15,7 +15,7 @@ namespace SnowmeetApi.Models.SkiPass
         public string resort {get; set;}
         public string product_name {get; set;}
         public int count {get; set;}
-        
+       
         public int? order_id {get; set;}
         public double? deal_price {get; set;}
         public double? ticket_price {get; set;}

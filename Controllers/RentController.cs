@@ -285,41 +285,44 @@ namespace SnowmeetApi.Controllers
                             sheet.SetColumnWidth(i, 1000);
                             break;
                         case 3:
-                        case 21:
-                        case 24:
+                        case 22:
                         case 25:
+                        case 26:
                         case 9:
+                        case 10:
                         case 14:
                         case 15:
                         case 16:
                         case 1:
-                            sheet.SetColumnWidth(i, 1800);
+                            sheet.SetColumnWidth(i, 3500);
                             break;
 
                         case 5:
                         case 7:
-                        case 26:
-                        case 29:
-                        case 31:
-                        case 33:
-                            sheet.SetColumnWidth(i, 3000);
-                            break;
-                        case 6:
-                        case 8:
                         case 27:
                         case 30:
                         case 32:
                         case 34:
+                            sheet.SetColumnWidth(i, 3000);
+                            break;
+                        case 6:
+                        case 8:
+                        case 28:
+                        case 31:
+                        case 33:
+                        case 35:
                             sheet.SetColumnWidth(i, 2500);
                             break;
                         case 4:
-                        case 17:
-                        case 28:
-                        case 35:
+                        case 18:
+                        case 29:
+                        case 36:
 
                             sheet.SetColumnWidth(i, 3500);
                             break;
-
+                        case 17:
+                            sheet.SetColumnWidth(i, 10000);
+                            break;
                         default:
 
                             break;
@@ -337,7 +340,7 @@ namespace SnowmeetApi.Controllers
                             sheet.SetColumnWidth(i, 7200);
                             break;
                         case 4:
-                            sheet.SetColumnWidth(i, 1800);
+                            sheet.SetColumnWidth(i, 2900);
                             break;
                         case 5:
                             sheet.SetColumnWidth(i, 3000);
@@ -363,7 +366,7 @@ namespace SnowmeetApi.Controllers
                             sheet.SetColumnWidth(i, 11000);
                             break;
                         case 2:
-                            sheet.SetColumnWidth(i, 1800);
+                            sheet.SetColumnWidth(i, 2900);
                             break;
                         case 3:
                             sheet.SetColumnWidth(i, 3000);
@@ -636,6 +639,12 @@ namespace SnowmeetApi.Controllers
                                 needMerge = true;
                                 break;
                             case 17:
+                                string memo = o.memo + (o.order != null && o.order.memo != null ? o.order.memo.Trim() : "");
+                                cell.SetCellValue(memo);
+                                cell.CellStyle = styleText;
+                                needMerge = true;
+                                break;
+                            case 18:
                                 if (j == 0)
                                 {
                                     cell.SetCellValue((o.receptMsa == null) ? "" : o.receptMsa.member.real_name);
@@ -644,27 +653,27 @@ namespace SnowmeetApi.Controllers
 
                                 needMerge = true;
                                 break;
-                            case 18:
+                            case 19:
                                 cell.SetCellValue(detail.rent_item_code);
                                 cell.CellStyle = styleText;
                                 break;
-                            case 19:
+                            case 20:
                                 cell.SetCellValue(detail.rent_item_class);
                                 cell.CellStyle = styleText;
                                 break;
-                            case 20:
+                            case 21:
                                 cell.SetCellValue(detail.rent_item_name);
                                 cell.CellStyle = styleText;
                                 break;
-                            case 21:
+                            case 22:
                                 cell.SetCellValue(detail.deposit);
                                 cell.CellStyle = styleMoney;
                                 break;
-                            case 22:
+                            case 23:
                                 cell.SetCellValue(j == 0 ? detail.unit_rental : 0);
                                 cell.CellStyle = styleMoney;
                                 break;
-                            case 23:
+                            case 24:
                                 double summary = 0;
                                 for (int m = 0; m < o.rentalDetails.Count; m++)
                                 {
@@ -676,15 +685,15 @@ namespace SnowmeetApi.Controllers
                                 cell.SetCellValue(j == 0 ? summary : 0);
                                 cell.CellStyle = styleMoney;
                                 break;
-                            case 24:
+                            case 25:
                                 cell.SetCellValue(j == 0 ? detail.reparation : 0);
                                 cell.CellStyle = styleMoney;
                                 break;
-                            case 25:
+                            case 26:
                                 cell.SetCellValue(j == 0 ? detail.overtime_charge : 0);
                                 cell.CellStyle = styleMoney;
                                 break;
-                            case 26:
+                            case 27:
                                 if (detail.pick_date == null)
                                 {
                                     cell.SetCellValue(nullStr);
@@ -697,7 +706,7 @@ namespace SnowmeetApi.Controllers
                                 }
 
                                 break;
-                            case 27:
+                            case 28:
                                 if (detail.pick_date == null)
                                 {
                                     cell.SetCellValue(nullStr);
@@ -709,21 +718,9 @@ namespace SnowmeetApi.Controllers
                                     cell.CellStyle = styleTime;
                                 }
                                 break;
-                            case 28:
+                            case 29:
                                 cell.SetCellValue(detail.pickStaffName);
                                 cell.CellStyle = styleText;
-                                break;
-                            case 29:
-                                if (detail.start_date == null)
-                                {
-                                    cell.SetCellValue(nullStr);
-                                    cell.CellStyle = styleText;
-                                }
-                                else
-                                {
-                                    cell.SetCellValue((DateTime)detail.start_date);
-                                    cell.CellStyle = styleDate;
-                                }
                                 break;
                             case 30:
                                 if (detail.start_date == null)
@@ -734,19 +731,19 @@ namespace SnowmeetApi.Controllers
                                 else
                                 {
                                     cell.SetCellValue((DateTime)detail.start_date);
-                                    cell.CellStyle = styleTime;
+                                    cell.CellStyle = styleDate;
                                 }
                                 break;
                             case 31:
-                                if (detail.real_end_date == null)
+                                if (detail.start_date == null)
                                 {
                                     cell.SetCellValue(nullStr);
                                     cell.CellStyle = styleText;
                                 }
                                 else
                                 {
-                                    cell.SetCellValue((DateTime)detail.real_end_date);
-                                    cell.CellStyle = styleDate;
+                                    cell.SetCellValue((DateTime)detail.start_date);
+                                    cell.CellStyle = styleTime;
                                 }
                                 break;
                             case 32:
@@ -758,19 +755,19 @@ namespace SnowmeetApi.Controllers
                                 else
                                 {
                                     cell.SetCellValue((DateTime)detail.real_end_date);
-                                    cell.CellStyle = styleTime;
+                                    cell.CellStyle = styleDate;
                                 }
                                 break;
                             case 33:
-                                if (detail.return_date == null)
+                                if (detail.real_end_date == null)
                                 {
                                     cell.SetCellValue(nullStr);
                                     cell.CellStyle = styleText;
                                 }
                                 else
                                 {
-                                    cell.SetCellValue((DateTime)detail.return_date);
-                                    cell.CellStyle = styleDate;
+                                    cell.SetCellValue((DateTime)detail.real_end_date);
+                                    cell.CellStyle = styleTime;
                                 }
                                 break;
                             case 34:
@@ -782,10 +779,22 @@ namespace SnowmeetApi.Controllers
                                 else
                                 {
                                     cell.SetCellValue((DateTime)detail.return_date);
-                                    cell.CellStyle = styleTime;
+                                    cell.CellStyle = styleDate;
                                 }
                                 break;
                             case 35:
+                                if (detail.return_date == null)
+                                {
+                                    cell.SetCellValue(nullStr);
+                                    cell.CellStyle = styleText;
+                                }
+                                else
+                                {
+                                    cell.SetCellValue((DateTime)detail.return_date);
+                                    cell.CellStyle = styleTime;
+                                }
+                                break;
+                            case 36:
                                 cell.SetCellValue(detail.returnStaffName);
                                 cell.CellStyle = styleText;
                                 break;
@@ -995,7 +1004,7 @@ namespace SnowmeetApi.Controllers
             }
             //类型：正常，招待，储值，隐匿
             string[] commonHead = new string[] { "序号", "子序号", "类型", "订单号", "门店", "业务日期", "业务时间", "结算日期", "结算时间", "总计押金", "总计租金", "总计赔偿", "总计超时",
-                "总计减免", "总计实收", "总计退款", "结余","接待", "物品编号", "物品分类", "物品名称", "押金", "租金单价", "租金小计" ,  "赔偿", "超时", "发放日期", "发放时间", "发放人",
+                "总计减免", "总计实收", "总计退款", "结余", "备注","接待", "物品编号", "物品分类", "物品名称", "押金", "租金单价", "租金小计" ,  "赔偿", "超时", "发放日期", "发放时间", "发放人",
                 "起租日期", "起租时间", "退租日期", "退租时间", "归还日期", "归还时间", "接收人" };
             string[] paymentHead = new string[] { "收款门店", "支付方式", "微信支付单号", "商户订单号", "金额", "收款日期", "收款时间", "收款人" };
             string[] refundHead = new string[] { "退款单号", "商户退款单号", "退款金额", "退款日期", "退款时间", "退款人" };
