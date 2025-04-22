@@ -577,7 +577,7 @@ namespace SnowmeetApi.Models.Rent
             get
             {
                 double r = 0;
-                for(int i = 0; i < details.Count; i++)
+                for(int i = 0; details != null && i < details.Count; i++)
                 {
                     r += details[i].overtime_charge;
                 }
@@ -589,7 +589,7 @@ namespace SnowmeetApi.Models.Rent
             get
             {
                 double d = 0;
-                for(int i = 0; i < details.Count; i++)
+                for(int i = 0; details != null && i < details.Count; i++)
                 {
                     d += details[i].rental_discount + details[i].rental_ticket_discount;
                 }
