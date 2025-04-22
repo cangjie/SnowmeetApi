@@ -207,7 +207,9 @@ namespace SnowmeetApi.Controllers
             DateTime startDate = DateTime.Parse("2024-10-1");
             DateTime endDate = DateTime.Parse("2025-5-1");
             List<RentOrder> rList = await _context.RentOrder
-                .Where(r => r.finish_date >= startDate.Date && r.finish_date <= endDate.Date && r.closed == 0)
+                .Where(r =>   (r.finish_date >= startDate.Date && r.finish_date <= endDate.Date && r.closed == 0) )
+
+                
                 .Include(r => r.receptMsa).ThenInclude(m => m.member)
 
                 .Include(r => r.order).ThenInclude(o => o.paymentList.Where(p => p.status.Equals("支付成功")))
@@ -227,7 +229,7 @@ namespace SnowmeetApi.Controllers
                             .ThenInclude(r => r.msa).ThenInclude(m => m.member)
                 .Include(r => r.details.Where(d => d.valid == 1).OrderByDescending(d => d.id)).ThenInclude(d => d.log)
                     .ThenInclude(d => d.msa).ThenInclude(m => m.member)
-
+                
                 .OrderByDescending(o => o.id).AsNoTracking().ToListAsync();
             return rList;
         }
@@ -277,16 +279,21 @@ namespace SnowmeetApi.Controllers
                     switch (i)
                     {
                         case 0:
-                        case 1:
+                        
                         case 2:
-                        case 16:
+                        
                             sheet.SetColumnWidth(i, 1000);
                             break;
                         case 3:
                         case 21:
                         case 24:
                         case 25:
-                            sheet.SetColumnWidth(i, 1500);
+                        case 9:
+                        case 14:
+                        case 15:
+                        case 16:
+                        case 1:
+                            sheet.SetColumnWidth(i, 1800);
                             break;
 
                         case 5:
@@ -312,6 +319,7 @@ namespace SnowmeetApi.Controllers
 
                             sheet.SetColumnWidth(i, 3500);
                             break;
+
                         default:
 
                             break;
@@ -327,6 +335,9 @@ namespace SnowmeetApi.Controllers
                         case 2:
                         case 3:
                             sheet.SetColumnWidth(i, 7200);
+                            break;
+                        case 4:
+                            sheet.SetColumnWidth(i, 1800);
                             break;
                         case 5:
                             sheet.SetColumnWidth(i, 3000);
@@ -350,6 +361,9 @@ namespace SnowmeetApi.Controllers
                             break;
                         case 1:
                             sheet.SetColumnWidth(i, 11000);
+                            break;
+                        case 2:
+                            sheet.SetColumnWidth(i, 1800);
                             break;
                         case 3:
                             sheet.SetColumnWidth(i, 3000);
@@ -394,6 +408,9 @@ namespace SnowmeetApi.Controllers
                 styleText.DataFormat = format.GetFormat("General");
                 ICellStyle styleMoney = workbook.CreateCellStyle();
                 styleMoney.DataFormat = format.GetFormat("¥#,##0.00");
+                ICellStyle styleMoneyProblem = workbook.CreateCellStyle();
+                styleMoneyProblem.DataFormat = format.GetFormat("¥#,##0.00");
+                styleMoneyProblem.SetFont(fontProblem);
                 ICellStyle styleNum = workbook.CreateCellStyle();
                 styleNum.DataFormat = format.GetFormat("0");
                 ICellStyle styleDate = workbook.CreateCellStyle();
@@ -564,10 +581,17 @@ namespace SnowmeetApi.Controllers
 
                                 break;
                             case 10:
-                                cell.SetCellValue(j == 0 ? o.totalRental : 0);
-                                cell.CellStyle = styleMoney;
+                                double totalRental = o.totalRental;
+                                cell.SetCellValue(j == 0 ? totalRental : 0);
+                                if (totalRental < 0)
+                                {
+                                    cell.CellStyle = styleMoneyProblem;
+                                }
+                                else
+                                {
+                                    cell.CellStyle = styleMoney;
+                                }
                                 needMerge = true;
-
                                 break;
                             case 11:
                                 cell.SetCellValue(j == 0 ? o.totalReparation : 0);
@@ -599,8 +623,16 @@ namespace SnowmeetApi.Controllers
                                 needMerge = true;
                                 break;
                             case 16:
-                                cell.SetCellValue(j == 0 ? o.totalEarn : 0);
-                                cell.CellStyle = styleMoney;
+                                double totalEarn = o.totalEarn;
+                                cell.SetCellValue(j == 0 ? totalEarn : 0);
+                                if (totalEarn != o.totalRental + o.totalOvertimeCharge + o.totalReparation)
+                                {
+                                    cell.CellStyle = styleMoneyProblem;
+                                }
+                                else
+                                {
+                                    cell.CellStyle = styleMoney;
+                                }
                                 needMerge = true;
                                 break;
                             case 17:
@@ -1005,6 +1037,7 @@ namespace SnowmeetApi.Controllers
                 + " and finish_date <= '" + endDate.AddDays(1).ToShortDateString() + "' and shop like '" + shop + "%'  "
                 + " and finish_date is not null and closed = 0 "
                 //+ " and hide = 0 "
+                //+ " and rent_list.id = 5533 "
                 )
                 .AsNoTracking().ToListAsync();
             List<Balance> bList = new List<Balance>();

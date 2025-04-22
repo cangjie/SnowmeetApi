@@ -565,7 +565,7 @@ namespace SnowmeetApi.Models.Rent
             get
             {
                 double r = 0;
-                for(int i = 0; i < details.Count; i++)
+                for(int i = 0; details != null && i < details.Count; i++)
                 {
                     r += details[i].reparation;
                 }
@@ -593,7 +593,7 @@ namespace SnowmeetApi.Models.Rent
                 {
                     d += details[i].rental_discount + details[i].rental_ticket_discount;
                 }
-                return d + this.discount;
+                return d + this.rental_reduce + this.rental_reduce_ticket;
             }
         }
         public double totalDeposit
