@@ -9,7 +9,7 @@ using NPOI.SS.UserModel;
 using NPOI.XSSF.UserModel;
 using SnowmeetApi.Data;
 using SnowmeetApi.Models;
-using SnowmeetApi.Models.Order;
+
 using TencentCloud.Ocr.V20181119.Models;
 namespace SnowmeetApi.Controllers
 {
@@ -27,7 +27,7 @@ namespace SnowmeetApi.Controllers
         [HttpGet]
         public async Task ExportMi7Order(DateTime startDate)
         {
-            List<Models.Order.Retail> rl = (List<Models.Order.Retail>)((OkObjectResult)(await ShowMi7Order(startDate)).Result).Value;
+            List<Models.Retail> rl = (List<Models.Retail>)((OkObjectResult)(await ShowMi7Order(startDate)).Result).Value;
             List<Models.Mi7ExportedSaleDetail> details = await _db.mi7ExportedSaleDetail.ToListAsync();
             int maxPaymentNum = 0;
             int maxRefundNum = 0;
@@ -725,9 +725,9 @@ namespace SnowmeetApi.Controllers
             }
         }
         [HttpGet]
-        public async Task<ActionResult<List<Models.Order.Retail>>> ShowMi7Order(DateTime startDate)
+        public async Task<ActionResult<List<Models.Retail>>> ShowMi7Order(DateTime startDate)
         {
-            List<Models.Order.Retail> retailList = new List<Retail>();
+            List<Models.Retail> retailList = new List<Retail>();
             var mi7List = await (from m in _db.mi7Order
                 .Where(m => m.create_date.Date >= startDate.Date && m.mi7_order_id.Trim().StartsWith("XSD") //&& m.mi7_order_id.Trim().Equals("XSD20250326000A")
                 )

@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using SnowmeetApi.Data;
 using SnowmeetApi.Models;
-using SnowmeetApi.Models.Order;
+
 using SnowmeetApi.Models.Rent;
 using SnowmeetApi.Models.Users;
 using System.Collections;

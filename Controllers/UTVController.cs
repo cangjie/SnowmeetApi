@@ -12,7 +12,7 @@ using Microsoft.Extensions.Configuration;
 using SnowmeetApi.Controllers.Order;
 using SnowmeetApi.Data;
 using SnowmeetApi.Models;
-using SnowmeetApi.Models.Order;
+
 using SnowmeetApi.Models.Users;
 using SnowmeetApi.Models.UTV;
 //using static Org.BouncyCastle.Math.EC.ECCurve;
@@ -688,7 +688,7 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet("{reserveId}")]
-        public async Task<ActionResult<Models.Order.TenpaySet>> PayDepositByTencent(int reserveId, string sessionKey)
+        public async Task<ActionResult<Models.TenpaySet>> PayDepositByTencent(int reserveId, string sessionKey)
         {
             string openId = await GetOpenId(sessionKey);
             UTVUsers user = await GetUser(openId.Trim());

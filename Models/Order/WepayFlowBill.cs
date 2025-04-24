@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Humanizer;
 
-namespace SnowmeetApi.Models.Order
+namespace SnowmeetApi.Models
 {
 	[Table("wepay_downloaded_flowbill")]
 	public class WepayFlowBill

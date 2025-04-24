@@ -8,7 +8,7 @@ using SnowmeetApi.Data;
 using RouteAttribute = Microsoft.AspNetCore.Mvc.RouteAttribute;
 using SnowmeetApi.Models.Users;
 using System.Collections.Generic;
-using SnowmeetApi.Models.Order;
+
 using SnowmeetApi.Models;
 
 namespace SnowmeetApi.Controllers.User
@@ -62,7 +62,7 @@ namespace SnowmeetApi.Controllers.User
         }
 
         [NonAction]
-        public async Task<Models.Order.Kol> GetKol(int memberId)
+        public async Task<Models.Kol> GetKol(int memberId)
         {
             var l = await _db.kol.Where(k => k.member_id == memberId).ToListAsync();
             if (l == null || l.Count == 0)
@@ -88,7 +88,7 @@ namespace SnowmeetApi.Controllers.User
                     {
                         return null;
                     }
-                    Models.Order.Kol k = new Models.Order.Kol()
+                    Models.Kol k = new Models.Kol()
                     {
                         id = 0,
                         member_id = memberId,

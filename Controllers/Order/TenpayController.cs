@@ -17,7 +17,7 @@ using SKIT.FlurlHttpClient.Wechat.TenpayV3.Settings;
 using SnowmeetApi.Controllers.Order;
 using SnowmeetApi.Data;
 using SnowmeetApi.Models;
-using SnowmeetApi.Models.Order;
+
 using SnowmeetApi.Models.Product;
 using SnowmeetApi.Models.Rent;
 using SnowmeetApi.Models.Users;

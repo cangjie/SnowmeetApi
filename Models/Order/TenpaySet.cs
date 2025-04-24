@@ -1,5 +1,5 @@
 ﻿using System;
-namespace SnowmeetApi.Models.Order
+namespace SnowmeetApi.Models
 {
     public class TenpaySet
     {

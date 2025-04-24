@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using SnowmeetApi.Models.Users;
-namespace SnowmeetApi.Models.Order
+namespace SnowmeetApi.Models
 {
     [Table("mi7_order")]
     public class Mi7Order

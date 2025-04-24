@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using SnowmeetApi.Models.Users;
 
-namespace SnowmeetApi.Models.Order
+namespace SnowmeetApi.Models
 {
     [Table("order_payment")]
     public class OrderPayment
@@ -47,9 +47,9 @@ namespace SnowmeetApi.Models.Order
         public string? wepay_trans_id {get; set;}
 
         [ForeignKey(nameof(OrderPaymentRefund.payment_id))]
-        public List<Models.Order.OrderPaymentRefund> refunds {get; set;} = new List<OrderPaymentRefund>();
-        [ForeignKey(nameof(Models.Order.PaymentShare.payment_id))]
-        public List<Models.Order.PaymentShare> shares {get;set;}
+        public List<Models.OrderPaymentRefund> refunds {get; set;} = new List<OrderPaymentRefund>();
+        [ForeignKey(nameof(Models.PaymentShare.payment_id))]
+        public List<Models.PaymentShare> shares {get;set;}
         public string? deposit_type { get; set; } = null;
         public string? deposit_sub_type {get; set; } = null;
         public string shop

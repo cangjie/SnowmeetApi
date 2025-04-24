@@ -2,7 +2,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using SnowmeetApi.Models.Users;
-namespace SnowmeetApi.Models.Order
+namespace SnowmeetApi.Models
 {
     [Table("shop_sale_interact")]
     public class ShopSaleInteract

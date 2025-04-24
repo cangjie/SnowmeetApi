@@ -13,7 +13,7 @@ using SKIT.FlurlHttpClient.Wechat.TenpayV3.Models;
 using SnowmeetApi.Controllers.User;
 using SnowmeetApi.Data;
 using SnowmeetApi.Models;
-using SnowmeetApi.Models.Order;
+
 using SnowmeetApi.Models.Product;
 using SnowmeetApi.Models.SkiPass;
 using SnowmeetApi.Models.Users;
@@ -535,7 +535,7 @@ namespace SnowmeetApi.Controllers.SkiPass
             {
                 return BadRequest();
             }
-            List<Models.Order.OrderPayment> payments = await _db.OrderPayment
+            List<Models.OrderPayment> payments = await _db.OrderPayment
                 .Where(p => (p.order_id == skipass.order_id && p.status.Trim().Equals("支付成功")))
                 .AsNoTracking().ToListAsync();
             //double paidAmount = 0;

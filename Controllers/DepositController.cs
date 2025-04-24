@@ -9,7 +9,7 @@ using Microsoft.Extensions.Configuration;
 using SnowmeetApi.Controllers.User;
 using SnowmeetApi.Data;
 using SnowmeetApi.Models.Deposit;
-using SnowmeetApi.Models.Order;
+
 using SnowmeetApi.Models.Users;
 using SnowmeetApi.Models.Rent;
 using SnowmeetApi.Models;

@@ -41,11 +41,14 @@ namespace SnowmeetApi.Controllers
             }
             return jList[0].GetStaff((DateTime)date);
         }
+        //Test API
+        
         [HttpGet]
         public async Task<ActionResult<SnowmeetApi.Models.Staff>> GetStaffBySocialNumTest(string num, string type, DateTime? date = null)
         {
             return Ok(await GetStaffBySocialNum(num, type, date));
         }
+        
         
     }
 }

@@ -10,7 +10,7 @@ using Microsoft.Extensions.Configuration;
 using SnowmeetApi.Controllers.User;
 using SnowmeetApi.Data;
 using SnowmeetApi.Models;
-using SnowmeetApi.Models.Order;
+
 using SnowmeetApi.Models.Users;
 
 namespace SnowmeetApi.Controllers.Order

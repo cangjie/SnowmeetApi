@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 using Humanizer;
 using System.Data;
 
-namespace SnowmeetApi.Models.Order
+namespace SnowmeetApi.Models
 {
 	[Table("epayment_daily_biz_report")]
 	public class EPaymentDailyReport

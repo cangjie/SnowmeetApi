@@ -4,7 +4,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
 using SnowmeetApi.Controllers.Order;
 
-namespace SnowmeetApi.Models.Order
+namespace SnowmeetApi.Models
 {
     public class Retail
     {
@@ -59,7 +59,7 @@ namespace SnowmeetApi.Models.Order
                 return payments;
             }
         }
-        public List<Models.Order.OrderPaymentRefund> refunds
+        public List<Models.OrderPaymentRefund> refunds
         {
             get
             {

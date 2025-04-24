@@ -2,7 +2,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using SnowmeetApi.Models.Users;
-namespace SnowmeetApi.Models.Order
+namespace SnowmeetApi.Models
 {
     [Table("order_online_refund")]
     public class OrderPaymentRefund

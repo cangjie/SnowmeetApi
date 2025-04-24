@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Collections.Generic;
 using System.ComponentModel;
-using SnowmeetApi.Models.Order;
+
 using SnowmeetApi.Models.Users;
 using SnowmeetApi.Models.Ticket;
 using System.Linq;
@@ -145,9 +145,9 @@ namespace SnowmeetApi.Models
         /// </summary>order_id
         /// 
         [ForeignKey(nameof(OrderPayment.order_id))]
-        public List<Models.Order.OrderPayment> paymentList {get; set;}
+        public List<Models.OrderPayment> paymentList {get; set;}
         [NotMapped]
-        public List<Models.Order.OrderPaymentRefund> refundList
+        public List<Models.OrderPaymentRefund> refundList
         {
             get
             {

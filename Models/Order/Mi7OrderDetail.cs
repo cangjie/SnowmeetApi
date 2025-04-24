@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using static SKIT.FlurlHttpClient.Wechat.TenpayV3.Models.CreateApplyForSubMerchantApplymentRequest.Types.Business.Types.SaleScene.Types;
 
-namespace SnowmeetApi.Models.Order
+namespace SnowmeetApi.Models
 {
     [Table("mi7_order_detail")]
     public class Mi7OrderDetail

@@ -14,7 +14,7 @@ using SnowmeetApi.Models.Rent;
 using SnowmeetApi.Controllers.User;
 using Org.BouncyCastle.Asn1.X509;
 using System.Security.Cryptography;
-using SnowmeetApi.Models.Order;
+
 using SnowmeetApi.Models.Deposit;
 
 namespace SnowmeetApi.Controllers

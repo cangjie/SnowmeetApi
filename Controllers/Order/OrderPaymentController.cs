@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SnowmeetApi.Data;
-using SnowmeetApi.Models.Order;
+
 using SnowmeetApi.Models;
 using wechat_miniapp_base.Models;
 using SKIT.FlurlHttpClient.Wechat.TenpayV3.Settings;

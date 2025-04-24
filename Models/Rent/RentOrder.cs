@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Collections;
 using System.Collections.Generic;
-using SnowmeetApi.Models.Order;
+
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using System.Linq;
 using SnowmeetApi.Models.Users;
@@ -473,7 +473,7 @@ namespace SnowmeetApi.Models.Rent
             }
         }
         [NotMapped]
-        public List<Models.Order.OrderPaymentRefund> refunds
+        public List<Models.OrderPaymentRefund> refunds
         {
             get
             {

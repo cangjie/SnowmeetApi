@@ -1,6 +1,6 @@
 ﻿using System;
 using System.ComponentModel.DataAnnotations.Schema;
-namespace SnowmeetApi.Models.Order
+namespace SnowmeetApi.Models
 {
     public class SaleReport
     {

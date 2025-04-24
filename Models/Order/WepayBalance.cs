@@ -6,7 +6,7 @@ using Aop.Api.Domain;
 using Humanizer;
 using static SKIT.FlurlHttpClient.Wechat.TenpayV3.Models.QueryCapitalBanksByBankAccountResponse.Types;
 
-namespace SnowmeetApi.Models.Order
+namespace SnowmeetApi.Models
 {
     [Table("wepay_downloaded_balance")]
     public class WepayBalance

@@ -12,7 +12,7 @@ using SnowmeetApi.Models;
 using System.Configuration;
 using Microsoft.Extensions.Configuration;
 using SnowmeetApi.Models.Users;
-using SnowmeetApi.Models.Order;
+
 using SnowmeetApi.Models.Card;
 using Newtonsoft.Json;
 using SnowmeetApi.Controllers.User;
@@ -401,7 +401,7 @@ namespace SnowmeetApi.Controllers
             List<Models.SkiPass.SkiPass> skipasses = await _context.skiPass
                 .Where(s => s.valid == 1 && s.order_id == orderId)
                 .AsNoTracking().ToListAsync();
-            Models.Order.Kol kol = await _refHelper.GetKol(refereeMemberId);
+            Models.Kol kol = await _refHelper.GetKol(refereeMemberId);
             List<OrderPayment> payments = await _context.OrderPayment
                 .Where(p => p.status.Trim().Equals("支付成功") && p.order_id == orderId)
                 .AsNoTracking().ToListAsync();
@@ -855,7 +855,7 @@ namespace SnowmeetApi.Controllers
                     int paymentId = 0;
                     for(int i = 0; i < shareList.Count; i++)
                     {
-                        Models.Order.PaymentShare share = shareList[i];
+                        Models.PaymentShare share = shareList[i];
                         await _paymentHelper.SubmitShare(share.id);
                         if (paymentId != share.payment_id)
                         {
@@ -911,7 +911,7 @@ namespace SnowmeetApi.Controllers
                     int paymentId = 0;
                     for(int i = 0; i < shareList.Count; i++)
                     {
-                        Models.Order.PaymentShare share = shareList[i];
+                        Models.PaymentShare share = shareList[i];
                         await _paymentHelper.SubmitShare(share.id);
                         if (paymentId != share.payment_id)
                         {

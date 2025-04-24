@@ -15,7 +15,7 @@ using AlipaySDKNet.OpenAPI.Model;
 using NuGet.Packaging;
 using Microsoft.EntityFrameworkCore.Internal;
 using static SKIT.FlurlHttpClient.Wechat.TenpayV3.Models.AddHKSubMerchantRequest.Types;
-using SnowmeetApi.Models.Order;
+
 using System.IO;
 using SnowmeetApi.Models.Product;
 using SnowmeetApi.Models.SkiPass;

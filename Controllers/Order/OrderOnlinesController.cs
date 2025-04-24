@@ -15,7 +15,7 @@ using SKIT.FlurlHttpClient.Wechat.TenpayV3.Settings;
 using SKIT.FlurlHttpClient.Wechat.TenpayV3.Models;
 using Newtonsoft.Json;
 using SnowmeetApi.Models.Product;
-using SnowmeetApi.Models.Order;
+
 using System.IO;
 using System.Collections;
 using System.Text.RegularExpressions;

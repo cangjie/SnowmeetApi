@@ -24,7 +24,7 @@ using SnowmeetApi.Models;
 using SnowmeetApi.Models.Users;
 using SnowmeetApi.Models.Ticket;
 using SnowmeetApi.Models.Card;
-using SnowmeetApi.Models.Order;
+
 using SKIT.FlurlHttpClient.Wechat.TenpayV3.Models;
 using System.Reflection.PortableExecutable;
 using System.Threading;

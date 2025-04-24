@@ -9,7 +9,7 @@ using System;
 using SKIT.FlurlHttpClient.Wechat.TenpayV3.Models;
 using SnowmeetApi.Models.Product;
 using SnowmeetApi.Models.Maintain;
-using SnowmeetApi.Models.Order;
+
 //using Aop.Api.Domain;
 namespace SnowmeetApi.Data
 {
@@ -30,8 +30,8 @@ namespace SnowmeetApi.Data
             modelBuilder.Entity<SnowmeetApi.Models.DD.SysColumn>().HasNoKey();
             modelBuilder.Entity<SnowmeetApi.Models.OldWeixinReceive>().HasNoKey();
             modelBuilder.Entity<SnowmeetApi.Models.Maintain.MaintainReport>().HasNoKey();
-            modelBuilder.Entity<Models.Order.SaleReport>().HasNoKey();
-            modelBuilder.Entity<Models.Order.EPaymentDailyReport>().HasKey(e => new { e.biz_date, e.mch_id, e.pay_method });
+            modelBuilder.Entity<Models.SaleReport>().HasNoKey();
+            modelBuilder.Entity<Models.EPaymentDailyReport>().HasKey(e => new { e.biz_date, e.mch_id, e.pay_method });
             modelBuilder.Entity<RentPrice>().HasOne<RentCategory>().WithMany(r => r.priceList).HasForeignKey(r => r.category_id);
             modelBuilder.Entity<RentPackageCategory>().HasKey(e => new {e.package_id, e.category_id});
             modelBuilder.Entity<RentPackageCategory>().HasOne<RentPackage>().WithMany(r => r.rentPackageCategoryList).HasForeignKey(r => r.package_id);
@@ -60,8 +60,8 @@ namespace SnowmeetApi.Data
             modelBuilder.Entity<MemberSocialAccount>().HasMany<Models.Rent.RentOrder>().WithOne(r => r.receptMsa).HasForeignKey(m => m.staff_open_id).HasPrincipalKey(m => m.num);
             modelBuilder.Entity<MemberSocialAccount>().HasMany<Models.Rent.RentOrderDetailLog>().WithOne(r => r.msa).HasForeignKey(m => m.staff_open_id).HasPrincipalKey(m => m.num);
             modelBuilder.Entity<MemberSocialAccount>().HasMany<Models.Rent.RentOrderDetail>().WithOne(r => r.returnMsa).HasForeignKey(m => m.return_staff).HasPrincipalKey(m => m.num);
-            modelBuilder.Entity<MemberSocialAccount>().HasMany<Models.Order.OrderPaymentRefund>().WithOne(r => r.msa).HasForeignKey(m => m.oper).HasPrincipalKey(m => m.num);
-            modelBuilder.Entity<MemberSocialAccount>().HasMany<Models.Order.OrderPayment>().WithOne(r => r.msa).HasForeignKey(m => m.staff_open_id).HasPrincipalKey(m => m.num);
+            modelBuilder.Entity<MemberSocialAccount>().HasMany<Models.OrderPaymentRefund>().WithOne(r => r.msa).HasForeignKey(m => m.oper).HasPrincipalKey(m => m.num);
+            modelBuilder.Entity<MemberSocialAccount>().HasMany<Models.OrderPayment>().WithOne(r => r.msa).HasForeignKey(m => m.staff_open_id).HasPrincipalKey(m => m.num);
         }
 
         public DbSet<MaintainLive> MaintainLives {get; set;}
@@ -85,17 +85,17 @@ namespace SnowmeetApi.Data
         public DbSet<SnowmeetApi.Models.BltDevice> BltDevice { get; set; }
         public DbSet<SnowmeetApi.Models.Users.Point> Point { get; set; }
         public DbSet<SnowmeetApi.Models.SummerMaintain> SummerMaintain { get; set; }
-        public DbSet<SnowmeetApi.Models.Order.Mi7Order> mi7Order { get; set; }
+        public DbSet<SnowmeetApi.Models.Mi7Order> mi7Order { get; set; }
         public DbSet<SnowmeetApi.Models.Shop> Shop { get; set; }
-        public DbSet<SnowmeetApi.Models.Order.ShopSaleInteract> ShopSaleInteract { get; set; }
-        public DbSet<SnowmeetApi.Models.Order.OrderPayment> OrderPayment { get; set; }
+        public DbSet<SnowmeetApi.Models.ShopSaleInteract> ShopSaleInteract { get; set; }
+        public DbSet<SnowmeetApi.Models.OrderPayment> OrderPayment { get; set; }
         public DbSet<SnowmeetApi.Models.Maintain.Brand> Brand { get; set; }
         public DbSet<SnowmeetApi.Models.UploadFile> UploadFile { get; set; }
         public DbSet<SnowmeetApi.Models.Maintain.Serial> Serial { get; set; }
         public DbSet<SnowmeetApi.Models.Maintain.MaintainLog> MaintainLog { get; set; }
         public DbSet<SnowmeetApi.Models.Background.BackgroundLoginSession> BackgroundLoginSession { get; set; }
-        public DbSet<SnowmeetApi.Models.Order.Mi7OrderDetail> mi7OrderDetail { get; set; }
-        public DbSet<SnowmeetApi.Models.Order.OrderPaymentRefund> OrderPaymentRefund { get; set; }
+        public DbSet<SnowmeetApi.Models.Mi7OrderDetail> mi7OrderDetail { get; set; }
+        public DbSet<SnowmeetApi.Models.OrderPaymentRefund> OrderPaymentRefund { get; set; }
         public DbSet<SnowmeetApi.Models.Product.SkiPass> SkiPass { get; set; }
         public DbSet<SnowmeetApi.Models.OAReceive> oAReceive { get; set; }
         public DbSet<SnowmeetApi.Models.Ticket.TicketLog> ticketLog { get; set; }
@@ -117,28 +117,28 @@ namespace SnowmeetApi.Data
         public DbSet<UTVRentItem> utvrentItem { get; set;}
         public DbSet<UTVUserGroup> uTVUserGroups { get; set; }
         public DbSet<BusinessReport> businessReport { get; set; }
-        public DbSet<Models.Order.OldWeixinPaymentOrder> oldWeixinPaymentOrder { get; set; }
+        public DbSet<Models.OldWeixinPaymentOrder> oldWeixinPaymentOrder { get; set; }
         public DbSet<Models.OldWeixinReceive> oldWxReceive { get; set; }
-        public DbSet<Models.Order.WepayBalance> wepayBalance { get; set; }
-        public DbSet<Models.Order.WepaySummary> wepaySummary { get; set; }
+        public DbSet<Models.WepayBalance> wepayBalance { get; set; }
+        public DbSet<Models.WepaySummary> wepaySummary { get; set; }
         public DbSet<Models.Users.Vip> vip { get; set; }
         public DbSet<Models.Maintain.MaintainReport> maintainReport { get; set; }
         public DbSet<SnowmeetApi.Models.Printer> Printer { get; set; }
-        public DbSet<Models.Order.SaleReport> saleReport { get; set; }
+        public DbSet<Models.SaleReport> saleReport { get; set; }
         public DbSet<Models.IdList> idList { get; set; }
         public DbSet<Models.Rent.RentOrderDetailLog> rentOrderDetailLog { get; set; }
-        public DbSet<Models.Order.WepayFlowBill> wepayFlowBill { get; set; }
-        public DbSet<Models.Order.EPaymentDailyReport> ePaymentDailyReport { get; set; }
-        public DbSet<Models.Order.AlipayMchId> alipayMchId { get; set; }
-        public DbSet<Models.Order.Kol> kol {get; set;}
-        public DbSet<Models.Order.PaymentShare> paymentShare {get; set;}
-        public DbSet<Models.Order.AliDownloadFlowBill> aliDownloadFlowBill {get; set; }
+        public DbSet<Models.WepayFlowBill> wepayFlowBill { get; set; }
+        public DbSet<Models.EPaymentDailyReport> ePaymentDailyReport { get; set; }
+        public DbSet<Models.AlipayMchId> alipayMchId { get; set; }
+        public DbSet<Models.Kol> kol {get; set;}
+        public DbSet<Models.PaymentShare> paymentShare {get; set;}
+        public DbSet<Models.AliDownloadFlowBill> aliDownloadFlowBill {get; set; }
         public DbSet<SnowmeetApi.Models.Rent.RentCategory> rentCategory { get; set; }
         public DbSet<SnowmeetApi.Models.Rent.RentPrice> rentPrice {get; set;}
         public DbSet<SnowmeetApi.Models.Rent.RentPackage> rentPackage {get; set;}
         public DbSet<SnowmeetApi.Models.Rent.RentPackageCategory> rentPackageCategory {get; set; }
         public DbSet<SnowmeetApi.Models.Rent.RentCategoryInfoField> rentCategoryInfoField {get; set; }
-        public DbSet<SnowmeetApi.Models.Order.FinancialStatement> financialStatement {get; set;}
+        public DbSet<SnowmeetApi.Models.FinancialStatement> financialStatement {get; set;}
         public DbSet<SnowmeetApi.Models.Rent.RentProduct> rentProduct {get; set;}
         public DbSet<SnowmeetApi.Models.Rent.RentProductDetailInfo> rentProductDetailInfo {get;set;}
         public DbSet<RentProductImage> rentProductImage {get; set;}

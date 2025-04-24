@@ -2,7 +2,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using SnowmeetApi.Controllers.Order;
-using SnowmeetApi.Models.Order;
+
 
 namespace SnowmeetApi.Models.Rent
 {
