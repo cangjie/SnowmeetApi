@@ -704,6 +704,8 @@ namespace SnowmeetApi.Controllers.SkiPass
             int subIndex = 0;
             IFont fontProblem = workbook.CreateFont();
             fontProblem.Color = NPOI.HSSF.Util.HSSFColor.Red.Index;
+            IFont fontCancel= workbook.CreateFont();
+            fontCancel.Color = NPOI.HSSF.Util.HSSFColor.Grey50Percent.Index;
             IDataFormat format = workbook.CreateDataFormat();
             for (int i = 0; i < l.Count; i++)
             {
@@ -726,6 +728,17 @@ namespace SnowmeetApi.Controllers.SkiPass
                 for (int j = 0; j < order.skiPasses.Count; j++)
                 {
                     subIndex++;
+                    bool cancel = false;
+                    double earn = order.paidAmount - order.refundAmount;
+                    if (earn == 0 && order.skiPasses[j].card_member_pick_time == null)
+                    {
+                        cancel = true;
+                        styleDate.SetFont(fontCancel);
+                        styleTime.SetFont(fontCancel);
+                        styleText.SetFont(fontCancel);
+                        styleMoney.SetFont(fontCancel);
+                        styleText.SetFont(fontCancel);
+                    }
                     IRow dr = sheet.CreateRow(subIndex);
                     dr.Height = 500;
                     for (int k = 0; k < commonHead.Length + maxPaymentCount * paymentHead.Length + maxRefundCount * refundHead.Length; k++)
@@ -827,7 +840,7 @@ namespace SnowmeetApi.Controllers.SkiPass
                                 case 12:
                                     if (j == 0)
                                     {
-                                        double earn = order.paidAmount - order.refundAmount;
+                                        //double earn = order.paidAmount - order.refundAmount;
                                         cell.SetCellValue(earn);
                                         if (earn <= 0)
                                         {
@@ -847,6 +860,10 @@ namespace SnowmeetApi.Controllers.SkiPass
                                     break;
                                 case 14:
                                     cell.SetCellValue(order.skiPasses[j].contact_cell == null ? "" : order.skiPasses[j].contact_cell.Trim());
+                                    cell.CellStyle = styleText;
+                                    break;
+                                case 15:
+                                    cell.SetCellValue(cancel?"退票":"正常");
                                     cell.CellStyle = styleText;
                                     break;
                                 default:
@@ -989,7 +1006,7 @@ namespace SnowmeetApi.Controllers.SkiPass
                 maxRefundCount = Math.Max(maxRefundCount, order.refundList.Count);
 
             }
-            string[] commonHead = new string[] { "序号", "业务日期", "业务时间", "子序号", "票种", "票价", "押金", "核销日期", "核销时间", "卡号", "支付", "退款", "结余", "联系人", "电话" };
+            string[] commonHead = new string[] { "序号", "业务日期", "业务时间", "子序号", "票种", "票价", "押金", "核销日期", "核销时间", "卡号", "支付", "退款", "结余", "联系人", "电话", "状态" };
             string[] paymentHead = new string[] { "微信支付单号", "商户订单号", "金额", "支付日期", "支付时间" };
             string[] refundHead = new string[] { "微信退款单号", "商户退款单号", "金额", "退款日期", "退款时间" };
 
