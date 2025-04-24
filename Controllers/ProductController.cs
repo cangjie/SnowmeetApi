@@ -10,6 +10,7 @@ using SnowmeetApi.Data;
 using SnowmeetApi.Models.Product;
 using Newtonsoft.Json;
 using SnowmeetApi.Controllers.User;
+using SnowmeetApi.Models;
 namespace SnowmeetApi.Controllers
 {
     [Route("core/[controller]/[action]")]
@@ -62,7 +63,7 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<Product>> SetHidden(int productId, int hidden, string sessionKey, string sessionType = "wechat_mini_openid")
         {
             MemberController _memberHelper = new MemberController(_context, _oriConfig);
-            SnowmeetApi.Models.Users.Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
+            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
             if (member.is_admin != 1)
             {
                 return BadRequest();

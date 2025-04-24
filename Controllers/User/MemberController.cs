@@ -11,7 +11,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using NuGet.ProjectModel;
 using SnowmeetApi.Data;
-using SnowmeetApi.Models.Users;
+using SnowmeetApi.Models;
 
 namespace SnowmeetApi.Controllers.User
 {
@@ -440,9 +440,9 @@ namespace SnowmeetApi.Controllers.User
         }
 
         [NonAction]
-        public async Task<List<Models.Users.Member>> SearchMember(string key)
+        public async Task<List<Member>> SearchMember(string key)
         {
-            List<Models.Users.Member> mList = await _db.member.Where(m => (m.real_name.IndexOf(key) >= 0))
+            List<Member> mList = await _db.member.Where(m => (m.real_name.IndexOf(key) >= 0))
                 .Include(m => m.memberSocialAccounts.Where(msa => msa.valid == 1)).AsNoTracking().ToListAsync();
 
             List<MemberSocialAccount> cellList = await _db.memberSocialAccount
@@ -450,7 +450,7 @@ namespace SnowmeetApi.Controllers.User
                 .Include(msa => msa.member).AsNoTracking().ToListAsync();
 
 
-            List<Models.Users.Member> ret = new List<Models.Users.Member>();
+            List<Member> ret = new List<Member>();
             for(int i = 0; i < cellList.Count; i++)
             {
                 Member member = cellList[i].member;

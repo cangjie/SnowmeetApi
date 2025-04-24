@@ -6,7 +6,6 @@ using System.Net.Http;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using Aop.Api.Domain;
 using HttpHandlerDemo;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -1348,7 +1347,7 @@ namespace SnowmeetApi.Controllers
                             break;
                     }
                     //MiniAppUser mUser = await _db.MiniAppUsers.FindAsync(orderOnline.open_id);
-                    SnowmeetApi.Models.Users.Member mUser = await _memberHelper.GetMember(orderOnline.open_id, "wechat_mini_openid");
+                    Member mUser = await _memberHelper.GetMember(orderOnline.open_id, "wechat_mini_openid");
                     if (mUser != null)
                     {
                         try

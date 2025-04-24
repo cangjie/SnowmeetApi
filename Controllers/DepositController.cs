@@ -14,7 +14,6 @@ using SnowmeetApi.Models.Users;
 using SnowmeetApi.Models.Rent;
 using SnowmeetApi.Models;
 using System.Security;
-using Aop.Api.Domain;
 namespace SnowmeetApi.Controllers
 {
     [Route("core/[controller]/[action]")]
@@ -51,7 +50,7 @@ namespace SnowmeetApi.Controllers
             string sessionKey, string sessionType = "wechat_mini_openid")
         {
             MemberController _memberHelper = new MemberController(_db, _config);
-            Models.Users.Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
+            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
             if (member == null)
             {
                 return BadRequest();
@@ -89,7 +88,7 @@ namespace SnowmeetApi.Controllers
             string sessionKey, string sessionType = "wechat_mini_openid")
         {
             MemberController _memberHelper = new MemberController(_db, _config);
-            Models.Users.Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
+            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
             if (member == null || member.wechatMiniOpenId == null)
             {
                 return null;
@@ -117,7 +116,7 @@ namespace SnowmeetApi.Controllers
             string sessionKey, string sessionType = "wechat_mini_openid")
         {
             MemberController _memberHelper = new MemberController(_db, _config);
-            Models.Users.Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
+            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
             if (member == null)
             {
                 return BadRequest();
@@ -127,7 +126,7 @@ namespace SnowmeetApi.Controllers
             {
                 return NotFound();
             }
-            Models.Users.Member customer = await _memberHelper.GetMember(payment.open_id.Trim(), "wechat_mini_openid");
+            Member customer = await _memberHelper.GetMember(payment.open_id.Trim(), "wechat_mini_openid");
             if (customer == null)
             {
                 return NoContent();
@@ -352,7 +351,7 @@ namespace SnowmeetApi.Controllers
             return await GetAccounts(user.member.id, type, subType, sessionKey, sessionType);
         }
         [HttpGet]
-        public async Task<ActionResult<List<Models.Users.Member>>> SearchMember(string key,
+        public async Task<ActionResult<List<Member>>> SearchMember(string key,
             string sessionKey, string sessionType = "wechat_mini_openid")
         {
             UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _db);
@@ -361,10 +360,10 @@ namespace SnowmeetApi.Controllers
                 return BadRequest();
             }
             MemberController _memberHelper = new MemberController(_db, _config);
-            List<Models.Users.Member> members = await _memberHelper.SearchMember(key);
+            List<Member> members = await _memberHelper.SearchMember(key);
             for(int i = 0; i < members.Count; i++)
             {
-                Models.Users.Member member = members[i];
+                Member member = members[i];
                 await _db.member.Entry(member).Collection(m => m.memberSocialAccounts).LoadAsync();
                 member.memberSocialAccounts = member.memberSocialAccounts.Where(m => m.valid == 1).ToList();
                 if (member.wechatMiniOpenId == null)
@@ -387,7 +386,7 @@ namespace SnowmeetApi.Controllers
             return Ok(members);
         }
         [HttpGet("{memberId}")]
-        public async Task<ActionResult<Models.Users.Member>> GetMember(int memberId, 
+        public async Task<ActionResult<Member>> GetMember(int memberId, 
             string sessionKey, string sessionType = "wechat_mini_openid")
         {
             UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _db);
@@ -395,7 +394,7 @@ namespace SnowmeetApi.Controllers
             {
                 return BadRequest();
             }
-            Models.Users.Member member = await _db.member.FindAsync(memberId);
+            Member member = await _db.member.FindAsync(memberId);
             member.memberSocialAccounts = await _db.member.Entry(member)
                 .Collection(m => m.memberSocialAccounts).Query()
                 .Where(msa => msa.valid == 1).AsNoTracking().ToListAsync();
@@ -432,11 +431,11 @@ namespace SnowmeetApi.Controllers
                     .OrderByDescending(a => a.id).AsNoTracking().ToListAsync());
             }
             MemberController _memberHelper = new MemberController(_db, _config);
-            List<Models.Users.Member> members = await _memberHelper.SearchMember(key);
+            List<Member> members = await _memberHelper.SearchMember(key);
             List<DepositAccount> ret = new List<DepositAccount>();
             for(int i = 0; members != null && i < members.Count; i++)
             {
-                Models.Users.Member member = members[i];
+                Member member = members[i];
                 member.depositAccounts = await _db.member.Entry(member)
                     .Collection(m => m.depositAccounts)
                     .Query().Where(d => d.valid == 1)

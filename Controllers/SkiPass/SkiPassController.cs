@@ -159,7 +159,7 @@ namespace SnowmeetApi.Controllers
         [HttpGet("{skipassId}")]
         public async Task<ActionResult<Models.SkiPass.SkiPass>> GetSkipass(int skipassId, string sessionKey, string sessionType="wechat_mini_openid")
         {
-            Models.Users.Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
+            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
             if (member == null)
             {
                 return BadRequest();
@@ -177,7 +177,7 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<List<Models.SkiPass.SkiPass>>> GetMySkipass
             (string sessionKey, string sessionType = "wechat_mini_openid")
         {
-            Models.Users.Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
+            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
             if (member == null)
             {
                 return BadRequest();
@@ -194,7 +194,7 @@ namespace SnowmeetApi.Controllers
         [HttpGet("{skipassId}")]
         public async Task<ActionResult<Models.SkiPass.SkiPass>> Cancel(int skipassId, string sessionKey, string sessionType = "wechat_mini_openid")
         {
-            Models.Users.Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
+            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
             if (member == null)
             {
                 return BadRequest();
@@ -370,7 +370,7 @@ namespace SnowmeetApi.Controllers
             
 
             RefereeController _refHelper = new RefereeController(_context, _config);
-            Models.Users.Referee referee = await  _refHelper.GetReferee(member.id, "雪票");
+            Referee referee = await  _refHelper.GetReferee(member.id, "雪票");
             //确认分过账的kol
             if (referee != null)
             {
@@ -742,7 +742,7 @@ namespace SnowmeetApi.Controllers
             {
                 return BadRequest();
             }
-            Models.Users.Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
+            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
             //double totalPrice = 0;
             Models.SkiPass.SkiPass skipass = new Models.SkiPass.SkiPass()
             {
@@ -1052,7 +1052,7 @@ namespace SnowmeetApi.Controllers
             string dayType, string sessionKey, string sessionType = "wechat_mini_openid")
         {
             MemberController _memberHelper = new MemberController(_context, _config);
-            SnowmeetApi.Models.Users.Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
+            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
             if (member.is_admin != 1)
             {
                 return BadRequest();
@@ -1073,7 +1073,7 @@ namespace SnowmeetApi.Controllers
             DateTime end, string sessionKey, string sessionType = "wechat_mini_openid")
         {
             MemberController _memberHelper = new MemberController(_context, _config);
-            SnowmeetApi.Models.Users.Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
+            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
             if (member.is_admin != 1)
             {
                 return BadRequest();

@@ -22,7 +22,6 @@ using System.Net.Http.Headers;
 using SnowmeetApi.Models.Rent;
 using System.Text;
 using Microsoft.CodeAnalysis.Elfie.Model.Strings;
-using Aop.Api.Domain;
 using SnowmeetApi.Controllers.User;
 
 namespace SnowmeetApi.Controllers.Order
@@ -387,7 +386,7 @@ namespace SnowmeetApi.Controllers.Order
             }
             else
             {
-                Models.Users.Member member = await _memberHelper.GetMember(order.open_id.Trim(), "wechat_mini_openid");
+                Member member = await _memberHelper.GetMember(order.open_id.Trim(), "wechat_mini_openid");
                 if (member != null)
                 {
                     List<Referee> refList = await _context.referee
@@ -549,7 +548,7 @@ namespace SnowmeetApi.Controllers.Order
             OrderPayment payment = await _context.OrderPayment.FindAsync(paymentId);
 
 
-            Models.Users.Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);        
+            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);        
 
             if (member.is_manager == 0 && member.is_admin == 0 && member.is_staff == 0
                 && !payment.open_id.Trim().Equals(member.wechatMiniOpenId.Trim()))

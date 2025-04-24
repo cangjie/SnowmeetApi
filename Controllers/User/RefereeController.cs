@@ -9,6 +9,7 @@ using RouteAttribute = Microsoft.AspNetCore.Mvc.RouteAttribute;
 using SnowmeetApi.Models.Users;
 using System.Collections.Generic;
 using SnowmeetApi.Models.Order;
+using SnowmeetApi.Models;
 
 namespace SnowmeetApi.Controllers.User
 {

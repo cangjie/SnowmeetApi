@@ -2,28 +2,23 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-namespace SnowmeetApi.Models.Users
+namespace SnowmeetApi.Models
 {
     [Table("member_social_account")]
     public class MemberSocialAccount
     {
         [Key]
         public int id { get; set; }
-
-        [ForeignKey(nameof(Models.Users.Member))]
         public int member_id { get; set; }
-
         public string type {get; set;}
-
         public string num { get; set; }
-
         public int valid {get; set;} = 1;
-
         public string memo {get; set; } = "";
+        [ForeignKey("member_id")]
+        public Member member { get; set; }
 
-        //[NotMapped]
-        public Models.Users.Member member { get; set; }
-        public List<OrderOnline>? orders {get; set;}
+        //will delete
+        public List<OrderOnline> orders { get; set; } = new List<OrderOnline>();
 
     }
 }

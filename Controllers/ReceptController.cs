@@ -14,7 +14,6 @@ using SnowmeetApi.Models.Rent;
 using SnowmeetApi.Controllers.User;
 using Org.BouncyCastle.Asn1.X509;
 using System.Security.Cryptography;
-using Aop.Api.Domain;
 using SnowmeetApi.Models.Order;
 using SnowmeetApi.Models.Deposit;
 
@@ -363,7 +362,7 @@ namespace SnowmeetApi.Controllers
             if (!openId.Trim().Equals(""))
             {
                 //MiniAppUser user = await _context.MiniAppUsers.FindAsync(openId);
-                SnowmeetApi.Models.Users.Member user = await _memberHelper.GetMember(openId, "wechat_mini_openid");
+                Member user = await _memberHelper.GetMember(openId, "wechat_mini_openid");
                 realName = user.real_name.Trim();
                 switch (user.gender.Trim())
                 {
@@ -486,7 +485,7 @@ namespace SnowmeetApi.Controllers
                 if (!r.recept_staff.Trim().Equals(""))
                 {
                     //MiniAppUser user = await _context.MiniAppUsers.FindAsync(r.recept_staff.Trim());
-                    SnowmeetApi.Models.Users.Member member = await _memberHelper.GetMember(r.recept_staff.Trim(), "wechat_mini_openid");
+                    Member member = await _memberHelper.GetMember(r.recept_staff.Trim(), "wechat_mini_openid");
                     if (member != null)
                     {
                         r.recept_staff_name = member.real_name.Trim();
@@ -496,7 +495,7 @@ namespace SnowmeetApi.Controllers
                 if (!r.update_staff.Trim().Equals(""))
                 {
                     //MiniAppUser user = await _context.MiniAppUsers.FindAsync(r.update_staff.Trim());
-                    SnowmeetApi.Models.Users.Member user = await _memberHelper.GetMember(r.recept_staff.Trim(), "wechat_mini_openid");
+                    Member user = await _memberHelper.GetMember(r.recept_staff.Trim(), "wechat_mini_openid");
                     if (user != null)
                     {
                         r.update_staff_name = user.real_name.Trim();
@@ -910,7 +909,7 @@ namespace SnowmeetApi.Controllers
             }
 
             MemberController _memeberHelper = new MemberController(_context, _oriConfig);
-            Models.Users.Member member = await _memberHelper.GetMember(recept.open_id.Trim(), "wechat_mini_openid");
+            Member member = await _memberHelper.GetMember(recept.open_id.Trim(), "wechat_mini_openid");
             recept.member = member;
             return Ok(recept);
         }

@@ -10,7 +10,6 @@ using System.Linq;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System.Collections;
 using System.Collections.Generic;
-using Aop.Api.Domain;
 using SnowmeetApi.Models.Users;
 
 namespace SnowmeetApi.Controllers
@@ -187,16 +186,16 @@ namespace SnowmeetApi.Controllers
 
         
         [HttpGet]
-        public async Task<ActionResult<Models.Users.Member>> GetMember()
+        public async Task<ActionResult<Member>> GetMember()
         {
-            Models.Users.Member  member = await _context.member.Where(m => m.id == 15506)
+            Member  member = await _context.member.Where(m => m.id == 15506)
                 .Include(m => m.memberSocialAccounts)
                 .FirstAsync();
             return Ok(member);
         }
 
         [HttpGet]
-        public async Task<ActionResult<Models.Users.Member>> GetMemberByCell()
+        public async Task<ActionResult<Member>> GetMemberByCell()
         {
             MemberSocialAccount msa = await _context.memberSocialAccount
                 .Where(m => m.num.Trim().Equals("18601197897") && m.type.Trim().Equals("cell"))

@@ -18,6 +18,6 @@ namespace SnowmeetApi.Models
         public string? current_value {get; set;}
         public DateTime create_date {get; set;} = DateTime.Now;
         [ForeignKey("staff_member_id")]
-        public Models.Users.Member? staffMember {get; set;}
+        public Member? staffMember {get; set;}
     }
 }

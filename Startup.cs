@@ -64,42 +64,34 @@ namespace SnowmeetApi
             );
             services.AddSwaggerGen(c =>
             {
-                c.SwaggerDoc("v1", new OpenApiInfo { Title = "SnowmeetApi", Version = "v1" });
+                c.SwaggerDoc("v2", new OpenApiInfo { Title = "SnowmeetApi", Version = "v2" });
+            });
+            services.ConfigureSwaggerGen(options => 
+            {
+                options.CustomSchemaIds(x => x.FullName);
             });
             services.TryAddSingleton<IHttpContextAccessor, HttpContextAccessor>();
             services.AddControllers().AddJsonOptions(options =>{
                 options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
             });
-            //services.AddControllers().AddNewtonsoftJson(option => 
-            //    option.SerializerSettings.ReferenceLoopHandling = ReferenceLoopHandling.Ignore);
-            /*
-            services.AddDbContext<AppDBContext>(options =>
-                    options.UseSqlite(Configuration.GetConnectionString("AppDBContext")));
-            */
-            //services.AddHostedService<Services.BackgroundServices.TenpayCertificateRefreshingBackgroundService>();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
         {
-            /*
-            if (env.IsDevelopment())
-            {
-                app.UseDeveloperExceptionPage();
-                app.UseSwagger();
-                app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "SnowmeetApi v1"));
-            }
-            */
+            
             
             app.UseStaticFiles();
             app.UseDeveloperExceptionPage();
             app.UseSwagger();
-            app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "SnowmeetApi v1"));
+            app.UseSwaggerUI(c => 
+            {
+                c.SwaggerEndpoint("/swagger/v2/swagger.json", "SnowmeetApi v2");
+            });
 
             app.UseRouting();
 
             app.UseAuthorization();
-            //app.UsePathBase(new PathString("/background/index.html"));
             app.UseEndpoints(endpoints =>
             {
                 endpoints.MapControllers();

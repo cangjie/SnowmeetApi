@@ -15,7 +15,7 @@ namespace SnowmeetApi.Models.Rent
         public int? oper_member_id { get; set; }
         public DateTime create_date { get; set; } = DateTime.Now;
         [NotMapped]
-        public Models.Users.Member? member { get; set; }
+        public Member? member { get; set; }
 
     }
 }

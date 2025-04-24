@@ -14,6 +14,7 @@ using TencentCloud.Ocr.V20181119;
 using System.IO;
 using Newtonsoft.Json;
 using System.Text.RegularExpressions;
+using SnowmeetApi.Models;
 namespace SnowmeetApi.Controllers
 {
     [Route("core/[controller]/[action]")]

@@ -823,7 +823,7 @@ namespace SnowmeetApi.Controllers.Maintain
                 return NotFound();
             }
             MemberController _memberHelper = new MemberController(_context, _originConfig);
-            Models.Users.Member member = await _memberHelper.GetMember(scan.scaner_oa_open_id, "wechat_oa_openid");
+            Member member = await _memberHelper.GetMember(scan.scaner_oa_open_id, "wechat_oa_openid");
             if (member == null)
             {
                 return NoContent();

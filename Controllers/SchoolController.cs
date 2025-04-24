@@ -7,12 +7,11 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using SnowmeetApi.Data;
-using SnowmeetApi.Models;
 using SnowmeetApi.Models.Order;
 using SnowmeetApi.Models.Rent;
 using SnowmeetApi.Models.Users;
-using SnowmeetApi.Models.School;
 using System.Collections;
+using SnowmeetApi.Models;
 namespace SnowmeetApi.Controllers
 {
     [Route("core/[controller]/[action]")]
@@ -35,7 +34,7 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<Staff>> GetStaffInfo(string sessionKey, string sessionType="wl_wechat_mini_openid")
+        public async Task<ActionResult<Models.School.Staff>> GetStaffInfo(string sessionKey, string sessionType="wl_wechat_mini_openid")
         {
             sessionKey = Util.UrlDecode(sessionKey.Trim());
             sessionType = Util.UrlDecode(sessionType.Trim());
@@ -55,9 +54,8 @@ namespace SnowmeetApi.Controllers
             }
 
         }
-
         [NonAction]
-        public Staff RemoveSensitiveInfo(Staff staff)
+        public Models.School.Staff RemoveSensitiveInfo(Models.School.Staff staff)
         {
             staff.member_id = 0;
             return staff;

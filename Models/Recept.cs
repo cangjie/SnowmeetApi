@@ -110,7 +110,7 @@ namespace SnowmeetApi.Models
 
     }
     [NotMapped]
-    public Models.Users.Member member {get; set;}
+    public Member member {get; set;}
 
        
 

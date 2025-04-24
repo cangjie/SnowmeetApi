@@ -4,7 +4,6 @@ using System.Drawing;
 using System.Linq;
 using System.Threading.Tasks;
 using AlipaySDKNet.OpenAPI.Model;
-using Aop.Api.Domain;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -164,7 +163,7 @@ namespace SnowmeetApi.Controllers.SkiPass
         {
             sessionKey = Util.UrlDecode(sessionKey);
             sessionType = Util.UrlDecode(sessionType);
-            Models.Users.Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
+            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
             int canelMemberId = member.id;
             Models.SkiPass.SkiPass sp = await _db.skiPass.FindAsync(skiPassId);
             sp.cancel_member_id = canelMemberId;
@@ -357,7 +356,7 @@ namespace SnowmeetApi.Controllers.SkiPass
             {
                 return BadRequest();
             }
-            Models.Users.Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
+            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
             double totalPrice = 0;
             Models.SkiPass.SkiPass[] skipassArr = new Models.SkiPass.SkiPass[count];
             for (int i = 0; i < count; i++)
@@ -562,7 +561,7 @@ namespace SnowmeetApi.Controllers.SkiPass
         public async Task<ActionResult<List<Models.SkiPass.SkiPass>>> GetMySkipass
             (string sessionKey, string sessionType = "wechat_mini_openid")
         {
-            Models.Users.Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
+            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
             if (member == null)
             {
                 return BadRequest();

@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Aop.Api.Domain;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -171,7 +170,7 @@ namespace SnowmeetApi.Controllers.Order
             }
             int? memberId = null;
             MemberController _memberHelper = new MemberController(_context, _config);
-            Models.Users.Member member = (Models.Users.Member)((OkObjectResult)(await _memberHelper.GetMemberByCell(cell, sessionKey, sessionType)).Result).Value;
+            Member member = (Member)((OkObjectResult)(await _memberHelper.GetMemberByCell(cell, sessionKey, sessionType)).Result).Value;
             if (member != null)
             {
                 memberId = member.id;
@@ -252,8 +251,8 @@ namespace SnowmeetApi.Controllers.Order
             for(int i = 0; i < miList.Count; i++)
             {
                 Mi7Order mi7Order = miList[i];
-                Models.Users.Member customer = await _memberHelper.GetMember(mi7Order.order.open_id.Trim(), "wechat_mini_openid");
-                Models.Users.Member staff = await _memberHelper.GetMember(mi7Order.order.staff_open_id, "wechat_mini_openid");
+                Member customer = await _memberHelper.GetMember(mi7Order.order.open_id.Trim(), "wechat_mini_openid");
+                Member staff = await _memberHelper.GetMember(mi7Order.order.staff_open_id, "wechat_mini_openid");
                 
                 //try
                 //{

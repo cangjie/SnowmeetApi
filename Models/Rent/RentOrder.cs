@@ -75,7 +75,7 @@ namespace SnowmeetApi.Models.Rent
         
         public string staff_name { get; set; }
         [NotMapped]
-        public Models.Users.Member? staffMember {get; set;}
+        public Member? staffMember {get; set;}
 
         public int closed { get; set; } = 0;
         public DateTime? finish_date { get; set; }

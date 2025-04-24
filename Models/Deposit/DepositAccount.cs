@@ -31,7 +31,8 @@ namespace SnowmeetApi.Models.Deposit
         public DateTime create_date { get; set; }
         [ForeignKey("deposit_id")]
         public List<DepositBalance> balances { get; set; }
-        public Models.Users.Member member {get; set;}
+        [ForeignKey("member_id")]
+        public Member member {get; set;}
         public double avaliableAmount
         {
             get
