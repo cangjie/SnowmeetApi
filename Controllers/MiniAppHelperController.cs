@@ -138,6 +138,9 @@ namespace LuqinMiniAppBase.Controllers
             }
             return "success";
         }
+
+
+        //new season///////////////////////////////////////////////////////////////////
         [HttpGet]
         public async Task<ActionResult<ApiResult<Code2Session>>> MemberLogin(string code, string openIdType)
         {
