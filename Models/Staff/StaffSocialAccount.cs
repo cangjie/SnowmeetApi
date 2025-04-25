@@ -19,5 +19,7 @@ namespace SnowmeetApi.Models
         public DateTime create_date { get; set; } = DateTime.Now;
         [ForeignKey("staff_id")]
         public Staff staff { get; set; } = null;
+        [ForeignKey("social_account_id")]
+        public SocialAccountForJob jobMobile { get; set; } = null;
     }
 }

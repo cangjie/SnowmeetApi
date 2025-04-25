@@ -440,7 +440,7 @@ namespace SnowmeetApi.Controllers
             {
                 List<MemberSocialAccount> msaList = await _context.memberSocialAccount.Where(m => m.num.Trim().Equals(list[i].staff_open_id) && m.type.Trim().Equals("wechat_mini_openid"))
                     .Include(m => m.member).AsNoTracking().ToListAsync();
-                list[i].msa = msaList.Count > 0? msaList[0]:null;
+                //list[i].msa = msaList.Count > 0? msaList[0]:null;
                 list[i].payments = await _context.OrderPayment.Where(p => p.order_id == list[i].id).ToArrayAsync();
             }
             if (status == null || status.Trim().Equals(""))
@@ -490,7 +490,7 @@ namespace SnowmeetApi.Controllers
                     if (customerUser != null)
                     {
                         Member orderMember =  await _memberHelper.GetMember(order.open_id.Trim(), "wechat_mini_openid");
-                        order.member = orderMember;
+                        //order.member = orderMember;
                         order.user = orderMember.miniAppUser;
                         
                         bool needUpdateMemberInfo = false;
@@ -553,7 +553,7 @@ namespace SnowmeetApi.Controllers
                         try
                         {
                             Member member = (await _memberHelper.GetMember(order.open_id.Trim(), "wechat_mini_openid"));
-                            order.member = member;
+                            //order.member = member;
                             order.user = member.miniAppUser;
                             bool needUpdateMemberInfo = false;
                             string updateCellNum = "";

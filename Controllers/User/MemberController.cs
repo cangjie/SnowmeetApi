@@ -44,7 +44,7 @@ namespace SnowmeetApi.Controllers.User
         {
             sessionKey = Util.UrlDecode(sessionKey);
             sessionType = Util.UrlDecode(sessionType);
-            var sessions = await _db.MiniSessons.Where(s => s.session_key.Trim().Equals(sessionKey.Trim()) 
+            var sessions = await _db.miniSession.Where(s => s.session_key.Trim().Equals(sessionKey.Trim()) 
                 && s.session_type.Trim().Equals(sessionType.Trim())).OrderByDescending(s => s.create_date)
                 .AsNoTracking().ToListAsync();
             if (sessions.Count <= 0)
@@ -52,7 +52,7 @@ namespace SnowmeetApi.Controllers.User
                 return null;
             }
             int memberId = sessions[0].member_id != null ? (int)sessions[0].member_id:0;
-            string openId = sessions[0].open_id.Trim();
+            string openId = "";//sessions[0].open_id.Trim();
             if (memberId == 0)
             {
                 return await GetMember(openId, sessionType);

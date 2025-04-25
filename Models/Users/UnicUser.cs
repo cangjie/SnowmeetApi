@@ -344,7 +344,7 @@ namespace SnowmeetApi.Models.Users
         {
             sessionKey = Util.UrlDecode(sessionKey);
             sessionType = Util.UrlDecode(sessionType);
-            var sL = await _db.MiniSessons.Where(s => s.session_key.Trim().Equals(sessionKey.Trim())
+            var sL = await _db.miniSession.Where(s => s.session_key.Trim().Equals(sessionKey.Trim())
                 && s.session_type.Trim().Equals(sessionType)).OrderByDescending(s => s.create_date).AsNoTracking().ToListAsync();
             if (sL == null || sL.Count == 0)
             {

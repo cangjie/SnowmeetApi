@@ -53,7 +53,7 @@ namespace SnowmeetApi.Data
 
 
             modelBuilder.Entity<MemberSocialAccount>().HasAlternateKey(m => m.num);
-            modelBuilder.Entity<OrderOnline>().HasOne(o => o.msa).WithMany(m => m.orders).HasForeignKey(o => o.open_id).HasPrincipalKey(m => m.num);
+            //modelBuilder.Entity<OrderOnline>().HasOne(o => o.msa).WithMany(m => m.orders).HasForeignKey(o => o.open_id).HasPrincipalKey(m => m.num);
             modelBuilder.Entity<Mi7ExportedSaleDetail>().HasNoKey();
             modelBuilder.Entity<MemberSocialAccount>().HasMany<MaintainLog>().WithOne(l => l.msa).HasForeignKey(l => l.staff_open_id).HasPrincipalKey(m => m.num);
             modelBuilder.Entity<MemberSocialAccount>().HasMany<Models.MaintainLive>().WithOne(m => m.staffMsa).HasForeignKey(m => m.service_open_id).HasPrincipalKey(m => m.num);
@@ -62,11 +62,17 @@ namespace SnowmeetApi.Data
             modelBuilder.Entity<MemberSocialAccount>().HasMany<Models.Rent.RentOrderDetail>().WithOne(r => r.returnMsa).HasForeignKey(m => m.return_staff).HasPrincipalKey(m => m.num);
             modelBuilder.Entity<MemberSocialAccount>().HasMany<Models.OrderPaymentRefund>().WithOne(r => r.msa).HasForeignKey(m => m.oper).HasPrincipalKey(m => m.num);
             modelBuilder.Entity<MemberSocialAccount>().HasMany<Models.OrderPayment>().WithOne(r => r.msa).HasForeignKey(m => m.staff_open_id).HasPrincipalKey(m => m.num);
+
+
+
+
+            /////////////new season
+            modelBuilder.Entity<MiniSession>().HasKey(m => new {m.session_key, m.session_type});
         }
 
         public DbSet<MaintainLive> MaintainLives {get; set;}
        
-        public DbSet<Models.Users.MiniSession> MiniSessons { get; set; }
+        
         public DbSet<Models.Users.MToken> MTokens { get; set; }
         public DbSet<Models.Users.UnionId> UnionIds { get; set; }
         public DbSet<Models.Users.MiniAppUser> MiniAppUsers { get; set; }
@@ -86,7 +92,7 @@ namespace SnowmeetApi.Data
         public DbSet<SnowmeetApi.Models.Users.Point> Point { get; set; }
         public DbSet<SnowmeetApi.Models.SummerMaintain> SummerMaintain { get; set; }
         public DbSet<SnowmeetApi.Models.Mi7Order> mi7Order { get; set; }
-        public DbSet<SnowmeetApi.Models.Shop> Shop { get; set; }
+        
         public DbSet<SnowmeetApi.Models.ShopSaleInteract> ShopSaleInteract { get; set; }
         public DbSet<SnowmeetApi.Models.OrderPayment> OrderPayment { get; set; }
         public DbSet<SnowmeetApi.Models.Maintain.Brand> Brand { get; set; }
@@ -162,13 +168,29 @@ namespace SnowmeetApi.Data
         public DbSet<Models.Mi7ExportedSaleList> mi7ExportedSaleList {get; set;}
         public DbSet<Models.Mi7ExportedSaleDetail> mi7ExportedSaleDetail {get; set;}
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
         //New Season
         public DbSet<Member> member { get; set; }
         public DbSet<MemberSocialAccount> memberSocialAccount { get; set; }
-
-        public DbSet<Staff> Staff { get; set; }
-        public DbSet<StaffSocialAccount> StaffSocialAccount { get; set; }
-        public DbSet<SocialAccountForJob> SocialAccountForJob { get; set; }
+        public DbSet<Staff> staff { get; set; }
+        public DbSet<StaffSocialAccount> staffSocialAccount { get; set; }
+        public DbSet<SocialAccountForJob> socialAccountForJob { get; set; }
+        public DbSet<SnowmeetApi.Models.Shop> shop { get; set; }
+        public DbSet<SnowmeetApi.Models.Order> order { get; set; }
+        public DbSet<MiniSession> miniSession { get; set; }
 
     }
 }

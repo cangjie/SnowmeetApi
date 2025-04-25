@@ -1,78 +1,21 @@
 using System;
-using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-using System.Linq;
-using SnowmeetApi.Controllers.Order;
 
 namespace SnowmeetApi.Models
 {
+    [Table("retail")]
     public class Retail
     {
-        public string mi7OrderId {get; set;}
-        public double salePrie {get; set;}
-        public double charge {get; set;}
-        public int count {get; set;}
-        public int? orderId {get; set;} = null;
-        public List<OrderOnline>? orders {get; set;} = null;
-        public OrderOnline? order {get; set;} = null;
-        public List<Mi7ExportedSaleDetail>? details {get; set;} = null;
-        public double paidAmount
-        {
-            get
-            {
-                double amount = 0;
-                for(int i = 0; i < payments.Count; i++)
-                {
-                    amount += payments[i].amount;
-                }
-                return amount;
-            }
-        }
-        public double refundAmount
-        {
-            get
-            {
-                double amount = 0;
-                for(int i = 0; i < refunds.Count; i++)
-                {
-                    amount += refunds[i].amount;
-                }
-                return amount;
-            }
-        }
-        public List<OrderPayment> payments
-        {
-            get
-            {
-                List<OrderPayment> payments = new List<OrderPayment>();
-                for(int i = 0; i < orders.Count; i++)
-                {
-                    OrderOnline order = orders[i];
-                    for(int j = 0; j < order.paymentList.Count; j++)
-                    {
-                        if (payments.Where(p => p.id == order.paymentList[j].id).ToList().Count == 0)
-                        {
-                            payments.Add(order.paymentList[j]);
-                        }
-                    }
-                }
-                return payments;
-            }
-        }
-        public List<Models.OrderPaymentRefund> refunds
-        {
-            get
-            {
-                List<OrderPaymentRefund> refunds = new List<OrderPaymentRefund>();
-                for(int i = 0; i < payments.Count; i++)
-                {
-                    for(int j = 0; j < payments[i].refunds.Count; j++)
-                    {
-                        refunds.Add(payments[i].refunds[j]);
-                    }
-                }
-                return refunds;
-            }
-        }        
+        [Key]
+        public int id { get; set; }
+        public int? order_id {get; set;} = null;
+        public string? mi7_code {get; set;} = null;
+        public double sale_price {get; set;} = 0;
+        public double deal_price {get; set;} = 0;
+        public string? order_type {get; set;} = null;
+        public int valid {get; set;} = 1;
+        public DateTime? update_date {get; set;} = null;
+        public DateTime create_date {get; set;} = DateTime.Now;
     }
 }

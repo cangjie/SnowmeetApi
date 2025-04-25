@@ -27,13 +27,13 @@ namespace SnowmeetApi.Controllers
         [HttpGet]
         public async Task ExportMi7Order(DateTime startDate)
         {
-            List<Models.Retail> rl = (List<Models.Retail>)((OkObjectResult)(await ShowMi7Order(startDate)).Result).Value;
+            List<Models.Retail1> rl = (List<Models.Retail1>)((OkObjectResult)(await ShowMi7Order(startDate)).Result).Value;
             List<Models.Mi7ExportedSaleDetail> details = await _db.mi7ExportedSaleDetail.ToListAsync();
             int maxPaymentNum = 0;
             int maxRefundNum = 0;
             for (int i = 0; i < rl.Count; i++)
             {
-                Retail r = rl[i];
+                Retail1 r = rl[i];
                 r.details = details.Where(d => d.单据编号.Trim().Equals(r.mi7OrderId.Trim())).ToList();
                 maxPaymentNum = Math.Max(r.payments.Count, maxPaymentNum);
                 maxRefundNum = Math.Max(r.refunds.Count, maxRefundNum);
@@ -200,7 +200,7 @@ namespace SnowmeetApi.Controllers
             int fixDetailCount = 0;
             for (int i = 0; i < rl.Count; i++)
             {
-                Retail r = rl[i];
+                Retail1 r = rl[i];
                 IRow dr = sheet.CreateRow(i + 1 + fixDetailCount);
                 dr.Height = 500;
                 int mergeBaseIndex = i + 1 + fixDetailCount;
@@ -725,9 +725,9 @@ namespace SnowmeetApi.Controllers
             }
         }
         [HttpGet]
-        public async Task<ActionResult<List<Models.Retail>>> ShowMi7Order(DateTime startDate)
+        public async Task<ActionResult<List<Models.Retail1>>> ShowMi7Order(DateTime startDate)
         {
-            List<Models.Retail> retailList = new List<Retail>();
+            List<Models.Retail1> retailList = new List<Retail1>();
             var mi7List = await (from m in _db.mi7Order
                 .Where(m => m.create_date.Date >= startDate.Date && m.mi7_order_id.Trim().StartsWith("XSD") //&& m.mi7_order_id.Trim().Equals("XSD20250326000A")
                 )
@@ -741,7 +741,7 @@ namespace SnowmeetApi.Controllers
             //List<Models.Mi7ExportedSaleDetail> detail = await _db.mi7ExportedSaleDetail.ToListAsync();
             for (int i = 0; i < mi7List.Count; i++)
             {
-                Retail r = new Retail()
+                Retail1 r = new Retail1()
                 {
                     mi7OrderId = mi7List[i].mi7OrderId,
                     salePrie = mi7List[i].salePrie,
@@ -778,7 +778,7 @@ namespace SnowmeetApi.Controllers
                     retailList.Add(r);
                 }
             }
-            List<Retail> newList = retailList.OrderBy(r => r.orders[0].create_date).ToList();
+            List<Retail1> newList = retailList.OrderBy(r => r.orders[0].create_date).ToList();
             return Ok(newList);
         }
     }

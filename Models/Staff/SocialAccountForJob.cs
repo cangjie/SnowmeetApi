@@ -17,7 +17,6 @@ namespace SnowmeetApi.Models
         public int is_private { get; set; } = 0;
         public DateTime? update_date {get; set;} = null;
         public DateTime create_date { get; set; } = DateTime.Now;
-        [ForeignKey(nameof(StaffSocialAccount.social_account_id))]
         public List<StaffSocialAccount> staffSocialAccounts { get; set; } = new List<StaffSocialAccount>();
         public Staff GetStaff(DateTime date)
         {

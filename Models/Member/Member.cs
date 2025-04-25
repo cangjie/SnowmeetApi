@@ -11,11 +11,11 @@ namespace SnowmeetApi.Models
     {
         [Key]
         public int id { get; set; }
-        public string real_name { get; set; }
-        public string gender { get; set; }
+        public string real_name { get; set; } = "";
+        public string gender { get; set; } = "";
         public int is_merge { get; set; } = 0;
         public int? merge_id { get; set; }
-        public string source { get; set; }
+        public string source { get; set; } = "";
         public int in_staff_list {get; set;} = 0;
         public string title
         {
@@ -103,6 +103,7 @@ namespace SnowmeetApi.Models
         public int is_manager { get; set; } = 0;
         public int is_admin { get; set; } = 0;
         public List<OrderOnline> orders { get; set; } = new List<OrderOnline>();
+        [NotMapped]
         public SnowmeetApi.Models.Users.MiniAppUser miniAppUser {get; set;} = null;
     }
 }

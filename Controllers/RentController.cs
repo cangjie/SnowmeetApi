@@ -1448,7 +1448,7 @@ namespace SnowmeetApi.Controllers
                     .Include(m => m.member).ToListAsync();
                 if (msaList != null && msaList.Count > 0)
                 {
-                    rentOrder.order.msa = msaList[0];
+                    //rentOrder.order.msa = msaList[0];
                 }
                 for (int i = 0; i < rentOrder.refunds.Count; i++)
                 {
@@ -1461,7 +1461,7 @@ namespace SnowmeetApi.Controllers
                         r.msa = msaList[0];
                     }
                 }
-                rentOrder.order.member = await (_memberHelper.GetMember(rentOrder.open_id, "wechat_mini_openid"));
+                //rentOrder.order.member = await (_memberHelper.GetMember(rentOrder.open_id, "wechat_mini_openid"));
             }
             bool allReturned = true;
             DateTime returnTime = rentOrder.create_date;

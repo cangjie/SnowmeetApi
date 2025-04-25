@@ -486,7 +486,7 @@ namespace SnowmeetApi.Controllers.Order
                 return "";
             }
             
-            var shops = await _context.Shop.Where(s=>s.name.Trim().Equals(order.shop.Trim()))
+            var shops = await _context.shop.Where(s=>s.name.Trim().Equals(order.shop.Trim()))
                 .AsNoTracking().ToListAsync();
             if (shops == null || shops.Count == 0)
             {

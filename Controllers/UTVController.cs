@@ -169,12 +169,12 @@ namespace SnowmeetApi.Controllers
         public async Task<string> GetOpenId(string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey);
-            var sessionList = await _db.MiniSessons.Where(m => m.session_key.Trim().Equals(sessionKey)).OrderByDescending(s => s.create_date).ToListAsync();
+            var sessionList = await _db.miniSession.Where(m => m.session_key.Trim().Equals(sessionKey)).OrderByDescending(s => s.create_date).ToListAsync();
             if (sessionList == null || sessionList.Count == 0)
             {
                 return null;
             }
-            return sessionList[0].open_id.Trim();
+            return "";
         }
         [NonAction]
         public async Task<UTVUsers> GetUser(string openId)
@@ -1005,7 +1005,7 @@ namespace SnowmeetApi.Controllers
         [NonAction]
         public async Task<UTVUsers> GetUTVUser(string sessionKey)
         {
-            var sessionList = await _db.MiniSessons
+            var sessionList = await _db.miniSession
                 .Where(s => s.session_key.Trim().Equals(sessionKey))
                 .OrderByDescending(s => s.create_date).ToListAsync();
             if (sessionList == null || sessionList.Count == 0)
@@ -1013,7 +1013,7 @@ namespace SnowmeetApi.Controllers
                 return null;
             }
             string source = sessionList[0].session_type.Trim();
-            string openId = sessionList[0].open_id.Trim();
+            string openId = "";
             var userList = await _db.utvUser.Where(u => (( (source.Equals("") || source.Equals("wechat")) && u.wechat_open_id.Trim().Equals(openId))
                 || (source.Equals("tiktok") && u.tiktok_open_id.Trim().Equals(openId)))).ToListAsync();
             if (userList == null || userList.Count == 0)

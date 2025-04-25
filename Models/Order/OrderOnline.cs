@@ -19,6 +19,7 @@ namespace SnowmeetApi.Models
     [Table("order_online")]
     public class OrderOnline
     {
+        /*
         public class EnterainInfo
         {
             public string cell {get; set;}
@@ -26,12 +27,12 @@ namespace SnowmeetApi.Models
             public string gender {get; set;}
             public int? memberId {get; set;} = null;
         }
+        */
         public string staffRealName = "";
 
         //public Ticket.Ticket[] ticketArray = new Ticket.Ticket[0];
    
         [Key]
-        //[ForeignKey(nameof(Models.SkiPass.SkiPass.order))]
         public int id { get; set; }
 
         public string type { get; set; }
@@ -66,6 +67,7 @@ namespace SnowmeetApi.Models
         public int referee_member_id { get; set; } = 0;
         public DateTime biz_date {get; set;} = DateTime.Now;
         public string? payer { get; set; } = null;
+        /*
         public bool isEnterain
         {
             get
@@ -82,6 +84,8 @@ namespace SnowmeetApi.Models
                 return enterain;
             }
         }
+        */
+        /*
         public EnterainInfo enterainInfo
         {
             get
@@ -118,6 +122,7 @@ namespace SnowmeetApi.Models
                 }
             }
         }
+        */
         [NotMapped]
         public OrderPayment[]? _payments; 
 
@@ -265,10 +270,10 @@ namespace SnowmeetApi.Models
         public Ticket.Ticket[] tickets { get; set; }
         [NotMapped]
         public OrderOnlineDetail[]? details { get; set; }
-        [NotMapped]
-        public Member? member {get; set;}
-        [NotMapped]
-        public MemberSocialAccount? msa {get; set;}
+        //[NotMapped]
+        //public Member? member {get; set;}
+        //[NotMapped]
+        //public MemberSocialAccount? msa {get; set;}
         public List<RentOrder> rentOrderList {get; set;}
         [ForeignKey(nameof(MaintainLive.order_id))]
         public List<MaintainLive> maintainList {get; set;}

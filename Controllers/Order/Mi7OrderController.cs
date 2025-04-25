@@ -308,7 +308,7 @@ namespace SnowmeetApi.Controllers.Order
             {
                 Models.Mi7Order mi7Order = orders[0];
                 MemberController _memberHelper = new MemberController(_context, _config);
-                mi7Order.order.member = await _memberHelper.GetMember(mi7Order.order.open_id, "wechat_mini_openid");
+                //mi7Order.order.member = await _memberHelper.GetMember(mi7Order.order.open_id, "wechat_mini_openid");
                 return Ok(mi7Order);
             }
         }
@@ -337,7 +337,7 @@ namespace SnowmeetApi.Controllers.Order
             {
                 Models.Mi7Order mi7Order = orders[0];
                 MemberController _memberHelper = new MemberController(_context, _config);
-                mi7Order.order.member = await _memberHelper.GetMember(mi7Order.order.open_id, "wechat_mini_openid");
+                //mi7Order.order.member = await _memberHelper.GetMember(mi7Order.order.open_id, "wechat_mini_openid");
                 return Ok(mi7Order);
             }
         }

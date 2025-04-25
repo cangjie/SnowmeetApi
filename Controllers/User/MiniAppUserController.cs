@@ -226,13 +226,13 @@ namespace SnowmeetApi.Controllers
         {
             sessionKey = Util.UrlDecode(sessionKey.Trim());
 
-            var mSessionList = await _context.MiniSessons.Where(m => (m.session_key.Trim().Equals(sessionKey.Trim()))).ToListAsync();
+            var mSessionList = await _context.miniSession.Where(m => (m.session_key.Trim().Equals(sessionKey.Trim()))).ToListAsync();
             if (mSessionList.Count == 0)
             {
                 return NotFound();
             }
             //MiniAppUser user = await _context.MiniAppUsers.FindAsync(mSessionList[0].open_id);
-            MiniAppUser user = (await _memberHelper.GetMember(mSessionList[0].open_id, "wechat_mini_openid")).miniAppUser;
+            MiniAppUser user = (await _memberHelper.GetMember("", "wechat_mini_openid")).miniAppUser;
             user.open_id = "";
             if (user != null)
             {
@@ -254,13 +254,13 @@ namespace SnowmeetApi.Controllers
         {
             sessionKey = Util.UrlDecode(sessionKey.Trim());
 
-            var mSessionList = await _context.MiniSessons.Where(m => (m.session_key.Trim().Equals(sessionKey.Trim()))).ToListAsync();
+            var mSessionList = await _context.miniSession.Where(m => (m.session_key.Trim().Equals(sessionKey.Trim()))).ToListAsync();
             if (mSessionList.Count == 0)
             {
                 return NotFound();
             }
             //MiniAppUser user = await _context.MiniAppUsers.FindAsync(mSessionList[0].open_id);
-            MiniAppUser user = (await _memberHelper.GetMember(mSessionList[0].open_id)).miniAppUser;
+            MiniAppUser user = (await _memberHelper.GetMember("")).miniAppUser;
             return Ok(user);
 
         }
