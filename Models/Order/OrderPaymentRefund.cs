@@ -4,7 +4,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 using SnowmeetApi.Models.Users;
 namespace SnowmeetApi.Models
 {
-    [Table("order_online_refund")]
+    [Table("payment_refund")]
     public class OrderPaymentRefund
     {
         public int id { get; set; }
@@ -24,10 +24,10 @@ namespace SnowmeetApi.Models
 
         public string out_refund_no {get; set;} = "";
         public DateTime? update_date {get; set;} = null;
-
-        [NotMapped]
-        public MemberSocialAccount msa {get; set;}
-        
+        [ForeignKey("payment_id")]
+        public OrderPayment? payment { get; set; } = null;
+        [ForeignKey("order_id")]
+        public Order? order { get; set; } = null;
         public bool refundSuccess
         {
             get
@@ -40,7 +40,6 @@ namespace SnowmeetApi.Models
                 return suc;
             }
         }
-
         public bool isManual
         {
             get

@@ -217,7 +217,7 @@ namespace SnowmeetApi.Controllers
 
                 .Include(r => r.order).ThenInclude(o => o.paymentList.Where(p => p.status.Equals("支付成功")))
                     .ThenInclude(p => p.refunds.Where(r => r.state == 1 || !r.refund_id.Trim().Equals("")))
-                        .ThenInclude(r => r.msa).ThenInclude(m => m.member)
+                        //.ThenInclude(r => r.msa).ThenInclude(m => m.member)
 
                 .Include(r => r.additionalPayments.Where(a => a.is_paid == 1))
                     .ThenInclude(a => a.order).ThenInclude(o => o.paymentList.Where(p => p.status.Equals("支付成功")))
@@ -226,7 +226,7 @@ namespace SnowmeetApi.Controllers
                 .Include(r => r.additionalPayments.Where(a => a.is_paid == 1))
                     .ThenInclude(a => a.order).ThenInclude(o => o.paymentList.Where(p => p.status.Equals("支付成功")))
                         .ThenInclude(p => p.refunds.Where(r => r.state == 1 || !r.refund_id.Trim().Equals("")))
-                            .ThenInclude(r => r.msa).ThenInclude(m => m.member)
+                            //.ThenInclude(r => r.msa).ThenInclude(m => m.member)
                 .Include(r => r.details.Where(d => d.valid == 1).OrderByDescending(d => d.id)).ThenInclude(d => d.log)
                     .ThenInclude(d => d.msa).ThenInclude(m => m.member)
                 
@@ -957,7 +957,7 @@ namespace SnowmeetApi.Controllers
                                     case 5:
                                         if (j == 0)
                                         {
-                                            string staffName = (refund.msa != null && refund.msa.member != null) ? refund.msa.member.real_name : "";
+                                            string staffName = "";//(refund.msa != null && refund.msa.member != null) ? refund.msa.member.real_name : "";
                                             cell.SetCellValue(staffName);
                                             cell.CellStyle = styleText;
                                         }
@@ -1458,7 +1458,7 @@ namespace SnowmeetApi.Controllers
                         .Include(m => m.member).ToListAsync();
                     if (msaList != null && msaList.Count > 0)
                     {
-                        r.msa = msaList[0];
+                        //r.msa = msaList[0];
                     }
                 }
                 //rentOrder.order.member = await (_memberHelper.GetMember(rentOrder.open_id, "wechat_mini_openid"));

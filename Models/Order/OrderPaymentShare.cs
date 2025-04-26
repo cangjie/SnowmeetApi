@@ -21,5 +21,9 @@ namespace SnowmeetApi.Models
         public string out_trade_no {get; set;}
         [ForeignKey("kol_id")]
         public Kol kol {get; set;}
+        [ForeignKey("payment_id")]
+        public OrderPayment? payment { get; set; } = null;
+        [ForeignKey("order_id")]
+        public Order? order { get; set; } = null;
     }
 }

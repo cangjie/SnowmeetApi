@@ -46,9 +46,9 @@ namespace SnowmeetApi.Models
 
         public string? wepay_trans_id {get; set;}
 
-        [ForeignKey(nameof(OrderPaymentRefund.payment_id))]
+        //[ForeignKey(nameof(OrderPaymentRefund.payment_id))]
         public List<Models.OrderPaymentRefund> refunds {get; set;} = new List<OrderPaymentRefund>();
-        [ForeignKey(nameof(Models.PaymentShare.payment_id))]
+        //[ForeignKey(nameof(Models.PaymentShare.payment_id))]
         public List<Models.PaymentShare> shares {get;set;}
         public string? deposit_type { get; set; } = null;
         public string? deposit_sub_type {get; set; } = null;
@@ -110,9 +110,8 @@ namespace SnowmeetApi.Models
                 return amount - refundedAmount;
             }
         }
-
-        [NotMapped]
-        public OrderOnline order {get; set;}
+        [ForeignKey("order_id")]
+        public Order? order {get; set;}
         [NotMapped]
         public MemberSocialAccount? msa {get; set;} = null;
 

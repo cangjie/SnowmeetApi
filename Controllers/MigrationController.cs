@@ -128,7 +128,6 @@ namespace SnowmeetApi.Controllers
                     cell = cell,
                     gender = gender,
                     total_amount = oldList[i].order_price,
-                    final_charge = oldList[i].final_price,
                     memo = oldList[i].memo,
                     biz_date = oldList[i].pay_time == null ? oldList[i].create_date : (DateTime)oldList[i].pay_time,
                     staff_id = staff.id,

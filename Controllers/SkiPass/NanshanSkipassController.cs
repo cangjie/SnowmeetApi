@@ -993,7 +993,7 @@ namespace SnowmeetApi.Controllers.SkiPass
                 .Include(o => o.skiPasses)
                 .Include(o => o.paymentList.Where(p => p.status.Trim().Equals("支付成功")))
                     .ThenInclude(p => p.refunds.Where(r => r.state == 1 || !r.refund_id.Trim().Equals("")))
-                        .ThenInclude(r => r.msa).ThenInclude(m => m.member)
+                        //.ThenInclude(r => r.msa).ThenInclude(m => m.member)
                 .Where(o => o.type.Trim().Equals("雪票") && o.shop.Trim().Equals("南山") && o.pay_state == 1 && o.create_date >= startDate)
                 .OrderByDescending(o => o.id).AsNoTracking().ToListAsync();
             int maxPaymentCount = 0;

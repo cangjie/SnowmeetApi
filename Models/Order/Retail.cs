@@ -17,5 +17,7 @@ namespace SnowmeetApi.Models
         public int valid {get; set;} = 1;
         public DateTime? update_date {get; set;} = null;
         public DateTime create_date {get; set;} = DateTime.Now;
+        [ForeignKey("order_id")]
+        public Order? order {get; set;} = null;
     }
 }

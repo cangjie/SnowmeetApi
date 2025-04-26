@@ -60,7 +60,7 @@ namespace SnowmeetApi.Data
             modelBuilder.Entity<MemberSocialAccount>().HasMany<Models.Rent.RentOrder>().WithOne(r => r.receptMsa).HasForeignKey(m => m.staff_open_id).HasPrincipalKey(m => m.num);
             modelBuilder.Entity<MemberSocialAccount>().HasMany<Models.Rent.RentOrderDetailLog>().WithOne(r => r.msa).HasForeignKey(m => m.staff_open_id).HasPrincipalKey(m => m.num);
             modelBuilder.Entity<MemberSocialAccount>().HasMany<Models.Rent.RentOrderDetail>().WithOne(r => r.returnMsa).HasForeignKey(m => m.return_staff).HasPrincipalKey(m => m.num);
-            modelBuilder.Entity<MemberSocialAccount>().HasMany<Models.OrderPaymentRefund>().WithOne(r => r.msa).HasForeignKey(m => m.oper).HasPrincipalKey(m => m.num);
+            //modelBuilder.Entity<MemberSocialAccount>().HasMany<Models.OrderPaymentRefund>().WithOne(r => r.msa).HasForeignKey(m => m.oper).HasPrincipalKey(m => m.num);
             modelBuilder.Entity<MemberSocialAccount>().HasMany<Models.OrderPayment>().WithOne(r => r.msa).HasForeignKey(m => m.staff_open_id).HasPrincipalKey(m => m.num);
 
 
@@ -137,7 +137,7 @@ namespace SnowmeetApi.Data
         public DbSet<Models.EPaymentDailyReport> ePaymentDailyReport { get; set; }
         public DbSet<Models.AlipayMchId> alipayMchId { get; set; }
         public DbSet<Models.Kol> kol {get; set;}
-        public DbSet<Models.PaymentShare> paymentShare {get; set;}
+        
         public DbSet<Models.AliDownloadFlowBill> aliDownloadFlowBill {get; set; }
         public DbSet<SnowmeetApi.Models.Rent.RentCategory> rentCategory { get; set; }
         public DbSet<SnowmeetApi.Models.Rent.RentPrice> rentPrice {get; set;}
@@ -191,6 +191,10 @@ namespace SnowmeetApi.Data
         public DbSet<SnowmeetApi.Models.Shop> shop { get; set; }
         public DbSet<SnowmeetApi.Models.Order> order { get; set; }
         public DbSet<MiniSession> miniSession { get; set; }
+        public DbSet<SnowmeetApi.Models.OrderPayment> orderPayment { get; set; }
+        public DbSet<OrderPaymentRefund> paymentRefund { get; set; }
+        public DbSet<Models.PaymentShare> paymentShare {get; set;}
+        
 
     }
 }
