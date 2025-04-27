@@ -40,7 +40,7 @@ namespace SnowmeetApi.Controllers
                     && (shop == null || o.shop.Equals(shop.Trim())) 
                     //&& (status == null || o.paymentStatus.Equals(status.Trim()))
                     && (mi7Num == null || (mi7Num.Trim().Equals("已填") && !o.retails.Any(r => r.mi7_code == null ) ) || (mi7Num.Trim().Equals("未填") && o.retails.Any(r => r.mi7_code == null ))  )
-                    && (cell == null || o.cell.EndsWith(cell.Trim()) || o.member.cell.EndsWith(cell.Trim()) )
+                    && (cell == null ||(cell.Length >=4 && o.cell.EndsWith(cell.Trim()) ) || o.member.memberSocialAccounts.Any(m => cell.Length >= 4 && m.type.Trim().Equals("cell") && m.num.EndsWith(cell) ) )
                     && (orderId == null || o.id == orderId)
                     && (mi7OrderId == null || o.retails.Any(r => r.mi7_code.IndexOf(mi7OrderId.Trim()) >= 0) )
                 ).OrderByDescending(o => o.id).AsNoTracking().ToListAsync();
@@ -99,6 +99,10 @@ namespace SnowmeetApi.Controllers
                     message = "不能确定员工身份。",
                     data = null
                 };
+            }
+            if (mi7Num != null && mi7Num.Trim().Equals("紧急开单"))
+            {
+                mi7Num = "未填";
             }
             List<SnowmeetApi.Models.Order> orders = await GetRetailOrders(orderId, startDate, endDate, shop, mi7Num, cell, mi7OrderId);
             if (onlyMine)
