@@ -43,13 +43,33 @@ namespace SnowmeetApi.Controllers
                     && (cell == null || o.cell.EndsWith(cell.Trim()) || o.member.cell.EndsWith(cell.Trim()) )
                     && (orderId == null || o.id == orderId)
                     && (mi7OrderId == null || o.retails.Any(r => r.mi7_code.IndexOf(mi7OrderId.Trim()) >= 0) )
-                ).AsNoTracking().ToListAsync();
+                ).OrderByDescending(o => o.id).AsNoTracking().ToListAsync();
             return orderList;
         }
         [NonAction]
         public static void RendOrderList(List<SnowmeetApi.Models.Order> orderList)
         { 
-
+            for(int i = 0; i < orderList.Count; i++)
+            {
+                string txtColor = "";
+                string backColor = "";
+                SnowmeetApi.Models.Order order = orderList[i];
+                if (order.paidAmount < order.totalCharge && order.closed == 0)
+                {
+                    txtColor = "red";
+                }
+                else if (order.retails != null 
+                    && order.retails.Any(r => (r.mi7_code == null || r.mi7_code.StartsWith("XSD") || r.mi7_code.Length != 15 || (r.mi7_code.ToUpper().EndsWith("A") && r.mi7_code.ToUpper().EndsWith("I") ) )))
+                {
+                    txtColor = "orange";
+                }
+                if (order.paidAmount == 0 && order.pay_option.Trim().Equals("招待"))
+                {
+                    backColor = "yellow";
+                }
+                order.textColor = txtColor;
+                order.backgroundColor = backColor;
+            }
         }
 
 
@@ -89,6 +109,7 @@ namespace SnowmeetApi.Controllers
             {
                 orders = orders.Where(o => o.paymentStatus.Trim().Equals(status)).ToList();
             }
+            RendOrderList(orders);
             return new ApiResult<List<SnowmeetApi.Models.Order>>()
             {
                 code = 0,

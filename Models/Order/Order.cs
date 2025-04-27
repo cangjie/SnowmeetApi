@@ -131,6 +131,14 @@ namespace SnowmeetApi.Models
             }
         }
         [NotMapped]
+        public double surplusAmount
+        {
+            get
+            {
+                return paidAmount - refundAmount;
+            }
+        }
+        [NotMapped]
         public string paymentStatus
         {
             get
