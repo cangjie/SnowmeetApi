@@ -35,6 +35,10 @@ namespace SnowmeetApi.Models
         public int? waiting_for_pay { get; set; } = null;
         public int supplement { get; set; } = 0;
         public DateTime? update_date { get; set; } = null;
+        [NotMapped]
+        public string textColor { get; set; } = "";
+        [NotMapped]
+        public string backgroundColor { get; set; } = "";
         public DateTime create_date { get; set; } = DateTime.Now;
         [ForeignKey("staff_id")]
         public Staff staff { get; set; } = null;
