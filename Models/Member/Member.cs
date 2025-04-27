@@ -17,6 +17,7 @@ namespace SnowmeetApi.Models
         public int? merge_id { get; set; }
         public string source { get; set; } = "";
         public int in_staff_list {get; set;} = 0;
+        [NotMapped]
         public string title
         {
             get
@@ -25,7 +26,7 @@ namespace SnowmeetApi.Models
                 title += gender.Trim().Equals("男") ? "先生" : (gender.Trim().Equals("女") ? "女士" : "");
                 return title.Trim();
             }
-        }
+        }  
         public List<MemberSocialAccount> memberSocialAccounts { get; set; } = new List<MemberSocialAccount>();
         public List<DepositAccount> depositAccounts { get; set; }
         public List<MemberSocialAccount> GetInfo(string type)
@@ -97,6 +98,7 @@ namespace SnowmeetApi.Models
                 return v;
             }
         }
+        public List<SocialAccountForJob>? jobAccounts {get; set;}
 
         //will be deleted
         public int is_staff { get; set; } = 0;

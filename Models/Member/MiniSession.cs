@@ -14,5 +14,7 @@ namespace SnowmeetApi.Models
         public DateTime expire_date { get; set; }
         public int? member_id {get; set;} = null;
         public DateTime create_date { get; set; } = DateTime.Now;
+        [ForeignKey("member_id")]
+        public Member? member {get; set;}
     }
 }

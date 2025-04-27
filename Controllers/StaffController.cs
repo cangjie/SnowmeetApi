@@ -42,6 +42,33 @@ namespace SnowmeetApi.Controllers
             return jList[0].GetStaff((DateTime)date);
         }
         [NonAction]
+        public async Task<Staff> GetStaffBySessionKey(string sessionKey, string sessionType = "wechat_mini")
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            List<MiniSession> sList = await _db.miniSession
+                .Include(m => m.member).ThenInclude(m => m.jobAccounts)
+                    .ThenInclude(j => j.staffSocialAccounts.Where(s => s.valid == 1 && (s.end_date == null || s.end_date >= DateTime.Now)).OrderByDescending(s => s.start_date))
+                    .ThenInclude(s => s.staff)
+                .Where(m => m.session_key.Trim().Equals(sessionKey) && m.session_type.Equals(sessionType) && m.valid == 1 && m.expire_date >= DateTime.Now)
+                .OrderByDescending(m => m.expire_date).AsNoTracking().ToListAsync();
+            for(int i = 0; i < sList.Count; i++)
+            {
+                MiniSession mSession = sList[i];
+                for(int j = 0; mSession.member != null && mSession.member.jobAccounts != null && j < mSession.member.jobAccounts.Count; j++)
+                {
+                    SocialAccountForJob jobAccount = mSession.member.jobAccounts[j];
+                    for(int k = 0; jobAccount.staffSocialAccounts != null && k < jobAccount.staffSocialAccounts.Count; k++)
+                    {
+                        if (jobAccount.staffSocialAccounts[k].staff != null && jobAccount.staffSocialAccounts[k].staff.valid == 1)
+                        {
+                            return jobAccount.staffSocialAccounts[k].staff;
+                        }
+                    }
+                }
+            }
+            return null;
+        }
+        [NonAction]
         public async Task<Staff> CreateStaff(string openId, string cell, string name, string gender, DateTime bizDate)
         {
             List<SocialAccountForJob> jl = await _db.socialAccountForJob

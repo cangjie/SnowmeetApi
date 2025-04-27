@@ -12,6 +12,7 @@ namespace SnowmeetApi.Models
         public string name { get; set; } = "";
         public string gender {get; set;} = "";
         public int title_level { get; set; } = 0;
+        public int valid {get; set;}
         public DateTime? update_date {get; set;} = null;
         public DateTime create_date { get; set; } = DateTime.Now;
     }

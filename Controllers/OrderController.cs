@@ -24,7 +24,7 @@ namespace SnowmeetApi.Controllers
             _http = httpContextAccessor;
         }
 
-        [HttpGet]
+        [NonAction]
         public async Task<List<SnowmeetApi.Models.Order>> GetRetailOrders(int? orderId, DateTime? startDate = null, DateTime? endDate = null,
             string? shop = null, string? status = null, string? mi7Num = null, string? cell = null, string? mi7OrderId = null)
         {
@@ -59,11 +59,33 @@ namespace SnowmeetApi.Controllers
                 message = ""
             });
         }
-        [NonAction]
-        public async Task<ActionResult<ApiResult<List<SnowmeetApi.Models.Order>>>> GetRetailOrders(string staffSessionKey, DateTime startDate, DateTime endDate,
-            string shop = "", string status = "", string mi7Num = "", bool onlyMine = false, string cell = "", string orderId = "0", string mi7OrderId = "")
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<List<SnowmeetApi.Models.Order>>>> GetRetailOrders(string staffSessionKey, int? orderId, 
+            DateTime? startDate = null, DateTime? endDate = null, string? shop = null, string? status = null, string? mi7Num = null, 
+            string? cell = null, string? mi7OrderId = null, bool onlyMine = false)
         {
-            return BadRequest();
+            StaffController _staffHelper = new StaffController(_db);
+            Staff staff = await _staffHelper.GetStaffBySessionKey(staffSessionKey);
+            if (staff == null)
+            {
+                return new ApiResult<List<SnowmeetApi.Models.Order>>()
+                {
+                    code = 1,
+                    message = "不能确定员工身份。",
+                    data = null
+                };
+            }
+            List<SnowmeetApi.Models.Order> orders = await GetRetailOrders(orderId, startDate, endDate, shop, status, mi7Num, cell, mi7OrderId);
+            if (onlyMine)
+            {
+                orders = orders.Where(o => o.staff_id == staff.id).ToList();
+            }
+            return new ApiResult<List<SnowmeetApi.Models.Order>>()
+            {
+                code = 0,
+                message = "",
+                data = orders
+            };
         }
     }
 }
