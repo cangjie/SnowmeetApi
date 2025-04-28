@@ -274,7 +274,7 @@ namespace LuqinMiniAppBase.Controllers
                     await _db.SaveChangesAsync();
                 }
             }
-            string sessionType = "wechat_mini";
+            string sessionType = "wechat_mini_openid";
             MiniSession session = await _db.miniSession.FindAsync(sessionKey.Trim(), sessionType);
             DateTime expireDate = DateTime.Now.AddHours(2);
             if (session == null)

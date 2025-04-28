@@ -23,56 +23,58 @@ namespace SnowmeetApi.Controllers
             _config = config;
             _http = httpContextAccessor;
         }
-
         [NonAction]
         public async Task<List<SnowmeetApi.Models.Order>> GetRetailOrders(int? orderId, DateTime? startDate = null, DateTime? endDate = null,
             string? shop = null, string? mi7Num = null, string? cell = null, string? mi7OrderId = null)
         {
-            startDate = startDate == null? DateTime.MinValue: startDate;
-            endDate = endDate == null? DateTime.MaxValue: endDate;
+            startDate = startDate == null ? DateTime.MinValue : startDate;
+            endDate = endDate == null ? DateTime.MaxValue : endDate;
             List<SnowmeetApi.Models.Order> orderList = await _db.order
                 .Include(o => o.retails)
-                .Include(o => o.payments).ThenInclude(o => o.refunds)
+                .Include(o => o.payments).ThenInclude(p => p.staff)
+                .Include(o=>o.payments).ThenInclude(o => o.refunds)
                 .Include(o => o.staff)
                 .Include(o => o.member).ThenInclude(m => m.memberSocialAccounts)
-                .Where(o => o.valid == 1 && o.type == "零售" 
-                    && o.biz_date.Date >= ((DateTime)startDate).Date && o.biz_date.Date <= ((DateTime)endDate).Date  
-                    && (shop == null || o.shop.Equals(shop.Trim())) 
+                .Where(o => o.valid == 1 && o.type == "零售"
+                    && o.biz_date.Date >= ((DateTime)startDate).Date && o.biz_date.Date <= ((DateTime)endDate).Date
+                    && (shop == null || o.shop.Equals(shop.Trim()))
                     //&& (status == null || o.paymentStatus.Equals(status.Trim()))
-                    && (mi7Num == null || (mi7Num.Trim().Equals("已填") && !o.retails.Any(r => r.mi7_code == null ) ) || (mi7Num.Trim().Equals("未填") && o.retails.Any(r => r.mi7_code == null ))  )
-                    && (cell == null ||(cell.Length >=4 && o.cell.EndsWith(cell.Trim()) ) || o.member.memberSocialAccounts.Any(m => cell.Length >= 4 && m.type.Trim().Equals("cell") && m.num.EndsWith(cell) ) )
+                    && (mi7Num == null || (mi7Num.Trim().Equals("已填") && !o.retails.Any(r => r.mi7_code == null)) || (mi7Num.Trim().Equals("未填") && o.retails.Any(r => r.mi7_code == null)))
+                    && (cell == null || (cell.Length >= 4 && o.cell.EndsWith(cell.Trim())) || o.member.memberSocialAccounts.Any(m => cell.Length >= 4 && m.type.Trim().Equals("cell") && m.num.EndsWith(cell)))
                     && (orderId == null || o.id == orderId)
-                    && (mi7OrderId == null || o.retails.Any(r => r.mi7_code.IndexOf(mi7OrderId.Trim()) >= 0) )
+                    && (mi7OrderId == null || o.retails.Any(r => r.mi7_code.IndexOf(mi7OrderId.Trim()) >= 0))
                 ).OrderByDescending(o => o.id).AsNoTracking().ToListAsync();
             return orderList;
         }
         [NonAction]
-        public static void RendOrderList(List<SnowmeetApi.Models.Order> orderList)
-        { 
-            for(int i = 0; i < orderList.Count; i++)
+        public static void RendOrder(SnowmeetApi.Models.Order order)
+        {
+            string txtColor = "";
+            string backColor = "";
+            if (order.paidAmount < order.totalCharge && order.closed == 0)
             {
-                string txtColor = "";
-                string backColor = "";
-                SnowmeetApi.Models.Order order = orderList[i];
-                if (order.paidAmount < order.totalCharge && order.closed == 0)
-                {
-                    txtColor = "red";
-                }
-                else if (order.retails != null 
-                    && order.retails.Any(r => (r.mi7_code == null || r.mi7_code.StartsWith("XSD") || r.mi7_code.Length != 15 || (r.mi7_code.ToUpper().EndsWith("A") && r.mi7_code.ToUpper().EndsWith("I") ) )))
-                {
-                    txtColor = "orange";
-                }
-                if (order.paidAmount == 0 && order.pay_option.Trim().Equals("招待"))
-                {
-                    backColor = "yellow";
-                }
-                order.textColor = txtColor;
-                order.backgroundColor = backColor;
+                txtColor = "red";
+            }
+            else if (order.retails != null
+                && order.retails.Any(r => (r.mi7_code == null || r.mi7_code.StartsWith("XSD") || r.mi7_code.Length != 15 || (r.mi7_code.ToUpper().EndsWith("A") && r.mi7_code.ToUpper().EndsWith("I")))))
+            {
+                txtColor = "orange";
+            }
+            if (order.paidAmount == 0 && order.pay_option.Trim().Equals("招待"))
+            {
+                backColor = "yellow";
+            }
+            order.textColor = txtColor;
+            order.backgroundColor = backColor;
+        }
+        [NonAction]
+        public static void RendOrderList(List<SnowmeetApi.Models.Order> orderList)
+        {
+            for (int i = 0; i < orderList.Count; i++)
+            {
+                RendOrder(orderList[i]);
             }
         }
-
-
         [HttpGet]
         public async Task<ActionResult<ApiResult<List<Shop>>>> GetShops()
         {
@@ -85,8 +87,8 @@ namespace SnowmeetApi.Controllers
             });
         }
         [HttpGet]
-        public async Task<ActionResult<ApiResult<List<SnowmeetApi.Models.Order>>>> GetRetailOrders(string staffSessionKey, int? orderId, 
-            DateTime? startDate = null, DateTime? endDate = null, string? shop = null, string? status = null, string? mi7Num = null, 
+        public async Task<ActionResult<ApiResult<List<SnowmeetApi.Models.Order>>>> GetRetailOrders(string staffSessionKey, int? orderId,
+            DateTime? startDate = null, DateTime? endDate = null, string? shop = null, string? status = null, string? mi7Num = null,
             string? cell = null, string? mi7OrderId = null, bool onlyMine = false)
         {
             StaffController _staffHelper = new StaffController(_db);
@@ -120,6 +122,56 @@ namespace SnowmeetApi.Controllers
                 message = "",
                 data = orders
             };
+        }
+        [HttpGet("{orderId}")]
+        public async Task<ActionResult<ApiResult<SnowmeetApi.Models.Order>>> GetRetailOrder(int orderId, string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            StaffController _staffHelper = new StaffController(_db);
+            Staff staff = await _staffHelper.GetStaffBySessionKey(sessionKey, sessionType);
+            MemberController _memberHelper = new MemberController(_db, _config);
+            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
+            if (staff == null && member == null)
+            {
+                return Ok(new ApiResult<object?>()
+                {
+                    code = 1,
+                    message = "不能验证用户身份。",
+                    data = null
+                });
+            }
+            List<SnowmeetApi.Models.Order> orderList = await GetRetailOrders(orderId, null, null, null, null, null, null);
+            SnowmeetApi.Models.Order? order = (orderList != null && orderList.Count > 0) ? orderList[0] : null;
+            if (order == null)
+            {
+                return Ok(new ApiResult<object?>()
+                {
+                    code = 1,
+                    message = "订单不存在。",
+                    data = null
+                });
+            }
+            else
+            {
+                if (staff != null || order.member_id == member.id)
+                {
+                    RendOrder(order);
+                    return Ok(new ApiResult<object?>()
+                    {
+                        code = 0,
+                        message = "",
+                        data = order
+                    });
+                }
+                else
+                {
+                    return Ok(new ApiResult<object?>()
+                    {
+                        code = 1,
+                        message = "没有权限",
+                        data = null
+                    });
+                }
+            }
         }
     }
 }

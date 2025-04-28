@@ -42,9 +42,10 @@ namespace SnowmeetApi.Controllers
             return jList[0].GetStaff((DateTime)date);
         }
         [NonAction]
-        public async Task<Staff> GetStaffBySessionKey(string sessionKey, string sessionType = "wechat_mini")
+        public async Task<Staff> GetStaffBySessionKey(string sessionKey, string sessionType = "wechat_mini_openid")
         {
             sessionKey = Util.UrlDecode(sessionKey);
+            sessionType = Util.UrlDecode(sessionType);
             List<MiniSession> sList = await _db.miniSession
                 .Include(m => m.member).ThenInclude(m => m.jobAccounts)
                     .ThenInclude(j => j.staffSocialAccounts.Where(s => s.valid == 1 && (s.end_date == null || s.end_date >= DateTime.Now)).OrderByDescending(s => s.start_date))

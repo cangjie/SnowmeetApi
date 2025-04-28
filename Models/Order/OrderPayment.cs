@@ -38,6 +38,9 @@ namespace SnowmeetApi.Models
         public string? prepay_id { get; set; }
         public string? ssyn { get; set; }
         public string staff_open_id { get; set; } = "";
+        public int? staff_id {get; set;}
+        [ForeignKey("staff_id")]
+        public Staff? staff {get; set;}
         public DateTime create_date { get; set; } = DateTime.Now;
 
         public string? ali_qr_code { get; set; }

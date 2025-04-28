@@ -13,22 +13,105 @@ using NuGet.ProjectModel;
 using SnowmeetApi.Data;
 using SnowmeetApi.Models;
 
-namespace SnowmeetApi.Controllers.User
+namespace SnowmeetApi.Controllers
 {
-    [Route("core/[controller]/[action]")]
+    [Route("api/[controller]/[action]")]
     [ApiController]
     public class MemberController : ControllerBase
     {
         private readonly ApplicationDBContext _db;
         private readonly IConfiguration _config;
-        
-
         public MemberController(ApplicationDBContext db, IConfiguration config)
         {
             _db = db;
             _config = config;
         }
+        [NonAction]
+        public async Task<Member> GetMemberBySessionKey(string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            sessionType = Util.UrlDecode(sessionType);
+            List<MiniSession> sList = await _db.miniSession
+                .Include(m => m.member).ThenInclude(m => m.memberSocialAccounts.Where(m => m.valid == 1))
+                .Where(m => m.session_key.Trim().Equals(sessionKey) && m.session_type.Equals(sessionType) && m.valid == 1 && m.expire_date >= DateTime.Now)
+                .OrderByDescending(m => m.expire_date).AsNoTracking().ToListAsync();
+            for (int i = 0; i < sList.Count; i++)
+            {
+                MiniSession mSession = sList[i];
+                if (mSession.member != null)
+                {
+                    return mSession.member;
+                }
+            }
+            return null;
+        }
+        [NonAction]
+        public async Task<Member> GetMemberByNum(string num, string type)
+        {
+            List<MemberSocialAccount> msaList = await _db.memberSocialAccount
+                .Where(m => (m.valid == 1 && m.type.Trim().Equals(type.Trim()) && m.num.Trim().Equals(num.Trim())))
+                .OrderByDescending(m => m.id).AsNoTracking().ToListAsync();
+            if (msaList == null || msaList.Count <= 0)
+            {
+                return null;
+            }
+            List<Member> mList = await _db.member.Include(m => m.memberSocialAccounts)
+                .Where(m => m.id == msaList[0].member_id).AsNoTracking().ToListAsync();
+            if (mList == null || mList.Count <= 0)
+            {
+                return null;
+            }
+            return mList[0];
+        }
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<Member?>>> GetMemberByNum(string num, string type,
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            num = Util.UrlDecode(num);
+            type = Util.UrlDecode(type);
+            StaffController _staffHelper = new StaffController(_db);
+            Staff staff = await _staffHelper.GetStaffBySessionKey(sessionKey, sessionType);
+            if (staff == null)
+            {
+                return Ok(new ApiResult<Member?>()
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = null
+                });
+            }
+            Member? member = await GetMemberByNum(num, type);
+            if (member == null)
+            {
+                return Ok(new ApiResult<Member>()
+                {
+                    code = 1,
+                    message = "未找到会员",
+                    data = null
+                });
+            }
+            else
+            {
+                return Ok(new ApiResult<Member>()
+                {
+                    code = 0,
+                    message = "",
+                    data = member
+                });
+            }
+        }
 
+
+
+
+
+
+        /// <summary>
+        /// ///////////////////////will be deleted////////////////////////////////////////////////////////////////////////////
+        /// </summary>
+        /// <param name="sessionKey"></param>
+        /// <param name="sessionType"></param>
+        /// <returns></returns>
         [HttpGet]
         public async Task<ActionResult<Member>> GetMemberInfoSimple(string sessionKey, string sessionType)
         {
@@ -39,30 +122,8 @@ namespace SnowmeetApi.Controllers.User
             //member.memberSocialAccounts = new List<MemberSocialAccount>();
             return Ok(RemoveSensitiveInfo(member));
         }
-        [NonAction]
-        public async Task<Member> GetMemberBySessionKey(string sessionKey, string sessionType="wechat_mini_openid")
-        {
-            sessionKey = Util.UrlDecode(sessionKey);
-            sessionType = Util.UrlDecode(sessionType);
-            var sessions = await _db.miniSession.Where(s => s.session_key.Trim().Equals(sessionKey.Trim()) 
-                && s.session_type.Trim().Equals(sessionType.Trim())).OrderByDescending(s => s.create_date)
-                .AsNoTracking().ToListAsync();
-            if (sessions.Count <= 0)
-            {
-                return null;
-            }
-            int memberId = sessions[0].member_id != null ? (int)sessions[0].member_id:0;
-            string openId = "";//sessions[0].open_id.Trim();
-            if (memberId == 0)
-            {
-                return await GetMember(openId, sessionType);
-            }
-            else
-            {
-                return await _db.member.Include(m => m.memberSocialAccounts)
-                    .Where(m => m.id == memberId).FirstAsync();
-            }
-        }
+
+
 
         [NonAction]
         public async Task<Member> UpdateDetailInfo(int memberId, string num, string type, bool isUnic)
@@ -75,7 +136,7 @@ namespace SnowmeetApi.Controllers.User
             //int valid = 0;
             var msaList = await _db.memberSocialAccount.Where(m => m.member_id == memberId).ToListAsync();
             bool haveMod = true;
-            for(int i = 0; i < msaList.Count; i++)
+            for (int i = 0; i < msaList.Count; i++)
             {
                 MemberSocialAccount msa = msaList[i];
                 if (msa.type.Trim().Equals(type.Trim()) && msa.num.Trim().Equals(num.Trim()) && msa.valid == 1)
@@ -94,10 +155,10 @@ namespace SnowmeetApi.Controllers.User
                 }
                 return ml[0];
             }
-            for(int i = 0; i < msaList.Count; i++)
+            for (int i = 0; i < msaList.Count; i++)
             {
                 MemberSocialAccount msa = msaList[i];
-                if (isUnic && msa.type.Trim().Equals(type.Trim()) )
+                if (isUnic && msa.type.Trim().Equals(type.Trim()))
                 {
                     msa.valid = 0;
                     _db.memberSocialAccount.Entry(msa).State = EntityState.Modified;
@@ -123,14 +184,14 @@ namespace SnowmeetApi.Controllers.User
 
 
         }
-       
+
         [NonAction]
-        public async Task<Member> GetMember(string num, string type="")
+        public async Task<Member> GetMember(string num, string type = "")
         {
-            
+
             type = type.Trim();
             int memberId = 0;
-  
+
             var msaList = await _db.memberSocialAccount
                         .Where(a => (a.valid == 1 && a.num.Trim().Equals(num) && a.type.Trim().Equals(type)))
                         .OrderByDescending(a => a.member_id).ToListAsync();
@@ -159,7 +220,7 @@ namespace SnowmeetApi.Controllers.User
             await _db.SaveChangesAsync();
             return member;
         }
-        
+
 
         private bool MemberExists(int id)
         {
@@ -214,7 +275,7 @@ namespace SnowmeetApi.Controllers.User
         */
 
         [HttpGet("{memberId}")]
-        public async Task<ActionResult> SetMemberInfo(int memberId, string type, string num, 
+        public async Task<ActionResult> SetMemberInfo(int memberId, string type, string num,
             string sessionKey, string sessionType)
         {
             sessionKey = Util.UrlDecode(sessionKey);
@@ -248,7 +309,7 @@ namespace SnowmeetApi.Controllers.User
             else
             {
                 MemberSocialAccount msa = list[0];
-                if(msa.valid == 0)
+                if (msa.valid == 0)
                 {
                     msa.valid = 1;
                     _db.memberSocialAccount.Entry(msa).State = EntityState.Modified;
@@ -257,13 +318,13 @@ namespace SnowmeetApi.Controllers.User
 
             }
             return Ok();
-        } 
+        }
 
         [HttpGet("{memberId}")]
-        public async Task<ActionResult> SetStaffInfo(int memberId,  
+        public async Task<ActionResult> SetStaffInfo(int memberId,
             string name, string gender, string cell,
             int isAdmin, int isManager, int isStaff, int inStaffList,
-            string sessionKey, string sessionType="wechat_mini_openid")
+            string sessionKey, string sessionType = "wechat_mini_openid")
         {
             Member admin = await GetMemberBySessionKey(sessionKey, sessionType);
             if (admin.is_admin == 0)
@@ -281,20 +342,20 @@ namespace SnowmeetApi.Controllers.User
             staff.in_staff_list = inStaffList;
             if (name != null)
                 staff.real_name = name.Trim();
-            if (gender!=null)
+            if (gender != null)
                 staff.gender = gender.Trim();
-            if (cell!=null)
-                await ModMemberCell(memberId, cell.Trim());    
-            
-            
+            if (cell != null)
+                await ModMemberCell(memberId, cell.Trim());
+
+
             _db.member.Entry(staff).State = EntityState.Modified;
             await _db.SaveChangesAsync();
             return Ok();
         }
 
         [HttpGet("{memberId}")]
-        public async Task<ActionResult<Member>> GetWholeMemberInfo(int memberId, 
-            string sessionKey, string sessionType="wechat_mini_openid")
+        public async Task<ActionResult<Member>> GetWholeMemberInfo(int memberId,
+            string sessionKey, string sessionType = "wechat_mini_openid")
         {
             sessionKey = Util.UrlDecode(sessionKey);
             sessionType = Util.UrlDecode(sessionType);
@@ -314,8 +375,8 @@ namespace SnowmeetApi.Controllers.User
         }
 
         [HttpGet]
-        public async Task<ActionResult<List<Member>>> GetStaffList(string sessionKey, 
-            string sessionType="wechat_mini_openid")
+        public async Task<ActionResult<List<Member>>> GetStaffList(string sessionKey,
+            string sessionType = "wechat_mini_openid")
         {
             sessionKey = Util.UrlDecode(sessionKey);
             sessionType = Util.UrlDecode(sessionType);
@@ -329,12 +390,12 @@ namespace SnowmeetApi.Controllers.User
                 .Include(m => m.memberSocialAccounts).AsNoTracking().ToListAsync();
             //memberList = GetCells(memberList);
             return Ok(memberList);
-            
+
         }
 
         [HttpGet("{cell}")]
-        public async Task<ActionResult<Member>> GetMemberByCell(string cell, 
-            string sessionKey, string sessionType="wechat_mini_openid")
+        public async Task<ActionResult<Member>> GetMemberByCell(string cell,
+            string sessionKey, string sessionType = "wechat_mini_openid")
         {
             sessionKey = Util.UrlDecode(sessionKey);
             sessionType = Util.UrlDecode(sessionType);
@@ -346,30 +407,30 @@ namespace SnowmeetApi.Controllers.User
             return Ok(await GetMember(cell, "cell"));
         }
 
-/*
-        [NonAction]
-        public List<Member> GetCells(List<Member> memberList)
-        {
-            for(int i = 0; i < memberList.Count; i++)
-            {
-                Member member = memberList[i];
-                foreach(MemberSocialAccount msa in member.memberSocialAccounts)
+        /*
+                [NonAction]
+                public List<Member> GetCells(List<Member> memberList)
                 {
-                    if (msa.type.Trim().Equals("cell"))
+                    for(int i = 0; i < memberList.Count; i++)
                     {
-                        member.cell = msa.num.Trim();
-                        break;
+                        Member member = memberList[i];
+                        foreach(MemberSocialAccount msa in member.memberSocialAccounts)
+                        {
+                            if (msa.type.Trim().Equals("cell"))
+                            {
+                                member.cell = msa.num.Trim();
+                                break;
+                            }
+                        }
                     }
+                    return memberList;
                 }
-            }
-            return memberList;
-        }
-*/
+        */
         [NonAction]
         public async Task ModMemberCell(int memberId, string cell)
         {
             var list = await _db.memberSocialAccount
-                .Where(m => (m.type.Trim().Equals("cell") && m.num.Trim().Equals(cell.Trim()) 
+                .Where(m => (m.type.Trim().Equals("cell") && m.num.Trim().Equals(cell.Trim())
                 && m.member_id == memberId))
                 .ToListAsync();
             if (list == null || list.Count == 0)
@@ -406,7 +467,7 @@ namespace SnowmeetApi.Controllers.User
             member.id = 0;
             IList<MemberSocialAccount> msaList = member.memberSocialAccounts.ToList();
 
-            for(int i = 0; i < msaList.Count; i++)
+            for (int i = 0; i < msaList.Count; i++)
             {
                 MemberSocialAccount msa = msaList[i];
                 msa.member_id = 0;
@@ -451,7 +512,7 @@ namespace SnowmeetApi.Controllers.User
 
 
             List<Member> ret = new List<Member>();
-            for(int i = 0; i < cellList.Count; i++)
+            for (int i = 0; i < cellList.Count; i++)
             {
                 Member member = cellList[i].member;
                 if (mList.Where(m => m.id == member.id).ToList().Count == 0)

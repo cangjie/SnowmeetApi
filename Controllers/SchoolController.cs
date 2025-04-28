@@ -23,14 +23,14 @@ namespace SnowmeetApi.Controllers
         private readonly IConfiguration _config;
         private readonly IHttpContextAccessor _http;
 
-        private readonly User.MemberController _memberHelper;
+        private readonly MemberController _memberHelper;
 
         public SchoolController(ApplicationDBContext context, IConfiguration config, IHttpContextAccessor httpContextAccessor)
         {
             _db = context;
             _config = config;
             _http = httpContextAccessor;
-            _memberHelper = new User.MemberController(_db, _config);
+            _memberHelper = new MemberController(_db, _config);
         }
 
         [HttpGet]
