@@ -126,6 +126,33 @@ namespace SnowmeetApi.Controllers
             await _db.SaveChangesAsync();
             return staff;
         }
+        [NonAction]
+        public async Task<ApiResult<object?>> CheckStaffLevel(int level, string sessionKey, string sessionType)
+        {
+            Staff staff = await GetStaffBySessionKey(sessionKey, sessionType);
+            if (staff == null)
+            {
+                return new ApiResult<object?>()
+                {
+                    code = 1,
+                    message = "不能识别用户身份",
+                    data = null
+                };
+            }
+            if (staff.title_level < level)
+            {
+                return new ApiResult<object?>()
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = null
+                };
+            }
+            else
+            {
+                return null;
+            }
+        }
         //Test API
         
         [HttpGet]

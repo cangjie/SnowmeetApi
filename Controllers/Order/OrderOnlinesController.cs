@@ -1255,6 +1255,7 @@ namespace SnowmeetApi.Controllers
                 return BadRequest();
             }
             OrderOnline order = await _context.OrderOnlines.FindAsync(orderId);
+            /*
             StaffModLog log = new StaffModLog()
             {
                 id = 0,
@@ -1267,6 +1268,7 @@ namespace SnowmeetApi.Controllers
                 staff_member_id = user.member.id
             };
             await _context.staffModLog.AddAsync(log);
+            */
             order.biz_date = bizDate;
             _context.OrderOnlines.Entry(order).State = EntityState.Modified;
             await _context.SaveChangesAsync();

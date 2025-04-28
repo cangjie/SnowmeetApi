@@ -164,7 +164,7 @@ namespace SnowmeetApi.Data
         public DbSet<Models.Rent.RentRewardRefund> rentRewardRefund { get; set; }
         public DbSet<Models.Users.CellWhiteList> cellWhiteList {get; set;}
         public DbSet<Models.WebApiLog> webApiLog{get; set;}
-        public DbSet<Models.StaffModLog> staffModLog {get; set;}
+        //public DbSet<Models.StaffModLog> staffModLog {get; set;}
         public DbSet<Models.Mi7ExportedSaleList> mi7ExportedSaleList {get; set;}
         public DbSet<Models.Mi7ExportedSaleDetail> mi7ExportedSaleDetail {get; set;}
 
@@ -194,7 +194,8 @@ namespace SnowmeetApi.Data
         public DbSet<SnowmeetApi.Models.OrderPayment> orderPayment { get; set; }
         public DbSet<OrderPaymentRefund> paymentRefund { get; set; }
         public DbSet<Models.PaymentShare> paymentShare {get; set;}
-        
+        public DbSet<Models.CoreDataModLog> coreDataModLog {get; set;}
+        public DbSet<Models.Retail> retail {get; set;}
 
     }
 }

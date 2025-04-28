@@ -341,7 +341,7 @@ namespace SnowmeetApi.Controllers.Order
                 return Ok(mi7Order);
             }
         }
-
+/*
         [HttpGet("{id}")]
         public async Task<ActionResult<List<Models.StaffModLog>>> GetLogs(int id, string sessionKey,
             string sessionType = "wechat_mini_openid")
@@ -358,7 +358,7 @@ namespace SnowmeetApi.Controllers.Order
                 .OrderByDescending(l => l.id).AsNoTracking().ToListAsync();
             return Ok(logs); 
         }
-
+*/
         [HttpGet("{id}")]
         public async Task<ActionResult<Mi7Order>> ModMi7Order(int id, string orderNum, string sessionKey, string orderType = "普通")
         {
@@ -378,6 +378,7 @@ namespace SnowmeetApi.Controllers.Order
             if (!orderNum.Trim().Equals(""))
             {
                 order.mi7_order_id = orderNum;
+                /*
                 StaffModLog log = new StaffModLog()
                 {
                     id = 0,
@@ -390,11 +391,12 @@ namespace SnowmeetApi.Controllers.Order
                     current_value = orderNum,
                     create_date = DateTime.Now
                 };
-                await _context.staffModLog.AddAsync(log);
+                */
+                //await _context.staffModLog.AddAsync(log);
             }
             if (!order.order_type.Trim().Equals(orderType.Trim()))
             {
-                
+                /*
                 StaffModLog log = new StaffModLog()
                 {
                     id = 0,
@@ -408,6 +410,7 @@ namespace SnowmeetApi.Controllers.Order
                     create_date = DateTime.Now
                 };
                 await _context.staffModLog.AddAsync(log);
+                */
                 order.order_type = orderType.Trim();
             }
             

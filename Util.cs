@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.Mvc;
 using System.Net.Http.Headers;
 using System.Net.Http;
 using System.Text;
+using SnowmeetApi.Models;
 namespace SnowmeetApi
 {
     public class Util
@@ -379,6 +380,27 @@ namespace SnowmeetApi
             return season;
         }
 
+        public static CoreDataModLog CreateCoreDataModLog(string table, string filed, string key, object? prev, object? curr, int? memberId, int? staffId, string scene, long? traceId = null)
+        {
+            if (traceId == null)
+            {
+                traceId = (DateTime.Now - DateTime.Parse("1970-1-1")).Ticks;
+            }
+            return new CoreDataModLog()
+            {
+                id = 0,
+                table_name = table,
+                field_name = filed,
+                key_value = key,
+                prev_value = prev.ToString(),
+                current_value = curr.ToString(),
+                member_id = memberId,
+                staff_id = staffId,
+                scene = scene,
+                trace_id = (long)traceId,
+                create_date = DateTime.Now
+            };
+        }
       
 
         
