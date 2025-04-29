@@ -46,35 +46,7 @@ namespace SnowmeetApi.Controllers
                 ).OrderByDescending(o => o.id).AsNoTracking().ToListAsync();
             return orderList;
         }
-        [NonAction]
-        public static void RendOrder(SnowmeetApi.Models.Order order)
-        {
-            string txtColor = "";
-            string backColor = "";
-            if (order.paidAmount < order.totalCharge && order.closed == 0)
-            {
-                txtColor = "red";
-            }
-            else if (order.retails != null
-                && order.retails.Any(r => (r.mi7_code == null || r.mi7_code.StartsWith("XSD") || r.mi7_code.Length != 15 || (r.mi7_code.ToUpper().EndsWith("A") && r.mi7_code.ToUpper().EndsWith("I")))))
-            {
-                txtColor = "orange";
-            }
-            if (order.paidAmount == 0 && order.pay_option.Trim().Equals("招待"))
-            {
-                backColor = "yellow";
-            }
-            order.textColor = txtColor;
-            order.backgroundColor = backColor;
-        }
-        [NonAction]
-        public static void RendOrderList(List<SnowmeetApi.Models.Order> orderList)
-        {
-            for (int i = 0; i < orderList.Count; i++)
-            {
-                RendOrder(orderList[i]);
-            }
-        }
+        
         [NonAction]
         public async Task<SnowmeetApi.Models.Order> UpdateOrder(SnowmeetApi.Models.Order order, int? memberId, int? staffId, string scene)
         {
@@ -144,7 +116,7 @@ namespace SnowmeetApi.Controllers
             {
                 orders = orders.Where(o => o.paymentStatus.Trim().Equals(status)).ToList();
             }
-            RendOrderList(orders);
+            SnowmeetApi.Models.Order.RendOrderList(orders);
             return new ApiResult<List<SnowmeetApi.Models.Order>>()
             {
                 code = 0,
@@ -180,7 +152,7 @@ namespace SnowmeetApi.Controllers
             {
                 if (staff != null || order.member_id == member.id)
                 {
-                    RendOrder(order);
+                    SnowmeetApi.Models.Order.RendOrder(order);
                     return Ok(new ApiResult<object?>()
                     {
                         code = 0,

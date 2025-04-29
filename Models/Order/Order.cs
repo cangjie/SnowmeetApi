@@ -10,6 +10,33 @@ namespace SnowmeetApi.Models
     [Table("order")]
     public class Order
     {
+        public static void RendOrder(SnowmeetApi.Models.Order order)
+        {
+            string txtColor = "";
+            string backColor = "";
+            if (order.paidAmount < order.totalCharge && order.closed == 0)
+            {
+                txtColor = "red";
+            }
+            else if (order.retails == null || (order.retails != null
+                && order.retails.Any(r => (r.mi7_code == null || !r.mi7_code.StartsWith("XSD") || r.mi7_code.Length != 15 || (!r.mi7_code.ToUpper().EndsWith("A") && !r.mi7_code.ToUpper().EndsWith("I"))))))
+            {
+                txtColor = "orange";
+            }
+            if (order.paidAmount == 0 && order.pay_option.Trim().Equals("招待"))
+            {
+                backColor = "yellow";
+            }
+            order.textColor = txtColor;
+            order.backgroundColor = backColor;
+        }
+        public static void RendOrderList(List<SnowmeetApi.Models.Order> orderList)
+        {
+            for (int i = 0; i < orderList.Count; i++)
+            {
+                RendOrder(orderList[i]);
+            }
+        }
         public static List<CoreDataModLog> GetUpdateDifferenceLog(Order oriOrder, Order order, int? memberId, int? staffId, string scene)
         {
             if (oriOrder.id != order.id)
