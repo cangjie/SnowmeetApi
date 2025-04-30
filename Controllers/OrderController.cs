@@ -80,6 +80,69 @@ namespace SnowmeetApi.Controllers
             await _db.SaveChangesAsync();
             return oriRetail;
         }
+        [NonAction]
+        public async Task GenerateOrderCode(SnowmeetApi.Models.Order order)
+        {
+            ApiResult<List<Shop>> shopResult = (ApiResult<List<Shop>>)((OkObjectResult)(await GetShops()).Result).Value;
+            string shopCode = "WZ";
+            for(int i = 0; i < shopResult.data.Count; i++)
+            {
+                if (shopResult.data[i].name.Trim().Equals(order.shop.Trim()))
+                {
+                    shopCode = shopResult.data[i].code.Trim();
+                    break;
+                }
+            }
+            string bizCode = "";
+            switch(order.type.Trim())
+            {
+                case "零售":
+                    bizCode = "LS";
+                    break;
+                case "养护":
+                    bizCode = "YH";
+                    break;
+                case "雪票":
+                    bizCode = "XP";
+                    break;
+                case "租赁":
+                    bizCode = "ZL";
+                    break;
+                default:
+                    bizCode = "WZ";
+                    break;
+            }
+            string dateStr = order.create_date.ToString("yyMMdd");
+            string orderCode = shopCode + "_" + bizCode + "_" + dateStr + "_";
+            List<SnowmeetApi.Models.Order> orders = await _db.order.Where(o => o.code.StartsWith(orderCode))
+                .AsNoTracking().ToListAsync();
+            orderCode += (orders.Count + 1).ToString().PadLeft(5, '0');
+            order.code = orderCode;
+        }
+        [NonAction]
+        public async Task<bool> CheckRetailMi7CodeUnique(SnowmeetApi.Models.Order order)
+        {
+            bool valid = true;
+            for(int i = 0; order.retails != null && i < order.retails.Count; i++)
+            {
+                Retail retail = order.retails[i];
+                if (retail.mi7_code != null)
+                {
+                    List<Retail> retails = await _db.retail.Include(r => r.order)
+                        .Where(r => r.mi7_code.Equals(retail.mi7_code.Trim()) && r.valid == 1 )
+                        .AsNoTracking().ToListAsync();
+                    for(int j = 0; j < retails.Count; j++)
+                    {
+                        if ((retails[j].order != null && retails[j].order.valid == 1) || retails[j].order == null)
+                        {
+                            valid = false;
+                            break;
+                        }
+                    }
+                }
+            }
+            return valid;
+        }
         [HttpGet]
         public async Task<ActionResult<ApiResult<List<Shop>>>> GetShops()
         {
@@ -114,7 +177,15 @@ namespace SnowmeetApi.Controllers
             }
             if (status != null)
             {
-                orders = orders.Where(o => o.paymentStatus.Trim().Equals(status)).ToList();
+                if (status.Trim().Equals("支付完成"))
+                {
+                    orders = orders.Where(o => o.paymentStatus.Trim().Equals(status) 
+                        || o.paymentStatus.Trim().Equals("无需支付") ).ToList();
+                }
+                else
+                {
+                    orders = orders.Where(o => o.paymentStatus.Trim().Equals(status)).ToList();
+                }
             }
             SnowmeetApi.Models.Order.RendOrderList(orders);
             return new ApiResult<List<SnowmeetApi.Models.Order>>()
@@ -242,6 +313,48 @@ namespace SnowmeetApi.Controllers
                 code = 0,
                 message = "",
                 data = retail
+            });
+        }
+        [HttpPost]
+        public async Task<ActionResult<ApiResult<SnowmeetApi.Models.Order?>>> PlaceOrder([FromBody] SnowmeetApi.Models.Order order, 
+            [FromQuery] string sessionKey, [FromQuery] string sessionType = "wechat_mini_openid")
+        {
+            StaffController _staffHelper = new StaffController(_db);
+            Staff staff = await _staffHelper.GetStaffBySessionKey(sessionKey, sessionType);
+            MemberController _memberHelper = new MemberController(_db, _config);
+            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
+            if (staff != null && staff.title_level >= 100)
+            {
+                order.staff_id = staff.id;
+            }
+            else if (member != null && order.member_id == null)
+            {
+                order.member_id = member.id;
+            }
+            switch(order.type)
+            {
+                case "零售":
+                    if (!await CheckRetailMi7CodeUnique(order))
+                    {
+                        return new ApiResult<SnowmeetApi.Models.Order?>()
+                        {
+                            code = 1,
+                            message = "七色米订单号重复",
+                            data = null
+                        };
+                    }     
+                    break; 
+                default:
+                    break;
+            }
+            await GenerateOrderCode(order);
+            await _db.order.AddAsync(order);
+            await _db.SaveChangesAsync();
+            return Ok(new ApiResult<SnowmeetApi.Models.Order?>()
+            {
+                code = 0,
+                message = "",
+                data = order
             });
         }
     }

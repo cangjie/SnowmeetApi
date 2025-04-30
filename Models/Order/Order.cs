@@ -330,7 +330,7 @@ namespace SnowmeetApi.Models
                     }
                     else if (pay_option.Trim().Equals("挂账"))
                     {
-                        return "挂账";
+                        return "暂缓支付";
                     }
                     else
                     {

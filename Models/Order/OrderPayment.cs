@@ -17,19 +17,18 @@ namespace SnowmeetApi.Models
             支付成功,
             取消
         }
-
         public string staffRealName = "";
-
         [Key]
         public int id { get; set; }
-
         public int order_id { get; set; }
         public string pay_method { get; set; }
         public double amount { get; set; }
         public string status { get; set; } = "待支付";
         public string? out_trade_no { get; set; }
         public int? mch_id { get; set; }
-        public string open_id { get; set; } = "";
+        public string? open_id { get; set; }
+        public string? open_id_type {get; set;}
+        public int? member_id {get; set;}
         public string? app_id { get; set; }
         public string? notify { get; set; }
         public string? nonce { get; set; }
@@ -37,21 +36,18 @@ namespace SnowmeetApi.Models
         public string? timestamp { get; set; }
         public string? prepay_id { get; set; }
         public string? ssyn { get; set; }
-        public string staff_open_id { get; set; } = "";
+        public string? staff_open_id { get; set; }
         public int? staff_id {get; set;}
         [ForeignKey("staff_id")]
         public Staff? staff {get; set;}
+        public int? is_staff_paid {get; set;}
+        public DateTime? update_date {get; set;}
         public DateTime create_date { get; set; } = DateTime.Now;
-
+        public DateTime? paid_date {get; set;} = null;
         public string? ali_qr_code { get; set; }
-
         public string? ali_trade_no {get; set;}
-
         public string? wepay_trans_id {get; set;}
-
-        //[ForeignKey(nameof(OrderPaymentRefund.payment_id))]
         public List<Models.OrderPaymentRefund> refunds {get; set;} = new List<OrderPaymentRefund>();
-        //[ForeignKey(nameof(Models.PaymentShare.payment_id))]
         public List<Models.PaymentShare> shares {get;set;}
         public string? deposit_type { get; set; } = null;
         public string? deposit_sub_type {get; set; } = null;
@@ -86,8 +82,6 @@ namespace SnowmeetApi.Models
                 return shop;
             }
         }
-
-
         [NotMapped]
         public double refundedAmount
         {
@@ -103,7 +97,6 @@ namespace SnowmeetApi.Models
                 }
                 return amount;
             }
-
         }
         [NotMapped]
         public double unRefundedAmount
@@ -117,7 +110,6 @@ namespace SnowmeetApi.Models
         public Order? order {get; set;}
         [NotMapped]
         public MemberSocialAccount? msa {get; set;} = null;
-
         [NotMapped]
         public string staffName
         {
@@ -126,7 +118,6 @@ namespace SnowmeetApi.Models
                 return staffRealName.Trim();
             }
         }
- 
     }
 }
 
