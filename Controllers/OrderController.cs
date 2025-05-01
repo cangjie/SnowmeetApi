@@ -133,6 +133,7 @@ namespace SnowmeetApi.Controllers
                         .AsNoTracking().ToListAsync();
                     for(int j = 0; j < retails.Count; j++)
                     {
+                        
                         if ((retails[j].order != null && retails[j].order.valid == 1) || retails[j].order == null)
                         {
                             valid = false;
@@ -142,6 +143,43 @@ namespace SnowmeetApi.Controllers
                 }
             }
             return valid;
+        }
+        [NonAction]
+        public async Task CancelOrder(SnowmeetApi.Models.Order order, int? staffId, int? memberId, string scene)
+        {
+            order.valid = 0;
+            order.update_date = DateTime.Now;
+            _db.order.Entry(order).State = EntityState.Modified;
+            for(int i = 0; order.retails != null && i < order.retails.Count; i++)
+            {
+                Retail retail = order.retails[i];
+                retail.valid = 0;
+                retail.update_date = DateTime.Now;
+                _db.retail.Entry(retail).State = EntityState.Modified;
+            }
+            for(int i = 0; order.payments != null && i < order.payments.Count; i++)
+            {
+                OrderPayment payment = order.payments[i];
+                payment.valid = 0;
+                payment.update_date = DateTime.Now;
+                _db.orderPayment.Entry(payment).State = EntityState.Modified;
+            }
+            CoreDataModLog log = new CoreDataModLog()
+            {
+                id = 0,
+                table_name = "order",
+                field_name = null,
+                key_value = order.id.ToString(),
+                scene = scene,
+                member_id = memberId,
+                staff_id = staffId,
+                trace_id = (DateTime.Now - DateTime.Parse("1970-1-1")).Ticks,
+                is_manual = 1,
+                manual_memo = "删除订单",
+                create_date = DateTime.Now
+            };
+            await _db.coreDataModLog.AddAsync(log);
+            await _db.SaveChangesAsync();
         }
         [HttpGet]
         public async Task<ActionResult<ApiResult<List<Shop>>>> GetShops()
@@ -207,7 +245,6 @@ namespace SnowmeetApi.Controllers
             Staff staff = await _staffHelper.GetStaffBySessionKey(sessionKey, sessionType);
             MemberController _memberHelper = new MemberController(_db, _config);
             Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
-
             List<SnowmeetApi.Models.Order> orderList = await GetRetailOrders(orderId, null, null, null, null, null, null);
             SnowmeetApi.Models.Order? order = (orderList != null && orderList.Count > 0) ? orderList[0] : null;
             if (order == null)
@@ -350,6 +387,43 @@ namespace SnowmeetApi.Controllers
             await GenerateOrderCode(order);
             await _db.order.AddAsync(order);
             await _db.SaveChangesAsync();
+            return Ok(new ApiResult<SnowmeetApi.Models.Order?>()
+            {
+                code = 0,
+                message = "",
+                data = order
+            });
+        }
+        [HttpGet("{orderId}")]
+        public async Task<ActionResult<ApiResult<SnowmeetApi.Models.Order?>>> CancelOrder(int orderId, 
+            string scene, string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            scene = Util.UrlDecode(scene);
+            StaffController _staffHelper = new StaffController(_db);
+            Staff staff = await _staffHelper.GetStaffBySessionKey(sessionKey, sessionType);
+            if (staff.title_level < 100)
+            {
+                return Ok(new ApiResult<SnowmeetApi.Models.Order?>()
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = null
+                });
+            }
+            SnowmeetApi.Models.Order order = await _db.order.FindAsync(orderId);
+            order.retails = await _db.order.Entry(order).Collection(o => o.retails).Query().ToListAsync();
+            order.payments = await _db.order.Entry(order).Collection(o => o.payments).Query().ToListAsync();
+            if (!order.canDelete)
+            {
+                return Ok(new ApiResult<SnowmeetApi.Models.Order?>()
+                {
+                    code = 1,
+                    message = "订单不支持取消",
+                    data = null
+                });
+            }
+            await CancelOrder(order, staff.id, null, scene);
+            SnowmeetApi.Models.Order.RendOrder(order);
             return Ok(new ApiResult<SnowmeetApi.Models.Order?>()
             {
                 code = 0,

@@ -27,6 +27,10 @@ namespace SnowmeetApi.Models
             {
                 backColor = "yellow";
             }
+            if (order.valid == 0)
+            {
+                txtColor = "grey";
+            }
             order.textColor = txtColor;
             order.backgroundColor = backColor;
         }
@@ -200,6 +204,22 @@ namespace SnowmeetApi.Models
             get
             {
                 return total_amount - ticket_discount - discount;
+            }
+        }
+        [NotMapped]
+        public bool canDelete
+        {
+            get
+            {
+                bool can = true;
+                for(int i = 0; availablePayments != null && i < availablePayments.Count; i++)
+                {
+                    if (availablePayments[i].pay_method.Trim().Equals("微信支付"))
+                    {
+                        can = false;
+                    }
+                }
+                return can;
             }
         }
         [NotMapped]
