@@ -39,8 +39,81 @@ namespace SnowmeetApi.Controllers
                 return "";
             }
             DateTime orderDate = (DateTime)(order.pay_time == null? order.create_date : order.pay_time);
-            string orderCode = shopCode.Trim() + "_LS_" + orderDate.ToString("yyMMdd") + "_" + order.id.ToString().PadLeft(5, '0');
+            string bizCode = "QT";
+            switch(order.type.Trim())
+            {
+                case "店销":
+                case "店销现货":
+                case "零售":
+                    bizCode = "LS";
+                    break;
+                case "服务":
+                    bizCode = "YH";
+                    break;
+                case "押金" :
+                    bizCode = "ZL";
+                    break;
+                case "雪票":
+                    bizCode = "XP";
+                    break;
+                default:
+                    break;
+            }
+            string orderCode = shopCode.Trim() + "_" + bizCode + "_" + orderDate.ToString("yyMMdd") + "_" + order.id.ToString().PadLeft(5, '0');
             return orderCode;
+        }
+        [HttpGet]
+        public async Task MigrateCare()
+        {
+            StaffController _staffHelper = new StaffController(_db);
+            var orderIdList = await _db.care.Where(c => c.order_id != null)
+                .Where(c => c.order_id == 36434 || c.order_id == 36996 || c.order_id == 39595 || c.order_id == 34914 || c.order_id == 34922)
+                .Select(c => c.order_id).Distinct().ToListAsync();
+            foreach(int orderId in orderIdList)
+            {
+                OrderOnline oo = await _db.OrderOnlines.FindAsync(orderId);
+                string orderCode = await CreateTextOrderCode(oo);
+                if (orderCode == "")
+                {
+                    Console.WriteLine(oo.id.ToString() + " order code is blank");
+                    continue;
+                }
+                Staff? staff = await _staffHelper.GetStaffBySocialNum(oo.staff_open_id, "wechat_mini_openid", oo.create_date);
+                if (staff==null)
+                {
+                    Console.WriteLine(oo.id.ToString() + " staff is null");
+                }
+                List<MemberSocialAccount> msaList = await _db.memberSocialAccount
+                    .Where(m => m.type.Trim().Equals("wechat_mini_openid") && m.num.Trim().Equals(oo.open_id))
+                    .OrderByDescending(m => m.id).AsNoTracking().ToListAsync();
+                int? memberId = null;
+                if (msaList.Count>0)
+                {
+                    memberId = msaList[0].member_id;
+                }
+                SnowmeetApi.Models.Order order = new SnowmeetApi.Models.Order()
+                {
+                    id = oo.id,
+                    code = orderCode,
+                    type = "养护",
+                    sub_type = "雪季",
+                    shop = oo.shop,
+                    is_package = 0,
+                    member_id = memberId,
+                    name = oo.name.Replace("先生", "").Replace("女士", ""),
+                    cell = oo.cell_number.Length > 11? oo.cell_number.Substring(0, 11) : oo.cell_number.Trim(),
+                    gender = oo.name.EndsWith("先生")? "男": (oo.name.EndsWith("女士")? "女": ""),
+                    total_amount = oo.final_price,
+                    memo = oo.memo,
+                    biz_date = oo.pay_time == null ? oo.create_date : (DateTime)oo.pay_time,
+                    staff_id = staff==null?null:staff.id,
+                    closed = 1,
+                    valid = 1,
+                    create_date = oo.create_date
+                };
+                await _db.order.AddAsync(order);
+                await _db.SaveChangesAsync();
+            }
         }
         [HttpGet]
         public async Task MigrateRetail()

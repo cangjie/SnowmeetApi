@@ -196,6 +196,7 @@ namespace SnowmeetApi.Data
         public DbSet<Models.PaymentShare> paymentShare {get; set;}
         public DbSet<Models.CoreDataModLog> coreDataModLog {get; set;}
         public DbSet<Models.Retail> retail {get; set;}
+        public DbSet<Models.Care> care {get; set;}
 
     }
 }
