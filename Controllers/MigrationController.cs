@@ -38,9 +38,9 @@ namespace SnowmeetApi.Controllers
             {
                 return "";
             }
-            DateTime orderDate = (DateTime)(order.pay_time == null? order.create_date : order.pay_time);
+            DateTime orderDate = (DateTime)(order.pay_time == null ? order.create_date : order.pay_time);
             string bizCode = "QT";
-            switch(order.type.Trim())
+            switch (order.type.Trim())
             {
                 case "店销":
                 case "店销现货":
@@ -50,7 +50,7 @@ namespace SnowmeetApi.Controllers
                 case "服务":
                     bizCode = "YH";
                     break;
-                case "押金" :
+                case "押金":
                     bizCode = "ZL";
                     break;
                 case "雪票":
@@ -63,13 +63,77 @@ namespace SnowmeetApi.Controllers
             return orderCode;
         }
         [HttpGet]
+        public async Task MigrateCareEntrain()
+        {
+            StaffController _staffHelper = new StaffController(_db);
+            List<Care> careList = await _db.care.Where(c => c.order_id == null && c.valid == 1).ToListAsync();
+            for (int i = 0; i < careList.Count; i++)
+            {
+                Care care = careList[i];
+                if (care.order_id == null)
+                {
+                    MaintainLive live = await _db.MaintainLives.FindAsync(careList[i].id);
+                    int batchId = live.batch_id;
+                    List<MaintainLive> mL = await _db.MaintainLives.Where(m => m.batch_id == batchId).AsNoTracking().ToListAsync();
+                    Staff? staff = await _staffHelper.GetStaffBySocialNum(live.service_open_id, "wechat_mini_openid", live.create_date);
+                    List<MemberSocialAccount> msaList = await _db.memberSocialAccount
+                        .Where(m => m.type.Trim().Equals("wechat_mini_openid") && m.num.Trim().Equals(live.open_id))
+                        .OrderByDescending(m => m.id).AsNoTracking().ToListAsync();
+                    int? memberId = null;
+                    if (msaList.Count > 0)
+                    {
+                        memberId = msaList[0].member_id;
+                    }
+                    int orderId = await _db.order.MaxAsync(o => o.id);
+                    orderId++;
+                    string shopCode = live.shop.IndexOf("万龙") >= 0 ? "WL" : "NS";
+                    string orderCode = shopCode + "_YH_" + live.create_date.ToString("yyMMdd") + "_" + orderId.ToString().PadLeft(5, '0');
+                    string payMemo = "普通";
+                    if (live.pay_memo.IndexOf("招待")>=0)
+                    {
+                        payMemo = "招待";
+                    }
+                    if (live.pay_memo.IndexOf("质保")>=0)
+                    {
+                        payMemo = "质保";
+                    }
+                    if (live.pay_memo.IndexOf("次卡")>=0)
+                    {
+                        payMemo = "次卡";
+                    }
+                    SnowmeetApi.Models.Order order = new SnowmeetApi.Models.Order()
+                    {
+                        id = orderId,
+                        code = orderCode,
+                        type = "养护",
+                        sub_type = "雪季",
+                        shop = live.shop,
+                        is_package = 0,
+                        member_id = memberId,
+                        name = live.confirmed_name.Replace("先生", "").Replace("女士", ""),
+                        cell = live.confirmed_cell.Length > 11 ? live.confirmed_cell.Substring(0, 11) : live.confirmed_cell.Trim(),
+                        gender = live.confirmed_name.EndsWith("先生") ? "男" : (live.confirmed_name.EndsWith("女士") ? "女" : ""),
+                        total_amount = 0,
+                        memo = live.confirmed_memo,
+                        biz_date = live.create_date,
+                        staff_id = staff == null ? null : staff.id,
+                        closed = 1,
+                        valid = 1,
+                        pay_option = payMemo,
+                        create_date = live.create_date
+                    };
+                }
+
+            }
+        }
+        [HttpGet]
         public async Task MigrateCare()
         {
             StaffController _staffHelper = new StaffController(_db);
             var orderIdList = await _db.care.Where(c => c.order_id != null)
                 .Where(c => c.order_id == 36434 || c.order_id == 36996 || c.order_id == 39595 || c.order_id == 34914 || c.order_id == 34922)
                 .Select(c => c.order_id).Distinct().ToListAsync();
-            foreach(int orderId in orderIdList)
+            foreach (int orderId in orderIdList)
             {
                 OrderOnline oo = await _db.OrderOnlines.FindAsync(orderId);
                 string orderCode = await CreateTextOrderCode(oo);
@@ -79,7 +143,7 @@ namespace SnowmeetApi.Controllers
                     continue;
                 }
                 Staff? staff = await _staffHelper.GetStaffBySocialNum(oo.staff_open_id, "wechat_mini_openid", oo.create_date);
-                if (staff==null)
+                if (staff == null)
                 {
                     Console.WriteLine(oo.id.ToString() + " staff is null");
                 }
@@ -87,10 +151,11 @@ namespace SnowmeetApi.Controllers
                     .Where(m => m.type.Trim().Equals("wechat_mini_openid") && m.num.Trim().Equals(oo.open_id))
                     .OrderByDescending(m => m.id).AsNoTracking().ToListAsync();
                 int? memberId = null;
-                if (msaList.Count>0)
+                if (msaList.Count > 0)
                 {
                     memberId = msaList[0].member_id;
                 }
+                
                 SnowmeetApi.Models.Order order = new SnowmeetApi.Models.Order()
                 {
                     id = oo.id,
@@ -101,12 +166,12 @@ namespace SnowmeetApi.Controllers
                     is_package = 0,
                     member_id = memberId,
                     name = oo.name.Replace("先生", "").Replace("女士", ""),
-                    cell = oo.cell_number.Length > 11? oo.cell_number.Substring(0, 11) : oo.cell_number.Trim(),
-                    gender = oo.name.EndsWith("先生")? "男": (oo.name.EndsWith("女士")? "女": ""),
+                    cell = oo.cell_number.Length > 11 ? oo.cell_number.Substring(0, 11) : oo.cell_number.Trim(),
+                    gender = oo.name.EndsWith("先生") ? "男" : (oo.name.EndsWith("女士") ? "女" : ""),
                     total_amount = oo.final_price,
                     memo = oo.memo,
                     biz_date = oo.pay_time == null ? oo.create_date : (DateTime)oo.pay_time,
-                    staff_id = staff==null?null:staff.id,
+                    staff_id = staff == null ? null : staff.id,
                     closed = 1,
                     valid = 1,
                     create_date = oo.create_date
@@ -186,7 +251,7 @@ namespace SnowmeetApi.Controllers
                         cell = orderMemberList[0].cell;
                         gender = orderMemberList[0].gender;
                     }
-                    
+
                 }
                 SnowmeetApi.Models.Order order = new SnowmeetApi.Models.Order()
                 {
@@ -207,7 +272,7 @@ namespace SnowmeetApi.Controllers
                     closed = 1,
                     create_date = oldList[i].create_date
                 };
-                for(int j = 0; j < oldList[i].mi7Orders.Count; j++)
+                for (int j = 0; j < oldList[i].mi7Orders.Count; j++)
                 {
                     string? mi7Code = null;
                     Mi7Order mi7 = oldList[i].mi7Orders[j];
