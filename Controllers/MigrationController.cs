@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SnowmeetApi.Data;
 using SnowmeetApi.Models;
+using SnowmeetApi.Models.Maintain;
 namespace SnowmeetApi.Controllers
 {
     [Route("api/[controller]/[action]")]
@@ -122,8 +123,18 @@ namespace SnowmeetApi.Controllers
                         pay_option = payMemo,
                         create_date = live.create_date
                     };
+                    await _db.order.AddAsync(order);
+                    for(int j = 0; j < mL.Count; j++)
+                    {
+                        List<Care> subCL = careList.Where(c => c.id == mL[j].id).ToList();
+                        for(int k = 0; k < subCL.Count; k++)
+                        {
+                            subCL[k].order_id = orderId;
+                            _db.care.Entry(subCL[k]).State = EntityState.Modified;
+                        }
+                    }
+                    await _db.SaveChangesAsync();
                 }
-
             }
         }
         [HttpGet]
@@ -177,6 +188,56 @@ namespace SnowmeetApi.Controllers
                     create_date = oo.create_date
                 };
                 await _db.order.AddAsync(order);
+                await _db.SaveChangesAsync();
+            }
+        }
+        [HttpGet]
+        public async Task MigrateCareTask()
+        {
+            StaffController _staffHelper = new StaffController(_db);
+            List<SnowmeetApi.Models.Maintain.MaintainLog> l = await _db.MaintainLog
+                .Include(m => m.msa).AsNoTracking().ToListAsync();
+            for(int i = 0; i < l.Count; i++)
+            {
+                MaintainLog log = l[i];
+                int? staffId = null;
+                int? memberId = null;
+                int? terminateStaffId = null;
+                if (log.staff_open_id != null && !log.staff_open_id.Trim().Equals(""))
+                {
+                    Staff staff = await _staffHelper.GetStaffBySocialNum(log.staff_open_id, "wechat_mini_openid");
+                    if (staff != null)
+                    {
+                        staffId = staff.id;
+                    }
+                }
+                if (log.msa != null)
+                {
+                    memberId = log.msa.member_id;
+                }
+                if (log.stop_open_id == null && !log.stop_open_id.Trim().Equals(""))
+                {
+                    Staff staff = await _staffHelper.GetStaffBySocialNum(log.stop_open_id, "wechat_mini_openid");
+                    if (staff != null)
+                    {
+                        staffId = staff.id;
+                    }
+                    terminateStaffId = staff.id;
+                }
+                CareTask task = new CareTask()
+                {
+                    id = log.id,
+                    care_id = log.task_id,
+                    task_name = log.step_name,
+                    memo = log.memo,
+                    start_time = log.start_time,
+                    end_time = log.end_time,
+                    status = log.status,
+                    staff_id = staffId,
+                    terminate_staff_id = terminateStaffId,
+                    member_id = memberId
+                };
+                await _db.careTask.AddAsync(task);
                 await _db.SaveChangesAsync();
             }
         }

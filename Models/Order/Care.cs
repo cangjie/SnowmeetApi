@@ -48,5 +48,35 @@ namespace SnowmeetApi.Models
         public int valid { get; set; }
         public DateTime? update_date { get; set; }
         public DateTime create_date { get; set; }
+        [ForeignKey("order_id")]
+        public Order? order {get; set;}
+        [NotMapped]
+        public string description
+        {
+            get
+            {
+                string desc = "";
+                if (edge_degree != null && need_vax == 1)
+                {
+                    desc += "双项";
+                }
+                else if (edge_degree != null || need_vax == 1)
+                {
+                    desc += "单项";
+                }
+                if (repair_memo != null)
+                {
+                    desc += repair_memo.Trim();
+                }
+                if (desc.Trim().Equals(""))
+                {
+                    return "无";
+                }
+                else
+                {
+                    return desc.Trim();
+                }
+            }
+        }
     }
 }

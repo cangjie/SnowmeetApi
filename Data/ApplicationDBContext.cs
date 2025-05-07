@@ -197,6 +197,7 @@ namespace SnowmeetApi.Data
         public DbSet<Models.CoreDataModLog> coreDataModLog {get; set;}
         public DbSet<Models.Retail> retail {get; set;}
         public DbSet<Models.Care> care {get; set;}
+        public DbSet<Models.CareTask> careTask {get; set;}
 
     }
 }
