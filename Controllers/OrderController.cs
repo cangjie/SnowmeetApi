@@ -54,7 +54,7 @@ namespace SnowmeetApi.Controllers
             endDate = endDate == null ? DateTime.MaxValue : endDate;
             List<SnowmeetApi.Models.Order> orderList = await _db.order
                 .Include(o => o.retails)
-                .Include(o => o.cares)
+                .Include(o => o.cares).ThenInclude(c => c.tasks.OrderBy(t => t.id))
                 .Include(o => o.payments).ThenInclude(p => p.staff)
                 .Include(o => o.payments).ThenInclude(o => o.refunds)
                 .Include(o => o.staff)

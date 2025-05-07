@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Drawing;
 
 namespace SnowmeetApi.Models
 {
@@ -75,6 +77,39 @@ namespace SnowmeetApi.Models
                 else
                 {
                     return desc.Trim();
+                }
+            }
+        }
+        
+        public List<CareTask> tasks { get; set; } = new List<CareTask>();
+        [NotMapped]
+        public string? currentStep
+        {
+            get
+            {
+                if (tasks == null || tasks.Count == 0)
+                {
+                    return null;
+                }
+                return tasks[tasks.Count - 1].task_name.Trim();
+            }
+        }
+        [NotMapped]
+        public string? status
+        {
+            get 
+            {
+                if (currentStep == null)
+                {
+                    return "未开始";
+                }
+                if (currentStep.Trim().Equals("发板") || currentStep.Trim().Equals("强行索回"))
+                {
+                    return "已完成";
+                }
+                else
+                {
+                    return "进行中";
                 }
             }
         }
