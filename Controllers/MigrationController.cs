@@ -200,6 +200,11 @@ namespace SnowmeetApi.Controllers
             for(int i = 0; i < l.Count; i++)
             {
                 MaintainLog log = l[i];
+                CareTask oriTask = await _db.careTask.FindAsync(log.id);
+                if (oriTask != null)
+                {
+                    continue;
+                }
                 int? staffId = null;
                 int? memberId = null;
                 int? terminateStaffId = null;
