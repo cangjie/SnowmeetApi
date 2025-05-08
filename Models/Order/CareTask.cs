@@ -22,5 +22,9 @@ namespace SnowmeetApi.Models
         public DateTime create_date {get; set;} = DateTime.Now;
         [ForeignKey("care_id")]
         public Care care { get; set; }
+        [ForeignKey("staff_id")]
+        public Staff? staff{ get; set; } = null;
+        [ForeignKey("terminate_staff_id")]
+        public Staff terminateStaff {get; set;} = null;
     }
 }

@@ -24,6 +24,25 @@ namespace SnowmeetApi.Controllers
             _http = httpContextAccessor;
         }
         [NonAction]
+        public async Task<SnowmeetApi.Models.Order> GetOrder(int orderId)
+        {
+            SnowmeetApi.Models.Order order = await _db.order.FindAsync(orderId);
+            if (order == null)
+            {
+                return null;
+            }
+            await _db.order.Entry(order).Collection(o => o.retails).LoadAsync();
+            await _db.order.Entry(order).Collection(o => o.cares).LoadAsync();
+            await _db.order.Entry(order).Reference(o => o.staff).LoadAsync();
+            await _db.order.Entry(order).Reference(o => o.member).LoadAsync();
+            order.payments = await _db.orderPayment
+                .Include(p => p.member).ThenInclude(m => m.memberSocialAccounts)
+                .Include(p => p.staff)
+                .Include(p => p.refunds).ThenInclude(r => r.member)
+                .Where(p => p.order_id == order.id).ToListAsync();
+            return order;
+        }
+        [NonAction]
         public async Task<List<SnowmeetApi.Models.Order>> GetRetailOrders(int? orderId, DateTime? startDate = null, DateTime? endDate = null,
             string? shop = null, string? mi7Num = null, string? cell = null, string? mi7OrderId = null)
         {
@@ -48,7 +67,7 @@ namespace SnowmeetApi.Controllers
         }
         [NonAction]
         public async Task<List<SnowmeetApi.Models.Order>> GetCommonOrders(int? orderId, string? shop, int? memberId,
-            int? staffId, string? type, string? subType, DateTime? startDate, DateTime? endDate, string payOption = "普通")
+            int? staffId, string? type, string? subType, DateTime? startDate, DateTime? endDate, string? payOption = null)
         {
             startDate = startDate == null ? DateTime.MinValue : startDate;
             endDate = endDate == null ? DateTime.MaxValue : endDate;
@@ -61,7 +80,7 @@ namespace SnowmeetApi.Controllers
                 .Include(o => o.member).ThenInclude(m => m.memberSocialAccounts)
                 .Where(o => (o.biz_date.Date >= ((DateTime)startDate).Date && o.biz_date.Date <= ((DateTime)endDate).Date)
                     && (memberId == null || o.member_id == memberId) && (staffId == null || o.staff_id == staffId)
-                    && o.pay_option.Trim().Equals(payOption.Trim())
+                    && (payOption == null ||  o.pay_option.Trim().Equals(payOption.Trim()))
                     && (shop == null || o.shop.Trim().Equals(shop.Trim())))
                 .OrderByDescending(o => o.id).AsNoTracking().ToListAsync();
             return orderList;
@@ -453,7 +472,7 @@ namespace SnowmeetApi.Controllers
         [HttpGet]
         public async Task<ActionResult<ApiResult<List<SnowmeetApi.Models.Order>>>> GetOrdersByStaff(int? orderId,
             string? shop, string? type, string? subType, DateTime? startDate, DateTime? endDate, string sessionKey, 
-            string payOption = "普通", string sessionType = "wechat_mini_openid")
+            string? payOption, string sessionType = "wechat_mini_openid")
         {
             StaffController _staffHelper = new StaffController(_db);
             Staff staff = await _staffHelper.GetStaffBySessionKey(sessionKey, sessionType);

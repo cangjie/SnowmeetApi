@@ -26,6 +26,19 @@ namespace SnowmeetApi.Controllers
             _db = db;
             _config = config;
         }
+        /*
+        [NonAction]
+        public async Task<Member> GetMember(int id)
+        {
+            Member member = await _db.member.FindAsync(id);
+            if (member == null)
+            {
+                return null;
+            }
+            await _db.member.Entry(member).Collection(m => m.memberSocialAccounts).LoadAsync();
+            return member;
+        }
+        */
         [NonAction]
         public async Task<Member> GetMemberBySessionKey(string sessionKey, string sessionType = "wechat_mini_openid")
         {

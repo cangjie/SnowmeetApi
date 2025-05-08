@@ -40,6 +40,8 @@ namespace SnowmeetApi.Models
         public int? staff_id {get; set;}
         [ForeignKey("staff_id")]
         public Staff? staff {get; set;}
+        [ForeignKey("member_id")]
+        public Member? member {get; set;}
         public int? is_staff_paid {get; set;}
         public DateTime? update_date {get; set;}
         public DateTime create_date { get; set; } = DateTime.Now;
