@@ -464,7 +464,7 @@ namespace SnowmeetApi.Controllers
                 return NoContent();
             }
             start = start.Date;
-            end = end.Date.AddDays(1);
+            end = end.Date;
             var liveArr = await _context.MaintainLives.Include(m => m.taskLog)
                 .Where(m => (!m.task_flow_num.Trim().Equals("") && m.create_date.Date >= start.Date && m.create_date.Date <= end.Date
                 && (shop.Equals("") || m.shop.Equals(shop)) && (openId.Trim().Equals("") || m.open_id.Trim().Equals(openId)) 
