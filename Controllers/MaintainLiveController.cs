@@ -46,7 +46,7 @@ namespace SnowmeetApi.Controllers
             string[] brandArr = brand.Split('/');
             string brandName = brandArr[0].Trim();
             string brandChineseName = brandArr.Length == 2? brandArr[1].Trim() : "";
-            List<Brand> brands = await _context.Brand
+            List<Brand> brands = await _context.brand
                 .Where(b => b.brand_type.Trim().Equals(type.Trim()) && b.brand_name.Trim().Equals(brandName.Trim()))
                 .AsNoTracking().ToListAsync();
             if (brands != null && brands.Count > 0)
@@ -61,10 +61,10 @@ namespace SnowmeetApi.Controllers
                 origin = ""
 
             };
-            await _context.Brand.AddAsync(newBrand);
+            await _context.brand.AddAsync(newBrand);
             await _context.SaveChangesAsync();
         }
-
+/*
         [NonAction]
         public async Task UpdateSerial(string serial, string brand, string type)
         {
@@ -86,7 +86,7 @@ namespace SnowmeetApi.Controllers
             await _context.Serial.AddAsync(newSerial);
             await _context.SaveChangesAsync();
         }
-
+*/
 
         [HttpPost]
         public async Task<ActionResult<MaintainLive>> UpdateTask(MaintainLive task, string sessionKey)
@@ -124,18 +124,19 @@ namespace SnowmeetApi.Controllers
             _context.Entry(task).State = EntityState.Modified;
             await _context.SaveChangesAsync();
             await UpdateBrand(task.confirmed_brand, task.confirmed_equip_type.Trim());
-            await UpdateSerial(task.confirmed_serial, task.confirmed_brand.Split('/')[0].Trim(), task.confirmed_equip_type);
+            //await UpdateSerial(task.confirmed_serial, task.confirmed_brand.Split('/')[0].Trim(), task.confirmed_equip_type);
             return task;
         }
 
-
+/*
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Serial>>> GetSerials(string brand, string type)
         {
             brand = Util.UrlDecode(brand).Trim();
             return await _context.Serial.Where(s => (s.brand_name.Trim().Equals(brand) && s.type.Trim().Equals(type.Trim()) )).ToListAsync();
         }
-
+        */
+/*
         [HttpGet]
         public async Task<ActionResult<Serial>> AddSerial(string brand, string serialName, string sessionKey)
         {
@@ -164,7 +165,7 @@ namespace SnowmeetApi.Controllers
             await _context.SaveChangesAsync();
             return s;
         }
-
+*/
         [HttpGet("{orderId}")]
         public async Task<ActionResult<MaintainOrder>> BindNewMember(int orderId, string sessionKey)
         {
@@ -817,7 +818,7 @@ namespace SnowmeetApi.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Brand>>> GetBrand(string type)
         {
-            return await _context.Brand.Where(b => b.brand_type.Trim().Equals(type.Trim()))
+            return await _context.brand.Where(b => b.brand_type.Trim().Equals(type.Trim()))
                 .OrderBy(b => b.brand_name).ToListAsync();
         }
 

@@ -24,7 +24,7 @@ namespace SnowmeetApi.Data
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             modelBuilder.Entity<MaintainLive>().HasKey(c => c.id);
-            modelBuilder.Entity<SnowmeetApi.Models.Maintain.Brand>().HasNoKey();
+            //modelBuilder.Entity<SnowmeetApi.Models.Brand>().HasNoKey();
             modelBuilder.Entity<SnowmeetApi.Models.Users.UnionId>().HasKey(u => new { u.union_id, u.open_id });
             modelBuilder.Entity<SnowmeetApi.Models.DD.ExtendedProperties>().HasNoKey();
             modelBuilder.Entity<SnowmeetApi.Models.DD.SysColumn>().HasNoKey();
@@ -68,6 +68,7 @@ namespace SnowmeetApi.Data
 
             /////////////new season
             modelBuilder.Entity<MiniSession>().HasKey(m => new {m.session_key, m.session_type});
+            modelBuilder.Entity<Brand>().HasKey(m => new {m.brand_name, m.brand_type});
         }
 
         public DbSet<MaintainLive> MaintainLives {get; set;}
@@ -95,9 +96,9 @@ namespace SnowmeetApi.Data
         
         public DbSet<SnowmeetApi.Models.ShopSaleInteract> ShopSaleInteract { get; set; }
         public DbSet<SnowmeetApi.Models.OrderPayment> OrderPayment { get; set; }
-        public DbSet<SnowmeetApi.Models.Maintain.Brand> Brand { get; set; }
+        
         public DbSet<SnowmeetApi.Models.UploadFile> UploadFile { get; set; }
-        public DbSet<SnowmeetApi.Models.Maintain.Serial> Serial { get; set; }
+        
         public DbSet<SnowmeetApi.Models.Maintain.MaintainLog> MaintainLog { get; set; }
         public DbSet<SnowmeetApi.Models.Background.BackgroundLoginSession> BackgroundLoginSession { get; set; }
         public DbSet<SnowmeetApi.Models.Mi7OrderDetail> mi7OrderDetail { get; set; }
@@ -198,6 +199,8 @@ namespace SnowmeetApi.Data
         public DbSet<Models.Retail> retail {get; set;}
         public DbSet<Models.Care> care {get; set;}
         public DbSet<Models.CareTask> careTask {get; set;}
+        public DbSet<SnowmeetApi.Models.Brand> brand { get; set; }
+        public DbSet<SnowmeetApi.Models.Series> series { get; set; }
 
     }
 }
