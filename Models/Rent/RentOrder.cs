@@ -16,67 +16,36 @@ namespace SnowmeetApi.Models.Rent
     [Table("rent_list")]
     public class RentOrder
     {
-
-        
-
         [Key]
         public int id { get; set; }
-
         public string open_id { get; set; } = "";
-
         public string cell_number { get; set; } = "";
-
         public string real_name { get; set; } = "";
-
         public string shop { get; set; } = "";
-
         public int? order_id { get; set; } = 0;
-
         public double deposit { get; set; } = 0;
-
         public double deposit_real { get; set; } = 0;
-
         public double deposit_reduce { get; set; } = 0;
-
         public double deposit_reduce_ticket { get; set; } = 0;
-
         public double deposit_final { get; set; } = 0;
-
         public DateTime start_date { get; set; } = DateTime.Now;
-
         public DateTime due_end_date { get; set; } = DateTime.Now;
-
         public DateTime? end_date { get; set; } = null;
-
         public double rental { get; set; } = 0;
-
         public double rental_real { get; set; } = 0;
-
         public double rental_reduce { get; set; } = 0;
-
         public double rental_reduce_ticket { get; set; } = 0;
-
         public double rental_final { get; set; } = 0;
-
         public double refund { get; set; } = 0;
-
         public string ticket_code { get; set; } = "";
-
         public int has_guarantee_credit { get; set; } = 0;
-
         public string guarantee_credit_photos { get; set; } = "";
-
         public string memo { get; set; } = "";
-
         public string pay_option { get; set; } = "";
-
         public string staff_open_id { get; set; } = "";
-
-        
         public string staff_name { get; set; }
         [NotMapped]
         public Member? staffMember {get; set;}
-
         public int closed { get; set; } = 0;
         public DateTime? finish_date { get; set; }
         public DateTime create_date { get; set; } = DateTime.Now;

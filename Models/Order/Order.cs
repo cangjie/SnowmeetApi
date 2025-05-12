@@ -4,6 +4,7 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
 using Microsoft.AspNetCore.Mvc;
+using NPOI.SS.Formula.PTG;
 
 namespace SnowmeetApi.Models
 {
@@ -104,6 +105,7 @@ namespace SnowmeetApi.Models
                 logs.Add(Util.CreateCoreDataModLog("order", "total_amount", order.id.ToString(), oriOrder.total_amount, order.total_amount, memberId, staffId, scene, ts.Ticks));
                 oriOrder.total_amount = order.total_amount;
             }
+            /*
             if (oriOrder.ticket_code != order.ticket_code)
             {
                 logs.Add(Util.CreateCoreDataModLog("order", "ticket_code", order.id.ToString(), oriOrder.ticket_code, order.ticket_code, memberId, staffId, scene, ts.Ticks));
@@ -119,6 +121,7 @@ namespace SnowmeetApi.Models
                 logs.Add(Util.CreateCoreDataModLog("order", "discount", order.id.ToString(), oriOrder.discount, order.discount, memberId, staffId, scene, ts.Ticks));
                 oriOrder.discount = order.discount;
             }
+            */
             if (oriOrder.memo != order.memo)
             {
                 logs.Add(Util.CreateCoreDataModLog("order", "memo", order.id.ToString(), oriOrder.memo, order.memo, memberId, staffId, scene, ts.Ticks));
@@ -174,9 +177,11 @@ namespace SnowmeetApi.Models
         public string? gender { get; set; }
         public string? cell { get; set; }
         public double total_amount { get; set; }
+        /*
         public string? ticket_code { get; set; } = null;
         public double ticket_discount { get; set; } = 0;
         public double discount { get; set; } = 0;
+        */
         public string memo { get; set; } = "";
         public DateTime biz_date { get; set; } = DateTime.Now;
         public int? staff_id { get; set; }
@@ -200,11 +205,33 @@ namespace SnowmeetApi.Models
         public List<OrderPayment>? payments { get; set; }
         public List<OrderPaymentRefund>? refunds { get; set; }
         public List<PaymentShare>? shares { get; set; }
+        public List<Discount> discounts {get; set;}
+        [NotMapped]
+        public double discountAmount
+        {
+            get
+            {
+                if (discounts == null)
+                {
+                    return 0;
+                }
+                double amount = 0;
+                foreach(Discount discount in discounts)
+                {
+                    if (discount.valid == 1)
+                    {
+                        amount += discount.amount;
+                    }
+                }
+                return amount;
+            }
+        }
+        [NotMapped]
         public double totalCharge
         {
             get
             {
-                return total_amount - ticket_discount - discount;
+                return total_amount - discountAmount;
             }
         }
         [NotMapped]

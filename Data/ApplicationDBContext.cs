@@ -140,14 +140,11 @@ namespace SnowmeetApi.Data
         public DbSet<Models.Kol> kol {get; set;}
         
         public DbSet<Models.AliDownloadFlowBill> aliDownloadFlowBill {get; set; }
-        public DbSet<SnowmeetApi.Models.Rent.RentCategory> rentCategory { get; set; }
-        public DbSet<SnowmeetApi.Models.Rent.RentPrice> rentPrice {get; set;}
         public DbSet<SnowmeetApi.Models.Rent.RentPackage> rentPackage {get; set;}
         public DbSet<SnowmeetApi.Models.Rent.RentPackageCategory> rentPackageCategory {get; set; }
-        public DbSet<SnowmeetApi.Models.Rent.RentCategoryInfoField> rentCategoryInfoField {get; set; }
+        
         public DbSet<SnowmeetApi.Models.FinancialStatement> financialStatement {get; set;}
-        public DbSet<SnowmeetApi.Models.Rent.RentProduct> rentProduct {get; set;}
-        public DbSet<SnowmeetApi.Models.Rent.RentProductDetailInfo> rentProductDetailInfo {get;set;}
+        
         public DbSet<RentProductImage> rentProductImage {get; set;}
         public DbSet<Models.School.Staff> schoolStaff {get; set;}
         public DbSet<Models.School.Course> schoolCourse {get; set;}
@@ -201,6 +198,11 @@ namespace SnowmeetApi.Data
         public DbSet<Models.CareTask> careTask {get; set;}
         public DbSet<SnowmeetApi.Models.Brand> brand { get; set; }
         public DbSet<SnowmeetApi.Models.Series> series { get; set; }
+        public DbSet<SnowmeetApi.Models.RentCategory> rentCategory { get; set; }
+        public DbSet<SnowmeetApi.Models.RentPrice> rentPrice {get; set;}
+        public DbSet<SnowmeetApi.Models.RentCategoryInfoField> rentCategoryInfoField {get; set; }
+        public DbSet<SnowmeetApi.Models.RentProduct> rentProduct {get; set;}
+        public DbSet<SnowmeetApi.Models.RentProductDetailInfo> rentProductDetailInfo {get;set;}
 
     }
 }

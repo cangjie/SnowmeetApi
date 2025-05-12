@@ -2,7 +2,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Collections.Generic;
-namespace SnowmeetApi.Models.Rent
+namespace SnowmeetApi.Models
 {
     [Table("rent_category")]
     public class RentCategory

@@ -1,7 +1,7 @@
 using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-namespace SnowmeetApi.Models.Rent
+namespace SnowmeetApi.Models
 {
     [Table("rent_category_info_field")]
     public class RentCategoryInfoField

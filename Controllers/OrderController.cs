@@ -33,6 +33,7 @@ namespace SnowmeetApi.Controllers
             }
             await _db.order.Entry(order).Collection(o => o.retails).LoadAsync();
             await _db.order.Entry(order).Collection(o => o.cares).LoadAsync();
+            await _db.order.Entry(order).Collection(o => o.discounts).LoadAsync();
             await _db.order.Entry(order).Reference(o => o.staff).LoadAsync();
             await _db.order.Entry(order).Reference(o => o.member).LoadAsync();
             order.payments = await _db.orderPayment
@@ -52,6 +53,7 @@ namespace SnowmeetApi.Controllers
                 .Include(o => o.retails)
                 .Include(o => o.payments).ThenInclude(p => p.staff)
                 .Include(o => o.payments).ThenInclude(o => o.refunds)
+                .Include(o => o.discounts)
                 .Include(o => o.staff)
                 .Include(o => o.member).ThenInclude(m => m.memberSocialAccounts)
                 .Where(o => o.valid == 1 && o.type == "零售"
@@ -76,6 +78,7 @@ namespace SnowmeetApi.Controllers
                 .Include(o => o.cares).ThenInclude(c => c.tasks.OrderBy(t => t.id))
                 .Include(o => o.payments).ThenInclude(p => p.staff)
                 .Include(o => o.payments).ThenInclude(o => o.refunds)
+                .Include(o => o.discounts)
                 .Include(o => o.staff)
                 .Include(o => o.member).ThenInclude(m => m.memberSocialAccounts)
                 .Where(o => (o.biz_date.Date >= ((DateTime)startDate).Date && o.biz_date.Date <= ((DateTime)endDate).Date)
