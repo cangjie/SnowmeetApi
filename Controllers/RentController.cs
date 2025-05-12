@@ -8,7 +8,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using SnowmeetApi.Data;
 using SnowmeetApi.Models;
-
 using SnowmeetApi.Models.Rent;
 using SnowmeetApi.Models.Users;
 using System.Collections;
@@ -25,23 +24,14 @@ namespace SnowmeetApi.Controllers
     public class RentController : ControllerBase
     {
         private readonly ApplicationDBContext _db;
-
         private IConfiguration _config;
-
         public string _appId = "";
-
         public bool isStaff = false;
-
         private IConfiguration _oriConfig;
-
         private readonly IHttpContextAccessor _httpContextAccessor;
-
         private readonly DateTime startDate = DateTime.Parse("2020-10-20");
-
         private MemberController _memberHelper;
-
         private OrderOnlinesController _orderHelper;
-
         public class Balance
         {
             public int id { get; set; }
@@ -57,7 +47,6 @@ namespace SnowmeetApi.Controllers
             public double rental { get; set; } = 0;
             public string payMethod { get; set; } = "";
         }
-
         public RentController(ApplicationDBContext context, IConfiguration config, IHttpContextAccessor httpContextAccessor)
         {
             _db = context;
@@ -68,7 +57,6 @@ namespace SnowmeetApi.Controllers
             _memberHelper = new MemberController(context, config);
             _orderHelper = new OrderOnlinesController(_db, _oriConfig);
         }
-
         [HttpGet("{id}")]
         public async Task<ActionResult<RentCategory>> ModCategory(int id, string code, string name, string sessionKey, string sessionType)
         {
@@ -107,7 +95,6 @@ namespace SnowmeetApi.Controllers
             }
             return Ok(rentCate);
         }
-
         [NonAction]
         public async Task<RentCategory> MoveCategory(int id, string code)
         {
@@ -136,7 +123,6 @@ namespace SnowmeetApi.Controllers
             await _db.SaveChangesAsync();
             return (RentCategory)((OkObjectResult)(await GetCategory(code)).Result).Value;
         }
-
         [HttpGet("{code}")]
         public async Task<ActionResult<RentCategory>> AddCategoryManual(string code, string name, string sessionKey, string sessionType)
         {
@@ -173,7 +159,6 @@ namespace SnowmeetApi.Controllers
             await _db.SaveChangesAsync();
             return Ok(rcNew);
         }
-
         [HttpGet]
         public async Task<ActionResult<RentCategory>> AddCategory(string code, string name, string sessionKey, string sessionType)
         {
@@ -209,7 +194,6 @@ namespace SnowmeetApi.Controllers
             await _db.SaveChangesAsync();
             return Ok(rcNew);
         }
-
         [HttpGet]
         public async Task<ActionResult<ICollection<RentCategory>>> GetAllCategories()
         {
@@ -227,20 +211,19 @@ namespace SnowmeetApi.Controllers
             }
             return Ok(rl);
         }
-
         [HttpGet("{id}")]
         public async Task<ActionResult<RentCategory>> GetCategoryById(int id)
         {
             RentCategory category = await _db.rentCategory.FindAsync(id);
             return await GetCategory(category.code.Trim());
         }
-
         [HttpGet("{code}")]
         public async Task<ActionResult<RentCategory>> GetCategory(string code = "")
         {
             code = code.Trim();
             RentCategory rc = await _db.rentCategory
-                .Include(r => r.priceList).Include(r => r.infoFields)
+                .Include(r => r.priceList)
+                .Include(r => r.infoFields)
                 .Include(r => r.productList)
                 .Where(r => r.code.Trim().Equals(code.Trim())).FirstAsync();
             if (rc == null)
@@ -278,13 +261,12 @@ namespace SnowmeetApi.Controllers
                 rc.priceList = null;
             }
 
-            var pList = from product in rc.productList
+            var pList = (from product in rc.productList
                         where product.is_delete == 0
-                        select product;
+                        select product).ToList();
             rc.productList = pList;
             return Ok(rc);
         }
-
         [HttpGet("{code}")]
         public async Task<ActionResult> DeleteCategory(string code, string sessionKey, string sessionType)
         {
@@ -297,7 +279,6 @@ namespace SnowmeetApi.Controllers
             await _db.SaveChangesAsync();
             return Ok();
         }
-
         [HttpGet("{code}")]
         public async Task<ActionResult<RentPrice>> SetRentCategoryPrice(string code, string shop, string dayType, string scene, double price, string sessionKey, string sessionType="wchat_mini_openid")
         {
@@ -364,7 +345,6 @@ namespace SnowmeetApi.Controllers
                 return Ok(rp);
             }
         }
-
         [HttpGet("{id}")]
         public async Task<ActionResult<RentCategory>> SetShopCategoryRentPrice(int id, string shop, string dayType, string scene, string price, string sessionKey, string sessionType)
         {
@@ -385,16 +365,12 @@ namespace SnowmeetApi.Controllers
             {
                 return NotFound();
             }
-
-            
-
             var priceL = await _db.rentPrice.Where(p => (p.type.Trim().Equals("分类")
                 && p.category_id == cate.id && p.day_type.Trim().Equals(dayType)
                 && p.scene.Trim().Equals(scene) && p.shop.Trim().Equals(shop))).ToListAsync();
             double? numPrice = price.Equals("-")? null : double.Parse(price);
             if (priceL == null || priceL.Count == 0)
-            {
-                
+            { 
                 RentPrice rp = new RentPrice()
                 {
                     shop = shop,
@@ -418,7 +394,6 @@ namespace SnowmeetApi.Controllers
             RentCategory rc = (RentCategory)((OkObjectResult)(await GetCategory(cate.code.Trim())).Result).Value;
             return Ok(rc);
         }
-
         [HttpGet("{code}")]
         public async Task<ActionResult<RentCategory>> UpdateCategory(string code, string name, double deposit, string sessionKey, string sessionType)
         {
@@ -442,7 +417,6 @@ namespace SnowmeetApi.Controllers
             await _db.SaveChangesAsync();
             return Ok(cate);
         }
-
         [HttpGet]
         public async Task<ActionResult<RentPackage>> AddRentPackage(string name, string description, string sessionKey, string sessionType)
         {
@@ -464,7 +438,6 @@ namespace SnowmeetApi.Controllers
             await _db.SaveChangesAsync();
             return Ok(rp);
         }
-
         [HttpGet("{packageId}")]
         public async Task<ActionResult<RentPackage>> RentPackageCategoryAdd(int packageId, int categoryId, string sessionKey, string sessionType)
         {
@@ -491,7 +464,6 @@ namespace SnowmeetApi.Controllers
             RentPackage pr = await _db.rentPackage.Include(r => r.rentPackageCategoryList).Where(r => r.id == packageId).FirstAsync();
             return Ok(pr);
         }
-
         [HttpGet("{packageId}")]
         public async Task<ActionResult<RentPackage>> RentPackageCategoryDel(int packageId, int categoryId, string sessionKey, string sessionType)
         {
@@ -514,7 +486,6 @@ namespace SnowmeetApi.Controllers
             RentPackage pr = await _db.rentPackage.Include(r => r.rentPackageCategoryList).Where(r => r.id == packageId).FirstAsync();
             return Ok(pr);
         }
-
         [HttpGet("{packageId}")]
         public async Task<ActionResult<RentPackage>> GetRentPackage(int packageId)
         {
@@ -525,7 +496,6 @@ namespace SnowmeetApi.Controllers
                 .Where(r => r.id == packageId).FirstAsync();
             return Ok(rp);
         }
-
         [HttpGet]
         public async Task<ActionResult<List<RentPackage>>> GetRentPackageList()
         {
@@ -537,7 +507,6 @@ namespace SnowmeetApi.Controllers
                 .OrderByDescending(r => r.id).ToListAsync();
             return Ok(list);
         }
-
         [HttpGet("{packageId}")]
         public async Task<ActionResult<RentPackage>> UpdateRentPackageBaseInfo(int packageId, string name, string description, double deposit, string sessionKey, string sessionType)
         {
@@ -580,7 +549,6 @@ namespace SnowmeetApi.Controllers
             {
                 return NotFound();
             }
-
             var priceL = await _db.rentPrice.Where(p => (p.type.Trim().Equals("套餐")
                 && p.package_id == packageId && p.day_type.Trim().Equals(dayType)
                 && p.scene.Trim().Equals(scene) && p.shop.Trim().Equals(shop))).ToListAsync();
@@ -635,7 +603,6 @@ namespace SnowmeetApi.Controllers
                     update_date = DateTime.Now
                 };
                 await _db.rentCategoryInfoField.AddAsync(field);
-               
             }
             else
             {
@@ -668,12 +635,17 @@ namespace SnowmeetApi.Controllers
             await _db.SaveChangesAsync();
             return Ok(field);
         }
-
         [HttpGet("{categoryId}")]
         public async Task<ActionResult<RentProduct>> AddRentProduct(int categoryId, string? shop, string name, string sessionKey, string sessionType)
         {
             sessionKey = Util.UrlDecode(sessionKey);
             sessionType = Util.UrlDecode(sessionType);
+            StaffController _staffHelper = new StaffController(_db);
+            Staff staff = await _staffHelper.GetStaffBySessionKey(sessionKey, sessionType);
+            if (staff == null)
+            {
+                return BadRequest();
+            }
             Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
             if (member.is_admin != 1)
             {
@@ -685,13 +657,12 @@ namespace SnowmeetApi.Controllers
                 category_id = categoryId,
                 shop = shop,
                 name = name.Trim(),
-                creator_memberid = member.id
+                staff_id = staff.id
             };
             await _db.rentProduct.AddAsync(p);
             await _db.SaveChangesAsync();
             return Ok(p);
         }
-
         [HttpPost]
         public async Task<ActionResult<RentProduct>> ModRentProduct(RentProduct rentProduct, 
             [FromQuery] string sessionKey, [FromQuery] string sessionType)
@@ -714,20 +685,13 @@ namespace SnowmeetApi.Controllers
                 return Ok(rentProduct);
             }
         }
-
         [HttpGet("{productId}")]
         public async Task<ActionResult<RentProduct>> GetRentProduct(int productId)
         {
-            /*
-            RentProduct product = await _db.rentProduct.FindAsync(productId);
-            if (product == null)
-            {
-                return NotFound();
-            }
-            */
-
             var productList = await _db.rentProduct.Where(p => p.id == productId)
-                .Include(p => p.images).Include(p => p.detailInfo).ToListAsync();
+                .Include(p => p.images)
+                .Include(p => p.detailInfo)
+                .AsNoTracking().ToListAsync();
             if (productList == null || productList.Count == 0)
             {
                 return NotFound();
@@ -763,7 +727,6 @@ namespace SnowmeetApi.Controllers
             }
             return Ok(product);
         }
-
         [HttpPost("{productId}")]
         public async Task<ActionResult<RentProduct>> UpdateRentProductDetailInfo(int productId, 
             [FromQuery] string sessionKey, [FromQuery] string sessionType, List<RentProductDetailInfo> details )
@@ -792,12 +755,10 @@ namespace SnowmeetApi.Controllers
                     info.update_date = DateTime.Now;
                     await _db.rentProductDetailInfo.AddAsync(info);
                     await _db.SaveChangesAsync();
-                }
-                
+                }  
             }
             return await GetRentProduct(productId);
         }
-
         [HttpPost("{productId}")]
         public async Task<ActionResult<RentProduct>> SetRentProductImage(int productId, [FromQuery] string sessionKey, 
             [FromQuery] string sessionType, string[] images)
@@ -850,7 +811,6 @@ namespace SnowmeetApi.Controllers
                     order.finish_date = (DateTime)dateList[0];
                     _db.RentOrder.Entry(order).State = EntityState.Modified;
                 }
-                
             }
             await _db.SaveChangesAsync();
         }
@@ -914,20 +874,10 @@ namespace SnowmeetApi.Controllers
             }
             await _db.SaveChangesAsync();
         }
-
-
-
-
-        /// <summary>
-        /// /////////////waiting to delete
-        /// </summary>
-        /// <param name="rentId"></param>
-        /// <returns></returns>
         [NonAction]
         public async Task StartRent(int rentId)
         {
             RentOrder order = await _db.RentOrder.FindAsync(rentId);
-
             List<RentOrderDetail> rentItemList = await _db.RentOrderDetail
                 .Where(i => i.rent_list_id == rentId && i.valid == 1).ToListAsync();
             for (int i = 0; rentItemList != null && i < rentItemList.Count; i++)
@@ -1038,12 +988,12 @@ namespace SnowmeetApi.Controllers
 
 
         [HttpGet("{code}")]
-        public async Task<ActionResult<RentItem>> GetRentItem(string code, string shop)
+        public async Task<ActionResult<SnowmeetApi.Models.Rent.RentItem>> GetRentItem(string code, string shop)
         {
             var rentItemList = await _db.RentItem.Where(r => r.code.Trim().Equals(code.Trim())).ToListAsync();
             if (rentItemList != null && rentItemList.Count > 0)
             {
-                RentItem item = rentItemList[0];
+                SnowmeetApi.Models.Rent.RentItem item = rentItemList[0];
                 if (item.rental == 0)
                 {
                     item.rental = item.GetRental(shop);
@@ -2988,7 +2938,7 @@ namespace SnowmeetApi.Controllers
                 double subTotalRental = 0;
                 for (int j = 0; j < order.rentalDetails.Count; j++)
                 {
-                    RentalDetail detail = order.rentalDetails[j];
+                    SnowmeetApi.Models.Rent.RentalDetail detail = order.rentalDetails[j];
                     if (detail.date.Date < date.Date)
                     {
                         subTotalRental = subTotalRental + detail.rental;
@@ -3047,7 +2997,7 @@ namespace SnowmeetApi.Controllers
                 double subTotalRental = 0;
                 for (int j = 0; j < order.rentalDetails.Count; j++)
                 {
-                    RentalDetail detail = order.rentalDetails[j];
+                    SnowmeetApi.Models.Rent.RentalDetail detail = order.rentalDetails[j];
                     subTotalRental = subTotalRental + detail.rental;
                 }
                 totalRental = totalRental + subTotalRental;
@@ -3090,7 +3040,7 @@ namespace SnowmeetApi.Controllers
                 double subTotalRental = 0;
                 for (int j = 0; j < orderArr[i].rentalDetails.Count; j++)
                 {
-                    RentalDetail detail = orderArr[i].rentalDetails[j];
+                    SnowmeetApi.Models.Rent.RentalDetail detail = orderArr[i].rentalDetails[j];
                     if (detail.date.Date <= date.Date)
                     {
                         subTotalRental = subTotalRental + detail.rental;
@@ -3145,7 +3095,7 @@ namespace SnowmeetApi.Controllers
                 double subTotalRental = 0;
                 for (int j = 0; j < order.rentalDetails.Count; j++)
                 {
-                    RentalDetail detail = order.rentalDetails[j];
+                    SnowmeetApi.Models.Rent.RentalDetail detail = order.rentalDetails[j];
                     if (detail.date.Date <= date.Date)
                     {
                         subTotalRental = subTotalRental + detail.rental;
@@ -3232,7 +3182,7 @@ namespace SnowmeetApi.Controllers
 
 
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<RentalDetail>>> GetRentDetailReport(DateTime start, DateTime end, string sessionKey)
+        public async Task<ActionResult<IEnumerable<SnowmeetApi.Models.Rent.RentalDetail>>> GetRentDetailReport(DateTime start, DateTime end, string sessionKey)
         {
 
             //RentalDetail[] details = new RentalDetail[];
@@ -3246,7 +3196,7 @@ namespace SnowmeetApi.Controllers
                 {
                     if (order.rentalDetails[j].date >= start.Date && order.rentalDetails[j].date <= end.Date)
                     {
-                        RentalDetail dtl = order.rentalDetails[j];
+                        SnowmeetApi.Models.Rent.RentalDetail dtl = order.rentalDetails[j];
                         dtl._name = order.real_name;
                         dtl._cell = order.cell_number;
                         dtl._shop = order.shop.Trim();
@@ -3271,7 +3221,7 @@ namespace SnowmeetApi.Controllers
                     DateTime rentDate = order.rentalDetails[j].date;
                     if (rentDate.Date >= start && rentDate.Date <= end)
                     {
-                        RentalDetail dtl = order.rentalDetails[j];
+                        SnowmeetApi.Models.Rent.RentalDetail dtl = order.rentalDetails[j];
                         dtl._name = order.real_name;
                         dtl._cell = order.cell_number;
                         dtl._shop = order.shop.Trim();
@@ -3282,12 +3232,12 @@ namespace SnowmeetApi.Controllers
             }
 
 
-            RentalDetail[] detailArr = new RentalDetail[details.Count];
+            SnowmeetApi.Models.Rent.RentalDetail[] detailArr = new SnowmeetApi.Models.Rent.RentalDetail[details.Count];
 
             for (int i = 0; i < detailArr.Length; i++)
             {
                 var dtl = details[i];
-                detailArr[i] = (RentalDetail)dtl;
+                detailArr[i] = (SnowmeetApi.Models.Rent.RentalDetail)dtl;
             }
 
             return Ok(detailArr);
@@ -3369,7 +3319,7 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpPost]
-        public async Task<ActionResult<RentalDetail>> UpdateDetail([FromQuery] string sessionKey, [FromBody] RentOrderDetail detail)
+        public async Task<ActionResult<SnowmeetApi.Models.Rent.RentalDetail>> UpdateDetail([FromQuery] string sessionKey, [FromBody] RentOrderDetail detail)
         {
             sessionKey = Util.UrlDecode(sessionKey).Trim();
             UnicUser user = await UnicUser.GetUnicUserAsync(sessionKey, _db);
@@ -3666,7 +3616,7 @@ namespace SnowmeetApi.Controllers
                     {
                         continue;
                     }
-                    RentalDetail rentalDtl = rentOrder.rentalDetails[j];
+                    SnowmeetApi.Models.Rent.RentalDetail rentalDtl = rentOrder.rentalDetails[j];
                     bool exists = false;
                     for (int k = 0; k < rentalList.Count; k++)
                     {

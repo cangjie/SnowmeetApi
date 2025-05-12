@@ -20,7 +20,6 @@ namespace SnowmeetApi.Data
         {
 
         }
-
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             modelBuilder.Entity<MaintainLive>().HasKey(c => c.id);
@@ -32,18 +31,18 @@ namespace SnowmeetApi.Data
             modelBuilder.Entity<SnowmeetApi.Models.Maintain.MaintainReport>().HasNoKey();
             modelBuilder.Entity<Models.SaleReport>().HasNoKey();
             modelBuilder.Entity<Models.EPaymentDailyReport>().HasKey(e => new { e.biz_date, e.mch_id, e.pay_method });
-            modelBuilder.Entity<RentPrice>().HasOne<RentCategory>().WithMany(r => r.priceList).HasForeignKey(r => r.category_id);
-            modelBuilder.Entity<RentPackageCategory>().HasKey(e => new {e.package_id, e.category_id});
-            modelBuilder.Entity<RentPackageCategory>().HasOne<RentPackage>().WithMany(r => r.rentPackageCategoryList).HasForeignKey(r => r.package_id);
-            modelBuilder.Entity<RentPrice>().HasOne<RentPackage>().WithMany( r => r.rentPackagePriceList).HasForeignKey(r => r.package_id);
-            modelBuilder.Entity<RentCategory>().HasMany<RentPackageCategory>().WithOne(r => r.rentCategory).HasForeignKey(r => r.category_id);
-            modelBuilder.Entity<RentCategoryInfoField>().HasOne<RentCategory>().WithMany(r => r.infoFields).HasForeignKey(r => r.category_id);
-            modelBuilder.Entity<RentProductDetailInfo>().HasKey(i => new {i.field_id, i.product_id});
-            modelBuilder.Entity<RentProductDetailInfo>().HasOne<RentProduct>().WithMany(r => r.detailInfo).HasForeignKey(r => r.product_id);
-            modelBuilder.Entity<RentProductImage>().HasOne<RentProduct>().WithMany(r => r.images).HasForeignKey(r => r.product_id);
-            modelBuilder.Entity<RentCategoryInfoField>().HasMany<RentProductDetailInfo>().WithOne(r => r.field).HasForeignKey(r => r.field_id);
-            modelBuilder.Entity<RentProduct>().HasOne<RentCategory>().WithMany(r => r.productList).HasForeignKey(r => r.category_id);
-            modelBuilder.Entity<RentProductDetailInfo>().HasKey(i => new {i.product_id, i.field_id});
+            //modelBuilder.Entity<RentPrice>().HasOne<RentCategory>().WithMany(r => r.priceList).HasForeignKey(r => r.category_id);
+            //modelBuilder.Entity<RentPackageCategory>().HasKey(e => new {e.package_id, e.category_id});
+            //modelBuilder.Entity<RentPackageCategory>().HasOne<RentPackage>().WithMany(r => r.rentPackageCategoryList).HasForeignKey(r => r.package_id);
+            //modelBuilder.Entity<RentPrice>().HasOne<RentPackage>().WithMany( r => r.rentPackagePriceList).HasForeignKey(r => r.package_id);
+            //modelBuilder.Entity<RentCategory>().HasMany<RentPackageCategory>().WithOne(r => r.rentCategory).HasForeignKey(r => r.category_id);
+            //modelBuilder.Entity<RentCategoryInfoField>().HasOne<RentCategory>().WithMany(r => r.infoFields).HasForeignKey(r => r.category_id);
+            
+            //modelBuilder.Entity<RentProductDetailInfo>().HasOne<RentProduct>().WithMany(r => r.detailInfo).HasForeignKey(r => r.product_id);
+            //modelBuilder.Entity<RentProductImage>().HasOne<RentProduct>().WithMany(r => r.images).HasForeignKey(r => r.product_id);
+            //modelBuilder.Entity<RentCategoryInfoField>().HasMany<RentProductDetailInfo>().WithOne(r => r.field).HasForeignKey(r => r.field_id);
+            //modelBuilder.Entity<RentProduct>().HasOne<RentCategory>().WithMany(r => r.productList).HasForeignKey(r => r.category_id);
+            
             modelBuilder.Entity<SkipassDailyPrice>().HasOne<Models.Product.SkiPass>().WithMany(s => s.dailyPrice).HasForeignKey(s => s.product_id);
             //modelBuilder.Entity<MaintainLog>().HasOne<Models.MaintainLive>().WithMany(m => m.taskLog).HasForeignKey(m => m.task_id);
             //modelBuilder.Entity<OrderOnline>().HasMany<MaintainLive>().WithOne(m => m.order).HasForeignKey(m => m.order_id);
@@ -69,11 +68,11 @@ namespace SnowmeetApi.Data
             /////////////new season
             modelBuilder.Entity<MiniSession>().HasKey(m => new {m.session_key, m.session_type});
             modelBuilder.Entity<Brand>().HasKey(m => new {m.brand_name, m.brand_type});
+            modelBuilder.Entity<RentPackageCategory>().HasKey(e => new {e.package_id, e.category_id});
+            modelBuilder.Entity<RentProductDetailInfo>().HasKey(i => new {i.field_id, i.product_id});
+            modelBuilder.Entity<RentProductDetailInfo>().HasKey(i => new {i.product_id, i.field_id});
         }
-
         public DbSet<MaintainLive> MaintainLives {get; set;}
-       
-        
         public DbSet<Models.Users.MToken> MTokens { get; set; }
         public DbSet<Models.Users.UnionId> UnionIds { get; set; }
         public DbSet<Models.Users.MiniAppUser> MiniAppUsers { get; set; }
@@ -138,13 +137,10 @@ namespace SnowmeetApi.Data
         public DbSet<Models.EPaymentDailyReport> ePaymentDailyReport { get; set; }
         public DbSet<Models.AlipayMchId> alipayMchId { get; set; }
         public DbSet<Models.Kol> kol {get; set;}
-        
         public DbSet<Models.AliDownloadFlowBill> aliDownloadFlowBill {get; set; }
         public DbSet<SnowmeetApi.Models.Rent.RentPackage> rentPackage {get; set;}
         public DbSet<SnowmeetApi.Models.Rent.RentPackageCategory> rentPackageCategory {get; set; }
-        
         public DbSet<SnowmeetApi.Models.FinancialStatement> financialStatement {get; set;}
-        
         public DbSet<RentProductImage> rentProductImage {get; set;}
         public DbSet<Models.School.Staff> schoolStaff {get; set;}
         public DbSet<Models.School.Course> schoolCourse {get; set;}
@@ -203,6 +199,8 @@ namespace SnowmeetApi.Data
         public DbSet<SnowmeetApi.Models.RentCategoryInfoField> rentCategoryInfoField {get; set; }
         public DbSet<SnowmeetApi.Models.RentProduct> rentProduct {get; set;}
         public DbSet<SnowmeetApi.Models.RentProductDetailInfo> rentProductDetailInfo {get;set;}
-
+        public DbSet<SnowmeetApi.Models.Rental> rental {get; set;}
+        public DbSet<SnowmeetApi.Models.RentalDetail> rentalDetail {get; set;}
+        public DbSet<SnowmeetApi.Models.RentItem> rentItem {get; set; }
     }
 }

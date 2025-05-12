@@ -18,6 +18,11 @@ namespace SnowmeetApi.Controllers
         {
             _db = context;
         }
+        [HttpGet]
+        public async Task MigrateRent()
+        {
+            
+        }
         [NonAction]
         public async Task<string> CreateTextOrderCode(OrderOnline order)
         {

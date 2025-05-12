@@ -13,6 +13,8 @@ namespace SnowmeetApi.Models
         public int is_delete {get;set;}
         public int sort {get;set;}
         public DateTime update_date {get;set;}
+        [ForeignKey("category_id")]
+        public RentCategory? category{ get; set; }
 
     }
 }

@@ -28,6 +28,8 @@ namespace SnowmeetApi.Models
         public string scene {get; set;}
 
         public DateTime update_date {get; set;}
+        [ForeignKey("category_id")]
+        public RentCategory? category {get; set;}
 
 
 

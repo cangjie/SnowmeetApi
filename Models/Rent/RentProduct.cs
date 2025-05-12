@@ -24,15 +24,12 @@ namespace SnowmeetApi.Models
         public int is_delete {get; set; } = 0;
         public int is_valid {get; set; } = 0;
         public int is_online {get;set;} = 0;
-
         public int is_destroyed {get; set;} = 0;
-
-        public int creator_memberid {get; set;}
-
-        [NotMapped]
-        public ICollection<RentProductImage> images { get; set; }
-        [NotMapped]
-        public List<RentProductDetailInfo> detailInfo { get; set; }
+        public int? staff_id {get; set;}
+        public List<RentProductImage>? images { get; set; }
+        public List<RentProductDetailInfo>? detailInfo { get; set; }
+        [ForeignKey("category_id")]
+        public RentCategory? category { get; set; }
        
 
     }
@@ -46,6 +43,8 @@ namespace SnowmeetApi.Models
         public string image_url {get; set;}
         public int sort {get; set;} = 0;
         public DateTime update_date {get; set;}
+        [ForeignKey("product_id")]
+        public RentProduct? rentProduct {get; set;}
     }
 
     [Table("rent_product_detail_info")]
@@ -59,6 +58,8 @@ namespace SnowmeetApi.Models
         public string fieldName {get; set;} = "";
         [NotMapped]
         public RentCategoryInfoField field {get; set;}
+        [ForeignKey("product_id")]
+        public RentProduct? rentProduct {get; set;}
     }
 
 }
