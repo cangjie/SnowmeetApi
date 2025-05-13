@@ -161,7 +161,7 @@ namespace SnowmeetApi.Models
                 for(int i = 0; paymentList != null && i < paymentList.Count; i++)
                 {
                     OrderPayment payment = paymentList[i];
-                    for(int j = 0; j <  payment.refunds.Count; j++)
+                    for(int j = 0; payment != null && payment.refunds != null && j <  payment.refunds.Count; j++)
                     {
                         rL.Add(payment.refunds[j]);
                     }

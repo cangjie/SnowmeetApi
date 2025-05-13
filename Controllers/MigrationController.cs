@@ -2,11 +2,16 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Aop.Api.Domain;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Internal;
+using Microsoft.Extensions.Configuration;
 using SnowmeetApi.Data;
 using SnowmeetApi.Models;
 using SnowmeetApi.Models.Maintain;
+using SnowmeetApi.Models.Rent;
 namespace SnowmeetApi.Controllers
 {
     [Route("api/[controller]/[action]")]
@@ -14,20 +19,215 @@ namespace SnowmeetApi.Controllers
     public class MigrationController : ControllerBase
     {
         private readonly ApplicationDBContext _db;
-        public MigrationController(ApplicationDBContext context)
+        private readonly IConfiguration _config;
+        private readonly IHttpContextAccessor _http;
+        public MigrationController(ApplicationDBContext context, IConfiguration config, IHttpContextAccessor httpContextAccessor)
         {
             _db = context;
+            _config = config;
+            _http = httpContextAccessor;
+        }
+        public class RentalPackage
+        {
+            public List<RentOrderDetail> details = new List<RentOrderDetail>();
+            public string packageCode = "";
+            public RentOrderDetail mainItem;
+        }
+        public class RentalList
+        {
+            public List<RentalPackage> packages = new List<RentalPackage>();
+            public List<RentOrderDetail> details = new List<RentOrderDetail>();
+        }
+        [NonAction]
+        public RentalList OrgniazeDetails(List<RentOrderDetail> details)
+        {
+            RentalList ret = new RentalList();
+            var pList = from p in details group p by p.package_code into g select new { g.Key, Count = g.Count() };
+            foreach (var p in pList)
+            {
+                if (p.Key != null)
+                {
+                    string pCode = p.Key;
+                    RentalPackage package = new RentalPackage();
+                    package.packageCode = pCode;
+                    try
+                    {
+                        var subList = details.Where(d => d.package_code != null && d.package_code.Trim().Equals(pCode.Trim())).ToList();
+                        if (subList!=null)
+                        {
+                            package.details = subList;
+                        }
+                        //package.details = subList != null ? subList : package.details;
+                        foreach (RentOrderDetail d in package.details)
+                        {
+                            if (d.unit_rental > 0)
+                            {
+                                package.mainItem = d;
+                            }
+                        }
+                        ret.packages.Add(package);
+                    }
+                    catch (Exception err)
+                    {
+                        Console.WriteLine(err.ToString());
+                    }
+                }
+            }
+            ret.details = details.Where(d => d.package_code == null).ToList();
+            return ret;
         }
         [HttpGet]
         public async Task MigrateRent()
         {
-            
+
+            RentController _rHelper = new RentController(_db, _config, _http);
+            StaffController _staffHelper = new StaffController(_db);
+
+            /*
+            RentOrder commonOrder = (RentOrder)((OkObjectResult)(await _rHelper.GetRentOrder(14384, "", false)).Result).Value;
+            RentOrder entOrder = (RentOrder)((OkObjectResult)(await _rHelper.GetRentOrder(14382, "", false)).Result).Value;
+            RentOrder closeOrder = (RentOrder)((OkObjectResult)(await _rHelper.GetRentOrder(13370, "", false)).Result).Value;
+            */
+
+
+            List<RentOrder> rentIdList = await _db.RentOrder.AsNoTracking().OrderByDescending(r => r.id).ToListAsync();
+
+            //string sessionKey = "KB2ziprfR0VIPCtXsYWO6w==";
+            Console.WriteLine(rentIdList.Count.ToString());
+            for (int i = 0; i < rentIdList.Count; i++)
+            {
+
+                RentOrder rentOrder = (RentOrder)((OkObjectResult)(await _rHelper.GetRentOrder(rentIdList[i].id, "", false)).Result).Value;
+
+                if (rentOrder.order != null && rentOrder.order.pay_state == 0)
+                {
+                    continue;
+                }
+                if (rentOrder.details.Count <= 1 || rentOrder.rentalDetails.Count <= rentOrder.details.Count)
+                {
+                    continue;
+                }
+                SnowmeetApi.Models.Order order = new SnowmeetApi.Models.Order();
+                order.code = await CreateRentTextOrderCode(rentOrder);
+                Console.WriteLine(i.ToString() + "\t: " + order.code.Trim());
+                order.type = "租赁";
+                if (rentOrder.order == null)
+                {
+                    order.pay_option = "招待";
+                }
+                else
+                {
+                    order.pay_option = "普通";
+                }
+                Staff staff = await _staffHelper.GetStaffBySocialNum(rentOrder.staff_open_id.Trim(), "wechat_mini_openid");
+                if (staff != null)
+                {
+                    order.staff_id = staff.id;
+                }
+                List<MemberSocialAccount> msaL = await _db.memberSocialAccount.Where(m => m.num.Trim().Equals(rentOrder.open_id.Trim()) && m.valid == 1)
+                    .OrderByDescending(m => m.id).AsNoTracking().ToListAsync();
+                if (msaL.Count > 0)
+                {
+                    order.member_id = msaL[0].member_id;
+                }
+                string memo = (rentOrder.order == null? "" : rentOrder.order.memo) + " " + rentOrder.memo.Trim();
+                RentalList rentalList = OrgniazeDetails(rentOrder.details);
+                List<Rental> rentalObjList = new List<Rental>();
+                for(int j = 0; j < rentalList.packages.Count; j++)
+                {
+                   
+                    Rental r = new Rental()
+                    {
+                        order_id = order.id,
+                        package_id = 0,
+                        name = "【" + rentalList.packages[j].mainItem.rent_item_class + "】" 
+                            +  rentalList.packages[j].mainItem.rent_item_name 
+                            + "(" + rentalList.packages[j].mainItem.rent_item_code + ")",
+                        
+                        valid = 1,
+                        settled = 1,
+                        hide = rentOrder.hide,
+                        memo = rentOrder.memo,
+                        start_date = rentalList.packages[j].mainItem.start_date,
+                        end_date = rentalList.packages[j].mainItem.real_end_date
+                    };
+                    double totalGuaranty = 0;
+                    for(int k = 0; k < rentalList.packages[j].details.Count; k++)
+                    {
+                        RentOrderDetail dtl = rentalList.packages[j].details[k];
+                        totalGuaranty += dtl.deposit;
+                        
+                        Models.RentItem item = new Models.RentItem()
+                        {
+                            id = dtl.id,
+                            rental_id = r.id,
+                            pick_time = dtl.pick_date == null? dtl.start_date: dtl.pick_date,
+                            return_time = dtl.return_date == null? dtl.real_end_date: dtl.return_date,
+                            name = rentalList.packages[j].details[k].rent_item_name,
+                            code =  rentalList.packages[j].details[k].rent_item_code,
+                            memo = rentalList.packages[j].details[k].memo,
+                            create_date = DateTime.Now
+
+                        };
+                        r.rentItems.Add(item);
+                    }
+                    r.guaranty_amount = totalGuaranty;
+                    for(int k = 0; k < rentOrder.rentalDetails.Count; k++)
+                    {
+                        for(int l = 0; l < r.rentItems.Count; l++)
+                        {
+                            List<Models.Rent.RentalDetail> oriRentalList = rentOrder
+                                .rentalDetails.Where(orr => orr.item.id == r.rentItems[l].id).ToList();
+                            
+                            
+                        }
+                    }
+                    order.rentals.Add(r);
+                    
+                }
+                for(int j = 0; j < rentalList.details.Count; j++)
+                {
+
+                }
+                
+               
+
+            }
+
+
+        }
+        [NonAction]
+        public async Task<string> CreateRentTextOrderCode(RentOrder rentOrder)
+        {
+            if (rentOrder.order != null)
+            {
+                return await CreateTextOrderCode(rentOrder.order);
+            }
+            string shopCode = "WL";
+            List<SnowmeetApi.Models.Shop> shopList = await _db.shop.Where(s => s.name.Trim().Equals(rentOrder.shop.Trim())).AsNoTracking().ToListAsync();
+            if (shopList.Count <= 0)
+            {
+                if (rentOrder.shop.Trim().Equals("万龙"))
+                {
+                    shopCode = "WL";
+                }
+                //return "";
+            }
+            else
+            {
+                shopCode = shopList[0].code;
+            }
+            string orderCode = shopCode + "_ZL_" + rentOrder.create_date.ToString("yyMMdd") + "_";
+            List<SnowmeetApi.Models.Order> ol = await _db.order.Where(o => o.code.StartsWith(orderCode)).AsNoTracking().ToListAsync();
+            orderCode = orderCode + (ol.Count + 1).ToString().PadLeft(5, '0');
+            return orderCode;
+
         }
         [NonAction]
         public async Task<string> CreateTextOrderCode(OrderOnline order)
         {
             string shopCode = "";
-            List<Shop> shopList = await _db.shop.Where(s => s.name.Trim().Equals(order.shop.Trim())).AsNoTracking().ToListAsync();
+            List<SnowmeetApi.Models.Shop> shopList = await _db.shop.Where(s => s.name.Trim().Equals(order.shop.Trim())).AsNoTracking().ToListAsync();
             if (shopList.Count <= 0)
             {
                 if (order.shop.Trim().Equals("万龙"))
@@ -95,15 +295,15 @@ namespace SnowmeetApi.Controllers
                     string shopCode = live.shop.IndexOf("万龙") >= 0 ? "WL" : "NS";
                     string orderCode = shopCode + "_YH_" + live.create_date.ToString("yyMMdd") + "_" + orderId.ToString().PadLeft(5, '0');
                     string payMemo = "普通";
-                    if (live.pay_memo.IndexOf("招待")>=0)
+                    if (live.pay_memo.IndexOf("招待") >= 0)
                     {
                         payMemo = "招待";
                     }
-                    if (live.pay_memo.IndexOf("质保")>=0)
+                    if (live.pay_memo.IndexOf("质保") >= 0)
                     {
                         payMemo = "质保";
                     }
-                    if (live.pay_memo.IndexOf("次卡")>=0)
+                    if (live.pay_memo.IndexOf("次卡") >= 0)
                     {
                         payMemo = "次卡";
                     }
@@ -129,10 +329,10 @@ namespace SnowmeetApi.Controllers
                         create_date = live.create_date
                     };
                     await _db.order.AddAsync(order);
-                    for(int j = 0; j < mL.Count; j++)
+                    for (int j = 0; j < mL.Count; j++)
                     {
                         List<Care> subCL = careList.Where(c => c.id == mL[j].id).ToList();
-                        for(int k = 0; k < subCL.Count; k++)
+                        for (int k = 0; k < subCL.Count; k++)
                         {
                             subCL[k].order_id = orderId;
                             _db.care.Entry(subCL[k]).State = EntityState.Modified;
@@ -171,7 +371,7 @@ namespace SnowmeetApi.Controllers
                 {
                     memberId = msaList[0].member_id;
                 }
-                
+
                 SnowmeetApi.Models.Order order = new SnowmeetApi.Models.Order()
                 {
                     id = oo.id,
@@ -202,7 +402,7 @@ namespace SnowmeetApi.Controllers
             StaffController _staffHelper = new StaffController(_db);
             List<SnowmeetApi.Models.Maintain.MaintainLog> l = await _db.MaintainLog
                 .Include(m => m.msa).AsNoTracking().ToListAsync();
-            for(int i = 0; i < l.Count; i++)
+            for (int i = 0; i < l.Count; i++)
             {
                 MaintainLog log = l[i];
                 CareTask oriTask = await _db.careTask.FindAsync(log.id);
@@ -282,7 +482,7 @@ namespace SnowmeetApi.Controllers
 
                     }
                     int memberId = msaList[0].member_id;
-                    Member? member = await _db.member.Include(m => m.memberSocialAccounts)
+                    SnowmeetApi.Models.Member? member = await _db.member.Include(m => m.memberSocialAccounts)
                         .Where(m => m.id == memberId)
                         .AsNoTracking().FirstOrDefaultAsync();
                     if (member == null)
@@ -312,7 +512,7 @@ namespace SnowmeetApi.Controllers
                 string? gender = null;
                 if (memberMsaList.Count > 0)
                 {
-                    List<Member> orderMemberList = await _db.member.Where(m => m.id == memberMsaList[0].member_id)
+                    List<SnowmeetApi.Models.Member> orderMemberList = await _db.member.Where(m => m.id == memberMsaList[0].member_id)
                         .Include(m => m.memberSocialAccounts)
                         .AsNoTracking().ToListAsync();
                     orderMemberId = memberMsaList[0].member_id;

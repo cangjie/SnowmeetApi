@@ -202,6 +202,7 @@ namespace SnowmeetApi.Models
         public Member member { get; set; } = null;
         public List<Retail> retails { get; set; } = new List<Retail>();
         public List<Care> cares {get; set;} = new List<Care>();
+        public List<Rental> rentals { get; set;} = new List<Rental>();
         public List<OrderPayment>? payments { get; set; }
         public List<OrderPaymentRefund>? refunds { get; set; }
         public List<PaymentShare>? shares { get; set; }

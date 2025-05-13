@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
@@ -10,7 +11,7 @@ namespace SnowmeetApi.Models
         [Key]
         public int id { get; set; }
         public int? order_id { get; set; }
-        public int? product_id { get; set; }
+        public int? package_id { get; set; }
         public int? categroy_id { get; set; }
         public string? name { get; set; }
         public DateTime? start_date { get; set; }
@@ -25,6 +26,10 @@ namespace SnowmeetApi.Models
         public int current_avaliable { get; set; }
         public DateTime? update_date { get; set; }
         public DateTime create_date { get; set; }
+        public List<RentItem> rentItems{ get; set; } = new List<RentItem>();
+        public List<RentalDetail> details {get; set;} = new List<RentalDetail>();
+        [ForeignKey("order_id")]
+        public SnowmeetApi.Models.Order order { get; set; }
     }
     [Table("rental_detail")]
     public class RentalDetail
@@ -40,6 +45,8 @@ namespace SnowmeetApi.Models
         public int valid { get; set; }
         public DateTime? update_date { get; set; }
         public DateTime create_date { get; set; }
+        [ForeignKey("rental_id")]
+        public Rental rental {get; set;}
     }
     [Table("rent_item")]
     public class RentItem
@@ -57,5 +64,7 @@ namespace SnowmeetApi.Models
         public string memo { get; set; }
         public DateTime? update_date { get; set; }
         public DateTime create_date { get; set; }
+        [ForeignKey("rental_id")]
+        public Rental rental {get; set;}
     }
 }

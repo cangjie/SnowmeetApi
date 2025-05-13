@@ -2196,9 +2196,9 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<RentOrder>> GetRentOrder(int id, string sessionKey, bool needAuth = true)
         {
             sessionKey = Util.UrlDecode(sessionKey).Trim();
-            UnicUser user = await UnicUser.GetUnicUserAsync(sessionKey, _db);
+            //UnicUser user = //await UnicUser.GetUnicUserAsync(sessionKey, _db);
             List<RentOrder> rentOrderList = await _db.RentOrder
-                .Include(r => r.recept)
+                //.Include(r => r.recept)
                 .Include(r => r.details.OrderBy(d => d.package_code).OrderBy(d => d.id))
                     .ThenInclude(d => d.log)
                 .Include(r => r.order)
@@ -2230,10 +2230,12 @@ namespace SnowmeetApi.Controllers
                 {
                     return NotFound();
                 }
+                /*
                 if (!user.isAdmin && !rentOrder.open_id.Trim().Equals(user.miniAppOpenId.Trim()))
                 {
                     return BadRequest();
                 }
+                */
                 if (rentOrder.staff_open_id.Trim().Equals("") || rentOrder.staff_name == null || rentOrder.staff_name.Trim().Equals(""))
                 {
                     try
@@ -2297,7 +2299,7 @@ namespace SnowmeetApi.Controllers
                     detail.overTime = false;
 
                 }
-
+                /*
                 if (!detail.rent_staff.Trim().Equals(""))
                 {
                     detail.rentStaff = (await UnicUser.GetUnicUserByDetailInfo(detail.rent_staff, "wechat_mini_openid", _db)).miniAppUser;
@@ -2321,7 +2323,7 @@ namespace SnowmeetApi.Controllers
                 {
                     detail.returnStaff = null;
                 }
-
+                */
                 if (!detail.rentStatus.Trim().Equals("已归还"))
                 {
                     allReturned = false;
@@ -2378,6 +2380,7 @@ namespace SnowmeetApi.Controllers
             {
                 rentOrder.staff_name = rentOrder.order == null ? "" : rentOrder.order.staffName.Trim();
             }
+            
             if (rentOrder.staff_name.Trim().Equals(""))
             {
                 if (rentOrder.recept != null && rentOrder.recept.Count > 0)
@@ -2406,6 +2409,7 @@ namespace SnowmeetApi.Controllers
                 }
 
             }
+            
 
             if (rentOrder.pay_option.Trim().Equals("招待"))
             {
@@ -2448,7 +2452,7 @@ namespace SnowmeetApi.Controllers
             {
                 rentOrder.textColor = "#C0C0C0";
             }
-
+            /*
             if (!rentOrder.real_name.Trim().EndsWith("先生") && !rentOrder.real_name.Trim().EndsWith("女士"))
             {
                 Member member = await _memberHelper.GetMember(rentOrder.open_id.Trim(), "wechat_mini_openid");
@@ -2468,6 +2472,7 @@ namespace SnowmeetApi.Controllers
                     }
                 }
             }
+            */
             for (int i = 0; rentOrder.additionalPayments != null
                 && i < rentOrder.additionalPayments.Count; i++)
             {
@@ -2480,6 +2485,7 @@ namespace SnowmeetApi.Controllers
                     p.staffMember = msaL[0].member;
                 }
             }
+            /*
             Mi7OrderController _mi7Helper = new Mi7OrderController(_db, _oriConfig, _httpContextAccessor);
             for (int i = 0; rentOrder.rewards != null && i < rentOrder.rewards.Count; i++)
             {
@@ -2490,6 +2496,7 @@ namespace SnowmeetApi.Controllers
                 }
 
             }
+            */
             var ret = Ok(rentOrder);
             return ret;
         }
