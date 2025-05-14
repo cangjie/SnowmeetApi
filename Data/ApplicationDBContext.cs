@@ -71,6 +71,7 @@ namespace SnowmeetApi.Data
             modelBuilder.Entity<RentPackageCategory>().HasKey(e => new {e.package_id, e.category_id});
             modelBuilder.Entity<RentProductDetailInfo>().HasKey(i => new {i.field_id, i.product_id});
             modelBuilder.Entity<RentProductDetailInfo>().HasKey(i => new {i.product_id, i.field_id});
+            modelBuilder.Entity<GuarantyPayment>().HasKey(g => new {g.guaranty_id, g.payment_id});
         }
         public DbSet<MaintainLive> MaintainLives {get; set;}
         public DbSet<Models.Users.MToken> MTokens { get; set; }
@@ -202,5 +203,7 @@ namespace SnowmeetApi.Data
         public DbSet<SnowmeetApi.Models.Rental> rental {get; set;}
         public DbSet<SnowmeetApi.Models.RentalDetail> rentalDetail {get; set;}
         public DbSet<SnowmeetApi.Models.RentItem> rentItem {get; set; }
+        public DbSet<SnowmeetApi.Models.Guaranty> guaranty {get; set;}
+        public DbSet<SnowmeetApi.Models.GuarantyPayment> guarantyPayment {get; set;}
     }
 }

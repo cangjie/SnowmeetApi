@@ -206,7 +206,8 @@ namespace SnowmeetApi.Models
         public List<OrderPayment>? payments { get; set; }
         public List<OrderPaymentRefund>? refunds { get; set; }
         public List<PaymentShare>? shares { get; set; }
-        public List<Discount> discounts {get; set;}
+        public List<Discount> discounts {get; set;} = new List<Discount>();
+        public List<Guaranty> guarantys {get; set;} = new List<Guaranty>();
         [NotMapped]
         public double discountAmount
         {

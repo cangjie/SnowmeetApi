@@ -60,6 +60,7 @@ namespace SnowmeetApi.Models.Rent
         public string? package_code {get; set;} = null;
 
         public DateTime? update_date {get; set;} = null;
+        public DateTime create_date {get; set;}
         [ForeignKey("detail_id")]
         public List<RentOrderDetailLog> log { get; set; } = new List<RentOrderDetailLog>();
 

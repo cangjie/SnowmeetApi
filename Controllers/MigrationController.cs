@@ -41,6 +41,9 @@ namespace SnowmeetApi.Controllers
         [NonAction]
         public RentalList OrgniazeDetails(List<RentOrderDetail> details)
         {
+            ////////
+            /// 明天，考虑日志的导入和多笔支付的导入，超时费，损坏赔偿，以及押金
+            /// ////////////////
             RentalList ret = new RentalList();
             var pList = from p in details group p by p.package_code into g select new { g.Key, Count = g.Count() };
             foreach (var p in pList)
@@ -53,14 +56,14 @@ namespace SnowmeetApi.Controllers
                     try
                     {
                         var subList = details.Where(d => d.package_code != null && d.package_code.Trim().Equals(pCode.Trim())).ToList();
-                        if (subList!=null)
+                        if (subList != null)
                         {
                             package.details = subList;
                         }
                         //package.details = subList != null ? subList : package.details;
                         foreach (RentOrderDetail d in package.details)
                         {
-                            if (d.unit_rental > 0)
+                            if (d.rent_item_class.IndexOf("板") >= 0)
                             {
                                 package.mainItem = d;
                             }
@@ -90,7 +93,9 @@ namespace SnowmeetApi.Controllers
             */
 
 
-            List<RentOrder> rentIdList = await _db.RentOrder.AsNoTracking().OrderByDescending(r => r.id).ToListAsync();
+            List<RentOrder> rentIdList = await _db.RentOrder
+            //.Where(r => r.id == 10135)
+            .AsNoTracking().OrderByDescending(r => r.id).ToListAsync();
 
             //string sessionKey = "KB2ziprfR0VIPCtXsYWO6w==";
             Console.WriteLine(rentIdList.Count.ToString());
@@ -103,10 +108,7 @@ namespace SnowmeetApi.Controllers
                 {
                     continue;
                 }
-                if (rentOrder.details.Count <= 1 || rentOrder.rentalDetails.Count <= rentOrder.details.Count)
-                {
-                    continue;
-                }
+
                 SnowmeetApi.Models.Order order = new SnowmeetApi.Models.Order();
                 order.code = await CreateRentTextOrderCode(rentOrder);
                 Console.WriteLine(i.ToString() + "\t: " + order.code.Trim());
@@ -124,26 +126,27 @@ namespace SnowmeetApi.Controllers
                 {
                     order.staff_id = staff.id;
                 }
+                order.memo = rentOrder.memo.Trim();
                 List<MemberSocialAccount> msaL = await _db.memberSocialAccount.Where(m => m.num.Trim().Equals(rentOrder.open_id.Trim()) && m.valid == 1)
                     .OrderByDescending(m => m.id).AsNoTracking().ToListAsync();
                 if (msaL.Count > 0)
                 {
                     order.member_id = msaL[0].member_id;
                 }
-                string memo = (rentOrder.order == null? "" : rentOrder.order.memo) + " " + rentOrder.memo.Trim();
+                string memo = (rentOrder.order == null ? "" : rentOrder.order.memo) + " " + rentOrder.memo.Trim();
                 RentalList rentalList = OrgniazeDetails(rentOrder.details);
                 List<Rental> rentalObjList = new List<Rental>();
-                for(int j = 0; j < rentalList.packages.Count; j++)
+                for (int j = 0; j < rentalList.packages.Count; j++)
                 {
-                   
+
                     Rental r = new Rental()
                     {
                         order_id = order.id,
                         package_id = 0,
-                        name = "【" + rentalList.packages[j].mainItem.rent_item_class + "】" 
-                            +  rentalList.packages[j].mainItem.rent_item_name 
+                        name = "【" + rentalList.packages[j].mainItem.rent_item_class + "】"
+                            + rentalList.packages[j].mainItem.rent_item_name
                             + "(" + rentalList.packages[j].mainItem.rent_item_code + ")",
-                        
+
                         valid = 1,
                         settled = 1,
                         hide = rentOrder.hide,
@@ -152,45 +155,331 @@ namespace SnowmeetApi.Controllers
                         end_date = rentalList.packages[j].mainItem.real_end_date
                     };
                     double totalGuaranty = 0;
-                    for(int k = 0; k < rentalList.packages[j].details.Count; k++)
+                    for (int k = 0; k < rentalList.packages[j].details.Count; k++)
                     {
                         RentOrderDetail dtl = rentalList.packages[j].details[k];
                         totalGuaranty += dtl.deposit;
-                        
                         Models.RentItem item = new Models.RentItem()
                         {
                             id = dtl.id,
                             rental_id = r.id,
-                            pick_time = dtl.pick_date == null? dtl.start_date: dtl.pick_date,
-                            return_time = dtl.return_date == null? dtl.real_end_date: dtl.return_date,
+                            pick_time = dtl.pick_date == null ? dtl.start_date : dtl.pick_date,
+                            return_time = dtl.return_date == null ? dtl.real_end_date : dtl.return_date,
                             name = rentalList.packages[j].details[k].rent_item_name,
-                            code =  rentalList.packages[j].details[k].rent_item_code,
+                            code = rentalList.packages[j].details[k].rent_item_code,
                             memo = rentalList.packages[j].details[k].memo,
-                            create_date = DateTime.Now
+                            create_date = rentalList.packages[j].details[k].create_date
 
                         };
                         r.rentItems.Add(item);
-                    }
-                    r.guaranty_amount = totalGuaranty;
-                    for(int k = 0; k < rentOrder.rentalDetails.Count; k++)
-                    {
-                        for(int l = 0; l < r.rentItems.Count; l++)
+                        if (dtl.overtime_charge > 0)
                         {
-                            List<Models.Rent.RentalDetail> oriRentalList = rentOrder
-                                .rentalDetails.Where(orr => orr.item.id == r.rentItems[l].id).ToList();
-                            
-                            
+                            SnowmeetApi.Models.RentalDetail rentalDetail = new SnowmeetApi.Models.RentalDetail()
+                            {
+                                id = 0,
+                                rent_item_id = dtl.id,
+                                amount = dtl.overtime_charge,
+                                rental_date = dtl.real_end_date == null ? dtl.create_date.Date : (DateTime)dtl.real_end_date,
+                                charge_type = "超时费",
+                                rental_id = r.id,
+                                valid = 1
+                            };
+                            r.details.Add(rentalDetail);
+                        }
+                        if (dtl.reparation > 0)
+                        {
+                            SnowmeetApi.Models.RentalDetail rentalDetail = new SnowmeetApi.Models.RentalDetail()
+                            {
+                                id = 0,
+                                rent_item_id = dtl.id,
+                                amount = dtl.reparation,
+                                rental_date = dtl.real_end_date == null ? dtl.create_date.Date : (DateTime)dtl.real_end_date,
+                                charge_type = "赔偿费",
+                                rental_id = r.id,
+                                valid = 1
+                            };
+                            r.details.Add(rentalDetail);
                         }
                     }
+                    //r.guaranty_amount = totalGuaranty;
+                    Guaranty guaranty = new Guaranty()
+                    {
+                        id = 0,
+                        biz_type = "租赁",
+                        biz_id = r.id,
+                        sub_biz_type = "套餐押金",
+                        sub_biz_id = rentalList.packages[j].mainItem.id,
+                        amount = totalGuaranty,
+                        valid = 1,
+                        relieve = 1,
+                        create_date = rentOrder.create_date
+                    };
+                    r.guarantyList.Add(guaranty);
+
+                    List<SnowmeetApi.Models.Rent.RentalDetail> oriRentalDetails = rentOrder.rentalDetails
+                        .Where(rd => rd.item.id == rentalList.packages[j].mainItem.id).ToList();
+                    for (int k = 0; k < oriRentalDetails.Count; k++)
+                    {
+                        double rentalAmount = oriRentalDetails[k].rental;
+                        if (k == oriRentalDetails.Count - 1)
+                        {
+                            rentalAmount += (oriRentalDetails[k].item.rental_discount + oriRentalDetails[k].item.rental_ticket_discount);
+                            if (oriRentalDetails[k].item.rental_discount > 0)
+                            {
+                                Discount discount = new Discount()
+                                {
+                                    order_id = order.id,
+                                    amount = oriRentalDetails[k].item.rental_discount,
+                                    biz_type = "租赁",
+                                    sub_biz_type = "租赁项",
+                                    sub_biz_id = oriRentalDetails[k].item.id,
+                                    valid = 1
+                                };
+                                order.discounts.Add(discount);
+                            }
+                            if (oriRentalDetails[k].item.rental_ticket_discount > 0)
+                            {
+                                Discount discount = new Discount()
+                                {
+                                    order_id = order.id,
+                                    amount = oriRentalDetails[k].item.rental_discount,
+                                    biz_type = "租赁",
+                                    sub_biz_type = "租赁项",
+                                    sub_biz_id = oriRentalDetails[k].item.id,
+                                    ticket_code = "",
+                                    valid = 1
+                                };
+                                order.discounts.Add(discount);
+                            }
+
+                        }
+                        SnowmeetApi.Models.RentalDetail dtl = new Models.RentalDetail()
+                        {
+                            id = 0,
+                            rental_id = r.id,
+                            rent_item_id = oriRentalDetails[k].item.id,
+                            rental_date = oriRentalDetails[k].date,
+                            charge_type = "租金",
+                            amount = rentalAmount,
+                            valid = 1
+                        };
+                        r.details.Add(dtl);
+                    }
                     order.rentals.Add(r);
-                    
-                }
-                for(int j = 0; j < rentalList.details.Count; j++)
-                {
 
                 }
-                
-               
+                for (int j = 0; j < rentalList.details.Count; j++)
+                {
+                    Rental r = new Rental()
+                    {
+                        order_id = order.id,
+                        package_id = 0,
+                        name = "【" + rentalList.details[j].rent_item_class + "】"
+                            + rentalList.details[j].rent_item_name
+                            + "(" + rentalList.details[j].rent_item_code + ")",
+
+                        valid = 1,
+                        settled = 1,
+                        hide = rentOrder.hide,
+                        memo = rentOrder.memo,
+                        start_date = rentalList.details[j].start_date,
+                        end_date = rentalList.details[j].real_end_date
+                    };
+                    if (rentalList.details[j].overtime_charge > 0)
+                    {
+                        SnowmeetApi.Models.RentalDetail rentalDetail = new SnowmeetApi.Models.RentalDetail()
+                        {
+                            id = 0,
+                            rent_item_id = rentalList.details[j].id,
+                            amount = rentalList.details[j].overtime_charge,
+                            rental_date = rentalList.details[j].real_end_date == null ? rentalList.details[j].create_date.Date : (DateTime)rentalList.details[j].real_end_date,
+                            charge_type = "超时费",
+                            rental_id = r.id,
+                            valid = 1
+                        };
+                        r.details.Add(rentalDetail);
+                    }
+                    if (rentalList.details[j].reparation > 0)
+                    {
+                        SnowmeetApi.Models.RentalDetail rentalDetail = new SnowmeetApi.Models.RentalDetail()
+                        {
+                            id = 0,
+                            rent_item_id = rentalList.details[j].id,
+                            amount = rentalList.details[j].reparation,
+                            rental_date = rentalList.details[j].real_end_date == null ? rentalList.details[j].create_date.Date : (DateTime)rentalList.details[j].real_end_date,
+                            charge_type = "赔偿金",
+                            rental_id = r.id,
+                            valid = 1
+                        };
+                        r.details.Add(rentalDetail);
+                    }
+                    Guaranty guaranty = new Guaranty()
+                    {
+                        id = 0,
+                        biz_type = "租赁",
+                        biz_id = r.id,
+                        sub_biz_type = "单品押金",
+                        sub_biz_id = rentalList.details[j].id,
+                        amount = rentalList.details[j].deposit,
+                        valid = 1,
+                        relieve = 1,
+                        create_date = rentOrder.create_date
+                    };
+                    r.guarantyList.Add(guaranty);
+                    Models.RentItem item = new Models.RentItem()
+                    {
+                        id = rentalList.details[j].id,
+                        rental_id = r.id,
+                        pick_time = rentalList.details[j].pick_date == null ? rentalList.details[j].start_date : rentalList.details[j].pick_date,
+                        return_time = rentalList.details[j].return_date == null ? rentalList.details[j].real_end_date : rentalList.details[j].return_date,
+                        name = rentalList.details[j].rent_item_name,
+                        code = rentalList.details[j].rent_item_code,
+                        memo = rentalList.details[j].memo,
+                        create_date = rentalList.details[j].create_date,
+
+                    };
+                    r.rentItems.Add(item);
+                    List<SnowmeetApi.Models.Rent.RentalDetail> oriRentalDetails = rentOrder.rentalDetails
+                        .Where(rd => rd.item.id == rentalList.details[j].id).ToList();
+                    for (int k = 0; k < oriRentalDetails.Count; k++)
+                    {
+                        double rentalAmount = oriRentalDetails[k].rental;
+                        if (k == oriRentalDetails.Count - 1)
+                        {
+                            rentalAmount += (oriRentalDetails[k].item.rental_discount + oriRentalDetails[k].item.rental_ticket_discount);
+                            if (oriRentalDetails[k].item.rental_discount > 0)
+                            {
+                                Discount discount = new Discount()
+                                {
+                                    order_id = order.id,
+                                    amount = oriRentalDetails[k].item.rental_discount,
+                                    biz_type = "租赁",
+                                    sub_biz_type = "租赁项",
+                                    sub_biz_id = oriRentalDetails[k].item.id,
+                                    valid = 1
+                                };
+                                order.discounts.Add(discount);
+                            }
+                            if (oriRentalDetails[k].item.rental_ticket_discount > 0)
+                            {
+                                Discount discount = new Discount()
+                                {
+                                    order_id = order.id,
+                                    amount = oriRentalDetails[k].item.rental_discount,
+                                    biz_type = "租赁",
+                                    sub_biz_type = "租赁项",
+                                    sub_biz_id = oriRentalDetails[k].item.id,
+                                    ticket_code = "",
+                                    valid = 1
+                                };
+                                order.discounts.Add(discount);
+                            }
+
+                        }
+                        SnowmeetApi.Models.RentalDetail dtl = new Models.RentalDetail()
+                        {
+                            id = 0,
+                            rental_id = r.id,
+                            rent_item_id = oriRentalDetails[k].item.id,
+                            rental_date = oriRentalDetails[k].date,
+                            charge_type = "租金",
+                            amount = rentalAmount,
+                            valid = 1
+                        };
+                        r.details.Add(dtl);
+                    }
+                    order.rentals.Add(r);
+                }
+
+                if (rentOrder.deposit_reduce > 0)
+                {
+                    Guaranty gOrderDiscount = new Guaranty()
+                    {
+                        id = 0,
+                        order_id = order.id,
+                        biz_type = "租赁",
+                        memo = "租赁整单押金减免",
+                        amount = -1 * rentOrder.deposit_reduce,
+                        valid = 1,
+                        relieve = 1,
+                        create_date = rentOrder.create_date
+                    };
+                    order.guarantys.Add(gOrderDiscount);
+                }
+                if (rentOrder.deposit_reduce_ticket > 0)
+                {
+                    Guaranty gOrderDiscount = new Guaranty()
+                    {
+                        id = 0,
+                        order_id = order.id,
+                        biz_type = "租赁",
+                        memo = "租赁整单押金优惠券减免",
+                        amount = -1 * rentOrder.deposit_reduce,
+                        valid = 1,
+                        relieve = 1,
+                        create_date = rentOrder.create_date
+                    };
+                    order.guarantys.Add(gOrderDiscount);
+                }
+                for (int j = 0; j < rentOrder.additionalPayments.Count; j++)
+                {
+                    RentAdditionalPayment addPay = rentOrder.additionalPayments[j];
+                    if (addPay.is_paid != 1)
+                    {
+                        continue;
+                    }
+                    if (addPay.reason.Trim().Equals("追加押金"))
+                    {
+                        Guaranty g = new Guaranty()
+                        {
+                            id = 0,
+                            order_id = order.id,
+                            biz_type = "租赁",
+                            memo = "追加押金",
+                            amount = -1 * addPay.amount,
+                            valid = 1,
+                            relieve = 1,
+                            create_date = rentOrder.create_date
+                        };
+                        order.guarantys.Add(g);
+                    }
+                    if (addPay.order_id == null)
+                    {
+                        continue;
+                    }
+                    List<OrderPayment> payments = await _db.orderPayment
+                        .Where(p => p.status.Equals("支付成功") && p.order_id == addPay.order_id )
+                        .ToListAsync();
+                    for(int k = 0; k < payments.Count; k++)
+                    {
+                        OrderPayment payment = payments[k];
+                        CoreDataModLog log = new CoreDataModLog()
+                        {
+                            id = 0,
+                            table_name = "order_payment",
+                            field_name = "order_id",
+                            key_value = payment.id.ToString(),
+                            scene = "导入老租赁数据，追加支付并入主订单",
+                            prev_value = payment.order_id.ToString(),
+                            current_value = order.id.ToString()
+                        };
+                        //await _db.coreDataModLog.AddAsync(log);
+                        payment.order_id = order.id;
+                        //_db.orderPayment.Entry(payment).State = EntityState.Modified;
+
+                    }
+                    //await _db.SaveChangesAsync();
+
+                }
+                //Console.WriteLine(order.rentals[0].totalRentalAmount.ToString());
+                for (int j = 0; j < rentOrder.details.Count; j++)
+                {
+                    if (rentOrder.details[j].reparation > 0)
+                    {
+                        string aa = "";
+                    }
+                }
+
 
             }
 
