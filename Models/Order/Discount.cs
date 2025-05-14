@@ -1,6 +1,7 @@
 using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using NuGet.Common;
 
 namespace SnowmeetApi.Models
 {
@@ -19,7 +20,8 @@ namespace SnowmeetApi.Models
         public int? staff_id {get; set;}
         public int? member_id {get; set;}
         public int valid {get; set;}
-        public DateTime create_date {get; set;}
+        public DateTime? update_date {get; set;}
+        public DateTime create_date {get; set;} = DateTime.Now;
         [ForeignKey("order_id")]
         public SnowmeetApi.Models.Order? order {get; set;} = null;
     }

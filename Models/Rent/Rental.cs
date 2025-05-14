@@ -12,7 +12,7 @@ namespace SnowmeetApi.Models
         public int id { get; set; }
         public int? order_id { get; set; }
         public int? package_id { get; set; }
-        public int? categroy_id { get; set; }
+        public int? category_id { get; set; }
         public string? name { get; set; }
         public DateTime? start_date { get; set; }
         public DateTime? end_date { get; set; }
@@ -25,7 +25,7 @@ namespace SnowmeetApi.Models
         public int changed { get; set; }
         public int current_avaliable { get; set; }
         public DateTime? update_date { get; set; }
-        public DateTime create_date { get; set; }
+        public DateTime create_date { get; set; } = DateTime.Now;
         public List<RentItem> rentItems { get; set; } = new List<RentItem>();
         public List<RentalDetail> details { get; set; } = new List<RentalDetail>();
         [ForeignKey("order_id")]
@@ -57,11 +57,11 @@ namespace SnowmeetApi.Models
         public DateTime rental_date { get; set; }
         public int? rent_price_id { get; set; }
         public double amount { get; set; }
-        public string memo { get; set; }
+        public string memo { get; set; } = "";
         public int? staff_id { get; set; }
         public int valid { get; set; }
         public DateTime? update_date { get; set; }
-        public DateTime create_date { get; set; }
+        public DateTime create_date { get; set; } = DateTime.Now;
         [ForeignKey("rental_id")]
         public Rental rental { get; set; }
     }
@@ -80,7 +80,7 @@ namespace SnowmeetApi.Models
         public int? prev_id { get; set; }
         public string memo { get; set; }
         public DateTime? update_date { get; set; }
-        public DateTime create_date { get; set; }
+        public DateTime create_date { get; set; } = DateTime.Now;
         [ForeignKey("rental_id")]
         public Rental rental { get; set; }
     }

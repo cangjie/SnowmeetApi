@@ -110,7 +110,16 @@ namespace SnowmeetApi.Controllers
                 }
 
                 SnowmeetApi.Models.Order order = new SnowmeetApi.Models.Order();
+                if (rentOrder.order_id != null)
+                {
+                    order.id = rentOrder.id;
+                }
+                else
+                {
+                    order.id = (await _db.order.MaxAsync(o => o.id))+1;
+                }
                 order.code = await CreateRentTextOrderCode(rentOrder);
+                order.shop = rentOrder.shop.Trim();
                 Console.WriteLine(i.ToString() + "\t: " + order.code.Trim());
                 order.type = "租赁";
                 if (rentOrder.order == null)
@@ -261,7 +270,8 @@ namespace SnowmeetApi.Controllers
                             rental_date = oriRentalDetails[k].date,
                             charge_type = "租金",
                             amount = rentalAmount,
-                            valid = 1
+                            valid = 1,
+                            memo = ""
                         };
                         r.details.Add(dtl);
                     }
@@ -384,7 +394,8 @@ namespace SnowmeetApi.Controllers
                             rental_date = oriRentalDetails[k].date,
                             charge_type = "租金",
                             amount = rentalAmount,
-                            valid = 1
+                            valid = 1,
+                            memo = ""
                         };
                         r.details.Add(dtl);
                     }
@@ -463,24 +474,16 @@ namespace SnowmeetApi.Controllers
                             prev_value = payment.order_id.ToString(),
                             current_value = order.id.ToString()
                         };
-                        //await _db.coreDataModLog.AddAsync(log);
+                        await _db.coreDataModLog.AddAsync(log);
                         payment.order_id = order.id;
-                        //_db.orderPayment.Entry(payment).State = EntityState.Modified;
+                        _db.orderPayment.Entry(payment).State = EntityState.Modified;
 
                     }
                     //await _db.SaveChangesAsync();
 
                 }
-                //Console.WriteLine(order.rentals[0].totalRentalAmount.ToString());
-                for (int j = 0; j < rentOrder.details.Count; j++)
-                {
-                    if (rentOrder.details[j].reparation > 0)
-                    {
-                        string aa = "";
-                    }
-                }
-
-
+                await _db.order.AddAsync(order);
+                await _db.SaveChangesAsync();
             }
 
 
