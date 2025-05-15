@@ -405,6 +405,42 @@ namespace SnowmeetApi.Models
                 
             }
         }
+        [NotMapped]
+        public string? rentalStatus
+        {
+            get
+            {
+                //已付押金 未支付 已关闭 全部归还 已退款  已完成 免押金
+                string? s = null;
+                if (rentals == null && rentals.Count <= 0)
+                {
+                    return null;
+                }
+                bool allSettled = true;
+                for(int i = 0; i < rentals.Count; i++)
+                {
+                    if (rentals[i].settled == 0)
+                    {
+                        allSettled = false;
+                        break;
+                    }
+                }
+                if (allSettled)
+                {
+                    return "已完成";
+                }
+                if(closed == 1)
+                {
+                    return "已关闭";
+                }
+                if (pay_option.Trim().Equals("招待"))
+                {
+                    return "免押金";
+                }
 
+
+                return s;
+            }
+        }
     }
 }

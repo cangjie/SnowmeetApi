@@ -505,7 +505,23 @@ namespace SnowmeetApi.Controllers
                     .AsNoTracking().ToListAsync();
                 if (dupOrderList.Count == 0)
                 {
-                    await _db.SaveChangesAsync();
+                    try
+                    {
+                        await _db.SaveChangesAsync();
+                    }
+                    catch
+                    {
+                        System.Threading.Thread.Sleep(10000);
+                        try
+                        {
+                            await _db.SaveChangesAsync();
+                        }
+                        catch
+                        {
+                            System.Threading.Thread.Sleep(10000);
+                            await _db.SaveChangesAsync();
+                        }
+                    }
                 }
             }
         }
