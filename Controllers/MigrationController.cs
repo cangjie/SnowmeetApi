@@ -68,6 +68,21 @@ namespace SnowmeetApi.Controllers
                                 package.mainItem = d;
                             }
                         }
+                        if (package.mainItem==null)
+                        {
+                            for(int i = 0; i < details.Count; i++)
+                            {
+                                if (details[i].unit_rental > 0)
+                                {
+                                    package.mainItem = details[i];
+                                    break;
+                                }
+                            }
+                        }
+                        if (package.mainItem == null)
+                        {
+                            package.mainItem = details[0];
+                        }
                         ret.packages.Add(package);
                     }
                     catch (Exception err)
@@ -77,6 +92,7 @@ namespace SnowmeetApi.Controllers
                 }
             }
             ret.details = details.Where(d => d.package_code == null).ToList();
+           
             return ret;
         }
         [HttpGet]
@@ -94,7 +110,7 @@ namespace SnowmeetApi.Controllers
 
 
             List<RentOrder> rentIdList = await _db.RentOrder
-            //.Where(r => r.id == 10135)
+            //.Where(r => r.id == 4562)
             .AsNoTracking().OrderByDescending(r => r.id).ToListAsync();
 
             //string sessionKey = "KB2ziprfR0VIPCtXsYWO6w==";
@@ -112,7 +128,7 @@ namespace SnowmeetApi.Controllers
                 SnowmeetApi.Models.Order order = new SnowmeetApi.Models.Order();
                 if (rentOrder.order_id != null)
                 {
-                    order.id = rentOrder.id;
+                    order.id = (int)rentOrder.order_id;
                 }
                 else
                 {
@@ -483,10 +499,14 @@ namespace SnowmeetApi.Controllers
 
                 }
                 await _db.order.AddAsync(order);
-                await _db.SaveChangesAsync();
+                List<SnowmeetApi.Models.Order> dupOrderList = await _db.order
+                    .Where(o => o.code.Trim().Equals(order.code.Trim()))
+                    .AsNoTracking().ToListAsync();
+                if (dupOrderList.Count == 0)
+                {
+                    await _db.SaveChangesAsync();
+                }
             }
-
-
         }
         [NonAction]
         public async Task<string> CreateRentTextOrderCode(RentOrder rentOrder)
@@ -502,6 +522,10 @@ namespace SnowmeetApi.Controllers
                 if (rentOrder.shop.Trim().Equals("万龙"))
                 {
                     shopCode = "WL";
+                }
+                else
+                {
+                    shopCode = "QJ";
                 }
                 //return "";
             }
@@ -525,6 +549,10 @@ namespace SnowmeetApi.Controllers
                 if (order.shop.Trim().Equals("万龙"))
                 {
                     shopCode = "WL";
+                }
+                else
+                {
+                    shopCode = "QJ";
                 }
                 //return "";
             }

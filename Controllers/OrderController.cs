@@ -76,15 +76,19 @@ namespace SnowmeetApi.Controllers
             List<SnowmeetApi.Models.Order> orderList = await _db.order
                 .Include(o => o.retails)
                 .Include(o => o.cares).ThenInclude(c => c.tasks.OrderBy(t => t.id))
+                .Include(o => o.rentals).ThenInclude(r => r.details)
+                .Include(o => o.rentals).ThenInclude(r => r.rentItems)
                 .Include(o => o.payments).ThenInclude(p => p.staff)
                 .Include(o => o.payments).ThenInclude(o => o.refunds)
                 .Include(o => o.discounts)
+                .Include(o => o.guarantys)
                 .Include(o => o.staff)
                 .Include(o => o.member).ThenInclude(m => m.memberSocialAccounts)
                 .Where(o => (o.biz_date.Date >= ((DateTime)startDate).Date && o.biz_date.Date <= ((DateTime)endDate).Date)
                     && (memberId == null || o.member_id == memberId) && (staffId == null || o.staff_id == staffId)
                     && (payOption == null ||  o.pay_option.Trim().Equals(payOption.Trim()))
-                    && (shop == null || o.shop.Trim().Equals(shop.Trim())))
+                    && (shop == null || o.shop.Trim().Equals(shop.Trim()))
+                    && (type == null || o.type.Trim().Equals(type.Trim())))
                 .OrderByDescending(o => o.id).AsNoTracking().ToListAsync();
             return orderList;
         }
