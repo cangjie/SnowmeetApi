@@ -126,7 +126,7 @@ namespace SnowmeetApi.Controllers
                 }
 
                 SnowmeetApi.Models.Order order = new SnowmeetApi.Models.Order();
-                if (rentOrder.order_id != null)
+                if (rentOrder.order_id != null && rentOrder.order_id != 0)
                 {
                     order.id = (int)rentOrder.order_id;
                 }
@@ -134,6 +134,7 @@ namespace SnowmeetApi.Controllers
                 {
                     order.id = (await _db.order.MaxAsync(o => o.id))+1;
                 }
+                order.biz_date = rentOrder.create_date;
                 order.code = await CreateRentTextOrderCode(rentOrder);
                 order.shop = rentOrder.shop.Trim();
                 Console.WriteLine(i.ToString() + "\t: " + order.code.Trim());
