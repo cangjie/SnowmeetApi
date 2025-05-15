@@ -209,6 +209,24 @@ namespace SnowmeetApi.Models
         public List<Discount> discounts {get; set;} = new List<Discount>();
         public List<Guaranty> guarantys {get; set;} = new List<Guaranty>();
         [NotMapped]
+        public List<Guaranty> paidGuarantys
+        {
+            get
+            {
+                
+                List<Guaranty> paidGuarantys = new List<Guaranty>();
+                for(int i = 0; i < guarantys.Count; i++)
+                {
+                    Guaranty g = guarantys[i];
+                    if (g.payStatus.Trim().Equals("支付完成"))
+                    {
+                        paidGuarantys.Add(g);
+                    }
+                }
+                return paidGuarantys;
+            }
+        }
+        [NotMapped]
         public double discountAmount
         {
             get
@@ -433,13 +451,96 @@ namespace SnowmeetApi.Models
                 {
                     return "已关闭";
                 }
+
                 if (pay_option.Trim().Equals("招待"))
                 {
-                    return "免押金";
+                    s = "免押金";
                 }
-
+                bool unPaid = true;
+                foreach(Guaranty g in guarantys)
+                {
+                    if (!g.payStatus.Equals("未支付"))
+                    {
+                        unPaid = false;
+                        break;
+                    }
+                }
+                if (unPaid)
+                {
+                    s = "未支付";
+                }
+                else
+                {
+                    s = "已付押金";
+                }
+                bool allReturned = true;
+                foreach(Rental rental in  rentals)
+                {
+                    foreach(RentItem item in rental.rentItems)
+                    {
+                        if (item.return_time == null)
+                        {
+                            allReturned = false;
+                            break;
+                        }
+                    }
+                    if (!allReturned)
+                    {
+                        break;
+                    }
+                }
+                if (allReturned)
+                {
+                    s = "全部归还";
+                }
+               
 
                 return s;
+            }
+        }
+        [NotMapped]
+        public DateTime? rentalLastRefundDate
+        {
+            get
+            {
+                if (rentals == null || rentals.Count == 0)
+                {
+                    return null;
+                }
+               
+                DateTime rDate = DateTime.MinValue;
+                foreach(OrderPayment payment in payments)
+                {
+                    foreach(OrderPaymentRefund refund in payment.refunds)
+                    {
+                        if (refund.state == 1 || !refund.refund_id.Trim().Equals(""))
+                        {
+                            rDate = rDate > refund.create_date ? rDate : refund.create_date;
+                        }
+                    }
+                }
+                
+                if (rDate == DateTime.MinValue)
+                {
+                    return null;
+                }
+                else
+                {
+                    return rDate;
+                }
+            }
+        }
+        [NotMapped]
+        public double guarantyAmount
+        {
+            get
+            {
+                double amount = 0;
+                foreach(Guaranty g in paidGuarantys)
+                {
+                    amount += (double)g.amount;
+                }
+                return amount;
             }
         }
     }
