@@ -464,7 +464,7 @@ namespace SnowmeetApi.Controllers
                             order_id = order.id,
                             biz_type = "租赁",
                             memo = "追加押金",
-                            amount = -1 * addPay.amount,
+                            amount = addPay.amount,
                             valid = 1,
                             relieve = 1,
                             create_date = rentOrder.create_date
