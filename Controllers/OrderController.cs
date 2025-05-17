@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Identity.Client;
 using SnowmeetApi.Data;
 using SnowmeetApi.Models;
 namespace SnowmeetApi.Controllers
@@ -31,16 +32,22 @@ namespace SnowmeetApi.Controllers
             {
                 return null;
             }
-            await _db.order.Entry(order).Collection(o => o.retails).LoadAsync();
-            await _db.order.Entry(order).Collection(o => o.cares).LoadAsync();
-            await _db.order.Entry(order).Collection(o => o.discounts).LoadAsync();
+            order.retails = await _db.order.Entry(order).Collection(o => o.retails).Query().Where(r => r.valid == 1).ToListAsync();
+            order.cares = await _db.order.Entry(order).Collection(o => o.cares).Query().Include(c => c.tasks)
+            .ToListAsync();
+            order.rentals = await _db.order.Entry(order).Collection(o => o.rentals).Query()
+                .Include(r => r.details.Where(d => d.valid == 1))
+                .Include(r => r.rentItems.Where(i => i.valid == 1))
+                .Include(r => r.guarantyList.Where(g => g.valid == 1)).ThenInclude(g => g.guarantyPayments).ThenInclude(g => g.payment)
+                .ToListAsync();
+            order.discounts = await _db.order.Entry(order).Collection(o => o.discounts).Query().Where(d => d.valid == 1).ToListAsync();
             await _db.order.Entry(order).Reference(o => o.staff).LoadAsync();
             await _db.order.Entry(order).Reference(o => o.member).LoadAsync();
-            order.payments = await _db.orderPayment
+            order.payments = await _db.order.Entry(order).Collection(o => o.payments).Query().Where(p => p.valid == 1)
                 .Include(p => p.member).ThenInclude(m => m.memberSocialAccounts)
                 .Include(p => p.staff)
                 .Include(p => p.refunds).ThenInclude(r => r.member)
-                .Where(p => p.order_id == order.id).ToListAsync();
+                .ToListAsync();
             return order;
         }
         [NonAction]
@@ -74,19 +81,20 @@ namespace SnowmeetApi.Controllers
             startDate = startDate == null ? DateTime.MinValue : startDate;
             endDate = endDate == null ? DateTime.MaxValue : endDate;
             List<SnowmeetApi.Models.Order> orderList = await _db.order
-                .Include(o => o.retails)
-                .Include(o => o.cares).ThenInclude(c => c.tasks.OrderBy(t => t.id))
-                .Include(o => o.rentals).ThenInclude(r => r.details)
-                .Include(o => o.rentals).ThenInclude(r => r.rentItems)
+                .Include(o => o.retails.Where(r => r.valid == 1))
+                .Include(o => o.cares.Where(c => c.valid == 1)).ThenInclude(c => c.tasks.Where(t => t.valid == 1).OrderBy(t => t.id))
+                .Include(o => o.rentals.Where(r => r.valid == 1)).ThenInclude(r => r.details.Where(d => d.valid == 1))
+                .Include(o => o.rentals.Where(r => r.valid == 1)).ThenInclude(r => r.rentItems.Where(r => r.valid == 1))
                 .Include(o => o.payments).ThenInclude(p => p.staff)
                 .Include(o => o.payments).ThenInclude(o => o.refunds)
-                .Include(o => o.discounts)
-                .Include(o => o.guarantys)
+                .Include(o => o.discounts.Where(d => d.valid == 1))
+                .Include(o => o.guarantys.Where(g => g.valid == 1)).ThenInclude(g => g.guarantyPayments).ThenInclude(g => g.payment)
                 .Include(o => o.staff)
                 .Include(o => o.member).ThenInclude(m => m.memberSocialAccounts)
                 .Where(o => (o.biz_date.Date >= ((DateTime)startDate).Date && o.biz_date.Date <= ((DateTime)endDate).Date)
+                    //&& (o.id == 59298)
                     && (memberId == null || o.member_id == memberId) && (staffId == null || o.staff_id == staffId)
-                    && (payOption == null ||  o.pay_option.Trim().Equals(payOption.Trim()))
+                    && (payOption == null || o.pay_option.Trim().Equals(payOption.Trim()))
                     && (shop == null || o.shop.Trim().Equals(shop.Trim()))
                     && (type == null || o.type.Trim().Equals(type.Trim())))
                 .OrderByDescending(o => o.id).AsNoTracking().ToListAsync();
@@ -130,7 +138,7 @@ namespace SnowmeetApi.Controllers
         {
             ApiResult<List<Shop>> shopResult = (ApiResult<List<Shop>>)((OkObjectResult)(await GetShops()).Result).Value;
             string shopCode = "WZ";
-            for(int i = 0; i < shopResult.data.Count; i++)
+            for (int i = 0; i < shopResult.data.Count; i++)
             {
                 if (shopResult.data[i].name.Trim().Equals(order.shop.Trim()))
                 {
@@ -139,7 +147,7 @@ namespace SnowmeetApi.Controllers
                 }
             }
             string bizCode = "";
-            switch(order.type.Trim())
+            switch (order.type.Trim())
             {
                 case "零售":
                     bizCode = "LS";
@@ -168,17 +176,17 @@ namespace SnowmeetApi.Controllers
         public async Task<bool> CheckRetailMi7CodeUnique(SnowmeetApi.Models.Order order)
         {
             bool valid = true;
-            for(int i = 0; order.retails != null && i < order.retails.Count; i++)
+            for (int i = 0; order.retails != null && i < order.retails.Count; i++)
             {
                 Retail retail = order.retails[i];
                 if (retail.mi7_code != null)
                 {
                     List<Retail> retails = await _db.retail.Include(r => r.order)
-                        .Where(r => r.mi7_code.Equals(retail.mi7_code.Trim()) && r.valid == 1 )
+                        .Where(r => r.mi7_code.Equals(retail.mi7_code.Trim()) && r.valid == 1)
                         .AsNoTracking().ToListAsync();
-                    for(int j = 0; j < retails.Count; j++)
+                    for (int j = 0; j < retails.Count; j++)
                     {
-                        
+
                         if ((retails[j].order != null && retails[j].order.valid == 1) || retails[j].order == null)
                         {
                             valid = false;
@@ -195,14 +203,14 @@ namespace SnowmeetApi.Controllers
             order.valid = 0;
             order.update_date = DateTime.Now;
             _db.order.Entry(order).State = EntityState.Modified;
-            for(int i = 0; order.retails != null && i < order.retails.Count; i++)
+            for (int i = 0; order.retails != null && i < order.retails.Count; i++)
             {
                 Retail retail = order.retails[i];
                 retail.valid = 0;
                 retail.update_date = DateTime.Now;
                 _db.retail.Entry(retail).State = EntityState.Modified;
             }
-            for(int i = 0; order.payments != null && i < order.payments.Count; i++)
+            for (int i = 0; order.payments != null && i < order.payments.Count; i++)
             {
                 OrderPayment payment = order.payments[i];
                 payment.valid = 0;
@@ -262,8 +270,8 @@ namespace SnowmeetApi.Controllers
             {
                 if (status.Trim().Equals("支付完成"))
                 {
-                    orders = orders.Where(o => o.paymentStatus.Trim().Equals(status) 
-                        || o.paymentStatus.Trim().Equals("无需支付") ).ToList();
+                    orders = orders.Where(o => o.paymentStatus.Trim().Equals(status)
+                        || o.paymentStatus.Trim().Equals("无需支付")).ToList();
                 }
                 else
                 {
@@ -356,7 +364,7 @@ namespace SnowmeetApi.Controllers
             }
             Retail retail = await GetRetailDetail(detailId);
             LogController _logHelper = new LogController(_db);
-            
+
             if (retail == null)
             {
                 return Ok(new ApiResult<Retail?>()
@@ -398,7 +406,7 @@ namespace SnowmeetApi.Controllers
             });
         }
         [HttpPost]
-        public async Task<ActionResult<ApiResult<SnowmeetApi.Models.Order?>>> PlaceOrder([FromBody] SnowmeetApi.Models.Order order, 
+        public async Task<ActionResult<ApiResult<SnowmeetApi.Models.Order?>>> PlaceOrder([FromBody] SnowmeetApi.Models.Order order,
             [FromQuery] string sessionKey, [FromQuery] string sessionType = "wechat_mini_openid")
         {
             StaffController _staffHelper = new StaffController(_db);
@@ -413,7 +421,7 @@ namespace SnowmeetApi.Controllers
             {
                 order.member_id = member.id;
             }
-            switch(order.type)
+            switch (order.type)
             {
                 case "零售":
                     if (!await CheckRetailMi7CodeUnique(order))
@@ -424,8 +432,8 @@ namespace SnowmeetApi.Controllers
                             message = "七色米订单号重复",
                             data = null
                         };
-                    }     
-                    break; 
+                    }
+                    break;
                 default:
                     break;
             }
@@ -440,7 +448,7 @@ namespace SnowmeetApi.Controllers
             });
         }
         [HttpGet("{orderId}")]
-        public async Task<ActionResult<ApiResult<SnowmeetApi.Models.Order?>>> CancelOrder(int orderId, 
+        public async Task<ActionResult<ApiResult<SnowmeetApi.Models.Order?>>> CancelOrder(int orderId,
             string scene, string sessionKey, string sessionType = "wechat_mini_openid")
         {
             scene = Util.UrlDecode(scene);
@@ -478,14 +486,15 @@ namespace SnowmeetApi.Controllers
         }
         [HttpGet]
         public async Task<ActionResult<ApiResult<List<SnowmeetApi.Models.Order>>>> GetOrdersByStaff(int? orderId,
-            string? shop, string? type, string? subType, DateTime? startDate, DateTime? endDate, string sessionKey, 
+            string? shop, string? type, string? subType, DateTime? startDate, DateTime? endDate, string sessionKey,
             string? payOption, string sessionType = "wechat_mini_openid")
         {
             StaffController _staffHelper = new StaffController(_db);
             Staff staff = await _staffHelper.GetStaffBySessionKey(sessionKey, sessionType);
             if (staff == null)
             {
-                return Ok(new ApiResult<object?>(){
+                return Ok(new ApiResult<object?>()
+                {
                     code = 1,
                     message = "不是管理员",
                     data = null
@@ -493,11 +502,47 @@ namespace SnowmeetApi.Controllers
             }
             List<SnowmeetApi.Models.Order> orders = await GetCommonOrders(orderId, shop, null, null, type, subType, startDate, endDate, payOption);
             SnowmeetApi.Models.Order.RendOrderList(orders);
-            return Ok(new ApiResult<List<SnowmeetApi.Models.Order>>(){
+            return Ok(new ApiResult<List<SnowmeetApi.Models.Order>>()
+            {
                 code = 0,
                 message = "",
                 data = orders
             });
+        }
+        [HttpGet("{orderId}")]
+        public async Task<ActionResult<ApiResult<SnowmeetApi.Models.Order?>>> GetOrderByStaff(int orderId,
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            StaffController _staffHelper = new StaffController(_db);
+            Staff staff = await _staffHelper.GetStaffBySessionKey(sessionKey, sessionType);
+            if (staff == null)
+            {
+                return Ok(new ApiResult<SnowmeetApi.Models.Order>()
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = null
+                });
+            }
+            SnowmeetApi.Models.Order order = await GetOrder(orderId);
+            if (order == null)
+            {
+                return Ok(new ApiResult<SnowmeetApi.Models.Order>()
+                {
+                    code = 1,
+                    message = "没有找到",
+                    data = null
+                });
+            }
+            else
+            { 
+                return Ok(new ApiResult<SnowmeetApi.Models.Order>()
+                {
+                    code = 0,
+                    message = "",
+                    data = order
+                });
+            }
         }
     }
 }

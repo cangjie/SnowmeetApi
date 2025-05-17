@@ -45,6 +45,22 @@ namespace SnowmeetApi.Models
                 return amount;
             }
         }
+        [NotMapped]
+        public bool isPackage
+        {
+            get
+            {
+                if (package_id != null && package_id > 0)
+                {
+                    return true;
+                }
+                if (rentItems.Count > 0)
+                {
+                    return true;
+                }
+                return false;
+            }
+        }
     }
     [Table("rental_detail")]
     public class RentalDetail
@@ -71,6 +87,7 @@ namespace SnowmeetApi.Models
         [Key]
         public int id { get; set; }
         public int rental_id { get; set; }
+        public string class_name { get; set; }
         public DateTime? pick_time { get; set; }
         public DateTime? return_time { get; set; }
         public string? name { get; set; }
@@ -79,6 +96,7 @@ namespace SnowmeetApi.Models
         public int? category_id { get; set; }
         public int? prev_id { get; set; }
         public string memo { get; set; }
+        public int valid { get; set; } = 0;
         public DateTime? update_date { get; set; }
         public DateTime create_date { get; set; } = DateTime.Now;
         [ForeignKey("rental_id")]

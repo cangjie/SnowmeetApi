@@ -45,7 +45,7 @@ namespace SnowmeetApi.Models
                         payStatus = "部分支付";
                     }
                 }
-                if (allPaid)
+                if (allPaid && guarantyPayments != null && guarantyPayments.Count > 0)
                 {
                     return "支付完成";
                 }
