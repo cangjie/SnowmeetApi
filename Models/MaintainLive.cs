@@ -179,7 +179,7 @@ namespace SnowmeetApi.Models
                 List<Maintain.MaintainLog> l = taskLog.Where(l => l.step_name.Trim().Equals(step)).ToList();
                 if (l.Count > 0)
                 {
-                    name = l[0].msa.member.real_name.Trim();
+                    name = (l[0].msa == null)? "" : l[0].msa.member.real_name.Trim();
                 }
             }
             return name.Trim();
