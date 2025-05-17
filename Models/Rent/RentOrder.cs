@@ -473,6 +473,29 @@ namespace SnowmeetApi.Models.Rent
             }
         }
         [NotMapped]
+        public double totalGuarantyAmount
+        {
+            get
+            {
+                double amount = 0;
+                for (int i = 0; i < payments.Count; i++)
+                {
+                    if (!payments[i].pay_method.Trim().Equals("储值支付"))
+                    {
+                        amount += payments[i].amount;
+                    }
+                }
+                for (int i = 0; i < additionalPayments.Count; i++)
+                {
+                    if (additionalPayments[i].reason.IndexOf("押金") >= 0)
+                    {
+                        amount += additionalPayments[i].amount;
+                    }
+                }
+                return amount;
+            }
+        }
+        [NotMapped]
         public List<Models.Order.OrderPaymentRefund> refunds
         {
             get

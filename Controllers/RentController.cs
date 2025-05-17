@@ -1323,6 +1323,7 @@ namespace SnowmeetApi.Controllers
                         .ThenInclude(p => p.refunds.Where(r => r.state == 1))
                 .Include(o => o.details.Where(d => d.valid == 1))
                     .ThenInclude(d => d.log)
+                .Include(o => o.additionalPayments.Where(d => d.is_paid == 1))
                 .Where(o => (o.create_date >= start && o.create_date < end.Date.AddDays(1) && (shop.Trim().Equals("") || o.shop.Trim().Equals(shop))))
                 .OrderByDescending(o => o.id).ToArrayAsync();
 
