@@ -19,218 +19,218 @@ namespace SnowmeetApi.Models
             TimeSpan ts = DateTime.Now - DateTime.Parse("1970-1-1");
             if (oriCare.order_id != newCare.order_id)
             {
-                logs.Add(Util.CreateCoreDataModLog("care", "order_id", oriCare.id.ToString(), oriCare.order_id, newCare.order_id, memberId, staffId, scene, ts.Ticks));
+                logs.Add(Util.CreateCoreDataModLog("care", "order_id", oriCare.id, oriCare.order_id, newCare.order_id, memberId, staffId, scene, ts.Ticks));
                 oriCare.order_id = newCare.order_id;
             }
 
             if (oriCare.biz_type != newCare.biz_type)
             {
-                logs.Add(Util.CreateCoreDataModLog("care", "biz_type", oriCare.id.ToString(), oriCare.biz_type, newCare.biz_type, memberId, staffId, scene, ts.Ticks));
+                logs.Add(Util.CreateCoreDataModLog("care", "biz_type", oriCare.id, oriCare.biz_type, newCare.biz_type, memberId, staffId, scene, ts.Ticks));
                 oriCare.biz_type = newCare.biz_type;
             }
 
             if (oriCare.equipment != newCare.equipment)
             {
-                logs.Add(Util.CreateCoreDataModLog("care", "equipment", oriCare.id.ToString(), oriCare.equipment, newCare.equipment, memberId, staffId, scene, ts.Ticks));
+                logs.Add(Util.CreateCoreDataModLog("care", "equipment", oriCare.id, oriCare.equipment, newCare.equipment, memberId, staffId, scene, ts.Ticks));
                 oriCare.equipment = newCare.equipment;
             }
 
             if (oriCare.brand != newCare.brand)
             {
-                logs.Add(Util.CreateCoreDataModLog("care", "brand", oriCare.id.ToString(), oriCare.brand, newCare.brand, memberId, staffId, scene, ts.Ticks));
+                logs.Add(Util.CreateCoreDataModLog("care", "brand", oriCare.id, oriCare.brand, newCare.brand, memberId, staffId, scene, ts.Ticks));
                 oriCare.brand = newCare.brand;
             }
             if (oriCare.series != newCare.series)
             {
-                logs.Add(Util.CreateCoreDataModLog("care", "series", oriCare.id.ToString(), oriCare.series, newCare.series, memberId, staffId, scene, ts.Ticks));
+                logs.Add(Util.CreateCoreDataModLog("care", "series", oriCare.id, oriCare.series, newCare.series, memberId, staffId, scene, ts.Ticks));
                 oriCare.series = newCare.series;
             }
 
             if (oriCare.scale != newCare.scale)
             {
-                logs.Add(Util.CreateCoreDataModLog("care", "scale", oriCare.id.ToString(), oriCare.scale, newCare.scale, memberId, staffId, scene, ts.Ticks));
+                logs.Add(Util.CreateCoreDataModLog("care", "scale", oriCare.id, oriCare.scale, newCare.scale, memberId, staffId, scene, ts.Ticks));
                 oriCare.scale = newCare.scale;
             }
 
             if (oriCare.year != newCare.year)
             {
-                logs.Add(Util.CreateCoreDataModLog("care", "year", oriCare.id.ToString(), oriCare.year, newCare.year, memberId, staffId, scene, ts.Ticks));
+                logs.Add(Util.CreateCoreDataModLog("care", "year", oriCare.id, oriCare.year, newCare.year, memberId, staffId, scene, ts.Ticks));
                 oriCare.year = newCare.year;
             }
 
             if (oriCare.images != newCare.images)
             {
-                logs.Add(Util.CreateCoreDataModLog("care", "images", oriCare.id.ToString(), oriCare.images, newCare.images, memberId, staffId, scene, ts.Ticks));
+                logs.Add(Util.CreateCoreDataModLog("care", "images", oriCare.id, oriCare.images, newCare.images, memberId, staffId, scene, ts.Ticks));
                 oriCare.images = newCare.images;
             }
 
             if (oriCare.urgent != newCare.urgent)
             {
-                logs.Add(Util.CreateCoreDataModLog("care", "urgent", oriCare.id.ToString(), oriCare.urgent, newCare.urgent, memberId, staffId, scene, ts.Ticks));
+                logs.Add(Util.CreateCoreDataModLog("care", "urgent", oriCare.id, oriCare.urgent, newCare.urgent, memberId, staffId, scene, ts.Ticks));
                 oriCare.urgent = newCare.urgent;
             }
 
             if (oriCare.boot_length != newCare.boot_length)
             {
-                logs.Add(Util.CreateCoreDataModLog("care", "boot_length", oriCare.id.ToString(), oriCare.boot_length, newCare.boot_length, memberId, staffId, scene, ts.Ticks));
+                logs.Add(Util.CreateCoreDataModLog("care", "boot_length", oriCare.id, oriCare.boot_length, newCare.boot_length, memberId, staffId, scene, ts.Ticks));
                 oriCare.boot_length = newCare.boot_length;
             }
 
             if (oriCare.height != newCare.height)
             {
-                logs.Add(Util.CreateCoreDataModLog("care", "height", oriCare.id.ToString(), oriCare.height, newCare.height, memberId, staffId, scene, ts.Ticks));
+                logs.Add(Util.CreateCoreDataModLog("care", "height", oriCare.id, oriCare.height, newCare.height, memberId, staffId, scene, ts.Ticks));
                 oriCare.height = newCare.height;
             }
 
             if (oriCare.weight != newCare.weight)
             {
-                logs.Add(Util.CreateCoreDataModLog("care", "weight", oriCare.id.ToString(), oriCare.weight, newCare.weight, memberId, staffId, scene, ts.Ticks));
+                logs.Add(Util.CreateCoreDataModLog("care", "weight", oriCare.id, oriCare.weight, newCare.weight, memberId, staffId, scene, ts.Ticks));
                 oriCare.weight = newCare.weight;
             }
 
             if (oriCare.gap != newCare.gap)
             {
-                logs.Add(Util.CreateCoreDataModLog("care", "gap", oriCare.id.ToString(), oriCare.gap, newCare.gap, memberId, staffId, scene, ts.Ticks));
+                logs.Add(Util.CreateCoreDataModLog("care", "gap", oriCare.id, oriCare.gap, newCare.gap, memberId, staffId, scene, ts.Ticks));
                 oriCare.gap = newCare.gap;
             }
 
             if (oriCare.board_front != newCare.board_front)
             {
-                logs.Add(Util.CreateCoreDataModLog("care", "board_front", oriCare.id.ToString(), oriCare.board_front, newCare.board_front, memberId, staffId, scene, ts.Ticks));
+                logs.Add(Util.CreateCoreDataModLog("care", "board_front", oriCare.id, oriCare.board_front, newCare.board_front, memberId, staffId, scene, ts.Ticks));
                 oriCare.board_front = newCare.board_front;
             }
 
             if (oriCare.front_din != newCare.front_din)
             {
-                logs.Add(Util.CreateCoreDataModLog("care", "front_din", oriCare.id.ToString(), oriCare.front_din, newCare.front_din, memberId, staffId, scene, ts.Ticks));
+                logs.Add(Util.CreateCoreDataModLog("care", "front_din", oriCare.id, oriCare.front_din, newCare.front_din, memberId, staffId, scene, ts.Ticks));
                 oriCare.front_din = newCare.front_din;
             }
 
             if (oriCare.rear_din != newCare.rear_din)
             {
-                logs.Add(Util.CreateCoreDataModLog("care", "rear_din", oriCare.id.ToString(), oriCare.rear_din, newCare.rear_din, memberId, staffId, scene, ts.Ticks));
+                logs.Add(Util.CreateCoreDataModLog("care", "rear_din", oriCare.id, oriCare.rear_din, newCare.rear_din, memberId, staffId, scene, ts.Ticks));
                 oriCare.rear_din = newCare.rear_din;
             }
 
             if (oriCare.left_angle != newCare.left_angle)
             {
-                logs.Add(Util.CreateCoreDataModLog("care", "left_angle", oriCare.id.ToString(), oriCare.left_angle, newCare.left_angle, memberId, staffId, scene, ts.Ticks));
+                logs.Add(Util.CreateCoreDataModLog("care", "left_angle", oriCare.id, oriCare.left_angle, newCare.left_angle, memberId, staffId, scene, ts.Ticks));
                 oriCare.left_angle = newCare.left_angle;
             }
 
             if (oriCare.right_angle != newCare.right_angle)
             {
-                logs.Add(Util.CreateCoreDataModLog("care", "right_angle", oriCare.id.ToString(), oriCare.right_angle, newCare.right_angle, memberId, staffId, scene, ts.Ticks));
+                logs.Add(Util.CreateCoreDataModLog("care", "right_angle", oriCare.id, oriCare.right_angle, newCare.right_angle, memberId, staffId, scene, ts.Ticks));
                 oriCare.right_angle = newCare.right_angle;
             }
 
             if (oriCare.serials != newCare.serials)
             {
-                logs.Add(Util.CreateCoreDataModLog("care", "serials", oriCare.id.ToString(), oriCare.serials, newCare.serials, memberId, staffId, scene, ts.Ticks));
+                logs.Add(Util.CreateCoreDataModLog("care", "serials", oriCare.id, oriCare.serials, newCare.serials, memberId, staffId, scene, ts.Ticks));
                 oriCare.serials = newCare.serials;
             }
 
             if (oriCare.edge_degree != newCare.edge_degree)
             {
-                logs.Add(Util.CreateCoreDataModLog("care", "edge_degree", oriCare.id.ToString(), oriCare.edge_degree, newCare.edge_degree, memberId, staffId, scene, ts.Ticks));
+                logs.Add(Util.CreateCoreDataModLog("care", "edge_degree", oriCare.id, oriCare.edge_degree, newCare.edge_degree, memberId, staffId, scene, ts.Ticks));
                 oriCare.edge_degree = newCare.edge_degree;
             }
 
             if (oriCare.need_edge != newCare.need_edge)
             {
-                logs.Add(Util.CreateCoreDataModLog("care", "need_edge", oriCare.id.ToString(), oriCare.need_edge, newCare.need_edge, memberId, staffId, scene, ts.Ticks));
+                logs.Add(Util.CreateCoreDataModLog("care", "need_edge", oriCare.id, oriCare.need_edge, newCare.need_edge, memberId, staffId, scene, ts.Ticks));
                 oriCare.need_edge = newCare.need_edge;
             }
 
             if (oriCare.need_vax != newCare.need_vax)
             {
-                logs.Add(Util.CreateCoreDataModLog("care", "need_vax", oriCare.id.ToString(), oriCare.need_vax, newCare.need_vax, memberId, staffId, scene, ts.Ticks));
+                logs.Add(Util.CreateCoreDataModLog("care", "need_vax", oriCare.id, oriCare.need_vax, newCare.need_vax, memberId, staffId, scene, ts.Ticks));
                 oriCare.need_vax = newCare.need_vax;
             }
 
             if (oriCare.need_unvax != newCare.need_unvax)
             {
-                logs.Add(Util.CreateCoreDataModLog("care", "need_unvax", oriCare.id.ToString(), oriCare.need_unvax, newCare.need_unvax, memberId, staffId, scene, ts.Ticks));
+                logs.Add(Util.CreateCoreDataModLog("care", "need_unvax", oriCare.id, oriCare.need_unvax, newCare.need_unvax, memberId, staffId, scene, ts.Ticks));
                 oriCare.need_unvax = newCare.need_unvax;
             }
 
             if (oriCare.need_repair != newCare.need_repair)
             {
-                logs.Add(Util.CreateCoreDataModLog("care", "need_repair", oriCare.id.ToString(), oriCare.need_repair, newCare.need_repair, memberId, staffId, scene, ts.Ticks));
+                logs.Add(Util.CreateCoreDataModLog("care", "need_repair", oriCare.id, oriCare.need_repair, newCare.need_repair, memberId, staffId, scene, ts.Ticks));
                 oriCare.need_repair = newCare.need_repair;
             }
             if (oriCare.repair_memo != newCare.repair_memo)
             {
-                logs.Add(Util.CreateCoreDataModLog("care", "repair_memo", oriCare.id.ToString(), oriCare.repair_memo, newCare.repair_memo, memberId, staffId, scene, ts.Ticks));
+                logs.Add(Util.CreateCoreDataModLog("care", "repair_memo", oriCare.id, oriCare.repair_memo, newCare.repair_memo, memberId, staffId, scene, ts.Ticks));
                 oriCare.repair_memo = newCare.repair_memo;
             }
 
             if (oriCare.repair_charge != newCare.repair_charge)
             {
-                logs.Add(Util.CreateCoreDataModLog("care", "repair_charge", oriCare.id.ToString(), oriCare.repair_charge, newCare.repair_charge, memberId, staffId, scene, ts.Ticks));
+                logs.Add(Util.CreateCoreDataModLog("care", "repair_charge", oriCare.id, oriCare.repair_charge, newCare.repair_charge, memberId, staffId, scene, ts.Ticks));
                 oriCare.repair_charge = newCare.repair_charge;
             }
 
             if (oriCare.common_charge != newCare.common_charge)
             {
-                logs.Add(Util.CreateCoreDataModLog("care", "common_charge", oriCare.id.ToString(), oriCare.common_charge, newCare.common_charge, memberId, staffId, scene, ts.Ticks));
+                logs.Add(Util.CreateCoreDataModLog("care", "common_charge", oriCare.id, oriCare.common_charge, newCare.common_charge, memberId, staffId, scene, ts.Ticks));
                 oriCare.common_charge = newCare.common_charge;
             }
 
             if (oriCare.ticket_code != newCare.ticket_code)
             {
-                logs.Add(Util.CreateCoreDataModLog("care", "ticket_code", oriCare.id.ToString(), oriCare.ticket_code, newCare.ticket_code, memberId, staffId, scene, ts.Ticks));
+                logs.Add(Util.CreateCoreDataModLog("care", "ticket_code", oriCare.id, oriCare.ticket_code, newCare.ticket_code, memberId, staffId, scene, ts.Ticks));
                 oriCare.ticket_code = newCare.ticket_code;
             }
 
             if (oriCare.ticket_discount != newCare.ticket_discount)
             {
-                logs.Add(Util.CreateCoreDataModLog("care", "ticket_discount", oriCare.id.ToString(), oriCare.ticket_discount, newCare.ticket_discount, memberId, staffId, scene, ts.Ticks));
+                logs.Add(Util.CreateCoreDataModLog("care", "ticket_discount", oriCare.id, oriCare.ticket_discount, newCare.ticket_discount, memberId, staffId, scene, ts.Ticks));
                 oriCare.ticket_discount = newCare.ticket_discount;
             }
 
             if (oriCare.discount != newCare.discount)
             {
-                logs.Add(Util.CreateCoreDataModLog("care", "discount", oriCare.id.ToString(), oriCare.discount, newCare.discount, memberId, staffId, scene, ts.Ticks));
+                logs.Add(Util.CreateCoreDataModLog("care", "discount", oriCare.id, oriCare.discount, newCare.discount, memberId, staffId, scene, ts.Ticks));
                 oriCare.discount = newCare.discount;
             }
 
             if (oriCare.finish != newCare.finish)
             {
-                logs.Add(Util.CreateCoreDataModLog("care", "finish", oriCare.id.ToString(), oriCare.finish, newCare.finish, memberId, staffId, scene, ts.Ticks));
+                logs.Add(Util.CreateCoreDataModLog("care", "finish", oriCare.id, oriCare.finish, newCare.finish, memberId, staffId, scene, ts.Ticks));
                 oriCare.finish = newCare.finish;
             }
 
             if (oriCare.member_pick_date != newCare.member_pick_date)
             {
-                logs.Add(Util.CreateCoreDataModLog("care", "member_pick_date", oriCare.id.ToString(), oriCare.member_pick_date, newCare.member_pick_date, memberId, staffId, scene, ts.Ticks));
+                logs.Add(Util.CreateCoreDataModLog("care", "member_pick_date", oriCare.id, oriCare.member_pick_date, newCare.member_pick_date, memberId, staffId, scene, ts.Ticks));
                 oriCare.member_pick_date = newCare.member_pick_date;
             }
 
             if (oriCare.veri_code != newCare.veri_code)
             {
-                logs.Add(Util.CreateCoreDataModLog("care", "veri_code", oriCare.id.ToString(), oriCare.veri_code, newCare.veri_code, memberId, staffId, scene, ts.Ticks));
+                logs.Add(Util.CreateCoreDataModLog("care", "veri_code", oriCare.id, oriCare.veri_code, newCare.veri_code, memberId, staffId, scene, ts.Ticks));
                 oriCare.veri_code = newCare.veri_code;
             }
 
             if (oriCare.veri_code_time != newCare.veri_code_time)
             {
-                logs.Add(Util.CreateCoreDataModLog("care", "veri_code_time", oriCare.id.ToString(), oriCare.veri_code_time, newCare.veri_code_time, memberId, staffId, scene, ts.Ticks));
+                logs.Add(Util.CreateCoreDataModLog("care", "veri_code_time", oriCare.id, oriCare.veri_code_time, newCare.veri_code_time, memberId, staffId, scene, ts.Ticks));
                 oriCare.veri_code_time = newCare.veri_code_time;
             }
             if (oriCare.memo != newCare.memo)
             {
-                logs.Add(Util.CreateCoreDataModLog("care", "memo", oriCare.id.ToString(), oriCare.memo, newCare.memo, memberId, staffId, scene, ts.Ticks));
+                logs.Add(Util.CreateCoreDataModLog("care", "memo", oriCare.id, oriCare.memo, newCare.memo, memberId, staffId, scene, ts.Ticks));
                 oriCare.memo = newCare.memo;
             }
             if (oriCare.task_flow_code != newCare.task_flow_code)
             {
-                logs.Add(Util.CreateCoreDataModLog("care", "task_flow_code", oriCare.id.ToString(), oriCare.task_flow_code, newCare.task_flow_code, memberId, staffId, scene, ts.Ticks));
+                logs.Add(Util.CreateCoreDataModLog("care", "task_flow_code", oriCare.id, oriCare.task_flow_code, newCare.task_flow_code, memberId, staffId, scene, ts.Ticks));
                 oriCare.task_flow_code = newCare.task_flow_code;
             }
             if (oriCare.valid != newCare.valid)
             {
-                logs.Add(Util.CreateCoreDataModLog("care", "valid", oriCare.id.ToString(), oriCare.valid, newCare.valid, memberId, staffId, scene, ts.Ticks));
+                logs.Add(Util.CreateCoreDataModLog("care", "valid", oriCare.id, oriCare.valid, newCare.valid, memberId, staffId, scene, ts.Ticks));
                 oriCare.valid = newCare.valid;
             }
             return logs;

@@ -13,10 +13,10 @@ namespace SnowmeetApi.Controllers
         {
             _db = context;
         }
-        public async Task<List<CoreDataModLog>> GetSimpleLogs(string tableName, string key)
+        public async Task<List<CoreDataModLog>> GetSimpleLogs(string tableName, int key)
         {
             return await _db.coreDataModLog.Include(l => l.staff)
-                .Where(l => l.table_name.Trim().Equals(tableName.Trim()) && l.key_value.Trim().Equals(key.Trim()))
+                .Where(l => l.table_name.Trim().Equals(tableName.Trim()) && l.key_value == key)
                 .OrderByDescending(l => l.trace_id).AsNoTracking().ToListAsync();
         }
     }

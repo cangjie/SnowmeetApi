@@ -11,13 +11,13 @@ namespace SnowmeetApi.Models
         public int id { get; set; }
         public string table_name {get; set;}
         public string? field_name {get; set;}
-        public string key_value {get; set;}
+        public int key_value {get; set;}
         public string scene {get; set;}
         public int? member_id {get; set;}
         public int? staff_id {get; set;}
         public string? prev_value {get; set;}
         public string? current_value {get; set;}
-        public long trace_id {get; set;}
+        public long trace_id { get; set; } = 0;
         public int is_manual {get; set;} = 0;
         public string? manual_memo {get; set;} = null;
         public DateTime create_date {get; set;} = DateTime.Now;

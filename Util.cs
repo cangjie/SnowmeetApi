@@ -380,7 +380,7 @@ namespace SnowmeetApi
             return season;
         }
 
-        public static CoreDataModLog CreateCoreDataModLog(string table, string filed, string key, object? prev, object? curr, int? memberId, int? staffId, string scene, long? traceId = null)
+        public static CoreDataModLog CreateCoreDataModLog(string table, string filed, int key, object? prev, object? curr, int? memberId, int? staffId, string scene, long? traceId = null)
         {
             if (traceId == null)
             {

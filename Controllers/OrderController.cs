@@ -36,9 +36,14 @@ namespace SnowmeetApi.Controllers
             order.cares = await _db.order.Entry(order).Collection(o => o.cares).Query().Include(c => c.tasks)
             .ToListAsync();
             order.rentals = await _db.order.Entry(order).Collection(o => o.rentals).Query()
+                .Include(r => r.discounts.Where(d => d.valid == 1 && d.biz_type.Trim().Equals("租赁")))
                 .Include(r => r.details.Where(d => d.valid == 1))
                 .Include(r => r.rentItems.Where(i => i.valid == 1))
-                .Include(r => r.guarantyList.Where(g => g.valid == 1)).ThenInclude(g => g.guarantyPayments).ThenInclude(g => g.payment)
+                    .ThenInclude(r => r.repairationCharge)
+                .Include(r => r.rentItems.Where(i => i.valid == 1))
+                    .ThenInclude(i => i.logs.Where(l => l.table_name.Trim().Equals("rent_item")).OrderByDescending(o => o.id))
+                        .ThenInclude(l => l.staff)
+                .Include(r => r.guaranties.Where(g => g.valid == 1 && g.biz_type.Trim().Equals("租赁"))).ThenInclude(g => g.guarantyPayments).ThenInclude(g => g.payment)
                 .ToListAsync();
             order.discounts = await _db.order.Entry(order).Collection(o => o.discounts).Query().Where(d => d.valid == 1).ToListAsync();
             await _db.order.Entry(order).Reference(o => o.staff).LoadAsync();
@@ -222,7 +227,7 @@ namespace SnowmeetApi.Controllers
                 id = 0,
                 table_name = "order",
                 field_name = null,
-                key_value = order.id.ToString(),
+                key_value = order.id,
                 scene = scene,
                 member_id = memberId,
                 staff_id = staffId,
@@ -376,7 +381,7 @@ namespace SnowmeetApi.Controllers
             }
             else
             {
-                retail.logs = await _logHelper.GetSimpleLogs("retail", retail.id.ToString());
+                retail.logs = await _logHelper.GetSimpleLogs("retail", retail.id);
                 return Ok(new ApiResult<Retail?>()
                 {
                     code = 0,

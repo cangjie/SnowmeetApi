@@ -52,114 +52,114 @@ namespace SnowmeetApi.Models
             TimeSpan ts = DateTime.Now - DateTime.Parse("1970-1-1");
             if (oriOrder.code != order.code)
             {
-                logs.Add(Util.CreateCoreDataModLog("order", "code", order.id.ToString(), oriOrder.code, order.code, memberId, staffId, scene, ts.Ticks));
+                logs.Add(Util.CreateCoreDataModLog("order", "code", order.id, oriOrder.code, order.code, memberId, staffId, scene, ts.Ticks));
                 oriOrder.code = order.code;
             }
             if (oriOrder.shop != order.shop)
             {
-                logs.Add(Util.CreateCoreDataModLog("order", "shop", order.id.ToString(), oriOrder.shop, order.shop, memberId, staffId, scene, ts.Ticks));
+                logs.Add(Util.CreateCoreDataModLog("order", "shop", order.id, oriOrder.shop, order.shop, memberId, staffId, scene, ts.Ticks));
                 oriOrder.shop = order.shop;
             }
             if (oriOrder.type != order.type)
             {
-                logs.Add(Util.CreateCoreDataModLog("order", "type", order.id.ToString(), oriOrder.type, order.type, memberId, staffId, scene, ts.Ticks));
+                logs.Add(Util.CreateCoreDataModLog("order", "type", order.id, oriOrder.type, order.type, memberId, staffId, scene, ts.Ticks));
                 oriOrder.type = order.type;
             }
             if (oriOrder.sub_type != order.sub_type)
             {
-                logs.Add(Util.CreateCoreDataModLog("order", "sub_type", order.id.ToString(), oriOrder.sub_type, order.sub_type, memberId, staffId, scene, ts.Ticks));
+                logs.Add(Util.CreateCoreDataModLog("order", "sub_type", order.id, oriOrder.sub_type, order.sub_type, memberId, staffId, scene, ts.Ticks));
                 oriOrder.sub_type = order.sub_type;
             }
             if (oriOrder.is_package != order.is_package)
             {
-                logs.Add(Util.CreateCoreDataModLog("order", "is_package", order.id.ToString(), oriOrder.is_package, order.is_package, memberId, staffId, scene, ts.Ticks));
+                logs.Add(Util.CreateCoreDataModLog("order", "is_package", order.id, oriOrder.is_package, order.is_package, memberId, staffId, scene, ts.Ticks));
                 oriOrder.is_package = order.is_package;
             }
             if (oriOrder.pay_option != order.pay_option)
             {
-                logs.Add(Util.CreateCoreDataModLog("order", "pay_option", order.id.ToString(), oriOrder.pay_option, order.pay_option, memberId, staffId, scene, ts.Ticks));
+                logs.Add(Util.CreateCoreDataModLog("order", "pay_option", order.id, oriOrder.pay_option, order.pay_option, memberId, staffId, scene, ts.Ticks));
                 oriOrder.pay_option = order.pay_option;
             }
             if (oriOrder.member_id != order.member_id)
             {
-                logs.Add(Util.CreateCoreDataModLog("order", "member_id", order.id.ToString(), oriOrder.member_id, order.member_id, memberId, staffId, scene, ts.Ticks));
+                logs.Add(Util.CreateCoreDataModLog("order", "member_id", order.id, oriOrder.member_id, order.member_id, memberId, staffId, scene, ts.Ticks));
                 oriOrder.member_id = order.member_id;
             }
             if (oriOrder.name != order.name)
             {
-                logs.Add(Util.CreateCoreDataModLog("order", "name", order.id.ToString(), oriOrder.name, order.name, memberId, staffId, scene, ts.Ticks));
+                logs.Add(Util.CreateCoreDataModLog("order", "name", order.id, oriOrder.name, order.name, memberId, staffId, scene, ts.Ticks));
                 oriOrder.name = order.name;
             }
             if (oriOrder.gender != order.gender)
             {
-                logs.Add(Util.CreateCoreDataModLog("order", "gender", order.id.ToString(), oriOrder.gender, order.gender, memberId, staffId, scene, ts.Ticks));
+                logs.Add(Util.CreateCoreDataModLog("order", "gender", order.id, oriOrder.gender, order.gender, memberId, staffId, scene, ts.Ticks));
                 oriOrder.gender = order.gender;
             }
             if (oriOrder.cell != order.cell)
             {
-                logs.Add(Util.CreateCoreDataModLog("order", "cell", order.id.ToString(), oriOrder.cell, order.cell, memberId, staffId, scene, ts.Ticks));
+                logs.Add(Util.CreateCoreDataModLog("order", "cell", order.id, oriOrder.cell, order.cell, memberId, staffId, scene, ts.Ticks));
                 oriOrder.cell = order.cell;
             }
             if (oriOrder.total_amount != order.total_amount)
             {
-                logs.Add(Util.CreateCoreDataModLog("order", "total_amount", order.id.ToString(), oriOrder.total_amount, order.total_amount, memberId, staffId, scene, ts.Ticks));
+                logs.Add(Util.CreateCoreDataModLog("order", "total_amount", order.id, oriOrder.total_amount, order.total_amount, memberId, staffId, scene, ts.Ticks));
                 oriOrder.total_amount = order.total_amount;
             }
             /*
             if (oriOrder.ticket_code != order.ticket_code)
             {
-                logs.Add(Util.CreateCoreDataModLog("order", "ticket_code", order.id.ToString(), oriOrder.ticket_code, order.ticket_code, memberId, staffId, scene, ts.Ticks));
+                logs.Add(Util.CreateCoreDataModLog("order", "ticket_code", order.id, oriOrder.ticket_code, order.ticket_code, memberId, staffId, scene, ts.Ticks));
                 oriOrder.ticket_code = order.ticket_code;
             }
             if (oriOrder.ticket_discount != order.ticket_discount)
             {
-                logs.Add(Util.CreateCoreDataModLog("order", "ticket_discount", order.id.ToString(), oriOrder.ticket_discount, order.ticket_discount, memberId, staffId, scene, ts.Ticks));
+                logs.Add(Util.CreateCoreDataModLog("order", "ticket_discount", order.id, oriOrder.ticket_discount, order.ticket_discount, memberId, staffId, scene, ts.Ticks));
                 oriOrder.ticket_discount = order.ticket_discount;
             }
             if (oriOrder.discount != order.discount)
             {
-                logs.Add(Util.CreateCoreDataModLog("order", "discount", order.id.ToString(), oriOrder.discount, order.discount, memberId, staffId, scene, ts.Ticks));
+                logs.Add(Util.CreateCoreDataModLog("order", "discount", order.id, oriOrder.discount, order.discount, memberId, staffId, scene, ts.Ticks));
                 oriOrder.discount = order.discount;
             }
             */
             if (oriOrder.memo != order.memo)
             {
-                logs.Add(Util.CreateCoreDataModLog("order", "memo", order.id.ToString(), oriOrder.memo, order.memo, memberId, staffId, scene, ts.Ticks));
+                logs.Add(Util.CreateCoreDataModLog("order", "memo", order.id, oriOrder.memo, order.memo, memberId, staffId, scene, ts.Ticks));
                 oriOrder.memo = order.memo;
             }
             if (oriOrder.biz_date != order.biz_date)
             {
-                logs.Add(Util.CreateCoreDataModLog("order", "biz_date", order.id.ToString(), oriOrder.biz_date, order.biz_date, memberId, staffId, scene, ts.Ticks));
+                logs.Add(Util.CreateCoreDataModLog("order", "biz_date", order.id, oriOrder.biz_date, order.biz_date, memberId, staffId, scene, ts.Ticks));
                 oriOrder.biz_date = order.biz_date;
             }
             if (oriOrder.staff_id != order.staff_id)
             {
-                logs.Add(Util.CreateCoreDataModLog("order", "staff_id", order.id.ToString(), oriOrder.staff_id, order.biz_date, memberId, staffId, scene, ts.Ticks));
+                logs.Add(Util.CreateCoreDataModLog("order", "staff_id", order.id, oriOrder.staff_id, order.biz_date, memberId, staffId, scene, ts.Ticks));
                 oriOrder.staff_id = order.staff_id;
             }
             if (oriOrder.closed != order.closed)
             {
-                logs.Add(Util.CreateCoreDataModLog("order", "closed", order.id.ToString(), oriOrder.closed, order.closed, memberId, staffId, scene, ts.Ticks));
+                logs.Add(Util.CreateCoreDataModLog("order", "closed", order.id, oriOrder.closed, order.closed, memberId, staffId, scene, ts.Ticks));
                 oriOrder.closed = order.closed;
             }
             if (oriOrder.valid != order.valid)
             {
-                logs.Add(Util.CreateCoreDataModLog("order", "valid", order.id.ToString(), oriOrder.valid, order.valid, memberId, staffId, scene, ts.Ticks));
+                logs.Add(Util.CreateCoreDataModLog("order", "valid", order.id, oriOrder.valid, order.valid, memberId, staffId, scene, ts.Ticks));
                 oriOrder.valid = order.valid;
             }
             if (oriOrder.close_date != order.close_date)
             {
-                logs.Add(Util.CreateCoreDataModLog("order", "close_date", order.id.ToString(), oriOrder.close_date, order.close_date, memberId, staffId, scene, ts.Ticks));
+                logs.Add(Util.CreateCoreDataModLog("order", "close_date", order.id, oriOrder.close_date, order.close_date, memberId, staffId, scene, ts.Ticks));
                 oriOrder.close_date = order.close_date;
             }
             if (oriOrder.waiting_for_pay != order.waiting_for_pay)
             {
-                logs.Add(Util.CreateCoreDataModLog("order", "waiting_for_pay", order.id.ToString(), oriOrder.waiting_for_pay, order.waiting_for_pay, memberId, staffId, scene, ts.Ticks));
+                logs.Add(Util.CreateCoreDataModLog("order", "waiting_for_pay", order.id, oriOrder.waiting_for_pay, order.waiting_for_pay, memberId, staffId, scene, ts.Ticks));
                 oriOrder.waiting_for_pay = order.waiting_for_pay;
             }
             if (oriOrder.supplement != order.supplement)
             {
-                logs.Add(Util.CreateCoreDataModLog("order", "supplement", order.id.ToString(), oriOrder.supplement, order.supplement, memberId, staffId, scene, ts.Ticks));
+                logs.Add(Util.CreateCoreDataModLog("order", "supplement", order.id, oriOrder.supplement, order.supplement, memberId, staffId, scene, ts.Ticks));
                 oriOrder.supplement = order.supplement;
             }
             return logs;

@@ -17,32 +17,32 @@ namespace SnowmeetApi.Models
             TimeSpan ts = DateTime.Now - DateTime.Parse("1970-1-1");
             if (ori.order_id != cur.order_id)
             {
-                logs.Add(Util.CreateCoreDataModLog("retail", "order_id", ori.id.ToString(), ori.order_id, cur.order_id, memberId, staffId, scene, ts.Ticks));
+                logs.Add(Util.CreateCoreDataModLog("retail", "order_id", ori.id, ori.order_id, cur.order_id, memberId, staffId, scene, ts.Ticks));
                 ori.order_id = cur.order_id;
             }
             if (ori.mi7_code != cur.mi7_code)
             {
-                logs.Add(Util.CreateCoreDataModLog("retail", "mi7_code", ori.id.ToString(), ori.mi7_code, cur.mi7_code, memberId, staffId, scene, ts.Ticks));
+                logs.Add(Util.CreateCoreDataModLog("retail", "mi7_code", ori.id, ori.mi7_code, cur.mi7_code, memberId, staffId, scene, ts.Ticks));
                 ori.mi7_code = cur.mi7_code;
             }
             if (ori.sale_price != cur.sale_price)
             {
-                logs.Add(Util.CreateCoreDataModLog("retail", "sale_price", ori.id.ToString(), ori.sale_price, cur.sale_price, memberId, staffId, scene, ts.Ticks));
+                logs.Add(Util.CreateCoreDataModLog("retail", "sale_price", ori.id, ori.sale_price, cur.sale_price, memberId, staffId, scene, ts.Ticks));
                 ori.sale_price = cur.sale_price;
             }
             if (ori.deal_price != cur.deal_price)
             {
-                logs.Add(Util.CreateCoreDataModLog("retail", "deal_price", ori.id.ToString(), ori.deal_price, cur.deal_price, memberId, staffId, scene, ts.Ticks));
+                logs.Add(Util.CreateCoreDataModLog("retail", "deal_price", ori.id, ori.deal_price, cur.deal_price, memberId, staffId, scene, ts.Ticks));
                 ori.deal_price = cur.deal_price;
             }
             if (ori.order_type != cur.order_type)
             {
-                logs.Add(Util.CreateCoreDataModLog("retail", "order_type", ori.id.ToString(), ori.order_type, cur.order_type, memberId, staffId, scene, ts.Ticks));
+                logs.Add(Util.CreateCoreDataModLog("retail", "order_type", ori.id, ori.order_type, cur.order_type, memberId, staffId, scene, ts.Ticks));
                 ori.order_type = cur.order_type;
             }
             if (ori.valid != cur.valid)
             {
-                logs.Add(Util.CreateCoreDataModLog("retail", "valid", ori.id.ToString(), ori.valid, cur.valid, memberId, staffId, scene, ts.Ticks));
+                logs.Add(Util.CreateCoreDataModLog("retail", "valid", ori.id, ori.valid, cur.valid, memberId, staffId, scene, ts.Ticks));
                 ori.valid = cur.valid;
             }
             

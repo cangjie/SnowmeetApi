@@ -38,6 +38,84 @@ namespace SnowmeetApi.Controllers
             public List<RentalPackage> packages = new List<RentalPackage>();
             public List<RentOrderDetail> details = new List<RentOrderDetail>();
         }
+        [HttpGet]
+        public async Task UpdatePackageRental()
+        {
+            RentController _rHelper = new RentController(_db, _config, _http);
+            List<int> list = await _db.Database.SqlQueryRaw<int>("select distinct rent_list_id from rent_list_detail where [id] in ( select distinct rent_item_id from rental_detail where amount = 0) order by rent_list_id desc")
+                .ToListAsync();
+            for (int i = 0; i < list.Count; i++)
+            {
+                RentOrder rentOrder = (RentOrder)((OkObjectResult)(await _rHelper.GetRentOrder(list[i], "", false)).Result).Value;
+                Console.WriteLine(i.ToString() + "\t" + rentOrder.id.ToString());
+                foreach (SnowmeetApi.Models.Rent.RentalDetail dtl in rentOrder.rentalDetails)
+                {
+                    if (dtl.rental != 0)
+                    {
+                        int itemId = dtl.item.id;
+                        DateTime rentalDate = dtl.date;
+                        List<SnowmeetApi.Models.RentItem> itemList = await _db.rentItem
+                            .Where(r => r.id == itemId).AsNoTracking().ToListAsync();
+                        int? rentalId = null;
+                        foreach (SnowmeetApi.Models.RentItem item in itemList)
+                        {
+                            rentalId = item.rental_id;
+                            break;
+                        }
+                        if (rentalId == null)
+                        {
+                            continue;
+                        }
+                        List<SnowmeetApi.Models.RentalDetail> dtlList = await _db.rentalDetail
+                            .Where(r => r.rental_id == rentalId && r.rental_date.Date == rentalDate.Date)
+                            .ToListAsync();
+                        for (int j = 0; j < dtlList.Count; j++)
+                        {
+                            SnowmeetApi.Models.RentalDetail d = dtlList[j];
+                            d.amount = dtl.rental;
+                            d.update_date = DateTime.Now;
+                            _db.rentalDetail.Entry(d).State = EntityState.Modified;
+                        }
+
+                    }
+                }
+                await _db.SaveChangesAsync();
+            }
+        }
+        [HttpGet]
+        public async Task MigrateRentItemLog()
+        {
+            StaffController _staffH = new StaffController(_db);
+            List<RentOrderDetailLog> l = await _db.rentOrderDetailLog.ToListAsync();
+            Console.WriteLine("total count" + l.Count.ToString());
+            for (int i = 0; i < l.Count; i++)
+            {
+                RentOrderDetailLog rLog = l[i];
+                Staff staff = await _staffH.GetStaffBySocialNum(rLog.staff_open_id, "wechat_mini_openid", rLog.create_date);
+                CoreDataModLog log = new CoreDataModLog()
+                {
+                    id = 0,
+                    table_name = "rent_item",
+                    key_value = rLog.detail_id,
+                    scene = "租赁物状态改变",
+                    staff_id = staff == null ? null : staff.id,
+                    prev_value = rLog.prev_value,
+                    current_value = rLog.status,
+                    is_manual = 1,
+                    manual_memo = "界面造作"
+                };
+                Console.WriteLine(i.ToString() + "\t" + rLog.id.ToString());
+                await _db.coreDataModLog.AddAsync(log);
+                try
+                {
+                    await _db.SaveChangesAsync();
+                }
+                catch (Exception err)
+                {
+                    Console.WriteLine(err.ToString());
+                }
+            }
+        }
         [NonAction]
         public RentalList OrgniazeDetails(List<RentOrderDetail> details)
         {
@@ -240,7 +318,7 @@ namespace SnowmeetApi.Controllers
                         relieve = 1,
                         create_date = rentOrder.create_date
                     };
-                    r.guarantyList.Add(guaranty);
+                    r.guaranties.Add(guaranty);
 
                     List<SnowmeetApi.Models.Rent.RentalDetail> oriRentalDetails = rentOrder.rentalDetails
                         .Where(rd => rd.item.id == rentalList.packages[j].mainItem.id).ToList();
@@ -352,7 +430,7 @@ namespace SnowmeetApi.Controllers
                         relieve = 1,
                         create_date = rentOrder.create_date
                     };
-                    r.guarantyList.Add(guaranty);
+                    r.guaranties.Add(guaranty);
                     Models.RentItem item = new Models.RentItem()
                     {
                         id = rentalList.details[j].id,
@@ -486,7 +564,7 @@ namespace SnowmeetApi.Controllers
                             id = 0,
                             table_name = "order_payment",
                             field_name = "order_id",
-                            key_value = payment.id.ToString(),
+                            key_value = payment.id,
                             scene = "导入老租赁数据，追加支付并入主订单",
                             prev_value = payment.order_id.ToString(),
                             current_value = order.id.ToString()
