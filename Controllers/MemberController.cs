@@ -26,6 +26,12 @@ namespace SnowmeetApi.Controllers
             _db = db;
             _config = config;
         }
+        [HttpGet]
+        public async Task Test()
+        {
+            await MergeMember(18363, 1486);
+        }
+
         [NonAction]
         public async Task MergeMember(int sourceId, int targetId)
         {
