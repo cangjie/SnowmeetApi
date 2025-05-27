@@ -26,19 +26,128 @@ namespace SnowmeetApi.Controllers
             _db = db;
             _config = config;
         }
-        /*
         [NonAction]
-        public async Task<Member> GetMember(int id)
+        public async Task MergeMember(int sourceId, int targetId)
         {
-            Member member = await _db.member.FindAsync(id);
-            if (member == null)
+            int traceId = (DateTime.Now - DateTime.Parse("1970-01-01")).Milliseconds;
+            Member sourceMember = await _db.member.FindAsync(sourceId);
+            Member targetMember = await _db.member.FindAsync(targetId);
+            await _db.member.Entry(sourceMember).Collection(m => m.memberSocialAccounts).LoadAsync();
+            await _db.member.Entry(targetMember).Collection(m => m.memberSocialAccounts).LoadAsync();
+            sourceMember.is_merge = 1;
+            sourceMember.merge_id = targetId;
+            string? cell = null;
+            for (int i = 0; i < sourceMember.memberSocialAccounts.Count; i++)
             {
-                return null;
+                MemberSocialAccount msa = sourceMember.memberSocialAccounts[i];
+                msa.valid = 0;
+                msa.update_date = DateTime.Now;
+                if (msa.type.Trim().Equals("cell"))
+                {
+                    cell = msa.num.Trim();
+                }
+                _db.memberSocialAccount.Entry(msa).State = EntityState.Modified;
             }
-            await _db.member.Entry(member).Collection(m => m.memberSocialAccounts).LoadAsync();
-            return member;
+            for (int i = 0; i < targetMember.memberSocialAccounts.Count; i++)
+            {
+                MemberSocialAccount msa = targetMember.memberSocialAccounts[i];
+                msa.valid = 1;
+                msa.update_date = DateTime.Now;
+                _db.memberSocialAccount.Entry(msa).State = EntityState.Modified;
+            }
+
+            targetMember.is_merge = 0;
+            targetMember.merge_id = null;
+            _db.member.Entry(sourceMember).State = EntityState.Modified;
+            _db.member.Entry(targetMember).State = EntityState.Modified;
+            CoreDataModLog logMember = new CoreDataModLog()
+            {
+                id = 0,
+                trace_id = traceId,
+                table_name = "member",
+                key_value = sourceId,
+                scene = "用户批量合并",
+                current_value = targetId.ToString(),
+                is_manual = 1,
+                manual_memo = "用户批量合并"
+            };
+            await _db.coreDataModLog.AddAsync(logMember);
+            List<Models.Order> orderList = await _db.order.Where(o => o.member_id == sourceId).ToListAsync();
+            for (int i = 0; i < orderList.Count; i++)
+            {
+                Models.Order order = orderList[i];
+                order.member_id = targetId;
+                order.update_date = DateTime.Now;
+                _db.order.Entry(order).State = EntityState.Modified;
+                CoreDataModLog logOrder = new CoreDataModLog()
+                {
+                    id = 0,
+                    trace_id = traceId,
+                    table_name = "order",
+                    key_value = order.id,
+                    scene = "用户批量合并",
+                    field_name = "member_id",
+                    prev_value = sourceId.ToString(),
+                    current_value = targetId.ToString(),
+                    is_manual = 1,
+                    manual_memo = "订单迁移"
+                };
+                await _db.coreDataModLog.AddAsync(logOrder);
+            }
+            List<DepositAccount> depositList = await _db.depositAccount.Where(d => d.member_id == sourceId).ToListAsync();
+            for (int i = 0; i < depositList.Count; i++)
+            {
+                DepositAccount deposit = depositList[i];
+                deposit.member_id = targetId;
+                deposit.update_date = DateTime.Now;
+                _db.depositAccount.Entry(deposit).State = EntityState.Modified;
+                CoreDataModLog logDeposit = new CoreDataModLog()
+                {
+                    id = 0,
+                    trace_id = traceId,
+                    table_name = "deposit_account",
+                    key_value = deposit.id,
+                    scene = "用户批量合并",
+                    field_name = "member_id",
+                    prev_value = sourceId.ToString(),
+                    current_value = targetId.ToString(),
+                    is_manual = 1,
+                    manual_memo = "充值账户迁移"
+                };
+                await _db.coreDataModLog.AddAsync(logDeposit);
+            }
+            await _db.SaveChangesAsync();
+            if (cell != null && targetMember.memberSocialAccounts.Where(m => m.type.Trim().Equals("cell") && m.num.Trim().Equals(cell.Trim())).ToList().Count == 0)
+            {
+                MemberSocialAccount msaNew = new MemberSocialAccount()
+                {
+                    id = 0,
+                    member_id = targetId,
+                    type = "cell",
+                    num = cell.Trim(),
+                    valid = 1,
+                    memo = "批量合并用户时添加的手机号"
+                };
+                await _db.memberSocialAccount.AddAsync(msaNew);
+                await _db.SaveChangesAsync();
+            }
         }
-        */
+        [NonAction]
+        public async Task<bool> IsEmpty(int memberId, bool needValid)
+        {
+            bool isEmpty = true;
+            List<Models.Order> orderList = await _db.order.Where(m => m.member_id == memberId && ((needValid && m.valid == 1 ) || !needValid) ).AsNoTracking().ToListAsync();
+            List<DepositAccount> depositList = await _db.depositAccount.Where(m => m.member_id == memberId && ((needValid && m.valid == 1 ) || !needValid)  ).AsNoTracking().ToListAsync();
+            if (orderList.Count == 0 && depositList.Count == 0)
+            {
+                isEmpty = true;
+            }
+            else
+            {
+                isEmpty = false;
+            }
+            return isEmpty;
+        }
         [NonAction]
         public async Task<Member> GetMemberBySessionKey(string sessionKey, string sessionType = "wechat_mini_openid")
         {

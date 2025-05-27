@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Aop.Api.Domain;
-namespace SnowmeetApi.Models.Deposit
+namespace SnowmeetApi.Models
 {
     public enum DepositType
     {

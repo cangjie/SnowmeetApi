@@ -39,6 +39,46 @@ namespace SnowmeetApi.Controllers
             public List<RentOrderDetail> details = new List<RentOrderDetail>();
         }
         [HttpGet]
+        public async Task MigrateMember()
+        {
+            MemberController _mHelper = new MemberController(_db, _config);
+            List<Models.Member> ml = await _db.member.Where(m => m.merge_id != null).AsNoTracking().ToListAsync();
+            for (int i = 0; i < ml.Count; i++)
+            {
+                Models.Member m = ml[i];
+                int oldId = m.id;
+                int newId = (int)m.merge_id;
+                bool isOldEmpty = await _mHelper.IsEmpty(oldId, false);
+                bool isNewEmpty = await _mHelper.IsEmpty(newId, false);
+                if (!isOldEmpty && !isNewEmpty)
+                {
+                    isOldEmpty = await _mHelper.IsEmpty(oldId, true);
+                    isNewEmpty = await _mHelper.IsEmpty(newId, true);
+                }
+                if (isOldEmpty && !isNewEmpty)
+                {
+                    Console.WriteLine(i.ToString() + "\t" + oldId.ToString() + "=>" + newId.ToString());
+                    await _mHelper.MergeMember(oldId, newId);
+                }
+                else if (isNewEmpty && !isOldEmpty)
+                {
+                    Console.WriteLine(i.ToString() + "\t" + oldId.ToString() + "<=" + newId.ToString());
+                    await _mHelper.MergeMember(newId, oldId);
+                }
+                else if (!isNewEmpty && !isOldEmpty)
+                {
+                    Console.WriteLine(i.ToString() + "\t" + newId.ToString() + "<=>" + oldId.ToString());
+                    await _mHelper.MergeMember(oldId, newId);
+                }
+                else
+                {
+                    Console.WriteLine(i.ToString() + "\t" + newId.ToString() + "=" + oldId.ToString());
+                    await _mHelper.MergeMember(oldId, newId);
+                }
+                
+            }
+        }
+        [HttpGet]
         public async Task UpdatePackageRental()
         {
             RentController _rHelper = new RentController(_db, _config, _http);

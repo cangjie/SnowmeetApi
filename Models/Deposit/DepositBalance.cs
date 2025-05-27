@@ -1,7 +1,7 @@
 using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-namespace SnowmeetApi.Models.Deposit
+namespace SnowmeetApi.Models
 {
     [Table("deposit_balance")]
     public class DepositBalance
@@ -23,6 +23,6 @@ namespace SnowmeetApi.Models.Deposit
         public DateTime create_date { get; set; }
         [ForeignKey("order_id")]
         public OrderOnline? order {get; set;}
-        public Deposit.DepositAccount depositAccount {get; set;}
+        public DepositAccount depositAccount {get; set;}
     }
 }
