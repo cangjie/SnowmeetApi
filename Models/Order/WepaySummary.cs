@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Humanizer;
-
 namespace SnowmeetApi.Models
 {
 	[Table("wepay_downloaded_summary")]
@@ -22,7 +21,6 @@ namespace SnowmeetApi.Models
         public double total_request_refund_amount { get; set; }
 
     }
-
     public class WepayReport
     {
         public int maxRefundLength { get; set; } = 0;
