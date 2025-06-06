@@ -13,11 +13,12 @@ using System.Net.Http.Headers;
 using System.Net.Http;
 using System.Text;
 using SnowmeetApi.Models;
+using SnowmeetApi.Data;
 namespace SnowmeetApi
 {
     public class Util
     {
-
+        public static ApplicationDBContext? db = null;
 
         public static string workingPath = $"{Environment.CurrentDirectory}";
 
@@ -39,7 +40,7 @@ namespace SnowmeetApi
             {
                 return null;
             }
-            
+
         }
 
         public static long getTime13()
@@ -58,7 +59,7 @@ namespace SnowmeetApi
                 : "¥" + Math.Round(amount, 2).ToString();
         }
 
-       
+
 
         public static string GetRandomCode(int digit)
         {
@@ -102,7 +103,7 @@ namespace SnowmeetApi
             {
                 return "";
             }
-            
+
         }
 
         public static string GetWebContent(string url)
@@ -200,31 +201,9 @@ namespace SnowmeetApi
                     client.DefaultRequestHeaders.Add(headerName, headerValue);
                 }
                 var ret = await client.GetStringAsync(url);
-                return "";
-
-                /*
-                HttpWebRequest req = (HttpWebRequest)WebRequest.Create(url);
-                req.Method = "GET";
-                WebHeaderCollection headsC = req.Headers;
-                for (int i = 0; i < headers.Length; i++)
-                {
-                    string headerName = headers[i].Trim().Split(':')[0].Trim();
-                    string headerValue = headers[i].Trim().Split(':')[1].Trim();
-                    headsC.Add(headerName.Trim(), headerValue);
-                }
-                
-                HttpWebResponse res = (HttpWebResponse)req.GetResponse();
-                Stream s = res.GetResponseStream();
-                StreamReader sr = new StreamReader(s);
-                string str = sr.ReadToEnd();
-                sr.Close();
-                s.Close();
-                res.Close();
-                req.Abort();
-                return str;
-                */
+                return ret;
             }
-            catch(Exception err)
+            catch (Exception err)
             {
                 Console.WriteLine(err.ToString());
                 return "";
@@ -364,13 +343,13 @@ namespace SnowmeetApi
             string season = "【雪季】";
             int year = date.Year;
             int month = date.Month;
-            if (month <=5)
+            if (month <= 5)
             {
-                season = (year-1-2000).ToString() + "-" + (year-2000).ToString() + season;
+                season = (year - 1 - 2000).ToString() + "-" + (year - 2000).ToString() + season;
             }
             else if (month >= 10)
             {
-                season = (year-2000).ToString() + "-" + (year+1-2000).ToString() + season;
+                season = (year - 2000).ToString() + "-" + (year + 1 - 2000).ToString() + season;
             }
             else
             {
@@ -392,14 +371,58 @@ namespace SnowmeetApi
                 table_name = table,
                 field_name = filed,
                 key_value = key,
-                prev_value = prev==null? "null": prev.ToString(),
-                current_value = curr==null? "null": curr.ToString(),
+                prev_value = prev == null ? "null" : prev.ToString(),
+                current_value = curr == null ? "null" : curr.ToString(),
                 member_id = memberId,
                 staff_id = staffId,
                 scene = scene,
                 trace_id = (long)traceId,
                 create_date = DateTime.Now
             };
+        }
+
+        public static string? GetSqlServerConnectionString()
+        {
+            string path = $"{Environment.CurrentDirectory}";
+
+            if (path.StartsWith("/"))
+            {
+                path = path + "/";
+            }
+            else
+            {
+                path = path + "\\";
+            }
+            path = path + "config.sqlServer";
+
+            string? conStr = null;
+
+            using (StreamReader sr = new StreamReader(path, true))
+            {
+                conStr = sr.ReadToEnd().Trim();
+                sr.Close();
+            }
+            return conStr;
+        }
+        public static ApplicationDBContext? GetDbContext()
+        {
+            string conStr = GetSqlServerConnectionString();
+            if (conStr == null)
+            {
+                return null;
+            }
+            DbContextOptionsBuilder<ApplicationDBContext> dbo = new DbContextOptionsBuilder<ApplicationDBContext>();
+            dbo.UseSqlServer(conStr);
+            ApplicationDBContext db = new ApplicationDBContext(dbo.Options);
+            return db;
+        }
+        public static string DealWebSocketMessage(string message)
+        {
+            if (db == null)
+            {
+                db = GetDbContext();
+            }
+            return "OK" + DateTime.Now.Millisecond.ToString();
         }
       
 

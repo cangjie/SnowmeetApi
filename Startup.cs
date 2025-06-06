@@ -21,11 +21,13 @@ using System.Threading;
 //using Microsoft.AspNetCore.Mvc.NewtonsoftJson;
 using Newtonsoft.Json;
 using System.Text.Json.Serialization;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 
 namespace SnowmeetApi
 {
     public class Startup
     {
+        public ApplicationDBContext? _db = null;
         public Startup(IConfiguration configuration)
         {
             Configuration = configuration;
@@ -36,26 +38,8 @@ namespace SnowmeetApi
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
-           
-            string path = $"{Environment.CurrentDirectory}";
 
-            if (path.StartsWith("/"))
-            {
-                path = path + "/";
-            }
-            else
-            {
-                path = path + "\\";
-            }
-            path = path + "config.sqlServer";
-
-            string conStr = "";
-
-            using (StreamReader sr = new StreamReader(path, true))
-            {
-                conStr = sr.ReadToEnd();
-                sr.Close();
-            }
+            string conStr = Util.GetSqlServerConnectionString();
 
 
             services.AddControllers();
@@ -75,12 +59,9 @@ namespace SnowmeetApi
                 options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
             });
         }
-
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
         {
-            
-            
             app.UseStaticFiles();
             app.UseDeveloperExceptionPage();
             app.UseSwagger();
@@ -88,25 +69,19 @@ namespace SnowmeetApi
             {
                 c.SwaggerEndpoint("/swagger/v2/swagger.json", "SnowmeetApi v2");
             });
-
             app.UseRouting();
-
             app.UseAuthorization();
             app.UseEndpoints(endpoints =>
             {
                 endpoints.MapControllers();
             });
-
             app.UseWebSockets();
-            
-
             app.Use(async (context, next) =>
             {
                 if (context.Request.Path == "/ws")
                 {
                     if (context.WebSockets.IsWebSocketRequest)
                     {
-                        
                         using var webSocket = await context.WebSockets.AcceptWebSocketAsync();
                         await Echo(webSocket);
                         Console.WriteLine(webSocket);
@@ -120,28 +95,28 @@ namespace SnowmeetApi
                 {
                     await next(context);
                 }
-
             });
         }
         private static async Task Echo(WebSocket webSocket)
         {
-            var buffer = new byte[1024 * 4];
+            var buffer = new byte[1024 * 1024 * 10];
             var receiveResult = await webSocket.ReceiveAsync(
                 new ArraySegment<byte>(buffer), CancellationToken.None);
-
+            
             while (!receiveResult.CloseStatus.HasValue)
             {
-                System.Threading.Thread.Sleep(5000);
+                string receiveMessage = System.Text.Encoding.UTF8.GetString(buffer).Trim();
+                receiveMessage = receiveMessage.Replace("\0", "");
+                string ret = Util.DealWebSocketMessage(receiveMessage);
+                var retBuff =System.Text.Encoding.UTF8.GetBytes(ret);
                 await webSocket.SendAsync(
-                    new ArraySegment<byte>(buffer, 0, receiveResult.Count),
+                    new ArraySegment<byte>(retBuff, 0, retBuff.Length),
                     receiveResult.MessageType,
                     receiveResult.EndOfMessage,
-                    CancellationToken.None); 
-
+                    CancellationToken.None);
                 receiveResult = await webSocket.ReceiveAsync(
                 new ArraySegment<byte>(buffer), CancellationToken.None);
             }
-
             await webSocket.CloseAsync(
                 receiveResult.CloseStatus.Value,
                 receiveResult.CloseStatusDescription,
