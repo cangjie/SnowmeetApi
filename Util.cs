@@ -14,6 +14,12 @@ using System.Net.Http;
 using System.Text;
 using SnowmeetApi.Models;
 using SnowmeetApi.Data;
+using Newtonsoft.Json;
+using System.Net.WebSockets;
+using System.Configuration.Internal;
+using Microsoft.Extensions.Configuration;
+using Microsoft.AspNetCore.Http;
+using SnowmeetApi.Controllers;
 namespace SnowmeetApi
 {
     public class Util
@@ -416,13 +422,62 @@ namespace SnowmeetApi
             ApplicationDBContext db = new ApplicationDBContext(dbo.Options);
             return db;
         }
-        public static string DealWebSocketMessage(string message)
+        public static async Task<string> DealWebSocketMessage(string message, IConfiguration config, IHttpContextAccessor http)
         {
+            //string[] msgArr = message.Split('')
+            /*
             if (db == null)
             {
                 db = GetDbContext();
             }
-            return "OK" + DateTime.Now.Millisecond.ToString();
+            */
+            ApplicationDBContext db = GetDbContext();
+            try
+            {
+                ApiResult<object> result = new ApiResult<object>()
+                {
+                    code = 1,
+                    message = "无任何结果。",
+                    data = null
+                };
+                WebsocketPost<object> post = JsonConvert.DeserializeObject<WebsocketPost<object>>(message);
+                switch (post.command.ToLower())
+                {
+                    case "queryqrscan":
+                        QrCodeController _qH = new QrCodeController(db, config, http);
+                        ScanQrCode sc = await _qH.QueryScan((int)post.id);
+                        ApiResult<ScanQrCode> realResult = new ApiResult<ScanQrCode>()
+                        {
+                            code = 0,
+                            message = "",
+                            data = sc
+                        };
+                        return JsonConvert.SerializeObject(realResult);
+                    case "stopqueryqrscan":
+                        QrCodeController _qHStop = new QrCodeController(db, config, http);
+                        ScanQrCode scStop = await _qHStop.StopQeryScan((int)post.id);
+                        ApiResult<ScanQrCode> realResultStop = new ApiResult<ScanQrCode>()
+                        {
+                            code = 0,
+                            message = "",
+                            data = scStop
+                        };
+                        return JsonConvert.SerializeObject(realResultStop);
+                    default:
+                        break;
+                }
+                return JsonConvert.SerializeObject(result);
+            }
+            catch (Exception err)
+            {
+                ApiResult<object> result = new ApiResult<object>()
+                {
+                    code = 1,
+                    message = err.ToString(),
+                    data = null
+                };
+                return JsonConvert.SerializeObject(result);
+            }
         }
       
 

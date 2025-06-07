@@ -62,6 +62,8 @@ namespace SnowmeetApi
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
         {
+            IConfiguration config = app.ApplicationServices.GetService<IConfiguration>();
+            IHttpContextAccessor http = app.ApplicationServices.GetService<IHttpContextAccessor>();
             app.UseStaticFiles();
             app.UseDeveloperExceptionPage();
             app.UseSwagger();
@@ -83,7 +85,8 @@ namespace SnowmeetApi
                     if (context.WebSockets.IsWebSocketRequest)
                     {
                         using var webSocket = await context.WebSockets.AcceptWebSocketAsync();
-                        await Echo(webSocket);
+                        
+                        await Echo(webSocket, config, http);
                         Console.WriteLine(webSocket);
                     }
                     else
@@ -97,17 +100,16 @@ namespace SnowmeetApi
                 }
             });
         }
-        private static async Task Echo(WebSocket webSocket)
+        private static async Task Echo(WebSocket webSocket, IConfiguration config, IHttpContextAccessor http)
         {
             var buffer = new byte[1024 * 1024 * 10];
             var receiveResult = await webSocket.ReceiveAsync(
                 new ArraySegment<byte>(buffer), CancellationToken.None);
-            
             while (!receiveResult.CloseStatus.HasValue)
             {
                 string receiveMessage = System.Text.Encoding.UTF8.GetString(buffer).Trim();
                 receiveMessage = receiveMessage.Replace("\0", "");
-                string ret = Util.DealWebSocketMessage(receiveMessage);
+                string ret = await Util.DealWebSocketMessage(receiveMessage, config, http);
                 var retBuff =System.Text.Encoding.UTF8.GetBytes(ret);
                 await webSocket.SendAsync(
                     new ArraySegment<byte>(retBuff, 0, retBuff.Length),

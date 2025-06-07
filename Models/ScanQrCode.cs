@@ -16,9 +16,12 @@ namespace SnowmeetApi.Models
         public string purpose { get; set; }
         public string? scaner_openid { get; set; } = null;
         public string? scaner_unionid { get; set; } = null;
-        public string? scaner_member_id { get; set; } = null;
+        public int? scaner_member_id { get; set; } = null;
         public int scaned { get; set; } = 0;
+        public int stoped { get; set; } = 0;
+        public DateTime? expire_time { get; set; }
         public DateTime? scan_time { get; set; } = null;
+        public DateTime? update_date { get; set; } = null;
         public DateTime create_date { get; set; } = DateTime.Now;
     }
 }
