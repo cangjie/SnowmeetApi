@@ -424,14 +424,10 @@ namespace SnowmeetApi
         }
         public static async Task<string> DealWebSocketMessage(string message, IConfiguration config, IHttpContextAccessor http)
         {
-            //string[] msgArr = message.Split('')
-            /*
             if (db == null)
             {
                 db = GetDbContext();
             }
-            */
-            ApplicationDBContext db = GetDbContext();
             try
             {
                 ApiResult<object> result = new ApiResult<object>()
@@ -453,16 +449,6 @@ namespace SnowmeetApi
                             data = sc
                         };
                         return JsonConvert.SerializeObject(realResult);
-                    case "stopqueryqrscan":
-                        QrCodeController _qHStop = new QrCodeController(db, config, http);
-                        ScanQrCode scStop = await _qHStop.StopQeryScan((int)post.id);
-                        ApiResult<ScanQrCode> realResultStop = new ApiResult<ScanQrCode>()
-                        {
-                            code = 0,
-                            message = "",
-                            data = scStop
-                        };
-                        return JsonConvert.SerializeObject(realResultStop);
                     default:
                         break;
                 }

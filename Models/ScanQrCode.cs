@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
@@ -19,9 +20,20 @@ namespace SnowmeetApi.Models
         public int? scaner_member_id { get; set; } = null;
         public int scaned { get; set; } = 0;
         public int stoped { get; set; } = 0;
+        public string? cell { get; set; } = null;
+        public int authed { get; set; } = 0;
         public DateTime? expire_time { get; set; }
         public DateTime? scan_time { get; set; } = null;
         public DateTime? update_date { get; set; } = null;
         public DateTime create_date { get; set; } = DateTime.Now;
+        public Member? member { get; set; } = null;
+        public class AuthCell
+        {
+            public string cell { get; set; }
+            public DateTime submitTime { get; set; }
+            public Member? member { get; set; }
+            public bool authed { get; set; }
+            public Staff? submitStaff { get; set; }
+        }
     }
 }
