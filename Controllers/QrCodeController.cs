@@ -155,7 +155,7 @@ namespace SnowmeetApi.Controllers
             }
             else if (staff.title_level < 200)
             {
-                
+
                 List<ScanQrCode> cL = await _db.scanQrCode
                     .Where(c => c.cell.Trim().Equals(cell.Trim()) && c.authed == 1 && c.create_date >= DateTime.Now.Date
                         && c.platform.Trim().Equals(sq.platform.Trim()) && c.scene.Trim().Equals(sq.scene.Trim()) && c.purpose.Trim().Equals(sq.purpose.Trim()))
@@ -211,6 +211,7 @@ namespace SnowmeetApi.Controllers
                 Member member = await _mHelper.GetMemberByNum(sq.cell.Trim(), "cell");
                 ScanQrCode.AuthCell item = new ScanQrCode.AuthCell()
                 {
+                    id = sq.id,
                     cell = sq.cell,
                     authed = authed,
                     member = member,
@@ -225,6 +226,34 @@ namespace SnowmeetApi.Controllers
                 code = 0,
                 message = "",
                 data = cellList
+            });
+        }
+        [HttpGet("{id}")]
+        public async Task<ActionResult<ApiResult<ScanQrCode>>> GiveAuth(int id,
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            StaffController _staffHelper = new StaffController(_db);
+            Staff staff = await _staffHelper.GetStaffBySessionKey(sessionKey, sessionType);
+            if (staff.title_level < 200)
+            {
+                return Ok(new ApiResult<object?>()
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = null
+                });
+            }
+            ScanQrCode sq = await _db.scanQrCode.FindAsync(id);
+            sq.authed = 1;
+            sq.auth_staff_id = staff.id;
+            sq.update_date = DateTime.Now;
+            _db.scanQrCode.Entry(sq).State = EntityState.Modified;
+            await _db.SaveChangesAsync();
+            return Ok(new ApiResult<ScanQrCode>()
+            {
+                code = 0,
+                message = "",
+                data = sq
             });
         }
     }

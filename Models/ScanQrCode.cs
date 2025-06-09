@@ -22,13 +22,16 @@ namespace SnowmeetApi.Models
         public int stoped { get; set; } = 0;
         public string? cell { get; set; } = null;
         public int authed { get; set; } = 0;
+        public int? auth_staff_id { get; set; }
         public DateTime? expire_time { get; set; }
         public DateTime? scan_time { get; set; } = null;
         public DateTime? update_date { get; set; } = null;
         public DateTime create_date { get; set; } = DateTime.Now;
+        [NotMapped]
         public Member? member { get; set; } = null;
         public class AuthCell
         {
+            public int id { get; set; }
             public string cell { get; set; }
             public DateTime submitTime { get; set; }
             public Member? member { get; set; }
