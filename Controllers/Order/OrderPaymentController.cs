@@ -97,7 +97,7 @@ namespace SnowmeetApi.Controllers.Order
         }
         */
 
-        
+        /*
         [HttpGet]
         public  async Task<ActionResult<OrderOnline>> SetTenpayPaymentSuccess(string outTradeNumber)
         {
@@ -181,7 +181,7 @@ namespace SnowmeetApi.Controllers.Order
             }
             return order;
         }
-
+*/
         [NonAction]
         public int GetMchId(OrderOnline order)
         {
@@ -768,7 +768,7 @@ namespace SnowmeetApi.Controllers.Order
                         {
 
                         }
-                        await SetTenpayPaymentSuccess(outTradeNumber);
+                        //await SetTenpayPaymentSuccess(outTradeNumber);
 
                         //Console.WriteLine("订单 {0} 已完成支付，交易单号为 {1}", outTradeNumber, transactionId);
                     }

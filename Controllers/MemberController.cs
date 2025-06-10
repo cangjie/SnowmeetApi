@@ -228,31 +228,14 @@ namespace SnowmeetApi.Controllers
                 });
             }
         }
-
-
-
-
-
-
-        /// <summary>
-        /// ///////////////////////will be deleted////////////////////////////////////////////////////////////////////////////
-        /// </summary>
-        /// <param name="sessionKey"></param>
-        /// <param name="sessionType"></param>
-        /// <returns></returns>
         [HttpGet]
         public async Task<ActionResult<Member>> GetMemberInfoSimple(string sessionKey, string sessionType)
         {
             sessionKey = Util.UrlDecode(sessionKey);
             sessionType = Util.UrlDecode(sessionType);
             Member member = await GetMemberBySessionKey(sessionKey.Trim(), sessionType.Trim());
-            //member.id = 0;
-            //member.memberSocialAccounts = new List<MemberSocialAccount>();
             return Ok(RemoveSensitiveInfo(member));
         }
-
-
-
         [NonAction]
         public async Task<Member> UpdateDetailInfo(int memberId, string num, string type, bool isUnic)
         {
@@ -376,32 +359,6 @@ namespace SnowmeetApi.Controllers
             await _db.SaveChangesAsync();
             return RemoveSensitiveInfo(member);
         }
-
-        /*
-
-        [HttpGet("{memberId}")]
-        public async Task<ActionResult> UpdateUserCell(int memberId, string encData, string iv, 
-            string sessionKey, string sessionType = "wechat_mini_openid" )
-        {
-            sessionKey = Util.UrlDecode(sessionKey);
-            sessionType = Util.UrlDecode(sessionType);
-            encData = Util.UrlDecode(encData);
-            iv = Util.UrlDecode(iv);
-            string cell = "";
-            string json = Util.AES_decrypt(encData.Trim(), sessionKey, iv);
-            Newtonsoft.Json.Linq.JToken jsonObj = (Newtonsoft.Json.Linq.JToken)Newtonsoft.Json.JsonConvert.DeserializeObject(json);
-            if (jsonObj["phoneNumber"] != null)
-            {
-                cell = jsonObj["phoneNumber"].ToString().Trim();
-            }
-            if (cell.Trim().Equals(""))
-            {
-                return BadRequest();
-            }
-            return (await SetMemberInfo(memberId, "cell", cell.Trim(), sessionKey, sessionType));
-        }
-        */
-
         [HttpGet("{memberId}")]
         public async Task<ActionResult> SetMemberInfo(int memberId, string type, string num,
             string sessionKey, string sessionType)

@@ -90,7 +90,7 @@ namespace SnowmeetApi.Data
         public DbSet<SnowmeetApi.Models.Ticket.TicketTemplate> TicketTemplate { get; set; }
         public DbSet<SnowmeetApi.Models.Card.Card> Card { get; set; }
         public DbSet<SnowmeetApi.Models.BltDevice> BltDevice { get; set; }
-        public DbSet<SnowmeetApi.Models.Users.Point> Point { get; set; }
+
         public DbSet<SnowmeetApi.Models.SummerMaintain> SummerMaintain { get; set; }
         public DbSet<SnowmeetApi.Models.Mi7Order> mi7Order { get; set; }
 
@@ -206,5 +206,6 @@ namespace SnowmeetApi.Data
         public DbSet<Models.DepositAccount> depositAccount { get; set; }
         public DbSet<Models.DepositBalance> depositBalance { get; set; }
         public DbSet<Models.ScanQrCode> scanQrCode { get; set; }
+        public DbSet<SnowmeetApi.Models.Point> Point { get; set; }
     }
 }

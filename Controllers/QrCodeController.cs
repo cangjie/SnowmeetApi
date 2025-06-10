@@ -172,6 +172,7 @@ namespace SnowmeetApi.Controllers
             sq.cell = cell.Trim();
             sq.authed = authed ? 1 : 0;
             sq.update_date = DateTime.Now;
+            sq.scaner_member_id = msaList[0].member_id;
             _db.scanQrCode.Entry(sq).State = EntityState.Modified;
             await _db.SaveChangesAsync();
             return Ok(new ApiResult<ScanQrCode>()

@@ -502,7 +502,7 @@ namespace SnowmeetApi.Controllers
                 {
                     outTradeNo = field.Split('=')[1];
                     TenpayController tenHelper = new TenpayController(_db, _oriConfig, _http);
-                    await tenHelper.SetTenpayPaymentSuccess(outTradeNo);
+                    //await tenHelper.SetTenpayPaymentSuccess(outTradeNo);
                     //break;
                 }
                 if (field.StartsWith("trade_no"))

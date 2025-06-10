@@ -335,7 +335,7 @@ namespace SnowmeetApi.Controllers
                             sucPay.status = "支付成功";
                             _db.OrderPayment.Entry(sucPay).State = EntityState.Modified;
                             await _db.SaveChangesAsync();
-                            await SetTenpayPaymentSuccess(outTradeNumber);
+                            //await SetTenpayPaymentSuccess(outTradeNumber);
                         }
                         
                         //Console.WriteLine("订单 {0} 已完成支付，交易单号为 {1}", outTradeNumber, transactionId);
@@ -349,7 +349,7 @@ namespace SnowmeetApi.Controllers
             }
             return "{ \r\n \"code\": \"SUCCESS\", \r\n \"message\": \"成功\" \r\n}";
         }
-
+/*
         [HttpGet]
         public  async Task<ActionResult<OrderOnline>> SetTenpayPaymentSuccess(string outTradeNumber)
         {
@@ -359,12 +359,12 @@ namespace SnowmeetApi.Controllers
                 return NotFound();
             }
             OrderPayment payment = paymentList[0];
-            /*
+            
             payment.status = "支付成功";
             //payment.ali_trade_no = tradeNo.Trim();
             _db.Entry(payment).State = EntityState.Modified;
             await _db.SaveChangesAsync();
-*/
+
             OrderOnline order = await _db.OrderOnlines.FindAsync(payment.order_id);
             if (order == null)
             {
@@ -452,6 +452,7 @@ namespace SnowmeetApi.Controllers
             return order;
             
         }
+        */
 
         
 

@@ -785,7 +785,7 @@ namespace SnowmeetApi.Controllers
                 if (order.generate_score > 0)
                 {
                     PointController pc = new PointController(_context, _oriConfig);
-                    await pc.SetPoint((int)order.generate_score, staffSessionKey, "店销现货支付赠送龙珠，订单ID：" + order.id.ToString());
+                    //await pc.SetPoint((int)order.generate_score, staffSessionKey, "店销现货支付赠送龙珠，订单ID：" + order.id.ToString());
                 }
             }
             catch
