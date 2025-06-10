@@ -45,6 +45,80 @@ namespace SnowmeetApi.Controllers
                 .OrderBy(a => a.expire_date).AsNoTracking().ToListAsync();
             return list;
         }
+        [NonAction]
+        public async Task<double> GetMemberTotalAmount(int memberId)
+        { 
+            List<DepositAccount> accountList = await GetMemberAccountAvaliable(memberId, "", "");
+            double sum = 0;
+            for(int i = 0; i < accountList.Count; i++)
+            {
+                sum += accountList[i].income_amount;
+            }
+            return sum;
+        }
+        [NonAction]
+        public async Task<double> GetMemberSummaryAmount(int memberId)
+        { 
+            List<DepositAccount> accountList = await GetMemberAccountAvaliable(memberId, "", "");
+            double sum = 0;
+            for(int i = 0; i < accountList.Count; i++)
+            {
+                sum += accountList[i].avaliableAmount;
+            }
+            return sum;
+        }
+        [HttpGet("{memberId}")]
+        public async Task<ActionResult<ApiResult<double?>>> GetMemberTotalAmountByStaff(int memberId,
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            StaffController _staffHelper = new StaffController(_db);
+            ApiResult<object?> checkRightResult = await _staffHelper.CheckStaffLevel(0, sessionKey, sessionType);
+            if (checkRightResult != null)
+            {
+                return Ok(checkRightResult);
+            }
+            double sum = 0;
+            try
+            {
+                sum = await GetMemberTotalAmount(memberId);
+            }
+            catch
+            {
+
+            }
+            return Ok(new ApiResult<double?>
+            {
+                code = 0,
+                message = "",
+                data = sum
+            });
+        }
+        [HttpGet("{memberId}")]
+        public async Task<ActionResult<ApiResult<double?>>> GetMemberSummaryAmountByStaff(int memberId,
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            StaffController _staffHelper = new StaffController(_db);
+            ApiResult<object?> checkRightResult = await _staffHelper.CheckStaffLevel(0, sessionKey, sessionType);
+            if (checkRightResult != null)
+            {
+                return Ok(checkRightResult);
+            }
+            double sum = 0;
+            try
+            {
+                sum = await GetMemberSummaryAmount(memberId);
+            }
+            catch
+            {
+
+            }
+            return Ok(new ApiResult<double?>
+            {
+                code = 0,
+                message = "",
+                data = sum
+            });
+        }
         [HttpGet("{memberId}")]
         public async Task<ActionResult<double>> GetMemberAvaliableAmount(int memberId, string depositType, string depositSubType,
             string sessionKey, string sessionType = "wechat_mini_openid")
