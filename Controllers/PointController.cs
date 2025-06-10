@@ -15,20 +15,61 @@ namespace SnowmeetApi.Controllers
     public class PointController : ControllerBase
     {
         private readonly ApplicationDBContext _db;
-
         private IConfiguration _config;
-
-        public string _appId = "";
-
         public PointController(ApplicationDBContext context, IConfiguration config)
         {
-            /*
-            _context = context;
-            _config = config.GetSection("Settings");
-            _appId = _config.GetSection("AppId").Value.Trim();
-            */
             _db = context;
             _config = config;
+        }
+        [NonAction]
+        public async Task<int> GetMemberTotalPoints(int memberId)
+        {
+            return await _db.Point
+                .Where(p => p.member_id == memberId && p.points > 0 && p.valid == 1)
+                .SumAsync(p => p.points);
+        }
+        [NonAction]
+        public async Task<int> GetMemberSummaryPoints(int memberId)
+        {
+            return await _db.Point
+                .Where(p => p.member_id == memberId && p.valid == 1)
+                .SumAsync(p => p.points);
+        }
+        [HttpGet("{memberId}")]
+        public async Task<ActionResult<ApiResult<int>>> GetMemberTotalPoints(int memberId,
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            StaffController _staffHelper = new StaffController(_db);
+            ApiResult<object?> checkRightResult = await _staffHelper.CheckStaffLevel(0, sessionKey, sessionType);
+            if (checkRightResult != null)
+            {
+                return Ok(checkRightResult);
+            }
+            int totalPoints = await GetMemberTotalPoints(memberId);
+            return Ok(new ApiResult<int>
+            {
+                code = 0,
+                message = "",
+                data = totalPoints
+            });
+        }
+        [HttpGet("{memberId}")]
+        public async Task<ActionResult<ApiResult<int>>> GetMemberSummaryPoints(int memberId,
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            StaffController _staffHelper = new StaffController(_db);
+            ApiResult<object?> checkRightResult = await _staffHelper.CheckStaffLevel(0, sessionKey, sessionType);
+            if (checkRightResult != null)
+            {
+                return Ok(checkRightResult);
+            }
+            int summaryPoints = await GetMemberSummaryPoints(memberId);
+            return Ok(new ApiResult<int>
+            {
+                code = 0,
+                message = "",
+                data = summaryPoints
+            });
         }
         /*
         [HttpGet]
@@ -186,12 +227,12 @@ namespace SnowmeetApi.Controllers
 
         */
 
-/*
+        /*
 
-        private bool PointExists(int id)
-        {
-            return _context.Point.Any(e => e.id == id);
-        }
-        */
+                private bool PointExists(int id)
+                {
+                    return _context.Point.Any(e => e.id == id);
+                }
+                */
     }
 }

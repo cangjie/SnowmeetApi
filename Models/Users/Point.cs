@@ -11,6 +11,7 @@ namespace SnowmeetApi.Models
         //public string user_open_id { get; set; }
         public int member_id { get; set; }
         public int points { get; set; }
+        public int valid { get; set; }
         public string memo { get; set; }
         public DateTime transact_date { get; set; }
         public DateTime create_date { get; set; } = DateTime.Now;
