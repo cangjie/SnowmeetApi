@@ -166,8 +166,6 @@ namespace SnowmeetApi.Controllers
             return Ok(await GetMiniAppUser(member.wechatMiniOpenId.Trim()));
 
         }
-
-
         [HttpGet]
         public async Task<ActionResult<MiniAppUser>> GetMiniAppUser(string openId, string sessionKey)
         {
@@ -276,21 +274,13 @@ namespace SnowmeetApi.Controllers
                 return BadRequest();
             }
             string openId = miniUser.open_id.Trim();
-
-            
-
-
-
             if (openId.Equals(""))
             {
                 openId = user.miniAppOpenId.Trim();
             }
-
             Member? member = await _memberHelper.GetWholeMemberByNum(openId.Trim(), "wechat_mini_openid");
-            
             member.real_name = miniUser.real_name.Trim();
             member.gender = miniUser.gender.Trim();
-            
             _context.member.Entry(member).State = EntityState.Modified;
             await _context.SaveChangesAsync();
 
@@ -298,9 +288,7 @@ namespace SnowmeetApi.Controllers
             //await _memberHelper.UpdateDetailInfo(member.id, miniUser.wechat_id.Trim(), "wechat_id", false);
 
             MiniAppUser mUser = (MiniAppUser)((OkObjectResult)(await GetMiniAppUser(member.wechatMiniOpenId, sessionKey)).Result).Value;
-
             return Ok(mUser);
-
         }
 
         [HttpGet]

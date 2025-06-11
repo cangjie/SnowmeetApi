@@ -16,7 +16,8 @@ namespace SnowmeetApi.Models
         public int is_merge { get; set; } = 0;
         public int? merge_id { get; set; }
         public string source { get; set; } = "";
-        public int in_staff_list {get; set;} = 0;
+        public int in_staff_list { get; set; } = 0;
+        public DateTime? update_date { get; set; } = null;
         [NotMapped]
         public string title
         {
@@ -26,7 +27,7 @@ namespace SnowmeetApi.Models
                 title += gender.Trim().Equals("男") ? "先生" : (gender.Trim().Equals("女") ? "女士" : "");
                 return title.Trim();
             }
-        }  
+        }
         public List<MemberSocialAccount> memberSocialAccounts { get; set; } = new List<MemberSocialAccount>();
         public List<DepositAccount> depositAccounts { get; set; } = new List<DepositAccount>();
         public List<Point> points { get; set; } = new List<Point>();
@@ -99,7 +100,7 @@ namespace SnowmeetApi.Models
                 return v;
             }
         }
-        public List<SocialAccountForJob>? jobAccounts {get; set;}
+        public List<SocialAccountForJob>? jobAccounts { get; set; }
 
         //will be deleted
         public int is_staff { get; set; } = 0;
@@ -107,6 +108,71 @@ namespace SnowmeetApi.Models
         public int is_admin { get; set; } = 0;
         public List<OrderOnline> orders { get; set; } = new List<OrderOnline>();
         [NotMapped]
-        public SnowmeetApi.Models.Users.MiniAppUser miniAppUser {get; set;} = null;
+        public SnowmeetApi.Models.Users.MiniAppUser miniAppUser { get; set; } = null;
+        [NotMapped]
+        public double totalPoints
+        {
+            get
+            {
+                double totalPoints = 0;
+                foreach (Point point in points)
+                {
+                    if (point.points > 0 && point.valid == 1)
+                    {
+                        totalPoints += point.points;
+                    }
+
+                }
+                return totalPoints;
+            }
+        }
+        [NotMapped]
+        public double avaliablePoints
+        {
+            get
+            {
+                double avaliablePoints = 0;
+                foreach (Point point in points)
+                {
+                    if (point.valid == 1)
+                    {
+                        avaliablePoints += point.points;
+                    }
+                }
+                return avaliablePoints;
+            }
+        }
+        [NotMapped]
+        public double totalDeposit
+        {
+            get
+            {
+                double totalDeposit = 0;
+                foreach (DepositAccount depositAccount in depositAccounts)
+                {
+                    if (depositAccount.valid == 1)
+                    {
+                        totalDeposit += depositAccount.income_amount;
+                    }
+                }
+                return totalDeposit;
+            }
+        }
+        [NotMapped]
+        public double avaliableDeposit
+        {
+            get
+            {
+                double avaliableDeposit = 0;
+                foreach (DepositAccount depositAccount in depositAccounts)
+                {
+                    if (depositAccount.valid == 1)
+                    {
+                        avaliableDeposit += depositAccount.avaliableAmount;
+                    }
+                }
+                return avaliableDeposit;
+            }
+        }
     }
 }
