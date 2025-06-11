@@ -309,9 +309,13 @@ namespace SnowmeetApi.Controllers
             {
                 return null;
             }
-            if (!member.cell.Trim().Equals(oriMember.cell.Trim()))
+            if (!member._cell.Trim().Equals(oriMember.cell.Trim()))
             {
-                await UpdateUniqueTypeMemberSocialAccount(member.id, member.cell.Trim(), "cell", scene, staff);
+                MemberSocialAccount? msa = await UpdateUniqueTypeMemberSocialAccount(member.id, member._cell.Trim(), "cell", scene, staff);
+                if (msa == null)
+                {
+                    return null;
+                }
             }
             Member newMember = await _db.member.FindAsync(member.id);
             if (!member.real_name.Trim().Equals(oriMember.real_name.Trim()))
@@ -388,7 +392,7 @@ namespace SnowmeetApi.Controllers
                 return Ok(new ApiResult<Member?>()
                 {
                     code = 1,
-                    message = "未找到会员",
+                    message = "更新失败",
                     data = null
                 });
             }

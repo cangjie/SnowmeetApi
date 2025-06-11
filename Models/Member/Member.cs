@@ -70,6 +70,7 @@ namespace SnowmeetApi.Models
                 return v;
             }
         }
+        [NotMapped]
         public string? cell
         {
             get
@@ -86,7 +87,13 @@ namespace SnowmeetApi.Models
                 }
                 return v;
             }
+            set
+            {
+                _cell = value;
+            }
         }
+        [NotMapped]
+        public string? _cell = null;
         public string? wechatId
         {
             get
