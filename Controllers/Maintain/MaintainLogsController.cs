@@ -49,7 +49,7 @@ namespace SnowmeetApi.Controllers.Maintain
                 ShopSaleInteract scan = await _context.ShopSaleInteract.Where(s => s.biz_id == taskId && s.scan_type.Trim().Equals("发板"))
                     .OrderByDescending(s => s.id).AsNoTracking().FirstAsync();
                 MemberController _memberHelper = new MemberController(_context, _originConfig);
-                Member member = await _memberHelper.GetMember(scan.scaner_oa_open_id, "wechat_oa_openid");
+                Member member = await _memberHelper.GetWholeMemberByNum(scan.scaner_oa_open_id, "wechat_oa_openid");
                 customerOpenId = member.wechatMiniOpenId.Trim();
             }
             catch
@@ -822,7 +822,7 @@ namespace SnowmeetApi.Controllers.Maintain
                 return NotFound();
             }
             MemberController _memberHelper = new MemberController(_context, _originConfig);
-            Member member = await _memberHelper.GetMember(scan.scaner_oa_open_id, "wechat_oa_openid");
+            Member member = await _memberHelper.GetWholeMemberByNum(scan.scaner_oa_open_id, "wechat_oa_openid");
             if (member == null)
             {
                 return NoContent();

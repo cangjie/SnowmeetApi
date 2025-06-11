@@ -1348,7 +1348,7 @@ namespace SnowmeetApi.Controllers
                             break;
                     }
                     //MiniAppUser mUser = await _db.MiniAppUsers.FindAsync(orderOnline.open_id);
-                    Member mUser = await _memberHelper.GetMember(orderOnline.open_id, "wechat_mini_openid");
+                    Member? mUser = await _memberHelper.GetWholeMemberByNum(orderOnline.open_id, "wechat_mini_openid");
                     if (mUser != null)
                     {
                         try

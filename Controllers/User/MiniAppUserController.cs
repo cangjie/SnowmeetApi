@@ -109,7 +109,7 @@ namespace SnowmeetApi.Controllers
                 return NotFound();
             }
             //MiniAppUser user = await _context.MiniAppUsers.FindAsync(openId);
-            MiniAppUser user = (await _memberHelper.GetMember(openId, "wechat_mini_openid")).miniAppUser;
+            MiniAppUser user = (await _memberHelper.GetWholeMemberByNum(openId, "wechat_mini_openid")).miniAppUser;
             if (isStaff)
             {
                 user.is_admin = 1;
@@ -157,8 +157,9 @@ namespace SnowmeetApi.Controllers
             {
                 return NoContent();
             }
-            Member member = (Member)((OkObjectResult)(await _memberHelper.GetMemberByCell(cell, staffSessionKey)).Result).Value;
-            if (member==null)
+            //Member member = (Member)((OkObjectResult)(await _memberHelper.GetMemberByCell(cell, staffSessionKey)).Result).Value;
+            Member? member = await _memberHelper.GetWholeMemberByNum(cell.Trim(), "cell");
+            if (member == null)
             {
                 return NotFound();
             }
@@ -181,7 +182,7 @@ namespace SnowmeetApi.Controllers
             }
 
            
-            Member member = await _memberHelper.GetMember(openId, "wechat_mini_openid");
+            Member? member = await _memberHelper.GetWholeMemberByNum(openId, "wechat_mini_openid");
             MiniAppUser mUser = new MiniAppUser();
             mUser.open_id = openId;
             mUser.union_id = member.wechatUnionId == null? "": member.wechatUnionId.Trim();
@@ -232,7 +233,7 @@ namespace SnowmeetApi.Controllers
                 return NotFound();
             }
             //MiniAppUser user = await _context.MiniAppUsers.FindAsync(mSessionList[0].open_id);
-            MiniAppUser user = (await _memberHelper.GetMember("", "wechat_mini_openid")).miniAppUser;
+            MiniAppUser user = (await _memberHelper.GetWholeMemberByNum("", "wechat_mini_openid")).miniAppUser;
             user.open_id = "";
             if (user != null)
             {
@@ -260,7 +261,7 @@ namespace SnowmeetApi.Controllers
                 return NotFound();
             }
             //MiniAppUser user = await _context.MiniAppUsers.FindAsync(mSessionList[0].open_id);
-            MiniAppUser user = (await _memberHelper.GetMember("")).miniAppUser;
+            MiniAppUser user = (await _memberHelper.GetWholeMemberByNum("", "")).miniAppUser;
             return Ok(user);
 
         }
@@ -285,7 +286,7 @@ namespace SnowmeetApi.Controllers
                 openId = user.miniAppOpenId.Trim();
             }
 
-            Member member = await _memberHelper.GetMember(openId.Trim(), "wechat_mini_openid");
+            Member? member = await _memberHelper.GetWholeMemberByNum(openId.Trim(), "wechat_mini_openid");
             
             member.real_name = miniUser.real_name.Trim();
             member.gender = miniUser.gender.Trim();
@@ -293,8 +294,8 @@ namespace SnowmeetApi.Controllers
             _context.member.Entry(member).State = EntityState.Modified;
             await _context.SaveChangesAsync();
 
-            await _memberHelper.UpdateDetailInfo(member.id, miniUser.cell_number.Trim(), "cell", true);
-            await _memberHelper.UpdateDetailInfo(member.id, miniUser.wechat_id.Trim(), "wechat_id", false);
+            //await _memberHelper.UpdateDetailInfo(member.id, miniUser.cell_number.Trim(), "cell", true);
+            //await _memberHelper.UpdateDetailInfo(member.id, miniUser.wechat_id.Trim(), "wechat_id", false);
 
             MiniAppUser mUser = (MiniAppUser)((OkObjectResult)(await GetMiniAppUser(member.wechatMiniOpenId, sessionKey)).Result).Value;
 
@@ -377,8 +378,8 @@ namespace SnowmeetApi.Controllers
 
             }
             member = await _memberHelper.GetMemberBySessionKey(sessionKey, "wechat_mini_openid");
-            return Ok(_memberHelper.RemoveSensitiveInfo(member));
-
+            //return Ok(_memberHelper.RemoveSensitiveInfo(member));
+            return Ok(member);
 
         }
 

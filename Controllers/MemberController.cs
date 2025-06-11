@@ -26,12 +26,71 @@ namespace SnowmeetApi.Controllers
             _db = db;
             _config = config;
         }
+        [NonAction]
+        public async Task<Member> GetWholeMemberById(int memberId)
+        {
+            List<Member> memberList = await _db.member
+                .Where(m => m.id == memberId)
+                .Include(m => m.memberSocialAccounts.Where(msa => msa.valid == 1))
+                .Include(m => m.depositAccounts.Where(d => d.valid == 1))
+                .Include(m => m.points.Where(p => p.valid == 1))
+                .AsNoTracking().ToListAsync();
+            if (memberList == null || memberList.Count == 0)
+            {
+                return null;
+            }
+            else
+            {
+                return memberList[0];
+            }
+        }
+        [NonAction]
+        public async Task<Member> GetWholeMemberByNum(string num, string type)
+        {
+            List<MemberSocialAccount> msaList = await _db.memberSocialAccount
+                .Where(m => (m.valid == 1 && m.type.Trim().Equals(type.Trim()) && m.num.Trim().Equals(num.Trim())))
+                .OrderByDescending(m => m.id).AsNoTracking().ToListAsync();
+            if (msaList == null || msaList.Count <= 0)
+            {
+                return null;
+            }
+            else
+            {
+                int memberId = msaList[0].member_id;
+                return await GetWholeMemberById(memberId);
+            }
+        }
+        [NonAction]
+        public async Task<Member> GetMemberBySessionKey(string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            sessionType = Util.UrlDecode(sessionType);
+            List<MiniSession> sList = await _db.miniSession
+                .Where(m => m.session_key.Trim().Equals(sessionKey) && m.session_type.Equals(sessionType) && m.valid == 1 && m.expire_date >= DateTime.Now)
+                .OrderByDescending(m => m.expire_date).AsNoTracking().ToListAsync();
+            if (sList == null || sList.Count == 0)
+            {
+                return null;
+            }
+            else
+            {
+                if (sList[0].member_id != null)
+                {
+                    return await GetWholeMemberById((int)sList[0].member_id);
+                }
+                else
+                {
+                    return null;
+                }
+            }
+        }
+        /*
         [HttpGet]
         public async Task Test()
         {
             await MergeMember(18363, 1486);
         }
-
+        */
         [NonAction]
         public async Task MergeMember(int sourceId, int targetId)
         {
@@ -138,6 +197,7 @@ namespace SnowmeetApi.Controllers
                 await _db.SaveChangesAsync();
             }
         }
+        
         [NonAction]
         public async Task<bool> IsEmpty(int memberId, bool needValid)
         {
@@ -154,6 +214,7 @@ namespace SnowmeetApi.Controllers
             }
             return isEmpty;
         }
+        /*
         [NonAction]
         public async Task<Member> GetMemberBySessionKey(string sessionKey, string sessionType = "wechat_mini_openid")
         {
@@ -491,7 +552,7 @@ namespace SnowmeetApi.Controllers
             }
             return Ok(await GetMember(cell, "cell"));
         }
-
+        */
         /*
                 [NonAction]
                 public List<Member> GetCells(List<Member> memberList)
@@ -511,6 +572,7 @@ namespace SnowmeetApi.Controllers
                     return memberList;
                 }
         */
+        /*
         [NonAction]
         public async Task ModMemberCell(int memberId, string cell)
         {
@@ -607,6 +669,6 @@ namespace SnowmeetApi.Controllers
             }
             return mList;
         }
-
+        */
     }
 }

@@ -47,7 +47,7 @@ namespace SnowmeetApi.Controllers
         public async Task<string> GetOAOpenId(string miniAppOpenId)
         {
             //MiniAppUser miniAppUser = await _context.MiniAppUsers.FindAsync(miniAppOpenId);
-            Member member = await _memberHelper.GetMember(miniAppOpenId, "wechat_mini_openid");
+            Member? member = await _memberHelper.GetWholeMemberByNum(miniAppOpenId, "wechat_mini_openid");
             List<UnionId> uidList = await _context.UnionIds.Where(u => u.union_id.Trim().Equals(member.wechatUnionId.Trim())
                 && u.source.Trim().Equals("snowmeet_official_account_new")).ToListAsync();
             if (uidList == null || uidList.Count < 1)

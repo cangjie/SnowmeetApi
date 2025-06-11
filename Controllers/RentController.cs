@@ -1943,7 +1943,7 @@ namespace SnowmeetApi.Controllers
             }
 
             //MiniAppUser customerUser = await _db.MiniAppUsers.FindAsync(rentOrder.open_id);
-            Member customerUser = await _memberHelper.GetMember(rentOrder.open_id, "wechat_mini_openid");
+            Member? customerUser = await _memberHelper.GetWholeMemberByNum(rentOrder.open_id, "wechat_mini_openid");
             if (customerUser != null)
             {
                 if (customerUser.real_name.Trim().Equals(""))
@@ -2139,7 +2139,7 @@ namespace SnowmeetApi.Controllers
                     //RentOrder order = (RentOrder)((OkObjectResult)(await GetRentOrder(orderArr[i].id, sessionKey, false)).Result).Value;
                     if (orderArr[i].staff_name == null || orderArr[i].staff_name.Trim().Equals(""))
                     {
-                        orderArr[i].staffMember = (await _memberHelper.GetMember(orderArr[i].staff_open_id, "wechat_mini_openid"));
+                        orderArr[i].staffMember = (await _memberHelper.GetWholeMemberByNum(orderArr[i].staff_open_id, "wechat_mini_openid"));
                         orderArr[i].staff_name = orderArr[i].staffMember == null ? "" : (orderArr[i].staffMember.real_name.Trim());
                         _db.RentOrder.Entry(orderArr[i]).State = EntityState.Modified;
                     }
@@ -2185,7 +2185,7 @@ namespace SnowmeetApi.Controllers
             if (receptList != null && receptList.Count > 0)
             {
                 order.staff_open_id = receptList[0].update_staff.Trim();
-                Member? staffUser = await _memberHelper.GetMember(order.staff_open_id, "wechat_mini_openid");
+                Member? staffUser = await _memberHelper.GetWholeMemberByNum(order.staff_open_id, "wechat_mini_openid");
                 order.staff_name = staffUser == null ? "" : staffUser.real_name;
                 _db.RentOrder.Entry(order);
                 await _db.SaveChangesAsync();
@@ -2395,7 +2395,7 @@ namespace SnowmeetApi.Controllers
                             string staffOpenId = rentOrder.recept[0].update_staff.Trim().Equals("") ?
                                 rentOrder.recept[0].recept_staff.Trim() : rentOrder.recept[0].update_staff.Trim();
                             //MiniAppUser? staffUser = await _db.MiniAppUsers.FindAsync(staffOpenId.Trim());
-                            Member staffUser = await _memberHelper.GetMember(staffOpenId.Trim(), "wechat_mini_openid");
+                            Member? staffUser = await _memberHelper.GetWholeMemberByNum(staffOpenId.Trim(), "wechat_mini_openid");
                             if (staffUser != null)
                             {
                                 rentOrder.staff_name = staffUser.real_name.Trim();
@@ -3599,7 +3599,7 @@ namespace SnowmeetApi.Controllers
                     r.amount = rentOrder.order.refunds[j].amount;
                     r.refund_id = rentOrder.order.refunds[j].refund_id.Trim();
                     string operOpenId = rentOrder.order.refunds[j].oper;
-                    Member refundUser = await _memberHelper.GetMember(operOpenId, "wechat_mini_openid");
+                    Member? refundUser = await _memberHelper.GetWholeMemberByNum(operOpenId, "wechat_mini_openid");
                     if (refundUser != null)
                     {
                         r.staffName = refundUser.real_name.Trim();

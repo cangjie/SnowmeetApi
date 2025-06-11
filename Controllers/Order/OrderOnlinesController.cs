@@ -403,7 +403,8 @@ namespace SnowmeetApi.Controllers
             if (cell.Trim().Length == 11)
             {
                 MemberController _memberHelper = new MemberController(_context, _oriConfig);
-                Member m = (Member)((OkObjectResult)(await _memberHelper.GetMemberByCell(cell, staffSessionKey)).Result).Value;
+                //Member m = (Member)((OkObjectResult)(await _memberHelper.GetMemberByCell(cell, staffSessionKey)).Result).Value;
+                Member? m = await _memberHelper.GetWholeMemberByNum(cell.Trim(), "cell");
                 openId = m.wechatMiniOpenId.Trim();
             }
 
@@ -489,7 +490,7 @@ namespace SnowmeetApi.Controllers
 
                     if (customerUser != null)
                     {
-                        Member orderMember =  await _memberHelper.GetMember(order.open_id.Trim(), "wechat_mini_openid");
+                        Member orderMember =  await _memberHelper.GetWholeMemberByNum(order.open_id.Trim(), "wechat_mini_openid");
                         //order.member = orderMember;
                         order.user = orderMember.miniAppUser;
                         
@@ -552,7 +553,7 @@ namespace SnowmeetApi.Controllers
                     {
                         try
                         {
-                            Member member = (await _memberHelper.GetMember(order.open_id.Trim(), "wechat_mini_openid"));
+                            Member member = (await _memberHelper.GetWholeMemberByNum(order.open_id.Trim(), "wechat_mini_openid"));
                             //order.member = member;
                             order.user = member.miniAppUser;
                             bool needUpdateMemberInfo = false;
@@ -627,7 +628,7 @@ namespace SnowmeetApi.Controllers
                     var payment = payments[i];
                     if (payment.staff_open_id != null && !payment.staff_open_id.Trim().Equals(""))
                     {
-                        Member member = await _memberHelper.GetMember(payment.staff_open_id, "wechat_mini_openid");
+                        Member member = await _memberHelper.GetWholeMemberByNum(payment.staff_open_id, "wechat_mini_openid");
                         //var staffUser = await _context.MiniAppUsers.FindAsync(payment.staff_open_id);
                         if (member != null)
                         {
@@ -660,7 +661,7 @@ namespace SnowmeetApi.Controllers
             string staffRealName = "";
             if (order != null && order.staff_open_id != null && !order.staff_open_id.Trim().Equals(""))
             {
-                Member staffMember = await _memberHelper.GetMember(order.staff_open_id, "wechat_mini_openid");
+                Member? staffMember = await _memberHelper.GetWholeMemberByNum(order.staff_open_id, "wechat_mini_openid");
                 //MiniAppUser staffUser = await _context.MiniAppUsers.FindAsync(order.staff_open_id);
                 if (staffMember != null)
                 {
@@ -897,7 +898,7 @@ namespace SnowmeetApi.Controllers
                 //MiniAppUser customerUser = await _context.MiniAppUsers.FindAsync(order.user.open_id);
                 //Member member = await _memberHelper.GetMember(order.user.open_id, "wechat_mini_openiud");
                 //_memberHelper.UpdateDetailInfo()
-                Member member = await _memberHelper.GetMember(order.user.open_id, "wechat_mini_openid");
+                Member? member = await _memberHelper.GetWholeMemberByNum(order.user.open_id, "wechat_mini_openid");
                 bool memberMod = false;
                 if (member.real_name.Trim().Equals(""))
                 {
@@ -916,7 +917,7 @@ namespace SnowmeetApi.Controllers
                 }
                 if (!order.user.cell_number.Trim().Equals("") && !member.cell.Trim().Equals(order.user.cell_number))
                 {
-                    await _memberHelper.UpdateDetailInfo(member.id, order.user.cell_number.Trim(), "cell", false);
+                    //await _memberHelper.UpdateDetailInfo(member.id, order.user.cell_number.Trim(), "cell", false);
                 }
 
                 

@@ -386,7 +386,7 @@ namespace SnowmeetApi.Controllers.Order
             }
             else
             {
-                Member member = await _memberHelper.GetMember(order.open_id.Trim(), "wechat_mini_openid");
+                Member? member = await _memberHelper.GetWholeMemberByNum(order.open_id.Trim(), "wechat_mini_openid");
                 if (member != null)
                 {
                     List<Referee> refList = await _context.referee

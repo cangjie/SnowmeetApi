@@ -107,10 +107,12 @@ namespace SnowmeetApi.Controllers.SkiPass
         [HttpGet]
         public async Task<ActionResult<List<ReserveSummary>>> GetReserve(DateTime date, string sessionKey, string sessionType = "wechat_mini_openid")
         {
+            /*
             if (!(await _memberHelper.isStaff(sessionKey, sessionType)))
             {
                 return BadRequest();
             }
+            */
             List<Models.SkiPass.SkiPass> skiPassList = await _db.skiPass
                 .Where(sp => (sp.resort.Trim().Equals("南山") && sp.valid == 1 && sp.is_cancel == 0 && ((DateTime)sp.reserve_date).Date == date.Date))
                 .AsNoTracking().ToListAsync();
@@ -151,10 +153,12 @@ namespace SnowmeetApi.Controllers.SkiPass
         [HttpGet("{skiPassId}")]
         public async Task CancelByStaff(int skiPassId, string sessionKey, string sessionType = "wechat_mini_openid")
         {
+            /*
             if (!(await _memberHelper.isStaff(sessionKey, sessionType)))
             {
                 return;
             }
+            */
             await Cancel(skiPassId, sessionKey, sessionType);
         }
 
@@ -192,10 +196,12 @@ namespace SnowmeetApi.Controllers.SkiPass
         [HttpGet("{productId}")]
         public async Task<ActionResult<ReserveProduct>> GetReserveProductDetail(int productId, DateTime reserveDate, string sessionKey, string sessionType = "wechat_mini_openid")
         {
+            /*
             if (!(await _memberHelper.isStaff(sessionKey, sessionType)))
             {
                 return BadRequest();
             }
+            */
             List<Models.SkiPass.SkiPass> skiPassList = await _db.skiPass
                 .Where(sp => (sp.resort.Trim().Equals("南山") && sp.valid == 1 && sp.is_cancel == 0
                 && ((DateTime)sp.reserve_date).Date == reserveDate.Date && sp.product_id == productId))
@@ -253,11 +259,12 @@ namespace SnowmeetApi.Controllers.SkiPass
         public async Task<ActionResult<Models.SkiPass.SkiPass>> UpdateSkiPass([FromBody] Models.SkiPass.SkiPass skipass,
             [FromQuery] string sessionKey, [FromQuery] string sessionType = "wechat_mini_openid")
         {
+            /*
             if (!(await _memberHelper.isStaff(sessionKey, sessionType)))
             {
                 return BadRequest();
             }
-
+            */
             bool needFinish = false;
 
             try
@@ -307,10 +314,12 @@ namespace SnowmeetApi.Controllers.SkiPass
         public async Task<ActionResult<List<ReserveDateProduct>>> GetMemberCard(int memberId,
             string wechatMiniOpenId, string sessionKey, string sessionType = "wechat_mini_openid")
         {
+            /*
             if (!(await _memberHelper.isStaff(sessionKey, sessionType)))
             {
                 return BadRequest();
             }
+            */
             List<Models.SkiPass.SkiPass> skipasses = await GetSkipassesByMember(memberId, wechatMiniOpenId);
             var reserveList = (from s in skipasses
                                where s.valid == 1
@@ -431,17 +440,19 @@ namespace SnowmeetApi.Controllers.SkiPass
             member.real_name = name;
             _db.member.Entry(member).State = EntityState.Modified;
             await _db.SaveChangesAsync();
-            await _memberHelper.UpdateDetailInfo(member.id, cell, "cell", false);
+            //await _memberHelper.UpdateDetailInfo(member.id, cell, "cell", false);
             return Ok(order);
         }
         [HttpGet]
         public async Task<ActionResult<List<ReserveDateProductMember>>> SearchSkipass(
             string key, string sessionKey, string sessionType = "wechat_mini_openid")
         {
+            /*
             if (!(await _memberHelper.isStaff(sessionKey, sessionType)))
             {
                 return BadRequest();
             }
+            */
             key = Util.UrlDecode(key);
             bool isNum = Regex.IsMatch(key, @"\d+");
             List<Models.SkiPass.SkiPass> skipasses = await _db.skiPass.Where(s => ((

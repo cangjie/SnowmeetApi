@@ -28,7 +28,8 @@ namespace SnowmeetApi.Models
             }
         }  
         public List<MemberSocialAccount> memberSocialAccounts { get; set; } = new List<MemberSocialAccount>();
-        public List<DepositAccount> depositAccounts { get; set; }
+        public List<DepositAccount> depositAccounts { get; set; } = new List<DepositAccount>();
+        public List<Point> points { get; set; } = new List<Point>();
         public List<MemberSocialAccount> GetInfo(string type)
         {
             List<MemberSocialAccount> msaList = new List<MemberSocialAccount>();

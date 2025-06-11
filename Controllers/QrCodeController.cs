@@ -209,7 +209,7 @@ namespace SnowmeetApi.Controllers
                     continue;
                 }
                 bool authed = scanQrCodeList.Any(s => s.cell.Trim().Equals(sq.cell) && s.authed == 1);
-                Member member = await _mHelper.GetMemberByNum(sq.cell.Trim(), "cell");
+                Member? member = await _mHelper.GetWholeMemberByNum(sq.cell.Trim(), "cell");
                 ScanQrCode.AuthCell item = new ScanQrCode.AuthCell()
                 {
                     id = sq.id,

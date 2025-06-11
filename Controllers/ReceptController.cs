@@ -362,7 +362,7 @@ namespace SnowmeetApi.Controllers
             if (!openId.Trim().Equals(""))
             {
                 //MiniAppUser user = await _context.MiniAppUsers.FindAsync(openId);
-                Member user = await _memberHelper.GetMember(openId, "wechat_mini_openid");
+                Member? user = await _memberHelper.GetWholeMemberByNum(openId, "wechat_mini_openid");
                 realName = user.real_name.Trim();
                 switch (user.gender.Trim())
                 {
@@ -485,7 +485,7 @@ namespace SnowmeetApi.Controllers
                 if (!r.recept_staff.Trim().Equals(""))
                 {
                     //MiniAppUser user = await _context.MiniAppUsers.FindAsync(r.recept_staff.Trim());
-                    Member member = await _memberHelper.GetMember(r.recept_staff.Trim(), "wechat_mini_openid");
+                    Member? member = await _memberHelper.GetWholeMemberByNum(r.recept_staff.Trim(), "wechat_mini_openid");
                     if (member != null)
                     {
                         r.recept_staff_name = member.real_name.Trim();
@@ -495,7 +495,7 @@ namespace SnowmeetApi.Controllers
                 if (!r.update_staff.Trim().Equals(""))
                 {
                     //MiniAppUser user = await _context.MiniAppUsers.FindAsync(r.update_staff.Trim());
-                    Member user = await _memberHelper.GetMember(r.recept_staff.Trim(), "wechat_mini_openid");
+                    Member? user = await _memberHelper.GetWholeMemberByNum(r.recept_staff.Trim(), "wechat_mini_openid");
                     if (user != null)
                     {
                         r.update_staff_name = user.real_name.Trim();
@@ -909,7 +909,7 @@ namespace SnowmeetApi.Controllers
             }
 
             MemberController _memeberHelper = new MemberController(_context, _oriConfig);
-            Member member = await _memberHelper.GetMember(recept.open_id.Trim(), "wechat_mini_openid");
+            Member? member = await _memberHelper.GetWholeMemberByNum(recept.open_id.Trim(), "wechat_mini_openid");
             recept.member = member;
             return Ok(recept);
         }

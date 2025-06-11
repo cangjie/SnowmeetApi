@@ -346,7 +346,7 @@ namespace SnowmeetApi.Controllers
             {
                 return;
             }
-            Member member = await _memberHelper.GetMember(order.open_id.Trim(), "wechat_mini_openid");
+            Member? member = await _memberHelper.GetWholeMemberByNum(order.open_id.Trim(), "wechat_mini_openid");
             if (member == null)
             {
                 return;
@@ -811,7 +811,7 @@ namespace SnowmeetApi.Controllers
             member.real_name = name;
             _context.member.Entry(member).State = EntityState.Modified;
             await _context.SaveChangesAsync();
-            await _memberHelper.UpdateDetailInfo(member.id, cell, "cell", false);
+            //await _memberHelper.UpdateDetailInfo(member.id, cell, "cell", false);
             return Ok(order);
         }
 
