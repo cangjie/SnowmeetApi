@@ -219,7 +219,7 @@ namespace SnowmeetApi.Controllers
             List<MemberSocialAccount> otherMsaList = await _db.memberSocialAccount
                 .Where(m => (m.valid == 1 && m.num.Trim().Equals(num.Trim()) && m.type.Trim().Equals(type.Trim()) && m.member_id != memberId))
                 .AsNoTracking().ToListAsync();
-            if (otherMsaList != null || otherMsaList.Count > 0)
+            if (otherMsaList != null && otherMsaList.Count > 0)
             {
                 return null;
             }
@@ -253,7 +253,7 @@ namespace SnowmeetApi.Controllers
                 msa.update_date = DateTime.Now;
                 _db.memberSocialAccount.Entry(msa).State = EntityState.Modified;
             }
-            if (found)
+            if (!found)
             {
                 MemberSocialAccount msa = new MemberSocialAccount()
                 {
