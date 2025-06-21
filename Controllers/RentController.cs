@@ -431,7 +431,7 @@ namespace SnowmeetApi.Controllers
             {
                 name = Util.UrlDecode(name),
                 description = Util.UrlDecode(description),
-                is_delete = 0,
+                valid = 1,
                 update_date = DateTime.Now
             };
             await _db.rentPackage.AddAsync(rp);
@@ -486,27 +486,8 @@ namespace SnowmeetApi.Controllers
             RentPackage pr = await _db.rentPackage.Include(r => r.rentPackageCategoryList).Where(r => r.id == packageId).FirstAsync();
             return Ok(pr);
         }
-        [HttpGet("{packageId}")]
-        public async Task<ActionResult<RentPackage>> GetRentPackage(int packageId)
-        {
-            RentPackage rp = await _db.rentPackage
-                .Include(r => r.rentPackageCategoryList)
-                    .ThenInclude(r => r.rentCategory)
-                .Include(r => r.rentPackagePriceList)
-                .Where(r => r.id == packageId).FirstAsync();
-            return Ok(rp);
-        }
-        [HttpGet]
-        public async Task<ActionResult<List<RentPackage>>> GetRentPackageList()
-        {
-            List<RentPackage> list = await _db.rentPackage
-                .Include(r => r.rentPackageCategoryList)
-                    .ThenInclude(r => r.rentCategory)
-                .Include(r => r.rentPackagePriceList)
-                .Where(r => r.is_delete == 0)
-                .OrderByDescending(r => r.id).ToListAsync();
-            return Ok(list);
-        }
+
+
         [HttpGet("{packageId}")]
         public async Task<ActionResult<RentPackage>> UpdateRentPackageBaseInfo(int packageId, string name, string description, double deposit, string sessionKey, string sessionType)
         {
@@ -4071,6 +4052,14 @@ namespace SnowmeetApi.Controllers
 
         /////////////New Seaon////////////////////
         /// 
+        [NonAction]
+        public async Task<RentProduct> GetProduct(int productId)
+        {
+            RentProduct product = await _db.rentProduct
+                .Include(p => p.category).ThenInclude(c => c.priceList)
+                .Where(p => p.id == productId).AsNoTracking().FirstAsync();
+            return product;
+        }
         [HttpGet]
         public async Task<ActionResult<ApiResult<List<RentCategory>>>> GetAllCategoryList()
         {
@@ -4094,6 +4083,61 @@ namespace SnowmeetApi.Controllers
                 message = "",
                 data = l
             });
+        }
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<List<RentPackage>>>> GetRentPackageList()
+        {
+            List<RentPackage> list = await _db.rentPackage
+                .Where(r => r.valid == 1)
+                .OrderByDescending(r => r.id).ToListAsync();
+            return Ok(new ApiResult<List<RentPackage>>()
+            {
+                code = 0,
+                message = "",
+                data = list
+            });
+            //return Ok(list);
+        }
+        [HttpGet("{packageId}")]
+        public async Task<ActionResult<RentPackage>> GetRentPackage(int packageId)
+        {
+            RentPackage rp = await _db.rentPackage
+                .Include(r => r.rentPackageCategoryList)
+                    .ThenInclude(r => r.rentCategory)
+                .Include(r => r.rentPackagePriceList)
+                .Where(r => r.id == packageId).FirstAsync();
+            return Ok(new ApiResult<RentPackage>()
+            {
+                code = 0,
+                message = "",
+                data = rp
+            });
+        }
+        [HttpGet("{barCode}")]
+        public async Task<ActionResult<ApiResult<RentProduct?>>> GetRentProductByBarcode(string barCode)
+        {
+            List<RentProduct> productList = await _db.rentProduct
+                .Where(p => p.barcode.Trim().Equals(barCode.Trim()))
+                .OrderByDescending(p => p.id).AsNoTracking().ToListAsync();
+            if (productList == null || productList.Count <= 0)
+            {
+                return Ok(new ApiResult<object?>()
+                {
+                    code = 1,
+                    message = "找不到该商品",
+                    data = null
+                });
+            }
+            else
+            {
+                RentProduct p = await GetProduct(productList[0].id);
+                return Ok(new ApiResult<RentProduct>()
+                {
+                    code = 0,
+                    message = "",
+                    data = p
+                });
+            }
         }
     }
 }

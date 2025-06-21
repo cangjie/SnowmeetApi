@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace SnowmeetApi.Models
 {
@@ -11,20 +12,20 @@ namespace SnowmeetApi.Models
     {
         [Key]
         public int id { get; set; }
-        public int? order_id { get; set; }
-        public int? package_id { get; set; }
-        public int? category_id { get; set; }
-        public string? name { get; set; }
-        public DateTime? start_date { get; set; }
-        public DateTime? end_date { get; set; }
-        public int valid { get; set; }
-        public int settled { get; set; }
-        public int hide { get; set; }
-        public string memo { get; set; }
-        public int? prev_id { get; set; }
-        public int changed { get; set; }
-        public int current_avaliable { get; set; }
-        public DateTime? update_date { get; set; }
+        public int? order_id { get; set; } = null;
+        public int? package_id { get; set; } = null;
+        public int? category_id { get; set; } = null;
+        public string? name { get; set; } = null;
+        public DateTime? start_date { get; set; } = null;
+        public DateTime? end_date { get; set; } = null;
+        public int valid { get; set; } = 0;
+        public int settled { get; set; } = 0;
+        public int hide { get; set; } = 0;
+        public string memo { get; set; } = "";
+        public int? prev_id { get; set; } = null;
+        public int changed { get; set; } = 0;
+        public int current_avaliable { get; set; } = 0;
+        public DateTime? update_date { get; set; } = null;
         public DateTime create_date { get; set; } = DateTime.Now;
         public List<RentItem> rentItems { get; set; } = new List<RentItem>();
         public List<RentalDetail> details { get; set; } = new List<RentalDetail>();
@@ -34,6 +35,8 @@ namespace SnowmeetApi.Models
         public List<Guaranty> guaranties { get; set; } = new List<Guaranty>();
         [ForeignKey(nameof(Discount.biz_id))]
         public List<Discount> discounts { get; set; } = new List<Discount>();
+        [ForeignKey("package_id")]
+        public RentPackage? package { get; set; }
         public double GetDiscountAmount(bool ticket)
         {
             List<Discount> dList = discounts
@@ -142,16 +145,16 @@ namespace SnowmeetApi.Models
     {
         [Key]
         public int id { get; set; }
-        public int rental_id { get; set; }
-        public string class_name { get; set; }
-        public DateTime? pick_time { get; set; }
-        public DateTime? return_time { get; set; }
-        public string? name { get; set; }
-        public int? rent_product_id { get; set; }
-        public string? code { get; set; }
-        public int? category_id { get; set; }
-        public int? prev_id { get; set; }
-        public string memo { get; set; }
+        public int rental_id { get; set; } = 0;
+        public string class_name { get; set; } = "";
+        public DateTime? pick_time { get; set; } = null;
+        public DateTime? return_time { get; set; } = null;
+        public string? name { get; set; } = null;
+        public int? rent_product_id { get; set; } = null;
+        public string? code { get; set; } = null;
+        public int? category_id { get; set; } = null;
+        public int? prev_id { get; set; } = null;
+        public string memo { get; set; } = "";
         public int valid { get; set; } = 0;
         public int? repairation_id { get; set; } = null;
         public DateTime? update_date { get; set; }

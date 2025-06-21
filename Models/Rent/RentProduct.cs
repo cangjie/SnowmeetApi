@@ -13,27 +13,39 @@ namespace SnowmeetApi.Models
         public int id { get; set; }
         public string owner { get; set; } = "自有";
         public string name { get; set; }
-        public string? description { get; set; } 
+        public string? description { get; set; }
         public string? brand { get; set; }
-        public string? shop {get; set;}
+        public string? shop { get; set; }
         public int category_id { get; set; }
         public string? barcode { get; set; }
-        public int? count {get; set;}
-        public double? deposit {get; set; }
-        public int is_common_price {get; set; } = 1;
-        public int is_delete {get; set; } = 0;
-        public int is_valid {get; set; } = 0;
-        public int is_online {get;set;} = 0;
-        public int is_destroyed {get; set;} = 0;
-        public int? staff_id {get; set;}
+        public int? count { get; set; }
+        public double? deposit { get; set; }
+        public int is_common_price { get; set; } = 1;
+        public int is_delete { get; set; } = 0;
+        public int is_valid { get; set; } = 0;
+        public int is_online { get; set; } = 0;
+        public int is_destroyed { get; set; } = 0;
+        public int? staff_id { get; set; }
         public List<RentProductImage>? images { get; set; }
         public List<RentProductDetailInfo>? detailInfo { get; set; }
         [ForeignKey("category_id")]
         public RentCategory? category { get; set; }
-       
-
+        [NotMapped]
+        public List<RentPrice> priceList
+        {
+            get
+            {
+                if (category != null)
+                {
+                    return category.priceList;
+                }
+                else
+                {
+                    return new List<RentPrice>();
+                }
+            }
+        }
     }
-
     [Table("rent_product_image")]
     public class RentProductImage
     {

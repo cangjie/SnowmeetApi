@@ -139,8 +139,6 @@ namespace SnowmeetApi.Data
         public DbSet<Models.AlipayMchId> alipayMchId { get; set; }
         public DbSet<Models.Kol> kol { get; set; }
         public DbSet<Models.AliDownloadFlowBill> aliDownloadFlowBill { get; set; }
-        public DbSet<SnowmeetApi.Models.Rent.RentPackage> rentPackage { get; set; }
-        public DbSet<SnowmeetApi.Models.Rent.RentPackageCategory> rentPackageCategory { get; set; }
         public DbSet<SnowmeetApi.Models.FinancialStatement> financialStatement { get; set; }
         public DbSet<RentProductImage> rentProductImage { get; set; }
         public DbSet<Models.School.Staff> schoolStaff { get; set; }
@@ -207,5 +205,8 @@ namespace SnowmeetApi.Data
         public DbSet<Models.DepositBalance> depositBalance { get; set; }
         public DbSet<Models.ScanQrCode> scanQrCode { get; set; }
         public DbSet<SnowmeetApi.Models.Point> Point { get; set; }
+        public DbSet<SnowmeetApi.Models.RentPackage> rentPackage { get; set; }
+        public DbSet<SnowmeetApi.Models.RentPackageCategory> rentPackageCategory { get; set; }
+
     }
 }

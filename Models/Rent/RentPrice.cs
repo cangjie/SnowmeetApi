@@ -10,8 +10,8 @@ namespace SnowmeetApi.Models
         public int id { get; set; }
 
         //category item package
-        public string type {get; set; }
-        public string shop {get;set; }
+        public string type { get; set; }
+        public string shop { get; set; }
 
         //public string? category_code {get; set; }    
 
@@ -21,15 +21,17 @@ namespace SnowmeetApi.Models
 
         public int? package_id { get; set; }
 
-        public string day_type {get; set;}
+        public string day_type { get; set; }
 
-        public double? price {get; set;}
+        public double? price { get; set; }
 
-        public string scene {get; set;}
+        public string scene { get; set; }
 
-        public DateTime update_date {get; set;}
+        public DateTime update_date { get; set; }
         [ForeignKey("category_id")]
-        public RentCategory? category {get; set;}
+        public RentCategory? category { get; set; }
+        [ForeignKey("package_id")]
+        public RentPackage? rentPackage{ get; set; }
 
 
 
