@@ -27,6 +27,28 @@ namespace SnowmeetApi.Models
         public int is_destroyed { get; set; } = 0;
         public int? staff_id { get; set; }
         public List<RentProductImage>? images { get; set; }
+        [NotMapped]
+        public double realDeposit
+        {
+            get
+            {
+                if (deposit == null)
+                {
+                    if (category != null)
+                    {
+                        return category.deposit;
+                    }
+                    else
+                    {
+                        return 0;
+                    }
+                }
+                else
+                {
+                    return (double)deposit;
+                }
+            }
+        }
         public List<RentProductDetailInfo>? detailInfo { get; set; }
         [ForeignKey("category_id")]
         public RentCategory? category { get; set; }
