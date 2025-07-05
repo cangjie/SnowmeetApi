@@ -2,17 +2,12 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-//using Aop.Api.Domain;
-
-//using Aop.Api.Domain;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
-using NuGet.ProjectModel;
 using SnowmeetApi.Data;
 using SnowmeetApi.Models;
-
 namespace SnowmeetApi.Controllers
 {
     [Route("api/[controller]/[action]")]
@@ -214,6 +209,172 @@ namespace SnowmeetApi.Controllers
             return isEmpty;
         }
         [NonAction]
+        public async Task<bool> UnbindMemberMainCellNum(int memberId, string num, string scene, Staff? staff)
+        {
+            List<MemberSocialAccount> list = await _db.memberSocialAccount
+                .Where(m => m.type.Trim().Equals("cell") && m.member_id == memberId && m.valid == 1 && m.num.Trim().Equals(num.Trim()))
+                .ToListAsync();
+            if (list == null || list.Count <= 0)
+            {
+                return false;
+            }
+            for (int i = 0; i < list.Count; i++)
+            {
+                list[i].valid = 0;
+                list[i].update_date = DateTime.Now;
+                _db.memberSocialAccount.Entry(list[i]).State = EntityState.Modified;
+            }
+            CoreDataModLog log = new CoreDataModLog()
+            {
+                id = 0,
+                trace_id = 0,
+                table_name = "member",
+                key_value = memberId,
+                scene = scene.Trim(),
+                field_name = "num",
+                prev_value = num,
+                current_value = null,
+                is_manual = 1,
+                manual_memo = "手机号解绑",
+                staff_id = staff == null ? null : staff.id,
+                member_id = staff != null ? memberId : null
+            };
+            await _db.coreDataModLog.AddAsync(log);
+            await _db.SaveChangesAsync();
+            return true;
+        }
+
+        [HttpGet("{memberId}")]
+        public async Task<ActionResult<ApiResult<Member>>> ChangeCellNumByStaff(int memberId, string num,
+            string sessionKey, string sessionType = "wechat_mini_openid", string scene = "")
+        {
+            scene = Util.UrlDecode(scene);
+            StaffController _staffHelper = new StaffController(_db);
+            Staff staff = await _staffHelper.GetStaffBySessionKey(sessionKey, sessionType);
+            if (staff == null)
+            {
+                return Ok(new ApiResult<Member?>()
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = null
+                });
+            }
+            List<MemberSocialAccount> validNumList = await _db.memberSocialAccount
+                .Where(m => m.num.Trim().Equals(num.Trim()) && m.type.Trim().Equals("cell") && m.valid == 1 && m.member_id != memberId)
+                .AsNoTracking().ToListAsync();
+            if (validNumList != null && validNumList.Count > 0)
+            {
+                return Ok(new ApiResult<Member?>()
+                {
+                    code = 1,
+                    message = "手机号已被他人绑定",
+                    data = null
+                });
+            }
+            Member member = await _db.member.Where(m => m.id == memberId)
+                .Include(m => m.memberSocialAccounts).AsNoTracking().FirstAsync();
+            if (member.cell != null && member.cell.Trim().Equals(num.Trim()))
+            {
+                return Ok(new ApiResult<Member?>()
+                {
+                    code = 1,
+                    message = "手机号没有改变",
+                    data = null
+                });
+            }
+            if (member.cell != null)
+            {
+                await UnbindMemberMainCellNum(memberId, member.cell, scene, staff);
+            }
+            MemberSocialAccount msa = await BindMemberMainCellNum(memberId, num, scene, staff);
+            if (msa == null)
+            {
+                return Ok(new ApiResult<Member?>()
+                {
+                    code = 1,
+                    message = "绑定失败",
+                    data = null
+                });
+            }
+            member = await _db.member.Where(m => m.id == memberId)
+                .Include(m => m.memberSocialAccounts).AsNoTracking().FirstAsync();
+            return Ok(new ApiResult<Member?>()
+            {
+                code = 0,
+                message = "",
+                data = member
+            });
+
+        }
+        [NonAction]
+        public async Task<MemberSocialAccount?> BindMemberMainCellNum(int memberId, string num, string scene, Staff? staff)
+        {
+            List<MemberSocialAccount> oriList = await _db.memberSocialAccount
+                .Where(m => m.member_id != memberId && m.valid == 1 && m.num.Trim().Equals(num.Trim()) && m.type.Trim().Equals("cell"))
+                .AsNoTracking().ToListAsync();
+            if (oriList != null && oriList.Count > 0)
+            {
+                return null;
+            }
+            bool find = false;
+            string? oriNum = null;
+            List<MemberSocialAccount> currentList = await _db.memberSocialAccount
+                .Where(m => m.type.Trim().Equals("cell") && m.member_id == memberId)
+                .ToListAsync();
+            for (int i = 0; i < currentList.Count; i++)
+            {
+                MemberSocialAccount msa = currentList[i];
+                if (msa.valid == 1)
+                {
+                    oriNum = msa.num.Trim();
+                }
+                if (msa.num.Trim().Equals(num.Trim()))
+                {
+                    find = true;
+                    msa.valid = 1;
+                    msa.update_date = DateTime.Now;
+                }
+                else
+                {
+                    msa.valid = 0;
+                    msa.update_date = DateTime.Now;
+                }
+                _db.memberSocialAccount.Entry(msa).State = EntityState.Modified;
+            }
+            if (!find)
+            {
+                MemberSocialAccount msa = new MemberSocialAccount()
+                {
+                    id = 0,
+                    member_id = memberId,
+                    type = "cell",
+                    num = num.Trim()
+                };
+                await _db.memberSocialAccount.AddAsync(msa);
+            }
+            CoreDataModLog log = new CoreDataModLog()
+            {
+                id = 0,
+                trace_id = 0,
+                table_name = "member",
+                key_value = memberId,
+                scene = scene.Trim(),
+                field_name = "num",
+                prev_value = null,
+                current_value = num.Trim(),
+                is_manual = 1,
+                manual_memo = "绑定手机号",
+                staff_id = staff == null ? null : staff.id,
+                member_id = staff != null ? memberId : null
+            };
+            await _db.coreDataModLog.AddAsync(log);
+            await _db.SaveChangesAsync();
+            return await _db.memberSocialAccount
+                .Where(m => m.member_id == memberId && m.valid == 1 && m.type.Trim().Equals("cell"))
+                .AsNoTracking().FirstAsync();
+        }
+        [NonAction]
         public async Task<MemberSocialAccount?> UpdateUniqueTypeMemberSocialAccount(int memberId, string num, string type, string scene, Staff? staff)
         {
             List<MemberSocialAccount> otherMsaList = await _db.memberSocialAccount
@@ -287,8 +448,8 @@ namespace SnowmeetApi.Controllers
                 current_value = num.Trim(),
                 is_manual = 1,
                 manual_memo = memo,
-                staff_id = staff == null? null: staff.id,
-                member_id = staff != null? memberId: null
+                staff_id = staff == null ? null : staff.id,
+                member_id = staff != null ? memberId : null
             };
             await _db.coreDataModLog.AddAsync(log);
             try
@@ -301,6 +462,7 @@ namespace SnowmeetApi.Controllers
                 return null;
             }
         }
+
         [NonAction]
         public async Task<Member> UpdateMemberInfo(Member member, Staff? staff, string scene)
         {
@@ -794,122 +956,122 @@ namespace SnowmeetApi.Controllers
                 return Ok(await GetMember(cell, "cell"));
             }
             */
-            /*
-                    [NonAction]
-                    public List<Member> GetCells(List<Member> memberList)
+        /*
+                [NonAction]
+                public List<Member> GetCells(List<Member> memberList)
+                {
+                    for(int i = 0; i < memberList.Count; i++)
                     {
-                        for(int i = 0; i < memberList.Count; i++)
+                        Member member = memberList[i];
+                        foreach(MemberSocialAccount msa in member.memberSocialAccounts)
                         {
-                            Member member = memberList[i];
-                            foreach(MemberSocialAccount msa in member.memberSocialAccounts)
+                            if (msa.type.Trim().Equals("cell"))
                             {
-                                if (msa.type.Trim().Equals("cell"))
-                                {
-                                    member.cell = msa.num.Trim();
-                                    break;
-                                }
+                                member.cell = msa.num.Trim();
+                                break;
                             }
                         }
-                        return memberList;
                     }
-            */
-            /*
-            [NonAction]
-            public async Task ModMemberCell(int memberId, string cell)
+                    return memberList;
+                }
+        */
+        /*
+        [NonAction]
+        public async Task ModMemberCell(int memberId, string cell)
+        {
+            var list = await _db.memberSocialAccount
+                .Where(m => (m.type.Trim().Equals("cell") && m.num.Trim().Equals(cell.Trim())
+                && m.member_id == memberId))
+                .ToListAsync();
+            if (list == null || list.Count == 0)
             {
-                var list = await _db.memberSocialAccount
-                    .Where(m => (m.type.Trim().Equals("cell") && m.num.Trim().Equals(cell.Trim())
-                    && m.member_id == memberId))
-                    .ToListAsync();
-                if (list == null || list.Count == 0)
+                MemberSocialAccount msa = new MemberSocialAccount()
                 {
-                    MemberSocialAccount msa = new MemberSocialAccount()
-                    {
-                        id = 0,
-                        member_id = memberId,
-                        type = "cell",
-                        num = cell.Trim(),
-                        valid = 1
-                    };
-                    await _db.memberSocialAccount.AddAsync(msa);
-                    await _db.SaveChangesAsync();
-                }
-                else
-                {
-                    MemberSocialAccount msa = list[0];
-                    msa.valid = 1;
-                    _db.memberSocialAccount.Entry(msa).State = EntityState.Modified;
-                    await _db.SaveChangesAsync();
-                }
-
+                    id = 0,
+                    member_id = memberId,
+                    type = "cell",
+                    num = cell.Trim(),
+                    valid = 1
+                };
+                await _db.memberSocialAccount.AddAsync(msa);
+                await _db.SaveChangesAsync();
+            }
+            else
+            {
+                MemberSocialAccount msa = list[0];
+                msa.valid = 1;
+                _db.memberSocialAccount.Entry(msa).State = EntityState.Modified;
+                await _db.SaveChangesAsync();
             }
 
+        }
 
-            [NonAction]
-            public Member RemoveSensitiveInfo(Member member)
+
+        [NonAction]
+        public Member RemoveSensitiveInfo(Member member)
+        {
+            if (member == null)
             {
-                if (member == null)
-                {
-                    return member;
-                }
-                member.id = 0;
-                IList<MemberSocialAccount> msaList = member.memberSocialAccounts.ToList();
-
-                for (int i = 0; i < msaList.Count; i++)
-                {
-                    MemberSocialAccount msa = msaList[i];
-                    msa.member_id = 0;
-                    if (msa.type.Trim().IndexOf("openid") >= 0)
-                    {
-                        msaList.Remove(msa);
-                        i--;
-                    }
-                    if (msa.type.Trim().IndexOf("unionid") >= 0)
-                    {
-                        msaList.Remove(msa);
-                        i--;
-                    }
-                }
-                member.memberSocialAccounts = msaList.ToList();
                 return member;
             }
+            member.id = 0;
+            IList<MemberSocialAccount> msaList = member.memberSocialAccounts.ToList();
 
-            [NonAction]
-            public async Task<bool> isStaff(string sessionKey, string sessionType = "wechat_mini_openid")
+            for (int i = 0; i < msaList.Count; i++)
             {
-                bool ret = false;
-                sessionKey = Util.UrlDecode(sessionKey);
-                sessionType = Util.UrlDecode(sessionType);
-                Member member = await GetMemberBySessionKey(sessionKey, sessionType);
-                if (member.is_admin == 1 || member.is_manager == 1 || member.is_staff == 1)
+                MemberSocialAccount msa = msaList[i];
+                msa.member_id = 0;
+                if (msa.type.Trim().IndexOf("openid") >= 0)
                 {
-                    ret = true;
+                    msaList.Remove(msa);
+                    i--;
                 }
-                return ret;
-            }
-
-            [NonAction]
-            public async Task<List<Member>> SearchMember(string key)
-            {
-                List<Member> mList = await _db.member.Where(m => (m.real_name.IndexOf(key) >= 0))
-                    .Include(m => m.memberSocialAccounts.Where(msa => msa.valid == 1)).AsNoTracking().ToListAsync();
-
-                List<MemberSocialAccount> cellList = await _db.memberSocialAccount
-                    .Where(msa => (msa.valid == 1 && msa.num.EndsWith(key) && key.Length >= 4 && msa.type.Trim().Equals("cell")))
-                    .Include(msa => msa.member).AsNoTracking().ToListAsync();
-
-
-                List<Member> ret = new List<Member>();
-                for (int i = 0; i < cellList.Count; i++)
+                if (msa.type.Trim().IndexOf("unionid") >= 0)
                 {
-                    Member member = cellList[i].member;
-                    if (mList.Where(m => m.id == member.id).ToList().Count == 0)
-                    {
-                        mList.Add(member);
-                    }
+                    msaList.Remove(msa);
+                    i--;
                 }
-                return mList;
             }
-            */
+            member.memberSocialAccounts = msaList.ToList();
+            return member;
         }
+
+        [NonAction]
+        public async Task<bool> isStaff(string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            bool ret = false;
+            sessionKey = Util.UrlDecode(sessionKey);
+            sessionType = Util.UrlDecode(sessionType);
+            Member member = await GetMemberBySessionKey(sessionKey, sessionType);
+            if (member.is_admin == 1 || member.is_manager == 1 || member.is_staff == 1)
+            {
+                ret = true;
+            }
+            return ret;
+        }
+
+        [NonAction]
+        public async Task<List<Member>> SearchMember(string key)
+        {
+            List<Member> mList = await _db.member.Where(m => (m.real_name.IndexOf(key) >= 0))
+                .Include(m => m.memberSocialAccounts.Where(msa => msa.valid == 1)).AsNoTracking().ToListAsync();
+
+            List<MemberSocialAccount> cellList = await _db.memberSocialAccount
+                .Where(msa => (msa.valid == 1 && msa.num.EndsWith(key) && key.Length >= 4 && msa.type.Trim().Equals("cell")))
+                .Include(msa => msa.member).AsNoTracking().ToListAsync();
+
+
+            List<Member> ret = new List<Member>();
+            for (int i = 0; i < cellList.Count; i++)
+            {
+                Member member = cellList[i].member;
+                if (mList.Where(m => m.id == member.id).ToList().Count == 0)
+                {
+                    mList.Add(member);
+                }
+            }
+            return mList;
+        }
+        */
+    }
 }
