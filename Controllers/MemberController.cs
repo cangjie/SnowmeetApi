@@ -471,6 +471,7 @@ namespace SnowmeetApi.Controllers
             {
                 return null;
             }
+            /*
             if (!member._cell.Trim().Equals(oriMember.cell.Trim()))
             {
                 MemberSocialAccount? msa = await UpdateUniqueTypeMemberSocialAccount(member.id, member._cell.Trim(), "cell", scene, staff);
@@ -478,6 +479,22 @@ namespace SnowmeetApi.Controllers
                 {
                     return null;
                 }
+            }
+            */
+            if (member.memberSocialAccounts.Where(m => (m.type.Equals("cell") || m.type.Equals("contact"))
+                && m.valid == 1 && m.num.Trim().Equals(member.currentNum)).ToList().Count <= 0)
+            {
+                MemberSocialAccount msa = new MemberSocialAccount()
+                {
+                    id = 0,
+                    member_id = member.id,
+                    type = "contact",
+                    num = member.currentNum.Trim(),
+                    valid = 1,
+                    create_date = DateTime.Now
+                };
+                await _db.memberSocialAccount.AddAsync(msa);
+                await _db.SaveChangesAsync();
             }
             Member newMember = await _db.member.FindAsync(member.id);
             if (!member.real_name.Trim().Equals(oriMember.real_name.Trim()))
@@ -531,7 +548,6 @@ namespace SnowmeetApi.Controllers
             {
                 return null;
             }
-
         }
         [HttpGet("{memberId}")]
         public async Task<ActionResult<ApiResult<Member?>>> GetMember(int memberId,

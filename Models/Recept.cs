@@ -44,6 +44,7 @@ namespace SnowmeetApi.Models
         public DateTime create_date { get; set; }
         public DateTime update_date { get; set; }
         public DateTime? submit_date { get; set; }
+        public int? scan_qrcode_id { get; set; } = null;
 
         public RentOrder _rentOrder;
         public Maintain.MaintainOrder _maintainOrder;

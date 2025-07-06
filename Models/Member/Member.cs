@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Linq;
 using Org.BouncyCastle.Tsp;
 using SnowmeetApi.Models.Deposit;
 namespace SnowmeetApi.Models
@@ -18,6 +19,8 @@ namespace SnowmeetApi.Models
         public string source { get; set; } = "";
         public int in_staff_list { get; set; } = 0;
         public DateTime? update_date { get; set; } = null;
+        [NotMapped]
+        public string? currentNum { get; set; } = null;
         [NotMapped]
         public string title
         {
@@ -43,7 +46,6 @@ namespace SnowmeetApi.Models
             }
             return msaList;
         }
-
         public string? wechatMiniOpenId
         {
             get
@@ -108,7 +110,21 @@ namespace SnowmeetApi.Models
             }
         }
         public List<SocialAccountForJob>? jobAccounts { get; set; }
-
+        [NotMapped]
+        public List<MemberSocialAccount> contactNums
+        {
+            get
+            {
+                if (memberSocialAccounts == null)
+                { 
+                    return new List<MemberSocialAccount>();
+                }
+                List<MemberSocialAccount> mList = memberSocialAccounts
+                    .Where(m => m.valid == 1 && (m.type.Equals("cell") || m.type.Equals("contact")))
+                    .OrderBy(m => m.type).ThenByDescending(m => m.id).ToList();
+                return mList;
+            }
+        }
         //will be deleted
         public int is_staff { get; set; } = 0;
         public int is_manager { get; set; } = 0;
