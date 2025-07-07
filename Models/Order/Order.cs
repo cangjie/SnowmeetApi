@@ -169,6 +169,9 @@ namespace SnowmeetApi.Models
         public string code { get; set; }
         public string shop { get; set; }
         public string type { get; set; }
+        public string? contact_num { get; set; } = null;
+        public string? contact_name { get; set; } = null;
+        public string? contact_gender { get; set; } = null;
         public string sub_type { get; set; } = "";
         public int is_package { get; set; } = 0;
         public string pay_option { get; set; } = "普通";
