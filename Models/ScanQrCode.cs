@@ -22,6 +22,7 @@ namespace SnowmeetApi.Models
         public int stoped { get; set; } = 0;
         public string? cell { get; set; } = null;
         public int authed { get; set; } = 0;
+        public int no_scan { get; set; } = 0;
         public int? auth_staff_id { get; set; }
         public DateTime? expire_time { get; set; }
         public DateTime? scan_time { get; set; } = null;

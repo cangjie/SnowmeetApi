@@ -23,19 +23,17 @@ namespace SnowmeetApi.Models
 
         public string shop { get; set; }
         public string open_id { get; set; }
-        public string cell { get; set; }
-        public string real_name { get; set; }
+        public int? member_id { get; set; } = null;
+        public string? cell { get; set; } = null;
+        public string? real_name { get; set; } = null;        
+        public string? gender { get; set; } = null;
         public int current_step { get; set; }
-        public string gender { get; set; }
         public string recept_type { get; set; }
         public string submit_data { get; set; } = "";
         public string recept_staff { get; set; }
-
         [NotMapped]
         public string recept_staff_name { get; set; } = "";
-
         public string update_staff { get; set; }
-
         [NotMapped]
         public string update_staff_name { get; set; } = "";
         //[ForeignKey(nameof(RentOrder))]
@@ -45,13 +43,10 @@ namespace SnowmeetApi.Models
         public DateTime update_date { get; set; }
         public DateTime? submit_date { get; set; }
         public int? scan_qrcode_id { get; set; } = null;
-
         public RentOrder _rentOrder;
         public Maintain.MaintainOrder _maintainOrder;
-
         [NotMapped]
         public SerialTest entity { get; set; }
-
         [NotMapped]
         public Rent.RentOrder? rentOrder
         {
@@ -74,7 +69,7 @@ namespace SnowmeetApi.Models
                 {
                     return _rentOrder;
                 }
-                
+   
             }
             set
             {

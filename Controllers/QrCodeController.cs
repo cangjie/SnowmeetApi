@@ -257,5 +257,56 @@ namespace SnowmeetApi.Controllers
                 data = sq
             });
         }
+        [HttpGet("scanId")]
+        public async Task<ActionResult<ApiResult<ScanQrCode>>> StartReceptWithoutScan(int scanId,
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            StaffController _staffHelper = new StaffController(_db);
+            Staff staff = await _staffHelper.GetStaffBySessionKey(sessionKey, sessionType);
+            if (staff == null)
+            {
+                return Ok(new ApiResult<object?>()
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = null
+                });
+            }
+            ScanQrCode code = await _db.scanQrCode.FindAsync(scanId);
+            if (code == null)
+            {
+                return Ok(new ApiResult<object?>()
+                {
+                    code = 1,
+                    message = "没查询到对象",
+                    data = null
+                });
+            }
+            code.stoped = 1;
+            code.no_scan = 1;
+            _db.scanQrCode.Entry(code).State = EntityState.Modified;
+            CoreDataModLog log = new CoreDataModLog()
+            {
+                id = 0,
+                table_name = "scan_qrcode",
+                field_name = "no_scan",
+                key_value = scanId,
+                scene = "接待流程扫码",
+                staff_id = staff.id,
+                prev_value = "0",
+                current_value = "1",
+                is_manual = 1,
+                manual_memo = ""
+            };
+            await _db.coreDataModLog.AddAsync(log);
+            await _db.SaveChangesAsync();
+            return Ok(new ApiResult<ScanQrCode>()
+            {
+                code = 0,
+                message = "",
+                data = code
+            });
+        }
+
     }
 }
