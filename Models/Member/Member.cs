@@ -20,7 +20,7 @@ namespace SnowmeetApi.Models
         public int in_staff_list { get; set; } = 0;
         public DateTime? update_date { get; set; } = null;
         [NotMapped]
-        public string? currentNum { get; set; } = null;
+        public string? currentContactNum { get; set; } = null;
         [NotMapped]
         public string title
         {

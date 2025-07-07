@@ -284,6 +284,7 @@ namespace SnowmeetApi.Controllers
             }
             code.stoped = 1;
             code.no_scan = 1;
+            code.update_date = DateTime.Now;
             _db.scanQrCode.Entry(code).State = EntityState.Modified;
             CoreDataModLog log = new CoreDataModLog()
             {

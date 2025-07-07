@@ -482,14 +482,14 @@ namespace SnowmeetApi.Controllers
             }
             */
             if (member.memberSocialAccounts.Where(m => (m.type.Equals("cell") || m.type.Equals("contact"))
-                && m.valid == 1 && m.num.Trim().Equals(member.currentNum)).ToList().Count <= 0)
+                && m.valid == 1 && m.num.Trim().Equals(member.currentContactNum)).ToList().Count <= 0)
             {
                 MemberSocialAccount msa = new MemberSocialAccount()
                 {
                     id = 0,
                     member_id = member.id,
                     type = "contact",
-                    num = member.currentNum.Trim(),
+                    num = member.currentContactNum.Trim(),
                     valid = 1,
                     create_date = DateTime.Now
                 };
