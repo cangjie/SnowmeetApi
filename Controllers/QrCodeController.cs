@@ -257,7 +257,7 @@ namespace SnowmeetApi.Controllers
                 data = sq
             });
         }
-        [HttpGet("scanId")]
+        [HttpGet("{scanId}")]
         public async Task<ActionResult<ApiResult<ScanQrCode>>> StartReceptWithoutScan(int scanId,
             string sessionKey, string sessionType = "wechat_mini_openid")
         {
