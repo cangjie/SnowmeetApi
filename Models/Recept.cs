@@ -16,20 +16,18 @@ namespace SnowmeetApi.Models
 
     [Table("recept")]
     public class Recept
-	{
-
+    {
         [Key]
         public int id { get; set; }
-
         public string shop { get; set; }
-        public string open_id { get; set; }
+        public string? open_id { get; set; }
         public int? member_id { get; set; } = null;
         public string? cell { get; set; } = null;
-        public string? real_name { get; set; } = null;        
+        public string? real_name { get; set; } = null;
         public string? gender { get; set; } = null;
         public int current_step { get; set; }
         public string recept_type { get; set; }
-        public string submit_data { get; set; } = "";
+        public string? submit_data { get; set; } = null;
         public string recept_staff { get; set; }
         [NotMapped]
         public string recept_staff_name { get; set; } = "";
@@ -37,7 +35,8 @@ namespace SnowmeetApi.Models
         [NotMapped]
         public string update_staff_name { get; set; } = "";
         //[ForeignKey(nameof(RentOrder))]
-        public int submit_return_id { get; set; } = 0;
+        public int? submit_return_id { get; set; } = null;
+        public int? order_id { get; set; } = null;
         public string code { get; set; } = "";
         public DateTime create_date { get; set; }
         public DateTime update_date { get; set; }
@@ -69,7 +68,7 @@ namespace SnowmeetApi.Models
                 {
                     return _rentOrder;
                 }
-   
+
             }
             set
             {
@@ -77,40 +76,38 @@ namespace SnowmeetApi.Models
             }
         }
 
-    [NotMapped]
-    public Maintain.MaintainOrder maintainOrder
-    {
-        get
-        {   if (_maintainOrder == null)
+        [NotMapped]
+        public Maintain.MaintainOrder maintainOrder
+        {
+            get
             {
-                if (recept_type.Trim().Equals("养护下单") || recept_type.Trim().Equals("养护招待"))
+                if (_maintainOrder == null)
                 {
-                    object order = JsonConvert.DeserializeObject(submit_data, typeof(Maintain.MaintainOrder));
-                    return (Maintain.MaintainOrder)order;
+                    if (recept_type.Trim().Equals("养护下单") || recept_type.Trim().Equals("养护招待"))
+                    {
+                        object order = JsonConvert.DeserializeObject(submit_data, typeof(Maintain.MaintainOrder));
+                        return (Maintain.MaintainOrder)order;
 
+                    }
+                    else
+                    {
+                        return null;
+                    }
                 }
                 else
                 {
-                    return null;
+                    return _maintainOrder;
                 }
             }
-            else
+            set
             {
-                return _maintainOrder;
+                _maintainOrder = value;
             }
+
         }
-        set
-        {
-            _maintainOrder = value;
-        }
+        [NotMapped]
+        public Member member { get; set; }
 
     }
-    [NotMapped]
-    public Member member {get; set;}
-
-       
-
-
-	}
 }
 

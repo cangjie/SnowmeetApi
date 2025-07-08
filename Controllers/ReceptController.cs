@@ -26,22 +26,13 @@ namespace SnowmeetApi.Controllers
         private readonly ApplicationDBContext _context;
 
         private IConfiguration _config;
-
         public string _appId = "";
-
         public bool isStaff = false;
-
         private IConfiguration _oriConfig;
-
         private readonly IHttpContextAccessor _httpContextAccessor;
-
         private readonly MaintainLiveController _maintainHelper;
-
         private readonly RentController _rentHelper;
-        //private readonly MaintainLiveController _maintainHelper;
-
         private readonly MemberController _memberHelper;
-
         public ReceptController(ApplicationDBContext context, IConfiguration config, IHttpContextAccessor httpContextAccessor)
         {
             _context = context;
@@ -54,7 +45,7 @@ namespace SnowmeetApi.Controllers
             _memberHelper = new MemberController(context, config);
 
         }
-
+        /*
         [HttpGet]
         public ActionResult<SerialTest> TestSerial()
         {
@@ -62,7 +53,6 @@ namespace SnowmeetApi.Controllers
             object s = JsonConvert.DeserializeObject(json, typeof(SerialTest));
             return (SerialTest)s;
         }
-
         [HttpGet]
         public ActionResult<string> TestDeSerial()
         {
@@ -77,7 +67,7 @@ namespace SnowmeetApi.Controllers
             string s = JsonConvert.SerializeObject(t);
             return s;
         }
-
+        */
         [HttpGet("{id}")]
         public async Task SendPaymentOAMessage(int id, string sessionKey)
         {
@@ -100,7 +90,6 @@ namespace SnowmeetApi.Controllers
                 + Util.UrlEncode(u.member.wechatUnionId) + "&content=" + Util.UrlEncode(content);
             Util.GetWebContent(sendUrl);
         }
-
         [HttpGet("{id}")]
         public async Task<ActionResult<Recept>> SetPaidManual(int id, string payMethod, string sessionKey)
         {
@@ -115,24 +104,21 @@ namespace SnowmeetApi.Controllers
                 return BadRequest();
             }
             Recept recept = await _context.Recept.FindAsync(id);
-
             int orderId = 0;
-
             OrderOnlinesController orderHelper = new OrderOnlinesController(_context, _oriConfig);
-
             switch (recept.recept_type)
             {
                 case "租赁下单":
                     RentOrder rentOrder = await _context.RentOrder.FindAsync(recept.submit_return_id);
                     orderId = (int)rentOrder.order_id;
-                    await _rentHelper.StartRent(recept.submit_return_id);
+                    await _rentHelper.StartRent((int)recept.submit_return_id);
                     break;
                 case "养护下单":
                     MaintainLiveController maintainHelper = new MaintainLiveController(_context, _oriConfig);
                     if (recept.submit_return_id > 0)
                     {
                         Models.Maintain.MaintainOrder maintainOrder = (Models.Maintain.MaintainOrder)
-                            ((OkObjectResult)(await maintainHelper.GetMaintainOrder(recept.submit_return_id, sessionKey)).Result).Value;
+                            ((OkObjectResult)(await maintainHelper.GetMaintainOrder((int)recept.submit_return_id, sessionKey)).Result).Value;
                         orderId = maintainOrder.orderId;
                         await maintainHelper.MaitainOrderPaySuccess(orderId);
                     }
@@ -144,28 +130,22 @@ namespace SnowmeetApi.Controllers
                         {
                             await maintainHelper.GenerateFlowNum(ml[i].id);
                         }
-
                     }
                     break;
                 default:
                     break;
             }
-
-
             if (orderId > 0)
             {
                 await orderHelper.SetOrderPaidManual(orderId, payMethod, sessionKey);
             }
-
             if (recept.code != null && !recept.code.Trim().Equals(""))
             {
                 TicketController tHelper = new TicketController(_context, _oriConfig);
                 await tHelper.Use(recept.code, sessionKey);
             }
-
             return Ok(recept);
         }
-
         [HttpGet("{id}")]
         public async Task<ActionResult<Recept>> UpdateReceptOpenId(int id, string openId, string sessionKey)
         {
@@ -176,22 +156,19 @@ namespace SnowmeetApi.Controllers
                 return BadRequest();
             }
             openId = Util.UrlDecode(openId);
-
             Recept recept = await _context.Recept.FindAsync(id);
             if (recept == null)
             {
                 return NotFound();
             }
-
             recept.open_id = openId;
-
             _context.Entry(recept).State = EntityState.Modified;
             await _context.SaveChangesAsync();
             int orderId = 0;
             switch (recept.recept_type)
             {
                 case "租赁下单":
-                    int rentId = recept.submit_return_id;
+                    int rentId = (int)recept.submit_return_id;
                     RentOrder rent = await _context.RentOrder.FindAsync(rentId);
                     rent.open_id = openId.Trim();
                     _context.Entry(rent).State = EntityState.Modified;
@@ -199,7 +176,7 @@ namespace SnowmeetApi.Controllers
                     orderId = (int)rent.order_id;
                     break;
                 case "养护下单":
-                    int maintainId = recept.submit_return_id;
+                    int maintainId = (int)recept.submit_return_id;
                     MaintainLive mOrder = await _context.MaintainLives.FindAsync(maintainId);
                     mOrder.open_id = openId.Trim();
                     _context.Entry(mOrder).State = EntityState.Modified;
@@ -217,9 +194,7 @@ namespace SnowmeetApi.Controllers
                 await _context.SaveChangesAsync();
             }
             return Ok(recept);
-
         }
-
         [HttpGet("{vipId}")]
         public async Task<ActionResult<Recept>> GetUnFinishedRecept(int vipId,
             string shop, string scene, string sessionKey)
@@ -237,7 +212,6 @@ namespace SnowmeetApi.Controllers
             {
                 return NotFound();
             }
-
             var rList = await _context.Recept.Where(r => (r.open_id.Trim().Equals("")
                 && r.cell.Trim().Equals(vip.cell.Trim()) && r.shop.Trim().Equals(shop)
                 && r.submit_return_id == 0
@@ -275,9 +249,7 @@ namespace SnowmeetApi.Controllers
                 Recept r = (Recept)((OkObjectResult)(await NewVipRecept(vipId, shop, scene, sessionKey)).Result).Value;
                 return await GetRecept(r.id, sessionKey);
             }
-
         }
-
         [HttpGet]
         public async Task<ActionResult<Recept>> NewVipRecept(int vipId,
             string shop, string scene, string sessionKey)
@@ -299,7 +271,6 @@ namespace SnowmeetApi.Controllers
             switch (scene)
             {
                 case "租赁招待":
-
                     RentOrder order = new RentOrder()
                     {
                         open_id = "",
@@ -321,7 +292,6 @@ namespace SnowmeetApi.Controllers
                 default:
                     break;
             }
-
             Recept recept = new Recept()
             {
                 shop = shop.Trim(),
@@ -342,8 +312,6 @@ namespace SnowmeetApi.Controllers
             await _context.SaveChangesAsync();
             return Ok(recept);
         }
-
-
         [HttpGet]
         public async Task<ActionResult<Recept>> NewRecept(string openId, string scene, string shop, string sessionKey, string code = "")
         {
@@ -378,9 +346,7 @@ namespace SnowmeetApi.Controllers
                 cell = user.cell.Trim();
                 gender = user.gender.Trim();
             }
-
             string entityJson = "";
-
             switch (scene)
             {
                 case "租赁下单":
@@ -429,11 +395,9 @@ namespace SnowmeetApi.Controllers
             await _context.SaveChangesAsync();
             return Ok(recept);
         }
-
         [HttpPost("{sessionKey}")]
         public async Task<ActionResult<Recept>> UpdateRecept(string sessionKey, Recept recept)
         {
-            //Recept recept = JsonConvert.DeserializeObject(receptJson.ToString(), typeof(Recept));
             MiniAppUser adminUser = await GetUser(sessionKey);
             if (adminUser.is_admin == 0)
             {
@@ -462,7 +426,6 @@ namespace SnowmeetApi.Controllers
             await _context.SaveChangesAsync();
             return Ok(recept);
         }
-
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Recept>>> GetUnSubmitRecept(string shop, string sessionKey)
         {
@@ -791,7 +754,6 @@ namespace SnowmeetApi.Controllers
                 rentOrder.order = order;
                 await _context.RentOrder.AddAsync(rentOrder);
                 await _context.SaveChangesAsync();
-                
             }
             else
             {
@@ -802,16 +764,12 @@ namespace SnowmeetApi.Controllers
                     await _rentHelper.StartRent(rentOrder.id);
                 }
             }
-
             recept.submit_return_id = rentOrder.id;
             recept.update_date = DateTime.Now;
             _context.Recept.Entry(recept).State = EntityState.Modified;
             await _context.SaveChangesAsync(); 
             return recept;
         }
-
-
-
         [HttpGet("{id}")]
         public async Task<ActionResult<Recept>> GetRecept(int id, string sessionKey)
         {
@@ -864,7 +822,7 @@ namespace SnowmeetApi.Controllers
                     case "养护招待":
                     case "养护下单":
                         MaintainLiveController mc = new MaintainLiveController(_context, _oriConfig);
-                        Models.Maintain.MaintainOrder mOrder = (Models.Maintain.MaintainOrder)((OkObjectResult)(await mc.GetMaintainOrder(recept.submit_return_id, sessionKey, false)).Result).Value;
+                        Models.Maintain.MaintainOrder mOrder = (Models.Maintain.MaintainOrder)((OkObjectResult)(await mc.GetMaintainOrder((int)recept.submit_return_id, sessionKey, false)).Result).Value;
                         if (!isAdmin)
                         {
                             mOrder.order.open_id = "";
@@ -880,9 +838,6 @@ namespace SnowmeetApi.Controllers
                 }
 
             }
-
-
-
             if (recept.rentOrder != null && recept.rentOrder.details != null)
             {
                 for (int i = 0; i < recept.rentOrder.details.Count; i++)
@@ -902,19 +857,14 @@ namespace SnowmeetApi.Controllers
                             rOrder.details[i].item = riL[0];
                             recept.rentOrder = rOrder;
                         }
-
                     }
-
                 }
             }
-
             MemberController _memeberHelper = new MemberController(_context, _oriConfig);
             Member? member = await _memberHelper.GetWholeMemberByNum(recept.open_id.Trim(), "wechat_mini_openid");
             recept.member = member;
             return Ok(recept);
         }
-
-
         [NonAction]
         public async Task<bool> IsAdmin(string sessionKey)
         {
@@ -928,7 +878,6 @@ namespace SnowmeetApi.Controllers
             }
             return isAdmin;
         }
-
         [NonAction]
         public async Task<MiniAppUser> GetUser(string sessionKey)
         {
@@ -958,8 +907,6 @@ namespace SnowmeetApi.Controllers
             }
             return Ok(l[0].id);
         }
-
-
         private bool ReceptExists(int id)
         {
             return _context.Recept.Any(e => e.id == id);
