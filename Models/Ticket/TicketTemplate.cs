@@ -1,7 +1,7 @@
 ﻿using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-namespace SnowmeetApi.Models.Ticket
+namespace SnowmeetApi.Models
 {
     [Table("ticket_template")]
     public class TicketTemplate

@@ -1,5 +1,5 @@
 ﻿using System;
-using SnowmeetApi.Models.Ticket;
+using SnowmeetApi.Models;
 namespace SnowmeetApi.Models.Maintain
 {
        
@@ -31,7 +31,7 @@ namespace SnowmeetApi.Models.Maintain
             }
         }
         public OrderOnline? order { get; set; }
-        public Ticket.Ticket? ticket { get; set; }
+        public Ticket? ticket { get; set; }
         public DateTime orderDate { get; set; }
     }
 }

@@ -24,14 +24,14 @@ namespace SnowmeetApi.Controllers
         [NonAction]
         public async Task<int> GetMemberTotalPoints(int memberId)
         {
-            return await _db.Point
+            return await _db.point
                 .Where(p => p.member_id == memberId && p.points > 0 && p.valid == 1)
                 .SumAsync(p => p.points);
         }
         [NonAction]
         public async Task<int> GetMemberSummaryPoints(int memberId)
         {
-            return await _db.Point
+            return await _db.point
                 .Where(p => p.member_id == memberId && p.valid == 1)
                 .SumAsync(p => p.points);
         }

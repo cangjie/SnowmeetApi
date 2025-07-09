@@ -11,7 +11,7 @@ using Microsoft.Extensions.Configuration;
 using SnowmeetApi.Models.Users;
 using SnowmeetApi.Models.Product;
 
-using SnowmeetApi.Models.Ticket;
+using SnowmeetApi.Models;
 
 namespace SnowmeetApi.Controllers
 {

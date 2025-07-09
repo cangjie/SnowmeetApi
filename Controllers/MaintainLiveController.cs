@@ -343,7 +343,7 @@ namespace SnowmeetApi.Controllers
             }
             if (!order.ticket_code.Trim().Equals(""))
             {
-                mOrder.ticket = await _context.Ticket.FindAsync(order.ticket_code.Trim());
+                mOrder.ticket = await _context.ticket.FindAsync(order.ticket_code.Trim());
                 if (!user.isAdmin && mOrder.ticket != null)
                 {
                     mOrder.ticket.open_id = "";

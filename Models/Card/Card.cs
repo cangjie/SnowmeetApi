@@ -1,7 +1,7 @@
 ﻿using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-namespace SnowmeetApi.Models.Card
+namespace SnowmeetApi.Models
 {
     [Table("card")]
     public class Card

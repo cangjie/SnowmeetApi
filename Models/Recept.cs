@@ -28,7 +28,8 @@ namespace SnowmeetApi.Models
         public int current_step { get; set; }
         public string recept_type { get; set; }
         public string? submit_data { get; set; } = null;
-        public string recept_staff { get; set; }
+        public string? recept_staff { get; set; } = null;
+        public int valid { get; set; } = 1;
         [NotMapped]
         public string recept_staff_name { get; set; } = "";
         public string update_staff { get; set; }
@@ -38,10 +39,11 @@ namespace SnowmeetApi.Models
         public int? submit_return_id { get; set; } = null;
         public int? order_id { get; set; } = null;
         public string code { get; set; } = "";
-        public DateTime create_date { get; set; }
-        public DateTime update_date { get; set; }
-        public DateTime? submit_date { get; set; }
+        public DateTime create_date { get; set; } = DateTime.Now;
+        public DateTime? update_date { get; set; } = null;
+        public DateTime? submit_date { get; set; } = null;
         public int? scan_qrcode_id { get; set; } = null;
+        public int? staff_id { get; set; } = null;
         public RentOrder _rentOrder;
         public Maintain.MaintainOrder _maintainOrder;
         [NotMapped]

@@ -2161,7 +2161,7 @@ namespace SnowmeetApi.Controllers
         [NonAction]
         public async Task RestoreStaffInfo(RentOrder order)
         {
-            var receptList = await _db.Recept.Where(r => r.submit_return_id == order.id)
+            var receptList = await _db.recept.Where(r => r.submit_return_id == order.id)
                 .AsNoTracking().ToListAsync();
             if (receptList != null && receptList.Count > 0)
             {

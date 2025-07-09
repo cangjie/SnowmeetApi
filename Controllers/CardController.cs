@@ -6,8 +6,8 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SnowmeetApi.Data;
-using SnowmeetApi.Models.Card;
 using Microsoft.Extensions.Configuration;
+using SnowmeetApi.Models;
 namespace SnowmeetApi.Controllers
 {
     [Route("core/[controller]/[action]")]
@@ -37,7 +37,7 @@ namespace SnowmeetApi.Controllers
             bool isDuplicate = true;
             for (; isDuplicate && retryTimes < 1000;)
             {
-                isDuplicate = _context.Card.Any(e => e.card_no == code);
+                isDuplicate = _context.card.Any(e => e.card_no == code);
             }
             if (isDuplicate)
             {
@@ -51,7 +51,7 @@ namespace SnowmeetApi.Controllers
             };
             try
             {
-                _context.Card.Add(card);
+                _context.card.Add(card);
                 _context.SaveChanges();
                 return code.Trim();
             }
@@ -159,7 +159,7 @@ namespace SnowmeetApi.Controllers
         */
         private bool CardExists(string id)
         {
-            return _context.Card.Any(e => e.card_no == id);
+            return _context.card.Any(e => e.card_no == id);
         }
     }
 }

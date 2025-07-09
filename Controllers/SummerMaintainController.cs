@@ -6,11 +6,9 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SnowmeetApi.Data;
-using SnowmeetApi.Models.Ticket;
+using SnowmeetApi.Models;
 using Microsoft.Extensions.Configuration;
 using SnowmeetApi.Models.Users;
-using SnowmeetApi.Models.Card;
-using SnowmeetApi.Models;
 using SnowmeetApi.Models.Product;
 using wechat_miniapp_base.Models;
 namespace SnowmeetApi.Controllers
@@ -122,7 +120,7 @@ namespace SnowmeetApi.Controllers
             }
             CardController cardController = new CardController(_context, wholeConfig);
             code = cardController.CreateCard(type.Trim());
-            Card card = _context.Card.Find(code);
+            Card card = _context.card.Find(code);
             card.product_id = productId;
             card.is_package = 0;
             card.is_ticket = 0;

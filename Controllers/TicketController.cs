@@ -6,10 +6,8 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SnowmeetApi.Data;
-using SnowmeetApi.Models.Ticket;
 using Microsoft.Extensions.Configuration;
 using SnowmeetApi.Models.Users;
-using SnowmeetApi.Models.Card;
 using SnowmeetApi.Controllers.User;
 using SnowmeetApi.Models;
 namespace SnowmeetApi.Controllers
@@ -34,21 +32,21 @@ namespace SnowmeetApi.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<TicketTemplate>>> GetTemplateList()
         {
-            var list = await _context.TicketTemplate.Where<TicketTemplate>(tt => tt.hide == 0).ToListAsync();
+            var list = await _context.ticketTemplate.Where<TicketTemplate>(tt => tt.hide == 0).ToListAsync();
             return Ok(list);
         }
 
         [HttpGet("{templateId}")]
         public async Task<ActionResult<TicketTemplate>> GetTicketTemplateById(int templateId)
         {
-            return Ok(await _context.TicketTemplate.FindAsync(templateId));
+            return Ok(await _context.ticketTemplate.FindAsync(templateId));
         }
 
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Ticket>>> GetUnusedTicketsByCode(string ticketCodeArr)
         {
             ticketCodeArr = Util.UrlDecode(ticketCodeArr);
-            var ticketArr = await _context.Ticket
+            var ticketArr = await _context.ticket
                 .FromSqlRaw(" select * from ticket where used = 0 and code in ("
                 + ticketCodeArr.Replace("'", "").Trim() + ") ")
                 .ToListAsync();
@@ -59,7 +57,7 @@ namespace SnowmeetApi.Controllers
         [ActionName("GetChannels")]
         public async Task<ActionResult<IEnumerable<string>>> GetChannels()
         {
-            return await _context.Ticket
+            return await _context.ticket
                 .Where(tt=>!tt.channel.Trim().Equals(""))
                 .Select(tt => tt.channel).Distinct().ToListAsync();
             
@@ -73,7 +71,7 @@ namespace SnowmeetApi.Controllers
 
             UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
 
-            Ticket ticket = await _context.Ticket.FindAsync(code);
+            Ticket ticket = await _context.ticket.FindAsync(code);
             if (ticket == null || !ticket.open_id.Trim().Equals(user.miniAppOpenId.Trim()))
             {
                 return NotFound();
@@ -97,7 +95,7 @@ namespace SnowmeetApi.Controllers
 
             UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
 
-            Ticket ticket = await _context.Ticket.FindAsync(code);
+            Ticket ticket = await _context.ticket.FindAsync(code);
 
             if (ticket.shared != 1)
             {
@@ -133,7 +131,7 @@ namespace SnowmeetApi.Controllers
         [HttpGet("{code}")]
         public async Task<ActionResult<Ticket>> GetTicket(string code)
         {
-            var ticket = await _context.Ticket.FindAsync(code);
+            var ticket = await _context.ticket.FindAsync(code);
 
             if (ticket == null)
             {
@@ -166,7 +164,7 @@ namespace SnowmeetApi.Controllers
             string code = Util.GetRandomCode(9);
             for (; isDuplicate && retryTimes < 1000;)
             {
-                isDuplicate = _context.Card.Any(e => e.card_no == code);
+                isDuplicate = _context.card.Any(e => e.card_no == code);
             }
 
             if (isDuplicate)
@@ -174,7 +172,7 @@ namespace SnowmeetApi.Controllers
                 return NoContent();
             }
 
-            TicketTemplate template = await _context.TicketTemplate.FindAsync(templateId);
+            TicketTemplate template = await _context.ticketTemplate.FindAsync(templateId);
 
             Card card = new Card
             {
@@ -182,7 +180,7 @@ namespace SnowmeetApi.Controllers
                 is_ticket = 1,
                 type = ""
             };
-            await _context.Card.AddAsync(card);
+            await _context.card.AddAsync(card);
             await _context.SaveChangesAsync();
             Ticket ticket = new Ticket
             {
@@ -200,7 +198,7 @@ namespace SnowmeetApi.Controllers
                 expire_date = ((template.expire_date == null)? DateTime.MaxValue : (DateTime)template.expire_date)
 
             };
-            await _context.Ticket.AddAsync(ticket);
+            await _context.ticket.AddAsync(ticket);
             await _context.SaveChangesAsync();
             return Ok(ticket);
         }
@@ -208,7 +206,7 @@ namespace SnowmeetApi.Controllers
         [HttpGet("{templateId}")]
         public async Task<ActionResult<Ticket[]>> GenerateTickets(int templateId, int count, string sessionKey, string channel = "")
         {
-            TicketTemplate template = _context.TicketTemplate.Find(templateId);
+            TicketTemplate template = _context.ticketTemplate.Find(templateId);
             if (template == null)
             {
                 return NoContent();
@@ -229,7 +227,7 @@ namespace SnowmeetApi.Controllers
                 string code = Util.GetRandomCode(9);
                 for (; isDuplicate && retryTimes < 1000;)
                 {
-                    isDuplicate = _context.Card.Any(e => e.card_no == code);
+                    isDuplicate = _context.card.Any(e => e.card_no == code);
                 }
                 if (isDuplicate)
                 {
@@ -240,7 +238,7 @@ namespace SnowmeetApi.Controllers
                     is_ticket = 1,
                     type = ""
                 };
-                _context.Card.Add(card);
+                _context.card.Add(card);
                 await _context.SaveChangesAsync();
                 Ticket ticket = new Ticket
                 {
@@ -257,7 +255,7 @@ namespace SnowmeetApi.Controllers
                     channel = channel.Trim()
 
                 };
-                _context.Ticket.Add(ticket);
+                _context.ticket.Add(ticket);
                 bool insertTicketSuccess = true;
                 try
                 {
@@ -267,14 +265,14 @@ namespace SnowmeetApi.Controllers
                 catch
                 {
                     insertTicketSuccess = false;
-                    _context.Ticket.Remove(ticket);
+                    _context.ticket.Remove(ticket);
                     
                     
                 }
                 if (!insertTicketSuccess)
                 {
-                    card = await _context.Card.FindAsync(code);
-                    _context.Card.Remove(card);
+                    card = await _context.card.FindAsync(code);
+                    _context.card.Remove(card);
                     try
                     {
                         await _context.SaveChangesAsync();
@@ -299,7 +297,7 @@ namespace SnowmeetApi.Controllers
             UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (user.isAdmin)
             {
-                Ticket ticket = await _context.Ticket.FindAsync(code);
+                Ticket ticket = await _context.ticket.FindAsync(code);
                 ticket.printed = 1;
                 _context.Entry<Ticket>(ticket).State = EntityState.Modified;
                 await _context.SaveChangesAsync();
@@ -322,7 +320,7 @@ namespace SnowmeetApi.Controllers
                 return NotFound();
             }
 
-            return await _context.Ticket.Where<Ticket>(t => (t.open_id == user.miniAppOpenId && t.used == used)).OrderByDescending(t=>t.create_date).ToListAsync();
+            return await _context.ticket.Where<Ticket>(t => (t.open_id == user.miniAppOpenId && t.used == used)).OrderByDescending(t=>t.create_date).ToListAsync();
         }
 
         [HttpGet("{code}")]
@@ -335,7 +333,7 @@ namespace SnowmeetApi.Controllers
             {
                 return NotFound();
             }
-            Ticket ticket = await _context.Ticket.FindAsync(code.Trim());
+            Ticket ticket = await _context.ticket.FindAsync(code.Trim());
             if (ticket == null)
             {
                 return NoContent();
@@ -361,7 +359,7 @@ namespace SnowmeetApi.Controllers
             {
                 return NoContent();
             }
-            var ticketList = await _context.Ticket.Where(t => (t.open_id.Trim().Equals(openId.Trim()) && t.used == used))
+            var ticketList = await _context.ticket.Where(t => (t.open_id.Trim().Equals(openId.Trim()) && t.used == used))
             .OrderByDescending(t => t.create_date).ToListAsync();
             return ticketList;
         }
@@ -383,7 +381,7 @@ namespace SnowmeetApi.Controllers
             }
             
 
-            Ticket ticket = await _context.Ticket.FindAsync(code);
+            Ticket ticket = await _context.ticket.FindAsync(code);
             if (ticket == null || ticket.is_active != 1)
             {
                 return NotFound();
@@ -412,7 +410,7 @@ namespace SnowmeetApi.Controllers
             for(int i = 0; i < 100; i++)
             {
                 code = Util.GetRandomCode(9);
-                Ticket ticket = await _context.Ticket.FindAsync(code);
+                Ticket ticket = await _context.ticket.FindAsync(code);
                 if (ticket == null)
                 {
                     break;
@@ -424,7 +422,7 @@ namespace SnowmeetApi.Controllers
         [NonAction]
         public async Task<Ticket> GenerateTicketByAction(int templateId, int memberId, int isActive = 1, int orderId = 0, string createMemo = "", string channel = "")
         {
-            TicketTemplate template = await _context.TicketTemplate.FindAsync(templateId);
+            TicketTemplate template = await _context.ticketTemplate.FindAsync(templateId);
             if (template == null)
             {
                 return null;
@@ -466,7 +464,7 @@ namespace SnowmeetApi.Controllers
                 is_active = isActive,
             
             };
-            await _context.Ticket.AddAsync(ticket);
+            await _context.ticket.AddAsync(ticket);
             await _context.SaveChangesAsync();
             return ticket;
         }
@@ -474,7 +472,7 @@ namespace SnowmeetApi.Controllers
         [NonAction]
         public async Task Cancel(int orderId)
         {
-            List<Ticket> ticketArr = await _context.Ticket
+            List<Ticket> ticketArr = await _context.ticket
                 .Where(t => t.used == 0 && t.order_id == orderId).ToListAsync();
             for(int i = 0; i < ticketArr.Count; i++)
             {
@@ -482,7 +480,7 @@ namespace SnowmeetApi.Controllers
                 ticket.used = 0;
                 ticket.used_time = DateTime.Now;
                 ticket.use_memo = "订单取消";
-                _context.Ticket.Entry(ticket).State = EntityState.Modified;
+                _context.ticket.Entry(ticket).State = EntityState.Modified;
             }
             await _context.SaveChangesAsync();
         }
@@ -490,12 +488,12 @@ namespace SnowmeetApi.Controllers
         [NonAction]
         public async Task ActiveTicket(int orderId)
         {
-            var tl = await _context.Ticket.Where(t => t.order_id == orderId 
+            var tl = await _context.ticket.Where(t => t.order_id == orderId 
                 && t.used == 0 && t.is_active == 0).ToListAsync(); 
             for(int i = 0; i < tl.Count; i++)
             {
                 tl[i].is_active = 1;
-                _context.Ticket.Entry(tl[i]).State = EntityState.Modified;
+                _context.ticket.Entry(tl[i]).State = EntityState.Modified;
             }
             await _context.SaveChangesAsync();
         }
@@ -506,7 +504,7 @@ namespace SnowmeetApi.Controllers
             sessionKey = Util.UrlDecode(sessionKey);
             MemberController _memberHelper = new MemberController(_context, _oriConfig);
             Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
-            List<Ticket> tl = await _context.Ticket.Where(t => t.open_id.Trim().Equals(member.wechatMiniOpenId.Trim())
+            List<Ticket> tl = await _context.ticket.Where(t => t.open_id.Trim().Equals(member.wechatMiniOpenId.Trim())
                 && t.template_id == templateId).OrderByDescending(t => t.create_date).AsNoTracking().ToListAsync();
             return Ok(tl);
         }
@@ -528,14 +526,14 @@ namespace SnowmeetApi.Controllers
         [HttpGet]
         public async Task<ActionResult<int>> MeGetPickCount(int templateId)
         {
-            List<Ticket> tl = await _context.Ticket.Where(t => (t.template_id == templateId
+            List<Ticket> tl = await _context.ticket.Where(t => (t.template_id == templateId
                 && (t.channel.Trim().StartsWith("pick") || t.channel.Trim().Equals(""))))
                 .AsNoTracking().ToListAsync();
             return (Ok(tl.Count));
         }
         private bool TicketExists(string id)
         {
-            return _context.Ticket.Any(e => e.code == id);
+            return _context.ticket.Any(e => e.code == id);
         }
     }
 }

@@ -19,31 +19,75 @@ using SnowmeetApi.Models.Deposit;
 
 namespace SnowmeetApi.Controllers
 {
-    [Route("core/[controller]/[action]")]
+    [Route("api/[controller]/[action]")]
     [ApiController]
     public class ReceptController : ControllerBase
     {
-        private readonly ApplicationDBContext _context;
-
+        private readonly ApplicationDBContext _db;
         private IConfiguration _config;
-        public string _appId = "";
-        public bool isStaff = false;
-        private IConfiguration _oriConfig;
-        private readonly IHttpContextAccessor _httpContextAccessor;
-        private readonly MaintainLiveController _maintainHelper;
-        private readonly RentController _rentHelper;
-        private readonly MemberController _memberHelper;
+        private readonly IHttpContextAccessor _http;
         public ReceptController(ApplicationDBContext context, IConfiguration config, IHttpContextAccessor httpContextAccessor)
         {
-            _context = context;
-            _oriConfig = config;
-            _config = config.GetSection("Settings");
-            _appId = _config.GetSection("AppId").Value.Trim();
-            _httpContextAccessor = httpContextAccessor;
-            _maintainHelper = new MaintainLiveController(context, config);
-            _rentHelper = new RentController(context, config, httpContextAccessor);
-            _memberHelper = new MemberController(context, config);
-
+            _db = context;
+            _config = config;
+            _http = httpContextAccessor;
+        }
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<Recept?>>> GetUnfinishedRecept(string bizType, string name, string gender,
+            string num, int? memberId, string shop, string sessionKey, string sessionType = "wechat_mini_openid", int? scanId = null)
+        {
+            StaffController _staffHelper = new StaffController(_db);
+            Staff staff = await _staffHelper.GetStaffBySessionKey(sessionKey, sessionType);
+            if (staff == null)
+            {
+                return Ok(new ApiResult<object?>()
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = null
+                });
+            }
+            bizType = Util.UrlDecode(bizType);
+            name = Util.UrlDecode(name);
+            gender = Util.UrlDecode(gender);
+            shop = Util.UrlDecode(shop);
+            sessionKey = Util.UrlDecode(sessionKey);
+            List<Recept> recepts = await _db.recept
+                .Where(r => r.real_name.Equals(name) && r.gender.Equals(gender) && r.recept_type.Equals(bizType)
+                && r.cell.Equals(num) && r.member_id == memberId && r.create_date.Date == DateTime.Now.Date
+                && r.submit_return_id == null && r.order_id == null && r.valid == 1).AsNoTracking().ToListAsync();
+            if (recepts == null || recepts.Count == 0)
+            {
+                Recept recept = new Recept()
+                {
+                    id = 0,
+                    real_name = name,
+                    cell = num,
+                    gender = gender,
+                    member_id = memberId,
+                    shop = shop,
+                    recept_type = bizType,
+                    staff_id = staff.id,
+                    scan_qrcode_id = scanId
+                };
+                await _db.recept.AddAsync(recept);
+                await _db.SaveChangesAsync();
+                return Ok(new ApiResult<Recept>()
+                {
+                    code = 0,
+                    message = "",
+                    data = recept
+                });
+            }
+            else
+            {
+                return Ok(new ApiResult<Recept>()
+                {
+                    code = 0,
+                    message = "",
+                    data = recepts[0]
+                });
+            }
         }
         /*
         [HttpGet]
@@ -67,7 +111,7 @@ namespace SnowmeetApi.Controllers
             string s = JsonConvert.SerializeObject(t);
             return s;
         }
-        */
+        
         [HttpGet("{id}")]
         public async Task SendPaymentOAMessage(int id, string sessionKey)
         {
@@ -632,7 +676,7 @@ namespace SnowmeetApi.Controllers
                 {
                     DepositController _depositHelper = new DepositController(_context, _oriConfig);
                     OrderPayment payment = await _depositHelper.CreateDepositPayment(order.id, order.final_price, sessionKey);
-                    List<DepositBalance> bList =  (List<DepositBalance>)((OkObjectResult)(await _depositHelper.DepositCosume(payment.id, sessionKey)).Result).Value;
+                    List<DepositBalance> bList = (List<DepositBalance>)((OkObjectResult)(await _depositHelper.DepositCosume(payment.id, sessionKey)).Result).Value;
                     if (bList.Count > 0)
                     {
                         paySuc = true;
@@ -678,7 +722,7 @@ namespace SnowmeetApi.Controllers
                 {
                     m.confirmed_pick_date = DateTime.Now.Date.AddDays(1);
                 }
-                */
+                
                 //临时矫正取板日期
                 if (m.confirmed_urgent == 0 && m.confirmed_pick_date.Date == DateTime.Now.Date)
                 {
@@ -767,7 +811,7 @@ namespace SnowmeetApi.Controllers
             recept.submit_return_id = rentOrder.id;
             recept.update_date = DateTime.Now;
             _context.Recept.Entry(recept).State = EntityState.Modified;
-            await _context.SaveChangesAsync(); 
+            await _context.SaveChangesAsync();
             return recept;
         }
         [HttpGet("{id}")]
@@ -797,7 +841,7 @@ namespace SnowmeetApi.Controllers
             {
                 return BadRequest();
             }
-            */
+            
 
             if (!isAdmin)
             {
@@ -887,7 +931,7 @@ namespace SnowmeetApi.Controllers
             user.miniAppUser.is_admin = user.member.is_admin;
             user.miniAppUser.is_manager = user.member.is_manager;
             user.miniAppUser.is_staff = user.member.is_staff;
-            */
+            
             if (user.member.is_admin == 1 || user.member.is_manager == 1 || user.member.is_staff == 1)
             {
                 user.miniAppUser.is_admin = 1;
@@ -911,5 +955,6 @@ namespace SnowmeetApi.Controllers
         {
             return _context.Recept.Any(e => e.id == id);
         }
+        */
     }
 }

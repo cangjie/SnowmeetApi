@@ -86,9 +86,7 @@ namespace SnowmeetApi.Data
         public DbSet<SnowmeetApi.Models.Product.Product> Product { get; set; }
         public DbSet<OrderOnlineDetail> OrderOnlineDetails { get; set; }
         public DbSet<SnowmeetApi.Models.Experience> Experience { get; set; }
-        public DbSet<SnowmeetApi.Models.Ticket.Ticket> Ticket { get; set; }
-        public DbSet<SnowmeetApi.Models.Ticket.TicketTemplate> TicketTemplate { get; set; }
-        public DbSet<SnowmeetApi.Models.Card.Card> Card { get; set; }
+
         public DbSet<SnowmeetApi.Models.BltDevice> BltDevice { get; set; }
 
         public DbSet<SnowmeetApi.Models.SummerMaintain> SummerMaintain { get; set; }
@@ -105,13 +103,12 @@ namespace SnowmeetApi.Data
         public DbSet<SnowmeetApi.Models.OrderPaymentRefund> OrderPaymentRefund { get; set; }
         public DbSet<SnowmeetApi.Models.Product.SkiPass> SkiPass { get; set; }
         public DbSet<SnowmeetApi.Models.OAReceive> oAReceive { get; set; }
-        public DbSet<SnowmeetApi.Models.Ticket.TicketLog> ticketLog { get; set; }
+        public DbSet<SnowmeetApi.Models.TicketLog> ticketLog { get; set; }
         public DbSet<SnowmeetApi.Models.ServiceMessage> ServiceMessage { get; set; }
         public DbSet<SnowmeetApi.Models.TemplateMessage> templateMessage { get; set; }
         public DbSet<SnowmeetApi.Models.Rent.RentOrder> RentOrder { get; set; }
         public DbSet<SnowmeetApi.Models.Rent.RentItem> RentItem { get; set; }
         public DbSet<SnowmeetApi.Models.Rent.RentOrderDetail> RentOrderDetail { get; set; }
-        public DbSet<SnowmeetApi.Models.Recept> Recept { get; set; }
         public DbSet<SnowmeetApi.Models.DD.SysObject> sysObject { get; set; }
         public DbSet<SnowmeetApi.Models.DD.SysType> sysType { get; set; }
         public DbSet<SnowmeetApi.Models.DD.ExtendedProperties> extendedProperties { get; set; }
@@ -204,9 +201,13 @@ namespace SnowmeetApi.Data
         public DbSet<Models.DepositAccount> depositAccount { get; set; }
         public DbSet<Models.DepositBalance> depositBalance { get; set; }
         public DbSet<Models.ScanQrCode> scanQrCode { get; set; }
-        public DbSet<SnowmeetApi.Models.Point> Point { get; set; }
+        public DbSet<SnowmeetApi.Models.Point> point { get; set; }
         public DbSet<SnowmeetApi.Models.RentPackage> rentPackage { get; set; }
         public DbSet<SnowmeetApi.Models.RentPackageCategory> rentPackageCategory { get; set; }
+        public DbSet<SnowmeetApi.Models.Recept> recept { get; set; }
+        public DbSet<SnowmeetApi.Models.Ticket> ticket { get; set; }
+        public DbSet<SnowmeetApi.Models.TicketTemplate> ticketTemplate { get; set; }
+        public DbSet<SnowmeetApi.Models.Card> card { get; set; }
 
     }
 }

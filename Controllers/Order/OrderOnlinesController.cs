@@ -676,7 +676,7 @@ namespace SnowmeetApi.Controllers
 
             if (order != null && order.ticket_code != null && !order.ticket_code.Trim().Equals(""))
             {
-                order.tickets = await _context.Ticket.Where(t => t.code.Trim().Equals(order.ticket_code)).ToArrayAsync();
+                order.tickets = await _context.ticket.Where(t => t.code.Trim().Equals(order.ticket_code)).ToArrayAsync();
             }
 
             return Ok(order);
@@ -768,7 +768,7 @@ namespace SnowmeetApi.Controllers
                 await _context.SaveChangesAsync();
                 if (order.ticket_code != null && !order.ticket_code.Trim().Equals(""))
                 {
-                    var ticket = await _context.Ticket.FindAsync(order.ticket_code.Trim());
+                    var ticket = await _context.ticket.FindAsync(order.ticket_code.Trim());
                     ticket.used = 1;
                     ticket.used_time = DateTime.Now;
                     _context.Entry(ticket).State = EntityState.Modified;
@@ -946,7 +946,7 @@ namespace SnowmeetApi.Controllers
             {
                 return NotFound();
             }
-            var card = await _context.Card.FindAsync(code);
+            var card = await _context.card.FindAsync(code);
             card.use_memo = certNo.Trim();
             _context.Entry(card).State = EntityState.Modified;
             await _context.SaveChangesAsync();
@@ -1047,7 +1047,7 @@ namespace SnowmeetApi.Controllers
 
                 if (orderOnline.ticket_code != null && !orderOnline.ticket_code.ToString().Trim().Equals(""))
                 {
-                    orderOnline.tickets = await _context.Ticket.Where(t => t.code == orderOnline.ticket_code).ToArrayAsync();
+                    orderOnline.tickets = await _context.ticket.Where(t => t.code == orderOnline.ticket_code).ToArrayAsync();
                 }
                 orderOnline.details = await _context.OrderOnlineDetails.Where(d => d.OrderOnlineId == orderOnline.id).ToArrayAsync();
                 return orderOnline;

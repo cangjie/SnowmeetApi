@@ -5,7 +5,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 
 using SnowmeetApi.Models.Users;
-using SnowmeetApi.Models.Ticket;
+using SnowmeetApi.Models;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
@@ -267,7 +267,7 @@ namespace SnowmeetApi.Models
             }
         }
         [NotMapped]
-        public Ticket.Ticket[] tickets { get; set; }
+        public Ticket[] tickets { get; set; }
         [NotMapped]
         public OrderOnlineDetail[]? details { get; set; }
         //[NotMapped]

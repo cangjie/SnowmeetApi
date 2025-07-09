@@ -12,8 +12,6 @@ using SnowmeetApi.Models;
 using System.Configuration;
 using Microsoft.Extensions.Configuration;
 using SnowmeetApi.Models.Users;
-
-using SnowmeetApi.Models.Card;
 using Newtonsoft.Json;
 using SnowmeetApi.Controllers.User;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
@@ -440,7 +438,7 @@ namespace SnowmeetApi.Controllers
             for(int i = 0; i < skipass.count; i++)
             {
                     
-                Models.Ticket.Ticket ticket = await _ticketHelper.GenerateTicketByAction(12, 
+                Models.Ticket ticket = await _ticketHelper.GenerateTicketByAction(12, 
                         skipass.member_id, 0, skipass.order_id == null? 0 : (int)skipass.order_id, "");
             } 
         }

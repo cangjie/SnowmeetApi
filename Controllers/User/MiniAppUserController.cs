@@ -208,7 +208,7 @@ namespace SnowmeetApi.Controllers
         [HttpGet("{code}")]
         public async Task<ActionResult<MiniAppUser>> GetMiniUserByTicket(string code, string sessionKey)
         {
-            var ticket = await _context.Ticket.FindAsync(code.Trim());
+            var ticket = await _context.ticket.FindAsync(code.Trim());
             if (ticket != null)
             {
                 string openId = ticket.open_id.Trim();
