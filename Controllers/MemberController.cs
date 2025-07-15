@@ -29,6 +29,7 @@ namespace SnowmeetApi.Controllers
                 .Include(m => m.memberSocialAccounts.Where(msa => msa.valid == 1))
                 .Include(m => m.depositAccounts.Where(d => d.valid == 1))
                 .Include(m => m.points.Where(p => p.valid == 1))
+                .Include(m => m.tickets)
                 .AsNoTracking().ToListAsync();
             if (memberList == null || memberList.Count == 0)
             {

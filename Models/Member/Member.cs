@@ -34,6 +34,7 @@ namespace SnowmeetApi.Models
         public List<MemberSocialAccount> memberSocialAccounts { get; set; } = new List<MemberSocialAccount>();
         public List<DepositAccount> depositAccounts { get; set; } = new List<DepositAccount>();
         public List<Point> points { get; set; } = new List<Point>();
+        public List<Ticket> tickets { get; set; } = new List<Ticket>();
         public List<MemberSocialAccount> GetInfo(string type)
         {
             List<MemberSocialAccount> msaList = new List<MemberSocialAccount>();
@@ -116,7 +117,7 @@ namespace SnowmeetApi.Models
             get
             {
                 if (memberSocialAccounts == null)
-                { 
+                {
                     return new List<MemberSocialAccount>();
                 }
                 List<MemberSocialAccount> mList = memberSocialAccounts
@@ -195,6 +196,15 @@ namespace SnowmeetApi.Models
                     }
                 }
                 return avaliableDeposit;
+            }
+        }
+        [NotMapped]
+        public List<Ticket> avaliableTickets
+        {
+            get
+            {
+                return tickets.Where(t => t.valid == 1 && t.is_active == 1 && t.used == 0
+                    && (t.expire_date == null || ((DateTime)t.expire_date).Date <= DateTime.Now)).ToList();
             }
         }
     }
