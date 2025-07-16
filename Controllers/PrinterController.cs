@@ -11,7 +11,7 @@ using SnowmeetApi.Models;
 using SnowmeetApi.Models.Users;
 namespace SnowmeetApi.Controllers
 {
-    [Route("core/[controller]/[action]")]
+    [Route("api/[controller]/[action]")]
     [ApiController]
     public class PrinterController : ControllerBase
     {
