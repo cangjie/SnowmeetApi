@@ -449,6 +449,17 @@ namespace SnowmeetApi
                             data = sc
                         };
                         return JsonConvert.SerializeObject(realResult);
+                    case "getprinttask":
+                        ShopPrintTask postDetail = JsonConvert.DeserializeObject<ShopPrintTask>(post.data.ToString().Trim());
+                        PrinterController _printHelper = new PrinterController(db);
+                        List<PrintTask> tasks = await _printHelper.QueryPrintTask(postDetail.shop, postDetail.startDate);
+                        ApiResult<List<PrintTask>> newPrintTasks = new ApiResult<List<PrintTask>>()
+                        {
+                            code = 0,
+                            message = "",
+                            data = tasks
+                        };
+                        return JsonConvert.SerializeObject(newPrintTasks);
                     default:
                         break;
                 }

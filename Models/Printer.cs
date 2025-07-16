@@ -7,6 +7,7 @@ namespace SnowmeetApi.Models
     [Table("printer")]
     public class Printer
 	{
+		[Key]
 		public int id { get; set; }
 		public string name { get; set; }
 		public string shop { get; set; }

@@ -127,7 +127,7 @@ namespace SnowmeetApi.Data
         public DbSet<Models.WepaySummary> wepaySummary { get; set; }
         public DbSet<Models.Users.Vip> vip { get; set; }
         public DbSet<Models.Maintain.MaintainReport> maintainReport { get; set; }
-        public DbSet<SnowmeetApi.Models.Printer> Printer { get; set; }
+
         public DbSet<Models.SaleReport> saleReport { get; set; }
         public DbSet<Models.IdList> idList { get; set; }
         public DbSet<Models.Rent.RentOrderDetailLog> rentOrderDetailLog { get; set; }
@@ -208,6 +208,8 @@ namespace SnowmeetApi.Data
         public DbSet<SnowmeetApi.Models.Ticket> ticket { get; set; }
         public DbSet<SnowmeetApi.Models.TicketTemplate> ticketTemplate { get; set; }
         public DbSet<SnowmeetApi.Models.Card> card { get; set; }
+        public DbSet<SnowmeetApi.Models.Printer> printer { get; set; }
+        public DbSet<SnowmeetApi.Models.PrintTask> printTask { get; set; }
 
     }
 }
