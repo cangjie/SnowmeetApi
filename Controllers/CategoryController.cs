@@ -59,7 +59,7 @@ namespace SnowmeetApi.Controllers
             if (bizType.Trim().Equals("餐饮"))
             {
                 List<Category> cl = await _db.category
-                    .Where(c => c.biz_type.Equals(bizType.Trim()) && c.name.Trim().Equals(name.Trim()))
+                    .Where(c => c.biz_type.Equals(bizType.Trim()) && c.name.Trim().Equals(name.Trim()) && c.valid == 1)
                     .AsNoTracking().ToListAsync();
                 if (cl != null && cl.Count > 0)
                 {
