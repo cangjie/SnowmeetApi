@@ -19,6 +19,7 @@ using Aop.Api.Response;
 using Aop.Api.Domain;
 
 using Aop.Api.Util;
+using SnowmeetApi.Models;
 namespace SnowmeetApi.Controllers
 {
     [Route("core/[controller]/[action]")]
@@ -54,6 +55,28 @@ namespace SnowmeetApi.Controllers
             _db = context;
             _config = config;
             _http = httpContextAccessor;
+        }
+        [HttpGet]
+        public ActionResult<int> TestGenLogs()
+        {
+            Printer newP = new Printer()
+            {
+                id = 1,
+                name = "aaa",
+                shop = "bbb",
+                owner = "ccc",
+                color = "red"
+            };
+            Printer oldP = new Printer()
+            {
+                id = 1,
+                name = "aaaa",
+                shop = "bbbb",
+                owner = "cccc",
+                color = "redblack"
+            };
+            Util.GetUpdateDifferenceLog<Printer>(newP, oldP, 0, 0, "");
+            return Ok(0);
         }
 
         [HttpGet]

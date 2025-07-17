@@ -210,6 +210,6 @@ namespace SnowmeetApi.Data
         public DbSet<SnowmeetApi.Models.Card> card { get; set; }
         public DbSet<SnowmeetApi.Models.Printer> printer { get; set; }
         public DbSet<SnowmeetApi.Models.PrintTask> printTask { get; set; }
-
+        public DbSet<SnowmeetApi.Models.Category> category { get; set; }
     }
 }

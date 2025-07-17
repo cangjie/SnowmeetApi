@@ -1,3 +1,4 @@
+/*
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -459,7 +460,7 @@ namespace SnowmeetApi.Controllers
 
             return NoContent();
         }
-        */
+        
 
         private bool ExperienceExists(int id)
         {
@@ -467,3 +468,4 @@ namespace SnowmeetApi.Controllers
         }
     }
 }
+*/

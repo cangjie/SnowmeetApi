@@ -1,3 +1,4 @@
+/*
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -60,11 +61,6 @@ namespace SnowmeetApi.Controllers
             staff.member_id = 0;
             return staff;
         }
-
-
-       
-
-
-
     }
 }
+*/

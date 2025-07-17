@@ -20,6 +20,7 @@ using System.Configuration.Internal;
 using Microsoft.Extensions.Configuration;
 using Microsoft.AspNetCore.Http;
 using SnowmeetApi.Controllers;
+using NPOI.Util.ArrayExtensions;
 namespace SnowmeetApi
 {
     public class Util
@@ -476,9 +477,41 @@ namespace SnowmeetApi
                 return JsonConvert.SerializeObject(result);
             }
         }
-      
-
-        
+        public static List<CoreDataModLog> GetUpdateDifferenceLog<T>(T oriObj, T newObj, int? memberId, int? staffId, string scene)
+        {
+            int? id = null;
+            List<CoreDataModLog> logList = new List<CoreDataModLog>();
+            Type t = oriObj.GetType();
+            var list = t.GetProperties().ToList();
+            TimeSpan ts = DateTime.Now - DateTime.Parse("1970-1-1");
+            list.ForEach(x =>
+            {
+                object oriValue = x.GetValue(oriObj);
+                object newValue = x.GetValue(newObj);
+                if (x.Name.ToString().ToLower().Equals("id"))
+                {
+                    id = (int)oriValue;
+                }
+                if (!oriValue.ToString().Trim().Equals(newValue.ToString().Trim()))
+                {
+                    CoreDataModLog log = new CoreDataModLog()
+                    {
+                        id = 0,
+                        table_name = t.Name.ToString().Trim(),
+                        field_name = x.Name.ToString().Trim(),
+                        key_value = ((id == null) ? 0 : (int)id),
+                        scene = scene,
+                        member_id = memberId,
+                        staff_id = staffId,
+                        prev_value = oriValue == null ? null : oriValue.ToString(),
+                        current_value = newValue == null ? null : newValue.ToString(),
+                        trace_id = ts.Ticks,
+                        is_manual = 0
+                    };
+                    logList.Add(log);
+                }
+            });
+            return logList;
+        } 
     }
-
 }
