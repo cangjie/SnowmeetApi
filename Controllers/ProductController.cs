@@ -7,7 +7,6 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using SnowmeetApi.Data;
-using SnowmeetApi.Models.Product;
 using Newtonsoft.Json;
 using SnowmeetApi.Controllers.User;
 using SnowmeetApi.Models;

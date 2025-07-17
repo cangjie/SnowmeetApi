@@ -17,8 +17,6 @@ using SKIT.FlurlHttpClient.Wechat.TenpayV3.Settings;
 using SnowmeetApi.Controllers.Order;
 using SnowmeetApi.Data;
 using SnowmeetApi.Models;
-
-using SnowmeetApi.Models.Product;
 using SnowmeetApi.Models.Rent;
 using SnowmeetApi.Models.Users;
 using wechat_miniapp_base.Models;
@@ -124,7 +122,7 @@ namespace SnowmeetApi.Controllers
                     .Where(d => d.OrderOnlineId == order.id).ToListAsync();
                 for (int i = 0; i < details.Count; i++)
                 {
-                    Models.Product.Product p = await _db.Product.FindAsync(details[i].product_id);
+                    Models.Product p = await _db.Product.FindAsync(details[i].product_id);
                     if (p != null)
                     {
                         name = name + " " + p.name.Trim();
@@ -349,113 +347,6 @@ namespace SnowmeetApi.Controllers
             }
             return "{ \r\n \"code\": \"SUCCESS\", \r\n \"message\": \"成功\" \r\n}";
         }
-/*
-        [HttpGet]
-        public  async Task<ActionResult<OrderOnline>> SetTenpayPaymentSuccess(string outTradeNumber)
-        {
-            var paymentList = await _db.OrderPayment.Where(o => o.out_trade_no.Trim().Equals(outTradeNumber.Trim())).ToListAsync();
-            if (paymentList == null || paymentList.Count == 0)
-            {
-                return NotFound();
-            }
-            OrderPayment payment = paymentList[0];
-            
-            payment.status = "支付成功";
-            //payment.ali_trade_no = tradeNo.Trim();
-            _db.Entry(payment).State = EntityState.Modified;
-            await _db.SaveChangesAsync();
-
-            OrderOnline order = await _db.OrderOnlines.FindAsync(payment.order_id);
-            if (order == null)
-            {
-                return NotFound();
-            }
-            OrderPayment[] paymentsArr = await _db.OrderPayment.Where(p => p.order_id == order.id).ToArrayAsync();
-            order.paymentList = paymentsArr.ToList();
-            if (order.final_price <= order.paidAmount)
-            {
-                order.pay_state = 1;
-                order.pay_time = DateTime.Now;
-            }
-            if (order.open_id.Trim().Equals(""))
-            {
-                order.open_id = payment.open_id.Trim();
-            }
-            _db.Entry(order).State = EntityState.Modified;
-            await _db.SaveChangesAsync();
-
-            var pointList = await _db.Point.Where(p => p.memo.Contains("支付赠送龙珠，订单ID：" + order.id.ToString())).ToListAsync();
-            int score = (int)Math.Round(order.generate_score, 0);
-            if (pointList.Count == 0 && !order.open_id.Trim().Equals("") && score > 0)
-            {
-                Point p = new Point()
-                {
-                    memo = "店销现货支付赠送龙珠，订单ID：" + order.id,
-                    user_open_id = order.open_id.Trim(),
-                    points = score,
-                    transact_date = DateTime.Now
-                };
-                await _db.Point.AddAsync(p);
-                await _db.SaveChangesAsync();
-            }
-
-            switch (order.type.Trim())
-            {
-                case "店销现货":
-                    Mi7OrderController mi7Helper = new Mi7OrderController(_db, _oriConfig, _http);
-                    await mi7Helper.SetMi7OrderPaySuccess(order.id);
-                    break;
-                case "服务":
-                    MaintainLiveController maintainHelper = new MaintainLiveController(_db, _oriConfig);
-                    await maintainHelper.MaitainOrderPaySuccess(order.id);
-                    break;
-                case "雪票":
-                    SkiPassController skiPassHelper = new SkiPassController(_db, _oriConfig, _http);
-                    await skiPassHelper.CreateSkiPass(order.id);
-                    break;
-                case "押金":
-                    switch(order.pay_memo.Trim())
-                    {
-                        case "追加押金":
-                            await _rentHelper.AdditionalOrderPaid(order.id);
-                            break;
-                        default:
-                            List<RentOrder> rentOrderList = await _db.RentOrder
-                                .Where(o => o.order_id == order.id).OrderByDescending(o => o.id).ToListAsync();
-                            if (rentOrderList != null && rentOrderList.Count > 0)
-                            {
-                                RentOrder rentOrder = rentOrderList[0];
-                                rentOrder.open_id = order.open_id;
-                                _db.Entry(rentOrder).State = EntityState.Modified;
-                                await _db.SaveChangesAsync();
-                                await _rentHelper.StartRent(rentOrder.id);
-                            }
-                            break;
-                    }
-                    
-
-                    break;
-                case "UTV押金":
-                    UTVController uCtl = new UTVController(_db, _oriConfig, _http);
-                    var utvList = await _db.utvReserve.Where(u => u.order_id == order.id).ToListAsync();
-                    if (utvList != null && utvList.Count == 1)
-                    {
-                        await uCtl.SetReservePaySuccess(utvList[0].id);
-                    }
-                    //await uCtl.SetReservePaySuccess()
-                    break;
-                default:
-                    break;
-            }
-
-
-            return order;
-            
-        }
-        */
-
-        
-
         [NonAction]
         public async Task<OrderPaymentRefund> Refund(int refundId)
         {

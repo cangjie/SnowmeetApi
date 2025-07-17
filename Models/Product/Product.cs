@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Collections.Generic;
 
-namespace SnowmeetApi.Models.Product
+namespace SnowmeetApi.Models
 {
     [Table("product")]
     public class Product
@@ -11,6 +11,7 @@ namespace SnowmeetApi.Models.Product
         [Key]
         public int id { get; set; }
         public string name { get; set; }
+        public string? content { get; set; } = null;
         public double sale_price { get; set; }
         public double? market_price { get; set; } = null;
         public double? cost { get; set; } = null;
@@ -19,7 +20,7 @@ namespace SnowmeetApi.Models.Product
         public int hidden { get; set; }
         public int sort { get; set; }
         public int resort_id { get; set; }
-        public int stock_num { get; set; }
+        public int? stock_num { get; set; }
         public double deposit { get; set; }
         public double prepay { get; set; }
         public DateTime start_date { get; set; }

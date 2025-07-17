@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-namespace SnowmeetApi.Models.Product
+namespace SnowmeetApi.Models.ProudctSkiPass
 {
 	[Table("product_resort_ski_pass")]
 	public class SkiPass

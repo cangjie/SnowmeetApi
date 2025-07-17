@@ -1,4 +1,5 @@
-﻿using System;
+﻿/*
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -942,59 +943,6 @@ namespace SnowmeetApi.Controllers
             return await _db.utvUser.FindAsync(id);
 
         }
-        
-        /*
-        [NonAction]
-        public async Task<IEnumerable<UTVVehicleSchedule>> AllocateVehicleForReserve(int reserveId)
-        {
-            UTVReserve reserve = await _db.utvReserve.FindAsync(reserveId);
-            if (reserve == null || !reserve.status.Trim().Equals("待付押金"))
-            {
-                return null;
-            }
-
-            var vList = await _db.utvVehicleSchedule.Where(s => (s.reserve_id == reserveId && s.status.Trim().Equals("待支付"))).ToListAsync();
-            if (vList == null || vList.Count == 0)
-            {
-                return null;
-            }
-
-            for (int i = 0; i < vList.Count; i++)
-            {
-                UTVVehicleSchedule s = vList[i];
-                s.memo = "重新支付取消原有的。";
-                _db.Entry(s).State = EntityState.Modified;
-            }
-            await _db.SaveChangesAsync();
-
-            for (int i = 0; i < reserve.vehicle_num; i++)
-            {
-                UTVVehicleSchedule s = new UTVVehicleSchedule()
-                {
-                    trip_id = reserve.trip_id,
-                    reserve_id = reserve.id,
-                    car_no = "",
-                    status = "",
-                    start_mile = "",
-                    end_mile = "",
-                    line_type = reserve.line_type.Trim(),
-                    charge = 0,
-                    deposit = 0,
-                    discount = 0,
-                    ticket_code = "",
-                    ticket_discount = 0,
-                    driver_user_id = 0,
-                    driver_insurance = "",
-                    passenger_user_id = 0,
-                    passenger_insurance = "",
-                    memo = ""
-                };
-                await _db.utvVehicleSchedule.AddAsync(s);
-            }
-            await _db.SaveChangesAsync();
-            return await _db.utvVehicleSchedule.Where(s => s.reserve_id == reserve.id).ToListAsync();
-        }
-        */
         [NonAction]
         public async Task<bool> IsAdmin(string sessionKey)
         {
@@ -1166,36 +1114,6 @@ namespace SnowmeetApi.Controllers
             await _db.SaveChangesAsync();
             return Ok(trip);
         }
-
-        /*
-
-        [NonAction]
-        public async Task<UTVReserve> SetDepositPaySuccess(int reserveId)
-        {
-
-        }
-
-        [NonAction]
-        public async Task<UTVVehicleSchedule> LockTripSchedule(int scheduleId, string sessionKey)
-        {
-            string status = "已锁定";
-            UTVVehicleSchedule s = await _db.utvVehicleSchedule.FindAsync(scheduleId);
-            if (s == null)
-            {
-                return null;
-            }
-            int lockNum = (int)Util.GetValueFromResult((await GetLockedNumForTrip(s.trip_id, sessionKey)).Result);
-            int totalNum = (int)Util.GetValueFromResult((await GetAvailableVehicleNum(s.trip_id)).Result);
-            if (lockNum >= totalNum)
-            {
-                status = "候补";
-            }
-            s.status = status;
-            _db.Entry(s).State = EntityState.Modified;
-            await _db.SaveChangesAsync();
-            return s;
-        }
-        */
-
     }
 }
+*/

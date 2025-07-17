@@ -17,13 +17,13 @@ using Microsoft.EntityFrameworkCore.Internal;
 using static SKIT.FlurlHttpClient.Wechat.TenpayV3.Models.AddHKSubMerchantRequest.Types;
 
 using System.IO;
-using SnowmeetApi.Models.Product;
 using SnowmeetApi.Models.SkiPass;
 using LuqinMiniAppBase.Controllers;
 using SnowmeetApi.Models;
 using NPOI.XSSF.UserModel;
 using NPOI.SS.UserModel;
 using TencentCloud.Ocr.V20181119.Models;
+using SnowmeetApi.Models.ProudctSkiPass;
 
 namespace SnowmeetApi.Controllers
 {
@@ -220,7 +220,7 @@ namespace SnowmeetApi.Controllers
                 return NoContent();
             }
 
-            Models.Product.SkiPass skipassProduct = await _context.SkiPass.FindAsync(skipass.product_id);
+            Models.ProudctSkiPass.SkiPass skipassProduct = await _context.SkiPass.FindAsync(skipass.product_id);
             if (skipassProduct.source.Trim().Equals("大好河山"))
             {
                 apiKey = dhhsApiKey;
@@ -320,7 +320,7 @@ namespace SnowmeetApi.Controllers
         }
 
         [NonAction]
-        public async Task<Models.Product.SkiPass> GetSkipassProductByCode(string code)
+        public async Task<Models.ProudctSkiPass.SkiPass> GetSkipassProductByCode(string code)
         {
             var l = await _context.SkiPass.Where(s => s.third_party_no.Trim().Equals(code.Trim()))
                 .AsNoTracking().ToListAsync();
@@ -328,7 +328,7 @@ namespace SnowmeetApi.Controllers
             {
                 return null;
             }
-            Models.Product.SkiPass skipass = l[0];
+            Models.ProudctSkiPass.SkiPass skipass = l[0];
             skipass.product = await _context.Product.FindAsync(skipass.product_id);
             return skipass;
 
@@ -440,17 +440,17 @@ namespace SnowmeetApi.Controllers
             for (int i = 0; i < originProductInfo.data.results.Length; i++)
             {
                 SkiPassProduct skipassProduct = originProductInfo.data.results[i];
-                Models.Product.SkiPass skipass = await GetSkipassProductByCode(skipassProduct.productNo);
+                Models.ProudctSkiPass.SkiPass skipass = await GetSkipassProductByCode(skipassProduct.productNo);
                 if (skipass != null)
                 {
                     skipass.product.market_price = skipassProduct.salePrice;
                     skipass.product.cost = skipassProduct.settlementPrice;
-                    _context.Entry<Models.Product.Product>(skipass.product).State = EntityState.Modified;
+                    _context.Entry<Models.Product>(skipass.product).State = EntityState.Modified;
                     await _context.SaveChangesAsync();
                 }
                 else
                 {
-                    Models.Product.Product p = new Models.Product.Product()
+                    Models.Product p = new Models.Product()
                     {
                         id = 0,
                         name = skipassProduct.productName.Trim(),
@@ -468,7 +468,7 @@ namespace SnowmeetApi.Controllers
                     };
                     await _context.Product.AddAsync(p);
                     await _context.SaveChangesAsync();
-                    Models.Product.SkiPass ski = new Models.Product.SkiPass()
+                    Models.ProudctSkiPass.SkiPass ski = new Models.ProudctSkiPass.SkiPass()
                     {
                         product_id = p.id,
                         resort = keyword.Trim(),
@@ -525,7 +525,6 @@ namespace SnowmeetApi.Controllers
         {
             await UpdateZiwoyouOrder(DateTime.Now.Date.AddDays(-7), DateTime.Now.Date);
         }
-
         [HttpGet]
         public async Task UpdateZiwoyouOrder(DateTime start, DateTime end)
         {
@@ -572,8 +571,6 @@ namespace SnowmeetApi.Controllers
                 }
             }
         }
-
-
         [HttpGet]
         public async Task<ActionResult<double>> GetBalance()
         {
@@ -658,29 +655,20 @@ namespace SnowmeetApi.Controllers
                 }
             }
             string nullStr = "【-】";
-
-
             XSSFWorkbook workbook = new XSSFWorkbook();
             ISheet sheet = workbook.CreateSheet("大好河山雪票");
             IDataFormat format = workbook.CreateDataFormat();
             IFont headFont = workbook.CreateFont();
             headFont.Color = NPOI.HSSF.Util.HSSFColor.White.Index;
             headFont.IsBold = true;
-
-
             ICellStyle headStyle = workbook.CreateCellStyle();
             headStyle.Alignment = HorizontalAlignment.Center;
             headStyle.FillForegroundColor = NPOI.HSSF.Util.HSSFColor.Black.Index;
             headStyle.FillPattern = FillPattern.SolidForeground;
             headStyle.SetFont(headFont);
             headStyle.VerticalAlignment = VerticalAlignment.Center;
-
-
-
-
             IRow headRow = sheet.CreateRow(0);
             headRow.Height = 500;
-
             for (int i = 0; i < head.Count; i++)
             {
                 ICell headCell = headRow.CreateCell(i);
@@ -707,7 +695,6 @@ namespace SnowmeetApi.Controllers
                             sheet.SetColumnWidth(i, 2500);
                             break;
                         case 5:
-                        
                             sheet.SetColumnWidth(i, 8000);
                             break;
                         case 7:

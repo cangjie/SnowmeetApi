@@ -17,8 +17,6 @@ using Newtonsoft.Json;
 using SnowmeetApi.Controllers.Order;
 using SnowmeetApi.Data;
 using SnowmeetApi.Models;
-
-using SnowmeetApi.Models.Product;
 using SnowmeetApi.Models.Rent;
 using SnowmeetApi.Models.Users;
 using wechat_miniapp_base.Models;

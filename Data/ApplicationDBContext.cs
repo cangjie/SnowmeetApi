@@ -7,8 +7,8 @@ using SnowmeetApi.Models.Rent;
 //using SnowmeetApi.Models.School;
 using System;
 using SKIT.FlurlHttpClient.Wechat.TenpayV3.Models;
-using SnowmeetApi.Models.Product;
 using SnowmeetApi.Models.Maintain;
+using SnowmeetApi.Models.ProudctSkiPass;
 
 //using Aop.Api.Domain;
 namespace SnowmeetApi.Data
@@ -43,7 +43,7 @@ namespace SnowmeetApi.Data
             //modelBuilder.Entity<RentCategoryInfoField>().HasMany<RentProductDetailInfo>().WithOne(r => r.field).HasForeignKey(r => r.field_id);
             //modelBuilder.Entity<RentProduct>().HasOne<RentCategory>().WithMany(r => r.productList).HasForeignKey(r => r.category_id);
 
-            modelBuilder.Entity<SkipassDailyPrice>().HasOne<Models.Product.SkiPass>().WithMany(s => s.dailyPrice).HasForeignKey(s => s.product_id);
+            modelBuilder.Entity<SkipassDailyPrice>().HasOne<Models.ProudctSkiPass.SkiPass>().WithMany(s => s.dailyPrice).HasForeignKey(s => s.product_id);
             //modelBuilder.Entity<MaintainLog>().HasOne<Models.MaintainLive>().WithMany(m => m.taskLog).HasForeignKey(m => m.task_id);
             //modelBuilder.Entity<OrderOnline>().HasMany<MaintainLive>().WithOne(m => m.order).HasForeignKey(m => m.order_id);
             modelBuilder.Entity<Brand>().HasKey(b => new { b.brand_name, b.brand_type });
@@ -83,7 +83,7 @@ namespace SnowmeetApi.Data
         public DbSet<WepayOrder> WepayOrders { get; set; }
         public DbSet<SnowmeetApi.Models.OrderOnlineTemp> OrderOnlineTemp { get; set; }
         public DbSet<SnowmeetApi.Models.WepayOrderRefund> WePayOrderRefund { get; set; }
-        public DbSet<SnowmeetApi.Models.Product.Product> Product { get; set; }
+        public DbSet<SnowmeetApi.Models.Product> Product { get; set; }
         public DbSet<OrderOnlineDetail> OrderOnlineDetails { get; set; }
         public DbSet<SnowmeetApi.Models.Experience> Experience { get; set; }
 
@@ -101,7 +101,7 @@ namespace SnowmeetApi.Data
         public DbSet<SnowmeetApi.Models.Background.BackgroundLoginSession> BackgroundLoginSession { get; set; }
         public DbSet<SnowmeetApi.Models.Mi7OrderDetail> mi7OrderDetail { get; set; }
         public DbSet<SnowmeetApi.Models.OrderPaymentRefund> OrderPaymentRefund { get; set; }
-        public DbSet<SnowmeetApi.Models.Product.SkiPass> SkiPass { get; set; }
+        public DbSet<SnowmeetApi.Models.ProudctSkiPass.SkiPass> SkiPass { get; set; }
         public DbSet<SnowmeetApi.Models.OAReceive> oAReceive { get; set; }
         public DbSet<SnowmeetApi.Models.TicketLog> ticketLog { get; set; }
         public DbSet<SnowmeetApi.Models.ServiceMessage> ServiceMessage { get; set; }
@@ -142,7 +142,7 @@ namespace SnowmeetApi.Data
         public DbSet<Models.School.Course> schoolCourse { get; set; }
         public DbSet<Models.School.CourseStudent> courseStudent { get; set; }
         public DbSet<Models.SkiPass.SkiPass> skiPass { get; set; }
-        public DbSet<Models.Product.SkipassDailyPrice> skipassDailyPrice { get; set; }
+        public DbSet<Models.ProudctSkiPass.SkipassDailyPrice> skipassDailyPrice { get; set; }
         public DbSet<Models.Users.Referee> referee { get; set; }
         public DbSet<Models.SkiPass.ZiwoyouListOrder> ziwoyouOrder { get; set; }
         public DbSet<Models.Deposit.DepositTemplate> depositTemplate { get; set; }

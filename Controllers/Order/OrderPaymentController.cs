@@ -11,12 +11,9 @@ using SnowmeetApi.Models;
 using wechat_miniapp_base.Models;
 using SKIT.FlurlHttpClient.Wechat.TenpayV3.Settings;
 using SKIT.FlurlHttpClient.Wechat.TenpayV3;
-//using NuGet.Packaging.Signing;
 using SKIT.FlurlHttpClient.Wechat.TenpayV3.Models;
 using Microsoft.Extensions.Configuration;
-using SnowmeetApi.Models.Product;
 using SnowmeetApi.Models.Users;
-//using SnowmeetApi.Controllers.WepayOrderController;
 using System.IO;
 using System.Net.Http.Headers;
 using SnowmeetApi.Models.Rent;
@@ -879,7 +876,7 @@ namespace SnowmeetApi.Controllers.Order
                     .Where(d => d.OrderOnlineId == order.id).ToListAsync();
                 for (int i = 0; i < details.Count; i++)
                 {
-                    SnowmeetApi.Models.Product.Product p = await _context.Product.FindAsync(details[i].product_id);
+                    SnowmeetApi.Models.Product p = await _context.Product.FindAsync(details[i].product_id);
                     if (p != null)
                     {
                         name = name + " " + p.name.Trim();

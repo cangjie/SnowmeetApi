@@ -1,4 +1,5 @@
-﻿using System;
+﻿/*
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -9,7 +10,7 @@ using SnowmeetApi.Data;
 using SnowmeetApi.Models;
 using Microsoft.Extensions.Configuration;
 using SnowmeetApi.Models.Users;
-using SnowmeetApi.Models.Product;
+//using SnowmeetApi.Models.Product;
 using wechat_miniapp_base.Models;
 namespace SnowmeetApi.Controllers
 {
@@ -459,7 +460,7 @@ namespace SnowmeetApi.Controllers
             OrderOnlinesController orderController = new OrderOnlinesController(_context, wholeConfig);
             return await orderController.Pay(orderId, sessionKey);
         }
-        */
+        
         [HttpPost]
         public async Task<ActionResult<int>> Recept(SummerMaintain summerMaintain)
         {
@@ -694,10 +695,11 @@ namespace SnowmeetApi.Controllers
 
             return NoContent();
         }
-        */
+        
         private bool SummerMaintainExists(int id)
         {
             return _context.SummerMaintain.Any(e => e.id == id);
         }
     }
 }
+*/

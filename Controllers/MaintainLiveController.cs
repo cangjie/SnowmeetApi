@@ -5,9 +5,7 @@ using Org.BouncyCastle.Utilities;
 using SnowmeetApi.Data;
 using SnowmeetApi.Models;
 using SnowmeetApi.Models.Maintain;
-using SnowmeetApi.Models.Product;
 using SnowmeetApi.Models.Users;
-
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -15,7 +13,6 @@ using System.Threading.Tasks;
 using Org.BouncyCastle.Asn1.X509;
 using SnowmeetApi.Controllers.Maintain;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-
 namespace SnowmeetApi.Controllers
 {
     [Route("core/[controller]/[action]")]
@@ -305,7 +302,7 @@ namespace SnowmeetApi.Controllers
             foreach (MaintainLive item in items)
             {
                 //item.taskLog = await _context.MaintainLog.Where(l => l.task_id == item.id).AsNoTracking().OrderBy(l => l.id).ToArrayAsync();
-                Models.Product.Product p = await _context.Product.FindAsync(item.confirmed_product_id);
+                Models.Product p = await _context.Product.FindAsync(item.confirmed_product_id);
                 itemPriceSummary = itemPriceSummary + (p!=null?p.sale_price:0) + item.confirmed_additional_fee;
             }
             OrderOnlinesController orderController = new OrderOnlinesController(_context, _originConfig);
