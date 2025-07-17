@@ -75,6 +75,19 @@ namespace SnowmeetApi.Controllers
                     data = null
                 });
             }
+            string? code = null;
+            if (bizType.Equals("餐饮"))
+            {
+                code = null;
+            }
+            List<Category> sameLevelCategories = await _db.category.Where(c => c.biz_type.Trim().Equals(bizType)
+                && (code == null || c.code.Length == code.Length)).ToListAsync();
+            for (int i = 0; sameLevelCategories != null && i < sameLevelCategories.Count; i++)
+            {
+                Category c = sameLevelCategories[i];
+                c.sort = c.sort + 100;
+                _db.category.Entry(c).State = EntityState.Modified;
+            }
             Category category = new Category()
             {
                 id = 0,
