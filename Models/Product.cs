@@ -19,6 +19,8 @@ namespace SnowmeetApi.Models
         public string? type { get; set; } = null;
         public string? shop { get; set; } = null;
         public int hidden { get; set; } = 1;
+        public int valid { get; set; } = 0;
+        public int on_shelves { get; set; } = 0;
         public int sort { get; set; } = 100;
         public int? resort_id { get; set; } = null;
         public int? stock_num { get; set; } = null;

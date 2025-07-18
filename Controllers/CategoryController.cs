@@ -175,7 +175,13 @@ namespace SnowmeetApi.Controllers
                 return Ok(checkStaffResult);
             }
             Staff staff = (Staff)checkStaffResult.data;
-            int? maxSort = await _db.product.Where(p => p.category_id == product.category_id).MaxAsync(p => p.sort);
+            List<Product> curPList = await _db.product.Where(p => p.category_id == product.category_id)
+                .OrderByDescending(p => p.sort).ToListAsync();
+            int? maxSort = 100;
+            if (curPList != null && curPList.Count > 0)
+            {
+                maxSort = curPList[0].sort;
+            }
             if (maxSort == null || maxSort == 0)
             {
                 maxSort = 100;
