@@ -26,6 +26,7 @@ namespace SnowmeetApi.Controllers
         private async Task<ApiResult<object?>> CheckStaff(int level,
             string sessionKey, string sessionType = "wechat_mini_openid")
         {
+            sessionKey = Util.UrlDecode(sessionKey);
             StaffController _staffHelper = new StaffController(_db);
             Staff staff = await _staffHelper.GetStaffBySessionKey(sessionKey, sessionType);
             if (staff == null || staff.title_level < level)
