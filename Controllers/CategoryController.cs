@@ -165,5 +165,52 @@ namespace SnowmeetApi.Controllers
                 data = cateList
             });
         }
+        [HttpPost]
+        public async Task<ActionResult<ApiResult<Product>>> AddProduct([FromBody] Product product,
+            [FromQuery] string sessionKey, [FromQuery] string sessionType = "wechat_mini_openid")
+        {
+            ApiResult<object?> checkStaffResult = await CheckStaff(100, sessionKey, sessionType);
+            if (checkStaffResult != null && checkStaffResult.code == 1)
+            {
+                return Ok(checkStaffResult);
+            }
+            Staff staff = (Staff)checkStaffResult.data;
+            int? maxSort = await _db.product.Where(p => p.category_id == product.category_id).MaxAsync(p => p.sort);
+            if (maxSort == null || maxSort == 0)
+            {
+                maxSort = 100;
+            }
+            else
+            {
+                maxSort = maxSort + 100;
+            }
+            product.sort = (int)maxSort;
+            await _db.product.AddAsync(product);
+            await _db.SaveChangesAsync();
+            CoreDataModLog log = new CoreDataModLog()
+            {
+                id = 0,
+                table_name = "product",
+                field_name = null,
+                key_value = product.id,
+                scene = "添加新商品",
+                member_id = null,
+                staff_id = staff.id,
+                prev_value = null,
+                current_value = null,
+                trace_id = 0,
+                is_manual = 1,
+                manual_memo = "新增饮品菜品"
+            };
+            await _db.coreDataModLog.AddAsync(log);
+            await _db.SaveChangesAsync();
+            return Ok(new ApiResult<Product>()
+            {
+                code = 0,
+                message = "",
+                data = product
+            });
+        }
+
     }
 }

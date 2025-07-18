@@ -58,7 +58,7 @@ namespace SnowmeetApi.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<object>> GetSkiPassDetailInfo(int id)
         {
-            return await _context.Product.Where(p => p.id == id)
+            return await _context.product.Where(p => p.id == id)
                 .Join(_context.SkiPass, p => p.id, s => s.product_id,
                 (p, s) => new
                 {
@@ -99,7 +99,7 @@ namespace SnowmeetApi.Controllers
             
 
 
-            var skiPassProdustList = await _context.Product.Where(p => (p.shop.Trim().Equals(resort.Trim()) && p.hidden == 0 && p.end_date >= DateTime.Now.Date))
+            var skiPassProdustList = await _context.product.Where(p => (p.shop.Trim().Equals(resort.Trim()) && p.hidden == 0 && p.end_date >= DateTime.Now.Date))
                 .Join(_context.SkiPass, p => p.id, s => s.product_id,
                 (p, s) => new {
                     p.id,
@@ -729,7 +729,7 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<object>> ReserveSkiPass(int productId, DateTime date, 
             int count, string cell, string name, string sessionKey, string sessionType = "wechat_mini_openid", string idNo = "", int refereeMemberId = 0)
         {
-            Models.Product product = await _context.Product.FindAsync(productId);
+            Models.Product product = await _context.product.FindAsync(productId);
             Models.ProudctSkiPass.SkiPass skipassProduct = await _context.SkiPass.FindAsync(productId);
             SkipassDailyPrice dailyPrice = await _context.skipassDailyPrice
                 .Where(s => s.product_id == productId && s.valid == 1 && s.reserve_date.Date == date.Date)
@@ -944,7 +944,7 @@ namespace SnowmeetApi.Controllers
         {
             resort = Util.UrlDecode(resort);
             var l = await _context.SkiPass//.Include(s => s.dailyPrice)
-                .Join(_context.Product, s=>s.product_id, p=>p.id,
+                .Join(_context.product, s=>s.product_id, p=>p.id,
                 (s, p)=> new {s.product_id, s.resort, s.rules, s.source, s.third_party_no, p.name, p.shop, 
                 s.commonDayDealPrice, s.weekendDealPrice, 
                 //s.dailyPrice, 
@@ -1018,7 +1018,7 @@ namespace SnowmeetApi.Controllers
         [HttpGet("{productId}")]
         public async Task<ActionResult<SkipassWithPrice>> GetProduct(int productId)
         {
-            Product p = await _context.Product.FindAsync(productId);
+            Product p = await _context.product.FindAsync(productId);
             Models.ProudctSkiPass.SkiPass skipass = await _context.SkiPass.FindAsync(productId);
             skipass.dailyPrice = await _context.skipassDailyPrice.Where(s => s.product_id == productId && s.valid == 1)
                 .OrderBy(s => s.reserve_date).AsNoTracking().ToListAsync();

@@ -10,24 +10,28 @@ namespace SnowmeetApi.Models
     {
         [Key]
         public int id { get; set; }
+        public int? category_id { get; set; } = null;
         public string name { get; set; }
         public string? content { get; set; } = null;
         public double sale_price { get; set; }
         public double? market_price { get; set; } = null;
         public double? cost { get; set; } = null;
-        public string type { get; set; }
-        public string shop { get; set; }
-        public int hidden { get; set; }
-        public int sort { get; set; }
-        public int resort_id { get; set; }
-        public int? stock_num { get; set; }
-        public double deposit { get; set; }
-        public double prepay { get; set; }
-        public DateTime start_date { get; set; }
-        public DateTime end_date { get; set; }
-        public string intro { get; set; }
-        public int ticket_template_id { get; set; }
-        public string principal { get; set; }
-        public int award_score { get; set; }
+        public string? type { get; set; } = null;
+        public string? shop { get; set; } = null;
+        public int hidden { get; set; } = 1;
+        public int sort { get; set; } = 100;
+        public int? resort_id { get; set; } = null;
+        public int? stock_num { get; set; } = null;
+        public double? deposit { get; set; } = null;
+        public double? prepay { get; set; } = null;
+        public DateTime? start_date { get; set; } = null;
+        public DateTime? end_date { get; set; } = null;
+        public string? intro { get; set; } = null;
+        public int? ticket_template_id { get; set; } = null;
+        public string? principal { get; set; } = null;
+        public int? award_score { get; set; } = null;
+        [ForeignKey("category_id")]
+        public Category? category { get; set; } = null;
+        public List<ProductImage> images { get; set; } = new List<ProductImage>();
     }
 }

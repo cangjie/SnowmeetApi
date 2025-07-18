@@ -83,7 +83,7 @@ namespace SnowmeetApi.Data
         public DbSet<WepayOrder> WepayOrders { get; set; }
         public DbSet<SnowmeetApi.Models.OrderOnlineTemp> OrderOnlineTemp { get; set; }
         public DbSet<SnowmeetApi.Models.WepayOrderRefund> WePayOrderRefund { get; set; }
-        public DbSet<SnowmeetApi.Models.Product> Product { get; set; }
+
         public DbSet<OrderOnlineDetail> OrderOnlineDetails { get; set; }
         public DbSet<SnowmeetApi.Models.Experience> Experience { get; set; }
 
@@ -211,5 +211,7 @@ namespace SnowmeetApi.Data
         public DbSet<SnowmeetApi.Models.Printer> printer { get; set; }
         public DbSet<SnowmeetApi.Models.PrintTask> printTask { get; set; }
         public DbSet<SnowmeetApi.Models.Category> category { get; set; }
+        public DbSet<SnowmeetApi.Models.Product> product { get; set; }
+        public DbSet<SnowmeetApi.Models.ProductImage> productImage { get; set; }
     }
 }

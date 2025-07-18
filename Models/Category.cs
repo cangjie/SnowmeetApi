@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 namespace SnowmeetApi.Models
@@ -16,5 +17,6 @@ namespace SnowmeetApi.Models
         public int sort { get; set; } = 100;
         public DateTime? update_date { get; set; }
         public DateTime create_date { get; set; } = DateTime.Now;
+        public List<Product> products { get; set; } = new List<Product>();
     }
 }

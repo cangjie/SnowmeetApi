@@ -302,7 +302,7 @@ namespace SnowmeetApi.Controllers
             foreach (MaintainLive item in items)
             {
                 //item.taskLog = await _context.MaintainLog.Where(l => l.task_id == item.id).AsNoTracking().OrderBy(l => l.id).ToArrayAsync();
-                Models.Product p = await _context.Product.FindAsync(item.confirmed_product_id);
+                Models.Product p = await _context.product.FindAsync(item.confirmed_product_id);
                 itemPriceSummary = itemPriceSummary + (p!=null?p.sale_price:0) + item.confirmed_additional_fee;
             }
             OrderOnlinesController orderController = new OrderOnlinesController(_context, _originConfig);
@@ -1047,7 +1047,7 @@ namespace SnowmeetApi.Controllers
 
                             if (productId > 0)
                             {
-                                Product product = _context.Product.Find(productId);
+                                Product product = _context.product.Find(productId);
                                 OrderOnlineDetail detail = new OrderOnlineDetail()
                                 {
                                     OrderOnlineId = 0,
@@ -1064,7 +1064,7 @@ namespace SnowmeetApi.Controllers
                             {
                                 int count = 0;
                                 productId = tasks[i].AddtionalFeeProductId;
-                                Product product = _context.Product.Find(productId);
+                                Product product = _context.product.Find(productId);
                                 count = (int)(tasks[i].confirmed_additional_fee / product.sale_price);
                                 totalPrice = totalPrice + count * product.sale_price;
                             }

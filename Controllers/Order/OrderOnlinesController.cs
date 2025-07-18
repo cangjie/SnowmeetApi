@@ -968,7 +968,7 @@ namespace SnowmeetApi.Controllers
                 {
                     List<OrderOnlineDetail> detail = await _context.OrderOnlineDetails
                         .Where<OrderOnlineDetail>(o => (o.OrderOnlineId == orders[i].id)).ToListAsync<OrderOnlineDetail>();
-                    Product prodcut = await _context.Product.FindAsync(detail[0].product_id);
+                    Product prodcut = await _context.product.FindAsync(detail[0].product_id);
                     if (type == 0 && prodcut.name.IndexOf("夜") < 0)
                     {
                         num = num + detail[0].count;

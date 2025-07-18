@@ -329,7 +329,7 @@ namespace SnowmeetApi.Controllers
                 return null;
             }
             Models.ProudctSkiPass.SkiPass skipass = l[0];
-            skipass.product = await _context.Product.FindAsync(skipass.product_id);
+            skipass.product = await _context.product.FindAsync(skipass.product_id);
             return skipass;
 
         }
@@ -466,7 +466,7 @@ namespace SnowmeetApi.Controllers
                         principal = ""
 
                     };
-                    await _context.Product.AddAsync(p);
+                    await _context.product.AddAsync(p);
                     await _context.SaveChangesAsync();
                     Models.ProudctSkiPass.SkiPass ski = new Models.ProudctSkiPass.SkiPass()
                     {
@@ -489,7 +489,7 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<object>> GetProductById(int id)
         {
             var l = await _context.SkiPass.Include(s => s.dailyPrice)
-                .Join(_context.Product, s => s.product_id, p => p.id,
+                .Join(_context.product, s => s.product_id, p => p.id,
                 (s, p) => new { s.product_id, s.resort, s.rules, s.source, s.third_party_no, p.name, p.shop, p.sale_price, p.market_price, p.cost, p.type, s.dailyPrice })
                 .Where(p => p.type.Trim().Equals("雪票") && p.product_id == id
                 && p.third_party_no != null)

@@ -122,7 +122,7 @@ namespace SnowmeetApi.Controllers
                     .Where(d => d.OrderOnlineId == order.id).ToListAsync();
                 for (int i = 0; i < details.Count; i++)
                 {
-                    Models.Product p = await _db.Product.FindAsync(details[i].product_id);
+                    Models.Product p = await _db.product.FindAsync(details[i].product_id);
                     if (p != null)
                     {
                         name = name + " " + p.name.Trim();

@@ -876,7 +876,7 @@ namespace SnowmeetApi.Controllers.Order
                     .Where(d => d.OrderOnlineId == order.id).ToListAsync();
                 for (int i = 0; i < details.Count; i++)
                 {
-                    SnowmeetApi.Models.Product p = await _context.Product.FindAsync(details[i].product_id);
+                    SnowmeetApi.Models.Product p = await _context.product.FindAsync(details[i].product_id);
                     if (p != null)
                     {
                         name = name + " " + p.name.Trim();

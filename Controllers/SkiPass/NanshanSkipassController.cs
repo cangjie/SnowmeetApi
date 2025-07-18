@@ -211,7 +211,7 @@ namespace SnowmeetApi.Controllers.SkiPass
                 by new { reserveDetail.member_id, reserveDetail.wechat_mini_openid, reserveDetail.contact_name, reserveDetail.contact_cell }
                 into reserveSum
                      select new { reserveSum.Key, count = reserveSum.Count() }).ToList();
-            Models.Product p = await _db.Product.FindAsync(productId);
+            Models.Product p = await _db.product.FindAsync(productId);
             ReserveProduct ret = new ReserveProduct()
             {
                 product_id = productId,
@@ -359,7 +359,7 @@ namespace SnowmeetApi.Controllers.SkiPass
         public async Task<ActionResult<object>> ReserveSkiPass(int productId, DateTime date,
             int count, string cell, string name, string sessionKey, int refereeMemberId = 0, string sessionType = "wechat_mini_openid")
         {
-            Models.Product product = await _db.Product.FindAsync(productId);
+            Models.Product product = await _db.product.FindAsync(productId);
             UnicUser user = await UnicUser.GetUnicUserAsync(sessionKey, _db);
             if (user == null || product == null)
             {

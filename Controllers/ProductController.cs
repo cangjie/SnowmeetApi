@@ -39,7 +39,7 @@ namespace SnowmeetApi.Controllers
         [ActionName("GetNanshanTodaySkipass")]
         public async Task<ActionResult<IEnumerable<Product>>> GetNanshanTodaySkipass()
         {
-            return await _context.Product
+            return await _context.product
                 .Where(p => (p.name.Trim().IndexOf("当日票") >= 0 && p.shop.Trim().Equals("南山") && p.type.Trim().Equals("雪票") && p.end_date > DateTime.Now ))
                 .ToListAsync();
         }
@@ -47,13 +47,13 @@ namespace SnowmeetApi.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<Product>> Get(int id)
         {
-            return await _context.Product.FindAsync(id);
+            return await _context.product.FindAsync(id);
         }
 
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Product>>> GetMaintainProduct(string shop)
         {
-            return await _context.Product
+            return await _context.product
                 .Where(p => (p.id == 137 || p.id == 138 || p.id == 139 || p.id == 140 || p.id == 142 || p.id == 143 || p.id == 202))
                 .ToListAsync();
         }
@@ -67,13 +67,13 @@ namespace SnowmeetApi.Controllers
             {
                 return BadRequest();
             }
-            Product product = await _context.Product.FindAsync(productId);
+            Product product = await _context.product.FindAsync(productId);
             if (product == null)
             {
                 return NotFound();
             }
             product.hidden = hidden;
-            _context.Product.Entry(product).State = EntityState.Modified;
+            _context.product.Entry(product).State = EntityState.Modified;
             await _context.SaveChangesAsync();
             return Ok(product);
         }
