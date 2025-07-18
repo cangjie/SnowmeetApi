@@ -128,6 +128,7 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<ApiResult<Category>>> UpdateCategory([FromBody] Category category, [FromQuery] string scene,
             [FromQuery] string sessionKey, [FromQuery] string sessionType = "wechat_mini_openid")
         {
+            scene = Util.UrlDecode(scene);
             ApiResult<object?> checkStaffResult = await CheckStaff(100, sessionKey, sessionType);
             if (checkStaffResult != null && checkStaffResult.code == 1)
             {

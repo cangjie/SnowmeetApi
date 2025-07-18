@@ -486,13 +486,34 @@ namespace SnowmeetApi
             TimeSpan ts = DateTime.Now - DateTime.Parse("1970-1-1");
             list.ForEach(x =>
             {
-                object oriValue = x.GetValue(oriObj);
-                object newValue = x.GetValue(newObj);
+                object? oriValue = x.GetValue(oriObj);
+                object? newValue = x.GetValue(newObj);
                 if (x.Name.ToString().ToLower().Equals("id"))
                 {
                     id = (int)oriValue;
                 }
-                if (!oriValue.ToString().Trim().Equals(newValue.ToString().Trim()))
+                bool isMod = false;
+                if (oriValue == null && newValue != null)
+                {
+                    isMod = true;
+                }
+                else if (oriValue != null && newValue == null)
+                {
+                    isMod = true;
+                }
+                else if (oriValue == null && newValue == null)
+                {
+                    isMod = false;
+                }
+                else if (!oriValue.ToString().Equals(newValue.ToString()))
+                {
+                    isMod = true;
+                }
+                else
+                {
+                    isMod = false;
+                 }
+                if (isMod)
                 {
                     CoreDataModLog log = new CoreDataModLog()
                     {
