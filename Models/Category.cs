@@ -45,6 +45,7 @@ namespace SnowmeetApi.Models
         [ForeignKey("category_id")]
         public Category category { get; set; }
         public List<CategoryPropertyOption> options { get; set; } = new List<CategoryPropertyOption>();
+        [NotMapped]
         public List<CategoryPropertyOption> availableOptions
         {
             get
