@@ -35,5 +35,21 @@ namespace SnowmeetApi.Models
         [ForeignKey("category_id")]
         public Category? category { get; set; } = null;
         public List<ProductImage> images { get; set; } = new List<ProductImage>();
+        public List<ProductProperty> properties { get; set; } = new List<ProductProperty>();
+    }
+    [Table("product_property")]
+    public class ProductProperty
+    {
+        [Key]
+        public int id { get; set; }
+        public int product_id { get; set; }
+        public int category_property_id { get; set; }
+        public int? option_id { get; set; } = null;
+        public string? text_value { get; set; } = null;
+        public int valid { get; set; } = 0;
+        public DateTime? update_date { get; set; } = null;
+        public DateTime create_date { get; set; } = DateTime.Now;
+        [ForeignKey("product_id")]
+        public Product product { get; set; }
     }
 }

@@ -18,5 +18,37 @@ namespace SnowmeetApi.Models
         public DateTime? update_date { get; set; }
         public DateTime create_date { get; set; } = DateTime.Now;
         public List<Product> products { get; set; } = new List<Product>();
+        public List<CategoryProperty> properties { get; set; } = new List<CategoryProperty>();
     }
+    [Table("category_property")]
+    public class CategoryProperty
+    {
+        [Key]
+        public int id { get; set; }
+        public int category_id { get; set; }
+        public string property_name { get; set; }
+        public int sort { get; set; } = 0;
+        public int valid { get; set; } = 0;
+        public int is_option { get; set; } = 0;
+        public int multi_selected { get; set; } = 0;
+        public DateTime? update_date { get; set; } = null;
+        public DateTime create_date { get; set; } = DateTime.Now;
+        [ForeignKey("category_id")]
+        public Category category { get; set; }
+        public List<CategoryPropertyOption> options = new List<CategoryPropertyOption>();
+    }
+    [Table("category_property_option")]
+    public class CategoryPropertyOption
+    {
+        [Key]
+        public int id { get; set; }
+        public int category_property_id { get; set; }
+        public string option_value { get; set; }
+        public int valid { get; set; }
+        public DateTime? update_date { get; set; }
+        public DateTime create_date { get; set; } = DateTime.Now;
+        [ForeignKey("category_property_id")]
+        public CategoryProperty categoryProperty { get; set; }
+    }
+
 }
