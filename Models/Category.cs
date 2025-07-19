@@ -35,7 +35,7 @@ namespace SnowmeetApi.Models
         public DateTime create_date { get; set; } = DateTime.Now;
         [ForeignKey("category_id")]
         public Category category { get; set; }
-        public List<CategoryPropertyOption> options = new List<CategoryPropertyOption>();
+        public List<CategoryPropertyOption> options { get; set; } = new List<CategoryPropertyOption>();
     }
     [Table("category_property_option")]
     public class CategoryPropertyOption

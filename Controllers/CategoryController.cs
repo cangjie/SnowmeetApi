@@ -156,8 +156,9 @@ namespace SnowmeetApi.Controllers
         [HttpGet]
         public async Task<ActionResult<ApiResult<List<Category>>>> GetSingleLevelCategory(string bizType)
         {
-            List<Category> cateList = await _db.category.Where(c => c.biz_type.Trim().Equals(bizType)
-                && c.valid == 1).AsNoTracking().OrderByDescending(c => c.sort).ThenBy(c => c.id).ToListAsync();
+            List<Category> cateList = await _db.category.Where(c => c.biz_type.Trim().Equals(bizType) && c.valid == 1)
+                .Include(c => c.properties).ThenInclude(p => p.options)
+                .AsNoTracking().OrderByDescending(c => c.sort).ThenBy(c => c.id).ToListAsync();
             return Ok(new ApiResult<List<Category>>()
             {
                 code = 0,
