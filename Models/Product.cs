@@ -2,6 +2,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace SnowmeetApi.Models
 {
@@ -36,6 +37,14 @@ namespace SnowmeetApi.Models
         public Category? category { get; set; } = null;
         public List<ProductImage> images { get; set; } = new List<ProductImage>();
         public List<ProductProperty> properties { get; set; } = new List<ProductProperty>();
+        [NotMapped]
+        public List<ProductImage> availableImages
+        {
+            get
+            {
+                return images.Where(i => i.valid == 1).ToList();
+            }
+        }
     }
     [Table("product_property")]
     public class ProductProperty

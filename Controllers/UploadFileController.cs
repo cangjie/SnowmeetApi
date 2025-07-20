@@ -13,7 +13,7 @@ using SnowmeetApi.Models.Users;
 
 namespace SnowmeetApi.Controllers
 {
-    [Route("core/[controller]/[action]")]
+    [Route("api/[controller]/[action]")]
     [ApiController]
     public class UploadFileController : ControllerBase
     {
@@ -31,15 +31,16 @@ namespace SnowmeetApi.Controllers
         [HttpPost]
         public async Task<ActionResult<UploadFile>> UploadFile(string sessionKey, string purpose, bool isWeb, IFormFile file)
         {
-            
-            sessionKey = Util.UrlDecode(sessionKey);
-            purpose = Util.UrlDecode(purpose);
-            //UnicUser._context = _db;
-            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _db);
-            if (user == null)
+            ApiResult<object?> result = await CheckStaff(100, sessionKey, "wechat_mini_openid");
+            if (result.code != 0)
             {
                 return BadRequest();
             }
+            Staff staff = (Staff)result.data;
+            sessionKey = Util.UrlDecode(sessionKey);
+            purpose = Util.UrlDecode(purpose);
+            //UnicUser._context = _db;
+            
 
             string dateStr = DateTime.Now.Year.ToString() + DateTime.Now.Month.ToString().PadLeft(2, '0') + DateTime.Now.Day.ToString().PadLeft(2, '0');
             string filePath = Util.workingPath + (isWeb? "/wwwroot/":"") + "/upload/" + dateStr;
@@ -59,7 +60,7 @@ namespace SnowmeetApi.Controllers
             UploadFile fileSave = new UploadFile()
             {
                 id = 0,
-                owner = user.miniAppOpenId.Trim(),
+                staff_id = staff.id,
                 file_path_name = returnFileName,
                 is_web = isWeb? 1:0,
                 purpose = purpose
@@ -127,6 +128,29 @@ namespace SnowmeetApi.Controllers
             await _db.SaveChangesAsync();
 
             return returnFileName.Trim();
+        }
+        private async Task<ApiResult<object?>> CheckStaff(int level,
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            StaffController _staffHelper = new StaffController(_db);
+            Staff staff = await _staffHelper.GetStaffBySessionKey(sessionKey, sessionType);
+            if (staff == null || staff.title_level < level)
+            {
+                return new ApiResult<object?>()
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = null
+                };
+            }
+
+            return new ApiResult<object?>()
+            {
+                code = 0,
+                message = "",
+                data = staff
+            };
         }
 
 
