@@ -192,6 +192,10 @@ namespace SnowmeetApi.Controllers
                 maxSort = maxSort + 100;
             }
             product.sort = (int)maxSort;
+            for (int i = 0; i < product.images.Count; i++)
+            {
+                product.images[i].create_date = DateTime.Now;
+            }
             await _db.product.AddAsync(product);
             await _db.SaveChangesAsync();
             CoreDataModLog log = new CoreDataModLog()
