@@ -24,6 +24,11 @@ namespace SnowmeetApi.Controllers
             _db = context;
             _config = config.GetSection("Settings");
         }
+        [HttpGet("id")]
+        public async Task<ActionResult<UploadFile>> GetFile(int id)
+        {
+            return await _db.UploadFile.FindAsync(id);
+        }
         [HttpPost]
         public async Task<ActionResult<UploadFile>> UploadFile([FromQuery]string sessionKey, [FromQuery]string purpose, [FromQuery]bool isWeb, IFormFile file)
         {
@@ -59,7 +64,7 @@ namespace SnowmeetApi.Controllers
             };
             await _db.UploadFile.AddAsync(fileSave);
             await _db.SaveChangesAsync();
-            return fileSave;
+            return Ok(fileSave);
         }
         [HttpGet]
         public async Task<ActionResult<IEnumerable<UploadFile>>> GetUploadList(string sessionKey, string purpose)

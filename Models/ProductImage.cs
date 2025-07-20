@@ -12,7 +12,7 @@ namespace SnowmeetApi.Models
         public string? image_url { get; set; } = null;
         public int valid { get; set; }
         public int is_head { get; set; }
-        public int sort { get; set; }
+        public int sort { get; set; } = 0;
         public string? title { get; set; } = null;
         public string? content { get; set; } = null;
         public DateTime? update_date { get; set; } = null;
