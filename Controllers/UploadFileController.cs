@@ -19,17 +19,13 @@ namespace SnowmeetApi.Controllers
     {
         private readonly ApplicationDBContext _db;
         private IConfiguration _config;
-        
-
         public UploadFileController(ApplicationDBContext context, IConfiguration config)
         {
             _db = context;
             _config = config.GetSection("Settings");
-            //UnicUser._context = context;
         }
-
         [HttpPost]
-        public async Task<ActionResult<UploadFile>> UploadFile(string sessionKey, string purpose, bool isWeb, IFormFile file)
+        public async Task<ActionResult<UploadFile>> UploadFile([FromQuery]string sessionKey, [FromQuery]string purpose, [FromQuery]bool isWeb, IFormFile file)
         {
             ApiResult<object?> result = await CheckStaff(100, sessionKey, "wechat_mini_openid");
             if (result.code != 0)
@@ -39,9 +35,6 @@ namespace SnowmeetApi.Controllers
             Staff staff = (Staff)result.data;
             sessionKey = Util.UrlDecode(sessionKey);
             purpose = Util.UrlDecode(purpose);
-            //UnicUser._context = _db;
-            
-
             string dateStr = DateTime.Now.Year.ToString() + DateTime.Now.Month.ToString().PadLeft(2, '0') + DateTime.Now.Day.ToString().PadLeft(2, '0');
             string filePath = Util.workingPath + (isWeb? "/wwwroot/":"") + "/upload/" + dateStr;
             if (!Directory.Exists(filePath))
@@ -56,7 +49,6 @@ namespace SnowmeetApi.Controllers
             {
                 await file.CopyToAsync(s);
             }
-
             UploadFile fileSave = new UploadFile()
             {
                 id = 0,
@@ -67,10 +59,8 @@ namespace SnowmeetApi.Controllers
             };
             await _db.UploadFile.AddAsync(fileSave);
             await _db.SaveChangesAsync();
-
             return fileSave;
         }
-
         [HttpGet]
         public async Task<ActionResult<IEnumerable<UploadFile>>> GetUploadList(string sessionKey, string purpose)
         {
