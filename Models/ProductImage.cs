@@ -8,7 +8,8 @@ namespace SnowmeetApi.Models
     {
         public int id { get; set; }
         public int product_id { get; set; }
-        public string image_url { get; set; }
+        public int? upload_id { get; set; } = null;
+        public string? image_url { get; set; } = null;
         public int valid { get; set; }
         public int is_head { get; set; }
         public int sort { get; set; }
@@ -18,5 +19,7 @@ namespace SnowmeetApi.Models
         public DateTime create_date { get; set; }
         [ForeignKey("product_id")]
         public Product product { get; set; }
+        [ForeignKey("upload_id")]
+        public UploadFile? uploadFile { get; set; } = null;
     }
 }
