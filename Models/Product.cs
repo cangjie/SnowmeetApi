@@ -45,6 +45,14 @@ namespace SnowmeetApi.Models
                 return images.Where(i => i.valid == 1).ToList();
             }
         }
+        [NotMapped]
+        public List<ProductProperty> availableProperties
+        {
+            get
+            {
+                return properties.Where(p => p.valid == 1).OrderBy(p => p.sort).ToList();
+            }
+        }
     }
     [Table("product_property")]
     public class ProductProperty
