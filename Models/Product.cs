@@ -60,5 +60,48 @@ namespace SnowmeetApi.Models
         public DateTime create_date { get; set; } = DateTime.Now;
         [ForeignKey("product_id")]
         public Product product { get; set; }
+        [ForeignKey("category_property_id")]
+        public CategoryProperty categoryProperty { get; set; }
+        [NotMapped]
+        public int sort
+        {
+            get
+            {
+                if (categoryProperty != null)
+                {
+                    return categoryProperty.sort;
+                }
+                return 100;
+            }
+        }
+        [NotMapped]
+        public string title
+        {
+            get
+            {
+                if (categoryProperty != null)
+                {
+                    return categoryProperty.property_name;
+                }
+                return "未知属性";
+            }
+        }
+        [NotMapped]
+        public string value
+        {
+            get
+            {
+                string ret = "";
+                foreach (CategoryPropertyOption option in categoryProperty.options)
+                {
+                    if (option.id == option_id)
+                    {
+                        ret = option.option_value;
+                        break;
+                    }
+                }
+                return ret;
+            }
+        }
     }
 }
