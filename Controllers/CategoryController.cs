@@ -249,7 +249,7 @@ namespace SnowmeetApi.Controllers
             }
             return product;
         }
-        [HttpGet("productId")]
+        [HttpGet("{productId}")]
         public async Task<ActionResult<ApiResult<Product>>> GetProduct(int productId,
             string sessionKey, string sessionType = "wechat_mini_openid")
         {
