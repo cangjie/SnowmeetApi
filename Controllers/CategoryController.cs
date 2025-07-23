@@ -166,6 +166,41 @@ namespace SnowmeetApi.Controllers
             });
         }
         [HttpPost]
+        public async Task<ActionResult<ApiResult<Product>>> ModProduct([FromBody] Product product,
+            [FromQuery] string sessionKey, [FromQuery] string sessionType = "wechat_mini_openid")
+        {
+            ApiResult<object?> checkStaffResult = await CheckStaff(100, sessionKey, sessionType);
+            if (checkStaffResult != null && checkStaffResult.code == 1)
+            {
+                return Ok(checkStaffResult);
+            }
+            Product oriProduct = await GetProduct(product.id);
+            if (oriProduct == null)
+            {
+                return Ok(new ApiResult<Category>()
+                {
+                    code = 1,
+                    message = "商品不存在",
+                    data = null
+                });
+            }
+            List<CoreDataModLog> logs = Util.GetUpdateDifferenceLog<Product>(oriProduct, product, null, ((Staff)checkStaffResult.data).id, "修改商品");
+            product.update_date = DateTime.Now;
+            _db.product.Entry(oriProduct).State = EntityState.Detached;
+            _db.product.Entry(product).State = EntityState.Modified;
+            for (int i = 0; i < logs.Count; i++)
+            {
+                await _db.coreDataModLog.AddAsync(logs[i]);
+            }
+            await _db.SaveChangesAsync();
+            return Ok(new ApiResult<Product>()
+            { 
+                code = 0,
+                message = "",
+                data = product
+            });
+        }
+        [HttpPost]
         public async Task<ActionResult<ApiResult<Product>>> AddProduct([FromBody] Product product,
             [FromQuery] string sessionKey, [FromQuery] string sessionType = "wechat_mini_openid")
         {

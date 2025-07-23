@@ -32,6 +32,8 @@ namespace SnowmeetApi.Models
         public string? intro { get; set; } = null;
         public int? ticket_template_id { get; set; } = null;
         public string? principal { get; set; } = null;
+        public DateTime? update_date { get; set; } = null;
+        public DateTime create_date { get; set; } = DateTime.Now;
         public int? award_score { get; set; } = null;
         [ForeignKey("category_id")]
         public Category? category { get; set; } = null;
