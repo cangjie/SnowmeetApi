@@ -165,6 +165,80 @@ namespace SnowmeetApi.Controllers
                 data = cateList
             });
         }
+        [NonAction]
+        public async Task<List<ProductImage>> UpdateProductImages(int productId, List<ProductImage> productImages, int? staffId)
+        {
+            List<ProductImage> oriProductImages = await _db.productImage
+                .Where(i => i.product_id == productId && i.valid == 1).ToListAsync();
+            for (int i = 0; i < productImages.Count; i++)
+            { 
+                ProductImage pi = productImages[i];
+                if (pi.id == 0)
+                {
+                    pi.product_id = productId;
+                    pi.create_date = DateTime.Now;
+                    await _db.productImage.AddAsync(pi);
+                }
+                else
+                {
+                    ProductImage oriImage = oriProductImages.Where(pi => pi.id == productImages[i].id).FirstOrDefault();
+                    if (oriImage != null)
+                    {
+                        List<CoreDataModLog> logs = Util.GetUpdateDifferenceLog<ProductImage>(oriImage, productImages[i], null, staffId, "修改商品图片");
+                        for (int j = 0; j < logs.Count; j++)
+                        {
+                            await _db.coreDataModLog.AddAsync(logs[j]);
+                        }
+                        if (logs.Count == 0)
+                        {
+                            continue; // No changes, skip update
+                        }
+                        oriImage.title = productImages[i].title;
+                        oriImage.content = productImages[i].content;
+                        oriImage.sort = productImages[i].sort;
+                        oriImage.is_head = productImages[i].is_head;
+                        oriImage.valid = productImages[i].valid;
+                        oriImage.update_date = DateTime.Now;
+                        oriImage.upload_id = productImages[i].upload_id;
+                        oriImage.image_url = productImages[i].image_url;
+                        _db.productImage.Entry(oriImage).State = EntityState.Modified;
+                    }
+                    else
+                    {
+                        productImages[i].id = 0;
+                        await _db.productImage.AddAsync(productImages[i]);
+                    }
+                }
+            }
+            for (int i = 0; i < oriProductImages.Count; i++)
+            {
+                ProductImage newImage = productImages.Where(pi => pi.id == oriProductImages[i].id).FirstOrDefault();
+                if (newImage == null)
+                {
+                    oriProductImages[i].valid = 0; // Mark as invalid
+                    oriProductImages[i].update_date = DateTime.Now;
+                    CoreDataModLog log = new CoreDataModLog()
+                    {
+                        id = 0,
+                        table_name = "product_image",
+                        field_name = "valid",
+                        key_value = oriProductImages[i].id,
+                        scene = "删除商品图片",
+                        member_id = null,
+                        staff_id = staffId,
+                        prev_value = "1",
+                        current_value = "0",
+                        trace_id = 0,
+                        is_manual = 1,
+                        manual_memo = "更新商品图片"
+                    };
+                    await _db.coreDataModLog.AddAsync(log);
+                    _db.productImage.Entry(oriProductImages[i]).State = EntityState.Modified;
+                }
+            }
+            await _db.SaveChangesAsync();
+            return productImages;
+        }
         [HttpPost]
         public async Task<ActionResult<ApiResult<Product>>> ModProduct([FromBody] Product product,
             [FromQuery] string sessionKey, [FromQuery] string sessionType = "wechat_mini_openid")
@@ -174,7 +248,9 @@ namespace SnowmeetApi.Controllers
             {
                 return Ok(checkStaffResult);
             }
+            Staff staff = (Staff)checkStaffResult.data;
             Product oriProduct = await GetProduct(product.id);
+            await UpdateProductImages(product.id, product.images, staff.id);
             if (oriProduct == null)
             {
                 return Ok(new ApiResult<Category>()
@@ -185,13 +261,14 @@ namespace SnowmeetApi.Controllers
                 });
             }
             List<CoreDataModLog> logs = Util.GetUpdateDifferenceLog<Product>(oriProduct, product, null, ((Staff)checkStaffResult.data).id, "修改商品");
-            product.update_date = DateTime.Now;
+
             _db.product.Entry(oriProduct).State = EntityState.Detached;
             _db.product.Entry(product).State = EntityState.Modified;
             for (int i = 0; i < logs.Count; i++)
             {
                 await _db.coreDataModLog.AddAsync(logs[i]);
             }
+            product.update_date = DateTime.Now;
             await _db.SaveChangesAsync();
             return Ok(new ApiResult<Product>()
             { 
