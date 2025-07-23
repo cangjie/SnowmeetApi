@@ -247,6 +247,11 @@ namespace SnowmeetApi.Controllers
                     await _db.Entry(pp.categoryProperty).Collection(c => c.options).LoadAsync();
                 }
             }
+            for(int i = 0; i < product.images.Count; i++)
+            {
+                ProductImage pi = product.images[i];
+                await _db.Entry(pi).Reference(p => p.uploadFile).LoadAsync();
+            }
             return product;
         }
         [HttpGet("{productId}")]
