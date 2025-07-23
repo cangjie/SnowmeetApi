@@ -347,9 +347,10 @@ namespace SnowmeetApi.Controllers
         public async Task<Product> GetProduct(int productId)
         {
             Product product = await _db.product.FindAsync(productId);
-            await _db.Entry(product).Collection(p => p.images).LoadAsync();
-            await _db.Entry(product).Collection(p => p.properties).LoadAsync();
-            await _db.Entry(product).Reference(p => p.category).LoadAsync();
+            await _db.product.Entry(product).Collection(p => p.images).LoadAsync();
+            await _db.product.Entry(product).Collection(p => p.properties).LoadAsync();
+            await _db.product.Entry(product).Reference(p => p.category).LoadAsync();
+            await _db.category.Entry(product.category).Collection(c => c.properties).LoadAsync();
             for (int i = 0; i < product.properties.Count; i++)
             {
                 ProductProperty pp = product.properties[i];
@@ -363,6 +364,11 @@ namespace SnowmeetApi.Controllers
             {
                 ProductImage pi = product.images[i];
                 await _db.Entry(pi).Reference(p => p.uploadFile).LoadAsync();
+            }
+            for(int i = 0; i < product.category.properties.Count; i++)
+            {
+                CategoryProperty cp = product.category.properties[i];
+                await _db.Entry(cp).Collection(c => c.options).LoadAsync();
             }
             return product;
         }
