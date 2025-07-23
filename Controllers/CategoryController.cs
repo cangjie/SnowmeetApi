@@ -231,6 +231,45 @@ namespace SnowmeetApi.Controllers
                 .AsNoTracking().ToListAsync();
 
         }
+        [NonAction]
+        public async Task<Product> GetProduct(int productId)
+        {
+            Product product = await _db.product.FindAsync(productId);
+            await _db.Entry(product).Collection(p => p.images).LoadAsync();
+            await _db.Entry(product).Collection(p => p.properties).LoadAsync();
+            await _db.Entry(product).Reference(p => p.category).LoadAsync();
+            for (int i = 0; i < product.properties.Count; i++)
+            {
+                ProductProperty pp = product.properties[i];
+                await _db.Entry(pp).Reference(p => p.categoryProperty).LoadAsync();
+                if (pp.categoryProperty != null)
+                {
+                    await _db.Entry(pp.categoryProperty).Collection(c => c.options).LoadAsync();
+                }
+            }
+            return product;
+        }
+        [HttpGet("productId")]
+        public async Task<ActionResult<ApiResult<Product>>> GetProduct(int productId,
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            Product product = await GetProduct(productId);
+            if (product == null)
+            {
+                return Ok(new ApiResult<Product>()
+                {
+                    code = 1,
+                    message = "商品不存在",
+                    data = null
+                });
+            }
+            return Ok(new ApiResult<Product>()
+            {
+                code = 0,
+                message = "",
+                data = product
+            });
+        }
         [HttpGet("{categoryId}")]
         public async Task<ActionResult<ApiResult<List<Product>>>> GetCategoryProducts(int categoryId,
             string sessionKey, string sessionType = "wechat_mini_openid")
