@@ -397,15 +397,15 @@ namespace SnowmeetApi.Controllers
             await _db.coreDataModLog.AddAsync(log);
             await _db.SaveChangesAsync();
             if (product.stock_num != null)
-            { 
+            {
                 await UpdateProductStock(product.id, (int)product.stock_num, "新增商品", staff.id, null);
             }
             return Ok(new ApiResult<Product>()
-                {
-                    code = 0,
-                    message = "",
-                    data = product
-                });
+            {
+                code = 0,
+                message = "",
+                data = product
+            });
         }
         [NonAction]
         public async Task<List<Product>> GetCategoryProducts(int categoryId)
@@ -532,6 +532,26 @@ namespace SnowmeetApi.Controllers
             return await _db.productStock
                 .Where(s => s.product_id == productId).OrderByDescending(s => s.id)
                 .AsNoTracking().ToListAsync();
+        }
+        [HttpGet("{productId}")]
+        public async Task<ActionResult<ApiResult<Product>>> UpdateProductStock(int productId, int delta, string scene,
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            ApiResult<object?> checkStaffResult = await CheckStaff(100, sessionKey, sessionType);
+            if (checkStaffResult != null && checkStaffResult.code == 1)
+            {
+                return Ok(checkStaffResult);
+            }
+            Staff staff = (Staff)checkStaffResult.data;
+            scene = Util.UrlDecode(scene);
+            await UpdateProductStock(productId, delta, scene, staff.id, null);
+            Product product = await GetProduct(productId);
+            return Ok(new ApiResult<Product>()
+            {
+                code = 0,
+                message = "",
+                data = product
+            });
         }
     }
 }
