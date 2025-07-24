@@ -274,11 +274,6 @@ namespace SnowmeetApi.Controllers
                         oriProperty.product_id = pp.product_id;
                         _db.productProperty.Entry(oriProperty).State = EntityState.Modified;
                     }
-                    else
-                    {
-                        pp.id = 0;
-                        await _db.productProperty.AddAsync(pp);
-                    }
                 }
             }
             for (int i = 0; i < oriProductProperties.Count; i++)
