@@ -67,6 +67,8 @@ namespace SnowmeetApi.Models
         public DateTime create_date { get; set; } = DateTime.Now;
         [ForeignKey("category_property_id")]
         public CategoryProperty categoryProperty { get; set; }
+        [NotMapped]
+        public bool is_checked {get; set;} = false;
     }
 
 }

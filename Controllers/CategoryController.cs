@@ -438,6 +438,20 @@ namespace SnowmeetApi.Controllers
             {
                 CategoryProperty cp = product.category.properties[i];
                 await _db.Entry(cp).Collection(c => c.options).LoadAsync();
+                for (int j = 0; j < cp.options.Count; j++)
+                {
+                    CategoryPropertyOption cpo = cp.options[j];
+                    ProductProperty? pp = product.availableProperties
+                        .Where(p => p.category_property_id == cp.id && p.option_id == cpo.id).FirstOrDefault();
+                    if (pp != null)
+                    { 
+                        cpo.is_checked = true;
+                    }
+                    else
+                    {
+                        cpo.is_checked = false;
+                    }
+                }
             }
             return product;
         }
