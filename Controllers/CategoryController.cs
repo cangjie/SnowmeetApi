@@ -310,7 +310,7 @@ namespace SnowmeetApi.Controllers
             await _db.SaveChangesAsync();
             return await _db.productProperty.Where(p => p.product_id == productId && p.valid == 1)
                 .Include(p => p.categoryProperty).ThenInclude(cp => cp.options)
-                .OrderBy(p => p.sort).ThenByDescending(p => p.id).ToListAsync();
+                .OrderBy(p => p.categoryProperty.sort).ThenByDescending(p => p.id).ToListAsync();
         }
         [HttpPost]
         public async Task<ActionResult<ApiResult<Product>>> ModProduct([FromBody] Product product,
