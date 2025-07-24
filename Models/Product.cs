@@ -102,14 +102,18 @@ namespace SnowmeetApi.Models
             get
             {
                 string ret = "";
-                foreach (CategoryPropertyOption option in categoryProperty.options)
+                if (categoryProperty == null)
                 {
-                    if (option.id == option_id)
-                    {
-                        ret = option.option_value;
-                        break;
-                    }
+                    return "";
                 }
+                foreach (CategoryPropertyOption option in categoryProperty.options)
+                    {
+                        if (option.id == option_id)
+                        {
+                            ret = option.option_value;
+                            break;
+                        }
+                    }
                 return ret;
             }
         }

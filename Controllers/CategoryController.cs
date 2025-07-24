@@ -171,7 +171,7 @@ namespace SnowmeetApi.Controllers
             List<ProductImage> oriProductImages = await _db.productImage
                 .Where(i => i.product_id == productId && i.valid == 1).ToListAsync();
             for (int i = 0; i < productImages.Count; i++)
-            { 
+            {
                 ProductImage pi = productImages[i];
                 if (pi.id == 0)
                 {
@@ -237,7 +237,80 @@ namespace SnowmeetApi.Controllers
                 }
             }
             await _db.SaveChangesAsync();
-            return productImages;
+            return await _db.productImage.Where(i => i.product_id == productId && i.valid == 1)
+                .OrderBy(i => i.sort).ThenByDescending(i => i.id).ToListAsync();
+        }
+        [NonAction]
+        public async Task<List<ProductProperty>> UpdateProductProperties(int productId, List<ProductProperty> productProperties, int? staffId)
+        {
+            List<ProductProperty> oriProductProperties = await _db.productProperty
+                .Where(p => p.product_id == productId && p.valid == 1).ToListAsync();
+            for (int i = 0; i < productProperties.Count; i++)
+            {
+                ProductProperty pp = productProperties[i];
+                if (pp.id == 0)
+                {
+                    await _db.productProperty.AddAsync(pp);
+                }
+                else
+                {
+                    ProductProperty? oriProperty = oriProductProperties.Where(p => p.id == pp.id).FirstOrDefault();
+                    if (oriProperty != null)
+                    {
+                        List<CoreDataModLog> logs = Util.GetUpdateDifferenceLog<ProductProperty>(oriProperty, pp, null, staffId, "修改商品属性");
+                        for (int j = 0; j < logs.Count; j++)
+                        {
+                            await _db.coreDataModLog.AddAsync(logs[j]);
+                        }
+                        if (logs.Count == 0)
+                        {
+                            continue; // No changes, skip update
+                        }
+                        oriProperty.text_value = pp.text_value;
+                        oriProperty.option_id = pp.option_id;
+                        oriProperty.update_date = DateTime.Now;
+                        oriProperty.valid = pp.valid;
+                        oriProperty.category_property_id = pp.category_property_id;
+                        oriProperty.product_id = pp.product_id;
+                        _db.productProperty.Entry(oriProperty).State = EntityState.Modified;
+                    }
+                    else
+                    {
+                        pp.id = 0;
+                        await _db.productProperty.AddAsync(pp);
+                    }
+                }
+            }
+            for (int i = 0; i < oriProductProperties.Count; i++)
+            {
+                ProductProperty? pp = productProperties.Where(p => p.id == oriProductProperties[i].id).FirstOrDefault();
+                if (pp == null)
+                {
+                    oriProductProperties[i].valid = 0; // Mark as invalid
+                    oriProductProperties[i].update_date = DateTime.Now;
+                    CoreDataModLog log = new CoreDataModLog()
+                    {
+                        id = 0,
+                        table_name = "product_property",
+                        field_name = "valid",
+                        key_value = oriProductProperties[i].id,
+                        scene = "删除商品属性",
+                        member_id = null,
+                        staff_id = staffId,
+                        prev_value = "1",
+                        current_value = "0",
+                        trace_id = 0,
+                        is_manual = 1,
+                        manual_memo = "更新商品属性"
+                    };
+                    await _db.coreDataModLog.AddAsync(log);
+                    _db.productProperty.Entry(oriProductProperties[i]).State = EntityState.Modified;
+                }
+            }
+            await _db.SaveChangesAsync();
+            return await _db.productProperty.Where(p => p.product_id == productId && p.valid == 1)
+                .Include(p => p.categoryProperty).ThenInclude(cp => cp.options)
+                .OrderBy(p => p.sort).ThenByDescending(p => p.id).ToListAsync();
         }
         [HttpPost]
         public async Task<ActionResult<ApiResult<Product>>> ModProduct([FromBody] Product product,
@@ -250,7 +323,8 @@ namespace SnowmeetApi.Controllers
             }
             Staff staff = (Staff)checkStaffResult.data;
             Product oriProduct = await GetProduct(product.id);
-            await UpdateProductImages(product.id, product.images, staff.id);
+            product.images = await UpdateProductImages(product.id, product.images, staff.id);
+            product.properties = await UpdateProductProperties(product.id, product.properties, staff.id);
             if (oriProduct == null)
             {
                 return Ok(new ApiResult<Category>()
@@ -271,7 +345,7 @@ namespace SnowmeetApi.Controllers
             product.update_date = DateTime.Now;
             await _db.SaveChangesAsync();
             return Ok(new ApiResult<Product>()
-            { 
+            {
                 code = 0,
                 message = "",
                 data = product
@@ -360,12 +434,12 @@ namespace SnowmeetApi.Controllers
                     await _db.Entry(pp.categoryProperty).Collection(c => c.options).LoadAsync();
                 }
             }
-            for(int i = 0; i < product.images.Count; i++)
+            for (int i = 0; i < product.images.Count; i++)
             {
                 ProductImage pi = product.images[i];
                 await _db.Entry(pi).Reference(p => p.uploadFile).LoadAsync();
             }
-            for(int i = 0; i < product.category.properties.Count; i++)
+            for (int i = 0; i < product.category.properties.Count; i++)
             {
                 CategoryProperty cp = product.category.properties[i];
                 await _db.Entry(cp).Collection(c => c.options).LoadAsync();

@@ -212,6 +212,7 @@ namespace SnowmeetApi.Data
         public DbSet<ProductImage> productImage { get; set; }
         public DbSet<CategoryProperty> categoryProperty { get; set; }
         public DbSet<CategoryPropertyOption> categoryPropertyOption { get; set; }
+        public DbSet<ProductProperty> productProperty { get; set; }
 
     }
 }
