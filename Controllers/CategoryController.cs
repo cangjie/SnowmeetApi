@@ -423,7 +423,7 @@ namespace SnowmeetApi.Controllers
             Product product = await _db.product.FindAsync(productId);
             await _db.product.Entry(product).Collection(p => p.images).LoadAsync();
             await _db.product.Entry(product).Collection(p => p.properties).LoadAsync();
-            await _db.product.Entry(product).Collection(p => p.stocks.OrderByDescending(s => s.id)).LoadAsync();
+            await _db.product.Entry(product).Collection(p => p.stocks).LoadAsync();
             await _db.product.Entry(product).Reference(p => p.category).LoadAsync();
             await _db.category.Entry(product.category).Collection(c => c.properties).LoadAsync();
             for (int i = 0; i < product.properties.Count; i++)
@@ -458,6 +458,10 @@ namespace SnowmeetApi.Controllers
                         cpo.is_checked = false;
                     }
                 }
+            }
+            if (product.stocks.Count > 0)
+            {
+                product.stocks = product.stocks.OrderByDescending(s => s.id).ToList();
             }
             return product;
         }
