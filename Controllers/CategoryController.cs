@@ -377,6 +377,7 @@ namespace SnowmeetApi.Controllers
                 product.images[i].create_date = DateTime.Now;
             }
             await _db.product.AddAsync(product);
+
             await _db.SaveChangesAsync();
             CoreDataModLog log = new CoreDataModLog()
             {
@@ -395,12 +396,16 @@ namespace SnowmeetApi.Controllers
             };
             await _db.coreDataModLog.AddAsync(log);
             await _db.SaveChangesAsync();
+            if (product.stock_num != null)
+            { 
+                await UpdateProductStock(product.id, (int)product.stock_num, "新增商品", staff.id, null);
+            }
             return Ok(new ApiResult<Product>()
-            {
-                code = 0,
-                message = "",
-                data = product
-            });
+                {
+                    code = 0,
+                    message = "",
+                    data = product
+                });
         }
         [NonAction]
         public async Task<List<Product>> GetCategoryProducts(int categoryId)
@@ -418,6 +423,7 @@ namespace SnowmeetApi.Controllers
             Product product = await _db.product.FindAsync(productId);
             await _db.product.Entry(product).Collection(p => p.images).LoadAsync();
             await _db.product.Entry(product).Collection(p => p.properties).LoadAsync();
+            await _db.product.Entry(product).Collection(p => p.stocks.OrderByDescending(s => s.id)).LoadAsync();
             await _db.product.Entry(product).Reference(p => p.category).LoadAsync();
             await _db.category.Entry(product.category).Collection(c => c.properties).LoadAsync();
             for (int i = 0; i < product.properties.Count; i++)
@@ -444,7 +450,7 @@ namespace SnowmeetApi.Controllers
                     ProductProperty? pp = product.availableProperties
                         .Where(p => p.category_property_id == cp.id && p.option_id == cpo.id).FirstOrDefault();
                     if (pp != null)
-                    { 
+                    {
                         cpo.is_checked = true;
                     }
                     else
@@ -487,6 +493,41 @@ namespace SnowmeetApi.Controllers
                 message = "",
                 data = productList
             });
+        }
+        [NonAction]
+        public async Task<List<ProductStock>> UpdateProductStock(int productId, int delta, string scene, int? staffId, int? orderId)
+        {
+            Product product = await _db.product.FindAsync(productId);
+            if (product == null)
+            {
+                return new List<ProductStock>();
+            }
+            List<ProductStock> stockList = await _db.productStock
+                .Where(s => s.product_id == productId).OrderByDescending(s => s.id)
+                .AsNoTracking().ToListAsync();
+            int prevStock = 0;
+            if (stockList != null && stockList.Count > 0)
+            {
+                prevStock = stockList[0].sum;
+            }
+            product.stock_num = prevStock + delta;
+            ProductStock stock = new ProductStock()
+            {
+                id = 0,
+                product_id = productId,
+                delta = delta,
+                sum = prevStock + delta,
+                memo = scene,
+                staff_id = staffId,
+                order_id = orderId,
+                create_date = DateTime.Now
+            };
+            _db.product.Entry(product).State = EntityState.Modified;
+            await _db.productStock.AddAsync(stock);
+            await _db.SaveChangesAsync();
+            return await _db.productStock
+                .Where(s => s.product_id == productId).OrderByDescending(s => s.id)
+                .AsNoTracking().ToListAsync();
         }
     }
 }

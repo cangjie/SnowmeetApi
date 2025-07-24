@@ -39,6 +39,7 @@ namespace SnowmeetApi.Models
         public Category? category { get; set; } = null;
         public List<ProductImage> images { get; set; } = new List<ProductImage>();
         public List<ProductProperty> properties { get; set; } = new List<ProductProperty>();
+        public List<ProductStock> stocks { get; set; } = new List<ProductStock>();
         [NotMapped]
         public List<ProductImage> availableImages
         {
@@ -107,15 +108,30 @@ namespace SnowmeetApi.Models
                     return "";
                 }
                 foreach (CategoryPropertyOption option in categoryProperty.options)
+                {
+                    if (option.id == option_id)
                     {
-                        if (option.id == option_id)
-                        {
-                            ret = option.option_value;
-                            break;
-                        }
+                        ret = option.option_value;
+                        break;
                     }
+                }
                 return ret;
             }
         }
+    }
+    [Table("product_stock")]
+    public class ProductStock
+    {
+        [Key]
+        public int id { get; set; }
+        public int product_id { get; set; }
+        public int delta { get; set; }
+        public int sum { get; set; }
+        public string memo { get; set; } = "";
+        public int? staff_id { get; set; } = null;
+        public int? order_id { get; set; } = null;
+        public DateTime create_date { get; set; } = DateTime.Now;
+        [ForeignKey("product_id")]
+        public Product product { get; set; }
     }
 }
