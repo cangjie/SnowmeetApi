@@ -15,6 +15,8 @@ namespace SnowmeetApi.Models
         public string name { get; set; }
         public int valid { get; set; } = 0;
         public int hide { get; set; } = 1;
+        public int no_entrain { get; set; } = 0;
+        public int on_shelves { get; set; } = 1;
         public int sort { get; set; } = 100;
         public DateTime? update_date { get; set; }
         public DateTime create_date { get; set; } = DateTime.Now;
