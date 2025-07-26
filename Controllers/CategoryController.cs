@@ -412,6 +412,7 @@ namespace SnowmeetApi.Controllers
         {
             return await _db.product.Where(p => p.category_id == categoryId && p.valid == 1)
                 .Include(p => p.images.OrderBy(i => i.sort))
+                    .ThenInclude(i => i.uploadFile)
                 .Include(t => t.properties.Where(p => p.valid == 1))
                     .ThenInclude(p => p.categoryProperty).ThenInclude(c => c.options).OrderBy(t => t.sort)
                 .AsNoTracking().ToListAsync();

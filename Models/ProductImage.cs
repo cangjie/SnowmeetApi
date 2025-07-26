@@ -21,5 +21,22 @@ namespace SnowmeetApi.Models
         public Product product { get; set; }
         [ForeignKey("upload_id")]
         public UploadFile? uploadFile { get; set; } = null;
+        [NotMapped]
+        public string imageUrl
+        {
+            get
+            {
+                string ret = "";
+                if (uploadFile != null)
+                {
+                    ret = uploadFile.file_path_name;
+                }
+                else if (!string.IsNullOrEmpty(image_url))
+                {
+                    ret = image_url;
+                }
+                return ret;
+            }
+         }
     }
 }
