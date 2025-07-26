@@ -414,7 +414,7 @@ namespace SnowmeetApi.Controllers
                 .Include(p => p.images.OrderBy(i => i.sort))
                     .ThenInclude(i => i.uploadFile)
                 .Include(t => t.properties.Where(p => p.valid == 1))
-                    .ThenInclude(p => p.categoryProperty).ThenInclude(c => c.options).OrderBy(t => t.sort)
+                    .ThenInclude(p => p.categoryProperty).ThenInclude(c => c.options).OrderByDescending(t => t.sort)
                 .AsNoTracking().ToListAsync();
 
         }
