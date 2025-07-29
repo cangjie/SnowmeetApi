@@ -179,9 +179,9 @@ namespace SnowmeetApi.Models
         public string? name { get; set; }
         public string? gender { get; set; }
         public string? cell { get; set; }
-        public string? ticket_code { get; set; }
-        public double ticket_discount { get; set; } = 0;
-        public double discount { get; set; } = 0;
+        //public string? ticket_code { get; set; }
+        //public double ticket_discount { get; set; } = 0;
+        //public double discount { get; set; } = 0;
         public double total_amount { get; set; }
         public string memo { get; set; } = "";
         public DateTime biz_date { get; set; } = DateTime.Now;

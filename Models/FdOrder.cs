@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Linq;
 
 namespace SnowmeetApi.Models
 {
@@ -26,6 +28,7 @@ namespace SnowmeetApi.Models
         public Order order { get; set; }
         [ForeignKey("product_id")]
         public Product product { get; set; }
-
+        [ForeignKey(nameof(Discount.sub_biz_id))]
+        public List<Discount> discounts { get; set; } = new List<Discount>();
     }
 }

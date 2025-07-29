@@ -34,7 +34,9 @@ namespace SnowmeetApi.Controllers
             }
             order.retails = await _db.order.Entry(order).Collection(o => o.retails).Query().Where(r => r.valid == 1).ToListAsync();
             order.cares = await _db.order.Entry(order).Collection(o => o.cares).Query().Include(c => c.tasks).ToListAsync();
-            order.fdOrders = await _db.order.Entry(order).Collection(o => o.fdOrders).Query().Include(f => f.product).ThenInclude(p => p.category).ToListAsync();
+            order.fdOrders = await _db.order.Entry(order).Collection(o => o.fdOrders).Query()
+                .Include(f => f.product).ThenInclude(p => p.category)
+                .Include(f => f.discounts.Where(d => d.valid == 1 && d.biz_type.Trim().Equals("餐饮")) ).ToListAsync();
             order.rentals = await _db.order.Entry(order).Collection(o => o.rentals).Query()
                 .Include(r => r.discounts.Where(d => d.valid == 1 && d.biz_type.Trim().Equals("租赁")))
                 .Include(r => r.details.Where(d => d.valid == 1))
