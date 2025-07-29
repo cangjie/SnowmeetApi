@@ -19,6 +19,7 @@ namespace SnowmeetApi.Models
         public string ticket_code { get; set; } = null;
         public double ticket_discount { get; set; }
         public string memo { get; set; } = "";
+        public int valid { get; set; } = 1;
         public DateTime? update_date { get; set; } = null;
         public DateTime create_date { get; set; } = DateTime.Now;
         [ForeignKey("order_id")]

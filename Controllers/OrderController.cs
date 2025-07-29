@@ -33,8 +33,8 @@ namespace SnowmeetApi.Controllers
                 return null;
             }
             order.retails = await _db.order.Entry(order).Collection(o => o.retails).Query().Where(r => r.valid == 1).ToListAsync();
-            order.cares = await _db.order.Entry(order).Collection(o => o.cares).Query().Include(c => c.tasks)
-            .ToListAsync();
+            order.cares = await _db.order.Entry(order).Collection(o => o.cares).Query().Include(c => c.tasks).ToListAsync();
+            order.fdOrders = await _db.order.Entry(order).Collection(o => o.fdOrders).Query().Include(f => f.product).ThenInclude(p => p.category).ToListAsync();
             order.rentals = await _db.order.Entry(order).Collection(o => o.rentals).Query()
                 .Include(r => r.discounts.Where(d => d.valid == 1 && d.biz_type.Trim().Equals("租赁")))
                 .Include(r => r.details.Where(d => d.valid == 1))
@@ -444,6 +444,14 @@ namespace SnowmeetApi.Controllers
                     break;
                 default:
                     break;
+            }
+            if (order.total_amount > 0)
+            {
+                order.waiting_for_pay = 1;
+            }
+            else
+            {
+                order.waiting_for_pay = 0;
             }
             await GenerateOrderCode(order);
             await _db.order.AddAsync(order);

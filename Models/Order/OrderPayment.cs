@@ -21,7 +21,8 @@ namespace SnowmeetApi.Models
         [Key]
         public int id { get; set; }
         public int order_id { get; set; }
-        public string pay_method { get; set; }
+        public string? pay_method { get; set; } = null;
+        public int is_debt { get; set; } = 0;
         public double amount { get; set; }
         public string status { get; set; } = "待支付";
         public string? out_trade_no { get; set; }

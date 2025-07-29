@@ -189,8 +189,9 @@ namespace SnowmeetApi.Models
         public int closed { get; set; } = 0;
         public int valid { get; set; } = 1;
         public DateTime? close_date { get; set; } = null;
-        public int? waiting_for_pay { get; set; } = null;
+        public int waiting_for_pay { get; set; } = 1;
         public int supplement { get; set; } = 0;
+        public int single_payment { get; set; } = 1;
         public DateTime? update_date { get; set; } = null;
         [NotMapped]
         public string textColor { get; set; } = "";
