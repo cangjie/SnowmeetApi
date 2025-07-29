@@ -179,12 +179,10 @@ namespace SnowmeetApi.Models
         public string? name { get; set; }
         public string? gender { get; set; }
         public string? cell { get; set; }
-        public double total_amount { get; set; }
-        /*
-        public string? ticket_code { get; set; } = null;
+        public string? ticket_code { get; set; }
         public double ticket_discount { get; set; } = 0;
         public double discount { get; set; } = 0;
-        */
+        public double total_amount { get; set; }
         public string memo { get; set; } = "";
         public DateTime biz_date { get; set; } = DateTime.Now;
         public int? staff_id { get; set; }
@@ -206,6 +204,7 @@ namespace SnowmeetApi.Models
         public List<Retail> retails { get; set; } = new List<Retail>();
         public List<Care> cares {get; set;} = new List<Care>();
         public List<Rental> rentals { get; set;} = new List<Rental>();
+        public List<FdOrder> fdOrders { get; set; } = new List<FdOrder>();
         public List<OrderPayment>? payments { get; set; }
         public List<OrderPaymentRefund>? refunds { get; set; }
         public List<PaymentShare>? shares { get; set; }

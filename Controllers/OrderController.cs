@@ -166,6 +166,9 @@ namespace SnowmeetApi.Controllers
                 case "租赁":
                     bizCode = "ZL";
                     break;
+                case "餐饮" :
+                    bizCode = "CY";
+                    break;
                 default:
                     bizCode = "WZ";
                     break;
