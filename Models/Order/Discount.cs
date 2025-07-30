@@ -20,6 +20,7 @@ namespace SnowmeetApi.Models
         public int? staff_id {get; set;}
         public int? member_id {get; set;}
         public int valid {get; set;}
+        public string memo { get; set; }
         public DateTime? update_date {get; set;}
         public DateTime create_date {get; set;} = DateTime.Now;
         [ForeignKey("order_id")]

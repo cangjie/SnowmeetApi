@@ -1,14 +1,16 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+using Aop.Api.Domain;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Identity.Client;
+using NPOI.Util;
 using SnowmeetApi.Data;
 using SnowmeetApi.Models;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 namespace SnowmeetApi.Controllers
 {
     [Route("api/[controller]/[action]")]
@@ -561,6 +563,61 @@ namespace SnowmeetApi.Controllers
                     data = order
                 });
             }
+        }
+        [NonAction]
+        public async Task<List<Discount>> SetDiscount(int orderId, int? bizId, string? bizType, double discountAmount,
+            string? ticketCode, int? staffId, int? memberId)
+        {
+            List<Discount> discounts = await _db.discount
+                .Where(d => d.order_id == orderId && d.valid == 1 && d.biz_id == bizId && d.biz_type == bizType).ToListAsync();
+
+            if (discounts.Count == 0)
+            {
+                Discount discount = new Discount()
+                {
+                    id = 0,
+                    order_id = orderId,
+                    biz_id = bizId,
+                    biz_type = bizType,
+                    amount = discountAmount,
+                    ticket_code = ticketCode,
+                    staff_id = staffId,
+                    member_id = memberId,
+                    valid = 1,
+                    create_date = DateTime.Now
+                };
+                await _db.discount.AddAsync(discount);
+            }
+            else
+            {
+                List<Discount> subList = discounts.Where(d => d.ticket_code == ticketCode).ToList();
+                if (subList.Count == 0)
+                {
+                    Discount discount = new Discount()
+                    {
+                        id = 0,
+                        order_id = orderId,
+                        biz_id = bizId,
+                        biz_type = bizType,
+                        amount = discountAmount,
+                        ticket_code = ticketCode,
+                        staff_id = staffId,
+                        member_id = memberId,
+                        valid = 1,
+                        create_date = DateTime.Now
+                    };
+                    await _db.discount.AddAsync(discount);
+                }
+                else
+                {
+                    Discount discount = subList[0];
+                    Discount oriDiscount = discount.Copy();
+
+                    //Util.GetUpdateDifferenceLog()
+                }
+            }
+                //int orderId 
+                return null;
         }
     }
 }
