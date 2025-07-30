@@ -17,9 +17,6 @@ namespace SnowmeetApi.Models
         public double unit_price { get; set; }
         public string order_type { get; set; }
         public int count { get; set; }
-        public double discount { get; set; }
-        public string ticket_code { get; set; } = null;
-        public double ticket_discount { get; set; }
         public string memo { get; set; } = "";
         public int valid { get; set; } = 1;
         public DateTime? update_date { get; set; } = null;
