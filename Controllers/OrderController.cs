@@ -1,16 +1,14 @@
-using Aop.Api.Domain;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Identity.Client;
-using NPOI.Util;
 using SnowmeetApi.Data;
 using SnowmeetApi.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Newtonsoft.Json;
 namespace SnowmeetApi.Controllers
 {
     [Route("api/[controller]/[action]")]
@@ -38,7 +36,7 @@ namespace SnowmeetApi.Controllers
             order.cares = await _db.order.Entry(order).Collection(o => o.cares).Query().Include(c => c.tasks).ToListAsync();
             order.fdOrders = await _db.order.Entry(order).Collection(o => o.fdOrders).Query()
                 .Include(f => f.product).ThenInclude(p => p.category)
-                .Include(f => f.discounts.Where(d => d.valid == 1 && d.biz_type.Trim().Equals("餐饮")) ).ToListAsync();
+                .Include(f => f.discounts.Where(d => d.valid == 1 && d.biz_type.Trim().Equals("餐饮"))).ToListAsync();
             order.rentals = await _db.order.Entry(order).Collection(o => o.rentals).Query()
                 .Include(r => r.discounts.Where(d => d.valid == 1 && d.biz_type.Trim().Equals("租赁")))
                 .Include(r => r.details.Where(d => d.valid == 1))
@@ -145,7 +143,7 @@ namespace SnowmeetApi.Controllers
         [NonAction]
         public async Task GenerateOrderCode(SnowmeetApi.Models.Order order)
         {
-            ApiResult<List<Shop>> shopResult = (ApiResult<List<Shop>>)((OkObjectResult)(await GetShops()).Result).Value;
+            ApiResult<List<Models.Shop>> shopResult = (ApiResult<List<Models.Shop>>)((OkObjectResult)(await GetShops()).Result).Value;
             string shopCode = "WZ";
             for (int i = 0; i < shopResult.data.Count; i++)
             {
@@ -170,7 +168,7 @@ namespace SnowmeetApi.Controllers
                 case "租赁":
                     bizCode = "ZL";
                     break;
-                case "餐饮" :
+                case "餐饮":
                     bizCode = "CY";
                     break;
                 default:
@@ -247,10 +245,10 @@ namespace SnowmeetApi.Controllers
             await _db.SaveChangesAsync();
         }
         [HttpGet]
-        public async Task<ActionResult<ApiResult<List<Shop>>>> GetShops()
+        public async Task<ActionResult<ApiResult<List<Models.Shop>>>> GetShops()
         {
-            List<Shop> shopList = await _db.shop.OrderBy(s => s.sort).AsNoTracking().ToListAsync();
-            return Ok(new ApiResult<List<Shop>>()
+            List<Models.Shop> shopList = await _db.shop.OrderBy(s => s.sort).AsNoTracking().ToListAsync();
+            return Ok(new ApiResult<List<Models.Shop>>()
             {
                 data = shopList,
                 code = 0,
@@ -309,7 +307,7 @@ namespace SnowmeetApi.Controllers
             }
             Staff staff = await _staffHelper.GetStaffBySessionKey(sessionKey, sessionType);
             MemberController _memberHelper = new MemberController(_db, _config);
-            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
+            Models.Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
             List<SnowmeetApi.Models.Order> orderList = await GetRetailOrders(orderId, null, null, null, null, null, null);
             SnowmeetApi.Models.Order? order = (orderList != null && orderList.Count > 0) ? orderList[0] : null;
             if (order == null)
@@ -424,7 +422,7 @@ namespace SnowmeetApi.Controllers
             StaffController _staffHelper = new StaffController(_db);
             Staff staff = await _staffHelper.GetStaffBySessionKey(sessionKey, sessionType);
             MemberController _memberHelper = new MemberController(_db, _config);
-            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
+            Models.Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
             if (staff != null && staff.title_level >= 100)
             {
                 order.staff_id = staff.id;
@@ -555,7 +553,7 @@ namespace SnowmeetApi.Controllers
                 });
             }
             else
-            { 
+            {
                 return Ok(new ApiResult<SnowmeetApi.Models.Order>()
                 {
                     code = 0,
@@ -564,13 +562,47 @@ namespace SnowmeetApi.Controllers
                 });
             }
         }
+        [HttpGet("{orderId}")]
+        public async Task<ActionResult<ApiResult<List<Discount>>>> SetDiscount(int orderId, int? bizId, string? bizType,
+            double discountAmount, string? ticketCode, string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            StaffController _staffHelper = new StaffController(_db);
+            Staff staff = await _staffHelper.GetStaffBySessionKey(sessionKey, sessionType);
+            if (staff == null)
+            {
+                return Ok(new ApiResult<SnowmeetApi.Models.Order>()
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = null
+                });
+            }
+            List<Discount>? discounts = await SetDiscount(orderId, bizId, bizType, discountAmount, ticketCode, staff == null ? null : staff.id, null);
+            if (discounts == null)
+            {
+                return Ok(new ApiResult<object?>()
+                {
+                    code = 1,
+                    message = "减免设置失败",
+                    data = null
+                });
+            }
+            else
+            { 
+                return Ok(new ApiResult<List<Discount>>()
+                {
+                    code = 0,
+                    message = "",
+                    data = discounts
+                });
+            }
+        }
         [NonAction]
-        public async Task<List<Discount>> SetDiscount(int orderId, int? bizId, string? bizType, double discountAmount,
+        public async Task<List<Discount>> SetDiscount(int? orderId, int? bizId, string? bizType, double discountAmount,
             string? ticketCode, int? staffId, int? memberId)
         {
             List<Discount> discounts = await _db.discount
-                .Where(d => d.order_id == orderId && d.valid == 1 && d.biz_id == bizId && d.biz_type == bizType).ToListAsync();
-
+                .Where(d => d.order_id == orderId && d.biz_id == bizId && d.biz_type == bizType && d.valid == 1).ToListAsync();
             if (discounts.Count == 0)
             {
                 Discount discount = new Discount()
@@ -590,34 +622,87 @@ namespace SnowmeetApi.Controllers
             }
             else
             {
-                List<Discount> subList = discounts.Where(d => d.ticket_code == ticketCode).ToList();
-                if (subList.Count == 0)
+                if (ticketCode != null)
                 {
-                    Discount discount = new Discount()
+                    List<Discount> ticketDiscounts = discounts.Where(d => d.ticket_code != null).ToList();
+                    if (ticketDiscounts.Count == 0)
                     {
-                        id = 0,
-                        order_id = orderId,
-                        biz_id = bizId,
-                        biz_type = bizType,
-                        amount = discountAmount,
-                        ticket_code = ticketCode,
-                        staff_id = staffId,
-                        member_id = memberId,
-                        valid = 1,
-                        create_date = DateTime.Now
-                    };
-                    await _db.discount.AddAsync(discount);
+                        Discount discount = new Discount()
+                        {
+                            id = 0,
+                            order_id = orderId,
+                            biz_id = bizId,
+                            biz_type = bizType,
+                            amount = discountAmount,
+                            ticket_code = ticketCode,
+                            staff_id = staffId,
+                            member_id = memberId,
+                            valid = 1,
+                            create_date = DateTime.Now
+                        };
+                        await _db.discount.AddAsync(discount);
+                    }
+                    else
+                    {
+                        List<Discount> subList = ticketDiscounts.Where(d => d.ticket_code.Trim().Equals(ticketCode.Trim())).ToList();
+                        if (subList.Count > 0)
+                        {
+                            Discount discount = subList[0];
+                            string json = JsonConvert.SerializeObject(discount);
+                            Discount oriDiscount = JsonConvert.DeserializeObject<Discount>(json);
+                            discount.amount = discountAmount;
+                            List<CoreDataModLog> logs = Util.GetUpdateDifferenceLog<Discount>(oriDiscount, discount, memberId, staffId, "修改优惠券减免金额");
+                            discount.update_date = DateTime.Now;
+                            for (int i = 0; i < logs.Count; i++)
+                            {
+                                await _db.coreDataModLog.AddAsync(logs[i]);
+                            }
+                            _db.discount.Entry(discount).State = EntityState.Modified;
+                        }
+                        else
+                        {
+                            return null;
+                        }
+                    }
                 }
                 else
                 {
-                    Discount discount = subList[0];
-                    Discount oriDiscount = discount.Copy();
-
-                    //Util.GetUpdateDifferenceLog()
+                    List<Discount> subList = discounts.Where(d => d.ticket_code == null).ToList();
+                    if (subList.Count > 0)
+                    {
+                        Discount discount = subList[0];
+                        string json = JsonConvert.SerializeObject(discount);
+                        Discount oriDiscount = JsonConvert.DeserializeObject<Discount>(json);
+                        discount.amount = discountAmount;
+                        List<CoreDataModLog> logs = Util.GetUpdateDifferenceLog<Discount>(oriDiscount, discount, memberId, staffId, "修改普通减免金额");
+                        discount.update_date = DateTime.Now;
+                        for (int i = 0; i < logs.Count; i++)
+                        {
+                            await _db.coreDataModLog.AddAsync(logs[i]);
+                        }
+                        _db.discount.Entry(discount).State = EntityState.Modified;
+                    }
+                    else
+                    { 
+                        Discount discount = new Discount()
+                        {
+                            id = 0,
+                            order_id = orderId,
+                            biz_id = bizId,
+                            biz_type = bizType,
+                            amount = discountAmount,
+                            ticket_code = ticketCode,
+                            staff_id = staffId,
+                            member_id = memberId,
+                            valid = 1,
+                            create_date = DateTime.Now
+                        };
+                        await _db.discount.AddAsync(discount);
+                    }
                 }
             }
-                //int orderId 
-                return null;
+            await _db.SaveChangesAsync();
+            return discounts;
         }
     }
 }
