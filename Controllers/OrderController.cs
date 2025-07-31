@@ -712,7 +712,8 @@ namespace SnowmeetApi.Controllers
             {
                 return null;
             }
-            _db.order.Entry(order).Collection(o => o.discounts.Where(d => d.valid == 1));
+            await _db.order.Entry(order).Collection(o => o.discounts).LoadAsync();
+            order.discounts = order.discounts.Where(d => d.valid == 1).ToList();
             if (order == null)
             {
                 return null;
