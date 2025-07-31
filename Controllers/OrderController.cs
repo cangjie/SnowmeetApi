@@ -588,7 +588,7 @@ namespace SnowmeetApi.Controllers
                 });
             }
             else
-            { 
+            {
                 return Ok(new ApiResult<List<Discount>>()
                 {
                     code = 0,
@@ -683,7 +683,7 @@ namespace SnowmeetApi.Controllers
                         _db.discount.Entry(discount).State = EntityState.Modified;
                     }
                     else
-                    { 
+                    {
                         Discount discount = new Discount()
                         {
                             id = 0,
@@ -703,6 +703,129 @@ namespace SnowmeetApi.Controllers
             }
             await _db.SaveChangesAsync();
             return discounts;
+        }
+        [NonAction]
+        public async Task<OrderPayment> GetReadyOrderPayment(int orderId, double? amount, string payMethod)
+        {
+            Models.Order order = await _db.order.FindAsync(orderId);
+            if (order.closed == 1)
+            {
+                return null;
+            }
+            _db.order.Entry(order).Collection(o => o.discounts.Where(d => d.valid == 1));
+            if (order == null)
+            {
+                return null;
+            }
+            double payAmount = 0;
+            if (order.single_payment == 1)
+            {
+                payAmount = order.totalCharge;
+            }
+            else if (amount == null)
+            {
+                payAmount = order.totalCharge;
+            }
+            else
+            {
+                payAmount = (double)amount;
+            }
+            List<OrderPayment> payments = await _db.orderPayment
+                .Where(p => p.order_id == orderId && p.valid == 1)
+                .OrderByDescending(p => p.out_trade_no).ToListAsync();
+            List<OrderPayment> methodAmountPayments = payments
+                .Where(p => p.pay_method.Trim().Equals(payMethod.Trim()) && p.amount == payAmount)
+                .OrderByDescending(p => p.out_trade_no).ToList();
+            OrderPayment payment = new OrderPayment();
+            if (methodAmountPayments.Count == 0)
+            {
+                payment = new OrderPayment()
+                {
+                    id = 0,
+                    order_id = order.id,
+                    pay_method = payMethod.Trim(),
+                    amount = payAmount,
+                    out_trade_no = order.code + "_ZF_01"
+                };
+                await _db.orderPayment.AddAsync(payment);
+                await _db.SaveChangesAsync();
+            }
+            else if (methodAmountPayments[0].submit_time != null
+                && (DateTime.Now - (DateTime)methodAmountPayments[0].submit_time).Seconds >= 3600)
+            {
+                payment = new OrderPayment()
+                {
+                    id = 0,
+                    order_id = order.id,
+                    pay_method = payMethod.Trim(),
+                    amount = payAmount,
+                    out_trade_no = order.code + "_ZF_" + payments.Count.ToString().PadLeft(2, '0')
+                };
+                await _db.orderPayment.AddAsync(payment);
+                await _db.SaveChangesAsync();
+            }
+            else
+            {
+                return methodAmountPayments[0];
+            }
+            switch (payMethod)
+            {
+                case "支付宝":
+                    AliController _aliHelper = new AliController(_db, _config, _http);
+                    return await _aliHelper.GetPaymentQrCodeUrl(payment.id);
+                case "微信支付":
+                    break;
+                default:
+                    break;
+            }
+            return null;
+        }
+        [HttpGet("orderId")]
+        public async Task<ActionResult<ApiResult<string>>> GetAlipayPaymentQrCode(int orderId, double amount,
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            Models.Order order = await _db.order.Where(o => o.id == orderId).AsNoTracking().FirstOrDefaultAsync();
+            string message = "";
+            if (order == null)
+            {
+                message = "无此订单";
+            }
+            else if (order.closed == 1)
+            {
+                message = "订单关闭";
+            }
+            else if (order.waiting_for_pay != 1)
+            {
+                message = "订单或已经支付";
+            }
+            else
+            {
+                OrderPayment payment = await GetReadyOrderPayment(orderId, amount, "支付宝");
+                if (payment == null)
+                {
+                    message = "获取二维码失败";
+                }
+                else if (payment.ali_qr_code == null || payment.ali_qr_code.Trim().Equals(""))
+                {
+                    message = "支付宝系统故障";
+                }
+                if (message.Trim().Equals(""))
+                {
+                    return Ok(new ApiResult<string>()
+                    {
+                        code = 0,
+                        message = "",
+                        data = payment.ali_qr_code.Trim()
+                    });
+                }
+            }
+        
+            return Ok(new ApiResult<string>()
+            {
+                code = 1,
+                message = message,
+                data = null
+            });
         }
     }
 }

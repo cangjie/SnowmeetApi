@@ -200,22 +200,22 @@ namespace SnowmeetApi.Models
         [ForeignKey("member_id")]
         public Member member { get; set; } = null;
         public List<Retail> retails { get; set; } = new List<Retail>();
-        public List<Care> cares {get; set;} = new List<Care>();
-        public List<Rental> rentals { get; set;} = new List<Rental>();
+        public List<Care> cares { get; set; } = new List<Care>();
+        public List<Rental> rentals { get; set; } = new List<Rental>();
         public List<FdOrder> fdOrders { get; set; } = new List<FdOrder>();
         public List<OrderPayment>? payments { get; set; }
         public List<OrderPaymentRefund>? refunds { get; set; }
         public List<PaymentShare>? shares { get; set; }
-        public List<Discount> discounts {get; set;} = new List<Discount>();
-        public List<Guaranty> guarantys {get; set;} = new List<Guaranty>();
+        public List<Discount> discounts { get; set; } = new List<Discount>();
+        public List<Guaranty> guarantys { get; set; } = new List<Guaranty>();
         [NotMapped]
         public List<Guaranty> paidGuarantys
         {
             get
             {
-                
+
                 List<Guaranty> paidGuarantys = new List<Guaranty>();
-                for(int i = 0; i < guarantys.Count; i++)
+                for (int i = 0; i < guarantys.Count; i++)
                 {
                     Guaranty g = guarantys[i];
                     if (g.payStatus.Trim().Equals("支付完成"))
@@ -236,7 +236,7 @@ namespace SnowmeetApi.Models
                     return 0;
                 }
                 double amount = 0;
-                foreach(Discount discount in discounts)
+                foreach (Discount discount in discounts)
                 {
                     if (discount.valid == 1)
                     {
@@ -260,7 +260,7 @@ namespace SnowmeetApi.Models
             get
             {
                 bool can = true;
-                for(int i = 0; availablePayments != null && i < availablePayments.Count; i++)
+                for (int i = 0; availablePayments != null && i < availablePayments.Count; i++)
                 {
                     if (availablePayments[i].pay_method.Trim().Equals("微信支付"))
                     {
@@ -420,7 +420,7 @@ namespace SnowmeetApi.Models
                         return s;
                     }
                 }
-                
+
             }
         }
         [NotMapped]
@@ -435,7 +435,7 @@ namespace SnowmeetApi.Models
                     return null;
                 }
                 bool allSettled = true;
-                for(int i = 0; i < rentals.Count; i++)
+                for (int i = 0; i < rentals.Count; i++)
                 {
                     if (rentals[i].settled == 0)
                     {
@@ -447,7 +447,7 @@ namespace SnowmeetApi.Models
                 {
                     return "已完成";
                 }
-                if(closed == 1)
+                if (closed == 1)
                 {
                     return "已关闭";
                 }
@@ -457,7 +457,7 @@ namespace SnowmeetApi.Models
                     s = "免押金";
                 }
                 bool unPaid = true;
-                foreach(Guaranty g in guarantys)
+                foreach (Guaranty g in guarantys)
                 {
                     if (!g.payStatus.Equals("未支付"))
                     {
@@ -474,9 +474,9 @@ namespace SnowmeetApi.Models
                     s = "已付押金";
                 }
                 bool allReturned = true;
-                foreach(Rental rental in  rentals)
+                foreach (Rental rental in rentals)
                 {
-                    foreach(RentItem item in rental.rentItems)
+                    foreach (RentItem item in rental.rentItems)
                     {
                         if (item.return_time == null)
                         {
@@ -493,7 +493,7 @@ namespace SnowmeetApi.Models
                 {
                     s = "全部归还";
                 }
-               
+
 
                 return s;
             }
@@ -507,11 +507,11 @@ namespace SnowmeetApi.Models
                 {
                     return null;
                 }
-               
+
                 DateTime rDate = DateTime.MinValue;
-                foreach(OrderPayment payment in payments)
+                foreach (OrderPayment payment in payments)
                 {
-                    foreach(OrderPaymentRefund refund in payment.refunds)
+                    foreach (OrderPaymentRefund refund in payment.refunds)
                     {
                         if (refund.state == 1 || !refund.refund_id.Trim().Equals(""))
                         {
@@ -519,7 +519,7 @@ namespace SnowmeetApi.Models
                         }
                     }
                 }
-                
+
                 if (rDate == DateTime.MinValue)
                 {
                     return null;
@@ -536,11 +536,39 @@ namespace SnowmeetApi.Models
             get
             {
                 double amount = 0;
-                foreach(Guaranty g in paidGuarantys)
+                foreach (Guaranty g in paidGuarantys)
                 {
                     amount += (double)g.amount;
                 }
                 return amount;
+            }
+        }
+        [NotMapped]
+        public string subject
+        {
+            get
+            {
+                return type.Trim() + "订单";
+            }
+        }
+        [NotMapped]
+        public string description
+        {
+            get
+            {
+                string ret = "";
+                switch (type)
+                {
+                    case "餐饮":
+                        foreach (FdOrder fd in fdOrders)
+                        {
+                            ret += (fd.product_name + " x " + fd.count.ToString() + ";");
+                        }
+                        break;
+                    default:
+                        break;
+                }
+                return ret;
             }
         }
     }

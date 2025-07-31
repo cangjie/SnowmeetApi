@@ -23,6 +23,7 @@ namespace SnowmeetApi.Models
         public int order_id { get; set; }
         public string? pay_method { get; set; } = null;
         public int is_debt { get; set; } = 0;
+        public int? reference_debt_id { get; set; } = null;
         public double amount { get; set; }
         public string status { get; set; } = "待支付";
         public string? out_trade_no { get; set; }
@@ -38,7 +39,8 @@ namespace SnowmeetApi.Models
         public string? prepay_id { get; set; }
         public string? ssyn { get; set; }
         public string? staff_open_id { get; set; }
-        public int? staff_id {get; set;}
+        public string? response_data { get; set; } = null;
+        public int? staff_id { get; set; }
         [ForeignKey("staff_id")]
         public Staff? staff {get; set;}
         [ForeignKey("member_id")]
@@ -55,12 +57,13 @@ namespace SnowmeetApi.Models
         public List<Models.PaymentShare> shares {get;set;}
         public string? deposit_type { get; set; } = null;
         public string? deposit_sub_type {get; set; } = null;
+        public DateTime? submit_time { get; set; } = null;
         public string shop
         {
             get
             {
                 string shop = "";
-                if (out_trade_no!=null)
+                if (out_trade_no != null)
                 {
                     if (out_trade_no.StartsWith("WT"))
                     {

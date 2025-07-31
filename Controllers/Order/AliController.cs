@@ -26,7 +26,7 @@ using System.Net;
 using Flurl.Http;
 namespace SnowmeetApi.Controllers
 {
-    [Route("core/[controller]/[action]")]
+    [Route("api/[controller]/[action]")]
     [ApiController]
     public class AliController : ControllerBase
     {
@@ -68,25 +68,11 @@ namespace SnowmeetApi.Controllers
             public string out_trade_no { get; set; }
             public string trade_no { get; set; }
         }
-        /*
-        public class AlipayTradeOrderOnsettleQueryResponse
-        {
-            public string code { get; set; }
-            public string msg { get; set; }
-
-            public double unsettled_amount {get; set;} = 0;
-
-        }
-        */
         public ApplicationDBContext _db;
         public IConfiguration _oriConfig;
         public IHttpContextAccessor _http;
-
-        //public string appId = "2021004143665722";
-        public string appId = "2021004150619003";
-
+        public string appId = "2021004143665722";
         public IAopClient client;
-
         public AliController(ApplicationDBContext context, IConfiguration config, IHttpContextAccessor httpContextAccessor)
         {
             _db = context;
@@ -95,7 +81,6 @@ namespace SnowmeetApi.Controllers
             string certPath = Util.workingPath + "/AlipayCertificate/" + appId;
             string appCertPublicKeyPath = certPath + "/appCertPublicKey_" + appId + ".crt";
             string privateKey = System.IO.File.OpenText(certPath + "/private_key_" + appId + ".txt").ReadToEnd().Trim();
-
             CertParams certParams = new CertParams
             {
                 AlipayPublicCertPath = Util.workingPath + "/AlipayCertificate/" + appId + "/alipayCertPublicKey_RSA2.crt",
@@ -104,7 +89,6 @@ namespace SnowmeetApi.Controllers
             };
             client = new DefaultAopClient("https://openapi.alipay.com/gateway.do", appId, privateKey, "json", "1.0", "RSA2", "utf-8", false, certParams);
         }
-
         [NonAction]
         public IAopClient  GetClient(string appId)
         {
@@ -119,7 +103,6 @@ namespace SnowmeetApi.Controllers
             };
             return new DefaultAopClient("https://openapi.alipay.com/gateway.do", appId, privateKey, "json", "1.0", "RSA2", "utf-8", false, certParams);
         }
-
         [NonAction]
         public async Task<AlipayMchId> GetMch(OrderOnline order)
         {
@@ -127,7 +110,6 @@ namespace SnowmeetApi.Controllers
             AlipayMchId mch = await _db.alipayMchId.FindAsync(mchId);
             return mch;
         }
-
         [HttpGet]
         //public async Task BindRoyaltiRelation(string login, string name, string memo)
         public async Task<string> BindRoyaltiRelation(int kolId)
@@ -163,7 +145,6 @@ namespace SnowmeetApi.Controllers
                 return "false";
              } 
         }
-
         [HttpGet]
         public ActionResult<double> GetUnSettledAmount(string tradeNo)
         {
@@ -175,84 +156,6 @@ namespace SnowmeetApi.Controllers
                 ret = double.Parse(response.UnsettledAmount);
             return Ok(ret);
         }
-/*
-        [HttpGet]
-        public async Task SettleTest(string tradeNo, double amount, string login, string name,  string memo)
-        {
-            string certPath = Util.workingPath + "/AlipayCertificate/" + appId;
-
-            String AlipayPublicCertPath = certPath + "/alipayCertPublicKey_RSA2.crt";   
-            //解析支付宝公钥的值需要引用using Org.BouncyCastle.X509和using Aop.Api.Util;
-            Org.BouncyCastle.X509.X509Certificate alipayPublicKeyCert = AntCertificationUtil.ParseCert(System.IO.File.ReadAllText(AlipayPublicCertPath));
-            String PUBLIC_KEY = AntCertificationUtil.ExtractPemPublicKeyFromCert(alipayPublicKeyCert);
-
-             /** 支付宝网关 **/
-            //String ALIPAY_GATEWAY = "https://openapi.alipay.com/gateway.do";
-
-            /** 应用id，如何获取请参考：https://opensupport.alipay.com/support/helpcenter/190/201602493024 **/
-            //String APP_ID = appId;
-
-            /** 应用私钥，密钥格式为pkcs1，如何获取私钥请参考：https://opensupport.alipay.com/support/helpcenter/207/201602469554  **/
-            //String PRIVATE_KEY = "MIIEpAIBAAKCAQEAsL0G9Qg182PpISGvwXefHyPRnxd4lhy6JEC6NWwHRkY39qJYKPHEWqhUbvFLP7NMw+Gzdz2LmukaBTw4nvVqy/5e+294eZ7LwGDah+E7jbOFMW5JoY9Pz+3NcqRuPhjT5YN4CIIAH4O1YcA3iPri0Yc+lUl9/2dq/Yr9NcR9r/5BJ7AFeYCmLqzEJGoA6L+8O/rlLiLXQMqKMM6h/EUcn7lD6in52T/i4T0h1jBLp+//PX8OGfm/hu2BdV3OgoZ3cf8IM6H5WLQUcA2jO/N0ytnhpXWd/CLsHAJEKb6pZ4McyuK4BnM5JdRSDY+B/wv56LztT6t8e4kvhAWbnu0LVQIDAQABAoIBAFAG156eACfcJpS89yNIMgHcqy85Zn26NkLyGB7WcpjMdMy1h+vKRVmzfL/bfHI0kt7jVOr6MDuNrx2NvimkAJ6r6IA7YjbXw3SxpmH+h4PLNNVEFg0UolQJXoy5jb2KanAzTmezzbB3Z+sCKWNaDthHP/xDEc1TG6wAglUVSsAkROCCA1thaT3cUX3BLR5NujoEbysy0XTzxN2lG3R/+zrkNLd5ab3syqX9YCRMqPEyZKJ37+KjEVT1SDpViMO6GY/4Y1OYHI7rPwCduRDRw6edXKMMyD8YT6ys/xRI9EwcXhbMrVaNA1mdrqnPRr4jl1sQg8OgQVTIremE0qFVUGUCgYEA14scgrtCxFZhngNPLEj2Zw+4rjU1cOEkSvj19gwH/aY2g3DE6btJZbBynRJL5/uVUHV0BwIxiYeXY33SJHgyqbBMIM8hnFGee3xUrWyMgzLLT8UnbV95ZZineHxeFMTueHmX23dxnLiFEq9Wbkv70nRi2jg1RupbDRQ7YFVLLt8CgYEA0elUaCtSJCOyC9fFdgBbJ8fqLT6Y8B6cLlllbOxRhF3NU0DPf5kfeE9JXaVAYiOQoKSvgMcG78Q4Z6A1wf6jpGYx5XOjPXzkvGr/thRSsUuUjOLoN/r085K2lAGTDz9BMXWCfGTReXLUluQnhnmu9d7k0hrVrHYQ7USfsQzzsEsCgYEAjoRfzJ0O740CLJ2ZivmPWuPNQ/rQpBtpiN0GnLKl0fRF1TEKMlVwmXlKv0qqv+/ccX/HwR6VLI9n7RPzj8OeFA8KtyLd4WMiPBogTy8X1WQPhGYixLG9Lgz6prLs7iSsXSJg428dwvdKnekrZ/B7yFLGTe2eZI5ut74p6G9dL9cCgYEAsAFLw9hnFGRVurZeHBYqWI24nd050URpQje04oK3yxv3uJHEKkIS8AbTBlE0TdVyRDAx8/FtsIa/oKvlx1aikYsa1UCDpF/fTtkMtfgOahhsY0Ey4xVqY/0lV66GRyeLm1PjaDgEqCePd0GwnoHTINeW11CmzudkQ/3hREwO3EcCgYAi9+DYB8D1TbEeMPxUMX2l+A4JmdTJvaMZr3D9HIyuJXyYHCHqWB2QCuq7repW9JNJlRm/Zhqvi9t55jP3EBNvFKcveYTkuTy/ilEhDvTPxiC1jHN7qij8Ar/alr4Z54bphhNRYDB49FoX/rYjc3MbPLaEW8s0GgDuJ7Dknd1DvQ==";
-
-            /** 支付宝公钥，如何获取请参考：https://opensupport.alipay.com/support/helpcenter/207/20160248743 **/
-            //String PUBLIC_KEY = "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAsL0G9Qg182PpISGvwXefHyPRnxd4lhy6JEC6NWwHRkY39qJYKPHEWqhUbvFLP7NMw+Gzdz2LmukaBTw4nvVqy/5e+294eZ7LwGDah+E7jbOFMW5JoY9Pz+3NcqRuPhjT5YN4CIIAH4O1YcA3iPri0Yc+lUl9/2dq/Yr9NcR9r/5BJ7AFeYCmLqzEJGoA6L+8O/rlLiLXQMqKMM6h/EUcn7lD6in52T/i4T0h1jBLp+//PX8OGfm/hu2BdV3OgoZ3cf8IM6H5WLQUcA2jO/N0ytnhpXWd/CLsHAJEKb6pZ4McyuK4BnM5JdRSDY+B/wv56LztT6t8e4kvhAWbnu0LVQIDAQAB";
-
-        /** 初始化 **/
-           // IAopClient client = new DefaultAopClient(ALIPAY_GATEWAY, APP_ID, PRIVATE_KEY, "json", "1.0", "RSA2", PUBLIC_KEY, "utf-8", false);
-
-        /** 实例化具体API对应的request类，类名称和接口名称对应,当前调用接口名称alipay.trade.order.settle(统一收单交易结算接口) **/
-         //   AlipayTradeOrderSettleRequest request = new AlipayTradeOrderSettleRequest();
-
-        /** 设置业务参数，具体接口参数传值以文档说明为准：https://opendocs.alipay.com/apis/api_1/alipay.trade.order.settle  **/
-          //  request.BizContent = "{" +
-
-                /** 结算请求流水号 开发者自行生成并保证唯一性  **/
-          //      "\"out_request_no\":\"" + Util.GetLongTimeStamp(DateTime.Now) + "\"," +
-
-                /** 支付宝订单号  **/
-            //    "\"trade_no\":\"" + tradeNo.Trim() + "\"," +
-
-                /** 操作员id  **/
-              //  "\"operator_id\":\"\"," +
-
-                /** 分账明细信息，单次传入最多20个，一次分账请求中，有任意一个收入方分账失败，则这次分账请求的全部分账处理均会失败  **/
-                //"\"royalty_parameters\":[" +
-
-                    /** 分账收入方信息  **/
-                  //  "{" +
-                          /** 分账类型.普通分账为：transfer;  **/
-                    //      "\"royalty_type\":\"transfer\"," +
-
-                          /** 支出方账户  **/
-                          //"\"trans_out\":\"2088***335\"," +
-
-                          /** 支出方账户类型。userId表示是支付宝账号对应的支付宝唯一用户号;loginName表示是支付宝登录号  **/
-                          //"\"trans_out_type\":\"userId\"," +
-
-                          /** 收入方账户  **/
-                      //    "\"trans_in\":\"2088002319285895\"," +
-
-                           /** 收入方账户类型。userId表示是支付宝账号对应的支付宝唯一用户号;loginName表示是支付宝登录号   **/
-                        //   "\"trans_in_type\":\"userId\"," +
-
-                          /** 分账的金额，单位为元  **/
-                          //"\"amount\":0.01," +
-
-                          /** 设分账描述  **/
-                          //"\"desc\":\"" + memo + "\"" +
-                      //"}" +
-              //"]" +
-        //"}";
-
-       // AlipayTradeOrderSettleResponse response = client.Execute(request);
-
-        /** 第三方调用（服务商模式），传值app_auth_token后，会收款至授权app_auth_token对应商家账号，如何获传值app_auth_token请参考文档：https://opensupport.alipay.com/support/helpcenter/79/201602494631 **/
-        //AlipayTradeOrderSettleResponse response = client.Execute(request,"","传入获取到的app_auth_token值")
-
-        /**获取接口调用结果，如果调用失败，可根据返回错误信息到该文档寻找排查方案：https://opensupport.alipay.com/support/helpcenter/108 **/
-       // Console.WriteLine(response.Body);
-       // }
         [NonAction]
         public async Task<PaymentShare> Share(int shareId)
         {
@@ -282,7 +185,6 @@ namespace SnowmeetApi.Controllers
             await _db.SaveChangesAsync();
             return share;   
         }
-
         [NonAction]
         public AlipayTradeOrderSettleResponse Settle(string tradeNo, double amount, string login, string name,  string memo, string outTradeNo)
         {
@@ -291,24 +193,7 @@ namespace SnowmeetApi.Controllers
             name = Util.UrlDecode(name);
             AlipayTradeOrderSettleRequest req = new AlipayTradeOrderSettleRequest();
 
-            /*
-            AlipayTradeOrderSettleModel model = new AlipayTradeOrderSettleModel();
-            model.OutRequestNo = Util.GetLongTimeStamp(DateTime.Now);
-            model.TradeNo = tradeNo;
-            List<OpenApiRoyaltyDetailInfoPojo> royaltyParameters = new List<OpenApiRoyaltyDetailInfoPojo>();
-            OpenApiRoyaltyDetailInfoPojo royaltyParameters0 = new OpenApiRoyaltyDetailInfoPojo();
-            royaltyParameters0.RoyaltyType = "transfer";
-            royaltyParameters0.TransInType = "userId";
-            royaltyParameters0.TransIn = "2088002319285895";
-            //royaltyParameters0.TransInName = "苍杰";
-            royaltyParameters0.Amount = amount.ToString();
-            royaltyParameters0.Desc = memo;
-            //royaltyParameters0.AmountPercentage = 30;
-            royaltyParameters.Add(royaltyParameters0);
-            model.RoyaltyParameters = royaltyParameters;
-            //req.SetBizModel(model);
-            */
-
+          
             req.BizContent = "{" +
 
                 /** 结算请求流水号 开发者自行生成并保证唯一性  **/
@@ -419,67 +304,36 @@ namespace SnowmeetApi.Controllers
             }
             
         }
-
-        [HttpGet]
-        public async Task<string> GetPaymentQrCodeUrl(int paymentId)
+        [NonAction]
+        public async Task<OrderPayment> GetPaymentQrCodeUrl(int paymentId)
         {
-
-            AlipayMchId mch = await GetMch(null);
-
-            client = GetClient(mch.app_id.Trim());
-
-            OrderPayment payment = await _db.OrderPayment.FindAsync(paymentId);
-            
-
-            
-            
-            string notify = "https://mini.snowmeet.top/core/Ali/Callback";
-            
+            client = GetClient(appId.Trim());
+            OrderPayment payment = await _db.orderPayment.FindAsync(paymentId);
+            OrderController _orderHelper = new OrderController(_db, _oriConfig, _http);
+            Models.Order? order = await _orderHelper.GetOrder(payment.order_id);
+            if (order == null)
+            {
+                return null;
+            }
+            string notify = _http.HttpContext.Request.Scheme + "://" + _http.HttpContext.Request.Host.Value  + "/api/Ali/CallBack";
             AlipayTradePrecreateRequest request = new AlipayTradePrecreateRequest();
             request.SetNotifyUrl(notify);
-            
-
-            /*
-            RoyaltyInfo rInfo = new RoyaltyInfo();
-            rInfo.RoyaltyType = "ROYALTY";
-            RoyaltyDetailInfos dtl = new RoyaltyDetailInfos();
-            dtl.AmountPercentage = "30";
-            dtl.BatchNo = Util.GetLongTimeStamp(DateTime.Now).ToString();
-            dtl.TransOutType = "userId";
-            dtl.TransOut = "2088640272285174";
-            dtl.TransIn = "2088002319285895";
-            rInfo.RoyaltyDetailInfos = new List<RoyaltyDetailInfos>();
-            rInfo.RoyaltyDetailInfos.Add(dtl);
-            */
-
-
-
+            payment.notify = notify;
             AlipayTradePrecreateModel model = new AlipayTradePrecreateModel();
             model.OutTradeNo = payment.out_trade_no.Trim();
-
-            ////////////////////////////////////
-            //////等待从订单获取//////////////////
-            model.Subject = "test";
-            model.Body = "test1";
-            /////////////////////////////////////
-
-
-
+            model.Subject = order.subject.Trim();
+            model.Body = order.description.Trim();
             model.TotalAmount = payment.amount.ToString();
-            //model.RoyaltyInfo = rInfo;
-            model.ExtendParams = new ExtendParams{ RoyaltyFreeze = "true" };
+            model.ExtendParams = new ExtendParams{ RoyaltyFreeze = "false" };
             request.SetBizModel(model);
             AlipayTradePrecreateResponse response = client.CertificateExecute(request);
             string responseStr = response.Body.Trim();
             Console.WriteLine(responseStr);
             AlipayRequestResult respObj = JsonConvert.DeserializeObject<AlipayRequestResult>(responseStr);
-            payment.notify = notify;
+            payment.submit_time = DateTime.Now;
             payment.ali_qr_code = respObj.alipay_trade_precreate_response.qr_code.Trim();
-            payment.mch_id = mch.id;
-            payment.pay_method = "支付宝";
-            _db.OrderPayment.Entry(payment).State = EntityState.Modified;
-            await _db.SaveChangesAsync();
-            return respObj.alipay_trade_precreate_response.qr_code.Trim();
+            payment.response_data = JsonConvert.SerializeObject(respObj);
+            return payment;
         }
 
         [HttpPost]
