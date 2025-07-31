@@ -780,8 +780,8 @@ namespace SnowmeetApi.Controllers
             }
             return null;
         }
-        [HttpGet("orderId")]
-        public async Task<ActionResult<ApiResult<string>>> GetAlipayPaymentQrCode(int orderId, double amount,
+        [HttpGet("{orderId}")]
+        public async Task<ActionResult<ApiResult<string>>> GetAlipayPaymentQrCode(int orderId, double? amount,
             string sessionKey, string sessionType = "wechat_mini_openid")
         {
             Models.Order order = await _db.order.Where(o => o.id == orderId).AsNoTracking().FirstOrDefaultAsync();
