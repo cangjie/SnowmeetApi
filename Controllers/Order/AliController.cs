@@ -323,7 +323,7 @@ namespace SnowmeetApi.Controllers
             model.OutTradeNo = payment.out_trade_no.Trim();
             model.Subject = order.subject.Trim();
             model.Body = order.description.Trim();
-            model.TotalAmount = payment.amount.ToString();
+            model.TotalAmount = Math.Round(payment.amount, 2).ToString();
             model.ExtendParams = new ExtendParams{ RoyaltyFreeze = "false" };
             request.SetBizModel(model);
             AlipayTradePrecreateResponse response = client.CertificateExecute(request);
