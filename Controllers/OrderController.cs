@@ -751,8 +751,9 @@ namespace SnowmeetApi.Controllers
                 await _db.orderPayment.AddAsync(payment);
                 await _db.SaveChangesAsync();
             }
-            else if (methodAmountPayments[0].submit_time != null
+            else if ((methodAmountPayments[0].submit_time != null
                 && (DateTime.Now - (DateTime)methodAmountPayments[0].submit_time).Seconds >= 3600)
+                || methodAmountPayments[0].request_failed == 1)
             {
                 payment = new OrderPayment()
                 {

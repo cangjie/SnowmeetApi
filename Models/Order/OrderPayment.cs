@@ -53,7 +53,8 @@ namespace SnowmeetApi.Models
         public string? ali_trade_no {get; set;}
         public string? wepay_trans_id {get; set;}
         public int valid {get; set;} = 1;
-        public List<Models.OrderPaymentRefund> refunds {get; set;} = new List<OrderPaymentRefund>();
+        public int request_failed { get; set; } = 0;
+        public List<Models.OrderPaymentRefund> refunds { get; set; } = new List<OrderPaymentRefund>();
         public List<Models.PaymentShare> shares {get;set;}
         public string? deposit_type { get; set; } = null;
         public string? deposit_sub_type {get; set; } = null;

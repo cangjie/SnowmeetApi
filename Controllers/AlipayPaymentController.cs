@@ -229,7 +229,7 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpPost]
-        public async Task  callback()
+        public async Task  CallBack()
         {
             StreamReader sr = new StreamReader(Request.Body);
             string postStr = await sr.ReadToEndAsync();

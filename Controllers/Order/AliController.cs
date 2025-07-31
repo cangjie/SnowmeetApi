@@ -315,7 +315,7 @@ namespace SnowmeetApi.Controllers
             {
                 return null;
             }
-            string notify = _http.HttpContext.Request.Scheme + "://" + _http.HttpContext.Request.Host.Value  + "/api/Ali/CallBack";
+            string notify =  "https://" + _http.HttpContext.Request.Host.Value  + "/api/Ali/CallBack";
             AlipayTradePrecreateRequest request = new AlipayTradePrecreateRequest();
             request.SetNotifyUrl(notify);
             payment.notify = notify;
@@ -336,8 +336,8 @@ namespace SnowmeetApi.Controllers
                 payment.ali_qr_code = respObj.alipay_trade_precreate_response.qr_code.Trim();
             }
             catch
-            { 
-
+            {
+                payment.request_failed = 1;
             }
             payment.response_data = JsonConvert.SerializeObject(respObj);
             payment.update_date = DateTime.Now;
