@@ -331,8 +331,18 @@ namespace SnowmeetApi.Controllers
             Console.WriteLine(responseStr);
             AlipayRequestResult respObj = JsonConvert.DeserializeObject<AlipayRequestResult>(responseStr);
             payment.submit_time = DateTime.Now;
-            payment.ali_qr_code = respObj.alipay_trade_precreate_response.qr_code.Trim();
+            try
+            {
+                payment.ali_qr_code = respObj.alipay_trade_precreate_response.qr_code.Trim();
+            }
+            catch
+            { 
+
+            }
             payment.response_data = JsonConvert.SerializeObject(respObj);
+            payment.update_date = DateTime.Now;
+            _db.orderPayment.Entry(payment).State = EntityState.Modified;
+            await _db.SaveChangesAsync();
             return payment;
         }
 
