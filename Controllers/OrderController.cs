@@ -821,13 +821,18 @@ namespace SnowmeetApi.Controllers
                     });
                 }
             }
-        
+
             return Ok(new ApiResult<string>()
             {
                 code = 1,
                 message = message,
                 data = null
             });
+        }
+        [NonAction]
+        public async Task DealSuccessPaidOrder(int orderId)
+        { 
+
         }
     }
 }
