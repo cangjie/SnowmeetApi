@@ -528,6 +528,29 @@ namespace SnowmeetApi.Controllers
             });
         }
         [HttpGet("{orderId}")]
+        public async Task<ActionResult<ApiResult<Models.Order>>> GetOrderByCustomer(int orderId,
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            MemberController _memberHelper = new MemberController(_db, _config);
+            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
+            SnowmeetApi.Models.Order order = await GetOrder(orderId);
+            if (order.member_id != null && order.member_id != member.id)
+            {
+                return Ok(new ApiResult<object?>()
+                {
+                    code = 1,
+                    message = "该订单不属于当前顾客。",
+                    data = null
+                });
+            }
+            return Ok(new ApiResult<Models.Order>()
+            {
+                code = 0,
+                message = "",
+                data = order
+            });
+        }
+        [HttpGet("{orderId}")]
         public async Task<ActionResult<ApiResult<SnowmeetApi.Models.Order?>>> GetOrderByStaff(int orderId,
             string sessionKey, string sessionType = "wechat_mini_openid")
         {

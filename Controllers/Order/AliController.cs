@@ -465,8 +465,6 @@ namespace SnowmeetApi.Controllers
             }
             return Ok("success");
         }
-
-
         [NonAction]
         public async Task<OrderPaymentRefund> Refund(int refundId)
         {
@@ -482,9 +480,6 @@ namespace SnowmeetApi.Controllers
             }
             var refunds = await _db.OrderPaymentRefund.Where(r => r.payment_id == payment.id)
                 .AsNoTracking().ToListAsync();
-            //string outRefundNo = payment.out_trade_no.Trim() + "_REFND_" + DateTime.Now.ToString("yyyyMMdd") 
-            //    + "_" + refunds.Count.ToString().PadLeft(2, '0');
-            //refund.out_refund_no = outRefundNo;
             try
             {
                 AlipayTradeRefundResponse res = Refund(payment.out_trade_no.Trim(), refund.out_refund_no.Trim(), refund.amount, refund.reason.Trim());
@@ -529,23 +524,6 @@ namespace SnowmeetApi.Controllers
         [HttpGet("{appId}")]
         public async Task GetBill(string appId, DateTime billDate)
         {
-            /*
-            string certPath = Util.workingPath + "/AlipayCertificate/" + appId;
-            string privateKey = await System.IO.File.ReadAllTextAsync(certPath + "/private_key_" + appId + ".txt");
-            
-            string publicKey = await System.IO.File.ReadAllTextAsync(certPath + "/alipayCertPublicKey_RSA2.crt");
-
-
-            
-            CertParams certParams = new CertParams
-            {
-                AlipayPublicCertPath = Util.workingPath + "/AlipayCertificate/" + appId + "/alipayCertPublicKey_RSA2.crt",
-                AppCertPath = Util.workingPath + "/AlipayCertificate/" + appId + "/appCertPublicKey_" + appId + ".crt",
-                RootCertPath = Util.workingPath + "/AlipayCertificate/" + appId + "/alipayRootCert.crt"
-            };
-            */
-            //IAopClient alipayClient = new DefaultAopClient("https://openapi.alipay.com/gateway.do", appId, privateKey, "json", "1.0", "RSA2", "utf-8", false, certParams);
-
             IAopClient alipayClient = GetClient(appId);
             AlipayDataDataserviceBillDownloadurlQueryRequest request = new AlipayDataDataserviceBillDownloadurlQueryRequest();
             AlipayDataDataserviceBillDownloadurlQueryModel model = new AlipayDataDataserviceBillDownloadurlQueryModel();
@@ -578,7 +556,6 @@ namespace SnowmeetApi.Controllers
             s.Close();
             res.Close();
             req.Abort();
-
             using (var zip = ZipFile.Open(downloadPath + "/" + tempFileName, ZipArchiveMode.Read, Encoding.GetEncoding("GB2312")))
             {
 
@@ -597,7 +574,6 @@ namespace SnowmeetApi.Controllers
                     }
                 }
             }
-
             if (!response.IsError)
             {
                 Console.WriteLine("调用成功");
@@ -606,7 +582,6 @@ namespace SnowmeetApi.Controllers
             {
                 Console.WriteLine("调用失败");
             }
-
         }
         [HttpGet]
         public void GetFlow(DateTime startDate, DateTime endDate)
