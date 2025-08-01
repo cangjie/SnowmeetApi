@@ -25,7 +25,7 @@ using Microsoft.VisualStudio.Web.CodeGenerators.Mvc.Templates.Blazor;
 
 namespace SnowmeetApi.Controllers
 {
-    [Route("core/[controller]/[action]")]
+    [Route("api/[controller]/[action]")]
     [ApiController]
     public class TenpayController : ControllerBase
     {
@@ -47,7 +47,7 @@ namespace SnowmeetApi.Controllers
         public MemberController _memberHelper;
         public TenpayController(ApplicationDBContext context, IConfiguration config, IHttpContextAccessor httpContextAccessor)
         {
-            
+
             _db = context;
             _oriConfig = config;
             _http = httpContextAccessor;
@@ -56,9 +56,71 @@ namespace SnowmeetApi.Controllers
             _appId = _oriConfig.GetSection("Settings").GetSection("AppId").Value.Trim();
             _rentHelper = new RentController(_db, _oriConfig, _http);
             _memberHelper = new MemberController(context, config);
-            
-        }
 
+        }
+        [NonAction]
+        public async Task<OrderPayment> TenpayRequest(OrderPayment payment, Models.Order order)
+        {
+            payment.mch_id = GetMchId(order);
+            if (payment == null || payment.submit_time != null
+                || payment.status != OrderPayment.PaymentStatus.待支付.ToString()
+                || payment.mch_id == null)
+            {
+                return null;
+            }
+            List<PaymentShare> shares = await _db.paymentShare.Where(s => s.valid == 1 && s.submit_date == null)
+                .AsNoTracking().ToListAsync();
+            
+            string notifyUrl = "https://" + _http.HttpContext.Request.Host.Value + "/api/Tenpay/TenpayPaymentCallBack/" + payment.mch_id.ToString();
+            bool needProfitShare = !(shares == null || shares.Count == 0);
+            var client = await GetClient((int)payment.mch_id);
+            var request = new CreatePayTransactionJsapiRequest()
+            {
+                OutTradeNumber = payment.out_trade_no.Trim(),
+                AppId = _appId,
+                Description = "",
+                ExpireTime = DateTimeOffset.Now.AddMinutes(30),
+                NotifyUrl = notifyUrl,//wepayOrder.notify.Trim() + "/" + mchid.ToString(),
+                Amount = new CreatePayTransactionJsapiRequest.Types.Amount()
+                {
+                    Total = (int)Math.Round(payment.amount * 100, 0)
+                },
+                Payer = new CreatePayTransactionJsapiRequest.Types.Payer()
+                {
+                    OpenId = payment.open_id
+                },
+                Settlement = new CreatePayTransactionJsapiRequest.Types.Settlement()
+                {
+                    IsProfitSharing = needProfitShare
+                }
+
+            };
+            var response = await client.ExecuteCreatePayTransactionJsapiAsync(request);
+            var paraMap = client.GenerateParametersForJsapiPayRequest(request.AppId, response.PrepayId);
+            if (response != null && response.PrepayId != null && !response.PrepayId.Trim().Equals(""))
+            {
+                TenpaySet set = new TenpaySet()
+                {
+                    prepay_id = response.PrepayId.Trim(),
+                    timeStamp = paraMap["timeStamp"].Trim(),
+                    nonce = paraMap["nonceStr"].Trim(),
+                    sign = paraMap["paySign"].Trim()
+
+                };
+                payment.app_id = _appId;
+                payment.notify = notifyUrl.Trim();
+                payment.nonce = set.nonce.Trim();
+                payment.sign = set.sign.Trim();
+                payment.out_trade_no = payment.out_trade_no;
+                payment.prepay_id = set.prepay_id.Trim();
+                payment.timestamp = set.timeStamp.Trim();
+                payment.submit_time = DateTime.Now;
+                _db.Entry(payment).State = EntityState.Modified;
+                await _db.SaveChangesAsync();
+                return payment;
+            }
+            return null;
+        }
         [NonAction]
         public async Task<OrderPayment> TenpayRequest(int paymentId, string sessionKey, bool profitShare = false)
         {
@@ -88,7 +150,7 @@ namespace SnowmeetApi.Controllers
             }
             string timeStamp = Util.getTime13().ToString();
             int mchid = _orderPaymentHelper.GetMchId(order);
-            
+
 
             string desc = "未知商品";
 
@@ -100,7 +162,7 @@ namespace SnowmeetApi.Controllers
                 string mi7Nos = "";
                 for (int i = 0; i < mi7Orders.Length; i++)
                 {
-                    mi7Nos = mi7Nos.Trim() + " " + ((mi7Orders[i].mi7_order_id == null)? "紧急开单" : mi7Orders[i].mi7_order_id.Trim());
+                    mi7Nos = mi7Nos.Trim() + " " + ((mi7Orders[i].mi7_order_id == null) ? "紧急开单" : mi7Orders[i].mi7_order_id.Trim());
                 }
                 desc = desc + mi7Nos.Trim();
             }
@@ -113,7 +175,7 @@ namespace SnowmeetApi.Controllers
                 desc = "租赁";
             }
 
-           
+
 
             if (order.type.Trim().Equals("服务"))
             {
@@ -141,10 +203,12 @@ namespace SnowmeetApi.Controllers
 
             string notifyUrl = "https://" + _domain.Trim() + "/core/Tenpay/TenpayPaymentCallBack/" + mchid.ToString();
             string? outTradeNo = payment.out_trade_no;
-            if (outTradeNo == null )
-            { 
+            if (outTradeNo == null)
+            {
                 outTradeNo = order.id.ToString().PadLeft(6, '0') + payment.id.ToString().PadLeft(2, '0') + timeStamp.Substring(3, 10);
             }
+            //CreatePayTransactionJsapiRequest.Types.Detail detail = new CreatePayTransactionJsapiRequest.Types.Detail();
+            //detail.GoodsList 
             var client = await GetClient(mchid);
             var request = new CreatePayTransactionJsapiRequest()
             {
@@ -165,10 +229,10 @@ namespace SnowmeetApi.Controllers
                 {
                     IsProfitSharing = profitShare
                 }
-                
+
             };
-            
-            
+
+
             var response = await client.ExecuteCreatePayTransactionJsapiAsync(request);
             var paraMap = client.GenerateParametersForJsapiPayRequest(request.AppId, response.PrepayId);
             if (response != null && response.PrepayId != null && !response.PrepayId.Trim().Equals(""))
@@ -199,7 +263,7 @@ namespace SnowmeetApi.Controllers
             return null;
         }
 
-        
+
         [HttpPost("{mchid}")]
         public async Task<ActionResult<string>> TenpayPaymentCallback(int mchid,
             [FromHeader(Name = "Wechatpay-Timestamp")] string timeStamp,
@@ -225,25 +289,7 @@ namespace SnowmeetApi.Controllers
                 return NotFound();
             }
             string path = $"{Environment.CurrentDirectory}";
-            /*
-            string postJson = Newtonsoft.Json.JsonConvert.SerializeObject(postData);
-            
-            string paySign = "no sign";
-            string nonce = "no nonce";
-            string serial = "no serial";
-            string timeStamp = "no time";
-            try
-            {
-                paySign = _httpContextAccessor.HttpContext.Request.Headers["Wechatpay-Signature"].ToString();
-                nonce = _httpContextAccessor.HttpContext.Request.Headers["Wechatpay-Nonce"].ToString();
-                serial = _httpContextAccessor.HttpContext.Request.Headers["Wechatpay-Serial"].ToString();
-                timeStamp = _httpContextAccessor.HttpContext.Request.Headers["Wechatpay-Timestamp"].ToString();
-            }
-            catch
-            {
 
-            }
-            */
             if (path.StartsWith("/"))
             {
                 path = path + "/WepayCertificate/";
@@ -297,7 +343,7 @@ namespace SnowmeetApi.Controllers
                 var client = new WechatTenpayClient(options);
                 Exception? verifyErr;
                 bool valid = client.VerifyEventSignature(timeStamp, nonce, postJson, paySign, serial, out verifyErr);
-             
+
                 if (valid)
                 {
                     var callbackModel = client.DeserializeEvent(postJson);
@@ -323,19 +369,29 @@ namespace SnowmeetApi.Controllers
                         {
 
                         }
-                        
-
                         OrderPayment sucPay = await _db.OrderPayment.Where(p => (p.out_trade_no.Trim().Equals(outTradeNumber.Trim()) && p.status.Trim().Equals("待支付")))
                             .OrderByDescending(p => p.id).FirstAsync();
                         if (sucPay != null)
                         {
-                            sucPay.wepay_trans_id = transactionId.Trim();
-                            sucPay.status = "支付成功";
-                            _db.OrderPayment.Entry(sucPay).State = EntityState.Modified;
-                            await _db.SaveChangesAsync();
+                            Models.Order order = await _db.order.FindAsync(sucPay.order_id);
+                            bool needDeal = (order.dealed == 0);
+                            if (needDeal)
+                            {
+                                order.dealed = 1;
+                                order.update_date = DateTime.Now;
+                                _db.order.Entry(order).State = EntityState.Modified;
+                                await _db.SaveChangesAsync();
+                                sucPay.wepay_trans_id = transactionId.Trim();
+                                sucPay.status = "支付成功";
+                                sucPay.update_date = DateTime.Now;
+                                _db.OrderPayment.Entry(sucPay).State = EntityState.Modified;
+                                await _db.SaveChangesAsync();
+                                OrderController _orderHelper = new OrderController(_db, _oriConfig, _http);
+                                await _orderHelper.DealSuccessPaidOrder(order.id);
+                            }
                             //await SetTenpayPaymentSuccess(outTradeNumber);
                         }
-                        
+
                         //Console.WriteLine("订单 {0} 已完成支付，交易单号为 {1}", outTradeNumber, transactionId);
                     }
                 }
@@ -362,7 +418,7 @@ namespace SnowmeetApi.Controllers
             var refunds = await _db.OrderPaymentRefund
                 .Where(r => r.payment_id == payment.id)
                 .AsNoTracking().ToListAsync();
-            
+
 
             string notifyUrl = payment.notify.Trim().Replace("https://", "").Split('/')[0].Trim();
             notifyUrl = "https://" + notifyUrl + "/core/Tenpay/RefundCallback/" + payment.mch_id.ToString();
@@ -377,16 +433,16 @@ namespace SnowmeetApi.Controllers
 
 
             //var client = new WechatTenpayClient(options);
-           
-            
 
-            
-            
+
+
+
+
             var client = await GetClient((int)payment.mch_id);
             var request = new CreateRefundDomesticRefundRequest()
             {
                 OutTradeNumber = payment.out_trade_no.Trim(),
-                OutRefundNumber = refund.out_refund_no.Trim(),  
+                OutRefundNumber = refund.out_refund_no.Trim(),
                 Amount = new CreateRefundDomesticRefundRequest.Types.Amount()
                 {
                     Total = (int)Math.Round(payment.amount * 100, 0),
@@ -394,9 +450,9 @@ namespace SnowmeetApi.Controllers
                 },
                 Reason = refund.reason,
                 NotifyUrl = refund.notify_url.Trim(),
-                
+
             };
-            
+
             var response = await client.ExecuteCreateRefundDomesticRefundAsync(request);
             try
             {
@@ -423,7 +479,7 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpPost("{mchid}")]
-        public async Task<ActionResult<string>> RefundCallback(int mchid, [FromBody]object postData)
+        public async Task<ActionResult<string>> RefundCallback(int mchid, [FromBody] object postData)
         {
             string paySign = _http.HttpContext.Request.Headers["Wechatpay-Signature"].ToString();
             string nonce = _http.HttpContext.Request.Headers["Wechatpay-Nonce"].ToString();
@@ -461,7 +517,7 @@ namespace SnowmeetApi.Controllers
             }
 
 
-            
+
 
             string cerStr = "";
             using (StreamReader sr = new StreamReader(path + serial.Trim() + ".pem", true))
@@ -529,9 +585,9 @@ namespace SnowmeetApi.Controllers
                     {
 
                     }
-                    
-                        
-                    
+
+
+
 
                 }
 
@@ -543,9 +599,9 @@ namespace SnowmeetApi.Controllers
         public async Task<string> BindKol(int mchId, int kolId)
         {
             string ret = "";
-            
+
             Kol kol = await _db.kol.FindAsync(kolId);
-            
+
             var req = new AddProfitSharingReceiverRequest()
             {
                 AppId = _appId,
@@ -570,9 +626,9 @@ namespace SnowmeetApi.Controllers
         {
             DateTime startDate = DateTime.Parse("2024-10-15");
             List<OrderPayment> pList = await _db.OrderPayment
-                .Where(p => p.create_date > startDate && p.status.Trim().Equals("支付成功") && p.mch_id == mchId )
-                .OrderByDescending(p=>p.id).AsNoTracking().ToListAsync();
-            for(int i = 0; i < pList.Count; i++)
+                .Where(p => p.create_date > startDate && p.status.Trim().Equals("支付成功") && p.mch_id == mchId)
+                .OrderByDescending(p => p.id).AsNoTracking().ToListAsync();
+            for (int i = 0; i < pList.Count; i++)
             {
                 try
                 {
@@ -599,7 +655,7 @@ namespace SnowmeetApi.Controllers
                 Description = description
             };
             var res = await client.ExecuteSetProfitSharingOrderUnfrozenAsync(req);
-            
+
 
         }
 
@@ -618,15 +674,15 @@ namespace SnowmeetApi.Controllers
             {
                 return null;
             }
-            
-            
+
+
             WechatTenpayClient client = await GetClient((int)payment.mch_id);
             List<CreateProfitSharingOrderRequest.Types.Receiver> rl = new List<CreateProfitSharingOrderRequest.Types.Receiver>();
             CreateProfitSharingOrderRequest.Types.Receiver r = new CreateProfitSharingOrderRequest.Types.Receiver()
             {
                 Type = "PERSONAL_OPENID",
                 Account = kol.wechat_open_id,
-                Amount =  (int)Math.Round(share.amount * 100),
+                Amount = (int)Math.Round(share.amount * 100),
                 Description = share.memo.Trim()
             };
             rl.Add(r);
@@ -652,7 +708,7 @@ namespace SnowmeetApi.Controllers
             }
             _db.paymentShare.Entry(share).State = EntityState.Modified;
             await _db.SaveChangesAsync();
-            return share; 
+            return share;
         }
 
         [NonAction]
@@ -715,7 +771,7 @@ namespace SnowmeetApi.Controllers
                 try
                 {
                     DateTime transDate = DateTime.Parse(transDateStr);
-                        
+
 
                 }
                 catch
@@ -723,11 +779,11 @@ namespace SnowmeetApi.Controllers
                     continue;
                 }
                 WepayBalance b = new WepayBalance();
-                for (int j = 0; j < fieldArr.Length-1; j++)
+                for (int j = 0; j < fieldArr.Length - 1; j++)
                 {
 
-                    string v = fieldArr[j+1].Trim().Replace("`", "");
-                    
+                    string v = fieldArr[j + 1].Trim().Replace("`", "");
+
                     switch (j)
                     {
                         case 0:
@@ -817,7 +873,7 @@ namespace SnowmeetApi.Controllers
                                     b.request_refund_amount = double.Parse(v.Trim());
                                 }
                             }
-                            catch(Exception err)
+                            catch (Exception err)
                             {
                                 Console.WriteLine(err.ToString());
                             }
@@ -828,7 +884,7 @@ namespace SnowmeetApi.Controllers
                         default:
                             break;
                     }
-                    
+
                     //count += await _db.SaveChangesAsync();
                 }
                 await _db.wepayBalance.AddAsync(b);
@@ -841,7 +897,7 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet("{mchId}")]
-        public async Task  RequestTradeBill(int mchId, DateTime billDate)
+        public async Task RequestTradeBill(int mchId, DateTime billDate)
         {
             Console.WriteLine(mchId.ToString() + "\t" + billDate.ToShortDateString());
             var summaryList = await _db.wepaySummary.Where(s => s.trans_date.Date == billDate.Date && s.mch_id == mchId)
@@ -996,7 +1052,7 @@ namespace SnowmeetApi.Controllers
                             break;
                     }
                 }
-                balanceArr[i-1] = b;
+                balanceArr[i - 1] = b;
             }
 
             if (summary.trans_num == balanceArr.Length)
@@ -1169,9 +1225,9 @@ namespace SnowmeetApi.Controllers
                 && (mchId.Equals("") || b.mch_id.Trim().Equals(mchId)))
                 .OrderByDescending(b => b.trans_date).AsNoTracking().ToListAsync();
 
-            
-            
-            
+
+
+
             var wepayKeyList = await _db.WepayKeys.ToListAsync();
 
             List<WepayBalance> retList = new List<WepayBalance>();
@@ -1217,7 +1273,7 @@ namespace SnowmeetApi.Controllers
                             if (rentOrderList != null && rentOrderList.Count > 0)
                             {
                                 orderId = rentOrderList[0].id.ToString();
-                                
+
                             }
                             break;
                         case "店销现货":
@@ -1244,11 +1300,11 @@ namespace SnowmeetApi.Controllers
                     {
                         try
                         {
-                            cell = mUser.cell == null? "" : mUser.cell.Trim();
-                            realName = mUser.real_name == null? "" : mUser.real_name.Trim();
-                            gender = mUser.gender == null? "" : mUser.gender.Trim();
+                            cell = mUser.cell == null ? "" : mUser.cell.Trim();
+                            realName = mUser.real_name == null ? "" : mUser.real_name.Trim();
+                            gender = mUser.gender == null ? "" : mUser.gender.Trim();
                         }
-                        catch(Exception err)
+                        catch (Exception err)
                         {
                             Console.WriteLine(err.ToString());
                         }
@@ -1264,7 +1320,7 @@ namespace SnowmeetApi.Controllers
                     }
                 }
                 b.orderId = orderId.Trim();
-                b.refunds = await _db.wepayBalance.Where(c =>  c.pay_status.Trim().Equals("REFUND")
+                b.refunds = await _db.wepayBalance.Where(c => c.pay_status.Trim().Equals("REFUND")
                     && c.out_trade_no.Trim().Equals(b.out_trade_no)
                     && c.refund_status.Trim().Equals("SUCCESS"))
                     .OrderBy(b => b.id).AsNoTracking().ToListAsync();
@@ -1275,7 +1331,7 @@ namespace SnowmeetApi.Controllers
                     b.totalRefundAmountReal += b.refunds[j].real_refund_amount;
                     b.totalRefundFee += Math.Abs(b.refunds[j].fee);
                 }
-                b.netAmount = b.receiveable_amount - b.totalRefundAmountReal ;
+                b.netAmount = b.receiveable_amount - b.totalRefundAmountReal;
                 b.shop = shop;
                 b.orderType = orderType;
                 b.real_name = realName;
@@ -1330,12 +1386,12 @@ namespace SnowmeetApi.Controllers
         [HttpGet]
         public async Task<ActionResult<int>> CreateStatement(string mchId = "1636404775")
         {
-            var bList = await _db.wepayBalance.Where(b => (b.statement_id == 0 && b.mch_id.Trim().Equals(mchId.Trim()) ))
+            var bList = await _db.wepayBalance.Where(b => (b.statement_id == 0 && b.mch_id.Trim().Equals(mchId.Trim())))
                 .OrderBy(b => b.trans_date).ToListAsync();
-            for(int i = 0; i < bList.Count; i++)
+            for (int i = 0; i < bList.Count; i++)
             {
-                
-                switch(bList[i].pay_status.Trim())
+
+                switch (bList[i].pay_status.Trim())
                 {
                     case "SUCCESS":
                         var flowList = await _db.wepayFlowBill
@@ -1347,7 +1403,7 @@ namespace SnowmeetApi.Controllers
                         string oper = "";
                         string oper_account = "";
                         double platFormRemain = 0;
-                        for(int j = 0; j < flowList.Count; j++)
+                        for (int j = 0; j < flowList.Count; j++)
                         {
                             if (flowList[j].biz_name.Trim().Equals("交易") && flowList[j].biz_type.Trim().Equals("交易")
                                 && flowList[j].bill_type.Trim().Equals("收入"))
@@ -1361,7 +1417,7 @@ namespace SnowmeetApi.Controllers
                             {
                                 platFormRemain = flowList[j].surplus;
                             }
-                                
+
                         }
                         FinancialStatement s = new FinancialStatement()
                         {
@@ -1397,12 +1453,12 @@ namespace SnowmeetApi.Controllers
                             refund_settle = null,
                             charge = null
 
-                        };  
+                        };
                         await _db.financialStatement.AddAsync(s);
                         await _db.SaveChangesAsync();
                         bList[i].statement_id = s.id;
                         _db.wepayBalance.Entry(bList[i]).State = EntityState.Modified;
-                        for(int j = 0; j < flowList.Count; j++)
+                        for (int j = 0; j < flowList.Count; j++)
                         {
                             flowList[j].statement_id = s.id;
                             _db.wepayFlowBill.Entry(flowList[j]).State = EntityState.Modified;
@@ -1416,7 +1472,7 @@ namespace SnowmeetApi.Controllers
                             .ToListAsync();
                         DateTime rBillDate = DateTime.MinValue;
                         string rFlowNo = "";
-                        for(int j = 0; j < fList.Count; j++)
+                        for (int j = 0; j < fList.Count; j++)
                         {
                             rFlowNo = fList[j].flow_no.Trim();
                             if (!rFlowNo.Trim().Equals(""))
@@ -1428,7 +1484,7 @@ namespace SnowmeetApi.Controllers
                         fList = await _db.wepayFlowBill
                             .Where(f => f.flow_no.Trim().Equals(rFlowNo) && f.biz_name.Equals("退款") && f.biz_type.Trim().Equals("退款") && f.bill_type.Trim().Equals("支出"))
                             .ToListAsync();
-                        
+
 
 
 
@@ -1439,7 +1495,7 @@ namespace SnowmeetApi.Controllers
                         double rPlatformRemain = 0;
                         double rRealRefund = 0;
                         string rPlatformNo = "";
-                        for(int j = 0; j < fList.Count; j++)
+                        for (int j = 0; j < fList.Count; j++)
                         {
                             rBillDate = fList[j].bill_date_time;
                             rFlowNo = fList[j].flow_no.Trim();
@@ -1447,15 +1503,15 @@ namespace SnowmeetApi.Controllers
                             rPlatformRemain = fList[j].surplus;
                             rRealRefund = fList[j].amount;
                             rPlatformNo = fList[j].biz_no;
-                            if (rOper.IndexOf("(")>=0 || rOper.IndexOf("@")>=0)
+                            if (rOper.IndexOf("(") >= 0 || rOper.IndexOf("@") >= 0)
                             {
                                 rOpType = "人工";
-                                if (rOper.ToLower().Trim().IndexOf("kou")>=0)
+                                if (rOper.ToLower().Trim().IndexOf("kou") >= 0)
                                 {
                                     rOperName = "寇芳";
                                     rOperAccount = rOper;
                                 }
-                                else if (rOper.ToLower().Trim().IndexOf("buguai")>=0)
+                                else if (rOper.ToLower().Trim().IndexOf("buguai") >= 0)
                                 {
                                     rOperName = "舒娟";
                                     rOperAccount = rOper;
@@ -1494,7 +1550,7 @@ namespace SnowmeetApi.Controllers
                             out_trade_no = bList[i].out_refund_no,
                             flow_no = rFlowNo,
                             open_id = bList[i].open_id.Trim(),
-                            op_type =  rOpType,
+                            op_type = rOpType,
                             oper = rOperName,
                             oper_account = rOperAccount,
                             amount = null,
@@ -1513,10 +1569,10 @@ namespace SnowmeetApi.Controllers
                             refund_settle = bList[i].request_refund_amount,
                             charge = null
 
-                        };  
+                        };
                         await _db.financialStatement.AddAsync(r);
                         await _db.SaveChangesAsync();
-                        for(int j = 0; j < fList.Count; j++)
+                        for (int j = 0; j < fList.Count; j++)
                         {
                             fList[j].statement_id = r.id;
                             _db.wepayFlowBill.Entry(fList[j]).State = EntityState.Modified;
@@ -1530,8 +1586,8 @@ namespace SnowmeetApi.Controllers
                         break;
                 }
 
-                
-                
+
+
 
             }
 
@@ -1539,7 +1595,7 @@ namespace SnowmeetApi.Controllers
             var asFlowList = await _db.wepayFlowBill
                 .Where(f => (f.biz_name.Trim().Equals("充值/提现") && f.statement_id == 0 && f.mch_id.Trim().Equals(mchId.Trim())))
                 .ToListAsync();
-            for(int i = 0; i < asFlowList.Count; i++)
+            for (int i = 0; i < asFlowList.Count; i++)
             {
                 string opName = "";
                 string opAccount = asFlowList[i].oper.Trim();
@@ -1570,7 +1626,7 @@ namespace SnowmeetApi.Controllers
                     out_trade_no = "",
                     flow_no = asFlowList[i].flow_no,
                     open_id = "",
-                    op_type =  "人工",
+                    op_type = "人工",
                     oper = opName.Trim(),
                     oper_account = asFlowList[i].oper,
                     amount = null,
@@ -1583,11 +1639,11 @@ namespace SnowmeetApi.Controllers
                     coming = 0,
                     bank_remain = 0,
                     can_withdraw = 0,
-                    withdraw = asFlowList[i].biz_type.Trim().Equals("提现")? asFlowList[i].amount: null,
+                    withdraw = asFlowList[i].biz_type.Trim().Equals("提现") ? asFlowList[i].amount : null,
                     refund_amount = null,
                     refund_fee = null,
                     refund_settle = null,
-                    charge = asFlowList[i].biz_type.Trim().Equals("网银充值")? asFlowList[i].amount: null
+                    charge = asFlowList[i].biz_type.Trim().Equals("网银充值") ? asFlowList[i].amount : null
                 };
                 await _db.financialStatement.AddAsync(fs);
                 await _db.SaveChangesAsync();
@@ -1599,6 +1655,78 @@ namespace SnowmeetApi.Controllers
 
 
             return Ok(0);
+        }
+        [NonAction]
+        public int GetMchId(Models.Order order)
+        {
+            int mchId = 3;
+            if (order.shop.Trim().IndexOf("南山") >= 0)
+            {
+                switch (order.type.Trim())
+                {
+                    case "店销现货":
+                        mchId = 6;
+                        break;
+                    case "雪票":
+                        mchId = 7;
+                        break;
+                    case "押金":
+                        mchId = 17;
+                        break;
+                    case "服务":
+                        mchId = 15;
+                        break;
+                    default:
+                        mchId = 6;
+                        break;
+
+                }
+            }
+            else if (order.shop.Trim().IndexOf("万龙") >= 0)
+            {
+                switch (order.type.Trim())
+                {
+                    case "服务":
+                        mchId = 3;
+                        break;
+                    case "押金":
+                        mchId = 5;
+                        break;
+                    case "店销现货":
+                        mchId = 12;
+                        break;
+                    default:
+                        mchId = 12;
+                        break;
+
+                }
+            }
+            else
+            {
+                switch (order.type.Trim())
+                {
+                    case "服务":
+                        mchId = 8;
+                        break;
+                    case "押金":
+                        mchId = 10;
+                        break;
+                    case "店销现货":
+                    case "餐饮":
+                        mchId = 9;
+                        break;
+                    case "雪票":
+                        mchId = 11;
+                        break;
+                    default:
+                        mchId = 9;
+                        break;
+
+                }
+            }
+
+
+            return mchId;
         }
     }
 }

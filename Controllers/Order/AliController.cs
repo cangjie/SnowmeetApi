@@ -307,12 +307,9 @@ namespace SnowmeetApi.Controllers
 
         }
         [NonAction]
-        public async Task<OrderPayment> GetPaymentQrCodeUrl(int paymentId)
+        public async Task<OrderPayment> GetPaymentQrCodeUrl(Models.OrderPayment payment, Models.Order order)
         {
             client = GetClient(appId.Trim());
-            OrderPayment payment = await _db.orderPayment.FindAsync(paymentId);
-            OrderController _orderHelper = new OrderController(_db, _oriConfig, _http);
-            Models.Order? order = await _orderHelper.GetOrder(payment.order_id);
             if (order == null)
             {
                 return null;

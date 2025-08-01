@@ -15,7 +15,7 @@ namespace SnowmeetApi.Models
         public string memo { get; set; }
         public int state { get; set; }  
         public string ret_msg { get; set; } 
-
+        public int valid { get; set; }
         public DateTime? submit_date {get; set; }
 
         public string out_trade_no {get; set;}
