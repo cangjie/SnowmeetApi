@@ -174,9 +174,6 @@ namespace SnowmeetApi.Controllers
             {
                 desc = "租赁";
             }
-
-
-
             if (order.type.Trim().Equals("服务"))
             {
                 string name = "";
@@ -207,8 +204,6 @@ namespace SnowmeetApi.Controllers
             {
                 outTradeNo = order.id.ToString().PadLeft(6, '0') + payment.id.ToString().PadLeft(2, '0') + timeStamp.Substring(3, 10);
             }
-            //CreatePayTransactionJsapiRequest.Types.Detail detail = new CreatePayTransactionJsapiRequest.Types.Detail();
-            //detail.GoodsList 
             var client = await GetClient(mchid);
             var request = new CreatePayTransactionJsapiRequest()
             {

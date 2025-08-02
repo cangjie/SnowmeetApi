@@ -314,16 +314,40 @@ namespace SnowmeetApi.Controllers
             {
                 return null;
             }
+
             string notify = "https://" + _http.HttpContext.Request.Host.Value + "/api/Ali/CallBack";
             AlipayTradePrecreateRequest request = new AlipayTradePrecreateRequest();
             request.SetNotifyUrl(notify);
             payment.notify = notify;
+            List<Aop.Api.Domain.GoodsDetail> gList = new List<GoodsDetail>();
+            for (int i = 0; i < order.fdOrders.Count; i++)
+            {
+                Aop.Api.Domain.GoodsDetail detail = new GoodsDetail()
+                {
+                    AlipayGoodsId = "",
+                    Body = "",
+                    CategoriesTree = "",
+                    GoodsCategory = "",
+                    GoodsId = order.fdOrders[i].product_id.ToString(),
+                    GoodsName = order.fdOrders[i].product_name.Trim(),
+                    OutItemId = "",
+                    OutSkuId = "",
+                    Price = order.fdOrders[i].unit_price.ToString(),
+                    Quantity = order.fdOrders[i].count,
+                    ShowUrl = ""
+                };
+                gList.Add(detail);
+            }
+
+
             AlipayTradePrecreateModel model = new AlipayTradePrecreateModel();
             model.OutTradeNo = payment.out_trade_no.Trim();
             model.Subject = order.subject.Trim();
             model.Body = order.description.Trim();
             model.TotalAmount = Math.Round(payment.amount, 2).ToString();
             model.ExtendParams = new ExtendParams { RoyaltyFreeze = "false" };
+            model.ProductCode = order.id.ToString();
+            model.GoodsDetail = gList;
             request.SetBizModel(model);
             AlipayTradePrecreateResponse response = client.CertificateExecute(request);
             string responseStr = response.Body.Trim();

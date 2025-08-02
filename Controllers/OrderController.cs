@@ -757,7 +757,11 @@ namespace SnowmeetApi.Controllers
             {
                 needCreateNew = true;
             }
-            else if (lastPayment.submit_time != null && (DateTime.Now - (DateTime)lastPayment.submit_time).Seconds >= 3600)
+            else if (lastPayment.submit_time == null)
+            {
+                needCreateNew = true;
+            }
+            else if ((DateTime.Now - (DateTime)lastPayment.submit_time).Seconds >= 3600)
             {
                 needCreateNew = true;
             }
@@ -892,8 +896,8 @@ namespace SnowmeetApi.Controllers
             {
                 return Ok(new ApiResult<object?>()
                 {
-                    code = 0,
-                    message = "",
+                    code = 1,
+                    message = message,
                     data = null
                 });
             }
