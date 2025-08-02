@@ -15,7 +15,7 @@ using System.Threading.Tasks;
 
 namespace SnowmeetApi.Controllers
 {
-    [Route("core/[controller]/[action]")]
+    [Route("api/[controller]/[action]")]
     [ApiController]
     public class MediaHelper : ControllerBase
     {
