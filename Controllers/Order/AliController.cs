@@ -314,7 +314,6 @@ namespace SnowmeetApi.Controllers
             {
                 return null;
             }
-
             string notify = "https://" + _http.HttpContext.Request.Host.Value + "/api/Ali/CallBack";
             AlipayTradePrecreateRequest request = new AlipayTradePrecreateRequest();
             request.SetNotifyUrl(notify);
@@ -338,15 +337,14 @@ namespace SnowmeetApi.Controllers
                 };
                 gList.Add(detail);
             }
-
-
             AlipayTradePrecreateModel model = new AlipayTradePrecreateModel();
             model.OutTradeNo = payment.out_trade_no.Trim();
             model.Subject = order.subject.Trim();
             model.Body = order.description.Trim();
             model.TotalAmount = Math.Round(payment.amount, 2).ToString();
             model.ExtendParams = new ExtendParams { RoyaltyFreeze = "false" };
-            model.ProductCode = order.id.ToString();
+            model.QrCodeTimeoutExpress = "60m";
+            //model.ProductCode = order.id.ToString();
             model.GoodsDetail = gList;
             request.SetBizModel(model);
             AlipayTradePrecreateResponse response = client.CertificateExecute(request);

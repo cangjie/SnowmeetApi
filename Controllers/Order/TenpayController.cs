@@ -22,6 +22,7 @@ using SnowmeetApi.Models.Users;
 using wechat_miniapp_base.Models;
 using SnowmeetApi.Controllers.User;
 using Microsoft.VisualStudio.Web.CodeGenerators.Mvc.Templates.Blazor;
+using AlipaySDKNet.OpenAPI.Model;
 
 namespace SnowmeetApi.Controllers
 {
@@ -70,7 +71,22 @@ namespace SnowmeetApi.Controllers
             }
             List<PaymentShare> shares = await _db.paymentShare.Where(s => s.valid == 1 && s.submit_date == null)
                 .AsNoTracking().ToListAsync();
-            
+            CreatePayTransactionJsapiRequest.Types.Detail detail = new CreatePayTransactionJsapiRequest.Types.Detail();
+            detail.CostPrice = (int)order.totalCharge * 100;
+            List<CreatePayTransactionAppRequest.Types.Detail.Types.GoodsDetail> details = new List<CreatePayTransactionAppRequest.Types.Detail.Types.GoodsDetail>();
+            for (int i = 0; i < order.fdOrders.Count; i++)
+            {
+                CreatePayTransactionAppRequest.Types.Detail.Types.GoodsDetail item = new CreatePayTransactionAppRequest.Types.Detail.Types.GoodsDetail()
+                {
+                    MerchantGoodsId = order.fdOrders[i].product_id.ToString(),
+                    WechatpayGoodsId = null,
+                    GoodsName = order.fdOrders[i].product_name,
+                    Quantity = order.fdOrders[i].count,
+                    UnitPrice = (int)order.fdOrders[i].unit_price * 100
+                };
+                details.Add(item);
+            }
+            detail.GoodsList = details;
             string notifyUrl = "https://" + _http.HttpContext.Request.Host.Value + "/api/Tenpay/TenpayPaymentCallBack/" + payment.mch_id.ToString();
             bool needProfitShare = !(shares == null || shares.Count == 0);
             var client = await GetClient((int)payment.mch_id);
@@ -78,8 +94,8 @@ namespace SnowmeetApi.Controllers
             {
                 OutTradeNumber = payment.out_trade_no.Trim(),
                 AppId = _appId,
-                Description = "",
-                ExpireTime = DateTimeOffset.Now.AddMinutes(30),
+                Description = order.description,
+                ExpireTime = DateTimeOffset.Now.AddMinutes(60),
                 NotifyUrl = notifyUrl,//wepayOrder.notify.Trim() + "/" + mchid.ToString(),
                 Amount = new CreatePayTransactionJsapiRequest.Types.Amount()
                 {
@@ -92,7 +108,9 @@ namespace SnowmeetApi.Controllers
                 Settlement = new CreatePayTransactionJsapiRequest.Types.Settlement()
                 {
                     IsProfitSharing = needProfitShare
-                }
+                },
+                Detail = detail
+
 
             };
             var response = await client.ExecuteCreatePayTransactionJsapiAsync(request);
