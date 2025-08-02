@@ -72,7 +72,7 @@ namespace SnowmeetApi.Controllers
             List<PaymentShare> shares = await _db.paymentShare.Where(s => s.valid == 1 && s.submit_date == null)
                 .AsNoTracking().ToListAsync();
             CreatePayTransactionJsapiRequest.Types.Detail detail = new CreatePayTransactionJsapiRequest.Types.Detail();
-            detail.CostPrice = (int)order.totalCharge * 100;
+            detail.CostPrice = (int)Math.Round(order.totalCharge * 100, 0);
             List<CreatePayTransactionAppRequest.Types.Detail.Types.GoodsDetail> details = new List<CreatePayTransactionAppRequest.Types.Detail.Types.GoodsDetail>();
             for (int i = 0; i < order.fdOrders.Count; i++)
             {
@@ -82,7 +82,7 @@ namespace SnowmeetApi.Controllers
                     WechatpayGoodsId = null,
                     GoodsName = order.fdOrders[i].product_name,
                     Quantity = order.fdOrders[i].count,
-                    UnitPrice = (int)order.fdOrders[i].unit_price * 100
+                    UnitPrice = (int)Math.Round(order.fdOrders[i].unit_price * 100, 2)
                 };
                 details.Add(item);
             }
