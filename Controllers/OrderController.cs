@@ -910,10 +910,84 @@ namespace SnowmeetApi.Controllers
             });
            
         }
+        [HttpGet("{orderId}")]
+        public async Task<ActionResult<ApiResult<Models.Order?>>> EffectUnpaidOrder(int orderId,
+            string? payMethod, bool payLater, string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            StaffController _staffHelper = new StaffController(_db);
+            Staff staff = await _staffHelper.GetStaffBySessionKey(sessionKey, sessionType);
+            if (staff == null && staff.title_level < 100)
+            {
+                return Ok(new ApiResult<object?>()
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = null
+                });
+            }
+            Models.Order order = await GetOrder(orderId);
+            if (order.dealed != 0)
+            {
+                return Ok(new ApiResult<object?>()
+                {
+                    code = 1,
+                    message = "无效订单",
+                    data = null
+                });
+            }
+            OrderPayment payment;
+            if (payLater)
+            {
+                payment = new OrderPayment()
+                {
+                    id = 0,
+                    order_id = orderId,
+                    amount = order.totalCharge,
+                    pay_method = null,
+                    is_debt = 1,
+                    staff_id = staff.id,
+                    create_date = DateTime.Now
+                };
+            }
+            else if (payMethod != null && !payMethod.Trim().Equals("微信支付") && !payMethod.Trim().Equals("支付宝"))
+            {
+                payment = new OrderPayment()
+                {
+                    id = 0,
+                    order_id = orderId,
+                    amount = order.totalCharge,
+                    pay_method = payMethod,
+                    is_debt = 0,
+                    status = OrderPayment.PaymentStatus.支付成功.ToString(),
+                    staff_id = staff.id,
+                    create_date = DateTime.Now
+                };
+            }
+            else
+            {
+                return Ok(new ApiResult<object?>()
+                {
+                    code = 1,
+                    message = "支付方式不支持",
+                    data = null
+                });
+            }
+            await _db.orderPayment.AddAsync(payment);
+            order.dealed = 1;
+            _db.order.Entry(order).State = EntityState.Modified;
+            await _db.SaveChangesAsync();
+            await DealSuccessPaidOrder(orderId);
+            return Ok(new ApiResult<Models.Order>()
+            {
+                code = 0,
+                message = "",
+                data = order
+            });
+        }
         [NonAction]
         public async Task DealSuccessPaidOrder(int orderId)
         {
-
+            
         }
     }
 }

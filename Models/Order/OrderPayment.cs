@@ -25,7 +25,7 @@ namespace SnowmeetApi.Models
         public int is_debt { get; set; } = 0;
         public int? reference_debt_id { get; set; } = null;
         public double amount { get; set; }
-        public string status { get; set; } = "待支付";
+        public string? status { get; set; } = "待支付";
         public string? out_trade_no { get; set; }
         public int? mch_id { get; set; }
         public string? open_id { get; set; }
