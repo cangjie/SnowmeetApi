@@ -974,7 +974,6 @@ namespace SnowmeetApi.Controllers
                 });
             }
             await _db.orderPayment.AddAsync(payment);
-            order.dealed = 1;
             _db.order.Entry(order).State = EntityState.Modified;
             await _db.SaveChangesAsync();
             await DealSuccessPaidOrder(orderId);
@@ -990,6 +989,7 @@ namespace SnowmeetApi.Controllers
         {
             Models.Order order = await GetOrder(orderId);
             order.dealed = 1;
+            order.waiting_for_pay = 0;
             order.update_date = DateTime.Now;
             _db.order.Entry(order).State = EntityState.Modified;
             await _db.SaveChangesAsync();
