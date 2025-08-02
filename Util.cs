@@ -462,7 +462,28 @@ namespace SnowmeetApi
                         };
                         return JsonConvert.SerializeObject(newPrintTasks);
                     case "orderpaid":
-                        break;
+                        OrderController _orderH = new OrderController(db, config, http);
+                        Models.Order order = await _orderH.QueryOrderPaid((int)post.id);
+                        if (order.dealed == 1)
+                        {
+                            ApiResult<Models.Order> orderResult = new ApiResult<Models.Order>()
+                            {
+                                code = 0,
+                                message = "",
+                                data = order
+                            };
+                            return JsonConvert.SerializeObject(orderResult);
+                        }
+                        else
+                        {
+                            ApiResult<Models.Order?> orderResultOverTime = new ApiResult<Models.Order?>()
+                            {
+                                code = 1,
+                                message = "支付超时",
+                                data = null
+                            };
+                            return JsonConvert.SerializeObject(orderResultOverTime);
+                        }
                     default:
                         break;
                 }
@@ -514,7 +535,7 @@ namespace SnowmeetApi
                 else
                 {
                     isMod = false;
-                 }
+                }
                 if (isMod)
                 {
                     CoreDataModLog log = new CoreDataModLog()
@@ -535,6 +556,6 @@ namespace SnowmeetApi
                 }
             });
             return logList;
-        } 
+        }
     }
 }
