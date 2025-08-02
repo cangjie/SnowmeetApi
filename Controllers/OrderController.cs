@@ -9,6 +9,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
+using System.Threading;
 namespace SnowmeetApi.Controllers
 {
     [Route("api/[controller]/[action]")]
@@ -730,7 +731,7 @@ namespace SnowmeetApi.Controllers
         [NonAction]
         public async Task<OrderPayment> GetReadyOrderPayment(Models.Order order, double? amount, string payMethod, int? memberId, string? openId)
         {
-            if (order == null && order.closed == 1 )
+            if (order == null && order.closed == 1)
             {
                 return null;
             }
@@ -908,7 +909,7 @@ namespace SnowmeetApi.Controllers
                 message = "",
                 data = payment
             });
-           
+
         }
         [HttpGet("{orderId}")]
         public async Task<ActionResult<ApiResult<Models.Order?>>> EffectUnpaidOrder(int orderId,
@@ -987,7 +988,23 @@ namespace SnowmeetApi.Controllers
         [NonAction]
         public async Task DealSuccessPaidOrder(int orderId)
         {
-            
+            Models.Order order = await GetOrder(orderId);
+            order.dealed = 1;
+            order.update_date = DateTime.Now;
+            _db.order.Entry(order).State = EntityState.Modified;
+            await _db.SaveChangesAsync();
+        }
+        [NonAction]
+        public async Task<Models.Order?> QueryOrderPaid(int orderId)
+        {
+            DateTime startTime = DateTime.Now;
+            Models.Order order = await _db.order.Where(o => o.id == orderId).AsNoTracking().FirstOrDefaultAsync();
+            for (; order.dealed == 0 && (DateTime.Now - startTime).Seconds <= 3600;)
+            {
+                Thread.Sleep(1000);
+                order = await _db.order.Where(o => o.id == orderId).AsNoTracking().FirstOrDefaultAsync();
+            }
+            return order;
         }
     }
 }

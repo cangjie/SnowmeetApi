@@ -85,7 +85,6 @@ namespace SnowmeetApi
                     if (context.WebSockets.IsWebSocketRequest)
                     {
                         using var webSocket = await context.WebSockets.AcceptWebSocketAsync();
-                        
                         await Echo(webSocket, config, http);
                         Console.WriteLine(webSocket);
                     }

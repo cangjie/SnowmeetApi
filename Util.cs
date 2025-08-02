@@ -461,6 +461,8 @@ namespace SnowmeetApi
                             data = tasks
                         };
                         return JsonConvert.SerializeObject(newPrintTasks);
+                    case "orderpaid":
+                        break;
                     default:
                         break;
                 }
