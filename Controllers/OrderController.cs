@@ -93,6 +93,7 @@ namespace SnowmeetApi.Controllers
                 .Include(o => o.cares.Where(c => c.valid == 1)).ThenInclude(c => c.tasks.Where(t => t.valid == 1).OrderBy(t => t.id))
                 .Include(o => o.rentals.Where(r => r.valid == 1)).ThenInclude(r => r.details.Where(d => d.valid == 1))
                 .Include(o => o.rentals.Where(r => r.valid == 1)).ThenInclude(r => r.rentItems.Where(r => r.valid == 1))
+                .Include(o => o.fdOrders.Where(f => f.valid == 1)).ThenInclude(f => f.product).ThenInclude(p => p.category)
                 .Include(o => o.payments).ThenInclude(p => p.staff)
                 .Include(o => o.payments).ThenInclude(o => o.refunds)
                 .Include(o => o.discounts.Where(d => d.valid == 1))
