@@ -960,9 +960,12 @@ namespace SnowmeetApi.Controllers
                     data = null
                 });
             }
-            await _db.orderPayment.AddAsync(payment);
-            _db.order.Entry(order).State = EntityState.Modified;
-            await _db.SaveChangesAsync();
+            if (payment.amount == 0)
+            {
+                await _db.orderPayment.AddAsync(payment);
+                _db.order.Entry(order).State = EntityState.Modified;
+                await _db.SaveChangesAsync();
+            }
             await DealSuccessPaidOrder(orderId);
             return Ok(new ApiResult<Models.Order>()
             {
