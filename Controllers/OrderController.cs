@@ -822,10 +822,6 @@ namespace SnowmeetApi.Controllers
             {
                 message = "订单关闭";
             }
-            else if (order.waiting_for_pay != 1)
-            {
-                message = "订单或已经支付";
-            }
             else
             {
                 OrderPayment payment = await GetReadyOrderPayment(order, amount, "支付宝", null, null);
@@ -852,7 +848,6 @@ namespace SnowmeetApi.Controllers
                     });
                 }
             }
-
             return Ok(new ApiResult<string>()
             {
                 code = 1,
@@ -902,7 +897,6 @@ namespace SnowmeetApi.Controllers
                 message = "",
                 data = payment
             });
-
         }
         [HttpGet("{orderId}")]
         public async Task<ActionResult<ApiResult<Models.Order?>>> EffectUnpaidOrder(int orderId,
