@@ -468,6 +468,7 @@ namespace SnowmeetApi.Controllers
                                 payment.notify_id = callback.notifyId;
                                 payment.paid_date = DateTime.Now;
                                 payment.update_date = DateTime.Now;
+                                payment.ali_buyer_id = callback.buyerId;
                                 payment.status = OrderPayment.PaymentStatus.支付成功.ToString();
                                 _db.orderPayment.Entry(payment).State = EntityState.Modified;
                             }
