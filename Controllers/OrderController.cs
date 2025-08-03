@@ -971,7 +971,7 @@ namespace SnowmeetApi.Controllers
                     data = null
                 });
             }
-            if (payment.amount == 0)
+            if (payment.amount != 0)
             {
                 await _db.orderPayment.AddAsync(payment);
                 _db.order.Entry(order).State = EntityState.Modified;
