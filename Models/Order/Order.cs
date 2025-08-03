@@ -190,6 +190,7 @@ namespace SnowmeetApi.Models
         public int supplement { get; set; } = 0;
         public int single_payment { get; set; } = 1;
         public int dealed { get; set; } = 0;
+        public int is_test { get; set; } = 0;
         public DateTime? update_date { get; set; } = null;
         [NotMapped]
         public string textColor { get; set; } = "";

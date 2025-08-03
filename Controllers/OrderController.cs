@@ -433,6 +433,7 @@ namespace SnowmeetApi.Controllers
             {
                 order.member_id = member.id;
             }
+
             switch (order.type)
             {
                 case "零售":
@@ -451,6 +452,15 @@ namespace SnowmeetApi.Controllers
             }
             order.waiting_for_pay = 0;
             await GenerateOrderCode(order);
+            if (_http.HttpContext.Request.Host.Value != null
+                && _http.HttpContext.Request.Host.Value.Equals("mini.snowmeet.top"))
+            {
+                order.is_test = 0;
+            }
+            else
+            {
+                order.is_test = 1;
+            }
             await _db.order.AddAsync(order);
             await _db.SaveChangesAsync();
             return Ok(new ApiResult<SnowmeetApi.Models.Order?>()
