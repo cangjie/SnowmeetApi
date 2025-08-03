@@ -448,14 +448,7 @@ namespace SnowmeetApi.Controllers
                 default:
                     break;
             }
-            if (order.total_amount > 0)
-            {
-                order.waiting_for_pay = 1;
-            }
-            else
-            {
-                order.waiting_for_pay = 0;
-            }
+            order.waiting_for_pay = 0;
             await GenerateOrderCode(order);
             await _db.order.AddAsync(order);
             await _db.SaveChangesAsync();
@@ -750,7 +743,7 @@ namespace SnowmeetApi.Controllers
             }
             List<OrderPayment> allPayments = await _db.orderPayment.Where(o => o.order_id == order.id).ToListAsync();
             OrderPayment lastPayment = allPayments.Where(o => o.valid == 1 && o.pay_method.Trim().Equals(payMethod.Trim())
-                && o.status.Equals(OrderPayment.PaymentStatus.待支付.ToString()))
+                && o.status.Equals(OrderPayment.PaymentStatus.待支付.ToString()) && o.open_id == openId && o.member_id == memberId)
                 .OrderByDescending(o => o.id).FirstOrDefault();
             OrderPayment payment;
             bool needCreateNew = false;

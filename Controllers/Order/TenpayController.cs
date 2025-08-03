@@ -133,7 +133,9 @@ namespace SnowmeetApi.Controllers
                 payment.prepay_id = set.prepay_id.Trim();
                 payment.timestamp = set.timeStamp.Trim();
                 payment.submit_time = DateTime.Now;
+                order.waiting_for_pay = 1;
                 _db.Entry(payment).State = EntityState.Modified;
+                _db.Entry(order).State = EntityState.Modified;
                 await _db.SaveChangesAsync();
                 return payment;
             }

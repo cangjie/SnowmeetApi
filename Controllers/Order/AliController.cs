@@ -362,7 +362,9 @@ namespace SnowmeetApi.Controllers
             }
             payment.response_data = JsonConvert.SerializeObject(respObj);
             payment.update_date = DateTime.Now;
+            order.waiting_for_pay = 1;
             _db.orderPayment.Entry(payment).State = EntityState.Modified;
+            _db.order.Entry(order).State = EntityState.Modified;
             await _db.SaveChangesAsync();
             return payment;
         }
