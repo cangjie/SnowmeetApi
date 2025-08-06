@@ -25,7 +25,7 @@ namespace SnowmeetApi.Models
         public Order order { get; set; }
         [ForeignKey("product_id")]
         public Product product { get; set; }
-        [ForeignKey(nameof(Discount.sub_biz_id))]
+        [ForeignKey(nameof(Discount.biz_id))]
         public List<Discount> discounts { get; set; } = new List<Discount>();
         [NotMapped]
         public double discountAmount
