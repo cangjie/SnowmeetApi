@@ -38,6 +38,7 @@ namespace SnowmeetApi.Controllers
             order.fdOrders = await _db.order.Entry(order).Collection(o => o.fdOrders).Query()
                 .Include(f => f.product).ThenInclude(p => p.category)
                 .Include(f => f.discounts.Where(d => d.valid == 1 && d.biz_type.Trim().Equals("餐饮"))).ToListAsync();
+            order.fdOrders = order.fdOrders.Where(o => o.valid == 1).ToList();
             order.rentals = await _db.order.Entry(order).Collection(o => o.rentals).Query()
                 .Include(r => r.discounts.Where(d => d.valid == 1 && d.biz_type.Trim().Equals("租赁")))
                 .Include(r => r.details.Where(d => d.valid == 1))
