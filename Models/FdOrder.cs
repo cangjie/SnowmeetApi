@@ -27,5 +27,14 @@ namespace SnowmeetApi.Models
         public Product product { get; set; }
         [ForeignKey(nameof(Discount.sub_biz_id))]
         public List<Discount> discounts { get; set; } = new List<Discount>();
+        [NotMapped]
+        public double discountAmount
+        {
+            get
+            {
+                List<Discount> availableDList = discounts.Where(d => d.valid == 1).ToList();
+                return availableDList.Sum(d => d.amount);
+            }
+        }
     }
 }
