@@ -129,6 +129,24 @@ namespace SnowmeetApi.Controllers
         public async Task<FdOrder> UpdateFdOrder(FdOrder fdOrder, int? memberId, int? staffId, string scene)
         {
             FdOrder oriFdOrder = await _db.fdOrder.Where(f => f.id == fdOrder.id).AsNoTracking().FirstOrDefaultAsync();
+            if (oriFdOrder == null)
+            {
+                return null;
+            }
+            else
+            {
+                if (oriFdOrder.valid == 1 && fdOrder.valid == 0)
+                {
+                    List<Discount> discounts = await _db.discount.Where(d => d.biz_id == fdOrder.id && d.biz_type.Trim().Equals("餐饮")).ToListAsync();
+                    for (int i = 0; i < discounts.Count; i++)
+                    {
+                        Discount discount = discounts[i];
+                        discount.valid = 0;
+                        discount.update_date = DateTime.Now;
+                        _db.discount.Entry(discount).State = EntityState.Modified;
+                    }
+                }
+            }
             List<CoreDataModLog> logs = Util.GetUpdateDifferenceLog<FdOrder>(oriFdOrder, fdOrder, memberId, staffId, scene);
             foreach (CoreDataModLog log in logs)
             {
