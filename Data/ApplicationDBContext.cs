@@ -215,6 +215,7 @@ namespace SnowmeetApi.Data
         public DbSet<ProductProperty> productProperty { get; set; }
         public DbSet<ProductStock> productStock { get; set; }
         public DbSet<Discount> discount { get; set; }
+        public DbSet<FdOrder> fdOrder { get; set; }
 
     }
 }

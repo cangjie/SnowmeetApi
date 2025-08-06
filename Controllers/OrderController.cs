@@ -123,6 +123,21 @@ namespace SnowmeetApi.Controllers
             await _db.SaveChangesAsync();
             return oriOrder;
         }
+        
+        [NonAction]
+        public async Task<FdOrder> UpdateFdOrder(FdOrder fdOrder, int? memberId, int? staffId, string scene)
+        {
+            FdOrder oriFdOrder = await _db.fdOrder.Where(f => f.id == fdOrder.id).AsNoTracking().FirstOrDefaultAsync();
+            List<CoreDataModLog> logs = Util.GetUpdateDifferenceLog<FdOrder>(oriFdOrder, fdOrder, memberId, staffId, scene);
+            foreach (CoreDataModLog log in logs)
+            {
+                await _db.coreDataModLog.AddAsync(log);
+            }
+            fdOrder.update_date = DateTime.Now;
+            _db.fdOrder.Entry(fdOrder).State = EntityState.Modified;
+            await _db.SaveChangesAsync();
+            return fdOrder;
+        }
         [NonAction]
         public async Task<Retail> GetRetailDetail(int detailId)
         {
@@ -362,6 +377,26 @@ namespace SnowmeetApi.Controllers
                 code = 0,
                 message = "",
                 data = order
+            });
+        }
+        [HttpPost]
+        public async Task<ActionResult<ApiResult<FdOrder>>> UpdateFdOrderByStaff([FromBody] FdOrder fdOrder,
+            [FromQuery] string scene, [FromQuery] string sessionKey, [FromQuery] string sessionType = "wechat_mini_openid")
+        {
+            StaffController _staffHelper = new StaffController(_db);
+            Staff staff = await _staffHelper.GetStaffBySessionKey(sessionKey, sessionType);
+            ApiResult<object?> r = await _staffHelper.CheckStaffLevel(100, sessionKey, sessionType);
+            if (r != null)
+            {
+                return Ok(r);
+            }
+            scene = Util.UrlDecode(scene);
+            fdOrder = await UpdateFdOrder(fdOrder, null, staff.id, scene);
+            return Ok(new ApiResult<SnowmeetApi.Models.FdOrder>()
+            {
+                code = 0,
+                message = "",
+                data = fdOrder
             });
         }
         [HttpGet("{detailId}")]
