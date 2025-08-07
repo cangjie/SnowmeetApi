@@ -824,6 +824,10 @@ namespace SnowmeetApi.Controllers
             {
                 needCreateNew = true;
             }
+            else if (order.single_payment == 1 && order.totalCharge != lastPayment.amount)
+            { 
+                needCreateNew = true;
+            }
             else
             {
                 needCreateNew = false;
