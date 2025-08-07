@@ -1063,6 +1063,7 @@ namespace SnowmeetApi.Controllers
             {
                 Thread.Sleep(1000);
                 order = await _db.order.Where(o => o.id == orderId).AsNoTracking().FirstOrDefaultAsync();
+                await _db.order.Entry(order).Collection(o => o.payments).LoadAsync();
             }
             return order;
         }
