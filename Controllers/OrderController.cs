@@ -124,7 +124,7 @@ namespace SnowmeetApi.Controllers
             await _db.SaveChangesAsync();
             return oriOrder;
         }
-        
+
         [NonAction]
         public async Task<FdOrder> UpdateFdOrder(FdOrder fdOrder, int? memberId, int? staffId, string scene)
         {
@@ -825,7 +825,7 @@ namespace SnowmeetApi.Controllers
                 needCreateNew = true;
             }
             else if (order.single_payment == 1 && order.totalCharge != lastPayment.amount)
-            { 
+            {
                 needCreateNew = true;
             }
             else
@@ -1059,13 +1059,11 @@ namespace SnowmeetApi.Controllers
             DateTime startTime = DateTime.Now;
             Models.Order order = await _db.order.Where(o => o.id == orderId).AsNoTracking().FirstOrDefaultAsync();
             order.payments = await _db.orderPayment.Where(p => p.order_id == orderId).AsNoTracking().ToListAsync();
-            //await _db.order.Entry(order).Collection(o => o.payments).LoadAsync();
             for (; order.dealed == 0 && (DateTime.Now - startTime).Seconds <= 3600;)
             {
                 Thread.Sleep(1000);
                 order = await _db.order.Where(o => o.id == orderId).AsNoTracking().FirstOrDefaultAsync();
                 order.payments = await _db.orderPayment.Where(p => p.order_id == orderId).AsNoTracking().ToListAsync();
-                //await _db.order.Entry(order).Collection(o => o.payments).LoadAsync();
             }
             return order;
         }
