@@ -1058,12 +1058,14 @@ namespace SnowmeetApi.Controllers
         {
             DateTime startTime = DateTime.Now;
             Models.Order order = await _db.order.Where(o => o.id == orderId).AsNoTracking().FirstOrDefaultAsync();
-            await _db.order.Entry(order).Collection(o => o.payments).LoadAsync();
+            order.payments = await _db.orderPayment.Where(p => p.order_id == orderId).AsNoTracking().ToListAsync();
+            //await _db.order.Entry(order).Collection(o => o.payments).LoadAsync();
             for (; order.dealed == 0 && (DateTime.Now - startTime).Seconds <= 3600;)
             {
                 Thread.Sleep(1000);
                 order = await _db.order.Where(o => o.id == orderId).AsNoTracking().FirstOrDefaultAsync();
-                await _db.order.Entry(order).Collection(o => o.payments).LoadAsync();
+                order.payments = await _db.orderPayment.Where(p => p.order_id == orderId).AsNoTracking().ToListAsync();
+                //await _db.order.Entry(order).Collection(o => o.payments).LoadAsync();
             }
             return order;
         }
