@@ -628,7 +628,7 @@ namespace SnowmeetApi.Models
                             .Where(p => p.status.Equals(OrderPayment.PaymentStatus.支付成功.ToString())).ToList();
                         for (int i = 0; i < debts.Count; i++)
                         {
-                            if (pL.Where(p => p.reference_debt_id == debts[i].id).ToList().Count == 0)
+                            if (pL.Where(p => p.reference_debt_id == debts[i].id).ToList().Count > 0)
                             {
                                 havePaid = true;
                             }
@@ -648,7 +648,6 @@ namespace SnowmeetApi.Models
                                 tags.Add(OrderTag.部分平账.ToString());
                             }
                         }
-                        
                     }
                     else
                     {
