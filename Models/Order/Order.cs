@@ -11,6 +11,19 @@ namespace SnowmeetApi.Models
     [Table("order")]
     public class Order
     {
+        public enum OrderTag
+        {
+            无效订单,
+            已关闭,
+            部分支付,
+            支付完成,
+            挂账,
+            已平账,
+            部分平账,
+            招待,
+            减免,
+            支付中
+        }
         public static void RendOrder(SnowmeetApi.Models.Order order)
         {
             string txtColor = "";
@@ -571,6 +584,66 @@ namespace SnowmeetApi.Models
                         break;
                 }
                 return ret;
+            }
+        }
+        [NotMapped]
+        public List<OrderTag> tags
+        {
+            get
+            {
+                List<OrderTag> tags = new List<OrderTag>();
+                if (valid == 0)
+                {
+                    tags.Add(OrderTag.无效订单);
+                    return tags;
+                }
+                else
+                {
+                    if (closed == 1)
+                    {
+                        tags.Add(OrderTag.已关闭);
+                    }
+                    List<OrderPayment> debtList = availablePayments.Where(p => p.is_debt == 1).ToList();
+                    if (debtList.Count > 0)
+                    {
+                        tags.Add(OrderTag.挂账);
+                        bool allPaid = true;
+                        bool havePaid = false;
+                        List<OrderPayment> pL = availablePayments
+                            .Where(p => p.status.Equals(OrderPayment.PaymentStatus.支付成功.ToString())).ToList();
+                        for (int i = 0; i < debtList.Count; i++)
+                        {
+                            if (pL.Where(p => p.reference_debt_id == debtList[i].id).ToList().Count == 0)
+                            {
+                                havePaid = true;
+                            }
+                            else
+                            {
+                                allPaid = false;
+                            }
+                        }
+                        if (allPaid)
+                        {
+                            tags.Add(OrderTag.已平账);
+                        }
+                        else if (havePaid)
+                        {
+                            tags.Add(OrderTag.部分平账);
+                        }
+                    }
+                    else
+                    {
+                        if (waiting_for_pay == 1)
+                        {
+                            tags.Add(OrderTag.支付中);
+                        }
+                        if (waiting_for_pay == 0 && paidAmount == totalCharge)
+                        { 
+                            tags.Add(OrderTag.支付完成);
+                        }
+                    }
+                }
+                return tags;
             }
         }
     }
