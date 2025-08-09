@@ -587,26 +587,26 @@ namespace SnowmeetApi.Models
             }
         }
         [NotMapped]
-        public List<OrderTag> tags
+        public List<string> tags
         {
             get
             {
-                List<OrderTag> tags = new List<OrderTag>();
+                List<string> tags = new List<string>();
                 if (valid == 0)
                 {
-                    tags.Add(OrderTag.无效订单);
+                    tags.Add(OrderTag.无效订单.ToString());
                     return tags;
                 }
                 else
                 {
                     if (closed == 1)
                     {
-                        tags.Add(OrderTag.已关闭);
+                        tags.Add(OrderTag.已关闭.ToString());
                     }
                     List<OrderPayment> debtList = availablePayments.Where(p => p.is_debt == 1).ToList();
                     if (debtList.Count > 0)
                     {
-                        tags.Add(OrderTag.挂账);
+                        tags.Add(OrderTag.挂账.ToString());
                         bool allPaid = true;
                         bool havePaid = false;
                         List<OrderPayment> pL = availablePayments
@@ -624,22 +624,22 @@ namespace SnowmeetApi.Models
                         }
                         if (allPaid)
                         {
-                            tags.Add(OrderTag.已平账);
+                            tags.Add(OrderTag.已平账.ToString());
                         }
                         else if (havePaid)
                         {
-                            tags.Add(OrderTag.部分平账);
+                            tags.Add(OrderTag.部分平账.ToString());
                         }
                     }
                     else
                     {
                         if (waiting_for_pay == 1)
                         {
-                            tags.Add(OrderTag.支付中);
+                            tags.Add(OrderTag.支付中.ToString());
                         }
                         if (waiting_for_pay == 0 && paidAmount == totalCharge)
                         { 
-                            tags.Add(OrderTag.支付完成);
+                            tags.Add(OrderTag.支付完成.ToString());
                         }
                     }
                 }
