@@ -618,6 +618,10 @@ namespace SnowmeetApi.Models
                     {
                         tags.Add(OrderTag.已关闭.ToString());
                     }
+                    if (discounts.Where(d => d.valid == 1).ToList().Count > 0)
+                    {
+                        tags.Add(OrderTag.减免.ToString());
+                    }
                     //List<OrderPayment> debtList = availablePayments.Where(p => p.is_debt == 1).ToList();
                     if (debts.Count > 0)
                     {
@@ -644,7 +648,7 @@ namespace SnowmeetApi.Models
                                 tags.Add(OrderTag.已平账.ToString());
                             }
                             else
-                            { 
+                            {
                                 tags.Add(OrderTag.部分平账.ToString());
                             }
                         }
@@ -656,9 +660,10 @@ namespace SnowmeetApi.Models
                             tags.Add(OrderTag.支付中.ToString());
                         }
                         if (waiting_for_pay == 0 && paidAmount == totalCharge)
-                        { 
+                        {
                             tags.Add(OrderTag.支付完成.ToString());
                         }
+
                     }
                 }
                 return tags;
