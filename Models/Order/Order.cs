@@ -286,17 +286,32 @@ namespace SnowmeetApi.Models
             }
         }
         [NotMapped]
-        public List<OrderPayment>? availablePayments
+        public List<OrderPayment> availablePayments
         {
             get
             {
                 if (payments == null)
                 {
-                    return null;
+                    return new List<OrderPayment>();
                 }
                 else
                 {
-                    return payments.Where(p => p.status.Equals("支付成功")).ToList();
+                    return payments.Where(p => p.status.Equals("支付成功") && p.valid == 1).ToList();
+                }
+            }
+        }
+        [NotMapped]
+        public List<OrderPayment> debts
+        {
+            get
+            {
+                if (payments == null)
+                {
+                    return new List<OrderPayment>();
+                }
+                else
+                {
+                    return payments.Where(p => p.is_debt == 1 && p.valid == 1).ToList();
                 }
             }
         }
@@ -603,17 +618,17 @@ namespace SnowmeetApi.Models
                     {
                         tags.Add(OrderTag.已关闭.ToString());
                     }
-                    List<OrderPayment> debtList = availablePayments.Where(p => p.is_debt == 1).ToList();
-                    if (debtList.Count > 0)
+                    //List<OrderPayment> debtList = availablePayments.Where(p => p.is_debt == 1).ToList();
+                    if (debts.Count > 0)
                     {
                         tags.Add(OrderTag.挂账.ToString());
                         bool allPaid = true;
                         bool havePaid = false;
                         List<OrderPayment> pL = availablePayments
                             .Where(p => p.status.Equals(OrderPayment.PaymentStatus.支付成功.ToString())).ToList();
-                        for (int i = 0; i < debtList.Count; i++)
+                        for (int i = 0; i < debts.Count; i++)
                         {
-                            if (pL.Where(p => p.reference_debt_id == debtList[i].id).ToList().Count == 0)
+                            if (pL.Where(p => p.reference_debt_id == debts[i].id).ToList().Count == 0)
                             {
                                 havePaid = true;
                             }
