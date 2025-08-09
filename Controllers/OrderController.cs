@@ -687,20 +687,23 @@ namespace SnowmeetApi.Controllers
                 .Where(d => d.order_id == orderId && d.biz_id == bizId && d.biz_type == bizType && d.valid == 1).ToListAsync();
             if (discounts.Count == 0)
             {
-                Discount discount = new Discount()
+                if (discountAmount > 0)
                 {
-                    id = 0,
-                    order_id = orderId,
-                    biz_id = bizId,
-                    biz_type = bizType,
-                    amount = discountAmount,
-                    ticket_code = ticketCode,
-                    staff_id = staffId,
-                    member_id = memberId,
-                    valid = 1,
-                    create_date = DateTime.Now
-                };
-                await _db.discount.AddAsync(discount);
+                    Discount discount = new Discount()
+                    {
+                        id = 0,
+                        order_id = orderId,
+                        biz_id = bizId,
+                        biz_type = bizType,
+                        amount = discountAmount,
+                        ticket_code = ticketCode,
+                        staff_id = staffId,
+                        member_id = memberId,
+                        valid = 1,
+                        create_date = DateTime.Now
+                    };
+                    await _db.discount.AddAsync(discount);
+                }
             }
             else
             {

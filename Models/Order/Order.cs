@@ -618,7 +618,7 @@ namespace SnowmeetApi.Models
                     {
                         tags.Add(OrderTag.已关闭.ToString());
                     }
-                    if (discounts.Where(d => d.valid == 1).ToList().Count > 0)
+                    if ( discountAmount > 0)
                     {
                         tags.Add(OrderTag.减免.ToString());
                     }
