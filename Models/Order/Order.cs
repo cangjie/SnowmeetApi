@@ -637,14 +637,18 @@ namespace SnowmeetApi.Models
                                 allPaid = false;
                             }
                         }
-                        if (allPaid)
+                        if (havePaid)
                         {
-                            tags.Add(OrderTag.已平账.ToString());
+                            if (allPaid)
+                            {
+                                tags.Add(OrderTag.已平账.ToString());
+                            }
+                            else
+                            { 
+                                tags.Add(OrderTag.部分平账.ToString());
+                            }
                         }
-                        else if (havePaid)
-                        {
-                            tags.Add(OrderTag.部分平账.ToString());
-                        }
+                        
                     }
                     else
                     {
