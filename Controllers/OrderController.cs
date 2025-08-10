@@ -110,7 +110,7 @@ namespace SnowmeetApi.Controllers
             if (tags != null)
             {
                 List<Models.Order> newOrderList = new List<Models.Order>();
-                foreach (Models.Order order in newOrderList)
+                foreach (Models.Order order in orderList)
                 {
                     if (order.MatchTag(tags))
                     {

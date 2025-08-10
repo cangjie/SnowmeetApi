@@ -18,10 +18,12 @@ namespace SnowmeetApi.Models
             部分支付,
             支付完成,
             挂账,
+            未支付,
             已平账,
             部分平账,
             招待,
             部分招待,
+            整单招待,
             减免,
             支付中
         }
@@ -652,6 +654,10 @@ namespace SnowmeetApi.Models
                                 tags.Add(OrderTag.部分平账.ToString());
                             }
                         }
+                        else
+                        {
+                            tags.Add(OrderTag.未支付.ToString());
+                        }
                     }
                     if (waiting_for_pay == 1)
                     {
@@ -677,9 +683,10 @@ namespace SnowmeetApi.Models
                     }
                     if (haveEntrain)
                     {
+                        tags.Add(OrderTag.招待.ToString());
                         if (allEntrain)
                         {
-                            tags.Add(OrderTag.招待.ToString());
+                            tags.Add(OrderTag.整单招待.ToString());
                         }
                         else
                         {
