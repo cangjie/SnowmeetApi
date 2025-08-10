@@ -690,5 +690,23 @@ namespace SnowmeetApi.Models
                 return tags;
             }
         }
+        public bool MatchTag(List<string> searchTags)
+        {
+            bool isMatch = true;
+            List<string> orderTags = tags;
+            foreach (string searchTag in searchTags)
+            {
+                bool find = false;
+                if (orderTags.Contains(searchTag))
+                {
+                    find = true;
+                }
+                if (!find)
+                {
+                    return false;
+                }
+            }
+            return isMatch;
+        }
     }
 }
