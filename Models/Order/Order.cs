@@ -21,6 +21,7 @@ namespace SnowmeetApi.Models
             已平账,
             部分平账,
             招待,
+            部分招待,
             减免,
             支付中
         }
@@ -618,11 +619,10 @@ namespace SnowmeetApi.Models
                     {
                         tags.Add(OrderTag.已关闭.ToString());
                     }
-                    if ( discountAmount > 0)
+                    if (discountAmount > 0)
                     {
                         tags.Add(OrderTag.减免.ToString());
                     }
-                    //List<OrderPayment> debtList = availablePayments.Where(p => p.is_debt == 1).ToList();
                     if (debts.Count > 0)
                     {
                         tags.Add(OrderTag.挂账.ToString());
@@ -653,17 +653,38 @@ namespace SnowmeetApi.Models
                             }
                         }
                     }
-                    else
+                    if (waiting_for_pay == 1)
                     {
-                        if (waiting_for_pay == 1)
+                        tags.Add(OrderTag.支付中.ToString());
+                    }
+                    if (waiting_for_pay == 0 && paidAmount == totalCharge)
+                    {
+                        tags.Add(OrderTag.支付完成.ToString());
+                    }
+                    bool haveEntrain = false;
+                    bool allEntrain = true;
+                    for (int i = 0; fdOrders != null && i < fdOrders.Count; i++)
+                    {
+                        FdOrder fd = fdOrders[i];
+                        if (fd.valid == 1 && fd.order_type.Trim().Equals("招待"))
                         {
-                            tags.Add(OrderTag.支付中.ToString());
+                            haveEntrain = true;
                         }
-                        if (waiting_for_pay == 0 && paidAmount == totalCharge)
+                        else
                         {
-                            tags.Add(OrderTag.支付完成.ToString());
+                            allEntrain = false;
                         }
-
+                    }
+                    if (haveEntrain)
+                    {
+                        if (allEntrain)
+                        {
+                            tags.Add(OrderTag.招待.ToString());
+                        }
+                        else
+                        {
+                            tags.Add(OrderTag.部分招待.ToString());
+                        }
                     }
                 }
                 return tags;
