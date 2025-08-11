@@ -693,6 +693,13 @@ namespace SnowmeetApi.Models
                             tags.Add(OrderTag.部分招待.ToString());
                         }
                     }
+                    if (single_payment == 1)
+                    {
+                        if (dealed == 1 && paidAmount >= totalCharge)
+                        {
+                            tags.Add(OrderTag.支付完成.ToString());
+                        }
+                    }
                 }
                 return tags;
             }

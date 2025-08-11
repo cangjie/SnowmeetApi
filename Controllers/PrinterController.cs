@@ -46,7 +46,7 @@ namespace SnowmeetApi.Controllers
         }
         [NonAction]
         public async Task<List<PrintTask>> QueryPrintTask(string shop, DateTime startDate)
-        {  
+        {
             for (; true;)
             {
                 List<PrintTask> tasks = await GetPrintTask(shop, startDate);
@@ -56,6 +56,21 @@ namespace SnowmeetApi.Controllers
                 }
                 Thread.Sleep(1000);
             }
+        }
+        [HttpGet("{taskId}")]
+        public async Task<ActionResult<ApiResult<PrintTask>>> ReplyFetched(int taskId)
+        {
+            PrintTask pt = await _db.printTask.FindAsync(taskId);
+            pt.fetched = 1;
+            pt.update_date = DateTime.Now;
+            _db.printTask.Entry(pt);
+            await _db.SaveChangesAsync();
+            return Ok(new ApiResult<PrintTask>()
+            {
+                code = 0,
+                message = "",
+                data = pt
+            });
         }
     }
 }
