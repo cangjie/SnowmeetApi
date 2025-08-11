@@ -49,10 +49,17 @@ namespace SnowmeetApi.Controllers
         {
             for (; true;)
             {
-                List<PrintTask> tasks = await GetPrintTask(shop, startDate);
-                if (tasks.Where(t => t.fetched == 0).ToList().Count > 0)
+                try
                 {
-                    return tasks;
+                    List<PrintTask> tasks = await GetPrintTask(shop, startDate);
+                    if (tasks.Where(t => t.fetched == 0).ToList().Count > 0)
+                    {
+                        return tasks;
+                    }
+                }
+                catch
+                { 
+                    
                 }
                 Thread.Sleep(1000);
             }
