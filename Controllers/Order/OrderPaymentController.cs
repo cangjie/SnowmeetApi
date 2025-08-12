@@ -728,24 +728,16 @@ namespace SnowmeetApi.Controllers.Order
                 };
 
                 var client = new WechatTenpayClient(options);
-                Exception? verifyErr;
-                bool valid = client.VerifyEventSignature(timeStamp, nonce, postJson, paySign, serial, out verifyErr);
-                //valid = client.VerifyEventSignature()
-                /*
-                bool valid = client.VerifyEventSignature(
-                    callbackTimestamp: timeStamp,
-                    callbackNonce: nonce,
-                    callbackBody: postJson,
-                    callbackSignature: paySign,
-                    callbackSerialNumber: serial
-                );
-                */
+                //Exception? verifyErr;
+                bool valid = client.VerifyEventSignature(timeStamp, nonce, postJson, paySign, serial);
+                
+                
                 if (valid)
                 {
                     var callbackModel = client.DeserializeEvent(postJson);
                     if ("TRANSACTION.SUCCESS".Equals(callbackModel.EventType))
                     {
-                        /* 根据事件类型，解密得到支付通知敏感数据 */
+                       
 
                         var callbackResource = client.DecryptEventResource<SKIT.FlurlHttpClient.Wechat.TenpayV3.Events.TransactionResource>(callbackModel);
                         string outTradeNumber = callbackResource.OutTradeNumber;
@@ -782,10 +774,6 @@ namespace SnowmeetApi.Controllers.Order
         [HttpGet("{id}")]
         public async Task<ActionResult<TenpaySet>> TenpayRequest(int id, string sessionKey)
         {
-
-
-
-            
             sessionKey = Util.UrlDecode(sessionKey.Trim());
             UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (user == null)

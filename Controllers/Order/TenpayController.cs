@@ -96,7 +96,7 @@ namespace SnowmeetApi.Controllers
                 AppId = _appId,
                 Description = order.description,
                 ExpireTime = DateTimeOffset.Now.AddMinutes(60),
-                NotifyUrl = notifyUrl,//wepayOrder.notify.Trim() + "/" + mchid.ToString(),
+                NotifyUrl = notifyUrl,
                 Amount = new CreatePayTransactionJsapiRequest.Types.Amount()
                 {
                     Total = (int)Math.Round(payment.amount * 100, 0)
@@ -356,8 +356,8 @@ namespace SnowmeetApi.Controllers
                 };
 
                 var client = new WechatTenpayClient(options);
-                Exception? verifyErr;
-                bool valid = client.VerifyEventSignature(timeStamp, nonce, postJson, paySign, serial, out verifyErr);
+                //Exception? verifyErr;
+                bool valid = client.VerifyEventSignature(timeStamp, nonce, postJson, paySign, serial );
 
                 if (valid)
                 {
@@ -707,8 +707,8 @@ namespace SnowmeetApi.Controllers
                 AppId = _appId,
                 TransactionId = (string)payment.wepay_trans_id,
                 OutOrderNumber = share.out_trade_no.Trim(),
-                ReceiverList = rl,
-                WechatpayCertificateSerialNumber = key.key_serial.Trim()
+                ReceiverList = rl
+               // WechatpayCertificateSerialNumber = key.key_serial.Trim()
             };
             share.submit_date = DateTime.Now;
             var res = await client.ExecuteCreateProfitSharingOrderAsync(req);
@@ -950,11 +950,8 @@ namespace SnowmeetApi.Controllers
             str = (await sr.ReadToEndAsync()).Trim();
             sr.Close();
             Console.WriteLine(str);
-
             string[] lineArr = str.Split('\n');
             string[] summaryFields = lineArr[lineArr.Length - 1].Split(',');
-
-
             WepaySummary summary = new WepaySummary()
             {
                 id = 0,
@@ -968,11 +965,7 @@ namespace SnowmeetApi.Controllers
                 total_order_amount = double.Parse(summaryFields[5].Replace("`", "")),
                 total_request_refund_amount = double.Parse(summaryFields[6].Replace("`", ""))
             };
-
-
             WepayBalance[] balanceArr = new WepayBalance[lineArr.Length - 3];
-
-
             for (int i = 1; i < lineArr.Length - 2; i++)
             {
                 WepayBalance b = new WepayBalance();
@@ -1359,7 +1352,6 @@ namespace SnowmeetApi.Controllers
                 retList.Add(b);
 
             }
-
             var withDraw = await _db.wepayFlowBill.Where(b => (b.bill_date_time.Date >= startDate.Date
                 && b.bill_date_time.Date <= endDate.Date && b.biz_type.Trim().Equals("提现")
                 && b.bill_type.Trim().Equals("支出")
@@ -1386,15 +1378,10 @@ namespace SnowmeetApi.Controllers
                 retList.Add(b);
 
             }
-
             List<WepayBalance> ret = retList.OrderByDescending(b => b.trans_date).ToList();
-
-
-
             WepayReport report = new WepayReport();
             report.maxRefundLength = maxLen;
             report.items = ret;
-
             return Ok(report);
         }
 
@@ -1495,15 +1482,9 @@ namespace SnowmeetApi.Controllers
                                 break;
                             }
                         }
-
                         fList = await _db.wepayFlowBill
                             .Where(f => f.flow_no.Trim().Equals(rFlowNo) && f.biz_name.Equals("退款") && f.biz_type.Trim().Equals("退款") && f.bill_type.Trim().Equals("支出"))
                             .ToListAsync();
-
-
-
-
-
                         string rOpType = "系统";
                         string rOperName = "";
                         string rOperAccount = "";
@@ -1547,8 +1528,6 @@ namespace SnowmeetApi.Controllers
                             {
 
                             }
-
-
                         }
                         FinancialStatement r = new FinancialStatement()
                         {
@@ -1600,13 +1579,7 @@ namespace SnowmeetApi.Controllers
                     default:
                         break;
                 }
-
-
-
-
             }
-
-
             var asFlowList = await _db.wepayFlowBill
                 .Where(f => (f.biz_name.Trim().Equals("充值/提现") && f.statement_id == 0 && f.mch_id.Trim().Equals(mchId.Trim())))
                 .ToListAsync();
@@ -1739,9 +1712,20 @@ namespace SnowmeetApi.Controllers
 
                 }
             }
-
-
             return mchId;
+        }
+        [HttpGet("{paymentId}")]
+        public async Task<ActionResult<ApiResult<OrderPayment>>> ClosePayment(int paymentId)
+        {
+            OrderPayment payment = await _db.orderPayment.FindAsync(paymentId);
+            WepayKey key = await _db.WepayKeys.Where(k => k.id == payment.mch_id).AsNoTracking().FirstOrDefaultAsync();
+            int mchId = (int)payment.mch_id;
+            var req = new ClosePayTransactionRequest();
+            req.OutTradeNumber = payment.out_trade_no.Trim();
+            req.MerchantId = key.mch_id.Trim();
+            WechatTenpayClient client = await GetClient(key.id);
+            var res = await client.ExecuteClosePayTransactionAsync(req);
+            return null;
         }
     }
 }

@@ -473,7 +473,7 @@ namespace SnowmeetApi.Controllers
                                 _db.orderPayment.Entry(payment).State = EntityState.Modified;
                             }
                         }
-                        
+
                         if (needDeal)
                         {
                             await _db.SaveChangesAsync();
@@ -790,6 +790,21 @@ namespace SnowmeetApi.Controllers
             }
 
         }
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<OrderPayment>>> ClosePayment(int paymentId)
+        {
+            OrderPayment payment = await _db.orderPayment.FindAsync(paymentId);
+            AlipayTradeCancelModel model = new AlipayTradeCancelModel()
+            {
+                OutTradeNo = payment.out_trade_no,
+                TradeNo = payment.ali_trade_no
+            };
+            AlipayTradeCancelRequest req = new AlipayTradeCancelRequest();
+            req.SetBizModel(model);
+            AlipayTradeCancelResponse res = client.CertificateExecute(req);
+            return null;
+        }
+
 
         /*
         [NonAction]

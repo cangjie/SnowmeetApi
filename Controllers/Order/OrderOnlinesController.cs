@@ -18,7 +18,7 @@ using System.IO;
 using System.Collections;
 using System.Text.RegularExpressions;
 
-using static SKIT.FlurlHttpClient.Wechat.TenpayV3.Models.CreateHKTransactionMicroPayRequest.Types;
+//using static SKIT.FlurlHttpClient.Wechat.TenpayV3.Models.CreateHKTransactionMicroPayRequest.Types;
 using SnowmeetApi.Controllers.User;
 using AlipaySDKNet.OpenAPI.Model;
 
