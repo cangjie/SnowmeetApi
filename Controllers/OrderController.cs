@@ -125,7 +125,7 @@ namespace SnowmeetApi.Controllers
         public async Task<SnowmeetApi.Models.Order> UpdateOrder(SnowmeetApi.Models.Order order, int? memberId, int? staffId, string scene)
         {
             SnowmeetApi.Models.Order oriOrder = await _db.order.Where(o => o.id == order.id).AsNoTracking().FirstOrDefaultAsync();
-            List<CoreDataModLog> logs = Util.GetUpdateDifferenceLog<Models.Order>(oriOrder, order, memberId, staffId, "订单生成");
+            List<CoreDataModLog> logs = Util.GetUpdateDifferenceLog<Models.Order>(oriOrder, order, memberId, staffId, scene);
             foreach (CoreDataModLog log in logs)
             {
                 await _db.coreDataModLog.AddAsync(log);
