@@ -68,6 +68,7 @@ namespace SnowmeetApi.Models
                 RendOrder(orderList[i]);
             }
         }
+        /*
         public static List<CoreDataModLog> GetUpdateDifferenceLog(Order oriOrder, Order order, int? memberId, int? staffId, string scene)
         {
             if (oriOrder.id != order.id)
@@ -131,6 +132,9 @@ namespace SnowmeetApi.Models
                 logs.Add(Util.CreateCoreDataModLog("order", "total_amount", order.id, oriOrder.total_amount, order.total_amount, memberId, staffId, scene, ts.Ticks));
                 oriOrder.total_amount = order.total_amount;
             }
+
+
+
             /*
             if (oriOrder.ticket_code != order.ticket_code)
             {
@@ -148,53 +152,64 @@ namespace SnowmeetApi.Models
                 oriOrder.discount = order.discount;
             }
             */
-            if (oriOrder.memo != order.memo)
-            {
-                logs.Add(Util.CreateCoreDataModLog("order", "memo", order.id, oriOrder.memo, order.memo, memberId, staffId, scene, ts.Ticks));
-                oriOrder.memo = order.memo;
-            }
-            if (oriOrder.biz_date != order.biz_date)
-            {
-                logs.Add(Util.CreateCoreDataModLog("order", "biz_date", order.id, oriOrder.biz_date, order.biz_date, memberId, staffId, scene, ts.Ticks));
-                oriOrder.biz_date = order.biz_date;
-            }
-            if (oriOrder.staff_id != order.staff_id)
-            {
-                logs.Add(Util.CreateCoreDataModLog("order", "staff_id", order.id, oriOrder.staff_id, order.biz_date, memberId, staffId, scene, ts.Ticks));
-                oriOrder.staff_id = order.staff_id;
-            }
-            if (oriOrder.closed != order.closed)
-            {
-                logs.Add(Util.CreateCoreDataModLog("order", "closed", order.id, oriOrder.closed, order.closed, memberId, staffId, scene, ts.Ticks));
-                oriOrder.closed = order.closed;
-            }
-            if (oriOrder.valid != order.valid)
-            {
-                logs.Add(Util.CreateCoreDataModLog("order", "valid", order.id, oriOrder.valid, order.valid, memberId, staffId, scene, ts.Ticks));
-                oriOrder.valid = order.valid;
-            }
-            if (oriOrder.close_date != order.close_date)
-            {
-                logs.Add(Util.CreateCoreDataModLog("order", "close_date", order.id, oriOrder.close_date, order.close_date, memberId, staffId, scene, ts.Ticks));
-                oriOrder.close_date = order.close_date;
-            }
-            /*
-            if (oriOrder.waiting_for_pay != order.waiting_for_pay)
-            {
-                logs.Add(Util.CreateCoreDataModLog("order", "waiting_for_pay", order.id, oriOrder.waiting_for_pay, order.waiting_for_pay, memberId, staffId, scene, ts.Ticks));
-                oriOrder.waiting_for_pay = order.waiting_for_pay;
-            }
-            */
-            if (oriOrder.supplement != order.supplement)
-            {
-                logs.Add(Util.CreateCoreDataModLog("order", "supplement", order.id, oriOrder.supplement, order.supplement, memberId, staffId, scene, ts.Ticks));
-                oriOrder.supplement = order.supplement;
-            }
-            return logs;
+
+
+        /*
+        if (oriOrder.memo != order.memo)
+        {
+            logs.Add(Util.CreateCoreDataModLog("order", "memo", order.id, oriOrder.memo, order.memo, memberId, staffId, scene, ts.Ticks));
+            oriOrder.memo = order.memo;
         }
+        if (oriOrder.biz_date != order.biz_date)
+        {
+            logs.Add(Util.CreateCoreDataModLog("order", "biz_date", order.id, oriOrder.biz_date, order.biz_date, memberId, staffId, scene, ts.Ticks));
+            oriOrder.biz_date = order.biz_date;
+        }
+        if (oriOrder.staff_id != order.staff_id)
+        {
+            logs.Add(Util.CreateCoreDataModLog("order", "staff_id", order.id, oriOrder.staff_id, order.biz_date, memberId, staffId, scene, ts.Ticks));
+            oriOrder.staff_id = order.staff_id;
+        }
+        if (oriOrder.closed != order.closed)
+        {
+            logs.Add(Util.CreateCoreDataModLog("order", "closed", order.id, oriOrder.closed, order.closed, memberId, staffId, scene, ts.Ticks));
+            oriOrder.closed = order.closed;
+        }
+        if (oriOrder.valid != order.valid)
+        {
+            logs.Add(Util.CreateCoreDataModLog("order", "valid", order.id, oriOrder.valid, order.valid, memberId, staffId, scene, ts.Ticks));
+            oriOrder.valid = order.valid;
+        }
+        if (oriOrder.close_date != order.close_date)
+        {
+            logs.Add(Util.CreateCoreDataModLog("order", "close_date", order.id, oriOrder.close_date, order.close_date, memberId, staffId, scene, ts.Ticks));
+            oriOrder.close_date = order.close_date;
+        }
+
+
+
+        /*
+        if (oriOrder.waiting_for_pay != order.waiting_for_pay)
+        {
+            logs.Add(Util.CreateCoreDataModLog("order", "waiting_for_pay", order.id, oriOrder.waiting_for_pay, order.waiting_for_pay, memberId, staffId, scene, ts.Ticks));
+            oriOrder.waiting_for_pay = order.waiting_for_pay;
+        }
+        */
+
+
+        /*
+        if (oriOrder.supplement != order.supplement)
+        {
+            logs.Add(Util.CreateCoreDataModLog("order", "supplement", order.id, oriOrder.supplement, order.supplement, memberId, staffId, scene, ts.Ticks));
+            oriOrder.supplement = order.supplement;
+        }
+        return logs;
+    }
+    */
+        
         [Key]
         public int id { get; set; }
-        public string code { get; set; }
+        public string? code { get; set; } = null;
         public string shop { get; set; }
         public string type { get; set; }
         public string? contact_num { get; set; } = null;

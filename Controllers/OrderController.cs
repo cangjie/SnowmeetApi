@@ -84,7 +84,7 @@ namespace SnowmeetApi.Controllers
             return orderList;
         }
         [NonAction]
-        public async Task<List<SnowmeetApi.Models.Order>> GetCommonOrders(int? orderId, string? shop, int? memberId, int? staffId, string? type, 
+        public async Task<List<SnowmeetApi.Models.Order>> GetCommonOrders(int? orderId, string? shop, int? memberId, int? staffId, string? type,
             string? subType, DateTime? startDate, DateTime? endDate, string? payOption = null, List<string>? tags = null)
         {
             startDate = startDate == null ? DateTime.MinValue : startDate;
@@ -124,14 +124,20 @@ namespace SnowmeetApi.Controllers
         [NonAction]
         public async Task<SnowmeetApi.Models.Order> UpdateOrder(SnowmeetApi.Models.Order order, int? memberId, int? staffId, string scene)
         {
+
             SnowmeetApi.Models.Order oriOrder = await _db.order.Where(o => o.id == order.id).AsNoTracking().FirstOrDefaultAsync();
+            if (order.code == null && order.valid == 1)
+            {
+                await GenerateOrderCode(order);
+            }
             List<CoreDataModLog> logs = Util.GetUpdateDifferenceLog<Models.Order>(oriOrder, order, memberId, staffId, scene);
             foreach (CoreDataModLog log in logs)
             {
                 await _db.coreDataModLog.AddAsync(log);
             }
-            oriOrder.update_date = DateTime.Now;
-            _db.order.Entry(oriOrder).State = EntityState.Modified;
+            order.update_date = DateTime.Now;
+
+            _db.order.Entry(order).State = EntityState.Modified;
             await _db.SaveChangesAsync();
             return oriOrder;
         }
@@ -516,7 +522,7 @@ namespace SnowmeetApi.Controllers
                     break;
             }
             //order.waiting_for_pay = 0;
-            await GenerateOrderCode(order);
+            //await GenerateOrderCode(order);
             if (_http.HttpContext.Request.Host.Value != null
                 && _http.HttpContext.Request.Host.Value.Equals("mini.snowmeet.top"))
             {
