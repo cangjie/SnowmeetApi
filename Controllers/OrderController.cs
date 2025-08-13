@@ -124,8 +124,8 @@ namespace SnowmeetApi.Controllers
         [NonAction]
         public async Task<SnowmeetApi.Models.Order> UpdateOrder(SnowmeetApi.Models.Order order, int? memberId, int? staffId, string scene)
         {
-            SnowmeetApi.Models.Order oriOrder = await _db.order.FindAsync(order.id);
-            List<CoreDataModLog> logs = SnowmeetApi.Models.Order.GetUpdateDifferenceLog(oriOrder, order, memberId, staffId, scene);
+            SnowmeetApi.Models.Order oriOrder = await _db.order.Where(o => o.id == order.id).AsNoTracking().FirstOrDefaultAsync();
+            List<CoreDataModLog> logs = Util.GetUpdateDifferenceLog<Models.Order>(oriOrder, order, memberId, staffId, "订单生成");
             foreach (CoreDataModLog log in logs)
             {
                 await _db.coreDataModLog.AddAsync(log);
@@ -515,7 +515,7 @@ namespace SnowmeetApi.Controllers
                 default:
                     break;
             }
-            order.waiting_for_pay = 0;
+            //order.waiting_for_pay = 0;
             await GenerateOrderCode(order);
             if (_http.HttpContext.Request.Host.Value != null
                 && _http.HttpContext.Request.Host.Value.Equals("mini.snowmeet.top"))
@@ -1071,7 +1071,7 @@ namespace SnowmeetApi.Controllers
         {
             Models.Order order = await GetOrder(orderId);
             order.dealed = 1;
-            order.waiting_for_pay = 0;
+            //order.waiting_for_pay = 0;
             order.update_date = DateTime.Now;
             _db.order.Entry(order).State = EntityState.Modified;
             await _db.SaveChangesAsync();

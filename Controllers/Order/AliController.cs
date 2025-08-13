@@ -362,7 +362,7 @@ namespace SnowmeetApi.Controllers
             }
             payment.response_data = JsonConvert.SerializeObject(respObj);
             payment.update_date = DateTime.Now;
-            order.waiting_for_pay = 1;
+            //order.waiting_for_pay = 1;
             _db.orderPayment.Entry(payment).State = EntityState.Modified;
             _db.order.Entry(order).State = EntityState.Modified;
             await _db.SaveChangesAsync();
@@ -676,16 +676,12 @@ namespace SnowmeetApi.Controllers
             s.Close();
             resWeb.Close();
             reqWeb.Abort();
-
             using (var zip = ZipFile.Open(downloadPath + "/" + tempFileName, ZipArchiveMode.Read, Encoding.GetEncoding("GB2312")))
             {
-
                 foreach (var entry in zip.Entries)
                 {
-
                     string fileName = entry.FullName.Trim();
                     fileName = Util.UrlDecode(fileName);
-
                     Console.WriteLine("文件名：{0}", entry.FullName);
                     using (var stream = entry.Open())
                     using (var reader = new StreamReader(stream, Encoding.GetEncoding("GB2312")))
@@ -804,16 +800,5 @@ namespace SnowmeetApi.Controllers
             AlipayTradeCancelResponse res = client.CertificateExecute(req);
             return null;
         }
-
-
-        /*
-        [NonAction]
-        private async Task DealBalance(string content)
-        {
-
-
-        }
-        */
-
     }
 }

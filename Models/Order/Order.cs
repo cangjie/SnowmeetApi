@@ -27,6 +27,16 @@ namespace SnowmeetApi.Models
             减免,
             支付中
         }
+        public enum PayFlowStatus
+        {
+            待生成,
+            已生成,
+            待支付,
+            已支付,
+            已关闭,
+            部分退款,
+            全额退款
+        }
         public static void RendOrder(SnowmeetApi.Models.Order order)
         {
             string txtColor = "";
@@ -168,11 +178,13 @@ namespace SnowmeetApi.Models
                 logs.Add(Util.CreateCoreDataModLog("order", "close_date", order.id, oriOrder.close_date, order.close_date, memberId, staffId, scene, ts.Ticks));
                 oriOrder.close_date = order.close_date;
             }
+            /*
             if (oriOrder.waiting_for_pay != order.waiting_for_pay)
             {
                 logs.Add(Util.CreateCoreDataModLog("order", "waiting_for_pay", order.id, oriOrder.waiting_for_pay, order.waiting_for_pay, memberId, staffId, scene, ts.Ticks));
                 oriOrder.waiting_for_pay = order.waiting_for_pay;
             }
+            */
             if (oriOrder.supplement != order.supplement)
             {
                 logs.Add(Util.CreateCoreDataModLog("order", "supplement", order.id, oriOrder.supplement, order.supplement, memberId, staffId, scene, ts.Ticks));
@@ -202,10 +214,11 @@ namespace SnowmeetApi.Models
         public int closed { get; set; } = 0;
         public int valid { get; set; } = 1;
         public DateTime? close_date { get; set; } = null;
-        public int waiting_for_pay { get; set; } = 1;
+        //public int waiting_for_pay { get; set; } = 1;
         public int supplement { get; set; } = 0;
         public int single_payment { get; set; } = 1;
         public int dealed { get; set; } = 0;
+        public string? pay_flow_status { get; set; } = null;
         public int is_test { get; set; } = 0;
         public DateTime? update_date { get; set; } = null;
         [NotMapped]
@@ -659,6 +672,7 @@ namespace SnowmeetApi.Models
                             tags.Add(OrderTag.未支付.ToString());
                         }
                     }
+                    /*
                     if (waiting_for_pay == 1)
                     {
                         tags.Add(OrderTag.支付中.ToString());
@@ -667,6 +681,7 @@ namespace SnowmeetApi.Models
                     {
                         tags.Add(OrderTag.支付完成.ToString());
                     }
+                    */
                     bool haveEntrain = false;
                     bool allEntrain = true;
                     for (int i = 0; fdOrders != null && i < fdOrders.Count; i++)
