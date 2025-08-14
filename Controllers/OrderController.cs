@@ -84,8 +84,10 @@ namespace SnowmeetApi.Controllers
             return orderList;
         }
         [NonAction]
-        public async Task<List<SnowmeetApi.Models.Order>> GetCommonOrders(int? orderId, string? shop, int? memberId, int? staffId, string? type,
-            string? subType, DateTime? startDate, DateTime? endDate, string? payOption = null, List<string>? tags = null)
+        public async Task<List<SnowmeetApi.Models.Order>> GetCommonOrders(int? orderId, string? shop, int? memberId,
+            int? staffId, string? type, DateTime? startDate, DateTime? endDate, string? payOption = null,
+            bool? isTest = null, bool? isEnterain = null, bool? isPackage = null, bool? isOnCredit = null,
+            bool? haveDiscount = null, string? status = null)
         {
             startDate = startDate == null ? DateTime.MinValue : startDate;
             endDate = endDate == null ? DateTime.MaxValue : endDate;
@@ -107,17 +109,30 @@ namespace SnowmeetApi.Controllers
                     && (shop == null || o.shop.Trim().Equals(shop.Trim()))
                     && (type == null || o.type.Trim().Equals(type.Trim())))
                 .OrderByDescending(o => o.id).AsNoTracking().ToListAsync();
-            if (tags != null)
+
+            if (isTest != null)
             {
-                List<Models.Order> newOrderList = new List<Models.Order>();
-                foreach (Models.Order order in orderList)
-                {
-                    if (order.MatchTag(tags))
-                    {
-                        newOrderList.Add(order);
-                    }
-                }
-                return newOrderList;
+                orderList = orderList.Where(o => o.is_test == ((bool)isTest ? 1 : 0)).ToList();
+            }
+            if (isEnterain != null)
+            {
+                orderList = orderList.Where(o => o.haveEntrain == isEnterain).ToList();
+            }
+            if (isPackage != null)
+            { 
+                orderList = orderList.Where(o => o.is_package == ((bool)isPackage? 1:0)).ToList();
+            }
+            if (isOnCredit != null)
+            {
+                orderList = orderList.Where(o => o.haveOnCredit == isOnCredit).ToList();
+            }
+            if (haveDiscount != null)
+            {
+                orderList = orderList.Where(o => o.haveDiscount == haveDiscount).ToList();
+            }
+            if (status != null)
+            {
+                orderList = orderList.Where(o => o.orderStatus.Trim().Equals(status)).ToList();
             }
             return orderList;
         }
@@ -578,7 +593,8 @@ namespace SnowmeetApi.Controllers
         [HttpGet]
         public async Task<ActionResult<ApiResult<List<SnowmeetApi.Models.Order>>>> GetOrdersByStaff(int? orderId,
             string? shop, string? type, string? subType, DateTime? startDate, DateTime? endDate, string sessionKey,
-            string? payOption, string sessionType = "wechat_mini_openid", string? tags = null)
+            string? payOption, string sessionType = "wechat_mini_openid",bool? isTest = null, bool? isEnterain = null,
+            bool? isPackage = null, bool? isOnCredit = null, bool? haveDiscount = null, string? status = null)
         {
             StaffController _staffHelper = new StaffController(_db);
             Staff staff = await _staffHelper.GetStaffBySessionKey(sessionKey, sessionType);
@@ -591,16 +607,8 @@ namespace SnowmeetApi.Controllers
                     data = null
                 });
             }
-            List<SnowmeetApi.Models.Order> orders;
-            if (tags == null)
-            {
-                orders = await GetCommonOrders(orderId, shop, null, null, type, subType, startDate, endDate, payOption);
-            }
-            else
-            {
-                List<string> tagList = tags.Split(',').ToList();
-                orders = await GetCommonOrders(orderId, shop, null, null, type, subType, startDate, endDate, payOption, tagList);
-            }
+            List<SnowmeetApi.Models.Order> orders = await GetCommonOrders(orderId, shop, null, null, type, startDate, endDate, payOption,
+            isTest, isEnterain, isPackage, isOnCredit, haveDiscount, status);
             SnowmeetApi.Models.Order.RendOrderList(orders);
             return Ok(new ApiResult<List<SnowmeetApi.Models.Order>>()
             {

@@ -11,6 +11,7 @@ namespace SnowmeetApi.Models
     [Table("order")]
     public class Order
     {
+        /*
         public enum OrderTag
         {
             无效订单,
@@ -26,6 +27,18 @@ namespace SnowmeetApi.Models
             整单招待,
             减免,
             支付中
+        }
+        */
+        public enum OrderStatus
+        {
+            已完成,
+            已支付,
+            待生成,
+            待支付,
+            已关闭,
+            全额退款,
+            部分退款,
+            退款失败
         }
         public enum PayFlowStatus
         {
@@ -98,6 +111,7 @@ namespace SnowmeetApi.Models
         public int is_test { get; set; } = 0;
         public string? current_pay_method { get; set; } = null;
         public DateTime? update_date { get; set; } = null;
+
         [NotMapped]
         public string textColor { get; set; } = "";
         [NotMapped]
@@ -494,6 +508,7 @@ namespace SnowmeetApi.Models
                 return ret;
             }
         }
+        /*
         [NotMapped]
         public List<string> tags
         {
@@ -549,16 +564,7 @@ namespace SnowmeetApi.Models
                             tags.Add(OrderTag.未支付.ToString());
                         }
                     }
-                    /*
-                    if (waiting_for_pay == 1)
-                    {
-                        tags.Add(OrderTag.支付中.ToString());
-                    }
-                    if (waiting_for_pay == 0 && paidAmount == totalCharge)
-                    {
-                        tags.Add(OrderTag.支付完成.ToString());
-                    }
-                    */
+                   
                     bool haveEntrain = false;
                     bool allEntrain = true;
                     for (int i = 0; fdOrders != null && i < fdOrders.Count; i++)
@@ -596,6 +602,8 @@ namespace SnowmeetApi.Models
                 return tags;
             }
         }
+        */
+        /*
         public bool MatchTag(List<string> searchTags)
         {
             bool isMatch = true;
@@ -614,5 +622,117 @@ namespace SnowmeetApi.Models
             }
             return isMatch;
         }
+        */
+
+        [NotMapped]
+        public bool haveEntrain
+        {
+            get
+            {
+                bool haveEntrain = false;
+                for (int i = 0; fdOrders != null && i < fdOrders.Count; i++)
+                {
+                    if (fdOrders[i].order_type.Trim().Equals("招待"))
+                    {
+                        haveEntrain = true;
+                    }
+                }
+                return haveEntrain;
+            }
+        }
+        [NotMapped]
+        public bool allEntrain
+        {
+            get
+            {
+                bool allEntrain = true;
+                for (int i = 0; fdOrders != null && i < fdOrders.Count; i++)
+                {
+                    if (!fdOrders[i].order_type.Trim().Equals("招待"))
+                    {
+                        allEntrain = false;
+                    }
+                }
+                return haveEntrain && allEntrain;
+            }
+        }
+        [NotMapped]
+        public double creditAmount
+        {
+            get
+            {
+                return payments.Where(p => p.valid == 1 && p.is_debt == 1).Sum(p => p.amount);
+            }
+        }
+        [NotMapped]
+        public bool haveOnCredit
+        {
+            get
+            {
+                return creditAmount > 0;
+            }
+        }
+        [NotMapped]
+        public bool allOnCredit
+        {
+            get
+            {
+                return creditAmount >= totalCharge;
+            }
+        }
+        [NotMapped]
+        public bool haveDiscount
+        {
+            get
+            {
+                return discounts.Count > 0;
+            }
+        }
+        [NotMapped]
+        public string orderStatus
+        {
+            get
+            {
+                string status = "未定义";
+                if (single_payment == 1)
+                {
+                    if (pay_flow_status.Trim().Equals("待生成"))
+                    {
+                        if ((dealed == 0 && totalCharge > 0) || (creditAmount > 0 && paidAmount == 0))
+                        {
+                            return "待生成";
+                        }
+                    }
+                    if (pay_flow_status.Trim().Equals("待支付") || pay_flow_status.Trim().Equals("支付中"))
+                    {
+                        if ((dealed == 0 && totalCharge > 0) || (creditAmount > 0 && paidAmount == 0))
+                        {
+                            return "待支付";
+                        }
+                    }
+                    if (paidAmount == 0 && totalCharge > 0 && closed == 1)
+                    {
+                        return "已关闭";
+                    }
+                    if (refundAmount > 0)
+                    {
+                        if (refundAmount < totalCharge)
+                        {
+                            return "部分退款";
+                        }
+                        else
+                        {
+                            return "全额退款";
+                        }
+                    }
+                    if (dealed == 1)
+                    {
+                        return "已完成";
+                    }
+                }
+                return status;
+            }
+        }
+        
     }
 }
