@@ -125,9 +125,9 @@ namespace SnowmeetApi.Models
         public List<Care> cares { get; set; } = new List<Care>();
         public List<Rental> rentals { get; set; } = new List<Rental>();
         public List<FdOrder> fdOrders { get; set; } = new List<FdOrder>();
-        public List<OrderPayment>? payments { get; set; }
-        public List<OrderPaymentRefund>? refunds { get; set; }
-        public List<PaymentShare>? shares { get; set; }
+        public List<OrderPayment>? payments { get; set; } = new List<OrderPayment>();
+        public List<OrderPaymentRefund>? refunds { get; set; } = new List<OrderPaymentRefund>();
+        public List<PaymentShare>? shares { get; set; } = new List<PaymentShare>();
         public List<Discount> discounts { get; set; } = new List<Discount>();
         public List<Guaranty> guarantys { get; set; } = new List<Guaranty>();
         [NotMapped]
@@ -696,14 +696,15 @@ namespace SnowmeetApi.Models
                 string status = "未定义";
                 if (single_payment == 1)
                 {
-                    if (pay_flow_status.Trim().Equals("待生成"))
+
+                    if (pay_flow_status != null && pay_flow_status.Trim().Equals("待生成"))
                     {
                         if ((dealed == 0 && totalCharge > 0) || (creditAmount > 0 && paidAmount == 0))
                         {
                             return "待生成";
                         }
                     }
-                    if (pay_flow_status.Trim().Equals("待支付") || pay_flow_status.Trim().Equals("支付中"))
+                    if (pay_flow_status != null && pay_flow_status.Trim().Equals("待支付") || pay_flow_status.Trim().Equals("支付中"))
                     {
                         if ((dealed == 0 && totalCharge > 0) || (creditAmount > 0 && paidAmount == 0))
                         {
