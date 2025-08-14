@@ -137,7 +137,7 @@ namespace SnowmeetApi.Controllers
             order.update_date = DateTime.Now;
             _db.order.Entry(order).State = EntityState.Modified;
             await _db.SaveChangesAsync();
-            return oriOrder;
+            return order;
         }
         [NonAction]
         public async Task<FdOrder> UpdateFdOrder(FdOrder fdOrder, int? memberId, int? staffId, string scene)
