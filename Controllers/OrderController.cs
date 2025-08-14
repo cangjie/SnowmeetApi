@@ -106,8 +106,8 @@ namespace SnowmeetApi.Controllers
                 .Where(o => (o.biz_date.Date >= ((DateTime)startDate).Date && o.biz_date.Date <= ((DateTime)endDate).Date)
                     && (memberId == null || o.member_id == memberId) && (staffId == null || o.staff_id == staffId)
                     && (payOption == null || o.pay_option.Trim().Equals(payOption.Trim()))
-                    && (shop == null || o.shop.Trim().Equals(shop.Trim()))
-                    && (type == null || o.type.Trim().Equals(type.Trim())))
+                    && (shop == null || o.shop.Trim().Equals(shop.Trim())) && (type == null || o.type.Trim().Equals(type.Trim()))
+                    && o.valid == 1)
                 .OrderByDescending(o => o.id).AsNoTracking().ToListAsync();
 
             if (isTest != null)
