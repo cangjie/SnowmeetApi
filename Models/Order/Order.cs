@@ -661,7 +661,7 @@ namespace SnowmeetApi.Models
         {
             get
             {
-                return payments.Where(p => p.valid == 1 && p.is_debt == 1).Sum(p => p.amount);
+                return payments == null ? 0 : payments.Where(p => p.valid == 1 && p.is_debt == 1).Sum(p => p.amount);
             }
         }
         [NotMapped]
