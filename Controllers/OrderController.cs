@@ -124,7 +124,6 @@ namespace SnowmeetApi.Controllers
         [NonAction]
         public async Task<SnowmeetApi.Models.Order> UpdateOrder(SnowmeetApi.Models.Order order, int? memberId, int? staffId, string scene)
         {
-
             SnowmeetApi.Models.Order oriOrder = await _db.order.Where(o => o.id == order.id).AsNoTracking().FirstOrDefaultAsync();
             if (order.code == null && order.valid == 1)
             {
@@ -136,12 +135,10 @@ namespace SnowmeetApi.Controllers
                 await _db.coreDataModLog.AddAsync(log);
             }
             order.update_date = DateTime.Now;
-
             _db.order.Entry(order).State = EntityState.Modified;
             await _db.SaveChangesAsync();
             return oriOrder;
         }
-
         [NonAction]
         public async Task<FdOrder> UpdateFdOrder(FdOrder fdOrder, int? memberId, int? staffId, string scene)
         {
@@ -628,12 +625,17 @@ namespace SnowmeetApi.Controllers
                     data = null
                 });
             }
-            return Ok(new ApiResult<Models.Order>()
+            if (order.pay_flow_status.Trim().Equals("已生成"))
             {
-                code = 0,
-                message = "",
-                data = order
-            });
+                order.pay_flow_status = Models.Order.PayFlowStatus.待支付.ToString();
+                await UpdateOrder(order, member.id, null, "顾客微信小程序打开待支付订单");
+            }
+            return Ok(new ApiResult<Models.Order>()
+                {
+                    code = 0,
+                    message = "",
+                    data = order
+                });
         }
         [HttpGet("{orderId}")]
         public async Task<ActionResult<ApiResult<SnowmeetApi.Models.Order?>>> GetOrderByStaff(int orderId,
@@ -989,6 +991,9 @@ namespace SnowmeetApi.Controllers
                 });
             }
             OrderPayment payment = await GetReadyOrderPayment(order, amount, payMethod, member.id, member.wechatMiniOpenId);
+            order.pay_flow_status = Models.Order.PayFlowStatus.支付中.ToString();
+            //order.update_date = DateTime.Now;
+            await UpdateOrder(order, member.id, null, "微信支付点击支付按钮");
             return Ok(new ApiResult<OrderPayment>()
             {
                 code = 0,
@@ -1077,10 +1082,8 @@ namespace SnowmeetApi.Controllers
         {
             Models.Order order = await GetOrder(orderId);
             order.dealed = 1;
-            //order.waiting_for_pay = 0;
-            order.update_date = DateTime.Now;
-            _db.order.Entry(order).State = EntityState.Modified;
-            await _db.SaveChangesAsync();
+            order.pay_flow_status = Models.Order.PayFlowStatus.已支付.ToString();
+            await UpdateOrder(order, null, null, "支付成功");
         }
         [NonAction]
         public async Task<Models.Order?> QueryOrderPaid(int orderId)
