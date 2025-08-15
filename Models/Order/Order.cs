@@ -706,7 +706,14 @@ namespace SnowmeetApi.Models
                     {
                         if (unPaidAutoPayments.Count == 0)
                         {
-                            return Models.Order.OrderStatus.待生成.ToString();
+                            if (current_pay_method != null && current_pay_method.Equals("微信支付"))
+                            {
+                                return Models.Order.OrderStatus.待支付.ToString();
+                            }
+                            else
+                            { 
+                                return Models.Order.OrderStatus.待生成.ToString();
+                            }
                         }
                         else
                         {
