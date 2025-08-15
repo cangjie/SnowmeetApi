@@ -700,20 +700,17 @@ namespace SnowmeetApi.Models
                 string status = "未定义";
                 if (dealed == 0)
                 {
-                    if (current_pay_method != null && (current_pay_method.Trim().Equals("微信支付") || current_pay_method.Trim().Equals("支付宝")))
+                    List<OrderPayment> unPaidAutoPayments = payments.Where(p => p.valid == 1
+                        && (p.pay_method.Trim().Equals("微信支付") || p.pay_method.Trim().Equals("支付宝"))).ToList();
+                    if (paidAmount == 0 && totalCharge > 0)
                     {
-                        List<OrderPayment> unPaidAutoPayments = payments.Where(p => p.valid == 1
-                            && (p.pay_method.Trim().Equals("微信支付") || p.pay_method.Trim().Equals("支付宝"))).ToList();
-                        if (paidAmount == 0 && totalCharge > 0)
+                        if (unPaidAutoPayments.Count == 0)
                         {
-                            if (unPaidAutoPayments.Count == 0)
-                            {
-                                return Models.Order.OrderStatus.待生成.ToString();
-                            }
-                            else
-                            {
-                                return Models.Order.OrderStatus.待支付.ToString();
-                            }
+                            return Models.Order.OrderStatus.待生成.ToString();
+                        }
+                        else
+                        {
+                            return Models.Order.OrderStatus.待支付.ToString();
                         }
                     }
                 }
