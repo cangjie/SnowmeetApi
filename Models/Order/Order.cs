@@ -694,46 +694,52 @@ namespace SnowmeetApi.Models
             get
             {
                 string status = "未定义";
-                if (single_payment == 1)
-                {
 
-                    if (pay_flow_status != null && pay_flow_status.Trim().Equals("待生成"))
+                if (dealed == 1 && pay_flow_status == null)
+                {
+                    if (paidAmount == 0)
                     {
-                        if ((dealed == 0 && totalCharge > 0) || (creditAmount > 0 && paidAmount == 0))
-                        {
-                            return "待生成";
-                        }
+                        return "已下单";
                     }
-                    if (pay_flow_status != null && (pay_flow_status.Trim().Equals("已生成") || pay_flow_status.Trim().Equals("待支付") || pay_flow_status.Trim().Equals("支付中")))
-                    {
-                        if ((dealed == 0 && totalCharge > 0) || (creditAmount > 0 && paidAmount == 0))
-                        {
-                            return "待支付";
-                        }
-                    }
-                    if (paidAmount == 0 && totalCharge > 0 && closed == 1)
-                    {
-                        return "已关闭";
-                    }
-                    if (refundAmount > 0)
-                    {
-                        if (refundAmount < totalCharge)
-                        {
-                            return "部分退款";
-                        }
-                        else
-                        {
-                            return "全额退款";
-                        }
-                    }
-                    if (dealed == 1)
+                    else
                     {
                         return "已完成";
                     }
                 }
+                if (pay_flow_status != null && pay_flow_status.Trim().Equals("待生成"))
+                {
+                    if ((dealed == 0 && totalCharge > 0) || (creditAmount > 0 && paidAmount == 0))
+                    {
+                        return "待生成";
+                    }
+                }
+                if (pay_flow_status != null && (pay_flow_status.Trim().Equals("已生成") || pay_flow_status.Trim().Equals("待支付") || pay_flow_status.Trim().Equals("支付中")))
+                {
+                    if ((dealed == 0 && totalCharge > 0) || (creditAmount > 0 && paidAmount == 0))
+                    {
+                        return "待支付";
+                    }
+                }
+                if (paidAmount == 0 && totalCharge > 0 && closed == 1)
+                {
+                    return "已关闭";
+                }
+                if (refundAmount > 0)
+                {
+                    if (refundAmount < totalCharge)
+                    {
+                        return "部分退款";
+                    }
+                    else
+                    {
+                        return "全额退款";
+                    }
+                }
+                
+
                 return status;
             }
         }
-        
+
     }
 }
