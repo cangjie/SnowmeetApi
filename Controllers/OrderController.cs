@@ -119,8 +119,8 @@ namespace SnowmeetApi.Controllers
                 orderList = orderList.Where(o => o.haveEntrain == isEnterain).ToList();
             }
             if (isPackage != null)
-            { 
-                orderList = orderList.Where(o => o.is_package == ((bool)isPackage? 1:0)).ToList();
+            {
+                orderList = orderList.Where(o => o.is_package == ((bool)isPackage ? 1 : 0)).ToList();
             }
             if (isOnCredit != null)
             {
@@ -593,7 +593,7 @@ namespace SnowmeetApi.Controllers
         [HttpGet]
         public async Task<ActionResult<ApiResult<List<SnowmeetApi.Models.Order>>>> GetOrdersByStaff(int? orderId,
             string? shop, string? type, string? subType, DateTime? startDate, DateTime? endDate, string sessionKey,
-            string? payOption, string sessionType = "wechat_mini_openid",bool? isTest = null, bool? isEnterain = null,
+            string? payOption, string sessionType = "wechat_mini_openid", bool? isTest = null, bool? isEnterain = null,
             bool? isPackage = null, bool? isOnCredit = null, bool? haveDiscount = null, string? status = null)
         {
             StaffController _staffHelper = new StaffController(_db);
@@ -639,11 +639,11 @@ namespace SnowmeetApi.Controllers
                 await UpdateOrder(order, member.id, null, "顾客微信小程序打开待支付订单");
             }
             return Ok(new ApiResult<Models.Order>()
-                {
-                    code = 0,
-                    message = "",
-                    data = order
-                });
+            {
+                code = 0,
+                message = "",
+                data = order
+            });
         }
         [HttpGet("{orderId}")]
         public async Task<ActionResult<ApiResult<SnowmeetApi.Models.Order?>>> GetOrderByStaff(int orderId,
@@ -832,12 +832,23 @@ namespace SnowmeetApi.Controllers
             {
                 return null;
             }
+
             double payAmount = 0;
+            /*
             if (order.single_payment == 1)
             {
                 payAmount = order.totalCharge;
             }
             else if (amount == null)
+            {
+                payAmount = order.totalCharge;
+            }
+            else
+            {
+                payAmount = (double)amount;
+            }
+            */
+            if (amount == null)
             {
                 payAmount = order.totalCharge;
             }
@@ -863,7 +874,7 @@ namespace SnowmeetApi.Controllers
             {
                 needCreateNew = true;
             }
-            else if (order.single_payment == 1 && order.totalCharge != lastPayment.amount)
+            else if (order.totalCharge != lastPayment.amount)
             {
                 needCreateNew = true;
             }
@@ -975,13 +986,10 @@ namespace SnowmeetApi.Controllers
                 message = "订单已关闭";
             }
             double realPayAmount = (amount == null) ? 0 : (double)amount;
-            if (order.single_payment == 1)
+            realPayAmount = order.totalCharge;
+            if (order.paidAmount > 0)
             {
-                realPayAmount = order.totalCharge;
-                if (order.paidAmount > 0)
-                {
-                    message = "订单已经支付过";
-                }
+                message = "订单已经支付过";
             }
             MemberController _memberHelper = new MemberController(_db, _config);
             Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);

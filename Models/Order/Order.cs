@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
+using System.Runtime.ConstrainedExecution;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using NPOI.SS.Formula.PTG;
 
 namespace SnowmeetApi.Models
@@ -31,14 +33,16 @@ namespace SnowmeetApi.Models
         */
         public enum OrderStatus
         {
-            已完成,
-            已支付,
+            已下单,
             待生成,
             待支付,
-            已关闭,
+            部分支付,
+            支付成功,
+            挂账,
             全额退款,
             部分退款,
-            退款失败
+            退款失败,
+            订单关闭
         }
         public enum PayFlowStatus
         {
@@ -105,7 +109,7 @@ namespace SnowmeetApi.Models
         public int valid { get; set; } = 1;
         public DateTime? close_date { get; set; } = null;
         public int supplement { get; set; } = 0;
-        public int single_payment { get; set; } = 1;
+        //public int single_payment { get; set; } = 1;
         public int dealed { get; set; } = 0;
         public string? pay_flow_status { get; set; } = null;
         public int is_test { get; set; } = 0;
@@ -694,49 +698,56 @@ namespace SnowmeetApi.Models
             get
             {
                 string status = "未定义";
-
-                if (dealed == 1 && pay_flow_status == null)
+                if (dealed == 0)
                 {
-                    if (paidAmount == 0)
+                    if (current_pay_method.Trim().Equals("微信支付") || current_pay_method.Trim().Equals("支付宝"))
                     {
-                        return "已下单";
+                        List<OrderPayment> unPaidAutoPayments = payments.Where(p => p.valid == 1
+                            && (p.pay_method.Trim().Equals("微信支付") || p.pay_method.Trim().Equals("支付宝"))).ToList();
+                        if (paidAmount == 0 && totalCharge > 0)
+                        {
+                            if (unPaidAutoPayments.Count == 0)
+                            {
+                                return Models.Order.OrderStatus.待生成.ToString();
+                            }
+                            else
+                            {
+                                return Models.Order.OrderStatus.待支付.ToString();
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    if ((paidAmount == 0 || totalCharge == 0) && pay_flow_status == null)
+                    {
+                        status = Models.Order.OrderStatus.已下单.ToString();
+                    }
+                    else if (paidAmount == totalCharge)
+                    {
+                        status = Models.Order.OrderStatus.支付成功.ToString();
+                    }
+                    else if (paidAmount < totalCharge)
+                    {
+                        status = Models.Order.OrderStatus.部分支付.ToString();
+                    }
+                    else if (refundAmount == paidAmount)
+                    {
+                        status = Models.Order.OrderStatus.全额退款.ToString();
+                    }
+                    else if (refundAmount < paidAmount)
+                    {
+                        status = Models.Order.OrderStatus.部分支付.ToString();
                     }
                     else
                     {
-                        return "已完成";
+                        if (refunds.Count > 0 && refundAmount == 0)
+                        {
+                            status = Models.Order.OrderStatus.退款失败.ToString();
+                        }
                     }
+                    return status;
                 }
-                if (pay_flow_status != null && pay_flow_status.Trim().Equals("待生成"))
-                {
-                    if ((dealed == 0 && totalCharge > 0) || (creditAmount > 0 && paidAmount == 0))
-                    {
-                        return "待生成";
-                    }
-                }
-                if (pay_flow_status != null && (pay_flow_status.Trim().Equals("已生成") || pay_flow_status.Trim().Equals("待支付") || pay_flow_status.Trim().Equals("支付中")))
-                {
-                    if ((dealed == 0 && totalCharge > 0) || (creditAmount > 0 && paidAmount == 0))
-                    {
-                        return "待支付";
-                    }
-                }
-                if (paidAmount == 0 && totalCharge > 0 && closed == 1)
-                {
-                    return "已关闭";
-                }
-                if (refundAmount > 0)
-                {
-                    if (refundAmount < totalCharge)
-                    {
-                        return "部分退款";
-                    }
-                    else
-                    {
-                        return "全额退款";
-                    }
-                }
-                
-
                 return status;
             }
         }
