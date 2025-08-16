@@ -633,7 +633,7 @@ namespace SnowmeetApi.Controllers
                     data = null
                 });
             }
-            if (order.pay_flow_status.Trim().Equals("已生成"))
+            if (order.pay_flow_status != null && order.pay_flow_status.Trim().Equals("已生成"))
             {
                 order.pay_flow_status = Models.Order.PayFlowStatus.待支付.ToString();
                 await UpdateOrder(order, member.id, null, "顾客微信小程序打开待支付订单");
