@@ -1147,7 +1147,7 @@ namespace SnowmeetApi.Controllers
             TenpayController _weHelper = new TenpayController(_db, _config, _http);
             List<OrderPayment> payments = await _db.orderPayment
                 .Where(p => p.valid == 1 && (p.pay_method.Trim().Equals("微信支付") || p.pay_method.Trim().Equals("支付宝"))
-                && p.status.Trim().Equals(OrderPayment.PaymentStatus.支付成功.ToString())).ToListAsync();
+                && p.status.Trim().Equals(OrderPayment.PaymentStatus.支付成功.ToString()) && p.order_id == order.id).ToListAsync();
             for (int i = 0; i < payments.Count; i++)
             {
                 OrderPayment payment = payments[i];
