@@ -1145,13 +1145,13 @@ namespace SnowmeetApi.Controllers
             bool canceled = true;
             AliController _aliHelper = new AliController(_db, _config, _http);
             TenpayController _weHelper = new TenpayController(_db, _config, _http);
-            List<OrderPayment> payments = order.availablePayments
-                .Where(p => (p.pay_method.Trim().Equals("微信支付") || p.pay_method.Trim().Equals("支付宝"))
+            List<OrderPayment> payments = order.payments
+                .Where(p => p.valid == 1 && (p.pay_method.Trim().Equals("微信支付") || p.pay_method.Trim().Equals("支付宝"))
                 && !p.status.Trim().Equals(OrderPayment.PaymentStatus.支付成功.ToString())).ToList();
             for (int i = 0; i < payments.Count; i++)
             {
                 OrderPayment payment = payments[i];
-                OrderPayment oriPayment = JsonConvert.DeserializeObject<OrderPayment>(JsonConvert.SerializeObject(payment));
+                OrderPayment oriPayment = await _db.orderPayment.Where(p => p.id == payment.id).AsNoTracking().FirstOrDefaultAsync();
                 switch (payment.pay_method.Trim())
                 {
                     case "支付宝":
