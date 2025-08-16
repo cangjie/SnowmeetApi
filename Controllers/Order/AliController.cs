@@ -798,7 +798,7 @@ namespace SnowmeetApi.Controllers
             AlipayTradeCancelRequest req = new AlipayTradeCancelRequest();
             req.SetBizModel(model);
             AlipayTradeCancelResponse res = client.CertificateExecute(req);
-            if (res.Code.Trim().Equals("1000") && res.Msg.Trim().ToLower().Equals("success"))
+            if (res.Code.Trim().Equals("10000") && res.Msg.Trim().ToLower().Equals("success"))
             {
                 return true;
             }
