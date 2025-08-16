@@ -787,7 +787,7 @@ namespace SnowmeetApi.Controllers
 
         }
         [HttpGet]
-        public async Task<ActionResult<ApiResult<OrderPayment>>> ClosePayment(int paymentId)
+        public async Task<bool> ClosePayment(int paymentId)
         {
             OrderPayment payment = await _db.orderPayment.FindAsync(paymentId);
             AlipayTradeCancelModel model = new AlipayTradeCancelModel()
@@ -798,7 +798,14 @@ namespace SnowmeetApi.Controllers
             AlipayTradeCancelRequest req = new AlipayTradeCancelRequest();
             req.SetBizModel(model);
             AlipayTradeCancelResponse res = client.CertificateExecute(req);
-            return null;
+            if (res.Code.Trim().Equals("1000") && res.Msg.Trim().ToLower().Equals("success"))
+            {
+                return true;
+            }
+            else
+            {
+                return false;
+            }
         }
     }
 }

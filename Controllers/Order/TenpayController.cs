@@ -1715,7 +1715,7 @@ namespace SnowmeetApi.Controllers
             return mchId;
         }
         [HttpGet("{paymentId}")]
-        public async Task<ActionResult<ApiResult<OrderPayment>>> ClosePayment(int paymentId)
+        public async Task<bool> ClosePayment(int paymentId)
         {
             OrderPayment payment = await _db.orderPayment.FindAsync(paymentId);
             WepayKey key = await _db.WepayKeys.Where(k => k.id == payment.mch_id).AsNoTracking().FirstOrDefaultAsync();
@@ -1725,7 +1725,14 @@ namespace SnowmeetApi.Controllers
             req.MerchantId = key.mch_id.Trim();
             WechatTenpayClient client = await GetClient(key.id);
             var res = await client.ExecuteClosePayTransactionAsync(req);
-            return null;
+            if (res.ErrorCode == null && res.ErrorDetail == null)
+            {
+                return true;
+            }
+            else
+            {
+                return false;
+            }
         }
     }
 }

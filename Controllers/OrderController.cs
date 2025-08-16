@@ -1115,5 +1115,101 @@ namespace SnowmeetApi.Controllers
             }
             return order;
         }
+        [HttpGet("{orderId}")]
+        public async Task<ActionResult<ApiResult<Models.Order>>> CancelPaying(int orderId, string sessionKey,
+        string sessionType = "wechat_mini_openid")
+        {
+            StaffController _staffHelper = new StaffController(_db);
+            Staff staff = await _staffHelper.GetStaffBySessionKey(sessionKey, sessionType);
+            if (staff == null && staff.title_level < 100)
+            {
+                return Ok(new ApiResult<object?>()
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = null
+                });
+            }
+            Models.Order order = await GetOrder(orderId);
+            bool needOrderUpdate = false;
+            if (order.current_pay_method != null)
+            {
+                order.current_pay_method = null;
+                needOrderUpdate = true;
+            }
+            if (order.pay_flow_status != null)
+            {
+                order.pay_flow_status = null;
+                needOrderUpdate = true;
+            }
+            bool canceled = true;
+            AliController _aliHelper = new AliController(_db, _config, _http);
+            TenpayController _weHelper = new TenpayController(_db, _config, _http);
+            List<OrderPayment> payments = await _db.orderPayment
+                .Where(p => p.valid == 1 && (p.pay_method.Trim().Equals("微信支付") || p.pay_method.Trim().Equals("支付宝"))
+                && p.status.Trim().Equals(OrderPayment.PaymentStatus.支付成功.ToString())).ToListAsync();
+            for (int i = 0; i < payments.Count; i++)
+            {
+                OrderPayment payment = payments[i];
+                OrderPayment oriPayment = JsonConvert.DeserializeObject<OrderPayment>(JsonConvert.SerializeObject(payment));
+                switch (payment.pay_method.Trim())
+                {
+                    case "支付宝":
+                        if (payment.ali_qr_code != null)
+                        {
+                            canceled = await _aliHelper.ClosePayment(payment.id);
+                        }
+                        break;
+                    case "微信支付":
+                        if (payment.prepay_id != null)
+                        {
+                            canceled = await _weHelper.ClosePayment(payment.id);
+                        }
+                        break;
+                    default:
+                        break;
+                }
+                if (canceled)
+                {
+                    payment.valid = 0;
+                    payment.update_date = DateTime.Now;
+                    List<CoreDataModLog> logs = Util.GetUpdateDifferenceLog<OrderPayment>(oriPayment, payment, null, staff.id, "修改支付方式");
+                    for (int j = 0; j < logs.Count; j++)
+                    {
+                        await _db.coreDataModLog.AddAsync(logs[i]);
+                    }
+                    _db.orderPayment.Entry(payment).State = EntityState.Modified;
+                }
+                else
+                {
+                    break;
+                }
+                //await _db.SaveChangesAsync();
+            }
+            if (canceled)
+            {
+                if (needOrderUpdate)
+                {
+                    await UpdateOrder(order, null, staff.id, "修改支付方式");
+                }
+                await _db.SaveChangesAsync();
+                return Ok(new ApiResult<Models.Order>()
+                {
+                    code = 0,
+                    message = "",
+                    data = order
+                });
+            }
+            else
+            {
+                return Ok(new ApiResult<Models.Order?>()
+                {
+                    code = 1,
+                    message = "订单无法修改",
+                    data = null
+                });
+            }
+        }
     }
+
 }
