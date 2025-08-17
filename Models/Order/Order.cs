@@ -15,6 +15,7 @@ namespace SnowmeetApi.Models
     {
         public enum OrderStatus { 待生成, 待支付, 部分支付, 支付成功, 挂账, 全额退款, 部分退款, 退款失败, 订单关闭, 已下单 }
         public enum PayFlowStatus { 待生成, 已生成, 待支付, 支付中, 已支付, 已关闭, 部分退款, 全额退款 }
+        public enum PayType {整单支付, 分付, 无需支付, 未支付}
         public static void RendOrder(SnowmeetApi.Models.Order order)
         {
             string txtColor = "";
@@ -661,12 +662,36 @@ namespace SnowmeetApi.Models
                 return status;
             }
         }
+        
         [NotMapped]
-        public string paidStatus
+        public string payType
         {
             get
             {
-                return "";
+                string type = Order.PayType.未支付.ToString();
+                if (paidAmount > 0)
+                {
+                    if (availablePayments.Count > 1)
+                    {
+                        type = Order.PayType.分付.ToString();
+                    }
+                    else
+                    {
+                        type = Order.PayType.整单支付.ToString();
+                    }
+                }
+                else
+                {
+                    if (totalCharge == 0)
+                    {
+                        type = Order.PayType.无需支付.ToString();
+                    }
+                    else
+                    {
+                        type = Order.PayType.未支付.ToString();
+                    }
+                }
+                return type;
             }
         }
     }
