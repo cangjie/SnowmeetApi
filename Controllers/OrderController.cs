@@ -1261,7 +1261,8 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<ApiResult<List<CoreDataModLog>>>> GetOrderMemoLog(int orderId)
         {
             List<CoreDataModLog> logs = await _db.coreDataModLog.Where(l => l.table_name.ToLower().Equals("order")
-                && l.key_value == orderId && l.field_name.Trim().Equals("memo")).AsNoTracking()
+                && l.key_value == orderId && l.field_name.Trim().Equals("memo"))
+                .Include(l => l.staff).Include(l => l.member).AsNoTracking()
                 .OrderByDescending(l => l.id).ToListAsync();
             return Ok(new ApiResult<List<CoreDataModLog>>()
             {
