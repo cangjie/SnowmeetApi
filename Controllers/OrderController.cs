@@ -28,27 +28,27 @@ namespace SnowmeetApi.Controllers
         [NonAction]
         public async Task<SnowmeetApi.Models.Order> GetOrder(int orderId)
         {
-            SnowmeetApi.Models.Order order = await _db.order.FindAsync(orderId);
+            SnowmeetApi.Models.Order order = await _db.order.Where(o => o.id == orderId).AsNoTracking().FirstOrDefaultAsync();
             if (order == null)
             {
                 return null;
             }
-            order.retails = await _db.order.Entry(order).Collection(o => o.retails).Query().Where(r => r.valid == 1).ToListAsync();
-            order.cares = await _db.order.Entry(order).Collection(o => o.cares).Query().Include(c => c.tasks).ToListAsync();
+            order.retails = await _db.order.Entry(order).Collection(o => o.retails).Query().Where(r => r.valid == 1).AsNoTracking().ToListAsync();
+            order.cares = await _db.order.Entry(order).Collection(o => o.cares).Query().Include(c => c.tasks).AsNoTracking().ToListAsync();
             order.fdOrders = await _db.order.Entry(order).Collection(o => o.fdOrders).Query()
-                .Where(r => r.valid == 1)
+                .Where(r => r.valid == 1).AsNoTracking()
                 .Include(f => f.product).ThenInclude(p => p.category)
-                .Include(f => f.discounts.Where(d => d.valid == 1 && d.biz_type.Trim().Equals("餐饮"))).ToListAsync();
-            order.rentals = await _db.order.Entry(order).Collection(o => o.rentals).Query()
-                .Include(r => r.discounts.Where(d => d.valid == 1 && d.biz_type.Trim().Equals("租赁")))
-                .Include(r => r.details.Where(d => d.valid == 1))
+                .Include(f => f.discounts.Where(d => d.valid == 1 && d.biz_type.Trim().Equals("餐饮"))).AsNoTracking().ToListAsync();
+            order.rentals = await _db.order.Entry(order).Collection(o => o.rentals).Query().AsNoTracking()
+                .Include(r => r.discounts.Where(d => d.valid == 1 && d.biz_type.Trim().Equals("租赁"))).AsNoTracking()
+                .Include(r => r.details.Where(d => d.valid == 1)).AsNoTracking()
                 .Include(r => r.rentItems.Where(i => i.valid == 1))
                     .ThenInclude(r => r.repairationCharge)
                 .Include(r => r.rentItems.Where(i => i.valid == 1))
                     .ThenInclude(i => i.logs.Where(l => l.table_name.Trim().Equals("rent_item")).OrderByDescending(o => o.id))
                         .ThenInclude(l => l.staff)
                 .Include(r => r.guaranties.Where(g => g.valid == 1 && g.biz_type.Trim().Equals("租赁"))).ThenInclude(g => g.guarantyPayments).ThenInclude(g => g.payment)
-                .ToListAsync();
+                .AsNoTracking().ToListAsync();
             order.discounts = await _db.order.Entry(order).Collection(o => o.discounts).Query().Where(d => d.valid == 1).ToListAsync();
             await _db.order.Entry(order).Reference(o => o.staff).LoadAsync();
             await _db.order.Entry(order).Reference(o => o.member).LoadAsync();
@@ -56,7 +56,7 @@ namespace SnowmeetApi.Controllers
                 .Include(p => p.member).ThenInclude(m => m.memberSocialAccounts)
                 .Include(p => p.staff)
                 .Include(p => p.refunds).ThenInclude(r => r.member)
-                .ToListAsync();
+                .AsNoTracking().ToListAsync();
             return order;
         }
         [NonAction]
