@@ -22,7 +22,9 @@ namespace SnowmeetApi.Models
         public string? manual_memo {get; set;} = null;
         public DateTime create_date {get; set;} = DateTime.Now;
         [ForeignKey("staff_id")]
-        public Staff staff {get; set;}
+        public Staff? staff { get; set; } = null;
+        [ForeignKey("member_id")]
+        public Member? member { get; set; } = null;
         [NotMapped]
         public string simpleMemo 
         {

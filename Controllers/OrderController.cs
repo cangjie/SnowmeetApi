@@ -1221,6 +1221,42 @@ namespace SnowmeetApi.Controllers
                 data = list
             });
         }
+        [HttpGet("{orderId}")]
+        public async Task<ActionResult<ApiResult<List<CoreDataModLog>>>> GetOrderStatusLog(int orderId)
+        {
+            Models.Order order = await _db.order.Where(o => o.id == orderId).Include(o => o.staff).Include(o => o.member)
+                .AsNoTracking().FirstOrDefaultAsync();
+            if (order == null)
+            {
+                return Ok(new ApiResult<object?>()
+                {
+                    code = 1,
+                    message = "未找到订单",
+                    data = null
+                });
+            }
+            List<CoreDataModLog> logs = await _db.coreDataModLog.Where(c => (c.table_name.ToLower().Equals("order")
+                && c.key_value == orderId && c.field_name.ToString().Trim().ToLower().Equals("orderstatus")))
+                .Include(c => c.staff).Include(c => c.member)
+                .OrderByDescending(c => c.id).AsNoTracking().ToListAsync();
+            CoreDataModLog startLog = new CoreDataModLog()
+            {
+                id = 0,
+                current_value = "待生成",
+                create_date = order.biz_date,
+                staff_id = order.staff_id,
+                staff = order.staff,
+                member_id = order.member_id,
+                member = order.member
+            };
+            logs.Add(startLog);
+            return Ok(new ApiResult<List<CoreDataModLog>>()
+            {
+                code = 0,
+                message = "",
+                data = logs
+            });
+        }
     }
 
 }
