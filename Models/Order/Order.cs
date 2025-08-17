@@ -13,7 +13,7 @@ namespace SnowmeetApi.Models
     [Table("order")]
     public class Order
     {
-        public enum OrderStatus { 待生成, 待支付, 部分支付, 支付成功, 挂账, 全额退款, 部分退款, 退款失败, 订单关闭, 已下单 }
+        public enum OrderStatus { 待生成, 待支付, 部分支付, 支付成功, 挂账, 全额退款, 部分退款, 退款失败, 关闭, 已下单, 已完成 }
         public enum PayFlowStatus { 待生成, 已生成, 待支付, 支付中, 已支付, 已关闭, 部分退款, 全额退款 }
         public enum PayType {整单支付, 分付, 无需支付, 未支付}
         public static void RendOrder(SnowmeetApi.Models.Order order)
@@ -537,71 +537,6 @@ namespace SnowmeetApi.Models
                 return discounts.Count > 0;
             }
         }
-        /*
-        [NotMapped]
-        public string orderStatus
-        {
-            get
-            {
-                string status = "未定义";
-                if (dealed == 0)
-                {
-                    List<OrderPayment> unPaidAutoPayments = payments.Where(p => p.valid == 1
-                        && (p.pay_method.Trim().Equals("微信支付") || p.pay_method.Trim().Equals("支付宝"))).ToList();
-                    if (paidAmount == 0 && totalCharge > 0)
-                    {
-                        if (unPaidAutoPayments.Count == 0)
-                        {
-                            if (current_pay_method != null && current_pay_method.Equals("微信支付"))
-                            {
-                                return Models.Order.OrderStatus.待支付.ToString();
-                            }
-                            else
-                            {
-                                return Models.Order.OrderStatus.待生成.ToString();
-                            }
-                        }
-                        else
-                        {
-                            return Models.Order.OrderStatus.待支付.ToString();
-                        }
-                    }
-                }
-                else
-                {
-                    if ((paidAmount == 0 || totalCharge == 0) && pay_flow_status == null)
-                    {
-                        status = Models.Order.OrderStatus.已下单.ToString();
-                    }
-                    else if (paidAmount == totalCharge)
-                    {
-                        status = Models.Order.OrderStatus.支付成功.ToString();
-                    }
-                    else if (paidAmount < totalCharge)
-                    {
-                        status = Models.Order.OrderStatus.部分支付.ToString();
-                    }
-                    else if (refundAmount == paidAmount)
-                    {
-                        status = Models.Order.OrderStatus.全额退款.ToString();
-                    }
-                    else if (refundAmount < paidAmount)
-                    {
-                        status = Models.Order.OrderStatus.部分支付.ToString();
-                    }
-                    else
-                    {
-                        if (refunds.Count > 0 && refundAmount == 0)
-                        {
-                            status = Models.Order.OrderStatus.退款失败.ToString();
-                        }
-                    }
-                    return status;
-                }
-                return status;
-            }
-        }
-        */
         [NotMapped]
         public string orderStatus
         {
@@ -630,6 +565,10 @@ namespace SnowmeetApi.Models
                             {
                                 status = OrderStatus.待支付.ToString();
                             }
+                        }
+                        if (closed == 1)
+                        {
+                            status = OrderStatus.关闭.ToString();
                         }
                     }
                     else
@@ -687,7 +626,7 @@ namespace SnowmeetApi.Models
                         type = Order.PayType.无需支付.ToString();
                     }
                     else
-                    {
+                    { 
                         type = Order.PayType.未支付.ToString();
                     }
                 }
