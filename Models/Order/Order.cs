@@ -13,48 +13,8 @@ namespace SnowmeetApi.Models
     [Table("order")]
     public class Order
     {
-        /*
-        public enum OrderTag
-        {
-            无效订单,
-            已关闭,
-            部分支付,
-            支付完成,
-            挂账,
-            未支付,
-            已平账,
-            部分平账,
-            招待,
-            部分招待,
-            整单招待,
-            减免,
-            支付中
-        }
-        */
-        public enum OrderStatus
-        {
-            已下单,
-            待生成,
-            待支付,
-            部分支付,
-            支付成功,
-            挂账,
-            全额退款,
-            部分退款,
-            退款失败,
-            订单关闭
-        }
-        public enum PayFlowStatus
-        {
-            待生成,
-            已生成,
-            待支付,
-            支付中,
-            已支付,
-            已关闭,
-            部分退款,
-            全额退款
-        }
+        public enum OrderStatus {待生成, 待支付, 部分支付, 支付成功, 挂账, 全额退款, 部分退款, 退款失败, 订单关闭, 已下单}
+        public enum PayFlowStatus {待生成, 已生成, 待支付, 支付中, 已支付, 已关闭, 部分退款, 全额退款}
         public static void RendOrder(SnowmeetApi.Models.Order order)
         {
             string txtColor = "";
@@ -512,122 +472,6 @@ namespace SnowmeetApi.Models
                 return ret;
             }
         }
-        /*
-        [NotMapped]
-        public List<string> tags
-        {
-            get
-            {
-                List<string> tags = new List<string>();
-                if (valid == 0)
-                {
-                    tags.Add(OrderTag.无效订单.ToString());
-                    return tags;
-                }
-                else
-                {
-                    if (closed == 1)
-                    {
-                        tags.Add(OrderTag.已关闭.ToString());
-                    }
-                    if (discountAmount > 0)
-                    {
-                        tags.Add(OrderTag.减免.ToString());
-                    }
-                    if (debts.Count > 0)
-                    {
-                        tags.Add(OrderTag.挂账.ToString());
-                        bool allPaid = true;
-                        bool havePaid = false;
-                        List<OrderPayment> pL = availablePayments
-                            .Where(p => p.status.Equals(OrderPayment.PaymentStatus.支付成功.ToString())).ToList();
-                        for (int i = 0; i < debts.Count; i++)
-                        {
-                            if (pL.Where(p => p.reference_debt_id == debts[i].id).ToList().Count > 0)
-                            {
-                                havePaid = true;
-                            }
-                            else
-                            {
-                                allPaid = false;
-                            }
-                        }
-                        if (havePaid)
-                        {
-                            if (allPaid)
-                            {
-                                tags.Add(OrderTag.已平账.ToString());
-                            }
-                            else
-                            {
-                                tags.Add(OrderTag.部分平账.ToString());
-                            }
-                        }
-                        else
-                        {
-                            tags.Add(OrderTag.未支付.ToString());
-                        }
-                    }
-                   
-                    bool haveEntrain = false;
-                    bool allEntrain = true;
-                    for (int i = 0; fdOrders != null && i < fdOrders.Count; i++)
-                    {
-                        FdOrder fd = fdOrders[i];
-                        if (fd.valid == 1 && fd.order_type.Trim().Equals("招待"))
-                        {
-                            haveEntrain = true;
-                        }
-                        else
-                        {
-                            allEntrain = false;
-                        }
-                    }
-                    if (haveEntrain)
-                    {
-                        tags.Add(OrderTag.招待.ToString());
-                        if (allEntrain)
-                        {
-                            tags.Add(OrderTag.整单招待.ToString());
-                        }
-                        else
-                        {
-                            tags.Add(OrderTag.部分招待.ToString());
-                        }
-                    }
-                    if (single_payment == 1)
-                    {
-                        if (dealed == 1 && paidAmount >= totalCharge)
-                        {
-                            tags.Add(OrderTag.支付完成.ToString());
-                        }
-                    }
-                }
-                return tags;
-            }
-        }
-        */
-        /*
-        public bool MatchTag(List<string> searchTags)
-        {
-            bool isMatch = true;
-            List<string> orderTags = tags;
-            foreach (string searchTag in searchTags)
-            {
-                bool find = false;
-                if (orderTags.Contains(searchTag))
-                {
-                    find = true;
-                }
-                if (!find)
-                {
-                    return false;
-                }
-            }
-            return isMatch;
-        }
-        */
-
         [NotMapped]
         public bool haveEntrain
         {
@@ -692,6 +536,7 @@ namespace SnowmeetApi.Models
                 return discounts.Count > 0;
             }
         }
+        /*
         [NotMapped]
         public string orderStatus
         {
@@ -711,7 +556,7 @@ namespace SnowmeetApi.Models
                                 return Models.Order.OrderStatus.待支付.ToString();
                             }
                             else
-                            { 
+                            {
                                 return Models.Order.OrderStatus.待生成.ToString();
                             }
                         }
@@ -755,6 +600,71 @@ namespace SnowmeetApi.Models
                 return status;
             }
         }
-
+        */
+        [NotMapped]
+        public string orderStatus
+        {
+            get
+            {
+                string status = "未定义";
+                if (totalCharge == 0)
+                {
+                    status = OrderStatus.已下单.ToString();
+                }
+                else
+                {
+                    if (paidAmount == 0)
+                    {
+                        if (dealed == 1)
+                        {
+                            status = OrderStatus.已下单.ToString();
+                        }
+                        else
+                        {
+                            if (pay_flow_status == null)
+                            {
+                                status = OrderStatus.待生成.ToString();
+                            }
+                            else
+                            {
+                                status = OrderStatus.待支付.ToString();
+                            }
+                        }
+                    }
+                    else
+                    {
+                        if (paidAmount < totalCharge)
+                        {
+                            status = OrderStatus.部分支付.ToString();
+                        }
+                        else
+                        {
+                            status = OrderStatus.支付成功.ToString();
+                        }
+                        if (refundAmount < paidAmount)
+                        {
+                            status = OrderStatus.部分退款.ToString();
+                        }
+                        else
+                        {
+                            status = OrderStatus.全额退款.ToString();
+                        }
+                        if (debts.Count > 0)
+                        { 
+                            status = OrderStatus.挂账.ToString();
+                        }
+                    }
+                }
+                return status;
+            }
+        }
+        [NotMapped]
+        public string paidStatus
+        {
+            get
+            {
+                return "";
+            }
+        }
     }
 }
