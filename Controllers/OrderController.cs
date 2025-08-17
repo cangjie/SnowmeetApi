@@ -533,8 +533,6 @@ namespace SnowmeetApi.Controllers
                 default:
                     break;
             }
-            //order.waiting_for_pay = 0;
-            //await GenerateOrderCode(order);
             if (_http.HttpContext.Request.Host.Value != null
                 && _http.HttpContext.Request.Host.Value.Equals("mini.snowmeet.top"))
             {
@@ -1209,6 +1207,19 @@ namespace SnowmeetApi.Controllers
                     data = null
                 });
             }
+        }
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<object>>> GetUnCommonPayMethod()
+        {
+            var list = await _db.orderPayment.FromSqlRaw(" select distinct pay_method from order_payment where valid = 1 and status = '"
+                + OrderPayment.PaymentStatus.支付成功.ToString() + "' and pay_method not in ('微信支付','支付宝','京东收银','POS机刷卡', '现金') ")
+                .AsNoTracking().Select(p => p.pay_method).ToListAsync();
+            return Ok(new ApiResult<object>()
+            {
+                code = 0,
+                message = "",
+                data = list
+            });
         }
     }
 
