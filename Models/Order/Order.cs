@@ -13,7 +13,7 @@ namespace SnowmeetApi.Models
     [Table("order")]
     public class Order
     {
-        public enum OrderStatus { 待生成, 待支付, 部分支付, 支付成功, 挂账, 全额退款, 部分退款, 退款失败, 关闭, 已下单, 已完成 }
+        public enum OrderStatus { 待生成, 待支付, 部分支付, 支付成功, 挂账, 全额退款, 部分退款, 退款失败, 订单关闭, 已下单, 已完成 }
         public enum PayFlowStatus { 待生成, 已生成, 待支付, 支付中, 已支付, 已关闭, 部分退款, 全额退款 }
         public enum PayType {整单支付, 分付, 无需支付, 未支付}
         public static void RendOrder(SnowmeetApi.Models.Order order)
@@ -568,7 +568,7 @@ namespace SnowmeetApi.Models
                         }
                         if (closed == 1)
                         {
-                            status = OrderStatus.关闭.ToString();
+                            status = OrderStatus.订单关闭.ToString();
                         }
                     }
                     else
