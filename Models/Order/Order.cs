@@ -13,8 +13,8 @@ namespace SnowmeetApi.Models
     [Table("order")]
     public class Order
     {
-        public enum OrderStatus {待生成, 待支付, 部分支付, 支付成功, 挂账, 全额退款, 部分退款, 退款失败, 订单关闭, 已下单}
-        public enum PayFlowStatus {待生成, 已生成, 待支付, 支付中, 已支付, 已关闭, 部分退款, 全额退款}
+        public enum OrderStatus { 待生成, 待支付, 部分支付, 支付成功, 挂账, 全额退款, 部分退款, 退款失败, 订单关闭, 已下单 }
+        public enum PayFlowStatus { 待生成, 已生成, 待支付, 支付中, 已支付, 已关闭, 部分退款, 全额退款 }
         public static void RendOrder(SnowmeetApi.Models.Order order)
         {
             string txtColor = "";
@@ -641,16 +641,19 @@ namespace SnowmeetApi.Models
                         {
                             status = OrderStatus.支付成功.ToString();
                         }
-                        if (refundAmount < paidAmount)
+                        if (refundAmount > 0)
                         {
-                            status = OrderStatus.部分退款.ToString();
-                        }
-                        else
-                        {
-                            status = OrderStatus.全额退款.ToString();
+                            if (refundAmount < paidAmount)
+                            {
+                                status = OrderStatus.部分退款.ToString();
+                            }
+                            else
+                            {
+                                status = OrderStatus.全额退款.ToString();
+                            }
                         }
                         if (debts.Count > 0)
-                        { 
+                        {
                             status = OrderStatus.挂账.ToString();
                         }
                     }
