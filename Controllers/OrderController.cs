@@ -139,7 +139,7 @@ namespace SnowmeetApi.Controllers
         [NonAction]
         public async Task<SnowmeetApi.Models.Order> UpdateOrder(SnowmeetApi.Models.Order order, int? memberId, int? staffId, string scene)
         {
-            SnowmeetApi.Models.Order oriOrder = await _db.order.Where(o => o.id == order.id).AsNoTracking().FirstOrDefaultAsync();
+            SnowmeetApi.Models.Order oriOrder = await GetOrder(order.id);
             if (order.code == null && order.valid == 1)
             {
                 await GenerateOrderCode(order);
@@ -1256,6 +1256,12 @@ namespace SnowmeetApi.Controllers
                 message = "",
                 data = logs
             });
+        }
+        [HttpGet("{orderId}")]
+        public async Task<ActionResult<ApiResult<List<CoreDataModLog>>>> GetOrderMemoLog(int orderId)
+        {
+
+            return null;
         }
     }
 
