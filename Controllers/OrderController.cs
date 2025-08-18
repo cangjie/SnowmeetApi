@@ -1176,6 +1176,21 @@ namespace SnowmeetApi.Controllers
             //Models.Order order = await GetOrder(orderId);
             order.dealed = 1;
             order.pay_flow_status = Models.Order.PayFlowStatus.已支付.ToString();
+            CoreDataModLog log = new CoreDataModLog()
+            {
+                table_name = "Order",
+                field_name = "OrderState",
+                key_value = order.id,
+                prev_value = null,
+                current_value = Models.Order.OrderStatus.支付成功.ToString(),
+                staff_id = null,
+                is_manual = 1,
+                scene = "支付成功",
+                create_date = DateTime.Now
+
+            };
+            await _db.coreDataModLog.AddAsync(log);
+            await _db.SaveChangesAsync();
             await UpdateOrder(order, null, null, "支付成功");
         }
         [HttpGet]
