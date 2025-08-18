@@ -1031,15 +1031,24 @@ namespace SnowmeetApi.Controllers
                 });
             }
             Models.Order order = await GetOrder(orderId);
-            if (order.dealed != 0)
-            {
+            if (order.paidAmount >= order.totalCharge)
+            { 
                 return Ok(new ApiResult<object?>()
                 {
                     code = 1,
-                    message = "无效订单",
+                    message = "订单已支付",
                     data = null
                 });
             }
+            if (order.dealed != 0)
+                {
+                    return Ok(new ApiResult<object?>()
+                    {
+                        code = 1,
+                        message = "无效订单",
+                        data = null
+                    });
+                }
             OrderPayment payment;
             if (payLater)
             {
