@@ -1353,20 +1353,9 @@ namespace SnowmeetApi.Controllers
                 });
             }
             List<CoreDataModLog> logs = await _db.coreDataModLog.Where(c => (c.table_name.ToLower().Equals("order")
-                && c.key_value == orderId && c.field_name.ToString().Trim().ToLower().Equals("orderstatus")))
+                && c.key_value == orderId && c.field_name.ToString().Trim().ToLower().Equals("orderstate")))
                 .Include(c => c.staff).Include(c => c.member)
                 .OrderByDescending(c => c.id).AsNoTracking().ToListAsync();
-            CoreDataModLog startLog = new CoreDataModLog()
-            {
-                id = 0,
-                current_value = "待生成",
-                create_date = order.biz_date,
-                staff_id = order.staff_id,
-                staff = order.staff,
-                member_id = order.member_id,
-                member = order.member
-            };
-            logs.Add(startLog);
             return Ok(new ApiResult<List<CoreDataModLog>>()
             {
                 code = 0,
