@@ -1183,32 +1183,33 @@ namespace SnowmeetApi.Controllers
         {
             DateTime startTime = DateTime.Now;
             Models.Order order = await _db.order.FindAsync(orderId);
+            if (order.dealed == 1)
+            {
+                order.queryed = 1;
+                order.update_date = DateTime.Now;
+                _db.order.Entry(order).State = EntityState.Modified;
+                await _db.SaveChangesAsync();
+                return order;
+            }
             OrderPayment payment = await _db.orderPayment.Where(p => p.order_id == orderId && p.valid == 1 && p.queryed == 0
                  && p.status.Trim().Equals(OrderPayment.PaymentStatus.支付成功.ToString())
                  && p.paid_date > DateTime.Now.AddHours(-4))
                  .OrderByDescending(p => p.id).FirstOrDefaultAsync();
             
-            for (; (payment == null && (DateTime.Now - startTime).Seconds <= 3600 && order.dealed == 0);)
+            for (; (payment == null && (DateTime.Now - startTime).Seconds <= 3600);)
             {
                 Thread.Sleep(1000);
                 payment = await _db.orderPayment.Where(p => p.order_id == orderId && p.valid == 1 && p.queryed == 0
                  && p.status.Trim().Equals(OrderPayment.PaymentStatus.支付成功.ToString())
                  && p.paid_date > DateTime.Now.AddHours(-4))
                  .OrderByDescending(p => p.id).FirstOrDefaultAsync();
-
             }
             if (payment != null)
             {
                 payment.queryed = 1;
                 _db.orderPayment.Entry(payment).State = EntityState.Modified;
                 await _db.SaveChangesAsync();
-            }
-            else
-            {
-                order.queryed = 1;
-                order.update_date = DateTime.Now;
-                await UpdateOrder(order, null, null, "餐厅下单");
-            }
+            } 
             return order;
         }
         [HttpGet("{orderId}")]
