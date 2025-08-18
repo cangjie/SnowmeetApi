@@ -1254,13 +1254,13 @@ namespace SnowmeetApi.Controllers
                     case "支付宝":
                         if (payment.ali_qr_code != null)
                         {
-                            canceled = await _aliHelper.ClosePayment(payment.id);
+                            canceled = await _aliHelper.ClosePayment(payment);
                         }
                         break;
                     case "微信支付":
                         if (payment.prepay_id != null)
                         {
-                            canceled = await _weHelper.ClosePayment(payment.id);
+                            canceled = await _weHelper.ClosePayment(payment);
                         }
                         break;
                     default:

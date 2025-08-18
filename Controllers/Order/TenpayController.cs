@@ -1738,9 +1738,9 @@ namespace SnowmeetApi.Controllers
             return mchId;
         }
         [HttpGet("{paymentId}")]
-        public async Task<bool> ClosePayment(int paymentId)
+        public async Task<bool> ClosePayment(OrderPayment payment)
         {
-            OrderPayment payment = await _db.orderPayment.FindAsync(paymentId);
+            //OrderPayment payment = await _db.orderPayment.FindAsync(paymentId);
             WepayKey key = await _db.WepayKeys.Where(k => k.id == payment.mch_id).AsNoTracking().FirstOrDefaultAsync();
             int mchId = (int)payment.mch_id;
             var req = new ClosePayTransactionRequest();

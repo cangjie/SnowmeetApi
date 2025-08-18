@@ -818,9 +818,9 @@ namespace SnowmeetApi.Controllers
 
         }
         [HttpGet]
-        public async Task<bool> ClosePayment(int paymentId)
+        public async Task<bool> ClosePayment(OrderPayment payment)
         {
-            OrderPayment payment = await _db.orderPayment.FindAsync(paymentId);
+            //OrderPayment payment = await _db.orderPayment.Where(p => p.id == pay)
             AlipayTradeCancelModel model = new AlipayTradeCancelModel()
             {
                 OutTradeNo = payment.out_trade_no,
