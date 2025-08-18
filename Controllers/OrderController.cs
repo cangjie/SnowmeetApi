@@ -1343,6 +1343,7 @@ namespace SnowmeetApi.Controllers
                 data = list
             });
         }
+        /*
         [HttpGet("{orderId}")]
         public async Task<ActionResult<ApiResult<List<CoreDataModLog>>>> GetOrderStatusLog(int orderId)
         {
@@ -1382,6 +1383,7 @@ namespace SnowmeetApi.Controllers
                 data = logs
             });
         }
+        */
         [HttpGet("{key}")]
         public async Task<ActionResult<ApiResult<List<CoreDataModLog>>>> LoadLogs(string tableName, string fieldName, int key)
         {
