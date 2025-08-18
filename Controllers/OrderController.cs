@@ -1083,7 +1083,7 @@ namespace SnowmeetApi.Controllers
                 _db.order.Entry(order).State = EntityState.Modified;
                 await _db.SaveChangesAsync();
             }
-            await DealSuccessPaidOrder(orderId);
+            await DealSuccessPaidOrder(order);
             return Ok(new ApiResult<Models.Order>()
             {
                 code = 0,
@@ -1092,9 +1092,9 @@ namespace SnowmeetApi.Controllers
             });
         }
         [NonAction]
-        public async Task DealSuccessPaidOrder(int orderId)
+        public async Task DealSuccessPaidOrder(Models.Order order)
         {
-            Models.Order order = await GetOrder(orderId);
+            //Models.Order order = await GetOrder(orderId);
             order.dealed = 1;
             order.pay_flow_status = Models.Order.PayFlowStatus.已支付.ToString();
             await UpdateOrder(order, null, null, "支付成功");

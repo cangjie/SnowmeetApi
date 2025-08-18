@@ -402,7 +402,7 @@ namespace SnowmeetApi.Controllers
                                 _db.OrderPayment.Entry(sucPay).State = EntityState.Modified;
                                 await _db.SaveChangesAsync();
                                 OrderController _orderHelper = new OrderController(_db, _oriConfig, _http);
-                                await _orderHelper.DealSuccessPaidOrder(order.id);
+                                await _orderHelper.DealSuccessPaidOrder(order);
                             }
                             //await SetTenpayPaymentSuccess(outTradeNumber);
                         }
