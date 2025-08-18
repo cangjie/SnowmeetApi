@@ -357,7 +357,7 @@ namespace SnowmeetApi.Controllers
 
                 var client = new WechatTenpayClient(options);
                 //Exception? verifyErr;
-                bool valid = client.VerifyEventSignature(timeStamp, nonce, postJson, paySign, serial );
+                bool valid = client.VerifyEventSignature(timeStamp, nonce, postJson, paySign, serial);
 
                 if (valid)
                 {
@@ -384,10 +384,32 @@ namespace SnowmeetApi.Controllers
                         {
 
                         }
-                        OrderPayment sucPay = await _db.OrderPayment.Where(p => (p.out_trade_no.Trim().Equals(outTradeNumber.Trim()) && p.status.Trim().Equals("待支付")))
-                            .OrderByDescending(p => p.id).FirstAsync();
+                        OrderPayment sucPay = await _db.OrderPayment.Where(p => (p.out_trade_no.Trim().Equals(outTradeNumber.Trim())
+                            && p.status.Trim().Equals(OrderPayment.PaymentStatus.待支付.ToString()) && p.pay_method.Trim().Equals("微信支付")))
+                            .OrderByDescending(p => p.id).FirstOrDefaultAsync();
                         if (sucPay != null)
                         {
+                            sucPay.wepay_trans_id = transactionId.Trim();
+                            sucPay.status = OrderPayment.PaymentStatus.支付成功.ToString();
+                            sucPay.update_date = DateTime.Now;
+                            _db.OrderPayment.Entry(sucPay).State = EntityState.Modified;
+                            await _db.SaveChangesAsync();
+                            OrderController _orderHelper = new OrderController(_db, _oriConfig, _http);
+                            await _orderHelper.DealSuccessPaidOrder(await _orderHelper.GetOrder(sucPay.order_id));
+                            CoreDataModLog log = new CoreDataModLog()
+                            {
+                                table_name = "Order",
+                                field_name = "OrderState",
+                                key_value = sucPay.order_id,
+                                prev_value = null,
+                                current_value = Models.Order.OrderStatus.支付成功.ToString(),
+                                staff_id = null,
+                                is_manual = 1,
+                                create_date = (DateTime)sucPay.update_date
+                            };
+                            await _db.coreDataModLog.AddAsync(log);
+                            await _db.SaveChangesAsync();
+                            /*
                             Models.Order order = await _db.order.FindAsync(sucPay.order_id);
                             bool needDeal = (order.dealed == 0);
                             if (needDeal)
@@ -405,6 +427,7 @@ namespace SnowmeetApi.Controllers
                                 await _orderHelper.DealSuccessPaidOrder(order);
                             }
                             //await SetTenpayPaymentSuccess(outTradeNumber);
+                            */
                         }
 
                         //Console.WriteLine("订单 {0} 已完成支付，交易单号为 {1}", outTradeNumber, transactionId);
@@ -708,7 +731,7 @@ namespace SnowmeetApi.Controllers
                 TransactionId = (string)payment.wepay_trans_id,
                 OutOrderNumber = share.out_trade_no.Trim(),
                 ReceiverList = rl
-               // WechatpayCertificateSerialNumber = key.key_serial.Trim()
+                // WechatpayCertificateSerialNumber = key.key_serial.Trim()
             };
             share.submit_date = DateTime.Now;
             var res = await client.ExecuteCreateProfitSharingOrderAsync(req);

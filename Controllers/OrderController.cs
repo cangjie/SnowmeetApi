@@ -542,7 +542,21 @@ namespace SnowmeetApi.Controllers
             {
                 order.is_test = 1;
             }
+
             await _db.order.AddAsync(order);
+            await _db.SaveChangesAsync();
+            CoreDataModLog log = new CoreDataModLog()
+            {
+                table_name = "Order",
+                field_name = "OrderState",
+                key_value = order.id,
+                prev_value = null,
+                current_value = Models.Order.OrderStatus.待生成.ToString(),
+                staff_id = staff.id,
+                is_manual = 1,
+                create_date = DateTime.Now
+            };
+            await _db.coreDataModLog.AddAsync(log);
             await _db.SaveChangesAsync();
             return Ok(new ApiResult<SnowmeetApi.Models.Order?>()
             {
@@ -957,6 +971,19 @@ namespace SnowmeetApi.Controllers
                 }
                 if (message.Trim().Equals(""))
                 {
+                    CoreDataModLog log = new CoreDataModLog()
+                    {
+                        table_name = "Order",
+                        field_name = "OrderState",
+                        key_value = orderId,
+                        prev_value = null,
+                        current_value = Models.Order.OrderStatus.待支付.ToString(),
+                        staff_id = staff.id,
+                        is_manual = 1,
+                        create_date = DateTime.Now
+                    };
+                    await _db.coreDataModLog.AddAsync(log);
+                    await _db.SaveChangesAsync();
                     return Ok(new ApiResult<string>()
                     {
                         code = 0,
@@ -1032,7 +1059,7 @@ namespace SnowmeetApi.Controllers
             }
             Models.Order order = await GetOrder(orderId);
             if (order.paidAmount >= order.totalCharge)
-            { 
+            {
                 return Ok(new ApiResult<object?>()
                 {
                     code = 1,
@@ -1041,14 +1068,14 @@ namespace SnowmeetApi.Controllers
                 });
             }
             if (order.dealed != 0)
+            {
+                return Ok(new ApiResult<object?>()
                 {
-                    return Ok(new ApiResult<object?>()
-                    {
-                        code = 1,
-                        message = "无效订单",
-                        data = null
-                    });
-                }
+                    code = 1,
+                    message = "无效订单",
+                    data = null
+                });
+            }
             OrderPayment payment;
             if (payLater)
             {
@@ -1062,6 +1089,7 @@ namespace SnowmeetApi.Controllers
                     staff_id = staff.id,
                     create_date = DateTime.Now
                 };
+
             }
             else if (payMethod != null && !payMethod.Trim().Equals("微信支付") && !payMethod.Trim().Equals("支付宝"))
             {
@@ -1089,7 +1117,37 @@ namespace SnowmeetApi.Controllers
             if (payment.amount > 0)
             {
                 await _db.orderPayment.AddAsync(payment);
-                _db.order.Entry(order).State = EntityState.Modified;
+                await _db.SaveChangesAsync();
+                await _db.order.Entry(order).Collection(o => o.payments).LoadAsync();
+                CoreDataModLog log = new CoreDataModLog()
+                {
+                    table_name = "Order",
+                    field_name = "OrderState",
+                    key_value = orderId,
+                    prev_value = null,
+                    current_value = Models.Order.OrderStatus.支付成功.ToString(),
+                    staff_id = staff.id,
+                    is_manual = 1,
+                    create_date = DateTime.Now
+                };
+                await _db.coreDataModLog.AddAsync(log);
+                await _db.SaveChangesAsync();
+                await UpdateOrder(order, null, staff.id, "手动确认支付");
+            }
+            else
+            { 
+                CoreDataModLog log = new CoreDataModLog()
+                {
+                    table_name = "Order",
+                    field_name = "OrderState",
+                    key_value = orderId,
+                    prev_value = null,
+                    current_value = Models.Order.OrderStatus.已下单.ToString(),
+                    staff_id = staff.id,
+                    is_manual = 1,
+                    create_date = DateTime.Now
+                };
+                await _db.coreDataModLog.AddAsync(log);
                 await _db.SaveChangesAsync();
             }
             await DealSuccessPaidOrder(order);
@@ -1279,6 +1337,29 @@ namespace SnowmeetApi.Controllers
                 message = "",
                 data = logs
             });
+        }
+        [HttpGet("{orderId}")]
+        public async Task LogShowWechatQrCode(int orderId, string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            StaffController _staffHelper = new StaffController(_db);
+            Staff staff = await _staffHelper.GetStaffBySessionKey(sessionKey, sessionType);
+            if (staff == null && staff.title_level < 100)
+            {
+                return;
+            }
+            CoreDataModLog log = new CoreDataModLog()
+            {
+                table_name = "Order",
+                field_name = "OrderState",
+                key_value = orderId,
+                prev_value = null,
+                current_value = Models.Order.OrderStatus.待支付.ToString(),
+                staff_id = staff.id,
+                is_manual = 1,
+                create_date = DateTime.Now
+            };
+            await _db.coreDataModLog.AddAsync(log);
+            await _db.SaveChangesAsync();
         }
     }
 

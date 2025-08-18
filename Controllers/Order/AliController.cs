@@ -438,6 +438,36 @@ namespace SnowmeetApi.Controllers
                 case "trade_status_sync":
                     if (callback.tradeStatus.ToUpper().Trim().Equals("TRADE_SUCCESS"))
                     {
+                        OrderPayment payment = await _db.orderPayment.Where(p => p.valid == 1 && p.pay_method.Trim().Equals("支付宝")
+                            && p.out_trade_no.Trim().Equals(callback.outTradeNo.Trim())).OrderByDescending(p => p.id).FirstOrDefaultAsync();
+                        if (payment.status.Trim().Equals(OrderPayment.PaymentStatus.待支付.ToString()))
+                        {
+                            payment.ali_trade_no = callback.tradeNo;
+                            payment.notify_id = callback.notifyId;
+                            payment.paid_date = DateTime.Now;
+                            payment.update_date = DateTime.Now;
+                            payment.ali_buyer_id = callback.buyerId;
+                            payment.status = OrderPayment.PaymentStatus.支付成功.ToString();
+                            payment.update_date = DateTime.Now;
+                            _db.orderPayment.Entry(payment).State = EntityState.Modified;
+                            await _db.SaveChangesAsync();
+                            CoreDataModLog log = new CoreDataModLog()
+                            {
+                                table_name = "Order",
+                                field_name = "OrderState",
+                                key_value = payment.order_id,
+                                prev_value = null,
+                                current_value = Models.Order.OrderStatus.支付成功.ToString(),
+                                staff_id = null,
+                                is_manual = 1,
+                                create_date = (DateTime)payment.update_date
+                            };
+                            await _db.coreDataModLog.AddAsync(log);
+                            await _db.SaveChangesAsync();
+                            OrderController _orderHelper = new OrderController(_db, _oriConfig, _http);
+                            await _orderHelper.DealSuccessPaidOrder(await _orderHelper.GetOrder(payment.order_id));
+                        }
+                        /*
                         List<OrderPayment> payments = await _db.orderPayment
                             .Where(p => p.valid == 1 && p.request_failed == 0 && p.out_trade_no.Trim().Equals(callback.outTradeNo.Trim()))
                             .AsNoTracking().ToListAsync();
@@ -480,6 +510,7 @@ namespace SnowmeetApi.Controllers
                             OrderController _orderHelper = new OrderController(_db, _oriConfig, _http);
                             await _orderHelper.DealSuccessPaidOrder(order);
                         }
+                        */
                     }
                     break;
                 default:
