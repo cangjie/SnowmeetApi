@@ -419,6 +419,29 @@ namespace SnowmeetApi.Controllers
                 return Ok(r);
             }
             scene = Util.UrlDecode(scene);
+            switch (scene)
+            {
+                case "餐厅下单":
+                    if (order.dealed == 1 && order.valid == 1 && order.pay_flow_status == null)
+                    {
+                        CoreDataModLog log = new CoreDataModLog()
+                        {
+                            table_name = "Order",
+                            field_name = "OrderState",
+                            key_value = order.id,
+                            prev_value = null,
+                            current_value = Models.Order.OrderStatus.已下单.ToString(),
+                            staff_id = null,
+                            is_manual = 1,
+                            create_date = DateTime.Now
+                        };
+                        await _db.coreDataModLog.AddAsync(log);
+                        await _db.SaveChangesAsync();
+                    }
+                    break;
+                default:
+                    break;
+            }
             order = await UpdateOrder(order, null, staff.id, scene);
             return Ok(new ApiResult<SnowmeetApi.Models.Order>()
             {
@@ -1138,7 +1161,7 @@ namespace SnowmeetApi.Controllers
                 await UpdateOrder(order, null, staff.id, "手动确认支付");
             }
             else
-            { 
+            {
                 CoreDataModLog log = new CoreDataModLog()
                 {
                     table_name = "Order",
