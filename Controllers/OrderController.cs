@@ -1301,6 +1301,7 @@ namespace SnowmeetApi.Controllers
                     scene = "重新选择支付方式",
                     create_date = DateTime.Now
                 };
+                await _db.coreDataModLog.AddAsync(log);
                 await _db.SaveChangesAsync();
                 return Ok(new ApiResult<Models.Order>()
                 {
