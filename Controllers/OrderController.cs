@@ -433,6 +433,7 @@ namespace SnowmeetApi.Controllers
                             current_value = Models.Order.OrderStatus.已下单.ToString(),
                             staff_id = null,
                             is_manual = 1,
+                            scene = scene,
                             create_date = DateTime.Now
                         };
                         await _db.coreDataModLog.AddAsync(log);
@@ -1160,22 +1161,7 @@ namespace SnowmeetApi.Controllers
                 await _db.SaveChangesAsync();
                 await UpdateOrder(order, null, staff.id, "手动确认支付");
             }
-            else
-            {
-                CoreDataModLog log = new CoreDataModLog()
-                {
-                    table_name = "Order",
-                    field_name = "OrderState",
-                    key_value = orderId,
-                    prev_value = null,
-                    current_value = Models.Order.OrderStatus.已下单.ToString(),
-                    staff_id = staff.id,
-                    is_manual = 1,
-                    create_date = DateTime.Now
-                };
-                await _db.coreDataModLog.AddAsync(log);
-                await _db.SaveChangesAsync();
-            }
+            
             await DealSuccessPaidOrder(order);
             return Ok(new ApiResult<Models.Order>()
             {
