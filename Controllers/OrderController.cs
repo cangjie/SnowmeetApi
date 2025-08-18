@@ -1209,6 +1209,7 @@ namespace SnowmeetApi.Controllers
             order.update_date = DateTime.Now;
             _db.order.Entry(order).State = EntityState.Modified;
             await _db.SaveChangesAsync();
+            order.payments = null;
             return order;
         }
         [HttpGet("{orderId}")]
