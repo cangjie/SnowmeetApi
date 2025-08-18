@@ -1178,7 +1178,7 @@ namespace SnowmeetApi.Controllers
             order.pay_flow_status = Models.Order.PayFlowStatus.已支付.ToString();
             await UpdateOrder(order, null, null, "支付成功");
         }
-        [NonAction]
+        [HttpGet]
         public async Task<Models.Order?> QueryOrderPaid(int orderId)
         {
             DateTime startTime = DateTime.Now;
@@ -1188,7 +1188,7 @@ namespace SnowmeetApi.Controllers
                  && p.paid_date > DateTime.Now.AddHours(-4))
                  .OrderByDescending(p => p.id).FirstOrDefaultAsync();
             
-            for (; (payment == null && (DateTime.Now - startTime).Seconds <= 3600 || order.dealed == 0);)
+            for (; (payment == null && (DateTime.Now - startTime).Seconds <= 3600 && order.dealed == 0);)
             {
                 Thread.Sleep(1000);
                 payment = await _db.orderPayment.Where(p => p.order_id == orderId && p.valid == 1 && p.queryed == 0
@@ -1197,9 +1197,12 @@ namespace SnowmeetApi.Controllers
                  .OrderByDescending(p => p.id).FirstOrDefaultAsync();
 
             }
-            payment.queryed = 1;
-            _db.orderPayment.Entry(payment).State = EntityState.Modified;
-            await _db.SaveChangesAsync();
+            if (payment != null)
+            {
+                payment.queryed = 1;
+                _db.orderPayment.Entry(payment).State = EntityState.Modified;
+                await _db.SaveChangesAsync();
+            }
             return order;
         }
         [HttpGet("{orderId}")]
