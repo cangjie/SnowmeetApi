@@ -1161,7 +1161,7 @@ namespace SnowmeetApi.Controllers
                 await _db.SaveChangesAsync();
                 await UpdateOrder(order, null, staff.id, "手动确认支付");
             }
-            
+
             await DealSuccessPaidOrder(order);
             return Ok(new ApiResult<Models.Order>()
             {
@@ -1183,7 +1183,7 @@ namespace SnowmeetApi.Controllers
         {
             DateTime startTime = DateTime.Now;
             Models.Order order = await _db.order.Where(o => o.id == orderId).AsNoTracking().FirstOrDefaultAsync();
-            
+
             OrderPayment payment = await _db.orderPayment.Where(p => p.order_id == orderId && p.valid == 1 && p.queryed == 0
                  && p.status.Trim().Equals(OrderPayment.PaymentStatus.支付成功.ToString())
                  && p.paid_date > DateTime.Now.AddHours(-4)).AsNoTracking()
@@ -1196,7 +1196,7 @@ namespace SnowmeetApi.Controllers
                  && p.status.Trim().Equals(OrderPayment.PaymentStatus.支付成功.ToString())
                  && p.paid_date > DateTime.Now.AddHours(-4)).AsNoTracking()
                  .OrderByDescending(p => p.id).FirstOrDefaultAsync();
-                 order = await _db.order.Where(o => o.id == orderId).AsNoTracking().FirstOrDefaultAsync();
+                order = await _db.order.Where(o => o.id == orderId).AsNoTracking().FirstOrDefaultAsync();
             }
             if (payment != null)
             {
@@ -1289,6 +1289,18 @@ namespace SnowmeetApi.Controllers
                 {
                     await UpdateOrder(order, null, staff.id, "修改支付方式");
                 }
+                CoreDataModLog log = new CoreDataModLog()
+                {
+                    table_name = "Order",
+                    field_name = "OrderState",
+                    key_value = orderId,
+                    prev_value = null,
+                    current_value = Models.Order.OrderStatus.待生成.ToString(),
+                    staff_id = staff.id,
+                    is_manual = 1,
+                    scene = "重新选择支付方式",
+                    create_date = DateTime.Now
+                };
                 await _db.SaveChangesAsync();
                 return Ok(new ApiResult<Models.Order>()
                 {
