@@ -1382,6 +1382,18 @@ namespace SnowmeetApi.Controllers
                 data = logs
             });
         }
+        [HttpGet("{key}")]
+        public async Task<ActionResult<ApiResult<List<CoreDataModLog>>>> LoadLogs(string tableName, string fieldName, int key)
+        {
+            List<CoreDataModLog> logs = await _db.coreDataModLog.Where(l => l.table_name.ToLower().Trim().Equals(tableName)
+                && l.field_name.ToLower().Trim().Equals(fieldName) && l.key_value == key).OrderByDescending(l => l.id).AsNoTracking().ToListAsync();
+            return Ok(new ApiResult<List<CoreDataModLog>>()
+            {
+                code = 0,
+                message = "",
+                data = logs
+            });
+        }
         [HttpGet("{orderId}")]
         public async Task LogShowWechatQrCode(int orderId, string sessionKey, string sessionType = "wechat_mini_openid")
         {
