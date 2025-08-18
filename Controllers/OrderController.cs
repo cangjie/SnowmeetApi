@@ -554,6 +554,7 @@ namespace SnowmeetApi.Controllers
                 current_value = Models.Order.OrderStatus.待生成.ToString(),
                 staff_id = staff.id,
                 is_manual = 1,
+                scene = "开单",
                 create_date = DateTime.Now
             };
             await _db.coreDataModLog.AddAsync(log);
@@ -980,6 +981,7 @@ namespace SnowmeetApi.Controllers
                         current_value = Models.Order.OrderStatus.待支付.ToString(),
                         staff_id = staff.id,
                         is_manual = 1,
+                        scene = "显示支付宝二维码",
                         create_date = DateTime.Now
                     };
                     await _db.coreDataModLog.AddAsync(log);
@@ -1128,6 +1130,7 @@ namespace SnowmeetApi.Controllers
                     current_value = Models.Order.OrderStatus.支付成功.ToString(),
                     staff_id = staff.id,
                     is_manual = 1,
+                    scene = "手工收款",
                     create_date = DateTime.Now
                 };
                 await _db.coreDataModLog.AddAsync(log);
@@ -1356,6 +1359,7 @@ namespace SnowmeetApi.Controllers
                 current_value = Models.Order.OrderStatus.待支付.ToString(),
                 staff_id = staff.id,
                 is_manual = 1,
+                scene = "显示微信支付二维码",
                 create_date = DateTime.Now
             };
             await _db.coreDataModLog.AddAsync(log);
