@@ -1234,8 +1234,10 @@ namespace SnowmeetApi.Controllers
             }
             Models.Order order = await GetOrder(orderId);
             bool needOrderUpdate = false;
+            bool isFirstSetPayMethod = true;
             if (order.current_pay_method != null)
             {
+                isFirstSetPayMethod = false;
                 order.current_pay_method = null;
                 needOrderUpdate = true;
             }
@@ -1294,26 +1296,29 @@ namespace SnowmeetApi.Controllers
                 {
                     await UpdateOrder(order, null, staff.id, "修改支付方式");
                 }
-                CoreDataModLog log = new CoreDataModLog()
+                if (!isFirstSetPayMethod)
                 {
-                    table_name = "Order",
-                    field_name = "OrderState",
-                    key_value = orderId,
-                    prev_value = null,
-                    current_value = Models.Order.OrderStatus.待生成.ToString(),
-                    staff_id = staff.id,
-                    is_manual = 1,
-                    scene = "重新选择支付方式",
-                    create_date = DateTime.Now
-                };
-                await _db.coreDataModLog.AddAsync(log);
-                await _db.SaveChangesAsync();
+                    CoreDataModLog log = new CoreDataModLog()
+                    {
+                        table_name = "Order",
+                        field_name = "OrderState",
+                        key_value = orderId,
+                        prev_value = null,
+                        current_value = Models.Order.OrderStatus.待生成.ToString(),
+                        staff_id = staff.id,
+                        is_manual = 1,
+                        scene = "重新选择支付方式",
+                        create_date = DateTime.Now
+                    };
+                    await _db.coreDataModLog.AddAsync(log);
+                    await _db.SaveChangesAsync();
+                }
                 return Ok(new ApiResult<Models.Order>()
-                {
-                    code = 0,
-                    message = "",
-                    data = order
-                });
+                    {
+                        code = 0,
+                        message = "",
+                        data = order
+                    });
             }
             else
             {
