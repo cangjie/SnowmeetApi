@@ -395,7 +395,6 @@ namespace SnowmeetApi.Controllers
                             _db.OrderPayment.Entry(sucPay).State = EntityState.Modified;
                             await _db.SaveChangesAsync();
                             OrderController _orderHelper = new OrderController(_db, _oriConfig, _http);
-                            await _orderHelper.DealSuccessPaidOrder(await _orderHelper.GetOrder(sucPay.order_id));
                             CoreDataModLog log = new CoreDataModLog()
                             {
                                 table_name = "Order",
@@ -405,29 +404,13 @@ namespace SnowmeetApi.Controllers
                                 current_value = Models.Order.OrderStatus.支付成功.ToString(),
                                 staff_id = null,
                                 is_manual = 1,
+                                scene = "微信支付成功",
                                 create_date = (DateTime)sucPay.update_date
                             };
                             await _db.coreDataModLog.AddAsync(log);
                             await _db.SaveChangesAsync();
-                            /*
-                            Models.Order order = await _db.order.FindAsync(sucPay.order_id);
-                            bool needDeal = (order.dealed == 0);
-                            if (needDeal)
-                            {
-                                order.dealed = 1;
-                                order.update_date = DateTime.Now;
-                                _db.order.Entry(order).State = EntityState.Modified;
-                                await _db.SaveChangesAsync();
-                                sucPay.wepay_trans_id = transactionId.Trim();
-                                sucPay.status = "支付成功";
-                                sucPay.update_date = DateTime.Now;
-                                _db.OrderPayment.Entry(sucPay).State = EntityState.Modified;
-                                await _db.SaveChangesAsync();
-                                OrderController _orderHelper = new OrderController(_db, _oriConfig, _http);
-                                await _orderHelper.DealSuccessPaidOrder(order);
-                            }
-                            //await SetTenpayPaymentSuccess(outTradeNumber);
-                            */
+                            await _orderHelper.DealSuccessPaidOrder(sucPay.order_id);
+                           
                         }
 
                         //Console.WriteLine("订单 {0} 已完成支付，交易单号为 {1}", outTradeNumber, transactionId);

@@ -460,12 +460,14 @@ namespace SnowmeetApi.Controllers
                                 current_value = Models.Order.OrderStatus.支付成功.ToString(),
                                 staff_id = null,
                                 is_manual = 1,
-                                create_date = (DateTime)payment.update_date
+                                scene = "支付宝支付成功",
+                                create_date = DateTime.Now
+
                             };
                             await _db.coreDataModLog.AddAsync(log);
                             await _db.SaveChangesAsync();
                             OrderController _orderHelper = new OrderController(_db, _oriConfig, _http);
-                            await _orderHelper.DealSuccessPaidOrder(await _orderHelper.GetOrder(payment.order_id));
+                            await _orderHelper.DealSuccessPaidOrder(payment.order_id);
                         }
                         /*
                         List<OrderPayment> payments = await _db.orderPayment
