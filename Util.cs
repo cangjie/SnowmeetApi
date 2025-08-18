@@ -464,26 +464,13 @@ namespace SnowmeetApi
                     case "orderpaid":
                         OrderController _orderH = new OrderController(db, config, http);
                         Models.Order order = await _orderH.QueryOrderPaid((int)post.id);
-                        if (order._paid)
+                        ApiResult<Models.Order> orderResult = new ApiResult<Models.Order>()
                         {
-                            ApiResult<Models.Order> orderResult = new ApiResult<Models.Order>()
-                            {
-                                code = 0,
-                                message = "",
-                                data = order
-                            };
-                            return JsonConvert.SerializeObject(orderResult);
-                        }
-                        else
-                        {
-                            ApiResult<Models.Order?> orderResultOverTime = new ApiResult<Models.Order?>()
-                            {
-                                code = 1,
-                                message = "支付超时",
-                                data = null
-                            };
-                            return JsonConvert.SerializeObject(orderResultOverTime);
-                        }
+                            code = 0,
+                            message = "",
+                            data = order
+                        };
+                        return JsonConvert.SerializeObject(orderResult);
                     default:
                         break;
                 }

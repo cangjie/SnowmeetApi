@@ -67,6 +67,7 @@ namespace SnowmeetApi.Models
         public DateTime biz_date { get; set; } = DateTime.Now;
         public int? staff_id { get; set; }
         public int closed { get; set; } = 0;
+        public int queryed { get; set; } = 0;
         public int valid { get; set; } = 1;
         public DateTime? close_date { get; set; } = null;
         public int supplement { get; set; } = 0;

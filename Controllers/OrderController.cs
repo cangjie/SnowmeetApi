@@ -1182,7 +1182,7 @@ namespace SnowmeetApi.Controllers
         public async Task<Models.Order?> QueryOrderPaid(int orderId)
         {
             DateTime startTime = DateTime.Now;
-            Models.Order order = await GetOrder(orderId);
+            Models.Order order = await _db.order.FindAsync(orderId);
             OrderPayment payment = await _db.orderPayment.Where(p => p.order_id == orderId && p.valid == 1 && p.queryed == 0
                  && p.status.Trim().Equals(OrderPayment.PaymentStatus.支付成功.ToString())
                  && p.paid_date > DateTime.Now.AddHours(-4))
@@ -1202,6 +1202,12 @@ namespace SnowmeetApi.Controllers
                 payment.queryed = 1;
                 _db.orderPayment.Entry(payment).State = EntityState.Modified;
                 await _db.SaveChangesAsync();
+            }
+            else
+            {
+                order.queryed = 1;
+                order.update_date = DateTime.Now;
+                await UpdateOrder(order, null, null, "餐厅下单");
             }
             return order;
         }
