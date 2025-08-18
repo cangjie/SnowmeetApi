@@ -41,6 +41,7 @@ namespace SnowmeetApi.Models
         public string? staff_open_id { get; set; }
         public string? response_data { get; set; } = null;
         public string? ali_buyer_id { get; set; } = null;
+        public int queryed { get; set; } = 0;
         public int? staff_id { get; set; }
         [ForeignKey("staff_id")]
         public Staff? staff {get; set;}
