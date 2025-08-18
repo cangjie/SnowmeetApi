@@ -1194,13 +1194,14 @@ namespace SnowmeetApi.Controllers
                 Thread.Sleep(1000);
                 payment = await _db.orderPayment.Where(p => p.order_id == orderId && p.valid == 1 && p.queryed == 0
                  && p.status.Trim().Equals(OrderPayment.PaymentStatus.支付成功.ToString())
-                 && p.paid_date > DateTime.Now.AddHours(-4))
+                 && p.paid_date > DateTime.Now.AddHours(-4)).AsNoTracking()
                  .OrderByDescending(p => p.id).FirstOrDefaultAsync();
                  order = await _db.order.Where(o => o.id == orderId).AsNoTracking().FirstOrDefaultAsync();
             }
             if (payment != null)
             {
                 payment.queryed = 1;
+                payment.order = null;
                 _db.orderPayment.Entry(payment).State = EntityState.Modified;
                 await _db.SaveChangesAsync();
             }
