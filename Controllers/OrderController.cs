@@ -1182,11 +1182,11 @@ namespace SnowmeetApi.Controllers
         public async Task<Models.Order?> QueryOrderPaid(int orderId)
         {
             DateTime startTime = DateTime.Now;
-            Models.Order order = await _db.order.FindAsync(orderId);
+            Models.Order order = await _db.order.Where(o => o.id == orderId).AsNoTracking().FirstOrDefaultAsync();
             
             OrderPayment payment = await _db.orderPayment.Where(p => p.order_id == orderId && p.valid == 1 && p.queryed == 0
                  && p.status.Trim().Equals(OrderPayment.PaymentStatus.支付成功.ToString())
-                 && p.paid_date > DateTime.Now.AddHours(-4))
+                 && p.paid_date > DateTime.Now.AddHours(-4)).AsNoTracking()
                  .OrderByDescending(p => p.id).FirstOrDefaultAsync();
 
             for (; (payment == null && order.dealed == 0 && (DateTime.Now - startTime).Seconds <= 3600);)
@@ -1196,7 +1196,7 @@ namespace SnowmeetApi.Controllers
                  && p.status.Trim().Equals(OrderPayment.PaymentStatus.支付成功.ToString())
                  && p.paid_date > DateTime.Now.AddHours(-4))
                  .OrderByDescending(p => p.id).FirstOrDefaultAsync();
-                 order = await _db.order.FindAsync(orderId);
+                 order = await _db.order.Where(o => o.id == orderId).AsNoTracking().FirstOrDefaultAsync();
             }
             if (payment != null)
             {
