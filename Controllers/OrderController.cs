@@ -152,6 +152,7 @@ namespace SnowmeetApi.Controllers
             order.update_date = DateTime.Now;
             _db.order.Entry(order).State = EntityState.Modified;
             await _db.SaveChangesAsync();
+            _db.order.Entry(order).State = EntityState.Detached;
             return order;
         }
         [NonAction]
@@ -1084,6 +1085,7 @@ namespace SnowmeetApi.Controllers
                 });
             }
             Models.Order order = await GetOrder(orderId);
+            /*
             if (order.paidAmount >= order.totalCharge)
             {
                 return Ok(new ApiResult<object?>()
@@ -1093,6 +1095,7 @@ namespace SnowmeetApi.Controllers
                     data = null
                 });
             }
+            */
             if (order.dealed != 0)
             {
                 return Ok(new ApiResult<object?>()
