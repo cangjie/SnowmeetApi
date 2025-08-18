@@ -464,7 +464,7 @@ namespace SnowmeetApi
                     case "orderpaid":
                         OrderController _orderH = new OrderController(db, config, http);
                         Models.Order order = await _orderH.QueryOrderPaid((int)post.id);
-                        if (order.dealed == 1)
+                        if (order._paid)
                         {
                             ApiResult<Models.Order> orderResult = new ApiResult<Models.Order>()
                             {

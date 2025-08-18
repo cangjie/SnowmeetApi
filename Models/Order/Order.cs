@@ -75,6 +75,8 @@ namespace SnowmeetApi.Models
         public string? pay_flow_status { get; set; } = null;
         public int is_test { get; set; } = 0;
         public string? current_pay_method { get; set; } = null;
+        [NotMapped]
+        public bool _paid = false;
         public DateTime? update_date { get; set; } = null;
 
         [NotMapped]

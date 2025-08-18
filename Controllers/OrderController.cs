@@ -1183,12 +1183,20 @@ namespace SnowmeetApi.Controllers
         {
             DateTime startTime = DateTime.Now;
             Models.Order order = await _db.order.Where(o => o.id == orderId).AsNoTracking().FirstOrDefaultAsync();
-            order.payments = await _db.orderPayment.Where(p => p.order_id == orderId).AsNoTracking().ToListAsync();
-            for (; order.dealed == 0 && (DateTime.Now - startTime).Seconds <= 3600;)
+            OrderPayment payment = await _db.orderPayment.Where(p => p.order_id == orderId && p.valid == 1
+                 && p.status.Trim().Equals(OrderPayment.PaymentStatus.支付成功) && p.paid_date > DateTime.Now.AddHours(-1))
+                 .OrderByDescending(p => p.id).AsNoTracking().FirstOrDefaultAsync();
+            for (; payment == null && order.dealed == 0 && (DateTime.Now - startTime).Seconds <= 3600;)
             {
                 Thread.Sleep(1000);
-                order = await _db.order.Where(o => o.id == orderId).AsNoTracking().FirstOrDefaultAsync();
-                order.payments = await _db.orderPayment.Where(p => p.order_id == orderId).AsNoTracking().ToListAsync();
+                payment = await _db.orderPayment.Where(p => p.order_id == orderId && p.valid == 1
+                 && p.status.Trim().Equals(OrderPayment.PaymentStatus.支付成功) && p.paid_date > DateTime.Now.AddHours(-1))
+                 .OrderByDescending(p => p.id).AsNoTracking().FirstOrDefaultAsync();
+                if (payment != null)
+                {
+                    order = await _db.order.Where(o => o.id == orderId).AsNoTracking().FirstOrDefaultAsync();
+                    order.payments = await _db.orderPayment.Where(p => p.order_id == orderId).AsNoTracking().ToListAsync();
+                }
             }
             return order;
         }
