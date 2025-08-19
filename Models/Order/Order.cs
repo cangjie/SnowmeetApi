@@ -531,6 +531,40 @@ namespace SnowmeetApi.Models
             }
         }
         [NotMapped]
+        public double itemDiscountAmount
+        {
+            get
+            {
+                double amount = 0;
+                for (int i = 0; i < discounts.Count; i++)
+                {
+                    Discount discount = discounts[i];
+                    if (discount.valid == 1 && discount.biz_id != null)
+                    { 
+                        amount += discount.amount;
+                    }
+                }
+                return amount;
+            }
+        }
+        [NotMapped]
+        public double orderDiscountAmount
+        { 
+            get
+            {
+                double amount = 0;
+                for (int i = 0; i < discounts.Count; i++)
+                {
+                    Discount discount = discounts[i];
+                    if (discount.valid == 1 && discount.biz_id == null)
+                    { 
+                        amount += discount.amount;
+                    }
+                }
+                return amount;
+            }
+        }
+        [NotMapped]
         public double creditAmount
         {
             get
