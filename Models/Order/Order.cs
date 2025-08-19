@@ -490,6 +490,31 @@ namespace SnowmeetApi.Models
             }
         }
         [NotMapped]
+        public double enterainAmount
+        {
+            get
+            {
+                double amount = 0;
+                switch (type)
+                {
+                    case "餐饮":
+                        for (int i = 0; i < fdOrders.Count; i++)
+                        {
+                            FdOrder fd = fdOrders[i];
+                            if (fd.valid == 1 && fd.order_type.Trim().Equals("招待"))
+                            {
+                                amount = amount + fd.summary;
+                            }
+                        }
+                        break;
+                    default:
+                        break;
+                }
+                
+                return amount;
+            }
+        }
+        [NotMapped]
         public bool allEntrain
         {
             get

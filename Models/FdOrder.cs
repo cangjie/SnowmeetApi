@@ -36,5 +36,13 @@ namespace SnowmeetApi.Models
                 return availableDList.Sum(d => d.amount);
             }
         }
+        [NotMapped]
+        public double summary
+        {
+            get
+            {
+                return unit_price * count - discountAmount;
+            }
+        }
     }
 }
