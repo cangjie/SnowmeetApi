@@ -608,7 +608,7 @@ namespace SnowmeetApi.Models
             get
             {
                 string type = Order.PayType.未支付.ToString();
-                if (total_amount == 0)
+                if (totalCharge == 0)
                 {
                     if (haveEntrain)
                     {
