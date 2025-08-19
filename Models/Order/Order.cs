@@ -490,7 +490,7 @@ namespace SnowmeetApi.Models
             }
         }
         [NotMapped]
-        public double enterainAmount
+        public double entrainAmount
         {
             get
             {
