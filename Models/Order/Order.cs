@@ -15,7 +15,7 @@ namespace SnowmeetApi.Models
     {
         public enum OrderStatus { 待生成, 待支付, 部分支付, 支付成功, 挂账, 全额退款, 部分退款, 退款失败, 订单关闭, 已下单, 已完成 }
         public enum PayFlowStatus { 待生成, 已生成, 待支付, 支付中, 已支付, 已关闭, 部分退款, 全额退款 }
-        public enum PayType {整单支付, 分付, 无需支付, 未支付}
+        public enum PayType {整单支付, 分付, 无需支付, 未支付, 招待}
         public static void RendOrder(SnowmeetApi.Models.Order order)
         {
             string txtColor = "";
@@ -76,10 +76,7 @@ namespace SnowmeetApi.Models
         public string? pay_flow_status { get; set; } = null;
         public int is_test { get; set; } = 0;
         public string? current_pay_method { get; set; } = null;
-        [NotMapped]
-        public bool _paid = false;
         public DateTime? update_date { get; set; } = null;
-
         [NotMapped]
         public string textColor { get; set; } = "";
         [NotMapped]
@@ -611,25 +608,29 @@ namespace SnowmeetApi.Models
             get
             {
                 string type = Order.PayType.未支付.ToString();
-                if (paidAmount > 0)
+                if (total_amount == 0)
                 {
-                    if (availablePayments.Count > 1)
+                    if (haveEntrain)
+                    {
+                        type = Order.PayType.招待.ToString();
+                    }
+                    else
+                    {
+                        type = Order.PayType.无需支付.ToString();
+                    }
+                }
+                else
+                {
+                    if (availablePayments.Count == 1)
+                    {
+                        type = Order.PayType.整单支付.ToString();
+                    }
+                    else if (availablePayments.Count > 1)
                     {
                         type = Order.PayType.分付.ToString();
                     }
                     else
                     {
-                        type = Order.PayType.整单支付.ToString();
-                    }
-                }
-                else
-                {
-                    if (totalCharge == 0)
-                    {
-                        type = Order.PayType.无需支付.ToString();
-                    }
-                    else
-                    { 
                         type = Order.PayType.未支付.ToString();
                     }
                 }
