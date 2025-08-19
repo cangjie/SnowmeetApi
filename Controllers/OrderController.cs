@@ -1131,6 +1131,7 @@ namespace SnowmeetApi.Controllers
                     is_debt = 0,
                     status = OrderPayment.PaymentStatus.支付成功.ToString(),
                     staff_id = staff.id,
+                    paid_date = DateTime.Now,
                     create_date = DateTime.Now
                 };
             }
