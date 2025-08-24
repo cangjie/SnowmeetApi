@@ -4139,5 +4139,42 @@ namespace SnowmeetApi.Controllers
                 });
             }
         }
+        [HttpGet("{barCode}")]
+        public async Task<ActionResult<ApiResult<List<RentProduct>>>> GetRentProductByBarcodeFuzzy(string barCode, int? categoryId)
+        {
+            List<RentProduct> products = await _db.rentProduct
+                .Where(p => p.valid == 1 && p.barcode.Contains(barCode)).AsNoTracking().ToListAsync();
+            if (categoryId != null)
+            {
+                RentCategory category = await _db.rentCategory.Where(c => c.id == categoryId).AsNoTracking().FirstOrDefaultAsync();
+                List<RentCategory> categories = await _db.rentCategory.Where(c => c.code.StartsWith(category.code)).AsNoTracking().ToListAsync();
+                List<RentProduct> results = new List<RentProduct>();
+                for (int i = 0; i < products.Count; i++)
+                {
+                    
+                    RentProduct product = products[i];
+                    if (product.category_id == categoryId)
+                    {
+                        results.Add(product);
+                    }
+                    else if (categories.Where(c => c.id == product.category_id).ToList().Count > 0)
+                    {
+                        results.Add(product);
+                    }
+                }
+                return Ok(new ApiResult<List<RentProduct>>()
+                {
+                    code = 0,
+                    message = "",
+                    data = results
+                });
+            }
+            return Ok(new ApiResult<List<RentProduct>>()
+            {
+                code = 0,
+                message = "",
+                data = products
+            });
+        }
     }
 }
