@@ -213,25 +213,31 @@ namespace SnowmeetApi.Controllers
             return Ok(rl);
         }
         [HttpGet]
-        public async Task<ActionResult<ICollection<RentCategory>>> GetAllRentCategories()
+        public async Task<ActionResult<ICollection<RentCategory>>> GetTopRentCategories()
         {
             var topL = await _db.rentCategory.Where(r => (r.code.Trim().Length == 2))
                 .OrderBy(r => r.code).ToListAsync();
-            if (topL == null || topL.Count == 0)
-            {
-                return BadRequest();
-            }
-            List<RentCategory> rl = new List<RentCategory>();
-            for (int i = 0; i < topL.Count; i++)
-            {
-                RentCategory rc = (RentCategory)((OkObjectResult)(await GetCategory(topL[i].code)).Result).Value;
-                rl.Add(rc);
-            }
+            
             return Ok(new ApiResult<List<RentCategory>>()
             {
                 code = 0,
                 message = "",
-                data = rl
+                data = topL
+            });
+        }
+        [HttpGet("{fatherId}")]
+        public async Task<ActionResult<ICollection<RentCategory>>> GetSubRentCategories(int fatherId)
+        {
+            RentCategory father = await _db.rentCategory.Where(c => c.id == fatherId).AsNoTracking().FirstOrDefaultAsync();
+
+            var topL = await _db.rentCategory.Where(r => (r.code.Trim().Length == 4 && r.code.StartsWith(father.code.Trim())))
+                .AsNoTracking().OrderBy(r => r.code).ToListAsync();
+            
+            return Ok(new ApiResult<List<RentCategory>>()
+            {
+                code = 0,
+                message = "",
+                data = topL
             });
         }
         [HttpGet("{id}")]
