@@ -246,6 +246,17 @@ namespace SnowmeetApi.Controllers
             RentCategory category = await _db.rentCategory.FindAsync(id);
             return await GetCategory(category.code.Trim());
         }
+        [HttpGet("{id}")]
+        public async Task<ActionResult<ApiResult<RentCategory>>> GetRentCategory(int id)
+        {
+            return Ok(new ApiResult<RentCategory>()
+            {
+                code = 0,
+                message = "",
+                data = await _db.rentCategory.Where(c => c.id == id ).AsNoTracking().FirstOrDefaultAsync()
+            });
+        }
+
         [HttpGet("{code}")]
         public async Task<ActionResult<RentCategory>> GetCategory(string code = "")
         {
