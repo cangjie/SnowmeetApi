@@ -864,7 +864,7 @@ namespace SnowmeetApi.Controllers
             return discounts;
         }
         [NonAction]
-        public async Task<OrderPayment> GetReadyOrderPayment(Models.Order order, double? amount, string payMethod, int? memberId, string? openId)
+        public async Task<OrderPayment> GetReadyOrderPayment(Models.Order order, double? amount, string payMethod, int? memberId, string? openId, bool needShare = false)
         {
             if (order == null && order.closed == 1)
             {
@@ -949,7 +949,7 @@ namespace SnowmeetApi.Controllers
                         return await _aliHelper.GetPaymentQrCodeUrl(payment, order);
                     case "微信支付":
                         TenpayController _tenHelper = new TenpayController(_db, _config, _http);
-                        return await _tenHelper.TenpayRequest(payment, order);
+                        return await _tenHelper.TenpayRequest(payment, order, needShare);
                     default:
                         break;
                 }
@@ -1028,7 +1028,7 @@ namespace SnowmeetApi.Controllers
         }
         [HttpGet("{orderId}")]
         public async Task<ActionResult<ApiResult<OrderPayment>>> WechatPay(int orderId, double? amount,
-            string sessionKey, string sessionType = "wechat_mini_openid")
+            string sessionKey, string sessionType = "wechat_mini_openid", bool needShare = false)
         {
             string payMethod = "微信支付";
             Models.Order? order = await GetOrder(orderId);
@@ -1058,7 +1058,7 @@ namespace SnowmeetApi.Controllers
                     data = null
                 });
             }
-            OrderPayment payment = await GetReadyOrderPayment(order, amount, payMethod, member.id, member.wechatMiniOpenId);
+            OrderPayment payment = await GetReadyOrderPayment(order, amount, payMethod, member.id, member.wechatMiniOpenId, needShare);
             order.pay_flow_status = Models.Order.PayFlowStatus.支付中.ToString();
             //order.update_date = DateTime.Now;
             await UpdateOrder(order, member.id, null, "微信支付点击支付按钮");
