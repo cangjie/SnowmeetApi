@@ -662,7 +662,7 @@ namespace SnowmeetApi.Controllers
             }
         }
 
-        [NonAction]
+        [HttpGet]
         public async Task ShareFinish(int paymentId, string description)
         {
             OrderPayment payment = await _db.OrderPayment.FindAsync(paymentId);
@@ -679,6 +679,7 @@ namespace SnowmeetApi.Controllers
 
 
         }
+      
 
         [NonAction]
         public async Task<PaymentShare> Share(int paymentShareId)

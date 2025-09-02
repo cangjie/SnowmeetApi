@@ -16,7 +16,9 @@ namespace SnowmeetApi.Models
         public DateTime update_date { get; set; } = DateTime.Now;
         [NotMapped]
         public ICollection<RentCategory> children { get; set; }
-        public List<RentPrice>? priceList {get; set;}
+        [NotMapped]
+        public RentCategory father { get; set; }
+        public List<RentPrice>? priceList { get; set; }
         public List<RentCategoryInfoField>? infoFields { get; set; }
         public List<RentProduct>? productList { get; set; }
     }

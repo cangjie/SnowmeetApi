@@ -594,12 +594,12 @@ namespace SnowmeetApi.Controllers.Order
                     TenpayController tenpayHelper = new TenpayController(_context, _originConfig, _httpContextAccessor);
                     refund = await tenpayHelper.Refund(refund.id);
                     break;
-                /*
+                
                 case "支付宝":
                     AliController aliHelper = new AliController(_context, _originConfig, _httpContextAccessor);
                     refund = await aliHelper.Refund(refund.id);
                     break;
-                */
+                
                 default:
                     refund.state = 1;
                     _context.OrderPaymentRefund.Entry(refund).State = EntityState.Modified;
@@ -944,7 +944,7 @@ namespace SnowmeetApi.Controllers.Order
             return BadRequest();
         }
 
-        [NonAction]
+        [HttpGet]
         public async Task<PaymentShare> CreateShare(int paymentId, double amount, string memo, int kolId)
         {
             OrderPayment payment = await _context.OrderPayment.FindAsync(paymentId);
