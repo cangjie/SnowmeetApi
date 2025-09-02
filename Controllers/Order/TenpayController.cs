@@ -60,7 +60,7 @@ namespace SnowmeetApi.Controllers
 
         }
         [NonAction]
-        public async Task<OrderPayment> TenpayRequest(OrderPayment payment, Models.Order order)
+        public async Task<OrderPayment> TenpayRequest(OrderPayment payment, Models.Order order, bool needProfitShare = false)
         {
             payment.mch_id = GetMchId(order);
             if (payment == null || payment.submit_time != null
@@ -69,8 +69,8 @@ namespace SnowmeetApi.Controllers
             {
                 return null;
             }
-            List<PaymentShare> shares = await _db.paymentShare.Where(s => s.valid == 1 && s.submit_date == null)
-                .AsNoTracking().ToListAsync();
+            //List<PaymentShare> shares = await _db.paymentShare.Where(s => s.valid == 1 && s.submit_date == null)
+            //    .AsNoTracking().ToListAsync();
             CreatePayTransactionJsapiRequest.Types.Detail detail = new CreatePayTransactionJsapiRequest.Types.Detail();
             detail.CostPrice = (int)Math.Round(order.totalCharge * 100, 0);
             List<CreatePayTransactionAppRequest.Types.Detail.Types.GoodsDetail> details = new List<CreatePayTransactionAppRequest.Types.Detail.Types.GoodsDetail>();
@@ -88,7 +88,7 @@ namespace SnowmeetApi.Controllers
             }
             detail.GoodsList = details;
             string notifyUrl = "https://" + _http.HttpContext.Request.Host.Value + "/api/Tenpay/TenpayPaymentCallBack/" + payment.mch_id.ToString();
-            bool needProfitShare = !(shares == null || shares.Count == 0);
+            //bool needProfitShare = !(shares == null || shares.Count == 0);
             var client = await GetClient((int)payment.mch_id);
             var request = new CreatePayTransactionJsapiRequest()
             {
