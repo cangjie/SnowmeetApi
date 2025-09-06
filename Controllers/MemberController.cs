@@ -634,6 +634,106 @@ namespace SnowmeetApi.Controllers
                 });
             }
         }
+
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<bool>>> VerifyCell(string sessionKey, string encData, string iv)
+        {
+            encData = Util.UrlDecode(encData);
+            iv = Util.UrlDecode(iv);   
+            string json = Util.AES_decrypt(encData.Trim(), sessionKey, iv);
+            Newtonsoft.Json.Linq.JToken jsonObj = (Newtonsoft.Json.Linq.JToken)Newtonsoft.Json.JsonConvert.DeserializeObject(json);
+            string cell = "";
+            string unionId = "";
+            try
+            {
+                if (jsonObj["phoneNumber"] != null)
+                {
+                    cell = jsonObj["phoneNumber"].ToString().Trim();
+                }
+            }
+            catch
+            {
+                return Ok(new ApiResult<bool>()
+                {
+                    code = 1,
+                    message = "验证失败",
+                    data = false
+                });
+            }
+            try
+            {
+                if (jsonObj["unionId"] != null && jsonObj["unionId"].ToString().Trim().Equals(""))
+                {
+                    unionId = jsonObj["unionId"].ToString().Trim();
+                }
+            }
+            catch
+            {
+
+            }
+            MemberController _memberHelper = new MemberController(_db, _config);
+            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey);
+            MemberSocialAccount msa = await _db.memberSocialAccount
+                .Where(m => m.valid == 1 && m.type.Trim().Equals("cell") && m.num.Trim().Equals(cell.Trim()))
+                .AsNoTracking().FirstOrDefaultAsync();
+            if (msa != null)
+            {
+                if (msa.member_id == member.id)
+                {
+                    return Ok(new ApiResult<bool>()
+                    {
+                        code = 1,
+                        message = "手机号曾经验证过",
+                        data = true
+
+                    });
+                }
+                else
+                {
+                    return Ok(new ApiResult<bool>()
+                    {
+                        code = 1,
+                        message = "手机号已被占用",
+                        data = false
+
+                    });
+                }
+            }
+            else
+            {
+                CoreDataModLog log = new CoreDataModLog()
+                {
+                    table_name = "member",
+                    key_value = member.id,
+                    scene = "会员注册验证手机号",
+                    field_name = "cell",
+                    prev_value = null,
+                    current_value = cell.Trim(),
+                    member_id = member.id,
+                    staff_id = null,
+                    create_date = DateTime.Now
+                };
+                MemberSocialAccount msaNew = new MemberSocialAccount()
+                {
+                    id = 0,
+                    member_id = member.id,
+                    type = "cell",
+                    valid = 1,
+                    num = cell,
+                    create_date = DateTime.Now
+                };
+                await _db.memberSocialAccount.AddAsync(msa);
+                await _db.coreDataModLog.AddAsync(log);
+                await _db.SaveChangesAsync();
+                return Ok(new ApiResult<bool>()
+                {
+                    code = 0,
+                    message = "",
+                    data = true
+                });
+            }
+            return null;
+        }
         /*
             [NonAction]
             public async Task<Member> GetMemberBySessionKey(string sessionKey, string sessionType = "wechat_mini_openid")
