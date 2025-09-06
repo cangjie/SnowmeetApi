@@ -722,7 +722,7 @@ namespace SnowmeetApi.Controllers
                     num = cell,
                     create_date = DateTime.Now
                 };
-                await _db.memberSocialAccount.AddAsync(msa);
+                await _db.memberSocialAccount.AddAsync(msaNew);
                 await _db.coreDataModLog.AddAsync(log);
                 await _db.SaveChangesAsync();
                 return Ok(new ApiResult<bool>()
