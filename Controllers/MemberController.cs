@@ -741,12 +741,19 @@ namespace SnowmeetApi.Controllers
             for (; times <= 900 && !find; times++)
             {
                 System.Threading.Thread.Sleep(1000);
-                MemberSocialAccount msa = await _db.memberSocialAccount
-                    .Where(m => m.member_id == member.id && m.type.Trim().Equals("cell") && m.valid == 1)
-                    .AsNoTracking().FirstOrDefaultAsync();
-                if (msa != null)
+                try
                 {
-                    find = true;
+                    MemberSocialAccount msa = await _db.memberSocialAccount
+                        .Where(m => m.member_id == member.id && m.type.Trim().Equals("cell") && m.valid == 1)
+                        .AsNoTracking().FirstOrDefaultAsync();
+                    if (msa != null)
+                    {
+                        find = true;
+                    }
+                }
+                catch
+                { 
+                    
                 }
             }
             if (find)
@@ -758,6 +765,7 @@ namespace SnowmeetApi.Controllers
                 return null;
             }
         }
+        
         /*
                 [NonAction]
                 public async Task<Member> GetMemberBySessionKey(string sessionKey, string sessionType = "wechat_mini_openid")
@@ -1097,122 +1105,122 @@ namespace SnowmeetApi.Controllers
                     return Ok(await GetMember(cell, "cell"));
                 }
                 */
-            /*
-                    [NonAction]
-                    public List<Member> GetCells(List<Member> memberList)
+        /*
+                [NonAction]
+                public List<Member> GetCells(List<Member> memberList)
+                {
+                    for(int i = 0; i < memberList.Count; i++)
                     {
-                        for(int i = 0; i < memberList.Count; i++)
+                        Member member = memberList[i];
+                        foreach(MemberSocialAccount msa in member.memberSocialAccounts)
                         {
-                            Member member = memberList[i];
-                            foreach(MemberSocialAccount msa in member.memberSocialAccounts)
+                            if (msa.type.Trim().Equals("cell"))
                             {
-                                if (msa.type.Trim().Equals("cell"))
-                                {
-                                    member.cell = msa.num.Trim();
-                                    break;
-                                }
+                                member.cell = msa.num.Trim();
+                                break;
                             }
                         }
-                        return memberList;
                     }
-            */
-            /*
-            [NonAction]
-            public async Task ModMemberCell(int memberId, string cell)
+                    return memberList;
+                }
+        */
+        /*
+        [NonAction]
+        public async Task ModMemberCell(int memberId, string cell)
+        {
+            var list = await _db.memberSocialAccount
+                .Where(m => (m.type.Trim().Equals("cell") && m.num.Trim().Equals(cell.Trim())
+                && m.member_id == memberId))
+                .ToListAsync();
+            if (list == null || list.Count == 0)
             {
-                var list = await _db.memberSocialAccount
-                    .Where(m => (m.type.Trim().Equals("cell") && m.num.Trim().Equals(cell.Trim())
-                    && m.member_id == memberId))
-                    .ToListAsync();
-                if (list == null || list.Count == 0)
+                MemberSocialAccount msa = new MemberSocialAccount()
                 {
-                    MemberSocialAccount msa = new MemberSocialAccount()
-                    {
-                        id = 0,
-                        member_id = memberId,
-                        type = "cell",
-                        num = cell.Trim(),
-                        valid = 1
-                    };
-                    await _db.memberSocialAccount.AddAsync(msa);
-                    await _db.SaveChangesAsync();
-                }
-                else
-                {
-                    MemberSocialAccount msa = list[0];
-                    msa.valid = 1;
-                    _db.memberSocialAccount.Entry(msa).State = EntityState.Modified;
-                    await _db.SaveChangesAsync();
-                }
-
+                    id = 0,
+                    member_id = memberId,
+                    type = "cell",
+                    num = cell.Trim(),
+                    valid = 1
+                };
+                await _db.memberSocialAccount.AddAsync(msa);
+                await _db.SaveChangesAsync();
+            }
+            else
+            {
+                MemberSocialAccount msa = list[0];
+                msa.valid = 1;
+                _db.memberSocialAccount.Entry(msa).State = EntityState.Modified;
+                await _db.SaveChangesAsync();
             }
 
+        }
 
-            [NonAction]
-            public Member RemoveSensitiveInfo(Member member)
+
+        [NonAction]
+        public Member RemoveSensitiveInfo(Member member)
+        {
+            if (member == null)
             {
-                if (member == null)
-                {
-                    return member;
-                }
-                member.id = 0;
-                IList<MemberSocialAccount> msaList = member.memberSocialAccounts.ToList();
-
-                for (int i = 0; i < msaList.Count; i++)
-                {
-                    MemberSocialAccount msa = msaList[i];
-                    msa.member_id = 0;
-                    if (msa.type.Trim().IndexOf("openid") >= 0)
-                    {
-                        msaList.Remove(msa);
-                        i--;
-                    }
-                    if (msa.type.Trim().IndexOf("unionid") >= 0)
-                    {
-                        msaList.Remove(msa);
-                        i--;
-                    }
-                }
-                member.memberSocialAccounts = msaList.ToList();
                 return member;
             }
+            member.id = 0;
+            IList<MemberSocialAccount> msaList = member.memberSocialAccounts.ToList();
 
-            [NonAction]
-            public async Task<bool> isStaff(string sessionKey, string sessionType = "wechat_mini_openid")
+            for (int i = 0; i < msaList.Count; i++)
             {
-                bool ret = false;
-                sessionKey = Util.UrlDecode(sessionKey);
-                sessionType = Util.UrlDecode(sessionType);
-                Member member = await GetMemberBySessionKey(sessionKey, sessionType);
-                if (member.is_admin == 1 || member.is_manager == 1 || member.is_staff == 1)
+                MemberSocialAccount msa = msaList[i];
+                msa.member_id = 0;
+                if (msa.type.Trim().IndexOf("openid") >= 0)
                 {
-                    ret = true;
+                    msaList.Remove(msa);
+                    i--;
                 }
-                return ret;
-            }
-
-            [NonAction]
-            public async Task<List<Member>> SearchMember(string key)
-            {
-                List<Member> mList = await _db.member.Where(m => (m.real_name.IndexOf(key) >= 0))
-                    .Include(m => m.memberSocialAccounts.Where(msa => msa.valid == 1)).AsNoTracking().ToListAsync();
-
-                List<MemberSocialAccount> cellList = await _db.memberSocialAccount
-                    .Where(msa => (msa.valid == 1 && msa.num.EndsWith(key) && key.Length >= 4 && msa.type.Trim().Equals("cell")))
-                    .Include(msa => msa.member).AsNoTracking().ToListAsync();
-
-
-                List<Member> ret = new List<Member>();
-                for (int i = 0; i < cellList.Count; i++)
+                if (msa.type.Trim().IndexOf("unionid") >= 0)
                 {
-                    Member member = cellList[i].member;
-                    if (mList.Where(m => m.id == member.id).ToList().Count == 0)
-                    {
-                        mList.Add(member);
-                    }
+                    msaList.Remove(msa);
+                    i--;
                 }
-                return mList;
             }
-            */
+            member.memberSocialAccounts = msaList.ToList();
+            return member;
         }
+
+        [NonAction]
+        public async Task<bool> isStaff(string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            bool ret = false;
+            sessionKey = Util.UrlDecode(sessionKey);
+            sessionType = Util.UrlDecode(sessionType);
+            Member member = await GetMemberBySessionKey(sessionKey, sessionType);
+            if (member.is_admin == 1 || member.is_manager == 1 || member.is_staff == 1)
+            {
+                ret = true;
+            }
+            return ret;
+        }
+
+        [NonAction]
+        public async Task<List<Member>> SearchMember(string key)
+        {
+            List<Member> mList = await _db.member.Where(m => (m.real_name.IndexOf(key) >= 0))
+                .Include(m => m.memberSocialAccounts.Where(msa => msa.valid == 1)).AsNoTracking().ToListAsync();
+
+            List<MemberSocialAccount> cellList = await _db.memberSocialAccount
+                .Where(msa => (msa.valid == 1 && msa.num.EndsWith(key) && key.Length >= 4 && msa.type.Trim().Equals("cell")))
+                .Include(msa => msa.member).AsNoTracking().ToListAsync();
+
+
+            List<Member> ret = new List<Member>();
+            for (int i = 0; i < cellList.Count; i++)
+            {
+                Member member = cellList[i].member;
+                if (mList.Where(m => m.id == member.id).ToList().Count == 0)
+                {
+                    mList.Add(member);
+                }
+            }
+            return mList;
+        }
+        */
+    }
 }
