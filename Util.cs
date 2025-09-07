@@ -471,6 +471,35 @@ namespace SnowmeetApi
                             data = order
                         };
                         return JsonConvert.SerializeObject(orderResult);
+                    case "querybindcell":
+                        StaffController _staffHelper = new StaffController(db);
+                        Staff staff = await _staffHelper.GetStaffBySessionKey(post.sessionKey);
+                        if (staff == null || staff.title_level < 100)
+                        {
+                            ApiResult<Object> r = new ApiResult<Object>()
+                            {
+                                code = 1,
+                                message = "没有权限",
+                                data = null
+                            };
+                            return JsonConvert.SerializeObject(r);
+                        }
+                        else
+                        {
+                            MemberController _memberHelper = new MemberController(db, config);
+                            Member member = await _memberHelper.QyeryMemberBindCell((int)post.id);
+                            for (int i = 0; i < member.memberSocialAccounts.Count; i++)
+                            {
+                                member.memberSocialAccounts[i].member = null;
+                            }
+                            ApiResult<Member> r = new ApiResult<Member>()
+                            {
+                                code = 0,
+                                message = "",
+                                data = member
+                            };
+                            return JsonConvert.SerializeObject(r);
+                        }
                     default:
                         break;
                 }
