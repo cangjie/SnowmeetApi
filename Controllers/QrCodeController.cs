@@ -63,6 +63,9 @@ namespace SnowmeetApi.Controllers
         [NonAction]
         public async Task<ScanQrCode> QueryScan(int id)
         {
+            var contextOptions = new DbContextOptionsBuilder<ApplicationDBContext>()
+                .UseSqlServer(Util.GetSqlServerConnectionString()).Options;
+            var db = new ApplicationDBContext(contextOptions);
             List<ScanQrCode> sqList = await _db.scanQrCode.Where(s => s.id == id).AsNoTracking().ToListAsync();
             ScanQrCode? sq = sqList.Count == 0 ? null : sqList[0];
             for (int times = 0;
@@ -72,7 +75,7 @@ namespace SnowmeetApi.Controllers
                 System.Threading.Thread.Sleep(1000);
                 try
                 {
-                    sqList = await _db.scanQrCode.Where(s => s.id == id).AsNoTracking().ToListAsync();
+                    sqList = await db.scanQrCode.Where(s => s.id == id).AsNoTracking().ToListAsync();
                     sq = sqList.Count == 0 ? null : sqList[0];
                 }
                 catch (Exception err)

@@ -730,10 +730,14 @@ namespace SnowmeetApi.Controllers
         [NonAction]
         public async Task<Member> QyeryMemberBindCell(int memberId)
         {
+            var contextOptions = new DbContextOptionsBuilder<ApplicationDBContext>()
+                .UseSqlServer(Util.GetSqlServerConnectionString()).Options;
+            var db = new ApplicationDBContext(contextOptions);
+
+            
             Member member = await GetWholeMemberById(memberId);
             if (member != null && member.cell != null)
             {
-
                 return member;
             }
             int times = 0;
@@ -743,7 +747,7 @@ namespace SnowmeetApi.Controllers
                 System.Threading.Thread.Sleep(1000);
                 try
                 {
-                    MemberSocialAccount msa = await _db.memberSocialAccount
+                    MemberSocialAccount msa = await db.memberSocialAccount
                         .Where(m => m.member_id == member.id && m.type.Trim().Equals("cell") && m.valid == 1)
                         .AsNoTracking().FirstOrDefaultAsync();
                     if (msa != null)
