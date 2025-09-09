@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -725,16 +726,52 @@ namespace SnowmeetApi.Controllers
                     data = true
                 });
             }
-            return null;
+        }
+        [HttpGet("{memberId}")]
+        public async Task<ActionResult<ApiResult<object?>>> StopQueryMemberBindCell(int memberId,
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            StaffController _staffHelper = new StaffController(_db);
+            Staff staff = await _staffHelper.GetStaffBySessionKey(sessionKey, sessionType);
+            if (staff == null || staff.title_level < 100)
+            {
+                return Ok(new ApiResult<object?>()
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = null
+                });
+            }
+            MemberSocialAccount msa = new MemberSocialAccount()
+            {
+                id = 0,
+                member_id = memberId,
+                type = "cell",
+                num = "",
+                valid = 1,
+                memo = "临时",
+                create_date = DateTime.Now
+            };
+            await _db.memberSocialAccount.AddAsync(msa);
+            await _db.SaveChangesAsync();
+            Thread.Sleep(2500);
+            _db.memberSocialAccount.Remove(msa);
+            await _db.SaveChangesAsync();
+            return Ok(new ApiResult<object?>()
+            {
+                code = 0,
+                message = "",
+                data = null
+            });
         }
         [NonAction]
-        public async Task<Member> QyeryMemberBindCell(int memberId)
+        public async Task<Member> QueryMemberBindCell(int memberId)
         {
             var contextOptions = new DbContextOptionsBuilder<ApplicationDBContext>()
                 .UseSqlServer(Util.GetSqlServerConnectionString()).Options;
             var db = new ApplicationDBContext(contextOptions);
 
-            
+
             Member member = await GetWholeMemberById(memberId);
             if (member != null && member.cell != null)
             {
@@ -756,8 +793,8 @@ namespace SnowmeetApi.Controllers
                     }
                 }
                 catch
-                { 
-                    
+                {
+
                 }
             }
             if (find)
@@ -769,7 +806,7 @@ namespace SnowmeetApi.Controllers
                 return null;
             }
         }
-        
+
         /*
                 [NonAction]
                 public async Task<Member> GetMemberBySessionKey(string sessionKey, string sessionType = "wechat_mini_openid")

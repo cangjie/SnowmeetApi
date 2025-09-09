@@ -487,7 +487,7 @@ namespace SnowmeetApi
                         else
                         {
                             MemberController _memberHelper = new MemberController(db, config);
-                            Member member = await _memberHelper.QyeryMemberBindCell((int)post.id);
+                            Member member = await _memberHelper.QueryMemberBindCell((int)post.id);
                             for (int i = 0; i < member.memberSocialAccounts.Count; i++)
                             {
                                 member.memberSocialAccounts[i].member = null;
