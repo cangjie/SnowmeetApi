@@ -525,6 +525,55 @@ namespace SnowmeetApi.Controllers
                 data = retail
             });
         }
+        [HttpGet("{isPackage}")]
+        public async Task<ActionResult<ApiResult<Models.Order?>>> PlaceBlankOrder(int isPackage, string type, string shop, int? memberId, string? cell,
+            string? name, string? gender, string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            StaffController _staffHelper = new StaffController(_db);
+            Staff staff = await _staffHelper.GetStaffBySessionKey(sessionKey, sessionType);
+            if (staff.title_level < 100)
+            {
+                return Ok(new ApiResult<Models.Order?>()
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = null
+                });
+            }
+            MemberController _memberHelper = new MemberController(_db, _config);
+            Member member = null;
+            if (memberId != null)
+            {
+                member = await _memberHelper.GetWholeMemberById((int)memberId);
+            }
+            Models.Order order = new Models.Order()
+            {
+                id = 0,
+                code = null,
+                shop = shop,
+                type = type,
+                contact_num = cell == null ? member.cell.Trim() : cell.Trim(),
+                contact_name = name == null ? member.real_name.Trim() : name.Trim(),
+                contact_gender = gender == null ? member.gender.Trim() : gender.Trim(),
+                is_package = isPackage,
+                member_id = memberId,
+                name = member == null ? "" : member.real_name.Trim(),
+                gender = member == null ? "" : member.gender.Trim(),
+                cell = member == null ? "" : member.cell.Trim(),
+                total_amount = 0,
+                memo = "",
+                staff_id = staff.id,
+                valid = 0
+            };
+            await _db.order.AddAsync(order);
+            await _db.SaveChangesAsync();
+            return Ok(new ApiResult<Models.Order>()
+            {
+                code = 0,
+                message = "",
+                data = order
+            });
+        }
         [HttpPost]
         public async Task<ActionResult<ApiResult<SnowmeetApi.Models.Order?>>> PlaceOrder([FromBody] SnowmeetApi.Models.Order order,
             [FromQuery] string sessionKey, [FromQuery] string sessionType = "wechat_mini_openid")
@@ -1181,7 +1230,7 @@ namespace SnowmeetApi.Controllers
                 .AsNoTracking().FirstOrDefaultAsync();
             order.dealed = 1;
             order.pay_flow_status = Models.Order.PayFlowStatus.已支付.ToString();
-            
+
             await UpdateOrder(order, null, null, "支付成功");
         }
         [HttpGet]
@@ -1315,11 +1364,11 @@ namespace SnowmeetApi.Controllers
                     await _db.SaveChangesAsync();
                 }
                 return Ok(new ApiResult<Models.Order>()
-                    {
-                        code = 0,
-                        message = "",
-                        data = order
-                    });
+                {
+                    code = 0,
+                    message = "",
+                    data = order
+                });
             }
             else
             {
