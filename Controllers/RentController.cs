@@ -4182,7 +4182,7 @@ namespace SnowmeetApi.Controllers
             }
         }
         [HttpGet]
-        public async Task<ActionResult<ApiResult<List<RentProduct>>>> GetRentProductByFuzzy(string key, int? categoryId)
+        public async Task<ActionResult<ApiResult<List<RentProduct>>>> GetRentProductFuzzy(string key, int? categoryId)
         {
             key = Util.UrlDecode(key);
             List<RentProduct> products = await _db.rentProduct
