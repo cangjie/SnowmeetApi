@@ -4181,7 +4181,7 @@ namespace SnowmeetApi.Controllers
                 });
             }
         }
-        [HttpGet("{barCode}")]
+        [HttpGet("{key}")]
         public async Task<ActionResult<ApiResult<List<RentProduct>>>> GetRentProductByFuzzy(string key, int? categoryId)
         {
             List<RentProduct> products = await _db.rentProduct
