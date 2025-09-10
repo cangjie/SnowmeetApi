@@ -10,10 +10,13 @@ namespace SnowmeetApi.Models
         [Key]
         public int id { get; set; }
         public string name { get; set; } = "";
-        public string gender {get; set;} = "";
+        public string gender { get; set; } = "";
         public int title_level { get; set; } = 0;
-        public int valid {get; set;}
-        public DateTime? update_date {get; set;} = null;
+        public int valid { get; set; }
+        public int? base_shop_id { get; set; } = null;
+        public DateTime? update_date { get; set; } = null;
         public DateTime create_date { get; set; } = DateTime.Now;
+        [ForeignKey("base_shop_id")]
+        public Shop shop { get; set; }
     }
 }
