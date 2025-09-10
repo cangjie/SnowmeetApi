@@ -565,7 +565,7 @@ namespace SnowmeetApi.Controllers
                 return Ok(new ApiResult<Member?>()
                 {
                     code = 1,
-                    message = "更新失败",
+                    message = "会员不存在",
                     data = null
                 });
             }
