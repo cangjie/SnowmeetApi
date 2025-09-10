@@ -525,6 +525,7 @@ namespace SnowmeetApi.Controllers
                 data = retail
             });
         }
+        /*
         [HttpGet("{isPackage}")]
         public async Task<ActionResult<ApiResult<Models.Order?>>> PlaceBlankOrder(int isPackage, string type, string shop, int? memberId, string? cell,
             string? name, string? gender, string sessionKey, string sessionType = "wechat_mini_openid")
@@ -574,6 +575,7 @@ namespace SnowmeetApi.Controllers
                 data = order
             });
         }
+        */
         [HttpPost]
         public async Task<ActionResult<ApiResult<SnowmeetApi.Models.Order?>>> PlaceOrder([FromBody] SnowmeetApi.Models.Order order,
             [FromQuery] string sessionKey, [FromQuery] string sessionType = "wechat_mini_openid")

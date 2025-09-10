@@ -4182,10 +4182,10 @@ namespace SnowmeetApi.Controllers
             }
         }
         [HttpGet("{barCode}")]
-        public async Task<ActionResult<ApiResult<List<RentProduct>>>> GetRentProductByBarcodeFuzzy(string barCode, int? categoryId)
+        public async Task<ActionResult<ApiResult<List<RentProduct>>>> GetRentProductByFuzzy(string key, int? categoryId)
         {
             List<RentProduct> products = await _db.rentProduct
-                .Where(p => p.valid == 1 && p.barcode.Contains(barCode))
+                .Where(p => p.valid == 1 && ( p.barcode.Contains(key) || p.name.Contains(key) ))
                 .Include(p => p.category) .AsNoTracking().ToListAsync();
             if (categoryId != null)
             {
