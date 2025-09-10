@@ -32,7 +32,7 @@ namespace SnowmeetApi.Controllers
                 return null;
             }
             List<SocialAccountForJob> jList = await _db.socialAccountForJob
-                .Include(j => j.staffSocialAccounts).ThenInclude(s => s.staff)
+                .Include(j => j.staffSocialAccounts).ThenInclude(s => s.staff).ThenInclude(s => s.shop)
                 .Where(j => j.member_id == msaList[0].member_id)
                 .OrderByDescending(j => j.id).AsNoTracking().ToListAsync();
             if (jList.Count == 0)
