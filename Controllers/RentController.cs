@@ -4181,9 +4181,10 @@ namespace SnowmeetApi.Controllers
                 });
             }
         }
-        [HttpGet("{key}")]
+        [HttpGet]
         public async Task<ActionResult<ApiResult<List<RentProduct>>>> GetRentProductByFuzzy(string key, int? categoryId)
         {
+            key = Util.UrlDecode(key);
             List<RentProduct> products = await _db.rentProduct
                 .Where(p => p.valid == 1 && ( p.barcode.Contains(key) || p.name.ToLower().Contains(key.ToLower()) ))
                 .Include(p => p.category) .AsNoTracking().ToListAsync();
