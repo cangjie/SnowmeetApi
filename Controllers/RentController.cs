@@ -17,6 +17,7 @@ using Mono.TextTemplating;
 using TencentCloud.Ocr.V20181119.Models;
 using NPOI.XSSF.UserModel;
 using NPOI.SS.UserModel;
+using NPOI.SS.Formula.Functions;
 namespace SnowmeetApi.Controllers
 {
     [Route("api/[controller]/[action]")]
@@ -102,6 +103,50 @@ namespace SnowmeetApi.Controllers
                 data = arr
             });
         }
+        [HttpPost("{shopId}")]
+        public async Task<ActionResult<ApiResult<List<RentPrice>?>>> UpdateRentPrice([FromRoute] int shopId,
+            [FromBody] List<RentPrice> priceList, [FromQuery] string sessionKey, [FromQuery] string sessionType = "wechat_mini_openid")
+        {
+            StaffController _staffHelper = new StaffController(_db);
+            Staff staff = await _staffHelper.GetStaffBySessionKey(sessionKey, sessionType);
+            if (staff == null || staff.title_level < 200)
+            {
+                return Ok(new ApiResult<List<RentPrice>?>()
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = null
+                });
+            }
+            for (int i = 0; i < priceList.Count; i++)
+            {
+                RentPrice rentPrice = priceList[i];
+                rentPrice.valid = 1;
+                rentPrice.staff_id = staff.id;
+                if (rentPrice.id == 0)
+                {
+                    await _db.rentPrice.AddAsync(rentPrice);
+                }
+                else
+                {
+                    RentPrice oriPrice = await _db.rentPrice.Where(p => p.id == rentPrice.id).AsNoTracking().FirstOrDefaultAsync();
+                    List<CoreDataModLog> logs = Util.GetUpdateDifferenceLog<RentPrice>(oriPrice, rentPrice, null, staff.id, "修改租赁商品价格");
+                    for (int j = 0; j < logs.Count; j++)
+                    {
+                        await _db.coreDataModLog.AddAsync(logs[j]);
+                    }
+                    _db.rentPrice.Entry(rentPrice).State = EntityState.Modified;
+                }
+            }
+            await _db.SaveChangesAsync();
+            return Ok(new ApiResult<List<RentPrice>?>()
+            {
+                code = 0,
+                message = "",
+                data = priceList
+            });
+
+        }
         [HttpGet("{shopId}")]
         public async Task<ActionResult<ApiResult<List<RentPrice>>>> GetRentPriceList(int shopId, string type, int id, string scene)
         {
@@ -109,10 +154,11 @@ namespace SnowmeetApi.Controllers
             type = Util.UrlDecode(type);
             List<RentPrice> rentPrice = await _db.rentPrice
                 .Where(p => p.valid == 1 && p.shop_id == shopId && type.Trim().Equals(p.type)
-                && (type.Trim().Equals("分类") && p.category_id == id)
-                && (type.Trim().Equals("套餐") && p.package_id == id)
+                && ((type.Trim().Equals("分类") && p.category_id == id)
+                || (type.Trim().Equals("套餐") && p.package_id == id))
                 && p.scene.Trim().Equals(scene)).AsNoTracking().ToListAsync();
-            return Ok(new ApiResult<List<RentPrice>>() {
+            return Ok(new ApiResult<List<RentPrice>>()
+            {
                 code = 0,
                 message = "",
                 data = rentPrice
@@ -278,7 +324,7 @@ namespace SnowmeetApi.Controllers
         {
             var topL = await _db.rentCategory.Where(r => (r.code.Trim().Length == 2))
                 .OrderBy(r => r.code).ToListAsync();
-            
+
             return Ok(new ApiResult<List<RentCategory>>()
             {
                 code = 0,
@@ -293,7 +339,7 @@ namespace SnowmeetApi.Controllers
 
             var topL = await _db.rentCategory.Where(r => (r.code.Trim().Length == 4 && r.code.StartsWith(father.code.Trim())))
                 .AsNoTracking().OrderBy(r => r.code).ToListAsync();
-            
+
             return Ok(new ApiResult<List<RentCategory>>()
             {
                 code = 0,
@@ -4249,8 +4295,8 @@ namespace SnowmeetApi.Controllers
         {
             key = Util.UrlDecode(key);
             List<RentProduct> products = await _db.rentProduct
-                .Where(p => p.valid == 1 && ( p.barcode.Contains(key) || p.name.ToLower().Contains(key.ToLower()) ))
-                .Include(p => p.category) .AsNoTracking().ToListAsync();
+                .Where(p => p.valid == 1 && (p.barcode.Contains(key) || p.name.ToLower().Contains(key.ToLower())))
+                .Include(p => p.category).AsNoTracking().ToListAsync();
             if (categoryId != null)
             {
                 RentCategory category = await _db.rentCategory.Where(c => c.id == categoryId).AsNoTracking().FirstOrDefaultAsync();
@@ -4258,7 +4304,7 @@ namespace SnowmeetApi.Controllers
                 List<RentProduct> results = new List<RentProduct>();
                 for (int i = 0; i < products.Count; i++)
                 {
-                    
+
                     RentProduct product = products[i];
                     if (product.category_id == categoryId)
                     {

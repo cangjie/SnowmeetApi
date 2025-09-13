@@ -22,7 +22,9 @@ namespace SnowmeetApi.Models
         public string? scene { get; set; } = null;
         public string? rent_type { get; set; } = null;
         public int valid { get; set; }
-        public DateTime update_date { get; set; }
+        public int? staff_id { get; set; } = null;
+        public DateTime? update_date { get; set; }
+        public DateTime create_date { get; set; } = DateTime.Now;
         [ForeignKey("category_id")]
         public RentCategory? category { get; set; }
         [ForeignKey("package_id")]
