@@ -57,37 +57,8 @@ namespace SnowmeetApi.Controllers
             _http = httpContextAccessor;
         }
         [HttpGet]
-        public ActionResult<int> TestGenLogs()
-        {
-            Printer newP = new Printer()
-            {
-                id = 1,
-                name = "aaa",
-                shop = "bbb",
-                owner = "ccc",
-                color = "red"
-            };
-            Printer oldP = new Printer()
-            {
-                id = 1,
-                name = "aaaa",
-                shop = "bbbb",
-                owner = "cccc",
-                color = "redblack"
-            };
-            Util.GetUpdateDifferenceLog<Printer>(newP, oldP, 0, 0, "");
-            return Ok(0);
-        }
-
-        [HttpGet]
         public void QRCodeTest(string qrCodeUrl)
         {
-            /*
-            ThoughtWorks.QRCode.Codec.QRCodeEncoder coder = new ThoughtWorks.QRCode.Codec.QRCodeEncoder();
-            System.Drawing.Bitmap bmp = coder.Encode("https:/\/qr.alipay.com\/bax07611fimfgrbn8vyk5511", System.Text.Encoding.UTF8);
-            bmp.Save(Util.workingPath + "/wwwroot/images/alipayqr.bmp");
-            */
-
             byte[] bArr = QRCoder.BitmapByteQRCodeHelper.GetQRCode(qrCodeUrl, QRCoder.QRCodeGenerator.ECCLevel.Q, 5);
             Response.ContentType = "image/jpeg";
             Response.ContentLength = bArr.Length;
@@ -99,7 +70,6 @@ namespace SnowmeetApi.Controllers
             }
             sOut.Close();
         }
-
         [HttpGet]
         public void Query(string appId, string out_trade_no)
         {
@@ -125,109 +95,8 @@ namespace SnowmeetApi.Controllers
             queryOptions.Add("trade_settle_info");
             model.QueryOptions = queryOptions;
             request.SetBizModel(model);
-
             AlipayTradeQueryResponse response = client.CertificateExecute(request);
-
         }
-
-        [HttpGet("{appId}")]
-        public void Test(string appId, double amount)
-        {
-            string certPath = Util.workingPath + "/AlipayCertificate/" + appId;
-            string appCertPublicKeyPath = certPath + "/appCertPublicKey_" + appId + ".crt";
-            
-
-            string privateKey = System.IO.File.OpenText(certPath + "/private_key_" + appId + ".txt").ReadToEnd().Trim();
-
-            CertParams certParams = new CertParams
-            {
-                AlipayPublicCertPath = Util.workingPath + "/AlipayCertificate/" + appId + "/alipayCertPublicKey_RSA2.crt",
-                AppCertPath = appCertPublicKeyPath,
-                RootCertPath = Util.workingPath + "/AlipayCertificate/" + appId + "/alipayRootCert.crt"
-            };
-            IAopClient client = new DefaultAopClient("https://openapi.alipay.com/gateway.do", appId, privateKey, "json", "1.0", "RSA2", "utf-8", false, certParams);
-            AlipayTradePrecreateRequest request = new AlipayTradePrecreateRequest();
-            request.SetNotifyUrl("https://mini.snowmeet.top/core/AlipayPayment/callback");
-            string outTradeNo = DateTime.Now.Year.ToString() + DateTime.Now.Month.ToString().PadLeft(2, '0') + DateTime.Now.Day.ToString().PadLeft(2, '0') + DateTime.Now.Hour.ToString().PadLeft(2, '0')
-                + DateTime.Now.Minute.ToString().PadLeft(2, '0') + DateTime.Now.Second.ToString().PadLeft(2, '0');
-            
-            
-            
-            AlipayTradePrecreateModel model = new AlipayTradePrecreateModel();
-            
-            model.StoreId = "NJ_001";
-            
-            // 设置业务扩展参数
-            /*
-            ExtendParams extendParams = new ExtendParams();
-            extendParams.SysServiceProviderId = "2088511833207846";
-            extendParams.SpecifiedSellerName = "XXX的跨境小铺";
-            extendParams.CardType = "S0JP0000";
-            model.ExtendParams = extendParams;
-            */
-            // 设置订单标题
-            model.Subject = "Iphone6 16G";
-            
-            // 设置商户操作员编号
-            model.OperatorId = "yx_001";
-            
-            // 设置产品码
-            model.ProductCode = "FACE_TO_FACE_PAYMENT";
-            
-            // 设置订单附加信息
-            model.Body = "Iphone6 16G";
-            
-            // 设置订单包含的商品列表信息
-            List<GoodsDetail> goodsDetail = new List<GoodsDetail>();
-            GoodsDetail goodsDetail0 = new GoodsDetail();
-            goodsDetail0.GoodsName = "ipad";
-            goodsDetail0.Quantity = 1;
-            goodsDetail0.Price = "2000";
-            goodsDetail0.GoodsId = "apple-01";
-            goodsDetail0.GoodsCategory = "34543238";
-            goodsDetail0.CategoriesTree = "124868003|126232002|126252004";
-            goodsDetail0.ShowUrl = "http://www.alipay.com/xxx.jpg";
-            goodsDetail.Add(goodsDetail0);
-            model.GoodsDetail = goodsDetail;
-            
-            // 设置商户的原始订单号
-            model.MerchantOrderNo = "20161008001";
-            
-            // 设置可打折金额
-            model.DiscountableAmount = amount.ToString();
-            
-            // 设置商户订单号
-            model.OutTradeNo = outTradeNo;
-            
-            // 设置订单总金额
-            model.TotalAmount = amount.ToString();
-            
-            // 设置商户传入业务信息
-            BusinessParams businessParams = new BusinessParams();
-            businessParams.McCreateTradeIp = "127.0.0.1";
-            model.BusinessParams = businessParams;
-            
-            // 设置卖家支付宝用户ID
-            model.SellerId = "2088640272285174";
-            
-            // 设置商户机具终端编号
-            model.TerminalId = "NJ_T_001";
-
-
-
-
-
-            request.SetBizModel(model);
-
-
-            //AlipayTradePrecreateResponse response = client.Execute(request);
-            AlipayTradePrecreateResponse response = client.CertificateExecute(request);
-            string responseStr = response.Body.Trim();
-            Console.WriteLine(responseStr);
-            AlipayRequestResult respObj = JsonConvert.DeserializeObject<AlipayRequestResult>(responseStr);
-            QRCodeTest(respObj.alipay_trade_precreate_response.qr_code.Trim());
-        }
-
         [HttpPost]
         public async Task  CallBack()
         {
@@ -237,18 +106,12 @@ namespace SnowmeetApi.Controllers
             System.IO.File.AppendAllText("alipay_callback.txt", DateTime.Now.ToString() + "\t" + postStr + "\r\n");
             await Response.WriteAsync("success");
         }
-
-
         [HttpGet("{appId}")]
         public async Task GetBill(string appId, DateTime billDate)
         {
             string certPath = Util.workingPath + "/AlipayCertificate/" + appId;
             string privateKey = await System.IO.File.ReadAllTextAsync(certPath + "/private_key_" + appId + ".txt");
-            
             string publicKey = await System.IO.File.ReadAllTextAsync(certPath + "/alipayCertPublicKey_RSA2.crt");
-
-
-            
             CertParams certParams = new CertParams
             {
                 AlipayPublicCertPath = Util.workingPath + "/AlipayCertificate/" + appId + "/alipayCertPublicKey_RSA2.crt",
@@ -256,11 +119,8 @@ namespace SnowmeetApi.Controllers
                 RootCertPath = Util.workingPath + "/AlipayCertificate/" + appId + "/alipayRootCert.crt"
             };
             IAopClient alipayClient = new DefaultAopClient("https://openapi.alipay.com/gateway.do", appId, privateKey, "json", "1.0", "RSA2", "utf-8", false, certParams);
-            
-            //IAopClient alipayClient = new DefaultAopClient(alipayConfig);
             AlipayDataDataserviceBillDownloadurlQueryRequest request = new AlipayDataDataserviceBillDownloadurlQueryRequest();
             AlipayDataDataserviceBillDownloadurlQueryModel model = new AlipayDataDataserviceBillDownloadurlQueryModel();
-            //model.Smid = "2088123412341234";
             model.BillType = "trade";
             model.BillDate = billDate.ToString("yyyy-MM-dd");
             request.SetBizModel(model);
@@ -271,9 +131,7 @@ namespace SnowmeetApi.Controllers
              else{
              	Console.WriteLine("调用失败");
              }
-
         }
-
 	}
 }
 

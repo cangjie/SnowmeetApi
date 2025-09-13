@@ -57,6 +57,51 @@ namespace SnowmeetApi.Controllers
             _memberHelper = new MemberController(context, config);
             _orderHelper = new OrderOnlinesController(_db, _oriConfig);
         }
+        [HttpGet]
+        public ActionResult<ApiResult<ArrayList>> GetRentType()
+        {
+            ArrayList arr = new ArrayList();
+            foreach (object s in Enum.GetNames(typeof(RentPrice.RentType)))
+            {
+                arr.Add(s.ToString());
+            }
+            return Ok(new ApiResult<ArrayList>()
+            {
+                code = 0,
+                message = "",
+                data = arr
+            });
+        }
+        [HttpGet]
+        public ActionResult<ApiResult<ArrayList>> GetDayType()
+        {
+            ArrayList arr = new ArrayList();
+            foreach (object s in Enum.GetNames(typeof(RentPrice.DayType)))
+            {
+                arr.Add(s.ToString());
+            }
+            return Ok(new ApiResult<ArrayList>()
+            {
+                code = 0,
+                message = "",
+                data = arr
+            });
+        }
+        [HttpGet]
+        public ActionResult<ApiResult<ArrayList>> GetSceneType()
+        {
+            ArrayList arr = new ArrayList();
+            foreach (object s in Enum.GetNames(typeof(RentPrice.Scene)))
+            {
+                arr.Add(s.ToString());
+            }
+            return Ok(new ApiResult<ArrayList>()
+            {
+                code = 0,
+                message = "",
+                data = arr
+            });
+        }
         [HttpGet("{id}")]
         public async Task<ActionResult<RentCategory>> ModCategory(int id, string code, string name, string sessionKey, string sessionType)
         {
