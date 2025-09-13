@@ -21,6 +21,7 @@ namespace SnowmeetApi.Models
         public double? price { get; set; } = 0;
         public string? scene { get; set; } = null;
         public string? rent_type { get; set; } = null;
+        public int valid { get; set; }
         public DateTime update_date { get; set; }
         [ForeignKey("category_id")]
         public RentCategory? category { get; set; }

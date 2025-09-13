@@ -102,6 +102,22 @@ namespace SnowmeetApi.Controllers
                 data = arr
             });
         }
+        [HttpGet("{shopId}")]
+        public async Task<ActionResult<ApiResult<List<RentPrice>>>> GetRentPriceList(int shopId, string type, int id, string scene)
+        {
+            scene = Util.UrlDecode(scene);
+            type = Util.UrlDecode(type);
+            List<RentPrice> rentPrice = await _db.rentPrice
+                .Where(p => p.valid == 1 && p.shop_id == shopId && type.Trim().Equals(p.type)
+                && (type.Trim().Equals("分类") && p.category_id == id)
+                && (type.Trim().Equals("套餐") && p.package_id == id)
+                && p.scene.Trim().Equals(scene)).AsNoTracking().ToListAsync();
+            return Ok(new ApiResult<List<RentPrice>>() {
+                code = 0,
+                message = "",
+                data = rentPrice
+            });
+        }
         [HttpGet("{id}")]
         public async Task<ActionResult<RentCategory>> ModCategory(int id, string code, string name, string sessionKey, string sessionType)
         {
@@ -366,6 +382,7 @@ namespace SnowmeetApi.Controllers
             await _db.SaveChangesAsync();
             return Ok();
         }
+        /*
         [HttpGet("{code}")]
         public async Task<ActionResult<RentPrice>> SetRentCategoryPrice(string code, string shop, string dayType, string scene, double price, string sessionKey, string sessionType = "wchat_mini_openid")
         {
@@ -432,6 +449,7 @@ namespace SnowmeetApi.Controllers
                 return Ok(rp);
             }
         }
+        */
         [HttpGet("{id}")]
         public async Task<ActionResult<RentCategory>> SetShopCategoryRentPrice(int id, string shop, string dayType, string scene, string price, string sessionKey, string sessionType)
         {
