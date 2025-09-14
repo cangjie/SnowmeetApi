@@ -303,7 +303,7 @@ namespace SnowmeetApi.Controllers
         }
         //准备废弃3
         [HttpGet]
-        public async Task<ActionResult<ICollection<RentCategory>>> GetAllCategories()
+        public async Task<ActionResult<ApiResult<List<RentCategory>>>> GetAllCategories()
         {
             var topL = await _db.rentCategory.Where(r => (r.code.Trim().Length == 2))
                 .OrderBy(r => r.code).ToListAsync();
@@ -317,7 +317,11 @@ namespace SnowmeetApi.Controllers
                 RentCategory rc = (RentCategory)((OkObjectResult)(await GetCategory(topL[i].code)).Result).Value;
                 rl.Add(rc);
             }
-            return Ok(rl);
+            return Ok(new ApiResult<List<RentCategory>>() {
+                code = 0,
+                message = "",
+                data = rl
+            });
         }
         [HttpGet]
         public async Task<ActionResult<ICollection<RentCategory>>> GetTopRentCategories()
