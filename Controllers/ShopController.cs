@@ -10,7 +10,7 @@ using SnowmeetApi.Models;
 
 namespace SnowmeetApi.Controllers
 {
-    [Route("core/[controller]/[action]")]
+    [Route("api/[controller]/[action]")]
     [ApiController]
     public class ShopController : ControllerBase
     {
@@ -23,9 +23,26 @@ namespace SnowmeetApi.Controllers
 
         // GET: api/Shop
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Shop>>> GetShop()
+        public async Task<ActionResult<ActionResult<List<Shop>>>> GetShop()
         {
-            return await _context.shop.OrderBy(s => s.sort).ToListAsync();
+            return Ok(new ApiResult<List<Shop>>()
+            {
+                code = 0,
+                message = "",
+                data = await _context.shop.OrderBy(s => s.sort).AsNoTracking().ToListAsync()
+            });
+        }
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<Shop>>> GetShopByName(string shopName)
+        {
+            shopName = Util.UrlDecode(shopName);
+            Shop shop = await _context.shop.Where(s => s.name.Trim().Equals(shopName)).AsNoTracking().FirstOrDefaultAsync();
+            return Ok(new ApiResult<Shop>()
+            {
+                code = 0,
+                message = "",
+                data = shop
+            });
         }
 
 
