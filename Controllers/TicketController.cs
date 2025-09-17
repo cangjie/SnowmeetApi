@@ -12,7 +12,7 @@ using SnowmeetApi.Controllers.User;
 using SnowmeetApi.Models;
 namespace SnowmeetApi.Controllers
 {
-    [Route("core/[controller]/[action]")]
+    [Route("api/[controller]/[action]")]
     [ApiController]
     public class TicketController : ControllerBase
     {
@@ -28,6 +28,41 @@ namespace SnowmeetApi.Controllers
             _config = config.GetSection("Settings");
             _appId = _config.GetSection("AppId").Value.Trim();
         }
+        
+        [HttpGet("{used}")]
+        public async Task<ActionResult<ApiResult<List<Ticket>>>> GetMyTickets(int used,
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            MemberController _memberHelper = new MemberController(_context, _oriConfig);
+            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
+            if (member == null)
+            { 
+                return Ok(new ApiResult<List<Ticket>>()
+                {
+                    code = 0,
+                    message = "用户未登录",
+                    data = null
+                });
+            }
+            List<Ticket> tickets = await _context.ticket
+                .Where(t => t.member_id == member.id && t.valid == 1 && t.used == used)
+                .AsNoTracking().ToListAsync();
+
+            return Ok(new ApiResult<List<Ticket>>()
+            {
+                code = 0,
+                message = "",
+                data = tickets
+            });
+        }
+
+
+
+
+        /// <summary>
+        /// Old Season
+        /// </summary>
+        /// <returns></returns>
 
         [HttpGet]
         public async Task<ActionResult<IEnumerable<TicketTemplate>>> GetTemplateList()
