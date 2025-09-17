@@ -28,7 +28,7 @@ namespace SnowmeetApi.Controllers
             _config = config.GetSection("Settings");
             _appId = _config.GetSection("AppId").Value.Trim();
         }
-        
+
         [HttpGet("{used}")]
         public async Task<ActionResult<ApiResult<List<Ticket>>>> GetMyTickets(int used,
             string sessionKey, string sessionType = "wechat_mini_openid")
@@ -343,7 +343,7 @@ namespace SnowmeetApi.Controllers
                 return NoContent();
             }
         }
-
+        /*
         [HttpGet("{used}")]
         public async Task<ActionResult<IEnumerable<Ticket>>> GetMyTickets(int used, string sessionKey)
         {
@@ -357,7 +357,7 @@ namespace SnowmeetApi.Controllers
 
             return await _context.ticket.Where<Ticket>(t => (t.open_id == user.miniAppOpenId && t.used == used)).OrderByDescending(t=>t.create_date).ToListAsync();
         }
-
+        */
         [HttpGet("{code}")]
         public async Task<ActionResult<bool>> Bind(string code, string sessionKey)
         {
