@@ -423,6 +423,27 @@ namespace LuqinMiniAppBase.Controllers
             await _db.SaveChangesAsync();
             return log;
         }
+
+        [HttpGet]
+        public  ActionResult<string> OpenMiniProgram(string path, string query, string version = "release")
+        {
+            string ret = "";
+            string token = GetAccessToken();
+            string postUrl = "https://api.weixin.qq.com/wxa/generatescheme?access_token=" + token.Trim();
+            string postData = "{ "
+                + "\"jump_wxa\": "
+                + "{ "
+                + " \"path\": \"" + path.Trim() +  "\" , "
+                + " \"query\": \"" + query + "\", "
+                + " \"env_version\": \"" + version + "\" }, "
+                + " \"is_expire\": true , "
+                + " \"expire_type\":1, "
+                + " \"expire_interval\":1 }";
+            ret = Util.GetWebContent(postUrl, postData, "application/json");
+            return Ok(ret);
+        }
+
+
         public class Code2Session
         {
             public string openid { get; set; } = "";
@@ -430,11 +451,11 @@ namespace LuqinMiniAppBase.Controllers
             public string unionid { get; set; } = null;
             public string errcode { get; set; } = "";
             public string errmsg { get; set; } = "";
-            public int? member_id {get; set;} = null;
+            public int? member_id { get; set; } = null;
             [NotMapped]
-            public Member member {get; set;} = null;
+            public Member member { get; set; } = null;
             [NotMapped]
-            public Staff staff {get; set;} = null;
+            public Staff staff { get; set; } = null;
         }
 
         protected class AccessToken
