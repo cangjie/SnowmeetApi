@@ -46,7 +46,7 @@ namespace SnowmeetApi.Controllers
             }
             List<Ticket> tickets = await _context.ticket
                 .Where(t => t.member_id == member.id && t.valid == 1 && t.used == used)
-                .AsNoTracking().ToListAsync();
+                .OrderBy(t => t.create_date).AsNoTracking().ToListAsync();
 
             return Ok(new ApiResult<List<Ticket>>()
             {
@@ -164,7 +164,7 @@ namespace SnowmeetApi.Controllers
 
         // GET: api/Ticket/5
         [HttpGet("{code}")]
-        public async Task<ActionResult<Ticket>> GetTicket(string code)
+        public async Task<ActionResult<ApiResult<Ticket>>> GetTicket(string code)
         {
             var ticket = await _context.ticket.FindAsync(code);
 
@@ -175,7 +175,11 @@ namespace SnowmeetApi.Controllers
 
             ticket.open_id = "";
 
-            return ticket;
+            return Ok(new ApiResult<Ticket>(){
+                code = 0,
+                message = "",
+                data = ticket
+            });
         }
 
 
