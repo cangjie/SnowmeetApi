@@ -16,7 +16,8 @@
                 return;
             }
             console.log('open mapp', msg);
-            if (msg.code != 0) {
+            var msgObj = eval(msg);
+            if (msgObj.code != 0) {
                 alert('打开小程序失败，' + msg.msg);
                 return;
             }
