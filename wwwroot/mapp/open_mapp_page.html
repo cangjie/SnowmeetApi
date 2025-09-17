@@ -16,12 +16,15 @@
                 return;
             }
             console.log('open mapp', msg);
-            var msgObj = eval(msg);
+            var msgObj = JSON.parse(msg);
+            consle.log('open mapp obj', msgObj);
+            /*
             if (msgObj.code != 0) {
                 alert('打开小程序失败，' + msg.msg);
                 return;
             }
             alert('已打开小程序，请在微信开发者工具中查看');
+            */
         }
     })
     function getUrlParameter(para) {
