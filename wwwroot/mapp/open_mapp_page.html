@@ -1,0 +1,42 @@
+<script type="text/javascript" src="../js/jquery-3.6.1.min.js"></script>
+<script type="text/javascript" src="../js/util.js"></script>
+<script type="text/javascript">
+    var path = getUrlParameter('path');
+    var query = getUrlParameter('query');
+    var version = getUrlParameter('version');
+    if (version == ''){
+        version = 'release';
+    }
+    var url = '/api/MiniAppHelper/OpenMiniProgran?path=' + encodeURIComponent(path) + '&query=' + encodeURIComponent(query) + '&version=' + encodeURIComponent(version);
+    $.ajax({
+        url: url,
+        type: 'GET',
+        success: function (msg, status) {
+            if (status != 'success') {
+                return;
+            }
+            console.log('open mapp', msg);
+            if (msg.code != 0) {
+                alert('打开小程序失败，' + msg.msg);
+                return;
+            }
+            alert('已打开小程序，请在微信开发者工具中查看');
+        }
+    })
+    function getUrlParameter(para) {
+        var urlArr = window.location.href.split('?');
+        if (urlArr.length < 2) {
+            return '';
+        }
+        var paraArr = urlArr[1].trim().split('&');
+        var value = '';
+        for (var i = 0; i < paraArr.length; i++) {
+            var paraPair = paraArr[i].trim();
+            if (paraPair.startsWith(para + '=')) {
+                value = paraPair.replace(para + '=', '');
+                break;
+            }
+        }
+        return value.trim();
+    }
+</script>
