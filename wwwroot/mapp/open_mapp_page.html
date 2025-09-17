@@ -18,6 +18,7 @@
             console.log('open mapp', msg);
             var msgObj = JSON.parse(msg);
             consle.log('open mapp obj', msgObj);
+            window.location.href = msgObj.openlink;
             /*
             if (msgObj.code != 0) {
                 alert('打开小程序失败，' + msg.msg);
