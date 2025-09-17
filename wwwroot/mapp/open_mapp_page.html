@@ -7,7 +7,7 @@
     if (version == ''){
         version = 'release';
     }
-    var url = '/api/MiniAppHelper/OpenMiniProgran?path=' + encodeURIComponent(path) + '&query=' + encodeURIComponent(query) + '&version=' + encodeURIComponent(version);
+    var url = '/api/MiniAppHelper/OpenMiniProgran?path=' + encodeURIComponent(path) +  (query?  ('&query=' + encodeURIComponent(query)) : '') + '&version=' + encodeURIComponent(version);
     $.ajax({
         url: url,
         type: 'GET',
