@@ -17,16 +17,7 @@
             }
             console.log('open mapp', msg);
             var msgObj = JSON.parse(msg);
-            //console.log('open mapp obj', msgObj);
-            //window.open(msgObj.openlink);
             window.location.href = msgObj.openlink;
-            /*
-            if (msgObj.code != 0) {
-                alert('打开小程序失败，' + msg.msg);
-                return;
-            }
-            alert('已打开小程序，请在微信开发者工具中查看');
-            */
         }
     })
     function getUrlParameter(para) {

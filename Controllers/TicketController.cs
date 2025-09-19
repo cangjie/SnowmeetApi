@@ -55,10 +55,6 @@ namespace SnowmeetApi.Controllers
                 data = tickets
             });
         }
-
-
-
-
         /// <summary>
         /// Old Season
         /// </summary>
@@ -87,7 +83,6 @@ namespace SnowmeetApi.Controllers
                 .ToListAsync();
             return ticketArr;
         }
-
         [HttpGet]
         [ActionName("GetChannels")]
         public async Task<ActionResult<IEnumerable<string>>> GetChannels()
@@ -95,8 +90,6 @@ namespace SnowmeetApi.Controllers
             return await _context.ticket
                 .Where(tt=>!tt.channel.Trim().Equals(""))
                 .Select(tt => tt.channel).Distinct().ToListAsync();
-            
-            
         }
 
         [HttpGet("{code}")]
@@ -189,15 +182,6 @@ namespace SnowmeetApi.Controllers
             sessionKey = Util.UrlDecode(sessionKey);
             string channel = Util.UrlDecode(source);
             UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
-            /*
-            var tList = await _context.Ticket.Where(t => (t.template_id == templateId
-                && t.open_id.Trim().Equals(user.miniAppOpenId)
-                && t.used == 0 )).ToListAsync();
-            if (tList.Count > 0)
-            {
-                return BadRequest();
-            }
-            */
             int retryTimes = 0;
             bool isDuplicate = true;
             string code = Util.GetRandomCode(9);
