@@ -550,10 +550,12 @@ namespace SnowmeetApi.Controllers
             return Ok(rc);
         }
         [HttpGet("{code}")]
-        public async Task<ActionResult<ApiResult<RentCategory?>>> UpdateCategory(string code, string name, double guaranty, string sessionKey, string sessionType)
+        public async Task<ActionResult<ApiResult<RentCategory?>>> UpdateCategory(string code, string name, double guaranty, string scene, string sessionKey, string sessionType)
         {
             sessionKey = Util.UrlDecode(sessionKey);
             sessionType = Util.UrlDecode(sessionType);
+            name = Util.UrlDecode(name);
+            scene = Util.UrlDecode(scene);
             StaffController _staffHelper = new StaffController(_db);
             Staff staff = await _staffHelper.GetStaffBySessionKey(sessionKey);
             if (staff.title_level < 200)
@@ -585,7 +587,8 @@ namespace SnowmeetApi.Controllers
                     current_value = name,
                     is_manual = 1,
                     staff_id = staff.id,
-                    manual_memo = "修改分类名称"
+                    manual_memo = "修改分类名称",
+                    scene = scene
                 };
                 cate.name = name.Trim();
                 await _db.coreDataModLog.AddAsync(logName);
@@ -603,7 +606,8 @@ namespace SnowmeetApi.Controllers
                     current_value = guaranty.ToString(),
                     is_manual = 1,
                     staff_id = staff.id,
-                    manual_memo = "修改分类名称"
+                    manual_memo = "修改分类名称",
+                    scene = scene
                 };
                 cate.deposit = guaranty;
                 await _db.coreDataModLog.AddAsync(logDeposit);
