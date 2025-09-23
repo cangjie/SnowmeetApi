@@ -1,0 +1,39 @@
+<script type="text/javascript" src="../js/jquery-3.6.1.min.js"></script>
+<script type="text/javascript" src="../js/util.js"></script>
+<script type="text/javascript">
+    var path = getUrlParameter('path');
+    var query = getUrlParameter('query');
+    var version = getUrlParameter('version');
+    if (version == ''){
+        version = 'release';
+    }
+    var url = '/api/MiniAppHelper/OpenMiniProgram?path=' + encodeURIComponent(path) +  (query?  ('&query=' + encodeURIComponent(query)) : '') + '&version=' + encodeURIComponent(version);
+    $.ajax({
+        url: url,
+        type: 'GET',
+        success: function (msg, status) {
+            if (status != 'success') {
+                return;
+            }
+            console.log('open mapp', msg);
+            var msgObj = JSON.parse(msg);
+            window.location.href = msgObj.openlink;
+        }
+    })
+    function getUrlParameter(para) {
+        var urlArr = window.location.href.split('?');
+        if (urlArr.length < 2) {
+            return '';
+        }
+        var paraArr = urlArr[1].trim().split('&');
+        var value = '';
+        for (var i = 0; i < paraArr.length; i++) {
+            var paraPair = paraArr[i].trim();
+            if (paraPair.startsWith(para + '=')) {
+                value = paraPair.replace(para + '=', '');
+                break;
+            }
+        }
+        return value.trim();
+    }
+</script>

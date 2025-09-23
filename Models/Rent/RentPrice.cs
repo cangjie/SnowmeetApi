@@ -7,7 +7,7 @@ namespace SnowmeetApi.Models
     public class RentPrice
     {
         public enum DayType {平日, 周末, 节假日}
-        public enum RentType {日场, 夜场, 午加夜, 日加夜, 多日}
+        public enum RentType {日场, 下午场, 夜场, 午加夜, 日加夜, 多日}
         public enum Scene {门市, 预约, 会员}
         [Key]
         public int id { get; set; }

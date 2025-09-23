@@ -12,7 +12,7 @@ using SnowmeetApi.Controllers.User;
 using SnowmeetApi.Models;
 namespace SnowmeetApi.Controllers
 {
-    [Route("core/[controller]/[action]")]
+    [Route("api/[controller]/[action]")]
     [ApiController]
     public class TicketController : ControllerBase
     {
@@ -28,6 +28,37 @@ namespace SnowmeetApi.Controllers
             _config = config.GetSection("Settings");
             _appId = _config.GetSection("AppId").Value.Trim();
         }
+
+        [HttpGet("{used}")]
+        public async Task<ActionResult<ApiResult<List<Ticket>>>> GetMyTickets(int used,
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            MemberController _memberHelper = new MemberController(_context, _oriConfig);
+            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
+            if (member == null)
+            { 
+                return Ok(new ApiResult<List<Ticket>>()
+                {
+                    code = 0,
+                    message = "用户未登录",
+                    data = null
+                });
+            }
+            List<Ticket> tickets = await _context.ticket
+                .Where(t => t.member_id == member.id && t.valid == 1 && t.used == used)
+                .OrderBy(t => t.create_date).AsNoTracking().ToListAsync();
+
+            return Ok(new ApiResult<List<Ticket>>()
+            {
+                code = 0,
+                message = "",
+                data = tickets
+            });
+        }
+        /// <summary>
+        /// Old Season
+        /// </summary>
+        /// <returns></returns>
 
         [HttpGet]
         public async Task<ActionResult<IEnumerable<TicketTemplate>>> GetTemplateList()
@@ -52,7 +83,6 @@ namespace SnowmeetApi.Controllers
                 .ToListAsync();
             return ticketArr;
         }
-
         [HttpGet]
         [ActionName("GetChannels")]
         public async Task<ActionResult<IEnumerable<string>>> GetChannels()
@@ -60,8 +90,6 @@ namespace SnowmeetApi.Controllers
             return await _context.ticket
                 .Where(tt=>!tt.channel.Trim().Equals(""))
                 .Select(tt => tt.channel).Distinct().ToListAsync();
-            
-            
         }
 
         [HttpGet("{code}")]
@@ -129,7 +157,7 @@ namespace SnowmeetApi.Controllers
 
         // GET: api/Ticket/5
         [HttpGet("{code}")]
-        public async Task<ActionResult<Ticket>> GetTicket(string code)
+        public async Task<ActionResult<ApiResult<Ticket>>> GetTicket(string code)
         {
             var ticket = await _context.ticket.FindAsync(code);
 
@@ -140,7 +168,11 @@ namespace SnowmeetApi.Controllers
 
             ticket.open_id = "";
 
-            return ticket;
+            return Ok(new ApiResult<Ticket>(){
+                code = 0,
+                message = "",
+                data = ticket
+            });
         }
 
 
@@ -150,15 +182,6 @@ namespace SnowmeetApi.Controllers
             sessionKey = Util.UrlDecode(sessionKey);
             string channel = Util.UrlDecode(source);
             UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
-            /*
-            var tList = await _context.Ticket.Where(t => (t.template_id == templateId
-                && t.open_id.Trim().Equals(user.miniAppOpenId)
-                && t.used == 0 )).ToListAsync();
-            if (tList.Count > 0)
-            {
-                return BadRequest();
-            }
-            */
             int retryTimes = 0;
             bool isDuplicate = true;
             string code = Util.GetRandomCode(9);
@@ -308,7 +331,7 @@ namespace SnowmeetApi.Controllers
                 return NoContent();
             }
         }
-
+        /*
         [HttpGet("{used}")]
         public async Task<ActionResult<IEnumerable<Ticket>>> GetMyTickets(int used, string sessionKey)
         {
@@ -322,7 +345,7 @@ namespace SnowmeetApi.Controllers
 
             return await _context.ticket.Where<Ticket>(t => (t.open_id == user.miniAppOpenId && t.used == used)).OrderByDescending(t=>t.create_date).ToListAsync();
         }
-
+        */
         [HttpGet("{code}")]
         public async Task<ActionResult<bool>> Bind(string code, string sessionKey)
         {
