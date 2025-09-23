@@ -550,27 +550,72 @@ namespace SnowmeetApi.Controllers
             return Ok(rc);
         }
         [HttpGet("{code}")]
-        public async Task<ActionResult<RentCategory>> UpdateCategory(string code, string name, double deposit, string sessionKey, string sessionType)
+        public async Task<ActionResult<ApiResult<RentCategory?>>> UpdateCategory(string code, string name, double guaranty, string sessionKey, string sessionType)
         {
             sessionKey = Util.UrlDecode(sessionKey);
             sessionType = Util.UrlDecode(sessionType);
-            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
-            if (member.is_admin != 1)
+            StaffController _staffHelper = new StaffController(_db);
+            Staff staff = await _staffHelper.GetStaffBySessionKey(sessionKey);
+            if (staff.title_level < 200)
             {
-                return BadRequest();
+                return Ok(new ApiResult<RentCategory?>()
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = null
+                });
             }
             RentCategory cate = await _db.rentCategory
-                .Where(r => r.code.Trim().Equals(code.Trim())).FirstOrDefaultAsync();
+            .Where(r => r.code.Trim().Equals(code.Trim())).FirstOrDefaultAsync();
             if (cate == null)
             {
                 return NotFound();
             }
             cate.update_date = DateTime.Now;
-            cate.name = name.Trim();
-            cate.deposit = deposit;
+            if (!cate.name.Trim().Equals(name.Trim()))
+            {
+
+                CoreDataModLog logName = new CoreDataModLog()
+                {
+                    id = 0,
+                    table_name = "rent_category",
+                    field_name = "name",
+                    key_value = cate.id,
+                    prev_value = cate.name,
+                    current_value = name,
+                    is_manual = 1,
+                    staff_id = staff.id,
+                    manual_memo = "修改分类名称"
+                };
+                cate.name = name.Trim();
+                await _db.coreDataModLog.AddAsync(logName);
+            }
+            //cate.name = name.Trim();
+            if (cate.deposit != guaranty)
+            { 
+                CoreDataModLog logDeposit = new CoreDataModLog()
+                {
+                    id = 0,
+                    table_name = "rent_category",
+                    field_name = "deposit",
+                    key_value = cate.id,
+                    prev_value = cate.deposit.ToString(),
+                    current_value = guaranty.ToString(),
+                    is_manual = 1,
+                    staff_id = staff.id,
+                    manual_memo = "修改分类名称"
+                };
+                cate.deposit = guaranty;
+                await _db.coreDataModLog.AddAsync(logDeposit);
+            }
             _db.Entry(cate).State = EntityState.Modified;
             await _db.SaveChangesAsync();
-            return Ok(cate);
+            return Ok(new ApiResult<RentCategory?>()
+            {
+                code = 0,
+                message = "",
+                data = cate
+            });
         }
         [HttpGet]
         public async Task<ActionResult<RentPackage>> AddRentPackage(string name, string description, string sessionKey, string sessionType)
