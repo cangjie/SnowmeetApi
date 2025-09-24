@@ -393,6 +393,8 @@ namespace SnowmeetApi
             //string path = $"{Environment.CurrentDirectory}";
             string path = Directory.GetCurrentDirectory();
 
+            System.IO.File.AppendAllText("test.txt", path);
+
             if (path.StartsWith("/"))
             {
                 path = path + "/";
