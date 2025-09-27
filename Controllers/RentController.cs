@@ -651,25 +651,37 @@ namespace SnowmeetApi.Controllers
             });
         }
         [HttpGet]
-        public async Task<ActionResult<RentPackage>> AddRentPackage(string name, string description, string sessionKey, string sessionType)
+        public async Task<ActionResult<ApiResult<RentPackage?>>> AddRentPackage(string name, string description, string sessionKey, string sessionType)
         {
             sessionKey = Util.UrlDecode(sessionKey);
             sessionType = Util.UrlDecode(sessionType);
-            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
-            if (member.is_admin != 1)
+            StaffController _staffHelper = new StaffController(_db);
+            Staff staff = await _staffHelper.GetStaffBySessionKey(sessionKey, sessionType);
+            if (staff == null || staff.title_level < 200)
             {
-                return BadRequest();
+                return Ok(new ApiResult<RentPackage?>()
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = null
+                });
             }
             RentPackage rp = new RentPackage()
             {
                 name = Util.UrlDecode(name),
                 description = Util.UrlDecode(description),
                 valid = 1,
+                staff_id = staff.id,
                 update_date = DateTime.Now
             };
             await _db.rentPackage.AddAsync(rp);
             await _db.SaveChangesAsync();
-            return Ok(rp);
+            return Ok(new ApiResult<RentPackage?>()
+            {
+                code = 0,
+                message = "",
+                data = rp
+            });
         }
         [HttpGet("{packageId}")]
         public async Task<ActionResult<ActionResult<RentPackage?>>> RentPackageCategoryAdd(int packageId, int categoryId,

@@ -14,6 +14,7 @@ namespace SnowmeetApi.Models
         public string description { get; set; }
         public double deposit { get; set; }
         public int valid { get; set; }
+        public int? staff_id { get; set; } = null;
         public DateTime update_date { get; set; }
         public List<RentPackageCategory>? rentPackageCategoryList { get; set; }
         public List<RentPrice> rentPackagePriceList { get; set; }
