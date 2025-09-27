@@ -687,7 +687,9 @@ namespace SnowmeetApi.Controllers
             await _db.coreDataModLog.AddAsync(log);
             await _db.rentPackageCategory.AddAsync(rpc);
             await _db.SaveChangesAsync();
-            RentPackage pr = await _db.rentPackage.Include(r => r.rentPackageCategoryList).Where(r => r.id == packageId).FirstAsync();
+            RentPackage pr = await _db.rentPackage
+                .Include(r => r.rentPackageCategoryList).ThenInclude(r => r.rentCategory)
+                .Where(r => r.id == packageId).FirstAsync();
             return Ok(new ApiResult<RentPackage?>()
             {
                 code = 0,
@@ -737,7 +739,9 @@ namespace SnowmeetApi.Controllers
             await _db.coreDataModLog.AddAsync(log);
             await _db.SaveChangesAsync();
 
-            RentPackage pr = await _db.rentPackage.Include(r => r.rentPackageCategoryList).Where(r => r.id == packageId).FirstAsync();
+            RentPackage pr = await _db.rentPackage
+                .Include(r => r.rentPackageCategoryList).ThenInclude(r => r.rentCategory)
+                .Where(r => r.id == packageId).FirstAsync();
             return Ok(new ApiResult<RentPackage?>()
             {
                 code = 0,
