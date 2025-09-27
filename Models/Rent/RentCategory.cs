@@ -12,8 +12,10 @@ namespace SnowmeetApi.Models
         public string code { get; set; }
         public string name { get; set; }
         public double deposit {get; set;}
-        public int valid { get; set; }
-        public DateTime update_date { get; set; } = DateTime.Now;
+        public int valid { get; set; } = 1;
+        public int? staff_id { get; set; } = null;
+        public DateTime? update_date { get; set; } = null;
+        public DateTime create_date { get; set; } = DateTime.Now;
         [NotMapped]
         public ICollection<RentCategory> children { get; set; }
         [NotMapped]

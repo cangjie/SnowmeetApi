@@ -231,17 +231,30 @@ namespace SnowmeetApi.Controllers
             return (RentCategory)((OkObjectResult)(await GetCategory(code)).Result).Value;
         }
         [HttpGet("{code}")]
-        public async Task<ActionResult<RentCategory>> AddCategoryManual(string code, string name, string sessionKey, string sessionType)
+        public async Task<ActionResult<ApiResult<RentCategory?>>> AddCategoryManual(string code, string name, string sessionKey, string sessionType)
         {
             name = Util.UrlDecode(name);
             sessionKey = Util.UrlDecode(sessionKey);
             sessionType = Util.UrlDecode(sessionType);
             code = code.Trim();
+            StaffController _staffHelper = new StaffController(_db);
+            Staff staff = await _staffHelper.GetStaffBySessionKey(sessionKey);
+            if (staff.title_level < 200)
+            {
+                return Ok(new ApiResult<RentCategory?>()
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = null
+                });
+            }
+            /*
             Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
             if (member.is_admin != 1)
             {
                 return BadRequest();
             }
+            */
             RentCategory rc = await _db.rentCategory.Where(r => r.code.Trim().Equals(code.Trim())).FirstOrDefaultAsync();
             if (rc != null)
             {
@@ -260,11 +273,18 @@ namespace SnowmeetApi.Controllers
             RentCategory rcNew = new RentCategory()
             {
                 name = name,
-                code = code
+                code = code,
+                valid = 1,
+                staff_id = staff.id
             };
             await _db.rentCategory.AddAsync(rcNew);
             await _db.SaveChangesAsync();
-            return Ok(rcNew);
+            return Ok(new ApiResult<RentCategory?>()
+            {
+                code = 0,
+                message = "",
+                data = rcNew
+             });
         }
         [HttpGet]
         public async Task<ActionResult<RentCategory>> AddCategory(string code, string name, string sessionKey, string sessionType)
