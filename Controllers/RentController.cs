@@ -643,15 +643,23 @@ namespace SnowmeetApi.Controllers
             return Ok(rp);
         }
         [HttpGet("{packageId}")]
-        public async Task<ActionResult<RentPackage>> RentPackageCategoryAdd(int packageId, int categoryId, string sessionKey, string sessionType)
+        public async Task<ActionResult<ActionResult<RentPackage?>>> RentPackageCategoryAdd(int packageId, int categoryId,
+            string sessionKey, string sessionType = "wechat_mini_openid")
         {
             sessionKey = Util.UrlDecode(sessionKey);
             sessionType = Util.UrlDecode(sessionType);
-            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
-            if (member.is_admin != 1)
+            StaffController _staffHelper = new StaffController(_db);
+            Staff staff = await _staffHelper.GetStaffBySessionKey(sessionKey, sessionType);
+            if (staff == null || staff.title_level < 200)
             {
-                return BadRequest();
+                return Ok(new ApiResult<RentPackage?>()
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = null
+                });
             }
+            
             RentCategory rentCategory = await _db.rentCategory.FindAsync(categoryId);
             if (rentCategory == null)
             {
@@ -663,32 +671,79 @@ namespace SnowmeetApi.Controllers
                 category_id = rentCategory.id,
                 update_date = DateTime.Now
             };
+            CoreDataModLog log = new CoreDataModLog()
+            {
+                id = 0,
+                table_name = "rent_package_category",
+                field_name = "category_id",
+                key_value = packageId,
+                prev_value = "",
+                current_value = categoryId.ToString(),
+                is_manual = 1,
+                staff_id = staff.id,
+                manual_memo = "添加套餐分类",
+                scene = "后台"
+            };
+            await _db.coreDataModLog.AddAsync(log);
             await _db.rentPackageCategory.AddAsync(rpc);
             await _db.SaveChangesAsync();
             RentPackage pr = await _db.rentPackage.Include(r => r.rentPackageCategoryList).Where(r => r.id == packageId).FirstAsync();
-            return Ok(pr);
+            return Ok(new ApiResult<RentPackage?>()
+            {
+                code = 0,
+                message = "",
+                data = pr
+            });
         }
         [HttpGet("{packageId}")]
-        public async Task<ActionResult<RentPackage>> RentPackageCategoryDel(int packageId, int categoryId, string sessionKey, string sessionType)
+        public async Task<ActionResult<RentPackage>> RentPackageCategoryDel(int packageId, int categoryId,
+            string sessionKey, string sessionType = "wechat_mini_openid")
         {
             sessionKey = Util.UrlDecode(sessionKey);
             sessionType = Util.UrlDecode(sessionType);
-            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
-            if (member.is_admin != 1)
+            StaffController _staffHelper = new StaffController(_db);
+            Staff staff = await _staffHelper.GetStaffBySessionKey(sessionKey, sessionType);
+            if (staff == null || staff.title_level < 200)
             {
-                return BadRequest();
+                return Ok(new ApiResult<RentPackage?>()
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = null
+                });
             }
+
+
             RentCategory category = await _db.rentCategory.FindAsync(categoryId);
             if (category == null)
             {
                 return NotFound();
             }
+            CoreDataModLog log = new CoreDataModLog()
+            {
+                id = 0,
+                table_name = "rent_package_category",
+                field_name = "category_id",
+                key_value = packageId,
+                prev_value = categoryId.ToString(),
+                current_value = "",
+                is_manual = 1,
+                staff_id = staff.id,
+                manual_memo = "删除套餐分类",
+                scene = "后台"
+            };
             RentPackageCategory rpc = await _db.rentPackageCategory.FindAsync(packageId, category.id);
             _db.rentPackageCategory.Remove(rpc);
+            await _db.coreDataModLog.AddAsync(log);
             await _db.SaveChangesAsync();
 
             RentPackage pr = await _db.rentPackage.Include(r => r.rentPackageCategoryList).Where(r => r.id == packageId).FirstAsync();
-            return Ok(pr);
+            return Ok(new ApiResult<RentPackage?>()
+            {
+                code = 0,
+                message = "",
+                data = pr
+            });
         }
 
 
