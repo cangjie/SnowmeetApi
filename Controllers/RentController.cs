@@ -682,7 +682,8 @@ namespace SnowmeetApi.Controllers
                 is_manual = 1,
                 staff_id = staff.id,
                 manual_memo = "添加套餐分类",
-                scene = "后台"
+                scene = "后台",
+                create_date = DateTime.Now
             };
             await _db.coreDataModLog.AddAsync(log);
             await _db.rentPackageCategory.AddAsync(rpc);
@@ -732,7 +733,8 @@ namespace SnowmeetApi.Controllers
                 is_manual = 1,
                 staff_id = staff.id,
                 manual_memo = "删除套餐分类",
-                scene = "后台"
+                scene = "后台",
+                create_date = DateTime.Now
             };
             RentPackageCategory rpc = await _db.rentPackageCategory.FindAsync(packageId, category.id);
             _db.rentPackageCategory.Remove(rpc);
