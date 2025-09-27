@@ -693,14 +693,22 @@ namespace SnowmeetApi.Controllers
 
 
         [HttpGet("{packageId}")]
-        public async Task<ActionResult<RentPackage>> UpdateRentPackageBaseInfo(int packageId, string name, string description, double deposit, string sessionKey, string sessionType)
+        public async Task<ActionResult<ApiResult<RentPackage?>>> UpdateRentPackageBaseInfo(int packageId, string name, string description, double deposit, string sessionKey, string sessionType)
         {
             sessionKey = Util.UrlDecode(sessionKey);
             sessionType = Util.UrlDecode(sessionType);
-            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
-            if (member.is_admin != 1)
+            name = Util.UrlDecode(name);
+            description = Util.UrlDecode(description);
+            StaffController _staffHelper = new StaffController(_db);
+            Staff staff = await _staffHelper.GetStaffBySessionKey(sessionKey, sessionType);
+            if (staff == null || staff.title_level < 200)
             {
-                return BadRequest();
+                return new ApiResult<RentPackage?>()
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = null
+                };
             }
             RentPackage p = await _db.rentPackage.FindAsync(packageId);
             if (p == null)
@@ -712,7 +720,13 @@ namespace SnowmeetApi.Controllers
             p.deposit = deposit;
             _db.rentPackage.Entry(p).State = EntityState.Modified;
             await _db.SaveChangesAsync();
-            return await GetRentPackage(packageId);
+            return Ok(new ApiResult<RentPackage?>()
+            {
+                code = 0,
+                message = "",
+                data = p
+            });
+            //return await GetRentPackage(packageId);
         }
         [HttpGet("{packageId}")]
         public async Task<ActionResult<RentPackage>> SetPackageRentPrice(int packageId, string shop, string dayType, string scene, string price, string sessionKey, string sessionType)
