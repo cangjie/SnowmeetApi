@@ -165,17 +165,35 @@ namespace SnowmeetApi.Controllers
             });
         }
         [HttpGet("{id}")]
-        public async Task<ActionResult<RentCategory>> ModCategory(int id, string code, string name, string sessionKey, string sessionType)
+        public async Task<ActionResult<ApiResult<RentCategory?>>> ModCategory(int id, string code, string name,
+            string sessionKey, string sessionType = "wechat_mini_openid")
         {
             name = Util.UrlDecode(name);
             sessionKey = Util.UrlDecode(sessionKey);
             sessionType = Util.UrlDecode(sessionType);
+
+            StaffController _staffHelper = new StaffController(_db);
+            Staff staff = await _staffHelper.GetStaffBySessionKey(sessionKey, sessionType);
+            if (staff == null || staff.title_level < 200)
+            {
+                return Ok(new ApiResult<List<RentPrice>?>()
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = null
+                });
+            }
+
+            /*
             Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
             if (member.is_admin != 1)
             {
                 return BadRequest();
             }
-            RentCategory rentCate = await _db.rentCategory.Where(r => r.code.Trim().Equals(code.Trim())).FirstOrDefaultAsync();
+            */
+            RentCategory rentCate = await _db.rentCategory.Where(r => r.code.Trim().Equals(code.Trim())).AsNoTracking().FirstOrDefaultAsync();
+            RentCategory rentCateOri = await _db.rentCategory.Where(r => r.code.Trim().Equals(code.Trim())).AsNoTracking().FirstOrDefaultAsync();
+
             if (rentCate != null && !code.Equals(rentCate.code.Trim()))
             {
                 return NotFound();
@@ -197,10 +215,20 @@ namespace SnowmeetApi.Controllers
             {
                 rentCate.name = name;
                 rentCate.update_date = DateTime.Now;
+                List<CoreDataModLog> logs = Util.GetUpdateDifferenceLog<RentCategory>(rentCateOri, rentCate, null, staff.id, "修改租赁商品分类名称或编码");
+                for (int j = 0; j < logs.Count; j++)
+                {
+                    await _db.coreDataModLog.AddAsync(logs[j]);
+                }
                 _db.rentCategory.Entry(rentCate).State = EntityState.Modified;
                 await _db.SaveChangesAsync();
             }
-            return Ok(rentCate);
+            return Ok(new ApiResult<RentCategory?>()
+            {
+                code = 0,
+                message = "",
+                data = rentCate
+            });
         }
         [NonAction]
         public async Task<RentCategory> MoveCategory(int id, string code)

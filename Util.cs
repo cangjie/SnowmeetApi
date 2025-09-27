@@ -571,7 +571,10 @@ namespace SnowmeetApi
                         trace_id = ts.Ticks,
                         is_manual = 0
                     };
-                    logList.Add(log);
+                    if (!log.field_name.Trim().Equals("update_date"))
+                    {
+                        logList.Add(log);
+                    }
                 }
             });
             return logList;
