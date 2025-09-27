@@ -314,7 +314,8 @@ namespace SnowmeetApi.Controllers
             List<RentCategory> rl = new List<RentCategory>();
             for (int i = 0; i < topL.Count; i++)
             {
-                RentCategory rc = (RentCategory)((OkObjectResult)(await GetCategory(topL[i].code)).Result).Value;
+                //RentCategory rc = (RentCategory)((OkObjectResult)(await GetCategory(topL[i].code)).Result).Value;
+                RentCategory rc = await GetSimpleCategory(topL[i].code);
                 rl.Add(rc);
             }
             return Ok(new ApiResult<List<RentCategory>>() {
@@ -369,7 +370,35 @@ namespace SnowmeetApi.Controllers
                 data = category
             });
         }
+        [NonAction]
+        public async Task<RentCategory?> GetSimpleCategory(string code = "")
+        {
+            code = code.Trim();
+            RentCategory rc = await _db.rentCategory
+                .Where(r => r.code.Trim().Equals(code.Trim())).FirstAsync();
+            if (rc == null)
+            {
+                return null;
+            }
+            var rcL = await _db.rentCategory.AsNoTracking().Where(r => r.code.Trim().Length == code.Length + 2
+                && r.code.StartsWith(code)).OrderBy(r => r.code).ToListAsync();
+            if (rcL != null && rcL.Count > 0)
+            {
+                List<RentCategory> children = new List<RentCategory>();
+                for (int i = 0; i < rcL.Count; i++)
+                {
+                    RentCategory child = await GetSimpleCategory(rcL[i].code);
+                    child.infoFields = rc.infoFields;
+                    if (child != null)
+                    {
+                        children.Add(child);
+                    }
 
+                }
+                rc.children = children;
+            }
+            return rc;
+        }
         [HttpGet("{code}")]
         public async Task<ActionResult<RentCategory>> GetCategory(string code = "")
         {
