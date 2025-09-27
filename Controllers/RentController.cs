@@ -192,13 +192,19 @@ namespace SnowmeetApi.Controllers
             }
             */
             RentCategory rentCate = await _db.rentCategory.Where(r => r.code.Trim().Equals(code.Trim())).AsNoTracking().FirstOrDefaultAsync();
-            RentCategory rentCateOri = await _db.rentCategory.Where(r => r.code.Trim().Equals(code.Trim())).AsNoTracking().FirstOrDefaultAsync();
+            
 
-            if (rentCate != null && !code.Equals(rentCate.code.Trim()))
+            if (rentCate != null && rentCate.id != id)
             {
-                return NotFound();
+                return Ok(new ApiResult<RentCategory?>()
+                {
+                    code = 1,
+                    message = "编号重复",
+                    data = null
+                });
             }
-            rentCate = await _db.rentCategory.FindAsync(id);
+            rentCate = await _db.rentCategory.Where(r => r.id == id).AsNoTracking().FirstOrDefaultAsync();
+            RentCategory rentCateOri = await _db.rentCategory.Where(r => r.id == id).AsNoTracking().FirstOrDefaultAsync();
             if (rentCate == null)
             {
                 return NotFound();
