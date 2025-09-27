@@ -710,7 +710,9 @@ namespace SnowmeetApi.Controllers
                     data = null
                 };
             }
-            RentPackage p = await _db.rentPackage.FindAsync(packageId);
+            RentPackage p = await _db.rentPackage.Where(p => p.id == packageId).AsNoTracking().FirstOrDefaultAsync();
+            RentPackage oriP = await _db.rentPackage.Where(p => p.id == packageId).AsNoTracking().FirstOrDefaultAsync();
+            
             if (p == null)
             {
                 return NotFound();
@@ -718,6 +720,11 @@ namespace SnowmeetApi.Controllers
             p.name = Util.UrlDecode(name);
             p.description = Util.UrlDecode(description);
             p.deposit = deposit;
+            List<CoreDataModLog> logs = Util.GetUpdateDifferenceLog<RentPackage>(oriP, p, null, staff.id, "修改套餐信息");
+            for (int i = 0; i < logs.Count; i++)
+            { 
+                await _db.coreDataModLog.AddAsync(logs[i]);
+            }
             _db.rentPackage.Entry(p).State = EntityState.Modified;
             await _db.SaveChangesAsync();
             return Ok(new ApiResult<RentPackage?>()
