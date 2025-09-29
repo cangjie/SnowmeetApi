@@ -4606,5 +4606,49 @@ namespace SnowmeetApi.Controllers
                 data = products
             });
         }
+        [HttpGet("{categoryId}")]
+        public async Task<ActionResult<ApiResult<RentPackage?>>> DeleteRentPackage(int categoryId,
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            sessionKey = Util.UrlDecode(sessionKey).Trim();
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            if (staff == null || staff.title_level < 200)
+            {
+                return Ok(new ApiResult<RentPackage?>()
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = null
+                });
+            }
+            RentPackage package = await _db.rentPackage
+                .Where(r => r.id == categoryId).AsNoTracking().FirstOrDefaultAsync();
+            RentPackage ori = await _db.rentPackage
+                .Where(r => r.id == categoryId).FirstOrDefaultAsync();
+            if (package == null)
+            {
+                return Ok(new ApiResult<RentPackage?>()
+                {
+                    code = 1,
+                    message = "找不到该套餐",
+                    data = null
+                });
+            }
+            package.valid = 0;
+            package.update_date = DateTime.Now;
+            List<CoreDataModLog> logs = Util.GetUpdateDifferenceLog<RentPackage>(ori, package, null, staff.id, "删除套餐");
+            for (int i = 0; i < logs.Count; i++)
+            {
+                await _db.coreDataModLog.AddAsync(logs[i]);
+            }
+            _db.rentPackage.Entry(package).State = EntityState.Modified;
+            await _db.SaveChangesAsync();
+            return Ok(new ApiResult<RentPackage>()
+            {
+                code = 0,
+                message = "",
+                data = package
+            });
+        }
     }
 }
