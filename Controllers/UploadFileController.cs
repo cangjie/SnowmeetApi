@@ -94,9 +94,12 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<string>> Upload(string sessionKey, IFormFile file)
         {
             sessionKey = Util.UrlDecode(sessionKey);
-            //UnicUser._context = _db;
-            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _db);
-            
+            //UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _db);
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, "wechat_mini_openid");
+            if (staff == null)
+            {
+                return BadRequest();
+            }
 
             string dateStr = DateTime.Now.Year.ToString() + DateTime.Now.Month.ToString().PadLeft(2, '0') + DateTime.Now.Day.ToString().PadLeft(2, '0');
             string filePath = Util.workingPath + "/wwwroot/upload/" + dateStr;
@@ -116,7 +119,7 @@ namespace SnowmeetApi.Controllers
             UploadFile fileSave = new UploadFile()
             {
                 id = 0,
-                owner = user.miniAppOpenId.Trim(),
+                staff_id = staff.id,
                 file_path_name = returnFileName
             };
             await _db.UploadFile.AddAsync(fileSave);
