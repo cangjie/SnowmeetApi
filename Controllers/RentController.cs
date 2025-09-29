@@ -282,13 +282,7 @@ namespace SnowmeetApi.Controllers
                     data = null
                 });
             }
-            /*
-            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
-            if (member.is_admin != 1)
-            {
-                return BadRequest();
-            }
-            */
+      
             RentCategory rc = await _db.rentCategory.Where(r => r.code.Trim().Equals(code.Trim())).FirstOrDefaultAsync();
             if (rc != null)
             {
@@ -998,20 +992,19 @@ namespace SnowmeetApi.Controllers
             return Ok(field);
         }
         [HttpGet("{categoryId}")]
-        public async Task<ActionResult<RentProduct>> AddRentProduct(int categoryId, string? shop, string name, string sessionKey, string sessionType)
+        public async Task<ActionResult<ApiResult<RentProduct?>>> AddRentProduct(int categoryId, string? shop, string name, string sessionKey, string sessionType)
         {
             sessionKey = Util.UrlDecode(sessionKey);
             sessionType = Util.UrlDecode(sessionType);
-            StaffController _staffHelper = new StaffController(_db);
-            Staff staff = await _staffHelper.GetStaffBySessionKey(sessionKey, sessionType);
-            if (staff == null)
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            if (staff == null || staff.title_level < 200)
             {
-                return BadRequest();
-            }
-            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
-            if (member.is_admin != 1)
-            {
-                return BadRequest();
+                return Ok(new ApiResult<RentProduct?>()
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = null
+                });
             }
             RentProduct p = new RentProduct()
             {
@@ -1023,7 +1016,12 @@ namespace SnowmeetApi.Controllers
             };
             await _db.rentProduct.AddAsync(p);
             await _db.SaveChangesAsync();
-            return Ok(p);
+            return Ok(new ApiResult<RentProduct?>()
+            {
+                code = 0,
+                message = "",
+                data = p
+            });
         }
         [HttpPost]
         public async Task<ActionResult<RentProduct>> ModRentProduct(RentProduct rentProduct,

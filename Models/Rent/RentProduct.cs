@@ -22,10 +22,13 @@ namespace SnowmeetApi.Models
         public double? deposit { get; set; }
         public int is_common_price { get; set; } = 1;
         public int is_delete { get; set; } = 0;
+        public int is_lost { get; set; } = 0;
         public int valid { get; set; } = 0;
         public int is_online { get; set; } = 0;
         public int is_destroyed { get; set; } = 0;
         public int? staff_id { get; set; }
+        public DateTime? update_date { get; set; }
+        public DateTime create_date { get; set; } = DateTime.Now;
         public List<RentProductImage>? images { get; set; }
         [NotMapped]
         public double realDeposit

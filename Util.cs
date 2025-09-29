@@ -579,5 +579,12 @@ namespace SnowmeetApi
             });
             return logList;
         }
+
+        public static async Task<Staff?> GetStaffBySessionKey(ApplicationDBContext db, string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            StaffController staffHelper = new StaffController(db);
+            Staff staff = await staffHelper.GetStaffBySessionKey(sessionKey, sessionType);
+            return staff;
+        }
     }
 }
