@@ -492,7 +492,7 @@ namespace SnowmeetApi.Controllers
             }
 
             var pList = (from product in rc.productList
-                         where product.is_delete == 0
+                         where product.valid == 1
                          select product).ToList();
             rc.productList = pList;
             return Ok(rc);
