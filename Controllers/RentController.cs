@@ -192,7 +192,7 @@ namespace SnowmeetApi.Controllers
             }
             */
             RentCategory rentCate = await _db.rentCategory.Where(r => r.code.Trim().Equals(code.Trim())).AsNoTracking().FirstOrDefaultAsync();
-            
+
 
             if (rentCate != null && rentCate.id != id)
             {
@@ -282,7 +282,7 @@ namespace SnowmeetApi.Controllers
                     data = null
                 });
             }
-      
+
             RentCategory rc = await _db.rentCategory.Where(r => r.code.Trim().Equals(code.Trim())).FirstOrDefaultAsync();
             if (rc != null)
             {
@@ -312,7 +312,7 @@ namespace SnowmeetApi.Controllers
                 code = 0,
                 message = "",
                 data = rcNew
-             });
+            });
         }
         [HttpGet]
         public async Task<ActionResult<RentCategory>> AddCategory(string code, string name, string sessionKey, string sessionType)
@@ -672,7 +672,7 @@ namespace SnowmeetApi.Controllers
             }
             //cate.name = name.Trim();
             if (cate.deposit != guaranty)
-            { 
+            {
                 CoreDataModLog logDeposit = new CoreDataModLog()
                 {
                     id = 0,
@@ -748,7 +748,7 @@ namespace SnowmeetApi.Controllers
                     data = null
                 });
             }
-            
+
             RentCategory rentCategory = await _db.rentCategory.FindAsync(categoryId);
             if (rentCategory == null)
             {
@@ -862,7 +862,7 @@ namespace SnowmeetApi.Controllers
             }
             RentPackage p = await _db.rentPackage.Where(p => p.id == packageId).AsNoTracking().FirstOrDefaultAsync();
             RentPackage oriP = await _db.rentPackage.Where(p => p.id == packageId).AsNoTracking().FirstOrDefaultAsync();
-            
+
             if (p == null)
             {
                 return NotFound();
@@ -872,7 +872,7 @@ namespace SnowmeetApi.Controllers
             p.deposit = deposit;
             List<CoreDataModLog> logs = Util.GetUpdateDifferenceLog<RentPackage>(oriP, p, null, staff.id, "修改套餐信息");
             for (int i = 0; i < logs.Count; i++)
-            { 
+            {
                 await _db.coreDataModLog.AddAsync(logs[i]);
             }
             _db.rentPackage.Entry(p).State = EntityState.Modified;
@@ -4563,6 +4563,30 @@ namespace SnowmeetApi.Controllers
                     data = results
                 });
             }
+            return Ok(new ApiResult<List<RentProduct>>()
+            {
+                code = 0,
+                message = "",
+                data = products
+            });
+        }
+        [HttpGet("{categoryId}")]
+        public async Task<ActionResult<ApiResult<List<RentProduct>?>>> GetRentProductByCategory(int categoryId)
+        {
+            RentCategory category = await _db.rentCategory.Where(c => c.id == categoryId).AsNoTracking().FirstOrDefaultAsync();
+            if (category == null)
+            {
+                return Ok(new ApiResult<List<RentProduct>?>()
+                {
+                    code = 1,
+                    message = "分类不存在",
+                    data = null
+                });
+            }
+            List<RentProduct> products = await _db.rentProduct
+                .Include(p => p.category)
+                .Where(p => p.valid == 1 && p.category.code.StartsWith(category.code))
+                .Include(p => p.category).AsNoTracking().ToListAsync();
             return Ok(new ApiResult<List<RentProduct>>()
             {
                 code = 0,
