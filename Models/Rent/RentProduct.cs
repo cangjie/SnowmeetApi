@@ -21,7 +21,6 @@ namespace SnowmeetApi.Models
         public int? count { get; set; }
         public double? deposit { get; set; }
         public int is_common_price { get; set; } = 1;
-        public int is_delete { get; set; } = 0;
         public int is_lost { get; set; } = 0;
         public int valid { get; set; } = 0;
         public int is_online { get; set; } = 0;
