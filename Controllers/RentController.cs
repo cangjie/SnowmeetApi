@@ -1012,7 +1012,8 @@ namespace SnowmeetApi.Controllers
                 category_id = categoryId,
                 shop = shop,
                 name = name.Trim(),
-                staff_id = staff.id
+                staff_id = staff.id,
+                valid = 1
             };
             await _db.rentProduct.AddAsync(p);
             await _db.SaveChangesAsync();
@@ -4585,8 +4586,9 @@ namespace SnowmeetApi.Controllers
             }
             List<RentProduct> products = await _db.rentProduct
                 .Include(p => p.category)
-                .Where(p => p.valid == 1 && p.category.code.StartsWith(category.code))
-                .Include(p => p.category).AsNoTracking().ToListAsync();
+                .Where(p => p.valid == 1 && (p.category.code.StartsWith(category.code) || p.category_id == categoryId))
+                //.Include(p => p.category)
+                .AsNoTracking().ToListAsync();
             return Ok(new ApiResult<List<RentProduct>>()
             {
                 code = 0,
