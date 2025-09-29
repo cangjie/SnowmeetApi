@@ -1060,7 +1060,7 @@ namespace SnowmeetApi.Controllers
             });
         }
         [HttpGet("{productId}")]
-        public async Task<ActionResult<RentProduct>> GetRentProduct(int productId)
+        public async Task<ActionResult<ApiResult<RentProduct?>>> GetRentProduct(int productId)
         {
             var productList = await _db.rentProduct.Where(p => p.id == productId)
                 .Include(p => p.images)
@@ -1099,10 +1099,15 @@ namespace SnowmeetApi.Controllers
                     product.detailInfo.Add(info);
                 }
             }
-            return Ok(product);
+            return Ok(new ApiResult<RentProduct?>()
+            {
+                code = 0,
+                message = "",
+                data = product
+            });
         }
         [HttpPost("{productId}")]
-        public async Task<ActionResult<RentProduct>> UpdateRentProductDetailInfo(int productId,
+        public async Task<ActionResult<ApiResult<RentProduct?>>> UpdateRentProductDetailInfo(int productId,
             [FromQuery] string sessionKey, [FromQuery] string sessionType, List<RentProductDetailInfo> details)
         {
             sessionKey = Util.UrlDecode(sessionKey);
@@ -1134,15 +1139,20 @@ namespace SnowmeetApi.Controllers
             return await GetRentProduct(productId);
         }
         [HttpPost("{productId}")]
-        public async Task<ActionResult<RentProduct>> SetRentProductImage(int productId, [FromQuery] string sessionKey,
+        public async Task<ActionResult<ApiResult<RentProduct?>>> SetRentProductImage(int productId, [FromQuery] string sessionKey,
             [FromQuery] string sessionType, string[] images)
         {
             sessionKey = Util.UrlDecode(sessionKey);
             sessionType = Util.UrlDecode(sessionType);
-            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
-            if (member.is_admin != 1)
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            if (staff == null || staff.title_level < 200)
             {
-                return BadRequest();
+                return Ok(new ApiResult<RentProduct?>()
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = null
+                });
             }
             var imageList = await _db.rentProductImage.Where(i => i.product_id == productId).ToListAsync();
             for (int i = 0; i < imageList.Count; i++)
