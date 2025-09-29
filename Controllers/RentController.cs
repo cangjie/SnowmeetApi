@@ -1024,26 +1024,39 @@ namespace SnowmeetApi.Controllers
             });
         }
         [HttpPost]
-        public async Task<ActionResult<RentProduct>> ModRentProduct(RentProduct rentProduct,
+        public async Task<ActionResult<ApiResult<RentProduct?>>> ModRentProduct(RentProduct rentProduct,
             [FromQuery] string sessionKey, [FromQuery] string sessionType)
         {
             sessionKey = Util.UrlDecode(sessionKey);
             sessionType = Util.UrlDecode(sessionType);
-            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
-            if (member.is_admin != 1)
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            if (staff == null || staff.title_level < 200)
             {
-                return BadRequest();
+                return Ok(new ApiResult<RentProduct?>()
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = null
+                });
             }
-            _db.rentProduct.Entry(rentProduct).State = EntityState.Modified;
-            int i = await _db.SaveChangesAsync();
-            if (i == 0)
+            RentProduct ori = await _db.rentProduct.AsNoTracking().Where(p => p.id == rentProduct.id).FirstOrDefaultAsync();
+            if (ori == null)
             {
                 return NotFound();
             }
-            else
+            List<CoreDataModLog> logs = Util.GetUpdateDifferenceLog<RentProduct>(ori, rentProduct, null, staff.id, "修改租赁商品基础信息");
+            for (int i = 0; i < logs.Count; i++)
             {
-                return Ok(rentProduct);
+                await _db.coreDataModLog.AddAsync(logs[i]);
             }
+            _db.rentProduct.Entry(rentProduct).State = EntityState.Modified;
+            await _db.SaveChangesAsync();
+            return Ok(new ApiResult<RentProduct?>()
+            {
+                code = 0,
+                message = "",
+                data = rentProduct
+            });
         }
         [HttpGet("{productId}")]
         public async Task<ActionResult<RentProduct>> GetRentProduct(int productId)
