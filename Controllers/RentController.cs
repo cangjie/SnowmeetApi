@@ -4624,7 +4624,7 @@ namespace SnowmeetApi.Controllers
             RentPackage package = await _db.rentPackage
                 .Where(r => r.id == categoryId).AsNoTracking().FirstOrDefaultAsync();
             RentPackage ori = await _db.rentPackage
-                .Where(r => r.id == categoryId).FirstOrDefaultAsync();
+                .Where(r => r.id == categoryId).AsNoTracking().FirstOrDefaultAsync();
             if (package == null)
             {
                 return Ok(new ApiResult<RentPackage?>()
