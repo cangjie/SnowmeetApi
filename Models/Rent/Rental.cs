@@ -25,6 +25,7 @@ namespace SnowmeetApi.Models
         public int? prev_id { get; set; } = null;
         public int changed { get; set; } = 0;
         public int current_avaliable { get; set; } = 0;
+        public int expect_days { get; set; } = 0;
         public DateTime? update_date { get; set; } = null;
         public DateTime create_date { get; set; } = DateTime.Now;
         public List<RentItem> rentItems { get; set; } = new List<RentItem>();
@@ -69,7 +70,7 @@ namespace SnowmeetApi.Models
                 {
                     return true;
                 }
-                if (rentItems.Count > 1)
+                if (rentItems != null && rentItems.Count > 1)
                 {
                     return true;
                 }
@@ -116,6 +117,10 @@ namespace SnowmeetApi.Models
         public double GetTotalAmountByType(string type)
         {
             double amount = 0;
+            if (details == null)
+            {
+                return 0;
+            }
             List<RentalDetail> dtlList = details
                 .Where(d => d.charge_type.Trim().Equals(type.Trim()) && d.valid == 1)
                 .ToList();
@@ -172,11 +177,14 @@ namespace SnowmeetApi.Models
             get
             {
                 Staff? staff = null;
-                foreach (CoreDataModLog log in logs)
+                if (logs != null)
                 {
-                    if (log.current_value.Trim().Equals("已发放"))
+                    foreach (CoreDataModLog log in logs)
                     {
-                        staff = log.staff;
+                        if (log.current_value.Trim().Equals("已发放"))
+                        {
+                            staff = log.staff;
+                        }
                     }
                 }
                 return staff;
@@ -188,11 +196,14 @@ namespace SnowmeetApi.Models
             get
             {
                 Staff? staff = null;
-                foreach (CoreDataModLog log in logs)
+                if (logs != null)
                 {
-                    if (log.current_value.Trim().Equals("已归还"))
+                    foreach (CoreDataModLog log in logs)
                     {
-                        staff = log.staff;
+                        if (log.current_value.Trim().Equals("已归还"))
+                        {
+                            staff = log.staff;
+                        }
                     }
                 }
                 return staff;
@@ -206,10 +217,10 @@ namespace SnowmeetApi.Models
         [Key]
         public int id { get; set; }
         public int rental_id { get; set; }
-        public string rent_type { get; set; }
-        public DateTime rent_date { get; set; }
-        public double price { get; set; }
-        public double discount { get; set; }
+        public string rent_type { get; set; } = "日场";
+        public DateTime rent_date { get; set; } = DateTime.Now.Date;
+        public double price { get; set; } = 0;
+        public double discount { get; set; } = 0;
         public DateTime? update_date { get; set; }
         public DateTime create_date { get; set; } = DateTime.Now;
         [ForeignKey("rental_id")]

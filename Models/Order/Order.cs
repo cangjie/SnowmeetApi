@@ -77,6 +77,7 @@ namespace SnowmeetApi.Models
         public int is_test { get; set; } = 0;
         public string? current_pay_method { get; set; } = null;
         public string? customer_type { get; set; } = null;
+        public int recepting { get; set; } = 0;
         public DateTime? update_date { get; set; } = null;
         [NotMapped]
         public string textColor { get; set; } = "";

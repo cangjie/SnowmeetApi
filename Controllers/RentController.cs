@@ -366,7 +366,8 @@ namespace SnowmeetApi.Controllers
                 RentCategory rc = await GetSimpleCategory(topL[i].code);
                 rl.Add(rc);
             }
-            return Ok(new ApiResult<List<RentCategory>>() {
+            return Ok(new ApiResult<List<RentCategory>>()
+            {
                 code = 0,
                 message = "",
                 data = rl
@@ -4493,11 +4494,56 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<ApiResult<Models.Order?>>> SaveRentRecept([FromBody] Models.Order order,
             [FromQuery] string sessionKey, [FromQuery] string sessionType = "wechat_mini_openid")
         {
-
+            sessionKey = Util.UrlDecode(sessionKey);
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            if (staff == null || staff.title_level < 100)
+            {
+                return Ok(new ApiResult<Models.Order?>()
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = null
+                });
+            }
+            if (order.id == 0)
+            {
+                if (_httpContextAccessor.HttpContext.Request.Host.Value != null
+                && _httpContextAccessor.HttpContext.Request.Host.Value.Equals("mini.snowmeet.top"))
+                {
+                    order.is_test = 0;
+                }
+                else
+                {
+                    order.is_test = 1;
+                }
+                order.staff_id = staff.id;
+                order.create_date = DateTime.Now;
+                order.valid = 0;
+                order.recepting = 1;
+                for (int i = 0; i < order.rentals.Count; i++)
+                {
+                    Rental rental = order.rentals[i];
+                    for (int j = 0; j < rental.rentItems.Count; j++)
+                    {
+                        Models.RentItem item = rental.rentItems[j];
+                        item.logs = null;
+                        //await _db.rentItem.AddAsync(item);
+                        //await _db.SaveChangesAsync();
+                    }
+                    rental.details = null;
+                    //rental.rentItems = null;
+                    //rental.order_id = 0;
+                    //await _db.rental.AddAsync(rental);
+                    //await _db.SaveChangesAsync();
+                }
+                //order.rentals = null;
+                await _db.order.AddAsync(order);
+                await _db.SaveChangesAsync();
+            }
             return Ok(new ApiResult<Models.Order?>()
             {
                 code = 0,
-                message ="",
+                message = "",
                 data = order
             });
         }

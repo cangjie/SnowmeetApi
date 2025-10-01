@@ -21,20 +21,17 @@ namespace SnowmeetApi.Models.Rent
         public string scale { get; set; }
         public string grade { get; set; }
         public string bwh { get; set; }
-
-
-		
 		public double rental { get; set; } = 0;
         public double rental_member { get; set; } = 0;
         public double rental_reserve { get; set; } = 0;
-
-      
-
+        public int noCode { get; set; } = 0;
+        public int noNeed { get; set; } = 0;
+        public int atOnce { get; set; } = 0;
 		public double GetRental(string shop)
-		{
-			double rental = 0;
-			if (shop.IndexOf("南山")>=0)
-			{
+        {
+            double rental = 0;
+            if (shop.IndexOf("南山") >= 0)
+            {
                 if (type.IndexOf("Phenix") >= 0)
                 {
                     rental = 300;
@@ -83,39 +80,39 @@ namespace SnowmeetApi.Models.Rent
                     rental = 0;
                 }
             }
-			else if (shop.IndexOf("万龙") >= 0)
-			{
-				if (type.IndexOf("Phenix") >= 0)
-				{
-					rental = 300;
-				}
-				else if (type.IndexOf("Nandn") >= 0 || type.IndexOf("Trake") >= 0
-					|| type.IndexOf("Tittalon") >= 0 || type.IndexOf("West Scout") >= 0
-					|| type.IndexOf("Burton") >= 0 || type.IndexOf("Swagli") >= 0)
-				{
-					//Nandn/Trake/Tittalon/West Scout/Burton/Swagli
-					rental = 150;
-				}
-				else if (type.IndexOf("双板鞋") >= 0)
-				{
-					rental = 100;
-				}
-				else if (type.IndexOf("双板") >= 0)
-				{
-					rental = 300;
-				}
-				else if (type.IndexOf("雪杖") >= 0)
-				{
-					rental = 50;
-				}
-				else if (type.IndexOf("单板鞋") >= 0)
-				{
-					rental = 100;
-				}
-				else if (type.IndexOf("单板") >= 0)
-				{
-					rental = 300;
-				}
+            else if (shop.IndexOf("万龙") >= 0)
+            {
+                if (type.IndexOf("Phenix") >= 0)
+                {
+                    rental = 300;
+                }
+                else if (type.IndexOf("Nandn") >= 0 || type.IndexOf("Trake") >= 0
+                    || type.IndexOf("Tittalon") >= 0 || type.IndexOf("West Scout") >= 0
+                    || type.IndexOf("Burton") >= 0 || type.IndexOf("Swagli") >= 0)
+                {
+                    //Nandn/Trake/Tittalon/West Scout/Burton/Swagli
+                    rental = 150;
+                }
+                else if (type.IndexOf("双板鞋") >= 0)
+                {
+                    rental = 100;
+                }
+                else if (type.IndexOf("双板") >= 0)
+                {
+                    rental = 300;
+                }
+                else if (type.IndexOf("雪杖") >= 0)
+                {
+                    rental = 50;
+                }
+                else if (type.IndexOf("单板鞋") >= 0)
+                {
+                    rental = 100;
+                }
+                else if (type.IndexOf("单板") >= 0)
+                {
+                    rental = 300;
+                }
                 else if (type.IndexOf("头盔") >= 0)
                 {
                     rental = 70;
@@ -129,12 +126,12 @@ namespace SnowmeetApi.Models.Rent
                     rental = 100;
                 }
                 else
-				{
-					rental = 0;
-				}
+                {
+                    rental = 0;
+                }
             }
-			return rental;
-		}
+            return rental;
+        }
 	}
 }
 
