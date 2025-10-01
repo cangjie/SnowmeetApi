@@ -4540,6 +4540,25 @@ namespace SnowmeetApi.Controllers
                 await _db.order.AddAsync(order);
                 await _db.SaveChangesAsync();
             }
+            else
+            {
+                /*
+                for (int i = 0; i < order.rentals.Count; i++)
+                {
+                    Rental rental = order.rentals[i];
+                    rental.details = null;
+
+                    for (int j = 0; j < rental.rentItems.Count; j++)
+                    {
+                        Models.RentItem item = rental.rentItems[j];
+
+                    }
+
+                }
+                */
+                _db.Update(order);
+                await _db.SaveChangesAsync();
+            }
             return Ok(new ApiResult<Models.Order?>()
             {
                 code = 0,

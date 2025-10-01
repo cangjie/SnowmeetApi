@@ -163,6 +163,9 @@ namespace SnowmeetApi.Models
         public string memo { get; set; } = "";
         public int valid { get; set; } = 0;
         public int? repairation_id { get; set; } = null;
+        public bool noCode { get; set; } = false;
+        public bool noNeed { get; set; } = false;
+        public bool atOnce { get; set; } = false;
         public DateTime? update_date { get; set; }
         public DateTime create_date { get; set; } = DateTime.Now;
         [ForeignKey("rental_id")]

@@ -24,9 +24,7 @@ namespace SnowmeetApi.Models.Rent
 		public double rental { get; set; } = 0;
         public double rental_member { get; set; } = 0;
         public double rental_reserve { get; set; } = 0;
-        public int noCode { get; set; } = 0;
-        public int noNeed { get; set; } = 0;
-        public int atOnce { get; set; } = 0;
+       
 		public double GetRental(string shop)
         {
             double rental = 0;
