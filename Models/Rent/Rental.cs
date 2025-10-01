@@ -29,6 +29,7 @@ namespace SnowmeetApi.Models
         public DateTime create_date { get; set; } = DateTime.Now;
         public List<RentItem> rentItems { get; set; } = new List<RentItem>();
         public List<RentalDetail> details { get; set; } = new List<RentalDetail>();
+        public List<RentalPricePreset> pricePresets { get; set; } = null;
         [ForeignKey("order_id")]
         public SnowmeetApi.Models.Order? order { get; set; }
         [ForeignKey(nameof(Guaranty.biz_id))]
@@ -55,7 +56,7 @@ namespace SnowmeetApi.Models
         public double othersDiscountAmount
         {
             get
-            { 
+            {
                 return GetDiscountAmount(false);
             }
         }
@@ -118,7 +119,7 @@ namespace SnowmeetApi.Models
             List<RentalDetail> dtlList = details
                 .Where(d => d.charge_type.Trim().Equals(type.Trim()) && d.valid == 1)
                 .ToList();
-            return dtlList.Sum(d => d.amount); 
+            return dtlList.Sum(d => d.amount);
         }
     }
     [Table("rental_detail")]
@@ -197,6 +198,22 @@ namespace SnowmeetApi.Models
                 return staff;
             }
         }
-       
+
+    }
+    [Table("rental_price_preset")]
+    public class RentalPricePreset
+    {
+        [Key]
+        public int id { get; set; }
+        public int rental_id { get; set; }
+        public string rent_type { get; set; }
+        public DateTime rent_date { get; set; }
+        public double price { get; set; }
+        public double discount { get; set; }
+        public DateTime? update_date { get; set; }
+        public DateTime create_date { get; set; } = DateTime.Now;
+        [ForeignKey("rental_id")]
+        public Rental rental { get; set; } = null;
+
     }
 }

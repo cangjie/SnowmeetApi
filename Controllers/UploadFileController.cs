@@ -87,9 +87,6 @@ namespace SnowmeetApi.Controllers
             }
 
         }
-
-
-
         [HttpPost("{sessionKey}")]
         public async Task<ActionResult<string>> Upload(string sessionKey, IFormFile file)
         {
@@ -151,87 +148,6 @@ namespace SnowmeetApi.Controllers
             };
         }
 
-
-        /*
-        // GET: api/UploadFile
-        [HttpGet]
-        public async Task<ActionResult<IEnumerable<UploadFile>>> GetUploadFile()
-        {
-            return await _context.UploadFile.ToListAsync();
-        }
-
-        // GET: api/UploadFile/5
-        [HttpGet("{id}")]
-        public async Task<ActionResult<UploadFile>> GetUploadFile(int id)
-        {
-            var uploadFile = await _context.UploadFile.FindAsync(id);
-
-            if (uploadFile == null)
-            {
-                return NotFound();
-            }
-
-            return uploadFile;
-        }
-
-        // PUT: api/UploadFile/5
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
-        [HttpPut("{id}")]
-        public async Task<IActionResult> PutUploadFile(int id, UploadFile uploadFile)
-        {
-            if (id != uploadFile.id)
-            {
-                return BadRequest();
-            }
-
-            _context.Entry(uploadFile).State = EntityState.Modified;
-
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!UploadFileExists(id))
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
-            }
-
-            return NoContent();
-        }
-
-        // POST: api/UploadFile
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
-        [HttpPost]
-        public async Task<ActionResult<UploadFile>> PostUploadFile(UploadFile uploadFile)
-        {
-            _context.UploadFile.Add(uploadFile);
-            await _context.SaveChangesAsync();
-
-            return CreatedAtAction("GetUploadFile", new { id = uploadFile.id }, uploadFile);
-        }
-
-        // DELETE: api/UploadFile/5
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteUploadFile(int id)
-        {
-            var uploadFile = await _context.UploadFile.FindAsync(id);
-            if (uploadFile == null)
-            {
-                return NotFound();
-            }
-
-            _context.UploadFile.Remove(uploadFile);
-            await _context.SaveChangesAsync();
-
-            return NoContent();
-        }
-        */
         private bool UploadFileExists(int id)
         {
             return _db.UploadFile.Any(e => e.id == id);

@@ -509,74 +509,7 @@ namespace SnowmeetApi.Controllers
             await _db.SaveChangesAsync();
             return Ok();
         }
-        /*
-        [HttpGet("{code}")]
-        public async Task<ActionResult<RentPrice>> SetRentCategoryPrice(string code, string shop, string dayType, string scene, double price, string sessionKey, string sessionType = "wchat_mini_openid")
-        {
-            RentCategory category = await _db.rentCategory.Where(r => r.code.Trim().Equals(code.Trim())).FirstAsync();
-            if (category == null)
-            {
-                return NotFound();
-            }
-            sessionKey = Util.UrlDecode(sessionKey);
-            sessionType = Util.UrlDecode(sessionType);
-            shop = Util.UrlDecode(shop);
-            dayType = Util.UrlDecode(dayType);
-            scene = Util.UrlDecode(scene);
-            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
-            if (member.is_admin != 1)
-            {
-                return BadRequest();
-            }
-            if (!dayType.Trim().Equals("平日") && !dayType.Trim().Equals("周末") && !dayType.Trim().Equals("节假日"))
-            {
-                return BadRequest();
-            }
-            if (!scene.Equals("门市") && !scene.Equals("会员") && !scene.Equals("预约"))
-            {
-                return BadRequest();
-            }
 
-            RentCategory rc = await _db.rentCategory.Where(rc => rc.code.Trim().Equals(code.Trim())).FirstAsync();
-
-            List<RentPrice> rpL = await _db.rentPrice
-                .Where(r => (r.type.Trim().Equals("分类") && r.category_id == rc.id
-                && r.shop.Trim().Equals(shop.Trim()) && r.day_type.Trim().Equals(dayType.Trim())
-                && r.scene.Trim().Equals(scene.Trim()))).ToListAsync();
-            if (rpL.Count == 0)
-            {
-                RentPrice rp = new RentPrice()
-                {
-                    id = 0,
-                    type = "分类",
-                    shop = shop.Trim(),
-                    category_id = rc.id,
-                    day_type = dayType.Trim(),
-                    price = price,
-                    scene = scene
-                };
-                await _db.rentPrice.AddAsync(rp);
-                await _db.SaveChangesAsync();
-                return Ok(rp);
-            }
-            else
-            {
-                RentPrice rp = rpL[0];
-                if (price == 0)
-                {
-                    _db.rentPrice.Remove(rp);
-                }
-                else
-                {
-                    rp.price = price;
-                    rp.update_date = DateTime.Now;
-                    _db.rentPrice.Entry(rp).State = EntityState.Modified;
-                }
-                await _db.SaveChangesAsync();
-                return Ok(rp);
-            }
-        }
-        */
         [HttpGet("{id}")]
         public async Task<ActionResult<RentCategory>> SetShopCategoryRentPrice(int id, string shop, string dayType, string scene, string price, string sessionKey, string sessionType)
         {
@@ -2683,31 +2616,6 @@ namespace SnowmeetApi.Controllers
                     detail.overTime = false;
 
                 }
-                /*
-                if (!detail.rent_staff.Trim().Equals(""))
-                {
-                    detail.rentStaff = (await UnicUser.GetUnicUserByDetailInfo(detail.rent_staff, "wechat_mini_openid", _db)).miniAppUser;
-
-                }
-                else
-                {
-                    if (!rentOrder.staff_open_id.Trim().Equals(""))
-                    {
-                        detail.rentStaff = (await UnicUser.GetUnicUserByDetailInfo(rentOrder.staff_open_id, "wechat_mini_openid", _db)).miniAppUser;//await _db.MiniAppUsers.FindAsync(rentOrder.staff_open_id);
-                    }
-
-
-                }
-
-                if (!detail.return_staff.Trim().Equals(""))
-                {
-                    detail.returnStaff = (await UnicUser.GetUnicUserByDetailInfo(detail.return_staff, "wechat_mini_openid", _db)).miniAppUser;
-                }
-                else
-                {
-                    detail.returnStaff = null;
-                }
-                */
                 if (!detail.rentStatus.Trim().Equals("已归还"))
                 {
                     allReturned = false;
@@ -2836,27 +2744,6 @@ namespace SnowmeetApi.Controllers
             {
                 rentOrder.textColor = "#C0C0C0";
             }
-            /*
-            if (!rentOrder.real_name.Trim().EndsWith("先生") && !rentOrder.real_name.Trim().EndsWith("女士"))
-            {
-                Member member = await _memberHelper.GetMember(rentOrder.open_id.Trim(), "wechat_mini_openid");
-                if (member != null)
-                {
-                    rentOrder.real_name = member.real_name.Trim();
-                    switch (member.gender)
-                    {
-                        case "男":
-                            rentOrder.real_name += " 先生";
-                            break;
-                        case "女":
-                            rentOrder.real_name += " 女士";
-                            break;
-                        default:
-                            break;
-                    }
-                }
-            }
-            */
             for (int i = 0; rentOrder.additionalPayments != null
                 && i < rentOrder.additionalPayments.Count; i++)
             {
@@ -2869,18 +2756,6 @@ namespace SnowmeetApi.Controllers
                     p.staffMember = msaL[0].member;
                 }
             }
-            /*
-            Mi7OrderController _mi7Helper = new Mi7OrderController(_db, _oriConfig, _httpContextAccessor);
-            for (int i = 0; rentOrder.rewards != null && i < rentOrder.rewards.Count; i++)
-            {
-                if (rentOrder.rewards[i].mi7_order_id != null && !rentOrder.rewards[i].mi7_order_id.Trim().Equals(""))
-                {
-                    Mi7Order mi7Order = (Mi7Order)((OkObjectResult)(await _mi7Helper.GetMi7Order(rentOrder.rewards[i].mi7_order_id, sessionKey)).Result).Value;
-                    rentOrder.rewards[i].mi7Order = mi7Order;
-                }
-
-            }
-            */
             var ret = Ok(rentOrder);
             return ret;
         }
@@ -3028,40 +2903,7 @@ namespace SnowmeetApi.Controllers
             await _db.SaveChangesAsync();
             return Ok(detail);
         }
-        /*
-        [HttpGet("{id}")]
-        public async Task<ActionResult<RentOrderDetail>> SetRentStart(int id, string sessionKey)
-        {
-            sessionKey = Util.UrlDecode(sessionKey).Trim();
-            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _db);
-            if (!user.isAdmin)
-            {
-                return BadRequest();
-            }
-            RentOrderDetail detail = await _db.RentOrderDetail.FindAsync(id);
 
-            DateTime startDate = DateTime.Now;
-            if (detail.start_date != null)
-            {
-                startDate = (DateTime)detail.start_date;
-                startDate = startDate.AddHours(DateTime.Now.Hour).AddMinutes(DateTime.Now.Minute);
-
-            }
-            else
-            {
-                startDate = DateTime.Now;
-            }
-
-            detail.start_date = startDate;
-            detail.rent_staff = user.miniAppOpenId.Trim();
-            _db.Entry(detail).State = EntityState.Modified;
-            await _db.SaveChangesAsync();
-
-            await SetDetailLog(detail.id, "已发放", sessionKey);
-
-            return Ok(detail);
-        }
-        */
         [HttpGet("{id}")]
         public async Task<ActionResult<RentOrder>> Refund(int id, double amount,
             double rentalReduce, double rentalReduceTicket, string memo, string sessionKey)
@@ -3575,10 +3417,7 @@ namespace SnowmeetApi.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<SnowmeetApi.Models.Rent.RentalDetail>>> GetRentDetailReport(DateTime start, DateTime end, string sessionKey)
         {
-
-            //RentalDetail[] details = new RentalDetail[];
             ArrayList details = new ArrayList();
-            //RentOrder rentOrder = (RentOrder)((OkObjectResult)(await GetRentOrder(detail.rent_list_id, sessionKey)).Result).Value;
             RentOrderCollection beforeOrders = (RentOrderCollection)((OkObjectResult)(await GetUnSettledOrderBefore(start, sessionKey)).Result).Value;
             for (int i = 0; i < beforeOrders.orders.Length; i++)
             {
@@ -4648,6 +4487,18 @@ namespace SnowmeetApi.Controllers
                 code = 0,
                 message = "",
                 data = package
+            });
+        }
+        [HttpPost]
+        public async Task<ActionResult<ApiResult<Models.Order?>>> SaveRentRecept([FromBody] Models.Order order,
+            [FromQuery] string sessionKey, [FromQuery] string sessionType = "wechat_mini_openid")
+        {
+
+            return Ok(new ApiResult<Models.Order?>()
+            {
+                code = 0,
+                message ="",
+                data = order
             });
         }
     }
