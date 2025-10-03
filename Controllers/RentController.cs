@@ -4554,6 +4554,46 @@ namespace SnowmeetApi.Controllers
             }
             else
             {
+                
+                for (int i = 0; i < order.rentals.Count; i++)
+                {
+                    int rentalId = order.rentals[i].id;
+                    if (rentalId > 0)
+                    {
+                        List<RentalPricePreset> presets = await _db.rentalPricePreset
+                            .Where(r => r.rental_id == rentalId).AsNoTracking().ToListAsync();
+                        for (int j = 0; j < presets.Count; j++)
+                        {
+                            _db.rentalPricePreset.Remove(presets[j]);
+                        }
+                    }
+                }
+                await _db.SaveChangesAsync();
+                
+                
+
+
+
+                List<Rental> newRentals = order.rentals.Where(r => r.id == 0).ToList();
+                for (int i = 0; i < newRentals.Count; i++)
+                {
+                    Rental newRental = newRentals[i];
+                    newRental.order_id = order.id;
+                    newRental.create_date = DateTime.Now;
+                    newRental.details = null;
+                    for (int j = 0; newRental.pricePresets != null && j < newRental.pricePresets.Count; j++)
+                    {
+                        RentalPricePreset preset = newRental.pricePresets[j];
+                        preset.rental_id = newRental.id;
+
+                    }
+                    //newRental.pricePresets = null;
+
+                }
+                _db.Update(order);
+                await _db.SaveChangesAsync();
+
+                /*
                 for (int i = 0; i < order.rentals.Count; i++)
                 {
                     int rentalId = order.rentals[i].id;
@@ -4565,16 +4605,8 @@ namespace SnowmeetApi.Controllers
                     }
                 }
                 await _db.SaveChangesAsync();
-                List<Rental> newRentals = order.rentals.Where(r => r.id == 0).ToList();
-                for (int i = 0; i < newRentals.Count; i++)
-                {
-                    Rental newRental = newRentals[i];
-                    newRental.order_id = order.id;
-                    newRental.create_date = DateTime.Now;
-
-                }
-                _db.Update(order);
-                await _db.SaveChangesAsync();
+                */
+                
                 List<Rental> rentals = order.rentals;
                 List<Models.Rental> oriRentals = await _db.rental.Include(r => r.rentItems)
                 .Where(r => r.order_id == order.id).AsNoTracking().ToListAsync();
