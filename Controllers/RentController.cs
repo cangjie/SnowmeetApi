@@ -4571,7 +4571,7 @@ namespace SnowmeetApi.Controllers
                     Rental newRental = newRentals[i];
                     newRental.order_id = order.id;
                     newRental.create_date = DateTime.Now;
-                  
+
                 }
                 _db.Update(order);
                 await _db.SaveChangesAsync();
@@ -4588,13 +4588,13 @@ namespace SnowmeetApi.Controllers
                             _db.rentItem.Remove(ori.rentItems[j]);
                         }
                         //ori.rentItems.Clear();
-                        _db.rental.Remove(ori);
-                    }
-                    List<RentalPricePreset> presets = await _db.rentalPricePreset
+                        List<RentalPricePreset> presets = await _db.rentalPricePreset
                         .Where(r => r.rental_id == ori.id).AsNoTracking().ToListAsync();
-                    for (int j = 0; j < presets.Count; j++)
-                    {
-                        _db.rentalPricePreset.Remove(presets[j]);
+                        for (int j = 0; j < presets.Count; j++)
+                        {
+                            _db.rentalPricePreset.Remove(presets[j]);
+                        }
+                        _db.rental.Remove(ori);
                     }
                 }
                 await _db.SaveChangesAsync();
