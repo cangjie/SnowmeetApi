@@ -4590,6 +4590,12 @@ namespace SnowmeetApi.Controllers
                         //ori.rentItems.Clear();
                         _db.rental.Remove(ori);
                     }
+                    List<RentalPricePreset> presets = await _db.rentalPricePreset
+                        .Where(r => r.rental_id == ori.id).AsNoTracking().ToListAsync();
+                    for (int j = 0; j < presets.Count; j++)
+                    {
+                        _db.rentalPricePreset.Remove(presets[j]);
+                    }
                 }
                 await _db.SaveChangesAsync();
             }
