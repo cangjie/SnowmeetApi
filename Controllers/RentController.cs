@@ -18,6 +18,7 @@ using TencentCloud.Ocr.V20181119.Models;
 using NPOI.XSSF.UserModel;
 using NPOI.SS.UserModel;
 using NPOI.SS.Formula.Functions;
+using SQLitePCL;
 namespace SnowmeetApi.Controllers
 {
     [Route("api/[controller]/[action]")]
@@ -4505,6 +4506,24 @@ namespace SnowmeetApi.Controllers
                     data = null
                 });
             }
+            if (order.create_date == null)
+            {
+                order.create_date = DateTime.Now;
+                for (int i = 0; i < order.rentals.Count; i++)
+                {
+                    if (order.rentals[i].create_date == null)
+                    {
+                        order.rentals[i].create_date = DateTime.Now;
+                    }
+                    for (int j = 0; j < order.rentals[i].rentItems.Count; j++)
+                    {
+                        if (order.rentals[i].rentItems[j].create_date == null)
+                        {
+                            order.rentals[i].rentItems[j].create_date = DateTime.Now;
+                        }
+                    }
+                }
+            }
             if (order.id == 0)
             {
                 if (_httpContextAccessor.HttpContext.Request.Host.Value != null
@@ -4527,38 +4546,54 @@ namespace SnowmeetApi.Controllers
                     {
                         Models.RentItem item = rental.rentItems[j];
                         item.logs = null;
-                        //await _db.rentItem.AddAsync(item);
-                        //await _db.SaveChangesAsync();
                     }
                     rental.details = null;
-                    //rental.rentItems = null;
-                    //rental.order_id = 0;
-                    //await _db.rental.AddAsync(rental);
-                    //await _db.SaveChangesAsync();
                 }
-                //order.rentals = null;
                 await _db.order.AddAsync(order);
                 await _db.SaveChangesAsync();
             }
             else
             {
-                /*
                 for (int i = 0; i < order.rentals.Count; i++)
                 {
-                    Rental rental = order.rentals[i];
-                    rental.details = null;
-
-                    for (int j = 0; j < rental.rentItems.Count; j++)
+                    int rentalId = order.rentals[i].id;
+                    List<RentalPricePreset> presets = await _db.rentalPricePreset
+                        .Where(r => r.rental_id == rentalId).AsNoTracking().ToListAsync();
+                    for (int j = 0; j < presets.Count; j++)
                     {
-                        Models.RentItem item = rental.rentItems[j];
-
+                        _db.rentalPricePreset.Remove(presets[j]);
                     }
-
                 }
-                */
+                await _db.SaveChangesAsync();
+                List<Rental> newRentals = order.rentals.Where(r => r.id == 0).ToList();
+                for (int i = 0; i < newRentals.Count; i++)
+                {
+                    Rental newRental = newRentals[i];
+                    newRental.order_id = order.id;
+                    newRental.create_date = DateTime.Now;
+                  
+                }
                 _db.Update(order);
                 await _db.SaveChangesAsync();
+                List<Rental> rentals = order.rentals;
+                List<Models.Rental> oriRentals = await _db.rental.Include(r => r.rentItems)
+                .Where(r => r.order_id == order.id).AsNoTracking().ToListAsync();
+                for (int i = 0; i < oriRentals.Count; i++)
+                {
+                    Rental ori = oriRentals[i];
+                    if (rentals.Where(r => r.id == ori.id).ToList().Count == 0)
+                    {
+                        for (int j = 0; j < ori.rentItems.Count; j++)
+                        {
+                            _db.rentItem.Remove(ori.rentItems[j]);
+                        }
+                        //ori.rentItems.Clear();
+                        _db.rental.Remove(ori);
+                    }
+                }
+                await _db.SaveChangesAsync();
             }
+
             return Ok(new ApiResult<Models.Order?>()
             {
                 code = 0,

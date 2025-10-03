@@ -25,7 +25,11 @@ namespace SnowmeetApi.Models
         public int? prev_id { get; set; } = null;
         public int changed { get; set; } = 0;
         public int current_avaliable { get; set; } = 0;
-        public int expect_days { get; set; } = 0;
+        public int expectDays { get; set; } = 0;
+        public double? guaranty { get; set; }
+        public bool noGuaranty { get; set; } = false;
+        public double? guaranty_discount { get; set; } = 0;
+
         public DateTime? update_date { get; set; } = null;
         public DateTime create_date { get; set; } = DateTime.Now;
         public List<RentItem> rentItems { get; set; } = new List<RentItem>();
@@ -38,7 +42,7 @@ namespace SnowmeetApi.Models
         [ForeignKey(nameof(Discount.biz_id))]
         public List<Discount> discounts { get; set; } = new List<Discount>();
         [ForeignKey("package_id")]
-        public RentPackage? package { get; set; }
+        public RentPackage? package { get; set; } = null;
         public double GetDiscountAmount(bool ticket)
         {
             List<Discount> dList = discounts
@@ -224,10 +228,11 @@ namespace SnowmeetApi.Models
         public DateTime rent_date { get; set; } = DateTime.Now.Date;
         public double price { get; set; } = 0;
         public double discount { get; set; } = 0;
+        public string day_type { get; set; } = "";
         public DateTime? update_date { get; set; }
         public DateTime create_date { get; set; } = DateTime.Now;
         [ForeignKey("rental_id")]
         public Rental rental { get; set; } = null;
 
     }
-}
+} 
