@@ -35,6 +35,8 @@ namespace SnowmeetApi.Models
         public List<RentItem> rentItems { get; set; } = new List<RentItem>();
         public List<RentalDetail> details { get; set; } = new List<RentalDetail>();
         public List<RentalPricePreset> pricePresets { get; set; } = null;
+        [NotMapped]
+        public List<RentPrice> priceList { get; set; } = new List<RentPrice>();
         [ForeignKey("order_id")]
         public SnowmeetApi.Models.Order? order { get; set; }
         [ForeignKey(nameof(Guaranty.biz_id))]

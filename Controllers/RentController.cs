@@ -4578,9 +4578,7 @@ namespace SnowmeetApi.Controllers
                     {
                         RentalPricePreset preset = newRental.pricePresets[j];
                         preset.rental_id = newRental.id;
-
                     }
-                    //newRental.pricePresets = null;
                 }
                 for(int i = 0; i < order.rentals.Count; i++)
                 {
@@ -4600,7 +4598,6 @@ namespace SnowmeetApi.Controllers
                         {
                             _db.rentItem.Remove(ori.rentItems[j]);
                         }
-                        //ori.rentItems.Clear();
                         List<RentalPricePreset> presets = await _db.rentalPricePreset
                         .Where(r => r.rental_id == ori.id).AsNoTracking().ToListAsync();
                         for (int j = 0; j < presets.Count; j++)
@@ -4612,6 +4609,25 @@ namespace SnowmeetApi.Controllers
                 }
                 await _db.SaveChangesAsync();
             }
+            /*
+            ShopController _shopHelper = new ShopController(_db);
+            Shop shop = (Shop)((OkObjectResult)(await _shopHelper.GetShopByName(order.shop)).Result).Value;
+            for(int i = 0; i < order.rentals.Count; i++)
+            {
+                Rental rental = order.rentals[i];
+                string type = rental.package_id != null ? "套餐" : "分类";
+                int id = 0;
+                if (type == "套餐")
+                {
+                    id = (int)rental.package_id;
+                }
+                else
+                {
+                    id = (int)rental.category_id;
+                }
+                //rental.priceList = await GetRentPriceList(shop.id, type, id,  )
+            }
+            */
             return Ok(new ApiResult<Models.Order?>()
             {
                 code = 0,
