@@ -174,6 +174,8 @@ namespace SnowmeetApi.Models
         public bool atOnce { get; set; } = false;
         public DateTime? update_date { get; set; }
         public DateTime create_date { get; set; } = DateTime.Now;
+        [ForeignKey("category_id")]
+        public RentCategory category { get; set; } = null;
         [ForeignKey("rental_id")]
         public Rental rental { get; set; }
         [ForeignKey("repairation_id")]
@@ -231,6 +233,7 @@ namespace SnowmeetApi.Models
         public double price { get; set; } = 0;
         public double discount { get; set; } = 0;
         public string day_type { get; set; } = "";
+        public string scene { get; set; } = "";
         public DateTime? update_date { get; set; }
         public DateTime create_date { get; set; } = DateTime.Now;
         [ForeignKey("rental_id")]

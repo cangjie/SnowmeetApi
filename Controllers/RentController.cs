@@ -4506,6 +4506,14 @@ namespace SnowmeetApi.Controllers
                     data = null
                 });
             }
+            for (int i = 0; i < order.rentals.Count; i++)
+            {
+                order.rentals[i].details = null;
+                for (int j = 0; j < order.rentals[i].rentItems.Count; j++)
+                {
+                    order.rentals[i].rentItems[j].category = null;
+                }
+            }
             if (order.create_date == null)
             {
                 order.create_date = DateTime.Now;
@@ -4579,11 +4587,9 @@ namespace SnowmeetApi.Controllers
                         RentalPricePreset preset = newRental.pricePresets[j];
                         preset.rental_id = newRental.id;
                     }
+
                 }
-                for(int i = 0; i < order.rentals.Count; i++)
-                {
-                    order.rentals[i].details = null;
-                }
+
                 _db.Update(order);
                 await _db.SaveChangesAsync();
                 List<Rental> rentals = order.rentals;
@@ -4628,6 +4634,15 @@ namespace SnowmeetApi.Controllers
                 //rental.priceList = await GetRentPriceList(shop.id, type, id,  )
             }
             */
+            for (int i = 0; i < order.rentals.Count; i++)
+            {
+                Rental rental = order.rentals[i];
+                for (int j = 0; j < rental.rentItems.Count; j++)
+                {
+                    Models.RentItem item = rental.rentItems[j];
+                    item.category = await _db.rentCategory.Where(c => c.id == item.category_id).AsNoTracking().FirstOrDefaultAsync();
+                }
+            }
             return Ok(new ApiResult<Models.Order?>()
             {
                 code = 0,
