@@ -172,6 +172,7 @@ namespace SnowmeetApi.Models
         public bool noCode { get; set; } = false;
         public bool noNeed { get; set; } = false;
         public bool atOnce { get; set; } = false;
+        public bool entertain { get; set; } = false;
         public DateTime? update_date { get; set; }
         public DateTime create_date { get; set; } = DateTime.Now;
         [ForeignKey("category_id")]
