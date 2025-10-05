@@ -4651,7 +4651,7 @@ namespace SnowmeetApi.Controllers
                 //.Include(o => o.rentals).ThenInclude(r => r.rentItems)
                 //.Include(o => o.rentals).ThenInclude(r => r.pricePresets)
                 .Where(o => o.shop.Trim().Equals(shop) && o.valid == 0 && o.recepting == 1 && o.create_date.Date == DateTime.Now.Date)
-                .AsNoTracking().ToListAsync();
+                .OrderByDescending(o => o.id).AsNoTracking().ToListAsync();
             return Ok(new ApiResult<List<Models.Order>?>() {
                 code = 0,
                 message = "",
