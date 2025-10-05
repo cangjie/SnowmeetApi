@@ -4676,6 +4676,7 @@ namespace SnowmeetApi.Controllers
             Models.Order order = await _db.order
                 .Include(o => o.rentals).ThenInclude(r => r.rentItems)
                 .Include(o => o.rentals).ThenInclude(r => r.pricePresets)
+                .Include(o => o.member).ThenInclude(m => m.memberSocialAccounts)
                 .Where(o => o.id == orderId).FirstOrDefaultAsync();
             return Ok(new ApiResult<Models.Order?>()
             {
