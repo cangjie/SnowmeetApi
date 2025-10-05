@@ -4589,7 +4589,6 @@ namespace SnowmeetApi.Controllers
                     }
 
                 }
-
                 _db.Update(order);
                 await _db.SaveChangesAsync();
                 List<Rental> rentals = order.rentals;
@@ -4615,7 +4614,7 @@ namespace SnowmeetApi.Controllers
                 }
                 await _db.SaveChangesAsync();
             }
-           
+
             for (int i = 0; i < order.rentals.Count; i++)
             {
                 Rental rental = order.rentals[i];
@@ -4630,6 +4629,33 @@ namespace SnowmeetApi.Controllers
                 code = 0,
                 message = "",
                 data = order
+            });
+        }
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<List<Models.Order>?>>> GetReceptingOrder(string shop,
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            if (staff == null || staff.title_level < 100)
+            {
+                return Ok(new ApiResult<List<Models.Order>?>()
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = null
+                });
+            }
+            shop = Util.UrlDecode(shop);
+            List<Models.Order> orders = await _db.order
+                .Include(o => o.staff).Include(o => o.member)
+                .Include(o => o.rentals).ThenInclude(r => r.rentItems)
+                .Include(o => o.rentals).ThenInclude(r => r.pricePresets)
+                .Where(o => o.shop.Trim().Equals(shop) && o.valid == 0 && o.recepting == 1 && o.create_date.Date == DateTime.Now.Date)
+                .AsNoTracking().ToListAsync();
+            return Ok(new ApiResult<List<Models.Order>?>() {
+                code = 0,
+                message = "",
+                data = orders
             });
         }
     }
