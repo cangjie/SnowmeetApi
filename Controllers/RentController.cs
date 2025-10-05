@@ -4615,25 +4615,7 @@ namespace SnowmeetApi.Controllers
                 }
                 await _db.SaveChangesAsync();
             }
-            /*
-            ShopController _shopHelper = new ShopController(_db);
-            Shop shop = (Shop)((OkObjectResult)(await _shopHelper.GetShopByName(order.shop)).Result).Value;
-            for(int i = 0; i < order.rentals.Count; i++)
-            {
-                Rental rental = order.rentals[i];
-                string type = rental.package_id != null ? "套餐" : "分类";
-                int id = 0;
-                if (type == "套餐")
-                {
-                    id = (int)rental.package_id;
-                }
-                else
-                {
-                    id = (int)rental.category_id;
-                }
-                //rental.priceList = await GetRentPriceList(shop.id, type, id,  )
-            }
-            */
+           
             for (int i = 0; i < order.rentals.Count; i++)
             {
                 Rental rental = order.rentals[i];
