@@ -29,7 +29,7 @@ namespace SnowmeetApi.Models
         public double? guaranty { get; set; }
         public bool noGuaranty { get; set; } = false;
         public double? guaranty_discount { get; set; } = 0;
-
+        public bool entertain { get; set; } = false;
         public DateTime? update_date { get; set; } = null;
         public DateTime create_date { get; set; } = DateTime.Now;
         public List<RentItem> rentItems { get; set; } = new List<RentItem>();
@@ -172,7 +172,7 @@ namespace SnowmeetApi.Models
         public bool noCode { get; set; } = false;
         public bool noNeed { get; set; } = false;
         public bool atOnce { get; set; } = false;
-        public bool entertain { get; set; } = false;
+        
         public DateTime? update_date { get; set; }
         public DateTime create_date { get; set; } = DateTime.Now;
         [ForeignKey("category_id")]
