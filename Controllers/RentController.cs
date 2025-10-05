@@ -4632,7 +4632,7 @@ namespace SnowmeetApi.Controllers
             });
         }
         [HttpGet]
-        public async Task<ActionResult<ApiResult<List<Models.Order>?>>> GetReceptingOrder(string shop,
+        public async Task<ActionResult<ApiResult<List<Models.Order>?>>> GetReceptingOrders(string shop,
             string sessionKey, string sessionType = "wechat_mini_openid")
         {
             Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
@@ -4658,6 +4658,32 @@ namespace SnowmeetApi.Controllers
                 message = "",
                 data = orders
             });
+        }
+        [HttpGet("{orderId}")]
+        public async Task<ActionResult<ApiResult<Models.Order?>>> GetReceptingOrder(int orderId,
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            if (staff == null || staff.title_level < 100)
+            {
+                return Ok(new ApiResult<List<Models.Order>?>()
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = null
+                });
+            }
+            Models.Order order = await _db.order
+                .Include(o => o.rentals).ThenInclude(r => r.rentItems)
+                .Include(o => o.rentals).ThenInclude(r => r.pricePresets)
+                .Where(o => o.id == orderId).FirstOrDefaultAsync();
+            return Ok(new ApiResult<Models.Order?>()
+            {
+                code = 0,
+                 message = "",
+                data = order
+            });
+            
         }
     }
 }
