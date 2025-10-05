@@ -4648,8 +4648,8 @@ namespace SnowmeetApi.Controllers
             shop = Util.UrlDecode(shop);
             List<Models.Order> orders = await _db.order
                 .Include(o => o.staff).Include(o => o.member)
-                .Include(o => o.rentals).ThenInclude(r => r.rentItems)
-                .Include(o => o.rentals).ThenInclude(r => r.pricePresets)
+                //.Include(o => o.rentals).ThenInclude(r => r.rentItems)
+                //.Include(o => o.rentals).ThenInclude(r => r.pricePresets)
                 .Where(o => o.shop.Trim().Equals(shop) && o.valid == 0 && o.recepting == 1 && o.create_date.Date == DateTime.Now.Date)
                 .AsNoTracking().ToListAsync();
             return Ok(new ApiResult<List<Models.Order>?>() {
