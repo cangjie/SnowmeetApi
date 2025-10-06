@@ -4678,10 +4678,11 @@ namespace SnowmeetApi.Controllers
                 .Include(o => o.rentals).ThenInclude(r => r.pricePresets)
                 .Include(o => o.member).ThenInclude(m => m.memberSocialAccounts)
                 .Where(o => o.id == orderId).FirstOrDefaultAsync();
+            order.rentals = order.rentals.OrderByDescending(r => r.id).ToList();
             return Ok(new ApiResult<Models.Order?>()
             {
                 code = 0,
-                 message = "",
+                message = "",
                 data = order
             });
             
