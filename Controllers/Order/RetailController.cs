@@ -13,7 +13,7 @@ using SnowmeetApi.Models;
 using TencentCloud.Ocr.V20181119.Models;
 namespace SnowmeetApi.Controllers
 {
-    [Route("core/[controller]/[action]")]
+    [Route("api/[controller]/[action]")]
     [ApiController]
     public class RetailController : ControllerBase
     {
