@@ -52,7 +52,7 @@ namespace SnowmeetApi.Models
         public int id { get; set; }
         public int? order_id {get; set;} = null;
         public string? mi7_code {get; set;} = null;
-        public double sale_price {get; set;} = 0;
+        public double? sale_price {get; set;} = 0;
         public double deal_price {get; set;} = 0;
         public string? order_type {get; set;} = null;
         public int valid {get; set;} = 1;

@@ -160,7 +160,7 @@ namespace SnowmeetApi.Controllers
                 }
                 else if (i < commonFieldsNum + maxPaymentNum * headPayment.Length)
                 {
-                    
+
                     int paymentIndex = (i - commonFieldsNum) % headPayment.Length;
                     switch (paymentIndex)
                     {
@@ -781,5 +781,31 @@ namespace SnowmeetApi.Controllers
             List<Retail1> newList = retailList.OrderBy(r => r.orders[0].create_date).ToList();
             return Ok(newList);
         }
+        [HttpGet("{mi7Code}")]
+        public async Task<ActionResult<ApiResult<List<Retail>?>>> GetOrdersByMi7Code(string mi7Code,
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            if (staff == null && staff.title_level < 100)
+            {
+                return Ok(new ApiResult<List<Models.Order>?>()
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = null
+                });
+            }
+            List<Retail> retails = await _db.retail.Include(r => r.order)
+                .Where(r => r.mi7_code.Trim().Equals(mi7Code.Trim()) && r.order.valid == 1)
+                .AsNoTracking().ToListAsync();
+            return Ok(new ApiResult<List<Retail>>()
+            {
+                code = 0,
+                message = "",
+                data = retails
+            });
+        }
+        
+
     }
 }
