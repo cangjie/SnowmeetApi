@@ -805,6 +805,7 @@ namespace SnowmeetApi.Controllers
                 data = retails
             });
         }
+        /*
         [HttpPost]
         public async Task<ActionResult<ApiResult<Models.Order?>>> PlaceOrder(Models.Order order,
             string sessionKey, string sessionType = "wechat_mini_openid")
@@ -869,5 +870,6 @@ namespace SnowmeetApi.Controllers
                 data = order
             });
         }
+        */
     }
 }
