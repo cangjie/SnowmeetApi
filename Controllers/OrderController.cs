@@ -546,27 +546,36 @@ namespace SnowmeetApi.Controllers
             order.valid = 1;
             order.biz_date = DateTime.Now;
             order.create_date = DateTime.Now;
-            switch (order.type)
+            if (order.shop == null || order.shop.Trim().Equals(""))
             {
-                case "零售":
-                    if (!await CheckRetailMi7CodeUnique(order))
-                    {
-                        return new ApiResult<SnowmeetApi.Models.Order?>()
-                        {
-                            code = 1,
-                            message = "七色米订单号重复",
-                            data = null
-                        };
-                    }
-                    for (int i = 0; i < order.retails.Count; i++)
-                    {
-                        Retail retail = order.retails[i];
-                        retail.valid = 1;
-                    }
-                    break;
-                default:
-                    break;
+                return Ok(new ApiResult<Models.Order?>()
+                {
+                    code = 1,
+                    message = "店铺不能为空",
+                    data = null
+                });
             }
+            switch (order.type)
+                {
+                    case "零售":
+                        if (!await CheckRetailMi7CodeUnique(order))
+                        {
+                            return new ApiResult<SnowmeetApi.Models.Order?>()
+                            {
+                                code = 1,
+                                message = "七色米订单号重复",
+                                data = null
+                            };
+                        }
+                        for (int i = 0; i < order.retails.Count; i++)
+                        {
+                            Retail retail = order.retails[i];
+                            retail.valid = 1;
+                        }
+                        break;
+                    default:
+                        break;
+                }
             if (_http.HttpContext.Request.Host.Value != null
                 && _http.HttpContext.Request.Host.Value.Equals("mini.snowmeet.top"))
             {
