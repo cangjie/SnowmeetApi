@@ -805,7 +805,69 @@ namespace SnowmeetApi.Controllers
                 data = retails
             });
         }
-        
-
+        [HttpPost]
+        public async Task<ActionResult<ApiResult<Models.Order?>>> PlaceOrder(Models.Order order,
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            if (staff == null || staff.title_level < 100)
+            {
+                return Ok(new ApiResult<Models.Order?>()
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = null
+                });
+            }
+            if (order.retails == null || order.retails.Count == 0)
+            {
+                return Ok(new ApiResult<Models.Order?>()
+                {
+                    code = 1,
+                    message = "空订单",
+                    data = null
+                });
+            }
+            bool inValidMi7Code = false;
+            order.biz_date = DateTime.Now;
+            order.create_date = DateTime.Now;
+            order.staff_id = staff.id;
+            order.valid = 1;
+            for (int i = 0; i < order.retails.Count; i++)
+            {
+                Retail retail = order.retails[i];
+                retail.order_id = order.id;
+                retail.create_date = DateTime.Now;
+                retail.valid = 1;
+                if (retail.mi7_code != null)
+                {
+                    List<Retail> prevRetails = await _db.retail.Include(r => r.order)
+                        .Where(r => r.mi7_code.Trim().Equals(retail.mi7_code.Trim()) && r.order.valid == 1)
+                        .AsNoTracking().ToListAsync();
+                    if (prevRetails != null && prevRetails.Count > 0)
+                    {
+                        inValidMi7Code = true;
+                        break;
+                    }
+                }
+            }
+            if (inValidMi7Code)
+            {
+                return Ok(new ApiResult<Models.Order?>()
+                {
+                    code = 1,
+                    message = "七色迷订单号重复",
+                    data = null
+                });
+            }
+            await _db.order.AddAsync(order);
+            await _db.SaveChangesAsync();
+            return Ok(new ApiResult<Models.Order?>()
+            {
+                code = 0,
+                message = "",
+                data = order
+            });
+        }
     }
 }
