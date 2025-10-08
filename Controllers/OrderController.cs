@@ -86,37 +86,39 @@ namespace SnowmeetApi.Controllers
         [NonAction]
         public async Task<List<SnowmeetApi.Models.Order>> GetCommonOrders(int? orderId, string? shop, int? memberId,
             int? staffId, string? type, DateTime? startDate, DateTime? endDate, string? payOption = null,
-            bool? isTest = null, bool? isEnterain = null, bool? isPackage = null, bool? isOnCredit = null,
+            bool? isTest = null, bool? isEntertain = null, bool? isPackage = null, bool? isOnCredit = null,
             bool? haveDiscount = null, string? status = null)
         {
             startDate = startDate == null ? DateTime.MinValue : startDate;
             endDate = endDate == null ? DateTime.MaxValue : endDate;
             List<SnowmeetApi.Models.Order> orderList = await _db.order
-                .Include(o => o.retails.Where(r => r.valid == 1))
-                .Include(o => o.cares.Where(c => c.valid == 1)).ThenInclude(c => c.tasks.Where(t => t.valid == 1).OrderBy(t => t.id))
-                .Include(o => o.rentals.Where(r => r.valid == 1)).ThenInclude(r => r.details.Where(d => d.valid == 1))
-                .Include(o => o.rentals.Where(r => r.valid == 1)).ThenInclude(r => r.rentItems.Where(r => r.valid == 1))
-                .Include(o => o.fdOrders.Where(f => f.valid == 1)).ThenInclude(f => f.product).ThenInclude(p => p.category)
-                .Include(o => o.payments).ThenInclude(p => p.staff)
-                .Include(o => o.payments).ThenInclude(o => o.refunds)
-                .Include(o => o.discounts.Where(d => d.valid == 1))
-                .Include(o => o.guarantys.Where(g => g.valid == 1)).ThenInclude(g => g.guarantyPayments).ThenInclude(g => g.payment)
-                .Include(o => o.staff)
-                .Include(o => o.member).ThenInclude(m => m.memberSocialAccounts)
                 .Where(o => (o.biz_date.Date >= ((DateTime)startDate).Date && o.biz_date.Date <= ((DateTime)endDate).Date)
                     && (memberId == null || o.member_id == memberId) && (staffId == null || o.staff_id == staffId)
                     && (payOption == null || o.pay_option.Trim().Equals(payOption.Trim()))
                     && (shop == null || o.shop.Trim().Equals(shop.Trim())) && (type == null || o.type.Trim().Equals(type.Trim()))
                     && o.valid == 1)
+
+                .Include(o => o.fdOrders.Where(f => f.valid == 1)).ThenInclude(f => f.product).ThenInclude(p => p.category)
+                .Include(o => o.retails.Where(r => r.valid == 1))
+                .Include(o => o.cares.Where(c => c.valid == 1)).ThenInclude(c => c.tasks.Where(t => t.valid == 1).OrderBy(t => t.id))
+                .Include(o => o.rentals.Where(r => r.valid == 1)).ThenInclude(r => r.details.Where(d => d.valid == 1))
+                .Include(o => o.rentals.Where(r => r.valid == 1)).ThenInclude(r => r.rentItems.Where(r => r.valid == 1))
+                .Include(o => o.payments).ThenInclude(p => p.staff)
+                .Include(o => o.payments)//.ThenInclude(p => p.refunds)
+                .Include(o => o.refunds)
+                .Include(o => o.discounts.Where(d => d.valid == 1))
+                .Include(o => o.guarantys.Where(g => g.valid == 1)).ThenInclude(g => g.guarantyPayments)//.ThenInclude(g => g.payment)
+                .Include(o => o.staff)
+                .Include(o => o.member).ThenInclude(m => m.memberSocialAccounts)
                 .OrderByDescending(o => o.id).AsNoTracking().ToListAsync();
 
             if (isTest != null)
             {
                 orderList = orderList.Where(o => o.is_test == ((bool)isTest ? 1 : 0)).ToList();
             }
-            if (isEnterain != null)
+            if (isEntertain != null)
             {
-                orderList = orderList.Where(o => o.haveEntrain == isEnterain).ToList();
+                orderList = orderList.Where(o => o.haveEntrain == isEntertain).ToList();
             }
             if (isPackage != null)
             {
@@ -525,7 +527,7 @@ namespace SnowmeetApi.Controllers
                 data = retail
             });
         }
-       
+
         [HttpPost]
         public async Task<ActionResult<ApiResult<SnowmeetApi.Models.Order?>>> PlaceOrder([FromBody] SnowmeetApi.Models.Order order,
             [FromQuery] string sessionKey, [FromQuery] string sessionType = "wechat_mini_openid")
@@ -556,26 +558,26 @@ namespace SnowmeetApi.Controllers
                 });
             }
             switch (order.type)
-                {
-                    case "零售":
-                        if (!await CheckRetailMi7CodeUnique(order))
+            {
+                case "零售":
+                    if (!await CheckRetailMi7CodeUnique(order))
+                    {
+                        return new ApiResult<SnowmeetApi.Models.Order?>()
                         {
-                            return new ApiResult<SnowmeetApi.Models.Order?>()
-                            {
-                                code = 1,
-                                message = "七色米订单号重复",
-                                data = null
-                            };
-                        }
-                        for (int i = 0; i < order.retails.Count; i++)
-                        {
-                            Retail retail = order.retails[i];
-                            retail.valid = 1;
-                        }
-                        break;
-                    default:
-                        break;
-                }
+                            code = 1,
+                            message = "七色米订单号重复",
+                            data = null
+                        };
+                    }
+                    for (int i = 0; i < order.retails.Count; i++)
+                    {
+                        Retail retail = order.retails[i];
+                        retail.valid = 1;
+                    }
+                    break;
+                default:
+                    break;
+            }
             if (_http.HttpContext.Request.Host.Value != null
                 && _http.HttpContext.Request.Host.Value.Equals("mini.snowmeet.top"))
             {
