@@ -648,7 +648,7 @@ namespace SnowmeetApi.Controllers
         [HttpGet]
         public async Task<ActionResult<ApiResult<List<SnowmeetApi.Models.Order>>>> GetOrdersByStaff(int? orderId,
             string? shop, string? type, string? subType, DateTime? startDate, DateTime? endDate, string sessionKey,
-            string? payOption, string sessionType = "wechat_mini_openid", bool? isTest = null, bool? isEnterain = null,
+            string? payOption, string sessionType = "wechat_mini_openid", bool? isTest = null, bool? isEntertain = null,
             bool? isPackage = null, bool? isOnCredit = null, bool? haveDiscount = null, string? status = null)
         {
             StaffController _staffHelper = new StaffController(_db);
@@ -663,7 +663,7 @@ namespace SnowmeetApi.Controllers
                 });
             }
             List<SnowmeetApi.Models.Order> orders = await GetCommonOrders(orderId, shop, null, null, type, startDate, endDate, payOption,
-            isTest, isEnterain, isPackage, isOnCredit, haveDiscount, status);
+            isTest, isEntertain, isPackage, isOnCredit, haveDiscount, status);
             SnowmeetApi.Models.Order.RendOrderList(orders);
             return Ok(new ApiResult<List<SnowmeetApi.Models.Order>>()
             {
