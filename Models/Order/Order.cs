@@ -476,7 +476,7 @@ namespace SnowmeetApi.Models
             }
         }
         [NotMapped]
-        public bool haveEntrain
+        public bool haveEntrtain
         {
             get
             {
@@ -492,7 +492,7 @@ namespace SnowmeetApi.Models
             }
         }
         [NotMapped]
-        public double entrainAmount
+        public double entrtainAmount
         {
             get
             {
@@ -517,7 +517,7 @@ namespace SnowmeetApi.Models
             }
         }
         [NotMapped]
-        public bool allEntrain
+        public bool allEntrtain
         {
             get
             {
@@ -529,7 +529,7 @@ namespace SnowmeetApi.Models
                         allEntrain = false;
                     }
                 }
-                return haveEntrain && allEntrain;
+                return haveEntrtain && allEntrtain;
             }
         }
         [NotMapped]
@@ -671,7 +671,7 @@ namespace SnowmeetApi.Models
                 string type = Order.PayType.未支付.ToString();
                 if (totalCharge == 0)
                 {
-                    if (haveEntrain)
+                    if (haveEntrtain)
                     {
                         type = Order.PayType.招待.ToString();
                     }

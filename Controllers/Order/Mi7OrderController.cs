@@ -210,11 +210,11 @@ namespace SnowmeetApi.Controllers.Order
                 real_charge = 0,
                 barCode = "",
                 order_type = "招待",
-                enterain_member_id = memberId,
-                enterain_date = date.Date,
-                enterain_gender = gender.Trim(),
-                enterain_cell = cell.Trim(),
-                enterain_real_name = name.Trim(),
+                entertain_member_id = memberId,
+                entertain_date = date.Date,
+                entertain_gender = gender.Trim(),
+                entertain_cell = cell.Trim(),
+                entertain_real_name = name.Trim(),
                 valid = 1
             };
             await _context.mi7Order.AddAsync(mi7Order);

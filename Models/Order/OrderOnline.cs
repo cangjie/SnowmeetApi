@@ -67,62 +67,6 @@ namespace SnowmeetApi.Models
         public int referee_member_id { get; set; } = 0;
         public DateTime biz_date {get; set;} = DateTime.Now;
         public string? payer { get; set; } = null;
-        /*
-        public bool isEnterain
-        {
-            get
-            {
-                bool enterain = false;
-                for(int i = 0; mi7Orders != null && i < mi7Orders.Count; i++)
-                {
-                    if (mi7Orders[i].order_type.Trim().Equals("招待"))
-                    {
-                        enterain = true;
-                        break;
-                    }
-                }
-                return enterain;
-            }
-        }
-        */
-        /*
-        public EnterainInfo enterainInfo
-        {
-            get
-            {
-                if (!isEnterain)
-                {
-                    return null;
-                }
-                else
-                {
-                    string name = "";
-                    string cell = "";
-                    string gender = "";
-                    int? memberId = null;
-                    for(int i = 0; i < mi7Orders.Count; i++)
-                    {
-                        Mi7Order mi7Order = mi7Orders[i];
-                        if (mi7Order.order_type.Trim().Equals("招待"))
-                        {
-                            name = mi7Order.enterain_real_name == null? "" : mi7Order.enterain_real_name.Trim();
-                            cell = mi7Order.enterain_cell == null? "" : mi7Order.enterain_cell.Trim();
-                            gender = mi7Order.enterain_gender == null ? "" : mi7Order.enterain_gender.Trim();
-                            memberId = mi7Order.enterain_member_id == null? 0 :  mi7Order.enterain_member_id;
-                            break;
-                        }
-                    }
-                    return new EnterainInfo()
-                    {
-                        name = name,
-                        cell = cell,
-                        gender = gender,
-                        memberId = memberId
-                    };
-                }
-            }
-        }
-        */
         [NotMapped]
         public OrderPayment[]? _payments; 
 

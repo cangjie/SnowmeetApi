@@ -1023,21 +1023,21 @@ namespace SnowmeetApi.Controllers
                         order.pay_option = mi7.order_type.Trim();
                         if (mi7.order_type.Trim().Equals("招待"))
                         {
-                            if (mi7.enterain_member_id != null)
+                            if (mi7.entertain_member_id != null)
                             {
-                                order.member_id = (int)mi7.enterain_member_id;
+                                order.member_id = (int)mi7.entertain_member_id;
                             }
-                            if (mi7.enterain_cell != null)
+                            if (mi7.entertain_cell != null)
                             {
-                                order.cell = mi7.enterain_cell;
+                                order.cell = mi7.entertain_cell;
                             }
-                            if (mi7.enterain_real_name != null)
+                            if (mi7.entertain_real_name != null)
                             {
-                                order.name = mi7.enterain_real_name;
+                                order.name = mi7.entertain_real_name;
                             }
-                            if (mi7.enterain_gender != null)
+                            if (mi7.entertain_gender != null)
                             {
-                                order.gender = mi7.enterain_gender;
+                                order.gender = mi7.entertain_gender;
                             }
                         }
                     }
