@@ -15,7 +15,7 @@ namespace SnowmeetApi.Models
     {
         public enum OrderStatus { 待生成, 待支付, 部分支付, 支付成功, 挂账, 全额退款, 部分退款, 退款失败, 订单关闭, 已下单, 已完成 }
         public enum PayFlowStatus { 待生成, 已生成, 待支付, 支付中, 已支付, 已关闭, 部分退款, 全额退款 }
-        public enum PayType {整单支付, 分付, 无需支付, 未支付, 招待}
+        public enum PayType { 整单支付, 分付, 无需支付, 未支付, 招待 }
         public static void RendOrder(SnowmeetApi.Models.Order order)
         {
             string txtColor = "";
@@ -78,6 +78,7 @@ namespace SnowmeetApi.Models
         public string? current_pay_method { get; set; } = null;
         public string? customer_type { get; set; } = null;
         public int recepting { get; set; } = 0;
+        public double? paying_amount { get; set; } = null;
         public DateTime? update_date { get; set; } = null;
         [NotMapped]
         public string textColor { get; set; } = "";
@@ -480,15 +481,23 @@ namespace SnowmeetApi.Models
         {
             get
             {
-                bool haveEntrain = false;
+                bool haveEntrtain = false;
                 for (int i = 0; fdOrders != null && i < fdOrders.Count; i++)
                 {
                     if (fdOrders[i].order_type.Trim().Equals("招待"))
                     {
-                        haveEntrain = true;
+                        haveEntrtain = true;
                     }
                 }
-                return haveEntrain;
+                for (int i = 0; retails != null && i < retails.Count; i++)
+                {
+                    if (retails[i].order_type.Trim().Equals("招待"))
+                    {
+                        haveEntrtain = true;
+                    }
+
+                }
+                return haveEntrtain;
             }
         }
         [NotMapped]
@@ -497,23 +506,42 @@ namespace SnowmeetApi.Models
             get
             {
                 double amount = 0;
-                switch (type)
+                for (int i = 0; fdOrders != null && i < fdOrders.Count; i++)
                 {
-                    case "餐饮":
-                        for (int i = 0; i < fdOrders.Count; i++)
-                        {
-                            FdOrder fd = fdOrders[i];
-                            if (fd.valid == 1 && fd.order_type.Trim().Equals("招待"))
-                            {
-                                amount = amount + fd.summary;
-                            }
-                        }
-                        break;
-                    default:
-                        break;
+                    FdOrder fd = fdOrders[i];
+                    if (fd.valid == 1 && fd.order_type.Trim().Equals("招待"))
+                    {
+                        amount = amount + fd.summary;
+                    }
                 }
-                
-                return amount;
+                for (int i = 0; retails != null && i < retails.Count; i++)
+                {
+                    if (retails[i].order_type.Trim().Equals("招待"))
+                    {
+                        amount = amount + retails[i].deal_price;
+                    }
+                }
+                /*
+                    switch (type)
+                    {
+                        case "餐饮":
+                            for (int i = 0; i < fdOrders.Count; i++)
+                            {
+                                FdOrder fd = fdOrders[i];
+                                if (fd.valid == 1 && fd.order_type.Trim().Equals("招待"))
+                                {
+                                    amount = amount + fd.summary;
+                                }
+                            }
+                            break;
+                        case "零售":
+                        case "":
+                        default:
+                            break;
+                    }
+                    */
+
+                    return amount;
             }
         }
         [NotMapped]
@@ -521,14 +549,22 @@ namespace SnowmeetApi.Models
         {
             get
             {
-                bool allEntrain = true;
+                bool allEntrtain = true;
                 for (int i = 0; fdOrders != null && i < fdOrders.Count; i++)
                 {
                     if (!fdOrders[i].order_type.Trim().Equals("招待"))
                     {
-                        allEntrain = false;
+                        allEntrtain = false;
                     }
                 }
+                for (int i = 0; retails != null && i < retails.Count; i++)
+                {
+                    if (retails[i].order_type.Trim().Equals("招待"))
+                    {
+                        allEntrtain = false;
+                    }
+                }
+
                 return haveEntrtain && allEntrtain;
             }
         }
@@ -542,7 +578,7 @@ namespace SnowmeetApi.Models
                 {
                     Discount discount = discounts[i];
                     if (discount.valid == 1 && discount.biz_id != null)
-                    { 
+                    {
                         amount += discount.amount;
                     }
                 }
@@ -551,7 +587,7 @@ namespace SnowmeetApi.Models
         }
         [NotMapped]
         public double orderDiscountAmount
-        { 
+        {
             get
             {
                 double amount = 0;
@@ -559,7 +595,7 @@ namespace SnowmeetApi.Models
                 {
                     Discount discount = discounts[i];
                     if (discount.valid == 1 && discount.biz_id == null)
-                    { 
+                    {
                         amount += discount.amount;
                     }
                 }
@@ -662,7 +698,7 @@ namespace SnowmeetApi.Models
                 return status;
             }
         }
-        
+
         [NotMapped]
         public string payType
         {
