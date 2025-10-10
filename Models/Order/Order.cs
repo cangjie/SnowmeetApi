@@ -654,6 +654,17 @@ namespace SnowmeetApi.Models
                         }
                         else
                         {
+                            List<OrderPayment> unpaidPayments = payments
+                                .Where(p => p.valid == 1 && p.status.ToString().Equals(OrderPayment.PaymentStatus.待支付.ToString())).ToList();
+                            if (payments.Count == 0 || unpaidPayments.Count == 0)
+                            {
+                                status = OrderStatus.待生成.ToString();
+                            }
+                            else if (unpaidPayments.Count == 0)
+                            {
+                                status = OrderStatus.待支付.ToString();
+                            }
+                            /*
                             if (pay_flow_status == null)
                             {
                                 status = OrderStatus.待生成.ToString();
@@ -662,6 +673,7 @@ namespace SnowmeetApi.Models
                             {
                                 status = OrderStatus.待支付.ToString();
                             }
+                            */
                         }
                         if (closed == 1)
                         {

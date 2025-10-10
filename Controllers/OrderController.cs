@@ -1001,7 +1001,7 @@ namespace SnowmeetApi.Controllers
                 {
                     id = 0,
                     order_id = order.id,
-                    amount = (double)order.paying_amount,
+                    amount = amount == null ? (double)order.paying_amount : (double)amount,
                     staff_id = staff.id,
                     pay_method = "微信支付",
                     mch_id = mchId,
