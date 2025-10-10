@@ -1020,7 +1020,7 @@ namespace SnowmeetApi.Controllers
                     scene = "准备微信支付",
                     create_date = DateTime.Now
                 };
-                
+
                 //order.current_pay_method = null;
                 _db.order.Entry(order).State = EntityState.Modified;
                 await _db.SaveChangesAsync();
@@ -1326,11 +1326,25 @@ namespace SnowmeetApi.Controllers
                 payment = await _db.orderPayment.Where(p => p.id == paymentId).AsNoTracking().FirstOrDefaultAsync();
                 payment.queryed = 1;
                 payment.order = null;
-                _db.orderPayment.Entry(payment).State = EntityState.Modified;
+                try
+                {
+                    _db.orderPayment.Entry(payment).State = EntityState.Modified;
+                }
+                catch
+                {
+
+                }
             }
             order.queryed = 1;
             order.update_date = DateTime.Now;
-            _db.order.Entry(order).State = EntityState.Modified;
+            try
+            {
+                _db.order.Entry(order).State = EntityState.Modified;
+            }
+            catch
+            {
+                
+            }
             await _db.SaveChangesAsync();
             for (int i = 0; order.payments != null && i < order.payments.Count; i++)
             {
