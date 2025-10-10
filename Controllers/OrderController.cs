@@ -1332,6 +1332,10 @@ namespace SnowmeetApi.Controllers
             order.update_date = DateTime.Now;
             _db.order.Entry(order).State = EntityState.Modified;
             await _db.SaveChangesAsync();
+            for (int i = 0; order.payments != null && i < order.payments.Count; i++)
+            {
+                order.payments[i].order = null;
+            }
             //order.payments = null;
             return order;
         }
