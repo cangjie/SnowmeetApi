@@ -1295,7 +1295,7 @@ namespace SnowmeetApi.Controllers
                 .AsNoTracking().FirstOrDefaultAsync();
             order.dealed = 1;
             order.pay_flow_status = Models.Order.PayFlowStatus.已支付.ToString();
-
+            order.paying_amount = null;
             await UpdateOrder(order, null, null, "支付成功");
         }
         [HttpGet]
