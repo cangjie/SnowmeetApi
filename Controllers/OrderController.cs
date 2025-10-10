@@ -1415,13 +1415,18 @@ namespace SnowmeetApi.Controllers
             });
         }
         [HttpGet("{orderId}")]
-        public async Task LogShowWechatQrCode(int orderId, string sessionKey, string sessionType = "wechat_mini_openid")
+        public async Task<ActionResult<ApiResult<CoreDataModLog?>>> LogShowWechatQrCode(int orderId, string sessionKey, string sessionType = "wechat_mini_openid")
         {
             StaffController _staffHelper = new StaffController(_db);
             Staff staff = await _staffHelper.GetStaffBySessionKey(sessionKey, sessionType);
             if (staff == null && staff.title_level < 100)
             {
-                return;
+                return Ok(new ApiResult<CoreDataModLog?>()
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = null
+                });
             }
             CoreDataModLog log = new CoreDataModLog()
             {
@@ -1437,6 +1442,12 @@ namespace SnowmeetApi.Controllers
             };
             await _db.coreDataModLog.AddAsync(log);
             await _db.SaveChangesAsync();
+            return Ok(new ApiResult<CoreDataModLog?>()
+            {
+                code = 0,
+                message = "",
+                data = log
+            });
         }
     }
 
