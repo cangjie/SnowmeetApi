@@ -660,7 +660,7 @@ namespace SnowmeetApi.Models
                             {
                                 status = OrderStatus.待生成.ToString();
                             }
-                            else if (unpaidPayments.Count == 0)
+                            else if (unpaidPayments.Count > 0)
                             {
                                 status = OrderStatus.待支付.ToString();
                             }
