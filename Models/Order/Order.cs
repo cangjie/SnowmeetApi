@@ -664,16 +664,7 @@ namespace SnowmeetApi.Models
                             {
                                 status = OrderStatus.待支付.ToString();
                             }
-                            /*
-                            if (pay_flow_status == null)
-                            {
-                                status = OrderStatus.待生成.ToString();
-                            }
-                            else
-                            {
-                                status = OrderStatus.待支付.ToString();
-                            }
-                            */
+                          
                         }
                         if (closed == 1)
                         {
@@ -744,6 +735,25 @@ namespace SnowmeetApi.Models
                     }
                 }
                 return type;
+            }
+        }
+        [NotMapped]
+        public string? payMethod
+        {
+            get
+            {
+                string? payMethod = null;
+                if (paidAmount == 0 || payType.Trim().Equals("整单支付"))
+                {
+                    OrderPayment currentPayment = payments
+                        .Where(p => p.valid == 1 && p.status.Trim().Equals(OrderPayment.PaymentStatus.待支付.ToString()))
+                        .OrderByDescending(p => p.id).FirstOrDefault();
+                    if (currentPayment != null)
+                    {
+                        payMethod = currentPayment.pay_method.Trim();
+                    }
+                }
+                return payMethod;
             }
         }
     }
