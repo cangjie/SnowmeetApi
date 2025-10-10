@@ -887,22 +887,7 @@ namespace SnowmeetApi.Controllers
             {
                 return null;
             }
-
             double payAmount = 0;
-            /*
-            if (order.single_payment == 1)
-            {
-                payAmount = order.totalCharge;
-            }
-            else if (amount == null)
-            {
-                payAmount = order.totalCharge;
-            }
-            else
-            {
-                payAmount = (double)amount;
-            }
-            */
             if (amount == null)
             {
                 payAmount = order.totalCharge;
@@ -982,6 +967,120 @@ namespace SnowmeetApi.Controllers
                 return lastPayment;
             }
         }
+
+        [HttpGet("{orderId}")]
+        public async Task<ActionResult<ActionResult<OrderPayment?>>> GetWepayPayment(int orderId, double? amount,
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            Models.Order order = await GetOrder(orderId);
+            string message = "";
+            if (order == null)
+            {
+                message = "无此订单";
+            }
+            else if (order.closed == 1)
+            {
+                message = "订单关闭";
+            }
+            else
+            {
+                StaffController _staffHelper = new StaffController(_db);
+                Staff staff = await _staffHelper.GetStaffBySessionKey(sessionKey, sessionType);
+
+                List<OrderPayment> prevPayments = await _db.orderPayment
+                    .Where(p => p.valid == 1 && p.status.Trim().Equals(OrderPayment.PaymentStatus.待支付.ToString())
+                    && p.order_id == orderId && p.pay_method.Trim().Equals("微信支付")).AsNoTracking().ToListAsync();
+                for (int i = 0; i < prevPayments.Count; i++)
+                {
+                    prevPayments[i].valid = 0;
+                    _db.orderPayment.Entry(prevPayments[i]).State = EntityState.Modified;
+                }
+                TenpayController _tenHelper = new TenpayController(_db, _config, _http);
+                int mchId = _tenHelper.GetMchId(order);
+                OrderPayment newPayment = new OrderPayment()
+                {
+                    id = 0,
+                    order_id = order.id,
+                    amount = (double)order.paying_amount,
+                    staff_id = staff.id,
+                    pay_method = "微信支付",
+                    mch_id = mchId,
+                    create_date = DateTime.Now
+                };
+                await _db.orderPayment.AddAsync(newPayment);
+                CoreDataModLog log = new CoreDataModLog()
+                {
+                    table_name = "Order",
+                    field_name = "OrderState",
+                    key_value = orderId,
+                    prev_value = null,
+                    current_value = Models.Order.OrderStatus.待支付.ToString(),
+                    staff_id = staff.id,
+                    is_manual = 1,
+                    scene = "准备微信支付",
+                    create_date = DateTime.Now
+                };
+                await _db.coreDataModLog.AddAsync(log);
+                order.paying_amount = null;
+                order.update_date = DateTime.Now;
+                //order.current_pay_method = null;
+                _db.order.Entry(order).State = EntityState.Modified;
+                await _db.SaveChangesAsync();
+                return Ok(new ApiResult<OrderPayment?>()
+                {
+                    code = 0,
+                    message = "",
+                    data = newPayment
+                });
+
+
+                /*
+                                OrderPayment payment = await GetReadyOrderPayment(order, amount, "微信支付", null, null);
+
+                                payment.staff_id = staff == null ? null : staff.id;
+                                _db.orderPayment.Entry(payment).State = EntityState.Modified;
+                                await _db.SaveChangesAsync();
+                                if (payment == null)
+                                {
+                                    message = "获取二维码失败";
+                                }
+                                else if (payment.ali_qr_code == null || payment.ali_qr_code.Trim().Equals(""))
+                                {
+                                    message = "支付宝系统故障";
+                                }
+                                if (message.Trim().Equals(""))
+                                {
+                                    CoreDataModLog log = new CoreDataModLog()
+                                    {
+                                        table_name = "Order",
+                                        field_name = "OrderState",
+                                        key_value = orderId,
+                                        prev_value = null,
+                                        current_value = Models.Order.OrderStatus.待支付.ToString(),
+                                        staff_id = staff.id,
+                                        is_manual = 1,
+                                        scene = "显示支付宝二维码",
+                                        create_date = DateTime.Now
+                                    };
+                                    await _db.coreDataModLog.AddAsync(log);
+                                    await _db.SaveChangesAsync();
+                                    return Ok(new ApiResult<string>()
+                                    {
+                                        code = 0,
+                                        message = "",
+                                        data = payment.ali_qr_code.Trim()
+                                    });
+                                }
+                                */
+            }
+            return Ok(new ApiResult<OrderPayment?>()
+            {
+                code = 1,
+                message = message,
+                data = null
+            });
+        }
+
         [HttpGet("{orderId}")]
         public async Task<ActionResult<ApiResult<string>>> GetAlipayPaymentQrCode(int orderId, double? amount,
             string sessionKey, string sessionType = "wechat_mini_openid")
