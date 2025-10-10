@@ -1298,6 +1298,44 @@ namespace SnowmeetApi.Controllers
             order.paying_amount = null;
             await UpdateOrder(order, null, null, "支付成功");
         }
+        [NonAction]
+        public async Task<Models.Order?> QueryOrderPaid(int orderId)
+        {
+            DateTime startTime = DateTime.Now;
+            Models.Order order = await _db.order.Where(o => o.id == orderId).AsNoTracking().FirstOrDefaultAsync();
+            OrderPayment payment = await _db.orderPayment.Where(p => p.order_id == orderId && p.valid == 1 && p.queryed == 0
+                && p.status.Trim().Equals(OrderPayment.PaymentStatus.待支付.ToString())
+                && p.paid_date > DateTime.Now.AddHours(-4)).AsNoTracking()
+                .OrderByDescending(p => p.id).FirstOrDefaultAsync();
+            int? paymentId = null;
+            for (; (payment != null && order.dealed == 0 && (DateTime.Now - startTime).Seconds <= 3600);)
+            {
+                Thread.Sleep(1000);
+                if (paymentId == null)
+                {
+                    paymentId = payment.id;
+                }
+                payment = await _db.orderPayment.Where(p => p.order_id == orderId && p.valid == 1 && p.queryed == 0
+                && p.status.Trim().Equals(OrderPayment.PaymentStatus.待支付.ToString())
+                && p.paid_date > DateTime.Now.AddHours(-4)).AsNoTracking()
+                .OrderByDescending(p => p.id).FirstOrDefaultAsync();
+                order = await _db.order.Where(o => o.id == orderId).AsNoTracking().FirstOrDefaultAsync();
+            }
+            if (paymentId != null)
+            {
+                payment = await _db.orderPayment.Where(p => p.id == paymentId).AsNoTracking().FirstOrDefaultAsync();
+                payment.queryed = 1;
+                payment.order = null;
+                _db.orderPayment.Entry(payment).State = EntityState.Modified;
+            }
+            order.queryed = 1;
+            order.update_date = DateTime.Now;
+            _db.order.Entry(order).State = EntityState.Modified;
+            await _db.SaveChangesAsync();
+            //order.payments = null;
+            return order;
+        }
+        /*
         [HttpGet]
         public async Task<Models.Order?> QueryOrderPaid(int orderId)
         {
@@ -1332,6 +1370,7 @@ namespace SnowmeetApi.Controllers
             order.payments = null;
             return order;
         }
+        */
         [HttpGet("{orderId}")]
         public async Task<ActionResult<ApiResult<Models.Order>>> CancelPaying(int orderId, string sessionKey,
         string sessionType = "wechat_mini_openid")
