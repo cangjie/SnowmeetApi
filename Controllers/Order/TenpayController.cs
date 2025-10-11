@@ -63,9 +63,8 @@ namespace SnowmeetApi.Controllers
         public async Task<OrderPayment> TenpayRequest(OrderPayment payment, Models.Order order, bool needProfitShare = false)
         {
             payment.mch_id = GetMchId(order);
-            if (payment == null || payment.submit_time != null
-                || payment.status != OrderPayment.PaymentStatus.待支付.ToString()
-                || payment.mch_id == null)
+            if (payment == null  || payment.mch_id == null
+            || payment.status != OrderPayment.PaymentStatus.待支付.ToString()  )
             {
                 return null;
             }
@@ -89,12 +88,21 @@ namespace SnowmeetApi.Controllers
             detail.GoodsList = details;
             string notifyUrl = "https://" + _http.HttpContext.Request.Host.Value + "/api/Tenpay/TenpayPaymentCallBack/" + payment.mch_id.ToString();
             //bool needProfitShare = !(shares == null || shares.Count == 0);
+            string goodsName = order.description.Trim();
+            switch (order.type.Trim())
+            {
+                case "零售":
+                    goodsName = order.code.Trim();
+                    break;
+                default:
+                    break;
+            }
             var client = await GetClient((int)payment.mch_id);
             var request = new CreatePayTransactionJsapiRequest()
             {
                 OutTradeNumber = payment.out_trade_no.Trim(),
                 AppId = _appId,
-                Description = order.description,
+                Description = goodsName,
                 ExpireTime = DateTimeOffset.Now.AddMinutes(60),
                 NotifyUrl = notifyUrl,
                 Amount = new CreatePayTransactionJsapiRequest.Types.Amount()
@@ -109,7 +117,7 @@ namespace SnowmeetApi.Controllers
                 {
                     IsProfitSharing = needProfitShare
                 },
-                Detail = detail
+                Detail = details.Count == 0? null : detail
 
 
             };

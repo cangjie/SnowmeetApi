@@ -1140,6 +1140,85 @@ namespace SnowmeetApi.Controllers
                 data = null
             });
         }
+        [HttpGet("{paymentId}")]
+        public async Task<ActionResult<ApiResult<OrderPayment?>>> WechatPayByOrderPayment(int paymentId,
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            MemberController _memberHelper = new MemberController(_db, _config);
+            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
+            string message = "";
+            if (member == null || member.wechatMiniOpenId == null)
+            {
+                message = "未找到用户";
+            }
+            if (!message.Trim().Equals(""))
+            {
+                return Ok(new ApiResult<OrderPayment?>()
+                {
+                    code = 1,
+                    message = message,
+                    data = null
+                });
+            }
+            OrderPayment payment = await _db.orderPayment.Where(p => p.id == paymentId).AsNoTracking().FirstOrDefaultAsync();
+            Models.Order order = await GetOrder(payment.order_id);
+            List<OrderPayment> allPayments = await _db.orderPayment.Where(p => p.id == paymentId).AsNoTracking().ToListAsync();
+            string outTradeNo = order.code + "_ZF_" + (allPayments.Count + 1).ToString().PadLeft(2, '0');
+            if (payment.member_id == null)
+            {
+                payment.member_id = member.id;
+                payment.open_id = member.wechatMiniOpenId.Trim();
+                payment.update_date = DateTime.Now;
+                payment.out_trade_no = outTradeNo.Trim();
+                _db.orderPayment.Entry(payment).State = EntityState.Modified;
+                await _db.SaveChangesAsync();
+            }
+            if (payment.member_id != member.id && payment.member_id != null)
+            {
+                outTradeNo = payment.out_trade_no;
+                string[] outTradeNoArr = outTradeNo.Split('_');
+                int outNum = int.Parse(outTradeNoArr[outTradeNoArr.Length - 1].Trim()) + 1;
+                outTradeNo = order.code + "_ZF_" + outNum.ToString().PadLeft(2, '0');
+                CoreDataModLog log = new CoreDataModLog()
+                {
+                    id = 0,
+                    table_name = "order_payment",
+                    field_name = "member_id",
+                    key_value = payment.id,
+                    scene = "支付顾客换人",
+                    member_id = member.id,
+                    staff_id = null,
+                    prev_value = payment.member_id.ToString(),
+                    current_value = member.id.ToString(),
+                    trace_id = 0,
+                    is_manual = 1,
+                    manual_memo = ""
+                };
+                await _db.coreDataModLog.AddAsync(log);
+                payment.member_id = member.id;
+                payment.open_id = member.wechatMiniOpenId.Trim();
+                payment.out_trade_no = outTradeNo.Trim();
+                payment.prepay_id = null;
+                payment.timestamp = null;
+                payment.nonce = null;
+                payment.sign = null;
+                payment.update_date = DateTime.Now;
+                _db.orderPayment.Entry(payment).State = EntityState.Modified;
+                await _db.SaveChangesAsync();
+            }
+            
+            if (payment.prepay_id == null)
+            {
+                TenpayController _tenHelper = new TenpayController(_db, _config, _http);
+                payment = await _tenHelper.TenpayRequest(payment, order, payment.need_share == 1 ? true : false);
+            }
+            return Ok(new ApiResult<OrderPayment?>()
+            {
+                code = 0,
+                message = "",
+                data = payment
+            });
+        }
         [HttpGet("{orderId}")]
         public async Task<ActionResult<ApiResult<OrderPayment>>> WechatPay(int orderId, double? amount,
             string sessionKey, string sessionType = "wechat_mini_openid", bool needShare = false)
