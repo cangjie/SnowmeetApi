@@ -1343,7 +1343,7 @@ namespace SnowmeetApi.Controllers
             }
             catch
             {
-                
+
             }
             await _db.SaveChangesAsync();
             for (int i = 0; order.payments != null && i < order.payments.Count; i++)
@@ -1602,6 +1602,27 @@ namespace SnowmeetApi.Controllers
                 code = 0,
                 message = "",
                 data = log
+            });
+        }
+        [HttpGet("{paymentId}")]
+        public async Task<ActionResult<ApiResult<Models.Order?>>> GetOrderFromPaymentByCustomer(int paymentId)
+        {
+            OrderPayment payment = await _db.orderPayment.Where(p => p.id == paymentId).AsNoTracking().FirstOrDefaultAsync();
+            if (payment == null || payment.valid == 0)
+            {
+                return Ok(new ApiResult<Models.Order?>()
+                {
+                    code = 1,
+                    message = "没有找到",
+                    data = null
+                });
+            }
+            Models.Order order = await GetOrder(payment.order_id);
+            return Ok(new ApiResult<Models.Order?>()
+            {
+                code = 0,
+                message = "",
+                data = order
             });
         }
     }
