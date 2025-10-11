@@ -650,7 +650,10 @@ namespace SnowmeetApi.Models
                     {
                         if (dealed == 1)
                         {
-                            status = OrderStatus.已下单.ToString();
+                            if (type == "餐饮" || type == "养护")
+                            {
+                                status = OrderStatus.已下单.ToString();
+                            }
                         }
                         else
                         {
