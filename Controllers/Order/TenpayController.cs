@@ -399,6 +399,7 @@ namespace SnowmeetApi.Controllers
                         {
                             sucPay.wepay_trans_id = transactionId.Trim();
                             sucPay.status = OrderPayment.PaymentStatus.支付成功.ToString();
+                            sucPay.paid_date = DateTime.Now;
                             sucPay.update_date = DateTime.Now;
                             _db.OrderPayment.Entry(sucPay).State = EntityState.Modified;
                             //await _db.SaveChangesAsync();
@@ -430,7 +431,7 @@ namespace SnowmeetApi.Controllers
                             };
                             await _db.coreDataModLog.AddAsync(logPayment);
                             await _db.SaveChangesAsync();
-                            
+
                             OrderController _orderHelper = new OrderController(_db, _oriConfig, _http);
                             await _orderHelper.DealSuccessPaidOrder(sucPay.order_id);
                            
