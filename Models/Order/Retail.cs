@@ -57,6 +57,7 @@ namespace SnowmeetApi.Models
         public string? order_type {get; set;} = null;
         public int valid {get; set;} = 1;
         public int giveup_score { get; set; } = 0;
+        public string memo { get; set; } = "";
         public DateTime? update_date { get; set; } = null;
         public DateTime create_date {get; set;} = DateTime.Now;
         [NotMapped]
