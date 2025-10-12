@@ -480,10 +480,12 @@ namespace SnowmeetApi
                         OrderPayment payment =  await _orderHelper.QueryPaymentPaid((int)post.id);
                         Models.Order orderPaid = await db.order.Include(o => o.payments)
                             .Where(o => o.id == payment.id).AsNoTracking().FirstOrDefaultAsync();
+                        /*
                         for (int i = 0; i < orderPaid.payments.Count; i++)
                         {
                             orderPaid.payments[i].order = null;
                         }
+                        */
                         ApiResult<Models.Order> orderPaidResult = new ApiResult<Models.Order>()
                         {
                             code = 0,
