@@ -1684,8 +1684,12 @@ namespace SnowmeetApi.Controllers
             });
         }
         [HttpGet("{paymentId}")]
-        public async Task<ActionResult<ApiResult<Models.Order?>>> GetOrderFromPaymentByCustomer(int paymentId)
+        public async Task<ActionResult<ApiResult<Models.Order?>>> GetOrderFromPaymentByCustomer(int paymentId,
+            string sessionKey, string sessionType = "wechat_mini_openid")
         {
+            MemberController _memberHelper = new MemberController(_db, _config);
+            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
+
             OrderPayment payment = await _db.orderPayment.Where(p => p.id == paymentId).AsNoTracking().FirstOrDefaultAsync();
             if (payment == null || payment.valid == 0)
             {
@@ -1697,6 +1701,16 @@ namespace SnowmeetApi.Controllers
                 });
             }
             Models.Order order = await GetOrder(payment.order_id);
+            if (payment.status.Trim() == OrderPayment.PaymentStatus.支付成功.ToString()
+             && order.member_id != member.id && payment.member_id != member.id)
+            {
+                return Ok(new ApiResult<Models.Order?>()
+                {
+                    code = 1,
+                    message = "订单和当前用户无关",
+                    data = null
+                });
+            }
             return Ok(new ApiResult<Models.Order?>()
             {
                 code = 0,
