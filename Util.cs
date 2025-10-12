@@ -478,8 +478,8 @@ namespace SnowmeetApi
                     case "paymentpaid":
                         OrderController _orderHelper = new OrderController(db, config, http);
                         OrderPayment payment =  await _orderHelper.QueryPaymentPaid((int)post.id);
-                        Models.Order orderPaid = await db.order.Include(o => o.payments)
-                            .Where(o => o.id == payment.id).AsNoTracking().FirstOrDefaultAsync();
+                        Models.Order orderPaid = await db.order.Where(o => o.id == payment.order_id).AsNoTracking().FirstOrDefaultAsync();
+                        orderPaid.payments = await db.orderPayment.Where(p => p.order_id == payment.order_id).ToListAsync();
                         /*
                         for (int i = 0; i < orderPaid.payments.Count; i++)
                         {
