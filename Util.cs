@@ -586,5 +586,19 @@ namespace SnowmeetApi
             Staff staff = await staffHelper.GetStaffBySessionKey(sessionKey, sessionType);
             return staff;
         }
+        public static bool IsValidMi7Code(string mi7Code)
+        {
+            mi7Code = mi7Code.ToUpper();
+            if (mi7Code.StartsWith("XSD")
+                && (mi7Code.EndsWith("I") || mi7Code.EndsWith("A"))
+                && mi7Code.Length == 15)
+            {
+                return true;
+            }
+            else
+            {
+                return false;
+            }
+        }
     }
 }

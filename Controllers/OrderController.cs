@@ -10,6 +10,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using System.Threading;
+using NPOI.SS.Formula.Functions;
 namespace SnowmeetApi.Controllers
 {
     [Route("api/[controller]/[action]")]
@@ -1711,6 +1712,96 @@ namespace SnowmeetApi.Controllers
                     data = null
                 });
             }
+            return Ok(new ApiResult<Models.Order?>()
+            {
+                code = 0,
+                message = "",
+                data = order
+            });
+        }
+        [NonAction]
+        public async Task<Models.Order> UpdateOrderWithDetail(Models.Order order, int? staffId, int? memberId, string scene)
+        {
+            Models.Order oriOrder = await GetOrder(order.id);
+            for (int i = 0; i < order.retails.Count; i++)
+            {
+                Retail retail = order.retails[i];
+                Retail oriRetail = oriOrder.retails.Where(r => r.id == retail.id).FirstOrDefault();
+                if (oriRetail != null)
+                {
+                    List<CoreDataModLog> logs = Util.GetUpdateDifferenceLog<Retail>(oriRetail, retail, memberId, staffId, scene);
+                    for (int j = 0; j < logs.Count; j++)
+                    {
+                        await _db.coreDataModLog.AddAsync(logs[j]);
+                    }
+                }
+            }
+            order.update_date = DateTime.Now;
+            List<CoreDataModLog> orderLogs = Util.GetUpdateDifferenceLog<Models.Order>(oriOrder, order, memberId, staffId, scene);
+            for (int j = 0; j < orderLogs.Count; j++)
+            {
+                await _db.coreDataModLog.AddAsync(orderLogs[j]);
+            }
+            _db.Update(order);
+            await _db.SaveChangesAsync();
+            return order;
+        }
+        [NonAction]
+        public async Task<bool> CheckMi7Code(string mi7Code, int retailId)
+        {
+            if (!Util.IsValidMi7Code(mi7Code))
+            {
+                return false;
+            }
+            List<Retail> rList = await _db.retail.Include(r => r.order)
+                .Where(r => r.valid == 1 && r.mi7_code.Trim() == mi7Code && r.id != retailId && r.order.valid == 1)
+                .AsNoTracking().ToListAsync();
+            if (rList == null || rList.Count == 0)
+            {
+                return true;
+            }
+            else
+            {
+                return false;
+            }
+        }
+        [HttpPost]
+        public async Task<ActionResult<ApiResult<Models.Order?>>> UpdateOrderWithDetailByStaff([FromBody] Models.Order order,
+            [FromQuery] string scene, [FromQuery] string sessionKey, [FromQuery] string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            if (staff == null || staff.title_level < 100)
+            {
+                return Ok(new ApiResult<Models.Order?>()
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = null
+                });
+            }
+            bool mi7CodeValid = true;
+            for (int i = 0; order.retails != null && i < order.retails.Count; i++)
+            {
+                Retail retail = order.retails[i];
+                if (retail.mi7_code != null)
+                {
+                    if (!(await CheckMi7Code(retail.mi7_code, retail.id)))
+                    {
+                        mi7CodeValid = false;
+                        break;
+                    }
+                }
+            }
+            if (!mi7CodeValid)
+            {
+                return Ok(new ApiResult<Models.Order?>()
+                {
+                    code = 1,
+                    message = "七色米重复",
+                    data = null
+                });
+            }
+            order = await UpdateOrderWithDetail(order, staff.id, null, scene);
             return Ok(new ApiResult<Models.Order?>()
             {
                 code = 0,
