@@ -477,7 +477,7 @@ namespace SnowmeetApi
                         return JsonConvert.SerializeObject(orderResult);
                     case "paymentpaid":
                         OrderController _orderHelper = new OrderController(db, config, http);
-                        OrderPayment payment =  await _orderHelper.QueryPaymentPaid((int)post.id);
+                        OrderPayment payment = await _orderHelper.QueryPaymentPaid((int)post.id);
                         Models.Order orderPaid = await db.order.Where(o => o.id == payment.order_id).AsNoTracking().FirstOrDefaultAsync();
                         orderPaid.payments = await db.orderPayment.Where(p => p.order_id == payment.order_id).AsNoTracking().ToListAsync();
                         /*
@@ -492,7 +492,11 @@ namespace SnowmeetApi
                             message = "",
                             data = orderPaid
                         };
-                        return JsonConvert.SerializeObject(orderPaidResult);
+                        var settings = new JsonSerializerSettings()
+                        {
+                            ReferenceLoopHandling = ReferenceLoopHandling.Ignore
+                        };
+                        return JsonConvert.SerializeObject(orderPaidResult, Formatting.Indented, settings);
                     case "querybindcell":
                         StaffController _staffHelper = new StaffController(db);
                         Staff staff = await _staffHelper.GetStaffBySessionKey(post.sessionKey);
