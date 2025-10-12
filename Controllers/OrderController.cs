@@ -1163,8 +1163,20 @@ namespace SnowmeetApi.Controllers
             }
             OrderPayment payment = await _db.orderPayment.Where(p => p.id == paymentId).AsNoTracking().FirstOrDefaultAsync();
             Models.Order order = await GetOrder(payment.order_id);
-            List<OrderPayment> allPayments = await _db.orderPayment.Where(p => p.order_id == order.id).AsNoTracking().ToListAsync();
-            string outTradeNo = order.code + "_ZF_" + allPayments.Count.ToString().PadLeft(2, '0');
+            List<OrderPayment> allPayments = await _db.orderPayment.Where(p => p.order_id == order.id)
+                .OrderByDescending(p => p.out_trade_no).AsNoTracking().ToListAsync();
+            //string outTradeNo = order.code + "_ZF_" + allPayments.Count.ToString().PadLeft(2, '0');
+            string? outTradeNo = allPayments[0].out_trade_no;
+            if (outTradeNo == null)
+            {
+                outTradeNo = order.code + "_ZF_" + allPayments.Count.ToString().PadLeft(2, '0');
+            }
+            else
+            {
+                string[] outTradeNoArr = outTradeNo.Split('_');
+                int outNum = int.Parse(outTradeNoArr[outTradeNoArr.Length - 1].Trim()) + 1;
+                outTradeNo = order.code + "_ZF_" + outNum.ToString().PadLeft(2, '0');
+            }
             if (payment.member_id == null)
             {
                 payment.member_id = member.id;
@@ -1176,10 +1188,8 @@ namespace SnowmeetApi.Controllers
             }
             if (payment.member_id != member.id && payment.member_id != null)
             {
-                outTradeNo = payment.out_trade_no;
-                string[] outTradeNoArr = outTradeNo.Split('_');
-                int outNum = int.Parse(outTradeNoArr[outTradeNoArr.Length - 1].Trim()) + 1;
-                outTradeNo = order.code + "_ZF_" + outNum.ToString().PadLeft(2, '0');
+                //outTradeNo = payment.out_trade_no;
+                
                 CoreDataModLog log = new CoreDataModLog()
                 {
                     id = 0,
