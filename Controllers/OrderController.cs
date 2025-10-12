@@ -1189,7 +1189,7 @@ namespace SnowmeetApi.Controllers
             if (payment.member_id != member.id && payment.member_id != null)
             {
                 //outTradeNo = payment.out_trade_no;
-                
+
                 CoreDataModLog log = new CoreDataModLog()
                 {
                     id = 0,
@@ -1217,7 +1217,7 @@ namespace SnowmeetApi.Controllers
                 _db.orderPayment.Entry(payment).State = EntityState.Modified;
                 await _db.SaveChangesAsync();
             }
-            
+
             if (payment.prepay_id == null)
             {
                 TenpayController _tenHelper = new TenpayController(_db, _config, _http);
@@ -1388,7 +1388,20 @@ namespace SnowmeetApi.Controllers
             order.paying_amount = null;
             await UpdateOrder(order, null, null, "支付成功");
         }
-        [HttpGet]
+        [NonAction]
+        public async Task<Models.OrderPayment?> QueryPaymentPaid(int paymentId)
+        {
+            DateTime startTime = DateTime.Now;
+            OrderPayment payment = await _db.orderPayment.Where(p => p.id == paymentId).AsNoTracking().FirstOrDefaultAsync();
+            for (; payment.status.Trim() == OrderPayment.PaymentStatus.待支付.ToString()
+                && payment.valid == 1 && (DateTime.Now - startTime).Seconds <= 7200;)
+            {
+                Thread.Sleep(1000);
+                payment = await _db.orderPayment.Where(p => p.id == paymentId).AsNoTracking().FirstOrDefaultAsync();
+            }
+            return payment;
+        }
+        [NonAction]
         public async Task<Models.Order?> QueryOrderPaid(int orderId)
         {
             DateTime startTime = DateTime.Now;
@@ -1411,6 +1424,8 @@ namespace SnowmeetApi.Controllers
                 .OrderByDescending(p => p.id).FirstOrDefaultAsync();
                 order = await _db.order.Where(o => o.id == orderId).AsNoTracking().FirstOrDefaultAsync();
             }
+
+
             if (paymentId != null)
             {
                 payment = await _db.orderPayment.Where(p => p.id == paymentId).AsNoTracking().FirstOrDefaultAsync();

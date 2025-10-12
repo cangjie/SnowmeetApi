@@ -21,6 +21,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.AspNetCore.Http;
 using SnowmeetApi.Controllers;
 using NPOI.Util.ArrayExtensions;
+using Aop.Api.Domain;
 namespace SnowmeetApi
 {
     public class Util
@@ -474,6 +475,17 @@ namespace SnowmeetApi
                             data = order
                         };
                         return JsonConvert.SerializeObject(orderResult);
+                    case "paymentpaid":
+                        OrderController _orderHelper = new OrderController(db, config, http);
+                        OrderPayment payment =  await _orderHelper.QueryPaymentPaid((int)post.id);
+                        Models.Order orderPaid = await _orderHelper.GetOrder(payment.order_id);
+                        ApiResult<Models.Order> orderPaidResult = new ApiResult<Models.Order>()
+                        {
+                            code = 0,
+                            message = "",
+                            data = orderPaid
+                        };
+                        return JsonConvert.SerializeObject(orderPaidResult);
                     case "querybindcell":
                         StaffController _staffHelper = new StaffController(db);
                         Staff staff = await _staffHelper.GetStaffBySessionKey(post.sessionKey);
@@ -490,12 +502,12 @@ namespace SnowmeetApi
                         else
                         {
                             MemberController _memberHelper = new MemberController(db, config);
-                            Member member = await _memberHelper.QueryMemberBindCell((int)post.id);
+                            Models.Member member = await _memberHelper.QueryMemberBindCell((int)post.id);
                             for (int i = 0; i < member.memberSocialAccounts.Count; i++)
                             {
                                 member.memberSocialAccounts[i].member = null;
                             }
-                            ApiResult<Member> r = new ApiResult<Member>()
+                            ApiResult<Models.Member> r = new ApiResult<Models.Member>()
                             {
                                 code = 0,
                                 message = "",
