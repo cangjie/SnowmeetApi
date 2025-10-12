@@ -394,14 +394,14 @@ namespace SnowmeetApi.Controllers
                         }
                         OrderPayment sucPay = await _db.OrderPayment.Where(p => (p.out_trade_no.Trim().Equals(outTradeNumber.Trim())
                             && p.status.Trim().Equals(OrderPayment.PaymentStatus.待支付.ToString()) && p.pay_method.Trim().Equals("微信支付")))
-                            .OrderByDescending(p => p.id).FirstOrDefaultAsync();
+                            .OrderByDescending(p => p.id).AsNoTracking().FirstOrDefaultAsync();
                         if (sucPay != null)
                         {
                             sucPay.wepay_trans_id = transactionId.Trim();
                             sucPay.status = OrderPayment.PaymentStatus.支付成功.ToString();
                             sucPay.update_date = DateTime.Now;
                             _db.OrderPayment.Entry(sucPay).State = EntityState.Modified;
-                            await _db.SaveChangesAsync();
+                            //await _db.SaveChangesAsync();
                             OrderController _orderHelper = new OrderController(_db, _oriConfig, _http);
                             CoreDataModLog log = new CoreDataModLog()
                             {
@@ -416,6 +416,19 @@ namespace SnowmeetApi.Controllers
                                 create_date = (DateTime)sucPay.update_date
                             };
                             await _db.coreDataModLog.AddAsync(log);
+                            CoreDataModLog logPayment = new CoreDataModLog()
+                            {
+                                table_name = "order_payment",
+                                field_name = "status",
+                                key_value = sucPay.id,
+                                prev_value = OrderPayment.PaymentStatus.待支付.ToString(),
+                                current_value = OrderPayment.PaymentStatus.支付成功.ToString(),
+                                staff_id = null,
+                                is_manual = 1,
+                                scene = "微信支付成功",
+                                create_date = (DateTime)sucPay.update_date
+                            };
+                            await _db.coreDataModLog.AddAsync(logPayment);
                             await _db.SaveChangesAsync();
                             await _orderHelper.DealSuccessPaidOrder(sucPay.order_id);
                            
