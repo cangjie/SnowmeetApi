@@ -14,6 +14,15 @@ namespace SnowmeetApi.Models
         public string file_path_name { get; set; }
         public int is_web { get; set; } = 1;
         public string purpose { get; set; } = "";
+        public string? thumb { get; set; } = null;
+        [NotMapped]
+        public string thumbUrl
+        {
+            get
+            {
+                return thumb == null ? file_path_name.Trim() : thumb.Trim();
+            }
+        }
         public DateTime create_date { get; set; } = DateTime.Now;
     }
 }

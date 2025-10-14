@@ -9,8 +9,8 @@ namespace SnowmeetApi.Models
     [Table("care")]
     public class Care
     {
-        public enum SkiService {修底刃, 补板底, 贴板面, 前固定器, 后固定器, 雪耙 };
-        public enum BoardService {修底刃, 补板底, 贴板面, 固定器, 罗盘, 绑带, 扒扣, 螺丝 };
+        public enum SkiService { 修底刃, 补板底, 贴板面, 前固定器, 后固定器, 雪耙 };
+        public enum BoardService { 修底刃, 补板底, 贴板面, 固定器, 罗盘, 绑带, 扒扣, 螺丝 };
 
         public static List<CoreDataModLog> GetUpdateDifferenceLog(Care oriCare, Care newCare, int? memberId, int? staffId, string scene)
         {
@@ -280,7 +280,7 @@ namespace SnowmeetApi.Models
         public DateTime? update_date { get; set; }
         public DateTime create_date { get; set; }
         [ForeignKey("order_id")]
-        public Order? order {get; set;}
+        public Order? order { get; set; }
         [NotMapped]
         public string description
         {
@@ -309,7 +309,7 @@ namespace SnowmeetApi.Models
                 }
             }
         }
-        
+
         public List<CareTask> tasks { get; set; } = new List<CareTask>();
         [NotMapped]
         public string? currentStep
@@ -326,7 +326,7 @@ namespace SnowmeetApi.Models
         [NotMapped]
         public string? status
         {
-            get 
+            get
             {
                 if (currentStep == null)
                 {
@@ -342,5 +342,20 @@ namespace SnowmeetApi.Models
                 }
             }
         }
+        public List<CareImage> careImages { get; set; } = new List<CareImage>();
+    }
+    [Table("care_image")]
+    public class CareImage
+    {
+        public int care_id { get; set; }
+        public int image_id { get; set; }
+        public string title { get; set; } = null;
+        public bool valid { get; set; } = true;
+        public DateTime? update_date { get; set; } = null;
+        public DateTime create_date { get; set; } = DateTime.Now;
+        [ForeignKey("care_id")]
+        public Care care { get; set; }
+        [ForeignKey("images_id")]
+        public UploadFile image { get; set; }
     }
 }
