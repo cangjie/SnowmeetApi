@@ -30,6 +30,59 @@ namespace SnowmeetApi.Controllers
             return await _db.UploadFile.FindAsync(id);
         }
         [HttpPost]
+        public async Task<ActionResult<UploadFile>> UploadFileWithThumb(IFormFile file, [FromQuery] string sessionKey, [FromQuery] string purpose = "",
+            [FromQuery] bool isWeb = true, [FromQuery] string fileType = "", [FromQuery] int? mainId = null, [FromQuery] string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            if (staff == null || staff.title_level < 100)
+            {
+                return BadRequest();
+            }           
+            sessionKey = Util.UrlDecode(sessionKey);
+            purpose = Util.UrlDecode(purpose);
+            string dateStr = DateTime.Now.Year.ToString() + DateTime.Now.Month.ToString().PadLeft(2, '0') + DateTime.Now.Day.ToString().PadLeft(2, '0');
+            string filePath = Util.workingPath + (isWeb? "/wwwroot/":"") + "/upload/" + dateStr;
+            if (!Directory.Exists(filePath))
+            {
+                Directory.CreateDirectory(filePath);
+            }
+            string[] fileNameArr = file.FileName.Split('.');
+            string ext = fileNameArr[fileNameArr.Length - 1].Trim();
+            string fileName = Util.GetLongTimeStamp(DateTime.Now).Trim() + "." + ext.Trim();
+            string returnFileName = "/upload/" + dateStr + "/" + fileName.Trim();
+            using (Stream s = System.IO.File.Create(filePath + "/" + fileName.Trim()))
+            {
+                await file.CopyToAsync(s);
+            }
+            if (mainId == null)
+            {
+                UploadFile fileSave = new UploadFile()
+                {
+                    id = 0,
+                    staff_id = staff.id,
+                    file_path_name = returnFileName,
+                    is_web = isWeb ? 1 : 0,
+                    purpose = purpose
+                };
+                await _db.UploadFile.AddAsync(fileSave);
+                await _db.SaveChangesAsync();
+                return Ok(fileSave);
+            }
+            else
+            {
+                UploadFile mainFile = await _db.UploadFile.FindAsync(mainId);
+                if (file == null)
+                {
+                    return BadRequest();
+                }
+                mainFile.thumb = returnFileName;
+                _db.Entry(mainFile).State = EntityState.Modified;
+                await _db.SaveChangesAsync();
+                return Ok(mainFile);
+            }
+            return NoContent();
+        }
+        [HttpPost]
         public async Task<ActionResult<UploadFile>> UploadFile(IFormFile file, [FromQuery]string sessionKey, [FromQuery]string purpose, [FromQuery]bool isWeb = true)
         {
             ApiResult<object?> result = await CheckStaff(100, sessionKey, "wechat_mini_openid");
