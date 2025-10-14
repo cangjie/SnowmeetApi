@@ -83,7 +83,8 @@ namespace SnowmeetApi.Controllers
             return NoContent();
         }
         [HttpPost]
-        public async Task<ActionResult<UploadFile>> UploadFile(IFormFile file, [FromQuery]string sessionKey, [FromQuery]string purpose, [FromQuery]bool isWeb = true)
+        public async Task<ActionResult<UploadFile>> UploadFile([FromQuery] string sessionKey, [FromQuery] string purpose,
+            [FromQuery] bool isWeb, IFormFile file)
         {
             ApiResult<object?> result = await CheckStaff(100, sessionKey, "wechat_mini_openid");
             if (result.code != 0)
