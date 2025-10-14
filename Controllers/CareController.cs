@@ -174,7 +174,7 @@ namespace SnowmeetApi.Controllers
             }
         }
         [HttpPost]
-        public async Task<ActionResult<ApiResult<Care>>> UpdateCareByStaff([FromBody]Care care, [FromQuery] string scene, 
+        public async Task<ActionResult<ApiResult<Care>>> UpdateCareByStaff([FromBody] Care care, [FromQuery] string scene,
             [FromQuery] string sessionKey, [FromQuery] string sessionType = "wechat_mini_openid")
         {
             StaffController _staffHelper = new StaffController(_db);
@@ -197,6 +197,35 @@ namespace SnowmeetApi.Controllers
                 message = "",
                 data = care
             });
+        }
+        [HttpGet]
+        public ActionResult<ApiResult<List<string>>> GetOthersService(string type)
+        {
+            type = Util.UrlDecode(type).Trim();
+            switch (type)
+            {
+                case "双板":
+                    return Ok(new ApiResult<List<string>>()
+                    {
+                        code = 0,
+                        message = "",
+                        data = Enum.GetNames(typeof(Care.SkiService)).ToList()
+                    });
+                case "单板":
+                    return Ok(new ApiResult<List<string>>()
+                    {
+                        code = 0,
+                        message = "",
+                        data = Enum.GetNames(typeof(Care.BoardService)).ToList()
+                    });
+                default:
+                    return Ok(new ApiResult<List<string>>()
+                    {
+                        code = 1,
+                        message = "未知的器材类型",
+                        data = new List<string>()
+                    });
+            }
         }
     }
     
