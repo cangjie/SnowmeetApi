@@ -60,6 +60,23 @@ namespace SnowmeetApi.Controllers
             await _db.member.Entry(c.order.member).Collection(m => m.memberSocialAccounts).LoadAsync();
             return c;
         }
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<List<Brand>?>>> UpdateBrandByStaff(string type, string brandName,
+            string chineseName, string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            if (staff == null || staff.title_level < 100)
+            {
+                return Ok(new ApiResult<Brand?>()
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = null
+                });
+            }
+            await UpdateBrand(type, brandName + "/" + chineseName, staff.id);
+            return await GetBrands(type.Trim());
+        }
         [NonAction]
         public async Task<Brand> UpdateBrand(string type, string dispayedName, int? staffId)
         {
