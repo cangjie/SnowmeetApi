@@ -43,7 +43,7 @@ namespace SnowmeetApi.Data
             modelBuilder.Entity<RentProductDetailInfo>().HasKey(i => new { i.field_id, i.product_id });
             modelBuilder.Entity<RentProductDetailInfo>().HasKey(i => new { i.product_id, i.field_id });
             modelBuilder.Entity<GuarantyPayment>().HasKey(g => new { g.guaranty_id, g.payment_id });
-            modelBuilder.Entity<CareImage>().HasKey(c => new { c.care_id, c.image_id });
+            //modelBuilder.Entity<CareImage>().HasKey(c => new { c.care_id, c.image_id });
         }
         public DbSet<MaintainLive> MaintainLives { get; set; }
         public DbSet<Models.Users.MToken> MTokens { get; set; }

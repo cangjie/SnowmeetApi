@@ -574,6 +574,9 @@ namespace SnowmeetApi.Controllers
                         retail.valid = 1;
                     }
                     break;
+                case "养护":
+                    order.biz_date = DateTime.Now;
+                    break;
                 default:
                     break;
             }

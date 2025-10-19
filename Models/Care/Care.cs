@@ -278,7 +278,7 @@ namespace SnowmeetApi.Models
         public string? task_flow_code { get; set; }
         public int valid { get; set; }
         public DateTime? update_date { get; set; }
-        public DateTime create_date { get; set; }
+        public DateTime create_date { get; set; } = DateTime.Now;
         [ForeignKey("order_id")]
         public Order? order { get; set; }
         [NotMapped]
@@ -347,15 +347,17 @@ namespace SnowmeetApi.Models
     [Table("care_image")]
     public class CareImage
     {
-        public int care_id { get; set; }
+        [Key]
+        public int id { get; set; }
         public int image_id { get; set; }
+        public int care_id { get; set; }
         public string title { get; set; } = null;
         public bool valid { get; set; } = true;
         public DateTime? update_date { get; set; } = null;
         public DateTime create_date { get; set; } = DateTime.Now;
         [ForeignKey("care_id")]
         public Care care { get; set; }
-        [ForeignKey("images_id")]
+        [ForeignKey("image_id")]
         public UploadFile image { get; set; }
     }
 }
