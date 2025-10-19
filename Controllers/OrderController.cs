@@ -111,6 +111,48 @@ namespace SnowmeetApi.Controllers
                     .Include(o => o.member).ThenInclude(m => m.memberSocialAccounts)
                     .OrderByDescending(o => o.id).AsNoTracking().ToListAsync();
                     break;
+                case "养护":
+                orderList = await _db.order
+                    .Where(o => (o.biz_date.Date >= ((DateTime)startDate).Date && o.biz_date.Date <= ((DateTime)endDate).Date)
+                    && (memberId == null || o.member_id == memberId) && (staffId == null || o.staff_id == staffId)
+                    && (payOption == null || o.pay_option.Trim().Equals(payOption.Trim()))
+                    && (shop == null || o.shop.Trim().Equals(shop.Trim())) && (type == null || o.type.Trim().Equals(type.Trim()))
+                    && o.valid == 1)
+                    //.Include(o => o.fdOrders.Where(f => f.valid == 1)).ThenInclude(f => f.product).ThenInclude(p => p.category)
+                    //.Include(o => o.retails.Where(r => r.valid == 1))
+                    .Include(o => o.cares.Where(c => c.valid == 1)).ThenInclude(c => c.tasks.Where(t => t.valid == 1).OrderBy(t => t.id))
+                    //.Include(o => o.rentals.Where(r => r.valid == 1)).ThenInclude(r => r.details.Where(d => d.valid == 1))
+                    //.Include(o => o.rentals.Where(r => r.valid == 1)).ThenInclude(r => r.rentItems.Where(r => r.valid == 1))
+                    .Include(o => o.payments).ThenInclude(p => p.staff)
+                    .Include(o => o.payments).ThenInclude(p => p.refunds)
+                    .Include(o => o.refunds)
+                    .Include(o => o.discounts.Where(d => d.valid == 1))
+                    //.Include(o => o.guarantys.Where(g => g.valid == 1)).ThenInclude(g => g.guarantyPayments)//.ThenInclude(g => g.payment)
+                    .Include(o => o.staff)
+                    .Include(o => o.member).ThenInclude(m => m.memberSocialAccounts)
+                    .OrderByDescending(o => o.id).AsNoTracking().ToListAsync();
+                    break;
+                case "租赁":
+                orderList = await _db.order
+                    .Where(o => (o.biz_date.Date >= ((DateTime)startDate).Date && o.biz_date.Date <= ((DateTime)endDate).Date)
+                    && (memberId == null || o.member_id == memberId) && (staffId == null || o.staff_id == staffId)
+                    && (payOption == null || o.pay_option.Trim().Equals(payOption.Trim()))
+                    && (shop == null || o.shop.Trim().Equals(shop.Trim())) && (type == null || o.type.Trim().Equals(type.Trim()))
+                    && o.valid == 1)
+                    //.Include(o => o.fdOrders.Where(f => f.valid == 1)).ThenInclude(f => f.product).ThenInclude(p => p.category)
+                    //.Include(o => o.retails.Where(r => r.valid == 1))
+                    //.Include(o => o.cares.Where(c => c.valid == 1)).ThenInclude(c => c.tasks.Where(t => t.valid == 1).OrderBy(t => t.id))
+                    .Include(o => o.rentals.Where(r => r.valid == 1)).ThenInclude(r => r.details.Where(d => d.valid == 1))
+                    .Include(o => o.rentals.Where(r => r.valid == 1)).ThenInclude(r => r.rentItems.Where(r => r.valid == 1))
+                    .Include(o => o.payments).ThenInclude(p => p.staff)
+                    .Include(o => o.payments).ThenInclude(p => p.refunds)
+                    .Include(o => o.refunds)
+                    .Include(o => o.discounts.Where(d => d.valid == 1))
+                    .Include(o => o.guarantys.Where(g => g.valid == 1)).ThenInclude(g => g.guarantyPayments)//.ThenInclude(g => g.payment)
+                    .Include(o => o.staff)
+                    .Include(o => o.member).ThenInclude(m => m.memberSocialAccounts)
+                    .OrderByDescending(o => o.id).AsNoTracking().ToListAsync();
+                    break;
                 default:
                     orderList = await _db.order
                     .Where(o => (o.biz_date.Date >= ((DateTime)startDate).Date && o.biz_date.Date <= ((DateTime)endDate).Date)
@@ -1101,46 +1143,6 @@ namespace SnowmeetApi.Controllers
                     message = "",
                     data = newPayment
                 });
-
-
-                /*
-                                OrderPayment payment = await GetReadyOrderPayment(order, amount, "微信支付", null, null);
-
-                                payment.staff_id = staff == null ? null : staff.id;
-                                _db.orderPayment.Entry(payment).State = EntityState.Modified;
-                                await _db.SaveChangesAsync();
-                                if (payment == null)
-                                {
-                                    message = "获取二维码失败";
-                                }
-                                else if (payment.ali_qr_code == null || payment.ali_qr_code.Trim().Equals(""))
-                                {
-                                    message = "支付宝系统故障";
-                                }
-                                if (message.Trim().Equals(""))
-                                {
-                                    CoreDataModLog log = new CoreDataModLog()
-                                    {
-                                        table_name = "Order",
-                                        field_name = "OrderState",
-                                        key_value = orderId,
-                                        prev_value = null,
-                                        current_value = Models.Order.OrderStatus.待支付.ToString(),
-                                        staff_id = staff.id,
-                                        is_manual = 1,
-                                        scene = "显示支付宝二维码",
-                                        create_date = DateTime.Now
-                                    };
-                                    await _db.coreDataModLog.AddAsync(log);
-                                    await _db.SaveChangesAsync();
-                                    return Ok(new ApiResult<string>()
-                                    {
-                                        code = 0,
-                                        message = "",
-                                        data = payment.ali_qr_code.Trim()
-                                    });
-                                }
-                                */
             }
             return Ok(new ApiResult<OrderPayment?>()
             {
