@@ -260,7 +260,7 @@ namespace SnowmeetApi.Controllers
         [NonAction]
         public async Task<Product?> GetProduct(string shop, Care care)
         {
-            List<Product> products = (List<Product>)((OkObjectResult)(await GetProducts(shop)).Result).Value;
+            List<Product> products = ((ApiResult<List<Product>>)((OkObjectResult)(await GetProducts(shop)).Result).Value).data;
             Product product = null;
             for(int i = 0; i < products.Count; i++)
             {
