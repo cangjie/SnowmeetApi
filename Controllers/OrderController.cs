@@ -599,48 +599,54 @@ namespace SnowmeetApi.Controllers
                     data = null
                 });
             }
-            switch (order.type)
+
+            if (order.sub_type != "雪季初临时订单")
             {
-                case "零售":
-                    if (!await CheckRetailMi7CodeUnique(order))
-                    {
-                        return new ApiResult<SnowmeetApi.Models.Order?>()
+                switch (order.type)
+                {
+                    case "零售":
+                        if (!await CheckRetailMi7CodeUnique(order))
                         {
-                            code = 1,
-                            message = "七色米订单号重复",
-                            data = null
-                        };
-                    }
-                    for (int i = 0; i < order.retails.Count; i++)
-                    {
-                        Retail retail = order.retails[i];
-                        retail.valid = 1;
-                    }
-                    break;
-                case "养护":
-                    CareController _careHelper = new CareController(_db, _config, _http);
-                    double total = 0;
-                    for (int i = 0; i < order.cares.Count; i++)
-                    {
-                        order.biz_date = DateTime.Now;
-                        Care care = order.cares[i];
-                        Product product = await _careHelper.GetProduct(order.shop, care);
-                        if (product == null)
-                        {
-                            care.common_charge = 0;
+                            return new ApiResult<SnowmeetApi.Models.Order?>()
+                            {
+                                code = 1,
+                                message = "七色米订单号重复",
+                                data = null
+                            };
                         }
-                        else
+                        for (int i = 0; i < order.retails.Count; i++)
                         {
-                            care.common_charge = product.sale_price;
+                            Retail retail = order.retails[i];
+                            retail.valid = 1;
                         }
-                        total += (care.common_charge + care.repair_charge - care.discount);
-                    }
-                    order.total_amount = total;
-                    order.paying_amount = total;
-                    break;
-                default:
-                    break;
+                        break;
+                    case "养护":
+                        CareController _careHelper = new CareController(_db, _config, _http);
+                        double total = 0;
+                        for (int i = 0; i < order.cares.Count; i++)
+                        {
+                            order.biz_date = DateTime.Now;
+                            Care care = order.cares[i];
+                            Product product = await _careHelper.GetProduct(order.shop, care);
+                            if (product == null)
+                            {
+                                care.common_charge = 0;
+                            }
+                            else
+                            {
+                                care.common_charge = product.sale_price;
+                            }
+                            total += (care.common_charge + care.repair_charge - care.discount);
+                        }
+                        order.total_amount = total;
+                        order.paying_amount = total;
+                        break;
+                    default:
+                        break;
+                }
             }
+
+
             if (_http.HttpContext.Request.Host.Value != null
                 && _http.HttpContext.Request.Host.Value.Equals("mini.snowmeet.top"))
             {
