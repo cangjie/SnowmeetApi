@@ -243,9 +243,9 @@ namespace SnowmeetApi.Models
         public int? order_id { get; set; }
         public string? biz_type { get; set; }
         public string equipment { get; set; }
-        public string brand { get; set; }
+        public string? brand { get; set; }
         public string? series { get; set; }
-        public string scale { get; set; }
+        public string? scale { get; set; }
         public string? year { get; set; }
         public string? images { get; set; }
         public int urgent { get; set; }
