@@ -92,10 +92,11 @@ namespace SnowmeetApi.Controllers
         {
             startDate = startDate == null ? DateTime.MinValue : startDate;
             endDate = endDate == null ? DateTime.MaxValue : endDate;
+            /*
             List<SnowmeetApi.Models.Order> orderList = new List<SnowmeetApi.Models.Order>();
             switch (type)
             {
-                case "零售":
+                case "零售1":
                     orderList = await _db.order
                     .Where(o => (o.biz_date.Date >= ((DateTime)startDate).Date && o.biz_date.Date <= ((DateTime)endDate).Date)
                     && (memberId == null || o.member_id == memberId) && (staffId == null || o.staff_id == staffId)
@@ -111,7 +112,7 @@ namespace SnowmeetApi.Controllers
                     .Include(o => o.member).ThenInclude(m => m.memberSocialAccounts)
                     .OrderByDescending(o => o.id).AsNoTracking().ToListAsync();
                     break;
-                case "养护":
+                case "养护1":
                 orderList = await _db.order
                     .Where(o => (o.biz_date.Date >= ((DateTime)startDate).Date && o.biz_date.Date <= ((DateTime)endDate).Date)
                     && (memberId == null || o.member_id == memberId) && (staffId == null || o.staff_id == staffId)
@@ -132,7 +133,7 @@ namespace SnowmeetApi.Controllers
                     .Include(o => o.member).ThenInclude(m => m.memberSocialAccounts)
                     .OrderByDescending(o => o.id).AsNoTracking().ToListAsync();
                     break;
-                case "租赁":
+                case "租赁1":
                 orderList = await _db.order
                     .Where(o => (o.biz_date.Date >= ((DateTime)startDate).Date && o.biz_date.Date <= ((DateTime)endDate).Date)
                     && (memberId == null || o.member_id == memberId) && (staffId == null || o.staff_id == staffId)
@@ -175,7 +176,8 @@ namespace SnowmeetApi.Controllers
                     .OrderByDescending(o => o.id).AsNoTracking().ToListAsync();
                     break;
             }
-            /*
+            */
+            
             List<SnowmeetApi.Models.Order> orderList = await _db.order
                 .Where(o => (o.biz_date.Date >= ((DateTime)startDate).Date && o.biz_date.Date <= ((DateTime)endDate).Date)
                     && (memberId == null || o.member_id == memberId) && (staffId == null || o.staff_id == staffId)
@@ -195,7 +197,7 @@ namespace SnowmeetApi.Controllers
                 .Include(o => o.staff)
                 .Include(o => o.member).ThenInclude(m => m.memberSocialAccounts)
                 .OrderByDescending(o => o.id).AsNoTracking().ToListAsync();
-            */
+            
             if (isTest != null)
             {
                 orderList = orderList.Where(o => o.is_test == ((bool)isTest ? 1 : 0)).ToList();
