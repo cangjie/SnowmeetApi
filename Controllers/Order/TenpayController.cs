@@ -95,6 +95,10 @@ namespace SnowmeetApi.Controllers
                     goodsName = order.code.Trim();
                     break;
                 default:
+                    if (goodsName == "")
+                    {
+                        goodsName = order.type + " 临时订单";
+                    }
                     break;
             }
             var client = await GetClient((int)payment.mch_id);
