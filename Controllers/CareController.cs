@@ -257,6 +257,52 @@ namespace SnowmeetApi.Controllers
                 data = products
             });
         }
+        [NonAction]
+        public async Task<Product?> GetProduct(string shop, Care care)
+        {
+            List<Product> products = (List<Product>)((OkObjectResult)(await GetProducts(shop)).Result).Value;
+            Product product = null;
+            for(int i = 0; i < products.Count; i++)
+            {
+                if (products[i].name.IndexOf("修刃打蜡") >= 0 && products[i].name.IndexOf("立等") >= 0
+                && care.need_edge == 1 && care.need_wax == 1 && care.urgent == 1)
+                {
+                    product = products[i];
+                    break;
+                }
+                else if (products[i].name.IndexOf("修刃") >= 0 && products[i].name.IndexOf("立等") >= 0
+                && care.need_edge == 1 && care.need_wax == 0 && care.urgent == 1)
+                {
+                    product = products[i];
+                    break;
+                }
+                else if (products[i].name.IndexOf("打蜡") >= 0 && products[i].name.IndexOf("立等") >= 0
+                && care.need_edge == 0 && care.need_wax == 1 && care.urgent == 1)
+                {
+                    product = products[i];
+                    break;
+                }
+                else if (products[i].name.IndexOf("修刃打蜡") >= 0 && products[i].name.IndexOf("次日") >= 0
+                && care.need_edge == 1 && care.need_wax == 1 && care.urgent == 0)
+                {
+                    product = products[i];
+                    break;
+                }
+                else if (products[i].name.IndexOf("修刃") >= 0 && products[i].name.IndexOf("次日") >= 0
+                && care.need_edge == 1 && care.need_wax == 0 && care.urgent == 0)
+                {
+                    product = products[i];
+                    break;
+                }
+                else if (products[i].name.IndexOf("打蜡") >= 0 && products[i].name.IndexOf("次日") >= 0
+                && care.need_edge == 0 && care.need_wax == 1 && care.urgent == 0)
+                {
+                    product = products[i];
+                    break;
+                }
+            }
+            return product;
+        }
     }
     
 }

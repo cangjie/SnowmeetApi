@@ -575,7 +575,25 @@ namespace SnowmeetApi.Controllers
                     }
                     break;
                 case "养护":
-                    order.biz_date = DateTime.Now;
+                    CareController _careHelper = new CareController(_db, _config, _http);
+                    double total = 0;
+                    for (int i = 0; i < order.cares.Count; i++)
+                    {
+                        order.biz_date = DateTime.Now;
+                        Care care = order.cares[i];
+                        Product product = await _careHelper.GetProduct(order.shop, care);
+                        if (product == null)
+                        {
+                            care.common_charge = 0;
+                        }
+                        else
+                        {
+                            care.common_charge = product.sale_price;
+                        }
+                        total += (care.common_charge + care.repair_charge - care.discount);
+                    }
+                    order.total_amount = total;
+                    order.paying_amount = total;
                     break;
                 default:
                     break;

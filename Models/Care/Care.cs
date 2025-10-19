@@ -145,16 +145,16 @@ namespace SnowmeetApi.Models
                 oriCare.need_edge = newCare.need_edge;
             }
 
-            if (oriCare.need_vax != newCare.need_vax)
+            if (oriCare.need_wax != newCare.need_wax)
             {
-                logs.Add(Util.CreateCoreDataModLog("care", "need_vax", oriCare.id, oriCare.need_vax, newCare.need_vax, memberId, staffId, scene, ts.Ticks));
-                oriCare.need_vax = newCare.need_vax;
+                logs.Add(Util.CreateCoreDataModLog("care", "need_wax", oriCare.id, oriCare.need_wax, newCare.need_wax, memberId, staffId, scene, ts.Ticks));
+                oriCare.need_wax = newCare.need_wax;
             }
 
-            if (oriCare.need_unvax != newCare.need_unvax)
+            if (oriCare.need_unwax != newCare.need_unwax)
             {
-                logs.Add(Util.CreateCoreDataModLog("care", "need_unvax", oriCare.id, oriCare.need_unvax, newCare.need_unvax, memberId, staffId, scene, ts.Ticks));
-                oriCare.need_unvax = newCare.need_unvax;
+                logs.Add(Util.CreateCoreDataModLog("care", "need_unwax", oriCare.id, oriCare.need_unwax, newCare.need_unwax, memberId, staffId, scene, ts.Ticks));
+                oriCare.need_unwax = newCare.need_unwax;
             }
 
             if (oriCare.need_repair != newCare.need_repair)
@@ -261,8 +261,8 @@ namespace SnowmeetApi.Models
         public string? serials { get; set; }
         public string? edge_degree { get; set; }
         public int need_edge { get; set; }
-        public int need_vax { get; set; }
-        public int need_unvax { get; set; }
+        public int need_wax { get; set; }
+        public int need_unwax { get; set; }
         public int need_repair { get; set; }
         public string? repair_memo { get; set; }
         public double repair_charge { get; set; }
@@ -287,11 +287,11 @@ namespace SnowmeetApi.Models
             get
             {
                 string desc = "";
-                if (edge_degree != null && need_vax == 1)
+                if (edge_degree != null && need_wax == 1)
                 {
                     desc += "双项";
                 }
-                else if (edge_degree != null || need_vax == 1)
+                else if (edge_degree != null || need_wax == 1)
                 {
                     desc += "单项";
                 }
