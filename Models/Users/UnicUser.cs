@@ -133,7 +133,7 @@ namespace SnowmeetApi.Models.Users
             string miniAppOpenId = "";
             string officialOpenId = "";
             string unionId = "";
-            List<MiniSession> mList = await db.MiniSessons.Where(s => s.session_key.Trim().Equals(sessionKey.Trim())
+            List<MiniSession> mList = await db.miniSession.Where(s => s.session_key.Trim().Equals(sessionKey.Trim())
                 && s.session_type.Trim().Equals("wl_wechat_mini_openid")).AsNoTracking().ToListAsync();
             if (mList == null || mList.Count <= 0)
             {
@@ -173,7 +173,7 @@ namespace SnowmeetApi.Models.Users
             string miniAppOpenId = "";
             string officialOpenId = "";
             string unionId = "";
-            List<MiniSession> mList = await db.MiniSessons.Where(s => s.session_key.Trim().Equals(sessionKey.Trim())
+            List<MiniSession> mList = await db.miniSession.Where(s => s.session_key.Trim().Equals(sessionKey.Trim())
                 && s.session_type.Trim().Equals("wl_wechat_mini_openid")).AsNoTracking().ToListAsync();
             if (mList == null || mList.Count <= 0)
             {
@@ -213,7 +213,7 @@ namespace SnowmeetApi.Models.Users
             string officialOpenId = "";
             string unionId = "";
 
-            MiniSession miniSession = db.MiniSessons.Find(sessionKey);
+            MiniSession miniSession = db.miniSession.Find(sessionKey);
             if (miniSession != null && miniSession.session_type.Trim().Equals("wl_wechat_mini_openid"))
             {
                 //miniAppOpenId = miniSession.open_id.Trim();
@@ -306,7 +306,7 @@ namespace SnowmeetApi.Models.Users
             string officialOpenId = "";
             string unionId = "";
             
-            MiniSession miniSession = _context.MiniSessons.Find(sessionKey);
+            MiniSession miniSession = _context.miniSession.Find(sessionKey);
             if (miniSession != null)
             {
                 miniAppOpenId = miniSession.open_id.Trim();

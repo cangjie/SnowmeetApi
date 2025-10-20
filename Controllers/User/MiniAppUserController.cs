@@ -9,6 +9,7 @@ using SnowmeetApi.Data;
 using Microsoft.Extensions.Configuration;
 using SnowmeetApi.Models.Users;
 using SnowmeetApi.Controllers.User;
+using SnowmeetApi.Models;
 
 namespace SnowmeetApi.Controllers
 {
@@ -83,7 +84,7 @@ namespace SnowmeetApi.Controllers
         [NonAction]
         public async Task<MiniAppUser> GetMiniAppUser(string sessionKey)
         {
-            var sList = await _context.MiniSessons.Where(s => s.session_key.Trim().Equals(sessionKey))
+            var sList = await _context.miniSession.Where(s => s.session_key.Trim().Equals(sessionKey))
                 .OrderByDescending(s => s.create_date).AsNoTracking().ToListAsync();
             if (sList == null || sList.Count <= 0)
             {
@@ -207,7 +208,7 @@ namespace SnowmeetApi.Controllers
         {
             sessionKey = Util.UrlDecode(sessionKey.Trim());
 
-            var mSessionList = await _context.MiniSessons.Where(m => (m.session_key.Trim().Equals(sessionKey.Trim()))).ToListAsync();
+            var mSessionList = await _context.miniSession.Where(m => (m.session_key.Trim().Equals(sessionKey.Trim()))).ToListAsync();
             if (mSessionList.Count == 0)
             {
                 return NotFound();
@@ -234,7 +235,7 @@ namespace SnowmeetApi.Controllers
         {
             sessionKey = Util.UrlDecode(sessionKey.Trim());
 
-            var mSessionList = await _context.MiniSessons.Where(m => (m.session_key.Trim().Equals(sessionKey.Trim()))).ToListAsync();
+            var mSessionList = await _context.miniSession.Where(m => (m.session_key.Trim().Equals(sessionKey.Trim()))).ToListAsync();
             if (mSessionList.Count == 0)
             {
                 return NotFound();

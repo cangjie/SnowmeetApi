@@ -15,7 +15,9 @@ namespace SnowmeetApi.Models.Users
 
         public string session_type { get; set; } = "";
 
-        public int? member_id {get; set;} = null;
+        public int? member_id { get; set; } = null;
+        public int valid { get; set; }
+        public DateTime expire_date { get; set; } = DateTime.Now.AddDays(7);
         public DateTime create_date { get; set; } = DateTime.Now;
 
         /*

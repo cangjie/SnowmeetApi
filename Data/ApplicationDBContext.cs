@@ -53,7 +53,7 @@ namespace SnowmeetApi.Data
 
         public DbSet<MaintainLive> MaintainLives {get; set;}
        
-        public DbSet<MiniSession> MiniSessons { get; set; }
+        public DbSet<MiniSession> miniSession { get; set; }
         public DbSet<MToken> MTokens { get; set; }
         public DbSet<UnionId> UnionIds { get; set; }
         public DbSet<MiniAppUser> MiniAppUsers { get; set; }
@@ -120,7 +120,7 @@ namespace SnowmeetApi.Data
         public DbSet<Models.Order.Kol> kol {get; set;}
         public DbSet<Models.Order.PaymentShare> paymentShare {get; set;}
         public DbSet<Models.Order.AliDownloadFlowBill> aliDownloadFlowBill {get; set; }
-        public DbSet<SnowmeetApi.Models.Users.Member> member { get; set; }
+        public DbSet<SnowmeetApi.Models.Member> member { get; set; }
         public DbSet<SnowmeetApi.Models.Users.MemberSocialAccount> memberSocialAccount { get; set; }
         public DbSet<SnowmeetApi.Models.Rent.RentCategory> rentCategory { get; set; }
         public DbSet<SnowmeetApi.Models.Rent.RentPrice> rentPrice {get; set;}
@@ -136,5 +136,6 @@ namespace SnowmeetApi.Data
         public DbSet<Course> schoolCourse {get; set;}
         public DbSet<CourseStudent> courseStudent {get; set;}
         public DbSet<CourseInteractLog> courseInteractLog { get; set; }
+        public DbSet<WebApiLog> webApiLog {get; set;}
     }
 }

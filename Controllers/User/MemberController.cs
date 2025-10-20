@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using SnowmeetApi.Data;
+using SnowmeetApi.Models;
 using SnowmeetApi.Models.Users;
 
 namespace SnowmeetApi.Controllers.User
@@ -29,7 +30,7 @@ namespace SnowmeetApi.Controllers.User
         [NonAction]
         public async Task<Member> GetMemberBySessionKey(string sessionKey, string sessionType="wl_wechat_mini_openid")
         {
-            var sessions = await _db.MiniSessons.Where(s => s.session_key.Trim().Equals(sessionKey.Trim()) 
+            var sessions = await _db.miniSession.Where(s => s.session_key.Trim().Equals(sessionKey.Trim()) 
                 && s.session_type.Trim().Equals(sessionType.Trim())).OrderByDescending(s => s.create_date)
                 .AsNoTracking().ToListAsync();
             if (sessions.Count <= 0)
@@ -97,7 +98,7 @@ namespace SnowmeetApi.Controllers.User
         public Member RemoveSensitiveInfo(Member member)
         {
             member.id = 0;
-            IList<MemberSocialAccount> msaList = member.memberSocialAccounts.ToList();
+            List<MemberSocialAccount> msaList = member.memberSocialAccounts.ToList();
 
             for(int i = 0; i < msaList.Count; i++)
             {
