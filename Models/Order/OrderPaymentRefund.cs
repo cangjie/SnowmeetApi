@@ -30,7 +30,10 @@ namespace SnowmeetApi.Models
         [ForeignKey("order_id")]
         public Order? order { get; set; } = null;
         [ForeignKey("oper_member_id")]
-        public Member? member {get; set; } = null;
+        public Member? member { get; set; } = null;
+        public int? staff_id { get; set; }
+        [ForeignKey("staff_id")]
+        public Staff? staff { get; set; }
         public bool refundSuccess
         {
             get

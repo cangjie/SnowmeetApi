@@ -72,7 +72,7 @@ namespace SnowmeetApi.Data
         public DbSet<Models.Maintain.MaintainLog> MaintainLog { get; set; }
         public DbSet<Models.Background.BackgroundLoginSession> BackgroundLoginSession { get; set; }
         public DbSet<Mi7OrderDetail> mi7OrderDetail { get; set; }
-        public DbSet<OrderPaymentRefund> OrderPaymentRefund { get; set; }
+        
         public DbSet<Models.ProudctSkiPass.SkiPass> SkiPass { get; set; }
         public DbSet<OAReceive> oAReceive { get; set; }
         public DbSet<TicketLog> ticketLog { get; set; }
@@ -193,6 +193,7 @@ namespace SnowmeetApi.Data
         public DbSet<FdOrder> fdOrder { get; set; }
         public DbSet<RentalPricePreset> rentalPricePreset { get; set; }
         public DbSet<CareImage> careImage { get; set; }
+        public DbSet<OrderPaymentRefund> orderPaymentRefund { get; set; }
 
     }
 }

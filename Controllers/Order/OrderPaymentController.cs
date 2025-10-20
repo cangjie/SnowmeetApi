@@ -556,7 +556,7 @@ namespace SnowmeetApi.Controllers.Order
             {
                 return BadRequest();
             }
-            var refunds = await _context.OrderPaymentRefund
+            var refunds = await _context.orderPaymentRefund
                 .Where(r => r.payment_id == paymentId && ((!r.refund_id.Trim().Equals("") && r.refund_id != null ) || r.state == 1))
                 .AsNoTracking().ToListAsync();
             double totalRefundAmount = 0;
@@ -585,7 +585,7 @@ namespace SnowmeetApi.Controllers.Order
                 notify_url = "",
                 out_refund_no = outRefundNo.Trim()
             };
-            await _context.OrderPaymentRefund.AddAsync(refund);
+            await _context.orderPaymentRefund.AddAsync(refund);
             await _context.SaveChangesAsync();
 
             switch(payment.pay_method.Trim())
@@ -602,7 +602,7 @@ namespace SnowmeetApi.Controllers.Order
                 
                 default:
                     refund.state = 1;
-                    _context.OrderPaymentRefund.Entry(refund).State = EntityState.Modified;
+                    _context.orderPaymentRefund.Entry(refund).State = EntityState.Modified;
                     await _context.SaveChangesAsync();
                     break;
             }

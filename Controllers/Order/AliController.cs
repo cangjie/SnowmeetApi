@@ -523,7 +523,7 @@ namespace SnowmeetApi.Controllers
         [NonAction]
         public async Task<OrderPaymentRefund> Refund(int refundId)
         {
-            OrderPaymentRefund refund = await _db.OrderPaymentRefund.FindAsync(refundId);
+            OrderPaymentRefund refund = await _db.orderPaymentRefund.FindAsync(refundId);
             if (refund == null)
             {
                 return null;
@@ -533,7 +533,7 @@ namespace SnowmeetApi.Controllers
             {
                 return null;
             }
-            var refunds = await _db.OrderPaymentRefund.Where(r => r.payment_id == payment.id)
+            var refunds = await _db.orderPaymentRefund.Where(r => r.payment_id == payment.id)
                 .AsNoTracking().ToListAsync();
             try
             {
@@ -550,7 +550,7 @@ namespace SnowmeetApi.Controllers
                 refund.memo = ex.ToString().Length > 500 ? ex.ToString().Substring(0, 500) : ex.ToString();
             }
 
-            _db.OrderPaymentRefund.Entry(refund).State = EntityState.Modified;
+            _db.orderPaymentRefund.Entry(refund).State = EntityState.Modified;
             await _db.SaveChangesAsync();
             return refund;
         }

@@ -46,7 +46,7 @@ namespace SnowmeetApi.Controllers.Order
         [NonAction]
         public async Task<ActionResult<int>> RefreshWepayRefundInfo()
         {
-            var refundList = await _db.OrderPaymentRefund
+            var refundList = await _db.orderPaymentRefund
                 .Where(r => (!r.refund_id.Trim().Equals("") && r.TransactionId.Trim().Equals("") && r.create_date.Date > DateTime.Parse("2022-9-1")))
                 .ToListAsync();
             if (refundList == null)
@@ -110,7 +110,7 @@ namespace SnowmeetApi.Controllers.Order
             {
                 return NoContent();
             }
-            var paymentRefundList = await _db.OrderPaymentRefund.Where(r => r.payment_id == paymentId).ToListAsync();
+            var paymentRefundList = await _db.orderPaymentRefund.Where(r => r.payment_id == paymentId).ToListAsync();
             if (paymentRefundList == null || paymentRefundList.Count == 0)
             {
                 return NotFound();
@@ -153,7 +153,7 @@ namespace SnowmeetApi.Controllers.Order
             string notify = payment.notify.Trim().Replace("OrderPayment/TenpayPaymentCallBack", "OrderRefund/TenpayRefundCallback"); 
 
             UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _db); 
-            double refundedAmount = await _db.OrderPaymentRefund.Where(r => (r.payment_id == paymentId && r.state == 1)).SumAsync(s => s.amount); 
+            double refundedAmount = await _db.orderPaymentRefund.Where(r => (r.payment_id == paymentId && r.state == 1)).SumAsync(s => s.amount); 
             
             
             if (refundedAmount >= payment.amount || refundedAmount + amount > payment.amount)
@@ -178,7 +178,7 @@ namespace SnowmeetApi.Controllers.Order
 
             }; 
 
-            await _db.OrderPaymentRefund.AddAsync(refund); 
+            await _db.orderPaymentRefund.AddAsync(refund); 
             await _db.SaveChangesAsync();
             //var client = new WechatTenpayClient(options);
             OrderOnlinesController orderHelper = new OrderOnlinesController(_db, _originConfig); 
@@ -243,7 +243,7 @@ namespace SnowmeetApi.Controllers.Order
         [NonAction]
         public async Task<string> GetOutRefundNo(OrderPayment payment)
         {
-            var refundList = await _db.OrderPaymentRefund.Where(r => r.payment_id == payment.id)
+            var refundList = await _db.orderPaymentRefund.Where(r => r.payment_id == payment.id)
                 .AsNoTracking().ToListAsync();
             string outNo = payment.out_trade_no.Trim() + "_TK_";
             if (refundList == null || refundList.Count == 0)
@@ -349,7 +349,7 @@ namespace SnowmeetApi.Controllers.Order
 
 
                         double refundAmount = Math.Round(((double)callbackResource.Amount.Total) / 100, 2);
-                        OrderPaymentRefund refund = await _db.OrderPaymentRefund.Where(r => (r.payment_id == payment.id
+                        OrderPaymentRefund refund = await _db.orderPaymentRefund.Where(r => (r.payment_id == payment.id
                          && r.amount == refundAmount && r.state == 0)).FirstAsync();
 
                         refund.state = 1;
@@ -469,7 +469,7 @@ namespace SnowmeetApi.Controllers.Order
 
         private bool OrderPaymentRefundExists(int id)
         {
-            return _db.OrderPaymentRefund.Any(e => e.id == id);
+            return _db.orderPaymentRefund.Any(e => e.id == id);
         }
     }
 }

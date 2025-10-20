@@ -1909,6 +1909,90 @@ namespace SnowmeetApi.Controllers
                 data = order
             });
         }
+        [HttpPost("{orderId}")]
+        public async Task<ActionResult<ApiResult<Models.Order?>>> Refund([FromRoute] int orderId,
+        [FromBody] List<OrderPaymentRefund> refunds, [FromQuery]string sessionKey, [FromQuery]string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            if (staff == null || staff.title_level < 100)
+            {
+                return Ok(new ApiResult<Models.Order?>()
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = null
+                });
+            }
+            Models.Order order = await GetOrder(orderId);
+            string message = "";
+            for (int i = 0; i < refunds.Count; i++)
+            {
+                OrderPaymentRefund refund = refunds[i];
+                OrderPayment payment = order.availablePayments.Where(p => p.id == refund.payment_id).FirstOrDefault();
+                if (payment == null)
+                {
+                    message = "该笔支付记录不存在";
+                    break;
+                }
+                else if (payment.refundedAmount + refund.amount > payment.amount)
+                {
+                    message = "退款金额超过可退款金额";
+                    break;
+                }
+                else
+                {
+                    refund.out_refund_no = payment.out_trade_no + "_TK_" + (payment.refunds.Count + 1).ToString().PadLeft(2, '0');
+                    refund.order_id = orderId;
+                    refund.staff_id = staff.id;
+                    refund.create_date = DateTime.Now;
+                    if (payment.pay_method != "微信支付" && payment.pay_method != "支付宝")
+                    {
+                        refund.state = 1;
+                    }
+                    else
+                    {
+                        refund.state = 0;
+                    }
+                    refund.refund_id = "";
+                    await _db.orderPaymentRefund.AddAsync(refund);
+                }
+            }
+            if (!message.Trim().Equals(""))
+            {
+                return Ok(new ApiResult<Models.Order?>()
+                {
+                    code = 1,
+                    message = message,
+                    data = null
+                });
+            }
+            await _db.SaveChangesAsync();
+            AliController _aliHelper = new AliController(_db, _config, _http);
+            TenpayController _weHelper = new TenpayController(_db, _config, _http);
+            for (int i = 0; i < refunds.Count; i++)
+            {
+                OrderPaymentRefund refund = refunds[i];
+                OrderPayment payment = order.availablePayments.Where(p => p.id == refund.payment_id).FirstOrDefault();
+                switch(payment.pay_method.Trim())
+                {
+                    case "支付宝":
+                        refund = await _aliHelper.Refund(refund.id);
+                        break;
+                    case "微信支付":
+                        refund = await _weHelper.Refund(refund.id);
+                        break;
+                    default:
+                        break;
+                }
+            }
+            order = await GetOrder(orderId);
+            return Ok(new ApiResult<Models.Order?>()
+            {
+                code = 0,
+                message = "",
+                data = order
+            });
+        }
     }
 
 }

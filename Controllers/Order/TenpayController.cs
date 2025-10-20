@@ -455,38 +455,16 @@ namespace SnowmeetApi.Controllers
         [NonAction]
         public async Task<OrderPaymentRefund> Refund(int refundId)
         {
-
-
-            OrderPaymentRefund refund = await _db.OrderPaymentRefund.FindAsync(refundId);
-
-
-
+            OrderPaymentRefund refund = await _db.orderPaymentRefund.FindAsync(refundId);
             OrderPayment payment = await _db.OrderPayment.FindAsync(refund.payment_id);
-
-
-            var refunds = await _db.OrderPaymentRefund
+            var refunds = await _db.orderPaymentRefund
                 .Where(r => r.payment_id == payment.id)
                 .AsNoTracking().ToListAsync();
-
-
             string notifyUrl = payment.notify.Trim().Replace("https://", "").Split('/')[0].Trim();
             notifyUrl = "https://" + notifyUrl + "/core/Tenpay/RefundCallback/" + payment.mch_id.ToString();
             refund.notify_url = notifyUrl.Trim();
-            //string outRefundNo = payment.out_trade_no + "_REFND_" + DateTime.Now.ToString("yyyyMMdd")
-            //    +"_" + refunds.Count.ToString().PadLeft(2, '0');
-            //refund.out_refund_no = outRefundNo;
-
-
-            _db.OrderPaymentRefund.Entry(refund).State = EntityState.Modified;
+            _db.orderPaymentRefund.Entry(refund).State = EntityState.Modified;
             await _db.SaveChangesAsync();
-
-
-            //var client = new WechatTenpayClient(options);
-
-
-
-
-
             var client = await GetClient((int)payment.mch_id);
             var request = new CreateRefundDomesticRefundRequest()
             {
@@ -501,7 +479,6 @@ namespace SnowmeetApi.Controllers
                 NotifyUrl = refund.notify_url.Trim(),
 
             };
-
             var response = await client.ExecuteCreateRefundDomesticRefundAsync(request);
             try
             {
@@ -510,11 +487,9 @@ namespace SnowmeetApi.Controllers
                 {
                     return refund;
                 }
-                //refund.status = refundId;
                 refund.refund_id = refundStrId;
                 _db.Entry<OrderPaymentRefund>(refund).State = EntityState.Modified;
                 await _db.SaveChangesAsync();
-                //await Response.WriteAsync("SUCCESS");
                 return refund;
             }
             catch
@@ -524,9 +499,7 @@ namespace SnowmeetApi.Controllers
                 await _db.SaveChangesAsync();
                 return refund;
             }
-
         }
-
         [HttpPost("{mchid}")]
         public async Task<ActionResult<string>> RefundCallback(int mchid, [FromBody] object postData)
         {
@@ -618,7 +591,7 @@ namespace SnowmeetApi.Controllers
 
 
                         double refundAmount = Math.Round(((double)callbackResource.Amount.Total) / 100, 2);
-                        OrderPaymentRefund refund = await _db.OrderPaymentRefund
+                        OrderPaymentRefund refund = await _db.orderPaymentRefund
                             .Where(r => (r.refund_id.Trim().Equals(callbackResource.RefundId.Trim()))).FirstAsync();
 
                         refund.state = 1;

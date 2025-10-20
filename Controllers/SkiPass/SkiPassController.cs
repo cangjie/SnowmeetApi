@@ -539,7 +539,7 @@ namespace SnowmeetApi.Controllers
             Models.SkiPass.SkiPass skipass = await _context.skiPass
                 .Where(s => (s.valid == 1 && s.order_id == payment.order_id))
                 .OrderByDescending(s => s.id).FirstAsync();
-            OrderPaymentRefund refund = await _context.OrderPaymentRefund
+            OrderPaymentRefund refund = await _context.orderPaymentRefund
                 .Where(p => p.order_id == payment.order_id && p.state == 1)
                 .AsNoTracking().FirstAsync();
             if (!skipass.resort.Trim().Equals("南山"))

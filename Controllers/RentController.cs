@@ -2971,7 +2971,7 @@ namespace SnowmeetApi.Controllers
                             create_date = DateTime.Now,
                             oper = user.miniAppOpenId.Trim()
                         };
-                        await _db.OrderPaymentRefund.AddAsync(r);
+                        await _db.orderPaymentRefund.AddAsync(r);
                         await _db.SaveChangesAsync();
                     }
                     needRefundAmount = 0;
@@ -2997,7 +2997,7 @@ namespace SnowmeetApi.Controllers
                             create_date = DateTime.Now,
                             oper = user.miniAppOpenId.Trim()
                         };
-                        await _db.OrderPaymentRefund.AddAsync(r);
+                        await _db.orderPaymentRefund.AddAsync(r);
                         await _db.SaveChangesAsync();
                     }
 
@@ -3715,7 +3715,7 @@ namespace SnowmeetApi.Controllers
                     rentOrder.order = await _db.OrderOnlines.FindAsync(rentOrder.order_id);
                     rentOrder.order.paymentList = await _db.OrderPayment
                         .Where(p => p.order_id == rentOrder.order_id).ToListAsync();
-                    rentOrder.order.refunds = await _db.OrderPaymentRefund
+                    rentOrder.order.refunds = await _db.orderPaymentRefund
                         .Where(r => r.order_id == rentOrder.order_id).ToListAsync();
 
                 }

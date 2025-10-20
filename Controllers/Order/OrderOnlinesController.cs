@@ -636,7 +636,7 @@ namespace SnowmeetApi.Controllers
                 }
                 order.payments = payments;
 
-                var refunds = await _context.OrderPaymentRefund.Where(r => r.order_id == order.id
+                var refunds = await _context.orderPaymentRefund.Where(r => r.order_id == order.id
                     && (r.state == 1 || !r.refund_id.Trim().Equals(""))).ToListAsync();
                 if (refunds != null)
                 {
@@ -1040,7 +1040,7 @@ namespace SnowmeetApi.Controllers
                 orderOnline.paymentList = await _context.OrderPayment.Where(p => (p.order_id == orderOnline.id))
                     .OrderByDescending(p => p.id).ToListAsync();
 
-                orderOnline.refunds = await _context.OrderPaymentRefund.Where(r => r.order_id == orderOnline.id &&  (!r.refund_id.Trim().Equals("") || r.state == 1))
+                orderOnline.refunds = await _context.orderPaymentRefund.Where(r => r.order_id == orderOnline.id &&  (!r.refund_id.Trim().Equals("") || r.state == 1))
                     .OrderByDescending(r => r.id).ToListAsync();
 
                 if (orderOnline.ticket_code != null && !orderOnline.ticket_code.ToString().Trim().Equals(""))
