@@ -759,5 +759,53 @@ namespace SnowmeetApi.Models
                 return payMethod;
             }
         }
+        [NotMapped]
+        public string customerCalledName
+        {
+            get
+            {
+                string calledName = "";
+                if (contact_name != null)
+                {
+                    calledName = contact_name;
+                }
+                if (contact_gender != null)
+                {
+                    calledName += " " + contact_gender == "男" ? "先生" : (contact_gender == "女" ? "女士" : "");
+                }
+                if (calledName == "" && member != null)
+                {
+                    if (member.real_name != null)
+                    {
+                        calledName = member.real_name;
+                    }
+                    if (member.gender != null)
+                    {
+                        calledName += " " + member.gender == "男" ? "先生" : (member.gender == "女" ? "女士" : "");
+                    }
+                }
+                return calledName;
+            }
+        }
+        [NotMapped]
+        public string customerCell
+        {
+            get
+            {
+                if (contact_num != null)
+                {
+                    return contact_num;
+                }
+                else if (member != null && member.cell != null)
+                {
+                    return member.cell;
+                }
+                else
+                {
+                    return "";
+                }
+            }
+        }
+            
     }
 }
