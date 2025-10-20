@@ -323,7 +323,8 @@ namespace Controllers
                 }
             }
             string sessionType = "wechat_mini_openid";
-            MiniSession session = await _db.miniSession.FindAsync(sessionKey.Trim(), sessionType);
+            MiniSession session = await _db.miniSession.Where(s => s.session_key == sessionKey.Trim() && s.session_type == sessionType)
+                .AsNoTracking().OrderByDescending(s => s.expire_date).FirstOrDefaultAsync();
             DateTime expireDate = DateTime.Now.AddHours(2);
             if (session == null)
             {
