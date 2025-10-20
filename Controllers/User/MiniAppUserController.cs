@@ -357,7 +357,7 @@ namespace SnowmeetApi.Controllers
                 }
 
             }
-            return Ok(_memberHelper.RemoveSensitiveInfo(member));
+            return Ok(member);
         }
 
         [HttpGet]

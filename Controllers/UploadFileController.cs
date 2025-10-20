@@ -26,14 +26,14 @@ namespace SnowmeetApi.Controllers
     {
         private readonly ApplicationDBContext _db;
         private IConfiguration _config;
-        private readonly User.MemberController _memberHelper;
+        private readonly MemberController _memberHelper;
 
         public UploadFileController(ApplicationDBContext context, IConfiguration config)
         {
             _db = context;
             _config = config.GetSection("Settings");
             UnicUser._context = context;
-            _memberHelper = new User.MemberController(_db, _config);
+            _memberHelper = new MemberController(_db, _config);
         }
 
         [HttpPost("{sessionKey}")]

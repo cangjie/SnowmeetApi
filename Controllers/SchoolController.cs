@@ -28,7 +28,7 @@ namespace SnowmeetApi.Controllers
         private readonly IConfiguration _config;
         private readonly IHttpContextAccessor _http;
 
-        private readonly User.MemberController _memberHelper;
+        private readonly MemberController _memberHelper;
 
         public class Student
         {
@@ -57,7 +57,7 @@ namespace SnowmeetApi.Controllers
             _db = context;
             _config = config;
             _http = httpContextAccessor;
-            _memberHelper = new User.MemberController(_db, _config);
+            _memberHelper = new MemberController(_db, _config);
         }
 
         [HttpGet("{staffId}")]
@@ -229,7 +229,7 @@ namespace SnowmeetApi.Controllers
                 .Include(m => m.memberSocialAccounts).AsNoTracking().ToListAsync();
             if (members.Count > 0)
             {
-                staff.member = _memberHelper.RemoveSensitiveInfo(members[0]);
+                //staff.member = _memberHelper.RemoveSensitiveInfo(members[0]);
                 
             }
             
@@ -706,6 +706,7 @@ namespace SnowmeetApi.Controllers
             act = Util.UrlDecode(act);
             var sl = await _db.miniSession.Where(s => (s.session_type.Trim().Equals(sessionType) && s.session_key.Trim().Equals(sessionKey)))
                 .OrderByDescending(s => s.create_date).AsNoTracking().ToListAsync();
+            
             if (sl == null || sl.Count <= 0)
             {
                 return;
