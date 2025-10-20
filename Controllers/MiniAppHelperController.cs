@@ -38,14 +38,14 @@ namespace Controllers
 
         private readonly Settings _settings;
 
-        public MemberController _memberHelper;
+        //public MemberController _memberHelper;
 
         public MiniAppHelperController(ApplicationDBContext db, IConfiguration config)
         {
             _db = db;
             _config = config;
             _settings = Settings.GetSettings(_config);
-            _memberHelper = new MemberController(db, config);
+            //_memberHelper = new MemberController(db, config);
         }
 
         [HttpGet]
@@ -244,7 +244,7 @@ namespace Controllers
             if (memberId == null)
             {
                 List<MemberSocialAccount> msaList = await _db.memberSocialAccount
-                    .Where(m => (m.num.Trim().Equals(openId.Trim()) && m.valid == 1 && m.type.Trim().Equals("wechat_mini_openid")))
+                    .Where(m => (m.num.Trim().Equals(openId.Trim()) && m.valid == 1 && m.type.Trim().Equals("wl_wechat_mini_openid")))
                     .OrderByDescending(m => m.id).AsNoTracking().ToListAsync();
                 if (msaList.Count > 0)
                 {
@@ -259,7 +259,7 @@ namespace Controllers
                 {
                     MemberSocialAccount msa = new MemberSocialAccount()
                     {
-                        type = "wechat_mini_openid",
+                        type = "wl_wechat_mini_openid",
                         num = openId.Trim(),
                         valid = 1,
                         memo = "",
@@ -271,7 +271,7 @@ namespace Controllers
                 {
                     MemberSocialAccount msa = new MemberSocialAccount()
                     {
-                        type = "wechat_unionid",
+                        type = "wl_wechat_unionid",
                         num = unionId.Trim(),
                         valid = 1,
                         memo = "",
@@ -297,7 +297,7 @@ namespace Controllers
                 {
                     MemberSocialAccount msa = new MemberSocialAccount()
                     {
-                        type = "wechat_mini_openid",
+                        type = "wl_wechat_mini_openid",
                         num = openId.Trim(),
                         valid = 1,
                         memo = "",
@@ -322,7 +322,7 @@ namespace Controllers
                     await _db.SaveChangesAsync();
                 }
             }
-            string sessionType = "wechat_mini_openid";
+            string sessionType = "wl_wechat_mini_openid";
             MiniSession session = await _db.miniSession.Where(s => s.session_key == sessionKey.Trim() && s.session_type == sessionType)
                 .AsNoTracking().OrderByDescending(s => s.expire_date).FirstOrDefaultAsync();
             DateTime expireDate = DateTime.Now.AddHours(2);
@@ -351,7 +351,7 @@ namespace Controllers
             sessionObj.member = member;
             /*
             StaffController _staffHelper = new StaffController(_db);
-            sessionObj.staff = await _staffHelper.GetStaffBySocialNum(openId, "wechat_mini_openid", DateTime.Now);
+            sessionObj.staff = await _staffHelper.GetStaffBySocialNum(openId, "wl_wechat_mini_openid", DateTime.Now);
             sessionObj.openid = "";
             sessionObj.unionid = "";
             result.code = 0;
@@ -362,157 +362,7 @@ namespace Controllers
             return Ok(sessionObj);
         }
 
-        [HttpGet]
-        public async Task<ActionResult<Code2Session>> MemberLoginBak(string code, string openIdType = "wl_wchat_mini_openid")
-        {
-            string appId = _settings.appId;
-            string appSecret = _settings.appSecret;
-            string checkUrl = "https://api.weixin.qq.com/sns/jscode2session?appid=" + appId.Trim()
-                + "&secret=" + appSecret.Trim() + "&js_code=" + code.Trim()
-                + "&grant_type=authorization_code";
-            string jsonResult = Util.GetWebContent(checkUrl);
-            Code2Session sessionObj = JsonConvert.DeserializeObject<Code2Session>(jsonResult);
-            if (!sessionObj.errcode.ToString().Equals(""))
-            {
-                return BadRequest();
-            }
-            SnowmeetApi.Models.Member member = new SnowmeetApi.Models.Member()
-            {
-                id = 0
-            };
-            if (sessionObj.unionid != null && !sessionObj.unionid.Trim().Equals(""))
-            {
-                member = await _memberHelper.GetMember(sessionObj.unionid.Trim(), "wechat_unionid");
-            }
-            /*
-            if ((member == null || member.id == 0) && sessionObj.openid != null && !sessionObj.openid.Trim().Equals(""))
-            {
-                member = await _memberHelper.GetMember(sessionObj.unionid.Trim(), openIdType.Trim());
-            }
-            */
-            if (member == null)
-            {
-                return BadRequest();
-                /*
-                member = new Member()
-                {
-                    id = 0,
-                    real_name = "",
-                    gender = ""
-                };
-                if (sessionObj.unionid != null && !sessionObj.unionid.Trim().Equals(""))
-                {
-                    MemberSocialAccount msa = new MemberSocialAccount()
-                    {
-                        type = "wechat_unionid",
-                        num = sessionObj.unionid.Trim(),
-                        valid = 1,
-                        memo = ""
-                    };
-                    member.memberSocialAccounts.Add(msa);
-                }
-                if (sessionObj.openid != null && !sessionObj.openid.Trim().Equals(""))
-                {
-                    MemberSocialAccount msa = new MemberSocialAccount()
-                    {
-                        type = openIdType.Trim(),
-                        num = sessionObj.openid.Trim(),
-                        valid = 1,
-                        memo = ""
-                    };
-                    member.memberSocialAccounts.Add(msa);
-                }
-                member = await _memberHelper.CreateMember(member);
-                */
-
-            }
-            bool existsUnionid = false;
-            bool existsOpneId = false;
-            foreach (MemberSocialAccount msa in member.memberSocialAccounts)
-            {
-                if (msa.type.Trim().Equals("wechat_unionid"))
-                {
-                    existsUnionid = true;
-
-                }
-                if (msa.type.Trim().Equals(openIdType.Trim()))
-                {
-                    existsOpneId = true;
-                }
-            }
-            if (!existsUnionid && sessionObj.unionid != null && !sessionObj.unionid.Trim().Equals(""))
-            {
-                MemberSocialAccount newMsa = new MemberSocialAccount()
-                {
-                    member_id = member.id,
-                    type = "wechat_unionid",
-                    num = sessionObj.unionid,
-                    valid = 1,
-                    memo = ""
-                };
-                await _db.memberSocialAccount.AddAsync(newMsa);
-                await _db.SaveChangesAsync();
-            }
-            if (!existsOpneId && sessionObj.openid != null && !sessionObj.openid.Trim().Equals(""))
-            {
-                MemberSocialAccount newMsa = new MemberSocialAccount()
-                {
-                    member_id = member.id,
-                    type = openIdType.Trim(),
-                    num = sessionObj.openid,
-                    valid = 1,
-                    memo = ""
-                };
-                await _db.memberSocialAccount.AddAsync(newMsa);
-                await _db.SaveChangesAsync();
-            }
-            var sessionList = await _db.miniSession.Where(m => (m.session_key.Trim().Equals(sessionObj.session_key.Trim())
-                    && m.open_id.Trim().Equals(sessionObj.openid.Trim())
-                    && m.session_type.Trim().Equals(openIdType.Trim()))).ToListAsync();
-            MiniSession session = new MiniSession();
-            if (sessionList.Count > 0)
-            {
-                session = sessionList[0];
-            }
-            else
-            {
-                session = new MiniSession()
-                {
-                    session_key = sessionObj.session_key,
-                    session_type = openIdType.Trim(),
-                    open_id = sessionObj.openid.Trim(),
-                    member_id = member.id
-                };
-                await _db.miniSession.AddAsync(session);
-                await _db.SaveChangesAsync();
-            }
-
-            /*
-            Member memberNew = new Member()
-            {
-                id = 0,
-                real_name = member.real_name,
-                gender = member.gender,
-                is_admin = member.is_admin,
-                is_manager = member.is_manager,
-                is_staff = member.is_staff,
-                memberSocialAccounts = new List<MemberSocialAccount>()
-            };
-
-            foreach(MemberSocialAccount msadd in member.memberSocialAccounts)
-            {
-                if (msadd.type.Trim().Equals("cell"))
-                {
-                    memberNew.memberSocialAccounts.Add(msadd);
-                }
-            }
-*/
-
-            sessionObj.member = _memberHelper.RemoveSensitiveInfo(member);
-            sessionObj.openid = "";
-            sessionObj.unionid = "";
-            return Ok(sessionObj);
-        }
+        /*
 
         [HttpGet]
         public async Task<ActionResult<Code2Session>> VisitorLogin(string code, string openIdType = "wl_wechat_mini_openid")
@@ -542,7 +392,7 @@ namespace Controllers
                 {
                     session_key = sessionObj.session_key,
                     session_type = openIdType.Trim(),
-                    open_id = sessionObj.openid.Trim(),
+                    //open_id = sessionObj.openid.Trim(),
                     member_id = 0
                 };
                 await _db.miniSession.AddAsync(session);
@@ -577,7 +427,7 @@ namespace Controllers
                     MiniSession mSession = new MiniSession()
                     {
                         session_key = sessionObj.session_key.Trim(),
-                        open_id = sessionObj.openid.Trim()
+                        //open_id = sessionObj.openid.Trim()
                     };
                     await _db.miniSession.AddAsync(mSession);
                     await _db.SaveChangesAsync();
@@ -613,7 +463,7 @@ namespace Controllers
             return NotFound();
         }
 
-
+*/
 
 
         [HttpGet]

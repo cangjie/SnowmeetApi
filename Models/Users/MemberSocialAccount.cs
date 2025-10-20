@@ -18,7 +18,8 @@ namespace SnowmeetApi.Models.Users
 
         public int valid {get; set;}
 
-        public string memo {get; set; } = "";
+        public string memo { get; set; } = "";
+        public DateTime? update_date { get; set; }
 
        // public Member member { get; set; }
 

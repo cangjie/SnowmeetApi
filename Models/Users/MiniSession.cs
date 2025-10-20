@@ -11,6 +11,7 @@ namespace SnowmeetApi.Models.Users
         [Key]
         public string session_key { get; set; }
 
+        [NotMapped]
         public string open_id { get; set; }
 
         public string session_type { get; set; } = "";
