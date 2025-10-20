@@ -59,7 +59,7 @@ namespace SnowmeetApi.Controllers
             }
         }
         [NonAction]
-        public async Task<Member> GetMemberBySessionKey(string sessionKey, string sessionType = "wechat_mini_openid")
+        public async Task<Member> GetMemberBySessionKey(string sessionKey, string sessionType = "wl_wechat_mini_openid")
         {
             sessionKey = Util.UrlDecode(sessionKey);
             sessionType = Util.UrlDecode(sessionType);

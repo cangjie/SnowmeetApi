@@ -211,7 +211,7 @@ namespace SnowmeetApi.Controllers
                 .AsNoTracking().ToListAsync();
             Staff staff = new Staff();
             bool find = false;
-            if (staffList != null && staffList.Count > 1)
+            if (staffList == null || staffList.Count < 1)
             {
                 return NoContent();
             }
