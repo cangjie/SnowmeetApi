@@ -34,9 +34,7 @@ namespace SnowmeetApi
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
-           
-            string path = $"{Environment.CurrentDirectory}";
-
+            string path = Directory.GetCurrentDirectory();
             if (path.StartsWith("/"))
             {
                 path = path + "/";
@@ -46,16 +44,12 @@ namespace SnowmeetApi
                 path = path + "\\";
             }
             path = path + "config.sqlServer";
-
             string conStr = "";
-
             using (StreamReader sr = new StreamReader(path, true))
             {
                 conStr = sr.ReadToEnd();
                 sr.Close();
             }
-
-
             services.AddControllers();
             services.AddDbContext<ApplicationDBContext>(
                 options => options.UseSqlServer(conStr)
