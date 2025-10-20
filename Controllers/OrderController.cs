@@ -53,6 +53,7 @@ namespace SnowmeetApi.Controllers
             order.discounts = await _db.order.Entry(order).Collection(o => o.discounts).Query().Where(d => d.valid == 1).ToListAsync();
             await _db.order.Entry(order).Reference(o => o.staff).LoadAsync();
             await _db.order.Entry(order).Reference(o => o.member).LoadAsync();
+            await _db.member.Entry(order.member).Collection(m => m.memberSocialAccounts).LoadAsync();
             order.payments = await _db.order.Entry(order).Collection(o => o.payments).Query().Where(p => p.valid == 1)
                 .Include(p => p.member).ThenInclude(m => m.memberSocialAccounts)
                 .Include(p => p.staff)
