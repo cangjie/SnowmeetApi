@@ -43,7 +43,7 @@ namespace SnowmeetApi.Controllers.Tiktok
                     open_id = codeObj.data.openid,
                     session_type = "tiktok"
                 };
-                await _db.MiniSessons.AddAsync(session);
+                await _db.miniSession.AddAsync(session);
                 await _db.SaveChangesAsync();
                 return Ok(session.session_key);
             }

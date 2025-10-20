@@ -23,8 +23,9 @@ using SnowmeetApi.Data;
 using SnowmeetApi;
 using SnowmeetApi.Controllers.User;
 using Aop.Api.Domain;
+using System.ComponentModel.DataAnnotations.Schema;
 
-namespace LuqinMiniAppBase.Controllers
+namespace Controllers
 {
     [Route("core/[controller]/[action]")]
     [ApiController]
@@ -55,7 +56,7 @@ namespace LuqinMiniAppBase.Controllers
         }
 
 
-        
+
         [HttpPost]
         public async Task<ActionResult<string>> PushMessage([FromQuery] string signature,
             [FromQuery] string timestamp, [FromQuery] string nonce)
@@ -89,7 +90,7 @@ namespace LuqinMiniAppBase.Controllers
                         + DateTime.Now.Day.ToString().PadLeft(2, '0');
                     if (path.StartsWith("/"))
                     {
-                       path = path + "/";
+                        path = path + "/";
                     }
                     else
                     {
@@ -128,7 +129,7 @@ namespace LuqinMiniAppBase.Controllers
                     msgType = root.SelectSingleNode("MsgType").InnerText.Trim();
                 }
 
-                
+
                 OAReceive msg = new OAReceive()
                 {
                     id = 0,
@@ -156,9 +157,212 @@ namespace LuqinMiniAppBase.Controllers
             }
             return "success";
         }
+        [NonAction]
+        public async Task<WebApiLog> PerformRequest(string url, string header, string payload, 
+            string method = "GET", string source = "易龙雪聚小程序", string purpose = "", string memo = "")
+        {
+            WebApiLog log = new WebApiLog()
+            {
+                id = 0,
+                source = source.Trim(),
+                purpose = purpose.Trim(),
+                memo = memo.Trim(),
+                method = method.Trim(),
+                header = header.Trim(),
+                payload = payload.Trim(),
+                request_url = url.Trim()
+            };
+            await _db.webApiLog.AddAsync(log);
+            await _db.SaveChangesAsync();
+            try
+            {
+                switch(method.ToLower())
+                {
+                    case "post":
+                        log.response = Util.GetWebContent(log.request_url, log.payload, "application/json");
+                    break;
+                    default:
+                        log.response = Util.GetWebContent(log.request_url);
+                    break;
+                }
+            }
+            catch
+            {
+
+            }
+            log.deal = 1;
+            log.update_date = DateTime.Now;
+            _db.webApiLog.Entry(log).State = EntityState.Modified;
+            await _db.SaveChangesAsync();
+            return log;
+        }
+        [HttpGet]
+        public async Task<ActionResult<Code2Session>> MemberLogin(string code, string openIdType)
+        {
+            Code2Session result = new Code2Session();
+            string appId = _settings.appId;
+            string appSecret = _settings.appSecret;
+            string checkUrl = "https://api.weixin.qq.com/sns/jscode2session?appid=" + appId.Trim()
+                + "&secret=" + appSecret.Trim() + "&js_code=" + code.Trim()
+                + "&grant_type=authorization_code";
+
+            WebApiLog log = await PerformRequest(checkUrl, "", "", "GET", "小程序登录", "获取session");
+            if (log == null || log.response == null || log.response.Trim().Length <= 0)
+            {
+                return BadRequest();
+            }
+
+            string jsonResult = log.response.Trim();
+            Code2Session sessionObj = JsonConvert.DeserializeObject<Code2Session>(jsonResult);
+            if (!sessionObj.errcode.ToString().Equals(""))
+            {
+                return BadRequest();
+            }
+            string openId = sessionObj.openid;
+            string sessionKey = sessionObj.session_key;
+            string? unionId = null;
+            int? memberId = null;
+            try
+            {
+                unionId = sessionObj.unionid;
+            }
+            catch
+            {
+                unionId = null;
+            }
+
+            if (unionId != null && unionId.Trim().Length > 0)
+            {
+                List<MemberSocialAccount> msaList = await _db.memberSocialAccount
+                    .Where(m => (m.num.Trim().Equals(unionId.Trim()) && m.valid == 1 && m.type.Trim().Equals("wechat_unionid")))
+                    .OrderByDescending(m => m.id).AsNoTracking().ToListAsync();
+                if (msaList.Count > 0)
+                {
+                    memberId = msaList[0].member_id;
+                }
+            }
+            if (memberId == null)
+            {
+                List<MemberSocialAccount> msaList = await _db.memberSocialAccount
+                    .Where(m => (m.num.Trim().Equals(openId.Trim()) && m.valid == 1 && m.type.Trim().Equals("wechat_mini_openid")))
+                    .OrderByDescending(m => m.id).AsNoTracking().ToListAsync();
+                if (msaList.Count > 0)
+                {
+                    memberId = msaList[0].member_id;
+                }
+            }
+            SnowmeetApi.Models.Member member = new SnowmeetApi.Models.Member();
+            if (memberId == null)
+            {
+                member.id = 0;
+                if (openId != null && openId.Trim().Length > 0)
+                {
+                    MemberSocialAccount msa = new MemberSocialAccount()
+                    {
+                        type = "wechat_mini_openid",
+                        num = openId.Trim(),
+                        valid = 1,
+                        memo = "",
+                        member_id = member.id
+                    };
+                    member.memberSocialAccounts.Add(msa);
+                }
+                if (unionId != null && unionId.Trim().Length > 0)
+                {
+                    MemberSocialAccount msa = new MemberSocialAccount()
+                    {
+                        type = "wechat_unionid",
+                        num = unionId.Trim(),
+                        valid = 1,
+                        memo = "",
+                        member_id = member.id
+                    };
+                    member.memberSocialAccounts.Add(msa);
+                }
+                await _db.member.AddAsync(member);
+                await _db.SaveChangesAsync();
+            }
+            if (member.id == 0)
+            {
+                List<SnowmeetApi.Models.Member> memberList = await _db.member
+                    .Where(m => m.id == memberId)
+                    .Include(m => m.memberSocialAccounts)
+                    .ToListAsync();
+                if (memberList.Count <= 0)
+                {
+                    return BadRequest();
+                }
+                member = memberList[0];
+                if (member.wechatMiniOpenId == null)
+                {
+                    MemberSocialAccount msa = new MemberSocialAccount()
+                    {
+                        type = "wechat_mini_openid",
+                        num = openId.Trim(),
+                        valid = 1,
+                        memo = "",
+                        member_id = member.id
+                    };
+                    member.memberSocialAccounts.Add(msa);
+                    _db.member.Entry(member).State = EntityState.Modified;
+                    await _db.SaveChangesAsync();
+                }
+                if (member.wechatUnionId == null)
+                {
+                    MemberSocialAccount msa = new MemberSocialAccount()
+                    {
+                        type = "wl_wechat_mini_openid",
+                        num = unionId.Trim(),
+                        valid = 1,
+                        memo = "",
+                        member_id = member.id
+                    };
+                    member.memberSocialAccounts.Add(msa);
+                    _db.member.Entry(member).State = EntityState.Modified;
+                    await _db.SaveChangesAsync();
+                }
+            }
+            string sessionType = "wechat_mini_openid";
+            MiniSession session = await _db.miniSession.FindAsync(sessionKey.Trim(), sessionType);
+            DateTime expireDate = DateTime.Now.AddHours(2);
+            if (session == null)
+            {
+                session = new MiniSession()
+                {
+                    session_key = sessionKey.Trim(),
+                    session_type = sessionType.Trim(),
+                    member_id = member.id,
+                    valid = 1,
+                    expire_date = expireDate
+                };
+                await _db.miniSession.AddAsync(session);
+
+            }
+            else
+            {
+                session.valid = 1;
+                session.member_id = member.id;
+                session.expire_date = expireDate;
+                _db.miniSession.Entry(session).State = EntityState.Modified;
+            }
+            await _db.SaveChangesAsync();
+            member.memberSocialAccounts = member.memberSocialAccounts.Where(m => m.valid == 1 && m.type.Trim().Equals("cell")).OrderByDescending(m => m.id).ToList();
+            sessionObj.member = member;
+            /*
+            StaffController _staffHelper = new StaffController(_db);
+            sessionObj.staff = await _staffHelper.GetStaffBySocialNum(openId, "wechat_mini_openid", DateTime.Now);
+            sessionObj.openid = "";
+            sessionObj.unionid = "";
+            result.code = 0;
+            result.message = "";
+            result.data = sessionObj;
+*/
+
+            return Ok(sessionObj);
+        }
 
         [HttpGet]
-        public async Task<ActionResult<Code2Session>> MemberLogin(string code, string openIdType = "wl_wchat_mini_openid")
+        public async Task<ActionResult<Code2Session>> MemberLoginBak(string code, string openIdType = "wl_wchat_mini_openid")
         {
             string appId = _settings.appId;
             string appSecret = _settings.appSecret;
@@ -171,7 +375,7 @@ namespace LuqinMiniAppBase.Controllers
             {
                 return BadRequest();
             }
-            SnowmeetApi.Models.Users.Member member = new SnowmeetApi.Models.Users.Member()
+            SnowmeetApi.Models.Member member = new SnowmeetApi.Models.Member()
             {
                 id = 0
             };
@@ -223,12 +427,12 @@ namespace LuqinMiniAppBase.Controllers
             }
             bool existsUnionid = false;
             bool existsOpneId = false;
-            foreach(MemberSocialAccount msa in member.memberSocialAccounts)
+            foreach (MemberSocialAccount msa in member.memberSocialAccounts)
             {
                 if (msa.type.Trim().Equals("wechat_unionid"))
                 {
                     existsUnionid = true;
-                    
+
                 }
                 if (msa.type.Trim().Equals(openIdType.Trim()))
                 {
@@ -261,9 +465,9 @@ namespace LuqinMiniAppBase.Controllers
                 await _db.memberSocialAccount.AddAsync(newMsa);
                 await _db.SaveChangesAsync();
             }
-            var sessionList = await _db.MiniSessons.Where(m => (m.session_key.Trim().Equals(sessionObj.session_key.Trim())
-                    && m.open_id.Trim().Equals(sessionObj.openid.Trim()) 
-                    && m.session_type.Trim().Equals(openIdType.Trim())  )).ToListAsync();
+            var sessionList = await _db.miniSession.Where(m => (m.session_key.Trim().Equals(sessionObj.session_key.Trim())
+                    && m.open_id.Trim().Equals(sessionObj.openid.Trim())
+                    && m.session_type.Trim().Equals(openIdType.Trim()))).ToListAsync();
             MiniSession session = new MiniSession();
             if (sessionList.Count > 0)
             {
@@ -278,7 +482,7 @@ namespace LuqinMiniAppBase.Controllers
                     open_id = sessionObj.openid.Trim(),
                     member_id = member.id
                 };
-                await _db.MiniSessons.AddAsync(session);
+                await _db.miniSession.AddAsync(session);
                 await _db.SaveChangesAsync();
             }
 
@@ -323,7 +527,7 @@ namespace LuqinMiniAppBase.Controllers
             {
                 return BadRequest();
             }
-            var sessionList = await _db.MiniSessons.Where(m => (m.session_key.Trim().Equals(sessionObj.session_key.Trim())
+            var sessionList = await _db.miniSession.Where(m => (m.session_key.Trim().Equals(sessionObj.session_key.Trim())
                     && m.open_id.Trim().Equals(sessionObj.openid.Trim())
                     && m.session_type.Trim().Equals(openIdType.Trim()))).ToListAsync();
             MiniSession session = new MiniSession();
@@ -340,7 +544,7 @@ namespace LuqinMiniAppBase.Controllers
                     open_id = sessionObj.openid.Trim(),
                     member_id = 0
                 };
-                await _db.MiniSessons.AddAsync(session);
+                await _db.miniSession.AddAsync(session);
                 await _db.SaveChangesAsync();
             }
             return Ok(session);
@@ -350,7 +554,7 @@ namespace LuqinMiniAppBase.Controllers
 
 
         [HttpGet]
-        public  async Task<ActionResult<Code2Session>> Login(string code)
+        public async Task<ActionResult<Code2Session>> Login(string code)
         {
             string appId = _settings.appId;
             string appSecret = _settings.appSecret;
@@ -359,13 +563,13 @@ namespace LuqinMiniAppBase.Controllers
                 + "&grant_type=authorization_code";
             string jsonResult = Util.GetWebContent(checkUrl);
             Code2Session sessionObj = JsonConvert.DeserializeObject<Code2Session>(jsonResult);
-            
+
             if (sessionObj.errcode.ToString().Equals(""))
             {
-                var sessionList = await _db.MiniSessons.Where(m => (m.session_key.Trim().Equals(sessionObj.session_key.Trim())
+                var sessionList = await _db.miniSession.Where(m => (m.session_key.Trim().Equals(sessionObj.session_key.Trim())
                     && m.open_id.Trim().Equals(sessionObj.openid.Trim()))).ToListAsync();
 
-                
+
 
                 if (sessionList.Count == 0)
                 {
@@ -374,7 +578,7 @@ namespace LuqinMiniAppBase.Controllers
                         session_key = sessionObj.session_key.Trim(),
                         open_id = sessionObj.openid.Trim()
                     };
-                    await _db.MiniSessons.AddAsync(mSession);
+                    await _db.miniSession.AddAsync(mSession);
                     await _db.SaveChangesAsync();
                 }
                 MiniAppUser user = await _db.MiniAppUsers.FindAsync(sessionObj.openid);
@@ -384,7 +588,7 @@ namespace LuqinMiniAppBase.Controllers
                     {
                         open_id = sessionObj.openid,
                         union_id = sessionObj.unionid.Trim()
-                        
+
                     };
                     await _db.MiniAppUsers.AddAsync(user);
                     await _db.SaveChangesAsync();
@@ -408,7 +612,7 @@ namespace LuqinMiniAppBase.Controllers
             return NotFound();
         }
 
-        
+
 
 
         [HttpGet]
@@ -498,10 +702,11 @@ namespace LuqinMiniAppBase.Controllers
             public string unionid { get; set; } = null;
             public string errcode { get; set; } = "";
             public string errmsg { get; set; } = "";
-
-            public int? member_id {get; set;} = null;
-
-            public SnowmeetApi.Models.Users.Member member {get; set;} = null;
+            public int? member_id { get; set; } = null;
+            [NotMapped]
+            public SnowmeetApi.Models.Member member { get; set; } = null;
+            //[NotMapped]
+            //public Staff staff { get; set; } = null;
         }
 
         protected class AccessToken
