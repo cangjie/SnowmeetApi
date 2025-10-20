@@ -19,6 +19,32 @@ namespace SnowmeetApi
 
 
         public static string workingPath = $"{Environment.CurrentDirectory}";
+        public static string? GetSqlServerConnectionString()
+        {
+            //string path = $"{Environment.CurrentDirectory}";
+            string path = Directory.GetCurrentDirectory();
+
+            //System.IO.File.AppendAllText("test.txt", path);
+
+            if (path.StartsWith("/"))
+            {
+                path = path + "/";
+            }
+            else
+            {
+                path = path + "\\";
+            }
+            path = path + "config.sqlServer";
+
+            string? conStr = null;
+
+            using (StreamReader sr = new StreamReader(path, true))
+            {
+                conStr = sr.ReadToEnd().Trim();
+                sr.Close();
+            }
+            return conStr;
+        }
 
         public static Object GetValueFromResult(ActionResult value)
         {
