@@ -97,6 +97,24 @@ namespace SnowmeetApi.Models
             }
         }
         [NotMapped]
+        public string? contactNum
+        {
+            get
+            {
+                string? v = null;
+                List<MemberSocialAccount> msaList = GetInfo("contact");
+                for (int i = 0; i < msaList.Count; i++)
+                {
+                    if (!msaList[i].num.Trim().Equals(""))
+                    {
+                        v = msaList[i].num.Trim();
+                        break;
+                    }
+                }
+                return v;
+            }
+        }
+        [NotMapped]
         public string? _cell = null;
         public string? wechatId
         {

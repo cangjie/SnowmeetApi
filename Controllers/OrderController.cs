@@ -184,7 +184,7 @@ namespace SnowmeetApi.Controllers
                     && (memberId == null || o.member_id == memberId) && (staffId == null || o.staff_id == staffId)
                     && (payOption == null || o.pay_option.Trim().Equals(payOption.Trim()))
                     && (shop == null || o.shop.Trim().Equals(shop.Trim())) && (type == null || o.type.Trim().Equals(type.Trim()))
-                    && o.valid == 1)
+                    && o.valid == 1 && (orderId == null || o.id == orderId))
                 .Include(o => o.fdOrders.Where(f => f.valid == 1)).ThenInclude(f => f.product).ThenInclude(p => p.category)
                 .Include(o => o.retails.Where(r => r.valid == 1))
                 .Include(o => o.cares.Where(c => c.valid == 1)).ThenInclude(c => c.tasks.Where(t => t.valid == 1).OrderBy(t => t.id))

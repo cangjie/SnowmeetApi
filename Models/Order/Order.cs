@@ -796,13 +796,13 @@ namespace SnowmeetApi.Models
                 {
                     return contact_num;
                 }
-                else if (member != null && member.cell != null)
+                else if (member != null && member.cell != null && member.cell != "")
                 {
                     return member.cell;
                 }
                 else
                 {
-                    return "";
+                    return member.contactNum.Trim();
                 }
             }
         }
