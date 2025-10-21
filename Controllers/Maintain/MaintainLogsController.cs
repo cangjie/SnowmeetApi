@@ -174,6 +174,521 @@ namespace SnowmeetApi.Controllers.Maintain
                     }
                 }
             }
+            string[] commonHead = ["序号", "订单号", "日期", "时间", "门店", "姓名", "手机", "支付订单号", "支付金额", "退款金额", "结余金额", "流水号", "类型", "品牌", "长度",
+                "角度", "接待", "修刃", "打蜡", "刮蜡", "其他", "维修", "发板", "备注", "附加费用"];
+            string[] paymentHead = ["支付门店", "支付方式" ,"微信支付单号", "商户订单号", "支付金额", "支付日期", "支付时间"];
+            string[] refundHead = ["微信退款单号", "商户退款单号", "退款金额", "退款原因", "退款日期", "退款时间"];
+            string nullStr = "【-】";
+            List<string> realHead = new List<string>();
+            for (int i = 0; i < commonHead.Length; i++)
+            {
+                realHead.Add(commonHead[i].Trim());
+            }
+            for (int i = 0; i < maxPaymentCount; i++)
+            {
+                for (int j = 0; j < paymentHead.Length; j++)
+                {
+                    realHead.Add(paymentHead[j].Trim() + (i + 1).ToString());
+                }
+            }
+            for (int i = 0; i < maxRefundCount; i++)
+            {
+                for (int j = 0; j < refundHead.Length; j++)
+                {
+                    realHead.Add(refundHead[j].Trim() + (i + 1).ToString());
+                }
+            }
+
+            XSSFWorkbook workbook = new XSSFWorkbook();
+
+            IFont fontProblem = workbook.CreateFont();
+            fontProblem.Color = NPOI.HSSF.Util.HSSFColor.Red.Index;
+            ISheet sheet = workbook.CreateSheet("24-25养护");
+            IDataFormat format = workbook.CreateDataFormat();
+            IFont headFont = workbook.CreateFont();
+            headFont.Color = NPOI.HSSF.Util.HSSFColor.White.Index;
+            headFont.IsBold = true;
+            ICellStyle headStyle = workbook.CreateCellStyle();
+            headStyle.Alignment = HorizontalAlignment.Center;
+            headStyle.FillForegroundColor = NPOI.HSSF.Util.HSSFColor.Black.Index;
+            headStyle.FillPattern = FillPattern.SolidForeground;
+            headStyle.SetFont(headFont);
+            headStyle.VerticalAlignment = VerticalAlignment.Center;
+
+            IRow headRow = sheet.CreateRow(0);
+            headRow.Height = 500;
+
+            for (int i = 0; i < realHead.Count; i++)
+            {
+                ICell headCell = headRow.CreateCell(i);
+                headCell.SetCellValue(realHead[i].Trim());
+                headCell.SetCellType(CellType.String);
+                headCell.CellStyle = headStyle;
+                if (i < commonHead.Length)
+                {
+                    switch(i)
+                    {
+                        case 0:
+                            sheet.SetColumnWidth(i, 1000);
+                            break;
+                        case 1:
+                            sheet.SetColumnWidth(i,1500);
+                            break;
+                        case 2:
+                            sheet.SetColumnWidth(i,2800);
+                            break;
+                        case 3:
+                            sheet.SetColumnWidth(i, 2000);
+                            break;
+                        case 4:
+                        case 9:
+                            sheet.SetColumnWidth(i,3000);
+                            break;
+                        case 11:
+                            sheet.SetColumnWidth(i, 4000);
+                            break;
+                        case 14:
+                        case 15:
+                        case 16:
+                        case 17:
+                        case 18:
+                        case 19:
+                        case 20:
+                        case 21:
+                            sheet.SetColumnWidth(i, 4300);
+                            break;
+                        default:
+                            break;
+                    }
+                }
+                else if (i < maxPaymentCount * paymentHead.Length + commonHead.Length)
+                {
+                    int index = (i - commonHead.Length) % commonHead.Length;
+                    switch(index)
+                    {
+                        case 0:
+                            sheet.SetColumnWidth(i, 3000);
+                            break;
+                        case 2:
+                        case 3:
+                            sheet.SetColumnWidth(i, 7000);
+                            break;
+                        case 5:
+                            sheet.SetColumnWidth(i, 2800);
+                            break;
+                        case 6:
+                            sheet.SetColumnWidth(i, 2000);
+                            break;
+                        default:
+                            break;
+                    }
+                }
+                else
+                {
+                    int index = (i - commonHead.Length
+                        - maxPaymentCount * paymentHead.Length) % refundHead.Length;
+                    switch(index)
+                    {
+                        case 0:
+                            sheet.SetColumnWidth(i, 7500);
+                            break;
+                        case 1:
+                            sheet.SetColumnWidth(i,10000);
+                            break;
+                        case 3:
+                            sheet.SetColumnWidth(i, 5000);
+                            break;
+                        case 4:
+                            sheet.SetColumnWidth(i, 2800);
+                            break;
+                        case 5:
+                            sheet.SetColumnWidth(i, 2000);
+                            break;
+                        default:
+                            break;
+                    }
+                        
+                }
+            }
+
+            for (int i = 0; i < oriList.Count; i++)
+            {
+                ICellStyle styleText = workbook.CreateCellStyle();
+                styleText.Alignment = HorizontalAlignment.Center;
+                styleText.DataFormat = format.GetFormat("General");
+                ICellStyle styleMoney = workbook.CreateCellStyle();
+                styleMoney.DataFormat = format.GetFormat("¥#,##0.00");
+                ICellStyle styleNum = workbook.CreateCellStyle();
+                styleNum.DataFormat = format.GetFormat("0");
+                ICellStyle styleDate = workbook.CreateCellStyle();
+                styleDate.DataFormat = format.GetFormat("yyyy-MM-dd");
+                ICellStyle styleTime = workbook.CreateCellStyle();
+                styleTime.DataFormat = format.GetFormat("HH:mm:ss");
+
+                IRow dr = sheet.CreateRow(i + 1);
+                dr.Height = 500;
+                MaintainLive task = oriList[i];
+                string staffOpenId = task.service_open_id;
+                //MemberSocialAccount staffMsa = await _context.memberSocialAccount.Where(m => m.num == staffOpenId && m.valid == 1)
+                   // .AsNoTracking().FirstOrDefaultAsync();
+                //staffMsa.member = await _context.member.Where(m => m.id == staffMsa.member_id).AsNoTracking().FirstOrDefaultAsync();
+                if (task.order == null)
+                {
+                    //isEnterain = true;
+                    styleText.FillForegroundColor = NPOI.HSSF.Util.HSSFColor.Yellow.Index;
+                    styleText.FillPattern = FillPattern.SolidForeground;
+
+                    styleMoney.FillForegroundColor = NPOI.HSSF.Util.HSSFColor.Yellow.Index;
+                    styleMoney.FillPattern = FillPattern.SolidForeground;
+
+                    styleNum.FillForegroundColor = NPOI.HSSF.Util.HSSFColor.Yellow.Index;
+                    styleNum.FillPattern = FillPattern.SolidForeground;
+
+                    styleDate.FillForegroundColor = NPOI.HSSF.Util.HSSFColor.Yellow.Index;
+                    styleDate.FillPattern = FillPattern.SolidForeground;
+
+                    styleTime.FillForegroundColor = NPOI.HSSF.Util.HSSFColor.Yellow.Index;
+                    styleTime.FillPattern = FillPattern.SolidForeground;
+                }
+
+                for (int j = 0; j < realHead.Count; j++)
+                {
+                    ICell cell = dr.CreateCell(j);
+                    if (j < commonHead.Length)
+                    {
+                        switch (j)
+                        {
+                            case 0:
+                                cell.SetCellValue((i + 1));
+                                cell.CellStyle = styleNum;
+                                break;
+                            case 1:
+                                cell.SetCellValue(task.batch_id);
+                                cell.CellStyle = styleNum;
+                                break;
+                            case 2:
+                                cell.SetCellValue(task.create_date.Date);
+                                cell.CellStyle = styleDate;
+                                break;
+                            case 3:
+                                cell.SetCellValue(task.create_date);
+                                cell.CellStyle = styleTime;
+                                break;
+                            case 4:
+                                cell.SetCellValue(task.shop);
+                                cell.CellStyle = styleText;
+                                break;
+                            case 5:
+                                string name = task.confirmed_name + ((task.confirmed_gender == "男") ? "先生" : (task.confirmed_gender == "女" ? "女士" : ""));
+                                cell.SetCellValue(name);
+                                cell.CellStyle = styleText;
+                                break;
+                            case 6:
+                                cell.SetCellValue(task.confirmed_cell);
+                                cell.CellStyle = styleText;
+                                break;
+                            
+
+
+
+                            case 5+2:
+                                if (task.order == null)
+                                {
+                                    cell.SetCellValue(nullStr);
+                                    cell.CellStyle = styleText;
+                                }
+                                else
+                                {
+                                    cell.SetCellValue(task.order.id);
+                                    cell.CellStyle = styleNum;
+                                }
+                                break;
+                            case 6+2:
+                                if (task.order == null)
+                                {
+                                    cell.SetCellValue(nullStr);
+                                    cell.CellStyle = styleText;
+                                }
+                                else
+                                {
+                                    cell.SetCellValue(task.order.paidAmount);
+                                    cell.CellStyle = styleMoney;
+                                }
+                                break;
+                            case 7+2:
+                                if (task.order == null)
+                                {
+                                    cell.SetCellValue(nullStr);
+                                    cell.CellStyle = styleText;
+                                }
+                                else
+                                {
+                                    cell.SetCellValue(task.order.refundAmount);
+                                    cell.CellStyle = styleMoney;
+                                }
+                                break;
+                            case 8+2:
+                                if (task.order == null)
+                                {
+                                    cell.SetCellValue(nullStr);
+                                    cell.CellStyle = styleText;
+                                }
+                                else
+                                {
+                                    cell.SetCellValue(task.order.paidAmount - task.order.refundAmount);
+                                    cell.CellStyle = styleMoney;
+                                }
+                                break;
+                            case 9+2:
+                                cell.SetCellValue(task.task_flow_num.Trim());
+                                cell.CellStyle = styleText;
+                                break;
+                            case 10+2:
+                                cell.SetCellValue(task.confirmed_equip_type.Trim());
+                                cell.CellStyle = styleText;
+                                break;
+                            case 11+2:
+                                cell.SetCellValue(task.confirmed_brand.Trim());
+                                cell.CellStyle = styleText;
+                                break;
+                            case 12+2:
+                                cell.SetCellValue(task.confirmed_scale.Trim());
+                                cell.CellStyle = styleText;
+                                break;
+                            case 13+2:
+                                cell.SetCellValue(task.confirmed_degree.ToString());
+                                cell.CellStyle = styleText;
+                                break;
+                            case 14+2:
+                                cell.SetCellValue(task.staffRecept);
+                                cell.CellStyle = styleText;
+                                break;
+                            case 15+2:
+                                if (task.confirmed_edge == 1)
+                                {
+                                    if (!task.staffEdge.Trim().Equals(""))
+                                    {
+                                        cell.SetCellValue(task.staffEdge.Trim());
+                                    }
+                                    else
+                                    {
+                                        cell.SetCellValue("——");
+                                    }
+                                }
+                                else
+                                {
+                                    cell.SetCellValue(nullStr);
+                                }
+                                cell.CellStyle = styleText;
+                                break;
+                            case 16+2:
+                                if (task.confirmed_candle == 1)
+                                {
+                                    if (!task.staffVax.Trim().Equals(""))
+                                    {
+                                        cell.SetCellValue(task.staffVax.Trim());
+                                    }
+                                    else
+                                    {
+                                        cell.SetCellValue("——");
+                                    }
+                                }
+                                else
+                                {
+                                    cell.SetCellValue(nullStr);
+                                }
+                                cell.CellStyle = styleText;
+                                break;
+                            case 17+2:
+                                if (task.confirmed_candle == 1)
+                                {
+                                    if (!task.staffUnVax.Trim().Equals(""))
+                                    {
+                                        cell.SetCellValue(task.staffUnVax.Trim());
+                                    }
+                                    else
+                                    {
+                                        cell.SetCellValue("——");
+                                    }
+                                }
+                                else
+                                {
+                                    cell.SetCellValue(nullStr);
+                                }
+                                cell.CellStyle = styleText;
+                                break;
+                            case 18+2:
+                                cell.SetCellValue(task.confirmed_more.Trim().Equals("") ? nullStr : task.confirmed_more.Trim());
+                                cell.CellStyle = styleText;
+                                break;
+                            case 19+2:
+                                if (task.confirmed_more.Trim().Equals(""))
+                                {
+                                    cell.SetCellValue(nullStr);
+                                }
+                                else
+                                {
+                                    if (task.staffRepair.Trim().Equals(""))
+                                    {
+                                        cell.SetCellValue("——");
+                                    }
+                                    else
+                                    {
+                                        cell.SetCellValue(task.staffRepair.Trim());
+                                    }
+                                }
+                                cell.CellStyle = styleText;
+                                break;
+                            case 20+2:
+                                cell.SetCellValue(task.staffGiveOut.Trim().Equals("")?"——": task.staffGiveOut);
+                                cell.CellStyle = styleText;
+                                break;
+                            case 21+2:
+                                string memo = task.confirmed_memo.Trim() + " "
+                                    + ((task.order != null && task.order.memo != "") ? task.order.memo.Trim() : "");
+                                cell.SetCellValue(memo);
+                                cell.CellStyle = styleText;
+                                break;
+                            case 22+2:
+                                cell.SetCellValue(task.confirmed_additional_fee);
+                                cell.CellStyle = styleMoney;
+                                break;
+                            default:
+                                break;
+                        }
+                    }
+                    else if (j < commonHead.Length + maxPaymentCount * paymentHead.Length)
+                    {
+                        int index = (j - commonHead.Length) / paymentHead.Length;
+                        if (task.order == null || task.order.paymentList.Count <= index)
+                        {
+                            cell.SetCellValue(nullStr);
+                            cell.CellStyle = styleText;
+                        }
+                        else
+                        {
+                            OrderPayment payment = task.order.paymentList[index];
+                            switch ((j - commonHead.Length) % paymentHead.Length)
+                            {
+                                case 0:
+                                    cell.SetCellValue(task.order.shop.Trim());
+                                    cell.CellStyle = styleText;
+                                    break;
+                                case 1:
+                                    cell.SetCellValue(payment.pay_method.Trim());
+                                    break;
+                                case 2:
+                                    cell.SetCellValue(payment.wepay_trans_id==null?nullStr:payment.wepay_trans_id);
+                                    cell.CellStyle = styleText;
+                                    break;
+                                case 3:
+                                    cell.SetCellValue(payment.out_trade_no==null?nullStr:payment.out_trade_no);
+                                    cell.CellStyle = styleText;
+                                    break;
+                                case 4:
+                                    cell.SetCellValue(payment.amount);
+                                    cell.CellStyle = styleMoney;
+                                    break;
+                                case 5:
+                                    cell.SetCellValue(payment.create_date);
+                                    cell.CellStyle = styleDate;
+                                    break;
+                                case 6:
+                                    cell.SetCellValue(payment.create_date);
+                                    cell.CellStyle = styleTime;
+                                    break;
+                                default:
+                                    break;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        int index = (j - commonHead.Length - maxPaymentCount * paymentHead.Length) / refundHead.Length;
+                        if (task.order == null || task.order.refundList.Count <= index)
+                        {
+                            cell.SetCellValue(nullStr);
+                            cell.CellStyle = styleText;
+                        }
+                        else
+                        {
+                            OrderPaymentRefund refund = task.order.refundList[index];
+                            switch ((j - commonHead.Length-maxPaymentCount * paymentHead.Length) % paymentHead.Length)
+                            {
+                                case 0:
+                                    cell.SetCellValue(refund.refund_id);
+                                    cell.CellStyle = styleText;
+                                    break;
+                                case 1:
+                                    cell.SetCellValue(refund.out_refund_no);
+                                    cell.CellStyle = styleText;
+                                    break;
+                                
+                                case 2:
+                                    cell.SetCellValue(refund.amount);
+                                    cell.CellStyle = styleMoney;
+                                    break;
+                                case 3:
+                                    cell.SetCellValue(refund.reason);
+                                    cell.CellStyle = styleText;
+                                    break;
+                                case 4:
+                                    cell.SetCellValue(refund.create_date);
+                                    cell.CellStyle = styleDate;
+                                    break;
+                                case 5:
+                                    cell.SetCellValue(refund.create_date);
+                                    cell.CellStyle = styleTime;
+                            
+                                    break;
+                                default:
+                                    break;
+                            }
+                        }
+                    }
+                }
+            }
+            MergeSheet(sheet, 1, new int[] {0, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22});
+            string filePath = $"{Environment.CurrentDirectory}" + "/maintain.xlsx";
+            using (var file = System.IO.File.Create(filePath))
+            {
+                workbook.Write(file);
+            }
+
+        }
+        [HttpGet]
+        public async Task ExportExcel1()
+        {
+            DateTime start = DateTime.Parse("2024-10-1");
+            DateTime end = DateTime.Parse("2025-5-1");
+            List<MaintainLive> oriList = await _context.MaintainLives
+                .Where(m => m.create_date.Date >= start.Date && m.create_date.Date <= end.Date
+                && m.task_flow_num.IndexOf("-") >= 0
+                //&& m.task_flow_num.Equals("250409-00001")
+                )
+                .Include(m => m.order)
+                    .ThenInclude(o => o.paymentList.Where(p => p.status.Trim().Equals("支付成功")))
+                        .ThenInclude(p => p.refunds.Where(r => r.state == 1 || !r.refund_id.Trim().Equals("")))
+                .Include(m => m.taskLog).ThenInclude(l => l.msa).ThenInclude(m => m.member)
+                .Include(m => m.staffMsa).ThenInclude(m => m.member)
+                .OrderByDescending(m => m.batch_id).ThenByDescending(m => m.order_id)
+                .AsNoTracking().ToListAsync();
+
+            int maxPaymentCount = 1;
+            int maxRefundCount = 0;
+
+            for (int i = 0; i < oriList.Count; i++)
+            {
+                MaintainLive task = oriList[i];
+                if (task.order != null && task.order.paymentList != null)
+                {
+                    maxPaymentCount = Math.Max(maxPaymentCount, task.order.paymentList.Count);
+                    if (task.order.refundList != null && task.order.refundList.Count > 0)
+                    {
+                        maxRefundCount = Math.Max(maxRefundCount, task.order.refundList.Count);
+                    }
+                }
+            }
             string[] commonHead = ["序号", "订单号", "日期", "时间", "门店", "支付订单号", "支付金额", "退款金额", "结余金额", "流水号", "类型", "品牌", "长度",
                 "角度", "接待", "修刃", "打蜡", "刮蜡", "其他", "维修", "发板", "备注", "附加费用"];
             string[] paymentHead = ["支付门店", "支付方式" ,"微信支付单号", "商户订单号", "支付金额", "支付日期", "支付时间"];
