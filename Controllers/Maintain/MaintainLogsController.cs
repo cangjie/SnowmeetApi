@@ -154,7 +154,7 @@ namespace SnowmeetApi.Controllers.Maintain
                     .ThenInclude(o => o.paymentList.Where(p => p.status.Trim().Equals("支付成功")))
                         .ThenInclude(p => p.refunds.Where(r => r.state == 1 || !r.refund_id.Trim().Equals("")))
                 .Include(m => m.taskLog).ThenInclude(l => l.msa).ThenInclude(m => m.member)
-                .Include(m => m.staffMsa).ThenInclude(m => m.member)
+                //.Include(m => m.staffMsa).ThenInclude(m => m.member)
                 .OrderByDescending(m => m.batch_id).ThenByDescending(m => m.order_id)
                 .AsNoTracking().ToListAsync();
 
@@ -173,7 +173,7 @@ namespace SnowmeetApi.Controllers.Maintain
                     }
                 }
             }
-            string[] commonHead = ["序号", "订单号", "日期", "时间", "门店", "支付订单号", "支付金额", "退款金额", "结余金额", "流水号", "类型", "品牌", "长度",
+            string[] commonHead = ["序号", "订单号", "日期", "时间", "门店", "姓名", "手机", "支付订单号", "支付金额", "退款金额", "结余金额", "流水号", "类型", "品牌", "长度",
                 "角度", "接待", "修刃", "打蜡", "刮蜡", "其他", "维修", "发板", "备注", "附加费用"];
             string[] paymentHead = ["支付门店", "支付方式" ,"微信支付单号", "商户订单号", "支付金额", "支付日期", "支付时间"];
             string[] refundHead = ["微信退款单号", "商户退款单号", "退款金额", "退款原因", "退款日期", "退款时间"];
@@ -327,6 +327,10 @@ namespace SnowmeetApi.Controllers.Maintain
                 IRow dr = sheet.CreateRow(i + 1);
                 dr.Height = 500;
                 MaintainLive task = oriList[i];
+                string staffOpenId = task.service_open_id;
+                MemberSocialAccount staffMsa = await _context.memberSocialAccount.Where(m => m.num == staffOpenId && m.valid == 1)
+                    .AsNoTracking().FirstOrDefaultAsync();
+                staffMsa.member = await _context.member.Where(m => m.id == staffMsa.member_id).AsNoTracking().FirstOrDefaultAsync();
                 if (task.order == null)
                 {
                     //isEnterain = true;
@@ -374,6 +378,19 @@ namespace SnowmeetApi.Controllers.Maintain
                                 cell.CellStyle = styleText;
                                 break;
                             case 5:
+                                string name = task.confirmed_name + ((task.confirmed_gender == "男") ? "先生" : (task.confirmed_gender == "女" ? "女士" : ""));
+                                cell.SetCellValue(name);
+                                cell.CellStyle = styleText;
+                                break;
+                            case 6:
+                                cell.SetCellValue(task.confirmed_cell);
+                                cell.CellStyle = styleText;
+                                break;
+                            
+
+
+
+                            case 5+2:
                                 if (task.order == null)
                                 {
                                     cell.SetCellValue(nullStr);
@@ -385,7 +402,7 @@ namespace SnowmeetApi.Controllers.Maintain
                                     cell.CellStyle = styleNum;
                                 }
                                 break;
-                            case 6:
+                            case 6+2:
                                 if (task.order == null)
                                 {
                                     cell.SetCellValue(nullStr);
@@ -397,7 +414,7 @@ namespace SnowmeetApi.Controllers.Maintain
                                     cell.CellStyle = styleMoney;
                                 }
                                 break;
-                            case 7:
+                            case 7+2:
                                 if (task.order == null)
                                 {
                                     cell.SetCellValue(nullStr);
@@ -409,7 +426,7 @@ namespace SnowmeetApi.Controllers.Maintain
                                     cell.CellStyle = styleMoney;
                                 }
                                 break;
-                            case 8:
+                            case 8+2:
                                 if (task.order == null)
                                 {
                                     cell.SetCellValue(nullStr);
@@ -421,31 +438,31 @@ namespace SnowmeetApi.Controllers.Maintain
                                     cell.CellStyle = styleMoney;
                                 }
                                 break;
-                            case 9:
+                            case 9+2:
                                 cell.SetCellValue(task.task_flow_num.Trim());
                                 cell.CellStyle = styleText;
                                 break;
-                            case 10:
+                            case 10+2:
                                 cell.SetCellValue(task.confirmed_equip_type.Trim());
                                 cell.CellStyle = styleText;
                                 break;
-                            case 11:
+                            case 11+2:
                                 cell.SetCellValue(task.confirmed_brand.Trim());
                                 cell.CellStyle = styleText;
                                 break;
-                            case 12:
+                            case 12+2:
                                 cell.SetCellValue(task.confirmed_scale.Trim());
                                 cell.CellStyle = styleText;
                                 break;
-                            case 13:
+                            case 13+2:
                                 cell.SetCellValue(task.confirmed_degree.ToString());
                                 cell.CellStyle = styleText;
                                 break;
-                            case 14:
+                            case 14+2:
                                 cell.SetCellValue(task.staffRecept);
                                 cell.CellStyle = styleText;
                                 break;
-                            case 15:
+                            case 15+2:
                                 if (task.confirmed_edge == 1)
                                 {
                                     if (!task.staffEdge.Trim().Equals(""))
@@ -463,7 +480,7 @@ namespace SnowmeetApi.Controllers.Maintain
                                 }
                                 cell.CellStyle = styleText;
                                 break;
-                            case 16:
+                            case 16+2:
                                 if (task.confirmed_candle == 1)
                                 {
                                     if (!task.staffVax.Trim().Equals(""))
@@ -481,7 +498,7 @@ namespace SnowmeetApi.Controllers.Maintain
                                 }
                                 cell.CellStyle = styleText;
                                 break;
-                            case 17:
+                            case 17+2:
                                 if (task.confirmed_candle == 1)
                                 {
                                     if (!task.staffUnVax.Trim().Equals(""))
@@ -499,11 +516,11 @@ namespace SnowmeetApi.Controllers.Maintain
                                 }
                                 cell.CellStyle = styleText;
                                 break;
-                            case 18:
+                            case 18+2:
                                 cell.SetCellValue(task.confirmed_more.Trim().Equals("") ? nullStr : task.confirmed_more.Trim());
                                 cell.CellStyle = styleText;
                                 break;
-                            case 19:
+                            case 19+2:
                                 if (task.confirmed_more.Trim().Equals(""))
                                 {
                                     cell.SetCellValue(nullStr);
@@ -521,17 +538,17 @@ namespace SnowmeetApi.Controllers.Maintain
                                 }
                                 cell.CellStyle = styleText;
                                 break;
-                            case 20:
+                            case 20+2:
                                 cell.SetCellValue(task.staffGiveOut.Trim().Equals("")?"——": task.staffGiveOut);
                                 cell.CellStyle = styleText;
                                 break;
-                            case 21:
+                            case 21+2:
                                 string memo = task.confirmed_memo.Trim() + " "
                                     + ((task.order != null && task.order.memo != "") ? task.order.memo.Trim() : "");
                                 cell.SetCellValue(memo);
                                 cell.CellStyle = styleText;
                                 break;
-                            case 22:
+                            case 22+2:
                                 cell.SetCellValue(task.confirmed_additional_fee);
                                 cell.CellStyle = styleMoney;
                                 break;
