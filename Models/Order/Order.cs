@@ -802,7 +802,14 @@ namespace SnowmeetApi.Models
                 }
                 else
                 {
-                    return member.contactNum.Trim();
+                    if (member != null)
+                    {
+                        return member.contactNum.Trim();
+                    }
+                    else
+                    {
+                        return "";
+                    }
                 }
             }
         }
