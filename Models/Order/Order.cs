@@ -73,6 +73,7 @@ namespace SnowmeetApi.Models
         public int supplement { get; set; } = 0;
         //public int single_payment { get; set; } = 1;
         public int dealed { get; set; } = 0;
+        public int entertain { get; set; } = 0;
         public string? pay_flow_status { get; set; } = null;
         public int is_test { get; set; } = 0;
         public string? current_pay_method { get; set; } = null;
