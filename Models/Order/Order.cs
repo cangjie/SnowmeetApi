@@ -730,6 +730,10 @@ namespace SnowmeetApi.Models
                     {
                         type = Order.PayType.无需支付.ToString();
                     }
+                    if (allEntrtain)
+                    {
+                        return  Order.PayType.无需支付.ToString();
+                    }
                 }
                 else
                 {
