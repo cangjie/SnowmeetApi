@@ -554,6 +554,10 @@ namespace SnowmeetApi.Models
         {
             get
             {
+                if (entertain == 1)
+                {
+                    return true;
+                }
                 bool allEntrtain = true;
                 for (int i = 0; fdOrders != null && i < fdOrders.Count; i++)
                 {
