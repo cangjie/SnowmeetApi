@@ -546,7 +546,7 @@ namespace SnowmeetApi.Models
                     }
                     */
 
-                    return amount;
+                return amount;
             }
         }
         [NotMapped]
@@ -676,7 +676,7 @@ namespace SnowmeetApi.Models
                             {
                                 status = OrderStatus.待支付.ToString();
                             }
-                          
+
                         }
                         if (closed == 1)
                         {
@@ -719,6 +719,10 @@ namespace SnowmeetApi.Models
         {
             get
             {
+                if (allEntrtain)
+                {
+                    return Order.PayType.无需支付.ToString();
+                }
                 string type = Order.PayType.未支付.ToString();
                 if (totalCharge == 0)
                 {
@@ -730,10 +734,7 @@ namespace SnowmeetApi.Models
                     {
                         type = Order.PayType.无需支付.ToString();
                     }
-                    if (allEntrtain)
-                    {
-                        return  Order.PayType.无需支付.ToString();
-                    }
+
                 }
                 else
                 {
@@ -826,6 +827,6 @@ namespace SnowmeetApi.Models
                 }
             }
         }
-            
+
     }
 }
