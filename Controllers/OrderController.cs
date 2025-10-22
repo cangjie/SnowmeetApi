@@ -205,7 +205,7 @@ namespace SnowmeetApi.Controllers
             }
             if (isEntertain != null)
             {
-                orderList = orderList.Where(o => o.haveEntrtain == isEntertain).ToList();
+                orderList = orderList.Where(o => o.haveEntertain == isEntertain).ToList();
             }
             if (isPackage != null)
             {
