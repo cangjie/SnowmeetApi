@@ -19,6 +19,7 @@ using System.IO;
 using System.Net.WebSockets;
 using System.Threading;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
+using System.Text.Json.Serialization;
 
 namespace SnowmeetApi
 {
@@ -61,6 +62,9 @@ namespace SnowmeetApi
                 c.SwaggerDoc("v1", new OpenApiInfo { Title = "SnowmeetApi", Version = "v1" });
             });
             services.TryAddSingleton<IHttpContextAccessor, HttpContextAccessor>();
+            services.AddControllers().AddJsonOptions(options =>{
+                options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
+            });
             services.Configure<KestrelServerOptions>(options =>
             {
                 options.Limits.MaxRequestBodySize = 1024*1024*500;
