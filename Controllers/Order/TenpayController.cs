@@ -1660,16 +1660,16 @@ namespace SnowmeetApi.Controllers
             {
                 switch (order.type.Trim())
                 {
-                    case "店销现货":
+                    case "零售":
                         mchId = 6;
                         break;
                     case "雪票":
                         mchId = 7;
                         break;
-                    case "押金":
+                    case "租赁":
                         mchId = 17;
                         break;
-                    case "服务":
+                    case "养护":
                         mchId = 15;
                         break;
                     default:
@@ -1682,13 +1682,13 @@ namespace SnowmeetApi.Controllers
             {
                 switch (order.type.Trim())
                 {
-                    case "服务":
+                    case "养护":
                         mchId = 3;
                         break;
-                    case "押金":
+                    case "租赁":
                         mchId = 5;
                         break;
-                    case "店销现货":
+                    case "零售":
                         mchId = 12;
                         break;
                     default:
@@ -1701,13 +1701,13 @@ namespace SnowmeetApi.Controllers
             {
                 switch (order.type.Trim())
                 {
-                    case "服务":
+                    case "养护":
                         mchId = 8;
                         break;
-                    case "押金":
+                    case "租赁":
                         mchId = 10;
                         break;
-                    case "店销现货":
+                    case "零售":
                     case "餐饮":
                         mchId = 9;
                         break;
