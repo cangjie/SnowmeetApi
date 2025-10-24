@@ -334,7 +334,7 @@ namespace SnowmeetApi.Controllers
             {
                 memberId = 0;
             }
-            var courses = await GetCourses(DateTime.Parse("2024-10-1"), DateTime.Parse("2100-10-1"), memberId, 0);
+            var courses = await GetCourses(DateTime.Parse("2025-3-1"), DateTime.Parse("2100-10-1"), memberId, 0);
             return Ok(GetStudents(courses));
         }
 

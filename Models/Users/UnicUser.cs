@@ -179,7 +179,7 @@ namespace SnowmeetApi.Models.Users
             {
                 return user;
             }
-            miniAppOpenId = mList[0].open_id.Trim();
+            //miniAppOpenId = mList[0].open_id.Trim();
             List<MemberSocialAccount> msaList = await db.memberSocialAccount.Where(m => m.member_id == mList[0].member_id)
                 .AsNoTracking().ToListAsync();
             foreach(MemberSocialAccount msa in msaList)
