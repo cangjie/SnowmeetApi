@@ -30,6 +30,7 @@ namespace SnowmeetApi.Models
         public bool noGuaranty { get; set; } = false;
         public double? guaranty_discount { get; set; } = 0;
         public bool entertain { get; set; } = false;
+        public int? staff_id { get; set; } = null;
         public DateTime? update_date { get; set; } = null;
         public DateTime create_date { get; set; } = DateTime.Now;
         public List<RentItem> rentItems { get; set; } = new List<RentItem>();

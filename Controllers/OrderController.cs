@@ -1533,42 +1533,7 @@ namespace SnowmeetApi.Controllers
             //order.payments = null;
             return order;
         }
-        /*
-        [HttpGet]
-        public async Task<Models.Order?> QueryOrderPaid(int orderId)
-        {
-            DateTime startTime = DateTime.Now;
-            Models.Order order = await _db.order.Where(o => o.id == orderId).AsNoTracking().FirstOrDefaultAsync();
-
-            OrderPayment payment = await _db.orderPayment.Where(p => p.order_id == orderId && p.valid == 1 && p.queryed == 0
-                 && p.status.Trim().Equals(OrderPayment.PaymentStatus.支付成功.ToString())
-                 && p.paid_date > DateTime.Now.AddHours(-4)).AsNoTracking()
-                 .OrderByDescending(p => p.id).FirstOrDefaultAsync();
-
-            for (; (payment == null && order.dealed == 0 && (DateTime.Now - startTime).Seconds <= 3600);)
-            {
-                Thread.Sleep(1000);
-                payment = await _db.orderPayment.Where(p => p.order_id == orderId && p.valid == 1 && p.queryed == 0
-                 && p.status.Trim().Equals(OrderPayment.PaymentStatus.支付成功.ToString())
-                 && p.paid_date > DateTime.Now.AddHours(-4)).AsNoTracking()
-                 .OrderByDescending(p => p.id).FirstOrDefaultAsync();
-                order = await _db.order.Where(o => o.id == orderId).AsNoTracking().FirstOrDefaultAsync();
-            }
-            if (payment != null)
-            {
-                payment.queryed = 1;
-                payment.order = null;
-                _db.orderPayment.Entry(payment).State = EntityState.Modified;
-                await _db.SaveChangesAsync();
-            }
-            order.queryed = 1;
-            order.update_date = DateTime.Now;
-            _db.order.Entry(order).State = EntityState.Modified;
-            await _db.SaveChangesAsync();
-            order.payments = null;
-            return order;
-        }
-        */
+        
         [HttpGet("{orderId}")]
         public async Task<ActionResult<ApiResult<Models.Order>>> CancelPaying(int orderId, string sessionKey,
         string sessionType = "wechat_mini_openid")
@@ -1696,47 +1661,7 @@ namespace SnowmeetApi.Controllers
                 data = list
             });
         }
-        /*
-        [HttpGet("{orderId}")]
-        public async Task<ActionResult<ApiResult<List<CoreDataModLog>>>> GetOrderStatusLog(int orderId)
-        {
-            Models.Order order = await _db.order.Where(o => o.id == orderId).Include(o => o.staff).Include(o => o.member)
-                .AsNoTracking().FirstOrDefaultAsync();
-            if (order == null)
-            {
-                return Ok(new ApiResult<object?>()
-                {
-                    code = 1,
-                    message = "未找到订单",
-                    data = null
-                });
-            }
-            List<CoreDataModLog> logs = await _db.coreDataModLog.Where(c => (c.table_name.ToLower().Equals("order")
-                && c.key_value == orderId && c.field_name.ToString().Trim().ToLower().Equals("orderstate")))
-                .Include(c => c.staff).Include(c => c.member)
-                .OrderByDescending(c => c.id).AsNoTracking().ToListAsync();
-            return Ok(new ApiResult<List<CoreDataModLog>>()
-            {
-                code = 0,
-                message = "",
-                data = logs
-            });
-        }
-        [HttpGet("{orderId}")]
-        public async Task<ActionResult<ApiResult<List<CoreDataModLog>>>> GetOrderMemoLog(int orderId)
-        {
-            List<CoreDataModLog> logs = await _db.coreDataModLog.Where(l => l.table_name.ToLower().Equals("order")
-                && l.key_value == orderId && l.field_name.Trim().Equals("memo"))
-                .Include(l => l.staff).Include(l => l.member).AsNoTracking()
-                .OrderByDescending(l => l.id).ToListAsync();
-            return Ok(new ApiResult<List<CoreDataModLog>>()
-            {
-                code = 0,
-                message = "",
-                data = logs
-            });
-        }
-        */
+       
         [HttpGet("{key}")]
         public async Task<ActionResult<ApiResult<List<CoreDataModLog>>>> LoadLogs(string tableName, string fieldName, int key)
         {
@@ -1911,7 +1836,7 @@ namespace SnowmeetApi.Controllers
         }
         [HttpPost("{orderId}")]
         public async Task<ActionResult<ApiResult<Models.Order?>>> Refund([FromRoute] int orderId,
-        [FromBody] List<OrderPaymentRefund> refunds, [FromQuery]string sessionKey, [FromQuery]string sessionType = "wechat_mini_openid")
+        [FromBody] List<OrderPaymentRefund> refunds, [FromQuery] string sessionKey, [FromQuery] string sessionType = "wechat_mini_openid")
         {
             Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
             if (staff == null || staff.title_level < 100)
@@ -1973,7 +1898,7 @@ namespace SnowmeetApi.Controllers
             {
                 OrderPaymentRefund refund = refunds[i];
                 OrderPayment payment = order.availablePayments.Where(p => p.id == refund.payment_id).FirstOrDefault();
-                switch(payment.pay_method.Trim())
+                switch (payment.pay_method.Trim())
                 {
                     case "支付宝":
                         refund = await _aliHelper.Refund(refund.id);
@@ -1987,6 +1912,80 @@ namespace SnowmeetApi.Controllers
             }
             order = await GetOrder(orderId);
             return Ok(new ApiResult<Models.Order?>()
+            {
+                code = 0,
+                message = "",
+                data = order
+            });
+        }
+        [HttpGet("{tempOrderId}")]
+        public async Task<ActionResult<ApiResult<Models.Order>>> PlaceRentOrder(int tempOrderId,
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            if (staff == null || staff.title_level < 100)
+            {
+                return Ok(new ApiResult<Models.Order?>()
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = null
+                });
+            }
+            Models.Order order = await _db.order.Include(o => o.rentals).ThenInclude(r => r.rentItems)
+                .Where(o => o.id == tempOrderId && o.valid == 0).AsNoTracking().FirstOrDefaultAsync();
+            if (order == null)
+            {
+                return Ok(new ApiResult<Models.Order?>()
+                {
+                    code = 1,
+                    message = "无订单数据",
+                    data = null
+                });
+            }
+            double paidAmount = 0;
+            for (int i = 0; i < order.rentals.Count; i++)
+            {
+                Rental rental = order.rentals[i];
+                double guarantyAmount = 0;
+                if (!rental.noGuaranty)
+                {
+                    guarantyAmount = (double)rental.guaranty - (double)rental.guaranty_discount;
+                }
+                if (guarantyAmount > 0)
+                {
+                    Guaranty guaranty = new Guaranty()
+                    {
+                        id = 0,
+                        order_id = order.id,
+                        guaranty_type = "在线支付",
+                        biz_type = "租赁",
+                        biz_id = rental.id,
+                        sub_biz_type = null,
+                        sub_biz_id = null,
+                        amount = guarantyAmount,
+                        memo = "",
+                        valid = 1,
+                        relieve = 0,
+                        staff_id = staff.id,
+                        create_date = DateTime.Now
+                    };
+                    await _db.guaranty.AddAsync(guaranty);
+                }
+                rental.valid = 1;
+                rental.staff_id = staff.id;
+                rental.update_date = DateTime.Now;
+                _db.rental.Entry(rental).State = EntityState.Modified;
+                paidAmount += guarantyAmount;
+            }
+            order.valid = 1;
+            order.update_date = DateTime.Now;
+            order.staff_id = staff.id;
+            order.paying_amount = paidAmount;
+            await GenerateOrderCode(order);
+            _db.order.Entry(order).State = EntityState.Modified;
+            await _db.SaveChangesAsync();
+            return Ok(new ApiResult<Models.Order>()
             {
                 code = 0,
                 message = "",
