@@ -272,8 +272,6 @@ namespace SnowmeetApi.Controllers
                     sign = paraMap["paySign"].Trim()
 
                 };
-
-                //payment.out_trade_no = order.id.ToString().PadLeft(6, '0') + payment.id.ToString().PadLeft(2, '0') + timeStamp;
                 payment.mch_id = mchid;
                 payment.open_id = user.miniAppOpenId.Trim();
                 payment.app_id = _appId;
@@ -289,8 +287,6 @@ namespace SnowmeetApi.Controllers
             }
             return null;
         }
-
-
         [HttpPost("{mchid}")]
         public async Task<ActionResult<string>> TenpayPaymentCallback(int mchid,
             [FromHeader(Name = "Wechatpay-Timestamp")] string timeStamp,
@@ -368,7 +364,6 @@ namespace SnowmeetApi.Controllers
                 };
 
                 var client = new WechatTenpayClient(options);
-                //Exception? verifyErr;
                 bool valid = client.VerifyEventSignature(timeStamp, nonce, postJson, paySign, serial);
 
                 if (valid)
@@ -1686,7 +1681,7 @@ namespace SnowmeetApi.Controllers
                         mchId = 3;
                         break;
                     case "租赁":
-                        mchId = 5;
+                        mchId = 10;
                         break;
                     case "零售":
                         mchId = 12;
