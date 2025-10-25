@@ -1454,7 +1454,7 @@ namespace SnowmeetApi.Controllers
             });
         }
         [NonAction]
-        public async Task DealSuccessPaidOrder(int orderId)
+        public async Task DealSuccessPaidOrder(int orderId, int? paymentId = null)
         {
             Models.Order order = await _db.order.Where(o => o.id == orderId)
                 .AsNoTracking().FirstOrDefaultAsync();
@@ -1462,6 +1462,15 @@ namespace SnowmeetApi.Controllers
             order.pay_flow_status = Models.Order.PayFlowStatus.已支付.ToString();
             order.paying_amount = null;
             await UpdateOrder(order, null, null, "支付成功");
+            switch (order.type)
+            {
+                case "租赁":
+                    RentController _rentHelper = new RentController(_db, _config, _http);
+
+                    break;
+                default:
+                    break;
+            }
         }
         [NonAction]
         public async Task<Models.OrderPayment?> QueryPaymentPaid(int paymentId)

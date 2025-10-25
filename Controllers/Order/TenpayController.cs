@@ -432,9 +432,17 @@ namespace SnowmeetApi.Controllers
                             await _db.SaveChangesAsync();
 
                             OrderController _orderHelper = new OrderController(_db, _oriConfig, _http);
-                            await _orderHelper.DealSuccessPaidOrder(sucPay.order_id);
-                           
-                        }
+                            try
+                            {
+                                await _orderHelper.DealSuccessPaidOrder(sucPay.order_id, sucPay.id);
+                            }
+                            catch
+
+                            {
+                                
+                            }
+
+                            }
 
                         //Console.WriteLine("订单 {0} 已完成支付，交易单号为 {1}", outTradeNumber, transactionId);
                     }
