@@ -24,7 +24,7 @@
 <body>
     <div id="menu" style="display:flex; flex-direction:row; width:100%"></div>
     <div style="margin-top: 20px">
-        <h1 style="text-align:center">销售业务临时报表</h1>
+        <h1 style="text-align:center">养护业务临时报表</h1>
     </div>
     <div class="row_view" style="align-items:center;justify-content:center; margin-top:20px">
         门店：<select id="shop">
@@ -48,7 +48,6 @@
             <tr>
                 <td class="table_head">序号</td>
                 <td class="table_head">订单号</td>
-                <td class="table_head">七色米订单号</td>
                 <td class="table_head">门店</td>
                 <td class="table_head">姓名</td>
                 <td class="table_head">电话</td>
@@ -71,7 +70,7 @@
 </html>
 <script type="text/javascript">var currentColor = '#DDDDDD';
     var totalPaid = 0;
-    var tHead = ['序号', '订单号', '七色米订单号', '门店', '姓名', '电话', '收款方式', '支付', '退款', '订单金额', '日期', '时间', '销售', '备注']
+    var tHead = ['序号', '订单号',  '门店', '姓名', '电话', '收款方式', '支付', '退款', '订单金额', '日期', '时间', '销售', '备注']
     function FillItem(item) {
         var totalColNum = 11;
         var orderIdIndex = 4;
@@ -92,10 +91,7 @@
         if (item.retails[0].mi7_code) {
             mi7Code = item.retails[0].mi7_code
         }
-        var td_mi7_no = document.createElement('td');
-        lineData.push(mi7Code);
-        td_mi7_no.innerText = mi7Code;
-        newRow.appendChild(td_mi7_no);
+      
 
         var td_shop = document.createElement('td');
         td_shop.innerText = item.shop;
@@ -185,7 +181,7 @@
         var btnCtrl = document.getElementById('btn');
         btnCtrl.disabled = true;
         var shop = document.getElementById('shop')
-        var getUrl = '../../api/Order/GetOrdersByStaff?type=%E9%9B%B6%E5%94%AE' + '&startDate=' + formatDate(startDate) + '&endDate='
+        var getUrl = '../../api/Order/GetOrdersByStaff?type=' + encodeURIComponent('养护') +  '&startDate=' + formatDate(startDate) + '&endDate='
             + formatDate(endDate) + (shop.value == '' ? '' : '&shop=' + encodeURIComponent(shop.value)) + '&sessionKey=' + encodeURIComponent(sessionKey)
         $.ajax({
             url: getUrl,
