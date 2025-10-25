@@ -4653,7 +4653,8 @@ namespace SnowmeetApi.Controllers
                 //.Include(o => o.rentals).ThenInclude(r => r.pricePresets)
                 .Where(o => o.shop.Trim().Equals(shop) && o.valid == 0 && o.recepting == 1 && o.create_date.Date == DateTime.Now.Date)
                 .OrderByDescending(o => o.id).AsNoTracking().ToListAsync();
-            return Ok(new ApiResult<List<Models.Order>?>() {
+            return Ok(new ApiResult<List<Models.Order>?>()
+            {
                 code = 0,
                 message = "",
                 data = orders
@@ -4685,7 +4686,107 @@ namespace SnowmeetApi.Controllers
                 message = "",
                 data = order
             });
-            
+
+        }
+        [HttpGet]
+        public async Task<Models.RentalDetail> SetRentalDetail(int rentalId, DateTime date)
+        {
+            List<Models.RentalDetail> detailList = await _db.rentalDetail
+                .Where(r => r.rental_id == rentalId && r.rental_date.Date == date.Date)
+                .AsNoTracking().ToListAsync();
+            if (detailList.Count > 0)
+            {
+                return null;
+            }
+            string rentType = "";
+            string dayType = "";
+            string scene = "";
+            double discount = 0;
+            double? price = null;
+            Models.Rental rental = await _db.rental.Where(r => r.id == rentalId).AsNoTracking().FirstOrDefaultAsync();
+            RentalPricePreset? preset = await _db.rentalPricePreset
+                .Where(p => p.rental_id == rentalId && p.rent_date.Date == date.Date)
+                .AsNoTracking().FirstOrDefaultAsync();
+            if (preset != null)
+            {
+                rentType = preset.rent_type.Trim();
+                dayType = preset.day_type.Trim();
+                scene = preset.scene.Trim();
+                discount = preset.discount;
+                price = preset.price;
+            }
+            else
+            {
+                Models.RentalDetail prevRentalDetail = await _db.rentalDetail
+                    .Where(r => r.rental_id == rentalId && r.rental_date.Date < date.Date)
+                    .OrderByDescending(r => r.rental_date).AsNoTracking().FirstOrDefaultAsync();
+                if (prevRentalDetail == null)
+                {
+                    rentType = "日场";
+                }
+                else
+                {
+                    rentType = "多日";
+                }
+                if (date.DayOfWeek == DayOfWeek.Sunday || date.DayOfWeek == DayOfWeek.Saturday)
+                {
+                    dayType = "周末";
+                }
+                else
+                {
+                    dayType = "平日";
+                }
+                
+                if (rental == null)
+                {
+                    return null;
+                }
+                Models.Order order = await _db.order.Where(o => o.id == rental.order_id).AsNoTracking().FirstOrDefaultAsync();
+                if (order.member_id == null)
+                {
+                    scene = "门市";
+                }
+                else
+                {
+                    scene = "会员";
+                }
+            }
+           
+            List<RentPrice> priceList = new List<RentPrice>();
+            if (rental.package_id != null)
+            {
+                priceList = await _db.rentPrice.Where(r => r.category_id == rental.category_id).AsNoTracking().ToListAsync();
+            }
+            else
+            {
+                priceList = await _db.rentPrice.Where(r => r.package_id == rental.package_id).AsNoTracking().ToListAsync();
+            }
+            RentPrice rentPrice = priceList.Where(p => p.day_type == dayType && p.rent_type == rentType && p.scene == scene).FirstOrDefault();
+            if (rentPrice == null && price == null)
+            {
+                return null;
+            }
+            if (price == null)
+            {
+                price = rentPrice.price;
+            }
+            Models.RentalDetail detail = new Models.RentalDetail()
+            {
+                id = 0,
+                rental_id = rentalId,
+                rent_price_id = rentPrice == null ? null : rentPrice.id,
+                charge_type = "租金",
+                rental_date = date,
+                rent_item_id = null,
+                amount = (double)price,
+                memo = "",
+                staff_id = null,
+                valid = 1,
+                create_date = DateTime.Now
+            };
+            await _db.rentalDetail.AddAsync(detail);
+            await _db.SaveChangesAsync();
+            return detail;
         }
     }
 }
