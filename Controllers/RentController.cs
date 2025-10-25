@@ -4688,7 +4688,7 @@ namespace SnowmeetApi.Controllers
             });
 
         }
-        [HttpGet]
+        [NonAction]
         public async Task<Models.RentalDetail> SetRentalDetail(int rentalId, DateTime date)
         {
             List<Models.RentalDetail> detailList = await _db.rentalDetail
