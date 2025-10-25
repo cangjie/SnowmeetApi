@@ -199,7 +199,7 @@
                 for (var i = 0; i < msg.data.length; i++) {
                     msg.data[i].id = i + 1;
                     FillItem(msg.data[i]);
-                    tData.push(msg.data[i]);
+                    //tData.push(msg.data[i]);
                     totalPaid += (msg.data[i].paidAmount - msg.data[i].refundAmount)
                 }
                 var divTotal = document.getElementById('total');
