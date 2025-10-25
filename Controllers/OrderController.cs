@@ -1835,6 +1835,7 @@ namespace SnowmeetApi.Controllers
                     data = null
                 });
             }
+            order.member = null;
             order = await UpdateOrderWithDetail(order, staff.id, null, scene);
             return Ok(new ApiResult<Models.Order?>()
             {
