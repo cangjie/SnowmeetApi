@@ -197,6 +197,9 @@
                     return
                 }
                 for (var i = 0; i < msg.data.length; i++) {
+                    if (msg.data[i].paidAmount <= 0 && msg.data[i].entertain == 0){
+                        continue;
+                    }
                     msg.data[i].id = i + 1;
                     FillItem(msg.data[i]);
                     //tData.push(msg.data[i]);
