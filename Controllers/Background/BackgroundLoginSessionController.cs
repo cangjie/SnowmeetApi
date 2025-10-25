@@ -12,7 +12,7 @@ using SnowmeetApi.Models.Users;
 
 namespace SnowmeetApi.Controllers.Background
 {
-    [Route("core/[controller]/[action]")]
+    [Route("api/[controller]/[action]")]
     [ApiController]
     public class BackgroundLoginSessionController : ControllerBase
     {
@@ -38,7 +38,7 @@ namespace SnowmeetApi.Controllers.Background
             };
             await _context.BackgroundLoginSession.AddAsync(session);
             await _context.SaveChangesAsync();
-            return "https://mini.snowmeet.top/core/MediaHelper/GetQRCode?qrCodeText=" + timeStamp.ToString();
+            return "https://mini.snowmeet.top/api/MediaHelper/GetQRCode?qrCodeText=" + timeStamp.ToString();
             //return "http://weixin.snowmeet.top/show_qrcode.aspx?qrcodetext=" + timeStamp.ToString();
         }
 
