@@ -34,7 +34,7 @@
     })
 
     function CheckScan() {
-        var getLoginSessionUrl = '../core/BackgroundLoginSession/GetBackgroundLoginSession/' + timeStamp.toString();
+        var getLoginSessionUrl = '../api/BackgroundLoginSession/GetBackgroundLoginSession/' + timeStamp.toString();
         $.ajax({
             url: getLoginSessionUrl,
             type: 'GET',
