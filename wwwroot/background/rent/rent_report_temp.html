@@ -87,12 +87,6 @@
         lineData.push(item.code);
         newRow.appendChild(td_order_id);
 
-        var mi7Code = '紧急开单';
-        if (item.retails[0].mi7_code) {
-            mi7Code = item.retails[0].mi7_code
-        }
-      
-
         var td_shop = document.createElement('td');
         td_shop.innerText = item.shop;
         lineData.push(item.shop);
