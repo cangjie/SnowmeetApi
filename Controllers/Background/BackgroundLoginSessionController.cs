@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using SnowmeetApi.Data;
+using SnowmeetApi.Models;
 using SnowmeetApi.Models.Background;
 using SnowmeetApi.Models.Users;
 
@@ -54,6 +55,19 @@ namespace SnowmeetApi.Controllers.Background
         {
             sessionKey = Util.UrlDecode(sessionKey);
             BackgroundLoginSession session = await _context.BackgroundLoginSession.FindAsync(timeStamp);
+            Staff staff = await Util.GetStaffBySessionKey(_context, sessionKey);
+            if (staff != null && staff.title_level >= 100)
+            {
+                session.session_key = sessionKey;
+                _context.Entry(session).State = EntityState.Modified;
+                await _context.SaveChangesAsync();
+                return session;
+            }
+            else
+            {
+                return BadRequest();
+            }
+            /*
             UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (user.isAdmin)
             {
@@ -66,6 +80,7 @@ namespace SnowmeetApi.Controllers.Background
             {
                 return BadRequest();
             }
+            */
         }
 
         /*
