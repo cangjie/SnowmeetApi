@@ -192,10 +192,10 @@
                 if (status != 'success') {
                     return
                 }
-                for (var i = 0; i < msg.length; i++) {
-                    msg[i].id = i + 1;
-                    FillItem(msg[i]);
-                    tData.push(msg[i]);
+                for (var i = 0; i < msg.data.length; i++) {
+                    msg.data[i].id = i + 1;
+                    FillItem(msg.data[i]);
+                    tData.push(msg.data[i]);
                 }
                 var divTotal = document.getElementById('total');
                 divTotal.innerText = '总计：' + formatAmount(totalPaid);
