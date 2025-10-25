@@ -172,7 +172,8 @@ namespace SnowmeetApi.Models
                 }
                 else
                 {
-                    return payments.Where(p => p.status.Equals("支付成功") && p.valid == 1).ToList();
+                    return payments.Where(p => ((p.pay_method == "微信支付" || p.pay_method == "支付宝") &&  p.status.Equals("支付成功") )
+                     || (p.valid == 1 && p.pay_method != "微信支付" && p.pay_method != "支付宝" && p.status.Equals("支付成功") )).ToList();
                 }
             }
         }
