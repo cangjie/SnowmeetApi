@@ -139,12 +139,16 @@
         var td_refund = document.createElement('td');
         td_refund.innerText = formatAmount(item.refundAmount);
         lineData.push(item.refundAmount);
+        var rightAttr = document.createAttribute('style');
+        rightAttr.value = 'text-align:right';
         td_refund.attributes.setNamedItem(rightAttr);
         newRow.appendChild(td_refund);
 
         var td_rev = document.createElement('td');
         td_rev.innerText = formatAmount(item.paidAmount - item.refundAmount)
         lineData.push(item.paidAmount - item.refundAmount);
+        var rightAttr = document.createAttribute('style');
+        rightAttr.value = 'text-align:right';
         td_real_charge.attributes.setNamedItem(rightAttr);
         newRow.appendChild(td_rev);
 
