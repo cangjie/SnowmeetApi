@@ -176,7 +176,7 @@
         btnCtrl.disabled = true;
         var shop = document.getElementById('shop')
         var getUrl = '../../api/Order/GetOrdersByStaff?type=' + encodeURIComponent('租赁') +  '&startDate=' + formatDate(startDate) + '&endDate='
-            + formatDate(endDate) + (shop.value == '' ? '' : '&shop=' + encodeURIComponent(shop.value)) + '&sessionKey=' + encodeURIComponent(sessionKey)
+            + formatDate(endDate) + (shop.value == '' ? '' : '&shop=' + encodeURIComponent(shop.value)) + '&isTest=false&sessionKey=' + encodeURIComponent(sessionKey)
         $.ajax({
             url: getUrl,
             type: 'GET',

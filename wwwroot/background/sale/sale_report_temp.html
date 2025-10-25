@@ -186,7 +186,7 @@
         btnCtrl.disabled = true;
         var shop = document.getElementById('shop')
         var getUrl = '../../api/Order/GetOrdersByStaff?type=%E9%9B%B6%E5%94%AE' + '&startDate=' + formatDate(startDate) + '&endDate='
-            + formatDate(endDate) + (shop.value == '' ? '' : '&shop=' + encodeURIComponent(shop.value)) + '&sessionKey=' + encodeURIComponent(sessionKey)
+            + formatDate(endDate) + (shop.value == '' ? '' : '&isTest=false&shop=' + encodeURIComponent(shop.value)) + '&sessionKey=' + encodeURIComponent(sessionKey)
         $.ajax({
             url: getUrl,
             type: 'GET',
