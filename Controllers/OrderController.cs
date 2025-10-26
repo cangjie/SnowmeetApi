@@ -1465,8 +1465,12 @@ namespace SnowmeetApi.Controllers
             switch (order.type)
             {
                 case "租赁":
-                    RentController _rentHelper = new RentController(_db, _config, _http);
-                    await _rentHelper.EffectRentOrder(order.id, (int)paymentId);
+                    CoreDataModLog orderLog = CoreDataModLog.CreateManualLog("Order", "", order.id, "租赁支付回调", null, null, null,
+                        paymentId.ToString(), "支付成功，开始生效租赁订单");
+                    await _db.coreDataModLog.AddAsync(orderLog);
+                    await _db.SaveChangesAsync();
+                    //RentController _rentHelper = new RentController(_db, _config, _http);
+                    //await _rentHelper.EffectRentOrder(order.id, (int)paymentId);
                     break;
                 default:
                     break;

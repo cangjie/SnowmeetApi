@@ -4853,7 +4853,7 @@ namespace SnowmeetApi.Controllers
             await SetRentalDetail(rentalId, DateTime.Now, staffId);
             return await GetRental(rentalId);
         }
-        [NonAction]
+        [HttpGet]
         public async Task<Models.Order> EffectRentOrder(int orderId, int paymentId)
         {
             OrderController _orderHelper = new OrderController(_db, _oriConfig, _httpContextAccessor);
