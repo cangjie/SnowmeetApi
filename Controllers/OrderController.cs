@@ -1473,8 +1473,8 @@ namespace SnowmeetApi.Controllers
                         paymentId.ToString(), "支付成功，开始生效租赁订单");
                     await _db.coreDataModLog.AddAsync(orderLog);
                     await _db.SaveChangesAsync();
-                    //RentController _rentHelper = new RentController(_db, _config, _http);
-                    //await _rentHelper.EffectRentOrder(order.id, (int)paymentId);
+                    RentController _rentHelper = new RentController(_db, _config, _http);
+                    await _rentHelper.EffectRentOrder(order.id, (int)paymentId);
                     break;
                 default:
                     break;
