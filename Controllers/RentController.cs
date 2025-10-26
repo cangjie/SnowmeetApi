@@ -4913,7 +4913,7 @@ namespace SnowmeetApi.Controllers
                 if (!existsUnpaidGuaranty)
                 {
                     CoreDataModLog log = CoreDataModLog.CreateManualLog("Rental", "", rental.id, "租赁开单",
-                    null, null, null, null, "该笔押金已经支付过");
+                    null, null, null, null, "押金重复支付");
                     await _db.coreDataModLog.AddAsync(log);
                     await _db.SaveChangesAsync();
                     return null;
