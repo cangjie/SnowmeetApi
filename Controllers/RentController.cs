@@ -4871,6 +4871,9 @@ namespace SnowmeetApi.Controllers
             }
             for (int i = 0; order.rentals != null && i < order.rentals.Count; i++)
             {
+                CoreDataModLog rentalLog = CoreDataModLog.CreateManualLog("Rental", "", order.rentals[i].id, "租赁下单支付回调", null, null, null, null, "开始检查租赁子订单");
+                await _db.coreDataModLog.AddAsync(rentalLog);
+                await _db.SaveChangesAsync();
                 Rental rental = await GetRental(order.rentals[i].id);
                 bool existsUnpaidGuaranty = false;
                 for(int j = 0; rental.guaranties != null && j < rental.guaranties.Count; j++)
