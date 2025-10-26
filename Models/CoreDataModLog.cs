@@ -49,6 +49,25 @@ namespace SnowmeetApi.Models
                 return "";
             }
         }
-
+        public static CoreDataModLog CreateManualLog(string talbeName, string fieldName, int keyValue, string scene,
+            int? memberId, int? staffId, string? prevValue, string? curentValue, string? manualMemo)
+        {
+            CoreDataModLog log = new CoreDataModLog()
+            {
+                id = 0,
+                table_name = talbeName,
+                field_name = fieldName,
+                key_value = keyValue,
+                scene = scene,
+                member_id = memberId,
+                staff_id = staffId,
+                prev_value = prevValue,
+                current_value = curentValue,
+                is_manual = 1,
+                manual_memo = manualMemo,
+                create_date = DateTime.Now
+            };
+            return log;
+        }
     }
 }

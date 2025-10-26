@@ -1466,7 +1466,7 @@ namespace SnowmeetApi.Controllers
             {
                 case "租赁":
                     RentController _rentHelper = new RentController(_db, _config, _http);
-
+                    await _rentHelper.EffectRentOrder(order.id, (int)paymentId);
                     break;
                 default:
                     break;

@@ -4696,6 +4696,10 @@ namespace SnowmeetApi.Controllers
                 .AsNoTracking().ToListAsync();
             if (detailList.Count > 0)
             {
+                CoreDataModLog log = CoreDataModLog.CreateManualLog("Rental", "", rentalId, "租赁开单",
+                        null, null, null, null, "该笔租赁已经开始计费");
+                await _db.coreDataModLog.AddAsync(log);
+                await _db.SaveChangesAsync();
                 return null;
             }
             string rentType = "";
@@ -4739,6 +4743,10 @@ namespace SnowmeetApi.Controllers
 
                 if (rental == null)
                 {
+                    CoreDataModLog log = CoreDataModLog.CreateManualLog("Rental", "", rentalId, "租赁开单",
+                        null, null, null, null, "未找到租赁订单");
+                    await _db.coreDataModLog.AddAsync(log);
+                    await _db.SaveChangesAsync();
                     return null;
                 }
                 Models.Order order = await _db.order.Where(o => o.id == rental.order_id).AsNoTracking().FirstOrDefaultAsync();
@@ -4764,6 +4772,10 @@ namespace SnowmeetApi.Controllers
             RentPrice rentPrice = priceList.Where(p => p.day_type == dayType && p.rent_type == rentType && p.scene == scene).FirstOrDefault();
             if (rentPrice == null && price == null)
             {
+                CoreDataModLog log = CoreDataModLog.CreateManualLog("Rental", "", rentalId, "租赁开单",
+                   null, null, null, null, "租赁价格未确认");
+                await _db.coreDataModLog.AddAsync(log);
+                await _db.SaveChangesAsync();
                 return null;
             }
             if (price == null)
@@ -4831,11 +4843,19 @@ namespace SnowmeetApi.Controllers
             double guarantyAmount = 0;
             if (order == null || payment == null || payment.status != OrderPayment.PaymentStatus.支付成功.ToString())
             {
+                CoreDataModLog log = CoreDataModLog.CreateManualLog("Order", "", order.id, "租赁开单",
+                    null, null, null, null, "未确认支付");
+                await _db.coreDataModLog.AddAsync(log);
+                await _db.SaveChangesAsync();
                 return null;
             }
             for (int i = 0; order.rentals != null && i < order.rentals.Count; i++)
             {
                 Rental rental = await GetRental(order.rentals[i].id);
+                if (rental.valid == 1)
+                {
+                    continue;
+                }
                 for (int j = 0; rental.guaranties != null && j < rental.guaranties.Count; j++)
                 {
                     Guaranty guaranty = rental.guaranties[j];
@@ -4846,8 +4866,12 @@ namespace SnowmeetApi.Controllers
                     }
                 }
             }
-            if (guarantyAmount != payment.amount)
+            if (guarantyAmount >= payment.amount)
             {
+                CoreDataModLog log = CoreDataModLog.CreateManualLog("Order", "", order.id, "租赁开单",
+                    null, null, null, null, "未足额支付押金");
+                await _db.coreDataModLog.AddAsync(log);
+                await _db.SaveChangesAsync();
                 return null;
             }
             for (int i = 0; i < guaranties.Count; i++)
@@ -4866,7 +4890,6 @@ namespace SnowmeetApi.Controllers
                 order.rentals[i] = await EffectRental(order.rentals[i].id, payment.staff_id);
             }
             return order;
-
         }
         [NonAction]
         public async Task<Models.Rental> GetRental(int rentalId)
