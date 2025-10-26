@@ -4876,8 +4876,9 @@ namespace SnowmeetApi.Controllers
                 for(int j = 0; rental.guaranties != null && j < rental.guaranties.Count; j++)
                 {
                     Guaranty guaranty = rental.guaranties[j];
-                    if (guaranty.payStatus == "支付成功")
+                    if (guaranty.payStatus != "支付成功")
                     {
+                        existsUnpaidGuaranty = true;
                         continue;
                     }
                     /*
