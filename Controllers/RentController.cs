@@ -4689,7 +4689,7 @@ namespace SnowmeetApi.Controllers
 
         }
         [NonAction]
-        public async Task<Models.RentalDetail> SetRentalDetail(int rentalId, DateTime date, int staffId)
+        public async Task<Models.RentalDetail> SetRentalDetail(int rentalId, DateTime date, int? staffId)
         {
             List<Models.RentalDetail> detailList = await _db.rentalDetail
                 .Where(r => r.rental_id == rentalId && r.rental_date.Date == date.Date)
@@ -4789,7 +4789,7 @@ namespace SnowmeetApi.Controllers
             return detail;
         }
         [NonAction]
-        public async Task<Rental> EffectRental(int rentalId, int staffId)
+        public async Task<Rental> EffectRental(int rentalId, int? staffId)
         {
             Rental rental = await _db.rental.Where(r => r.id == rentalId)
                 .AsNoTracking().FirstOrDefaultAsync();
@@ -4850,8 +4850,22 @@ namespace SnowmeetApi.Controllers
             {
                 return null;
             }
-            
-            return null;
+            for (int i = 0; i < guaranties.Count; i++)
+            { 
+                GuarantyPayment gp = new GuarantyPayment()
+                {
+                    guaranty_id = guaranties[i].id,
+                    payment_id = paymentId,
+                    create_date = DateTime.Now
+                };
+                await _db.guarantyPayment.AddAsync(gp);
+            }
+            await _db.SaveChangesAsync();
+            for (int i = 0; i < order.rentals.Count; i++)
+            {
+                order.rentals[i] = await EffectRental(order.rentals[i].id, payment.staff_id);
+            }
+            return order;
 
         }
         [NonAction]

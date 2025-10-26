@@ -66,6 +66,7 @@ namespace SnowmeetApi.Models
         public Guaranty? guaranty { get; set; }
         [ForeignKey("payment_id")]
         public OrderPayment payment {get; set;}
+        public DateTime create_date { get; set; } = DateTime.Now;
     }
 
 }
