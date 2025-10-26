@@ -4798,6 +4798,26 @@ namespace SnowmeetApi.Controllers
             };
             await _db.rentalDetail.AddAsync(detail);
             await _db.SaveChangesAsync();
+            if (discount > 0)
+            {
+                Discount discountObj = new Discount()
+                {
+                    id = 0,
+                    amount = discount,
+                    order_id = rental.order_id,
+                    biz_type = "租赁",
+                    biz_id = rental.id,
+                    sub_biz_type = "日租金",
+                    sub_biz_id = detail.id,
+                    staff_id = rental.staff_id,
+                    member_id = null,
+                    create_date = DateTime.Now
+
+                };
+                await _db.discount.AddAsync(discountObj);
+                await _db.SaveChangesAsync();
+            }
+            
             return detail;
         }
         [NonAction]

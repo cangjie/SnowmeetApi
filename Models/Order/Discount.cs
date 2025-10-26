@@ -10,7 +10,7 @@ namespace SnowmeetApi.Models
     {
         [Key]
         public int id {get; set;}
-        public string? ticket_code {get; set;}
+        public string? ticket_code { get; set; } = null;
         public double amount {get; set;}
         public int? order_id {get; set;}
         public string? biz_type {get; set;}
