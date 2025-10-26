@@ -36,7 +36,7 @@ namespace SnowmeetApi.Models
                 bool allPaid = true;
                 foreach(GuarantyPayment gp in guarantyPayments)
                 {
-                    if (!gp.payment.status.Equals("支付成功"))
+                    if (gp.payment != null && !gp.payment.status.Equals("支付成功"))
                     {
                         allPaid = false;
                     }

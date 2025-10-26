@@ -1453,7 +1453,7 @@ namespace SnowmeetApi.Controllers
                 data = order
             });
         }
-        [NonAction]
+        [HttpGet]
         public async Task DealSuccessPaidOrder(int orderId, int? paymentId = null)
         {
             Models.Order order = await _db.order.Where(o => o.id == orderId)
