@@ -63,8 +63,8 @@ namespace SnowmeetApi.Controllers
         public async Task<OrderPayment> TenpayRequest(OrderPayment payment, Models.Order order, bool needProfitShare = false)
         {
             payment.mch_id = GetMchId(order);
-            if (payment == null  || payment.mch_id == null
-            || payment.status != OrderPayment.PaymentStatus.待支付.ToString()  )
+            if (payment == null || payment.mch_id == null
+            || payment.status != OrderPayment.PaymentStatus.待支付.ToString())
             {
                 return null;
             }
@@ -121,7 +121,7 @@ namespace SnowmeetApi.Controllers
                 {
                     IsProfitSharing = needProfitShare
                 },
-                Detail = details.Count == 0? null : detail
+                Detail = details.Count == 0 ? null : detail
 
 
             };
@@ -402,7 +402,7 @@ namespace SnowmeetApi.Controllers
                             sucPay.update_date = DateTime.Now;
                             _db.OrderPayment.Entry(sucPay).State = EntityState.Modified;
                             //await _db.SaveChangesAsync();
-                            
+
                             CoreDataModLog log = new CoreDataModLog()
                             {
                                 table_name = "Order",
@@ -436,13 +436,15 @@ namespace SnowmeetApi.Controllers
                             {
                                 await _orderHelper.DealSuccessPaidOrder(sucPay.order_id, sucPay.id);
                             }
-                            catch
-
+                            catch(Exception err)
                             {
-                                
-                            }
+                                CoreDataModLog callBackLog = CoreDataModLog.CreateManualLog("Order", "Exception", sucPay.order_id, "支付回调", null, null, null, err.ToString(), "");
+                                await _db.coreDataModLog.AddAsync(callBackLog);
+                                await _db.SaveChangesAsync();
 
                             }
+
+                        }
 
                         //Console.WriteLine("订单 {0} 已完成支付，交易单号为 {1}", outTradeNumber, transactionId);
                     }
@@ -683,7 +685,7 @@ namespace SnowmeetApi.Controllers
 
 
         }
-      
+
 
         [NonAction]
         public async Task<PaymentShare> Share(int paymentShareId)
