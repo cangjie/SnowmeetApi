@@ -1462,6 +1462,10 @@ namespace SnowmeetApi.Controllers
             order.pay_flow_status = Models.Order.PayFlowStatus.已支付.ToString();
             order.paying_amount = null;
             await UpdateOrder(order, null, null, "支付成功");
+            CoreDataModLog orderSucLog = CoreDataModLog.CreateManualLog("Order", "", order.id, "租赁支付回调",
+                null, null, null, order.type, "支付成功，检查订单类型");
+            await _db.coreDataModLog.AddAsync(orderSucLog);
+            await _db.SaveChangesAsync();
             switch (order.type)
             {
                 case "租赁":
