@@ -4828,6 +4828,7 @@ namespace SnowmeetApi.Controllers
             Models.Order order = (await _orderHelper.GetCommonOrders(orderId, null, null, null, null, null, null)).FirstOrDefault();
             OrderPayment payment = order.availablePayments.Where(p => p.id == paymentId).FirstOrDefault();
             List<Guaranty> guaranties = new List<Guaranty>();
+            double guarantyAmount = 0;
             if (order == null || payment == null || payment.status != OrderPayment.PaymentStatus.支付成功.ToString())
             {
                 return null;
@@ -4841,9 +4842,15 @@ namespace SnowmeetApi.Controllers
                     if (guaranty.guarantyPayments == null || guaranty.guarantyPayments.Count == 0)
                     {
                         guaranties.Add(guaranty);
+                        guarantyAmount += (double)guaranty.amount;
                     }
                 }
             }
+            if (guarantyAmount != payment.amount)
+            {
+                return null;
+            }
+            
             return null;
 
         }
