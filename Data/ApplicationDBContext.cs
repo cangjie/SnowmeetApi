@@ -194,6 +194,7 @@ namespace SnowmeetApi.Data
         public DbSet<RentalPricePreset> rentalPricePreset { get; set; }
         public DbSet<CareImage> careImage { get; set; }
         public DbSet<OrderPaymentRefund> orderPaymentRefund { get; set; }
+        public DbSet<RentItemLog> rentItemLog { get; set; }
 
     }
 }

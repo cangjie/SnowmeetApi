@@ -46,7 +46,7 @@ namespace SnowmeetApi.Controllers
                 .Include(r => r.rentItems.Where(i => i.valid == 1))
                     .ThenInclude(r => r.repairationCharge)
                 .Include(r => r.rentItems.Where(i => i.valid == 1))
-                    .ThenInclude(i => i.logs.Where(l => l.table_name.Trim().Equals("rent_item")).OrderByDescending(o => o.id))
+                    .ThenInclude(i => i.logs.OrderByDescending(o => o.id))
                         .ThenInclude(l => l.staff)
                 .Include(r => r.guaranties.Where(g => g.valid == 1 && g.biz_type.Trim().Equals("租赁"))).ThenInclude(g => g.guarantyPayments).ThenInclude(g => g.payment)
                 .AsNoTracking().ToListAsync();

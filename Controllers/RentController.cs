@@ -4689,7 +4689,7 @@ namespace SnowmeetApi.Controllers
 
         }
         [NonAction]
-        public async Task<Models.RentalDetail> SetRentalDetail(int rentalId, DateTime date)
+        public async Task<Models.RentalDetail> SetRentalDetail(int rentalId, DateTime date, int staffId)
         {
             List<Models.RentalDetail> detailList = await _db.rentalDetail
                 .Where(r => r.rental_id == rentalId && r.rental_date.Date == date.Date)
@@ -4736,7 +4736,7 @@ namespace SnowmeetApi.Controllers
                 {
                     dayType = "平日";
                 }
-                
+
                 if (rental == null)
                 {
                     return null;
@@ -4751,7 +4751,7 @@ namespace SnowmeetApi.Controllers
                     scene = "会员";
                 }
             }
-           
+
             List<RentPrice> priceList = new List<RentPrice>();
             if (rental.package_id != null)
             {
@@ -4780,7 +4780,7 @@ namespace SnowmeetApi.Controllers
                 rent_item_id = null,
                 amount = (double)price,
                 memo = "",
-                staff_id = null,
+                staff_id = staffId,
                 valid = 1,
                 create_date = DateTime.Now
             };
@@ -4788,5 +4788,79 @@ namespace SnowmeetApi.Controllers
             await _db.SaveChangesAsync();
             return detail;
         }
+        [NonAction]
+        public async Task<Rental> EffectRental(int rentalId, int staffId)
+        {
+            Rental rental = await _db.rental.Where(r => r.id == rentalId)
+                .AsNoTracking().FirstOrDefaultAsync();
+            rental.valid = 1;
+            rental.update_date = DateTime.Now;
+            _db.rental.Entry(rental).State = EntityState.Modified;
+            List<Models.RentItem> items = await _db.rentItem.Where(i => i.rental_id == rentalId)
+                .AsNoTracking().ToListAsync();
+            for (int i = 0; i < items.Count; i++)
+            {
+                Models.RentItem item = items[i];
+                item.valid = 1;
+                item.update_date = DateTime.Now;
+                _db.rentItem.Entry(item).State = EntityState.Modified;
+                if (item.atOnce)
+                {
+                    RentItemLog log = new RentItemLog()
+                    {
+                        id = 0,
+                        rent_item_id = item.id,
+                        status = Models.RentItem.RentItemStatus.已发放.ToString(),
+                        staff_id = staffId,
+                        create_date = DateTime.Now
+                    };
+                    await _db.rentItemLog.AddAsync(log);
+                }
+            }
+            await _db.SaveChangesAsync();
+            await SetRentalDetail(rentalId, DateTime.Now, staffId);
+            return await GetRental(rentalId);
+        }
+        [NonAction]
+        public async Task<Models.Order> EffectRentOrder(int orderId, int paymentId)
+        {
+            OrderController _orderHelper = new OrderController(_db, _oriConfig, _httpContextAccessor);
+            Models.Order order = (await _orderHelper.GetCommonOrders(orderId, null, null, null, null, null, null)).FirstOrDefault();
+            OrderPayment payment = order.availablePayments.Where(p => p.id == paymentId).FirstOrDefault();
+            List<Guaranty> guaranties = new List<Guaranty>();
+            if (order == null || payment == null || payment.status != OrderPayment.PaymentStatus.支付成功.ToString())
+            {
+                return null;
+            }
+            for (int i = 0; order.rentals != null && i < order.rentals.Count; i++)
+            {
+                Rental rental = await GetRental(order.rentals[i].id);
+                for (int j = 0; rental.guaranties != null && j < rental.guaranties.Count; j++)
+                {
+                    Guaranty guaranty = rental.guaranties[j];
+                    if (guaranty.guarantyPayments == null || guaranty.guarantyPayments.Count == 0)
+                    {
+                        guaranties.Add(guaranty);
+                    }
+                }
+            }
+            return null;
+
+        }
+        [NonAction]
+        public async Task<Models.Rental> GetRental(int rentalId)
+        {
+            Models.Rental rental = await _db.rental.Where(r => r.id == rentalId)
+                .Include(r => r.staff)
+                .Include(r => r.rentItems).ThenInclude(i => i.logs).ThenInclude(l => l.staff)
+                .Include(r => r.details).ThenInclude(d => d.rentPrice)
+                .Include(r => r.pricePresets)
+                .Include(r => r.guaranties).ThenInclude(g => g.guarantyPayments)
+                .AsNoTracking().FirstOrDefaultAsync();
+            return rental;
+
+
+        }
+        
     }
 }

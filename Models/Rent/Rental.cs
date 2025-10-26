@@ -36,6 +36,9 @@ namespace SnowmeetApi.Models
         public List<RentItem> rentItems { get; set; } = new List<RentItem>();
         public List<RentalDetail> details { get; set; } = new List<RentalDetail>();
         public List<RentalPricePreset> pricePresets { get; set; } = null;
+        
+        [ForeignKey("staff_id")]
+        public Staff staff { get; set; }
         [NotMapped]
         public List<RentPrice> priceList { get; set; } = new List<RentPrice>();
         [ForeignKey("order_id")]
@@ -152,10 +155,14 @@ namespace SnowmeetApi.Models
         public DateTime create_date { get; set; } = DateTime.Now;
         [ForeignKey("rental_id")]
         public Rental rental { get; set; }
+        [ForeignKey("rent_price_id")]
+        public RentPrice? rentPrice { get; set; }
     }
     [Table("rent_item")]
     public class RentItem
     {
+        public enum RentItemStatus { 未发放, 已发放, 暂存, 已归还 }
+        public enum RentItemBusinessStatus {上架, 维修, 保养, 丢失, 下架, 异地归还 }
         [Key]
         public int id { get; set; }
         public int rental_id { get; set; } = 0;
@@ -173,7 +180,29 @@ namespace SnowmeetApi.Models
         public bool noCode { get; set; } = false;
         public bool noNeed { get; set; } = false;
         public bool atOnce { get; set; } = false;
-        
+        [NotMapped]
+        public string status
+        {
+            get
+            {
+                if (logs == null || logs.Count == 0)
+                {
+                    return RentItemStatus.未发放.ToString();
+                }
+                else
+                {
+                    RentItemLog log = logs.OrderByDescending(l => l.id).FirstOrDefault();
+                    if (log == null)
+                    {
+                        return RentItemStatus.未发放.ToString();
+                    }
+                    else
+                    {
+                        return log.status.Trim();
+                    }
+                }
+            }
+        }
         public DateTime? update_date { get; set; }
         public DateTime create_date { get; set; } = DateTime.Now;
         [ForeignKey("category_id")]
@@ -182,8 +211,8 @@ namespace SnowmeetApi.Models
         public Rental rental { get; set; }
         [ForeignKey("repairation_id")]
         public RentalDetail? repairationCharge { get; set; } = null;
-        [ForeignKey(nameof(CoreDataModLog.key_value))]
-        public List<CoreDataModLog> logs { get; set; } = new List<CoreDataModLog>();
+        [ForeignKey(nameof(RentItemLog.rent_item_id))]
+        public List<RentItemLog> logs { get; set; } = new List<RentItemLog>();
         [NotMapped]
         public Staff? pickStaff
         {
@@ -192,9 +221,9 @@ namespace SnowmeetApi.Models
                 Staff? staff = null;
                 if (logs != null)
                 {
-                    foreach (CoreDataModLog log in logs)
+                    foreach (RentItemLog log in logs)
                     {
-                        if (log.current_value.Trim().Equals("已发放"))
+                        if (log.status.Trim().Equals("已发放"))
                         {
                             staff = log.staff;
                         }
@@ -211,9 +240,9 @@ namespace SnowmeetApi.Models
                 Staff? staff = null;
                 if (logs != null)
                 {
-                    foreach (CoreDataModLog log in logs)
+                    foreach (RentItemLog log in logs)
                     {
-                        if (log.current_value.Trim().Equals("已归还"))
+                        if (log.status.Trim().Equals("已归还"))
                         {
                             staff = log.staff;
                         }
@@ -223,6 +252,19 @@ namespace SnowmeetApi.Models
             }
         }
 
+    }
+    [Table("rent_item_log")]
+    public class RentItemLog
+    {
+        [Key]
+        public int id { get; set; }
+        public int rent_item_id { get; set; }
+        public string status { get; set; }
+        public int? staff_id { get; set; }
+        public int? member_id { get; set; }
+        public DateTime create_date { get; set; } = DateTime.Now;
+        [ForeignKey("staff_id")]
+        public Staff staff { get; set; }
     }
     [Table("rental_price_preset")]
     public class RentalPricePreset
