@@ -451,7 +451,51 @@ namespace SnowmeetApi.Models
                 return staff;
             }
         }
-
+        [NotMapped]
+        public List<RentItemLog> availableLog
+        {
+            get
+            {
+                if (logs == null)
+                {
+                    return new List<RentItemLog>();
+                }
+                else
+                {
+                    return logs.Where(l => l.valid == 1).OrderBy(l => l.id).ToList();
+                }
+            }
+        }
+        [NotMapped]
+        public DateTime? pickDate
+        {
+            get
+            {
+                DateTime? pickDate = null;
+                for (int i = 0; availableLog != null && i < availableLog.Count; i++)
+                {
+                    if (availableLog[i].status == "已发放")
+                    {
+                        pickDate = availableLog[i].create_date;
+                        break;
+                    }
+                }
+                return pickDate;
+            }
+        }
+        [NotMapped]
+        public DateTime? returnDate
+        {
+            get
+            {
+                DateTime? returnDate = null;
+                if (availableLog != null && availableLog.Count > 0 && availableLog[availableLog.Count - 1].status == "已归还")
+                {
+                    returnDate = availableLog[availableLog.Count - 1].create_date;
+                }
+                return returnDate;
+            }
+        }
     }
     [Table("rent_item_log")]
     public class RentItemLog
@@ -462,6 +506,7 @@ namespace SnowmeetApi.Models
         public string status { get; set; }
         public int? staff_id { get; set; }
         public int? member_id { get; set; }
+        public int valid { get; set; } = 1;
         public DateTime create_date { get; set; } = DateTime.Now;
         [ForeignKey("staff_id")]
         public Staff staff { get; set; }
