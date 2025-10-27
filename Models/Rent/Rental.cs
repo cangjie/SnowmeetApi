@@ -111,8 +111,22 @@ namespace SnowmeetApi.Models
         public SnowmeetApi.Models.Order? order { get; set; }
         [ForeignKey(nameof(Guaranty.biz_id))]
         public List<Guaranty> guaranties { get; set; } = new List<Guaranty>();
+
+
+
+
+
+
+        [ForeignKey("package_id")]
+        public RentPackage? package { get; set; } = null;
+
+
+
         [ForeignKey(nameof(Discount.biz_id))]
         public List<Discount> discounts { get; set; } = new List<Discount>();
+        
+        
+        /*
         [NotMapped]
         public List<Discount> availableDiscounts
         {
@@ -128,8 +142,6 @@ namespace SnowmeetApi.Models
                 }
             }
         }
-        [ForeignKey("package_id")]
-        public RentPackage? package { get; set; } = null;
         
         public double GetDiscountAmount(bool ticket)
         {
@@ -155,7 +167,10 @@ namespace SnowmeetApi.Models
                 return GetDiscountAmount(false);
             }
         }
-        
+        */
+
+
+
         [NotMapped]
         public bool isPackage
         {
@@ -172,7 +187,7 @@ namespace SnowmeetApi.Models
                 return false;
             }
         }
-        /*
+        
         [NotMapped]
         public double totalGuarantyAmount
         {
@@ -186,7 +201,7 @@ namespace SnowmeetApi.Models
                 return amount;
             }
         }
-        */
+        
         [NotMapped]
         public double totalRentalAmount
         {
@@ -240,8 +255,11 @@ namespace SnowmeetApi.Models
         public int valid { get; set; }
         public DateTime? update_date { get; set; }
         public DateTime create_date { get; set; } = DateTime.Now;
+
+/*
         [ForeignKey(nameof(Discount.sub_biz_id))]
         public List<Discount> discounts { get; set; } = new List<Discount>();
+        
         public List<Discount> availableDiscounts
         {
             get
@@ -257,7 +275,30 @@ namespace SnowmeetApi.Models
             }
         }
         
-       
+        public double GetDiscountAmount(bool ticket)
+        {
+            List<Discount> dList = availableDiscounts
+                .Where(d => (ticket && d.ticket_code != null) || !ticket).ToList();
+            return dList.Sum(d => d.amount);
+        }
+        [NotMapped]
+        public double ticketDiscountAmount
+        {
+            get
+            {
+                return GetDiscountAmount(true);
+            }
+        }
+        
+        [NotMapped]
+        public double othersDiscountAmount
+        {
+            get
+            {
+                return GetDiscountAmount(false);
+            }
+        }
+       */
         
         [ForeignKey("rental_id")]
         public Rental rental { get; set; }
