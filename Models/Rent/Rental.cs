@@ -125,8 +125,8 @@ namespace SnowmeetApi.Models
         [ForeignKey(nameof(Discount.biz_id))]
         public List<Discount> discounts { get; set; } = new List<Discount>();
         
+
         
-        /*
         [NotMapped]
         public List<Discount> availableDiscounts
         {
@@ -167,7 +167,7 @@ namespace SnowmeetApi.Models
                 return GetDiscountAmount(false);
             }
         }
-        */
+        
 
 
 
@@ -256,10 +256,12 @@ namespace SnowmeetApi.Models
         public DateTime? update_date { get; set; }
         public DateTime create_date { get; set; } = DateTime.Now;
 
-/*
+
         [ForeignKey(nameof(Discount.sub_biz_id))]
         public List<Discount> discounts { get; set; } = new List<Discount>();
+
         
+       [NotMapped] 
         public List<Discount> availableDiscounts
         {
             get
@@ -298,7 +300,7 @@ namespace SnowmeetApi.Models
                 return GetDiscountAmount(false);
             }
         }
-       */
+       
         
         [ForeignKey("rental_id")]
         public Rental rental { get; set; }

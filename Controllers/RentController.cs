@@ -4938,7 +4938,7 @@ namespace SnowmeetApi.Controllers
                 .Include(r => r.staff)
                 .Include(r => r.rentItems).ThenInclude(i => i.logs).ThenInclude(l => l.staff)
                 .Include(r => r.details).ThenInclude(d => d.rentPrice)
-                //.Include(r => r.details).ThenInclude(d => d.discounts)
+                .Include(r => r.details).ThenInclude(d => d.discounts)
                 .Include(r => r.discounts)
                 .Include(r => r.pricePresets)
                 .Include(r => r.guaranties).ThenInclude(g => g.guarantyPayments).ThenInclude(p => p.payment)
