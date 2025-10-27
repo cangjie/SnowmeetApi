@@ -311,8 +311,8 @@ namespace SnowmeetApi.Controllers
             DateTime expireDate, string sessionKey, string sessionType = "wechat_mini_openid", 
              string type = "服务储值", string subType = "", string? mi7OrderId = null, string? bizType = null, string? memo = null)
         {
-            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _db);
-            if (!user.isAdmin || user.member.is_manager == 0)
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey);
+            if (staff == null || staff.title_level < 200)
             {
                 return BadRequest();
             }
@@ -345,7 +345,7 @@ namespace SnowmeetApi.Controllers
                         biz_id = mi7OrderId.Trim(),
                         memo = memo,
                         create_date = DateTime.Now,
-                        create_member_id = user.member.id
+                        create_member_id = staff.id
                     };
                     await _db.depositAccount.AddAsync(account);
                     await _db.SaveChangesAsync();
@@ -369,7 +369,7 @@ namespace SnowmeetApi.Controllers
                 id = 0,
                 deposit_id = account.id,
                 amount = chargeAmount,
-                member_id = user.member.id,
+                member_id = staff.id,
                 biz_id = mi7OrderId,
                 biz_type = bizType,
                 memo = memo,
@@ -400,7 +400,7 @@ namespace SnowmeetApi.Controllers
             return null;
         }
         [HttpGet("{memberId}")]
-        public async Task<ActionResult<List<DepositAccount>>> GetAccounts(int memberId, string type, 
+        public async Task<ActionResult<List<DepositAccount>>> GetAccounts(int memberId, string type,
             string subType, string sessionKey, string sessionType = "wechat_mini_openid")
         {
             if (subType == null)
@@ -409,7 +409,7 @@ namespace SnowmeetApi.Controllers
             }
             type = Util.UrlDecode(type);
             subType = Util.UrlDecode(subType);
-            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _db);
+            UnicUser user = await UnicUser.GetUnicUserAsync(sessionKey, _db);
             if (memberId != user.member.id && !user.isAdmin)
             {
                 return BadRequest();
@@ -418,6 +418,7 @@ namespace SnowmeetApi.Controllers
 
             return Ok(al);
         }
+        /*
         [HttpGet]
         public async Task<ActionResult<List<DepositAccount>>> GetMyAccounts(string type, 
             string subType, string sessionKey, string sessionType = "wechat_mini_openid")
@@ -426,13 +427,20 @@ namespace SnowmeetApi.Controllers
             UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _db);
             return await GetAccounts(user.member.id, type, subType, sessionKey, sessionType);
         }
-        
+        */
         [HttpGet]
         public async Task<ActionResult<List<Member>>> SearchMember(string key,
             string sessionKey, string sessionType = "wechat_mini_openid")
         {
+            /*
             UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _db);
             if (!user.isAdmin)
+            {
+                return BadRequest();
+            }
+            */
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey);
+            if (staff == null || staff.title_level < 200)
             {
                 return BadRequest();
             }
@@ -467,8 +475,8 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<Member>> GetMember(int memberId, 
             string sessionKey, string sessionType = "wechat_mini_openid")
         {
-            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _db);
-            if (!user.isAdmin && user.member.id != memberId)
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey);
+            if (staff == null || staff.title_level < 200)
             {
                 return BadRequest();
             }
@@ -497,8 +505,8 @@ namespace SnowmeetApi.Controllers
                 key = "";
             }
             key = Util.UrlDecode(key);
-            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _db);
-            if (!user.isAdmin)
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey);
+            if (staff == null || staff.title_level < 200)
             {
                 return BadRequest();
             }
@@ -535,8 +543,8 @@ namespace SnowmeetApi.Controllers
         {
             DepositAccount account = await _db.depositAccount.FindAsync(accountId);
             _db.depositAccount.Entry(account).State = EntityState.Detached;
-            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _db);
-            if (!user.isAdmin && account.member_id != user.member.id)
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey);
+            if (staff == null || staff.title_level < 200)
             {
                 return BadRequest();
             }
@@ -572,8 +580,8 @@ namespace SnowmeetApi.Controllers
             bizId = Util.UrlDecode(bizId);
             memo = Util.UrlDecode(memo);
 
-            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _db);
-            if (!user.isAdmin)
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey);
+            if (staff == null || staff.title_level < 200)
             {
                 return BadRequest();
             }
@@ -608,8 +616,8 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<List<DepositBalance>>> GetAllBalance(string type, DateTime start, DateTime end,
             string sessionKey, string sessionType = "wechat_mini_openid")
         {
-            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _db);
-            if (!user.isAdmin)
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey);
+            if (staff == null || staff.title_level < 200)
             {
                 return BadRequest();
             }
