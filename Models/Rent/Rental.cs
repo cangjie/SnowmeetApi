@@ -167,7 +167,14 @@ namespace SnowmeetApi.Models
                 return GetDiscountAmount(false);
             }
         }
-        
+        [NotMapped]
+        public double totalDiscountAmount
+        {
+            get
+            {
+                return ticketDiscountAmount + othersDiscountAmount;
+            }
+        }
 
 
 
@@ -300,8 +307,16 @@ namespace SnowmeetApi.Models
                 return GetDiscountAmount(false);
             }
         }
-       
-        
+        [NotMapped]
+        public double totalDiscountAmount
+        {
+            get
+            {
+                return ticketDiscountAmount + othersDiscountAmount;
+            }
+        }
+
+
         [ForeignKey("rental_id")]
         public Rental rental { get; set; }
         [ForeignKey("rent_price_id")]
