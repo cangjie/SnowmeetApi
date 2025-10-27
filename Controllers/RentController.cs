@@ -4884,31 +4884,7 @@ namespace SnowmeetApi.Controllers
                         existsUnpaidGuaranty = true;
                         continue;
                     }
-                    /*
-                    if (guaranty == null)
-                    {
-                        continue;
-                    }
-                    if (guaranty.guarantyPayments == null)
-                    {
-                        existsUnpaidGuaranty = true;
-                        continue;
-                    }
-                    bool havePaid = false;
-                    for (int k = 0; k < guaranty.guarantyPayments.Count; k++)
-                    {
-                        if (guaranty.guarantyPayments[k].payment.status == OrderPayment.PaymentStatus.支付成功.ToString())
-                        {
-                            havePaid = true;
-                            break;
-                        }
-                    }
-                    if (!havePaid)
-                    {
-                        existsUnpaidGuaranty = true;
-                        continue;
-                    }
-                    */
+                  
                 }
                 if (!existsUnpaidGuaranty)
                 {
@@ -4966,9 +4942,27 @@ namespace SnowmeetApi.Controllers
                 .Include(r => r.guaranties).ThenInclude(g => g.guarantyPayments).ThenInclude(p => p.payment)
                 .AsNoTracking().FirstOrDefaultAsync();
             return rental;
-
-
         }
-        
+        [HttpGet("{rentalId}")]
+        public async Task<ActionResult<ApiResult<Models.Rental?>>> GetRentalByStaff(int rentalId, 
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey);
+            if (staff == null || staff.title_level < 100)
+            {
+                return Ok(new ApiResult<Models.Rental?>(){
+                    code = 1,
+                    message = "",
+                    data = null
+                });
+            }
+            Rental rental = await GetRental(rentalId);
+            return Ok(new ApiResult<Models.Rental?>()
+            {
+                code = 0,
+                message = "",
+                data = rental
+            });
+        }       
     }
 }

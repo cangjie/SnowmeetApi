@@ -36,7 +36,56 @@ namespace SnowmeetApi.Models
         public List<RentItem> rentItems { get; set; } = new List<RentItem>();
         public List<RentalDetail> details { get; set; } = new List<RentalDetail>();
         public List<RentalPricePreset> pricePresets { get; set; } = null;
-        
+        [NotMapped]
+        public DateTime? realStartDate
+        {
+            get
+            {
+                DateTime? startDate = start_date;
+                if (availabelRentDetails != null && availabelRentDetails.Count > 0)
+                {
+                    return availabelRentDetails[0].rental_date.Date;
+                }
+
+                return startDate;
+            }
+        }
+        [NotMapped]
+        public DateTime? realEndDate
+        {
+            get
+            {
+                if (settled == 1)
+                {
+                    if (availabelRentDetails != null && availabelRentDetails.Count > 0)
+                    {
+                        return availabelRentDetails[availabelRentDetails.Count - 1].rental_date.Date;
+                    }
+                    else
+                    {
+                        return null;
+                    }
+                }
+                else
+                {
+                    return null;
+                }
+
+            }
+        }
+        [NotMapped]
+        public List<RentalDetail> availabelRentDetails
+        {
+            get
+            {
+                if (details != null)
+                {
+                    return details.Where(d => d.valid == 1).OrderBy(d => d.rental_date).ToList();
+                }
+                return new List<RentalDetail>();;
+            }
+        }
+
         [ForeignKey("staff_id")]
         public Staff staff { get; set; }
         [NotMapped]
