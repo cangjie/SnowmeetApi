@@ -16,7 +16,7 @@ using SnowmeetApi.Models;
 using System.Security;
 namespace SnowmeetApi.Controllers
 {
-    [Route("api/[controller]/[action]")]
+    [Route("core/[controller]/[action]")]
     [ApiController]
     public class DepositController : ControllerBase
     {
