@@ -85,7 +85,23 @@ namespace SnowmeetApi.Models
                 return new List<RentalDetail>();;
             }
         }
-
+        [NotMapped]
+        public double totalPaidGuarantyAmount
+        {
+            get
+            {
+                double amount = 0;
+                for(int i = 0; guaranties != null && i < guaranties.Count; i++)
+                {
+                    Guaranty guaranty = guaranties[i];
+                    if (guaranty.payStatus == "支付完成")
+                    {
+                        amount += (double)guaranty.amount;
+                    }
+                }
+                return amount;
+            }
+        }
         [ForeignKey("staff_id")]
         public Staff staff { get; set; }
         [NotMapped]
