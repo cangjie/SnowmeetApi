@@ -374,10 +374,10 @@ namespace SnowmeetApi.Models
         [ForeignKey("rental_id")]
         public Rental rental { get; set; }
         
-        [ForeignKey(nameof(RentItemLog.rent_item_id))]
-        public List<RentItemLog> logs { get; set; } = new List<RentItemLog>();
-        [ForeignKey(nameof(RentalDetail.rent_item_id))]
-        public List<RentalDetail> repairationCharges = new List<RentalDetail>();
+        [ForeignKey(nameof(Models.RentItemLog.rent_item_id))]
+        public List<Models.RentItemLog> logs { get; set; } = new List<Models.RentItemLog>();
+        [NotMapped]
+        public List<Models.RentalDetail> repairationCharges = new List<Models.RentalDetail>();
         [NotMapped]
         public List<RentalDetail> availableRepairationCharges
         {

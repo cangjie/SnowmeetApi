@@ -4937,15 +4937,22 @@ namespace SnowmeetApi.Controllers
         {
             Models.Rental rental = await _db.rental.Where(r => r.id == rentalId)
                 .Include(r => r.staff)
+                //.Include(r => r.rentItems).ThenInclude(i => i.repairationCharges)
                 .Include(r => r.rentItems).ThenInclude(i => i.logs).ThenInclude(l => l.staff)
                 .Include(r => r.rentItems).ThenInclude(i => i.category)
-                .Include(r => r.rentItems).ThenInclude(i => i.repairationCharges)
                 .Include(r => r.details).ThenInclude(d => d.rentPrice)
                 .Include(r => r.details).ThenInclude(d => d.discounts)
                 .Include(r => r.discounts)
                 .Include(r => r.pricePresets)
                 .Include(r => r.guaranties).ThenInclude(g => g.guarantyPayments).ThenInclude(p => p.payment)
                 .AsNoTracking().FirstOrDefaultAsync();
+            for (int i = 0; i < rental.rentItems.Count; i++)
+            {
+                Models.RentItem rentItem = rental.rentItems[i];
+                rentItem.repairationCharges = await _db.rentalDetail
+                    .Where(r => r.rent_item_id == rentItem.id).AsNoTracking().ToListAsync();
+                //await _db.rentItem.Entry(rentItem).Collection(i => i.repairationCharges).LoadAsync();
+            }
             return rental;
         }
         [HttpGet("{rentalId}")]
