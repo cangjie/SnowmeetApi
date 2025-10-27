@@ -91,7 +91,7 @@ namespace SnowmeetApi.Models
             get
             {
                 double amount = 0;
-                for(int i = 0; guaranties != null && i < guaranties.Count; i++)
+                for (int i = 0; guaranties != null && i < guaranties.Count; i++)
                 {
                     Guaranty guaranty = guaranties[i];
                     if (guaranty.payStatus == "支付完成")
@@ -102,6 +102,7 @@ namespace SnowmeetApi.Models
                 return amount;
             }
         }
+
         [ForeignKey("staff_id")]
         public Staff staff { get; set; }
         [NotMapped]
@@ -112,14 +113,31 @@ namespace SnowmeetApi.Models
         public List<Guaranty> guaranties { get; set; } = new List<Guaranty>();
         [ForeignKey(nameof(Discount.biz_id))]
         public List<Discount> discounts { get; set; } = new List<Discount>();
+        [NotMapped]
+        public List<Discount> availableDiscounts
+        {
+            get
+            {
+                if (discounts == null)
+                {
+                    return new List<Discount>();
+                }
+                else
+                {
+                    return discounts.Where(d => d.valid == 1 && d.order_id == order_id).ToList();
+                }
+            }
+        }
         [ForeignKey("package_id")]
         public RentPackage? package { get; set; } = null;
+        
         public double GetDiscountAmount(bool ticket)
         {
-            List<Discount> dList = discounts
+            List<Discount> dList = availableDiscounts
                 .Where(d => (ticket && d.ticket_code != null) || !ticket).ToList();
             return dList.Sum(d => d.amount);
         }
+       
         [NotMapped]
         public double ticketDiscountAmount
         {
@@ -128,6 +146,7 @@ namespace SnowmeetApi.Models
                 return GetDiscountAmount(true);
             }
         }
+        
         [NotMapped]
         public double othersDiscountAmount
         {
@@ -136,6 +155,7 @@ namespace SnowmeetApi.Models
                 return GetDiscountAmount(false);
             }
         }
+        
         [NotMapped]
         public bool isPackage
         {
@@ -152,6 +172,7 @@ namespace SnowmeetApi.Models
                 return false;
             }
         }
+        /*
         [NotMapped]
         public double totalGuarantyAmount
         {
@@ -165,6 +186,7 @@ namespace SnowmeetApi.Models
                 return amount;
             }
         }
+        */
         [NotMapped]
         public double totalRentalAmount
         {
@@ -191,7 +213,7 @@ namespace SnowmeetApi.Models
         }
         public double GetTotalAmountByType(string type)
         {
-            double amount = 0;
+           // double amount = 0;
             if (details == null)
             {
                 return 0;
@@ -218,6 +240,25 @@ namespace SnowmeetApi.Models
         public int valid { get; set; }
         public DateTime? update_date { get; set; }
         public DateTime create_date { get; set; } = DateTime.Now;
+        [ForeignKey(nameof(Discount.sub_biz_id))]
+        public List<Discount> discounts { get; set; } = new List<Discount>();
+        public List<Discount> availableDiscounts
+        {
+            get
+            {
+                if (discounts == null)
+                {
+                    return new List<Discount>();
+                }
+                else
+                {
+                    return discounts.Where(d => d.valid == 1 && d.biz_id == rental_id).ToList();
+                }
+            }
+        }
+        
+       
+        
         [ForeignKey("rental_id")]
         public Rental rental { get; set; }
         [ForeignKey("rent_price_id")]

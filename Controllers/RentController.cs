@@ -4938,9 +4938,22 @@ namespace SnowmeetApi.Controllers
                 .Include(r => r.staff)
                 .Include(r => r.rentItems).ThenInclude(i => i.logs).ThenInclude(l => l.staff)
                 .Include(r => r.details).ThenInclude(d => d.rentPrice)
+                .Include(r => r.details).ThenInclude(d => d.discounts)
+                .Include(r => r.discounts)
                 .Include(r => r.pricePresets)
                 .Include(r => r.guaranties).ThenInclude(g => g.guarantyPayments).ThenInclude(p => p.payment)
                 .AsNoTracking().FirstOrDefaultAsync();
+
+            /*
+            rental.discounts = await _db.discount.Where(d => d.valid == 1 && d.biz_type == "租赁" && d.biz_id == rental.id)
+                .AsNoTracking().ToListAsync();
+            for (int i = 0; i < rental.details.Count; i++)
+            {
+                Models.RentalDetail detail = rental.details[i];
+                detail.discounts = await _db.discount.Where(d => d.valid == 1 && d.sub_biz_type == "日租金" && d.sub_biz_id == detail.id)
+                    .AsNoTracking().ToListAsync();
+            }
+            */
             return rental;
         }
         [HttpGet("{rentalId}")]
