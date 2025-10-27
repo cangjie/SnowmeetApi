@@ -426,7 +426,7 @@ namespace SnowmeetApi.Controllers
             UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _db);
             return await GetAccounts(user.member.id, type, subType, sessionKey, sessionType);
         }
-        /*
+        
         [HttpGet]
         public async Task<ActionResult<List<Member>>> SearchMember(string key,
             string sessionKey, string sessionType = "wechat_mini_openid")
@@ -462,7 +462,7 @@ namespace SnowmeetApi.Controllers
             }
             return Ok(members);
         }
-        */
+        
         [HttpGet("{memberId}")]
         public async Task<ActionResult<Member>> GetMember(int memberId, 
             string sessionKey, string sessionType = "wechat_mini_openid")
@@ -487,7 +487,7 @@ namespace SnowmeetApi.Controllers
                 .OrderByDescending(o => o.id).AsNoTracking().ToListAsync();
             return Ok(member);
         }
-        /*
+        
         [HttpGet]
         public async Task<ActionResult<List<DepositAccount>>> SearchDepositAccounts(string key, 
             string sessionKey, string sessionType = "wechat_mini_openid")
@@ -528,7 +528,7 @@ namespace SnowmeetApi.Controllers
             }
             return Ok(ret);
         }
-        */
+        
         [HttpGet("{accountId}")]
         public async Task<ActionResult<DepositAccount>> GetAccount(int accountId,
             string sessionKey, string sessionType = "wechat_mini_openid")

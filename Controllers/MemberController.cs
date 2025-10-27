@@ -1239,7 +1239,7 @@ namespace SnowmeetApi.Controllers
             }
             return ret;
         }
-
+*/
         [NonAction]
         public async Task<List<Member>> SearchMember(string key)
         {
@@ -1262,6 +1262,6 @@ namespace SnowmeetApi.Controllers
             }
             return mList;
         }
-        */
+        
     }
 }
