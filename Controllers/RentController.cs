@@ -4811,6 +4811,7 @@ namespace SnowmeetApi.Controllers
                     sub_biz_id = detail.id,
                     staff_id = rental.staff_id,
                     member_id = null,
+                    valid = 1,
                     create_date = DateTime.Now
 
                 };
@@ -4937,23 +4938,13 @@ namespace SnowmeetApi.Controllers
             Models.Rental rental = await _db.rental.Where(r => r.id == rentalId)
                 .Include(r => r.staff)
                 .Include(r => r.rentItems).ThenInclude(i => i.logs).ThenInclude(l => l.staff)
+                .Include(r => r.rentItems).ThenInclude(i => i.category)
                 .Include(r => r.details).ThenInclude(d => d.rentPrice)
                 .Include(r => r.details).ThenInclude(d => d.discounts)
                 .Include(r => r.discounts)
                 .Include(r => r.pricePresets)
                 .Include(r => r.guaranties).ThenInclude(g => g.guarantyPayments).ThenInclude(p => p.payment)
                 .AsNoTracking().FirstOrDefaultAsync();
-
-            /*
-            rental.discounts = await _db.discount.Where(d => d.valid == 1 && d.biz_type == "租赁" && d.biz_id == rental.id)
-                .AsNoTracking().ToListAsync();
-            for (int i = 0; i < rental.details.Count; i++)
-            {
-                Models.RentalDetail detail = rental.details[i];
-                detail.discounts = await _db.discount.Where(d => d.valid == 1 && d.sub_biz_type == "日租金" && d.sub_biz_id == detail.id)
-                    .AsNoTracking().ToListAsync();
-            }
-            */
             return rental;
         }
         [HttpGet("{rentalId}")]
