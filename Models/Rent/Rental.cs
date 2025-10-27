@@ -373,10 +373,46 @@ namespace SnowmeetApi.Models
         public RentCategory category { get; set; } = null;
         [ForeignKey("rental_id")]
         public Rental rental { get; set; }
-        [ForeignKey("repairation_id")]
-        public RentalDetail? repairationCharge { get; set; } = null;
+        
         [ForeignKey(nameof(RentItemLog.rent_item_id))]
         public List<RentItemLog> logs { get; set; } = new List<RentItemLog>();
+        [ForeignKey(nameof(RentalDetail.rent_item_id))]
+        public List<RentalDetail> repairationCharges = new List<RentalDetail>();
+        [NotMapped]
+        public List<RentalDetail> availableRepairationCharges
+        {
+            get
+            {
+                if (repairationCharges == null)
+                {
+                    return new List<RentalDetail>();
+                }
+                else
+                {
+                    return repairationCharges.Where(d => d.valid == 1 && d.charge_type == "赔偿金").ToList();
+                }
+            }
+        }
+        [NotMapped]
+        public double totalRepairationAmount
+        {
+            get
+            {
+                if (availableRepairationCharges == null)
+                {
+                    return 0;
+                }
+                else
+                {
+                    double amount = 0;
+                    for (int i = 0; i < repairationCharges.Count; i++)
+                    {
+                        amount += repairationCharges[i].amount;
+                    }
+                    return amount;
+                }
+            }
+        }
         [NotMapped]
         public Staff? pickStaff
         {
