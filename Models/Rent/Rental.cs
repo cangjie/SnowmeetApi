@@ -345,6 +345,48 @@ namespace SnowmeetApi.Models
         public bool noNeed { get; set; } = false;
         public bool atOnce { get; set; } = false;
         [NotMapped]
+        public Staff? pickStaff
+        {
+            get
+            {
+                Staff? staff = null;
+                if (availableLog == null)
+                {
+                    return null;
+                }
+                for (int i = 0; availableLog != null && i < availableLog.Count; i++)
+                {
+                    if (availableLog[i].status == "已发放")
+                    {
+                        staff = availableLog[i].staff;
+                        break;
+                    }
+                }
+                return staff;
+            }
+        }
+        [NotMapped]
+        public Staff? returnStaff
+        {
+            get
+            {
+                if (status != "已归还" || availableLog == null || availableLog.Count == 0)
+                {
+                    return null;
+                }
+                Staff? staff = null;
+                for (int i = availableLog.Count - 1; i >= 0; i--)
+                {
+                    if (availableLog[i].status == "已归还")
+                    {
+                        staff = availableLog[i].staff;
+                        break;
+                    }
+                }
+                return staff;
+            }
+        }
+        [NotMapped]
         public string status
         {
             get
@@ -413,6 +455,7 @@ namespace SnowmeetApi.Models
                 }
             }
         }
+        /*
         [NotMapped]
         public Staff? pickStaff
         {
@@ -432,6 +475,8 @@ namespace SnowmeetApi.Models
                 return staff;
             }
         }
+        */
+        /*
         [NotMapped]
         public Staff? returnStaff
         {
@@ -451,6 +496,7 @@ namespace SnowmeetApi.Models
                 return staff;
             }
         }
+        */
         [NotMapped]
         public List<RentItemLog> availableLog
         {
