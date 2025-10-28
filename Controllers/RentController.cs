@@ -4956,13 +4956,14 @@ namespace SnowmeetApi.Controllers
             return rental;
         }
         [HttpGet("{rentalId}")]
-        public async Task<ActionResult<ApiResult<Models.Rental?>>> GetRentalByStaff(int rentalId, 
+        public async Task<ActionResult<ApiResult<Models.Rental?>>> GetRentalByStaff(int rentalId,
             string sessionKey, string sessionType = "wechat_mini_openid")
         {
             Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey);
             if (staff == null || staff.title_level < 100)
             {
-                return Ok(new ApiResult<Models.Rental?>(){
+                return Ok(new ApiResult<Models.Rental?>()
+                {
                     code = 1,
                     message = "",
                     data = null
@@ -4975,6 +4976,58 @@ namespace SnowmeetApi.Controllers
                 message = "",
                 data = rental
             });
-        }       
+        }
+        [HttpGet("{rentItemId}")]
+        public async Task<ActionResult<ApiResult<Models.Rental?>>> SetRentItemStatus(int rentItemId,
+            string status, string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            if (staff == null || staff.title_level < 100)
+            {
+                return Ok(new ApiResult<Models.Rental?>()
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = null
+                });
+            }
+            if (status != "未发放" && status != "已暂存" && status != "已发放" && status != "已归还")
+            {
+                return Ok(new ApiResult<Models.Rental?>()
+                {
+                    code = 1,
+                    message = "无此状态",
+                    data = null
+                });
+            }
+            Models.RentItem? rentItem = await _db.rentItem.Where(r => r.id == rentItemId)
+                .AsNoTracking().FirstOrDefaultAsync();
+            if (rentItem == null)
+            {
+                return Ok(new ApiResult<Models.Rental?>()
+                {
+                    code = 1,
+                    message = "无此租赁物",
+                    data = null
+                });
+            }
+            RentItemLog log = new RentItemLog()
+            {
+                id = 0,
+                rent_item_id = rentItemId,
+                staff_id = staff.id,
+                valid = 1,
+                create_date = DateTime.Now
+            };
+            await _db.rentItemLog.AddAsync(log);
+            await _db.SaveChangesAsync();
+            Rental rental = await GetRental(rentItem.rental_id);
+            return Ok(new ApiResult<Models.Rental>()
+            {
+                code = 0,
+                message = "",
+                data = rental
+            });
+        }     
     }
 }
