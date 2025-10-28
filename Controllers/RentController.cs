@@ -5022,6 +5022,25 @@ namespace SnowmeetApi.Controllers
             await _db.rentItemLog.AddAsync(log);
             await _db.SaveChangesAsync();
             Rental rental = await GetRental(rentItem.rental_id);
+            bool allReturned = true;
+            for (int i = 0; rental.rentItems != null && i < rental.rentItems.Count; i++)
+            {
+                if (rental.rentItems[i].status != "已归还")
+                {
+                    allReturned = false;
+                    break;
+                }
+            }
+            if (allReturned)
+            {
+                rental.settled = 1;
+                rental.update_date = DateTime.Now;
+                CoreDataModLog dataLog = CoreDataModLog.CreateManualLog("Rental", "settled", rental.id,
+                    "归还租赁物", null, staff.id, "0", "1", "全部归还，结算租金");
+                await _db.coreDataModLog.AddAsync(dataLog);
+                _db.rental.Entry(rental).State = EntityState.Modified;
+                await _db.SaveChangesAsync();
+            }
             return Ok(new ApiResult<Models.Rental>()
             {
                 code = 0,
