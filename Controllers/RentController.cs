@@ -5038,6 +5038,13 @@ namespace SnowmeetApi.Controllers
                 CoreDataModLog dataLog = CoreDataModLog.CreateManualLog("Rental", "settled", rental.id,
                     "归还租赁物", null, staff.id, "0", "1", "全部归还，结算租金");
                 await _db.coreDataModLog.AddAsync(dataLog);
+                for (int k = 0; rental.guaranties != null && k < rental.guaranties.Count; k++)
+                {
+                    Guaranty guaranty = rental.guaranties[k];
+                    guaranty.relieve = 1;
+                    guaranty.update_date = DateTime.Now;
+                    _db.guaranty.Entry(guaranty).State = EntityState.Modified;
+                }
                 _db.rental.Entry(rental).State = EntityState.Modified;
                 await _db.SaveChangesAsync();
             }
