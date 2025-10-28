@@ -5015,6 +5015,7 @@ namespace SnowmeetApi.Controllers
             {
                 id = 0,
                 rent_item_id = rentItemId,
+                status = Util.UrlDecode(status),
                 staff_id = staff.id,
                 valid = 1,
                 create_date = DateTime.Now
