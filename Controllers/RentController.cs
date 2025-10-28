@@ -689,29 +689,36 @@ namespace SnowmeetApi.Controllers
             {
                 return NotFound();
             }
-            RentPackageCategory rpc = new RentPackageCategory()
+            RentPackageCategory rpc = await _db.rentPackageCategory
+                .Where(r => r.package_id == packageId && r.category_id == rentCategory.id)
+                .AsNoTracking().FirstOrDefaultAsync();
+            if (rpc == null)
             {
-                package_id = packageId,
-                category_id = rentCategory.id,
-                update_date = DateTime.Now
-            };
-            CoreDataModLog log = new CoreDataModLog()
-            {
-                id = 0,
-                table_name = "rent_package_category",
-                field_name = "category_id",
-                key_value = packageId,
-                prev_value = "",
-                current_value = categoryId.ToString(),
-                is_manual = 1,
-                staff_id = staff.id,
-                manual_memo = "添加套餐分类",
-                scene = "后台",
-                create_date = DateTime.Now
-            };
-            await _db.coreDataModLog.AddAsync(log);
-            await _db.rentPackageCategory.AddAsync(rpc);
-            await _db.SaveChangesAsync();
+                rpc = new RentPackageCategory()
+                {
+                    package_id = packageId,
+                    category_id = rentCategory.id,
+                    update_date = DateTime.Now
+                };
+                CoreDataModLog log = new CoreDataModLog()
+                {
+                    id = 0,
+                    table_name = "rent_package_category",
+                    field_name = "category_id",
+                    key_value = packageId,
+                    prev_value = "",
+                    current_value = categoryId.ToString(),
+                    is_manual = 1,
+                    staff_id = staff.id,
+                    manual_memo = "添加套餐分类",
+                    scene = "后台",
+                    create_date = DateTime.Now
+                };
+
+                await _db.coreDataModLog.AddAsync(log);
+                await _db.rentPackageCategory.AddAsync(rpc);
+                await _db.SaveChangesAsync();
+            }
             RentPackage pr = await _db.rentPackage
                 .Include(r => r.rentPackageCategoryList).ThenInclude(r => r.rentCategory)
                 .Where(r => r.id == packageId).FirstAsync();
