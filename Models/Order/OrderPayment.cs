@@ -100,9 +100,9 @@ namespace SnowmeetApi.Models
             get
             {
                 double amount = 0;
-                for (int i = 0; i < refunds.Count; i++)
+                for (int i = 0; refunds != null && i < refunds.Count; i++)
                 {
-                    if (refunds[i].state == 1 || !refunds[i].refund_id.Trim().Equals(""))
+                    if ( refunds[i] != null && refunds[i].refund_id != null && (refunds[i].state == 1 || !refunds[i].refund_id.Trim().Equals("")) )
                     {
                         amount += refunds[i].amount;
                     }

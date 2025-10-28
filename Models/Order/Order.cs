@@ -208,7 +208,7 @@ namespace SnowmeetApi.Models
                     {
                         foreach (OrderPaymentRefund refund in payment.refunds)
                         {
-                            if (refund.state == 1 || !refund.refund_id.Trim().Equals(""))
+                            if (refund.refund_id != null && (refund.state == 1 || !refund.refund_id.Trim().Equals("")) )
                             {
                                 availableRefunds.Add(refund);
                             }

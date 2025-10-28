@@ -765,6 +765,7 @@ namespace SnowmeetApi.Controllers
             string? payOption, string sessionType = "wechat_mini_openid", bool? isTest = null, bool? isEntertain = null,
             bool? isPackage = null, bool? isOnCredit = null, bool? haveDiscount = null, string? status = null)
         {
+            //startDate = DateTime.Parse("2025-10-27");
             StaffController _staffHelper = new StaffController(_db);
             Staff staff = await _staffHelper.GetStaffBySessionKey(sessionKey, sessionType);
             if (staff == null)
