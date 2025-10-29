@@ -262,6 +262,19 @@ namespace SnowmeetApi.Models
         public int valid { get; set; }
         public DateTime? update_date { get; set; }
         public DateTime create_date { get; set; } = DateTime.Now;
+        [NotMapped]
+        public double discountTotalAmount
+        {
+            get
+            {
+                double amount = 0;
+                for (int i = 0; availableDiscounts != null && i < availableDiscounts.Count; i++)
+                {
+                    amount += availableDiscounts[i].amount;
+                }
+                return amount;
+            }
+        }
 
 
         [ForeignKey(nameof(Discount.sub_biz_id))]
