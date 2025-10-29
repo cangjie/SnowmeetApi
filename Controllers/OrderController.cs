@@ -2058,7 +2058,7 @@ namespace SnowmeetApi.Controllers
                 {
                     await _db.coreDataModLog.AddAsync(logs[i]);
                 }
-                _db.discount.Entry(discount);
+                _db.discount.Entry(discount).State = EntityState.Modified;
                 await _db.SaveChangesAsync();
             }
             return discount;
