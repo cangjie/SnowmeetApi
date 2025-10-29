@@ -2009,6 +2009,60 @@ namespace SnowmeetApi.Controllers
                 data = order
             });
         }
+        [NonAction]
+        public async Task<Discount> UpdateSingleDiscount(int orderId, string bizType, int bizId, string? subBizType,
+            int? subBizId, double amount, int? staffId, string scene, string memo = "", string? ticketCode = null)
+        {
+            Discount discount = await _db.discount.Where(d => d.order_id == orderId && d.biz_type == bizType && d.biz_id == bizId
+                && d.sub_biz_type == subBizType && d.sub_biz_id == subBizId && d.ticket_code == ticketCode)
+                .AsNoTracking().FirstOrDefaultAsync();
+            if (amount == 0 && discount != null)
+            {
+                CoreDataModLog log = CoreDataModLog.CreateManualLog("discount", "valid", discount.id, scene, null, staffId,
+                    discount.valid.ToString(), "0", "取消减免");
+                discount.valid = 0;
+                discount.staff_id = staffId;
+                discount.update_date = DateTime.Now;
+                await _db.coreDataModLog.AddAsync(log);
+                _db.discount.Entry(discount).State = EntityState.Modified;
+                await _db.SaveChangesAsync();
+            }
+            if (discount == null && amount != 0)
+            {
+                discount = new Discount()
+                {
+                    id = 0,
+                    order_id = orderId,
+                    biz_type = bizType,
+                    biz_id = bizId,
+                    sub_biz_type = subBizType,
+                    sub_biz_id = subBizId,
+                    amount = amount,
+                    member_id = null,
+                    staff_id = staffId,
+                    valid = 1,
+                    create_date = DateTime.Now
+                };
+                await _db.discount.AddAsync(discount);
+                await _db.SaveChangesAsync();
+            }
+            else
+            {
+                Discount oriDiscount = await _db.discount.Where(d => d.id == discount.id).AsNoTracking().FirstOrDefaultAsync();
+                discount.valid = 1;
+                discount.amount = amount;
+                discount.staff_id = staffId;
+                discount.update_date = DateTime.Now;
+                List<CoreDataModLog> logs = Util.GetUpdateDifferenceLog<Discount>(oriDiscount, discount, null, staffId, scene);
+                for (int i = 0; i < logs.Count; i++)
+                {
+                    await _db.coreDataModLog.AddAsync(logs[i]);
+                }
+                _db.discount.Entry(discount);
+                await _db.SaveChangesAsync();
+            }
+            return discount;
+        }
     }
 
 }

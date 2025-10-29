@@ -258,6 +258,8 @@ namespace SnowmeetApi.Models
         public int? rent_price_id { get; set; }
         public double amount { get; set; }
         public string memo { get; set; } = "";
+        [NotMapped]
+        public double? _filledDiscountAmount { get; set; } = null;
         public int? staff_id { get; set; }
         public int valid { get; set; }
         public DateTime? update_date { get; set; }
@@ -273,6 +275,10 @@ namespace SnowmeetApi.Models
                     amount += availableDiscounts[i].amount;
                 }
                 return amount;
+            }
+            set
+            {
+                _filledDiscountAmount = value;
             }
         }
 

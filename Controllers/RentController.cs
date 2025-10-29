@@ -19,6 +19,7 @@ using NPOI.XSSF.UserModel;
 using NPOI.SS.UserModel;
 using NPOI.SS.Formula.Functions;
 using SQLitePCL;
+using Microsoft.CodeAnalysis;
 namespace SnowmeetApi.Controllers
 {
     [Route("api/[controller]/[action]")]
@@ -5062,6 +5063,58 @@ namespace SnowmeetApi.Controllers
                 message = "",
                 data = rental
             });
-        }     
+        }
+        [HttpPost]
+        public async Task<ActionResult<ApiResult<List<Models.RentalDetail>?>>> UpdateRentalDetails([FromBody] List<Models.RentalDetail> details, 
+            [FromQuery] string scene, [FromQuery]string sessionKey, [FromQuery]string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            scene = Util.UrlDecode(scene);
+            if (staff == null || staff.title_level < 100)
+            {
+                return Ok(new ApiResult<List<Models.RentalDetail>>()
+                {
+                    code = 1,
+                    message = "",
+                    data = null
+                });
+            }
+            List<Models.RentalDetail> newDetails = new List<Models.RentalDetail>();
+            for (int i = 0; i < details.Count; i++)
+            {
+                Models.RentalDetail detail = details[i];
+                if (detail._filledDiscountAmount != detail.discountTotalAmount)
+                {
+                    OrderController _orderHelper = new OrderController(_db, _oriConfig, _httpContextAccessor);
+                    Models.Rental rental = await _db.rental.Where(r => r.id == detail.rental_id).AsNoTracking().FirstOrDefaultAsync();
+                    if (rental == null)
+                    {
+                        continue;
+                    }
+                    await _orderHelper.UpdateSingleDiscount((int)rental.order_id, "租赁", rental.id, "日租金", detail.id,
+                        (double)detail._filledDiscountAmount, staff.id, scene);
+                }
+                Models.RentalDetail oriDetail = await _db.rentalDetail.Where(r => r.id == details[i].id)
+                    .AsNoTracking().FirstOrDefaultAsync();
+                if (oriDetail == null)
+                {
+                    continue;
+                }
+                List<CoreDataModLog> logs = Util.GetUpdateDifferenceLog<Models.RentalDetail>(oriDetail, detail, null, staff.id, scene);
+                _db.rentalDetail.Entry(detail).State = EntityState.Modified;
+                for (int j = 0; j < logs.Count; j++)
+                {
+                    await _db.coreDataModLog.AddAsync(logs[i]);
+                }
+                await _db.SaveChangesAsync();
+                newDetails.Add(detail);
+            }
+            return Ok(new ApiResult<List<Models.RentalDetail>>()
+            {
+                code = 0,
+                message = "",
+                data = newDetails
+            });
+        } 
     }
 }
