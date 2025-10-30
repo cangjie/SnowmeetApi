@@ -4823,10 +4823,13 @@ namespace SnowmeetApi.Controllers
                     create_date = DateTime.Now
 
                 };
+                CoreDataModLog logD = CoreDataModLog.CreateManualLog("RentDetail", "", detail.id, "租赁开单",
+                    null, null, null, null, "设置减免");
+                await _db.coreDataModLog.AddAsync(logD);
                 await _db.discount.AddAsync(discountObj);
                 await _db.SaveChangesAsync();
             }
-            
+
             return detail;
         }
         [NonAction]
@@ -4855,9 +4858,17 @@ namespace SnowmeetApi.Controllers
                         staff_id = staffId,
                         create_date = DateTime.Now
                     };
+                    CoreDataModLog logI = CoreDataModLog.CreateManualLog("RentItem", "", item.id, "租赁开单",
+                        null, null, null, null, "立即发放");
+                    await _db.coreDataModLog.AddAsync(logI);
                     await _db.rentItemLog.AddAsync(log);
                 }
             }
+            //await _db.SaveChangesAsync();
+
+            CoreDataModLog logR = CoreDataModLog.CreateManualLog("Rental", "", rentalId, "租赁开单",
+                null, null, null, null, "开始设置租金");
+            await _db.coreDataModLog.AddAsync(logR);
             await _db.SaveChangesAsync();
             await SetRentalDetail(rentalId, DateTime.Now, staffId);
             return await GetRental(rentalId);
@@ -4872,9 +4883,9 @@ namespace SnowmeetApi.Controllers
             double guarantyAmount = 0;
             if (order == null || payment == null || payment.status != OrderPayment.PaymentStatus.支付成功.ToString())
             {
-                CoreDataModLog log = CoreDataModLog.CreateManualLog("Order", "", order.id, "租赁开单",
+                CoreDataModLog logOrder = CoreDataModLog.CreateManualLog("Order", "", order.id, "租赁开单",
                     null, null, null, null, "未确认支付");
-                await _db.coreDataModLog.AddAsync(log);
+                await _db.coreDataModLog.AddAsync(logOrder);
                 await _db.SaveChangesAsync();
                 return null;
             }
@@ -4885,7 +4896,7 @@ namespace SnowmeetApi.Controllers
                 await _db.SaveChangesAsync();
                 Rental rental = await GetRental(order.rentals[i].id);
                 bool existsUnpaidGuaranty = false;
-                for(int j = 0; rental.guaranties != null && j < rental.guaranties.Count; j++)
+                for (int j = 0; rental.guaranties != null && j < rental.guaranties.Count; j++)
                 {
                     Guaranty guaranty = rental.guaranties[j];
                     if (guaranty.payStatus != "支付成功")
@@ -4893,13 +4904,13 @@ namespace SnowmeetApi.Controllers
                         existsUnpaidGuaranty = true;
                         continue;
                     }
-                  
+
                 }
                 if (!existsUnpaidGuaranty && rental.guaranties.Count > 0)
                 {
-                    CoreDataModLog log = CoreDataModLog.CreateManualLog("Rental", "", rental.id, "租赁开单",
+                    CoreDataModLog logG = CoreDataModLog.CreateManualLog("Rental", "", rental.id, "租赁开单",
                     null, null, null, null, "押金重复支付");
-                    await _db.coreDataModLog.AddAsync(log);
+                    await _db.coreDataModLog.AddAsync(logG);
                     await _db.SaveChangesAsync();
                     return null;
                 }
@@ -4915,9 +4926,9 @@ namespace SnowmeetApi.Controllers
             }
             if (Math.Round(guarantyAmount, 2) > Math.Round(payment.amount, 2))
             {
-                CoreDataModLog log = CoreDataModLog.CreateManualLog("Order", "", order.id, "租赁开单",
+                CoreDataModLog logGP = CoreDataModLog.CreateManualLog("Order", "", order.id, "租赁开单",
                     null, null, null, null, "未足额支付押金");
-                await _db.coreDataModLog.AddAsync(log);
+                await _db.coreDataModLog.AddAsync(logGP);
                 await _db.SaveChangesAsync();
                 return null;
             }
@@ -4930,12 +4941,19 @@ namespace SnowmeetApi.Controllers
                     payment_id = paymentId,
                     create_date = DateTime.Now
                 };
-                
+
                 await _db.guarantyPayment.AddAsync(gp);
             }
+            CoreDataModLog log = CoreDataModLog.CreateManualLog("Order", "", order.id, "租赁开单",
+                null, null, null, null, "确认押金支付");
+            await _db.coreDataModLog.AddAsync(log);
             await _db.SaveChangesAsync();
             for (int i = 0; i < order.rentals.Count; i++)
             {
+                CoreDataModLog logR = CoreDataModLog.CreateManualLog("Rental", "", order.rentals[i].id, "租赁开单",
+                null, null, null, null, "开始生效租赁子订单");
+                await _db.coreDataModLog.AddAsync(logR);
+                await _db.SaveChangesAsync();
                 order.rentals[i] = await EffectRental(order.rentals[i].id, payment.staff_id);
             }
             return order;
@@ -5065,8 +5083,8 @@ namespace SnowmeetApi.Controllers
             });
         }
         [HttpPost]
-        public async Task<ActionResult<ApiResult<List<Models.RentalDetail>?>>> UpdateRentalDetails([FromBody] List<Models.RentalDetail> details, 
-            [FromQuery] string scene, [FromQuery]string sessionKey, [FromQuery]string sessionType = "wechat_mini_openid")
+        public async Task<ActionResult<ApiResult<List<Models.RentalDetail>?>>> UpdateRentalDetails([FromBody] List<Models.RentalDetail> details,
+            [FromQuery] string scene, [FromQuery] string sessionKey, [FromQuery] string sessionType = "wechat_mini_openid")
         {
             Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
             scene = Util.UrlDecode(scene);
@@ -5115,6 +5133,6 @@ namespace SnowmeetApi.Controllers
                 message = "",
                 data = newDetails
             });
-        } 
+        }
     }
 }
