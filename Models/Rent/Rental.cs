@@ -238,7 +238,7 @@ namespace SnowmeetApi.Models
         {
             get
             {
-                return (entertain ? 0 : totalRentalAmount) + totalOvertimeAmount + totalRentalAmount - totalDiscountAmount;
+                return (entertain ? 0 : totalRentalAmount) + totalOvertimeAmount + totalRepairationAmount - totalDiscountAmount;
             }
         }
         public double GetTotalAmountByType(string type)
