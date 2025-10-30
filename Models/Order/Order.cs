@@ -824,7 +824,7 @@ namespace SnowmeetApi.Models
                     Rental rental = rentals[i];
                     amount += rental.totalGuarantyAmount;
                 }
-                return totalGuarantyAmount;
+                return amount;
             }
         }
         [NotMapped]
