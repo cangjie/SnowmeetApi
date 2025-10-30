@@ -845,6 +845,18 @@ namespace SnowmeetApi.Models
                 return amount;
             }
         }
+        [NotMapped]
+        public double? totalRentNeedToRefundAmount
+        {
+            get
+            {
+                if (rentals != null && rentals.Count >= 0)
+                {
+                    return totalGuarantyAmount - totalRentSummaryAmount;
+                }
+                return null;
+            }
+        }
 
     }
 }
