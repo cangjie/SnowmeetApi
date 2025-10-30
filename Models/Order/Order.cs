@@ -527,26 +527,6 @@ namespace SnowmeetApi.Models
                         amount = amount + retails[i].deal_price;
                     }
                 }
-                /*
-                    switch (type)
-                    {
-                        case "餐饮":
-                            for (int i = 0; i < fdOrders.Count; i++)
-                            {
-                                FdOrder fd = fdOrders[i];
-                                if (fd.valid == 1 && fd.order_type.Trim().Equals("招待"))
-                                {
-                                    amount = amount + fd.summary;
-                                }
-                            }
-                            break;
-                        case "零售":
-                        case "":
-                        default:
-                            break;
-                    }
-                    */
-
                 return amount;
             }
         }
@@ -826,6 +806,43 @@ namespace SnowmeetApi.Models
                         return "";
                     }
                 }
+            }
+        }
+
+        [NotMapped]
+        public double? totalGuarantyAmount
+        {
+            get
+            {
+                double? amount = null;
+                for (int i = 0; rentals != null && i < rentals.Count; i++)
+                {
+                    if (amount == null)
+                    {
+                        amount = 0;
+                    }
+                    Rental rental = rentals[i];
+                    amount += rental.totalGuarantyAmount;
+                }
+                return totalGuarantyAmount;
+            }
+        }
+        [NotMapped]
+        public double? totalRentSummaryAmount
+        {
+            get
+            {
+                double? amount = null;
+                for (int i = 0; rentals != null && i < rentals.Count; i++)
+                {
+                    if (amount == null)
+                    {
+                        amount = 0;
+                    }
+                    Rental rental = rentals[i];
+                    amount += rental.totalSummary;
+                }
+                return amount;
             }
         }
 
