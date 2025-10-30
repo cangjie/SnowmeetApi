@@ -214,7 +214,14 @@ namespace SnowmeetApi.Models
         {
             get
             {
-                return GetTotalAmountByType("租金");
+                if (!entertain)
+                {
+                    return GetTotalAmountByType("租金");
+                }
+                else
+                {
+                    return 0;
+                }
             }
         }
         [NotMapped]
@@ -233,9 +240,17 @@ namespace SnowmeetApi.Models
                 return GetTotalAmountByType("赔偿金");
             }
         }
+        [NotMapped]
+        public double totalSummary
+        {
+            get
+            {
+                return totalRentalAmount + totalOvertimeAmount + totalRentalAmount - totalDiscountAmount;
+            }
+        }
         public double GetTotalAmountByType(string type)
         {
-           // double amount = 0;
+            // double amount = 0;
             if (details == null)
             {
                 return 0;
@@ -245,6 +260,7 @@ namespace SnowmeetApi.Models
                 .ToList();
             return dtlList.Sum(d => d.amount);
         }
+        
     }
     [Table("rental_detail")]
     public class RentalDetail

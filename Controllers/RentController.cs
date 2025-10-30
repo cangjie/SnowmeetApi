@@ -4895,7 +4895,7 @@ namespace SnowmeetApi.Controllers
                     }
                   
                 }
-                if (!existsUnpaidGuaranty)
+                if (!existsUnpaidGuaranty && rental.guaranties.Count > 0)
                 {
                     CoreDataModLog log = CoreDataModLog.CreateManualLog("Rental", "", rental.id, "租赁开单",
                     null, null, null, null, "押金重复支付");
