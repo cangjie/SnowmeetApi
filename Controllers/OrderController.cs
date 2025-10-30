@@ -1876,7 +1876,7 @@ namespace SnowmeetApi.Controllers
                     message = "该笔支付记录不存在";
                     break;
                 }
-                else if (payment.refundedAmount + refund.amount > payment.amount)
+                else if (Math.Round(payment.refundedAmount + refund.amount, 2) > Math.Round(payment.amount, 2))
                 {
                     message = "退款金额超过可退款金额";
                     break;
