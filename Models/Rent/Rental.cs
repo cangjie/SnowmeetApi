@@ -214,14 +214,7 @@ namespace SnowmeetApi.Models
         {
             get
             {
-                if (!entertain)
-                {
-                    return GetTotalAmountByType("租金");
-                }
-                else
-                {
-                    return 0;
-                }
+                return GetTotalAmountByType("租金");
             }
         }
         [NotMapped]
@@ -245,7 +238,7 @@ namespace SnowmeetApi.Models
         {
             get
             {
-                return totalRentalAmount + totalOvertimeAmount + totalRentalAmount - totalDiscountAmount;
+                return (entertain ? 0 : totalRentalAmount) + totalOvertimeAmount + totalRentalAmount - totalDiscountAmount;
             }
         }
         public double GetTotalAmountByType(string type)
