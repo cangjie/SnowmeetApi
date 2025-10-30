@@ -786,7 +786,7 @@ namespace SnowmeetApi.Models
                 }
                 if (contact_gender != null)
                 {
-                    calledName += " " + contact_gender == "男" ? "先生" : (contact_gender == "女" ? "女士" : "");
+                    calledName += (" " + ((contact_gender == "男") ? "先生" : (contact_gender == "女" ? "女士" : "")));
                 }
                 if (calledName == "" && member != null)
                 {
@@ -796,7 +796,7 @@ namespace SnowmeetApi.Models
                     }
                     if (member.gender != null)
                     {
-                        calledName += " " + member.gender == "男" ? "先生" : (member.gender == "女" ? "女士" : "");
+                        calledName += (" " + ((member.gender == "男") ? "先生" : (member.gender == "女" ? "女士" : "")));
                     }
                 }
                 return calledName;
