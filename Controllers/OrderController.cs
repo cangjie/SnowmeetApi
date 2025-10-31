@@ -693,11 +693,11 @@ namespace SnowmeetApi.Controllers
             if (_http.HttpContext.Request.Host.Value != null
                 && _http.HttpContext.Request.Host.Value.Equals("mini.snowmeet.top"))
             {
-                order.is_test = 0;
+                order.is_test = 1;
             }
             else
             {
-                order.is_test = 1;
+                order.is_test = 0;
             }
             await GenerateOrderCode(order);
             await _db.order.AddAsync(order);
