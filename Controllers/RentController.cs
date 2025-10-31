@@ -5082,6 +5082,86 @@ namespace SnowmeetApi.Controllers
                 data = rental
             });
         }
+        [NonAction]
+        public async Task<Models.Rental> UpdateRental(Models.Rental rental, string scene, int? staffId, int? memberId = null)
+        {
+            Rental oriRental = await GetRental(rental.id);
+            if (rental._filledOverTimeCharge != null && oriRental.totalOvertimeAmount != rental._filledOverTimeCharge)
+            {
+                DateTime? rentDate = null;
+                List<Models.RentalDetail> details = oriRental.availabelRentDetails.Where(d => d.charge_type == "超时费").OrderByDescending(d => d.rental_date).ToList();
+                for (int i = 0; details != null && i < details.Count; i++)
+                {
+                    if (rentDate == null)
+                    {
+                        rentDate = details[i].rental_date;
+                    }
+                    details[i].valid = 0;
+                    details[i].update_date = DateTime.Now;
+                    _db.rentalDetail.Entry(details[i]).State = EntityState.Modified;
+                }
+                if (rentDate == null)
+                {
+                    if (rental.realEndDate != null)
+                    {
+                        rentDate = rental.realEndDate;
+                    }
+                    else if (rental.realStartDate != null)
+                    {
+                        rentDate = rental.realStartDate;
+                    }
+                    else
+                    {
+                        rentDate = DateTime.Now;
+                    }
+                }
+                Models.RentalDetail detail = new Models.RentalDetail()
+                {
+                    id = 0,
+                    rental_date = (DateTime)rentDate,
+                    rent_item_id = null,
+                    charge_type = "超时费",
+                    rent_price_id = null,
+                    amount = (double)rental._filledOverTimeCharge,
+                    staff_id = staffId,
+                    valid = 1,
+                    create_date = DateTime.Now
+
+                };
+                await _db.rentalDetail.AddAsync(detail);
+            }
+            List<CoreDataModLog> logs = Util.GetUpdateDifferenceLog<Models.Rental>(oriRental, rental, memberId, staffId, scene);
+            for (int i = 0; i < logs.Count; i++)
+            {
+                await _db.coreDataModLog.AddAsync(logs[i]);
+            }
+            _db.rental.Entry(rental).State = EntityState.Modified;
+            await _db.SaveChangesAsync();
+            return rental;
+        }
+        [HttpPost]
+        public async Task<ActionResult<ApiResult<Models.Rental?>>> UpdateRentalByStaff([FromBody] Models.Rental rental, [FromQuery] string scene,
+            [FromQuery] string sessionKey, [FromQuery] string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            if (staff == null || staff.title_level < 100)
+            {
+                return Ok(new ApiResult<Models.Rental?>()
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = null
+                });
+            }
+            scene = Util.UrlDecode(scene);
+            await UpdateRental(rental, scene, staff.id, null);
+            return Ok(new ApiResult<Models.Rental>()
+            {
+                code = 0,
+                message = "",
+                data = await GetRental(rental.id)
+            });
+        }
         [HttpPost]
         public async Task<ActionResult<ApiResult<List<Models.RentalDetail>?>>> UpdateRentalDetails([FromBody] List<Models.RentalDetail> details,
             [FromQuery] string scene, [FromQuery] string sessionKey, [FromQuery] string sessionType = "wechat_mini_openid")
