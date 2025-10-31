@@ -487,23 +487,30 @@ namespace SnowmeetApi.Models
                 {
                     return true;
                 }
-                bool haveEntrtain = false;
+                bool haveEntertain = false;
                 for (int i = 0; fdOrders != null && i < fdOrders.Count; i++)
                 {
                     if (fdOrders[i].order_type.Trim().Equals("招待"))
                     {
-                        haveEntrtain = true;
+                        haveEntertain = true;
                     }
                 }
                 for (int i = 0; retails != null && i < retails.Count; i++)
                 {
                     if (retails[i].order_type.Trim().Equals("招待"))
                     {
-                        haveEntrtain = true;
+                        haveEntertain = true;
                     }
 
                 }
-                return haveEntrtain;
+                for (int i = 0; rentals != null && i < rentals.Count; i++)
+                {
+                    if (rentals[i].entertain)
+                    {
+                        haveEntertain = true;
+                    }
+                }
+                return haveEntertain;
             }
         }
         [NotMapped]
@@ -525,6 +532,13 @@ namespace SnowmeetApi.Models
                     if (retails[i].order_type.Trim().Equals("招待"))
                     {
                         amount = amount + retails[i].deal_price;
+                    }
+                }
+                for (int i = 0; rentals != null && i < rentals.Count; i++)
+                {
+                    if (rentals[i].entertain)
+                    {
+                        amount += rentals[i].totalSummary;
                     }
                 }
                 return amount;
@@ -549,12 +563,18 @@ namespace SnowmeetApi.Models
                 }
                 for (int i = 0; retails != null && i < retails.Count; i++)
                 {
-                    if (retails[i].order_type.Trim().Equals("招待"))
+                    if (!retails[i].order_type.Trim().Equals("招待"))
                     {
                         allEntrtain = false;
                     }
                 }
-
+                for (int i = 0; rentals != null && i < rentals.Count; i++)
+                {
+                    if (!rentals[i].entertain)
+                    {
+                        allEntrtain = false;
+                    }
+                }
                 return haveEntertain && allEntrtain;
             }
         }
