@@ -689,7 +689,7 @@ namespace SnowmeetApi.Controllers
                 }
             }
 
-
+            /*
             if (_http.HttpContext.Request.Host.Value != null
                 && _http.HttpContext.Request.Host.Value.Equals("mini.snowmeet.top"))
             {
@@ -699,6 +699,17 @@ namespace SnowmeetApi.Controllers
             {
                 order.is_test = 0;
             }
+            */
+
+            if (order.staff_id == 28 || order.staff_id == 31 || order.staff_id == 34)
+            {
+                order.is_test = 1;
+            }
+            else
+            {
+                order.is_test = 0;
+            }
+
             await GenerateOrderCode(order);
             await _db.order.AddAsync(order);
             CoreDataModLog log = new CoreDataModLog()
