@@ -5118,6 +5118,7 @@ namespace SnowmeetApi.Controllers
                 Models.RentalDetail detail = new Models.RentalDetail()
                 {
                     id = 0,
+                    rental_id = rental.id,
                     rental_date = (DateTime)rentDate,
                     rent_item_id = null,
                     charge_type = "超时费",
