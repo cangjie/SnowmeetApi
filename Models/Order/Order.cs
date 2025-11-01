@@ -881,6 +881,13 @@ namespace SnowmeetApi.Models
                 return null;
             }
         }
-
+        [NotMapped]
+        public double? totalRentUnRefund
+        {
+            get
+            {
+                return totalRentNeedToRefundAmount - refundAmount;
+            }
+        }
     }
 }
