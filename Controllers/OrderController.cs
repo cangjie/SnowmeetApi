@@ -774,7 +774,7 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<ApiResult<List<SnowmeetApi.Models.Order>>>> GetOrdersByStaff(int? orderId,
             string? shop, string? type, string? subType, DateTime? startDate, DateTime? endDate, string sessionKey,
             string? payOption, string sessionType = "wechat_mini_openid", bool? isTest = null, bool? isEntertain = null,
-            bool? isPackage = null, bool? isOnCredit = null, bool? haveDiscount = null, string? status = null)
+            bool? isPackage = null, bool? isOnCredit = null, bool? haveDiscount = null, string? status = null, string cell = null)
         {
             //startDate = DateTime.Parse("2025-10-27");
             StaffController _staffHelper = new StaffController(_db);
@@ -790,12 +790,21 @@ namespace SnowmeetApi.Controllers
             }
             List<SnowmeetApi.Models.Order> orders = await GetCommonOrders(orderId, shop, null, null, type, startDate, endDate, payOption,
             isTest, isEntertain, isPackage, isOnCredit, haveDiscount, status);
-            SnowmeetApi.Models.Order.RendOrderList(orders);
+            List<SnowmeetApi.Models.Order> newOrders = new List<Models.Order>();
+            if (cell != null)
+            {
+                newOrders = orders.Where(o => o.customerCell.EndsWith(cell)).ToList();
+            }
+            else
+            {
+                newOrders = orders;
+            }
+            SnowmeetApi.Models.Order.RendOrderList(newOrders);
             return Ok(new ApiResult<List<SnowmeetApi.Models.Order>>()
             {
                 code = 0,
                 message = "",
-                data = orders
+                data = newOrders
             });
         }
         [HttpGet("{orderId}")]
