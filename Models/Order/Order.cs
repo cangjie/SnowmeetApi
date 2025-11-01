@@ -650,7 +650,7 @@ namespace SnowmeetApi.Models
             get
             {
                 string status = "未定义";
-                if (totalCharge == 0)
+                if (totalCharge == 0 && type != "租赁")
                 {
                     status = OrderStatus.已下单.ToString();
                 }
