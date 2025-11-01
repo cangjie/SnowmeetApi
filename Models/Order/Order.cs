@@ -725,6 +725,10 @@ namespace SnowmeetApi.Models
                     return Order.PayType.无需支付.ToString();
                 }
                 string type = Order.PayType.未支付.ToString();
+                if (paying_amount != null && paidAmount == 0)
+                {
+                    return type;
+                }
                 if (totalCharge == 0)
                 {
                     if (haveEntertain)
