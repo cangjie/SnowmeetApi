@@ -44,7 +44,7 @@ namespace SnowmeetApi.Models
         {
             get
             {
-                DateTime? startDate = start_date;
+                DateTime? startDate = null;
                 if (availabelRentDetails != null && availabelRentDetails.Count > 0)
                 {
                     return availabelRentDetails[0].rental_date.Date;
