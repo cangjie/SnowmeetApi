@@ -21,8 +21,12 @@ namespace SnowmeetApi.Models
         public int valid {get; set;} = 1;
         public DateTime? update_date {get; set;} = null;
         public DateTime create_date { get; set; }
+        /*
         [ForeignKey("order_id")]
         public OrderOnline? order {get; set;}
+        */
+        [ForeignKey("order_id")]
+        public Models.Order? order { get; set; }
         public DepositAccount depositAccount {get; set;}
     }
 }

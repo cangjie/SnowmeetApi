@@ -551,8 +551,8 @@ namespace SnowmeetApi.Controllers
             //await _db.depositAccount.Entry(account)
             //    .Collection(a => a.balances).LoadAsync();
             account.balances = await _db.depositBalance
-                .Include(b => b.order).ThenInclude(o => o.maintainList)
-                .Include(b => b.order).ThenInclude(o => o.rentOrderList)
+                .Include(b => b.order).ThenInclude(o => o.cares)
+                .Include(b => b.order).ThenInclude(o => o.rentals)
                 .Where(b => b.deposit_id == account.id).AsNoTracking().ToListAsync();
             await _db.depositAccount.Entry(account)
                 .Reference(a => a.member).LoadAsync();
@@ -626,9 +626,9 @@ namespace SnowmeetApi.Controllers
                     .ThenInclude(a => a.member)
                         .ThenInclude(m => m.memberSocialAccounts)
                 .Include(b => b.order)
-                    .ThenInclude(o => o.maintainList)
+                    .ThenInclude(o => o.cares)
                 .Include(b => b.order)
-                    .ThenInclude(o => o.rentOrderList)
+                    .ThenInclude(o => o.rentals)
                 .Where(b => b.valid == 1 && b.create_date.Date >= start.Date && b.create_date.Date <= end.Date 
                 && (type.Trim().Equals("all")? true : (type.Trim().Equals("income")? b.amount > 0 : b.amount < 0) ) )
                 .OrderByDescending(b => b.id).AsNoTracking().ToListAsync();
