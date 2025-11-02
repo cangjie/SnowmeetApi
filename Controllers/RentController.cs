@@ -4757,6 +4757,9 @@ namespace SnowmeetApi.Controllers
                     await _db.SaveChangesAsync();
                     return null;
                 }
+
+                //25-26雪季 统统门市价
+                /*
                 Models.Order order = await _db.order.Where(o => o.id == rental.order_id).AsNoTracking().FirstOrDefaultAsync();
                 if (order.member_id == null)
                 {
@@ -4766,6 +4769,8 @@ namespace SnowmeetApi.Controllers
                 {
                     scene = "会员";
                 }
+                */
+                scene = "门市";
             }
 
             List<RentPrice> priceList = new List<RentPrice>();
