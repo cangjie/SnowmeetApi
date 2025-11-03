@@ -5080,6 +5080,20 @@ namespace SnowmeetApi.Controllers
                 _db.rental.Entry(rental).State = EntityState.Modified;
                 await _db.SaveChangesAsync();
             }
+            if (log.status == "已发放")
+            {
+                rental.settled = 0;
+                rental.update_date = DateTime.Now;
+                for (int k = 0; rental.guaranties != null && k < rental.guaranties.Count; k++)
+                {
+                    Guaranty guaranty = rental.guaranties[k];
+                    guaranty.relieve = 0;
+                    guaranty.update_date = DateTime.Now;
+                    _db.guaranty.Entry(guaranty).State = EntityState.Modified;
+                }
+                _db.rental.Entry(rental).State = EntityState.Modified;
+                await _db.SaveChangesAsync();
+            }
             return Ok(new ApiResult<Models.Rental>()
             {
                 code = 0,
