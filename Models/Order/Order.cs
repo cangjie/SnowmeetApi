@@ -889,5 +889,41 @@ namespace SnowmeetApi.Models
                 return totalRentNeedToRefundAmount - refundAmount;
             }
         }
+        [NotMapped]
+        public double? totalRentOverTimeAmount
+        {
+            get
+            {
+                double? amount = null;
+                for (int i = 0; rentals != null && i < rentals.Count; i++)
+                {
+                    if (amount == null)
+                    {
+                        amount = 0;
+                    }
+                    Rental rental = rentals[i];
+                    amount += rental.totalOvertimeAmount;
+                }
+                return amount;
+            }
+        }
+        [NotMapped]
+        public double? totalRentRepairAmount
+        {
+            get
+            {
+                double? amount = null;
+                for (int i = 0; rentals != null && i < rentals.Count; i++)
+                {
+                    if (amount == null)
+                    {
+                        amount = 0;
+                    }
+                    Rental rental = rentals[i];
+                    amount += rental.totalRepairationAmount;
+                }
+                return amount;
+            }
+        }
     }
 }
