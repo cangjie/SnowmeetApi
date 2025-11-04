@@ -455,7 +455,6 @@ namespace SnowmeetApi.Models
         public RentCategory category { get; set; } = null;
         [ForeignKey("rental_id")]
         public Rental rental { get; set; }
-        
         [ForeignKey(nameof(Models.RentItemLog.rent_item_id))]
         public List<Models.RentItemLog> logs { get; set; } = new List<Models.RentItemLog>();
         [NotMapped]
@@ -487,9 +486,9 @@ namespace SnowmeetApi.Models
                 else
                 {
                     double amount = 0;
-                    for (int i = 0; i < repairationCharges.Count; i++)
+                    for (int i = 0; i < availableRepairationCharges.Count; i++)
                     {
-                        amount += repairationCharges[i].amount;
+                        amount += availableRepairationCharges[i].amount;
                     }
                     return amount;
                 }

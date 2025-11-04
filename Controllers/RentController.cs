@@ -5009,6 +5009,67 @@ namespace SnowmeetApi.Controllers
             });
         }
         [HttpGet("{rentItemId}")]
+        public async Task<ActionResult<ApiResult<Models.Rental?>>> SetRentItemRepairAmount(int rentItemId,
+            double amount, string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            if (staff == null || staff.title_level < 100)
+            {
+                return Ok(new ApiResult<Models.Rental?>()
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = null
+                });
+            }
+            Models.RentItem? rentItem = await _db.rentItem.Where(r => r.id == rentItemId)
+                .AsNoTracking().FirstOrDefaultAsync();
+            if (rentItem == null)
+            {
+                return Ok(new ApiResult<Models.Rental?>()
+                {
+                    code = 1,
+                    message = "无此租赁物",
+                    data = null
+                });
+            }
+            List<Models.RentalDetail> details = await _db.rentalDetail
+                .Where(d => d.rent_item_id == rentItemId && d.charge_type == "赔偿金" 
+                    && d.valid == 1 && d.rental_id == rentItem.rental_id)
+                .AsNoTracking().ToListAsync();
+            for (int i = 0; i < details.Count; i++)
+            {
+                details[i].valid = 0;
+                details[i].update_date = DateTime.Now;
+                _db.rentalDetail.Entry(details[i]).State = EntityState.Modified;
+            }
+            if (amount > 0)
+            {
+                Models.RentalDetail detail = new Models.RentalDetail()
+                {
+                    id = 0,
+                    rental_id = rentItem.rental_id,
+                    rent_item_id = rentItemId,
+                    charge_type = "赔偿金",
+                    rental_date = DateTime.Now,
+                    amount = amount,
+                    memo = "手动设置赔偿金",
+                    staff_id = staff.id,
+                    valid = 1,
+                    create_date = DateTime.Now
+                };
+                await _db.rentalDetail.AddAsync(detail);
+            }
+            await _db.SaveChangesAsync();
+            Rental rental = await GetRental(rentItem.rental_id);
+            return Ok(new ApiResult<Models.Rental>()
+            {
+                code = 0,
+                message = "",
+                data = rental
+            });
+        }
+        [HttpGet("{rentItemId}")]
         public async Task<ActionResult<ApiResult<Models.Rental?>>> SetRentItemStatus(int rentItemId,
             string status, string sessionKey, string sessionType = "wechat_mini_openid")
         {
