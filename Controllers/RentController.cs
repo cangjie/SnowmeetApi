@@ -149,6 +149,17 @@ namespace SnowmeetApi.Controllers
             });
 
         }
+        [HttpGet("{priceId}")]
+        public async Task<ActionResult<ApiResult<RentPrice>>> GetRentPriceById(int priceId)
+        {
+            RentPrice rentPrice = await _db.rentPrice.Where(p => p.id == priceId).AsNoTracking().FirstOrDefaultAsync();
+            return Ok(new ApiResult<RentPrice>()
+            {
+                code = 0,
+                message = "",
+                data = rentPrice
+            });
+        }
         [HttpGet("{shopId}")]
         public async Task<ActionResult<ApiResult<List<RentPrice>>>> GetRentPriceList(int shopId, string type, int id, string scene)
         {
@@ -5294,6 +5305,102 @@ namespace SnowmeetApi.Controllers
                 message = "",
                 data = newDetails
             });
+        }
+        [HttpGet]
+        public async Task ContinueRentOrder(DateTime? rentDate = null)
+        {
+            if (rentDate == null)
+            {
+                rentDate = DateTime.Now.Date.AddDays(1).Date ;
+            }
+            List<Models.Order> orders = await _db.order
+                .Include(o => o.rentals).ThenInclude(r => r.rentItems).ThenInclude(i => i.logs)
+                .Include(o => o.rentals).ThenInclude(r => r.details).ThenInclude(d => d.rentPrice)
+                .Include(o => o.rentals).ThenInclude(r => r.pricePresets)
+                .Where(o => o.valid == 1 && o.type == "租赁"
+                    && o.rentals.Any(r => r.valid == 1 && r.settled == 0
+                    && r.rentItems != null && r.rentItems.Count > 0
+                    //&& r.rentItems.Where(i => i.status != "已归还").ToList().Count > 0
+                ))
+                .AsNoTracking().ToListAsync();
+            for (int i = 0; i < orders.Count; i++)
+            {
+                for(int j = 0; orders[i].rentals != null && j < orders[i].rentals.Count; j++)
+                {
+                    Rental rental = orders[i].rentals[j];
+                    await ContinueRental(rental, (DateTime)rentDate);
+                }
+            }
+        }
+        [NonAction]
+        public async Task ContinueRental(Models.Rental rental, DateTime rentDate)
+        {
+            if (rental.settled == 1 || rental.valid == 0
+            || rental.rentItems.Where(i => i.status != "已归还").Count() == 0
+            || rental.details.Where(d => ((DateTime)d.rental_date).Date == rentDate.Date).Count() > 0)
+            {
+                return;
+            }
+            string? rentType = null;
+            string? scene = "门市";
+            string? dayType = rentDate.DayOfWeek == DayOfWeek.Saturday || rentDate.DayOfWeek == DayOfWeek.Sunday ? "周末" : "平日";
+            double? discountAmount = null;
+            RentalPricePreset preset = rental.pricePresets
+                .Where(p => p.rent_date.Date == rentDate.Date).FirstOrDefault();
+            if (preset != null)
+            {
+                rentType = preset.rent_type;
+                scene = preset.scene;
+                dayType = preset.day_type;
+                discountAmount = preset.discount == 0 ? null : preset.discount;
+            }
+            else
+            {
+                rentType = "多日";
+            }
+            RentPrice price = await _db.rentPrice.Where(p => p.day_type == dayType
+                && p.rent_type == rentType && p.scene == scene && p.valid == 1
+                && ((rental.package_id != null && p.package_id == rental.package_id)
+                || (rental.category_id != null && p.category_id == rental.category_id)))
+                .AsNoTracking().FirstOrDefaultAsync();
+
+            Models.RentalDetail detail = new Models.RentalDetail()
+            {
+                id = 0,
+                rental_id = rental.id,
+                rent_price_id = price == null ? null : price.id,
+                charge_type = "租金",
+                rental_date = rentDate,
+                rent_item_id = null,
+                amount = (double)(price == null ? 0 : price.price),
+                memo = "系统续租",
+                staff_id = rental.staff_id,
+                valid = 1,
+                create_date = DateTime.Now
+            };
+            await _db.rentalDetail.AddAsync(detail);
+            await _db.SaveChangesAsync();
+            if (discountAmount != null && discountAmount > 0)
+            {
+                Discount discountObj = new Discount()
+                {
+                    id = 0,
+                    amount = (double)discountAmount,
+                    order_id = rental.order_id,
+                    biz_type = "租赁",
+                    biz_id = rental.id,
+                    sub_biz_type = "日租金",
+                    sub_biz_id = detail.id,
+                    staff_id = rental.staff_id,
+                    member_id = null,
+                    valid = 1,
+                    create_date = DateTime.Now
+
+                };
+                
+                await _db.discount.AddAsync(discountObj);
+                await _db.SaveChangesAsync();
+            }            
         }
     }
 }
