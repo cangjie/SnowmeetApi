@@ -4878,10 +4878,14 @@ namespace SnowmeetApi.Controllers
                 null, null, null, null, "开始设置租金");
             await _db.coreDataModLog.AddAsync(logR);
             await _db.SaveChangesAsync();
-            if (rental.start_date == null || (((DateTime)rental.start_date).Date == DateTime.Now.Date))
+            if (rental.start_date == null)
             {
-                await SetRentalDetail(rentalId, DateTime.Now, staffId);
+                await SetRentalDetail(rentalId, DateTime.Now.Date, staffId);
             }
+            else
+            {
+                await SetRentalDetail(rentalId, ((DateTime)rental.start_date).Date, staffId);
+            }            
             return await GetRental(rentalId);
         }
         [HttpGet]
