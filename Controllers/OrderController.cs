@@ -1025,7 +1025,7 @@ namespace SnowmeetApi.Controllers
             double payAmount = 0;
             if (amount == null)
             {
-                payAmount = order.totalCharge;
+                payAmount = (double)order.paying_amount;
             }
             else
             {
@@ -1057,6 +1057,7 @@ namespace SnowmeetApi.Controllers
             {
                 needCreateNew = false;
             }
+            //needCreateNew = true;
             if (needCreateNew)
             {
                 if (lastPayment != null)
