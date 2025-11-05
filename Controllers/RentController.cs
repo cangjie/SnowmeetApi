@@ -196,14 +196,6 @@ namespace SnowmeetApi.Controllers
                     data = null
                 });
             }
-
-            /*
-            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
-            if (member.is_admin != 1)
-            {
-                return BadRequest();
-            }
-            */
             RentCategory rentCate = await _db.rentCategory.Where(r => r.code.Trim().Equals(code.Trim())).AsNoTracking().FirstOrDefaultAsync();
 
 
@@ -4886,7 +4878,10 @@ namespace SnowmeetApi.Controllers
                 null, null, null, null, "开始设置租金");
             await _db.coreDataModLog.AddAsync(logR);
             await _db.SaveChangesAsync();
-            await SetRentalDetail(rentalId, DateTime.Now, staffId);
+            if (rental.start_date == null || (((DateTime)rental.start_date).Date == DateTime.Now.Date))
+            {
+                await SetRentalDetail(rentalId, DateTime.Now, staffId);
+            }
             return await GetRental(rentalId);
         }
         [HttpGet]
