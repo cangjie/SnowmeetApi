@@ -176,27 +176,73 @@ namespace SnowmeetApi.Controllers
                     break;
             }
             */
-            
-            List<SnowmeetApi.Models.Order> orderList = await _db.order
-                .Where(o => (o.biz_date.Date >= ((DateTime)startDate).Date && o.biz_date.Date <= ((DateTime)endDate).Date)
-                    && (memberId == null || o.member_id == memberId) && (staffId == null || o.staff_id == staffId)
-                    && (payOption == null || o.pay_option.Trim().Equals(payOption.Trim()))
-                    && (shop == null || o.shop.Trim().Equals(shop.Trim())) && (type == null || o.type.Trim().Equals(type.Trim()))
-                    && o.valid == 1 && (orderId == null || o.id == orderId))
-                .Include(o => o.fdOrders.Where(f => f.valid == 1)).ThenInclude(f => f.product).ThenInclude(p => p.category)
-                .Include(o => o.retails.Where(r => r.valid == 1))
-                .Include(o => o.cares.Where(c => c.valid == 1)).ThenInclude(c => c.tasks.Where(t => t.valid == 1).OrderBy(t => t.id))
-                .Include(o => o.rentals.Where(r => r.valid == 1)).ThenInclude(r => r.details.Where(d => d.valid == 1))
-                .Include(o => o.rentals.Where(r => r.valid == 1)).ThenInclude(r => r.rentItems.Where(r => r.valid == 1))
-                .Include(o => o.payments).ThenInclude(p => p.staff)
-                .Include(o => o.payments).ThenInclude(p => p.refunds)
-                .Include(o => o.refunds)
-                .Include(o => o.discounts.Where(d => d.valid == 1))
-                .Include(o => o.guarantys.Where(g => g.valid == 1)).ThenInclude(g => g.guarantyPayments)//.ThenInclude(g => g.payment)
-                .Include(o => o.staff)
-                .Include(o => o.member).ThenInclude(m => m.memberSocialAccounts)
-                .OrderByDescending(o => o.id).AsNoTracking().ToListAsync();
-            
+            List<SnowmeetApi.Models.Order> orderList = new List<Models.Order>();
+            switch (type)
+            {
+                case "租赁":
+                    orderList = await _db.order.Where(o => (o.biz_date.Date >= ((DateTime)startDate).Date && o.biz_date.Date <= ((DateTime)endDate).Date)
+                        && (memberId == null || o.member_id == memberId) && (staffId == null || o.staff_id == staffId)
+                        && (payOption == null || o.pay_option.Trim().Equals(payOption.Trim()))
+                        && (shop == null || o.shop.Trim().Equals(shop.Trim())) && (type == null || o.type.Trim().Equals(type.Trim()))
+                        && o.valid == 1 && (orderId == null || o.id == orderId))
+                    //.Include(o => o.fdOrders.Where(f => f.valid == 1)).ThenInclude(f => f.product).ThenInclude(p => p.category)
+                    //.Include(o => o.retails.Where(r => r.valid == 1))
+                    //.Include(o => o.cares.Where(c => c.valid == 1)).ThenInclude(c => c.tasks.Where(t => t.valid == 1).OrderBy(t => t.id))
+                    .Include(o => o.rentals.Where(r => r.valid == 1)).ThenInclude(r => r.details.Where(d => d.valid == 1))
+                    .Include(o => o.rentals.Where(r => r.valid == 1)).ThenInclude(r => r.rentItems.Where(r => r.valid == 1))
+                    .Include(o => o.payments).ThenInclude(p => p.staff)
+                    .Include(o => o.payments).ThenInclude(p => p.refunds)
+                    .Include(o => o.refunds)
+                    .Include(o => o.discounts.Where(d => d.valid == 1))
+                    .Include(o => o.guarantys.Where(g => g.valid == 1)).ThenInclude(g => g.guarantyPayments)//.ThenInclude(g => g.payment)
+                    .Include(o => o.staff)
+                    .Include(o => o.member).ThenInclude(m => m.memberSocialAccounts)
+                    .OrderByDescending(o => o.id).AsNoTracking().ToListAsync();
+                    break;
+                case "零售":
+                    orderList = await _db.order.Where(o => (o.biz_date.Date >= ((DateTime)startDate).Date && o.biz_date.Date <= ((DateTime)endDate).Date)
+                        && (memberId == null || o.member_id == memberId) && (staffId == null || o.staff_id == staffId)
+                        && (payOption == null || o.pay_option.Trim().Equals(payOption.Trim()))
+                        && (shop == null || o.shop.Trim().Equals(shop.Trim())) && (type == null || o.type.Trim().Equals(type.Trim()))
+                        && o.valid == 1 && (orderId == null || o.id == orderId))
+                    //.Include(o => o.fdOrders.Where(f => f.valid == 1)).ThenInclude(f => f.product).ThenInclude(p => p.category)
+                    .Include(o => o.retails.Where(r => r.valid == 1))
+                    //.Include(o => o.cares.Where(c => c.valid == 1)).ThenInclude(c => c.tasks.Where(t => t.valid == 1).OrderBy(t => t.id))
+                    //.Include(o => o.rentals.Where(r => r.valid == 1)).ThenInclude(r => r.details.Where(d => d.valid == 1))
+                    // .Include(o => o.rentals.Where(r => r.valid == 1)).ThenInclude(r => r.rentItems.Where(r => r.valid == 1))
+                    .Include(o => o.payments).ThenInclude(p => p.staff)
+                    .Include(o => o.payments).ThenInclude(p => p.refunds)
+                    .Include(o => o.refunds)
+                    .Include(o => o.discounts.Where(d => d.valid == 1))
+                    .Include(o => o.guarantys.Where(g => g.valid == 1)).ThenInclude(g => g.guarantyPayments)//.ThenInclude(g => g.payment)
+                    .Include(o => o.staff)
+                    .Include(o => o.member).ThenInclude(m => m.memberSocialAccounts)
+                    .OrderByDescending(o => o.id).AsNoTracking().ToListAsync();
+
+                    break;
+                default:
+                    orderList = await _db.order.Where(o => (o.biz_date.Date >= ((DateTime)startDate).Date && o.biz_date.Date <= ((DateTime)endDate).Date)
+                                        && (memberId == null || o.member_id == memberId) && (staffId == null || o.staff_id == staffId)
+                                        && (payOption == null || o.pay_option.Trim().Equals(payOption.Trim()))
+                                        && (shop == null || o.shop.Trim().Equals(shop.Trim())) && (type == null || o.type.Trim().Equals(type.Trim()))
+                                        && o.valid == 1 && (orderId == null || o.id == orderId))
+                                    .Include(o => o.fdOrders.Where(f => f.valid == 1)).ThenInclude(f => f.product).ThenInclude(p => p.category)
+                                    .Include(o => o.retails.Where(r => r.valid == 1))
+                                    .Include(o => o.cares.Where(c => c.valid == 1)).ThenInclude(c => c.tasks.Where(t => t.valid == 1).OrderBy(t => t.id))
+                                    .Include(o => o.rentals.Where(r => r.valid == 1)).ThenInclude(r => r.details.Where(d => d.valid == 1))
+                                    .Include(o => o.rentals.Where(r => r.valid == 1)).ThenInclude(r => r.rentItems.Where(r => r.valid == 1))
+                                    .Include(o => o.payments).ThenInclude(p => p.staff)
+                                    .Include(o => o.payments).ThenInclude(p => p.refunds)
+                                    .Include(o => o.refunds)
+                                    .Include(o => o.discounts.Where(d => d.valid == 1))
+                                    .Include(o => o.guarantys.Where(g => g.valid == 1)).ThenInclude(g => g.guarantyPayments)//.ThenInclude(g => g.payment)
+                                    .Include(o => o.staff)
+                                    .Include(o => o.member).ThenInclude(m => m.memberSocialAccounts)
+                                    .OrderByDescending(o => o.id).AsNoTracking().ToListAsync();
+
+                    break;
+            }
+
             if (isTest != null)
             {
                 orderList = orderList.Where(o => o.is_test == ((bool)isTest ? 1 : 0)).ToList();
@@ -1570,7 +1616,7 @@ namespace SnowmeetApi.Controllers
             //order.payments = null;
             return order;
         }
-        
+
         [HttpGet("{orderId}")]
         public async Task<ActionResult<ApiResult<Models.Order>>> CancelPaying(int orderId, string sessionKey,
         string sessionType = "wechat_mini_openid")
@@ -1698,7 +1744,7 @@ namespace SnowmeetApi.Controllers
                 data = list
             });
         }
-       
+
         [HttpGet("{key}")]
         public async Task<ActionResult<ApiResult<List<CoreDataModLog>>>> LoadLogs(string tableName, string fieldName, int key)
         {
