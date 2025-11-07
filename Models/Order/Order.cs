@@ -1021,7 +1021,8 @@ namespace SnowmeetApi.Models
                     {
                         status = RentStatus.租赁中.ToString();
                     }
-                    if (settledCount < packageCount + categoryCount)
+                    if (settledCount < packageCount + categoryCount 
+                        && settledCount > 0)
                     {
                         status = RentStatus.部分归还.ToString();
                     }
