@@ -5325,6 +5325,10 @@ namespace SnowmeetApi.Controllers
                 .AsNoTracking().ToListAsync();
             for (int i = 0; i < orders.Count; i++)
             {
+                if (((DateTime)rentDate).Date < orders[i].biz_date.Date)
+                {
+                    continue;
+                }
                 for(int j = 0; orders[i].rentals != null && j < orders[i].rentals.Count; j++)
                 {
                     Rental rental = orders[i].rentals[j];
@@ -5335,6 +5339,13 @@ namespace SnowmeetApi.Controllers
         [NonAction]
         public async Task ContinueRental(Models.Rental rental, DateTime rentDate)
         {
+            List<Models.RentalDetail> details = await _db.rentalDetail
+                .Where(d => d.valid == 1 && d.rental_date.Date == rentDate.Date && d.rental_id == rental.id)
+                .AsNoTracking().ToListAsync();
+            if (details.Count > 0)
+            {
+                return;
+            }
             if (rental.settled == 1 || rental.valid == 0
             || rental.rentItems.Where(i => i.status != "已归还").Count() == 0
             || rental.details.Where(d => ((DateTime)d.rental_date).Date == rentDate.Date).Count() > 0)
