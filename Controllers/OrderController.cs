@@ -2082,10 +2082,7 @@ namespace SnowmeetApi.Controllers
                 rental.valid = 1;
                 rental.staff_id = staff.id;
                 rental.update_date = DateTime.Now;
-                if (rental.entertain)
-                {
-                    await _rentHelper.EffectRental(rental.id, rental.staff_id);
-                }
+                
                 _db.rental.Entry(rental).State = EntityState.Modified;
                 paidAmount += guarantyAmount;
             }
@@ -2096,6 +2093,14 @@ namespace SnowmeetApi.Controllers
             await GenerateOrderCode(order);
             _db.order.Entry(order).State = EntityState.Modified;
             await _db.SaveChangesAsync();
+            for (int i = 0; i < order.rentals.Count; i++)
+            {
+                Rental rental = order.rentals[i];
+                if (rental.entertain)
+                {
+                    await _rentHelper.EffectRental(rental.id, rental.staff_id);
+                }
+            }
             return Ok(new ApiResult<Models.Order>()
             {
                 code = 0,
