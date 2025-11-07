@@ -1011,7 +1011,7 @@ namespace SnowmeetApi.Models
                     summary += rental.totalSummary;
                 }
                 string status = "";
-                if (((DateTime)startDate).Date > ((DateTime)biz_date).Date)
+                if (startDate == null || ((DateTime)startDate).Date > ((DateTime)biz_date).Date)
                 {
                     status = RentStatus.未开始.ToString();
                 }
