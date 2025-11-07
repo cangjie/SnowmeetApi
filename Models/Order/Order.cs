@@ -945,121 +945,130 @@ namespace SnowmeetApi.Models
         {
             get
             {
-                if (rentals == null || rentals.Count == 0)
+                try
+
                 {
-                    return null;
-                }
-                DateTime? startDate = null;
-                DateTime? endDate = DateTime.MinValue;
-                double paidGuarantyAmount = 0;
-                int paidGuarantyCount = 0;
-                int relieveGuarantyCount = 0;
-                int settledCount = 0;
-                int packageCount = 0;
-                int categoryCount = 0;
-                double currentRentalAmount = 0;
-                double summary = 0;
-                for (int i = 0; i < rentals.Count; i++)
-                {
-                    Rental rental = rentals[i];
-                    if (rental.valid != 1)
+                    if (rentals == null || rentals.Count == 0)
                     {
-                        continue;
+                        return null;
                     }
-                    if ((startDate == null || (rental.realStartDate != null && ((DateTime)rental.realStartDate).Date < ((DateTime)startDate).Date))
-                         && rental.start_date != null)
+                    DateTime? startDate = null;
+                    DateTime? endDate = DateTime.MinValue;
+                    double paidGuarantyAmount = 0;
+                    int paidGuarantyCount = 0;
+                    int relieveGuarantyCount = 0;
+                    int settledCount = 0;
+                    int packageCount = 0;
+                    int categoryCount = 0;
+                    double currentRentalAmount = 0;
+                    double summary = 0;
+                    for (int i = 0; i < rentals.Count; i++)
                     {
-                        startDate = rental.realStartDate;
-                    }
-                    if (rental.realEndDate == null)
-                    {
-                        endDate = null;
-                    }
-                    else if (endDate != null)
-                    {
-                        if (((DateTime)endDate).Date < ((DateTime)rental.realEndDate).Date)
+                        Rental rental = rentals[i];
+                        if (rental.valid != 1)
                         {
-                            endDate = rental.end_date;
+                            continue;
                         }
-                    }
-                    for (int j = 0; j < rental.guaranties.Count; j++)
-                    {
-                        Guaranty g = rental.guaranties[j];
-                        if (g.payStatus == "支付完成")
+                        if ((startDate == null || (rental.realStartDate != null && ((DateTime)rental.realStartDate).Date < ((DateTime)startDate).Date))
+                             && rental.start_date != null)
                         {
-                            paidGuarantyCount++;
-                            paidGuarantyAmount += (double)g.amount;
-                            if (g.relieve == 1)
+                            startDate = rental.realStartDate;
+                        }
+                        if (rental.realEndDate == null)
+                        {
+                            endDate = null;
+                        }
+                        else if (endDate != null)
+                        {
+                            if (((DateTime)endDate).Date < ((DateTime)rental.realEndDate).Date)
                             {
-                                relieveGuarantyCount++;
+                                endDate = rental.end_date;
                             }
                         }
-                    }
-                    if (rental.settled == 1)
-                    {
-                        settledCount++;
-                    }
-                    if (rental.package_id != null)
-                    {
-                        packageCount++;
-                    }
-                    else
-                    {
-                        categoryCount++;
-                    }
-                    currentRentalAmount += rental.totalRentalAmount;
-                    summary += rental.totalSummary;
-                }
-                string status = "";
-                if (startDate == null || ((DateTime)startDate).Date > ((DateTime)biz_date).Date)
-                {
-                    status = RentStatus.未开始.ToString();
-                }
-                else
-                {
-                    if (endDate == null)
-                    {
-                        status = RentStatus.租赁中.ToString();
-                    }
-                    if (settledCount < packageCount + categoryCount 
-                        && settledCount > 0)
-                    {
-                        status = RentStatus.部分归还.ToString();
-                    }
-                    if (settledCount == packageCount + categoryCount)
-                    {
-                        status = RentStatus.全部归还.ToString();
-                    }
-                    if (refundAmount > 0)
-                    {
-                        if (paidAmount - summary <= refundAmount)
+                        for (int j = 0; j < rental.guaranties.Count; j++)
                         {
-                            if (closed == 1)
+                            Guaranty g = rental.guaranties[j];
+                            if (g.payStatus == "支付完成")
                             {
-                                status = RentStatus.了结关闭.ToString();
+                                paidGuarantyCount++;
+                                paidGuarantyAmount += (double)g.amount;
+                                if (g.relieve == 1)
+                                {
+                                    relieveGuarantyCount++;
+                                }
                             }
-                            else
-                            {
-                                status = RentStatus.全额退押金.ToString();
-                            }
+                        }
+                        if (rental.settled == 1)
+                        {
+                            settledCount++;
+                        }
+                        if (rental.package_id != null)
+                        {
+                            packageCount++;
                         }
                         else
                         {
-                            status = RentStatus.部分退押金.ToString();
+                            categoryCount++;
                         }
+                        currentRentalAmount += rental.totalRentalAmount;
+                        summary += rental.totalSummary;
                     }
-                    //rental.totalRentNeedToRefundAmount
+                    string status = "";
+                    if (startDate == null || ((DateTime)startDate).Date > ((DateTime)biz_date).Date)
+                    {
+                        status = RentStatus.未开始.ToString();
+                    }
+                    else
+                    {
+                        if (endDate == null)
+                        {
+                            status = RentStatus.租赁中.ToString();
+                        }
+                        if (settledCount < packageCount + categoryCount
+                            && settledCount > 0)
+                        {
+                            status = RentStatus.部分归还.ToString();
+                        }
+                        if (settledCount == packageCount + categoryCount)
+                        {
+                            status = RentStatus.全部归还.ToString();
+                        }
+                        if (refundAmount > 0)
+                        {
+                            if (paidAmount - summary <= refundAmount)
+                            {
+                                if (closed == 1)
+                                {
+                                    status = RentStatus.了结关闭.ToString();
+                                }
+                                else
+                                {
+                                    status = RentStatus.全额退押金.ToString();
+                                }
+                            }
+                            else
+                            {
+                                status = RentStatus.部分退押金.ToString();
+                            }
+                        }
+                        //rental.totalRentNeedToRefundAmount
 
+                    }
+                    RentPropertySet property = new RentPropertySet()
+                    {
+                        rentStatus = status,
+                        startDate = startDate,
+                        endDate = endDate
+
+                    };
+                    return property;
                 }
-                RentPropertySet property = new RentPropertySet()
-                {
-                    rentStatus = status,
-                    startDate = startDate,
-                    endDate = endDate
+                catch
 
-                };
-                return property;
-            }
+                {
+                    return null;
+                }
+                }
         }
 
     }
