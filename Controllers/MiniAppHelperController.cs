@@ -179,17 +179,24 @@ namespace LuqinMiniAppBase.Controllers
             {
                 unionId = null;
             }
-
-            if (unionId != null && unionId.Trim().Length > 0)
+             List<MemberSocialAccount> msaList = await _db.memberSocialAccount
+                    .Where(m => (m.num.Trim().Equals(openId.Trim()) && m.valid == 1 && m.type.Trim().Equals("wechat_mini_openid")))
+                    .OrderByDescending(m => m.id).AsNoTracking().ToListAsync();
+            if (msaList.Count > 0)
             {
-                List<MemberSocialAccount> msaList = await _db.memberSocialAccount
+                memberId = msaList[0].member_id;
+            }
+            else if (unionId != null && unionId.Trim().Length > 0)
+            {
+                List<MemberSocialAccount> msaListUnionId = await _db.memberSocialAccount
                     .Where(m => (m.num.Trim().Equals(unionId.Trim()) && m.valid == 1 && m.type.Trim().Equals("wechat_unionid")))
                     .OrderByDescending(m => m.id).AsNoTracking().ToListAsync();
-                if (msaList.Count > 0)
+                if (msaListUnionId.Count > 0)
                 {
-                    memberId = msaList[0].member_id;
+                    memberId = msaListUnionId[0].member_id;
                 }
             }
+            /*
             if (memberId == null)
             {
                 List<MemberSocialAccount> msaList = await _db.memberSocialAccount
@@ -200,6 +207,7 @@ namespace LuqinMiniAppBase.Controllers
                     memberId = msaList[0].member_id;
                 }
             }
+            */
             Member member = new Member();
             if (memberId == null)
             {
