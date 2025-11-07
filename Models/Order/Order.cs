@@ -16,6 +16,21 @@ namespace SnowmeetApi.Models
         public enum OrderStatus { 待生成, 待支付, 部分支付, 支付成功, 挂账, 全额退款, 部分退款, 退款失败, 订单关闭, 已下单, 已完成 }
         public enum PayFlowStatus { 待生成, 已生成, 待支付, 支付中, 已支付, 已关闭, 部分退款, 全额退款 }
         public enum PayType { 整单支付, 分付, 无需支付, 未支付, 招待 }
+        public enum RentStatus { 未开始, 租赁中, 部分归还, 全部归还, 部分退押金, 全额退押金, 了结关闭 };
+        public class RentPropertySet
+        {
+            public string? rentStatus { get; set; } = null;
+            public DateTime? startDate { get; set; } = null;
+            public DateTime? endDate { get; set; } = null;
+            public int totalPaidGuarantyCount { get; set; } = 0;
+            public int relieveGuarantyCount { get; set; } = 0;
+            public double? totalGuarantyAmount { get; set; } = null;
+            public double? currentRentalAmount { get; set; } = null;
+            public int totalRentalsCount { get; set; } = 0;
+            public int packageCount { get; set; } = 0;
+            public int categoryCount { get; set; } = 0;
+            public double? totalChargeSummaryAmount { get; set; } = null;
+        }
         public static void RendOrder(SnowmeetApi.Models.Order order)
         {
             string txtColor = "";
@@ -172,8 +187,8 @@ namespace SnowmeetApi.Models
                 }
                 else
                 {
-                    return payments.Where(p => ((p.pay_method == "微信支付" || p.pay_method == "支付宝") &&  p.status.Equals("支付成功") )
-                     || (p.valid == 1 && p.pay_method != "微信支付" && p.pay_method != "支付宝" && p.status.Equals("支付成功") )).ToList();
+                    return payments.Where(p => ((p.pay_method == "微信支付" || p.pay_method == "支付宝") && p.status.Equals("支付成功"))
+                     || (p.valid == 1 && p.pay_method != "微信支付" && p.pay_method != "支付宝" && p.status.Equals("支付成功"))).ToList();
                 }
             }
         }
@@ -208,7 +223,7 @@ namespace SnowmeetApi.Models
                     {
                         foreach (OrderPaymentRefund refund in payment.refunds)
                         {
-                            if (refund.refund_id != null && (refund.state == 1 || !refund.refund_id.Trim().Equals("")) )
+                            if (refund.refund_id != null && (refund.state == 1 || !refund.refund_id.Trim().Equals("")))
                             {
                                 availableRefunds.Add(refund);
                             }
@@ -925,5 +940,126 @@ namespace SnowmeetApi.Models
                 return amount;
             }
         }
+        [NotMapped]
+        public RentPropertySet? rentProperties
+        {
+            get
+            {
+                if (rentals == null || rentals.Count == 0)
+                {
+                    return null;
+                }
+                DateTime? startDate = null;
+                DateTime? endDate = DateTime.MinValue;
+                double paidGuarantyAmount = 0;
+                int paidGuarantyCount = 0;
+                int relieveGuarantyCount = 0;
+                int settledCount = 0;
+                int packageCount = 0;
+                int categoryCount = 0;
+                double currentRentalAmount = 0;
+                double summary = 0;
+                for (int i = 0; i < rentals.Count; i++)
+                {
+                    Rental rental = rentals[i];
+                    if (rental.valid != 1)
+                    {
+                        continue;
+                    }
+                    if ((startDate == null || (rental.start_date != null && ((DateTime)rental.start_date).Date < ((DateTime)startDate).Date))
+                         && rental.start_date != null)
+                    {
+                        startDate = rental.start_date;
+                    }
+                    if (rental.end_date == null)
+                    {
+                        endDate = null;
+                    }
+                    else if (endDate != null)
+                    {
+                        if (((DateTime)endDate).Date < ((DateTime)rental.end_date).Date)
+                        {
+                            endDate = rental.end_date;
+                        }
+                    }
+                    for (int j = 0; j < rental.guaranties.Count; j++)
+                    {
+                        Guaranty g = rental.guaranties[j];
+                        if (g.payStatus == "支付完成")
+                        {
+                            paidGuarantyCount++;
+                            paidGuarantyAmount += (double)g.amount;
+                            if (g.relieve == 1)
+                            {
+                                relieveGuarantyCount++;
+                            }
+                        }
+                    }
+                    if (rental.settled == 1)
+                    {
+                        settledCount++;
+                    }
+                    if (rental.package_id != null)
+                    {
+                        packageCount++;
+                    }
+                    else
+                    {
+                        categoryCount++;
+                    }
+                    currentRentalAmount += rental.totalRentalAmount;
+                    summary += rental.totalSummary;
+                }
+                string status = "";
+                if (((DateTime)startDate).Date > ((DateTime)biz_date).Date)
+                {
+                    status = RentStatus.未开始.ToString();
+                }
+                else
+                {
+                    if (endDate == null)
+                    {
+                        status = RentStatus.租赁中.ToString();
+                    }
+                    if (settledCount < packageCount + categoryCount)
+                    {
+                        status = RentStatus.部分归还.ToString();
+                    }
+                    if (settledCount == packageCount + categoryCount)
+                    {
+                        status = RentStatus.全部归还.ToString();
+                    }
+                    if (refundAmount > 0)
+                    {
+                        if (paidAmount - summary <= refundAmount)
+                        {
+                            if (closed == 1)
+                            {
+                                status = RentStatus.了结关闭.ToString();
+                            }
+                            else
+                            {
+                                status = RentStatus.全额退押金.ToString();
+                            }
+                        }
+                        else
+                        {
+                            status = RentStatus.部分退押金.ToString();
+                        }
+                    }
+                    //rental.totalRentNeedToRefundAmount
+
+                }
+                RentPropertySet property = new RentPropertySet()
+                {
+                    rentStatus = status,
+                    startDate = startDate,
+                    endDate = endDate
+
+                };
+                return property;
+            }
+        }
+
     }
 }
