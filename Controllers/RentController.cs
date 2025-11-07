@@ -5396,10 +5396,38 @@ namespace SnowmeetApi.Controllers
                     create_date = DateTime.Now
 
                 };
-                
+
                 await _db.discount.AddAsync(discountObj);
                 await _db.SaveChangesAsync();
-            }            
+            }
         }
+        /*
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<List<Models.Order>>>> GetRentOrderBySettleDateByStaff(string shop, 
+            DateTime startDate, DateTime endDate, string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            shop = Util.UrlDecode(shop);
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            if (staff == null || staff.title_level < 100)
+            {
+                return Ok(new ApiResult<List<Models.RentalDetail>>()
+                {
+                    code = 1,
+                    message = "",
+                    data = null
+                });
+            }
+            OrderController _orderHelper = new OrderController(_db, _config, _httpContextAccessor);
+            List<Models.Order> orders = await _orderHelper.GetCommonOrders(null, shop, null, null,
+                "租赁", DateTime.Parse("2025-10-15"), endDate, null, null, null, null, null, null, null);
+            List<Models.Order> settledOrders = new List<Models.Order>();
+            for (int i = 0; i < orders.Count; i++)
+            {
+                Models.Order order = orders[i];
+
+            }
+            return BadRequest();
+        }
+        */
     }
 }

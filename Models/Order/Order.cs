@@ -946,7 +946,6 @@ namespace SnowmeetApi.Models
             get
             {
                 try
-
                 {
                     if (rentals == null || rentals.Count == 0)
                     {
@@ -1051,8 +1050,6 @@ namespace SnowmeetApi.Models
                                 status = RentStatus.部分退押金.ToString();
                             }
                         }
-                        //rental.totalRentNeedToRefundAmount
-
                     }
                     RentPropertySet property = new RentPropertySet()
                     {
@@ -1068,7 +1065,7 @@ namespace SnowmeetApi.Models
                 {
                     return null;
                 }
-                }
+            }
         }
 
     }

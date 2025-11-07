@@ -222,23 +222,23 @@ namespace SnowmeetApi.Controllers
                     break;
                 default:
                     orderList = await _db.order.Where(o => (o.biz_date.Date >= ((DateTime)startDate).Date && o.biz_date.Date <= ((DateTime)endDate).Date)
-                                        && (memberId == null || o.member_id == memberId) && (staffId == null || o.staff_id == staffId)
-                                        && (payOption == null || o.pay_option.Trim().Equals(payOption.Trim()))
-                                        && (shop == null || o.shop.Trim().Equals(shop.Trim())) && (type == null || o.type.Trim().Equals(type.Trim()))
-                                        && o.valid == 1 && (orderId == null || o.id == orderId))
-                                    .Include(o => o.fdOrders.Where(f => f.valid == 1)).ThenInclude(f => f.product).ThenInclude(p => p.category)
-                                    .Include(o => o.retails.Where(r => r.valid == 1))
-                                    .Include(o => o.cares.Where(c => c.valid == 1)).ThenInclude(c => c.tasks.Where(t => t.valid == 1).OrderBy(t => t.id))
-                                    .Include(o => o.rentals.Where(r => r.valid == 1)).ThenInclude(r => r.details.Where(d => d.valid == 1))
-                                    .Include(o => o.rentals.Where(r => r.valid == 1)).ThenInclude(r => r.rentItems.Where(r => r.valid == 1))
-                                    .Include(o => o.payments).ThenInclude(p => p.staff)
-                                    .Include(o => o.payments).ThenInclude(p => p.refunds)
-                                    .Include(o => o.refunds)
-                                    .Include(o => o.discounts.Where(d => d.valid == 1))
-                                    .Include(o => o.guarantys.Where(g => g.valid == 1)).ThenInclude(g => g.guarantyPayments)//.ThenInclude(g => g.payment)
-                                    .Include(o => o.staff)
-                                    .Include(o => o.member).ThenInclude(m => m.memberSocialAccounts)
-                                    .OrderByDescending(o => o.id).AsNoTracking().ToListAsync();
+                            && (memberId == null || o.member_id == memberId) && (staffId == null || o.staff_id == staffId)
+                            && (payOption == null || o.pay_option.Trim().Equals(payOption.Trim()))
+                            && (shop == null || o.shop.Trim().Equals(shop.Trim())) && (type == null || o.type.Trim().Equals(type.Trim()))
+                            && o.valid == 1 && (orderId == null || o.id == orderId))
+                        .Include(o => o.fdOrders.Where(f => f.valid == 1)).ThenInclude(f => f.product).ThenInclude(p => p.category)
+                        .Include(o => o.retails.Where(r => r.valid == 1))
+                        .Include(o => o.cares.Where(c => c.valid == 1)).ThenInclude(c => c.tasks.Where(t => t.valid == 1).OrderBy(t => t.id))
+                        .Include(o => o.rentals.Where(r => r.valid == 1)).ThenInclude(r => r.details.Where(d => d.valid == 1))
+                        .Include(o => o.rentals.Where(r => r.valid == 1)).ThenInclude(r => r.rentItems.Where(r => r.valid == 1))
+                        .Include(o => o.payments).ThenInclude(p => p.staff)
+                        .Include(o => o.payments).ThenInclude(p => p.refunds)
+                        .Include(o => o.refunds)
+                        .Include(o => o.discounts.Where(d => d.valid == 1))
+                        .Include(o => o.guarantys.Where(g => g.valid == 1)).ThenInclude(g => g.guarantyPayments)//.ThenInclude(g => g.payment)
+                        .Include(o => o.staff)
+                        .Include(o => o.member).ThenInclude(m => m.memberSocialAccounts)
+                        .OrderByDescending(o => o.id).AsNoTracking().ToListAsync();
 
                     break;
             }
@@ -730,6 +730,7 @@ namespace SnowmeetApi.Controllers
                         order.total_amount = total;
                         order.paying_amount = total;
                         break;
+                    
                     default:
                         break;
                 }
@@ -772,6 +773,25 @@ namespace SnowmeetApi.Controllers
             };
             await _db.coreDataModLog.AddAsync(log);
             await _db.SaveChangesAsync();
+            if (order.paying_amount == 0)
+            {
+                switch (order.type)
+                {
+                    case "租赁":
+                        RentController _rentHelper = new RentController(_db, _config, _http);
+                        for (int i = 0; order.rentals != null && i < order.rentals.Count; i++)
+                        {
+                            Models.Rental rental = order.rentals[i];
+                            if (rental.entertain)
+                            {
+                                await _rentHelper.EffectRental(rental.id, order.staff_id);
+                            }
+                        }
+                        break;
+                    default:
+                        break;
+                }
+            }
             return Ok(new ApiResult<SnowmeetApi.Models.Order?>()
             {
                 code = 0,
