@@ -773,6 +773,7 @@ namespace SnowmeetApi.Controllers
             };
             await _db.coreDataModLog.AddAsync(log);
             await _db.SaveChangesAsync();
+            /*
             if (order.paying_amount == 0)
             {
                 switch (order.type)
@@ -792,6 +793,7 @@ namespace SnowmeetApi.Controllers
                         break;
                 }
             }
+            */
             return Ok(new ApiResult<SnowmeetApi.Models.Order?>()
             {
                 code = 0,
@@ -2048,6 +2050,7 @@ namespace SnowmeetApi.Controllers
                 });
             }
             double paidAmount = 0;
+            RentController _rentHelper = new RentController(_db, _config, _http);
             for (int i = 0; i < order.rentals.Count; i++)
             {
                 Rental rental = order.rentals[i];
@@ -2079,6 +2082,10 @@ namespace SnowmeetApi.Controllers
                 rental.valid = 1;
                 rental.staff_id = staff.id;
                 rental.update_date = DateTime.Now;
+                if (rental.entertain)
+                {
+                    await _rentHelper.EffectRental(rental.id, rental.staff_id);
+                }
                 _db.rental.Entry(rental).State = EntityState.Modified;
                 paidAmount += guarantyAmount;
             }
