@@ -2096,6 +2096,7 @@ namespace SnowmeetApi.Controllers
             for (int i = 0; i < order.rentals.Count; i++)
             {
                 Rental rental = order.rentals[i];
+                _db.rental.Entry(rental).State = EntityState.Detached;
                 if (rental.entertain)
                 {
                     await _rentHelper.EffectRental(rental.id, rental.staff_id);
