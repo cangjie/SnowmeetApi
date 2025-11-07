@@ -167,16 +167,11 @@ namespace LuqinMiniAppBase.Controllers
                 result.message = "获取session失败 " + sessionObj.errcode.ToString() + " " + sessionObj.errmsg;
                 result.data = null;
                 return Ok(result);
-            }
-         
-
+            }  
             string openId = sessionObj.openid;
             string sessionKey = sessionObj.session_key;
             string? unionId = null;
             int? memberId = null;
-            
-           
-           
             try
             {
                 unionId = sessionObj.unionid;
@@ -185,7 +180,6 @@ namespace LuqinMiniAppBase.Controllers
             {
                 unionId = null;
             }
-         
             List<MemberSocialAccount> msaList = await _db.memberSocialAccount
                    .Where(m => (m.num.Trim().Equals(openId.Trim()) && m.valid == 1 && m.type.Trim().Equals("wechat_mini_openid")))
                    .OrderByDescending(m => m.id).AsNoTracking().ToListAsync();
@@ -303,7 +297,7 @@ namespace LuqinMiniAppBase.Controllers
                         }
                         subList[j].valid = 0;
                         subList[j].update_date = DateTime.Now;
-                        _db.memberSocialAccount.Entry(subList[i]).State = EntityState.Modified;
+                        _db.memberSocialAccount.Entry(subList[j]).State = EntityState.Modified;
                     }
                 }
                 if (msaOA == null && oaOpenId != null)
