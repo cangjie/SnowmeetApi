@@ -966,18 +966,18 @@ namespace SnowmeetApi.Models
                     {
                         continue;
                     }
-                    if ((startDate == null || (rental.start_date != null && ((DateTime)rental.start_date).Date < ((DateTime)startDate).Date))
+                    if ((startDate == null || (rental.realStartDate != null && ((DateTime)rental.realStartDate).Date < ((DateTime)startDate).Date))
                          && rental.start_date != null)
                     {
-                        startDate = rental.start_date;
+                        startDate = rental.realStartDate;
                     }
-                    if (rental.end_date == null)
+                    if (rental.realEndDate == null)
                     {
                         endDate = null;
                     }
                     else if (endDate != null)
                     {
-                        if (((DateTime)endDate).Date < ((DateTime)rental.end_date).Date)
+                        if (((DateTime)endDate).Date < ((DateTime)rental.realEndDate).Date)
                         {
                             endDate = rental.end_date;
                         }
