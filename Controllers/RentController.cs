@@ -4841,7 +4841,7 @@ namespace SnowmeetApi.Controllers
             return detail;
         }
         [NonAction]
-        public async Task<Rental> EffectRental(int rentalId, int? staffId)
+        public async Task<Rental?> EffectRental(int rentalId, int? staffId)
         {
             Rental rental = await _db.rental.Where(r => r.id == rentalId)
                 .AsNoTracking().FirstOrDefaultAsync();
@@ -4885,8 +4885,9 @@ namespace SnowmeetApi.Controllers
             else
             {
                 await SetRentalDetail(rentalId, ((DateTime)rental.start_date).Date, staffId);
-            }            
+            }
             return await GetRental(rentalId);
+            //return null;
         }
         [HttpGet]
         public async Task<Models.Order> EffectRentOrder(int orderId, int paymentId)

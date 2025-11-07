@@ -2093,10 +2093,12 @@ namespace SnowmeetApi.Controllers
             await GenerateOrderCode(order);
             _db.order.Entry(order).State = EntityState.Modified;
             await _db.SaveChangesAsync();
+            _db.order.Entry(order).State = EntityState.Detached;
             for (int i = 0; i < order.rentals.Count; i++)
             {
                 Rental rental = order.rentals[i];
                 _db.rental.Entry(rental).State = EntityState.Detached;
+                //await _db.SaveChangesAsync();
                 if (rental.entertain)
                 {
                     await _rentHelper.EffectRental(rental.id, rental.staff_id);
