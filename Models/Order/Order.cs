@@ -31,6 +31,10 @@ namespace SnowmeetApi.Models
             public int categoryCount { get; set; } = 0;
             public double? totalChargeSummaryAmount { get; set; } = null;
         }
+        public class CarePropertySet
+        {
+            public string orderStatus { get; set; } = "临时订单";
+        }
         public static void RendOrder(SnowmeetApi.Models.Order order)
         {
             string txtColor = "";
@@ -1062,6 +1066,34 @@ namespace SnowmeetApi.Models
                 }
                 catch
 
+                {
+                    return null;
+                }
+            }
+        }
+        [NotMapped]
+        public CarePropertySet? careProperties
+        {
+            get
+            {
+                try
+                {
+                    if (type != "养护")
+                    {
+                        return null;
+                    }
+                    CarePropertySet property = new CarePropertySet();
+                    if (cares == null || cares.Count == 0)
+                    {
+                        property.orderStatus = "临时订单";
+                    }
+                    else
+                    {
+                        property.orderStatus = "正常订单";
+                    }
+                    return null;
+                }
+                catch
                 {
                     return null;
                 }
