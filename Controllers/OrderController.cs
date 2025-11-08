@@ -761,41 +761,8 @@ namespace SnowmeetApi.Controllers
 
             await GenerateOrderCode(order);
             await _db.order.AddAsync(order);
-            for (int i = 0; order.cares != null && i < order.cares.Count; i++)
-            {
-                if (order.cares[i].discount > 0)
-                {
-                    Discount discount = new Discount()
-                    {
-                        id = 0,
-                        order_id = order.id,
-                        biz_type = "养护",
-                        biz_id = order.cares[i].id,
-                        amount = order.cares[i].discount,
-                        valid = 1,
-                        staff_id = order.staff_id,
-                        create_date = DateTime.Now
-                    };
-                    await _db.discount.AddAsync(discount);
-                }
-                if (order.cares[i].ticket_discount > 0)
-                {
-                    Discount discount = new Discount()
-                    {
-                        id = 0,
-                        order_id = order.id,
-                        biz_type = "养护",
-                        biz_id = order.cares[i].id,
-                        amount = order.cares[i].discount,
-                        valid = 1,
-                        staff_id = order.staff_id,
-                        ticket_code = order.cares[i].ticket_code,
-                        create_date = DateTime.Now
-                    };
-                    await _db.discount.AddAsync(discount);
-                }
-                
-            }
+            
+            
             CoreDataModLog log = new CoreDataModLog()
             {
                 table_name = "Order",
@@ -831,6 +798,42 @@ namespace SnowmeetApi.Controllers
                 }
             }
             */
+            for (int i = 0; order.cares != null && i < order.cares.Count; i++)
+            {
+                if (order.cares[i].discount > 0)
+                {
+                    Discount discount = new Discount()
+                    {
+                        id = 0,
+                        order_id = order.id,
+                        biz_type = "养护",
+                        biz_id = order.cares[i].id,
+                        amount = order.cares[i].discount,
+                        valid = 1,
+                        staff_id = order.staff_id,
+                        create_date = DateTime.Now
+                    };
+                    await _db.discount.AddAsync(discount);
+                }
+                if (order.cares[i].ticket_discount > 0)
+                {
+                    Discount discount = new Discount()
+                    {
+                        id = 0,
+                        order_id = order.id,
+                        biz_type = "养护",
+                        biz_id = order.cares[i].id,
+                        amount = order.cares[i].discount,
+                        valid = 1,
+                        staff_id = order.staff_id,
+                        ticket_code = order.cares[i].ticket_code,
+                        create_date = DateTime.Now
+                    };
+                    await _db.discount.AddAsync(discount);
+                }
+
+            }
+            await _db.SaveChangesAsync();
             return Ok(new ApiResult<SnowmeetApi.Models.Order?>()
             {
                 code = 0,
