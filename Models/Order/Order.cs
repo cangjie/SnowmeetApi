@@ -34,6 +34,7 @@ namespace SnowmeetApi.Models
         public class CarePropertySet
         {
             public string orderStatus { get; set; } = "临时订单";
+            public string services { get; set; } = "";
         }
         public static void RendOrder(SnowmeetApi.Models.Order order)
         {
@@ -1090,6 +1091,42 @@ namespace SnowmeetApi.Models
                     else
                     {
                         property.orderStatus = "正常订单";
+                    }
+                    for (int i = 0; cares != null && i < cares.Count; i++)
+                    {
+                        Care care = cares[i];
+                        if (care.valid != 1)
+                        {
+                            continue;
+                        }
+                        if (care.need_edge == 1)
+                        {
+                            if (property.services.IndexOf("修刃") < 0)
+                            {
+                                property.services += " 修刃";
+                            }
+                        }
+                        if (care.need_wax == 1)
+                        {
+                            if (property.services.IndexOf("打蜡") < 0)
+                            {
+                                property.services += " 打蜡";
+                            }
+                        }
+                        if (care.need_unwax == 1)
+                        {
+                            if (property.services.IndexOf("刮蜡") < 0)
+                            {
+                                property.services += " 刮蜡";
+                            }
+                        }
+                        if (care.need_repair == 1)
+                        {
+                            if (property.services.IndexOf("维修") < 0)
+                            {
+                                property.services += " 维修";
+                            }
+                        }
                     }
                     return property;
                 }
