@@ -856,6 +856,10 @@ namespace SnowmeetApi.Controllers
                     data = null
                 });
             }
+            if (type == "养护" && ((DateTime)startDate).Date < DateTime.Parse("2025-11-01"))
+            {
+                startDate = DateTime.Parse("2025-11-01");
+            }
             List<SnowmeetApi.Models.Order> orders = await GetCommonOrders(orderId, shop, null, null, type, startDate, endDate, payOption,
             isTest, isEntertain, isPackage, isOnCredit, haveDiscount, status);
             List<SnowmeetApi.Models.Order> newOrders = new List<Models.Order>();
