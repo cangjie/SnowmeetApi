@@ -262,7 +262,7 @@ namespace SnowmeetApi.Controllers
         {
             List<Product> products = ((ApiResult<List<Product>>)((OkObjectResult)(await GetProducts(shop)).Result).Value).data;
             Product product = null;
-            for(int i = 0; i < products.Count; i++)
+            for (int i = 0; i < products.Count; i++)
             {
                 if (products[i].name.IndexOf("修刃打蜡") >= 0 && products[i].name.IndexOf("立等") >= 0
                 && care.need_edge == 1 && care.need_wax == 1 && care.urgent == 1)
@@ -303,6 +303,8 @@ namespace SnowmeetApi.Controllers
             }
             return product;
         }
+       
+
     }
     
 }
