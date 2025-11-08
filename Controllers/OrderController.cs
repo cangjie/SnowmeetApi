@@ -725,8 +725,10 @@ namespace SnowmeetApi.Controllers
                             {
                                 care.common_charge = product.sale_price;
                             }
-                            total += (care.common_charge + care.repair_charge - care.discount);
+                            total += (care.common_charge + care.repair_charge - care.discount - care.ticket_discount);
+                            
                         }
+                        
                         order.total_amount = total;
                         order.paying_amount = total;
                         break;
@@ -759,6 +761,41 @@ namespace SnowmeetApi.Controllers
 
             await GenerateOrderCode(order);
             await _db.order.AddAsync(order);
+            for (int i = 0; order.cares != null && i < order.cares.Count; i++)
+            {
+                if (order.cares[i].discount > 0)
+                {
+                    Discount discount = new Discount()
+                    {
+                        id = 0,
+                        order_id = order.id,
+                        biz_type = "养护",
+                        biz_id = order.cares[i].id,
+                        amount = order.cares[i].discount,
+                        valid = 1,
+                        staff_id = order.staff_id,
+                        create_date = DateTime.Now
+                    };
+                    await _db.discount.AddAsync(discount);
+                }
+                if (order.cares[i].ticket_discount > 0)
+                {
+                    Discount discount = new Discount()
+                    {
+                        id = 0,
+                        order_id = order.id,
+                        biz_type = "养护",
+                        biz_id = order.cares[i].id,
+                        amount = order.cares[i].discount,
+                        valid = 1,
+                        staff_id = order.staff_id,
+                        ticket_code = order.cares[i].ticket_code,
+                        create_date = DateTime.Now
+                    };
+                    await _db.discount.AddAsync(discount);
+                }
+                
+            }
             CoreDataModLog log = new CoreDataModLog()
             {
                 table_name = "Order",
