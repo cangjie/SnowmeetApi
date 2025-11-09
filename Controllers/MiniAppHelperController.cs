@@ -387,11 +387,10 @@ namespace LuqinMiniAppBase.Controllers
                 result.data = null;
                 return Ok(result);
             }
-
             string openId = sessionObj.openid;
             string sessionKey = sessionObj.session_key;
             string? unionId = null;
-
+            int? memberId = null;
             try
             {
                 unionId = sessionObj.unionid;
@@ -401,13 +400,6 @@ namespace LuqinMiniAppBase.Controllers
                 unionId = null;
             }
 
-/*
-            string openId = "oHdTn5enw9r05VeyOd5AnR4obmEA";
-            string sessionKey = "";
-            string? unionId = "o2T0C63VsHWs77sCrcL3gXxq-SWs";
-*/
-
-            int? memberId = null;
             if (unionId != null && unionId.Trim().Length > 0)
             {
                 List<MemberSocialAccount> msaList = await _db.memberSocialAccount
@@ -483,9 +475,8 @@ namespace LuqinMiniAppBase.Controllers
                         memo = "",
                         member_id = member.id
                     };
-                    //member.memberSocialAccounts.Add(msa);
-                    //_db.member.Entry(member).State = EntityState.Modified;
-                    await _db.memberSocialAccount.AddAsync(msa);
+                    member.memberSocialAccounts.Add(msa);
+                    _db.member.Entry(member).State = EntityState.Modified;
                     await _db.SaveChangesAsync();
                 }
                 if (member.wechatUnionId == null)
@@ -498,9 +489,8 @@ namespace LuqinMiniAppBase.Controllers
                         memo = "",
                         member_id = member.id
                     };
-                    //member.memberSocialAccounts.Add(msa);
-                    //_db.member.Entry(member).State = EntityState.Modified;
-                    await _db.memberSocialAccount.AddAsync(msa);
+                    member.memberSocialAccounts.Add(msa);
+                    _db.member.Entry(member).State = EntityState.Modified;
                     await _db.SaveChangesAsync();
                 }
             }
@@ -518,7 +508,7 @@ namespace LuqinMiniAppBase.Controllers
                     expire_date = expireDate
                 };
                 await _db.miniSession.AddAsync(session);
-
+                
             }
             else
             {
@@ -537,39 +527,6 @@ namespace LuqinMiniAppBase.Controllers
             result.code = 0;
             result.message = "";
             result.data = sessionObj;
-
-            //int? oldMemberId = null;
-            List<MemberSocialAccount> oldMsaMemberList = await _db.memberSocialAccount
-                .Where(m => m.num.Trim() == openId.Trim() && m.valid == 1 && m.member_id != memberId)
-                .AsNoTracking().ToListAsync();
-            for (int i = 0; i < oldMsaMemberList.Count; i++)
-            {
-                int oldMemberId = oldMsaMemberList[i].member_id;
-                List<MemberSocialAccount> msaOld = await _db.memberSocialAccount.Where(m => m.member_id == oldMemberId)
-                    .AsNoTracking().ToListAsync();
-                Member oldMember = await _db.member.Where(m => m.id == oldMemberId).AsNoTracking().FirstOrDefaultAsync();
-                if (oldMember != null)
-                {
-                    oldMember.valid = 0;
-                    oldMember.update_date = DateTime.Now;
-                    _db.member.Entry(oldMember).State = EntityState.Modified;
-                }
-                for (int j = 0; j < msaOld.Count; j++)
-                {
-                    msaOld[j].valid = 0;
-                    msaOld[j].update_date = DateTime.Now;
-                    _db.memberSocialAccount.Entry(msaOld[j]).State = EntityState.Modified;
-                }
-                List<SnowmeetApi.Models.Order> oldOrders = await _db.order.Where(o => o.member_id == oldMemberId).AsNoTracking().ToListAsync();
-                for (int j = 0; j < oldOrders.Count; j++)
-                {
-                    oldOrders[j].member_id = memberId;
-                    oldOrders[j].update_date = DateTime.Now;
-                    _db.order.Entry(oldOrders[j]).State = EntityState.Modified;
-                }
-            }
-            await _db.SaveChangesAsync();
-
             return Ok(result);
         }
         
