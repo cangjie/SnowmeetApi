@@ -26,16 +26,17 @@ namespace SnowmeetApi.Controllers
         [NonAction]
         public async Task<Care> UpdateCare(Care care, int? memberId, int? staffId, string scene)
         {
-            Care oriCare = await _db.care.FindAsync(care.id);
-            List<CoreDataModLog> logs = Care.GetUpdateDifferenceLog(oriCare, care, memberId, staffId, scene);
+            Care oriCare = await _db.care.Where(c => c.id == care.id).AsNoTracking().FirstOrDefaultAsync();
+            //List<CoreDataModLog> logs = Care.GetUpdateDifferenceLog(oriCare, care, memberId, staffId, scene);
+            List<CoreDataModLog> logs = Util.GetUpdateDifferenceLog<Care>(oriCare, care, memberId, staffId, scene);
             foreach (CoreDataModLog log in logs)
             {
                 await _db.coreDataModLog.AddAsync(log);
             }
-            oriCare.update_date = DateTime.Now;
-            _db.care.Entry(oriCare).State = EntityState.Modified;
+            care.update_date = DateTime.Now;
+            _db.care.Entry(care).State = EntityState.Modified;
             await _db.SaveChangesAsync();
-            return oriCare;
+            return care;
         }
         [NonAction]
         public async Task<Care> GetCare(int id)
