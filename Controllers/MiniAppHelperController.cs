@@ -462,8 +462,7 @@ namespace LuqinMiniAppBase.Controllers
             {
                 List<Member> memberList = await _db.member
                     .Where(m => m.id == memberId)
-                    .Include(m => m.memberSocialAccounts)
-                    .ToListAsync();
+                    .Include(m => m.memberSocialAccounts).ToListAsync();
                 if (memberList.Count <= 0)
                 {
                     result.code = 1;
@@ -524,8 +523,8 @@ namespace LuqinMiniAppBase.Controllers
                 session.expire_date = expireDate;
                 _db.miniSession.Entry(session).State = EntityState.Modified;
             }
-            await _db.SaveChangesAsync();
-            member.memberSocialAccounts = member.memberSocialAccounts.Where(m => m.valid == 1 && m.type.Trim().Equals("cell")).OrderByDescending(m => m.id).ToList();
+            //await _db.SaveChangesAsync();
+            
             sessionObj.member = member;
             StaffController _staffHelper = new StaffController(_db);
             sessionObj.staff = await _staffHelper.GetStaffBySocialNum(openId, "wechat_mini_openid", DateTime.Now);
@@ -534,7 +533,8 @@ namespace LuqinMiniAppBase.Controllers
             result.code = 0;
             result.message = "";
             result.data = sessionObj;
-            /*
+            //_db.member.Entry(member).State = EntityState.Detached;
+            //await _db.SaveChangesAsync();
             try
             {
                 List<SnowmeetApi.Models.MemberSocialAccount> oldMsaList = await _db.memberSocialAccount
@@ -566,13 +566,14 @@ namespace LuqinMiniAppBase.Controllers
                         _db.order.Entry(moveOrders[j]);
                     }
                 }
-                await _db.SaveChangesAsync();
+                
             }
             catch
             {
                 
             }
-            */
+            await _db.SaveChangesAsync();
+            member.memberSocialAccounts = member.memberSocialAccounts.Where(m => m.valid == 1 && m.type.Trim().Equals("cell")).OrderByDescending(m => m.id).ToList();
             return Ok(result);
         }
         
