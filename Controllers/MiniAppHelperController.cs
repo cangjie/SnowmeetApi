@@ -534,6 +534,7 @@ namespace LuqinMiniAppBase.Controllers
             result.code = 0;
             result.message = "";
             result.data = sessionObj;
+            /*
             try
             {
                 List<SnowmeetApi.Models.MemberSocialAccount> oldMsaList = await _db.memberSocialAccount
@@ -571,6 +572,7 @@ namespace LuqinMiniAppBase.Controllers
             {
                 
             }
+            */
             return Ok(result);
         }
         
