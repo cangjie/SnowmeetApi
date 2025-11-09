@@ -35,7 +35,9 @@ namespace SnowmeetApi.Controllers
                 return null;
             }
             order.retails = await _db.order.Entry(order).Collection(o => o.retails).Query().Where(r => r.valid == 1).AsNoTracking().ToListAsync();
-            order.cares = await _db.order.Entry(order).Collection(o => o.cares).Query().Include(c => c.tasks).AsNoTracking().ToListAsync();
+            order.cares = await _db.order.Entry(order).Collection(o => o.cares).Query()
+                .Include(c => c.tasks)
+                .Include(c => c.careImages).AsNoTracking().ToListAsync();
             order.fdOrders = await _db.order.Entry(order).Collection(o => o.fdOrders).Query()
                 .Where(r => r.valid == 1).AsNoTracking()
                 .Include(f => f.product).ThenInclude(p => p.category)
