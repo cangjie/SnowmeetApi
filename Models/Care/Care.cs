@@ -260,6 +260,7 @@ namespace SnowmeetApi.Models
         public string? right_angle { get; set; }
         public string? serials { get; set; }
         public string? edge_degree { get; set; }
+        public string? others_associates { get; set; } = null;
         public int need_edge { get; set; }
         public int need_wax { get; set; }
         public int need_unwax { get; set; }
