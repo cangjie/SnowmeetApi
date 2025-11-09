@@ -387,10 +387,11 @@ namespace LuqinMiniAppBase.Controllers
                 result.data = null;
                 return Ok(result);
             }
+
             string openId = sessionObj.openid;
             string sessionKey = sessionObj.session_key;
             string? unionId = null;
-            int? memberId = null;
+
             try
             {
                 unionId = sessionObj.unionid;
@@ -400,6 +401,14 @@ namespace LuqinMiniAppBase.Controllers
                 unionId = null;
             }
 
+/*
+            string openId = "oHdTn5enw9r05VeyOd5AnR4obmEA";
+            string sessionKey = "";
+            string? unionId = "o2T0C63VsHWs77sCrcL3gXxq-SWs";
+*/
+
+
+            int? memberId = null;
             if (unionId != null && unionId.Trim().Length > 0)
             {
                 List<MemberSocialAccount> msaList = await _db.memberSocialAccount
@@ -475,8 +484,9 @@ namespace LuqinMiniAppBase.Controllers
                         memo = "",
                         member_id = member.id
                     };
-                    member.memberSocialAccounts.Add(msa);
-                    _db.member.Entry(member).State = EntityState.Modified;
+                    //member.memberSocialAccounts.Add(msa);
+                    //_db.member.Entry(member).State = EntityState.Modified;
+                    await _db.memberSocialAccount.AddAsync(msa);
                     await _db.SaveChangesAsync();
                 }
                 if (member.wechatUnionId == null)
@@ -489,8 +499,9 @@ namespace LuqinMiniAppBase.Controllers
                         memo = "",
                         member_id = member.id
                     };
-                    member.memberSocialAccounts.Add(msa);
-                    _db.member.Entry(member).State = EntityState.Modified;
+                    //member.memberSocialAccounts.Add(msa);
+                    //_db.member.Entry(member).State = EntityState.Modified;
+                    await _db.memberSocialAccount.AddAsync(msa);
                     await _db.SaveChangesAsync();
                 }
             }
