@@ -400,6 +400,8 @@ namespace LuqinMiniAppBase.Controllers
                 unionId = null;
             }
 
+            //List<SocialAccountForJob> jobAccount 
+
             if (unionId != null && unionId.Trim().Length > 0)
             {
                 List<MemberSocialAccount> msaList = await _db.memberSocialAccount
@@ -408,6 +410,11 @@ namespace LuqinMiniAppBase.Controllers
                 if (msaList.Count > 0)
                 {
                     memberId = msaList[0].member_id;
+                }
+                SocialAccountForJob jobAccount = await _db.socialAccountForJob.Where(s => s.wechat_mini_openid == openId).AsNoTracking().FirstOrDefaultAsync();
+                if (jobAccount != null)
+                {
+                    memberId = jobAccount.member_id;
                 }
             }
             if (memberId == null)
