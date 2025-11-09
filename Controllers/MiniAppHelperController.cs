@@ -534,6 +534,43 @@ namespace LuqinMiniAppBase.Controllers
             result.code = 0;
             result.message = "";
             result.data = sessionObj;
+            try
+            {
+                List<SnowmeetApi.Models.MemberSocialAccount> oldMsaList = await _db.memberSocialAccount
+                    .Where(m => m.num == openId && m.member_id != memberId && m.valid == 1)
+                    .AsNoTracking().ToListAsync();
+                for (int i = 0; i < oldMsaList.Count; i++)
+                {
+                    int oldMemberId = oldMsaList[i].member_id;
+                    List<SnowmeetApi.Models.MemberSocialAccount> delMsaList = await _db.memberSocialAccount
+                        .Where(m => m.member_id == oldMemberId).AsNoTracking().ToListAsync();
+                    SnowmeetApi.Models.Member delMember = await _db.member.Where(m => m.id == oldMemberId).AsNoTracking().FirstOrDefaultAsync();
+                    if (delMember != null)
+                    {
+                        delMember.valid = 0;
+                        delMember.update_date = DateTime.Now;
+                        _db.member.Entry(delMember).State = EntityState.Modified;
+                    }
+                    for (int j = 0; j < delMsaList.Count; j++)
+                    {
+                        delMsaList[j].valid = 0;
+                        delMsaList[j].update_date = DateTime.Now;
+                        _db.memberSocialAccount.Entry(delMsaList[j]).State = EntityState.Modified;
+                    }
+                    List<SnowmeetApi.Models.Order> moveOrders = await _db.order.Where(o => o.member_id == oldMemberId).AsNoTracking().ToListAsync();
+                    for (int j = 0; j < moveOrders.Count; j++)
+                    {
+                        moveOrders[j].member_id = memberId;
+                        moveOrders[j].update_date = DateTime.Now;
+                        _db.order.Entry(moveOrders[j]);
+                    }
+                }
+                await _db.SaveChangesAsync();
+            }
+            catch
+            {
+                
+            }
             return Ok(result);
         }
         
