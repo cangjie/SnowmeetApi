@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Aop.Api.Domain;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -26,7 +27,8 @@ namespace SnowmeetApi.Controllers
         [NonAction]
         public async Task<Care> UpdateCare(Care care, int? memberId, int? staffId, string scene)
         {
-            Care oriCare = await _db.care.Where(c => c.id == care.id).AsNoTracking().FirstOrDefaultAsync();
+            Care oriCare = await _db.care.Where(c => c.id == care.id)
+                .Include(c => c.careImages).AsNoTracking().FirstOrDefaultAsync();
             //List<CoreDataModLog> logs = Care.GetUpdateDifferenceLog(oriCare, care, memberId, staffId, scene);
             List<CoreDataModLog> logs = Util.GetUpdateDifferenceLog<Care>(oriCare, care, memberId, staffId, scene);
             foreach (CoreDataModLog log in logs)
@@ -35,6 +37,7 @@ namespace SnowmeetApi.Controllers
             }
             care.update_date = DateTime.Now;
             _db.care.Entry(care).State = EntityState.Modified;
+            _db.Update(care);
             await _db.SaveChangesAsync();
             return care;
         }
@@ -246,12 +249,12 @@ namespace SnowmeetApi.Controllers
             }
         }
         [HttpGet]
-        public async Task<ActionResult<ApiResult<List<Product>?>>> GetProducts(string shop)
+        public async Task<ActionResult<ApiResult<List<Models.Product>?>>> GetProducts(string shop)
         {
-            List<Product> products = await _db.product
+            List<Models.Product> products = await _db.product
                 .Where(p => (p.id == 137 || p.id == 138 || p.id == 139 || p.id == 140 || p.id == 142 || p.id == 143 || p.id == 202)
                 && p.valid == 1).OrderBy(p => p.sale_price).AsNoTracking().ToListAsync();
-            return Ok(new ApiResult<List<Product>?>()
+            return Ok(new ApiResult<List<Models.Product>?>()
             {
                 code = 0,
                 message = "",
@@ -259,10 +262,10 @@ namespace SnowmeetApi.Controllers
             });
         }
         [NonAction]
-        public async Task<Product?> GetProduct(string shop, Care care)
+        public async Task<Models.Product?> GetProduct(string shop, Care care)
         {
-            List<Product> products = ((ApiResult<List<Product>>)((OkObjectResult)(await GetProducts(shop)).Result).Value).data;
-            Product product = null;
+            List<Models.Product> products = ((ApiResult<List<Models.Product>>)((OkObjectResult)(await GetProducts(shop)).Result).Value).data;
+            Models.Product product = null;
             for (int i = 0; i < products.Count; i++)
             {
                 if (products[i].name.IndexOf("修刃打蜡") >= 0 && products[i].name.IndexOf("立等") >= 0
