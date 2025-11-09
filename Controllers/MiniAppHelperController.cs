@@ -407,7 +407,6 @@ namespace LuqinMiniAppBase.Controllers
             string? unionId = "o2T0C63VsHWs77sCrcL3gXxq-SWs";
 */
 
-
             int? memberId = null;
             if (unionId != null && unionId.Trim().Length > 0)
             {
