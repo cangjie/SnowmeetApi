@@ -204,7 +204,7 @@ namespace SnowmeetApi.Controllers
             scene = Util.UrlDecode(scene);
             care = await UpdateCare(care, null, staff.id, scene);
             Brand brand = await UpdateBrand(care.equipment, care.brand, staff.id);
-            if (brand != null)
+            if (brand != null && care.series != null)
             {
                 await UpdateSeries(brand, care.series, staff.id);
             }
