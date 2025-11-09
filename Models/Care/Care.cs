@@ -270,6 +270,7 @@ namespace SnowmeetApi.Models
         public string? ticket_code { get; set; }
         public double ticket_discount { get; set; }
         public double discount { get; set; }
+        public bool? with_pole { get; set; } = null;
         public int finish { get; set; }
         public DateTime? member_pick_date { get; set; }
         public string? veri_code { get; set; }
