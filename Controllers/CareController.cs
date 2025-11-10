@@ -29,11 +29,18 @@ namespace SnowmeetApi.Controllers
         {
             Care oriCare = await _db.care.Where(c => c.id == care.id)
                 .Include(c => c.careImages).AsNoTracking().FirstOrDefaultAsync();
-            //List<CoreDataModLog> logs = Care.GetUpdateDifferenceLog(oriCare, care, memberId, staffId, scene);
             List<CoreDataModLog> logs = Util.GetUpdateDifferenceLog<Care>(oriCare, care, memberId, staffId, scene);
             foreach (CoreDataModLog log in logs)
             {
                 await _db.coreDataModLog.AddAsync(log);
+            }
+            for (int i = 0; oriCare.careImages !=  null && i < oriCare.careImages.Count; i++)
+            {
+                CareImage oriImage = oriCare.careImages[i];
+                if (care.careImages.Where(c => c.id == oriImage.id).ToList().Count <= 0)
+                {
+                    _db.careImage.Entry(oriImage).State = EntityState.Deleted;
+                }
             }
             _db.care.Update(care);
             care.update_date = DateTime.Now;
