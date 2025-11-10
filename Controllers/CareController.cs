@@ -34,7 +34,7 @@ namespace SnowmeetApi.Controllers
             {
                 await _db.coreDataModLog.AddAsync(log);
             }
-            for (int i = 0; oriCare.careImages !=  null && i < oriCare.careImages.Count; i++)
+            for (int i = 0; oriCare.careImages != null && i < oriCare.careImages.Count; i++)
             {
                 CareImage oriImage = oriCare.careImages[i];
                 if (care.careImages.Where(c => c.id == oriImage.id).ToList().Count <= 0)
@@ -98,7 +98,7 @@ namespace SnowmeetApi.Controllers
             string[] dispayedNameArr = dispayedName.Split('/');
             string name = dispayedNameArr[0];
             string chineseName = dispayedNameArr[1];
-            List<Brand> brands = await _db.brand.Where(b => b.brand_type.Trim().Equals(type.Trim()) &&  b.brand_name.Trim().Equals(name.Trim()))
+            List<Brand> brands = await _db.brand.Where(b => b.brand_type.Trim().Equals(type.Trim()) && b.brand_name.Trim().Equals(name.Trim()))
                 .AsNoTracking().ToListAsync();
             if (brands.Count > 0)
             {
@@ -123,7 +123,7 @@ namespace SnowmeetApi.Controllers
             {
                 return null;
             }
-            List<Series> sl = await _db.series.Where(s => s.type.Trim().Equals(brand.brand_type.Trim()) 
+            List<Series> sl = await _db.series.Where(s => s.type.Trim().Equals(brand.brand_type.Trim())
                 && s.brand_name.Trim().Equals(brand.brand_name.Trim()) && s.serial_name.Trim().Equals(seriesName))
                 .AsNoTracking().ToListAsync();
             if (sl.Count > 0)
@@ -157,7 +157,7 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<ApiResult<List<Series>>>> GetSeries(string brand, string type)
         {
             brand = Util.UrlDecode(brand).Trim();
-            List<Series> series = await _db.series.Where(s => (s.brand_name.Trim().Equals(brand) && s.type.Trim().Equals(type.Trim()) ))
+            List<Series> series = await _db.series.Where(s => (s.brand_name.Trim().Equals(brand) && s.type.Trim().Equals(type.Trim())))
                 .AsNoTracking().ToListAsync();
             return Ok(new ApiResult<List<Series>>()
             {
@@ -174,7 +174,8 @@ namespace SnowmeetApi.Controllers
             Staff staff = await _staffHelper.GetStaffBySessionKey(sessionKey, sessionType);
             if (staff == null)
             {
-                return Ok(new ApiResult<Care?>(){
+                return Ok(new ApiResult<Care?>()
+                {
                     code = 1,
                     message = "没有权限",
                     data = null
@@ -405,6 +406,63 @@ namespace SnowmeetApi.Controllers
             }
             await _db.SaveChangesAsync();
         }
+        [HttpGet("{taskId}")]
+        public async Task<ActionResult<ApiResult<Care?>>> SetTaskStatus(int taskId, string status,
+            string scene, string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            scene = Util.UrlDecode(scene);
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            if (staff.title_level < 100)
+            {
+                return Ok(new ApiResult<Care?>()
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = null
+                });
+            }
+            CareTask careTask = await _db.careTask.Where(t => t.id == taskId && t.valid == 1).AsNoTracking().FirstOrDefaultAsync();
+            CoreDataModLog log = Util.CreateCoreDataModLog("care_task", "status", taskId, careTask.status, status, null, staff.id, scene);
+            careTask.status = status;
+            switch (status)
+            {
+                case "已开始":
+                    careTask.start_time = DateTime.Now;
+                    careTask.staff_id = staff.id;
+                    break;
+                case "已完成":
+                    careTask.end_time = DateTime.Now;
+                    careTask.staff_id = staff.id;
+                    break;
+                case "强行中止":
+                    careTask.end_time = DateTime.Now;
+                    careTask.terminate_staff_id = staff.id;
+                    break;
+                default:
+                    break;
+            }
+            careTask.update_date = DateTime.Now;
+            await _db.coreDataModLog.AddAsync(log);
+            _db.careTask.Entry(careTask).State = EntityState.Modified;
+            await _db.SaveChangesAsync();
+            Care care = await GetCare(careTask.care_id);
+            return Ok(new ApiResult<Care>()
+            {
+                code = 0,
+                message = "",
+                data = care
+            });
+        }
+        /*
+        [NonAction]
+        public async Task<Care> GetCare(int careId)
+        {
+            Care care = await _db.care.Where(c => c.id == careId)
+                .Include(c => c.tasks).ThenInclude(t => t.staff)
+                .AsNoTracking().FirstOrDefaultAsync();
+            return care;
+        }
+        */
     }
-    
+
 }
