@@ -47,7 +47,7 @@ namespace SnowmeetApi.Controllers
             await _db.SaveChangesAsync();
             return care;
         }
-        [NonAction]
+        [HttpGet]
         public async Task<Care> GetCare(int id)
         {
             Care c = await _db.care.FindAsync(id);
@@ -65,8 +65,9 @@ namespace SnowmeetApi.Controllers
                 c.order = null;
             }
             c.tasks = await _db.careTask
-                .Include(t => t.staff).Include(t => t.terminateStaff)
-                .Where(t => t.care_id == c.id).ToListAsync();
+                .Include(t => t.staff)
+                .Include(t => t.terminateStaff)
+                .Where(t => t.care_id == c.id).OrderBy(t=>t.id).ToListAsync();
             await _db.member.Entry(c.order.member).Collection(m => m.memberSocialAccounts).LoadAsync();
             return c;
         }
