@@ -38,27 +38,6 @@ namespace SnowmeetApi.Controllers
             _db.care.Update(care);
             care.update_date = DateTime.Now;
             await _db.SaveChangesAsync();
-            //
-            /*
-            //await _db.SaveChangesAsync();
-            for (int i = 0; care.careImages != null && i < care.careImages.Count; i++)
-            {
-                CareImage ci = care.careImages[i];
-                ci.image = null;
-                if (ci.id == 0)
-                {
-                    await _db.careImage.AddAsync(ci);
-                }
-                else
-                {
-                    _db.careImage.Entry(care.careImages[i]).State = EntityState.Modified;
-                }
-                //_db.careImage.Entry(care.careImages[i]).State = EntityState.Modified;
-            }
-            
-            //_db.Update(care);
-            await _db.SaveChangesAsync();
-            */
             return care;
         }
         [NonAction]
