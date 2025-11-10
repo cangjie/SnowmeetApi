@@ -1603,6 +1603,7 @@ namespace SnowmeetApi.Controllers
                 null, null, null, order.type, "支付成功，检查订单类型");
             await _db.coreDataModLog.AddAsync(orderSucLog);
             await _db.SaveChangesAsync();
+            
             switch (order.type)
             {
                 case "租赁":
@@ -1612,6 +1613,14 @@ namespace SnowmeetApi.Controllers
                     await _db.SaveChangesAsync();
                     RentController _rentHelper = new RentController(_db, _config, _http);
                     await _rentHelper.EffectRentOrder(order.id, (int)paymentId);
+                    break;
+                case "养护":
+                    CoreDataModLog orderCareLog = CoreDataModLog.CreateManualLog("Order", "", order.id, "租赁支付回调", null, null, null,
+                        paymentId.ToString(), "支付成功，开始生效养护订单");
+                    await _db.coreDataModLog.AddAsync(orderCareLog);
+                    await _db.SaveChangesAsync();
+                    CareController _careHelper = new CareController(_db, _config, _http);
+                    await _careHelper.EffectCareOrder(order.id);
                     break;
                 default:
                     break;
