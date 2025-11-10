@@ -36,7 +36,7 @@ namespace SnowmeetApi.Controllers
             }
             order.retails = await _db.order.Entry(order).Collection(o => o.retails).Query().Where(r => r.valid == 1).AsNoTracking().ToListAsync();
             order.cares = await _db.order.Entry(order).Collection(o => o.cares).Query()
-                .Include(c => c.tasks)
+                .Include(c => c.tasks).OrderBy(t => t.id)
                 .Include(c => c.careImages).ThenInclude(i => i.image).AsNoTracking().ToListAsync();
             order.fdOrders = await _db.order.Entry(order).Collection(o => o.fdOrders).Query()
                 .Where(r => r.valid == 1).AsNoTracking()
@@ -1603,7 +1603,7 @@ namespace SnowmeetApi.Controllers
                 null, null, null, order.type, "支付成功，检查订单类型");
             await _db.coreDataModLog.AddAsync(orderSucLog);
             await _db.SaveChangesAsync();
-            
+
             switch (order.type)
             {
                 case "租赁":
