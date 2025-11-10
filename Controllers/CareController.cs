@@ -405,8 +405,6 @@ namespace SnowmeetApi.Controllers
             }
             await _db.SaveChangesAsync();
         }
-       
-
     }
     
 }
