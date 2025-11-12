@@ -40,9 +40,7 @@
             type: 'GET',
             success: function (msg, status) {
                 if (status == 'success') {
-                    
                     sessionKey = msg.session_key;
-                    
                     if (sessionKey != '') {
                         clearInterval(interVal);
                         setCookie('sessionKey', sessionKey.trim(), 60);
@@ -54,7 +52,6 @@
                             window.location.href = ref;
                         }
                     }
-                    
                 }
             }
         })
