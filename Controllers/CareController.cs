@@ -442,6 +442,7 @@ namespace SnowmeetApi.Controllers
                 default:
                     break;
             }
+            careTask.memo = scene;
             careTask.update_date = DateTime.Now;
             await _db.coreDataModLog.AddAsync(log);
             _db.careTask.Entry(careTask).State = EntityState.Modified;
