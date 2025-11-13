@@ -112,7 +112,7 @@
                 var orders = msg.data
                 console.log('get orders', orders);
                 var index = 1;
-                for (var i = 0; i < order.length; i++) {
+                for (var i = 0; i < orders.length; i++) {
                     var order = orders[i];
                     if (order.rentals != null && order.rentals.length > 0) {
                         for (var j = 0; j < order.rentals.length; j++) {
