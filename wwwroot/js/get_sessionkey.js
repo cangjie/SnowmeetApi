@@ -1,7 +1,7 @@
 ﻿var sessionKey = getCookie('sessionKey');
 var titleLevel = getCookie('title_level');
-alert(titleLevel);
-alert(sessionKey);
+//alert(titleLevel);
+//alert(sessionKey);
 if (titleLevel == 50){
     if (window.location.href.indexOf('rent/wl_list.html') < 0){
         window.location.href = '/background/rent/wl_list.html';
