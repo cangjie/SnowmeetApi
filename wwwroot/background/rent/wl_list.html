@@ -145,11 +145,12 @@
                                         lineData[j] = formatDate(order.close_date);
                                         break;
                                     case '租金':
+                                        lineData[j] = rental.totalRentalAmount = rental.totalDiscountAmount;
                                         break;
                                     default:
                                         break;
                                 }
-
+                                tData.push(lineData);
                             }
                         }
                     }
@@ -160,7 +161,7 @@
 
 
 
-
+/*
                     var lineData = [];
                     for (var k = 0; k < tHead.length; k++) {
                         switch (tHead[j]) {
@@ -173,11 +174,13 @@
                             case '订单类型':
                                 lineData[j] = order.rentProperties == null ? '临时订单' : '正常订单'
                                 break;
+                            
                             default:
                                 break;
                         }
 
                     }
+                        */
                 }
 
                 /*
