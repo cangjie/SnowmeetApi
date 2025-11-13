@@ -75,9 +75,11 @@
         link.click();
         document.body.removeChild(link);
     }
-    var tHeadTemplate = ['序号', '门店', '日序号', '星期','订单日期', '支付时间', '订单号', '状态', '免押金', '押金', '招待','姓名', '电话', '备注','开单人', '支付方式', '商户订单号', '租金合计'];
+    var tHeadTemplate = ['序号', '订单号', '订单类型', '商品名称','起租日期', '退租日期', '结算日期', '租金'];
     var tHead = tHeadTemplate;
     var tData = [];
+    render();
+    
     function getData() {
 
 
@@ -331,7 +333,7 @@
         }
         var tBodyCtl = document.getElementById('tBody');
         tBodyCtl.innerHTML = '';
-        for (var i = 0; i < tData.length; i++) {
+        for (var i = 0; tData && i < tData.length; i++) {
             var tr = document.createElement('tr');
             
             for (var j = 0; j < tHead.length; j++) {
