@@ -117,7 +117,7 @@
                     if (order.rentals != null && order.rentals.length > 0) {
                         for (var j = 0; j < order.rentals.length; j++) {
                             var rental = order.rentals[j]
-                            if (rental.entertain != 0){
+                            if (rental.entertain != 0) {
                                 continue;
                             }
                             var lineData = [];
@@ -151,40 +151,81 @@
                                     default:
                                         break;
                                 }
-                                
+
                             }
-                            if (rental.totalRentalAmount - rental.totalDiscountAmount >= 1){
+                            if (rental.totalRentalAmount - rental.totalDiscountAmount >= 1) {
                                 tData.push(lineData);
+                                index++;
                             }
                         }
                     }
-                    else{
-
-                    }
-
-
-
-
-/*
-                    var lineData = [];
-                    for (var k = 0; k < tHead.length; k++) {
-                        switch (tHead[j]) {
-                            case '序号':
-                                lineData[j] = (msg.items.length - i).toString();
-                                break;
-                            case '订单号':
-                                lineData[j] = order.code
-                                break;
-                            case '订单类型':
-                                lineData[j] = order.rentProperties == null ? '临时订单' : '正常订单'
-                                break;
-                            
-                            default:
-                                break;
+                    else {
+                        for (var k = 0; k < tHead.length; k++) {
+                            switch (tHead[k]) {
+                                case '序号':
+                                    lineData[k] = index.toString();
+                                    break;
+                                case '订单号':
+                                    lineData[k] = order.code
+                                    break;
+                                case '订单类型':
+                                    lineData[k] = '临时订单'
+                                    break;
+                                case '商品名称':
+                                    lineData[k] = '--';
+                                    break;
+                                case '起租日期':
+                                    lineData[k] = formatDate(order.biz_date);
+                                    break;
+                                case '退租日期':
+                                    lineData[k] = formatDate(order.biz_date);
+                                    break;
+                                case '结算日期':
+                                    if (order.availableRefunds.length > 0) {
+                                        lineData[k] = formatDate(order.availableRefunds[order.availableRefunds.length - 1].create_date);
+                                    }
+                                    else {
+                                        lineData[k] = '--';
+                                    }
+                                    break;
+                                case '租金':
+                                    var amount = order.paidAmount - order.reufundAmount;
+                                    lineData[k] = amount.toFixed(2);
+                                    break;
+                                default:
+                                    break;
+                            }
+                            if (rental.totalRentalAmount - rental.totalDiscountAmount >= 1) {
+                                tData.push(lineData);
+                                index++;
+                            }
                         }
 
                     }
-                        */
+
+
+
+
+                    /*
+                                        var lineData = [];
+                                        for (var k = 0; k < tHead.length; k++) {
+                                            switch (tHead[j]) {
+                                                case '序号':
+                                                    lineData[j] = (msg.items.length - i).toString();
+                                                    break;
+                                                case '订单号':
+                                                    lineData[j] = order.code
+                                                    break;
+                                                case '订单类型':
+                                                    lineData[j] = order.rentProperties == null ? '临时订单' : '正常订单'
+                                                    break;
+                                                
+                                                default:
+                                                    break;
+                                            }
+                    
+                                        }
+                                            */
                 }
 
                 /*
