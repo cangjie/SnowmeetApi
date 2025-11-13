@@ -124,28 +124,28 @@
                             for (var k = 0; k < tHead.length; k++) {
                                 switch (tHead[k]) {
                                     case '序号':
-                                        lineData[j] = index.toString();
+                                        lineData[k] = index.toString();
                                         break;
                                     case '订单号':
-                                        lineData[j] = order.code
+                                        lineData[k] = order.code
                                         break;
                                     case '订单类型':
-                                        lineData[j] = '正常订单'
+                                        lineData[k] = '正常订单'
                                         break;
                                     case '商品名称':
-                                        lineData[j] = rental.name;
+                                        lineData[k] = rental.name;
                                         break;
                                     case '起租日期':
-                                        lineData[j] = formatDate(rental.realStartDate);
+                                        lineData[k] = formatDate(rental.realStartDate);
                                         break;
                                     case '退租日期':
-                                        lineData[j] = formatDate(rental.realEndDate);
+                                        lineData[k] = formatDate(rental.realEndDate);
                                         break;
                                     case '结算日期':
-                                        lineData[j] = formatDate(order.close_date);
+                                        lineData[k] = formatDate(order.close_date);
                                         break;
                                     case '租金':
-                                        lineData[j] = rental.totalRentalAmount = rental.totalDiscountAmount;
+                                        lineData[k] = rental.totalRentalAmount = rental.totalDiscountAmount;
                                         break;
                                     default:
                                         break;
