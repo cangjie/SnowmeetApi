@@ -5413,6 +5413,44 @@ namespace SnowmeetApi.Controllers
                 await _db.SaveChangesAsync();
             }
         }
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<List<Models.Order>?>>> GetConfirmedRentOrder(string shop,
+            DateTime startDate, DateTime endDate, string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            if (staff.title_level == 50)
+            {
+                shop = "万龙体验中心";
+            }
+            if (staff.title_level < 50)
+            {
+                return Ok(new ApiResult<List<Models.Order>?>()
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = null
+                });
+            }
+            OrderController _orderHelper = new OrderController(_db, _config, _httpContextAccessor);
+            List<Models.Order> orders = await _orderHelper.GetCommonOrders(null, shop, null, null, "租赁",
+                null, null, null, false, false, false, false, null, null, startDate, endDate);
+            List<Models.Order> confirmedOrders = new List<Models.Order>();
+            for (int i = 0; i < orders.Count; i++)
+            {
+                Models.Order order = orders[i];
+                if (order.paidAmount > 0 && order.closed == 1)
+                {
+                    confirmedOrders.Add(order);
+                }
+            }
+            return Ok(new ApiResult<List<Models.Order>>()
+            {
+                code = 0,
+                message = "",
+                data = confirmedOrders
+            });
+        }
+
         /*
         [HttpGet]
         public async Task<ActionResult<ApiResult<List<Models.Order>>>> GetRentOrderBySettleDateByStaff(string shop, 

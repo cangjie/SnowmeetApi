@@ -37,7 +37,7 @@
         日期：从&nbsp;<input type="date" id="date_from" oninput="setDate()" />&nbsp;到&nbsp;<input type="date" id="date_to" oninput="setDate()" />
         &nbsp;<button id="btn" onclick="getData()"> 查 询 </button>&nbsp;<button onclick="download()"> 下 载 </button>
     </div>
-    <div style="text-align:center;display:flex;justify-content:left;">
+    <div style="text-align:center;display:flex;justify-content:left;margin-top:50px">
         <table style="border:solid;border-width:1px;width:100%">
             <thead>
                 <tr id="tHead">
@@ -91,7 +91,7 @@
         var btnCtrl = document.getElementById('btn');
         btnCtrl.disabled = true;
         btnCtrl.innerText = "查询中……";
-        var getUrl = '../../core/Rent/GetRentOrderList?sessionKey=' + encodeURIComponent(sessionKey)
+        var getUrl = '../../api/Rent/GetConfirmedRentOrder?sessionKey=' + encodeURIComponent(sessionKey)
             + '&startDate=' + formatDate(startDate) + '&endDate=' + formatDate(endDate);
         $.ajax({
             url: getUrl,
@@ -101,9 +101,13 @@
                 console.log('get data status', status)
                 btnCtrl.disabled = false;
                 btnCtrl.innerText = " 查 询 ";
+
                 if (status != 'success') {
                     return
                 }
+                
+
+                /*
                 for (var i = 0; i < msg.maxRentalLength; i++) {
                     tHead.push('租金' + (i + 1).toString());
                 }
@@ -311,6 +315,7 @@
                     console.log('line data', lineData);
                     tData.push(lineData);
                 }
+                    */
                 console.log('get head', tHead);
                 render();
             },

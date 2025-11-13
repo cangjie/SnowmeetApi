@@ -93,7 +93,7 @@ namespace SnowmeetApi.Controllers
         public async Task<List<SnowmeetApi.Models.Order>> GetCommonOrders(int? orderId, string? shop, int? memberId,
             int? staffId, string? type, DateTime? startDate, DateTime? endDate, string? payOption = null,
             bool? isTest = null, bool? isEntertain = null, bool? isPackage = null, bool? isOnCredit = null,
-            bool? haveDiscount = null, string? status = null)
+            bool? haveDiscount = null, string? status = null, DateTime? closeStartDate = null, DateTime? closeEndDate = null)
         {
             startDate = startDate == null ? DateTime.MinValue : startDate;
             endDate = endDate == null ? DateTime.MaxValue : endDate;
@@ -190,7 +190,9 @@ namespace SnowmeetApi.Controllers
                         && (memberId == null || o.member_id == memberId) && (staffId == null || o.staff_id == staffId)
                         && (payOption == null || o.pay_option.Trim().Equals(payOption.Trim()))
                         && (shop == null || o.shop.Trim().Equals(shop.Trim())) && (type == null || o.type.Trim().Equals(type.Trim()))
-                        && o.valid == 1 && (orderId == null || o.id == orderId))
+                        && o.valid == 1 && (orderId == null || o.id == orderId)
+                        && (closeStartDate == null || (o.close_date != null && ((DateTime)o.close_date).Date >= ((DateTime)closeStartDate).Date))
+                        && (closeEndDate == null ||  (o.close_date != null &&  ((DateTime)o.close_date).Date <= ((DateTime)closeEndDate).Date)))
                     //.Include(o => o.fdOrders.Where(f => f.valid == 1)).ThenInclude(f => f.product).ThenInclude(p => p.category)
                     //.Include(o => o.retails.Where(r => r.valid == 1))
                     //.Include(o => o.cares.Where(c => c.valid == 1)).ThenInclude(c => c.tasks.Where(t => t.valid == 1).OrderBy(t => t.id))
