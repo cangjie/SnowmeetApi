@@ -40,6 +40,7 @@
             oninput="setDate()" />
         &nbsp;<button id="btn" onclick="getData()"> 查 询 </button>&nbsp;<button onclick="download()"> 下 载 </button>
     </div>
+    <div id="total" ></div>
     <div style="text-align:center;display:flex;justify-content:left;margin-top:50px">
         <table style="border:solid;border-width:1px;width:100%">
             <thead>
@@ -83,14 +84,12 @@
     var tHead = tHeadTemplate;
     var tData = [];
     render();
+    var totalAmount = 0
 
     function getData() {
-
-
         //tHeadTemplate = ['序号', '门店', '日序号', '星期','订单日期', '支付时间', '订单号', '状态', '免押金', '押金', '招待', '姓名', '电话', '备注', '开单人' ,'支付方式', '商户订单号', '租金合计'];
         //tHead = tHeadTemplate;
-
-
+        totalAmount = 0;
         tData = [];
         var btnCtrl = document.getElementById('btn');
         btnCtrl.disabled = true;
@@ -158,6 +157,7 @@
                             }
                             if (rental.totalRentalAmount - rental.totalDiscountAmount >= 1) {
                                 tData.push(lineData);
+                                totalAmount +=  (rental.totalRentalAmount - rental.totalDiscountAmount);
                                 index++;
                             }
                         }
@@ -203,6 +203,7 @@
                         }
                         if (order.paidAmount - order.refundAmount >= 1) {
                             tData.push(lineData);
+                            totalAmount += (order.paidAmount - order.refundAmount);
                             index++;
                         }
 
@@ -240,6 +241,8 @@
             }
             tBodyCtl.appendChild(tr);
         }
+        var totalCell = document.getElementById('total');
+        totalCell.innerText = "总计：" + totalAmount.toFixed(2);
     }
 </script>
 <script type="text/javascript" src="../../js/date_selector.js"></script>
