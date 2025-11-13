@@ -197,7 +197,7 @@
                             }
 
                         }
-                        if (rental.totalRentalAmount - rental.totalDiscountAmount >= 1) {
+                        if (order.paidAmount - order.refundAmount >= 1) {
                             tData.push(lineData);
                             index++;
                         }
