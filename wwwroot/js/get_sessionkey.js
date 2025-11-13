@@ -1,6 +1,6 @@
 ﻿var sessionKey = getCookie('sessionKey');
 var titleLevel = getCookie('title_level');
-alert(titleLevel)
+alert(titleLevel);
 if (titleLevel == 50){
     window.location.href = '/background/rent/wl_list.html';
 }
