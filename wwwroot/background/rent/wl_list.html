@@ -145,7 +145,7 @@
                                         lineData[k] = formatDate(order.close_date);
                                         break;
                                     case '租金':
-                                        lineData[k] = rental.totalRentalAmount = rental.totalDiscountAmount;
+                                        lineData[k] = rental.totalRentalAmount - rental.totalDiscountAmount;
                                         break;
                                     default:
                                         break;
