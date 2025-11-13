@@ -145,14 +145,17 @@
                                         lineData[k] = formatDate(order.close_date);
                                         break;
                                     case '租金':
-                                        lineData[k] = rental.totalRentalAmount - rental.totalDiscountAmount;
+                                        var amount = rental.totalRentalAmount - rental.totalDiscountAmount;
+                                        lineData[k] = amount.toFixed(2);
                                         break;
                                     default:
                                         break;
                                 }
                                 
                             }
-                            tData.push(lineData);
+                            if (rental.totalRentalAmount - rental.totalDiscountAmount >= 1){
+                                tData.push(lineData);
+                            }
                         }
                     }
                     else{
