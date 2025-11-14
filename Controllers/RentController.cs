@@ -5458,8 +5458,8 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<ApiResult<List<Models.Order>?>>> CloseOrder()
         {
             List<Models.Order> orders = await _db.order.Include(o => o.payments).ThenInclude(p => p.refunds)
-                .Where(o => o.valid == 1 && o.closed == 0 && o.closed == 0 && o.close_date == null && o.type == "租赁" 
-                && o.create_date.Date > DateTime.Parse("2025-10-01").Date )
+                .Where(o => o.valid == 1  && o.closed == 0 && o.close_date == null && o.type == "租赁" 
+                && o.create_date.Date > DateTime.Parse("2025-10-01").Date  )
                 .AsNoTracking().ToListAsync();
             List<Models.Order> newList = new List<Models.Order>();
             OrderController _orderHelper = new OrderController(_db, _oriConfig, _httpContextAccessor);
@@ -5489,7 +5489,7 @@ namespace SnowmeetApi.Controllers
                     {
                         finished = true;
                     }
-                    if (order.rentProperties != null && order.totalRentNeedToRefundAmount != null && order.totalRentNeedToRefundAmount == 0)
+                    if (order.rentProperties != null && order.totalRentUnRefund != null && order.totalRentUnRefund == 0)
                     {
                         finished = true;
                     }
@@ -5498,6 +5498,11 @@ namespace SnowmeetApi.Controllers
                 if (finished)
                 {
                     order.closed = 1;
+                    DateTime closeDate = DateTime.Now;
+                    if (order.refundAmount > 0)
+                    {
+                        closeDate = order.availableRefunds[order.availableRefunds.Count - 1].create_date;
+                    }
                     order.close_date = DateTime.Now;
                     order.update_date = DateTime.Now;
                     _db.order.Entry(order).State = EntityState.Modified;
