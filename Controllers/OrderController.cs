@@ -213,8 +213,7 @@ namespace SnowmeetApi.Controllers
                     orderList = await _db.order.Where(o => (o.biz_date.Date >= ((DateTime)startDate).Date && o.biz_date.Date <= ((DateTime)endDate).Date)
                         && (memberId == null || o.member_id == memberId) && (staffId == null || o.staff_id == staffId)
                         && (payOption == null || o.pay_option.Trim().Equals(payOption.Trim()))
-                        && (shop == null || o.shop.Trim().Equals(shop.Trim())) && (type == null || o.type.Trim().Equals(type.Trim()))
-                        && o.valid == 1 && (orderId == null || o.id == orderId))
+                        && (shop == null || o.shop.Trim().Equals(shop.Trim())) && (type == null || o.type.Trim().Equals(type.Trim())))
                     //.Include(o => o.fdOrders.Where(f => f.valid == 1)).ThenInclude(f => f.product).ThenInclude(p => p.category)
                     .Include(o => o.retails.Where(r => r.valid == 1))
                     //.Include(o => o.cares.Where(c => c.valid == 1)).ThenInclude(c => c.tasks.Where(t => t.valid == 1).OrderBy(t => t.id))
@@ -236,7 +235,7 @@ namespace SnowmeetApi.Controllers
                             && (payOption == null || o.pay_option.Trim().Equals(payOption.Trim()))
                             && (shop == null || o.shop.Trim().Equals(shop.Trim())) && (type == null || o.type.Trim().Equals(type.Trim()))
                             && o.valid == 1 && (orderId == null || o.id == orderId)
-                            && (haveWarranty == null || (o.haveWarranty == haveWarranty)))
+                            && (haveWarranty == null || (o.haveWarranty == (bool)haveWarranty)))
                         //.Include(o => o.fdOrders.Where(f => f.valid == 1)).ThenInclude(f => f.product).ThenInclude(p => p.category)
                         //.Include(o => o.retails.Where(r => r.valid == 1))
                         .Include(o => o.cares.Where(c => c.valid == 1)).ThenInclude(c => c.tasks.Where(t => t.valid == 1).OrderBy(t => t.id))
@@ -297,6 +296,10 @@ namespace SnowmeetApi.Controllers
             if (status != null)
             {
                 orderList = orderList.Where(o => o.orderStatus.Trim().Equals(status)).ToList();
+            }
+            if (haveWarranty != null)
+            {
+                orderList = orderList.Where(o => o.haveWarranty == haveWarranty).ToList();
             }
             return orderList;
         }
@@ -931,7 +934,8 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<ApiResult<List<SnowmeetApi.Models.Order>>>> GetOrdersByStaff(int? orderId,
             string? shop, string? type, string? subType, DateTime? startDate, DateTime? endDate, string sessionKey,
             string? payOption, string sessionType = "wechat_mini_openid", bool? isTest = null, bool? isEntertain = null,
-            bool? isPackage = null, bool? isOnCredit = null, bool? haveDiscount = null, string? status = null, string cell = null)
+            bool? isPackage = null, bool? isOnCredit = null, bool? haveDiscount = null, string? status = null, 
+            string? cell = null, bool? haveWarranty = null)
         {
             //startDate = DateTime.Parse("2025-10-27");
             StaffController _staffHelper = new StaffController(_db);
@@ -950,7 +954,7 @@ namespace SnowmeetApi.Controllers
                 //startDate = DateTime.Parse("2025-11-01");
             }
             List<SnowmeetApi.Models.Order> orders = await GetCommonOrders(orderId, shop, null, null, type, startDate, endDate, payOption,
-            isTest, isEntertain, isPackage, isOnCredit, haveDiscount, status);
+            isTest, isEntertain, isPackage, isOnCredit, haveDiscount, status, null, null, haveWarranty);
             List<SnowmeetApi.Models.Order> newOrders = new List<Models.Order>();
             if (cell != null)
             {
