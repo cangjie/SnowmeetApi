@@ -5440,7 +5440,11 @@ namespace SnowmeetApi.Controllers
                 Models.Order order = orders[i];
                 if (order.paidAmount > 0 && order.closed == 1 && order.close_date != null && !order.hide)
                 {
-                    confirmedOrders.Add(order);
+                    if ((staff.title_level == 50 && ((DateTime)order.close_date).Date < DateTime.Now.AddDays(-1).Date)
+                        || staff.title_level > 50)
+                    {
+                        confirmedOrders.Add(order);
+                    }
                 }
             }
             return Ok(new ApiResult<List<Models.Order>>()
