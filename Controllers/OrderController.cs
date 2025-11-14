@@ -93,7 +93,8 @@ namespace SnowmeetApi.Controllers
         public async Task<List<SnowmeetApi.Models.Order>> GetCommonOrders(int? orderId, string? shop, int? memberId,
             int? staffId, string? type, DateTime? startDate, DateTime? endDate, string? payOption = null,
             bool? isTest = null, bool? isEntertain = null, bool? isPackage = null, bool? isOnCredit = null,
-            bool? haveDiscount = null, string? status = null, DateTime? closeStartDate = null, DateTime? closeEndDate = null)
+            bool? haveDiscount = null, string? status = null, DateTime? closeStartDate = null, DateTime? closeEndDate = null,
+            bool? haveWarranty = null)
         {
             startDate = startDate == null ? DateTime.MinValue : startDate;
             endDate = endDate == null ? DateTime.MaxValue : endDate;
@@ -228,6 +229,27 @@ namespace SnowmeetApi.Controllers
                     .Include(o => o.member).ThenInclude(m => m.memberSocialAccounts)
                     .OrderByDescending(o => o.id).AsNoTracking().ToListAsync();
 
+                    break;
+                case "养护":
+                    orderList = await _db.order.Where(o => (o.biz_date.Date >= ((DateTime)startDate).Date && o.biz_date.Date <= ((DateTime)endDate).Date)
+                            && (memberId == null || o.member_id == memberId) && (staffId == null || o.staff_id == staffId)
+                            && (payOption == null || o.pay_option.Trim().Equals(payOption.Trim()))
+                            && (shop == null || o.shop.Trim().Equals(shop.Trim())) && (type == null || o.type.Trim().Equals(type.Trim()))
+                            && o.valid == 1 && (orderId == null || o.id == orderId)
+                            && (haveWarranty == null || (o.haveWarranty == haveWarranty)))
+                        //.Include(o => o.fdOrders.Where(f => f.valid == 1)).ThenInclude(f => f.product).ThenInclude(p => p.category)
+                        //.Include(o => o.retails.Where(r => r.valid == 1))
+                        .Include(o => o.cares.Where(c => c.valid == 1)).ThenInclude(c => c.tasks.Where(t => t.valid == 1).OrderBy(t => t.id))
+                        //.Include(o => o.rentals.Where(r => r.valid == 1)).ThenInclude(r => r.details.Where(d => d.valid == 1))
+                        //.Include(o => o.rentals.Where(r => r.valid == 1)).ThenInclude(r => r.rentItems.Where(r => r.valid == 1))
+                        .Include(o => o.payments).ThenInclude(p => p.staff)
+                        .Include(o => o.payments).ThenInclude(p => p.refunds)
+                        .Include(o => o.refunds)
+                        .Include(o => o.discounts.Where(d => d.valid == 1))
+                        .Include(o => o.guarantys.Where(g => g.valid == 1)).ThenInclude(g => g.guarantyPayments)//.ThenInclude(g => g.payment)
+                        .Include(o => o.staff)
+                        .Include(o => o.member).ThenInclude(m => m.memberSocialAccounts)
+                        .OrderByDescending(o => o.id).AsNoTracking().ToListAsync();
                     break;
                 default:
                     orderList = await _db.order.Where(o => (o.biz_date.Date >= ((DateTime)startDate).Date && o.biz_date.Date <= ((DateTime)endDate).Date)

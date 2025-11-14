@@ -7,6 +7,7 @@ using System.Runtime.ConstrainedExecution;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using NPOI.SS.Formula.PTG;
+using Org.BouncyCastle.Bcpg.Sig;
 
 namespace SnowmeetApi.Models
 {
@@ -1149,6 +1150,23 @@ namespace SnowmeetApi.Models
                 {
                     return null;
                 }
+            }
+        }
+        [NotMapped]
+        public bool haveWarranty
+        {
+            get
+            {
+                bool haveWarranty = false;
+                for(int i = 0; cares != null && i < cares.Count; i++)
+                {
+                    if (cares[i].warranty)
+                    {
+                        haveWarranty = true;
+                        break;
+                    }
+                }
+                return haveWarranty;
             }
         }
 
