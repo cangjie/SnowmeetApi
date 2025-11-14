@@ -850,6 +850,11 @@ namespace SnowmeetApi.Controllers
             await _db.SaveChangesAsync();
             if (order.paying_amount == 0 && order.type == "养护")
             {
+                _db.order.Entry(order).State = EntityState.Detached;
+                for (int i = 0; i < order.cares.Count; i++)
+                {
+                    _db.care.Entry(order.cares[i]).State = EntityState.Detached;
+                }
                 CareController _careHelper = new CareController(_db, _config, _http);
                 await _careHelper.EffectCareOrder(order.id);
                 //await DealSuccessPaidOrder(order.id, null);
