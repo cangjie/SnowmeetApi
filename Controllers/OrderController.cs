@@ -844,6 +844,12 @@ namespace SnowmeetApi.Controllers
 
             }
             await _db.SaveChangesAsync();
+            if (order.paying_amount == 0)
+            {
+                await DealSuccessPaidOrder(order.id, null);
+                order = await GetOrder(order.id);
+            }
+
             return Ok(new ApiResult<SnowmeetApi.Models.Order?>()
             {
                 code = 0,
