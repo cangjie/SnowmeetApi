@@ -531,6 +531,13 @@ namespace SnowmeetApi.Models
                         haveEntertain = true;
                     }
                 }
+                for(int i = 0; cares != null && i < cares.Count; i++)
+                {
+                    if (cares[i].entertain)
+                    {
+                        haveEntertain = true;
+                    }
+                }
                 return haveEntertain;
             }
         }
@@ -592,6 +599,13 @@ namespace SnowmeetApi.Models
                 for (int i = 0; rentals != null && i < rentals.Count; i++)
                 {
                     if (!rentals[i].entertain)
+                    {
+                        allEntrtain = false;
+                    }
+                }
+                for(int i = 0; cares != null && i < cares.Count; i++)
+                {
+                    if (!cares[i].entertain)
                     {
                         allEntrtain = false;
                     }
