@@ -48,6 +48,8 @@ namespace SnowmeetApi.Models
         public double discount { get; set; }
         public bool? with_pole { get; set; } = null;
         public int finish { get; set; }
+        public bool warranty {get; set;} = false;
+        public bool entertain {get; set;} = false;
         public DateTime? member_pick_date { get; set; }
         public string? veri_code { get; set; }
         public DateTime? veri_code_time { get; set; }

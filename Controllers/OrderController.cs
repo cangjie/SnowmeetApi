@@ -726,7 +726,7 @@ namespace SnowmeetApi.Controllers
                             order.biz_date = DateTime.Now;
                             Care care = order.cares[i];
                             Product product = await _careHelper.GetProduct(order.shop, care);
-                            if (product == null)
+                            if (product == null || care.warranty || care.entertain)
                             {
                                 care.common_charge = 0;
                             }
@@ -734,6 +734,7 @@ namespace SnowmeetApi.Controllers
                             {
                                 care.common_charge = product.sale_price;
                             }
+                            
                             total += (care.common_charge + care.repair_charge - care.discount - care.ticket_discount);
                             
                         }
