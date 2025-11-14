@@ -741,6 +741,10 @@ namespace SnowmeetApi.Controllers
                         
                         order.total_amount = total;
                         order.paying_amount = total;
+                        if (total == 0)
+                        {
+                            order.dealed = 1;
+                        }
                         break;
                     
                     default:
@@ -844,9 +848,11 @@ namespace SnowmeetApi.Controllers
 
             }
             await _db.SaveChangesAsync();
-            if (order.paying_amount == 0)
+            if (order.paying_amount == 0 && order.type == "养护")
             {
-                await DealSuccessPaidOrder(order.id, null);
+                CareController _careHelper = new CareController(_db, _config, _http);
+                await _careHelper.EffectCareOrder(order.id);
+                //await DealSuccessPaidOrder(order.id, null);
                 order = await GetOrder(order.id);
             }
 
