@@ -54,7 +54,7 @@ namespace SnowmeetApi.Controllers
             order.discounts = await _db.order.Entry(order).Collection(o => o.discounts).Query().Where(d => d.valid == 1).ToListAsync();
             await _db.order.Entry(order).Reference(o => o.staff).LoadAsync();
             await _db.order.Entry(order).Reference(o => o.member).LoadAsync();
-            if (order.member_id != null)
+            if (order.member_id != null && order.member != null)
             {
                 await _db.member.Entry(order.member).Collection(m => m.memberSocialAccounts).LoadAsync();
             }

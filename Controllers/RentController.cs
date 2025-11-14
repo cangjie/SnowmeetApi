@@ -5438,7 +5438,7 @@ namespace SnowmeetApi.Controllers
             for (int i = 0; i < orders.Count; i++)
             {
                 Models.Order order = orders[i];
-                if (order.paidAmount > 0 && order.closed == 1)
+                if (order.paidAmount > 0 && order.closed == 1 && order.close_date != null && !order.hide)
                 {
                     confirmedOrders.Add(order);
                 }
@@ -5448,6 +5448,64 @@ namespace SnowmeetApi.Controllers
                 code = 0,
                 message = "",
                 data = confirmedOrders
+            });
+        }
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<List<Models.Order>?>>> CloseOrder()
+        {
+            List<Models.Order> orders = await _db.order.Include(o => o.payments).ThenInclude(p => p.refunds)
+                .Where(o => o.valid == 1 && o.closed == 0 && o.closed == 0 && o.close_date == null && o.type == "租赁" 
+                && o.create_date.Date > DateTime.Parse("2025-10-01").Date )
+                .AsNoTracking().ToListAsync();
+            List<Models.Order> newList = new List<Models.Order>();
+            OrderController _orderHelper = new OrderController(_db, _oriConfig, _httpContextAccessor);
+            for(int i = 0; i < orders.Count; i++)
+            {
+                if (orders[i].availablePayments.Count <= 0)
+                {
+                    orders[i].closed = 1;
+                    orders[i].close_date = null;
+                    orders[i].update_date = DateTime.Now;
+                    _db.order.Entry(orders[i]).State = EntityState.Modified;
+                    continue;
+                }
+                Models.Order order = await _orderHelper.GetOrder(orders[i].id);
+                bool allSettled = true;
+                for(int j = 0; order.rentals != null && j < order.rentals.Count; j++)
+                {
+                    if (order.rentals[j].settled != 1)
+                    {
+                        allSettled = false;
+                    }
+                }
+                bool finished = false;
+                if (allSettled)
+                {
+                    if (order.rentProperties == null && order.refundAmount > 0)
+                    {
+                        finished = true;
+                    }
+                    if (order.rentProperties != null && order.totalRentNeedToRefundAmount != null && order.totalRentNeedToRefundAmount == 0)
+                    {
+                        finished = true;
+                    }
+                }
+                
+                if (finished)
+                {
+                    order.closed = 1;
+                    order.close_date = DateTime.Now;
+                    order.update_date = DateTime.Now;
+                    _db.order.Entry(order).State = EntityState.Modified;
+                    newList.Add(order);
+                }
+            }
+            await _db.SaveChangesAsync();
+            return Ok(new ApiResult<List<Models.Order>>()
+            {
+                code = 0,
+                message = "",
+                data = newList
             });
         }
 

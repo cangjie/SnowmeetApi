@@ -101,6 +101,7 @@ namespace SnowmeetApi.Models
         public int recepting { get; set; } = 0;
         public double? paying_amount { get; set; } = null;
         public DateTime? update_date { get; set; } = null;
+        public bool hide {get; set;} = false;
         [NotMapped]
         public string textColor { get; set; } = "";
         [NotMapped]
