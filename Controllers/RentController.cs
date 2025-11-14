@@ -5433,7 +5433,7 @@ namespace SnowmeetApi.Controllers
             }
             OrderController _orderHelper = new OrderController(_db, _config, _httpContextAccessor);
             List<Models.Order> orders = await _orderHelper.GetCommonOrders(null, shop, null, null, "租赁",
-                null, null, null, false, false, false, false, null, null, startDate, endDate);
+                null, null, null, false, false, false, false, null, null, startDate, endDate).OrderBy(o => o.close_date) ;
             List<Models.Order> confirmedOrders = new List<Models.Order>();
             for (int i = 0; i < orders.Count; i++)
             {
@@ -5503,7 +5503,7 @@ namespace SnowmeetApi.Controllers
                     {
                         closeDate = order.availableRefunds[order.availableRefunds.Count - 1].create_date;
                     }
-                    order.close_date = DateTime.Now;
+                    order.close_date = closeDate;
                     order.update_date = DateTime.Now;
                     _db.order.Entry(order).State = EntityState.Modified;
                     newList.Add(order);
