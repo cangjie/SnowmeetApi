@@ -1,8 +1,12 @@
 <!DOCTYPE html>
 <html>
+
 <head>
+    <script type="text/javascript">
+        //var rnd = Math.round(Math.random()*10000).toString(); 
+    </script>
     <meta charset="utf-8" />
-    <title>租赁业务报表</title>
+    <title>租赁订单报表</title>
     <link rel="stylesheet" href="../../css/table.css" />
     <link rel="stylesheet" href="../../css/bootstrap.css" />
     <link rel="stylesheet" href="../../css/bootstrap-grid.css" />
@@ -11,222 +15,256 @@
     <script type="text/javascript" src="../../js/jquery-3.6.1.min.js"></script>
     <script type="text/javascript" src="../../js/bootstrap.js"></script>
     <script type="text/javascript" src="../../js/util.js"></script>
-    <script type="text/javascript" src="../../js/get_sessionkey.js"></script>
+    <script type="text/javascript" src="../../js/get_sessionkey.js?rnd=dfsdf" +></script>
     <script type="text/javascript">//alert(sessionKey);</script>
     <style>
         td {
-            text-align: center
+            text-align: center;
+            padding-left: 5px;
+            padding-right: 5px;
+            border: solid;
+            border-width: 1px;
+            border-color: #fcfcfc;
+        }
+        .private_column_title{
+            background-color: yellow;
         }
     </style>
+
 </head>
+
 <body>
-    
+    <!--div id="menu" style="display:flex; flex-direction:row; width:100%"></div-->
     <div style="margin-top: 20px">
-        <h1 style="text-align:center">租赁业务报表</h1>
+        <h1 style="text-align:center">租赁订单报表</h1>
     </div>
     <div class="row_view" style="align-items:center;justify-content:center; margin-top:20px">
-        门店：<select id="shop"><option>万龙</option></select> 日期：从&nbsp;<input type="date" id="date_from" oninput="setDate()" />&nbsp;到&nbsp;<input type="date" id="date_to" oninput="setDate()" />&nbsp;<button id="btn" onclick="getData()"> 查 询 </button>
+        日期：从&nbsp;<input type="date" id="date_from" oninput="setDate()" />&nbsp;到&nbsp;<input type="date" id="date_to"
+            oninput="setDate()" />
+        &nbsp;<button id="btn" onclick="getData()"> 查 询 </button>&nbsp;<button onclick="download()"> 下 载 </button>
     </div>
-    <div style="height:20px"></div>
-    <h1></h1>
-    <div style="height:20px" id="total"></div>
-    <table style="width:100%">
-        <thead>
-            <tr>
-                <td class="table_head">订单ID</td>
-                <td class="table_head">门店</td>
-                <td class="table_head">姓名</td>
-                <td class="table_head">电话</td>
-                <td class="table_head">押金</td>
-                <td class="table_head">退款</td>
-                <td class="table_head">结余</td>
-                <td class="table_head">损坏赔偿</td>
-                <td class="table_head">租金</td>
-                <td class="table_head">支付方式</td>
-                <td class="table_head">日期</td>
-                <td class="table_head">时间</td>
-                <td class="table_head">接待</td>
-            </tr>
-        </thead>
-        <tbody id="report_rows">
-        </tbody>
-    </table>
+    <div id="total" ></div>
+    <div style="text-align:center;display:flex;justify-content:left;margin-top:50px">
+        <table style="border:solid;border-width:1px;width:100%">
+            <thead>
+                <tr id="tHead">
+                </tr>
+            </thead>
+            <tbody id="tBody" class="table_body_row">
+            </tbody>
+        </table>
+    </div>
 </body>
+
 </html>
-<script type="text/javascript">var currentColor = '#DDDDDD';
-    var totalPaid = 0;
-    function FillItem(item) {
-        var totalColNum = 13;
-        var orderIdIndex = 0;
-        var rows = document.getElementById('report_rows');
-        var newRow = document.createElement('tr');
-
-        var lastOrderId = '-1';
-        var lastRow = {};
-        if (rows.childNodes.length > 0) {
-            for (var j = 0; j < rows.childNodes.length; j++) {
-                if (rows.childNodes[rows.childNodes.length - 1 - j].childNodes.length == totalColNum) {
-                    lastRow = rows.childNodes[rows.childNodes.length - 1 - j];
-                    lastOrderId = lastRow.childNodes[orderIdIndex].innerText;
-                    break;
-                }
-            }
-
+<script type="text/javascript">
+    function download() {
+        if (tHead.length <= 0 || tData.length <= 0) {
+            return;
         }
-
-        if (item.id.toString() == lastOrderId && item.id > 0) {
-            var lastOrderIdTd = lastRow.childNodes[orderIdIndex];
-
-            //var attrOrderIdTdRowSpan = lastOrderIdTd.attributes["rowspan"];
-            var span = 2;
-            if (attrOrderIdTdRowSpan != null && attrOrderIdTdRowSpan != undefined) {
-                span = parseInt(attrOrderIdTdRowSpan.value);
-                span++;
-            }
-
-            for (var k = orderIdIndex; k < lastRow.childNodes.length; k++) {
-
-                var spanAttr = document.createAttribute("rowspan");
-                spanAttr.value = span.toString();
-
-                lastRow.childNodes[k].attributes.setNamedItem(spanAttr);
-            }
+        var csvContent = '';
+        var lineContent = '';
+        for (var i = 0; i < tHead.length; i++) {
+            lineContent += (i > 0 ? ',' : '') + tHead[i];
         }
-        else {
-
-            if (currentColor == '#DDDDDD') {
-                currentColor = 'white';
+        csvContent += lineContent + '\r\n';
+        for (var i = 0; i < tData.length; i++) {
+            lineContent = '';
+            for (var j = 0; j < tHead.length; j++) {
+                lineContent += (j > 0 ? ',' : '') + tData[i][j];
             }
-            else {
-                currentColor = '#DDDDDD';
-            }
-            var td_order_id = document.createElement('td');
-            td_order_id.innerText = item.id;
-            newRow.appendChild(td_order_id);
-
-            var td_shop = document.createElement('td');
-            td_shop.innerText = item.shop;
-            newRow.appendChild(td_shop);
-
-            var td_name = document.createElement('td');
-            td_name.innerText = item.name;
-            newRow.appendChild(td_name);
-
-            var td_cell = document.createElement('td');
-            td_cell.innerText = item.cell;
-            newRow.appendChild(td_cell);
-
-            var rightAttr = document.createAttribute('style');
-            rightAttr.value = 'text-align:right';
-            var td_deposit = document.createElement('td');
-            td_deposit.innerText = formatAmount(item.deposit);
-            td_deposit.attributes.setNamedItem(rightAttr)
-            newRow.appendChild(td_deposit);
-
-            rightAttr = document.createAttribute('style');
-            rightAttr.value = 'text-align:right';
-            var td_refund = document.createElement('td');
-            td_refund.innerText = formatAmount(item.refund);
-            td_refund.attributes.setNamedItem(rightAttr)
-            newRow.appendChild(td_refund);
-
-            rightAttr = document.createAttribute('style');
-            rightAttr.value = 'text-align:right';
-            var td_earn = document.createElement('td');
-            td_earn.innerText = formatAmount(item.earn);
-            td_earn.attributes.setNamedItem(rightAttr)
-            newRow.appendChild(td_earn);
-
-            rightAttr = document.createAttribute('style');
-            rightAttr.value = 'text-align:right';
-            var td_reparation = document.createElement('td');
-            td_reparation.innerText = formatAmount(item.reparation);
-            td_reparation.attributes.setNamedItem(rightAttr)
-            newRow.appendChild(td_reparation);
-
-            rightAttr = document.createAttribute('style');
-            rightAttr.value = 'text-align:right';
-            if (item.rental != item.earn) {
-                rightAttr.value = 'text-align:right;color:red';
-            }
-            var td_rental = document.createElement('td');
-            td_rental.innerText = formatAmount(item.rental);
-            td_rental.attributes.setNamedItem(rightAttr)
-            newRow.appendChild(td_rental);
-
-            var td_pay_method = document.createElement('td');
-            td_pay_method.innerText = item.payMethod;
-            //td_pay_method.attributes.setNamedItem(rightAttr)
-            newRow.appendChild(td_pay_method);
-
-
-            totalPaid += item.rental;
-
-            var td_date = document.createElement('td');
-            td_date.innerText = formatDate(item.settleDate);
-            newRow.appendChild(td_date);
-
-            var td_time = document.createElement('td');
-            td_time.innerText = formatTime(item.settleDate);
-            newRow.appendChild(td_time);
-
-            
-
-            var td_staff = document.createElement('td');
-            td_staff.innerText = item.staff;
-            newRow.appendChild(td_staff);
-
+            csvContent += lineContent + '\r\n';
         }
-        newRow.style.backgroundColor = currentColor;
-        rows.appendChild(newRow);
+        csvContent = csvContent.trim();
+        var link = document.createElement('a');
+        link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvContent);
+        link.download = encodeURIComponent('ZuLinDingDan_' + formatDate(startDate) + '_' + formatDate(endDate) + '.csv');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     }
+    var tHeadTemplate = ['序号', '订单号', '订单类型', '商品名称','订单日期','订单时间', '起租日期', '退租日期', '结算日期', '租金'];
+    var tHead = tHeadTemplate;
+    var tData = [];
+    render();
+    var totalAmount = 0
 
     function getData() {
-        var selShop = document.getElementById('shop');
-        var shop = encodeURIComponent(selShop.value);
-        
-        totalPaid = 0;
-        var rows = document.getElementById('report_rows');
-        rows.innerHTML = '';
+        //tHeadTemplate = ['序号', '门店', '日序号', '星期','订单日期', '支付时间', '订单号', '状态', '免押金', '押金', '招待', '姓名', '电话', '备注', '开单人' ,'支付方式', '商户订单号', '租金合计'];
+        //tHead = tHeadTemplate;
+        totalAmount = 0;
+        tData = [];
         var btnCtrl = document.getElementById('btn');
         btnCtrl.disabled = true;
-        var getUrl = '../../core/Rent/GetBalance?sessionKey=' + encodeURIComponent(sessionKey)
-            + '&startDate=' + formatDate(startDate) + '&endDate=' + formatDate(endDate) + '&shop=' + shop;
+        btnCtrl.innerText = "查询中……";
+        var getUrl = '../../api/Rent/GetConfirmedRentOrder?sessionKey=' + encodeURIComponent(sessionKey)
+            + '&startDate=' + formatDate(startDate) + '&endDate=' + formatDate(endDate);
         $.ajax({
             url: getUrl,
             type: 'GET',
             success: function (msg, status) {
                 console.log('get data msg', msg)
                 console.log('get data status', status)
+                btnCtrl.disabled = false;
+                btnCtrl.innerText = " 查 询 ";
+
                 if (status != 'success') {
                     return
                 }
-                //var odd = false;
-                //var totalPaid = 0;
+                var orders = msg.data
+                console.log('get orders', orders);
+                var index = 1;
+                for (var i = 0; i < orders.length; i++) {
+                    var order = orders[i];
+                    if (order.code == 'WT_ZL_251111_00003'){
+                        console.log('aa')
+                    }
+                    if (order.rentals != null && order.rentals.length > 0) {
+                        for (var j = 0; j < order.rentals.length; j++) {
+                            var rental = order.rentals[j]
+                            if (rental.entertain != 0) {
+                                continue;
+                            }
+                            var lineData = [];
+                            for (var k = 0; k < tHead.length; k++) {
+                                switch (tHead[k]) {
+                                    case '序号':
+                                        lineData[k] = index.toString();
+                                        break;
+                                    case '订单号':
+                                        lineData[k] = order.code
+                                        break;
+                                    case '订单类型':
+                                        lineData[k] = '正常订单'
+                                        break;
+                                    case '商品名称':
+                                        lineData[k] = rental.name;
+                                        break;
+                                    case '订单日期':
+                                        lineData[k] = formatDate(order.biz_date);
+                                        break;
+                                    case '订单时间':
+                                        lineData[k] = formatTime(order.biz_date);
+                                        break;
+                                    case '起租日期':
+                                        lineData[k] = formatDate(rental.realStartDate);
+                                        break;
+                                    case '退租日期':
+                                        lineData[k] = formatDate(rental.realEndDate);
+                                        break;
+                                    case '结算日期':
+                                        lineData[k] = formatDate(order.close_date);
+                                        break;
+                                    case '租金':
+                                        var amount = rental.totalRentalAmount - rental.totalDiscountAmount;
+                                        lineData[k] = amount.toFixed(2);
+                                        break;
+                                    default:
+                                        break;
+                                }
 
-                for (var i = 0; i < msg.length; i++) {
-                   // console.log('report', msg)
-                 /*
-                    if (i > 0 && msg[i].order_id == msg[i - 1].order_id && msg[i].order_id > 0){
-                        msg[i].odd = odd;
+                            }
+                            if (rental.totalRentalAmount - rental.totalDiscountAmount >= 1) {
+                                tData.push(lineData);
+                                totalAmount +=  (rental.totalRentalAmount - rental.totalDiscountAmount);
+                                index++;
+                            }
+                        }
                     }
                     else {
-                        msg[i].odd = !odd;
-                        odd = !odd;
-                        totalPaid += msg[i].total_paid
-                    }
-                   */
-                    FillItem(msg[i]);
-                }
+                        var lineData = [];
+                        for (var k = 0; k < tHead.length; k++) {
+                            switch (tHead[k]) {
+                                case '序号':
+                                    lineData[k] = index.toString();
+                                    break;
+                                case '订单号':
+                                    lineData[k] = order.code
+                                    break;
+                                case '订单类型':
+                                    lineData[k] = '临时订单'
+                                    break;
+                                case '商品名称':
+                                    lineData[k] = '--';
+                                    break;
+                                case '订单日期':
+                                    lineData[k] = formatDate(order.biz_date);
+                                    break;
+                                case '订单时间':
+                                    lineData[k] = formatTime(order.biz_date);
+                                    break;
+                                case '起租日期':
+                                    lineData[k] = formatDate(order.biz_date);
+                                    break;
+                                case '退租日期':
+                                    lineData[k] = formatDate(order.biz_date);
+                                    break;
+                                case '结算日期':
+                                    if (order.availableRefunds.length > 0) {
+                                        lineData[k] = formatDate(order.availableRefunds[order.availableRefunds.length - 1].create_date);
+                                    }
+                                    else {
+                                        lineData[k] = '--';
+                                    }
+                                    break;
+                                case '租金':
+                                    var amount = order.paidAmount - order.refundAmount;
+                                    lineData[k] = amount.toFixed(2);
+                                    break;
+                                default:
+                                    break;
+                            }
 
-                var divTotal = document.getElementById('total');
-                divTotal.innerText = '总计：' + formatAmount(totalPaid);
-                //alert(totalPaid);
+                        }
+                        if (order.paidAmount - order.refundAmount >= 1) {
+                            tData.push(lineData);
+                            totalAmount += (order.paidAmount - order.refundAmount);
+                            index++;
+                        }
+
+                    }
+                }
+                console.log('get head', tHead);
+                render();
             },
-            complete: function (msg, status) {
+            finally: function (msg, status) {
                 btnCtrl.disabled = false;
+                btnCtrl.innerText = " 查 询 ";
             }
         })
+    }
+    function render() {
+        var tHeadCtl = document.getElementById('tHead');
+        tHeadCtl.innerHTML = '';
+        for (var i = 0; i < tHead.length; i++) {
+            var td = document.createElement('td');
+            td.innerText = tHead[i];
+            var classAttr = document.createAttribute('class');
+            if (i == 4 || i == 5){
+                classAttr.value = 'table_head private_column_title';
+            }
+            else{
+                classAttr.value = 'table_head';
+            }
+            
+            td.attributes.setNamedItem(classAttr);
+            tHeadCtl.appendChild(td);
+        }
+        var tBodyCtl = document.getElementById('tBody');
+        tBodyCtl.innerHTML = '';
+        for (var i = 0; tData && i < tData.length; i++) {
+            var tr = document.createElement('tr');
 
-    }</script>
+            for (var j = 0; j < tHead.length; j++) {
+                var td = document.createElement('td');
+                td.innerText = tData[i][j];
+                tr.appendChild(td);
+            }
+            tBodyCtl.appendChild(tr);
+        }
+        var totalCell = document.getElementById('total');
+        totalCell.innerText = "总计：" + totalAmount.toFixed(2);
+    }
+</script>
 <script type="text/javascript" src="../../js/date_selector.js"></script>
+<script type="text/javascript" src="../js/menu.js"></script>
