@@ -348,6 +348,18 @@ namespace SnowmeetApi.Controllers
                     create_date = DateTime.Now
                 };
                 await _db.careTask.AddAsync(taskSafe);
+                if (care.need_repair == 1)
+                {
+                    CareTask taskRepair = new CareTask()
+                    {
+                        id = 0,
+                        care_id = care.id,
+                        task_name = "维修",
+                        memo = care.repair_memo,
+                        create_date = DateTime.Now
+                    };
+                    await _db.careTask.AddAsync(taskRepair);
+                }
                 if (care.need_edge == 1)
                 {
                     CareTask taskEdge = new CareTask()
@@ -384,18 +396,7 @@ namespace SnowmeetApi.Controllers
                     };
                     await _db.careTask.AddAsync(taskUnWax);
                 }
-                if (care.need_repair == 1)
-                {
-                    CareTask taskRepair = new CareTask()
-                    {
-                        id = 0,
-                        care_id = care.id,
-                        task_name = "维修",
-                        memo = care.repair_memo,
-                        create_date = DateTime.Now
-                    };
-                    await _db.careTask.AddAsync(taskRepair);
-                }
+                
                 CareTask taskFinish = new CareTask()
                 {
                     id = 0,
