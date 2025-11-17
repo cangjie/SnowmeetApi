@@ -5444,7 +5444,10 @@ namespace SnowmeetApi.Controllers
                     if ((staff.title_level == 50 && ((DateTime)order.close_date).Date < DateTime.Now.AddDays(-1).Date)
                         || staff.title_level > 50)
                     {
-                        confirmedOrders.Add(order);
+                        if (order.availablePayments.Where(p => p.pay_method != "微信支付" && p.pay_method != "支付宝").ToList().Count <= 0 )
+                        {
+                            confirmedOrders.Add(order);
+                        }
                     }
                 }
             }
