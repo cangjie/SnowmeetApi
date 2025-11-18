@@ -1169,6 +1169,14 @@ namespace SnowmeetApi.Models
                 return haveWarranty;
             }
         }
+        [NotMapped]
+        public double totalEarnAmount
+        {
+            get
+            {
+                return paidAmount - refundAmount;
+            }
+        }
 
     }
 }
