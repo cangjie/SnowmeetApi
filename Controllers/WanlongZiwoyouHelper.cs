@@ -125,7 +125,7 @@ namespace SnowmeetApi.Controllers
 
 
 
-        public WanlongZiwoyouHelper(ApplicationDBContext context, IConfiguration config, string source = "大好河山")
+        public WanlongZiwoyouHelper(ApplicationDBContext context, IConfiguration config, string source = "万龙自我游")
         {
             _context = context;
             _oriConfig = config;
