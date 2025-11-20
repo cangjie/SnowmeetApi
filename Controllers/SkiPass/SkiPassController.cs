@@ -758,6 +758,7 @@ namespace SnowmeetApi.Controllers
                 //totalPrice += (double)skipass.deal_price;
             
 
+            /*
             OrderOnline order = new OrderOnline()
             {
                 type = "雪票",
@@ -803,6 +804,32 @@ namespace SnowmeetApi.Controllers
             _context.member.Entry(member).State = EntityState.Modified;
             await _context.SaveChangesAsync();
             //await _memberHelper.UpdateDetailInfo(member.id, cell, "cell", false);
+            */
+            Models.Order order = new Models.Order()
+            {
+                id = 0,
+                member_id = member.id,
+                type = "雪票",
+                shop = product.shop.Trim(),
+                total_amount = product.sale_price * count,
+                paying_amount = product.sale_price * count,
+                create_date = DateTime.Now,
+                skipasses = new List<Models.SkiPass>() { skipass  },
+            };
+            OrderController _orderHelper = new OrderController(_context, _config, _http);
+            await _orderHelper.GenerateOrderCode(order);
+            OrderPayment payment = new OrderPayment()
+            {
+                order_id = order.id,
+                pay_method = "微信支付",
+                amount = (double)order.paying_amount,
+                status = "待支付",
+                staff_open_id = "",
+                out_trade_no = order.code + "_ZF_01"
+            };
+            order.payments = new List<OrderPayment>() { payment };
+            await _context.order.AddAsync(order);
+            await _context.SaveChangesAsync();
             return Ok(order);
         }
 
