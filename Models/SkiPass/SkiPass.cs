@@ -52,8 +52,10 @@ namespace SnowmeetApi.Models
         public DateTime update_date {get; set;} = DateTime.Now;
         public DateTime create_date {get; set;} = DateTime.Now;
         public int is_used {get; set;} = 0;
+        //[ForeignKey("order_id")]
+        //public OrderOnline? order {get;set;}
         [ForeignKey("order_id")]
-        public OrderOnline? order {get;set;}
+        public Order? order {get; set;} = null;
         [NotMapped]
         public string cancelStatus
         {

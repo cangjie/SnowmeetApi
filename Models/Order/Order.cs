@@ -112,6 +112,7 @@ namespace SnowmeetApi.Models
         public Staff staff { get; set; } = null;
         [ForeignKey("member_id")]
         public Member member { get; set; } = null;
+        public List<SkiPass> skipasses {get; set;} = new List<SkiPass>();
         public List<Retail> retails { get; set; } = new List<Retail>();
         public List<Care> cares { get; set; } = new List<Care>();
         public List<Rental> rentals { get; set; } = new List<Rental>();

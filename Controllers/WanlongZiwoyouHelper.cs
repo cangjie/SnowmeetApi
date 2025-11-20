@@ -595,11 +595,11 @@ namespace SnowmeetApi.Controllers
             var l = await _context.ziwoyouOrder
             .Include(z => z.skipasses)
                 .ThenInclude(s => s.order)
-                    .ThenInclude(o => o.paymentList.Where(p => p.status.Equals("支付成功")))
+                    .ThenInclude(o => o.availablePayments.Where(p => p.status.Equals("支付成功")))
                         .ThenInclude(p => p.refunds.Where(r => (r.state == 1 || r.refund_id.Trim().Equals(""))))
             .Include(z => z.skipasses)
                 .ThenInclude(s => s.order)
-                    .ThenInclude(o => o.paymentList.Where(p => p.status.Equals("支付成功")))
+                    .ThenInclude(o => o.availablePayments.Where(p => p.status.Equals("支付成功")))
                         .ThenInclude(p => p.shares)
                             .ThenInclude(s => s.kol)
 
@@ -621,11 +621,11 @@ namespace SnowmeetApi.Controllers
                 {
                     if (order.skipasses[j].order != null)
                     {
-                        maxPaymentNum = Math.Max(maxPaymentNum, order.skipasses[j].order.paymentList.Count);
+                        maxPaymentNum = Math.Max(maxPaymentNum, order.skipasses[j].order.availablePayments.Count);
 
-                        if (order.skipasses[j].order.refundList != null)
+                        if (order.skipasses[j].order.refunds != null)
                         {
-                            maxRefundNum = Math.Max(maxRefundNum, order.skipasses[j].order.refundList.Count);
+                            maxRefundNum = Math.Max(maxRefundNum, order.skipasses[j].order.refunds.Count);
                         }
 
                     }
@@ -801,13 +801,13 @@ namespace SnowmeetApi.Controllers
                 PaymentShare? share = null;
                 bool haveOrder = false;
                 if (order.skipasses.Count > 0 && order.skipasses[0].order != null
-                    && order.skipasses[0].order.paymentList.Count > 0)
+                    && order.skipasses[0].order.availablePayments.Count > 0)
                 {
                     haveOrder = true;
                 }
-                if (haveOrder && order.skipasses[0].order.paymentList[0].shares.Count > 0)
+                if (haveOrder && order.skipasses[0].order.availablePayments[0].shares.Count > 0)
                 {
-                    share = order.skipasses[0].order.paymentList[0].shares[0];
+                    share = order.skipasses[0].order.availablePayments[0].shares[0];
                 }
 
                 if (order.skipasses.Count <= 0)
@@ -830,7 +830,7 @@ namespace SnowmeetApi.Controllers
                             styleTime.SetFont(fontUsed);
                             break;
                         case 3:
-                            if (order.skipasses[0].order.refundList.Count == 0)
+                            if (order.skipasses[0].order.refunds.Count == 0)
                             {
                                 styleText.SetFont(fontUnRefund);
                                 styleMoney.SetFont(fontUnRefund);
@@ -1033,9 +1033,9 @@ namespace SnowmeetApi.Controllers
                     {
                         int index = commonFieldsNum + j * headPayment.Length + k;
                         ICell cell = dr.CreateCell(index);
-                        if (haveOrder && j < order.skipasses[0].order.paymentList.Count)
+                        if (haveOrder && j < order.skipasses[0].order.availablePayments.Count)
                         {
-                            OrderPayment payment = order.skipasses[0].order.paymentList[0];
+                            OrderPayment payment = order.skipasses[0].order.availablePayments[0];
                             switch (k)
                             {
                                 case 0:
@@ -1073,9 +1073,9 @@ namespace SnowmeetApi.Controllers
                     {
                         int index = commonFieldsNum + headPayment.Length * maxPaymentNum + j * headRefund.Length + k;
                         ICell cell = dr.CreateCell(index);
-                        if (haveOrder && j < order.skipasses[0].order.refundList.Count)
+                        if (haveOrder && j < order.skipasses[0].order.refunds.Count)
                         {
-                            OrderPaymentRefund r = order.skipasses[0].order.refundList[j];
+                            OrderPaymentRefund r = order.skipasses[0].order.refunds[j];
                             switch (k)
                             {
                                 case 0:
