@@ -22,9 +22,7 @@ namespace SnowmeetApi.Models
         public double? refund_amount {get; set;} = null;
         public int? valid {get; set;} = 0;
         public int? have_refund {get; set;} = null;
-
         public string? card_no {get; set;} = null;
-
         public string? card_image_url {get; set;} = null;
         public DateTime? card_member_pick_time {get; set;} = null;
         public DateTime? card_member_return_time {get; set;} = null;

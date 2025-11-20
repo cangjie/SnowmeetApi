@@ -221,7 +221,7 @@ namespace SnowmeetApi.Models
         public List<RentOrder> rentOrderList {get; set;}
         [ForeignKey(nameof(MaintainLive.order_id))]
         public List<MaintainLive> maintainList {get; set;}
-        
+        [NotMapped]
         public List<Models.SkiPass> skiPasses {get; set;} = new List<Models.SkiPass>();
        
     }

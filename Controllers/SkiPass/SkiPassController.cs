@@ -814,7 +814,8 @@ namespace SnowmeetApi.Controllers
                 total_amount = product.sale_price * count,
                 paying_amount = product.sale_price * count,
                 create_date = DateTime.Now,
-                skipasses = new List<Models.SkiPass>() { skipass  },
+                //skipasses = new List<Models.SkiPass>() { skipass  },
+                valid = 0
             };
             OrderController _orderHelper = new OrderController(_context, _config, _http);
             await _orderHelper.GenerateOrderCode(order);
@@ -825,9 +826,11 @@ namespace SnowmeetApi.Controllers
                 amount = (double)order.paying_amount,
                 status = "待支付",
                 staff_open_id = "",
-                out_trade_no = order.code + "_ZF_01"
+                out_trade_no = order.code + "_ZF_01",
+                create_date = DateTime.Now
             };
             order.payments = new List<OrderPayment>() { payment };
+            order.skipasses = new List<Models.SkiPass>() { skipass };
             await _context.order.AddAsync(order);
             await _context.SaveChangesAsync();
             return Ok(order);
