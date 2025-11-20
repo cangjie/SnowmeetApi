@@ -735,11 +735,14 @@ namespace SnowmeetApi.Controllers
                 .Where(s => s.product_id == productId && s.valid == 1 && s.reserve_date.Date == date.Date)
                 .OrderBy(s => s.reserve_date).AsNoTracking().FirstAsync();
             
+            /*
             UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (user == null || product == null)
             {
                 return BadRequest();
             }
+            */
+            
             Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
             //double totalPrice = 0;
             Models.SkiPass.SkiPass skipass = new Models.SkiPass.SkiPass()
