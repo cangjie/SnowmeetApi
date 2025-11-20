@@ -4,7 +4,6 @@ using wechat_miniapp_base.Models;
 using System;
 using SKIT.FlurlHttpClient.Wechat.TenpayV3.Models;
 using SnowmeetApi.Models.UTV;
-using SnowmeetApi.Models.ProudctSkiPass;
 using SnowmeetApi.Models.Rent;
 
 //using Aop.Api.Domain;
@@ -28,7 +27,9 @@ namespace SnowmeetApi.Data
             modelBuilder.Entity<SnowmeetApi.Models.Maintain.MaintainReport>().HasNoKey();
             modelBuilder.Entity<Models.SaleReport>().HasNoKey();
             modelBuilder.Entity<Models.EPaymentDailyReport>().HasKey(e => new { e.biz_date, e.mch_id, e.pay_method });
-            modelBuilder.Entity<SkipassDailyPrice>().HasOne<Models.ProudctSkiPass.SkiPass>().WithMany(s => s.dailyPrice).HasForeignKey(s => s.product_id);
+
+
+            modelBuilder.Entity<SkipassDailyPrice>().HasOne<Models.SkiPassProduct>().WithMany(s => s.dailyPrice).HasForeignKey(s => s.product_id);
             
             modelBuilder.Entity<Brand>().HasKey(b => new { b.brand_name, b.brand_type });
             modelBuilder.Entity<Member>().HasMany<RentOrderLog>().WithOne(m => m.member).HasForeignKey(r => r.oper_member_id);
@@ -73,7 +74,7 @@ namespace SnowmeetApi.Data
         public DbSet<Models.Background.BackgroundLoginSession> BackgroundLoginSession { get; set; }
         public DbSet<Mi7OrderDetail> mi7OrderDetail { get; set; }
         
-        public DbSet<Models.ProudctSkiPass.SkiPass> SkiPass { get; set; }
+        public DbSet<Models.SkiPassProduct> skiPassProduct { get; set; }
         public DbSet<OAReceive> oAReceive { get; set; }
         public DbSet<TicketLog> ticketLog { get; set; }
         public DbSet<ServiceMessage> ServiceMessage { get; set; }
@@ -114,7 +115,7 @@ namespace SnowmeetApi.Data
         public DbSet<Models.School.Course> schoolCourse { get; set; }
         public DbSet<Models.School.CourseStudent> courseStudent { get; set; }
         public DbSet<Models.SkiPass.SkiPass> skiPass { get; set; }
-        public DbSet<Models.ProudctSkiPass.SkipassDailyPrice> skipassDailyPrice { get; set; }
+        public DbSet<Models.SkipassDailyPrice> skipassDailyPrice { get; set; }
         public DbSet<Models.Users.Referee> referee { get; set; }
         public DbSet<Models.SkiPass.ZiwoyouListOrder> ziwoyouOrder { get; set; }
         public DbSet<Models.Deposit.DepositTemplate> depositTemplate { get; set; }
