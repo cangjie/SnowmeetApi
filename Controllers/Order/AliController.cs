@@ -467,7 +467,7 @@ namespace SnowmeetApi.Controllers
                             await _db.coreDataModLog.AddAsync(log);
                             await _db.SaveChangesAsync();
                             OrderController _orderHelper = new OrderController(_db, _oriConfig, _http);
-                            await _orderHelper.DealSuccessPaidOrder(payment.order_id);
+                            await _orderHelper.DealSuccessPaidOrder(payment.order_id, payment.id);
                         }
                         /*
                         List<OrderPayment> payments = await _db.orderPayment

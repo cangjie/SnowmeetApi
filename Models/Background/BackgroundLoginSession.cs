@@ -10,6 +10,7 @@ namespace SnowmeetApi.Models.Background
         public long timestamp { get; set; }
 
         public string session_key { get; set; } = "";
+        public int title_level { get; set; } = 0;
 
     }
 }

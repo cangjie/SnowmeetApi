@@ -19,6 +19,7 @@ namespace SnowmeetApi.Models
         public string source { get; set; } = "";
         public int in_staff_list { get; set; } = 0;
         public int? following_wechat { get; set; } = null;
+        public int valid { get; set; } = 1;
         public DateTime? update_date { get; set; } = null;
         [NotMapped]
         public string? currentContactNum { get; set; } = null;

@@ -26,16 +26,12 @@
             border-width: 1px;
             border-color: #fcfcfc;
         }
-        .private_column_title{
-            background-color: yellow;
-            color: black;
-        }
     </style>
 
 </head>
 
 <body>
-    <div id="menu" style="display:flex; flex-direction:row; width:100%"></div>
+    <!--div id="menu" style="display:flex; flex-direction:row; width:100%"></div-->
     <div style="margin-top: 20px">
         <h1 style="text-align:center">租赁订单报表</h1>
     </div>
@@ -84,7 +80,7 @@
         link.click();
         document.body.removeChild(link);
     }
-    var tHeadTemplate = ['序号', '订单号', '订单类型', '商品名称','订单日期','订单时间', '起租日期', '退租日期', '结算日期', '租金'];
+    var tHeadTemplate = ['序号', '订单号', '订单类型', '商品名称', '起租日期', '退租日期', '结算日期', '租金'];
     var tHead = tHeadTemplate;
     var tData = [];
     render();
@@ -141,12 +137,6 @@
                                     case '商品名称':
                                         lineData[k] = rental.name;
                                         break;
-                                    case '订单日期':
-                                        lineData[k] = formatDate(order.biz_date);
-                                        break;
-                                    case '订单时间':
-                                        lineData[k] = formatTime(order.biz_date);
-                                        break;
                                     case '起租日期':
                                         lineData[k] = formatDate(rental.realStartDate);
                                         break;
@@ -187,12 +177,6 @@
                                     break;
                                 case '商品名称':
                                     lineData[k] = '--';
-                                    break;
-                                case '订单日期':
-                                    lineData[k] = formatDate(order.biz_date);
-                                    break;
-                                case '订单时间':
-                                    lineData[k] = formatTime(order.biz_date);
                                     break;
                                 case '起租日期':
                                     lineData[k] = formatDate(order.biz_date);
@@ -241,13 +225,7 @@
             var td = document.createElement('td');
             td.innerText = tHead[i];
             var classAttr = document.createAttribute('class');
-            if (i == 4 || i == 5){
-                classAttr.value = 'table_head private_column_title';
-            }
-            else{
-                classAttr.value = 'table_head';
-            }
-            
+            classAttr.value = 'table_head';
             td.attributes.setNamedItem(classAttr);
             tHeadCtl.appendChild(td);
         }

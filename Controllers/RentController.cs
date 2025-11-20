@@ -4841,7 +4841,7 @@ namespace SnowmeetApi.Controllers
             return detail;
         }
         [NonAction]
-        public async Task<Rental> EffectRental(int rentalId, int? staffId)
+        public async Task<Rental?> EffectRental(int rentalId, int? staffId)
         {
             Rental rental = await _db.rental.Where(r => r.id == rentalId)
                 .AsNoTracking().FirstOrDefaultAsync();
@@ -4885,8 +4885,9 @@ namespace SnowmeetApi.Controllers
             else
             {
                 await SetRentalDetail(rentalId, ((DateTime)rental.start_date).Date, staffId);
-            }            
+            }
             return await GetRental(rentalId);
+            //return null;
         }
         [HttpGet]
         public async Task<Models.Order> EffectRentOrder(int orderId, int paymentId)
@@ -5324,6 +5325,10 @@ namespace SnowmeetApi.Controllers
                 .AsNoTracking().ToListAsync();
             for (int i = 0; i < orders.Count; i++)
             {
+                if (((DateTime)rentDate).Date < orders[i].biz_date.Date)
+                {
+                    continue;
+                }
                 for(int j = 0; orders[i].rentals != null && j < orders[i].rentals.Count; j++)
                 {
                     Rental rental = orders[i].rentals[j];
@@ -5334,6 +5339,13 @@ namespace SnowmeetApi.Controllers
         [NonAction]
         public async Task ContinueRental(Models.Rental rental, DateTime rentDate)
         {
+            List<Models.RentalDetail> details = await _db.rentalDetail
+                .Where(d => d.valid == 1 && d.rental_date.Date == rentDate.Date && d.rental_id == rental.id)
+                .AsNoTracking().ToListAsync();
+            if (details.Count > 0)
+            {
+                return;
+            }
             if (rental.settled == 1 || rental.valid == 0
             || rental.rentItems.Where(i => i.status != "已归还").Count() == 0
             || rental.details.Where(d => ((DateTime)d.rental_date).Date == rentDate.Date).Count() > 0)
@@ -5396,10 +5408,147 @@ namespace SnowmeetApi.Controllers
                     create_date = DateTime.Now
 
                 };
-                
+
                 await _db.discount.AddAsync(discountObj);
                 await _db.SaveChangesAsync();
-            }            
+            }
         }
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<List<Models.Order>?>>> GetConfirmedRentOrder(string shop,
+            DateTime startDate, DateTime endDate, string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            if (staff.title_level == 50)
+            {
+                shop = "万龙体验中心";
+            }
+            if (staff.title_level < 50)
+            {
+                return Ok(new ApiResult<List<Models.Order>?>()
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = null
+                });
+            }
+            OrderController _orderHelper = new OrderController(_db, _config, _httpContextAccessor);
+            List<Models.Order> orders = (await _orderHelper.GetCommonOrders(null, shop, null, null, "租赁",
+                null, null, null, false, false, false, false, null, null, startDate, endDate))
+                .OrderByDescending(o => o.code).ToList();
+            List<Models.Order> confirmedOrders = new List<Models.Order>();
+            for (int i = 0; i < orders.Count; i++)
+            {
+                Models.Order order = orders[i];
+                if (order.paidAmount > 0 && order.closed == 1 && order.close_date != null && !order.hide)
+                {
+                    if ((staff.title_level == 50 && ((DateTime)order.close_date).Date < DateTime.Now.AddDays(-1).Date)
+                        || staff.title_level > 50)
+                    {
+                        if (order.availablePayments.Where(p => p.pay_method != "微信支付" && p.pay_method != "支付宝").ToList().Count <= 0 )
+                        {
+                            confirmedOrders.Add(order);
+                        }
+                    }
+                }
+            }
+            return Ok(new ApiResult<List<Models.Order>>()
+            {
+                code = 0,
+                message = "",
+                data = confirmedOrders
+            });
+        }
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<List<Models.Order>?>>> CloseOrder()
+        {
+            List<Models.Order> orders = await _db.order.Include(o => o.payments).ThenInclude(p => p.refunds)
+                .Where(o => o.valid == 1  && o.closed == 0 && o.close_date == null && o.type == "租赁" 
+                && o.create_date.Date > DateTime.Parse("2025-10-01").Date  )
+                .AsNoTracking().ToListAsync();
+            List<Models.Order> newList = new List<Models.Order>();
+            OrderController _orderHelper = new OrderController(_db, _oriConfig, _httpContextAccessor);
+            for(int i = 0; i < orders.Count; i++)
+            {
+                if (orders[i].availablePayments.Count <= 0)
+                {
+                    orders[i].closed = 1;
+                    orders[i].close_date = null;
+                    orders[i].update_date = DateTime.Now;
+                    _db.order.Entry(orders[i]).State = EntityState.Modified;
+                    continue;
+                }
+                Models.Order order = await _orderHelper.GetOrder(orders[i].id);
+                bool allSettled = true;
+                for(int j = 0; order.rentals != null && j < order.rentals.Count; j++)
+                {
+                    if (order.rentals[j].settled != 1)
+                    {
+                        allSettled = false;
+                    }
+                }
+                bool finished = false;
+                if (allSettled)
+                {
+                    if (order.rentProperties == null && order.refundAmount > 0)
+                    {
+                        finished = true;
+                    }
+                    if (order.rentProperties != null && order.totalRentUnRefund != null && order.totalRentUnRefund == 0)
+                    {
+                        finished = true;
+                    }
+                }
+                
+                if (finished)
+                {
+                    order.closed = 1;
+                    DateTime closeDate = DateTime.Now;
+                    if (order.refundAmount > 0)
+                    {
+                        closeDate = order.availableRefunds[order.availableRefunds.Count - 1].create_date;
+                    }
+                    order.close_date = closeDate;
+                    order.update_date = DateTime.Now;
+                    _db.order.Entry(order).State = EntityState.Modified;
+                    newList.Add(order);
+                }
+            }
+            await _db.SaveChangesAsync();
+            return Ok(new ApiResult<List<Models.Order>>()
+            {
+                code = 0,
+                message = "",
+                data = newList
+            });
+        }
+
+        /*
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<List<Models.Order>>>> GetRentOrderBySettleDateByStaff(string shop, 
+            DateTime startDate, DateTime endDate, string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            shop = Util.UrlDecode(shop);
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            if (staff == null || staff.title_level < 100)
+            {
+                return Ok(new ApiResult<List<Models.RentalDetail>>()
+                {
+                    code = 1,
+                    message = "",
+                    data = null
+                });
+            }
+            OrderController _orderHelper = new OrderController(_db, _config, _httpContextAccessor);
+            List<Models.Order> orders = await _orderHelper.GetCommonOrders(null, shop, null, null,
+                "租赁", DateTime.Parse("2025-10-15"), endDate, null, null, null, null, null, null, null);
+            List<Models.Order> settledOrders = new List<Models.Order>();
+            for (int i = 0; i < orders.Count; i++)
+            {
+                Models.Order order = orders[i];
+
+            }
+            return BadRequest();
+        }
+        */
     }
 }

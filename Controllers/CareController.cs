@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Aop.Api.Domain;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -26,18 +27,27 @@ namespace SnowmeetApi.Controllers
         [NonAction]
         public async Task<Care> UpdateCare(Care care, int? memberId, int? staffId, string scene)
         {
-            Care oriCare = await _db.care.FindAsync(care.id);
-            List<CoreDataModLog> logs = Care.GetUpdateDifferenceLog(oriCare, care, memberId, staffId, scene);
+            Care oriCare = await _db.care.Where(c => c.id == care.id)
+                .Include(c => c.careImages).AsNoTracking().FirstOrDefaultAsync();
+            List<CoreDataModLog> logs = Util.GetUpdateDifferenceLog<Care>(oriCare, care, memberId, staffId, scene);
             foreach (CoreDataModLog log in logs)
             {
                 await _db.coreDataModLog.AddAsync(log);
             }
-            oriCare.update_date = DateTime.Now;
-            _db.care.Entry(oriCare).State = EntityState.Modified;
+            for (int i = 0; oriCare.careImages != null && i < oriCare.careImages.Count; i++)
+            {
+                CareImage oriImage = oriCare.careImages[i];
+                if (care.careImages.Where(c => c.id == oriImage.id).ToList().Count <= 0)
+                {
+                    _db.careImage.Entry(oriImage).State = EntityState.Deleted;
+                }
+            }
+            _db.care.Update(care);
+            care.update_date = DateTime.Now;
             await _db.SaveChangesAsync();
-            return oriCare;
+            return care;
         }
-        [NonAction]
+        [HttpGet]
         public async Task<Care> GetCare(int id)
         {
             Care c = await _db.care.FindAsync(id);
@@ -55,8 +65,9 @@ namespace SnowmeetApi.Controllers
                 c.order = null;
             }
             c.tasks = await _db.careTask
-                .Include(t => t.staff).Include(t => t.terminateStaff)
-                .Where(t => t.care_id == c.id).ToListAsync();
+                .Include(t => t.staff)
+                .Include(t => t.terminateStaff)
+                .Where(t => t.care_id == c.id).OrderBy(t=>t.id).ToListAsync();
             await _db.member.Entry(c.order.member).Collection(m => m.memberSocialAccounts).LoadAsync();
             return c;
         }
@@ -88,7 +99,7 @@ namespace SnowmeetApi.Controllers
             string[] dispayedNameArr = dispayedName.Split('/');
             string name = dispayedNameArr[0];
             string chineseName = dispayedNameArr[1];
-            List<Brand> brands = await _db.brand.Where(b => b.brand_type.Trim().Equals(type.Trim()) &&  b.brand_name.Trim().Equals(name.Trim()))
+            List<Brand> brands = await _db.brand.Where(b => b.brand_type.Trim().Equals(type.Trim()) && b.brand_name.Trim().Equals(name.Trim()))
                 .AsNoTracking().ToListAsync();
             if (brands.Count > 0)
             {
@@ -113,7 +124,7 @@ namespace SnowmeetApi.Controllers
             {
                 return null;
             }
-            List<Series> sl = await _db.series.Where(s => s.type.Trim().Equals(brand.brand_type.Trim()) 
+            List<Series> sl = await _db.series.Where(s => s.type.Trim().Equals(brand.brand_type.Trim())
                 && s.brand_name.Trim().Equals(brand.brand_name.Trim()) && s.serial_name.Trim().Equals(seriesName))
                 .AsNoTracking().ToListAsync();
             if (sl.Count > 0)
@@ -147,7 +158,7 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<ApiResult<List<Series>>>> GetSeries(string brand, string type)
         {
             brand = Util.UrlDecode(brand).Trim();
-            List<Series> series = await _db.series.Where(s => (s.brand_name.Trim().Equals(brand) && s.type.Trim().Equals(type.Trim()) ))
+            List<Series> series = await _db.series.Where(s => (s.brand_name.Trim().Equals(brand) && s.type.Trim().Equals(type.Trim())))
                 .AsNoTracking().ToListAsync();
             return Ok(new ApiResult<List<Series>>()
             {
@@ -164,7 +175,8 @@ namespace SnowmeetApi.Controllers
             Staff staff = await _staffHelper.GetStaffBySessionKey(sessionKey, sessionType);
             if (staff == null)
             {
-                return Ok(new ApiResult<Care?>(){
+                return Ok(new ApiResult<Care?>()
+                {
                     code = 1,
                     message = "没有权限",
                     data = null
@@ -204,7 +216,7 @@ namespace SnowmeetApi.Controllers
             scene = Util.UrlDecode(scene);
             care = await UpdateCare(care, null, staff.id, scene);
             Brand brand = await UpdateBrand(care.equipment, care.brand, staff.id);
-            if (brand != null)
+            if (brand != null && care.series != null)
             {
                 await UpdateSeries(brand, care.series, staff.id);
             }
@@ -245,12 +257,12 @@ namespace SnowmeetApi.Controllers
             }
         }
         [HttpGet]
-        public async Task<ActionResult<ApiResult<List<Product>?>>> GetProducts(string shop)
+        public async Task<ActionResult<ApiResult<List<Models.Product>?>>> GetProducts(string shop)
         {
-            List<Product> products = await _db.product
+            List<Models.Product> products = await _db.product
                 .Where(p => (p.id == 137 || p.id == 138 || p.id == 139 || p.id == 140 || p.id == 142 || p.id == 143 || p.id == 202)
                 && p.valid == 1).OrderBy(p => p.sale_price).AsNoTracking().ToListAsync();
-            return Ok(new ApiResult<List<Product>?>()
+            return Ok(new ApiResult<List<Models.Product>?>()
             {
                 code = 0,
                 message = "",
@@ -258,11 +270,11 @@ namespace SnowmeetApi.Controllers
             });
         }
         [NonAction]
-        public async Task<Product?> GetProduct(string shop, Care care)
+        public async Task<Models.Product?> GetProduct(string shop, Care care)
         {
-            List<Product> products = ((ApiResult<List<Product>>)((OkObjectResult)(await GetProducts(shop)).Result).Value).data;
-            Product product = null;
-            for(int i = 0; i < products.Count; i++)
+            List<Models.Product> products = ((ApiResult<List<Models.Product>>)((OkObjectResult)(await GetProducts(shop)).Result).Value).data;
+            Models.Product product = null;
+            for (int i = 0; i < products.Count; i++)
             {
                 if (products[i].name.IndexOf("修刃打蜡") >= 0 && products[i].name.IndexOf("立等") >= 0
                 && care.need_edge == 1 && care.need_wax == 1 && care.urgent == 1)
@@ -303,6 +315,158 @@ namespace SnowmeetApi.Controllers
             }
             return product;
         }
+        [HttpGet]
+        public async Task EffectCareOrder(int orderId)
+        {
+            Models.Order order = await _db.order.Where(o => o.id == orderId)
+                .Include(o => o.cares).AsNoTracking().FirstOrDefaultAsync();
+            if (order == null)
+            {
+                return;
+            }
+            List<Care>? todayCareList = null;
+            for (int i = 0; order.cares != null && i < order.cares.Count; i++)
+            {
+                Care care = order.cares[i];
+                string? taskFlowCode = null;
+                if (todayCareList == null)
+                {
+                    todayCareList = await _db.care.Include(c => c.order)
+                        .Where(c => c.id < care.id && c.valid == 1 && c.order.valid == 1
+                        && c.task_flow_code != null && c.order.biz_date.Date == DateTime.Now.Date
+                        && c.order.shop == order.shop).AsNoTracking().ToListAsync();
+                }
+                string[] orderCodeArr = order.code.Split('_');
+                taskFlowCode = orderCodeArr[0] + '-' + orderCodeArr[2] + '-' + (todayCareList.Count + i + 1).ToString().PadLeft(3, '0');
+                _db.care.Update(care);
+                care.task_flow_code = taskFlowCode;
+                CareTask taskSafe = new CareTask()
+                {
+                    id = 0,
+                    care_id = care.id,
+                    task_name = "安全检查",
+                    create_date = DateTime.Now
+                };
+                await _db.careTask.AddAsync(taskSafe);
+                
+                if (care.need_edge == 1)
+                {
+                    CareTask taskEdge = new CareTask()
+                    {
+                        id = 0,
+                        care_id = care.id,
+                        task_name = "修刃",
+                        memo = care.edge_degree.ToString(),
+                        create_date = DateTime.Now
+                    };
+                    await _db.careTask.AddAsync(taskEdge);
+                }
+                if (care.need_repair == 1)
+                {
+                    CareTask taskRepair = new CareTask()
+                    {
+                        id = 0,
+                        care_id = care.id,
+                        task_name = "维修",
+                        memo = care.repair_memo,
+                        create_date = DateTime.Now
+                    };
+                    await _db.careTask.AddAsync(taskRepair);
+                }
+                if (care.need_wax == 1)
+                {
+                    CareTask taskWax = new CareTask()
+                    {
+                        id = 0,
+                        care_id = care.id,
+                        task_name = "打蜡",
+                        memo = "",
+                        create_date = DateTime.Now
+                    };
+                    await _db.careTask.AddAsync(taskWax);
+                }
+                if (care.need_unwax == 1)
+                {
+                    CareTask taskUnWax = new CareTask()
+                    {
+                        id = 0,
+                        care_id = care.id,
+                        task_name = "刮蜡",
+                        memo = "",
+                        create_date = DateTime.Now
+                    };
+                    await _db.careTask.AddAsync(taskUnWax);
+                }
+                
+                CareTask taskFinish = new CareTask()
+                {
+                    id = 0,
+                    care_id = care.id,
+                    task_name = "发板",
+                    create_date = DateTime.Now
+                };
+                await _db.careTask.AddAsync(taskFinish);
+            }
+            await _db.SaveChangesAsync();
+        }
+        [HttpGet("{taskId}")]
+        public async Task<ActionResult<ApiResult<Care?>>> SetTaskStatus(int taskId, string status,
+            string scene, string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            scene = Util.UrlDecode(scene);
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            if (staff.title_level < 100)
+            {
+                return Ok(new ApiResult<Care?>()
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = null
+                });
+            }
+            CareTask careTask = await _db.careTask.Where(t => t.id == taskId && t.valid == 1).AsNoTracking().FirstOrDefaultAsync();
+            CoreDataModLog log = Util.CreateCoreDataModLog("care_task", "status", taskId, careTask.status, status, null, staff.id, scene);
+            careTask.status = status;
+            switch (status)
+            {
+                case "已开始":
+                    careTask.start_time = DateTime.Now;
+                    careTask.staff_id = staff.id;
+                    break;
+                case "已完成":
+                    careTask.end_time = DateTime.Now;
+                    careTask.staff_id = staff.id;
+                    break;
+                case "强行中止":
+                    careTask.end_time = DateTime.Now;
+                    careTask.terminate_staff_id = staff.id;
+                    break;
+                default:
+                    break;
+            }
+            careTask.memo = scene;
+            careTask.update_date = DateTime.Now;
+            await _db.coreDataModLog.AddAsync(log);
+            _db.careTask.Entry(careTask).State = EntityState.Modified;
+            await _db.SaveChangesAsync();
+            Care care = await GetCare(careTask.care_id);
+            return Ok(new ApiResult<Care>()
+            {
+                code = 0,
+                message = "",
+                data = care
+            });
+        }
+        /*
+        [NonAction]
+        public async Task<Care> GetCare(int careId)
+        {
+            Care care = await _db.care.Where(c => c.id == careId)
+                .Include(c => c.tasks).ThenInclude(t => t.staff)
+                .AsNoTracking().FirstOrDefaultAsync();
+            return care;
+        }
+        */
     }
-    
+
 }

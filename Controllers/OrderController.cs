@@ -35,7 +35,10 @@ namespace SnowmeetApi.Controllers
                 return null;
             }
             order.retails = await _db.order.Entry(order).Collection(o => o.retails).Query().Where(r => r.valid == 1).AsNoTracking().ToListAsync();
-            order.cares = await _db.order.Entry(order).Collection(o => o.cares).Query().Include(c => c.tasks).AsNoTracking().ToListAsync();
+            order.cares = await _db.order.Entry(order).Collection(o => o.cares).Query()
+                .Include(c => c.tasks.OrderBy(t => t.id)).ThenInclude(t => t.staff)
+                .Include(c => c.tasks.OrderBy(t => t.id)).ThenInclude(t => t.terminateStaff)
+                .Include(c => c.careImages).ThenInclude(i => i.image).AsNoTracking().ToListAsync();
             order.fdOrders = await _db.order.Entry(order).Collection(o => o.fdOrders).Query()
                 .Where(r => r.valid == 1).AsNoTracking()
                 .Include(f => f.product).ThenInclude(p => p.category)
@@ -51,7 +54,10 @@ namespace SnowmeetApi.Controllers
             order.discounts = await _db.order.Entry(order).Collection(o => o.discounts).Query().Where(d => d.valid == 1).ToListAsync();
             await _db.order.Entry(order).Reference(o => o.staff).LoadAsync();
             await _db.order.Entry(order).Reference(o => o.member).LoadAsync();
-            await _db.member.Entry(order.member).Collection(m => m.memberSocialAccounts).LoadAsync();
+            if (order.member_id != null && order.member != null)
+            {
+                await _db.member.Entry(order.member).Collection(m => m.memberSocialAccounts).LoadAsync();
+            }
             order.payments = await _db.order.Entry(order).Collection(o => o.payments).Query().Where(p => p.valid == 1)
                 .Include(p => p.member).ThenInclude(m => m.memberSocialAccounts)
                 .Include(p => p.staff)
@@ -87,7 +93,8 @@ namespace SnowmeetApi.Controllers
         public async Task<List<SnowmeetApi.Models.Order>> GetCommonOrders(int? orderId, string? shop, int? memberId,
             int? staffId, string? type, DateTime? startDate, DateTime? endDate, string? payOption = null,
             bool? isTest = null, bool? isEntertain = null, bool? isPackage = null, bool? isOnCredit = null,
-            bool? haveDiscount = null, string? status = null)
+            bool? haveDiscount = null, string? status = null, DateTime? closeStartDate = null, DateTime? closeEndDate = null,
+            bool? haveWarranty = null)
         {
             startDate = startDate == null ? DateTime.MinValue : startDate;
             endDate = endDate == null ? DateTime.MaxValue : endDate;
@@ -176,27 +183,96 @@ namespace SnowmeetApi.Controllers
                     break;
             }
             */
-            
-            List<SnowmeetApi.Models.Order> orderList = await _db.order
-                .Where(o => (o.biz_date.Date >= ((DateTime)startDate).Date && o.biz_date.Date <= ((DateTime)endDate).Date)
-                    && (memberId == null || o.member_id == memberId) && (staffId == null || o.staff_id == staffId)
-                    && (payOption == null || o.pay_option.Trim().Equals(payOption.Trim()))
-                    && (shop == null || o.shop.Trim().Equals(shop.Trim())) && (type == null || o.type.Trim().Equals(type.Trim()))
-                    && o.valid == 1 && (orderId == null || o.id == orderId))
-                .Include(o => o.fdOrders.Where(f => f.valid == 1)).ThenInclude(f => f.product).ThenInclude(p => p.category)
-                .Include(o => o.retails.Where(r => r.valid == 1))
-                .Include(o => o.cares.Where(c => c.valid == 1)).ThenInclude(c => c.tasks.Where(t => t.valid == 1).OrderBy(t => t.id))
-                .Include(o => o.rentals.Where(r => r.valid == 1)).ThenInclude(r => r.details.Where(d => d.valid == 1))
-                .Include(o => o.rentals.Where(r => r.valid == 1)).ThenInclude(r => r.rentItems.Where(r => r.valid == 1))
-                .Include(o => o.payments).ThenInclude(p => p.staff)
-                .Include(o => o.payments).ThenInclude(p => p.refunds)
-                .Include(o => o.refunds)
-                .Include(o => o.discounts.Where(d => d.valid == 1))
-                .Include(o => o.guarantys.Where(g => g.valid == 1)).ThenInclude(g => g.guarantyPayments)//.ThenInclude(g => g.payment)
-                .Include(o => o.staff)
-                .Include(o => o.member).ThenInclude(m => m.memberSocialAccounts)
-                .OrderByDescending(o => o.id).AsNoTracking().ToListAsync();
-            
+            List<SnowmeetApi.Models.Order> orderList = new List<Models.Order>();
+            switch (type)
+            {
+                case "租赁":
+                    orderList = await _db.order.Where(o => (o.biz_date.Date >= ((DateTime)startDate).Date && o.biz_date.Date <= ((DateTime)endDate).Date)
+                        && (memberId == null || o.member_id == memberId) && (staffId == null || o.staff_id == staffId)
+                        && (payOption == null || o.pay_option.Trim().Equals(payOption.Trim()))
+                        && (shop == null || o.shop.Trim().Equals(shop.Trim())) && (type == null || o.type.Trim().Equals(type.Trim()))
+                        && o.valid == 1 && (orderId == null || o.id == orderId)
+                        && (closeStartDate == null || (o.close_date != null && ((DateTime)o.close_date).Date >= ((DateTime)closeStartDate).Date))
+                        && (closeEndDate == null ||  (o.close_date != null &&  ((DateTime)o.close_date).Date <= ((DateTime)closeEndDate).Date)))
+                    //.Include(o => o.fdOrders.Where(f => f.valid == 1)).ThenInclude(f => f.product).ThenInclude(p => p.category)
+                    //.Include(o => o.retails.Where(r => r.valid == 1))
+                    //.Include(o => o.cares.Where(c => c.valid == 1)).ThenInclude(c => c.tasks.Where(t => t.valid == 1).OrderBy(t => t.id))
+                    .Include(o => o.rentals.Where(r => r.valid == 1)).ThenInclude(r => r.details.Where(d => d.valid == 1)).ThenInclude(d => d.discounts.Where(d => d.valid == 1 && d.sub_biz_type == "日租金" ))
+                    .Include(o => o.rentals.Where(r => r.valid == 1)).ThenInclude(r => r.discounts.Where(d => d.valid == 1 && d.biz_type == "租赁" ))
+                    .Include(o => o.rentals.Where(r => r.valid == 1)).ThenInclude(r => r.rentItems.Where(r => r.valid == 1))
+                    .Include(o => o.payments).ThenInclude(p => p.staff)
+                    .Include(o => o.payments).ThenInclude(p => p.refunds)
+                    .Include(o => o.refunds)
+                    .Include(o => o.discounts.Where(d => d.valid == 1))
+                    .Include(o => o.guarantys.Where(g => g.valid == 1)).ThenInclude(g => g.guarantyPayments)//.ThenInclude(g => g.payment)
+                    .Include(o => o.staff)
+                    .Include(o => o.member).ThenInclude(m => m.memberSocialAccounts)
+                    .OrderByDescending(o => o.id).AsNoTracking().ToListAsync();
+                    break;
+                case "零售":
+                    orderList = await _db.order.Where(o => (o.biz_date.Date >= ((DateTime)startDate).Date && o.biz_date.Date <= ((DateTime)endDate).Date)
+                        && (memberId == null || o.member_id == memberId) && (staffId == null || o.staff_id == staffId)
+                        && (payOption == null || o.pay_option.Trim().Equals(payOption.Trim()))
+                        && (shop == null || o.shop.Trim().Equals(shop.Trim())) && (type == null || o.type.Trim().Equals(type.Trim()))
+                        && o.valid == 1 && (orderId == null || o.id == orderId))
+                    //.Include(o => o.fdOrders.Where(f => f.valid == 1)).ThenInclude(f => f.product).ThenInclude(p => p.category)
+                    .Include(o => o.retails.Where(r => r.valid == 1))
+                    //.Include(o => o.cares.Where(c => c.valid == 1)).ThenInclude(c => c.tasks.Where(t => t.valid == 1).OrderBy(t => t.id))
+                    //.Include(o => o.rentals.Where(r => r.valid == 1)).ThenInclude(r => r.details.Where(d => d.valid == 1))
+                    // .Include(o => o.rentals.Where(r => r.valid == 1)).ThenInclude(r => r.rentItems.Where(r => r.valid == 1))
+                    .Include(o => o.payments).ThenInclude(p => p.staff)
+                    .Include(o => o.payments).ThenInclude(p => p.refunds)
+                    .Include(o => o.refunds)
+                    .Include(o => o.discounts.Where(d => d.valid == 1))
+                    .Include(o => o.guarantys.Where(g => g.valid == 1)).ThenInclude(g => g.guarantyPayments)//.ThenInclude(g => g.payment)
+                    .Include(o => o.staff)
+                    .Include(o => o.member).ThenInclude(m => m.memberSocialAccounts)
+                    .OrderByDescending(o => o.id).AsNoTracking().ToListAsync();
+
+                    break;
+                case "养护":
+                    orderList = await _db.order.Where(o => (o.biz_date.Date >= ((DateTime)startDate).Date && o.biz_date.Date <= ((DateTime)endDate).Date)
+                            && (memberId == null || o.member_id == memberId) && (staffId == null || o.staff_id == staffId)
+                            && (payOption == null || o.pay_option.Trim().Equals(payOption.Trim()))
+                            && (shop == null || o.shop.Trim().Equals(shop.Trim())) && (type == null || o.type.Trim().Equals(type.Trim()))
+                            && o.valid == 1 && (orderId == null || o.id == orderId))
+                        //.Include(o => o.fdOrders.Where(f => f.valid == 1)).ThenInclude(f => f.product).ThenInclude(p => p.category)
+                        //.Include(o => o.retails.Where(r => r.valid == 1))
+                        .Include(o => o.cares.Where(c => c.valid == 1)).ThenInclude(c => c.tasks.Where(t => t.valid == 1).OrderBy(t => t.id))
+                        //.Include(o => o.rentals.Where(r => r.valid == 1)).ThenInclude(r => r.details.Where(d => d.valid == 1))
+                        //.Include(o => o.rentals.Where(r => r.valid == 1)).ThenInclude(r => r.rentItems.Where(r => r.valid == 1))
+                        .Include(o => o.payments).ThenInclude(p => p.staff)
+                        .Include(o => o.payments).ThenInclude(p => p.refunds)
+                        .Include(o => o.refunds)
+                        .Include(o => o.discounts.Where(d => d.valid == 1))
+                        .Include(o => o.guarantys.Where(g => g.valid == 1)).ThenInclude(g => g.guarantyPayments)//.ThenInclude(g => g.payment)
+                        .Include(o => o.staff)
+                        .Include(o => o.member).ThenInclude(m => m.memberSocialAccounts)
+                        .OrderByDescending(o => o.id).AsNoTracking().ToListAsync();
+                    break;
+                default:
+                    orderList = await _db.order.Where(o => (o.biz_date.Date >= ((DateTime)startDate).Date && o.biz_date.Date <= ((DateTime)endDate).Date)
+                            && (memberId == null || o.member_id == memberId) && (staffId == null || o.staff_id == staffId)
+                            && (payOption == null || o.pay_option.Trim().Equals(payOption.Trim()))
+                            && (shop == null || o.shop.Trim().Equals(shop.Trim())) && (type == null || o.type.Trim().Equals(type.Trim()))
+                            && o.valid == 1 && (orderId == null || o.id == orderId))
+                        .Include(o => o.fdOrders.Where(f => f.valid == 1)).ThenInclude(f => f.product).ThenInclude(p => p.category)
+                        .Include(o => o.retails.Where(r => r.valid == 1))
+                        .Include(o => o.cares.Where(c => c.valid == 1)).ThenInclude(c => c.tasks.Where(t => t.valid == 1).OrderBy(t => t.id))
+                        .Include(o => o.rentals.Where(r => r.valid == 1)).ThenInclude(r => r.details.Where(d => d.valid == 1))
+                        .Include(o => o.rentals.Where(r => r.valid == 1)).ThenInclude(r => r.rentItems.Where(r => r.valid == 1))
+                        .Include(o => o.payments).ThenInclude(p => p.staff)
+                        .Include(o => o.payments).ThenInclude(p => p.refunds)
+                        .Include(o => o.refunds)
+                        .Include(o => o.discounts.Where(d => d.valid == 1))
+                        .Include(o => o.guarantys.Where(g => g.valid == 1)).ThenInclude(g => g.guarantyPayments)//.ThenInclude(g => g.payment)
+                        .Include(o => o.staff)
+                        .Include(o => o.member).ThenInclude(m => m.memberSocialAccounts)
+                        .OrderByDescending(o => o.id).AsNoTracking().ToListAsync();
+
+                    break;
+            }
+
             if (isTest != null)
             {
                 orderList = orderList.Where(o => o.is_test == ((bool)isTest ? 1 : 0)).ToList();
@@ -220,6 +296,10 @@ namespace SnowmeetApi.Controllers
             if (status != null)
             {
                 orderList = orderList.Where(o => o.orderStatus.Trim().Equals(status)).ToList();
+            }
+            if (haveWarranty != null)
+            {
+                orderList = orderList.Where(o => o.haveWarranty == haveWarranty).ToList();
             }
             return orderList;
         }
@@ -671,7 +751,7 @@ namespace SnowmeetApi.Controllers
                             order.biz_date = DateTime.Now;
                             Care care = order.cares[i];
                             Product product = await _careHelper.GetProduct(order.shop, care);
-                            if (product == null)
+                            if (product == null || care.warranty || care.entertain)
                             {
                                 care.common_charge = 0;
                             }
@@ -679,11 +759,19 @@ namespace SnowmeetApi.Controllers
                             {
                                 care.common_charge = product.sale_price;
                             }
-                            total += (care.common_charge + care.repair_charge - care.discount);
+                            
+                            total += (care.common_charge + care.repair_charge - care.discount - care.ticket_discount);
+                            
                         }
+                        
                         order.total_amount = total;
                         order.paying_amount = total;
+                        if (total == 0)
+                        {
+                            order.dealed = 1;
+                        }
                         break;
+                    
                     default:
                         break;
                 }
@@ -712,6 +800,8 @@ namespace SnowmeetApi.Controllers
 
             await GenerateOrderCode(order);
             await _db.order.AddAsync(order);
+            
+            
             CoreDataModLog log = new CoreDataModLog()
             {
                 table_name = "Order",
@@ -726,6 +816,76 @@ namespace SnowmeetApi.Controllers
             };
             await _db.coreDataModLog.AddAsync(log);
             await _db.SaveChangesAsync();
+            /*
+            if (order.paying_amount == 0)
+            {
+                switch (order.type)
+                {
+                    case "租赁":
+                        RentController _rentHelper = new RentController(_db, _config, _http);
+                        for (int i = 0; order.rentals != null && i < order.rentals.Count; i++)
+                        {
+                            Models.Rental rental = order.rentals[i];
+                            if (rental.entertain)
+                            {
+                                await _rentHelper.EffectRental(rental.id, order.staff_id);
+                            }
+                        }
+                        break;
+                    default:
+                        break;
+                }
+            }
+            */
+            for (int i = 0; order.cares != null && i < order.cares.Count; i++)
+            {
+                if (order.cares[i].discount > 0)
+                {
+                    Discount discount = new Discount()
+                    {
+                        id = 0,
+                        order_id = order.id,
+                        biz_type = "养护",
+                        biz_id = order.cares[i].id,
+                        amount = order.cares[i].discount,
+                        valid = 1,
+                        staff_id = order.staff_id,
+                        create_date = DateTime.Now
+                    };
+                    await _db.discount.AddAsync(discount);
+                }
+                if (order.cares[i].ticket_discount > 0)
+                {
+                    Discount discount = new Discount()
+                    {
+                        id = 0,
+                        order_id = order.id,
+                        biz_type = "养护",
+                        biz_id = order.cares[i].id,
+                        amount = order.cares[i].discount,
+                        valid = 1,
+                        staff_id = order.staff_id,
+                        ticket_code = order.cares[i].ticket_code,
+                        create_date = DateTime.Now
+                    };
+                    await _db.discount.AddAsync(discount);
+                }
+
+            }
+            await _db.SaveChangesAsync();
+            if (order.paying_amount == 0 && order.type == "养护")
+            {
+                _db.order.Entry(order).State = EntityState.Detached;
+                for (int i = 0; i < order.cares.Count; i++)
+                {
+                    _db.care.Entry(order.cares[i]).State = EntityState.Detached;
+                }
+                CareController _careHelper = new CareController(_db, _config, _http);
+                await _careHelper.EffectCareOrder(order.id);
+                //await DealSuccessPaidOrder(order.id, null);
+                order = await GetOrder(order.id);
+            }
+
             return Ok(new ApiResult<SnowmeetApi.Models.Order?>()
             {
                 code = 0,
@@ -774,7 +934,8 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<ApiResult<List<SnowmeetApi.Models.Order>>>> GetOrdersByStaff(int? orderId,
             string? shop, string? type, string? subType, DateTime? startDate, DateTime? endDate, string sessionKey,
             string? payOption, string sessionType = "wechat_mini_openid", bool? isTest = null, bool? isEntertain = null,
-            bool? isPackage = null, bool? isOnCredit = null, bool? haveDiscount = null, string? status = null, string cell = null)
+            bool? isPackage = null, bool? isOnCredit = null, bool? haveDiscount = null, string? status = null, 
+            string? cell = null, bool? haveWarranty = null)
         {
             //startDate = DateTime.Parse("2025-10-27");
             StaffController _staffHelper = new StaffController(_db);
@@ -788,8 +949,12 @@ namespace SnowmeetApi.Controllers
                     data = null
                 });
             }
+            if (type == "养护" && ((DateTime)startDate).Date < DateTime.Parse("2025-11-01"))
+            {
+                //startDate = DateTime.Parse("2025-11-01");
+            }
             List<SnowmeetApi.Models.Order> orders = await GetCommonOrders(orderId, shop, null, null, type, startDate, endDate, payOption,
-            isTest, isEntertain, isPackage, isOnCredit, haveDiscount, status);
+            isTest, isEntertain, isPackage, isOnCredit, haveDiscount, status, null, null, haveWarranty);
             List<SnowmeetApi.Models.Order> newOrders = new List<Models.Order>();
             if (cell != null)
             {
@@ -1486,6 +1651,7 @@ namespace SnowmeetApi.Controllers
                 null, null, null, order.type, "支付成功，检查订单类型");
             await _db.coreDataModLog.AddAsync(orderSucLog);
             await _db.SaveChangesAsync();
+
             switch (order.type)
             {
                 case "租赁":
@@ -1495,6 +1661,14 @@ namespace SnowmeetApi.Controllers
                     await _db.SaveChangesAsync();
                     RentController _rentHelper = new RentController(_db, _config, _http);
                     await _rentHelper.EffectRentOrder(order.id, (int)paymentId);
+                    break;
+                case "养护":
+                    CoreDataModLog orderCareLog = CoreDataModLog.CreateManualLog("Order", "", order.id, "租赁支付回调", null, null, null,
+                        paymentId.ToString(), "支付成功，开始生效养护订单");
+                    await _db.coreDataModLog.AddAsync(orderCareLog);
+                    await _db.SaveChangesAsync();
+                    CareController _careHelper = new CareController(_db, _config, _http);
+                    await _careHelper.EffectCareOrder(order.id);
                     break;
                 default:
                     break;
@@ -1570,7 +1744,7 @@ namespace SnowmeetApi.Controllers
             //order.payments = null;
             return order;
         }
-        
+
         [HttpGet("{orderId}")]
         public async Task<ActionResult<ApiResult<Models.Order>>> CancelPaying(int orderId, string sessionKey,
         string sessionType = "wechat_mini_openid")
@@ -1698,7 +1872,7 @@ namespace SnowmeetApi.Controllers
                 data = list
             });
         }
-       
+
         [HttpGet("{key}")]
         public async Task<ActionResult<ApiResult<List<CoreDataModLog>>>> LoadLogs(string tableName, string fieldName, int key)
         {
@@ -1982,6 +2156,7 @@ namespace SnowmeetApi.Controllers
                 });
             }
             double paidAmount = 0;
+            RentController _rentHelper = new RentController(_db, _config, _http);
             for (int i = 0; i < order.rentals.Count; i++)
             {
                 Rental rental = order.rentals[i];
@@ -2013,6 +2188,7 @@ namespace SnowmeetApi.Controllers
                 rental.valid = 1;
                 rental.staff_id = staff.id;
                 rental.update_date = DateTime.Now;
+                
                 _db.rental.Entry(rental).State = EntityState.Modified;
                 paidAmount += guarantyAmount;
             }
@@ -2023,6 +2199,17 @@ namespace SnowmeetApi.Controllers
             await GenerateOrderCode(order);
             _db.order.Entry(order).State = EntityState.Modified;
             await _db.SaveChangesAsync();
+            _db.order.Entry(order).State = EntityState.Detached;
+            for (int i = 0; i < order.rentals.Count; i++)
+            {
+                Rental rental = order.rentals[i];
+                _db.rental.Entry(rental).State = EntityState.Detached;
+                //await _db.SaveChangesAsync();
+                if (rental.entertain)
+                {
+                    await _rentHelper.EffectRental(rental.id, rental.staff_id);
+                }
+            }
             return Ok(new ApiResult<Models.Order>()
             {
                 code = 0,

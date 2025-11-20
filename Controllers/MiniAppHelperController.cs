@@ -25,6 +25,8 @@ using SnowmeetApi.Controllers.User;
 using System.Net.Http;
 using System.ComponentModel.DataAnnotations.Schema;
 using SnowmeetApi.Controllers;
+using Flurl.Util;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 
 namespace LuqinMiniAppBase.Controllers
 {
@@ -81,7 +83,7 @@ namespace LuqinMiniAppBase.Controllers
                         + DateTime.Now.Day.ToString().PadLeft(2, '0');
                     if (path.StartsWith("/"))
                     {
-                       path = path + "/";
+                        path = path + "/";
                     }
                     else
                     {
@@ -140,6 +142,7 @@ namespace LuqinMiniAppBase.Controllers
         }
 
 
+        /*
         //new season///////////////////////////////////////////////////////////////////
         [HttpGet]
         public async Task<ActionResult<ApiResult<Code2Session>>> MemberLogin(string code, string openIdType)
@@ -166,7 +169,7 @@ namespace LuqinMiniAppBase.Controllers
                 result.message = "获取session失败 " + sessionObj.errcode.ToString() + " " + sessionObj.errmsg;
                 result.data = null;
                 return Ok(result);
-            }
+            }  
             string openId = sessionObj.openid;
             string sessionKey = sessionObj.session_key;
             string? unionId = null;
@@ -179,27 +182,24 @@ namespace LuqinMiniAppBase.Controllers
             {
                 unionId = null;
             }
-
-            if (unionId != null && unionId.Trim().Length > 0)
+            List<MemberSocialAccount> msaList = await _db.memberSocialAccount
+                   .Where(m => (m.num.Trim().Equals(openId.Trim()) && m.valid == 1 && m.type.Trim().Equals("wechat_mini_openid")))
+                   .OrderByDescending(m => m.id).AsNoTracking().ToListAsync();
+            if (msaList.Count > 0)
             {
-                List<MemberSocialAccount> msaList = await _db.memberSocialAccount
+                memberId = msaList[0].member_id;
+            }
+            else if (unionId != null && unionId.Trim().Length > 0)
+            {
+                List<MemberSocialAccount> msaListUnionId = await _db.memberSocialAccount
                     .Where(m => (m.num.Trim().Equals(unionId.Trim()) && m.valid == 1 && m.type.Trim().Equals("wechat_unionid")))
                     .OrderByDescending(m => m.id).AsNoTracking().ToListAsync();
-                if (msaList.Count > 0)
+                if (msaListUnionId.Count > 0)
                 {
-                    memberId = msaList[0].member_id;
+                    memberId = msaListUnionId[0].member_id;
                 }
             }
-            if (memberId == null)
-            {
-                List<MemberSocialAccount> msaList = await _db.memberSocialAccount
-                    .Where(m => (m.num.Trim().Equals(openId.Trim()) && m.valid == 1 && m.type.Trim().Equals("wechat_mini_openid")))
-                    .OrderByDescending(m => m.id).AsNoTracking().ToListAsync();
-                if (msaList.Count > 0)
-                {
-                    memberId = msaList[0].member_id;
-                }
-            }
+  
             Member member = new Member();
             if (memberId == null)
             {
@@ -274,6 +274,232 @@ namespace LuqinMiniAppBase.Controllers
                     await _db.SaveChangesAsync();
                 }
             }
+
+            try
+            {
+                MemberSocialAccount msaOA = await _db.memberSocialAccount
+                    .Where(m => m.valid == 1 && m.type == "wechat_oa_openid" && m.member_id == member.id)
+                    .AsNoTracking().FirstOrDefaultAsync();
+                string? oaOpenId = null;
+                List<MemberSocialAccount> doubleList = await _db.memberSocialAccount.Where(m => m.member_id != memberId
+                    && m.num.Trim() == unionId && m.type == "wechat_unionid" && m.valid == 1).AsNoTracking().ToListAsync();
+                for (int i = 0; i < doubleList.Count; i++)
+                {
+                    int dupMemberId = doubleList[i].member_id;
+                    List<MemberSocialAccount> subList = await _db.memberSocialAccount
+                        .Where(m => m.valid == 1 && m.member_id == dupMemberId).AsNoTracking().ToListAsync();
+                    for (int j = 0; j < subList.Count; j++)
+                    {
+                        if (msaOA == null && oaOpenId == null)
+                        {
+                            if (subList[j].type == "wechat_oa_openid")
+                            {
+                                oaOpenId = subList[j].num;
+                            }
+                        }
+                        subList[j].valid = 0;
+                        subList[j].update_date = DateTime.Now;
+                        _db.memberSocialAccount.Entry(subList[j]).State = EntityState.Modified;
+                    }
+                }
+                if (msaOA == null && oaOpenId != null)
+                {
+                    MemberSocialAccount msaOAOpenId = new MemberSocialAccount()
+                    {
+                        id = 0,
+                        member_id = member.id,
+                        type = "wechat_oa_openid",
+                        num = oaOpenId,
+                        valid = 1,
+                        memo = "",
+                        create_date = DateTime.Now
+                    };
+                    await _db.memberSocialAccount.AddAsync(msaOAOpenId);
+                }
+                await _db.SaveChangesAsync();
+            }
+            catch
+            {
+
+            }
+
+
+
+            string sessionType = "wechat_mini_openid";
+            MiniSession session = await _db.miniSession.FindAsync(sessionKey.Trim(), sessionType);
+            DateTime expireDate = DateTime.Now.AddHours(2);
+            if (session == null)
+            {
+                session = new MiniSession()
+                {
+                    session_key = sessionKey.Trim(),
+                    session_type = sessionType.Trim(),
+                    member_id = member.id,
+                    valid = 1,
+                    expire_date = expireDate
+                };
+                await _db.miniSession.AddAsync(session);
+
+            }
+            else
+            {
+                session.valid = 1;
+                session.member_id = member.id;
+                session.expire_date = expireDate;
+                _db.miniSession.Entry(session).State = EntityState.Modified;
+            }
+            await _db.SaveChangesAsync();
+            member.memberSocialAccounts = member.memberSocialAccounts.Where(m => m.valid == 1 && m.type.Trim().Equals("cell")).OrderByDescending(m => m.id).ToList();
+            sessionObj.member = member;
+            StaffController _staffHelper = new StaffController(_db);
+            sessionObj.staff = await _staffHelper.GetStaffBySocialNum(openId, "wechat_mini_openid", DateTime.Now);
+            sessionObj.openid = "";
+            sessionObj.unionid = "";
+            result.code = 0;
+            result.message = "";
+            result.data = sessionObj;
+            return Ok(result);
+        }
+        */
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<Code2Session>>> MemberLogin(string code, string openIdType)
+        {
+            ApiResult<Code2Session> result = new ApiResult<Code2Session>();
+            string appId = _settings.appId;
+            string appSecret = _settings.appSecret;
+            string checkUrl = "https://api.weixin.qq.com/sns/jscode2session?appid=" + appId.Trim()
+                + "&secret=" + appSecret.Trim() + "&js_code=" + code.Trim()
+                + "&grant_type=authorization_code";
+            WebApiLog log = await PerformRequest(checkUrl, "", "", "GET", "小程序登录", "获取session");
+            if (log == null || log.response == null || log.response.Trim().Length <= 0)
+            {
+                result.code = 1;
+                result.message = "请求小程序登录接口失败";
+                result.data = null;
+                return Ok(result);
+            }
+            string jsonResult = log.response.Trim();
+            Code2Session sessionObj = JsonConvert.DeserializeObject<Code2Session>(jsonResult);
+            if (!sessionObj.errcode.ToString().Equals(""))
+            {
+                result.code = 1;
+                result.message = "获取session失败 " + sessionObj.errcode.ToString() + " " + sessionObj.errmsg;
+                result.data = null;
+                return Ok(result);
+            }
+            string openId = sessionObj.openid;
+            string sessionKey = sessionObj.session_key;
+            string? unionId = null;
+            int? memberId = null;
+            try
+            {
+                unionId = sessionObj.unionid;
+            }
+            catch
+            {
+                unionId = null;
+            }
+
+            //List<SocialAccountForJob> jobAccount 
+
+            if (unionId != null && unionId.Trim().Length > 0)
+            {
+                List<MemberSocialAccount> msaList = await _db.memberSocialAccount
+                    .Where(m => (m.num.Trim().Equals(unionId.Trim()) && m.valid == 1 && m.type.Trim().Equals("wechat_unionid")))
+                    .OrderByDescending(m => m.id).AsNoTracking().ToListAsync();
+                if (msaList.Count > 0)
+                {
+                    memberId = msaList[0].member_id;
+                }
+                SocialAccountForJob jobAccount = await _db.socialAccountForJob.Where(s => s.wechat_mini_openid == openId).AsNoTracking().FirstOrDefaultAsync();
+                if (jobAccount != null)
+                {
+                    memberId = jobAccount.member_id;
+                }
+            }
+            if (memberId == null)
+            {
+                List<MemberSocialAccount> msaList = await _db.memberSocialAccount
+                    .Where(m => (m.num.Trim().Equals(openId.Trim()) && m.valid == 1 && m.type.Trim().Equals("wechat_mini_openid")))
+                    .OrderByDescending(m => m.id).AsNoTracking().ToListAsync();
+                if (msaList.Count > 0)
+                {
+                    memberId = msaList[0].member_id;
+                }
+            }
+            Member member = new Member();
+            if (memberId == null)
+            {
+                member.id = 0;
+                if (openId != null && openId.Trim().Length > 0)
+                {
+                    MemberSocialAccount msa = new MemberSocialAccount()
+                    {
+                        type = "wechat_mini_openid",
+                        num = openId.Trim(),
+                        valid = 1,
+                        memo = "",
+                        member_id = member.id
+                    };
+                    member.memberSocialAccounts.Add(msa);
+                }
+                if (unionId != null && unionId.Trim().Length > 0)
+                {
+                    MemberSocialAccount msa = new MemberSocialAccount()
+                    {
+                        type = "wechat_unionid",
+                        num = unionId.Trim(),
+                        valid = 1,
+                        memo = "",
+                        member_id = member.id
+                    };
+                    member.memberSocialAccounts.Add(msa);
+                }
+                await _db.member.AddAsync(member);
+                await _db.SaveChangesAsync();
+            }
+            if (member.id == 0)
+            {
+                List<Member> memberList = await _db.member
+                    .Where(m => m.id == memberId)
+                    .Include(m => m.memberSocialAccounts).ToListAsync();
+                if (memberList.Count <= 0)
+                {
+                    result.code = 1;
+                    result.message = "获取会员信息失败";
+                    result.data = null;
+                    return Ok(result);
+                }
+                member = memberList[0];
+                if (member.wechatMiniOpenId == null)
+                {
+                    MemberSocialAccount msa = new MemberSocialAccount()
+                    {
+                        type = "wechat_mini_openid",
+                        num = openId.Trim(),
+                        valid = 1,
+                        memo = "",
+                        member_id = member.id
+                    };
+                    member.memberSocialAccounts.Add(msa);
+                    _db.member.Entry(member).State = EntityState.Modified;
+                    await _db.SaveChangesAsync();
+                }
+                if (member.wechatUnionId == null)
+                {
+                    MemberSocialAccount msa = new MemberSocialAccount()
+                    {
+                        type = "wechat_unionid",
+                        num = unionId.Trim(),
+                        valid = 1,
+                        memo = "",
+                        member_id = member.id
+                    };
+                    member.memberSocialAccounts.Add(msa);
+                    _db.member.Entry(member).State = EntityState.Modified;
+                    await _db.SaveChangesAsync();
+                }
+            }
             string sessionType = "wechat_mini_openid";
             MiniSession session = await _db.miniSession.FindAsync(sessionKey.Trim(), sessionType);
             DateTime expireDate = DateTime.Now.AddHours(2);
@@ -297,8 +523,8 @@ namespace LuqinMiniAppBase.Controllers
                 session.expire_date = expireDate;
                 _db.miniSession.Entry(session).State = EntityState.Modified;
             }
-            await _db.SaveChangesAsync();
-            member.memberSocialAccounts = member.memberSocialAccounts.Where(m => m.valid == 1 && m.type.Trim().Equals("cell")).OrderByDescending(m => m.id).ToList();
+            //await _db.SaveChangesAsync();
+            
             sessionObj.member = member;
             StaffController _staffHelper = new StaffController(_db);
             sessionObj.staff = await _staffHelper.GetStaffBySocialNum(openId, "wechat_mini_openid", DateTime.Now);
@@ -307,8 +533,50 @@ namespace LuqinMiniAppBase.Controllers
             result.code = 0;
             result.message = "";
             result.data = sessionObj;
+            //_db.member.Entry(member).State = EntityState.Detached;
+            //await _db.SaveChangesAsync();
+            try
+            {
+                List<SnowmeetApi.Models.MemberSocialAccount> oldMsaList = await _db.memberSocialAccount
+                    .Where(m => m.num == openId && m.member_id != memberId && m.valid == 1)
+                    .AsNoTracking().ToListAsync();
+                for (int i = 0; i < oldMsaList.Count; i++)
+                {
+                    int oldMemberId = oldMsaList[i].member_id;
+                    List<SnowmeetApi.Models.MemberSocialAccount> delMsaList = await _db.memberSocialAccount
+                        .Where(m => m.member_id == oldMemberId).AsNoTracking().ToListAsync();
+                    SnowmeetApi.Models.Member delMember = await _db.member.Where(m => m.id == oldMemberId).AsNoTracking().FirstOrDefaultAsync();
+                    if (delMember != null)
+                    {
+                        delMember.valid = 0;
+                        delMember.update_date = DateTime.Now;
+                        _db.member.Entry(delMember).State = EntityState.Modified;
+                    }
+                    for (int j = 0; j < delMsaList.Count; j++)
+                    {
+                        delMsaList[j].valid = 0;
+                        delMsaList[j].update_date = DateTime.Now;
+                        _db.memberSocialAccount.Entry(delMsaList[j]).State = EntityState.Modified;
+                    }
+                    List<SnowmeetApi.Models.Order> moveOrders = await _db.order.Where(o => o.member_id == oldMemberId).AsNoTracking().ToListAsync();
+                    for (int j = 0; j < moveOrders.Count; j++)
+                    {
+                        moveOrders[j].member_id = memberId;
+                        moveOrders[j].update_date = DateTime.Now;
+                        _db.order.Entry(moveOrders[j]);
+                    }
+                }
+                
+            }
+            catch
+            {
+                
+            }
+            await _db.SaveChangesAsync();
+            member.memberSocialAccounts = member.memberSocialAccounts.Where(m => m.valid == 1 && m.type.Trim().Equals("cell")).OrderByDescending(m => m.id).ToList();
             return Ok(result);
         }
+        
         [HttpGet]
         public void RefreshAccessToken()
         {
@@ -385,7 +653,7 @@ namespace LuqinMiniAppBase.Controllers
 
         }
         [NonAction]
-        public async Task<WebApiLog> PerformRequest(string url, string header, string payload, 
+        public async Task<WebApiLog> PerformRequest(string url, string header, string payload,
             string method = "GET", string source = "易龙雪聚小程序", string purpose = "", string memo = "")
         {
             WebApiLog log = new WebApiLog()
@@ -403,14 +671,14 @@ namespace LuqinMiniAppBase.Controllers
             await _db.SaveChangesAsync();
             try
             {
-                switch(method.ToLower())
+                switch (method.ToLower())
                 {
                     case "post":
                         log.response = Util.GetWebContent(log.request_url, log.payload, "application/json");
-                    break;
+                        break;
                     default:
                         log.response = Util.GetWebContent(log.request_url);
-                    break;
+                        break;
                 }
             }
             catch
@@ -425,7 +693,7 @@ namespace LuqinMiniAppBase.Controllers
         }
 
         [HttpGet]
-        public  ActionResult<string> OpenMiniProgram(string path, string query, string version = "release")
+        public ActionResult<string> OpenMiniProgram(string path, string query, string version = "release")
         {
             string ret = "";
             string token = GetAccessToken();
@@ -433,7 +701,7 @@ namespace LuqinMiniAppBase.Controllers
             string postData = "{ "
                 + "\"jump_wxa\": "
                 + "{ "
-                + " \"path\": \"" + path.Trim() +  "\" , "
+                + " \"path\": \"" + path.Trim() + "\" , "
                 + " \"query\": \"" + query + "\", "
                 + " \"env_version\": \"" + version + "\" }, "
                 + " \"is_expire\": true , "

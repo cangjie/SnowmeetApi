@@ -56,9 +56,10 @@ namespace SnowmeetApi.Controllers.Background
             sessionKey = Util.UrlDecode(sessionKey);
             BackgroundLoginSession session = await _context.BackgroundLoginSession.FindAsync(timeStamp);
             Staff staff = await Util.GetStaffBySessionKey(_context, sessionKey);
-            if (staff != null && staff.title_level >= 100)
+            if (staff != null && staff.title_level >= 10)
             {
                 session.session_key = sessionKey;
+                session.title_level = staff.title_level;
                 _context.Entry(session).State = EntityState.Modified;
                 await _context.SaveChangesAsync();
                 return session;

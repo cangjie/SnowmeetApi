@@ -1,6 +1,7 @@
 ﻿var menuItems = [{ title: '销售业务临时报表', link: '../sale/sale_report_temp.html' },
     { title: '养护业务临时报表', link: '../maintain/maintain_report_temp.html' },
-    { title: '租赁业务临时报表', link: '../rent/rent_report_temp.html' }
+    { title: '租赁业务临时报表', link: '../rent/rent_report_temp.html' },
+    { title: '租赁业务报表', link: '../rent/rent_report_new.html' }
     //{ title: '租赁订单报表(交易表)', link: '../rent/rent_order_list.html' },
     //{ title: '微信支付订单(交易表)', link: '../wepay/wepay_list.html' },
     //{ title: '大好河山对账单', link: '../skipass/dhhs_list.html' }

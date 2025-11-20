@@ -7,6 +7,7 @@ using System.Runtime.ConstrainedExecution;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using NPOI.SS.Formula.PTG;
+using Org.BouncyCastle.Bcpg.Sig;
 
 namespace SnowmeetApi.Models
 {
@@ -16,6 +17,26 @@ namespace SnowmeetApi.Models
         public enum OrderStatus { 待生成, 待支付, 部分支付, 支付成功, 挂账, 全额退款, 部分退款, 退款失败, 订单关闭, 已下单, 已完成 }
         public enum PayFlowStatus { 待生成, 已生成, 待支付, 支付中, 已支付, 已关闭, 部分退款, 全额退款 }
         public enum PayType { 整单支付, 分付, 无需支付, 未支付, 招待 }
+        public enum RentStatus { 未开始, 租赁中, 部分归还, 全部归还, 部分退押金, 全额退押金, 了结关闭 };
+        public class RentPropertySet
+        {
+            public string? rentStatus { get; set; } = null;
+            public DateTime? startDate { get; set; } = null;
+            public DateTime? endDate { get; set; } = null;
+            public int totalPaidGuarantyCount { get; set; } = 0;
+            public int relieveGuarantyCount { get; set; } = 0;
+            public double? totalGuarantyAmount { get; set; } = null;
+            public double? currentRentalAmount { get; set; } = null;
+            public int totalRentalsCount { get; set; } = 0;
+            public int packageCount { get; set; } = 0;
+            public int categoryCount { get; set; } = 0;
+            public double? totalChargeSummaryAmount { get; set; } = null;
+        }
+        public class CarePropertySet
+        {
+            public string orderStatus { get; set; } = "临时订单";
+            public string services { get; set; } = "";
+        }
         public static void RendOrder(SnowmeetApi.Models.Order order)
         {
             string txtColor = "";
@@ -81,6 +102,7 @@ namespace SnowmeetApi.Models
         public int recepting { get; set; } = 0;
         public double? paying_amount { get; set; } = null;
         public DateTime? update_date { get; set; } = null;
+        public bool hide {get; set;} = false;
         [NotMapped]
         public string textColor { get; set; } = "";
         [NotMapped]
@@ -172,8 +194,8 @@ namespace SnowmeetApi.Models
                 }
                 else
                 {
-                    return payments.Where(p => ((p.pay_method == "微信支付" || p.pay_method == "支付宝") &&  p.status.Equals("支付成功") )
-                     || (p.valid == 1 && p.pay_method != "微信支付" && p.pay_method != "支付宝" && p.status.Equals("支付成功") )).ToList();
+                    return payments.Where(p => ((p.pay_method == "微信支付" || p.pay_method == "支付宝") && p.status.Equals("支付成功"))
+                     || (p.valid == 1 && p.pay_method != "微信支付" && p.pay_method != "支付宝" && p.status.Equals("支付成功"))).ToList();
                 }
             }
         }
@@ -208,7 +230,7 @@ namespace SnowmeetApi.Models
                     {
                         foreach (OrderPaymentRefund refund in payment.refunds)
                         {
-                            if (refund.refund_id != null && (refund.state == 1 || !refund.refund_id.Trim().Equals("")) )
+                            if (refund.refund_id != null && (refund.state == 1 || !refund.refund_id.Trim().Equals("")))
                             {
                                 availableRefunds.Add(refund);
                             }
@@ -510,6 +532,13 @@ namespace SnowmeetApi.Models
                         haveEntertain = true;
                     }
                 }
+                for(int i = 0; cares != null && i < cares.Count; i++)
+                {
+                    if (cares[i].entertain)
+                    {
+                        haveEntertain = true;
+                    }
+                }
                 return haveEntertain;
             }
         }
@@ -571,6 +600,13 @@ namespace SnowmeetApi.Models
                 for (int i = 0; rentals != null && i < rentals.Count; i++)
                 {
                     if (!rentals[i].entertain)
+                    {
+                        allEntrtain = false;
+                    }
+                }
+                for(int i = 0; cares != null && i < cares.Count; i++)
+                {
+                    if (!cares[i].entertain)
                     {
                         allEntrtain = false;
                     }
@@ -925,5 +961,222 @@ namespace SnowmeetApi.Models
                 return amount;
             }
         }
+        [NotMapped]
+        public RentPropertySet? rentProperties
+        {
+            get
+            {
+                try
+                {
+                    if (rentals == null || rentals.Count == 0)
+                    {
+                        return null;
+                    }
+                    DateTime? startDate = null;
+                    DateTime? endDate = DateTime.MinValue;
+                    double paidGuarantyAmount = 0;
+                    int paidGuarantyCount = 0;
+                    int relieveGuarantyCount = 0;
+                    int settledCount = 0;
+                    int packageCount = 0;
+                    int categoryCount = 0;
+                    double currentRentalAmount = 0;
+                    double summary = 0;
+                    for (int i = 0; i < rentals.Count; i++)
+                    {
+                        Rental rental = rentals[i];
+                        if (rental.valid != 1)
+                        {
+                            continue;
+                        }
+                        if ((startDate == null || (rental.realStartDate != null && ((DateTime)rental.realStartDate).Date < ((DateTime)startDate).Date))
+                             && rental.start_date != null)
+                        {
+                            startDate = rental.realStartDate;
+                        }
+                        if (rental.realEndDate == null)
+                        {
+                            endDate = null;
+                        }
+                        else if (endDate != null)
+                        {
+                            if (((DateTime)endDate).Date < ((DateTime)rental.realEndDate).Date)
+                            {
+                                endDate = rental.end_date;
+                            }
+                        }
+                        for (int j = 0; j < rental.guaranties.Count; j++)
+                        {
+                            Guaranty g = rental.guaranties[j];
+                            if (g.payStatus == "支付完成")
+                            {
+                                paidGuarantyCount++;
+                                paidGuarantyAmount += (double)g.amount;
+                                if (g.relieve == 1)
+                                {
+                                    relieveGuarantyCount++;
+                                }
+                            }
+                        }
+                        if (rental.settled == 1)
+                        {
+                            settledCount++;
+                        }
+                        if (rental.package_id != null)
+                        {
+                            packageCount++;
+                        }
+                        else
+                        {
+                            categoryCount++;
+                        }
+                        currentRentalAmount += rental.totalRentalAmount;
+                        summary += rental.totalSummary;
+                    }
+                    string status = "";
+                    if (startDate == null || ((DateTime)startDate).Date > ((DateTime)biz_date).Date)
+                    {
+                        status = RentStatus.未开始.ToString();
+                    }
+                    else
+                    {
+                        if (endDate == null)
+                        {
+                            status = RentStatus.租赁中.ToString();
+                        }
+                        if (settledCount < packageCount + categoryCount
+                            && settledCount > 0)
+                        {
+                            status = RentStatus.部分归还.ToString();
+                        }
+                        if (settledCount == packageCount + categoryCount)
+                        {
+                            status = RentStatus.全部归还.ToString();
+                        }
+                        if (refundAmount > 0)
+                        {
+                            if (paidAmount - summary <= refundAmount)
+                            {
+                                if (closed == 1)
+                                {
+                                    status = RentStatus.了结关闭.ToString();
+                                }
+                                else
+                                {
+                                    status = RentStatus.全额退押金.ToString();
+                                }
+                            }
+                            else
+                            {
+                                status = RentStatus.部分退押金.ToString();
+                            }
+                        }
+                    }
+                    RentPropertySet property = new RentPropertySet()
+                    {
+                        rentStatus = status,
+                        startDate = startDate,
+                        endDate = endDate
+
+                    };
+                    return property;
+                }
+                catch
+
+                {
+                    return null;
+                }
+            }
+        }
+        [NotMapped]
+        public CarePropertySet? careProperties
+        {
+            get
+            {
+                try
+                {
+                    if (type != "养护")
+                    {
+                        return null;
+                    }
+                    CarePropertySet property = new CarePropertySet();
+                    if (cares == null || cares.Count == 0)
+                    {
+                        property.orderStatus = "临时订单";
+                    }
+                    else
+                    {
+                        property.orderStatus = "正常订单";
+                    }
+                    for (int i = 0; cares != null && i < cares.Count; i++)
+                    {
+                        Care care = cares[i];
+                        if (care.valid != 1)
+                        {
+                            continue;
+                        }
+                        if (care.need_edge == 1)
+                        {
+                            if (property.services.IndexOf("修刃") < 0)
+                            {
+                                property.services += " 修刃";
+                            }
+                        }
+                        if (care.need_wax == 1)
+                        {
+                            if (property.services.IndexOf("打蜡") < 0)
+                            {
+                                property.services += " 打蜡";
+                            }
+                        }
+                        if (care.need_unwax == 1)
+                        {
+                            if (property.services.IndexOf("刮蜡") < 0)
+                            {
+                                property.services += " 刮蜡";
+                            }
+                        }
+                        if (care.need_repair == 1)
+                        {
+                            if (property.services.IndexOf("维修") < 0)
+                            {
+                                property.services += " 维修";
+                            }
+                        }
+                    }
+                    return property;
+                }
+                catch
+                {
+                    return null;
+                }
+            }
+        }
+        [NotMapped]
+        public bool haveWarranty
+        {
+            get
+            {
+                bool haveWarranty = false;
+                for(int i = 0; cares != null && i < cares.Count; i++)
+                {
+                    if (cares[i].warranty)
+                    {
+                        haveWarranty = true;
+                        break;
+                    }
+                }
+                return haveWarranty;
+            }
+        }
+        [NotMapped]
+        public double totalEarnAmount
+        {
+            get
+            {
+                return paidAmount - refundAmount;
+            }
+        }
+
     }
 }

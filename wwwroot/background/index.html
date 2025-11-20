@@ -40,21 +40,23 @@
             type: 'GET',
             success: function (msg, status) {
                 if (status == 'success') {
-                    
                     sessionKey = msg.session_key;
-                    
                     if (sessionKey != '') {
                         clearInterval(interVal);
                         setCookie('sessionKey', sessionKey.trim(), 60);
+                        var title_level = msg.title_level;
+                        setCookie('title_level', msg.title_level)
                         var ref = document.referrer;
+                        if (title_level <= 50){
+                            window.location.href = 'rent/wl_list.html';
+                        }
                         if (ref == undefined || ref == '') {
-                            window.location.href = 'mi7_upload/upload_orders.html';
+                            window.location.href = 'rent/wl_list.html';
                         }
                         else {
                             window.location.href = ref;
                         }
                     }
-                    
                 }
             }
         })
