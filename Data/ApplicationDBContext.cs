@@ -114,10 +114,10 @@ namespace SnowmeetApi.Data
         public DbSet<Models.School.Staff> schoolStaff { get; set; }
         public DbSet<Models.School.Course> schoolCourse { get; set; }
         public DbSet<Models.School.CourseStudent> courseStudent { get; set; }
-        public DbSet<Models.SkiPass.SkiPass> skiPass { get; set; }
+        public DbSet<Models.SkiPass> skiPass { get; set; }
         public DbSet<Models.SkipassDailyPrice> skipassDailyPrice { get; set; }
         public DbSet<Models.Users.Referee> referee { get; set; }
-        public DbSet<Models.SkiPass.ZiwoyouListOrder> ziwoyouOrder { get; set; }
+        public DbSet<Models.ZiwoyouListOrder> ziwoyouOrder { get; set; }
         public DbSet<Models.Deposit.DepositTemplate> depositTemplate { get; set; }
         public DbSet<Models.Rent.RentAdditionalPayment> rentAdditionalPayment { get; set; }
         public DbSet<Models.Rent.RentOrderLog> rentOrderLog { get; set; }

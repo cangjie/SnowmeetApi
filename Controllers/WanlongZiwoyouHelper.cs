@@ -14,10 +14,7 @@ using Aop.Api.Domain;
 using AlipaySDKNet.OpenAPI.Model;
 using NuGet.Packaging;
 using Microsoft.EntityFrameworkCore.Internal;
-//using static SKIT.FlurlHttpClient.Wechat.TenpayV3.Models.AddHKSubMerchantRequest.Types;
-
 using System.IO;
-using SnowmeetApi.Models.SkiPass;
 using LuqinMiniAppBase.Controllers;
 using SnowmeetApi.Models;
 using NPOI.XSSF.UserModel;
@@ -90,7 +87,7 @@ namespace SnowmeetApi.Controllers
             public int page { get; set; }
             public int pageCount { get; set; }
             public int resultNum { get; set; }
-            public List<SnowmeetApi.Models.SkiPass.ZiwoyouListOrder> results { get; set; }
+            public List<SnowmeetApi.Models.ZiwoyouListOrder> results { get; set; }
             public int size { get; set; }
             public int sizeAll { get; set; }
             public int startIndex { get; set; }
@@ -196,7 +193,7 @@ namespace SnowmeetApi.Controllers
         [HttpGet("skiPassId")]
         public async Task<ActionResult<ZiwoyouPlaceOrderResult>> Book(int skiPassId)
         {
-            Models.SkiPass.SkiPass skipass = await _context.skiPass.FindAsync(skiPassId);
+            Models.SkiPass skipass = await _context.skiPass.FindAsync(skiPassId);
             if (skipass == null)
             {
                 return NotFound();

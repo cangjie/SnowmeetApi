@@ -15,7 +15,6 @@ using SnowmeetApi.Data;
 using SnowmeetApi.Models;
 
 //using SnowmeetApi.Models.Product;
-using SnowmeetApi.Models.SkiPass;
 using SnowmeetApi.Models.Users;
 using System.Text.RegularExpressions;
 using SnowmeetApi.Controllers.Order;
@@ -54,7 +53,7 @@ namespace SnowmeetApi.Controllers.SkiPass
             public string? wechat_mini_openid { get; set; }
             public string name { get; set; }
             public string cell { get; set; }
-            public List<Models.SkiPass.SkiPass> skiPasses { get; set; } = new List<Models.SkiPass.SkiPass>();
+            public List<Models.SkiPass> skiPasses { get; set; } = new List<Models.SkiPass>();
         }
 
         public class ReserveProduct
@@ -74,7 +73,7 @@ namespace SnowmeetApi.Controllers.SkiPass
             public string product_name { get; set; }
             public string name { get; set; }
             public string cell { get; set; }
-            public List<Models.SkiPass.SkiPass> skiPasses { get; set; } = new List<Models.SkiPass.SkiPass>();
+            public List<Models.SkiPass> skiPasses { get; set; } = new List<Models.SkiPass>();
         }
 
         public class ReserveDateProductMember
@@ -86,7 +85,7 @@ namespace SnowmeetApi.Controllers.SkiPass
             public string wechatMiniOpenId { get; set; }
             public string name { get; set; }
             public string cell { get; set; }
-            public List<Models.SkiPass.SkiPass> skipasses { get; set; } = new List<Models.SkiPass.SkiPass>();
+            public List<Models.SkiPass> skipasses { get; set; } = new List<Models.SkiPass>();
         }
         private readonly ApplicationDBContext _db;
         private readonly IConfiguration _config;
@@ -113,7 +112,7 @@ namespace SnowmeetApi.Controllers.SkiPass
                 return BadRequest();
             }
             */
-            List<Models.SkiPass.SkiPass> skiPassList = await _db.skiPass
+            List<Models.SkiPass> skiPassList = await _db.skiPass
                 .Where(sp => (sp.resort.Trim().Equals("南山") && sp.valid == 1 && sp.is_cancel == 0 && ((DateTime)sp.reserve_date).Date == date.Date))
                 .AsNoTracking().ToListAsync();
             var summary = from skiPass in skiPassList
@@ -169,7 +168,7 @@ namespace SnowmeetApi.Controllers.SkiPass
             sessionType = Util.UrlDecode(sessionType);
             Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
             int canelMemberId = member.id;
-            Models.SkiPass.SkiPass sp = await _db.skiPass.FindAsync(skiPassId);
+            Models.SkiPass sp = await _db.skiPass.FindAsync(skiPassId);
             sp.cancel_member_id = canelMemberId;
             sp.is_cancel = 1;
             _db.skiPass.Entry(sp).State = EntityState.Modified;
@@ -202,7 +201,7 @@ namespace SnowmeetApi.Controllers.SkiPass
                 return BadRequest();
             }
             */
-            List<Models.SkiPass.SkiPass> skiPassList = await _db.skiPass
+            List<Models.SkiPass> skiPassList = await _db.skiPass
                 .Where(sp => (sp.resort.Trim().Equals("南山") && sp.valid == 1 && sp.is_cancel == 0
                 && ((DateTime)sp.reserve_date).Date == reserveDate.Date && sp.product_id == productId))
                 .AsNoTracking().ToListAsync();
@@ -246,7 +245,7 @@ namespace SnowmeetApi.Controllers.SkiPass
         }
 
         [NonAction]
-        public async Task<List<Models.SkiPass.SkiPass>> GetSkipassesByMember(int memberId, string num = "")
+        public async Task<List<Models.SkiPass>> GetSkipassesByMember(int memberId, string num = "")
         {
             return await _db.skiPass.Where(s => (((memberId != 0 && s.member_id == memberId)
                 || (!num.Trim().Equals("") && s.wechat_mini_openid.Trim().Equals(num))) && s.resort.Trim().Equals("南山")))
@@ -256,7 +255,7 @@ namespace SnowmeetApi.Controllers.SkiPass
 
 
         [HttpPost]
-        public async Task<ActionResult<Models.SkiPass.SkiPass>> UpdateSkiPass([FromBody] Models.SkiPass.SkiPass skipass,
+        public async Task<ActionResult<Models.SkiPass>> UpdateSkiPass([FromBody] Models.SkiPass skipass,
             [FromQuery] string sessionKey, [FromQuery] string sessionType = "wechat_mini_openid")
         {
             /*
@@ -270,7 +269,7 @@ namespace SnowmeetApi.Controllers.SkiPass
             try
             {
                 //TicketController _tHelper = new TicketController(_db, _config);
-                Models.SkiPass.SkiPass oriSkipass = await _db.skiPass.Where(s => s.id == skipass.id).AsNoTracking().FirstAsync();
+                Models.SkiPass oriSkipass = await _db.skiPass.Where(s => s.id == skipass.id).AsNoTracking().FirstAsync();
                 if ((oriSkipass.card_no == null || oriSkipass.card_no.Trim().Equals("")) && !skipass.card_no.Trim().Equals(""))
                 {
                     //南山出票后激活
@@ -320,7 +319,7 @@ namespace SnowmeetApi.Controllers.SkiPass
                 return BadRequest();
             }
             */
-            List<Models.SkiPass.SkiPass> skipasses = await GetSkipassesByMember(memberId, wechatMiniOpenId);
+            List<Models.SkiPass> skipasses = await GetSkipassesByMember(memberId, wechatMiniOpenId);
             var reserveList = (from s in skipasses
                                where s.valid == 1
                                group s by
@@ -340,7 +339,7 @@ namespace SnowmeetApi.Controllers.SkiPass
                 };
                 for (int j = 0; j < skipasses.Count; j++)
                 {
-                    Models.SkiPass.SkiPass skp = skipasses[j];
+                    Models.SkiPass skp = skipasses[j];
                     if (skp.contact_cell.Trim().Equals(item.cell.Trim())
                         && skp.contact_name.Trim().Equals(item.name.Trim())
                         && ((DateTime)skp.reserve_date).Date == item.reserveDate.Date
@@ -367,10 +366,10 @@ namespace SnowmeetApi.Controllers.SkiPass
             }
             Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
             double totalPrice = 0;
-            Models.SkiPass.SkiPass[] skipassArr = new Models.SkiPass.SkiPass[count];
+            Models.SkiPass[] skipassArr = new Models.SkiPass[count];
             for (int i = 0; i < count; i++)
             {
-                Models.SkiPass.SkiPass skipass = new Models.SkiPass.SkiPass()
+                Models.SkiPass skipass = new Models.SkiPass()
                 {
                     member_id = member.id,
                     wechat_mini_openid = member.wechatMiniOpenId,
@@ -430,7 +429,7 @@ namespace SnowmeetApi.Controllers.SkiPass
 
             for (int i = 0; i < skipassArr.Length; i++)
             {
-                Models.SkiPass.SkiPass skipass = skipassArr[i];
+                Models.SkiPass skipass = skipassArr[i];
                 skipass.order_id = order.id;
                 await _db.skiPass.AddAsync(skipass);
             }
@@ -455,7 +454,7 @@ namespace SnowmeetApi.Controllers.SkiPass
             */
             key = Util.UrlDecode(key);
             bool isNum = Regex.IsMatch(key, @"\d+");
-            List<Models.SkiPass.SkiPass> skipasses = await _db.skiPass.Where(s => ((
+            List<Models.SkiPass> skipasses = await _db.skiPass.Where(s => ((
                 (isNum && (s.card_no.Trim().IndexOf(key) >= 0 || s.contact_cell.IndexOf(key) >= 0))
                 ||
                 (!isNum && s.contact_name.IndexOf(key) >= 0)
@@ -480,7 +479,7 @@ namespace SnowmeetApi.Controllers.SkiPass
                 };
                 for (int i = 0; i < skipasses.Count; i++)
                 {
-                    Models.SkiPass.SkiPass skipass = skipasses[i];
+                    Models.SkiPass skipass = skipasses[i];
                     if (((DateTime)skipass.reserve_date).Date == struc.reserveDate.Date
                         && skipass.product_id == struc.product_id
                         && (skipass.wechat_mini_openid.Trim().Equals(struc.wechatMiniOpenId.Trim()) || skipass.member_id == struc.memberId))
@@ -514,7 +513,7 @@ namespace SnowmeetApi.Controllers.SkiPass
                 {
                     for (int l = 0; l < p.memberList[k].skiPasses.Count; l++)
                     {
-                        Models.SkiPass.SkiPass skipass = p.memberList[k].skiPasses[l];
+                        Models.SkiPass skipass = p.memberList[k].skiPasses[l];
                         //sum[i].count++;
                         sum[i].sumDealPrice += (double)skipass.deal_price;
                         if (skipass.card_member_pick_time != null)
@@ -541,7 +540,7 @@ namespace SnowmeetApi.Controllers.SkiPass
         public async Task<ActionResult<OrderPaymentRefund>> SkipassRefundDeposit(int skiPassId,
             string sessionKey, string sessionType = "wechat_mini_openid")
         {
-            Models.SkiPass.SkiPass skipass = await _db.skiPass.FindAsync(skiPassId);
+            Models.SkiPass skipass = await _db.skiPass.FindAsync(skiPassId);
             if (skipass.valid == 0 || skipass.card_member_return_time == null)
             {
                 return BadRequest();
@@ -569,7 +568,7 @@ namespace SnowmeetApi.Controllers.SkiPass
         }
 
         [HttpGet]
-        public async Task<ActionResult<List<Models.SkiPass.SkiPass>>> GetMySkipass
+        public async Task<ActionResult<List<Models.SkiPass>>> GetMySkipass
             (string sessionKey, string sessionType = "wechat_mini_openid")
         {
             Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
@@ -577,7 +576,7 @@ namespace SnowmeetApi.Controllers.SkiPass
             {
                 return BadRequest();
             }
-            List<Models.SkiPass.SkiPass> l = await _db.skiPass.Where(s => (s.resort.Trim().Equals("南山") && s.valid == 1
+            List<Models.SkiPass> l = await _db.skiPass.Where(s => (s.resort.Trim().Equals("南山") && s.valid == 1
                 && (s.member_id == member.id || s.wechat_mini_openid.Trim().Equals(member.wechatMiniOpenId.Trim()))))
                 .OrderByDescending(s => s.reserve_date).AsNoTracking().ToListAsync();
 

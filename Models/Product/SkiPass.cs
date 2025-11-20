@@ -170,6 +170,7 @@ namespace SnowmeetApi.Models
 			{
 				if (avaliablePriceList == null || avaliablePriceList.Count == 0)
 				{
+					//SnowmeetApi.Models.SkiPass p = new SnowmeetApi.Models.SkiPass();
 					return 0;
 				}
 				else
