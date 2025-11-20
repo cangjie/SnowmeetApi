@@ -18,8 +18,7 @@ namespace SnowmeetApi.Models
 		public string  tags { get; set; }
 		public string? source { get; set; } = null;
 		public string? third_party_no { get; set; } = null;
-		
-		[NotMapped]
+		[ForeignKey(nameof(SkipassDailyPrice.product_id))]
 		public List<SkipassDailyPrice> dailyPrice {get; set;}
 		[NotMapped]
 		public Product product {get; set;}

@@ -29,7 +29,7 @@ namespace SnowmeetApi.Data
             modelBuilder.Entity<Models.EPaymentDailyReport>().HasKey(e => new { e.biz_date, e.mch_id, e.pay_method });
 
 
-            modelBuilder.Entity<SkipassDailyPrice>().HasOne<Models.SkiPassProduct>().WithMany(s => s.dailyPrice).HasForeignKey(s => s.product_id);
+            //modelBuilder.Entity<SkipassDailyPrice>().HasOne<Models.SkiPassProduct>().WithMany(s => s.dailyPrice).HasForeignKey(s => s.product_id);
             
             modelBuilder.Entity<Brand>().HasKey(b => new { b.brand_name, b.brand_type });
             modelBuilder.Entity<Member>().HasMany<RentOrderLog>().WithOne(m => m.member).HasForeignKey(r => r.oper_member_id);
@@ -54,7 +54,7 @@ namespace SnowmeetApi.Data
         public DbSet<OrderOnline> OrderOnlines { get; set; }
         public DbSet<WepayKey> WepayKeys { get; set; }
         public DbSet<WepayOrder> WepayOrders { get; set; }
-        public DbSet<OrderOnlineTemp> OrderOnlineTemp { get; set; }
+        //public DbSet<OrderOnlineTemp> OrderOnlineTemp { get; set; }
         public DbSet<WepayOrderRefund> WePayOrderRefund { get; set; }
 
         public DbSet<OrderOnlineDetail> OrderOnlineDetails { get; set; }
