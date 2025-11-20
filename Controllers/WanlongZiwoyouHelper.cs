@@ -131,8 +131,10 @@ namespace SnowmeetApi.Controllers
             _oriConfig = config;
             _config = config.GetSection("Settings");
             _appId = _config.GetSection("AppId").Value.Trim();
-            apiKey = dhhsApiKey;
-            custId = dhhsCustId;
+            //apiKey = dhhsApiKey;
+            //custId = dhhsCustId;
+            apiKey = wlApiKey;
+            custId = wlCustId;
             this.source = source;
             SetParam(source);
         }
