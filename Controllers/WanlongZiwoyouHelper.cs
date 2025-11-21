@@ -336,7 +336,7 @@ namespace SnowmeetApi.Controllers
         public async Task UpdateSkipassProductPrice()
         {
             var l = await _context.skiPassProduct.Where(s => s.third_party_no != null).AsNoTracking().ToListAsync();
-            //var l = await _context.SkiPass.Where(s => s.third_party_no.Equals("80018099")).AsNoTracking().ToListAsync();
+            //var l = await _context.skiPassProduct.Where(s => s.third_party_no.Equals("37696044")).AsNoTracking().ToListAsync();
             foreach (var item in l)
             {
                 try
