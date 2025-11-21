@@ -443,6 +443,8 @@ namespace SnowmeetApi.Controllers
                 {
                     skipass.product.market_price = skipassProduct.salePrice;
                     skipass.product.cost = skipassProduct.settlementPrice;
+                    skipass.source = this.source.Trim();
+                    skipass.update_date = DateTime.Now;
                     _context.Entry<Models.Product>(skipass.product).State = EntityState.Modified;
                     await _context.SaveChangesAsync();
                 }

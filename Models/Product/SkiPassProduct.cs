@@ -22,7 +22,7 @@ namespace SnowmeetApi.Models
 		public List<SkipassDailyPrice> dailyPrice {get; set;}
 		[NotMapped]
 		public Product product {get; set;}
-
+		public DateTime? update_date {get; set;} = null;
 		public bool TagMatch(string[] userTags)
 		{
 			bool valid = true;
