@@ -422,8 +422,6 @@ namespace SnowmeetApi.Models
                 {
                     s = "全部归还";
                 }
-
-
                 return s;
             }
         }
