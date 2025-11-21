@@ -14,16 +14,12 @@ using Aop.Api.Domain;
 using AlipaySDKNet.OpenAPI.Model;
 using NuGet.Packaging;
 using Microsoft.EntityFrameworkCore.Internal;
-//using static SKIT.FlurlHttpClient.Wechat.TenpayV3.Models.AddHKSubMerchantRequest.Types;
-
 using System.IO;
-using SnowmeetApi.Models.SkiPass;
 using LuqinMiniAppBase.Controllers;
 using SnowmeetApi.Models;
 using NPOI.XSSF.UserModel;
 using NPOI.SS.UserModel;
 using TencentCloud.Ocr.V20181119.Models;
-using SnowmeetApi.Models.ProudctSkiPass;
 
 namespace SnowmeetApi.Controllers
 {
@@ -48,7 +44,7 @@ namespace SnowmeetApi.Controllers
         public string apiKey = "";
 
         public string custId = "";
-        public string source = "大好河山";
+        public string source = "万龙自我游";
 
         public class Voucher
         {
@@ -91,7 +87,7 @@ namespace SnowmeetApi.Controllers
             public int page { get; set; }
             public int pageCount { get; set; }
             public int resultNum { get; set; }
-            public List<SnowmeetApi.Models.SkiPass.ZiwoyouListOrder> results { get; set; }
+            public List<SnowmeetApi.Models.ZiwoyouListOrder> results { get; set; }
             public int size { get; set; }
             public int sizeAll { get; set; }
             public int startIndex { get; set; }
@@ -125,14 +121,16 @@ namespace SnowmeetApi.Controllers
 
 
 
-        public WanlongZiwoyouHelper(ApplicationDBContext context, IConfiguration config, string source = "大好河山")
+        public WanlongZiwoyouHelper(ApplicationDBContext context, IConfiguration config, string source = "万龙自我游")
         {
             _context = context;
             _oriConfig = config;
             _config = config.GetSection("Settings");
             _appId = _config.GetSection("AppId").Value.Trim();
-            apiKey = dhhsApiKey;
-            custId = dhhsCustId;
+            //apiKey = dhhsApiKey;
+            //custId = dhhsCustId;
+            apiKey = wlApiKey;
+            custId = wlCustId;
             this.source = source;
             SetParam(source);
         }
@@ -141,8 +139,8 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<ProductQueryResult>> GetProductList(string keyword)
         {
             int pageSize = 20;
-            string custId = dhhsCustId;
-            string apiKey = dhhsApiKey;
+            //string custId = dhhsCustId;
+            //string apiKey = dhhsApiKey;
             string postJson = "{\"apikey\": \"" + apiKey + "\",\t\"catIds\": \"\",\t\"cityId\": \"\",\t\"cityName\": \"\",\t\"custId\": " + custId + " ,\t\"isConfirm\": \"0\",\t\"isExpress\": \"0\",\t\"isMulti\": \"\",\t\"isPackage\": \"\",\t\"isPay\": \"\",\t\"keyWord\": \"" + keyword.Trim() + "\",\t\"orderBy\": \"\",\t\"page\": 0,\t\"productNos\": \"\",\t\"resultNum\": " + pageSize.ToString() + ",\t\"tagIds\": \"\",\t\"treeId\": \"\",\t\"viewId\": \"\"}";
             string ret = Util.GetWebContent("https://task-api.zowoyoo.com/api/thirdPaty/prod/list", postJson, "application/json");
             Console.WriteLine(postJson);
@@ -158,7 +156,7 @@ namespace SnowmeetApi.Controllers
                 {
                     continue;
                 }
-                SkiPassProduct[] newResults = new SkiPassProduct[r.data.results.Length + subR.data.results.Length];
+                ZiwoyouSkipassProduct[] newResults = new ZiwoyouSkipassProduct[r.data.results.Length + subR.data.results.Length];
                 for (int j = 0; j < r.data.results.Length; j++)
                 {
                     newResults[j] = r.data.results[j];
@@ -195,7 +193,7 @@ namespace SnowmeetApi.Controllers
         [HttpGet("skiPassId")]
         public async Task<ActionResult<ZiwoyouPlaceOrderResult>> Book(int skiPassId)
         {
-            Models.SkiPass.SkiPass skipass = await _context.skiPass.FindAsync(skiPassId);
+            Models.SkiPass skipass = await _context.skiPass.FindAsync(skiPassId);
             if (skipass == null)
             {
                 return NotFound();
@@ -220,7 +218,7 @@ namespace SnowmeetApi.Controllers
                 return NoContent();
             }
 
-            Models.ProudctSkiPass.SkiPass skipassProduct = await _context.SkiPass.FindAsync(skipass.product_id);
+            Models.SkiPassProduct skipassProduct = await _context.skiPassProduct.FindAsync(skipass.product_id);
             if (skipassProduct.source.Trim().Equals("大好河山"))
             {
                 apiKey = dhhsApiKey;
@@ -249,7 +247,7 @@ namespace SnowmeetApi.Controllers
                 + ",\n\t\"orderMemo\": \"" + memo + "\",\n\t\"orderSourceId\": \"" + orderId.Trim()
                 + "\",\n\t\"travelDate\": \"" + date.ToString("yyyy-MM-dd") + "\"\n}";
             string url = "https://task-api.zowoyoo.com/api/thirdPaty/order/add";
-            WebApiLog reqLog = await _miniHelper.PerformRequest(url, "", postData, "POST", "易龙雪聚小程序", "预订雪票", "大好河山下单");
+            WebApiLog reqLog = await _miniHelper.PerformRequest(url, "", postData, "POST", "易龙雪聚小程序", "预订雪票", "万龙自我游下单");
             ZiwoyouPlaceOrderResult r = JsonConvert.DeserializeObject<ZiwoyouPlaceOrderResult>(reqLog.response.Trim());
             return r;
         }
@@ -259,7 +257,7 @@ namespace SnowmeetApi.Controllers
             MiniAppHelperController _miniHelper = new MiniAppHelperController(_context, _oriConfig);
             string postData = "{\"apikey\": \"" + apiKey + "\",\"custId\": " + custId.Trim() + ",\"orderId\": " + orderId.ToString() + "}";
             WebApiLog reqLog = await _miniHelper.PerformRequest("https://task-api.zowoyoo.com/api/thirdPaty/order/pay",
-                "", postData, "POST", "易龙雪聚小程序", "预订雪票", "大好河山支付");
+                "", postData, "POST", "易龙雪聚小程序", "预订雪票", "万龙自我游支付");
             PayResult p = JsonConvert.DeserializeObject<PayResult>(reqLog.response);
             return p;
 
@@ -271,7 +269,7 @@ namespace SnowmeetApi.Controllers
             MiniAppHelperController _miniHelper = new MiniAppHelperController(_context, _oriConfig);
             string postData = "{\"apikey\": \"" + apiKey + "\",\"custId\": " + custId.Trim() + ",\"productNo\": " + productId.ToString() + "}";
             WebApiLog log = await _miniHelper.PerformRequest("https://task-api.zowoyoo.com/api/thirdPaty/prod/detail",
-                 "", postData, "POST", "易龙雪聚小程序", "预订雪票", "大好河山产品查询");
+                 "", postData, "POST", "易龙雪聚小程序", "预订雪票", "万龙自我游产品查询");
 
             return Ok(log.response);
         }
@@ -283,7 +281,7 @@ namespace SnowmeetApi.Controllers
             string postData = "{\"apikey\": \"" + apiKey + "\",\"custId\": " + custId.Trim() + ",\"productNo\": "
                 + productId.ToString() + ", \"travelDate\": \"" + date.ToString("yyyy-MM-dd") + "\" }";
             WebApiLog log = await _miniHelper.PerformRequest("https://task-api.zowoyoo.com/api/thirdPaty/prod/price",
-                 "", postData, "POST", "易龙雪聚小程序", "预订雪票", "大好河山产品价格查询");
+                 "", postData, "POST", "易龙雪聚小程序", "预订雪票", "万龙自我游产品价格查询");
             ZiwoyouQueryResult r = JsonConvert.DeserializeObject<ZiwoyouQueryResult>(log.response);
             ZiwoyouProductDailyPrice price = JsonConvert.DeserializeObject<ZiwoyouProductDailyPrice>(r.data.ToString());
             return price;
@@ -296,7 +294,7 @@ namespace SnowmeetApi.Controllers
             string postData = "{\"apikey\": \"" + apiKey + "\",\"custId\": " + custId.Trim()
                 + ",\"orderId\": " + orderId.ToString() + "}";
             WebApiLog log = await _miniHelper.PerformRequest("https://task-api.zowoyoo.com/api/thirdPaty/order/detail",
-                 "", postData, "POST", "易龙雪聚小程序", "预订雪票", "大好河山订单查询");
+                 "", postData, "POST", "易龙雪聚小程序", "预订雪票", "万龙自我游订单查询");
             ZiwoyouQueryResult r = JsonConvert.DeserializeObject<ZiwoyouQueryResult>(log.response.Trim());
             ZiwoyouOrder order = JsonConvert.DeserializeObject<ZiwoyouOrder>(r.data.ToString());
 
@@ -312,7 +310,7 @@ namespace SnowmeetApi.Controllers
             string postData = "{\"apikey\": \"" + apiKey + "\",\"custId\": " + custId.Trim()
                 + ",\"orderId\": " + orderId.ToString() + ", \"cancelNum\": " + order.num.ToString() + "}";
             WebApiLog log = await _miniHelper.PerformRequest("https://task-api.zowoyoo.com/api/thirdPaty/order/cancel",
-                 "", postData, "POST", "易龙雪聚小程序", "预订雪票", "大好河山订单取消");
+                 "", postData, "POST", "易龙雪聚小程序", "预订雪票", "万龙自我游订单取消");
             ZiwoyouQueryResult r = JsonConvert.DeserializeObject<ZiwoyouQueryResult>(log.response);
             ZiwoyouCancel cancel = JsonConvert.DeserializeObject<ZiwoyouCancel>(r.data.ToString());
             r.data = cancel;
@@ -320,15 +318,15 @@ namespace SnowmeetApi.Controllers
         }
 
         [NonAction]
-        public async Task<Models.ProudctSkiPass.SkiPass> GetSkipassProductByCode(string code)
+        public async Task<Models.SkiPassProduct> GetSkipassProductByCode(string code)
         {
-            var l = await _context.SkiPass.Where(s => s.third_party_no.Trim().Equals(code.Trim()))
+            var l = await _context.skiPassProduct.Where(s => s.third_party_no.Trim().Equals(code.Trim()))
                 .AsNoTracking().ToListAsync();
             if (l == null || l.Count <= 0)
             {
                 return null;
             }
-            Models.ProudctSkiPass.SkiPass skipass = l[0];
+            Models.SkiPassProduct skipass = l[0];
             skipass.product = await _context.product.FindAsync(skipass.product_id);
             return skipass;
 
@@ -337,7 +335,7 @@ namespace SnowmeetApi.Controllers
         [HttpGet]
         public async Task UpdateSkipassProductPrice()
         {
-            var l = await _context.SkiPass.Where(s => s.third_party_no != null).AsNoTracking().ToListAsync();
+            var l = await _context.skiPassProduct.Where(s => s.third_party_no != null).AsNoTracking().ToListAsync();
             //var l = await _context.SkiPass.Where(s => s.third_party_no.Equals("80018099")).AsNoTracking().ToListAsync();
             foreach (var item in l)
             {
@@ -439,13 +437,16 @@ namespace SnowmeetApi.Controllers
             ProductQueryResult originProductInfo = (ProductQueryResult)((OkObjectResult)(await GetProductList(keyword)).Result).Value;
             for (int i = 0; i < originProductInfo.data.results.Length; i++)
             {
-                SkiPassProduct skipassProduct = originProductInfo.data.results[i];
-                Models.ProudctSkiPass.SkiPass skipass = await GetSkipassProductByCode(skipassProduct.productNo);
+                ZiwoyouSkipassProduct skipassProduct = originProductInfo.data.results[i];
+                Models.SkiPassProduct skipass = await GetSkipassProductByCode(skipassProduct.productNo);
                 if (skipass != null)
                 {
                     skipass.product.market_price = skipassProduct.salePrice;
                     skipass.product.cost = skipassProduct.settlementPrice;
+                    skipass.source = this.source.Trim();
+                    skipass.update_date = DateTime.Now;
                     _context.Entry<Models.Product>(skipass.product).State = EntityState.Modified;
+                    _context.skiPassProduct.Entry(skipass).State = EntityState.Modified;
                     await _context.SaveChangesAsync();
                 }
                 else
@@ -468,7 +469,7 @@ namespace SnowmeetApi.Controllers
                     };
                     await _context.product.AddAsync(p);
                     await _context.SaveChangesAsync();
-                    Models.ProudctSkiPass.SkiPass ski = new Models.ProudctSkiPass.SkiPass()
+                    Models.SkiPassProduct ski = new Models.SkiPassProduct()
                     {
                         product_id = p.id,
                         resort = keyword.Trim(),
@@ -476,7 +477,7 @@ namespace SnowmeetApi.Controllers
                         source = this.source.Trim(),
                         third_party_no = skipassProduct.productNo
                     };
-                    await _context.SkiPass.AddAsync(ski);
+                    await _context.skiPassProduct.AddAsync(ski);
                     await _context.SaveChangesAsync();
 
                 }
@@ -488,7 +489,7 @@ namespace SnowmeetApi.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<object>> GetProductById(int id)
         {
-            var l = await _context.SkiPass.Include(s => s.dailyPrice)
+            var l = await _context.skiPassProduct.Include(s => s.dailyPrice)
                 .Join(_context.product, s => s.product_id, p => p.id,
                 (s, p) => new { s.product_id, s.resort, s.rules, s.source, s.third_party_no, p.name, p.shop, p.sale_price, p.market_price, p.cost, p.type, s.dailyPrice })
                 .Where(p => p.type.Trim().Equals("雪票") && p.product_id == id
@@ -515,7 +516,7 @@ namespace SnowmeetApi.Controllers
             string postData = "{\"apikey\": \"" + apiKey + "\", \"custId\": " + custId + ", \"resultNum\": 20, \"page\": " + page.ToString()
                 + ", \"startDate\": \"" + start.ToString("yyyy-MM-dd HH:mm:ss") + "\", \"endDate\": \"" + end.ToString("yyyy-MM-dd HH:mm:ss") + "\" }";
             WebApiLog log = await _miniHelper.PerformRequest("https://task-api.zowoyoo.com/api/thirdPaty/order/list",
-                 "", postData, "POST", "易龙雪聚小程序", "预订雪票", "大好河山订单获取分页列表");
+                 "", postData, "POST", "易龙雪聚小程序", "预订雪票", "万龙自我游订单获取分页列表");
             ZiwoyouQueryResult r = JsonConvert.DeserializeObject<ZiwoyouQueryResult>(log.response);
             ZiwoyouQueryList l = JsonConvert.DeserializeObject<ZiwoyouQueryList>(r.data.ToString());
             return Ok(l);
@@ -578,7 +579,7 @@ namespace SnowmeetApi.Controllers
             string postData = "{\"apikey\": \"" + apiKey + "\", \"custId\": " + custId + "}";
             MiniAppHelperController _miniHelper = new MiniAppHelperController(_context, _oriConfig);
             WebApiLog reqLog = await _miniHelper.PerformRequest("https://task-api.zowoyoo.com/api/thirdPaty/order/balance",
-                "", postData.Trim(), "POST", "易龙雪聚小程序", "预订雪票", "查询大好河山储值");
+                "", postData.Trim(), "POST", "易龙雪聚小程序", "预订雪票", "查询万龙自我游储值");
             try
             {
                 ZiwoyouQueryResult r = JsonConvert.DeserializeObject<ZiwoyouQueryResult>(reqLog.response.Trim());
@@ -597,11 +598,11 @@ namespace SnowmeetApi.Controllers
             var l = await _context.ziwoyouOrder
             .Include(z => z.skipasses)
                 .ThenInclude(s => s.order)
-                    .ThenInclude(o => o.paymentList.Where(p => p.status.Equals("支付成功")))
+                    .ThenInclude(o => o.availablePayments.Where(p => p.status.Equals("支付成功")))
                         .ThenInclude(p => p.refunds.Where(r => (r.state == 1 || r.refund_id.Trim().Equals(""))))
             .Include(z => z.skipasses)
                 .ThenInclude(s => s.order)
-                    .ThenInclude(o => o.paymentList.Where(p => p.status.Equals("支付成功")))
+                    .ThenInclude(o => o.availablePayments.Where(p => p.status.Equals("支付成功")))
                         .ThenInclude(p => p.shares)
                             .ThenInclude(s => s.kol)
 
@@ -623,11 +624,11 @@ namespace SnowmeetApi.Controllers
                 {
                     if (order.skipasses[j].order != null)
                     {
-                        maxPaymentNum = Math.Max(maxPaymentNum, order.skipasses[j].order.paymentList.Count);
+                        maxPaymentNum = Math.Max(maxPaymentNum, order.skipasses[j].order.availablePayments.Count);
 
-                        if (order.skipasses[j].order.refundList != null)
+                        if (order.skipasses[j].order.refunds != null)
                         {
-                            maxRefundNum = Math.Max(maxRefundNum, order.skipasses[j].order.refundList.Count);
+                            maxRefundNum = Math.Max(maxRefundNum, order.skipasses[j].order.refunds.Count);
                         }
 
                     }
@@ -803,13 +804,13 @@ namespace SnowmeetApi.Controllers
                 PaymentShare? share = null;
                 bool haveOrder = false;
                 if (order.skipasses.Count > 0 && order.skipasses[0].order != null
-                    && order.skipasses[0].order.paymentList.Count > 0)
+                    && order.skipasses[0].order.availablePayments.Count > 0)
                 {
                     haveOrder = true;
                 }
-                if (haveOrder && order.skipasses[0].order.paymentList[0].shares.Count > 0)
+                if (haveOrder && order.skipasses[0].order.availablePayments[0].shares.Count > 0)
                 {
-                    share = order.skipasses[0].order.paymentList[0].shares[0];
+                    share = order.skipasses[0].order.availablePayments[0].shares[0];
                 }
 
                 if (order.skipasses.Count <= 0)
@@ -832,7 +833,7 @@ namespace SnowmeetApi.Controllers
                             styleTime.SetFont(fontUsed);
                             break;
                         case 3:
-                            if (order.skipasses[0].order.refundList.Count == 0)
+                            if (order.skipasses[0].order.refunds.Count == 0)
                             {
                                 styleText.SetFont(fontUnRefund);
                                 styleMoney.SetFont(fontUnRefund);
@@ -1035,9 +1036,9 @@ namespace SnowmeetApi.Controllers
                     {
                         int index = commonFieldsNum + j * headPayment.Length + k;
                         ICell cell = dr.CreateCell(index);
-                        if (haveOrder && j < order.skipasses[0].order.paymentList.Count)
+                        if (haveOrder && j < order.skipasses[0].order.availablePayments.Count)
                         {
-                            OrderPayment payment = order.skipasses[0].order.paymentList[0];
+                            OrderPayment payment = order.skipasses[0].order.availablePayments[0];
                             switch (k)
                             {
                                 case 0:
@@ -1075,9 +1076,9 @@ namespace SnowmeetApi.Controllers
                     {
                         int index = commonFieldsNum + headPayment.Length * maxPaymentNum + j * headRefund.Length + k;
                         ICell cell = dr.CreateCell(index);
-                        if (haveOrder && j < order.skipasses[0].order.refundList.Count)
+                        if (haveOrder && j < order.skipasses[0].order.refunds.Count)
                         {
-                            OrderPaymentRefund r = order.skipasses[0].order.refundList[j];
+                            OrderPaymentRefund r = order.skipasses[0].order.refunds[j];
                             switch (k)
                             {
                                 case 0:

@@ -806,6 +806,30 @@ namespace SnowmeetApi.Controllers
                 return null;
             }
         }
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<Member?>>> GetMyInfo(string sessionKey)
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            Member member = await GetMemberBySessionKey(sessionKey.Trim());
+            if (member == null)
+            {
+                return Ok(new ApiResult<Member?>()
+                {
+                    code = 1,
+                    message = "未找到会员",
+                    data = null
+                });
+            }
+            else
+            {
+                return Ok(new ApiResult<Member?>()
+                {
+                    code = 0,
+                    message = "",
+                    data = member
+                });
+            }
+        }
 
         /*
                 [NonAction]

@@ -5,7 +5,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 using System.Data;
 using Microsoft.DotNet.Scaffolding.Shared.Messaging;
 
-namespace SnowmeetApi.Models.SkiPass
+namespace SnowmeetApi.Models
 {
     [Table("ziwoyou_order")]
     public class ZiwoyouListOrder
@@ -38,8 +38,8 @@ namespace SnowmeetApi.Models.SkiPass
         public DateTime? travelDate { get; set; }
         public DateTime? update_date{get; set;}
         public DateTime? create_date {get; set;}
-        [ForeignKey(nameof(Models.SkiPass.SkiPass.reserve_no))]
-        public List<Models.SkiPass.SkiPass> skipasses {get; set;}
+        [ForeignKey(nameof(Models.SkiPass.reserve_no))]
+        public List<Models.SkiPass> skipasses {get; set;}
     }
 
 }

@@ -7,7 +7,6 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SnowmeetApi.Data;
-using SnowmeetApi.Models.ProudctSkiPass;
 using SnowmeetApi.Models;
 using System.Configuration;
 using Microsoft.Extensions.Configuration;
@@ -59,7 +58,7 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<object>> GetSkiPassDetailInfo(int id)
         {
             return await _context.product.Where(p => p.id == id)
-                .Join(_context.SkiPass, p => p.id, s => s.product_id,
+                .Join(_context.skiPassProduct, p => p.id, s => s.product_id,
                 (p, s) => new
                 {
                     p.id,
@@ -100,7 +99,7 @@ namespace SnowmeetApi.Controllers
 
 
             var skiPassProdustList = await _context.product.Where(p => (p.shop.Trim().Equals(resort.Trim()) && p.hidden == 0 && p.end_date >= DateTime.Now.Date))
-                .Join(_context.SkiPass, p => p.id, s => s.product_id,
+                .Join(_context.skiPassProduct, p => p.id, s => s.product_id,
                 (p, s) => new {
                     p.id,
                     p.name,
@@ -122,7 +121,7 @@ namespace SnowmeetApi.Controllers
             for (int i = 0; i < skiPassProdustList.Count; i++)
             {
                 var r = skiPassProdustList[i];
-                Models.ProudctSkiPass.SkiPass skiPass = new Models.ProudctSkiPass.SkiPass()
+                Models.SkiPassProduct skiPass = new Models.SkiPassProduct()
                 {
                     product_id = r.product_id,
                     resort = r.resort.Trim(),
@@ -155,14 +154,14 @@ namespace SnowmeetApi.Controllers
             return Ok(skiPassProdustList);
         }
         [HttpGet("{skipassId}")]
-        public async Task<ActionResult<Models.SkiPass.SkiPass>> GetSkipass(int skipassId, string sessionKey, string sessionType="wechat_mini_openid")
+        public async Task<ActionResult<Models.SkiPass>> GetSkipass(int skipassId, string sessionKey, string sessionType="wechat_mini_openid")
         {
             Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
             if (member == null)
             {
                 return BadRequest();
             }
-            Models.SkiPass.SkiPass skipass = await _context.skiPass.FindAsync(skipassId);
+            Models.SkiPass skipass = await _context.skiPass.FindAsync(skipassId);
             if (member.id != skipass.member_id && member.wechatMiniOpenId.Trim().Equals(skipass.wechat_mini_openid)
                 && member.is_admin == 0 && member.is_staff == 0 && member.is_manager == 0)
             {
@@ -172,7 +171,7 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<List<Models.SkiPass.SkiPass>>> GetMySkipass
+        public async Task<ActionResult<List<Models.SkiPass>>> GetMySkipass
             (string sessionKey, string sessionType = "wechat_mini_openid")
         {
             Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
@@ -180,7 +179,7 @@ namespace SnowmeetApi.Controllers
             {
                 return BadRequest();
             }
-            List<Models.SkiPass.SkiPass> l = await _context.skiPass.Where(s => ( s.valid == 1
+            List<Models.SkiPass> l = await _context.skiPass.Where(s => ( s.valid == 1
                 && (s.member_id == member.id || s.wechat_mini_openid.Trim().Equals(member.wechatMiniOpenId.Trim())  )))
                 .OrderByDescending(s => s.create_date).AsNoTracking().ToListAsync();
             
@@ -190,14 +189,14 @@ namespace SnowmeetApi.Controllers
         
 
         [HttpGet("{skipassId}")]
-        public async Task<ActionResult<Models.SkiPass.SkiPass>> Cancel(int skipassId, string sessionKey, string sessionType = "wechat_mini_openid")
+        public async Task<ActionResult<Models.SkiPass>> Cancel(int skipassId, string sessionKey, string sessionType = "wechat_mini_openid")
         {
             Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
             if (member == null)
             {
                 return BadRequest();
             }
-            Models.SkiPass.SkiPass skipass = await _context.skiPass.FindAsync(skipassId);
+            Models.SkiPass skipass = await _context.skiPass.FindAsync(skipassId);
             if (member.id != skipass.member_id && member.wechatMiniOpenId.Trim().Equals(skipass.wechat_mini_openid)
                 && member.is_admin == 0 && member.is_staff == 0 && member.is_manager == 0)
             {
@@ -215,7 +214,7 @@ namespace SnowmeetApi.Controllers
 
             try
             {
-                Models.ProudctSkiPass.SkiPass product = await _context.SkiPass.FindAsync(skipass.product_id);
+                Models.SkiPassProduct product = await _context.skiPassProduct.FindAsync(skipass.product_id);
                 WanlongZiwoyouHelper _wlHelper = new WanlongZiwoyouHelper(_context, _config, product.source.Trim());
                 WanlongZiwoyouHelper.ZiwoyouQueryResult r = await _wlHelper.CancelOrder(int.Parse(skipass.reserve_no));
                 WanlongZiwoyouHelper.ZiwoyouCancel cancel = (WanlongZiwoyouHelper.ZiwoyouCancel)r.data;
@@ -238,10 +237,10 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<Models.SkiPass.SkiPass>> Refund(int skipassId, string reason, string sessionKey, string sessionType = "wechat_mini_openid")
+        public async Task<ActionResult<Models.SkiPass>> Refund(int skipassId, string reason, string sessionKey, string sessionType = "wechat_mini_openid")
         {
             
-            Models.SkiPass.SkiPass skipass = await _context.skiPass.FindAsync(skipassId);
+            Models.SkiPass skipass = await _context.skiPass.FindAsync(skipassId);
             if (skipass.resort.Trim().Equals("南山"))
             {
                 return BadRequest();
@@ -276,12 +275,49 @@ namespace SnowmeetApi.Controllers
             }
             return Ok(skipass);    
         }
-
-
-       
-        
         [HttpGet]
         public async Task CreateSkiPass(int orderId)
+        {
+            OrderController _orderHelper = new OrderController(_context, _config, _http);
+            Models.Order order = await _orderHelper.GetOrder(orderId);
+            if (order == null)
+            {
+                return;
+            }
+            List<Models.SkiPass> dealList = new List<Models.SkiPass>();
+            for(int i = 0; i < order.skipasses.Count; i++)
+            {
+                if (!order.skipasses[i].booking_now && !order.skipasses[i].reserve_success)
+                {
+                    order.skipasses[i].booking_now = true;
+                    _context.skiPass.Entry(order.skipasses[i]).State = EntityState.Modified;
+                    dealList.Add(order.skipasses[i]);
+                }
+            }
+            await _context.SaveChangesAsync();
+            for(int i = 0; i < dealList.Count; i++)
+            {
+                Models.SkiPass skipass = dealList[i];
+                if (!skipass.resort.Trim().Equals("南山"))
+                {
+
+                    await AutoReserve(skipass);
+
+                }
+                try
+                {
+                    await SendTicket(skipass);
+                }
+                catch
+                {
+
+                }
+            }
+        }
+       
+        /*
+        [NonAction]
+        public async Task CreateSkiPass1(int orderId)
         {
             OrderOnline order = await _context.OrderOnlines.FindAsync(orderId);
             List<OrderPayment> pList = await _context.OrderPayment
@@ -291,12 +327,12 @@ namespace SnowmeetApi.Controllers
             {
                 return;
             }
-            List<Models.SkiPass.SkiPass> skipassList = await _context.skiPass
+            List<Models.SkiPass> skipassList = await _context.skiPass
                 .Where(s => s.order_id == order.id).ToListAsync();
             bool notified = false;
             for(int i = 0; i < skipassList.Count; i++)
             {
-                Models.SkiPass.SkiPass skipass = skipassList[i];
+                Models.SkiPass skipass = skipassList[i];
                 skipass.valid = 1;
                 skipass.update_date = DateTime.Now;
                 _context.skiPass.Entry(skipass).State = EntityState.Modified;
@@ -314,7 +350,7 @@ namespace SnowmeetApi.Controllers
             //雪票生效后附赠以及分账
             for (int i = 0; i < skipassList.Count; i++)
             {
-                Models.SkiPass.SkiPass skipass = skipassList[i];
+                Models.SkiPass skipass = skipassList[i];
                 //await SetNotify(skipass.id, 1);
                 //await SendTicket(skipass);
                 if (!skipass.resort.Trim().Equals("南山"))
@@ -335,7 +371,7 @@ namespace SnowmeetApi.Controllers
             }
             await CreateShare(orderId);
         }
-
+        */
         [NonAction]
         public async Task CreateShare(int orderId)
         {
@@ -396,7 +432,7 @@ namespace SnowmeetApi.Controllers
             {
                 return;
             }
-            List<Models.SkiPass.SkiPass> skipasses = await _context.skiPass
+            List<Models.SkiPass> skipasses = await _context.skiPass
                 .Where(s => s.valid == 1 && s.order_id == orderId)
                 .AsNoTracking().ToListAsync();
             Models.Kol kol = await _refHelper.GetKol(refereeMemberId);
@@ -427,7 +463,7 @@ namespace SnowmeetApi.Controllers
         }
 
         [NonAction]
-        public async Task SendTicket(Models.SkiPass.SkiPass skipass)
+        public async Task SendTicket(Models.SkiPass skipass)
         {
             if (skipass.product_name.Trim().IndexOf("租板") >= 0)
             {
@@ -444,10 +480,8 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet]
-        public async Task AutoReserve(int skipassId)
+        public async Task AutoReserve(Models.SkiPass skipass)
         {
-            
-            Models.SkiPass.SkiPass skipass = await _context.skiPass.FindAsync(skipassId);
             if (!skipass.status.Equals("已付款"))
             {
                 skipass.memo += " 雪票状态不对。";
@@ -455,7 +489,7 @@ namespace SnowmeetApi.Controllers
                 await _context.SaveChangesAsync();
                 return;
             }
-            Models.ProudctSkiPass.SkiPass skipassProduct = await _context.SkiPass.FindAsync(skipass.product_id);
+            Models.SkiPassProduct skipassProduct = await _context.skiPassProduct.FindAsync(skipass.product_id);
             WanlongZiwoyouHelper _zwHelper = new WanlongZiwoyouHelper(_context, _config, skipassProduct.source);
             List<OrderPayment> pList = await _context.OrderPayment
                 .Where(p => (p.order_id == skipass.order_id && p.status.Trim().Equals("支付成功")))
@@ -524,8 +558,6 @@ namespace SnowmeetApi.Controllers
             skipass.reserve_no = payResult.data.orderId.ToString();
             _context.skiPass.Entry(skipass).State = EntityState.Modified;
             await _context.SaveChangesAsync();
-            //await SetNotify(skipass)
-            
         }
 
         [NonAction]
@@ -536,7 +568,7 @@ namespace SnowmeetApi.Controllers
             TicketController _ticketHelper = new TicketController(_context, _config);
             await _ticketHelper.Cancel(payment.order_id);
 
-            Models.SkiPass.SkiPass skipass = await _context.skiPass
+            Models.SkiPass skipass = await _context.skiPass
                 .Where(s => (s.valid == 1 && s.order_id == payment.order_id))
                 .OrderByDescending(s => s.id).FirstAsync();
             OrderPaymentRefund refund = await _context.orderPaymentRefund
@@ -554,13 +586,13 @@ namespace SnowmeetApi.Controllers
         [HttpGet]
         public async Task RefreshCancel()
         {
-            List<Models.SkiPass.SkiPass> skipassList = await _context.skiPass
+            List<Models.SkiPass> skipassList = await _context.skiPass
                 .Where(s => (s.valid == 1 && s.reserve_no != null && !s.resort.Trim().Equals("南山")
                 && s.is_cancel == 2)).ToListAsync();
             for(int i = 0; i < skipassList.Count; i++)
             {
-                Models.SkiPass.SkiPass skipass = skipassList[i];
-                Models.ProudctSkiPass.SkiPass skipassProduct = await _context.SkiPass.FindAsync(skipass.product_id);
+                Models.SkiPass skipass = skipassList[i];
+                Models.SkiPassProduct skipassProduct = await _context.skiPassProduct.FindAsync(skipass.product_id);
                 if (skipassProduct == null)
                 {
                     continue;
@@ -589,13 +621,13 @@ namespace SnowmeetApi.Controllers
         {
             TicketController _tHelper = new TicketController(_context, _config);
 
-            List<Models.SkiPass.SkiPass> skipassList = await _context.skiPass
+            List<Models.SkiPass> skipassList = await _context.skiPass
                 .Where(s => (s.valid == 1 && s.is_cancel == 0 
                 && s.is_used == 0 && !s.resort.Trim().Equals("南山")))
                 .OrderByDescending(s => s.id).ToListAsync();
             for(int i = 0; i < skipassList.Count; i++)
             {
-                Models.SkiPass.SkiPass skipass = skipassList[i];
+                Models.SkiPass skipass = skipassList[i];
                 if (skipass.reserve_no == null)
                 {
                     continue;
@@ -617,15 +649,12 @@ namespace SnowmeetApi.Controllers
             }
             
         }
-
-        
-
         [HttpGet]
         public async Task RefreshAutoReserve()
         {
-            List<Models.SkiPass.SkiPass> skipassList = await _context.skiPass
+            List<Models.SkiPass> skipassList = await _context.skiPass
                 .Include(s => s.order)
-                    .ThenInclude(o => o.paymentList.Where(p => p.status.Equals("支付成功")))
+                    .ThenInclude(o => o.availablePayments.Where(p => p.status.Equals("支付成功")))
                 .Where(s => (s.valid == 1 && s.reserve_no != null && !s.resort.Trim().Equals("南山")
                 && s.card_no == null && s.qr_code_url == null && s.send_content == null && s.is_cancel == 0
                 //&& s.create_date > DateTime.Now.AddHours(-480)
@@ -633,8 +662,8 @@ namespace SnowmeetApi.Controllers
                 )).ToListAsync();
             for(int i = 0; i < skipassList.Count; i++)
             {
-                Models.SkiPass.SkiPass skipass = skipassList[i];
-                Models.ProudctSkiPass.SkiPass skipassProduct = await _context.SkiPass.FindAsync(skipass.product_id);
+                Models.SkiPass skipass = skipassList[i];
+                Models.SkiPassProduct skipassProduct = await _context.skiPassProduct.FindAsync(skipass.product_id);
                 if (skipassProduct == null)
                 {
                     continue;
@@ -671,8 +700,8 @@ namespace SnowmeetApi.Controllers
                         if (updated)
                         {
                             //await SetNotify(skipass.wechat_mini_openid, skipass.order.paymentList[0].wepay_trans_id.Trim(), 1, skipass.product_name, (int)(skipass.deal_price * 100), skipass.order.paymentList[0].timestamp, 2);
-                            await SetNotify(skipass.wechat_mini_openid, skipass.order.paymentList[0].wepay_trans_id.Trim(), 1, skipass.product_name, (int)(skipass.deal_price * 100), skipass.order.paymentList[0].timestamp, 2);
-                            await SetNotify(skipass.wechat_mini_openid, skipass.order.paymentList[0].wepay_trans_id.Trim(), 1, skipass.product_name, (int)(skipass.deal_price * 100), skipass.order.paymentList[0].timestamp, 4);
+                            await SetNotify(skipass.wechat_mini_openid, skipass.order.availablePayments[0].wepay_trans_id.Trim(), 1, skipass.product_name, (int)(skipass.deal_price * 100), skipass.order.availablePayments[0].timestamp, 2);
+                            await SetNotify(skipass.wechat_mini_openid, skipass.order.availablePayments[0].wepay_trans_id.Trim(), 1, skipass.product_name, (int)(skipass.deal_price * 100), skipass.order.availablePayments[0].timestamp, 4);
                         }
                     }
                     switch(order.orderState)
@@ -730,19 +759,13 @@ namespace SnowmeetApi.Controllers
             int count, string cell, string name, string sessionKey, string sessionType = "wechat_mini_openid", string idNo = "", int refereeMemberId = 0)
         {
             Models.Product product = await _context.product.FindAsync(productId);
-            Models.ProudctSkiPass.SkiPass skipassProduct = await _context.SkiPass.FindAsync(productId);
+            Models.SkiPassProduct skipassProduct = await _context.skiPassProduct.FindAsync(productId);
             SkipassDailyPrice dailyPrice = await _context.skipassDailyPrice
                 .Where(s => s.product_id == productId && s.valid == 1 && s.reserve_date.Date == date.Date)
                 .OrderBy(s => s.reserve_date).AsNoTracking().FirstAsync();
-            
-            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
-            if (user == null || product == null)
-            {
-                return BadRequest();
-            }
             Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
             //double totalPrice = 0;
-            Models.SkiPass.SkiPass skipass = new Models.SkiPass.SkiPass()
+            Models.SkiPass skipass = new Models.SkiPass()
             {
                 member_id = member.id,
                 wechat_mini_openid = member.wechatMiniOpenId,
@@ -754,17 +777,20 @@ namespace SnowmeetApi.Controllers
                 deal_price = dailyPrice.deal_price * count,
                 ticket_price = dailyPrice.settlementPrice,
                 deposit = product.deposit,
-                valid = 0,
+                valid = 1,
                 contact_cell = cell,
                 contact_name = name,
                 contact_id_no = idNo.Trim(),
                 contact_id_type = "身份证",
-                reserve_date = date.Date
+                reserve_date = date.Date,
+                booking_now = false,
+                reserve_success = false
             };
                 //skipassArr[i] = skipass;
                 //totalPrice += (double)skipass.deal_price;
             
 
+            /*
             OrderOnline order = new OrderOnline()
             {
                 type = "雪票",
@@ -810,6 +836,36 @@ namespace SnowmeetApi.Controllers
             _context.member.Entry(member).State = EntityState.Modified;
             await _context.SaveChangesAsync();
             //await _memberHelper.UpdateDetailInfo(member.id, cell, "cell", false);
+            */
+            Models.Order order = new Models.Order()
+            {
+                id = 0,
+                member_id = member.id,
+                type = "雪票",
+                shop = product.shop.Trim(),
+                total_amount = product.sale_price * count,
+                paying_amount = product.sale_price * count,
+                create_date = DateTime.Now,
+                //skipasses = new List<Models.SkiPass>() { skipass  },
+                valid = 1
+            };
+            OrderController _orderHelper = new OrderController(_context, _config, _http);
+            await _orderHelper.GenerateOrderCode(order);
+            OrderPayment payment = new OrderPayment()
+            {
+                order_id = order.id,
+                pay_method = "微信支付",
+                amount = (double)order.paying_amount,
+                status = "待支付",
+                staff_open_id = "",
+                out_trade_no = order.code + "_ZF_01",
+                valid = 1,
+                create_date = DateTime.Now
+            };
+            order.payments = new List<OrderPayment>() { payment };
+            order.skipasses = new List<Models.SkiPass>() { skipass };
+            await _context.order.AddAsync(order);
+            await _context.SaveChangesAsync();
             return Ok(order);
         }
 
@@ -818,7 +874,7 @@ namespace SnowmeetApi.Controllers
         [HttpGet]
         public async Task CommitSkipassOrder(int orderId)
         {
-            List<Models.SkiPass.SkiPass> skipasses = await _context.skiPass
+            List<Models.SkiPass> skipasses = await _context.skiPass
                 .Where(s => s.valid == 1 && s.order_id == orderId)
                 .AsNoTracking().ToListAsync();
             bool allFinish = true;
@@ -885,7 +941,7 @@ namespace SnowmeetApi.Controllers
         [NonAction]
         public async Task CommitSkipass(int skipassId)
         {
-            Models.SkiPass.SkiPass skipass = await _context.skiPass.Where(s => s.id == skipassId)
+            Models.SkiPass skipass = await _context.skiPass.Where(s => s.id == skipassId)
                 .AsNoTracking().FirstAsync();
            
             if (skipass == null)
@@ -943,7 +999,7 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<List<SkipassWithPrice>>> GetProductsByResort(string resort, int showHidden = 0)
         {
             resort = Util.UrlDecode(resort);
-            var l = await _context.SkiPass//.Include(s => s.dailyPrice)
+            var l = await _context.skiPassProduct//.Include(s => s.dailyPrice)
                 .Join(_context.product, s=>s.product_id, p=>p.id,
                 (s, p)=> new {s.product_id, s.resort, s.rules, s.source, s.third_party_no, p.name, p.shop, 
                 s.commonDayDealPrice, s.weekendDealPrice, 
@@ -951,7 +1007,7 @@ namespace SnowmeetApi.Controllers
                 //s.avaliablePriceList,
                 p.sale_price, p.market_price, p.cost, p.type, p.hidden })
                 .Where(p => p.type.Trim().Equals("雪票") && p.resort.Trim().Equals(resort)
-                && p.third_party_no != null 
+                && p.third_party_no != null && p.source == "万龙自我游" 
                 && ((p.hidden == 0 && showHidden == 0) || (showHidden == 1))
                 ).OrderBy(p => p.market_price).AsNoTracking().ToListAsync();
             
@@ -959,7 +1015,7 @@ namespace SnowmeetApi.Controllers
             for(int i = 0; i < l.Count; i++)
             {
                 var p = l[i];
-                Models.ProudctSkiPass.SkiPass skipass = new Models.ProudctSkiPass.SkiPass()
+                Models.SkiPassProduct skipass = new Models.SkiPassProduct()
                 {
                     resort = p.resort,
                     rules = p.rules,
@@ -1019,7 +1075,7 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<SkipassWithPrice>> GetProduct(int productId)
         {
             Product p = await _context.product.FindAsync(productId);
-            Models.ProudctSkiPass.SkiPass skipass = await _context.SkiPass.FindAsync(productId);
+            Models.SkiPassProduct skipass = await _context.skiPassProduct.FindAsync(productId);
             skipass.dailyPrice = await _context.skipassDailyPrice.Where(s => s.product_id == productId && s.valid == 1)
                 .OrderBy(s => s.reserve_date).AsNoTracking().ToListAsync();
             
@@ -1067,7 +1123,7 @@ namespace SnowmeetApi.Controllers
             return Ok(priceObj);
         }
         [HttpGet]
-        public async Task<ActionResult<List<Models.SkiPass.SkiPass>>> GetDHHSReservedSkipasses(DateTime start,
+        public async Task<ActionResult<List<Models.SkiPass>>> GetDHHSReservedSkipasses(DateTime start,
             DateTime end, string sessionKey, string sessionType = "wechat_mini_openid")
         {
             MemberController _memberHelper = new MemberController(_context, _config);
@@ -1076,10 +1132,10 @@ namespace SnowmeetApi.Controllers
             {
                 return BadRequest();
             }
-            List<Models.SkiPass.SkiPass> sList = await _context.skiPass.Where(s => s.valid == 1 && !s.resort.Trim().Equals("南山")
+            List<Models.SkiPass> sList = await _context.skiPass.Where(s => s.valid == 1 && !s.resort.Trim().Equals("南山")
                 && s.create_date.Date >= start.Date && s.create_date.Date <= end.Date ).OrderByDescending(s => s.id)
                 .Include(s => s.order)
-                    .ThenInclude(o => o.paymentList.Where(p => p.status.Equals("支付成功")))
+                    .ThenInclude(o => o.availablePayments.Where(p => p.status.Equals("支付成功")))
                        .ThenInclude(p => p.refunds.Where(r => r.state == 1))
                 .AsNoTracking().ToListAsync();
             return Ok(sList);

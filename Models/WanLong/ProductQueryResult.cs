@@ -16,7 +16,7 @@ namespace SnowmeetApi.Models.WanLong
 		public int sizeAll { get; set; }
 		public int page { get; set; }
 		public int pageCount { get; set; }
-		public SkiPassProduct[] results { get; set; }
+		public ZiwoyouSkipassProduct[] results { get; set; }
 
     }
 

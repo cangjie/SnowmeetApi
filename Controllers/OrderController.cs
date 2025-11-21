@@ -51,6 +51,8 @@ namespace SnowmeetApi.Controllers
                         .ThenInclude(l => l.staff)
                 .Include(r => r.guaranties.Where(g => g.valid == 1 && g.biz_type.Trim().Equals("租赁"))).ThenInclude(g => g.guarantyPayments).ThenInclude(g => g.payment)
                 .AsNoTracking().ToListAsync();
+            order.skipasses = await _db.order.Entry(order).Collection(o => o.skipasses).Query()
+                .Where(s => s.valid == 1).Include(s => s.skiPassProduct).ThenInclude(p => p.dailyPrice).AsNoTracking().ToListAsync();
             order.discounts = await _db.order.Entry(order).Collection(o => o.discounts).Query().Where(d => d.valid == 1).ToListAsync();
             await _db.order.Entry(order).Reference(o => o.staff).LoadAsync();
             await _db.order.Entry(order).Reference(o => o.member).LoadAsync();
@@ -1669,6 +1671,10 @@ namespace SnowmeetApi.Controllers
                     await _db.SaveChangesAsync();
                     CareController _careHelper = new CareController(_db, _config, _http);
                     await _careHelper.EffectCareOrder(order.id);
+                    break;
+                case "雪票":
+                    SkiPassController _skiPassHelper = new SkiPassController(_db, _config, _http);
+                    await _skiPassHelper.CreateSkiPass(order.id);
                     break;
                 default:
                     break;

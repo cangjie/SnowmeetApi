@@ -2,10 +2,10 @@
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-namespace SnowmeetApi.Models.ProudctSkiPass
+namespace SnowmeetApi.Models
 {
 	[Table("product_resort_ski_pass")]
-	public class SkiPass
+	public class SkiPassProduct
 	{
 		[Key]
 		public int product_id { get; set; }
@@ -18,12 +18,11 @@ namespace SnowmeetApi.Models.ProudctSkiPass
 		public string  tags { get; set; }
 		public string? source { get; set; } = null;
 		public string? third_party_no { get; set; } = null;
-		
-		[NotMapped]
+		[ForeignKey(nameof(SkipassDailyPrice.product_id))]
 		public List<SkipassDailyPrice> dailyPrice {get; set;}
 		[NotMapped]
 		public Product product {get; set;}
-
+		public DateTime? update_date {get; set;} = null;
 		public bool TagMatch(string[] userTags)
 		{
 			bool valid = true;
@@ -170,6 +169,7 @@ namespace SnowmeetApi.Models.ProudctSkiPass
 			{
 				if (avaliablePriceList == null || avaliablePriceList.Count == 0)
 				{
+					//SnowmeetApi.Models.SkiPass p = new SnowmeetApi.Models.SkiPass();
 					return 0;
 				}
 				else

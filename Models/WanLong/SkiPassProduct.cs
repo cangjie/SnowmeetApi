@@ -1,7 +1,7 @@
 ﻿using System;
-namespace SnowmeetApi.Models.WanLong
+namespace SnowmeetApi.Models
 {
-	public class SkiPassProduct
+	public class ZiwoyouSkipassProduct
 	{
 		public string productNo { get; set; }
 		public string productName { get; set; }
