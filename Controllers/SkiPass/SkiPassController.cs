@@ -863,8 +863,8 @@ namespace SnowmeetApi.Controllers
                 member_id = member.id,
                 type = "雪票",
                 shop = product.shop.Trim(),
-                total_amount = product.sale_price * count,
-                paying_amount = product.sale_price * count,
+                total_amount = (double)skipass.deal_price * count,
+                paying_amount = (double)skipass.deal_price * count,
                 create_date = DateTime.Now,
                 //skipasses = new List<Models.SkiPass>() { skipass  },
                 valid = 1
