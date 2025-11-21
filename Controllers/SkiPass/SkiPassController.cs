@@ -534,7 +534,7 @@ namespace SnowmeetApi.Controllers
                     skipass.is_cancel = -2;
                     _context.skiPass.Entry(skipass).State = EntityState.Modified;
                     await _context.SaveChangesAsync();
-                return;
+                    return;
                 }
                 
             }
@@ -558,6 +558,12 @@ namespace SnowmeetApi.Controllers
             skipass.reserve_no = payResult.data.orderId.ToString();
             _context.skiPass.Entry(skipass).State = EntityState.Modified;
             await _context.SaveChangesAsync();
+            for(int i = 0; i < 5; i++)
+            {
+                System.Threading.Thread.Sleep(5000);
+                //_zwHelper.
+                await RefreshAutoReserve();
+            }
         }
 
         [NonAction]
@@ -677,7 +683,7 @@ namespace SnowmeetApi.Controllers
                     if (order == null)
                     {
                         skipass.is_cancel = -2;
-                        skipass.memo = "未获取到大好河山订单号";
+                        skipass.memo = "未获取到自我游订单号";
                         skipass.update_date = DateTime.Now;
                         
                         _context.skiPass.Entry(skipass).State = EntityState.Modified;
