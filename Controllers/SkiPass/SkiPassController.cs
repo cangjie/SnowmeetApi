@@ -1007,7 +1007,7 @@ namespace SnowmeetApi.Controllers
                 //s.avaliablePriceList,
                 p.sale_price, p.market_price, p.cost, p.type, p.hidden })
                 .Where(p => p.type.Trim().Equals("雪票") && p.resort.Trim().Equals(resort)
-                && p.third_party_no != null 
+                && p.third_party_no != null && p.source == "万龙自我游" 
                 && ((p.hidden == 0 && showHidden == 0) || (showHidden == 1))
                 ).OrderBy(p => p.market_price).AsNoTracking().ToListAsync();
             
