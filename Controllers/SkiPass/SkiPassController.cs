@@ -654,7 +654,7 @@ namespace SnowmeetApi.Controllers
         {
             List<Models.SkiPass> skipassList = await _context.skiPass
                 .Include(s => s.order)
-                    .ThenInclude(o => o.availablePayments.Where(p => p.status.Equals("支付成功")))
+                    .ThenInclude(o => o.payments.Where(p => p.status.Equals("支付成功")))
                 .Where(s => (s.valid == 1 && s.reserve_no != null && !s.resort.Trim().Equals("南山")
                 && s.card_no == null && s.qr_code_url == null && s.send_content == null && s.is_cancel == 0
                 //&& s.create_date > DateTime.Now.AddHours(-480)
@@ -700,8 +700,22 @@ namespace SnowmeetApi.Controllers
                         if (updated)
                         {
                             //await SetNotify(skipass.wechat_mini_openid, skipass.order.paymentList[0].wepay_trans_id.Trim(), 1, skipass.product_name, (int)(skipass.deal_price * 100), skipass.order.paymentList[0].timestamp, 2);
-                            await SetNotify(skipass.wechat_mini_openid, skipass.order.availablePayments[0].wepay_trans_id.Trim(), 1, skipass.product_name, (int)(skipass.deal_price * 100), skipass.order.availablePayments[0].timestamp, 2);
-                            await SetNotify(skipass.wechat_mini_openid, skipass.order.availablePayments[0].wepay_trans_id.Trim(), 1, skipass.product_name, (int)(skipass.deal_price * 100), skipass.order.availablePayments[0].timestamp, 4);
+                            try
+                            {
+                                await SetNotify(skipass.wechat_mini_openid, skipass.order.availablePayments[0].wepay_trans_id.Trim(), 1, skipass.product_name, (int)(skipass.deal_price * 100), skipass.order.availablePayments[0].timestamp, 2);
+                            }
+                            catch
+                            {
+                                
+                            }
+                            try
+                            {
+                                await SetNotify(skipass.wechat_mini_openid, skipass.order.availablePayments[0].wepay_trans_id.Trim(), 1, skipass.product_name, (int)(skipass.deal_price * 100), skipass.order.availablePayments[0].timestamp, 4);
+                            }
+                            catch
+                            {
+                                
+                            }
                         }
                     }
                     switch(order.orderState)
