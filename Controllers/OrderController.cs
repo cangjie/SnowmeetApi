@@ -1578,7 +1578,7 @@ namespace SnowmeetApi.Controllers
                 {
                     id = 0,
                     order_id = orderId,
-                    amount = order.totalCharge,
+                    amount = (double)order.paying_amount,
                     pay_method = null,
                     is_debt = 1,
                     staff_id = staff.id,
@@ -1592,7 +1592,7 @@ namespace SnowmeetApi.Controllers
                 {
                     id = 0,
                     order_id = orderId,
-                    amount = order.totalCharge,
+                    amount = (double)order.paying_amount,
                     pay_method = payMethod,
                     is_debt = 0,
                     status = OrderPayment.PaymentStatus.支付成功.ToString(),
