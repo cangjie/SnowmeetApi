@@ -438,9 +438,18 @@ namespace SnowmeetApi.Controllers
             for (int i = 0; i < originProductInfo.data.results.Length; i++)
             {
                 ZiwoyouSkipassProduct skipassProduct = originProductInfo.data.results[i];
+                /*
+                if (skipassProduct.productNo!="37696044")
+                {
+                    continue;
+                }
+                */
                 Models.SkiPassProduct skipass = await GetSkipassProductByCode(skipassProduct.productNo);
                 if (skipass != null)
                 {
+                    skipass.product.name = skipassProduct.productName;
+                    skipass.product.update_date = DateTime.Now;
+
                     skipass.product.market_price = skipassProduct.salePrice;
                     skipass.product.cost = skipassProduct.settlementPrice;
                     skipass.source = this.source.Trim();
