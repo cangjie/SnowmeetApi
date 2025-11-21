@@ -275,12 +275,49 @@ namespace SnowmeetApi.Controllers
             }
             return Ok(skipass);    
         }
-
-
-       
-        
         [HttpGet]
         public async Task CreateSkiPass(int orderId)
+        {
+            OrderController _orderHelper = new OrderController(_context, _config, _http);
+            Models.Order order = await _orderHelper.GetOrder(orderId);
+            if (order == null)
+            {
+                return;
+            }
+            List<Models.SkiPass> dealList = new List<Models.SkiPass>();
+            for(int i = 0; i < order.skipasses.Count; i++)
+            {
+                if (!order.skipasses[i].booking_now && !order.skipasses[i].reserve_success)
+                {
+                    order.skipasses[i].booking_now = true;
+                    _context.skiPass.Entry(order.skipasses[i]).State = EntityState.Modified;
+                    dealList.Add(order.skipasses[i]);
+                }
+            }
+            await _context.SaveChangesAsync();
+            for(int i = 0; i < dealList.Count; i++)
+            {
+                Models.SkiPass skipass = dealList[i];
+                if (!skipass.resort.Trim().Equals("南山"))
+                {
+
+                    await AutoReserve(skipass);
+
+                }
+                try
+                {
+                    await SendTicket(skipass);
+                }
+                catch
+                {
+
+                }
+            }
+        }
+       
+        /*
+        [NonAction]
+        public async Task CreateSkiPass1(int orderId)
         {
             OrderOnline order = await _context.OrderOnlines.FindAsync(orderId);
             List<OrderPayment> pList = await _context.OrderPayment
@@ -334,7 +371,7 @@ namespace SnowmeetApi.Controllers
             }
             await CreateShare(orderId);
         }
-
+        */
         [NonAction]
         public async Task CreateShare(int orderId)
         {
@@ -443,10 +480,8 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet]
-        public async Task AutoReserve(int skipassId)
+        public async Task AutoReserve(Models.SkiPass skipass)
         {
-            
-            Models.SkiPass skipass = await _context.skiPass.FindAsync(skipassId);
             if (!skipass.status.Equals("已付款"))
             {
                 skipass.memo += " 雪票状态不对。";
@@ -523,8 +558,6 @@ namespace SnowmeetApi.Controllers
             skipass.reserve_no = payResult.data.orderId.ToString();
             _context.skiPass.Entry(skipass).State = EntityState.Modified;
             await _context.SaveChangesAsync();
-            //await SetNotify(skipass)
-            
         }
 
         [NonAction]
@@ -616,9 +649,6 @@ namespace SnowmeetApi.Controllers
             }
             
         }
-
-        
-
         [HttpGet]
         public async Task RefreshAutoReserve()
         {
@@ -747,12 +777,14 @@ namespace SnowmeetApi.Controllers
                 deal_price = dailyPrice.deal_price * count,
                 ticket_price = dailyPrice.settlementPrice,
                 deposit = product.deposit,
-                valid = 0,
+                valid = 1,
                 contact_cell = cell,
                 contact_name = name,
                 contact_id_no = idNo.Trim(),
                 contact_id_type = "身份证",
-                reserve_date = date.Date
+                reserve_date = date.Date,
+                booking_now = false,
+                reserve_success = false
             };
                 //skipassArr[i] = skipass;
                 //totalPrice += (double)skipass.deal_price;
@@ -815,7 +847,7 @@ namespace SnowmeetApi.Controllers
                 paying_amount = product.sale_price * count,
                 create_date = DateTime.Now,
                 //skipasses = new List<Models.SkiPass>() { skipass  },
-                valid = 0
+                valid = 1
             };
             OrderController _orderHelper = new OrderController(_context, _config, _http);
             await _orderHelper.GenerateOrderCode(order);
@@ -827,6 +859,7 @@ namespace SnowmeetApi.Controllers
                 status = "待支付",
                 staff_open_id = "",
                 out_trade_no = order.code + "_ZF_01",
+                valid = 1,
                 create_date = DateTime.Now
             };
             order.payments = new List<OrderPayment>() { payment };

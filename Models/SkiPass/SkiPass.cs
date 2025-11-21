@@ -47,9 +47,15 @@ namespace SnowmeetApi.Models
         public string? send_content { get; set; } = null;
         public int? cancel_member_id {get; set;}
         public string memo {get; set;} = "";
-        public DateTime update_date {get; set;} = DateTime.Now;
+        public bool booking_now {get; set; } = false;
+        public bool reserve_success {get; set;} = false;
+        public DateTime? update_date {get; set;} = null;
         public DateTime create_date {get; set;} = DateTime.Now;
         public int is_used {get; set;} = 0;
+        [ForeignKey("product_id")]
+        public SkiPassProduct? skiPassProduct {get; set;}
+        [ForeignKey("product_id")]
+        public Product? product {get; set;}
         //[ForeignKey("order_id")]
         //public OrderOnline? order {get;set;}
         [ForeignKey("order_id")]

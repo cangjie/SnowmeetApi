@@ -247,7 +247,7 @@ namespace SnowmeetApi.Controllers
                 + ",\n\t\"orderMemo\": \"" + memo + "\",\n\t\"orderSourceId\": \"" + orderId.Trim()
                 + "\",\n\t\"travelDate\": \"" + date.ToString("yyyy-MM-dd") + "\"\n}";
             string url = "https://task-api.zowoyoo.com/api/thirdPaty/order/add";
-            WebApiLog reqLog = await _miniHelper.PerformRequest(url, "", postData, "POST", "易龙雪聚小程序", "预订雪票", "大好河山下单");
+            WebApiLog reqLog = await _miniHelper.PerformRequest(url, "", postData, "POST", "易龙雪聚小程序", "预订雪票", "万龙自我游下单");
             ZiwoyouPlaceOrderResult r = JsonConvert.DeserializeObject<ZiwoyouPlaceOrderResult>(reqLog.response.Trim());
             return r;
         }
@@ -257,7 +257,7 @@ namespace SnowmeetApi.Controllers
             MiniAppHelperController _miniHelper = new MiniAppHelperController(_context, _oriConfig);
             string postData = "{\"apikey\": \"" + apiKey + "\",\"custId\": " + custId.Trim() + ",\"orderId\": " + orderId.ToString() + "}";
             WebApiLog reqLog = await _miniHelper.PerformRequest("https://task-api.zowoyoo.com/api/thirdPaty/order/pay",
-                "", postData, "POST", "易龙雪聚小程序", "预订雪票", "大好河山支付");
+                "", postData, "POST", "易龙雪聚小程序", "预订雪票", "万龙自我游支付");
             PayResult p = JsonConvert.DeserializeObject<PayResult>(reqLog.response);
             return p;
 
@@ -269,7 +269,7 @@ namespace SnowmeetApi.Controllers
             MiniAppHelperController _miniHelper = new MiniAppHelperController(_context, _oriConfig);
             string postData = "{\"apikey\": \"" + apiKey + "\",\"custId\": " + custId.Trim() + ",\"productNo\": " + productId.ToString() + "}";
             WebApiLog log = await _miniHelper.PerformRequest("https://task-api.zowoyoo.com/api/thirdPaty/prod/detail",
-                 "", postData, "POST", "易龙雪聚小程序", "预订雪票", "大好河山产品查询");
+                 "", postData, "POST", "易龙雪聚小程序", "预订雪票", "万龙自我游产品查询");
 
             return Ok(log.response);
         }
@@ -281,7 +281,7 @@ namespace SnowmeetApi.Controllers
             string postData = "{\"apikey\": \"" + apiKey + "\",\"custId\": " + custId.Trim() + ",\"productNo\": "
                 + productId.ToString() + ", \"travelDate\": \"" + date.ToString("yyyy-MM-dd") + "\" }";
             WebApiLog log = await _miniHelper.PerformRequest("https://task-api.zowoyoo.com/api/thirdPaty/prod/price",
-                 "", postData, "POST", "易龙雪聚小程序", "预订雪票", "大好河山产品价格查询");
+                 "", postData, "POST", "易龙雪聚小程序", "预订雪票", "万龙自我游产品价格查询");
             ZiwoyouQueryResult r = JsonConvert.DeserializeObject<ZiwoyouQueryResult>(log.response);
             ZiwoyouProductDailyPrice price = JsonConvert.DeserializeObject<ZiwoyouProductDailyPrice>(r.data.ToString());
             return price;
@@ -294,7 +294,7 @@ namespace SnowmeetApi.Controllers
             string postData = "{\"apikey\": \"" + apiKey + "\",\"custId\": " + custId.Trim()
                 + ",\"orderId\": " + orderId.ToString() + "}";
             WebApiLog log = await _miniHelper.PerformRequest("https://task-api.zowoyoo.com/api/thirdPaty/order/detail",
-                 "", postData, "POST", "易龙雪聚小程序", "预订雪票", "大好河山订单查询");
+                 "", postData, "POST", "易龙雪聚小程序", "预订雪票", "万龙自我游订单查询");
             ZiwoyouQueryResult r = JsonConvert.DeserializeObject<ZiwoyouQueryResult>(log.response.Trim());
             ZiwoyouOrder order = JsonConvert.DeserializeObject<ZiwoyouOrder>(r.data.ToString());
 
@@ -310,7 +310,7 @@ namespace SnowmeetApi.Controllers
             string postData = "{\"apikey\": \"" + apiKey + "\",\"custId\": " + custId.Trim()
                 + ",\"orderId\": " + orderId.ToString() + ", \"cancelNum\": " + order.num.ToString() + "}";
             WebApiLog log = await _miniHelper.PerformRequest("https://task-api.zowoyoo.com/api/thirdPaty/order/cancel",
-                 "", postData, "POST", "易龙雪聚小程序", "预订雪票", "大好河山订单取消");
+                 "", postData, "POST", "易龙雪聚小程序", "预订雪票", "万龙自我游订单取消");
             ZiwoyouQueryResult r = JsonConvert.DeserializeObject<ZiwoyouQueryResult>(log.response);
             ZiwoyouCancel cancel = JsonConvert.DeserializeObject<ZiwoyouCancel>(r.data.ToString());
             r.data = cancel;
@@ -513,7 +513,7 @@ namespace SnowmeetApi.Controllers
             string postData = "{\"apikey\": \"" + apiKey + "\", \"custId\": " + custId + ", \"resultNum\": 20, \"page\": " + page.ToString()
                 + ", \"startDate\": \"" + start.ToString("yyyy-MM-dd HH:mm:ss") + "\", \"endDate\": \"" + end.ToString("yyyy-MM-dd HH:mm:ss") + "\" }";
             WebApiLog log = await _miniHelper.PerformRequest("https://task-api.zowoyoo.com/api/thirdPaty/order/list",
-                 "", postData, "POST", "易龙雪聚小程序", "预订雪票", "大好河山订单获取分页列表");
+                 "", postData, "POST", "易龙雪聚小程序", "预订雪票", "万龙自我游订单获取分页列表");
             ZiwoyouQueryResult r = JsonConvert.DeserializeObject<ZiwoyouQueryResult>(log.response);
             ZiwoyouQueryList l = JsonConvert.DeserializeObject<ZiwoyouQueryList>(r.data.ToString());
             return Ok(l);
@@ -576,7 +576,7 @@ namespace SnowmeetApi.Controllers
             string postData = "{\"apikey\": \"" + apiKey + "\", \"custId\": " + custId + "}";
             MiniAppHelperController _miniHelper = new MiniAppHelperController(_context, _oriConfig);
             WebApiLog reqLog = await _miniHelper.PerformRequest("https://task-api.zowoyoo.com/api/thirdPaty/order/balance",
-                "", postData.Trim(), "POST", "易龙雪聚小程序", "预订雪票", "查询大好河山储值");
+                "", postData.Trim(), "POST", "易龙雪聚小程序", "预订雪票", "查询万龙自我游储值");
             try
             {
                 ZiwoyouQueryResult r = JsonConvert.DeserializeObject<ZiwoyouQueryResult>(reqLog.response.Trim());
