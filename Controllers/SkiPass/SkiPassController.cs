@@ -888,9 +888,6 @@ namespace SnowmeetApi.Controllers
             await _context.SaveChangesAsync();
             return Ok(order);
         }
-
-        
-
         [HttpGet]
         public async Task CommitSkipassOrder(int orderId)
         {
@@ -1146,17 +1143,16 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<List<Models.SkiPass>>> GetDHHSReservedSkipasses(DateTime start,
             DateTime end, string sessionKey, string sessionType = "wechat_mini_openid")
         {
-            MemberController _memberHelper = new MemberController(_context, _config);
-            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
-            if (member.is_admin != 1)
+            Staff staff = await Util.GetStaffBySessionKey(_context, sessionKey, sessionType);
+            if (staff.title_level < 100)
             {
                 return BadRequest();
             }
             List<Models.SkiPass> sList = await _context.skiPass.Where(s => s.valid == 1 && !s.resort.Trim().Equals("南山")
                 && s.create_date.Date >= start.Date && s.create_date.Date <= end.Date ).OrderByDescending(s => s.id)
                 .Include(s => s.order)
-                    .ThenInclude(o => o.availablePayments.Where(p => p.status.Equals("支付成功")))
-                       .ThenInclude(p => p.refunds.Where(r => r.state == 1))
+                    .ThenInclude(o => o.payments.Where(p => p.status.Equals("支付成功")))
+                       .ThenInclude(p => p.refunds.Where(r => (r.state == 1 || r.refund_id != "")))
                 .AsNoTracking().ToListAsync();
             return Ok(sList);
         }
