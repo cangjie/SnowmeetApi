@@ -776,7 +776,7 @@ namespace SnowmeetApi.Controllers
         */
         [HttpGet("{productId}")]
         public async Task<ActionResult<object>> ReserveSkiPass(int productId, DateTime date, 
-            int count, string cell, string name, string sessionKey, string sessionType = "wechat_mini_openid", string idNo = "", int refereeMemberId = 0)
+            int count, string cell, string name, string sessionKey, string sessionType = "wechat_mini_openid", string idNo = "", int refereeMemberId = 0, int staffId = 0)
         {
             Models.Product product = await _context.product.FindAsync(productId);
             Models.SkiPassProduct skipassProduct = await _context.skiPassProduct.FindAsync(productId);
@@ -869,6 +869,10 @@ namespace SnowmeetApi.Controllers
                 //skipasses = new List<Models.SkiPass>() { skipass  },
                 valid = 1
             };
+            if (staffId != 0)
+            {
+                order.staff_id = staffId;
+            }
             OrderController _orderHelper = new OrderController(_context, _config, _http);
             await _orderHelper.GenerateOrderCode(order);
             OrderPayment payment = new OrderPayment()
