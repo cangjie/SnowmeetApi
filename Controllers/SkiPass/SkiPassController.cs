@@ -866,7 +866,6 @@ namespace SnowmeetApi.Controllers
                 total_amount = (double)skipass.deal_price * count,
                 paying_amount = (double)skipass.deal_price * count,
                 create_date = DateTime.Now,
-                //skipasses = new List<Models.SkiPass>() { skipass  },
                 valid = 1
             };
             if (staffId != 0)
