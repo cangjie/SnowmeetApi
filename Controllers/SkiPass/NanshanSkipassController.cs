@@ -356,16 +356,19 @@ namespace SnowmeetApi.Controllers.SkiPass
 
         [HttpGet("{productId}")]
         public async Task<ActionResult<object>> ReserveSkiPass(int productId, DateTime date,
-            int count, string cell, string name, string sessionKey, int refereeMemberId = 0, string sessionType = "wechat_mini_openid")
+            int count, string cell, string name, string sessionKey, int? refereeMemberId = null, string sessionType = "wechat_mini_openid", int? staffId = null)
         {
             Models.Product product = await _db.product.FindAsync(productId);
+            /*
             UnicUser user = await UnicUser.GetUnicUserAsync(sessionKey, _db);
             if (user == null || product == null)
             {
                 return BadRequest();
             }
+            */
             Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
             double totalPrice = 0;
+            double totalAmount = 0;
             Models.SkiPass[] skipassArr = new Models.SkiPass[count];
             for (int i = 0; i < count; i++)
             {
@@ -388,8 +391,9 @@ namespace SnowmeetApi.Controllers.SkiPass
                 };
                 skipassArr[i] = skipass;
                 totalPrice += (double)skipass.deal_price;
+                totalAmount += product.sale_price;
             }
-
+            /*
             OrderOnline order = new OrderOnline()
             {
                 type = "雪票",
@@ -403,6 +407,7 @@ namespace SnowmeetApi.Controllers.SkiPass
                 pay_method = "微信支付",
                 referee_member_id = refereeMemberId
             };
+
             await _db.OrderOnlines.AddAsync(order);
             await _db.SaveChangesAsync();
             string outTradeNo = "";
@@ -415,31 +420,38 @@ namespace SnowmeetApi.Controllers.SkiPass
                 outTradeNo = "QJ";
             }
             outTradeNo += "_XP_" + DateTime.Now.ToString("yyyyMMdd") + "_" + order.id.ToString().PadLeft(6, '0') + "_ZF_01";
-
+            */
+            Models.Order order = new Models.Order()
+            {
+                id = 0,
+                member_id = member.id,
+                type = "雪票",
+                shop = product.shop.Trim(),
+                total_amount = totalAmount,
+                paying_amount = totalPrice,
+                create_date = DateTime.Now,
+                valid = 1
+            };
+            if (staffId != null)
+            {
+                order.staff_id = staffId;
+            }
+            OrderController _orderHelper = new OrderController(_db, _config, _http);
+            await _orderHelper.GenerateOrderCode(order);
             OrderPayment payment = new OrderPayment()
             {
                 order_id = order.id,
-                pay_method = order.pay_method.Trim(),
-                amount = order.final_price,
+                pay_method = "微信支付",
+                amount = (double)order.paying_amount,
                 status = "待支付",
                 staff_open_id = "",
-                out_trade_no = outTradeNo
+                out_trade_no = order.code + "_ZF_01"
             };
-            await _db.OrderPayment.AddAsync(payment);
 
-            for (int i = 0; i < skipassArr.Length; i++)
-            {
-                Models.SkiPass skipass = skipassArr[i];
-                skipass.order_id = order.id;
-                await _db.skiPass.AddAsync(skipass);
-            }
+            order.payments = new List<OrderPayment>() { payment };
+            order.skipasses = skipassArr.ToList();
+            await _db.order.AddAsync(order);
             await _db.SaveChangesAsync();
-            order.paymentList = (new OrderPayment[] { payment }).ToList();
-
-            member.real_name = name;
-            _db.member.Entry(member).State = EntityState.Modified;
-            await _db.SaveChangesAsync();
-            //await _memberHelper.UpdateDetailInfo(member.id, cell, "cell", false);
             return Ok(order);
         }
         [HttpGet]
