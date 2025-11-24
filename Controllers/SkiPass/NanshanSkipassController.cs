@@ -311,14 +311,20 @@ namespace SnowmeetApi.Controllers.SkiPass
 
         [HttpGet]
         public async Task<ActionResult<List<ReserveDateProduct>>> GetMemberCard(int memberId,
-            string wechatMiniOpenId, string sessionKey, string sessionType = "wechat_mini_openid")
+            string sessionKey, string sessionType = "wechat_mini_openid")
         {
+            string wechatMiniOpenId = "";
             /*
             if (!(await _memberHelper.isStaff(sessionKey, sessionType)))
             {
                 return BadRequest();
             }
             */
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey);
+            if (staff == null || staff.title_level<100)
+            {
+                return BadRequest();
+            }
             List<Models.SkiPass> skipasses = await GetSkipassesByMember(memberId, wechatMiniOpenId);
             var reserveList = (from s in skipasses
                                where s.valid == 1

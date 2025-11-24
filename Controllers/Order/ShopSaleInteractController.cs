@@ -112,9 +112,7 @@ namespace SnowmeetApi.Controllers.Order
             else
             {
                 return Ok(retId);
-                //return BadRequest();
             }
-            //return NotFound();
         }
 
         [HttpGet("{id}")]
