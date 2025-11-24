@@ -60,11 +60,17 @@ namespace SnowmeetApi.Controllers.Order
         public async Task<ActionResult<int>> GetInterviewId(string sessionKey)
         {
             sessionKey = Util.UrlDecode(sessionKey.Trim());
-            
+            /*
             UnicUser staffUser = await UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (!staffUser.isAdmin)
             {
                 return NoContent();
+            }
+            */
+            Staff staff = await Util.GetStaffBySessionKey(_context, sessionKey);
+            if (staff == null || staff.title_level < 100)
+            {
+                return BadRequest();
             }
             bool needCreateNew = false;
                     
