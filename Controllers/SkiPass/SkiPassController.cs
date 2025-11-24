@@ -279,12 +279,14 @@ namespace SnowmeetApi.Controllers
         public async Task CreateSkiPass(int orderId)
         {
             OrderController _orderHelper = new OrderController(_context, _config, _http);
-            Models.Order order = await _orderHelper.GetOrder(orderId);
+            //Models.Order order = await _orderHelper.GetOrder(orderId);
+            Models.Order order = await _context.order.Where(o => o.id == orderId).AsNoTracking().FirstOrDefaultAsync();
             if (order == null)
             {
                 return;
             }
             List<Models.SkiPass> dealList = new List<Models.SkiPass>();
+            order.skipasses = await _context.skiPass.Where(s => s.order_id == order.id).AsNoTracking().ToListAsync();
             for(int i = 0; i < order.skipasses.Count; i++)
             {
                 if (!order.skipasses[i].booking_now && !order.skipasses[i].reserve_success)
