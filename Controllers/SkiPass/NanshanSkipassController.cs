@@ -248,7 +248,7 @@ namespace SnowmeetApi.Controllers.SkiPass
         public async Task<List<Models.SkiPass>> GetSkipassesByMember(int memberId, string num = "")
         {
             return await _db.skiPass.Where(s => (((memberId != 0 && s.member_id == memberId)
-                || (!num.Trim().Equals("") && s.wechat_mini_openid.Trim().Equals(num))) && s.resort.Trim().Equals("南山")))
+                || (!num.Trim().Equals("") && s.wechat_mini_openid.Trim().Equals(num))) && s.resort.Trim().Equals("南山")) && s.valid == 1)
                 .AsNoTracking().ToListAsync();
         }
 
@@ -264,6 +264,11 @@ namespace SnowmeetApi.Controllers.SkiPass
                 return BadRequest();
             }
             */
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey);
+            if (staff == null || staff.title_level < 100)
+            {
+                return BadRequest();
+            }
             bool needFinish = false;
 
             try
