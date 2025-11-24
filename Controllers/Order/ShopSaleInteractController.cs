@@ -79,7 +79,7 @@ namespace SnowmeetApi.Controllers.Order
             {
                 var scan = await _context
                     .ShopSaleInteract
-                    .Where(s => (s.staff_mapp_open_id == staffUser.miniAppOpenId.Trim()))
+                    .Where(s => (s.staff_mapp_open_id == staff.id.ToString().Trim()))
                     .OrderByDescending(s => s.id).FirstAsync();
                 if (scan == null || scan.scan == 1 || scan.create_date < DateTime.Now.AddMinutes(-600) || scan.needAuth)
                 {
@@ -101,9 +101,9 @@ namespace SnowmeetApi.Controllers.Order
                 var scanNew = new ShopSaleInteract()
                 {
                     id = 0,
-                    staff_mapp_open_id = staffUser.miniAppOpenId.Trim(),
+                    staff_mapp_open_id = staff.id.ToString().Trim(),
                     scan = 0,
-                    staff_member_id = staffUser.member.id
+                    staff_member_id = staff.id
                 };
                 await _context.AddAsync(scanNew);
                 await _context.SaveChangesAsync();
