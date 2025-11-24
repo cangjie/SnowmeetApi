@@ -797,7 +797,7 @@ namespace SnowmeetApi.Controllers
                 deal_price = dailyPrice.deal_price * count,
                 ticket_price = dailyPrice.settlementPrice,
                 deposit = product.deposit,
-                valid = 1,
+                valid = 0,
                 contact_cell = cell,
                 contact_name = name,
                 contact_id_no = idNo.Trim(),
