@@ -290,6 +290,8 @@ namespace SnowmeetApi.Controllers
                 if (!order.skipasses[i].booking_now && !order.skipasses[i].reserve_success)
                 {
                     order.skipasses[i].booking_now = true;
+                    order.skipasses[i].valid = 1;
+                    order.skipasses[i].update_date = DateTime.Now;
                     _context.skiPass.Entry(order.skipasses[i]).State = EntityState.Modified;
                     dealList.Add(order.skipasses[i]);
                 }
