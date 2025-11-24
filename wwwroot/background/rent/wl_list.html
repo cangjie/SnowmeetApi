@@ -95,7 +95,7 @@
         btnCtrl.disabled = true;
         btnCtrl.innerText = "查询中……";
         var getUrl = '../../api/Rent/GetConfirmedRentOrder?sessionKey=' + encodeURIComponent(sessionKey)
-            + '&startDate=' + formatDate(startDate) + '&endDate=' + formatDate(endDate);
+            + '&startDate=' + formatDate(startDate) + '&endDate=' + formatDate(endDate)+'&shop=' + encodeURIComponent('万龙体验中心');
         $.ajax({
             url: getUrl,
             type: 'GET',
