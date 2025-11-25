@@ -910,7 +910,8 @@ namespace SnowmeetApi.Models
         {
             get
             {
-                if (rentals != null && rentals.Count >= 0)
+                if (rentals != null && rentals.Count >= 0 && rentProperties != null 
+                    && rentProperties.totalPaidGuarantyAmount != null)
                 {
                     return rentProperties.totalPaidGuarantyAmount - totalRentSummaryAmount;
                 }
