@@ -1632,7 +1632,7 @@ namespace SnowmeetApi.Controllers
                 await UpdateOrder(order, null, staff.id, "手动确认支付");
             }
 
-            await DealSuccessPaidOrder(order.id);
+            await DealSuccessPaidOrder(order.id, payment.id);
             return Ok(new ApiResult<Models.Order>()
             {
                 code = 0,
