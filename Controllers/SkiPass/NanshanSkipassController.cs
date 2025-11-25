@@ -248,7 +248,8 @@ namespace SnowmeetApi.Controllers.SkiPass
         public async Task<List<Models.SkiPass>> GetSkipassesByMember(int memberId, string num = "")
         {
             return await _db.skiPass.Where(s => (((memberId != 0 && s.member_id == memberId)
-                || (!num.Trim().Equals("") && s.wechat_mini_openid.Trim().Equals(num))) && s.resort.Trim().Equals("南山")) && s.valid == 1)
+                || (!num.Trim().Equals("") && s.wechat_mini_openid.Trim().Equals(num))) && s.resort.Trim().Equals("南山")) 
+                && s.valid == 1 && s.reserve_date >= DateTime.Parse("2025-10-15") )
                 .AsNoTracking().ToListAsync();
         }
 
