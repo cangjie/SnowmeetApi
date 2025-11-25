@@ -243,7 +243,6 @@ namespace SnowmeetApi.Controllers.SkiPass
             return Ok(ret);
 
         }
-
         [NonAction]
         public async Task<List<Models.SkiPass>> GetSkipassesByMember(int memberId, string num = "")
         {
@@ -252,9 +251,6 @@ namespace SnowmeetApi.Controllers.SkiPass
                 && s.valid == 1 && s.reserve_date >= DateTime.Parse("2025-10-15") )
                 .AsNoTracking().ToListAsync();
         }
-
-
-
         [HttpPost]
         public async Task<ActionResult<Models.SkiPass>> UpdateSkiPass([FromBody] Models.SkiPass skipass,
             [FromQuery] string sessionKey, [FromQuery] string sessionType = "wechat_mini_openid")
@@ -271,7 +267,6 @@ namespace SnowmeetApi.Controllers.SkiPass
                 return BadRequest();
             }
             bool needFinish = false;
-
             try
             {
                 //TicketController _tHelper = new TicketController(_db, _config);
