@@ -25,6 +25,7 @@ namespace SnowmeetApi.Models
             public DateTime? endDate { get; set; } = null;
             public int totalPaidGuarantyCount { get; set; } = 0;
             public int relieveGuarantyCount { get; set; } = 0;
+            public double relieveGuarantyAmount {get; set; } = 0;
             public double? totalPaidGuarantyAmount { get; set; } = null;
             public double? currentRentalAmount { get; set; } = null;
             public int totalRentalsCount { get; set; } = 0;
@@ -976,6 +977,7 @@ namespace SnowmeetApi.Models
                     double paidGuarantyAmount = 0;
                     int paidGuarantyCount = 0;
                     int relieveGuarantyCount = 0;
+                    double relieveGuarantyAmount = 0;
                     int settledCount = 0;
                     int packageCount = 0;
                     int categoryCount = 0;
@@ -1014,6 +1016,7 @@ namespace SnowmeetApi.Models
                                 if (g.relieve == 1)
                                 {
                                     relieveGuarantyCount++;
+                                    relieveGuarantyAmount += (double)g.amount;
                                 }
                             }
                         }
@@ -1076,7 +1079,8 @@ namespace SnowmeetApi.Models
                         rentStatus = status,
                         startDate = startDate,
                         endDate = endDate,
-                        totalPaidGuarantyAmount = paidGuarantyAmount
+                        totalPaidGuarantyAmount = paidGuarantyAmount,
+                        relieveGuarantyAmount = relieveGuarantyAmount
 
                     };
                     return property;
