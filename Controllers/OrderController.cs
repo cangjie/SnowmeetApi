@@ -1437,6 +1437,16 @@ namespace SnowmeetApi.Controllers
             }
             OrderPayment payment = await _db.orderPayment.Where(p => p.id == paymentId).AsNoTracking().FirstOrDefaultAsync();
             Models.Order order = await GetOrder(payment.order_id);
+            if (order.shop == "万龙体验中心" && order.type == "租赁")
+            {
+                payment.need_share = 1;
+                _db.orderPayment.Entry(payment).State = EntityState.Modified;
+                await _db.SaveChangesAsync();
+            }
+            else
+            {
+                payment.need_share = 0;
+            }
             List<OrderPayment> allPayments = await _db.orderPayment.Where(p => p.order_id == order.id)
                 .OrderByDescending(p => p.out_trade_no).AsNoTracking().ToListAsync();
             //string outTradeNo = order.code + "_ZF_" + allPayments.Count.ToString().PadLeft(2, '0');
