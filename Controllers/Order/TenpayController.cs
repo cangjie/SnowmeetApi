@@ -87,6 +87,9 @@ namespace SnowmeetApi.Controllers
             }
             detail.GoodsList = details;
             string notifyUrl = "https://" + _http.HttpContext.Request.Host.Value + "/api/Tenpay/TenpayPaymentCallBack/" + payment.mch_id.ToString();
+            payment.notify = notifyUrl;
+            _db.orderPayment.Entry(payment).State = EntityState.Modified;
+            await _db.SaveChangesAsync();
             //bool needProfitShare = !(shares == null || shares.Count == 0);
             string goodsName = order.description.Trim();
             switch (order.type.Trim())
