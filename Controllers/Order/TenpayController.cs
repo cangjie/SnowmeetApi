@@ -650,6 +650,25 @@ namespace SnowmeetApi.Controllers
             }
             return ret;
         }
+        [HttpGet]
+        public async Task AddShareReceiver(int mid, string mchId, string type)
+        {
+            var client = await GetClient(mid);
+            WepayKey key = await _db.WepayKeys.Where(k => k.id == mid).AsNoTracking().FirstOrDefaultAsync();
+            var req = new AddProfitSharingReceiverRequest()
+            {
+                AppId = _appId,
+                Type = type,
+                Account = mchId,
+                RelationType = "USER",
+                //WechatpaySerialNumber = key.key_serial,
+                Name = "崔洋"
+            };
+            
+            var res = await client.ExecuteAddProfitSharingReceiverAsync(req);
+            string ret = res.IsSuccessful().ToString().ToLower();
+            Console.WriteLine(ret);
+        }
 
         [HttpGet]
         public async Task UnFreezeAll(int mchId)
@@ -687,6 +706,35 @@ namespace SnowmeetApi.Controllers
             var res = await client.ExecuteSetProfitSharingOrderUnfrozenAsync(req);
 
 
+        }
+
+        [HttpGet]
+        public async Task ShareToMerchantTest(int paymentId)
+        {
+            OrderPayment payment = await _db.orderPayment.Where(p => p.id == paymentId)
+                .Include(p => p.refunds.Where(r => r.state == 1 || r.refund_id != ""))
+                .AsNoTracking().FirstOrDefaultAsync();
+            double shareAmount = (payment.amount - payment.refundedAmount)/2;
+            WechatTenpayClient client = await GetClient((int)payment.mch_id);
+            CreateProfitSharingOrderRequest.Types.Receiver r = new CreateProfitSharingOrderRequest.Types.Receiver()
+            {
+                Type = "MERCHANT_ID",
+                Account = "1604236346",
+                Amount = (int)Math.Round(shareAmount * 100),
+                Description = "分账测试"
+            };
+            List<CreateProfitSharingOrderRequest.Types.Receiver> rl = new List<CreateProfitSharingOrderRequest.Types.Receiver>();
+            rl.Add(r);
+            WepayKey key = await _db.WepayKeys.FindAsync(payment.mch_id);
+            var req = new CreateProfitSharingOrderRequest()
+            {
+                AppId = _appId,
+                TransactionId = (string)payment.wepay_trans_id,
+                OutOrderNumber = payment.out_trade_no + "_FZ_01",
+                ReceiverList = rl
+            };
+            var res = await client.ExecuteCreateProfitSharingOrderAsync(req);
+            Console.WriteLine(res);
         }
 
 
