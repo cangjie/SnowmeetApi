@@ -655,6 +655,7 @@ namespace SnowmeetApi.Controllers
         {
             var client = await GetClient(mid);
             WepayKey key = await _db.WepayKeys.Where(k => k.id == mid).AsNoTracking().FirstOrDefaultAsync();
+            //string cer = 
             var req = new AddProfitSharingReceiverRequest()
             {
                 AppId = _appId,
