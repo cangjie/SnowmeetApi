@@ -772,6 +772,18 @@ namespace SnowmeetApi.Controllers
                         {
                             order.dealed = 1;
                         }
+                        for(int i = 0; order.cares != null && i < order.cares.Count; i++)
+                        {
+                            Care care = order.cares[i];
+                            if (care.urgent == 1)
+                            {
+                                care.member_pick_date = DateTime.Now.Date;
+                            }
+                            else
+                            {
+                                care.member_pick_date = DateTime.Now.Date.AddDays(1);
+                            }
+                        }
                         break;
                     
                     default:
