@@ -238,11 +238,17 @@ namespace SnowmeetApi.Controllers
 
             sessionKey = Util.UrlDecode(sessionKey);
 
+            MemberController _memberHelper = new MemberController(_context, _oriConfig);
+            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey);
+
+            /*
             UnicUser user = await UnicUser.GetUnicUserAsync(sessionKey, _context);
             if (user == null || !user.isAdmin)
             {
                 return NoContent();
             }
+            */
+
             Ticket[] tickets = new Ticket[count];
             for (int i = 0; i < count; i++)
             {
@@ -271,7 +277,7 @@ namespace SnowmeetApi.Controllers
                     template_id = templateId,
                     name = template.name.Trim(),
                     memo = template.memo.Trim(),
-                    oper_open_id = user.miniAppOpenId.Trim(),
+                    oper_open_id = member.wechatMiniOpenId.Trim(),
                     printed = 0,
                     used = 0,
                     miniapp_recept_path = template.miniapp_recept_path.Trim(),

@@ -78,5 +78,12 @@ namespace SnowmeetApi.Controllers
             await _db.SaveChangesAsync();
             return shares;
         }
+        [HttpGet("{orderId}")]
+        public async Task<ActionResult<List<OrderShare>>> CreateShare(int orderId)
+        {
+            OrderController _orderHelper = new OrderController(_db, _config, _http);
+            Models.Order order = await _orderHelper.GetOrder(orderId);
+            return Ok(await CreateShares(order));
+        }
     }
 }
