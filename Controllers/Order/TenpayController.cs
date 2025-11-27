@@ -125,8 +125,6 @@ namespace SnowmeetApi.Controllers
                     IsProfitSharing = needProfitShare
                 },
                 Detail = details.Count == 0 ? null : detail
-
-
             };
             var response = await client.ExecuteCreatePayTransactionJsapiAsync(request);
             var paraMap = client.GenerateParametersForJsapiPayRequest(request.AppId, response.PrepayId);
