@@ -198,6 +198,7 @@ namespace SnowmeetApi.Data
         public DbSet<RentItemLog> rentItemLog { get; set; }
         public DbSet<OrderShareRelation> orderShareRelation {get; set;}
         public DbSet<ShareRelationBind> shareRelationBind {get; set;}
+        public DbSet<OrderShare> orderShare {get; set;}
 
     }
 }
