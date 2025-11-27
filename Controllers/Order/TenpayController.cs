@@ -650,6 +650,7 @@ namespace SnowmeetApi.Controllers
             }
             return ret;
         }
+        /*
         [HttpGet]
         public async Task AddShareReceiver(int mid, string mchId, string type)
         {
@@ -663,14 +664,41 @@ namespace SnowmeetApi.Controllers
                 Account = mchId,
                 RelationType = "USER",
                 //WechatpaySerialNumber = key.key_serial,
-                Name = "崔洋"
+                Name = "崇礼区司诺密特餐吧"
             };
-            
-            var res = await client.ExecuteAddProfitSharingReceiverAsync(req);
+            var newReq = client.EncryptRequestSensitiveProperty(req);
+            var res = await client.ExecuteAddProfitSharingReceiverAsync(newReq);
             string ret = res.IsSuccessful().ToString().ToLower();
             Console.WriteLine(ret);
         }
-
+        */
+        [HttpGet("{relationId}")]
+        public async Task AddShareReciverTest(int relationId, int paymentMchId)
+        {
+            OrderShareRelation relation = await _db.orderShareRelation.Where(r => r.id == relationId)
+                .AsNoTracking().FirstOrDefaultAsync();
+            bool ret = await AddShareReciver(10, relation);
+        }
+        [NonAction]
+        public async Task<bool> AddShareReciver(int paymentMchId, OrderShareRelation relation)
+        {
+            var client = await GetClient(paymentMchId);
+            string type = relation.type == "公司" ? "MERCHANT_ID" : "PERSONAL_OPENID";
+            var req = new AddProfitSharingReceiverRequest()
+            {
+                AppId = _appId,
+                Type = type,
+                Account = relation.wepay_account_num,
+                RelationType = "USER"
+            };
+            if (type == "MERCHANT_ID")
+            {
+                req.Name = relation.wepay_account_name;
+                req = client.EncryptRequestSensitiveProperty(req);
+            }
+            var res = await client.ExecuteAddProfitSharingReceiverAsync(req);
+            return res.IsSuccessful();
+        }
         [HttpGet]
         public async Task UnFreezeAll(int mchId)
         {
@@ -754,8 +782,6 @@ namespace SnowmeetApi.Controllers
             {
                 return null;
             }
-
-
             WechatTenpayClient client = await GetClient((int)payment.mch_id);
             List<CreateProfitSharingOrderRequest.Types.Receiver> rl = new List<CreateProfitSharingOrderRequest.Types.Receiver>();
             CreateProfitSharingOrderRequest.Types.Receiver r = new CreateProfitSharingOrderRequest.Types.Receiver()
@@ -790,12 +816,17 @@ namespace SnowmeetApi.Controllers
             await _db.SaveChangesAsync();
             return share;
         }
-
         [NonAction]
         private async Task<WechatTenpayClient> GetClient(int mchId)
         {
-            WepayKey key = await _db.WepayKeys.FindAsync(mchId);
+            WepayKey key = await _db.WepayKeys.Where(k => k.id == mchId)
+                .AsNoTracking().FirstOrDefaultAsync();
             var certManager = new InMemoryCertificateManager();
+            if (key.cert != null)
+            {
+                CertificateEntry certEntry = new CertificateEntry("RSA", key.cert);
+                certManager.AddEntry(certEntry);
+            }
             var options = new WechatTenpayClientOptions()
             {
                 MerchantId = key.mch_id.Trim(),
@@ -806,7 +837,6 @@ namespace SnowmeetApi.Controllers
             };
             return new WechatTenpayClient(options);
         }
-
         [HttpGet]
         public async Task DownloadToday()
         {
