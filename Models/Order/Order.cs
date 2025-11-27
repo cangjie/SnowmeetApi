@@ -120,7 +120,7 @@ namespace SnowmeetApi.Models
         public List<FdOrder> fdOrders { get; set; } = new List<FdOrder>();
         public List<OrderPayment>? payments { get; set; } = new List<OrderPayment>();
         public List<OrderPaymentRefund>? refunds { get; set; } = new List<OrderPaymentRefund>();
-        public List<PaymentShare>? shares { get; set; } = new List<PaymentShare>();
+        //public List<PaymentShare>? shares { get; set; } = new List<PaymentShare>();
         public List<Discount> discounts { get; set; } = new List<Discount>();
         public List<Guaranty> guarantys { get; set; } = new List<Guaranty>();
         [NotMapped]

@@ -767,6 +767,8 @@ namespace SnowmeetApi.Controllers
         }
 
 
+
+        /*
         [NonAction]
         public async Task<PaymentShare> Share(int paymentShareId)
         {
@@ -816,6 +818,7 @@ namespace SnowmeetApi.Controllers
             await _db.SaveChangesAsync();
             return share;
         }
+        */
         [NonAction]
         private async Task<WechatTenpayClient> GetClient(int mchId)
         {

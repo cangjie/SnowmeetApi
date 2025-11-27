@@ -943,7 +943,7 @@ namespace SnowmeetApi.Controllers.Order
             }
             return BadRequest();
         }
-
+    /*
         [HttpGet]
         public async Task<PaymentShare> CreateShare(int paymentId, double amount, string memo, int kolId)
         {
@@ -973,7 +973,8 @@ namespace SnowmeetApi.Controllers.Order
             await _context.SaveChangesAsync();
             return share;
         }
-
+*/
+/*
         [HttpGet]
         public async Task<PaymentShare> SubmitShare(int shareId)
         {
@@ -999,6 +1000,7 @@ namespace SnowmeetApi.Controllers.Order
             }
             return share;
         }
+        */
         [NonAction]
         public async Task ShareFinish(int paymentId, string description)
         {

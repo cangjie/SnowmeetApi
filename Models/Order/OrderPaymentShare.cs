@@ -4,7 +4,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 namespace SnowmeetApi.Models
 {
     [Table("order_payment_share")]
-    public class PaymentShare
+    public class PaymentShare1
     {
         [Key]
         public int id { get; set; } 

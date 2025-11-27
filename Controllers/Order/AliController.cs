@@ -158,6 +158,7 @@ namespace SnowmeetApi.Controllers
                 ret = double.Parse(response.UnsettledAmount);
             return Ok(ret);
         }
+        /*
         [NonAction]
         public async Task<PaymentShare> Share(int shareId)
         {
@@ -187,6 +188,7 @@ namespace SnowmeetApi.Controllers
             await _db.SaveChangesAsync();
             return share;
         }
+        */
         [NonAction]
         public AlipayTradeOrderSettleResponse Settle(string tradeNo, double amount, string login, string name, string memo, string outTradeNo)
         {
