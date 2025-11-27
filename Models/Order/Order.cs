@@ -123,6 +123,9 @@ namespace SnowmeetApi.Models
         //public List<PaymentShare>? shares { get; set; } = new List<PaymentShare>();
         public List<Discount> discounts { get; set; } = new List<Discount>();
         public List<Guaranty> guarantys { get; set; } = new List<Guaranty>();
+        [ForeignKey(nameof(OrderShare.order_id))]
+        public List<OrderShare> orderShares {get; set;} = new List<OrderShare>();
+
         [NotMapped]
         public List<Guaranty> paidGuarantys
         {

@@ -63,6 +63,8 @@ namespace SnowmeetApi.Models
         public string? deposit_type { get; set; } = null;
         public string? deposit_sub_type {get; set; } = null;
         public DateTime? submit_time { get; set; } = null;
+        [ForeignKey(nameof(PaymentShare.payment_id))]
+        public List<PaymentShare> paymentShares { get; set; } = new List<PaymentShare>();
         public string shop
         {
             get

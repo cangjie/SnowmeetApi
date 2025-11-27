@@ -449,6 +449,7 @@ namespace SnowmeetApi.Controllers
             }
             for(int i = 0; i<skipasses.Count; i++)
             {
+                /*
                 PaymentShare share = new PaymentShare()
                 {
                     id = 0,
@@ -462,6 +463,7 @@ namespace SnowmeetApi.Controllers
                     out_trade_no = payments[0].out_trade_no + "_FZ_" + DateTime.Now.ToString("yyyyMMdd") + "_01"
                 };
                 await _context.paymentShare.AddAsync(share);
+                */
             }
             await _context.SaveChangesAsync();
         }
@@ -924,6 +926,7 @@ namespace SnowmeetApi.Controllers
             {
                 TicketController _tHelper = new TicketController(_context, _config);
                 await _tHelper.ActiveTicket((int)orderId);
+                /*
                 var shareList = await _context.paymentShare
                     .Where(s => s.order_id == orderId && s.state == 0 && s.submit_date == null)
                     .AsNoTracking().ToListAsync();
@@ -956,7 +959,7 @@ namespace SnowmeetApi.Controllers
                         await _refHelper.SetReferee(memberId, order.referee_member_id, "雪票", order.id, skipassId);
                     }
                 }
-
+                */
             }
         }
 
@@ -978,7 +981,7 @@ namespace SnowmeetApi.Controllers
                 await _tHelper.ActiveTicket((int)skipass.order_id);
 
                 
-
+                /*
                 var shareList = await _context.paymentShare
                     .Where(s => s.order_id == (int)skipass.order_id && s.state == 0 && s.submit_date == null)
                     .AsNoTracking().ToListAsync();
@@ -1013,6 +1016,7 @@ namespace SnowmeetApi.Controllers
                         await _refHelper.SetReferee(skipass.member_id, order.referee_member_id, "雪票", order.id, skipass.id);
                     }
                 }
+                */
             }
         }
 

@@ -612,8 +612,8 @@ namespace SnowmeetApi.Controllers
             .Include(z => z.skipasses)
                 .ThenInclude(s => s.order)
                     .ThenInclude(o => o.availablePayments.Where(p => p.status.Equals("支付成功")))
-                        .ThenInclude(p => p.shares)
-                            .ThenInclude(s => s.kol)
+                        //.ThenInclude(p => p.shares)
+                        //    .ThenInclude(s => s.kol)
 
 
             .Where(z => (z.orderDate.Date >= start.Date && z.orderDate.Date <= end.Date))
@@ -817,11 +817,12 @@ namespace SnowmeetApi.Controllers
                 {
                     haveOrder = true;
                 }
+                /*
                 if (haveOrder && order.skipasses[0].order.availablePayments[0].shares.Count > 0)
                 {
                     share = order.skipasses[0].order.availablePayments[0].shares[0];
                 }
-
+*/
                 if (order.skipasses.Count <= 0)
                 {
                     styleText.SetFont(fontFromWeb);
@@ -967,6 +968,7 @@ namespace SnowmeetApi.Controllers
                             cell.CellStyle = styleText;
                             break;
                         case 14:
+                        /*
                             if (share != null && share.kol != null && order.orderState == 4)
                             {
                                 cell.SetCellValue(share.kol.real_name.Trim());
@@ -975,6 +977,7 @@ namespace SnowmeetApi.Controllers
                             {
                                 cell.SetCellValue(nullStr);
                             }
+                            */
                             cell.CellStyle = styleText;
                             break;
                         case 15:
@@ -990,6 +993,7 @@ namespace SnowmeetApi.Controllers
                             }
                             break;
                         case 16:
+                        /*
                             if (share != null && order.orderState == 4)
                             {
                                 cell.SetCellValue(share.state == 1 ? "已分" : "未分");
@@ -998,9 +1002,11 @@ namespace SnowmeetApi.Controllers
                             {
                                 cell.SetCellValue(nullStr);
                             }
+                            */
                             cell.CellStyle = styleText;
                             break;
                         case 17:
+                        /*
                             if (share != null && share.state == 1 && share.submit_date != null && order.orderState == 4)
                             {
                                 cell.SetCellValue((DateTime)share.submit_date);
@@ -1011,8 +1017,10 @@ namespace SnowmeetApi.Controllers
                                 cell.SetCellValue(nullStr);
                                 cell.CellStyle = styleText;
                             }
+                            */
                             break;
                         case 18:
+                        /*
                             if (share != null && share.state == 1 && share.submit_date != null && order.orderState == 4)
                             {
                                 cell.SetCellValue((DateTime)share.submit_date);
@@ -1023,8 +1031,10 @@ namespace SnowmeetApi.Controllers
                                 cell.SetCellValue(nullStr);
                                 cell.CellStyle = styleText;
                             }
+                            */
                             break;
                         case 19:
+                        /*
                             if (share != null && share.state == 1 && share.submit_date != null && order.orderState == 4)
                             {
                                 cell.SetCellValue(share.out_trade_no);
@@ -1033,6 +1043,7 @@ namespace SnowmeetApi.Controllers
                             {
                                 cell.SetCellValue(nullStr);
                             }
+                            */
                             cell.CellStyle = styleText;
                             break;
                         default:
