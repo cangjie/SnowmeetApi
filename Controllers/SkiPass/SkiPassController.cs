@@ -1133,9 +1133,16 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<SkipassDailyPrice>> ModDailyPrice(int priceId, double price, 
             string dayType, string sessionKey, string sessionType = "wechat_mini_openid")
         {
+            /*
             MemberController _memberHelper = new MemberController(_context, _config);
             Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
             if (member.is_admin != 1)
+            {
+                return BadRequest();
+            }
+            */
+            Staff staff = await Util.GetStaffBySessionKey(_context, sessionKey);
+            if (staff.title_level <= 200)
             {
                 return BadRequest();
             }
