@@ -110,6 +110,8 @@ namespace SnowmeetApi.Controllers
             }
             if (Math.Round(sharedAmount, 2) == Math.Round(orderShare.amount, 2))
             {
+                orderShare.dealed = true;
+                _db.orderShare.Entry(orderShare).State = EntityState.Modified;
                 await _db.SaveChangesAsync();
             }
             return shares;

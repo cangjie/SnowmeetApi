@@ -13,6 +13,7 @@ namespace SnowmeetApi.Models
         public int relation_id {get; set;}
         public double amount {get; set;}
         public bool valid {get; set; } = true;
+        public bool dealed {get; set;} = false;
         public DateTime create_date {get; set;}
     }
     [Table("payment_share")]
