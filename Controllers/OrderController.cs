@@ -1438,7 +1438,7 @@ namespace SnowmeetApi.Controllers
             OrderPayment payment = await _db.orderPayment.Where(p => p.id == paymentId).AsNoTracking().FirstOrDefaultAsync();
             Models.Order order = await GetOrder(payment.order_id);
             ///////正式上线时去掉注释
-            /*
+            
             if (order.shop == "万龙体验中心" && order.type == "租赁")
             {
                 payment.need_share = 1;
@@ -1449,7 +1449,7 @@ namespace SnowmeetApi.Controllers
             {
                 payment.need_share = 0;
             }
-            */
+            
             List<OrderPayment> allPayments = await _db.orderPayment.Where(p => p.order_id == order.id)
                 .OrderByDescending(p => p.out_trade_no).AsNoTracking().ToListAsync();
             string? outTradeNo = allPayments[0].out_trade_no;
