@@ -764,6 +764,21 @@ namespace SnowmeetApi.Controllers
             Console.WriteLine(res);
         }
 
+        /*
+        [HttpGet("{paymentId}")]
+        public async Task QueryShareableAmouont(int paymentId)
+        {
+            OrderPayment payment = await _db.orderPayment.Where(p => p.id == paymentId)
+                .AsNoTracking().FirstOrDefaultAsync();
+            var client = await GetClient((int)payment.mch_id);
+            var req = new GetProfitSharingTransactionAmountsRequest()
+            {
+                TransactionId = payment.wepay_trans_id
+            };
+            var res = await client.ExecuteGetProfitSharingTransactionAmountsAsync(req);
+            Console.WriteLine(res);
+        }
+        */
 
 
         /*

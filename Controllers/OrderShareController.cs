@@ -24,7 +24,7 @@ namespace SnowmeetApi.Controllers
             _http = httpContextAccessor;
         }
         [NonAction]
-        public async Task<List<OrderShare>> CreateShares(Models.Order order)
+        public async Task<List<OrderShare>> CreateOrderShares(Models.Order order)
         {
             if (order.valid == 0 || order.hide)
             {
@@ -78,12 +78,60 @@ namespace SnowmeetApi.Controllers
             await _db.SaveChangesAsync();
             return shares;
         }
+        [NonAction]
+        public async Task<List<PaymentShare>> CreatePaymentShare(OrderShare orderShare)
+        {
+            List<OrderPayment> payments = await _db.orderPayment
+                .Where(p => p.order_id == orderShare.order_id && p.valid == 1 && p.status == "支付成功"
+                && (p.pay_method == "微信支付" || p.pay_method == "支付宝")).OrderBy(p => p.pay_method)
+                .AsNoTracking().ToListAsync();
+            List<PaymentShare> shares = new List<PaymentShare>();
+            double sharedAmount = 0;
+            orderShare.amount = Math.Round(orderShare.amount, 2);
+            for(int i = 0; i < payments.Count && sharedAmount < orderShare.amount; i++)
+            {
+                //sharedAmount += Math.Min(orderShare.amount, payments)
+                double currentAmount = Math.Min(orderShare.amount-sharedAmount, payments[i].amount * 0.29);
+                currentAmount = Math.Round(currentAmount, 2);
+                sharedAmount += currentAmount;
+                sharedAmount = Math.Round(sharedAmount, 2);
+                PaymentShare pShare = new PaymentShare()
+                {
+                    id = 0,
+                    payment_id = payments[i].id,
+                    share_id = orderShare.id,
+                    amount = currentAmount,
+                    valid = true,
+                    out_trade_no = payments[i].out_trade_no.Trim() + "_FZ_" + (i+1).ToString().PadLeft(2, '0'),
+                    create_date = DateTime.Now
+                };
+                await _db.paymentShare.AddAsync(pShare);
+                shares.Add(pShare);
+            }
+            if (Math.Round(sharedAmount, 2) == Math.Round(orderShare.amount, 2))
+            {
+                await _db.SaveChangesAsync();
+            }
+            return shares;
+        }
+
+        [HttpGet]
+        public async Task<ActionResult<List<PaymentShare>>> GetPaymentShares(int shareId)
+        {
+            OrderShare share = await _db.orderShare.Where(s => s.id == shareId)
+                .AsNoTracking().FirstOrDefaultAsync();
+            return Ok(await CreatePaymentShare(share));
+        }
+
+
+
+
         [HttpGet("{orderId}")]
         public async Task<ActionResult<List<OrderShare>>> CreateShare(int orderId)
         {
             OrderController _orderHelper = new OrderController(_db, _config, _http);
             Models.Order order = await _orderHelper.GetOrder(orderId);
-            return Ok(await CreateShares(order));
+            return Ok(await CreateOrderShares(order));
         }
     }
 }
