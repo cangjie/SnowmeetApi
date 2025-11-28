@@ -5461,6 +5461,7 @@ namespace SnowmeetApi.Controllers
         [HttpGet]
         public async Task<ActionResult<ApiResult<List<Models.Order>?>>> CloseOrder()
         {
+            OrderShareController _shareHelper = new OrderShareController(_db, _config, _httpContextAccessor);
             List<Models.Order> orders = await _db.order.Include(o => o.payments).ThenInclude(p => p.refunds)
                 .Where(o => o.valid == 1  && o.closed == 0 && o.close_date == null && o.type == "租赁" 
                 && o.create_date.Date > DateTime.Parse("2025-10-01").Date  )
@@ -5511,6 +5512,19 @@ namespace SnowmeetApi.Controllers
                     order.update_date = DateTime.Now;
                     _db.order.Entry(order).State = EntityState.Modified;
                     newList.Add(order);
+                    try
+                    {
+                        if (order.type == "租赁" && order.shop == "万龙体验中心")
+                        {
+                            OrderShare share = await _db.orderShare.Where(s => s.valid && s.order_id == order.id)
+                                .AsNoTracking().FirstOrDefaultAsync();
+                            await _shareHelper.CreatePaymentShare(share);
+                        }
+                    }
+                    catch
+                    {
+                        
+                    }
                 }
             }
             await _db.SaveChangesAsync();

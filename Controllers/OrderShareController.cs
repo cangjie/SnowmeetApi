@@ -124,10 +124,6 @@ namespace SnowmeetApi.Controllers
                 .AsNoTracking().FirstOrDefaultAsync();
             return Ok(await CreatePaymentShare(share));
         }
-
-
-
-
         [HttpGet("{orderId}")]
         public async Task<ActionResult<List<OrderShare>>> CreateShare(int orderId)
         {
