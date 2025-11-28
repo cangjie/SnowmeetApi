@@ -2157,7 +2157,7 @@ namespace SnowmeetApi.Controllers
             try
             {
                 if (order.type == "租赁" && order.shop == "万龙体验中心" && order.hide == false && order.valid == 1 && order.paidAmount > 0
-                && order.refundAmount > 0 &&  order.totalRentNeedToRefundAmount == 0 )
+                && order.refundAmount > 0 &&  Math.Round((double)order.totalRentUnRefund, 2) == 0 )
                 {
                     OrderShareController _shareHelper = new OrderShareController(_db, _config, _http);
                     List<OrderShare> orderShares = await _shareHelper.CreateOrderShares(order);
