@@ -110,9 +110,48 @@ namespace SnowmeetApi.Controllers
             AlipayMchId mch = await _db.alipayMchId.FindAsync(mchId);
             return mch;
         }
+        
+        [HttpGet]
+        public async Task BindRoyaltiRelation()
+        {
+            AlipayTradeRoyaltyRelationBindRequest req = new AlipayTradeRoyaltyRelationBindRequest();
+            AlipayTradeRoyaltyRelationBindModel model = new AlipayTradeRoyaltyRelationBindModel();
+            model.OutRequestNo = Util.GetLongTimeStamp(DateTime.Now);
+            List<RoyaltyEntity> receiverList = new List<RoyaltyEntity>();
+            RoyaltyEntity receiverList0 = new RoyaltyEntity();
+            receiverList0.Type = "userId";
+            //receiverList0.bin = "2088111161955442 ";
+            //receiverList0.LoginName = login;
+            //receiverList0.Name = "";
+            //receiverList0.Memo = "测试";
+            receiverList0.Account = "2088111161955442";
+            receiverList.Add(receiverList0);
+            model.ReceiverList = receiverList;
+            req.SetBizModel(model);
+            AlipayTradeRoyaltyRelationBindResponse response = client.CertificateExecute(req);
+            if (!response.IsError)
+            {
+                Console.WriteLine("调用成功");
+                /*
+                kol.ali_bind = 1;
+                _db.kol.Entry(kol).State = EntityState.Modified;
+                await _db.SaveChangesAsync();
+                */
+                //return "true";
+            }
+            else
+            {
+                Console.WriteLine("调用失败");
+                //return "false";
+            }
+        }
+        
+
+
+
         [HttpGet]
         //public async Task BindRoyaltiRelation(string login, string name, string memo)
-        public async Task<string> BindRoyaltiRelation(int kolId)
+        public async Task<string> BindRoyaltiRelationTest(int kolId)
         {
             Kol kol = await _db.kol.FindAsync(kolId);
             string login = Util.UrlDecode(kol.ali_login_name);
@@ -189,6 +228,55 @@ namespace SnowmeetApi.Controllers
             return share;
         }
         */
+        [HttpGet]
+        public ActionResult<AlipayTradeOrderSettleResponse> SettleTest()
+        {
+            AlipayTradeOrderSettleRequest req = new AlipayTradeOrderSettleRequest();
+            req.BizContent = "{" +
+
+                /** 结算请求流水号 开发者自行生成并保证唯一性  **/
+                "\"out_request_no\":\"WT_ZL_251128_00016_ZF_01_FZ_01\"," +
+
+                /** 支付宝订单号  **/
+                "\"trade_no\":\"2025112822001485891427772153\"," +
+
+                /** 操作员id  **/
+                "\"operator_id\":\"\"," +
+
+                /** 分账明细信息，单次传入最多20个，一次分账请求中，有任意一个收入方分账失败，则这次分账请求的全部分账处理均会失败  **/
+                "\"royalty_parameters\":[" +
+
+                    /** 分账收入方信息  **/
+                    "{" +
+                          /** 分账类型.普通分账为：transfer;  **/
+                          "\"royalty_type\":\"transfer\"," +
+
+                          /** 支出方账户  **/
+                          //"\"trans_out\":\"2088***335\"," +
+
+                          /** 支出方账户类型。userId表示是支付宝账号对应的支付宝唯一用户号;loginName表示是支付宝登录号  **/
+                          //"\"trans_out_type\":\"userId\"," +
+
+                          /** 收入方账户  **/
+                         // "\"trans_in\":\"" + login + "\"," +
+
+                           /** 收入方账户类型。userId表示是支付宝账号对应的支付宝唯一用户号;loginName表示是支付宝登录号   **/
+                           "\"trans_in_type\":\"userId\"," +
+
+                           "\"trans_in\":\"2088111161955442\"," +
+
+                          /** 分账的金额，单位为元  **/
+                          "\"amount\":0.01, " +
+
+                          /** 设分账描述  **/
+                          "\"desc\":\"测试\"" +
+                        "}" +
+                    "]" +
+                "}";
+
+            AlipayTradeOrderSettleResponse res = client.CertificateExecute(req);
+            return Ok(res);
+        }
         [NonAction]
         public AlipayTradeOrderSettleResponse Settle(string tradeNo, double amount, string login, string name, string memo, string outTradeNo)
         {
