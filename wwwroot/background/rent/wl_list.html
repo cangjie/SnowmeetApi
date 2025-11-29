@@ -169,6 +169,9 @@
                                 case 0:
                                     lineSumData[k] = '总计'
                                     break;
+                                case 7:
+                                    lineSumData[k] = order.totalRentSummaryAmount.toFixed(2);
+                                    break;
                                 default:
                                     lineSumData[k] = '--';
                                     break;
