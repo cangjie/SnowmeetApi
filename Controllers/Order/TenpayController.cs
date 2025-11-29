@@ -716,7 +716,6 @@ namespace SnowmeetApi.Controllers
                 }
             }
         }
-
         [HttpGet]
         public async Task ShareFinish(int paymentId, string description)
         {
@@ -734,7 +733,49 @@ namespace SnowmeetApi.Controllers
 
 
         }
-
+        [NonAction]
+        public async Task<PaymentShare> Settle(PaymentShare share)
+        {
+            if (!share.valid)
+            {
+                return null;
+            }
+            share.submit_time = DateTime.Now;
+            share.update_date = DateTime.Now;
+            _db.paymentShare.Entry(share).State = EntityState.Modified;
+            await _db.SaveChangesAsync();
+            WechatTenpayClient client = await GetClient((int)share.payment.mch_id);
+            CreateProfitSharingOrderRequest.Types.Receiver r = new CreateProfitSharingOrderRequest.Types.Receiver()
+            {
+                Type = share.orderShare.relation.wepay_account_type,
+                Account = share.orderShare.relation.wepay_account_num,
+                Amount = (int)Math.Round(share.amount * 100),
+                Description = share.out_trade_no
+            };
+            List<CreateProfitSharingOrderRequest.Types.Receiver> rl = new List<CreateProfitSharingOrderRequest.Types.Receiver>();
+            rl.Add(r);
+            var req = new CreateProfitSharingOrderRequest()
+            {
+                AppId = _appId,
+                TransactionId = (string)share.payment.wepay_trans_id,
+                OutOrderNumber = share.out_trade_no,
+                ReceiverList = rl
+            };
+            var res = await client.ExecuteCreateProfitSharingOrderAsync(req);
+            if (res.IsSuccessful())
+            {
+                share.success = true;
+            }
+            else
+            {
+                share.response_content = res.ErrorCode + ":" + res.ErrorMessage.Trim();
+            }
+            share.response_time = DateTime.Now;
+            share.update_date = DateTime.Now;
+            _db.paymentShare.Entry(share).State = EntityState.Modified;
+            await _db.SaveChangesAsync();
+            return share;
+        }
         [HttpGet]
         public async Task ShareToMerchantTest(int paymentId)
         {

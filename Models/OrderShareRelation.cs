@@ -12,8 +12,10 @@ namespace SnowmeetApi.Models
         public int id {get; set;}
         public string type {get; set;}
         public string name {get; set;}
+        public string? wepay_account_type {get; set;} = null; 
         public string? wepay_account_num {get; set;} = null;
         public string? wepay_account_name {get; set;} = null;
+        public string? ali_account_type {get; set;} = null;
         public string? ali_account_num {get; set;} = null;
         public bool valid {get; set;}
         public DateTime create_date {get; set;} = DateTime.Now;

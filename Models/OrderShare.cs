@@ -15,6 +15,9 @@ namespace SnowmeetApi.Models
         public bool valid {get; set; } = true;
         public bool dealed {get; set;} = false;
         public DateTime create_date {get; set;}
+        [ForeignKey("relation_id")]
+        public OrderShareRelation relation {get; set;}
+        public PaymentShare paymentShares {get; set;}
     }
     [Table("payment_share")]
     public class PaymentShare
@@ -32,8 +35,11 @@ namespace SnowmeetApi.Models
         public string? response_content {get; set;} = null;
         public string? memo {get; set;} = null;
         public bool can_not_share {get; set;} = false;
+        public DateTime? update_date {get; set;} = null;
         public DateTime create_date {get; set;} = DateTime.Now;
-
+        public OrderPayment payment {get; set;}
+        [ForeignKey("share_id")]
+        public OrderShare orderShare {get; set;}
 
     }
 }

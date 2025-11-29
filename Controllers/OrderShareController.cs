@@ -116,7 +116,7 @@ namespace SnowmeetApi.Controllers
             }
             return shares;
         }
-
+        
         [HttpGet]
         public async Task<ActionResult<List<PaymentShare>>> GetPaymentShares(int shareId)
         {
@@ -130,6 +130,24 @@ namespace SnowmeetApi.Controllers
             OrderController _orderHelper = new OrderController(_db, _config, _http);
             Models.Order order = await _orderHelper.GetOrder(orderId);
             return Ok(await CreateOrderShares(order));
+        }
+        [NonAction]
+        public async Task<PaymentShare> SharePayment(PaymentShare share)
+        {
+            switch(share.payment.pay_method.Trim())
+            {
+                case "支付宝":
+                    AliController _aliHelper = new AliController(_db, _config, _http);
+                    share = await _aliHelper.Settle(share);
+                    break;
+                case "微信支付":
+                    TenpayController _tenHelper = new TenpayController(_db, _config, _http);
+
+                    break;
+                default:
+                    break;
+            }
+            return share;
         }
     }
 }

@@ -5435,6 +5435,8 @@ namespace SnowmeetApi.Controllers
             List<Models.Order> orders = (await _orderHelper.GetCommonOrders(null, shop, null, null, "租赁",
                 null, null, null, false, false, false, false, null, null, startDate, endDate))
                 .OrderByDescending(o => o.code).ToList();
+            
+                
             List<Models.Order> confirmedOrders = new List<Models.Order>();
             for (int i = 0; i < orders.Count; i++)
             {

@@ -199,6 +199,7 @@ namespace SnowmeetApi.Controllers
                     //.Include(o => o.fdOrders.Where(f => f.valid == 1)).ThenInclude(f => f.product).ThenInclude(p => p.category)
                     //.Include(o => o.retails.Where(r => r.valid == 1))
                     //.Include(o => o.cares.Where(c => c.valid == 1)).ThenInclude(c => c.tasks.Where(t => t.valid == 1).OrderBy(t => t.id))
+
                     .Include(o => o.rentals.Where(r => r.valid == 1)).ThenInclude(r => r.details.Where(d => d.valid == 1)).ThenInclude(d => d.discounts.Where(d => d.valid == 1 && d.sub_biz_type == "日租金" ))
                     .Include(o => o.rentals.Where(r => r.valid == 1)).ThenInclude(r => r.discounts.Where(d => d.valid == 1 && d.biz_type == "租赁" ))
                     .Include(o => o.rentals.Where(r => r.valid == 1)).ThenInclude(r => r.rentItems.Where(r => r.valid == 1))
@@ -209,6 +210,7 @@ namespace SnowmeetApi.Controllers
                     .Include(o => o.guarantys.Where(g => g.valid == 1)).ThenInclude(g => g.guarantyPayments)//.ThenInclude(g => g.payment)
                     .Include(o => o.staff)
                     .Include(o => o.member).ThenInclude(m => m.memberSocialAccounts)
+                    .Include(o => o.orderShares.Where(s => s.valid)).ThenInclude(o => o.paymentShares)
                     .OrderByDescending(o => o.id).AsNoTracking().ToListAsync();
                     break;
                 case "零售":
@@ -247,7 +249,7 @@ namespace SnowmeetApi.Controllers
                         .Include(o => o.payments).ThenInclude(p => p.refunds)
                         .Include(o => o.refunds)
                         .Include(o => o.discounts.Where(d => d.valid == 1))
-                        .Include(o => o.guarantys.Where(g => g.valid == 1)).ThenInclude(g => g.guarantyPayments)//.ThenInclude(g => g.payment)
+                        //.Include(o => o.guarantys.Where(g => g.valid == 1)).ThenInclude(g => g.guarantyPayments)//.ThenInclude(g => g.payment)
                         .Include(o => o.staff)
                         .Include(o => o.member).ThenInclude(m => m.memberSocialAccounts)
                         .OrderByDescending(o => o.id).AsNoTracking().ToListAsync();

@@ -110,7 +110,7 @@ namespace SnowmeetApi.Controllers
             AlipayMchId mch = await _db.alipayMchId.FindAsync(mchId);
             return mch;
         }
-        
+
         [HttpGet]
         public async Task BindRoyaltiRelation()
         {
@@ -145,7 +145,7 @@ namespace SnowmeetApi.Controllers
                 //return "false";
             }
         }
-        
+
 
 
 
@@ -251,14 +251,14 @@ namespace SnowmeetApi.Controllers
                           /** 分账类型.普通分账为：transfer;  **/
                           "\"royalty_type\":\"transfer\"," +
 
-                          /** 支出方账户  **/
-                          //"\"trans_out\":\"2088***335\"," +
+                           /** 支出方账户  **/
+                           //"\"trans_out\":\"2088***335\"," +
 
-                          /** 支出方账户类型。userId表示是支付宝账号对应的支付宝唯一用户号;loginName表示是支付宝登录号  **/
-                          //"\"trans_out_type\":\"userId\"," +
+                           /** 支出方账户类型。userId表示是支付宝账号对应的支付宝唯一用户号;loginName表示是支付宝登录号  **/
+                           //"\"trans_out_type\":\"userId\"," +
 
-                          /** 收入方账户  **/
-                         // "\"trans_in\":\"" + login + "\"," +
+                           /** 收入方账户  **/
+                           // "\"trans_in\":\"" + login + "\"," +
 
                            /** 收入方账户类型。userId表示是支付宝账号对应的支付宝唯一用户号;loginName表示是支付宝登录号   **/
                            "\"trans_in_type\":\"userId\"," +
@@ -278,7 +278,68 @@ namespace SnowmeetApi.Controllers
             return Ok(res);
         }
         [NonAction]
-        public AlipayTradeOrderSettleResponse Settle(string tradeNo, double amount, string login, string name, string memo, string outTradeNo)
+        public async Task<PaymentShare> Settle(PaymentShare share)
+        {
+            if (!share.valid)
+            {
+                return null;
+            }
+            OrderShareRelation relation = share.orderShare.relation;
+            share.submit_time = DateTime.Now;
+            share.update_date = DateTime.Now;
+            _db.paymentShare.Entry(share).State = EntityState.Modified;
+            await _db.SaveChangesAsync();
+            AlipayTradeOrderSettleRequest req = new AlipayTradeOrderSettleRequest();
+            req.BizContent = "{" +
+                /** 结算请求流水号 开发者自行生成并保证唯一性  **/
+                "\"out_request_no\":\"" + share.out_trade_no.Trim() + "\"," +
+                /** 支付宝订单号  **/
+                "\"trade_no\":\"" + share.payment.ali_trade_no + "\"," +
+                /** 操作员id  **/
+                "\"operator_id\":\"\"," +
+                /** 分账明细信息，单次传入最多20个，一次分账请求中，有任意一个收入方分账失败，则这次分账请求的全部分账处理均会失败  **/
+                "\"royalty_parameters\":[" +
+                    /** 分账收入方信息  **/
+                    "{" +
+                        /** 分账类型.普通分账为：transfer;  **/
+                        "\"royalty_type\":\"transfer\"," +
+                        /** 支出方账户  **/
+                        //"\"trans_out\":\"2088***335\"," +
+                        /** 支出方账户类型。userId表示是支付宝账号对应的支付宝唯一用户号;loginName表示是支付宝登录号  **/
+                        //"\"trans_out_type\":\"userId\"," +
+                        /** 收入方账户  **/
+                        "\"trans_in\":\"" + relation.ali_account_num + "\"," +
+                        /** 收入方账户类型。userId表示是支付宝账号对应的支付宝唯一用户号;loginName表示是支付宝登录号   **/
+                        "\"trans_in_type\":\"" + relation.ali_account_type + "\"," +
+                        // "\"trans_in_name\":\"" + name + "\"," +
+                        /** 分账的金额，单位为元  **/
+                        "\"amount\":" + share.amount.ToString() + ", " +
+                        /** 设分账描述  **/
+                        "\"desc\":\"" + share.memo == null ? "" : share.memo.Trim() + "\"" +
+                    "}" +
+                "]" +
+            "}";
+            AlipayTradeOrderSettleResponse res = client.CertificateExecute(req);
+            if (res.IsError)
+            {
+                share.success = false;
+                share.response_content = res.Code.Trim() + ":" + res.Msg.Trim() + " " + res.SubCode.Trim() + ":" + res.SubMsg.Trim();
+                share.response_time = DateTime.Now;
+                share.update_date = DateTime.Now;
+            }
+            else
+            {
+                share.success = true;
+                share.update_date = DateTime.Now;
+                share.response_time = DateTime.Now;
+                share.response_content = res.SettleNo.Trim();
+            }
+            _db.paymentShare.Entry(share).State = EntityState.Modified;
+            await _db.SaveChangesAsync();
+            return share;
+        }
+        [NonAction]
+        public AlipayTradeOrderSettleResponse Settle1(string tradeNo, double amount, string login, string name, string memo, string outTradeNo)
         {
             login = Util.UrlDecode(login);
             memo = Util.UrlDecode(memo);
@@ -287,49 +348,34 @@ namespace SnowmeetApi.Controllers
 
 
             req.BizContent = "{" +
-
                 /** 结算请求流水号 开发者自行生成并保证唯一性  **/
                 "\"out_request_no\":\"" + outTradeNo.Trim() + "\"," +
-
                 /** 支付宝订单号  **/
                 "\"trade_no\":\"" + tradeNo.Trim() + "\"," +
-
                 /** 操作员id  **/
                 "\"operator_id\":\"\"," +
-
                 /** 分账明细信息，单次传入最多20个，一次分账请求中，有任意一个收入方分账失败，则这次分账请求的全部分账处理均会失败  **/
                 "\"royalty_parameters\":[" +
-
                     /** 分账收入方信息  **/
                     "{" +
                           /** 分账类型.普通分账为：transfer;  **/
                           "\"royalty_type\":\"transfer\"," +
-
                           /** 支出方账户  **/
                           //"\"trans_out\":\"2088***335\"," +
-
                           /** 支出方账户类型。userId表示是支付宝账号对应的支付宝唯一用户号;loginName表示是支付宝登录号  **/
                           //"\"trans_out_type\":\"userId\"," +
-
                           /** 收入方账户  **/
                           "\"trans_in\":\"" + login + "\"," +
-
                            /** 收入方账户类型。userId表示是支付宝账号对应的支付宝唯一用户号;loginName表示是支付宝登录号   **/
                            "\"trans_in_type\":\"loginName\"," +
-
                            "\"trans_in_name\":\"" + name + "\"," +
-
                           /** 分账的金额，单位为元  **/
                           "\"amount\":" + amount.ToString() + ", " +
-
                           /** 设分账描述  **/
                           "\"desc\":\"" + memo + "\"" +
                         "}" +
                     "]" +
                 "}";
-
-
-
             return client.CertificateExecute(req);
             /*
             if(!response.IsError)
