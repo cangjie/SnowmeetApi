@@ -161,5 +161,20 @@ namespace SnowmeetApi.Controllers
                 .AsNoTracking().FirstOrDefaultAsync();
             return Ok(await SharePayment(share));
         }
+        [HttpGet]
+        public async Task<ActionResult<List<List<PaymentShare>>>> ExccuteShare(DateTime? date = null)
+        {
+            DateTime shareDate = date == null? DateTime.Now.AddDays(-1).Date : (((DateTime)date).Date);
+            List<PaymentShare> shares = await _db.paymentShare.Include(p => p.payment)
+                .Include(s => s.orderShare).ThenInclude(o => o.order).ThenInclude(o => o.payments)
+                .ThenInclude(p => p.refunds).Include(s => s.orderShare).ThenInclude(s => s.relation)
+                .Where(s => s.submit_time == null && ((DateTime)s.orderShare.order.close_date).Date <= shareDate.Date )
+                .AsNoTracking().ToListAsync();
+            for(int i = 0; i < shares.Count; i++)
+            {
+                shares[i] = await SharePayment(shares[i]);
+            }
+            return Ok(shares);
+        }
     }
 }
