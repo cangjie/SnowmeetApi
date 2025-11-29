@@ -113,6 +113,7 @@
                 var index = 1;
                 for (var i = 0; i < orders.length; i++) {
                     var order = orders[i];
+                    var display = false;
                     if (order.code == 'WT_ZL_251111_00003'){
                         console.log('aa')
                     }
@@ -123,7 +124,7 @@
                                 continue;
                             }
                             var lineData = [];
-                            var display = false;
+                            
                             for (var k = 0; k < tHead.length; k++) {
                                 switch (tHead[k]) {
                                     case '序号':
