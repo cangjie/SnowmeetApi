@@ -123,6 +123,7 @@
                                 continue;
                             }
                             var lineData = [];
+                            var display = false;
                             for (var k = 0; k < tHead.length; k++) {
                                 switch (tHead[k]) {
                                     case '序号':
@@ -159,7 +160,21 @@
                                 tData.push(lineData);
                                 totalAmount +=  (rental.totalRentalAmount - rental.totalDiscountAmount);
                                 index++;
+                                display = true;
                             }
+                        }
+                        var lineSumData = [tHead.length]
+                        for(var k = 0; display && k < lineSumData.length; k++){
+                            switch(k){
+                                case 0:
+                                    lineSumData[k] = '总计'
+                                default:
+                                    lineSumData[k] = '--';
+                                    break;
+                            }
+                        }
+                        if (display){
+                            tData.push(lineData);
                         }
                     }
                     else {
