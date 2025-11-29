@@ -966,6 +966,24 @@ namespace SnowmeetApi.Models
             }
         }
         [NotMapped]
+        public double totalShareAmount
+        {
+            get
+            {
+                if (orderShares == null)
+                {
+                    return 0;
+                }
+                double shareAmount = 0;
+                List<OrderShare> availableShares = orderShares.Where(s => s.valid).ToList();
+                for(int i = 0; i < availableShares.Count; i++)
+                {
+                    shareAmount += availableShares[i].amount;
+                }
+                return shareAmount;
+            }
+        }
+        [NotMapped]
         public RentPropertySet? rentProperties
         {
             get
