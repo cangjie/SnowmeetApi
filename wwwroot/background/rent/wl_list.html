@@ -153,7 +153,6 @@
                                     case '结算日期':
                                         lineData[k] = formatDate(order.close_date);
                                         break;
-                                    
                                     case '租金':
                                         var amount = rental.totalRentalAmount - rental.totalDiscountAmount;
                                         lineData[k] = amount.toFixed(2);
@@ -162,7 +161,6 @@
                                         lineData[k] = '--'
                                         break;
                                 }
-
                             }
                             if (rental.totalRentalAmount - rental.totalDiscountAmount >= 1) {
                                 tData.push(lineData);
@@ -266,6 +264,20 @@
                                 case '租金':
                                     var amount = order.paidAmount - order.refundAmount;
                                     lineData[k] = amount.toFixed(2);
+                                    break;
+                                case '人工分账':
+                                    var amount = order.paidAmount - order.refundAmount;
+                                    lineData[k] = (amount*0.5).toFixed(2);
+                                    needToShare += parseFloat(lineData[k]);
+                                    break;
+                                case '系统分账':
+                                    lineData[k] = '--';
+                                    break;
+                                case '分账成功':
+                                    lineData[k] = '--';
+                                    break;
+                                case '剩余金额':
+                                    lineData[k] = '--';
                                     break;
                                 default:
                                     break;
