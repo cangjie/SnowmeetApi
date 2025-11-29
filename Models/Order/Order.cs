@@ -966,6 +966,21 @@ namespace SnowmeetApi.Models
             }
         }
         [NotMapped]
+        public List<OrderShare> availableShares
+        {
+            get
+            {
+                try
+                {
+                    return orderShares.Where(s => s.valid).ToList();
+                }
+                catch
+                {
+                    return new List<OrderShare>();
+                }
+            }
+        }
+        [NotMapped]
         public double totalShareAmount
         {
             get
@@ -975,12 +990,29 @@ namespace SnowmeetApi.Models
                     return 0;
                 }
                 double shareAmount = 0;
-                List<OrderShare> availableShares = orderShares.Where(s => s.valid).ToList();
+                //List<OrderShare> availableShares = orderShares.Where(s => s.valid).ToList();
                 for(int i = 0; i < availableShares.Count; i++)
                 {
                     shareAmount += availableShares[i].amount;
                 }
                 return shareAmount;
+            }
+        }
+        [NotMapped]
+        public double totalShareSuccessAmount
+        {
+            get
+            {
+                try
+                {
+
+                    return availableShares.Sum(s => s.successSharedAmount);
+                }
+                catch
+                {
+                    return 0;
+                }
+
             }
         }
         [NotMapped]

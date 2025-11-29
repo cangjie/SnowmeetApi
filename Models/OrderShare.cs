@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Linq;
 
 namespace SnowmeetApi.Models
 {
@@ -17,7 +19,22 @@ namespace SnowmeetApi.Models
         public DateTime create_date {get; set;}
         [ForeignKey("relation_id")]
         public OrderShareRelation relation {get; set;}
-        public PaymentShare paymentShares {get; set;}
+        public List<PaymentShare> paymentShares {get; set;}
+        [NotMapped]
+        public double successSharedAmount
+        {
+            get
+            {
+                try
+                {
+                    return paymentShares.Where(s => s.valid && (s.success == null)).Sum(s=>s.amount);
+                }
+                catch
+                {
+                    return 0;
+                }
+            }
+        }
     }
     [Table("payment_share")]
     public class PaymentShare
