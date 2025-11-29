@@ -27,7 +27,7 @@ namespace SnowmeetApi.Models
             {
                 try
                 {
-                    return paymentShares.Where(s => s.valid && (s.success == null)).Sum(s=>s.amount);
+                    return paymentShares.Where(s => s.valid && (s.success == true)).Sum(s=>s.amount);
                 }
                 catch
                 {
