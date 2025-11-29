@@ -188,7 +188,23 @@
                                         lineSumData[k] = 0;
                                     }
                                     else{
-                                        lineSumData[k] = totalShareAmount.toFixed(2);
+                                        lineSumData[k] = order.totalShareAmount.toFixed(2);
+                                    }
+                                    break;
+                                case 10:
+                                    if (order.orderShares == null || order.orderShares.length == 0){
+                                        lineSumData[k] = 0;
+                                    }
+                                    else{
+                                        lineSumData[k] = order.totalShareSuccessAmount.toFixed(2);
+                                    }
+                                    break;
+                                case 11:
+                                    if (order.orderShares == null || order.orderShares.length == 0){
+                                        lineSumData[k] = 0;
+                                    }
+                                    else{
+                                        lineSumData[k] = (order.totalShareAmount - order.totalShareSuccessAmount).toFixed(2);
                                     }
                                     break;
                                 default:
