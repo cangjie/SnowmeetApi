@@ -209,9 +209,9 @@
                                     break;
                                 case 12:
                                     var payMethod = ''
-                                    for(var i = 0; order.availablePayments && i < order.availablePayments.length; i++){
-                                        if (payMethod.indexOf(order.availablePayments[i].pay_method)<0){
-                                            payMethod += order.availablePayments[i].pay_method;
+                                    for(var m = 0; order.availablePayments && m < order.availablePayments.length; m++){
+                                        if (payMethod.indexOf(order.availablePayments[m].pay_method)<0){
+                                            payMethod += order.availablePayments[m].pay_method + ' ';
                                         }
                                     }
                                     lineSumData[k] = payMethod;
