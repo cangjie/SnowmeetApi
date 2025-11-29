@@ -175,6 +175,14 @@
                                 case 7:
                                     lineSumData[k] = order.totalRentSummaryAmount.toFixed(2);
                                     break;
+                                case 8:
+                                    if (order.orderShares == null || order.orderShares.length == 0){
+                                        lineSumData[k] = (order.totalRentSummaryAmount*0.5).toFixed(2);
+                                    }
+                                    else{
+                                        lineSumData[k] = 0;
+                                    }
+                                    break;
                                 default:
                                     lineSumData[k] = '--';
                                     break;
