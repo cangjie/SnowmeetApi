@@ -80,7 +80,7 @@
         link.click();
         document.body.removeChild(link);
     }
-    var tHeadTemplate = ['序号', '订单号', '订单类型', '商品名称', '起租日期', '退租日期', '结算日期', '租金',  '人工分账', '系统分账', '分账成功', '剩余金额'];
+    var tHeadTemplate = ['序号', '订单号', '订单类型', '商品名称', '起租日期', '退租日期', '结算日期', '租金',  '人工分账', '系统分账', '分账成功', '剩余金额', '支付方式'];
     var tHead = tHeadTemplate;
     var tData = [];
     render();
@@ -206,6 +206,15 @@
                                     else{
                                         lineSumData[k] = (order.totalShareAmount - order.totalShareSuccessAmount).toFixed(2);
                                     }
+                                    break;
+                                case 12:
+                                    var payMethod = ''
+                                    for(var i = 0; order.availablePayments && i < order.availablePayments.length; i++){
+                                        if (payMethod.indexOf(order.availablePayments[i].pay_method)<0){
+                                            payMethod += order.availablePayments[i].pay_method;
+                                        }
+                                    }
+                                    lineSumData[k] = payMethod;
                                     break;
                                 default:
                                     lineSumData[k] = '--';
