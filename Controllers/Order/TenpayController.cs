@@ -765,6 +765,7 @@ namespace SnowmeetApi.Controllers
             if (res.IsSuccessful())
             {
                 share.success = true;
+                share.response_content = res.OrderId;
             }
             else
             {

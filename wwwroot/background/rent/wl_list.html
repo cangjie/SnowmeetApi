@@ -84,12 +84,17 @@
     var tHead = tHeadTemplate;
     var tData = [];
     render();
-    var totalAmount = 0
+    var totalAmount = 0;
+    var needToShare = 0;
+    var sharedAmount = 0;
+    
 
     function getData() {
         //tHeadTemplate = ['序号', '门店', '日序号', '星期','订单日期', '支付时间', '订单号', '状态', '免押金', '押金', '招待', '姓名', '电话', '备注', '开单人' ,'支付方式', '商户订单号', '租金合计'];
         //tHead = tHeadTemplate;
         totalAmount = 0;
+        needToShare = 0;
+        sharedAmount = 0;
         tData = [];
         var btnCtrl = document.getElementById('btn');
         btnCtrl.disabled = true;
@@ -178,6 +183,7 @@
                                 case 8:
                                     if (order.orderShares == null || order.orderShares.length == 0){
                                         lineSumData[k] = (order.totalRentSummaryAmount*0.5).toFixed(2);
+                                        needToShare += parseFloat(lineSumData[k])
                                     }
                                     else{
                                         lineSumData[k] = 0;
@@ -189,6 +195,7 @@
                                     }
                                     else{
                                         lineSumData[k] = order.totalShareAmount.toFixed(2);
+                                        needToShare = parseFloat(lineSumData[k])
                                     }
                                     break;
                                 case 10:
@@ -197,6 +204,7 @@
                                     }
                                     else{
                                         lineSumData[k] = order.totalShareSuccessAmount.toFixed(2);
+                                        sharedAmount += parseFloat(lineSumData[k])
                                     }
                                     break;
                                 case 11:
@@ -305,7 +313,7 @@
             tBodyCtl.appendChild(tr);
         }
         var totalCell = document.getElementById('total');
-        totalCell.innerText = "总计：" + totalAmount.toFixed(2);
+        totalCell.innerText = "总计：" + totalAmount.toFixed(2) + " 应分：" + needToShare.toFixed(2) + " 已分：" + sharedAmount.toFixed(2);
     }
 </script>
 <script type="text/javascript" src="../../js/date_selector.js"></script>

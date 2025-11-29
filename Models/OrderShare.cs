@@ -35,6 +35,7 @@ namespace SnowmeetApi.Models
                 }
             }
         }
+        public Models.Order order {get; set;} = null;
     }
     [Table("payment_share")]
     public class PaymentShare

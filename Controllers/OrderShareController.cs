@@ -142,12 +142,24 @@ namespace SnowmeetApi.Controllers
                     break;
                 case "微信支付":
                     TenpayController _tenHelper = new TenpayController(_db, _config, _http);
-
+                    share = await _tenHelper.Settle(share);
                     break;
                 default:
                     break;
             }
             return share;
+        }
+        [NonAction]
+        //[HttpGet("{paymentShareId}")]
+        public async Task<ActionResult<PaymentShare>> SharePayment(int paymentShareId)
+        {
+            PaymentShare share = await _db.paymentShare.Where(p => p.id == paymentShareId)
+                .Include(p => p.payment)
+                .Include(s => s.orderShare).ThenInclude(o => o.order).ThenInclude(o => o.payments)
+                .ThenInclude(p => p.refunds)
+                .Include(s => s.orderShare).ThenInclude(s => s.relation)
+                .AsNoTracking().FirstOrDefaultAsync();
+            return Ok(await SharePayment(share));
         }
     }
 }

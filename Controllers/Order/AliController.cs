@@ -315,7 +315,7 @@ namespace SnowmeetApi.Controllers
                         /** 分账的金额，单位为元  **/
                         "\"amount\":" + share.amount.ToString() + ", " +
                         /** 设分账描述  **/
-                        "\"desc\":\"" + share.memo == null ? "" : share.memo.Trim() + "\"" +
+                        "\"desc\":\"" + ((share.memo == null) ? "" : share.memo.Trim()) + "\"" +
                     "}" +
                 "]" +
             "}";
