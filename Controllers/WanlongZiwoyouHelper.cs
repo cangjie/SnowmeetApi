@@ -333,15 +333,17 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet]
-        public async Task UpdateSkipassProductPrice()
+        public async Task UpdateSkipassProductPrice(DateTime? date = null)
         {
+            DateTime currentDate = date == null? DateTime.Now: (DateTime)date;
+
             var l = await _context.skiPassProduct.Where(s => s.third_party_no != null).AsNoTracking().ToListAsync();
             //var l = await _context.skiPassProduct.Where(s => s.third_party_no.Equals("37696044")).AsNoTracking().ToListAsync();
             foreach (var item in l)
             {
                 try
                 {
-                    string priceStr = Util.GetWebContent("https://mini.snowmeet.top/core/WanlongZiwoyouHelper/GetProductPrice?productId=" + item.third_party_no.Trim() + "&date=" + DateTime.Now.ToString("yyyy-MM-dd"));//+ DateTime.Now.ToString("yyyy-MM-dd"));
+                    string priceStr = Util.GetWebContent("https://mini.snowmeet.top/core/WanlongZiwoyouHelper/GetProductPrice?productId=" + item.third_party_no.Trim() + "&date=" + currentDate.ToString("yyyy-MM-dd"));//+ DateTime.Now.ToString("yyyy-MM-dd"));
                     //string priceStr = Util.GetWebContent("https://mini.snowmeet.top/core/WanlongZiwoyouHelper/GetProductPrice?productId=" + item.third_party_no.Trim() + "&date=2025-02-01"); //+ DateTime..ToString("yyyy-MM-dd") );//+ DateTime.Now.ToString("yyyy-MM-dd"));
                     ZiwoyouProductDailyPrice price = JsonConvert.DeserializeObject<ZiwoyouProductDailyPrice>(priceStr);
                     ZiwoyouDailyPrice[] priceArr = price.ticketPrices;
