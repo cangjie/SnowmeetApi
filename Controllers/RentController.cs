@@ -5441,6 +5441,15 @@ namespace SnowmeetApi.Controllers
             for (int i = 0; i < orders.Count; i++)
             {
                 Models.Order order = orders[i];
+                for(int j = 0; j < order.orderShares.Count; j++)
+                {
+                    OrderShare orderShare = order.orderShares[j];
+                    for(int k = 0; k < orderShare.paymentShares.Count; k++)
+                    {
+                        PaymentShare pShare = orderShare.paymentShares[k];
+                        pShare.payment = order.availablePayments.Where(p => p.id == pShare.payment_id).FirstOrDefault();
+                    }
+                }
                 if (order.paidAmount > 0 && order.closed == 1 && order.close_date != null && !order.hide)
                 {
                     if ((staff.title_level == 50 && ((DateTime)order.close_date).Date < DateTime.Now.AddDays(-1).Date)

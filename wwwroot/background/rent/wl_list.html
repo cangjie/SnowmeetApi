@@ -40,7 +40,7 @@
             oninput="setDate()" />
         &nbsp;<button id="btn" onclick="getData()"> 查 询 </button>&nbsp;<button onclick="download()"> 下 载 </button>
     </div>
-    <div id="total" ></div>
+    <div id="total"></div>
     <div style="text-align:center;display:flex;justify-content:left;margin-top:50px">
         <table style="border:solid;border-width:1px;width:100%">
             <thead>
@@ -80,14 +80,14 @@
         link.click();
         document.body.removeChild(link);
     }
-    var tHeadTemplate = ['序号', '订单号', '订单类型', '商品名称', '起租日期', '退租日期', '结算日期', '租金',  '人工分账', '系统分账', '分账成功', '剩余金额', '支付方式'];
+    var tHeadTemplate = ['序号', '订单号', '订单类型', '商品名称', '起租日期', '退租日期', '结算日期', '租金', '人工分账', '系统分账', '分账成功', '剩余金额', '支付方式'];
     var tHead = tHeadTemplate;
     var tData = [];
     render();
     var totalAmount = 0;
     var needToShare = 0;
     var sharedAmount = 0;
-    
+
 
     function getData() {
         //tHeadTemplate = ['序号', '门店', '日序号', '星期','订单日期', '支付时间', '订单号', '状态', '免押金', '押金', '招待', '姓名', '电话', '备注', '开单人' ,'支付方式', '商户订单号', '租金合计'];
@@ -100,7 +100,7 @@
         btnCtrl.disabled = true;
         btnCtrl.innerText = "查询中……";
         var getUrl = '../../api/Rent/GetConfirmedRentOrder?sessionKey=' + encodeURIComponent(sessionKey)
-            + '&startDate=' + formatDate(startDate) + '&endDate=' + formatDate(endDate)+'&shop=' + encodeURIComponent('万龙体验中心');
+            + '&startDate=' + formatDate(startDate) + '&endDate=' + formatDate(endDate) + '&shop=' + encodeURIComponent('万龙体验中心');
         $.ajax({
             url: getUrl,
             type: 'GET',
@@ -119,7 +119,7 @@
                 for (var i = 0; i < orders.length; i++) {
                     var order = orders[i];
                     var display = false;
-                    if (order.code == 'WT_ZL_251111_00003'){
+                    if (order.code == 'WT_ZL_251111_00003') {
                         console.log('aa')
                     }
                     if (order.rentals != null && order.rentals.length > 0) {
@@ -129,7 +129,7 @@
                                 continue;
                             }
                             var lineData = [];
-                            
+
                             for (var k = 0; k < tHead.length; k++) {
                                 switch (tHead[k]) {
                                     case '序号':
@@ -164,14 +164,14 @@
                             }
                             if (rental.totalRentalAmount - rental.totalDiscountAmount >= 1) {
                                 tData.push(lineData);
-                                totalAmount +=  (rental.totalRentalAmount - rental.totalDiscountAmount);
+                                totalAmount += (rental.totalRentalAmount - rental.totalDiscountAmount);
                                 index++;
                                 display = true;
                             }
                         }
                         var lineSumData = []
-                        for(var k = 0; display && k < tHead.length; k++){
-                            switch(k){
+                        for (var k = 0; display && k < tHead.length; k++) {
+                            switch (k) {
                                 case 6:
                                     lineSumData[k] = '总计'
                                     break;
@@ -179,57 +179,102 @@
                                     lineSumData[k] = order.totalRentSummaryAmount.toFixed(2);
                                     break;
                                 case 8:
-                                    if (order.orderShares == null || order.orderShares.length == 0){
-                                        lineSumData[k] = (order.totalRentSummaryAmount*0.5).toFixed(2);
+                                    if (order.orderShares == null || order.orderShares.length == 0) {
+                                        lineSumData[k] = (order.totalRentSummaryAmount * 0.5).toFixed(2);
                                         needToShare += parseFloat(lineSumData[k])
                                     }
-                                    else{
+                                    else {
                                         lineSumData[k] = 0;
                                     }
                                     break;
                                 case 9:
-                                    if (order.orderShares == null || order.orderShares.length == 0){
+                                    if (order.orderShares == null || order.orderShares.length == 0) {
                                         lineSumData[k] = 0;
                                     }
-                                    else{
+                                    else {
                                         lineSumData[k] = order.totalShareAmount.toFixed(2);
                                         needToShare += parseFloat(lineSumData[k])
                                     }
                                     break;
                                 case 10:
-                                    if (order.orderShares == null || order.orderShares.length == 0){
+                                    if (order.orderShares == null || order.orderShares.length == 0) {
                                         lineSumData[k] = 0;
                                     }
-                                    else{
+                                    else {
                                         lineSumData[k] = order.totalShareSuccessAmount.toFixed(2);
                                         sharedAmount += parseFloat(lineSumData[k])
                                     }
                                     break;
                                 case 11:
-                                    if (order.orderShares == null || order.orderShares.length == 0){
+                                    if (order.orderShares == null || order.orderShares.length == 0) {
                                         lineSumData[k] = 0;
                                     }
-                                    else{
+                                    else {
                                         lineSumData[k] = (order.totalShareAmount - order.totalShareSuccessAmount).toFixed(2);
                                     }
                                     break;
                                 case 12:
+                                    /*
                                     var payMethod = ''
                                     for(var m = 0; order.availablePayments && m < order.availablePayments.length; m++){
                                         if (payMethod.indexOf(order.availablePayments[m].pay_method)<0){
                                             payMethod += order.availablePayments[m].pay_method + ' ';
                                         }
                                     }
-                                    lineSumData[k] = payMethod;
+                                    */
+                                    lineSumData[k] = '--';
                                     break;
                                 default:
                                     lineSumData[k] = '--';
                                     break;
                             }
                         }
-                        if (display){
+                        if (display) {
                             tData.push(lineSumData);
+                            
+                            for (var k = 0; order.orderShares && k < order.orderShares.length; k++) {
+                                if (order.orderShares.relation_id == 4) {
+                                    for (var l = 0; order.orderShares[k].paymentShares && l < order.orderShares[k].paymentShares.length; l++) {
+                                        var pShare = order.orderShares[k].paymentShares[l];
+                                        var lineShareData = [];
+                                        for (var m = 0; m < tHead.length; m++) {
+                                            switch (m) {
+                                                case 6:
+                                                    lineShareData[m] = pShare.out_trade_no;
+                                                    break;
+                                                case 8:
+                                                    if (pShare.payment.pay_method != '微信支付' && pShare.payment.pay_method != '支付宝') {
+                                                        lineShareData[m] = pShare.amount.toFixed(2);
+                                                    }
+                                                case 9:
+                                                    if (pShare.payment.pay_method == '微信支付' || pShare.payment.pay_method == '支付宝') {
+                                                        lineShareData[m] = pShare.amount.toFixed(2);
+                                                    }
+                                                    break;
+                                                case 10:
+                                                    if (pShare.success == true) {
+                                                        lineShareData[m] = pShare.amount.toFixed(2);
+                                                    }
+                                                    break;
+                                                case 11:
+                                                    if (pShare.success != true) {
+                                                        lineShareData[m] = pShare.amount.toFixed(2);
+                                                    }
+                                                    break;
+                                                case 12:
+                                                    lineShareData[m] = pShare.payment.pay_method;
+                                                    break;
+                                                default:
+                                                    lineSumData[k] = '--';
+                                                    break;
+                                            }
+                                        }
+                                        tData.push(lineShareData);
+                                    }
+                                }
+                            }
                         }
+
                     }
                     else {
                         var lineData = [];
@@ -267,7 +312,7 @@
                                     break;
                                 case '人工分账':
                                     var amount = order.paidAmount - order.refundAmount;
-                                    lineData[k] = (amount*0.5).toFixed(2);
+                                    lineData[k] = (amount * 0.5).toFixed(2);
                                     needToShare += parseFloat(lineData[k]);
                                     break;
                                 case '系统分账':
