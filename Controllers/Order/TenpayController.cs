@@ -675,7 +675,7 @@ namespace SnowmeetApi.Controllers
         {
             OrderShareRelation relation = await _db.orderShareRelation.Where(r => r.id == relationId)
                 .AsNoTracking().FirstOrDefaultAsync();
-            bool ret = await AddShareReciver(10, relation);
+            bool ret = await AddShareReciver(paymentMchId, relation);
         }
         [NonAction]
         public async Task<bool> AddShareReciver(int paymentMchId, OrderShareRelation relation)
