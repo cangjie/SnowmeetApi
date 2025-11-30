@@ -233,7 +233,7 @@
                             tData.push(lineSumData);
                             
                             for (var k = 0; order.orderShares && k < order.orderShares.length; k++) {
-                                if (order.orderShares.relation_id == 4) {
+                                if (order.orderShares[k].relation_id == 4) {
                                     for (var l = 0; order.orderShares[k].paymentShares && l < order.orderShares[k].paymentShares.length; l++) {
                                         var pShare = order.orderShares[k].paymentShares[l];
                                         var lineShareData = [];
