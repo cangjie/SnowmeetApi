@@ -1831,7 +1831,8 @@ namespace SnowmeetApi.Controllers
                         mchId = 3;
                         break;
                     case "租赁":
-                        mchId = 10;
+                        mchId = 5;
+                        //mchId = 10;
                         break;
                     case "零售":
                         mchId = 12;
