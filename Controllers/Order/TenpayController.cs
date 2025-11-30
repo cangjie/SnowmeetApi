@@ -730,8 +730,6 @@ namespace SnowmeetApi.Controllers
                 Description = description
             };
             var res = await client.ExecuteSetProfitSharingOrderUnfrozenAsync(req);
-
-
         }
         [NonAction]
         public async Task<PaymentShare> Settle(PaymentShare share)

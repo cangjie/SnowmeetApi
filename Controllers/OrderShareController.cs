@@ -168,7 +168,7 @@ namespace SnowmeetApi.Controllers
             List<PaymentShare> shares = await _db.paymentShare.Include(p => p.payment)
                 .Include(s => s.orderShare).ThenInclude(o => o.order).ThenInclude(o => o.payments)
                 .ThenInclude(p => p.refunds).Include(s => s.orderShare).ThenInclude(s => s.relation)
-                .Where(s => s.submit_time == null && ((DateTime)s.orderShare.order.close_date).Date <= shareDate.Date )
+                .Where(s => s.submit_time == null && ((DateTime)s.orderShare.order.close_date).Date == shareDate.Date )
                 .AsNoTracking().ToListAsync();
             for(int i = 0; i < shares.Count; i++)
             {
