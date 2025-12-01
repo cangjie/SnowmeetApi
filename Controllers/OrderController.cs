@@ -11,6 +11,7 @@ using System.Threading.Tasks;
 using Newtonsoft.Json;
 using System.Threading;
 using NPOI.SS.Formula.Functions;
+using Humanizer;
 namespace SnowmeetApi.Controllers
 {
     [Route("api/[controller]/[action]")]
@@ -2317,6 +2318,103 @@ namespace SnowmeetApi.Controllers
                 await _db.SaveChangesAsync();
             }
             return discount;
+        }
+        [HttpGet("{orderId}")]
+        public async Task<ActionResult<ApiResult<Models.Order?>>> PayWithDeposit(int orderId, 
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            if (staff == null || staff.title_level < 100)
+            {
+                return Ok(new ApiResult<Models.Order?>()
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = null
+                });
+            }
+            bool canNotFindMember = false;
+            bool canNotFindOrder = false;
+            //bool depositIsNotEnough = false;
+            OrderController _orderHelper = new OrderController(_db, _config, _http);
+            Models.Order order = await _orderHelper.GetOrder(orderId);
+            if (order == null || order.paying_amount == null )
+            {
+                canNotFindOrder = true;
+            }
+            if (order.member_id == null)
+            {
+                canNotFindMember = true;
+            }
+            MemberController _memberHelper = new MemberController(_db, _config);
+            Member member = await _memberHelper.GetWholeMemberById((int)order.member_id);
+            if (member == null)
+            {
+                canNotFindMember = true;
+            }
+            if (canNotFindMember || canNotFindOrder)
+            {
+                return Ok(new ApiResult<Models.Order?>()
+                {
+                    code = 1,
+                    message = canNotFindMember? "未找到会员信息" : (canNotFindOrder? "未找到订单信息": ""),
+                    data = null
+                });
+            }
+            double payingAmount = Math.Round((double)order.paying_amount, 2);
+            double availableAmount = Math.Round(member.availableDeposit, 2);
+            if (payingAmount > availableAmount)
+            {
+                return Ok(new ApiResult<Models.Order?>()
+                {
+                    code = 1,
+                    message = "储值余额不足",
+                    data = null
+                });
+            }
+            if (order.paidAmount > 0)
+            {
+                return Ok(new ApiResult<Models.Order?>()
+                {
+                    code = 1,
+                    message = "订单已支付",
+                    data = null
+                });
+            }
+            DepositController _depositHelper = new DepositController(_db, _config);
+            OrderPayment payment = new OrderPayment()
+            {
+                id = 0,
+                order_id = order.id,
+                pay_method = "储值支付",
+                staff_id = staff.id,
+                member_id = order.member_id,
+                amount = (double)order.paying_amount,
+                status = OrderPayment.PaymentStatus.待支付.ToString(),
+                create_date = DateTime.Now
+            };
+            await _db.orderPayment.AddAsync(payment);
+            await _db.SaveChangesAsync();
+            //OrderPayment payment = await _depositHelper.CreateDepositPayment(order.id, (double)order.paying_amount, sessionKey, sessionType);
+            List<DepositBalance> balances = await _depositHelper.ConsumeDeposit(payment.id, sessionKey, sessionType);
+            if (balances == null)
+            {
+                return Ok(new ApiResult<Models.Order?>()
+                {
+                   code = 1,
+                   message = "消费失败",
+                   data = null 
+                });
+            }
+            member = await _memberHelper.GetWholeMemberById(member.id);
+            order = await _orderHelper.GetOrder(order.id);
+            order.member = member;
+            return Ok(new ApiResult<Models.Order>()
+            {
+                code = 0,
+                message = "",
+                data = order
+            });
         }
     }
 

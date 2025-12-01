@@ -174,7 +174,8 @@ namespace SnowmeetApi.Controllers
             {
                 id = 0,
                 order_id = orderId,
-                open_id = order.open_id,
+                open_id = null,
+                member_id = 0,
                 amount = amount,
                 status = OrderPayment.PaymentStatus.待支付.ToString(),
                 deposit_type = "服务储值",
@@ -187,6 +188,7 @@ namespace SnowmeetApi.Controllers
             await _db.SaveChangesAsync();
             return payment;
         }
+        
         [HttpGet("{paymentId}")]
         public async Task<ActionResult<List<DepositBalance>>> DepositCosume(int paymentId, 
             string sessionKey, string sessionType = "wechat_mini_openid")
@@ -637,6 +639,91 @@ namespace SnowmeetApi.Controllers
         /////////////////////////////////////
         /// new season
         /// ///////////////////////////////
+        /// [HttpGet("{paymentId}")]
+        [NonAction]
+        public async Task<List<DepositBalance>> ConsumeDeposit(int paymentId, 
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            MemberController _memberHelper = new MemberController(_db, _config);
+            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
+            if (member == null)
+            {
+                return null;
+            }
+            OrderPayment payment = await _db.OrderPayment.FindAsync(paymentId);
+            if (payment == null || payment.status.Trim().Equals("支付成功"))
+            {
+                return null;
+            }
+            Member customer = await _memberHelper.GetWholeMemberById((int)payment.member_id);
+            if (customer == null)
+            {
+                return null;
+            }
+            int memberId = customer.id;
+            List<DepositAccount> accountList = await GetMemberAccountAvaliable(memberId, 
+                payment.deposit_type, payment.deposit_sub_type);
+            List<DepositBalance> balanceList = new List<DepositBalance>();
+            double paidAmount = 0;
+            double unPaidAmount = payment.amount;
+            for(int i = 0; i < accountList.Count && unPaidAmount > 0; i++)
+            {
+                if (accountList[i].avaliableAmount >= unPaidAmount)
+                {
+                    DepositBalance balance = CreateDepositBalance(accountList[i], payment.amount);
+                    if (balance != null)
+                    {
+                        paidAmount += -1 * balance.amount;
+                        unPaidAmount = payment.amount - paidAmount;
+                        balance.payment_id = payment.id;
+                        balance.order_id = payment.order_id;
+                        balanceList.Add(balance);
+                    }
+                }
+                else
+                {
+                    DepositBalance balance = CreateDepositBalance(accountList[i], accountList[i].avaliableAmount);
+                    if (balance != null)
+                    {
+                        paidAmount += -1 * balance.amount;
+                        unPaidAmount = payment.amount - paidAmount;
+                        balance.payment_id = payment.id;
+                        balance.order_id = payment.order_id;
+                        balanceList.Add(balance);
+                    }
+                }
+            }
+            if (unPaidAmount > 0)
+            {
+                return null;
+            }
+            for(int i = 0; i < balanceList.Count; i++)
+            {
+                DepositBalance balance = balanceList[i];
+                await _db.depositBalance.AddAsync(balance);
+                for(int j = 0; j < accountList.Count; j++)
+                {
+                    if (accountList[j].id == balance.deposit_id)
+                    {
+                        DepositAccount account = accountList[j];
+                        account.consume_amount += balance.amount * -1;
+                        account.update_date = DateTime.Now;
+                        _db.depositAccount.Entry(account).State = EntityState.Modified;
+                    }
+                }
+            }
+            payment.status = "支付成功";
+            _db.OrderPayment.Entry(payment).State = EntityState.Modified;
+            try
+            {
+                await _db.SaveChangesAsync();
+                return balanceList;
+            }
+            catch
+            {
+                return null;
+            }
+        }
         
     }   
 }
