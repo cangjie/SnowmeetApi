@@ -250,7 +250,7 @@ namespace SnowmeetApi.Controllers.Order
 
             return mchId;
         }
-        
+        /*
         [HttpGet("{paymentId}")]
         public async Task<ActionResult<OrderOnline>> GetWholeOrder(int paymentId, string sessionKey)
         {
@@ -273,7 +273,8 @@ namespace SnowmeetApi.Controllers.Order
             
             return order;
         }
-
+*/
+/*
         [HttpGet("{paymentId}")]
         public async Task<ActionResult<OrderOnline>> ModPayMethod(int paymentId, string payMethod, string sessionKey)
         {
@@ -301,7 +302,8 @@ namespace SnowmeetApi.Controllers.Order
             await _context.SaveChangesAsync();
             return Ok(order);
         }
-
+*/
+/*
         [HttpGet("{orderId}")]
         public async Task<ActionResult<OrderOnline>> CancelOrder(int orderId, string sessionKey)
         {
@@ -358,7 +360,7 @@ namespace SnowmeetApi.Controllers.Order
             return Ok((await orderController.GetOrderOnline(orderId, sessionKey)).Value);
 
         }
-
+*/
         [HttpGet("{paymentId}")]
         public async Task<ActionResult<OrderPayment>> Pay(int paymentId, string sessionKey)
         {

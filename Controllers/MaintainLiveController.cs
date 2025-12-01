@@ -11,7 +11,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Org.BouncyCastle.Asn1.X509;
-using SnowmeetApi.Controllers.Maintain;
+//using SnowmeetApi.Controllers.Maintain;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 namespace SnowmeetApi.Controllers
 {
@@ -22,8 +22,8 @@ namespace SnowmeetApi.Controllers
         private readonly ApplicationDBContext _context;
         private IConfiguration _config;
         private IConfiguration _originConfig;
-        private readonly MaintainLogsController _logHelper;
-        private readonly OrderOnlinesController _orderHelper;
+        //private readonly MaintainLogsController _logHelper;
+        //private readonly OrderOnlinesController _orderHelper;
         
 
 
@@ -32,8 +32,8 @@ namespace SnowmeetApi.Controllers
             _context = context;
             _config = config.GetSection("Settings");
             _originConfig = config;
-            _logHelper = new MaintainLogsController(context, config);
-            _orderHelper = new OrderOnlinesController(context, config);
+            //_logHelper = new MaintainLogsController(context, config);
+            //_orderHelper = new OrderOnlinesController(context, config);
         }
 
 
@@ -163,6 +163,7 @@ namespace SnowmeetApi.Controllers
             return s;
         }
 */
+/*
         [HttpGet("{orderId}")]
         public async Task<ActionResult<MaintainOrder>> BindNewMember(int orderId, string sessionKey)
         {
@@ -186,7 +187,7 @@ namespace SnowmeetApi.Controllers
             return await GetMaintainOrder(orderId, sessionKey);
 
         }
-
+*/
         [HttpGet]
         public async Task<ActionResult<MaintainOrder[]>> GetMyMaintainOrders(string sessionKey)
         {
@@ -283,7 +284,7 @@ namespace SnowmeetApi.Controllers
         }
 
 
-
+/*
         [HttpGet("{orderId}")]
         public async Task<ActionResult<MaintainOrder>> GetMaintainOrder(int orderId, string sessionKey, bool needValid = true)
         {
@@ -348,7 +349,8 @@ namespace SnowmeetApi.Controllers
             }
             return Ok(mOrder);
         }
-
+*/
+/*
         [HttpGet("{id}")]
         public async Task<ActionResult<MaintainLive>> GetTask(int id, string sessionKey)
         {
@@ -368,6 +370,7 @@ namespace SnowmeetApi.Controllers
             task.log = await _context.MaintainLog.Where(l => l.task_id == id).OrderBy(m => m.id).AsNoTracking().ToArrayAsync();
             return Ok(task);
         }
+        */
         [HttpGet("{key}")]
         public async Task<ActionResult<List<MaintainLive>>> GetTasksQuick(string key, string shop = "", string sessionKey = "")
         {
@@ -518,7 +521,7 @@ namespace SnowmeetApi.Controllers
 
             return Ok(liveArr);
         }
-
+/*
         [HttpGet]
         public async Task<ActionResult<List<MaintainLive>>> GetInStockTask(string shop, string sessionKey)
         {
@@ -581,7 +584,7 @@ namespace SnowmeetApi.Controllers
             return Ok(liveArr);
 
         }
-
+*/
         [HttpPost]
         public async Task<ActionResult<MaintainOrder>> Recept(string sessionKey, MaintainOrder maintainOrder)
         {
@@ -723,7 +726,7 @@ namespace SnowmeetApi.Controllers
                 await GenerateFlowNum(tastList[i].id);
             }
         }
-
+/*
         [HttpGet("{orderId}")]
         public async Task<ActionResult<MaintainOrder>> MaitainOrderPaySuccessManual(int orderId, string sessionKey)
         {
@@ -765,7 +768,7 @@ namespace SnowmeetApi.Controllers
             }
 
         }
-
+*/
         [NonAction]
         public async Task<ActionResult<MaintainLive>> GenerateFlowNum(int taskId)
         {

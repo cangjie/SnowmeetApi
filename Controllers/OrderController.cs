@@ -2391,6 +2391,7 @@ namespace SnowmeetApi.Controllers
                 member_id = order.member_id,
                 amount = (double)order.paying_amount,
                 status = OrderPayment.PaymentStatus.待支付.ToString(),
+                deposit_type = "服务储值",
                 create_date = DateTime.Now
             };
             await _db.orderPayment.AddAsync(payment);

@@ -137,7 +137,7 @@ namespace SnowmeetApi.Controllers.Order
         }
 
         
-
+/*
         [NonAction]
         public async Task<OrderPaymentRefund> TenpayRefund(int paymentId, double amount, string memo, string sessionKey)
         {
@@ -239,7 +239,7 @@ namespace SnowmeetApi.Controllers.Order
 
             
         }
-
+*/
         [NonAction]
         public async Task<string> GetOutRefundNo(OrderPayment payment)
         {

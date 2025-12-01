@@ -1,4 +1,5 @@
-﻿using System;
+﻿/*
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -117,29 +118,7 @@ namespace SnowmeetApi.Controllers.Maintain
 
             return Ok(list);
         }
-        /*
-        [HttpGet]
-        public async Task ExportExcel()
-        {
-            List<MaintainReport> l = (List<MaintainReport>)((OkObjectResult)(await GetReport(DateTime.Parse("2024-10-01"), DateTime.Parse("2025-12-01"), "")).Result).Value;
-            l = l.OrderByDescending(l => l.task_flow_num).ToList();
-            List<MaintainReport> sortedL = new List<MaintainReport>();
-            for(int i = 0; i < l.Count; i++)
-            {
-                if (sortedL.Where(sl => sl.task_flow_num.Trim().Equals(l[i].task_flow_num.Trim())).ToList().Count > 0)
-                {
-                    continue;
-                }
-                //sortedL.Add(l[i]);
-                List<MaintainReport> subL = l.Where(subL => subL.order_id == l[i].order_id).ToList();
-                for(int j = 0; j < subL.Count; j++)
-                {
-                    sortedL.Add(subL[j]);
-                }
-            }
-            Console.WriteLine("");
-        }
-        */
+ 
         [HttpGet]
         public async Task ExportExcel()
         {
@@ -866,3 +845,4 @@ namespace SnowmeetApi.Controllers.Maintain
         }
     }
 }
+*/

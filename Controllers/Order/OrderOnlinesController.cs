@@ -1,4 +1,5 @@
-﻿using System;
+﻿/*
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -864,33 +865,7 @@ namespace SnowmeetApi.Controllers
                 await _context.OrderPayment.AddAsync(payment);
                 await _context.SaveChangesAsync();
                 //order.paymentList.Add(payment);
-            }
-            
-            
-            /*
-            if (order.mi7Orders != null)
-            {
-                for (int j = 0; j < order.mi7Orders.Count; j++)
-                {
-                    order.mi7Orders[j].order_id = order.id;
-                    order.mi7Orders[j].id = 0;
-                    await _context.mi7Order.AddAsync(order.mi7Orders[j]);
-                }
-                await _context.SaveChangesAsync();
-            }
-            */
-            /*
-            if (order.payments != null && order.payments.Length == 1 && !(order.pay_memo.Trim().Equals("无需付款") || order.pay_memo.Trim().Equals("暂缓支付")))
-            {
-                var payment = order.payments[0];
-                payment.order_id = order.id;
-                payment.status = "待支付";
-                payment.staff_open_id = order.staff_open_id;
-                await _context.OrderPayment.AddAsync(payment);
-                await _context.SaveChangesAsync();
-                order.payments[0] = payment;
-            }
-            */
+            }  
             if (order.user != null && order.user.open_id != null &&  !order.user.open_id.Trim().Equals(""))
             {
                 //MiniAppUser customerUser = await _context.MiniAppUsers.FindAsync(order.user.open_id);
@@ -1254,20 +1229,7 @@ namespace SnowmeetApi.Controllers
                 return BadRequest();
             }
             OrderOnline order = await _context.OrderOnlines.FindAsync(orderId);
-            /*
-            StaffModLog log = new StaffModLog()
-            {
-                id = 0,
-                key_id = order.id.ToString(),
-                scene = "修改零售业务时间",
-                table_name = "order_online",
-                field_name = "biz_date",
-                prev_value = order.biz_date.ToString(),
-                current_value = bizDate.ToString(),
-                staff_member_id = user.member.id
-            };
-            await _context.staffModLog.AddAsync(log);
-            */
+
             order.biz_date = bizDate;
             _context.OrderOnlines.Entry(order).State = EntityState.Modified;
             await _context.SaveChangesAsync();
@@ -1299,3 +1261,4 @@ namespace SnowmeetApi.Controllers
         }
     }
 }
+*/

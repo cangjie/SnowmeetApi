@@ -34,7 +34,7 @@ namespace SnowmeetApi.Controllers
         private readonly IHttpContextAccessor _httpContextAccessor;
         private readonly DateTime startDate = DateTime.Parse("2020-10-20");
         private MemberController _memberHelper;
-        private OrderOnlinesController _orderHelper;
+        //private OrderOnlinesController _orderHelper;
         public class Balance
         {
             public int id { get; set; }
@@ -58,7 +58,7 @@ namespace SnowmeetApi.Controllers
             _appId = _config.GetSection("AppId").Value.Trim();
             _httpContextAccessor = httpContextAccessor;
             _memberHelper = new MemberController(context, config);
-            _orderHelper = new OrderOnlinesController(_db, _oriConfig);
+            //_orderHelper = new OrderOnlinesController(_db, _oriConfig);
         }
         [HttpGet]
         public ActionResult<ApiResult<ArrayList>> GetRentType()
@@ -2261,7 +2261,7 @@ namespace SnowmeetApi.Controllers
             }
             return Ok(bList.OrderByDescending(b => b.id).ToList());
         }
-
+/*
         [HttpPost]
         public async Task<ActionResult<RentOrder>> Recept([FromQuery] string sessionKey, [FromBody] RentOrder rentOrder)
         {
@@ -2347,12 +2347,7 @@ namespace SnowmeetApi.Controllers
             for (int i = 0; i < rentOrder.details.Count; i++)
             {
                 RentOrderDetail detail = rentOrder.details[i];
-                /*
-                if (detail.deposit_type.Trim().Equals("立即租赁"))
-                {
-                    detail.start_date = DateTime.Now;
-                }
-                */
+      
                 detail.rent_staff = user.miniAppOpenId.Trim();
                 detail.return_staff = "";
                 detail.rent_list_id = rentOrder.id;
@@ -2367,7 +2362,7 @@ namespace SnowmeetApi.Controllers
 
             return rentOrder;
         }
-
+*/
         [HttpGet("{cell}")]
         public async Task<ActionResult<RentOrder[]>> GetRentOrderListByCell(string cell, string sessionKey, string status = "", string shop = "")
         {
@@ -2431,7 +2426,7 @@ namespace SnowmeetApi.Controllers
             return Ok(orderList.ToArray<RentOrder>());
         }
 
-
+/*
         [HttpGet]
         public async Task<ActionResult<RentOrder[]>> GetRentOrderListByStaff(string shop,
             DateTime start, DateTime end, string status, string sessionKey)
@@ -2506,7 +2501,7 @@ namespace SnowmeetApi.Controllers
             }
 
         }
-
+*/
         [NonAction]
         public async Task RestoreStaffInfo(RentOrder order)
         {
@@ -2916,7 +2911,7 @@ namespace SnowmeetApi.Controllers
             await _db.SaveChangesAsync();
             return Ok(detail);
         }
-
+/*
         [HttpGet("{id}")]
         public async Task<ActionResult<RentOrder>> Refund(int id, double amount,
             double rentalReduce, double rentalReduceTicket, string memo, string sessionKey)
@@ -3019,28 +3014,12 @@ namespace SnowmeetApi.Controllers
 
 
 
-            //List<OrderPayment> payments = rentOrder
-            /*
-
-
-            if (amount > 0 && rentOrder.order_id > 0 && rentOrder.order != null && rentOrder.payMethod.Trim().Equals("微信支付")
-                && rentOrder.order.payments != null && rentOrder.order.payments.Count > 0)
-            {
-                OrderPayment payment = rentOrder.order.payments[0];
-                
-                Order.OrderRefundController refundHelper = new Order.OrderRefundController(
-                    _db, _oriConfig, _httpContextAccessor);
-                double paidAmount = payment.amount;
-                if (paidAmount >= amount)
-                {
-                    await refundHelper.TenpayRefund(payment.id, amount,memo, sessionKey);
-                }
-            }
-            */
+           
             return Ok(rentOrder);
 
 
         }
+        */
 
         [HttpGet("{id}")]
         public async Task<ActionResult<RentOrder>> SetPaidManual(int id, string payMethod, string sessionKey)

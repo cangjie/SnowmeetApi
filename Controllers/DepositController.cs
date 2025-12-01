@@ -33,7 +33,7 @@ namespace SnowmeetApi.Controllers
             type = Util.UrlDecode(type);
             subType = Util.UrlDecode(subType);
             List<DepositAccount> list = await _db.depositAccount
-                .Where(a => ( (a.expire_date == null || ((DateTime)a.expire_date).Date >= DateTime.Now.Date)
+                .Where(a => ((a.expire_date == null || ((DateTime)a.expire_date).Date >= DateTime.Now.Date)
                 && a.valid == 1 && a.member_id == memberId)
                 && (type.Trim().Equals("") || a.type.Trim().Equals(type))
                 && (subType.Trim().Equals("") || subType.Trim().Equals(a.sub_type.Trim()))
@@ -47,10 +47,10 @@ namespace SnowmeetApi.Controllers
         }
         [NonAction]
         public async Task<double> GetMemberTotalAmount(int memberId)
-        { 
+        {
             List<DepositAccount> accountList = await GetMemberAccountAvaliable(memberId, "", "");
             double sum = 0;
-            for(int i = 0; i < accountList.Count; i++)
+            for (int i = 0; i < accountList.Count; i++)
             {
                 sum += accountList[i].income_amount;
             }
@@ -58,10 +58,10 @@ namespace SnowmeetApi.Controllers
         }
         [NonAction]
         public async Task<double> GetMemberSummaryAmount(int memberId)
-        { 
+        {
             List<DepositAccount> accountList = await GetMemberAccountAvaliable(memberId, "", "");
             double sum = 0;
-            for(int i = 0; i < accountList.Count; i++)
+            for (int i = 0; i < accountList.Count; i++)
             {
                 sum += accountList[i].avaliableAmount;
             }
@@ -144,7 +144,7 @@ namespace SnowmeetApi.Controllers
         }
         */
         [HttpGet("{rentOrderId}")]
-        public async Task<ActionResult<List<DepositBalance>>> RentOderPay(int rentOrderId, double amount, 
+        public async Task<ActionResult<List<DepositBalance>>> RentOderPay(int rentOrderId, double amount,
             string sessionKey, string sessionType = "wechat_mini_openid")
         {
             RentOrder rentOrder = await _db.RentOrder.FindAsync(rentOrderId);
@@ -160,7 +160,7 @@ namespace SnowmeetApi.Controllers
             return await DepositCosume(payment.id, sessionKey, sessionType);
         }
         [NonAction]
-        public async Task<OrderPayment> CreateDepositPayment(int orderId, double amount, 
+        public async Task<OrderPayment> CreateDepositPayment(int orderId, double amount,
             string sessionKey, string sessionType = "wechat_mini_openid")
         {
             MemberController _memberHelper = new MemberController(_db, _config);
@@ -188,9 +188,9 @@ namespace SnowmeetApi.Controllers
             await _db.SaveChangesAsync();
             return payment;
         }
-        
+
         [HttpGet("{paymentId}")]
-        public async Task<ActionResult<List<DepositBalance>>> DepositCosume(int paymentId, 
+        public async Task<ActionResult<List<DepositBalance>>> DepositCosume(int paymentId,
             string sessionKey, string sessionType = "wechat_mini_openid")
         {
             MemberController _memberHelper = new MemberController(_db, _config);
@@ -210,12 +210,12 @@ namespace SnowmeetApi.Controllers
                 return NoContent();
             }
             int memberId = customer.id;
-            List<DepositAccount> accountList = await GetMemberAccountAvaliable(memberId, 
+            List<DepositAccount> accountList = await GetMemberAccountAvaliable(memberId,
                 payment.deposit_type, payment.deposit_sub_type);
             List<DepositBalance> balanceList = new List<DepositBalance>();
             double paidAmount = 0;
             double unPaidAmount = payment.amount;
-            for(int i = 0; i < accountList.Count && unPaidAmount > 0; i++)
+            for (int i = 0; i < accountList.Count && unPaidAmount > 0; i++)
             {
                 if (accountList[i].avaliableAmount >= unPaidAmount)
                 {
@@ -246,11 +246,11 @@ namespace SnowmeetApi.Controllers
             {
                 return BadRequest();
             }
-            for(int i = 0; i < balanceList.Count; i++)
+            for (int i = 0; i < balanceList.Count; i++)
             {
                 DepositBalance balance = balanceList[i];
                 await _db.depositBalance.AddAsync(balance);
-                for(int j = 0; j < accountList.Count; j++)
+                for (int j = 0; j < accountList.Count; j++)
                 {
                     if (accountList[j].id == balance.deposit_id)
                     {
@@ -305,12 +305,12 @@ namespace SnowmeetApi.Controllers
             {
                 return null;
             }
-            
+
             return null;
         }
         [HttpGet("{memberId}")]
-        public async Task<ActionResult<DepositAccount>> DepositCharge(int memberId, int accountId,  double chargeAmount, 
-            DateTime expireDate, string sessionKey, string sessionType = "wechat_mini_openid", 
+        public async Task<ActionResult<DepositAccount>> DepositCharge(int memberId, int accountId, double chargeAmount,
+            DateTime expireDate, string sessionKey, string sessionType = "wechat_mini_openid",
              string type = "服务储值", string subType = "", string? mi7OrderId = null, string? bizType = null, string? memo = null)
         {
             Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey);
@@ -322,7 +322,7 @@ namespace SnowmeetApi.Controllers
             if (accountId != 0)
             {
                 account = await _db.depositAccount.FindAsync(accountId);
-                if (account == null || (account.member_id != memberId &&  memberId != 0))
+                if (account == null || (account.member_id != memberId && memberId != 0))
                 {
                     return BadRequest();
                 }
@@ -330,8 +330,8 @@ namespace SnowmeetApi.Controllers
             else
             {
                 List<DepositAccount> accList = await _db.depositAccount
-                    .Where(a => a.valid == 1 && a.member_id ==  memberId
-                    && a.type.Trim().Equals(type.Trim()) && a.sub_type.Trim().Equals(subType.Trim()) )
+                    .Where(a => a.valid == 1 && a.member_id == memberId
+                    && a.type.Trim().Equals(type.Trim()) && a.sub_type.Trim().Equals(subType.Trim()))
                     .ToListAsync();
                 if (accList == null || accList.Count == 0)
                 {
@@ -364,7 +364,7 @@ namespace SnowmeetApi.Controllers
             double sumIncome = await _db.depositBalance
                 .Where(b => b.valid == 1 && b.amount > 0 && b.deposit_id == account.id)
                 .SumAsync(b => b.amount);
-            double sumConsume = await _db.depositBalance.Where(b => b.valid == 1 && b.amount < 0 && b.deposit_id == account.id )
+            double sumConsume = await _db.depositBalance.Where(b => b.valid == 1 && b.amount < 0 && b.deposit_id == account.id)
                 .SumAsync(b => b.amount);
             DepositBalance b = new DepositBalance()
             {
@@ -448,7 +448,7 @@ namespace SnowmeetApi.Controllers
             }
             MemberController _memberHelper = new MemberController(_db, _config);
             List<Member> members = await _memberHelper.SearchMember(key);
-            for(int i = 0; i < members.Count; i++)
+            for (int i = 0; i < members.Count; i++)
             {
                 Member member = members[i];
                 await _db.member.Entry(member).Collection(m => m.memberSocialAccounts).LoadAsync();
@@ -467,14 +467,14 @@ namespace SnowmeetApi.Controllers
                     .Include(o => o.paymentList.Where(p => p.status.Trim().Equals("支付成功")))
                         .ThenInclude(p => p.refunds.Where(r => r.state == 1 || !r.refund_id.Trim().Equals("")))
                     .OrderByDescending(o => o.pay_time).ToListAsync();
-                
-                
+
+
             }
             return Ok(members);
         }
-        
+
         [HttpGet("{memberId}")]
-        public async Task<ActionResult<Member>> GetMember(int memberId, 
+        public async Task<ActionResult<Member>> GetMember(int memberId,
             string sessionKey, string sessionType = "wechat_mini_openid")
         {
             Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey);
@@ -490,16 +490,16 @@ namespace SnowmeetApi.Controllers
                 .Collection(m => m.depositAccounts).Query()
                 .Where(a => a.valid == 1).AsNoTracking().ToListAsync();
             member.orders = await _db.OrderOnlines
-                .Where(o => o.pay_state == 1 && o.type.Trim().Equals("店销现货") 
+                .Where(o => o.pay_state == 1 && o.type.Trim().Equals("店销现货")
                     && o.open_id.Trim().Equals(member.wechatMiniOpenId.Trim()))
                 .Include(o => o.paymentList.Where(p => p.status.Equals("支付成功")))
                     .ThenInclude(p => p.refunds.Where(r => r.state == 1 || r.refund_id.Trim().Equals("")))
                 .OrderByDescending(o => o.id).AsNoTracking().ToListAsync();
             return Ok(member);
         }
-        
+
         [HttpGet]
-        public async Task<ActionResult<List<DepositAccount>>> SearchDepositAccounts(string key, 
+        public async Task<ActionResult<List<DepositAccount>>> SearchDepositAccounts(string key,
             string sessionKey, string sessionType = "wechat_mini_openid")
         {
             if (key == null)
@@ -522,14 +522,14 @@ namespace SnowmeetApi.Controllers
             MemberController _memberHelper = new MemberController(_db, _config);
             List<Member> members = await _memberHelper.SearchMember(key);
             List<DepositAccount> ret = new List<DepositAccount>();
-            for(int i = 0; members != null && i < members.Count; i++)
+            for (int i = 0; members != null && i < members.Count; i++)
             {
                 Member member = members[i];
                 member.depositAccounts = await _db.member.Entry(member)
                     .Collection(m => m.depositAccounts)
                     .Query().Where(d => d.valid == 1)
                     .ToListAsync();
-                for(int j = 0; j < member.depositAccounts.Count; j++)
+                for (int j = 0; j < member.depositAccounts.Count; j++)
                 {
                     DepositAccount account = member.depositAccounts[j];
                     account.member = member;
@@ -538,7 +538,7 @@ namespace SnowmeetApi.Controllers
             }
             return Ok(ret);
         }
-        
+
         [HttpGet("{accountId}")]
         public async Task<ActionResult<DepositAccount>> GetAccount(int accountId,
             string sessionKey, string sessionType = "wechat_mini_openid")
@@ -562,7 +562,7 @@ namespace SnowmeetApi.Controllers
                 .Collection(m => m.memberSocialAccounts).LoadAsync();
             account.balances = account.balances.Where(b => b.valid == 1)
                 .OrderByDescending(b => b.id).ToList();
-            account.member.memberSocialAccounts 
+            account.member.memberSocialAccounts
                 = account.member.memberSocialAccounts.Where(a => a.valid == 1)
                 .ToList();
             return Ok(account);
@@ -631,8 +631,8 @@ namespace SnowmeetApi.Controllers
                     .ThenInclude(o => o.cares)
                 .Include(b => b.order)
                     .ThenInclude(o => o.rentals)
-                .Where(b => b.valid == 1 && b.create_date.Date >= start.Date && b.create_date.Date <= end.Date 
-                && (type.Trim().Equals("all")? true : (type.Trim().Equals("income")? b.amount > 0 : b.amount < 0) ) )
+                .Where(b => b.valid == 1 && b.create_date.Date >= start.Date && b.create_date.Date <= end.Date
+                && (type.Trim().Equals("all") ? true : (type.Trim().Equals("income") ? b.amount > 0 : b.amount < 0)))
                 .OrderByDescending(b => b.id).AsNoTracking().ToListAsync();
             return Ok(bList);
         }
@@ -640,8 +640,8 @@ namespace SnowmeetApi.Controllers
         /// new season
         /// ///////////////////////////////
         /// [HttpGet("{paymentId}")]
-        [NonAction]
-        public async Task<List<DepositBalance>> ConsumeDeposit(int paymentId, 
+        [HttpGet]
+        public async Task<List<DepositBalance>> ConsumeDeposit(int paymentId,
             string sessionKey, string sessionType = "wechat_mini_openid")
         {
             MemberController _memberHelper = new MemberController(_db, _config);
@@ -650,8 +650,13 @@ namespace SnowmeetApi.Controllers
             {
                 return null;
             }
-            OrderPayment payment = await _db.OrderPayment.FindAsync(paymentId);
+            OrderPayment payment = await _db.OrderPayment.Where(p => p.id == paymentId)
+                .AsNoTracking().FirstOrDefaultAsync();
             if (payment == null || payment.status.Trim().Equals("支付成功"))
+            {
+                return null;
+            }
+            if (payment.member_id == null)
             {
                 return null;
             }
@@ -661,12 +666,12 @@ namespace SnowmeetApi.Controllers
                 return null;
             }
             int memberId = customer.id;
-            List<DepositAccount> accountList = await GetMemberAccountAvaliable(memberId, 
+            List<DepositAccount> accountList = await GetMemberAccountAvaliable(memberId,
                 payment.deposit_type, payment.deposit_sub_type);
             List<DepositBalance> balanceList = new List<DepositBalance>();
             double paidAmount = 0;
             double unPaidAmount = payment.amount;
-            for(int i = 0; i < accountList.Count && unPaidAmount > 0; i++)
+            for (int i = 0; i < accountList.Count && unPaidAmount > 0; i++)
             {
                 if (accountList[i].avaliableAmount >= unPaidAmount)
                 {
@@ -697,25 +702,48 @@ namespace SnowmeetApi.Controllers
             {
                 return null;
             }
-            for(int i = 0; i < balanceList.Count; i++)
+            for (int i = 0; i < balanceList.Count; i++)
             {
                 DepositBalance balance = balanceList[i];
                 await _db.depositBalance.AddAsync(balance);
-                for(int j = 0; j < accountList.Count; j++)
+                for (int j = 0; j < accountList.Count; j++)
                 {
                     if (accountList[j].id == balance.deposit_id)
                     {
                         DepositAccount account = accountList[j];
                         account.consume_amount += balance.amount * -1;
                         account.update_date = DateTime.Now;
-                        _db.depositAccount.Entry(account).State = EntityState.Modified;
+                        try
+                        {
+                            _db.depositAccount.Entry(account).State = EntityState.Modified;
+                        }
+                        catch
+                        {
+                            _db.depositAccount.Entry(account).State = EntityState.Detached;
+                            await _db.SaveChangesAsync();
+                            _db.depositAccount.Entry(account).State = EntityState.Modified;
+                        }
                     }
                 }
             }
             payment.status = "支付成功";
-            _db.OrderPayment.Entry(payment).State = EntityState.Modified;
             try
             {
+                _db.OrderPayment.Entry(payment).State = EntityState.Modified;
+            }
+            catch
+            {
+                _db.orderPayment.Entry(payment).State = EntityState.Detached;
+                await _db.SaveChangesAsync();
+                _db.orderPayment.Entry(payment).State = EntityState.Modified;
+            }
+            try
+            {
+                await _db.SaveChangesAsync();
+                for(int i = 0; i < accountList.Count; i++)
+                {
+                    _db.depositAccount.Entry(accountList[i]).State = EntityState.Detached;
+                }
                 await _db.SaveChangesAsync();
                 return balanceList;
             }
@@ -724,6 +752,148 @@ namespace SnowmeetApi.Controllers
                 return null;
             }
         }
-        
-    }   
+        [NonAction]
+        public async Task Fix2025FallItem(Models.Order order)
+        {
+            double consumeAmount = 0;
+            if (order.type == "养护")
+            {
+                consumeAmount = order.total_amount;
+                if (consumeAmount == 0)
+                {
+                    
+                    double totalAmount = 0;
+                    for(int i = 0; order.cares != null && i < order.cares.Count; i++)
+                    {
+                        Care care = order.cares[i];
+                        if (care.need_edge == 1 && care.need_wax == 1)
+                        {
+                            totalAmount += 230;
+                        }
+                        if (care.need_edge == 1 || care.need_wax == 1)
+                        {
+                            totalAmount += 170;
+                        }
+                    }
+                    consumeAmount = totalAmount;
+                }
+
+            }
+            if (order.type == "租赁")
+            {
+                if (order.totalRentSummaryAmount != null)
+                    consumeAmount = (double)order.totalRentSummaryAmount;
+            }
+            if (consumeAmount == 0)
+            {
+                return;
+            }
+            //return;
+            OrderPayment payment = new OrderPayment()
+            {
+                id = 0,
+                order_id = order.id,
+                amount = consumeAmount,
+                member_id = order.member_id,
+                pay_method = "储值支付",
+                status = OrderPayment.PaymentStatus.待支付.ToString(),
+                deposit_type = "服务储值",
+                create_date = DateTime.Now
+            };
+            await _db.orderPayment.AddAsync(payment);
+            await _db.SaveChangesAsync();
+            _db.orderPayment.Entry(payment).State = EntityState.Detached;
+            CoreDataModLog log = Util.CreateCoreDataModLog("OrderPay", "id", payment.id, null, consumeAmount.ToString(), null, null, "储值补扣", null);
+            await _db.coreDataModLog.AddAsync(log);
+            await _db.SaveChangesAsync();
+
+            List<DepositBalance>? balances = await ConsumeDeposit(payment.id, "RF1kjdZB71Fs/TYazDkFHA==", "wechat_mini_openid");
+            if (balances == null)
+            {
+                CoreDataModLog logFail = Util.CreateCoreDataModLog("OrderPay", "id", payment.id, null, consumeAmount.ToString(), null, null, "储值补扣失败", null);
+                await _db.coreDataModLog.AddAsync(logFail);
+                await _db.SaveChangesAsync();
+            }
+        }
+        [HttpGet]
+        public async Task Fix2025Fall()
+        {
+
+            OrderController _orderHelper = new OrderController(_db, _config, null);
+            DateTime fallDate = DateTime.Parse("2025-10-15");
+            List<Models.Order> orders = await _db.order.Where(o => o.valid == 1 && o.memo.IndexOf("储值") >= 0 && o.create_date > fallDate)
+                .AsNoTracking().ToListAsync();
+            List<Models.Care> cares = await _db.care.Include(c => c.order)
+                .Where(c => c.order_id != null && c.valid == 1 && c.order.valid == 1 && (c.memo.IndexOf("储值") >= 0 || c.order.memo.IndexOf("储值") >= 0) && c.create_date > fallDate)
+                .AsNoTracking().ToListAsync();
+            List<Rental> rentals = await _db.rental.Include(r => r.order)
+                .Where(r => r.order_id != null && r.valid == 1 && r.order.valid == 1 && r.create_date > fallDate && (r.memo.IndexOf("储值") >= 0 || r.order.memo.IndexOf("储值") >= 0))
+                .AsNoTracking().ToListAsync();
+            List<Models.Order> depositOrders = new List<Models.Order>();
+            for (int i = 0; i < orders.Count; i++)
+            {
+                if (depositOrders.Where(o => o.id == orders[i].id).ToList().Count == 0)
+                {
+                    Models.Order order = await _orderHelper.GetOrder(orders[i].id);
+                    depositOrders.Add(order);
+                    if (order.availablePayments.Where(p => p.pay_method == "储值支付" && p.status == OrderPayment.PaymentStatus.支付成功.ToString()).ToList().Count == 0
+                        && (order.paidAmount == 0 || Math.Round(order.paidAmount - order.refundAmount, 2) == 0))
+                    {
+                        await Fix2025FallItem(order);
+                    }
+                    else
+                    {
+                        Console.WriteLine(order.id.ToString());
+                    }
+                }
+                else
+                {
+                    Console.WriteLine(orders[i].id.ToString() + " duplicate");
+                }
+            }
+            for (int i = 0; i < cares.Count; i++)
+            {
+                if (depositOrders.Where(o => o.id == cares[i].order_id).ToList().Count == 0)
+                {
+                    Models.Order order = await _orderHelper.GetOrder((int)cares[i].order_id);
+                    depositOrders.Add(order);
+                    if (order.availablePayments.Where(p => p.pay_method == "储值支付" && p.status == OrderPayment.PaymentStatus.支付成功.ToString()).ToList().Count == 0
+                        && (order.paidAmount == 0 || Math.Round(order.paidAmount - order.refundAmount, 2) == 0))
+                    {
+                        await Fix2025FallItem(order);
+                    }
+                    else
+                    {
+                        Console.WriteLine(order.id.ToString());
+                    }
+                }
+                else
+                {
+                    Console.WriteLine(cares[i].order_id.ToString() + " duplicate");
+                }
+            }
+            for (int i = 0; i < rentals.Count; i++)
+            {
+                if (depositOrders.Where(o => o.id == rentals[i].order_id).ToList().Count == 0)
+                {
+                    Models.Order order = await _orderHelper.GetOrder((int)rentals[i].order_id);
+                    depositOrders.Add(order);
+                    if (order.availablePayments.Where(p => p.pay_method == "储值支付" && p.status == OrderPayment.PaymentStatus.支付成功.ToString()).ToList().Count == 0
+                        && (order.paidAmount == 0 || Math.Round(order.paidAmount - order.refundAmount, 2) == 0))
+                    {
+                        await Fix2025FallItem(order);
+                    }
+                    else
+                    {
+                        Console.WriteLine(order.id.ToString());
+                    }
+                }
+                else
+                {
+                    Console.WriteLine(rentals[i].order_id.ToString() + " duplicate");
+                }
+            }
+        }
+
+    }
 }
