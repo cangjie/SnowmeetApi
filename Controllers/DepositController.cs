@@ -634,5 +634,9 @@ namespace SnowmeetApi.Controllers
                 .OrderByDescending(b => b.id).AsNoTracking().ToListAsync();
             return Ok(bList);
         }
+        /////////////////////////////////////
+        /// new season
+        /// ///////////////////////////////
+        
     }   
 }

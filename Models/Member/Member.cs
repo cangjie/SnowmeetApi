@@ -203,7 +203,7 @@ namespace SnowmeetApi.Models
             }
         }
         [NotMapped]
-        public double avaliableDeposit
+        public double availableDeposit
         {
             get
             {
