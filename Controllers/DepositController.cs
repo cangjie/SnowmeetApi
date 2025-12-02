@@ -448,6 +448,7 @@ namespace SnowmeetApi.Controllers
             }
             MemberController _memberHelper = new MemberController(_db, _config);
             List<Member> members = await _memberHelper.SearchMember(key);
+            OrderController _orderHelper = new OrderController(_db, _config, null);
             for (int i = 0; i < members.Count; i++)
             {
                 Member member = members[i];
@@ -462,11 +463,14 @@ namespace SnowmeetApi.Controllers
                 member.depositAccounts = await _db.member.Entry(member).Collection(m => m.depositAccounts)
                     .Query().Where(a => a.valid == 1).ToListAsync();
 
+                /*
                 member.orders = await _db.OrderOnlines
                     .Where(o => o.pay_state == 1 && o.open_id.Trim().Equals(member.wechatMiniOpenId.Trim()) && o.type.Trim().Equals("店销现货"))
                     .Include(o => o.paymentList.Where(p => p.status.Trim().Equals("支付成功")))
                         .ThenInclude(p => p.refunds.Where(r => r.state == 1 || !r.refund_id.Trim().Equals("")))
                     .OrderByDescending(o => o.pay_time).ToListAsync();
+                */
+                member.orders = await _orderHelper.GetCommonOrders(null, null, member.id, null, "零售", null, null, null, null, null, null, null, null, null, null, null, null);
 
 
             }
@@ -477,6 +481,7 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<Member>> GetMember(int memberId,
             string sessionKey, string sessionType = "wechat_mini_openid")
         {
+            OrderController _orderHelper = new OrderController(_db, _config, null);
             Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey);
             if (staff == null || staff.title_level < 200)
             {
@@ -489,12 +494,15 @@ namespace SnowmeetApi.Controllers
             member.depositAccounts = await _db.member.Entry(member)
                 .Collection(m => m.depositAccounts).Query()
                 .Where(a => a.valid == 1).AsNoTracking().ToListAsync();
+            /*
             member.orders = await _db.OrderOnlines
                 .Where(o => o.pay_state == 1 && o.type.Trim().Equals("店销现货")
                     && o.open_id.Trim().Equals(member.wechatMiniOpenId.Trim()))
                 .Include(o => o.paymentList.Where(p => p.status.Equals("支付成功")))
                     .ThenInclude(p => p.refunds.Where(r => r.state == 1 || r.refund_id.Trim().Equals("")))
                 .OrderByDescending(o => o.id).AsNoTracking().ToListAsync();
+            */
+            member.orders = await _orderHelper.GetCommonOrders(null, null, member.id, null, "零售", null, null, null, null, null, null, null, null, null, null, null, null);
             return Ok(member);
         }
 

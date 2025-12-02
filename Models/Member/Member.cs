@@ -150,7 +150,8 @@ namespace SnowmeetApi.Models
         public int is_staff { get; set; } = 0;
         public int is_manager { get; set; } = 0;
         public int is_admin { get; set; } = 0;
-        public List<OrderOnline> orders { get; set; } = new List<OrderOnline>();
+        //public List<OrderOnline> orders { get; set; } = new List<OrderOnline>();
+        public List<Models.Order> orders {get; set;} = new List<Order>();
         [NotMapped]
         public SnowmeetApi.Models.Users.MiniAppUser miniAppUser { get; set; } = null;
         [NotMapped]
