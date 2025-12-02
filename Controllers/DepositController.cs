@@ -508,7 +508,7 @@ namespace SnowmeetApi.Controllers
             }
             key = Util.UrlDecode(key);
             Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey);
-            if (staff == null || staff.title_level < 200)
+            if (staff == null || staff.title_level < 100)
             {
                 return BadRequest();
             }
@@ -753,6 +753,53 @@ namespace SnowmeetApi.Controllers
                 return null;
             }
         }
+        [HttpGet]
+        public async Task<ActionResult<DepositBalance>> FixDepositOrder(string code, double amount)
+        {
+            Models.Order order = await _db.order.Where(o => o.code == code && o.valid == 1)
+                .Include(o => o.payments).ThenInclude(p => p.refunds.Where(r => r.state == 1 || r.refund_id != ""))
+                .Include(o => o.payments).ThenInclude(p => p.depositBalances)
+                .AsNoTracking().FirstOrDefaultAsync();
+            List<OrderPayment> deopsitPayments = order.payments.Where(p => p.pay_method == "储值支付").ToList();
+            for(int i = 0; i < deopsitPayments.Count; i++)
+            {
+                OrderPayment payment = deopsitPayments[i];
+                payment.valid = 0;
+                payment.update_date = DateTime.Now;
+                _db.orderPayment.Entry(payment).State = EntityState.Modified;
+                for(int j = 0; payment.depositBalances != null && j < payment.depositBalances.Count; j++)
+                {
+                    payment.depositBalances[j].valid = 0;
+                    payment.depositBalances[j].update_date = DateTime.Now;
+                    _db.depositBalance.Entry(payment.depositBalances[j]).State = EntityState.Modified;
+                }
+            }
+            OrderPayment newPayment = new OrderPayment()
+            {
+                id = 0,
+                order_id = order.id,
+                member_id = order.member_id,
+                amount = amount,
+                pay_method = "储值支付",
+                deposit_type = "服务储值",
+                status = OrderPayment.PaymentStatus.待支付.ToString(),
+                create_date = DateTime.Now
+            };
+            await _db.orderPayment.AddAsync(newPayment);
+            await _db.SaveChangesAsync();
+            List<DepositBalance> balances = await ConsumeDeposit(newPayment);
+            if (balances == null)
+            {
+                return NoContent();
+            }
+            newPayment = await _db.orderPayment.Where(p => p.id == newPayment.id)
+                .Include(p => p.depositBalances).AsNoTracking().FirstOrDefaultAsync();
+            return Ok(newPayment);
+        }
+
+
+
+        /*
         [NonAction]
         public async Task Fix2025FallItem(Models.Order order)
         {
@@ -894,7 +941,9 @@ namespace SnowmeetApi.Controllers
                     Console.WriteLine(rentals[i].order_id.ToString() + " duplicate");
                 }
             }
+            
         }
+        */
 
     }
 }

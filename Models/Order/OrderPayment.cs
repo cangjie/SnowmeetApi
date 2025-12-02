@@ -132,6 +132,7 @@ namespace SnowmeetApi.Models
                 return staffRealName.Trim();
             }
         }
+        public List<DepositBalance>? depositBalances {get; set;}
     }
 }
 

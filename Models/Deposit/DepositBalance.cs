@@ -28,5 +28,7 @@ namespace SnowmeetApi.Models
         [ForeignKey("order_id")]
         public Models.Order? order { get; set; }
         public DepositAccount depositAccount {get; set;}
+        [ForeignKey("payment_id")]
+        public OrderPayment? payment {get; set;}
     }
 }
