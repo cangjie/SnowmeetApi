@@ -641,17 +641,18 @@ namespace SnowmeetApi.Controllers
         /// ///////////////////////////////
         /// [HttpGet("{paymentId}")]
         [HttpGet]
-        public async Task<List<DepositBalance>> ConsumeDeposit(int paymentId,
-            string sessionKey, string sessionType = "wechat_mini_openid")
+        public async Task<List<DepositBalance>> ConsumeDeposit(OrderPayment payment)
         {
             MemberController _memberHelper = new MemberController(_db, _config);
+            /*
             Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
             if (member == null)
             {
                 return null;
             }
-            OrderPayment payment = await _db.OrderPayment.Where(p => p.id == paymentId)
-                .AsNoTracking().FirstOrDefaultAsync();
+            */
+            //OrderPayment payment = await _db.OrderPayment.Where(p => p.id == paymentId)
+            //    .AsNoTracking().FirstOrDefaultAsync();
             if (payment == null || payment.status.Trim().Equals("支付成功"))
             {
                 return null;
@@ -802,12 +803,12 @@ namespace SnowmeetApi.Controllers
             };
             await _db.orderPayment.AddAsync(payment);
             await _db.SaveChangesAsync();
-            _db.orderPayment.Entry(payment).State = EntityState.Detached;
+            //_db.orderPayment.Entry(payment).State = EntityState.Detached;
             CoreDataModLog log = Util.CreateCoreDataModLog("OrderPay", "id", payment.id, null, consumeAmount.ToString(), null, null, "储值补扣", null);
             await _db.coreDataModLog.AddAsync(log);
             await _db.SaveChangesAsync();
 
-            List<DepositBalance>? balances = await ConsumeDeposit(payment.id, "RF1kjdZB71Fs/TYazDkFHA==", "wechat_mini_openid");
+            List<DepositBalance>? balances = await ConsumeDeposit(payment);
             if (balances == null)
             {
                 CoreDataModLog logFail = Util.CreateCoreDataModLog("OrderPay", "id", payment.id, null, consumeAmount.ToString(), null, null, "储值补扣失败", null);

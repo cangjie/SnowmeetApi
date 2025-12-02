@@ -2397,7 +2397,7 @@ namespace SnowmeetApi.Controllers
             await _db.orderPayment.AddAsync(payment);
             await _db.SaveChangesAsync();
             //OrderPayment payment = await _depositHelper.CreateDepositPayment(order.id, (double)order.paying_amount, sessionKey, sessionType);
-            List<DepositBalance> balances = await _depositHelper.ConsumeDeposit(payment.id, sessionKey, sessionType);
+            List<DepositBalance> balances = await _depositHelper.ConsumeDeposit(payment);
             if (balances == null)
             {
                 return Ok(new ApiResult<Models.Order?>()
