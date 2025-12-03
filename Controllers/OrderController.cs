@@ -2338,6 +2338,7 @@ namespace SnowmeetApi.Controllers
             //bool depositIsNotEnough = false;
             OrderController _orderHelper = new OrderController(_db, _config, _http);
             Models.Order order = await _orderHelper.GetOrder(orderId);
+
             if (order == null || order.paying_amount == null )
             {
                 canNotFindOrder = true;
@@ -2361,7 +2362,15 @@ namespace SnowmeetApi.Controllers
                     data = null
                 });
             }
-            double payingAmount = Math.Round((double)order.paying_amount, 2);
+            double payingAmount = 0;
+            if (order.type == "租赁")
+            {
+                payingAmount = (double)order.totalRentSummaryAmount;
+            }
+            else
+            {
+                payingAmount = Math.Round((double)order.paying_amount, 2);
+            }
             double availableAmount = Math.Round(member.availableDeposit, 2);
             if (payingAmount > availableAmount)
             {
@@ -2410,6 +2419,9 @@ namespace SnowmeetApi.Controllers
             member = await _memberHelper.GetWholeMemberById(member.id);
             order = await _orderHelper.GetOrder(order.id);
             order.member = member;
+            order.paying_amount = null;
+            _db.order.Entry(order).State = EntityState.Modified;
+            await _db.SaveChangesAsync();
             return Ok(new ApiResult<Models.Order>()
             {
                 code = 0,
