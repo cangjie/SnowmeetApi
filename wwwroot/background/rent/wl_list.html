@@ -239,6 +239,9 @@
                                         var lineShareData = [];
                                         for (var m = 0; m < tHead.length; m++) {
                                             switch (m) {
+                                                case 5:
+                                                    lineShareData[m] = formatDate(new Date(pShare.response_time));
+                                                    break;
                                                 case 6:
                                                     lineShareData[m] = pShare.out_trade_no;
                                                     break;
