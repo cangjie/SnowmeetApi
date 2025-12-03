@@ -2339,7 +2339,7 @@ namespace SnowmeetApi.Controllers
             OrderController _orderHelper = new OrderController(_db, _config, _http);
             Models.Order order = await _orderHelper.GetOrder(orderId);
 
-            if (order == null || order.paying_amount == null )
+            if ((order == null || order.paying_amount == null) && order.type != "租赁" )
             {
                 canNotFindOrder = true;
             }
@@ -2381,7 +2381,7 @@ namespace SnowmeetApi.Controllers
                     data = null
                 });
             }
-            if (order.paidAmount > 0)
+            if (order.paidAmount > 0 && order.type != "租赁")
             {
                 return Ok(new ApiResult<Models.Order?>()
                 {
@@ -2398,7 +2398,7 @@ namespace SnowmeetApi.Controllers
                 pay_method = "储值支付",
                 staff_id = staff.id,
                 member_id = order.member_id,
-                amount = (double)order.paying_amount,
+                amount = payingAmount,
                 status = OrderPayment.PaymentStatus.待支付.ToString(),
                 deposit_type = "服务储值",
                 create_date = DateTime.Now
@@ -2417,11 +2417,11 @@ namespace SnowmeetApi.Controllers
                 });
             }
             member = await _memberHelper.GetWholeMemberById(member.id);
-            order = await _orderHelper.GetOrder(order.id);
             order.member = member;
             order.paying_amount = null;
             _db.order.Entry(order).State = EntityState.Modified;
             await _db.SaveChangesAsync();
+            order = await _orderHelper.GetOrder(order.id);
             return Ok(new ApiResult<Models.Order>()
             {
                 code = 0,
