@@ -909,6 +909,19 @@ namespace SnowmeetApi.Models
             }
         }
         [NotMapped]
+        public double depositPaidAmount
+        {
+            get
+            {
+                if (availablePayments == null)
+                {
+                    return 0;
+                }
+                return availablePayments
+                    .Where(p => p.pay_method == "储值支付" && p.status == OrderPayment.PaymentStatus.支付成功.ToString()).Sum(p => p.amount);
+            }
+        }
+        [NotMapped]
         public double? totalRentNeedToRefundAmount
         {
             get
@@ -916,7 +929,7 @@ namespace SnowmeetApi.Models
                 if (rentals != null && rentals.Count >= 0 && rentProperties != null 
                     && rentProperties.totalPaidGuarantyAmount != null)
                 {
-                    return rentProperties.totalPaidGuarantyAmount - totalRentSummaryAmount;
+                    return rentProperties.totalPaidGuarantyAmount - totalRentSummaryAmount + depositPaidAmount;
                 }
                 return null;
             }
