@@ -196,13 +196,13 @@ namespace SnowmeetApi.Controllers
                         && (shop == null || o.shop.Trim().Equals(shop.Trim())) && (type == null || o.type.Trim().Equals(type.Trim()))
                         && o.valid == 1 && (orderId == null || o.id == orderId)
                         && (closeStartDate == null || (o.close_date != null && ((DateTime)o.close_date).Date >= ((DateTime)closeStartDate).Date))
-                        && (closeEndDate == null ||  (o.close_date != null &&  ((DateTime)o.close_date).Date <= ((DateTime)closeEndDate).Date)))
+                        && (closeEndDate == null || (o.close_date != null && ((DateTime)o.close_date).Date <= ((DateTime)closeEndDate).Date)))
                     //.Include(o => o.fdOrders.Where(f => f.valid == 1)).ThenInclude(f => f.product).ThenInclude(p => p.category)
                     //.Include(o => o.retails.Where(r => r.valid == 1))
                     //.Include(o => o.cares.Where(c => c.valid == 1)).ThenInclude(c => c.tasks.Where(t => t.valid == 1).OrderBy(t => t.id))
 
-                    .Include(o => o.rentals.Where(r => r.valid == 1)).ThenInclude(r => r.details.Where(d => d.valid == 1)).ThenInclude(d => d.discounts.Where(d => d.valid == 1 && d.sub_biz_type == "日租金" ))
-                    .Include(o => o.rentals.Where(r => r.valid == 1)).ThenInclude(r => r.discounts.Where(d => d.valid == 1 && d.biz_type == "租赁" ))
+                    .Include(o => o.rentals.Where(r => r.valid == 1)).ThenInclude(r => r.details.Where(d => d.valid == 1)).ThenInclude(d => d.discounts.Where(d => d.valid == 1 && d.sub_biz_type == "日租金"))
+                    .Include(o => o.rentals.Where(r => r.valid == 1)).ThenInclude(r => r.discounts.Where(d => d.valid == 1 && d.biz_type == "租赁"))
                     .Include(o => o.rentals.Where(r => r.valid == 1)).ThenInclude(r => r.rentItems.Where(r => r.valid == 1))
                     .Include(o => o.payments).ThenInclude(p => p.staff)
                     .Include(o => o.payments).ThenInclude(p => p.refunds)
@@ -764,18 +764,18 @@ namespace SnowmeetApi.Controllers
                             {
                                 care.common_charge = product.sale_price;
                             }
-                            
+
                             total += (care.common_charge + care.repair_charge - care.discount - care.ticket_discount);
-                            
+
                         }
-                        
+
                         order.total_amount = total;
                         order.paying_amount = total;
                         if (total == 0)
                         {
                             order.dealed = 1;
                         }
-                        for(int i = 0; order.cares != null && i < order.cares.Count; i++)
+                        for (int i = 0; order.cares != null && i < order.cares.Count; i++)
                         {
                             Care care = order.cares[i];
                             if (care.urgent == 1)
@@ -788,7 +788,7 @@ namespace SnowmeetApi.Controllers
                             }
                         }
                         break;
-                    
+
                     default:
                         break;
                 }
@@ -817,8 +817,8 @@ namespace SnowmeetApi.Controllers
 
             await GenerateOrderCode(order);
             await _db.order.AddAsync(order);
-            
-            
+
+
             CoreDataModLog log = new CoreDataModLog()
             {
                 table_name = "Order",
@@ -951,7 +951,7 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<ApiResult<List<SnowmeetApi.Models.Order>>>> GetOrdersByStaff(int? orderId,
             string? shop, string? type, string? subType, DateTime? startDate, DateTime? endDate, string sessionKey,
             string? payOption, string sessionType = "wechat_mini_openid", bool? isTest = null, bool? isEntertain = null,
-            bool? isPackage = null, bool? isOnCredit = null, bool? haveDiscount = null, string? status = null, 
+            bool? isPackage = null, bool? isOnCredit = null, bool? haveDiscount = null, string? status = null,
             string? cell = null, bool? haveWarranty = null)
         {
             //startDate = DateTime.Parse("2025-10-27");
@@ -1441,7 +1441,7 @@ namespace SnowmeetApi.Controllers
             OrderPayment payment = await _db.orderPayment.Where(p => p.id == paymentId).AsNoTracking().FirstOrDefaultAsync();
             Models.Order order = await GetOrder(payment.order_id);
             ///////正式上线时去掉注释
-            
+
             if (order.shop == "万龙体验中心" && order.type == "租赁")
             {
                 payment.need_share = 1;
@@ -1452,7 +1452,7 @@ namespace SnowmeetApi.Controllers
             {
                 payment.need_share = 0;
             }
-            
+
             List<OrderPayment> allPayments = await _db.orderPayment.Where(p => p.order_id == order.id)
                 .OrderByDescending(p => p.out_trade_no).AsNoTracking().ToListAsync();
             string? outTradeNo = allPayments[0].out_trade_no;
@@ -2160,7 +2160,7 @@ namespace SnowmeetApi.Controllers
             try
             {
                 if (order.type == "租赁" && order.shop == "万龙体验中心" && order.hide == false && order.valid == 1 && order.paidAmount > 0
-                && order.refundAmount > 0 &&  Math.Round((double)order.totalRentUnRefund, 2) == 0 )
+                && order.refundAmount > 0 && Math.Round((double)order.totalRentUnRefund, 2) == 0)
                 {
                     OrderShareController _shareHelper = new OrderShareController(_db, _config, _http);
                     List<OrderShare> orderShares = await _shareHelper.CreateOrderShares(order);
@@ -2168,7 +2168,7 @@ namespace SnowmeetApi.Controllers
             }
             catch
             {
-                
+
             }
 
             return Ok(new ApiResult<Models.Order?>()
@@ -2236,7 +2236,7 @@ namespace SnowmeetApi.Controllers
                 rental.valid = 1;
                 rental.staff_id = staff.id;
                 rental.update_date = DateTime.Now;
-                
+
                 _db.rental.Entry(rental).State = EntityState.Modified;
                 paidAmount += guarantyAmount;
             }
@@ -2320,7 +2320,7 @@ namespace SnowmeetApi.Controllers
             return discount;
         }
         [HttpGet("{orderId}")]
-        public async Task<ActionResult<ApiResult<Models.Order?>>> PayWithDeposit(int orderId, 
+        public async Task<ActionResult<ApiResult<Models.Order?>>> PayWithDeposit(int orderId,
             string sessionKey, string sessionType = "wechat_mini_openid")
         {
             Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
@@ -2335,11 +2335,10 @@ namespace SnowmeetApi.Controllers
             }
             bool canNotFindMember = false;
             bool canNotFindOrder = false;
-            //bool depositIsNotEnough = false;
             OrderController _orderHelper = new OrderController(_db, _config, _http);
             Models.Order order = await _orderHelper.GetOrder(orderId);
 
-            if ((order == null || order.paying_amount == null) && order.type != "租赁" )
+            if ((order == null || order.paying_amount == null) && order.type != "租赁")
             {
                 canNotFindOrder = true;
             }
@@ -2358,7 +2357,7 @@ namespace SnowmeetApi.Controllers
                 return Ok(new ApiResult<Models.Order?>()
                 {
                     code = 1,
-                    message = canNotFindMember? "未找到会员信息" : (canNotFindOrder? "未找到订单信息": ""),
+                    message = canNotFindMember ? "未找到会员信息" : (canNotFindOrder ? "未找到订单信息" : ""),
                     data = null
                 });
             }
@@ -2390,31 +2389,33 @@ namespace SnowmeetApi.Controllers
                     data = null
                 });
             }
-            DepositController _depositHelper = new DepositController(_db, _config);
-            OrderPayment payment = new OrderPayment()
+            if (order.depositPaidAmount == 0)
             {
-                id = 0,
-                order_id = order.id,
-                pay_method = "储值支付",
-                staff_id = staff.id,
-                member_id = order.member_id,
-                amount = payingAmount,
-                status = OrderPayment.PaymentStatus.待支付.ToString(),
-                deposit_type = "服务储值",
-                create_date = DateTime.Now
-            };
-            await _db.orderPayment.AddAsync(payment);
-            await _db.SaveChangesAsync();
-            //OrderPayment payment = await _depositHelper.CreateDepositPayment(order.id, (double)order.paying_amount, sessionKey, sessionType);
-            List<DepositBalance> balances = await _depositHelper.ConsumeDeposit(payment);
-            if (balances == null)
-            {
-                return Ok(new ApiResult<Models.Order?>()
+                DepositController _depositHelper = new DepositController(_db, _config);
+                OrderPayment payment = new OrderPayment()
                 {
-                   code = 1,
-                   message = "消费失败",
-                   data = null 
-                });
+                    id = 0,
+                    order_id = order.id,
+                    pay_method = "储值支付",
+                    staff_id = staff.id,
+                    member_id = order.member_id,
+                    amount = payingAmount,
+                    status = OrderPayment.PaymentStatus.待支付.ToString(),
+                    deposit_type = "服务储值",
+                    create_date = DateTime.Now
+                };
+                await _db.orderPayment.AddAsync(payment);
+                await _db.SaveChangesAsync();
+                List<DepositBalance> balances = await _depositHelper.ConsumeDeposit(payment);
+                if (balances == null)
+                {
+                    return Ok(new ApiResult<Models.Order?>()
+                    {
+                        code = 1,
+                        message = "消费失败",
+                        data = null
+                    });
+                }
             }
             member = await _memberHelper.GetWholeMemberById(member.id);
             order.member = member;
