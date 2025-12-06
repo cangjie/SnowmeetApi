@@ -59,20 +59,17 @@ namespace SnowmeetApi.Controllers
         /// Old Season
         /// </summary>
         /// <returns></returns>
-
         [HttpGet]
         public async Task<ActionResult<IEnumerable<TicketTemplate>>> GetTemplateList()
         {
             var list = await _context.ticketTemplate.Where<TicketTemplate>(tt => tt.hide == 0).ToListAsync();
             return Ok(list);
         }
-
         [HttpGet("{templateId}")]
         public async Task<ActionResult<TicketTemplate>> GetTicketTemplateById(int templateId)
         {
             return Ok(await _context.ticketTemplate.FindAsync(templateId));
         }
-
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Ticket>>> GetUnusedTicketsByCode(string ticketCodeArr)
         {
@@ -565,6 +562,54 @@ namespace SnowmeetApi.Controllers
             return code;
         }
         [NonAction]
+        public async Task<List<Ticket>> GetMemberTickets(int memberId)
+        {
+            return await _context.ticket.Where(t => t.member_id == memberId && t.valid == 1)
+                .Include(t => t.template).ThenInclude(t => t.productTicketTemplate)
+                .AsNoTracking().ToListAsync();
+        }
+        [HttpGet("{memberId}")]
+        public async Task<ActionResult<ApiResult<List<Ticket>?>>> GetMemberTicketsByStaff(int memberId, string? bizType,
+            bool? canUse, string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await Util.GetStaffBySessionKey(_context, sessionKey, sessionType);
+            if (staff == null || staff.title_level < 100)
+            {
+                return Ok(new ApiResult<List<Ticket>?>()
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = null
+                });
+            }
+            List<Ticket> tickets = await GetMemberTickets(memberId);
+            if (bizType != null)
+            {
+                tickets = tickets.Where(t => t.biz_type == bizType).ToList();
+            }
+            if (canUse != null)
+            {
+                if (canUse == true)
+                {
+                    tickets = tickets.Where(t => t.start_date == null || ((DateTime)t.start_date).Date <= DateTime.Now.Date)
+                        .Where(t => t.expire_date == null || ((DateTime)t.expire_date).Date >= DateTime.Now.Date).ToList();
+                }
+                else
+                {
+                    tickets = tickets.Where(t => t.start_date != null && ((DateTime)t.start_date).Date > DateTime.Now.Date)
+                        .Where(t => t.expire_date == null || ((DateTime)t.expire_date).Date >= DateTime.Now.Date).ToList();
+                }
+            }
+            tickets = tickets.OrderBy(t => t.expire_date).ToList();
+            return Ok(new ApiResult<List<Ticket>?>()
+            {
+                code = 0,
+                message = "",
+                data = tickets
+            });
+        }
+        /*
+        [NonAction]
         public async Task<Ticket> CreateTicket(int templateId, int? memberId, int? staffId,
              string? createMemo = null, string? bizType = null, int? bizId = null)
         {
@@ -590,6 +635,8 @@ namespace SnowmeetApi.Controllers
             await _context.SaveChangesAsync();
             return await GetWholeTicket(code);
         }
+        */
+        /*
         [NonAction]
         public async Task<Ticket> GetWholeTicket(string code)
         {
@@ -598,5 +645,6 @@ namespace SnowmeetApi.Controllers
                 .AsNoTracking().FirstOrDefaultAsync();
             return ticket;
         }
+        */
     }
 }

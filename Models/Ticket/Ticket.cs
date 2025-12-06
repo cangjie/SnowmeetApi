@@ -26,6 +26,7 @@ namespace SnowmeetApi.Models
         public string miniapp_recept_path { get; set; }
         public DateTime create_date { get; set; }
         public string channel { get; set; } = "";
+        public DateTime? start_date { get; set; } = null;
         public DateTime? expire_date { get; set; } = null;
         public string? create_memo { get; set; } = "";
         public int? order_id { get; set; }

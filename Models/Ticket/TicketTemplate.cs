@@ -12,15 +12,30 @@ namespace SnowmeetApi.Models
         public string type { get; set; }
         public string name { get; set; }
         public string memo { get; set; }
-
+        public int hide {get; set;} = 0;
         public string miniapp_recept_path { get; set; }
-
         public DateTime? expire_date { get; set; } = DateTime.MaxValue;
-
-        public int hide { get; set; }
-        [ForeignKey(nameof(TicketTemplateRule.template_id))]
-        public List<TicketTemplateRule>? rules;
+        public List<ProductTicketTemplate> productTicketTemplate {get; set;} = new List<ProductTicketTemplate>();
     }
+    [Table("product_ticket_template")]
+    public class ProductTicketTemplate
+    {
+        [Key]
+        public int id { get; set; }
+        public int product_id { get; set; }
+        public int ticket_template_id { get; set; }
+        public double? fixed_price { get; set; } = null;
+        public double? discount_rate { get; set; } = null;
+        public bool valid {get; set; }
+        public DateTime? update_date { get; set; } = null;
+        public DateTime create_date { get; set; } = DateTime.Now;
+        [ForeignKey("ticket_template_id")]
+        public TicketTemplate ticketTemplate {get; set;}
+        [ForeignKey("product_id")]
+        public Product product {get; set;}
+    }
+
+    /*
     [Table("ticket_template_rule")]
     public class TicketTemplateRule
     {
@@ -38,4 +53,5 @@ namespace SnowmeetApi.Models
         public DateTime create_date {get; set;} = DateTime.Now;
 
     }
+    */
 }

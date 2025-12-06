@@ -257,6 +257,23 @@ namespace SnowmeetApi.Controllers
             }
         }
         [HttpGet]
+        public async Task<ActionResult<ApiResult<List<Models.Product>?>>> GetCareProducts(int shopId)
+        {
+            DateTime currentDate = DateTime.Now.Date;
+            List<Models.Product> products = await _db.product
+                .Include(p => p.productTicketTemplate)
+                .Where(p => (p.category_id == 14 || p.category_id == 15) && ((int)p.shop_id) == shopId 
+                && p.valid == 1 && (p.end_date == null || ((DateTime)p.end_date).Date >= currentDate )
+                )
+                .AsNoTracking().ToListAsync();
+            return Ok(new ApiResult<List<Models.Product>?>()
+            {
+                code = 0,
+                message = "",
+                data = products
+            });
+        }
+        [HttpGet]
         public async Task<ActionResult<ApiResult<List<Models.Product>?>>> GetProducts(string shop)
         {
             List<Models.Product> products = await _db.product
