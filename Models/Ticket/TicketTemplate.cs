@@ -15,7 +15,7 @@ namespace SnowmeetApi.Models
         public int hide {get; set;} = 0;
         public string miniapp_recept_path { get; set; }
         public DateTime? expire_date { get; set; } = DateTime.MaxValue;
-        public List<ProductTicketTemplate> productTicketTemplate {get; set;} = new List<ProductTicketTemplate>();
+        public List<ProductTicketTemplate> productTicketTemplates {get; set;} = new List<ProductTicketTemplate>();
     }
     [Table("product_ticket_template")]
     public class ProductTicketTemplate
