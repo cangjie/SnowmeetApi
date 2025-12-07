@@ -428,6 +428,7 @@ namespace SnowmeetApi.Controllers
                 };
                 await _db.careTask.AddAsync(taskFinish);
             }
+            _db.order.Entry(order).State = EntityState.Detached;
             await _db.SaveChangesAsync();
         }
         [HttpGet("{taskId}")]
