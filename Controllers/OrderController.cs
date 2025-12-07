@@ -2423,6 +2423,8 @@ namespace SnowmeetApi.Controllers
             order.paying_amount = null;
             _db.order.Entry(order).State = EntityState.Modified;
             await _db.SaveChangesAsync();
+            CareController _careHelper = new CareController(_db, _config, _http);
+            await _careHelper.EffectCareOrder(order.id);
             order = await _orderHelper.GetOrder(order.id);
             return Ok(new ApiResult<Models.Order>()
             {
