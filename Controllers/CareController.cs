@@ -276,9 +276,13 @@ namespace SnowmeetApi.Controllers
         [HttpGet]
         public async Task<ActionResult<ApiResult<List<Models.Product>?>>> GetProducts(string shop)
         {
+            /*
             List<Models.Product> products = await _db.product
                 .Where(p => (p.id == 137 || p.id == 138 || p.id == 139 || p.id == 140 || p.id == 142 || p.id == 143 || p.id == 202)
                 && p.valid == 1).OrderBy(p => p.sale_price).AsNoTracking().ToListAsync();
+            */
+            List<Models.Product> products = await _db.product.Where(p => p.shop == shop && p.category_id == 14 && p.valid == 1)
+                .AsNoTracking().ToListAsync();
             return Ok(new ApiResult<List<Models.Product>?>()
             {
                 code = 0,
