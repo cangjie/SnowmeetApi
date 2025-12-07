@@ -282,7 +282,7 @@ namespace SnowmeetApi.Controllers
                 && p.valid == 1).OrderBy(p => p.sale_price).AsNoTracking().ToListAsync();
             */
             List<Models.Product> products = await _db.product.Where(p => (p.shop.IndexOf(shop) >= 0 || shop.IndexOf(p.shop) >= 0 ) && p.category_id == 14 && p.valid == 1)
-                .AsNoTracking().ToListAsync();
+                .OrderByDescending(p => p.sale_price).AsNoTracking().ToListAsync();
             return Ok(new ApiResult<List<Models.Product>?>()
             {
                 code = 0,
