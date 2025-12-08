@@ -610,6 +610,30 @@ namespace SnowmeetApi.Controllers
             });
         }
         [NonAction]
+        public async Task<Ticket> ActiveSkipassTicket(Models.SkiPass skiPass)
+        {
+            Ticket ticket = await _context.ticket.Where(t => t.create_memo == skiPass.id.ToString()).AsNoTracking().FirstOrDefaultAsync();
+            if (ticket == null)
+            {
+                return null;
+            }
+            if (ticket.is_active == 1)
+            {
+                return null;
+            }
+            DateTime? startDate = skiPass.card_member_pick_time;
+            if (startDate == null)
+            {
+                startDate = DateTime.Now.Date;
+            }
+            ticket.start_date = startDate;
+            ticket.expire_date = ((DateTime)startDate).AddDays(1);
+            ticket.is_active = 1;
+            _context.ticket.Entry(ticket).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
+            return ticket;
+        } 
+        [NonAction]
         public async Task<Ticket> CreateTicketBySkiPass(Models.SkiPass skiPass)
         {
             int templateId = 12;

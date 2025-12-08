@@ -666,7 +666,15 @@ namespace SnowmeetApi.Controllers
                     //await _tHelper.ActiveTicket((int)skipass.order_id);
                     if (skipass.order_id != null)
                     {
-                        await CommitSkipassOrder((int)skipass.order_id);
+                        //await CommitSkipassOrder((int)skipass.order_id);
+                        try
+                        {
+                            await _tHelper.ActiveSkipassTicket(skipass);
+                        }
+                        catch
+                        {
+                            
+                        }
                     }
                 }
             }
