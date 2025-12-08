@@ -394,13 +394,25 @@ namespace SnowmeetApi.Controllers
                     };
                     await _db.careTask.AddAsync(taskRepair);
                 }
+                if (care.free_wax == 1)
+                {
+                    CareTask taskWax = new CareTask()
+                    {
+                        id = 0,
+                        care_id = care.id,
+                        task_name = "机打蜡",
+                        memo = "",
+                        create_date = DateTime.Now
+                    };
+                    await _db.careTask.AddAsync(taskWax);
+                }
                 if (care.need_wax == 1)
                 {
                     CareTask taskWax = new CareTask()
                     {
                         id = 0,
                         care_id = care.id,
-                        task_name = "打蜡",
+                        task_name = "热蜡",
                         memo = "",
                         create_date = DateTime.Now
                     };
@@ -427,6 +439,18 @@ namespace SnowmeetApi.Controllers
                     create_date = DateTime.Now
                 };
                 await _db.careTask.AddAsync(taskFinish);
+                if (care.ticket_code != null)
+                {
+                    Ticket ticket = await _db.ticket.Where(t => t.code == care.ticket_code).AsNoTracking().FirstOrDefaultAsync();
+                    if (ticket != null)
+                    {
+                        ticket.used = 1;
+                        ticket.used_time = DateTime.Now;
+                        ticket.biz_type = "养护";
+                        ticket.biz_id = care.id;
+                        _db.ticket.Entry(ticket).State = EntityState.Modified;
+                    }
+                }
             }
             _db.order.Entry(order).State = EntityState.Detached;
             await _db.SaveChangesAsync();

@@ -36,10 +36,11 @@ namespace SnowmeetApi.Models
         public string? serials { get; set; }
         public string? edge_degree { get; set; }
         public string? others_associates { get; set; } = null;
-        public int need_edge { get; set; }
-        public int need_wax { get; set; }
-        public int need_unwax { get; set; }
-        public int need_repair { get; set; }
+        public int need_edge { get; set; } = 0;
+        public int need_wax { get; set; } = 0;
+        public int free_wax {get; set;} = 0;
+        public int need_unwax { get; set; } = 0;
+        public int need_repair { get; set; } = 0;
         public string? repair_memo { get; set; }
         public double repair_charge { get; set; }
         public double common_charge { get; set; }
