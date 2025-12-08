@@ -212,7 +212,7 @@ namespace SnowmeetApi.Controllers
                     .Include(o => o.staff)
                     .Include(o => o.member).ThenInclude(m => m.memberSocialAccounts)
                     .Include(o => o.orderShares.Where(s => s.valid)).ThenInclude(o => o.paymentShares)
-                    .OrderByDescending(o => o.id).AsNoTracking().ToListAsync();
+                    .OrderByDescending(o => o.id).AsSplitQuery().AsNoTracking().ToListAsync();
                     break;
                 case "零售":
                     orderList = await _db.order.Where(o => (o.biz_date.Date >= ((DateTime)startDate).Date && o.biz_date.Date <= ((DateTime)endDate).Date)
@@ -232,7 +232,7 @@ namespace SnowmeetApi.Controllers
                     .Include(o => o.guarantys.Where(g => g.valid == 1)).ThenInclude(g => g.guarantyPayments)//.ThenInclude(g => g.payment)
                     .Include(o => o.staff)
                     .Include(o => o.member).ThenInclude(m => m.memberSocialAccounts)
-                    .OrderByDescending(o => o.id).AsNoTracking().ToListAsync();
+                    .OrderByDescending(o => o.id).AsSplitQuery().AsNoTracking().ToListAsync();
 
                     break;
                 case "养护":
@@ -254,7 +254,7 @@ namespace SnowmeetApi.Controllers
                         //.Include(o => o.guarantys.Where(g => g.valid == 1)).ThenInclude(g => g.guarantyPayments)//.ThenInclude(g => g.payment)
                         .Include(o => o.staff)
                         .Include(o => o.member).ThenInclude(m => m.memberSocialAccounts)
-                        .OrderByDescending(o => o.id).AsNoTracking().ToListAsync();
+                        .OrderByDescending(o => o.id).AsSplitQuery().AsNoTracking().ToListAsync();
                     break;
                 default:
                     orderList = await _db.order.Where(o => (o.biz_date.Date >= ((DateTime)startDate).Date && o.biz_date.Date <= ((DateTime)endDate).Date)
@@ -274,7 +274,7 @@ namespace SnowmeetApi.Controllers
                         .Include(o => o.guarantys.Where(g => g.valid == 1)).ThenInclude(g => g.guarantyPayments)//.ThenInclude(g => g.payment)
                         .Include(o => o.staff)
                         .Include(o => o.member).ThenInclude(m => m.memberSocialAccounts)
-                        .OrderByDescending(o => o.id).AsNoTracking().ToListAsync();
+                        .OrderByDescending(o => o.id).AsSplitQuery().AsNoTracking().ToListAsync();
 
                     break;
             }
