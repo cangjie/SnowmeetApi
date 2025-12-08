@@ -14,7 +14,7 @@ namespace SnowmeetApi.Models
         public int? biz_id {get; set;}
         public string? memo { get; set; }
         public string open_id { get; set; }
-        public string oper_open_id { get; set; }
+        public string? oper_open_id { get; set; } = null;
         public int? member_id { get; set; }
         public int? staff_id {get; set;}
         public int shared { get; set; }
@@ -23,7 +23,7 @@ namespace SnowmeetApi.Models
         public int used { get; set; }
         public DateTime? used_time { get; set; }
         public int template_id { get; set; }
-        public string miniapp_recept_path { get; set; }
+        public string? miniapp_recept_path { get; set; } = null;
         public DateTime create_date { get; set; }
         public string channel { get; set; } = "";
         public DateTime? start_date { get; set; } = null;
