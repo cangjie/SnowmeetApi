@@ -299,14 +299,13 @@ namespace SnowmeetApi.Controllers
                 }
             }
             await _context.SaveChangesAsync();
+            TicketController _ticketHelper = new TicketController(_context, _config);
             for(int i = 0; i < dealList.Count; i++)
             {
                 Models.SkiPass skipass = dealList[i];
                 if (!skipass.resort.Trim().Equals("南山"))
                 {
-
                     await AutoReserve(skipass);
-
                 }
                 try
                 {
@@ -315,6 +314,14 @@ namespace SnowmeetApi.Controllers
                 catch
                 {
 
+                }
+                try
+                {
+                    await _ticketHelper.CreateTicketBySkiPass(skipass);
+                }
+                catch
+                {
+                    
                 }
             }
         }

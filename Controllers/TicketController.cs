@@ -609,10 +609,17 @@ namespace SnowmeetApi.Controllers
                 data = tickets
             });
         }
-        /*
+        [NonAction]
+        public async Task<Ticket> CreateTicketBySkiPass(Models.SkiPass skiPass)
+        {
+            Ticket ticket = await CreateTicket(12, skiPass.member_id, null, skiPass.id.ToString(), "养护", null, false, null, null);
+            return ticket;
+        }
+        
         [NonAction]
         public async Task<Ticket> CreateTicket(int templateId, int? memberId, int? staffId,
-             string? createMemo = null, string? bizType = null, int? bizId = null)
+            string? createMemo = null, string? bizType = null, int? bizId = null, 
+            bool active = false, DateTime? startDate = null, DateTime? expireDate = null)
         {
             TicketTemplate template = await _context.ticketTemplate
                 .Where(t => t.id == templateId).AsNoTracking().FirstOrDefaultAsync();
@@ -630,22 +637,24 @@ namespace SnowmeetApi.Controllers
                 create_memo = createMemo,
                 memo = template.memo.Trim(),
                 create_date = DateTime.Now,
-                valid = 1
+                valid = 1,
+                is_active = active?1:0,
+                start_date = startDate,
+                expire_date = expireDate
             };
             await _context.ticket.AddAsync(ticket);
             await _context.SaveChangesAsync();
             return await GetWholeTicket(code);
         }
-        */
-        /*
+        
         [NonAction]
         public async Task<Ticket> GetWholeTicket(string code)
         {
             Ticket ticket = await _context.ticket.Where(t => t.code == code)
-                .Include(t => t.template).ThenInclude(t => t.rules.Where(r => r.valid == true))
+                .Include(t => t.template).ThenInclude(t => t.productTicketTemplates.Where(p => p.valid))
                 .AsNoTracking().FirstOrDefaultAsync();
             return ticket;
         }
-        */
+        
     }
 }
