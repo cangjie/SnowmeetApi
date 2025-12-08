@@ -612,6 +612,13 @@ namespace SnowmeetApi.Controllers
         [NonAction]
         public async Task<Ticket> CreateTicketBySkiPass(Models.SkiPass skiPass)
         {
+            int templateId = 12;
+            List<Ticket> tickets = await _context.ticket.Where(t => t.template_id == templateId && t.create_memo == skiPass.id.ToString())
+                .AsNoTracking().ToListAsync();
+            if (tickets != null && tickets.Count > 0)
+            {
+                return null;
+            }
             Ticket ticket = await CreateTicket(12, skiPass.member_id, null, skiPass.id.ToString(), "养护", null, false, null, null);
             return ticket;
         }

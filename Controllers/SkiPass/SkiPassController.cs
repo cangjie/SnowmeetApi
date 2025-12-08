@@ -299,7 +299,7 @@ namespace SnowmeetApi.Controllers
                 }
             }
             await _context.SaveChangesAsync();
-            TicketController _ticketHelper = new TicketController(_context, _config);
+            
             for(int i = 0; i < dealList.Count; i++)
             {
                 Models.SkiPass skipass = dealList[i];
@@ -314,10 +314,14 @@ namespace SnowmeetApi.Controllers
                 catch
                 {
 
-                }
+                }   
+            }
+            TicketController _ticketHelper = new TicketController(_context, _config);
+            for(int i = 0; order.skipasses != null && i < order.skipasses.Count; i++)
+            {
                 try
                 {
-                    await _ticketHelper.CreateTicketBySkiPass(skipass);
+                    await _ticketHelper.CreateTicketBySkiPass(order.skipasses[i]);
                 }
                 catch
                 {
