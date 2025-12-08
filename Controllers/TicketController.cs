@@ -564,7 +564,7 @@ namespace SnowmeetApi.Controllers
         [NonAction]
         public async Task<List<Ticket>> GetMemberTickets(int memberId)
         {
-            return await _context.ticket.Where(t => t.member_id == memberId && t.valid == 1)
+            return await _context.ticket.Where(t => t.member_id == memberId && t.valid == 1 && t.is_active == 1)
                 .Include(t => t.template).ThenInclude(t => t.productTicketTemplates).ThenInclude(t => t.product)
                 .AsNoTracking().ToListAsync();
         }
