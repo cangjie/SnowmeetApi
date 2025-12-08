@@ -592,12 +592,13 @@ namespace SnowmeetApi.Controllers
                 if (canUse == true)
                 {
                     tickets = tickets.Where(t => t.start_date == null || ((DateTime)t.start_date).Date <= DateTime.Now.Date)
-                        .Where(t => t.expire_date == null || ((DateTime)t.expire_date).Date >= DateTime.Now.Date).ToList();
+                        .Where(t => t.expire_date == null || ((DateTime)t.expire_date).Date >= DateTime.Now.Date)
+                        .Where(t => t.is_active == 1 && t.used == 0).ToList();
                 }
                 else
                 {
-                    tickets = tickets.Where(t => t.start_date != null && ((DateTime)t.start_date).Date > DateTime.Now.Date)
-                        .Where(t => t.expire_date == null || ((DateTime)t.expire_date).Date >= DateTime.Now.Date).ToList();
+                    tickets = tickets.Where(t => (t.start_date != null && ((DateTime)t.start_date).Date > DateTime.Now.Date) 
+                        || (t.expire_date == null && ((DateTime)t.expire_date).Date < DateTime.Now.Date) || t.used == 1 || t.is_active == 0  ).ToList();
                 }
             }
             tickets = tickets.OrderBy(t => t.expire_date).ToList();
