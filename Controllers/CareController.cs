@@ -257,11 +257,32 @@ namespace SnowmeetApi.Controllers
             }
         }
         [HttpGet]
+        public async Task<ActionResult<ApiResult<List<Models.Product>?>>> GetCareProducts(int shopId)
+        {
+            DateTime currentDate = DateTime.Now.Date;
+            List<Models.Product> products = await _db.product
+                .Include(p => p.productTicketTemplate)
+                .Where(p => (p.category_id == 14 || p.category_id == 15) && ((int)p.shop_id) == shopId 
+                && p.valid == 1 && (p.end_date == null || ((DateTime)p.end_date).Date >= currentDate )
+                )
+                .AsNoTracking().ToListAsync();
+            return Ok(new ApiResult<List<Models.Product>?>()
+            {
+                code = 0,
+                message = "",
+                data = products
+            });
+        }
+        [HttpGet]
         public async Task<ActionResult<ApiResult<List<Models.Product>?>>> GetProducts(string shop)
         {
+            /*
             List<Models.Product> products = await _db.product
                 .Where(p => (p.id == 137 || p.id == 138 || p.id == 139 || p.id == 140 || p.id == 142 || p.id == 143 || p.id == 202)
                 && p.valid == 1).OrderBy(p => p.sale_price).AsNoTracking().ToListAsync();
+            */
+            List<Models.Product> products = await _db.product.Where(p => (p.shop.IndexOf(shop) >= 0 || shop.IndexOf(p.shop) >= 0 ) && p.category_id == 14 && p.valid == 1)
+                .OrderBy(p => p.sale_price).AsNoTracking().ToListAsync();
             return Ok(new ApiResult<List<Models.Product>?>()
             {
                 code = 0,
@@ -283,13 +304,13 @@ namespace SnowmeetApi.Controllers
                     break;
                 }
                 else if (products[i].name.IndexOf("修刃") >= 0 && products[i].name.IndexOf("立等") >= 0
-                && care.need_edge == 1 && care.need_wax == 0 && care.urgent == 1)
+                && care.need_edge == 1 && care.need_wax == 0 && care.urgent == 1 && products[i].name.IndexOf("修刃打蜡") < 0)
                 {
                     product = products[i];
                     break;
                 }
                 else if (products[i].name.IndexOf("打蜡") >= 0 && products[i].name.IndexOf("立等") >= 0
-                && care.need_edge == 0 && care.need_wax == 1 && care.urgent == 1)
+                && care.need_edge == 0 && care.need_wax == 1 && care.urgent == 1 && products[i].name.IndexOf("修刃打蜡") < 0 )
                 {
                     product = products[i];
                     break;
@@ -301,13 +322,13 @@ namespace SnowmeetApi.Controllers
                     break;
                 }
                 else if (products[i].name.IndexOf("修刃") >= 0 && products[i].name.IndexOf("次日") >= 0
-                && care.need_edge == 1 && care.need_wax == 0 && care.urgent == 0)
+                && care.need_edge == 1 && care.need_wax == 0 && care.urgent == 0 && products[i].name.IndexOf("修刃打蜡") < 0 )
                 {
                     product = products[i];
                     break;
                 }
                 else if (products[i].name.IndexOf("打蜡") >= 0 && products[i].name.IndexOf("次日") >= 0
-                && care.need_edge == 0 && care.need_wax == 1 && care.urgent == 0)
+                && care.need_edge == 0 && care.need_wax == 1 && care.urgent == 0 && products[i].name.IndexOf("修刃打蜡") < 0 )
                 {
                     product = products[i];
                     break;
@@ -373,13 +394,25 @@ namespace SnowmeetApi.Controllers
                     };
                     await _db.careTask.AddAsync(taskRepair);
                 }
+                if (care.free_wax == 1)
+                {
+                    CareTask taskWax = new CareTask()
+                    {
+                        id = 0,
+                        care_id = care.id,
+                        task_name = "机打蜡",
+                        memo = "",
+                        create_date = DateTime.Now
+                    };
+                    await _db.careTask.AddAsync(taskWax);
+                }
                 if (care.need_wax == 1)
                 {
                     CareTask taskWax = new CareTask()
                     {
                         id = 0,
                         care_id = care.id,
-                        task_name = "打蜡",
+                        task_name = "热蜡",
                         memo = "",
                         create_date = DateTime.Now
                     };
@@ -406,7 +439,20 @@ namespace SnowmeetApi.Controllers
                     create_date = DateTime.Now
                 };
                 await _db.careTask.AddAsync(taskFinish);
+                if (care.ticket_code != null)
+                {
+                    Ticket ticket = await _db.ticket.Where(t => t.code == care.ticket_code).AsNoTracking().FirstOrDefaultAsync();
+                    if (ticket != null)
+                    {
+                        ticket.used = 1;
+                        ticket.used_time = DateTime.Now;
+                        ticket.biz_type = "养护";
+                        ticket.biz_id = care.id;
+                        _db.ticket.Entry(ticket).State = EntityState.Modified;
+                    }
+                }
             }
+            _db.order.Entry(order).State = EntityState.Detached;
             await _db.SaveChangesAsync();
         }
         [HttpGet("{taskId}")]

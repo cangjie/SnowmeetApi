@@ -212,7 +212,7 @@ namespace SnowmeetApi.Controllers
                     .Include(o => o.staff)
                     .Include(o => o.member).ThenInclude(m => m.memberSocialAccounts)
                     .Include(o => o.orderShares.Where(s => s.valid)).ThenInclude(o => o.paymentShares)
-                    .OrderByDescending(o => o.id).AsNoTracking().ToListAsync();
+                    .OrderByDescending(o => o.id).AsSplitQuery().AsNoTracking().ToListAsync();
                     break;
                 case "零售":
                     orderList = await _db.order.Where(o => (o.biz_date.Date >= ((DateTime)startDate).Date && o.biz_date.Date <= ((DateTime)endDate).Date)
@@ -232,7 +232,7 @@ namespace SnowmeetApi.Controllers
                     .Include(o => o.guarantys.Where(g => g.valid == 1)).ThenInclude(g => g.guarantyPayments)//.ThenInclude(g => g.payment)
                     .Include(o => o.staff)
                     .Include(o => o.member).ThenInclude(m => m.memberSocialAccounts)
-                    .OrderByDescending(o => o.id).AsNoTracking().ToListAsync();
+                    .OrderByDescending(o => o.id).AsSplitQuery().AsNoTracking().ToListAsync();
 
                     break;
                 case "养护":
@@ -244,6 +244,7 @@ namespace SnowmeetApi.Controllers
                         //.Include(o => o.fdOrders.Where(f => f.valid == 1)).ThenInclude(f => f.product).ThenInclude(p => p.category)
                         //.Include(o => o.retails.Where(r => r.valid == 1))
                         .Include(o => o.cares.Where(c => c.valid == 1)).ThenInclude(c => c.tasks.Where(t => t.valid == 1).OrderBy(t => t.id))
+                        .Include(o => o.cares.Where(c => c.valid == 1)).ThenInclude(c => c.careImages).ThenInclude(i => i.image)
                         //.Include(o => o.rentals.Where(r => r.valid == 1)).ThenInclude(r => r.details.Where(d => d.valid == 1))
                         //.Include(o => o.rentals.Where(r => r.valid == 1)).ThenInclude(r => r.rentItems.Where(r => r.valid == 1))
                         .Include(o => o.payments).ThenInclude(p => p.staff)
@@ -253,7 +254,7 @@ namespace SnowmeetApi.Controllers
                         //.Include(o => o.guarantys.Where(g => g.valid == 1)).ThenInclude(g => g.guarantyPayments)//.ThenInclude(g => g.payment)
                         .Include(o => o.staff)
                         .Include(o => o.member).ThenInclude(m => m.memberSocialAccounts)
-                        .OrderByDescending(o => o.id).AsNoTracking().ToListAsync();
+                        .OrderByDescending(o => o.id).AsSplitQuery().AsNoTracking().ToListAsync();
                     break;
                 default:
                     orderList = await _db.order.Where(o => (o.biz_date.Date >= ((DateTime)startDate).Date && o.biz_date.Date <= ((DateTime)endDate).Date)
@@ -273,7 +274,7 @@ namespace SnowmeetApi.Controllers
                         .Include(o => o.guarantys.Where(g => g.valid == 1)).ThenInclude(g => g.guarantyPayments)//.ThenInclude(g => g.payment)
                         .Include(o => o.staff)
                         .Include(o => o.member).ThenInclude(m => m.memberSocialAccounts)
-                        .OrderByDescending(o => o.id).AsNoTracking().ToListAsync();
+                        .OrderByDescending(o => o.id).AsSplitQuery().AsNoTracking().ToListAsync();
 
                     break;
             }
@@ -2422,6 +2423,14 @@ namespace SnowmeetApi.Controllers
             order.paying_amount = null;
             _db.order.Entry(order).State = EntityState.Modified;
             await _db.SaveChangesAsync();
+            _db.order.Entry(order).State = EntityState.Detached;
+            await _db.SaveChangesAsync();
+            CareController _careHelper = new CareController(_db, _config, _http);
+            
+            if (order.type == "养护")
+            {
+                await _careHelper.EffectCareOrder(order.id);    
+            }
             order = await _orderHelper.GetOrder(order.id);
             return Ok(new ApiResult<Models.Order>()
             {

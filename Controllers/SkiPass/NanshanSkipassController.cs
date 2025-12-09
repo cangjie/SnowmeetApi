@@ -246,21 +246,16 @@ namespace SnowmeetApi.Controllers.SkiPass
         [NonAction]
         public async Task<List<Models.SkiPass>> GetSkipassesByMember(int memberId, string num = "")
         {
+            DateTime startDate = DateTime.Parse("2025-10-15");
             return await _db.skiPass.Where(s => (((memberId != 0 && s.member_id == memberId)
                 || (!num.Trim().Equals("") && s.wechat_mini_openid.Trim().Equals(num))) && s.resort.Trim().Equals("南山")) 
-                && s.valid == 1 && s.reserve_date >= DateTime.Parse("2025-10-15") )
+                && s.valid == 1 && s.reserve_date >= startDate )
                 .AsNoTracking().ToListAsync();
         }
         [HttpPost]
         public async Task<ActionResult<Models.SkiPass>> UpdateSkiPass([FromBody] Models.SkiPass skipass,
             [FromQuery] string sessionKey, [FromQuery] string sessionType = "wechat_mini_openid")
         {
-            /*
-            if (!(await _memberHelper.isStaff(sessionKey, sessionType)))
-            {
-                return BadRequest();
-            }
-            */
             Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey);
             if (staff == null || staff.title_level < 100)
             {
@@ -269,12 +264,19 @@ namespace SnowmeetApi.Controllers.SkiPass
             bool needFinish = false;
             try
             {
-                //TicketController _tHelper = new TicketController(_db, _config);
+                TicketController _tHelper = new TicketController(_db, _config);
                 Models.SkiPass oriSkipass = await _db.skiPass.Where(s => s.id == skipass.id).AsNoTracking().FirstAsync();
                 if ((oriSkipass.card_no == null || oriSkipass.card_no.Trim().Equals("")) && !skipass.card_no.Trim().Equals(""))
                 {
                     //南山出票后激活
-                    //await _tHelper.ActiveTicket((int)oriSkipass.order_id);
+                    try
+                    {
+                        await _tHelper.ActiveSkipassTicket(skipass);
+                    }
+                    catch
+                    {
+                        
+                    }
                     //SkiPassController _skpHelper = new SkiPassController(_db, _config, _http);
                     if (skipass.order_id != null)
                     {

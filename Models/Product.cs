@@ -12,6 +12,7 @@ namespace SnowmeetApi.Models
         [Key]
         public int id { get; set; }
         public int? category_id { get; set; } = null;
+        public int? shop_id { get; set; } = null;
         public string name { get; set; }
         public string? content { get; set; } = null;
         public double sale_price { get; set; }
@@ -39,6 +40,7 @@ namespace SnowmeetApi.Models
         public int? award_score { get; set; } = null;
         [ForeignKey("category_id")]
         public Category? category { get; set; } = null;
+        public ProductTicketTemplate? productTicketTemplate {get; set;} = null;
         public List<ProductImage> images { get; set; } = new List<ProductImage>();
         public List<ProductProperty> properties { get; set; } = new List<ProductProperty>();
         public List<ProductStock> stocks { get; set; } = new List<ProductStock>();

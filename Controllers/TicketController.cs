@@ -59,20 +59,17 @@ namespace SnowmeetApi.Controllers
         /// Old Season
         /// </summary>
         /// <returns></returns>
-
         [HttpGet]
         public async Task<ActionResult<IEnumerable<TicketTemplate>>> GetTemplateList()
         {
             var list = await _context.ticketTemplate.Where<TicketTemplate>(tt => tt.hide == 0).ToListAsync();
             return Ok(list);
         }
-
         [HttpGet("{templateId}")]
         public async Task<ActionResult<TicketTemplate>> GetTicketTemplateById(int templateId)
         {
             return Ok(await _context.ticketTemplate.FindAsync(templateId));
         }
-
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Ticket>>> GetUnusedTicketsByCode(string ticketCodeArr)
         {
@@ -565,8 +562,95 @@ namespace SnowmeetApi.Controllers
             return code;
         }
         [NonAction]
+        public async Task<List<Ticket>> GetMemberTickets(int memberId)
+        {
+            return await _context.ticket.Where(t => t.member_id == memberId && t.valid == 1 && t.is_active == 1)
+                .Include(t => t.template).ThenInclude(t => t.productTicketTemplates).ThenInclude(t => t.product)
+                .AsNoTracking().ToListAsync();
+        }
+        [HttpGet("{memberId}")]
+        public async Task<ActionResult<ApiResult<List<Ticket>?>>> GetMemberTicketsByStaff(int memberId, string? bizType,
+            bool? canUse, string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await Util.GetStaffBySessionKey(_context, sessionKey, sessionType);
+            if (staff == null || staff.title_level < 100)
+            {
+                return Ok(new ApiResult<List<Ticket>?>()
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = null
+                });
+            }
+            List<Ticket> tickets = await GetMemberTickets(memberId);
+            if (bizType != null)
+            {
+                tickets = tickets.Where(t => t.biz_type == bizType).ToList();
+            }
+            if (canUse != null)
+            {
+                if (canUse == true)
+                {
+                    tickets = tickets.Where(t => t.start_date == null || ((DateTime)t.start_date).Date <= DateTime.Now.Date)
+                        .Where(t => t.expire_date == null || ((DateTime)t.expire_date).Date >= DateTime.Now.Date)
+                        .Where(t => t.is_active == 1 && t.used == 0).ToList();
+                }
+                else
+                {
+                    tickets = tickets.Where(t => (t.start_date != null && ((DateTime)t.start_date).Date > DateTime.Now.Date) 
+                        || (t.expire_date == null && ((DateTime)t.expire_date).Date < DateTime.Now.Date) || t.used == 1 || t.is_active == 0  ).ToList();
+                }
+            }
+            tickets = tickets.OrderBy(t => t.expire_date).ToList();
+            return Ok(new ApiResult<List<Ticket>?>()
+            {
+                code = 0,
+                message = "",
+                data = tickets
+            });
+        }
+        [NonAction]
+        public async Task<Ticket> ActiveSkipassTicket(Models.SkiPass skiPass)
+        {
+            Ticket ticket = await _context.ticket.Where(t => t.create_memo == skiPass.id.ToString()).AsNoTracking().FirstOrDefaultAsync();
+            if (ticket == null)
+            {
+                return null;
+            }
+            if (ticket.is_active == 1)
+            {
+                return null;
+            }
+            DateTime? startDate = skiPass.card_member_pick_time;
+            if (startDate == null)
+            {
+                startDate = DateTime.Now.Date;
+            }
+            ticket.start_date = startDate;
+            ticket.expire_date = ((DateTime)startDate).AddDays(1);
+            ticket.is_active = 1;
+            _context.ticket.Entry(ticket).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
+            return ticket;
+        } 
+        [NonAction]
+        public async Task<Ticket> CreateTicketBySkiPass(Models.SkiPass skiPass)
+        {
+            int templateId = 12;
+            List<Ticket> tickets = await _context.ticket.Where(t => t.template_id == templateId && t.create_memo == skiPass.id.ToString())
+                .AsNoTracking().ToListAsync();
+            if (tickets != null && tickets.Count > 0)
+            {
+                return null;
+            }
+            Ticket ticket = await CreateTicket(12, skiPass.member_id, null, skiPass.id.ToString(), "养护", null, false, null, null);
+            return ticket;
+        }
+        
+        [NonAction]
         public async Task<Ticket> CreateTicket(int templateId, int? memberId, int? staffId,
-             string? createMemo = null, string? bizType = null, int? bizId = null)
+            string? createMemo = null, string? bizType = null, int? bizId = null, 
+            bool active = false, DateTime? startDate = null, DateTime? expireDate = null)
         {
             TicketTemplate template = await _context.ticketTemplate
                 .Where(t => t.id == templateId).AsNoTracking().FirstOrDefaultAsync();
@@ -584,19 +668,24 @@ namespace SnowmeetApi.Controllers
                 create_memo = createMemo,
                 memo = template.memo.Trim(),
                 create_date = DateTime.Now,
-                valid = 1
+                valid = 1,
+                is_active = active?1:0,
+                start_date = startDate,
+                expire_date = expireDate
             };
             await _context.ticket.AddAsync(ticket);
             await _context.SaveChangesAsync();
             return await GetWholeTicket(code);
         }
+        
         [NonAction]
         public async Task<Ticket> GetWholeTicket(string code)
         {
             Ticket ticket = await _context.ticket.Where(t => t.code == code)
-                .Include(t => t.template).ThenInclude(t => t.rules.Where(r => r.valid == true))
+                .Include(t => t.template).ThenInclude(t => t.productTicketTemplates.Where(p => p.valid))
                 .AsNoTracking().FirstOrDefaultAsync();
             return ticket;
         }
+        
     }
 }
