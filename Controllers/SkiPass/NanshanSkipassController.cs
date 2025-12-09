@@ -559,7 +559,7 @@ namespace SnowmeetApi.Controllers.SkiPass
         public async Task<ActionResult<OrderPaymentRefund>> SkipassRefundDeposit(int skiPassId,
             string sessionKey, string sessionType = "wechat_mini_openid")
         {
-            Models.SkiPass skipass = await _db.skiPass.FindAsync(skiPassId);
+            Models.SkiPass skipass = await _db.skiPass.Where(s => s.id == skiPassId).AsNoTracking().FirstOrDefaultAsync();
             if (skipass.valid == 0 || skipass.card_member_return_time == null)
             {
                 return BadRequest();
@@ -571,7 +571,7 @@ namespace SnowmeetApi.Controllers.SkiPass
             foreach (OrderPayment payment in payments)
             {
                 //paidAmount += payment.amount;
-                if (payment.amount >= skipass.needRefund)
+                if (Math.Round(payment.amount, 2) >= Math.Round(skipass.needRefund, 2))
                 {
                     skipass.have_refund = 1;
                     skipass.refund_amount = skipass.needRefund;

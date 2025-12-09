@@ -544,13 +544,19 @@ namespace SnowmeetApi.Controllers.Order
             reason = Util.UrlDecode(reason);
             sessionKey = Util.UrlDecode(sessionKey);
 
-            OrderPayment payment = await _context.OrderPayment.FindAsync(paymentId);
+            OrderPayment payment = await _context.OrderPayment.Where(p => p.id == paymentId).AsNoTracking().FirstOrDefaultAsync();
 
-
+            /*
             Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);        
 
             if (member.is_manager == 0 && member.is_admin == 0 && member.is_staff == 0
                 && !payment.open_id.Trim().Equals(member.wechatMiniOpenId.Trim()))
+            {
+                return BadRequest();
+            }
+            */
+            Staff staff = await Util.GetStaffBySessionKey(_context, sessionKey, sessionType);
+            if (staff == null && staff.title_level < 100)
             {
                 return BadRequest();
             }
@@ -570,8 +576,8 @@ namespace SnowmeetApi.Controllers.Order
             {
                 return BadRequest();
             }
-            string outRefundNo = payment.out_trade_no + "_TK_" + (refunds.Count + 1).ToString().PadLeft(2, '0') 
-                + "_" + DateTime.Now.ToString("yyyyMMdd");
+            string outRefundNo = payment.out_trade_no + "_TK_" + (refunds.Count + 1).ToString().PadLeft(2, '0');
+                //+ "_" + DateTime.Now.ToString("yyyyMMdd");
             OrderPaymentRefund refund = new OrderPaymentRefund()
             {
                 order_id = payment.order_id,
@@ -582,7 +588,8 @@ namespace SnowmeetApi.Controllers.Order
                 amount = amount,
                 TransactionId = "",
                 RefundFee = 0,
-                oper = member.wechatMiniOpenId,
+                oper = "",
+                staff_id = staff.id,
                 memo = "",
                 notify_url = "",
                 out_refund_no = outRefundNo.Trim()

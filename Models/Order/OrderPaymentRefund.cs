@@ -13,7 +13,7 @@ namespace SnowmeetApi.Models
         public int payment_id { get; set; }
         public double amount { get; set; }
         public int state { get; set; } = 0;
-        public string oper { get; set; }
+        public string oper { get; set; } = "";
         public int? oper_member_id {get; set;}
         public string memo { get; set; } = "";
         public string notify_url { get; set; } = "";
