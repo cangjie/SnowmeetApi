@@ -125,7 +125,7 @@ namespace SnowmeetApi.Models
         public List<CareImage> careImages { get; set; } = new List<CareImage>();
         public int? pick_image_id {get; set;} = null;
         [ForeignKey("pick_image_id")]
-        public CareImage pickImage {get; set;} = null;
+        public UploadFile pickImage {get; set;} = null;
     }
     [Table("care_image")]
     public class CareImage
