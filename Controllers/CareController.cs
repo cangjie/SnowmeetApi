@@ -490,6 +490,34 @@ namespace SnowmeetApi.Controllers
             _db.order.Entry(order).State = EntityState.Detached;
             await _db.SaveChangesAsync();
         }
+        [HttpGet("{careId}")]
+        public async Task<ActionResult<ApiResult<Models.Order>?>> SetPickImageId(int careId, int imageId, 
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            if (staff == null || staff.title_level < 100)
+            {
+                return Ok(new ApiResult<Models.Order?>()
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = null
+                });
+            }
+            Care care = await _db.care.Where(c => c.id == careId).FirstOrDefaultAsync();
+            care.pick_image_id = imageId;
+            _db.care.Entry(care).State = EntityState.Modified;
+            await _db.SaveChangesAsync();
+            OrderController _orderHelper = new OrderController(_db, _config, _http);
+            Models.Order order = await _orderHelper.GetOrder((int)care.order_id);
+            return Ok(new ApiResult<Models.Order?>()
+            {
+                code = 0,
+                message = "",
+                data = order
+            
+            });
+        }
         [HttpGet("{taskId}")]
         public async Task<ActionResult<ApiResult<Care?>>> SetTaskStatus(int taskId, string status,
             string scene, string sessionKey, string sessionType = "wechat_mini_openid")
@@ -531,6 +559,12 @@ namespace SnowmeetApi.Controllers
             _db.careTask.Entry(careTask).State = EntityState.Modified;
             await _db.SaveChangesAsync();
             Care care = await GetCare(careTask.care_id);
+            if (careTask.pick_image_id != null)
+            {
+                care.pick_image_id = careTask.pick_image_id;
+                _db.care.Entry(care).State = EntityState.Modified;
+                await _db.SaveChangesAsync();
+            }
             return Ok(new ApiResult<Care>()
             {
                 code = 0,
