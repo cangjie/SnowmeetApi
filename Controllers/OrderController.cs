@@ -39,6 +39,7 @@ namespace SnowmeetApi.Controllers
             order.cares = await _db.order.Entry(order).Collection(o => o.cares).Query()
                 .Include(c => c.tasks.OrderBy(t => t.id)).ThenInclude(t => t.staff)
                 .Include(c => c.tasks.OrderBy(t => t.id)).ThenInclude(t => t.terminateStaff)
+                .Include(c => c.pickImage).ThenInclude(p => p.image)
                 .Include(c => c.careImages).ThenInclude(i => i.image).AsNoTracking().ToListAsync();
             order.fdOrders = await _db.order.Entry(order).Collection(o => o.fdOrders).Query()
                 .Where(r => r.valid == 1).AsNoTracking()
