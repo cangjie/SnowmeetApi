@@ -196,9 +196,9 @@ namespace SnowmeetApi.Controllers
             {
                 return BadRequest();
             }
-            Models.SkiPass skipass = await _context.skiPass.FindAsync(skipassId);
-            if (member.id != skipass.member_id && member.wechatMiniOpenId.Trim().Equals(skipass.wechat_mini_openid)
-                && member.is_admin == 0 && member.is_staff == 0 && member.is_manager == 0)
+            Staff staff = await Util.GetStaffBySessionKey(_context, sessionKey,sessionType);
+            Models.SkiPass skipass = await _context.skiPass.Where(s => s.id == skipassId).AsNoTracking().FirstOrDefaultAsync();   //.FindAsync(skipassId);
+            if (member.id != skipass.member_id && staff == null && staff.title_level < 100)
             {
                 return BadRequest();
             }
