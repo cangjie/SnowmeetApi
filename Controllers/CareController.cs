@@ -42,6 +42,7 @@ namespace SnowmeetApi.Controllers
                     _db.careImage.Entry(oriImage).State = EntityState.Deleted;
                 }
             }
+            /*
             for(int i = 0; care.tasks != null && i < care.tasks.Count; i++)
             {
                 if (care.tasks[i].staff != null)
@@ -49,16 +50,30 @@ namespace SnowmeetApi.Controllers
                     _db.staff.Entry(care.tasks[i].staff).State = EntityState.Detached;
                 }
             }
+            */
             try
             {
                 _db.care.Update(care);
+                care.update_date = DateTime.Now;
+                int r = await _db.SaveChangesAsync();
             }
             catch
             {
-                _db.care.Entry(care).State = EntityState.Modified;
+                /*
+                int? pickImageId = care.pick_image_id;
+                if (pickImageId != null)
+                {
+                    //_db.care.Entry(care).State = EntityState.Detached;
+                    int r = await _db.SaveChangesAsync();
+                    care = await _db.care.FindAsync(care.id);
+                    care.pick_image_id = pickImageId;
+                    care.update_date = DateTime.Now;
+                    _db.care.Entry(care).State = EntityState.Modified;
+                    r = await _db.SaveChangesAsync();
+                }
+                */
             }
-            care.update_date = DateTime.Now;
-            await _db.SaveChangesAsync();
+            
             return care;
         }
         [HttpGet]

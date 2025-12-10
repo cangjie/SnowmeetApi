@@ -27,5 +27,7 @@ namespace SnowmeetApi.Models
         public Staff? staff{ get; set; } = null;
         [ForeignKey("terminate_staff_id")]
         public Staff terminateStaff {get; set;} = null;
+        [NotMapped]
+        public int? pick_image_id {get; set;} = null;
     }
 }
