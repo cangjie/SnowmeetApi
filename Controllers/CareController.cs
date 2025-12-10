@@ -42,7 +42,21 @@ namespace SnowmeetApi.Controllers
                     _db.careImage.Entry(oriImage).State = EntityState.Deleted;
                 }
             }
-            _db.care.Update(care);
+            for(int i = 0; care.tasks != null && i < care.tasks.Count; i++)
+            {
+                if (care.tasks[i].staff != null)
+                {
+                    _db.staff.Entry(care.tasks[i].staff).State = EntityState.Detached;
+                }
+            }
+            try
+            {
+                _db.care.Update(care);
+            }
+            catch
+            {
+                _db.care.Entry(care).State = EntityState.Modified;
+            }
             care.update_date = DateTime.Now;
             await _db.SaveChangesAsync();
             return care;
@@ -206,12 +220,18 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<ApiResult<Care>>> UpdateCareByStaff([FromBody] Care care, [FromQuery] string scene,
             [FromQuery] string sessionKey, [FromQuery] string sessionType = "wechat_mini_openid")
         {
-            StaffController _staffHelper = new StaffController(_db);
-            Staff staff = await _staffHelper.GetStaffBySessionKey(sessionKey, sessionType);
-            ApiResult<object?> r = await _staffHelper.CheckStaffLevel(100, sessionKey, sessionType);
-            if (r != null)
+            //StaffController _staffHelper = new StaffController(_db);
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            _db.staff.Entry(staff).State = EntityState.Detached;
+            await _db.SaveChangesAsync();
+            if (staff == null || staff.title_level < 100)
             {
-                return Ok(r);
+                return Ok(new ApiResult<Care?>
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = null
+                });
             }
             scene = Util.UrlDecode(scene);
             care = await UpdateCare(care, null, staff.id, scene);
