@@ -558,13 +558,16 @@ namespace SnowmeetApi.Controllers
             await _db.coreDataModLog.AddAsync(log);
             _db.careTask.Entry(careTask).State = EntityState.Modified;
             await _db.SaveChangesAsync();
+
             Care care = await GetCare(careTask.care_id);
+            /*
             if (careTask.pick_image_id != null)
             {
                 care.pick_image_id = careTask.pick_image_id;
                 _db.care.Entry(care).State = EntityState.Modified;
                 await _db.SaveChangesAsync();
             }
+            */
             return Ok(new ApiResult<Care>()
             {
                 code = 0,
