@@ -49,9 +49,9 @@ namespace SnowmeetApi.Controllers
             return uidList[0].open_id.Trim();
         }
         [HttpGet]
-        public async Task<ActionResult<TemplateMessage>> SendTemplateMessage(string miniAppOpenId, string templateId, string first, string keywords, string remark, string url, string sessionKey)
+        public async Task<ActionResult<TemplateMessage>> SendTemplateMessage(int memberId, string templateId, string first, string keywords, string remark, string url, string sessionKey)
         {
-            miniAppOpenId = Util.UrlDecode(miniAppOpenId);
+            //miniAppOpenId = Util.UrlDecode(miniAppOpenId);
             templateId = Util.UrlDecode(templateId);
             first = Util.UrlDecode(first);
             keywords = Util.UrlDecode(keywords);
@@ -69,7 +69,13 @@ namespace SnowmeetApi.Controllers
             {
                 return BadRequest();
             }
-            string openId = await GetOAOpenId(miniAppOpenId);
+            MemberSocialAccount? msa = await _context.memberSocialAccount
+                .Where(m => m.member_id == memberId && m.valid == 1 && m.type == "wechat_oa_openid").AsNoTracking().FirstOrDefaultAsync();
+            if (msa == null)
+            {
+                return NoContent();
+            }
+            string openId = msa.num.Trim();
             string[] keywordArr = keywords.Split('|');
             string keywordJson = "";
             for (int i = 1; i <= keywordArr.Length; i++)
