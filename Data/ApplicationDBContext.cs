@@ -77,8 +77,7 @@ namespace SnowmeetApi.Data
         public DbSet<Models.SkiPassProduct> skiPassProduct { get; set; }
         public DbSet<OAReceive> oAReceive { get; set; }
         public DbSet<TicketLog> ticketLog { get; set; }
-        public DbSet<ServiceMessage> ServiceMessage { get; set; }
-        public DbSet<TemplateMessage> templateMessage { get; set; }
+        
         public DbSet<Models.Rent.RentOrder> RentOrder { get; set; }
         public DbSet<Models.Rent.RentItem> RentItem { get; set; }
         public DbSet<Models.Rent.RentOrderDetail> RentOrderDetail { get; set; }
@@ -200,6 +199,8 @@ namespace SnowmeetApi.Data
         public DbSet<ShareRelationBind> shareRelationBind {get; set;}
         public DbSet<OrderShare> orderShare {get; set;}
         public DbSet<PaymentShare> paymentShare {get; set;}
+        public DbSet<ServiceMessage> serviceMessage { get; set; }
+        public DbSet<TemplateMessage> templateMessage { get; set; }
 
     }
 }
