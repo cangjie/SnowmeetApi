@@ -860,7 +860,7 @@ namespace SnowmeetApi.Models
                 }
                 else
                 {
-                    if (member != null)
+                    if (member != null && member.contactNum != null)
                     {
                         return member.contactNum.Trim();
                     }
