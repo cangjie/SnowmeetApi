@@ -348,7 +348,7 @@ namespace SnowmeetApi.Controllers
                             type = "cell",
                             num = cell,
                             valid = 1
-                        
+
                         };
                         await _context.memberSocialAccount.AddAsync(msa);
                         await _context.SaveChangesAsync();
@@ -357,6 +357,7 @@ namespace SnowmeetApi.Controllers
                 }
 
             }
+            member = await _context.member.Include(m => m.memberSocialAccounts).Where(m => m.id == member.id).AsNoTracking().FirstOrDefaultAsync();
             return Ok(member);
         }
 

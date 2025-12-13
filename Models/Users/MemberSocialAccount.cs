@@ -20,8 +20,8 @@ namespace SnowmeetApi.Models.Users
 
         public string memo { get; set; } = "";
         public DateTime? update_date { get; set; }
-
-       // public Member member { get; set; }
+        [ForeignKey("member_id")]
+       public Member member { get; set; }
 
     }
 }

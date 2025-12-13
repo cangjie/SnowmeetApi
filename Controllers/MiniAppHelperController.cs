@@ -271,7 +271,7 @@ namespace Controllers
                 {
                     MemberSocialAccount msa = new MemberSocialAccount()
                     {
-                        type = "wl_wechat_unionid",
+                        type = "wechat_unionid",
                         num = unionId.Trim(),
                         valid = 1,
                         memo = "",
