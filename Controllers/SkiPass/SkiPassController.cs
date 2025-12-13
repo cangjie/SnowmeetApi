@@ -306,6 +306,17 @@ namespace SnowmeetApi.Controllers
                 if (!skipass.resort.Trim().Equals("南山"))
                 {
                     await AutoReserve(skipass);
+                    try
+                    {
+                        if (skipass.card_no != null && skipass.card_no != "")
+                        {
+                            await SetNotify(skipass);
+                        }
+                    }
+                    catch
+                    {
+                        
+                    }
                 }
                 try
                 {
