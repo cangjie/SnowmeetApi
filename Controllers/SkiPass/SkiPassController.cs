@@ -1198,7 +1198,7 @@ namespace SnowmeetApi.Controllers
         [NonAction]
         public async Task<ActionResult<string>> SetNotify(Models.SkiPass skiPass)
         {
-            string dateStr = ((DateTime)skiPass.reserve_date).Date.ToString("YYYY-MM-DD");
+            string dateStr = ((DateTime)skiPass.reserve_date).Date.ToString("yyyy-MM-dd");
             string resort = skiPass.resort == "南山" ? "南山滑雪场" : "万龙度假天堂";
             string title = "";
             switch(skiPass.resort)
@@ -1237,7 +1237,7 @@ namespace SnowmeetApi.Controllers
             }
             string notUrl = "https://wxoa.snowmeet.top/api/TemlateMessage/SendTemplateMessage?memberId="
                 + skiPass.member_id.ToString() +  "&templateId=oxAKjz6JBBs_nPm6j89nMlGJoTtoQKrSm_E_HKn0QXE&first=test&keywords= " 
-                + Util.UrlEncode(resort + "【免费打蜡】|" + title + "|" + dateStr ) 
+                + Util.UrlEncode(resort + "【免费打蜡】|" + title + "|" + dateStr + "|" + skiPass.card_no.Trim() ) 
                 + "&remark=test2&url=&sessionKey=" + Util.UrlEncode("abcd123!@#");
             string ret = Util.GetWebContent(notUrl);
             return Ok(ret);
