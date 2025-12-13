@@ -609,12 +609,6 @@ namespace SnowmeetApi.Controllers
                 data = tickets
             });
         }
-        [HttpGet("{id}")]
-        public async Task ActiveSkipassTicketTest(int id)
-        {
-            Models.SkiPass p = await _context.skiPass.Where(s => s.id == id).AsNoTracking().FirstOrDefaultAsync();
-            await ActiveSkipassTicket(p);
-        }
         [NonAction]
         public async Task<Ticket> ActiveSkipassTicket(Models.SkiPass skiPass)
         {

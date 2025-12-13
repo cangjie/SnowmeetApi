@@ -299,7 +299,6 @@ namespace SnowmeetApi.Controllers
                 }
             }
             await _context.SaveChangesAsync();
-            
             for(int i = 0; i < dealList.Count; i++)
             {
                 Models.SkiPass skipass = dealList[i];
@@ -681,7 +680,6 @@ namespace SnowmeetApi.Controllers
                     //await _tHelper.ActiveTicket((int)skipass.order_id);
                     if (skipass.order_id != null)
                     {
-                        //await CommitSkipassOrder((int)skipass.order_id);
                         try
                         {
                             await _tHelper.ActiveSkipassTicket(skipass);
