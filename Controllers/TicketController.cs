@@ -609,6 +609,12 @@ namespace SnowmeetApi.Controllers
                 data = tickets
             });
         }
+        [HttpGet("{id}")]
+        public async Task ActiveSkipassTicketTest(int id)
+        {
+            Models.SkiPass p = await _context.skiPass.Where(s => s.id == id).AsNoTracking().FirstOrDefaultAsync();
+            await ActiveSkipassTicket(p);
+        }
         [NonAction]
         public async Task<Ticket> ActiveSkipassTicket(Models.SkiPass skiPass)
         {
@@ -631,6 +637,33 @@ namespace SnowmeetApi.Controllers
             ticket.is_active = 1;
             _context.ticket.Entry(ticket).State = EntityState.Modified;
             await _context.SaveChangesAsync();
+            try
+            {
+                string first = "您好，您的免费打蜡优惠券已经激活。";
+                string shop = "易龙雪聚";
+                switch(skiPass.resort)
+                {
+                    case "南山":
+                        shop = "易龙雪聚南山店";
+                        break;
+                    case "万龙":
+                        shop = "易龙雪聚万龙服务中心";
+                        break;
+                    default:
+                        break;
+                }
+                string remark = "有效期至" + ((DateTime)ticket.expire_date).ToString("yyyy-MM-dd");
+                string content = first + "|" + Math.Round((double)skiPass.deal_price, 2).ToString() + "元|微信支付|" + "无|" + shop + "|" + ticket.name.Trim() + "|" + remark;
+                string notUrl = "https://wxoa.snowmeet.top/api/TemlateMessage/SendTemplateMessage?memberId=" + skiPass.member_id.ToString() 
+                    + "&templateId=fvfTWtDQZdb-NcRyfsI4iC3kMTGrcMrzKrYXdT0TKmA&first=" + Util.UrlDecode(first) + "&keywords=" + Util.UrlDecode(content)
+                    + "&remark=" + Util.UrlDecode(remark) + "&url=&sessionKey=" + Util.UrlEncode("abcd123!@#");
+                Util.GetWebContent(notUrl);
+                
+            }
+            catch
+            {
+                
+            }
             return ticket;
         } 
         [NonAction]
