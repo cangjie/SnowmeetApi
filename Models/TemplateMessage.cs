@@ -9,7 +9,6 @@ namespace SnowmeetApi.Models
 	{
 		[Key]
 		public int id { get; set; }
-
 		public string template_id { get; set; }
 		public string from { get; set; }
 		public string to { get; set; }
@@ -20,4 +19,3 @@ namespace SnowmeetApi.Models
 		public string ret_message { get; set; }
 	}
 }
-

@@ -51,6 +51,7 @@ namespace SnowmeetApi.Controllers
         [HttpGet]
         public async Task<ActionResult<TemplateMessage>> SendTemplateMessage(int memberId, string templateId, string first, string keywords, string remark, string url, string sessionKey)
         {
+            
             //miniAppOpenId = Util.UrlDecode(miniAppOpenId);
             templateId = Util.UrlDecode(templateId);
             first = Util.UrlDecode(first);

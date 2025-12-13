@@ -730,18 +730,9 @@ namespace SnowmeetApi.Controllers
                         }
                         if (updated)
                         {
-                            //await SetNotify(skipass.wechat_mini_openid, skipass.order.paymentList[0].wepay_trans_id.Trim(), 1, skipass.product_name, (int)(skipass.deal_price * 100), skipass.order.paymentList[0].timestamp, 2);
                             try
                             {
-                                await SetNotify(skipass.wechat_mini_openid, skipass.order.availablePayments[0].wepay_trans_id.Trim(), 1, skipass.product_name, (int)(skipass.deal_price * 100), skipass.order.availablePayments[0].timestamp, 2);
-                            }
-                            catch
-                            {
-                                
-                            }
-                            try
-                            {
-                                await SetNotify(skipass.wechat_mini_openid, skipass.order.availablePayments[0].wepay_trans_id.Trim(), 1, skipass.product_name, (int)(skipass.deal_price * 100), skipass.order.availablePayments[0].timestamp, 4);
+                                await SetNotify(skipass);    
                             }
                             catch
                             {
@@ -1193,6 +1184,54 @@ namespace SnowmeetApi.Controllers
                 .AsNoTracking().ToListAsync();
             return Ok(sList);
         }
+        [NonAction]
+        public async Task<ActionResult<string>> SetNotify(Models.SkiPass skiPass)
+        {
+            string dateStr = ((DateTime)skiPass.reserve_date).Date.ToString("YYYY-MM-DD");
+            string resort = skiPass.resort == "南山" ? "南山滑雪场" : "万龙度假天堂";
+            string title = "";
+            switch(resort)
+            {
+                case "万龙":
+                    if (skiPass.product_name.IndexOf("夜场") >= 0)
+                    {
+                        title = "万龙夜场自带板雪票";
+                    }
+                    else if (skiPass.product_name.IndexOf("4小时") >= 0)
+                    {
+                        title = "万龙日场4小时自带板雪票";
+                    }
+                    else if (skiPass.product_name.IndexOf("6小时") >= 0)
+                    {
+                        title = "万龙日场6小时自带板雪票";
+                    }
+                    else if (skiPass.product_name.IndexOf("万龙日场1天自带板雪票") >= 0)
+                    {
+                        title = "万龙日场1天自带板雪票";
+                    }
+                    else if (skiPass.product_name.IndexOf("万龙日场1.5天自带板雪票") >= 0)
+                    {
+                        title = "万龙日场1.5天自带板雪票";
+                    }
+                    else if (skiPass.product_name.IndexOf("万龙日场2天自带板雪票") >= 0)
+                    {
+                        title = "万龙日场2天自带板雪票";
+                    }
+                    break;
+                case "南山":
+                    title = skiPass.product_name.Trim().Replace("【", "").Replace("】", "").Replace("-", "").Trim();
+                    break;
+                default:
+                    break;
+            }
+            string notUrl = "https://wxoa.snowmeet.top/api/TemlateMessage/SendTemplateMessage?memberId="
+                + skiPass.member_id.ToString() +  "&templateId=oxAKjz6JBBs_nPm6j89nMlGJoTtoQKrSm_E_HKn0QXE&first=test&keywords= " 
+                + Util.UrlEncode(resort + "【免费打蜡】|" + title + "|" + dateStr ) 
+                + "&remark=test2&url=&sessionKey=" + Util.UrlEncode("abcd123!@#");
+            string ret = Util.GetWebContent(notUrl);
+            return Ok(ret);
+        }
+        /*
         [HttpGet]
         public async Task SetNotify(string openId, string transId, int count, string name, int amount, string timeStamp, int curState)
         {
@@ -1263,6 +1302,7 @@ namespace SnowmeetApi.Controllers
 
             await _helper.PerformRequest(url, "", postJson, "POST", "易龙雪聚小程序", "预订雪票", memo);
         }
+        */
     }
 
     
