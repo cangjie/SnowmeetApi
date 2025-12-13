@@ -306,17 +306,6 @@ namespace SnowmeetApi.Controllers
                 if (!skipass.resort.Trim().Equals("南山"))
                 {
                     await AutoReserve(skipass);
-                    try
-                    {
-                        if (skipass.card_no != null && skipass.card_no != "")
-                        {
-                            await SetNotify(skipass);
-                        }
-                    }
-                    catch
-                    {
-                        
-                    }
                 }
                 try
                 {
@@ -333,6 +322,17 @@ namespace SnowmeetApi.Controllers
                 try
                 {
                     await _ticketHelper.CreateTicketBySkiPass(order.skipasses[i]);
+                    try
+                    {
+                        if (order.skipasses[i].card_no != null && order.skipasses[i].card_no != "")
+                        {
+                            await SetNotify(order.skipasses[i]);
+                        }
+                    }
+                    catch
+                    {
+                        
+                    }
                 }
                 catch
                 {
@@ -1201,7 +1201,7 @@ namespace SnowmeetApi.Controllers
             string dateStr = ((DateTime)skiPass.reserve_date).Date.ToString("YYYY-MM-DD");
             string resort = skiPass.resort == "南山" ? "南山滑雪场" : "万龙度假天堂";
             string title = "";
-            switch(resort)
+            switch(skiPass.resort)
             {
                 case "万龙":
                     if (skiPass.product_name.IndexOf("夜场") >= 0)
