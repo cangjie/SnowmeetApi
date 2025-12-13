@@ -1240,11 +1240,14 @@ namespace SnowmeetApi.Controllers
                 default:
                     break;
             }
+            string miniAppPath ="/pages/tickets/ticket_detail";
+            string miniAppQuery = "skipassId=" + skiPass.id.ToString();
+            string miniAppUrl = "https://mini.snowmeet.top/mapp/open_mapp_page.html?path=" + Util.UrlEncode(miniAppPath) + "&query=" + Util.UrlEncode(miniAppQuery);
 
             string notUrl = "https://wxoa.snowmeet.top/api/TemlateMessage/SendTemplateMessage?memberId="
                 + skiPass.member_id.ToString() +  "&templateId=oxAKjz6JBBs_nPm6j89nMlGJoTtoQKrSm_E_HKn0QXE&first=test&keywords=" 
                 + Util.UrlEncode(resort + "【免费打蜡】|" + title + "|" + dateStr + "|" + cardNo ) 
-                + "&remark=test2&url=&sessionKey=" + Util.UrlEncode("abcd123!@#");
+                + "&remark=test2&url=" + miniAppUrl + "&sessionKey=" + Util.UrlEncode("abcd123!@#");
             string ret = Util.GetWebContent(notUrl);
             return Ok(ret);
         }
