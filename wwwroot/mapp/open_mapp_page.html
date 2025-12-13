@@ -8,6 +8,10 @@
         version = 'release';
     }
     var url = '/api/MiniAppHelper/OpenMiniProgram?path=' + encodeURIComponent(path) +  (query?  ('&query=' + encodeURIComponent(query)) : '') + '&version=' + encodeURIComponent(version);
+    console.log('path', path);
+    console.log('query', query);
+    console.log('url', url);
+    return;
     $.ajax({
         url: url,
         type: 'GET',
