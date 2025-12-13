@@ -324,7 +324,11 @@ namespace SnowmeetApi.Controllers
                     await _ticketHelper.CreateTicketBySkiPass(order.skipasses[i]);
                     try
                     {
-                        if (order.skipasses[i].card_no != null && order.skipasses[i].card_no != "")
+                        if (order.shop != "南山" && order.skipasses[i].card_no != null && order.skipasses[i].card_no != "")
+                        {
+                            await SetNotify(order.skipasses[i]);
+                        }
+                        else if (order.shop == "南山")
                         {
                             await SetNotify(order.skipasses[i]);
                         }
@@ -1232,7 +1236,7 @@ namespace SnowmeetApi.Controllers
                     cardNo = skiPass.card_no;
                     break;
                 case "南山":
-                    cardNo = "请到南山店前台扫码验票";
+                    cardNo = skiPass.id.ToString();
                     title = skiPass.product_name.Trim().Replace("【", "").Replace("】", "").Replace("-", "").Trim();
                     break;
                 default:
