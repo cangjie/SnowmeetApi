@@ -1201,6 +1201,7 @@ namespace SnowmeetApi.Controllers
             string dateStr = ((DateTime)skiPass.reserve_date).Date.ToString("yyyy-MM-dd");
             string resort = skiPass.resort == "南山" ? "南山滑雪场" : "万龙度假天堂";
             string title = "";
+            string cardNo = "";
             switch(skiPass.resort)
             {
                 case "万龙":
@@ -1228,16 +1229,19 @@ namespace SnowmeetApi.Controllers
                     {
                         title = "万龙日场2天自带板雪票";
                     }
+                    cardNo = skiPass.card_no;
                     break;
                 case "南山":
+                    cardNo = "请到南山店前台扫码验票";
                     title = skiPass.product_name.Trim().Replace("【", "").Replace("】", "").Replace("-", "").Trim();
                     break;
                 default:
                     break;
             }
+
             string notUrl = "https://wxoa.snowmeet.top/api/TemlateMessage/SendTemplateMessage?memberId="
-                + skiPass.member_id.ToString() +  "&templateId=oxAKjz6JBBs_nPm6j89nMlGJoTtoQKrSm_E_HKn0QXE&first=test&keywords= " 
-                + Util.UrlEncode(resort + "【免费打蜡】|" + title + "|" + dateStr + "|" + skiPass.card_no.Trim() ) 
+                + skiPass.member_id.ToString() +  "&templateId=oxAKjz6JBBs_nPm6j89nMlGJoTtoQKrSm_E_HKn0QXE&first=test&keywords=" 
+                + Util.UrlEncode(resort + "【免费打蜡】|" + title + "|" + dateStr + "|" + cardNo ) 
                 + "&remark=test2&url=&sessionKey=" + Util.UrlEncode("abcd123!@#");
             string ret = Util.GetWebContent(notUrl);
             return Ok(ret);
