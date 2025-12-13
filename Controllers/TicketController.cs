@@ -656,7 +656,7 @@ namespace SnowmeetApi.Controllers
                 string content = first + "|" + Math.Round((double)skiPass.deal_price, 2).ToString() + "元|微信支付|" + "无|" + shop + "|" + ticket.name.Trim() + "|" + remark;
 
                 string miniAppPath ="/pages/tickets/ticket_detail";
-                string miniAppQuery = "skipassId=" + skiPass.id.ToString();
+                string miniAppQuery = skiPass.id.ToString();
                 string miniAppUrl = "https://mini.snowmeet.top/mapp/open_mapp_page.html?path=" + Util.UrlEncode(miniAppPath) + "&query=" + Util.UrlEncode(miniAppQuery);
 
                 string notUrl = "https://wxoa.snowmeet.top/api/TemlateMessage/SendTemplateMessage?memberId=" + skiPass.member_id.ToString() 

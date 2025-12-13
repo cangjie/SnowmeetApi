@@ -11,7 +11,7 @@
     console.log('path', path);
     console.log('query', query);
     console.log('url', url);
-    /*
+    
     $.ajax({
         url: url,
         type: 'GET',
@@ -21,10 +21,13 @@
             }
             console.log('open mapp', msg);
             var msgObj = JSON.parse(msg);
-            //window.location.href = msgObj.openlink;
+            if (msgObj.openlink){
+                window.location.href = msgObj.openlink;
+            }
+            
         }
     })
-    */
+    
     function getUrlParameter(para) {
         var urlArr = window.location.href.split('?');
         if (urlArr.length < 2) {
