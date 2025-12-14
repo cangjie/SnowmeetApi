@@ -697,6 +697,7 @@ namespace SnowmeetApi.Controllers
             var res = await client.ExecuteAddProfitSharingReceiverAsync(req);
             return res.IsSuccessful();
         }
+        /*
         [HttpGet]
         public async Task UnFreezeAll(int mchId)
         {
@@ -731,6 +732,7 @@ namespace SnowmeetApi.Controllers
             };
             var res = await client.ExecuteSetProfitSharingOrderUnfrozenAsync(req);
         }
+        */
         [NonAction]
         public async Task<PaymentShare> Settle(PaymentShare share)
         {
@@ -775,6 +777,7 @@ namespace SnowmeetApi.Controllers
             await _db.SaveChangesAsync();
             return share;
         }
+        /*
         [HttpGet]
         public async Task ShareToMerchantTest(int paymentId)
         {
@@ -803,7 +806,7 @@ namespace SnowmeetApi.Controllers
             var res = await client.ExecuteCreateProfitSharingOrderAsync(req);
             Console.WriteLine(res);
         }
-
+        */
         /*
         [HttpGet("{paymentId}")]
         public async Task QueryShareableAmouont(int paymentId)

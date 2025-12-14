@@ -1010,6 +1010,7 @@ namespace SnowmeetApi.Controllers.Order
             return share;
         }
         */
+        /*
         [NonAction]
         public async Task ShareFinish(int paymentId, string description)
         {
@@ -1028,7 +1029,7 @@ namespace SnowmeetApi.Controllers.Order
                     break;
             }
         }
-
+        */
        
         private bool OrderPaymentExists(int id)
         {
