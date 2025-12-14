@@ -1240,8 +1240,8 @@ namespace SnowmeetApi.Controllers
                 default:
                     break;
             }
-            string miniAppPath ="/pages/tickets/ticket_detail";
-            string miniAppQuery = "skipassId=" + skiPass.id.ToString();
+            string miniAppPath ="/pages/mine/skipass/my_skipass";
+            string miniAppQuery = "";
             string miniAppUrl = "https://mini.snowmeet.top/mapp/open_mapp_page.html?path=" + Util.UrlEncode(miniAppPath) + "&query=" + Util.UrlEncode(miniAppQuery);
 
             string notUrl = "https://wxoa.snowmeet.top/api/TemlateMessage/SendTemplateMessage?memberId="
