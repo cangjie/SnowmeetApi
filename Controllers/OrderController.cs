@@ -1450,7 +1450,7 @@ namespace SnowmeetApi.Controllers
                 _db.orderPayment.Entry(payment).State = EntityState.Modified;
                 await _db.SaveChangesAsync();
             }
-            else
+            else if (order.type != "雪票")
             {
                 payment.need_share = 0;
             }
