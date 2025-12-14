@@ -5311,6 +5311,7 @@ namespace SnowmeetApi.Controllers
                 for(int j = 0; orders[i].rentals != null && j < orders[i].rentals.Count; j++)
                 {
                     Rental rental = orders[i].rentals[j];
+                    rental.order = orders[i];
                     await ContinueRental(rental, (DateTime)rentDate);
                 }
             }
@@ -5348,8 +5349,19 @@ namespace SnowmeetApi.Controllers
             {
                 rentType = "多日";
             }
+            int shopId = 10;
+            Models.Order order = await _db.order.Where(o => o.id == rental.order_id).AsNoTracking().FirstOrDefaultAsync();
+            if (order != null)
+            {
+                Shop shop = await _db.shop.Where(s => s.name == order.shop).AsNoTracking().FirstOrDefaultAsync();
+                if (shop != null)
+                {
+                    shopId = shop.id;    
+                }
+                
+            }
             RentPrice price = await _db.rentPrice.Where(p => p.day_type == dayType
-                && p.rent_type == rentType && p.scene == scene && p.valid == 1
+                && p.rent_type == rentType && p.scene == scene && p.valid == 1 && p.shop_id == shopId
                 && ((rental.package_id != null && p.package_id == rental.package_id)
                 || (rental.category_id != null && p.category_id == rental.category_id)))
                 .AsNoTracking().FirstOrDefaultAsync();
