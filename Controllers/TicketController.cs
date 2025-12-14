@@ -655,8 +655,10 @@ namespace SnowmeetApi.Controllers
                 string remark = "有效期至" + ((DateTime)ticket.expire_date).ToString("yyyy-MM-dd");
                 string content = first + "|" + Math.Round((double)skiPass.deal_price, 2).ToString() + "元|微信支付|" + "无|" + shop + "|" + ticket.name.Trim() + "|" + remark;
 
-                string miniAppPath ="/pages/tickets/ticket_detail";
+                string miniAppPath ="/pages/mine/ticket/ticket_detail";
+                
                 string miniAppQuery = skiPass.id.ToString();
+                miniAppQuery = "code=" + ticket.code.Trim();
                 string miniAppUrl = "https://mini.snowmeet.top/mapp/open_mapp_page.html?path=" + Util.UrlEncode(miniAppPath) + "&query=" + Util.UrlEncode(miniAppQuery);
 
                 string notUrl = "https://wxoa.snowmeet.top/api/TemlateMessage/SendTemplateMessage?memberId=" + skiPass.member_id.ToString() 

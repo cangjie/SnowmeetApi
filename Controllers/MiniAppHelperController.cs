@@ -695,6 +695,8 @@ namespace LuqinMiniAppBase.Controllers
         [HttpGet]
         public ActionResult<string> OpenMiniProgram(string path, string query, string version = "release")
         {
+            path = Util.UrlDecode(path);
+            query = Util.UrlDecode(query);
             string ret = "";
             string token = GetAccessToken();
             string postUrl = "https://api.weixin.qq.com/wxa/generatescheme?access_token=" + token.Trim();
