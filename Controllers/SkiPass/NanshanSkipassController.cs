@@ -368,13 +368,6 @@ namespace SnowmeetApi.Controllers.SkiPass
             int count, string cell, string name, string sessionKey, int? refereeMemberId = null, string sessionType = "wechat_mini_openid", int? staffId = null)
         {
             Models.Product product = await _db.product.FindAsync(productId);
-            /*
-            UnicUser user = await UnicUser.GetUnicUserAsync(sessionKey, _db);
-            if (user == null || product == null)
-            {
-                return BadRequest();
-            }
-            */
             Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
             double totalPrice = 0;
             double totalAmount = 0;
@@ -402,34 +395,7 @@ namespace SnowmeetApi.Controllers.SkiPass
                 totalPrice += (double)skipass.deal_price;
                 totalAmount += product.sale_price;
             }
-            /*
-            OrderOnline order = new OrderOnline()
-            {
-                type = "雪票",
-                shop = product.shop.Trim(),
-                order_price = totalPrice,
-                order_real_pay_price = totalPrice,
-                final_price = totalPrice,
-                open_id = member.wechatMiniOpenId,
-                staff_open_id = "",
-                memo = "",
-                pay_method = "微信支付",
-                referee_member_id = refereeMemberId
-            };
-
-            await _db.OrderOnlines.AddAsync(order);
-            await _db.SaveChangesAsync();
-            string outTradeNo = "";
-            if (order.shop.Trim().Equals("南山"))
-            {
-                outTradeNo = "NS";
-            }
-            else
-            {
-                outTradeNo = "QJ";
-            }
-            outTradeNo += "_XP_" + DateTime.Now.ToString("yyyyMMdd") + "_" + order.id.ToString().PadLeft(6, '0') + "_ZF_01";
-            */
+            
             Models.Order order = new Models.Order()
             {
                 id = 0,
@@ -444,6 +410,21 @@ namespace SnowmeetApi.Controllers.SkiPass
             if (staffId != null)
             {
                 order.staff_id = staffId;
+                OrderShareRelation shareRelation = await _db.orderShareRelation.Where(r => r.staff_id == staffId).AsNoTracking().FirstOrDefaultAsync();
+                if (shareRelation != null)
+                {
+                    OrderShare share = new OrderShare()
+                    {
+                        id = 0,
+                        order_id = order.id,
+                        relation_id = shareRelation.id,
+                        amount = 1,
+                        valid = true,
+                        dealed = false,
+                        create_date = DateTime.Now
+                    };
+                    order.orderShares.Add(share);
+                }
             }
             OrderController _orderHelper = new OrderController(_db, _config, _http);
             await _orderHelper.GenerateOrderCode(order);
@@ -454,6 +435,8 @@ namespace SnowmeetApi.Controllers.SkiPass
                 amount = (double)order.paying_amount,
                 status = "待支付",
                 staff_open_id = "",
+                valid = 1,
+                need_share = order.orderShares.Count > 0?1:0,
                 out_trade_no = order.code + "_ZF_01"
             };
 

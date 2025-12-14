@@ -835,57 +835,6 @@ namespace SnowmeetApi.Controllers
                 booking_now = false,
                 reserve_success = false
             };
-                //skipassArr[i] = skipass;
-                //totalPrice += (double)skipass.deal_price;
-            
-
-            /*
-            OrderOnline order = new OrderOnline()
-            {
-                type = "雪票",
-                shop = product.shop.Trim(),
-                order_price = (double)skipass.deal_price,
-                order_real_pay_price = (double)skipass.deal_price,
-                final_price = (double)skipass.deal_price,
-                open_id = member.wechatMiniOpenId,
-                staff_open_id = "",
-                memo = "",
-                pay_method = "微信支付",
-                referee_member_id = refereeMemberId
-            };
-            await _context.OrderOnlines.AddAsync(order);
-            await _context.SaveChangesAsync();
-            string outTradeNo = "";
-            if (order.shop.Trim().Equals("南山"))
-            {
-                outTradeNo = "NS";
-            }
-            else
-            {
-                outTradeNo = "QJ";
-            }
-            outTradeNo += "_XP_" + DateTime.Now.ToString("yyyyMMdd") + "_" + order.id.ToString().PadLeft(6, '0') + "_ZF_01";
-
-            OrderPayment payment = new OrderPayment()
-            {
-                order_id = order.id,
-                pay_method = order.pay_method.Trim(),
-                amount = order.final_price,
-                status = "待支付",
-                staff_open_id = "",
-                out_trade_no = outTradeNo
-            };
-            await _context.OrderPayment.AddAsync(payment);
-            skipass.order_id = order.id;
-            await _context.skiPass.AddAsync(skipass);
-            await _context.SaveChangesAsync();
-            order.paymentList = (new OrderPayment[] { payment }).ToList();
-
-            member.real_name = name;
-            _context.member.Entry(member).State = EntityState.Modified;
-            await _context.SaveChangesAsync();
-            //await _memberHelper.UpdateDetailInfo(member.id, cell, "cell", false);
-            */
             Models.Order order = new Models.Order()
             {
                 id = 0,
@@ -900,6 +849,22 @@ namespace SnowmeetApi.Controllers
             if (staffId != null)
             {
                 order.staff_id = staffId;
+                OrderShareRelation shareRelation = await _context.orderShareRelation.Where(r => r.staff_id == staffId).AsNoTracking().FirstOrDefaultAsync();
+                if (shareRelation != null)
+                {
+                    OrderShare share = new OrderShare()
+                    {
+                        id = 0,
+                        order_id = order.id,
+                        relation_id = shareRelation.id,
+                        amount = 1,
+                        valid = true,
+                        dealed = false,
+                        create_date = DateTime.Now
+                    };
+                    order.orderShares.Add(share);
+                }
+                
             }
             OrderController _orderHelper = new OrderController(_context, _config, _http);
             await _orderHelper.GenerateOrderCode(order);
@@ -912,6 +877,7 @@ namespace SnowmeetApi.Controllers
                 staff_open_id = "",
                 out_trade_no = order.code + "_ZF_01",
                 valid = 1,
+                need_share = order.orderShares.Count > 0?1:0,
                 create_date = DateTime.Now
             };
             order.payments = new List<OrderPayment>() { payment };

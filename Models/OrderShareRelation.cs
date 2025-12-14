@@ -11,6 +11,7 @@ namespace SnowmeetApi.Models
         [Key]
         public int id {get; set;}
         public string type {get; set;}
+        public int? staff_id {get; set;} = null;
         public string name {get; set;}
         public string? wepay_account_type {get; set;} = null; 
         public string? wepay_account_num {get; set;} = null;
