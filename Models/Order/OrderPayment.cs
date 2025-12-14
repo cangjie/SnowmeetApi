@@ -58,6 +58,7 @@ namespace SnowmeetApi.Models
         public int valid {get; set;} = 1;
         public int request_failed { get; set; } = 0;
         public string? notify_id { get; set; } = null;
+        public DateTime? share_close_date {get; set;} = null;
         public List<Models.OrderPaymentRefund> refunds { get; set; } = new List<OrderPaymentRefund>();
         //public List<Models.PaymentShare> shares {get;set;}
         public string? deposit_type { get; set; } = null;

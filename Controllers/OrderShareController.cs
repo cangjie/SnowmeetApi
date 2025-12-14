@@ -6,6 +6,8 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using SKIT.FlurlHttpClient.Wechat.TenpayV3;
+using SKIT.FlurlHttpClient.Wechat.TenpayV3.Models;
 using SnowmeetApi.Data;
 using SnowmeetApi.Models;
 namespace SnowmeetApi.Controllers
@@ -175,6 +177,43 @@ namespace SnowmeetApi.Controllers
                 shares[i] = await SharePayment(shares[i]);
             }
             return Ok(shares);
+        }
+        [HttpGet]
+        public async Task CloseWepayShare()
+        {
+            TenpayController _tHelper = new TenpayController(_db, _config, _http);
+            List<OrderPayment> payments = await _db.orderPayment
+                .Include(p => p.paymentShares.Where(s => s.valid && s.success != null && (bool)s.success).OrderByDescending(s => s.submit_time))
+                .Where(p => p.pay_method == "微信支付" && p.status == "支付成功" && p.need_share == 1 && p.share_close_date == null)
+                .AsNoTracking().ToListAsync();
+            for(int i = 0; i < payments.Count; i++)
+            {
+                OrderPayment payment = payments[i];
+                if (payment.paymentShares != null && payment.paymentShares.Count > 0 && payment.paymentShares[0].response_time != null
+                    && ((DateTime)payment.paymentShares[0].response_time).Date <= DateTime.Now.Date.AddDays(-4))
+                {
+                    await UnFreezeWepaySharePayment(payment, _tHelper);    
+                }
+            }
+        }
+        [NonAction]
+        public async Task UnFreezeWepaySharePayment(OrderPayment payment, TenpayController _tHelper, string description = "完成关闭")
+        {
+            WechatTenpayClient client = await _tHelper.GetClient((int)payment.mch_id);
+            var req = new SetProfitSharingOrderUnfrozenRequest()
+            {
+                TransactionId = payment.wepay_trans_id,
+                OutOrderNumber = payment.out_trade_no.Trim(),
+                Description = description
+            };
+            var res = await client.ExecuteSetProfitSharingOrderUnfrozenAsync(req);
+            if (res.ErrorCode == null)
+            {
+                payment.share_close_date = DateTime.Now;
+                payment.update_date = DateTime.Now;
+                _db.orderPayment.Entry(payment).State = EntityState.Modified;
+                await _db.SaveChangesAsync();
+            }
         }
     }
 }

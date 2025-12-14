@@ -873,7 +873,7 @@ namespace SnowmeetApi.Controllers
         }
         */
         [NonAction]
-        private async Task<WechatTenpayClient> GetClient(int mchId)
+        public async Task<WechatTenpayClient> GetClient(int mchId)
         {
             WepayKey key = await _db.WepayKeys.Where(k => k.id == mchId)
                 .AsNoTracking().FirstOrDefaultAsync();
