@@ -736,7 +736,7 @@ namespace SnowmeetApi.Controllers
         [NonAction]
         public async Task<PaymentShare> Settle(PaymentShare share)
         {
-            if (!share.valid)
+            if (!share.valid && share.submit_time != null)
             {
                 return null;
             }

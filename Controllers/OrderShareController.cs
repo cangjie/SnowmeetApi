@@ -136,6 +136,10 @@ namespace SnowmeetApi.Controllers
         [NonAction]
         public async Task<PaymentShare> SharePayment(PaymentShare share)
         {
+            if (share.submit_time != null)
+            {
+                return share;
+            }
             switch(share.payment.pay_method.Trim())
             {
                 case "支付宝":
@@ -170,7 +174,8 @@ namespace SnowmeetApi.Controllers
             List<PaymentShare> shares = await _db.paymentShare.Include(p => p.payment)
                 .Include(s => s.orderShare).ThenInclude(o => o.order).ThenInclude(o => o.payments)
                 .ThenInclude(p => p.refunds).Include(s => s.orderShare).ThenInclude(s => s.relation)
-                .Where(s => s.submit_time == null && ((DateTime)s.orderShare.order.close_date).Date == shareDate.Date )
+                .Where(s => s.submit_time == null && ((DateTime)s.orderShare.order.close_date).Date == shareDate.Date 
+                && s.orderShare.order.type == "租赁" && s.orderShare.order.shop == "万龙体验中心")
                 .AsNoTracking().ToListAsync();
             for(int i = 0; i < shares.Count; i++)
             {
