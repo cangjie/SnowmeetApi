@@ -256,6 +256,7 @@ namespace SnowmeetApi.Controllers.SkiPass
         public async Task<ActionResult<Models.SkiPass>> UpdateSkiPass([FromBody] Models.SkiPass skipass,
             [FromQuery] string sessionKey, [FromQuery] string sessionType = "wechat_mini_openid")
         {
+            OrderShareController _shareHelper = new OrderShareController(_db, _config, _http);
             Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey);
             if (staff == null || staff.title_level < 100)
             {
@@ -272,16 +273,23 @@ namespace SnowmeetApi.Controllers.SkiPass
                     try
                     {
                         await _tHelper.ActiveSkipassTicket(skipass);
+                        if (skipass.order_id != null)
+                        {
+                            await _shareHelper.ExecuteShare((int)skipass.order_id);
+                        }
+                        OrderController _oH = new OrderController(_db, _config, _http);
+                        if (skipass.order_id != null)
+                        {
+                            await _oH.SetReferee((int)skipass.order_id, skipass.id);
+                        }
                     }
                     catch
                     {
                         
                     }
-                    //SkiPassController _skpHelper = new SkiPassController(_db, _config, _http);
                     if (skipass.order_id != null)
                     {
                         needFinish = true;
-                        //await _skpHelper.CommitSkipassOrder((int)skipass.order_id);
                     }
 
                 }
@@ -407,6 +415,11 @@ namespace SnowmeetApi.Controllers.SkiPass
                 create_date = DateTime.Now,
                 valid = 1
             };
+            BizReferee referee = await _db.bizReferee.Where(r => r.valid && r.biz_type == "雪票" && r.member_id == member.id).AsNoTracking().FirstOrDefaultAsync();
+            if (staffId == null && referee != null && referee.staff_id != null)
+            {
+                staffId = referee.staff_id;
+            }
             if (staffId != null)
             {
                 order.staff_id = staffId;

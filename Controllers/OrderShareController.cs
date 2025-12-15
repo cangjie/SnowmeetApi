@@ -178,6 +178,23 @@ namespace SnowmeetApi.Controllers
             }
             return Ok(shares);
         }
+        [NonAction]
+        public async Task ExecuteShare(int orderId)
+        {
+            List<OrderShare> shares = await _db.orderShare.Where(s => s.order_id == orderId)
+                .Include(s => s.paymentShares).AsNoTracking().ToListAsync();
+            for(int i = 0; i < shares.Count; i++)
+            {
+                for(int j = 0; shares[i].paymentShares != null && j < shares[i].paymentShares.Count; j++)
+                {
+                    PaymentShare sp = shares[i].paymentShares[j];
+                    if (sp.submit_time == null)
+                    {
+                        await SharePayment(sp);
+                    }
+                }
+            }
+        }
         [HttpGet]
         public async Task CloseWepayShare()
         {

@@ -1682,7 +1682,7 @@ namespace SnowmeetApi.Controllers
                 null, null, null, order.type, "支付成功，检查订单类型");
             await _db.coreDataModLog.AddAsync(orderSucLog);
             await _db.SaveChangesAsync();
-
+            OrderShareController _shareHelper = new OrderShareController(_db, _config, _http);
             switch (order.type)
             {
                 case "租赁":
@@ -1704,6 +1704,11 @@ namespace SnowmeetApi.Controllers
                 case "雪票":
                     SkiPassController _skiPassHelper = new SkiPassController(_db, _config, _http);
                     await _skiPassHelper.CreateSkiPass(order.id);
+                    List<OrderShare> shares = await _db.orderShare.Where(s => s.valid && s.order_id == orderId).AsNoTracking().ToListAsync();
+                    for(int i = 0; i < shares.Count; i++)
+                    {
+                        await _shareHelper.CreatePaymentShare(shares[i]);
+                    }
                     break;
                 default:
                     break;
@@ -2439,6 +2444,34 @@ namespace SnowmeetApi.Controllers
                 message = "",
                 data = order
             });
+        }
+        [NonAction]
+        public async Task SetReferee(int orderId, int? bizId)
+        {
+            Models.Order order = await _db.order.Where(o => o.id == orderId).AsNoTracking().FirstOrDefaultAsync();
+            if (order == null || order.member_id == null)
+            {
+                return;
+            }
+            BizReferee referee = await _db.bizReferee
+                .Where(b => b.biz_type == "雪票" && b.order_id == orderId && b.member_id == order.member_id)
+                .AsNoTracking().FirstOrDefaultAsync();
+            if (referee == null)
+            {
+                BizReferee bf = new BizReferee()
+                {
+                    id = 0,
+                    biz_type = order.type,
+                    order_id = orderId,
+                    member_id = (int)order.member_id,
+                    biz_id = bizId,
+                    staff_id = order.staff_id,
+                    valid = true,
+                    create_date = DateTime.Now
+                };
+                await _db.bizReferee.AddAsync(bf);
+                await _db.SaveChangesAsync();
+            }
         }
     }
 

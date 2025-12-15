@@ -279,7 +279,6 @@ namespace SnowmeetApi.Controllers
         public async Task CreateSkiPass(int orderId)
         {
             OrderController _orderHelper = new OrderController(_context, _config, _http);
-            //Models.Order order = await _orderHelper.GetOrder(orderId);
             Models.Order order = await _context.order.Where(o => o.id == orderId).AsNoTracking().FirstOrDefaultAsync();
             if (order == null)
             {
@@ -657,7 +656,7 @@ namespace SnowmeetApi.Controllers
         public async Task RefreshUsedAll()
         {
             TicketController _tHelper = new TicketController(_context, _config);
-
+            OrderShareController _shareHelper = new OrderShareController(_context, _config, _http);
             List<Models.SkiPass> skipassList = await _context.skiPass
                 .Where(s => (s.valid == 1 && s.is_cancel == 0 
                 && s.is_used == 0 && !s.resort.Trim().Equals("南山")))
@@ -683,6 +682,15 @@ namespace SnowmeetApi.Controllers
                         try
                         {
                             await _tHelper.ActiveSkipassTicket(skipass);
+                            if (skipass.order_id != null)
+                            {
+                                await _shareHelper.ExecuteShare((int)skipass.order_id);    
+                            }
+                            OrderController _oH = new OrderController(_context, _config, _http);
+                            if (skipass.order_id != null)
+                            {
+                                await _oH.SetReferee((int)skipass.order_id, skipass.id);
+                            }
                         }
                         catch
                         {
@@ -846,6 +854,11 @@ namespace SnowmeetApi.Controllers
                 create_date = DateTime.Now,
                 valid = 1
             };
+            BizReferee referee = await _context.bizReferee.Where(r => r.valid && r.biz_type == "雪票" && r.member_id == member.id).AsNoTracking().FirstOrDefaultAsync();
+            if (staffId == null && referee != null && referee.staff_id != null)
+            {
+                staffId = referee.staff_id;
+            }
             if (staffId != null)
             {
                 order.staff_id = staffId;

@@ -201,6 +201,6 @@ namespace SnowmeetApi.Data
         public DbSet<PaymentShare> paymentShare {get; set;}
         public DbSet<ServiceMessage> serviceMessage { get; set; }
         public DbSet<TemplateMessage> templateMessage { get; set; }
-
+        public DbSet<BizReferee> bizReferee { get; set;}
     }
 }
