@@ -19,11 +19,13 @@ namespace SnowmeetApi.Controllers
         private readonly ApplicationDBContext _db;
         private readonly IConfiguration _config;
         private readonly IHttpContextAccessor _http;
+        private readonly string _appId = "";
         public OrderShareController(ApplicationDBContext context, IConfiguration config, IHttpContextAccessor httpContextAccessor)
         {
             _db = context;
             _config = config;
             _http = httpContextAccessor;
+            _appId = _config.GetSection("Settings").GetSection("AppId").Value.Trim();
         }
         [NonAction]
         public async Task<List<OrderShare>> CreateOrderShares(Models.Order order)
@@ -36,7 +38,7 @@ namespace SnowmeetApi.Controllers
                 .Where(p => p.order_id == order.id && p.valid == 1 && p.status == "支付成功")
                 .Include(p => p.paymentShares.Where(s => s.valid)).AsNoTracking().ToListAsync();
             bool havePaymentShares = false;
-            for(int i = 0; i < paymentsWithShare.Count; i++)
+            for (int i = 0; i < paymentsWithShare.Count; i++)
             {
                 OrderPayment payment = paymentsWithShare[i];
                 if (payment.paymentShares.Count > 0)
@@ -51,7 +53,7 @@ namespace SnowmeetApi.Controllers
             }
             List<OrderShare> oriShares = await _db.orderShare.Where(s => s.valid && s.order_id == order.id)
                 .AsNoTracking().ToListAsync();
-            for(int i = 0; i < oriShares.Count; i++)
+            for (int i = 0; i < oriShares.Count; i++)
             {
                 oriShares[i].valid = false;
                 _db.orderShare.Entry(oriShares[i]).State = EntityState.Modified;
@@ -60,9 +62,9 @@ namespace SnowmeetApi.Controllers
             if (order.shop == "万龙体验中心" && order.type == "租赁")
             {
                 double rentalAmount = 0;
-                for(int i = 0; i < order.rentals.Count; i++)
+                for (int i = 0; i < order.rentals.Count; i++)
                 {
-                    Rental rental  = order.rentals[i];
+                    Rental rental = order.rentals[i];
                     rentalAmount += (rental.totalRentalAmount - rental.totalDiscountAmount);
                 }
                 OrderShare share = new OrderShare()
@@ -70,7 +72,7 @@ namespace SnowmeetApi.Controllers
                     id = 0,
                     order_id = order.id,
                     relation_id = 4,
-                    amount = rentalAmount/2,
+                    amount = rentalAmount / 2,
                     valid = true,
                     create_date = DateTime.Now
                 };
@@ -90,10 +92,10 @@ namespace SnowmeetApi.Controllers
             List<PaymentShare> shares = new List<PaymentShare>();
             double sharedAmount = 0;
             orderShare.amount = Math.Round(orderShare.amount, 2);
-            for(int i = 0; i < payments.Count && sharedAmount < orderShare.amount; i++)
+            for (int i = 0; i < payments.Count && sharedAmount < orderShare.amount; i++)
             {
                 //sharedAmount += Math.Min(orderShare.amount, payments)
-                double currentAmount = Math.Min(orderShare.amount-sharedAmount, payments[i].amount * 0.29);
+                double currentAmount = Math.Min(orderShare.amount - sharedAmount, payments[i].amount * 0.29);
                 currentAmount = Math.Round(currentAmount, 2);
                 sharedAmount += currentAmount;
                 sharedAmount = Math.Round(sharedAmount, 2);
@@ -104,7 +106,7 @@ namespace SnowmeetApi.Controllers
                     share_id = orderShare.id,
                     amount = currentAmount,
                     valid = true,
-                    out_trade_no = payments[i].out_trade_no.Trim() + "_FZ_" + (i+1).ToString().PadLeft(2, '0'),
+                    out_trade_no = payments[i].out_trade_no.Trim() + "_FZ_" + (i + 1).ToString().PadLeft(2, '0'),
                     create_date = DateTime.Now
                 };
                 await _db.paymentShare.AddAsync(pShare);
@@ -118,7 +120,7 @@ namespace SnowmeetApi.Controllers
             }
             return shares;
         }
-        
+
         [HttpGet]
         public async Task<ActionResult<List<PaymentShare>>> GetPaymentShares(int shareId)
         {
@@ -145,7 +147,7 @@ namespace SnowmeetApi.Controllers
                 share.payment = await _db.orderPayment.Where(p => p.id == share.payment_id)
                     .AsNoTracking().FirstOrDefaultAsync();
             }
-            switch(share.payment.pay_method.Trim())
+            switch (share.payment.pay_method.Trim())
             {
                 case "支付宝":
                     AliController _aliHelper = new AliController(_db, _config, _http);
@@ -153,12 +155,54 @@ namespace SnowmeetApi.Controllers
                     break;
                 case "微信支付":
                     TenpayController _tenHelper = new TenpayController(_db, _config, _http);
+                    await BindWepayShareRelation(share);
                     share = await _tenHelper.Settle(share);
                     break;
                 default:
                     break;
             }
             return share;
+        }
+        [NonAction]
+        public async Task<bool> BindWepayShareRelation(PaymentShare share)
+        {
+            OrderShare orderShare = await _db.orderShare.Where(s => s.id == share.share_id)
+                .Include(s => s.relation).ThenInclude(r => r.binds).AsNoTracking().FirstOrDefaultAsync();
+            if (share.payment == null)
+            {
+                share.payment = await _db.orderPayment.Where(p => p.id == share.payment_id).AsNoTracking().FirstOrDefaultAsync();
+            }
+            if (share.payment == null || share.payment.pay_method != "微信支付")
+            {
+                return false;
+            }
+            ShareRelationBind bind = orderShare.relation.binds.
+                Where(b => b.pay_method == "微信支付" && b.wepay_key_id == share.payment.mch_id)
+                .FirstOrDefault();
+            if (bind == null)
+            {
+                ////////////create relations/////////////////////
+                var req = new AddProfitSharingReceiverRequest()
+                {
+                    AppId = _appId,
+                    Type = orderShare.relation.wepay_account_type,
+                    Account = orderShare.relation.wepay_account_num,
+                    RelationType = "USER"
+                };
+                TenpayController _tHelper = new TenpayController(_db, _config, _http);
+                var client = await _tHelper.GetClient((int)share.payment.mch_id);
+                var res = await client.ExecuteAddProfitSharingReceiverAsync(req);
+                string ret = res.IsSuccessful().ToString().ToLower();
+                if (ret.Equals("true"))
+                {
+                   
+                }
+            }
+            else if (!bind.valid)
+            {
+                return false;
+            }
+            return false;
         }
         [NonAction]
         //[HttpGet("{paymentShareId}")]
@@ -175,14 +219,14 @@ namespace SnowmeetApi.Controllers
         [HttpGet]
         public async Task<ActionResult<List<List<PaymentShare>>>> ExccuteShare(DateTime? date = null)
         {
-            DateTime shareDate = date == null? DateTime.Now.AddDays(-1).Date : (((DateTime)date).Date);
+            DateTime shareDate = date == null ? DateTime.Now.AddDays(-1).Date : (((DateTime)date).Date);
             List<PaymentShare> shares = await _db.paymentShare.Include(p => p.payment)
                 .Include(s => s.orderShare).ThenInclude(o => o.order).ThenInclude(o => o.payments)
                 .ThenInclude(p => p.refunds).Include(s => s.orderShare).ThenInclude(s => s.relation)
-                .Where(s => s.submit_time == null && ((DateTime)s.orderShare.order.close_date).Date == shareDate.Date 
+                .Where(s => s.submit_time == null && ((DateTime)s.orderShare.order.close_date).Date == shareDate.Date
                 && s.orderShare.order.type == "租赁" && s.orderShare.order.shop == "万龙体验中心")
                 .AsNoTracking().ToListAsync();
-            for(int i = 0; i < shares.Count; i++)
+            for (int i = 0; i < shares.Count; i++)
             {
                 shares[i] = await SharePayment(shares[i]);
             }
@@ -193,9 +237,9 @@ namespace SnowmeetApi.Controllers
         {
             List<OrderShare> shares = await _db.orderShare.Where(s => s.order_id == orderId)
                 .Include(s => s.paymentShares).AsNoTracking().ToListAsync();
-            for(int i = 0; i < shares.Count; i++)
+            for (int i = 0; i < shares.Count; i++)
             {
-                for(int j = 0; shares[i].paymentShares != null && j < shares[i].paymentShares.Count; j++)
+                for (int j = 0; shares[i].paymentShares != null && j < shares[i].paymentShares.Count; j++)
                 {
                     PaymentShare sp = shares[i].paymentShares[j];
                     if (sp.submit_time == null)
@@ -213,13 +257,13 @@ namespace SnowmeetApi.Controllers
                 .Include(p => p.paymentShares.Where(s => s.valid && s.success != null && (bool)s.success).OrderByDescending(s => s.submit_time))
                 .Where(p => p.pay_method == "微信支付" && p.status == "支付成功" && p.need_share == 1 && p.share_close_date == null)
                 .AsNoTracking().ToListAsync();
-            for(int i = 0; i < payments.Count; i++)
+            for (int i = 0; i < payments.Count; i++)
             {
                 OrderPayment payment = payments[i];
                 if (payment.paymentShares != null && payment.paymentShares.Count > 0 && payment.paymentShares[0].response_time != null
                     && ((DateTime)payment.paymentShares[0].response_time).Date <= DateTime.Now.Date.AddDays(-4))
                 {
-                    await UnFreezeWepaySharePayment(payment, _tHelper);    
+                    await UnFreezeWepaySharePayment(payment, _tHelper);
                 }
             }
         }

@@ -20,7 +20,7 @@ namespace SnowmeetApi.Models
         public string? ali_account_num {get; set;} = null;
         public bool valid {get; set;}
         public DateTime create_date {get; set;} = DateTime.Now;
-        [ForeignKey(nameof(ShareRelationBind.share_id))]
+        [ForeignKey(nameof(ShareRelationBind.share_relation_id))]
         public List<ShareRelationBind> binds {get; set;}
     }
     [Table("share_relation_bind")]
@@ -28,9 +28,10 @@ namespace SnowmeetApi.Models
     {
         [Key]
         public int id {get; set;}
-        public int share_id {get; set;}
-        public int? wepay_key_id {get; set;}
-        public bool? bind_ali {get; set;}
+        public int share_relation_id {get; set;}
+        public string pay_method {get; set;}
+        public int? wepay_key_id {get; set;} = null;
+        public bool? ali_account_id {get; set;} = null;
         public bool valid {get; set;}
         public DateTime? update_date {get; set;}
         public DateTime create_date {get; set; } = DateTime.Now;
