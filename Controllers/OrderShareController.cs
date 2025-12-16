@@ -155,8 +155,10 @@ namespace SnowmeetApi.Controllers
                     break;
                 case "微信支付":
                     TenpayController _tenHelper = new TenpayController(_db, _config, _http);
-                    await BindWepayShareRelation(share);
-                    share = await _tenHelper.Settle(share);
+                    if (await BindWepayShareRelation(share, _tenHelper))
+                    {
+                        share = await _tenHelper.Settle(share);    
+                    }
                     break;
                 default:
                     break;
@@ -164,7 +166,7 @@ namespace SnowmeetApi.Controllers
             return share;
         }
         [NonAction]
-        public async Task<bool> BindWepayShareRelation(PaymentShare share)
+        public async Task<bool> BindWepayShareRelation(PaymentShare share, TenpayController _tHelper)
         {
             OrderShare orderShare = await _db.orderShare.Where(s => s.id == share.share_id)
                 .Include(s => s.relation).ThenInclude(r => r.binds).AsNoTracking().FirstOrDefaultAsync();
@@ -189,13 +191,29 @@ namespace SnowmeetApi.Controllers
                     Account = orderShare.relation.wepay_account_num,
                     RelationType = "USER"
                 };
-                TenpayController _tHelper = new TenpayController(_db, _config, _http);
+                //TenpayController _tHelper = new TenpayController(_db, _config, _http);
                 var client = await _tHelper.GetClient((int)share.payment.mch_id);
                 var res = await client.ExecuteAddProfitSharingReceiverAsync(req);
                 string ret = res.IsSuccessful().ToString().ToLower();
                 if (ret.Equals("true"))
                 {
-                   
+                   ShareRelationBind newBind = new ShareRelationBind()
+                   {
+                        id = 0,
+                        share_relation_id = orderShare.relation.id,
+                        pay_method = "微信支付",
+                        wepay_key_id = share.payment.mch_id,
+                        ali_account_id = null,
+                        valid = true,
+                        create_date = DateTime.Now
+                   };
+                   await _db.shareRelationBind.AddAsync(newBind);
+                   await _db.SaveChangesAsync();
+                   return true;
+                }
+                else
+                {
+                    return false;
                 }
             }
             else if (!bind.valid)
