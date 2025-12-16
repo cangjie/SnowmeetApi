@@ -140,6 +140,11 @@ namespace SnowmeetApi.Controllers
             {
                 return share;
             }
+            if (share.payment == null)
+            {
+                share.payment = await _db.orderPayment.Where(p => p.id == share.payment_id)
+                    .AsNoTracking().FirstOrDefaultAsync();
+            }
             switch(share.payment.pay_method.Trim())
             {
                 case "支付宝":
@@ -183,7 +188,7 @@ namespace SnowmeetApi.Controllers
             }
             return Ok(shares);
         }
-        [NonAction]
+        [HttpGet("{orderId}")]
         public async Task ExecuteShare(int orderId)
         {
             List<OrderShare> shares = await _db.orderShare.Where(s => s.order_id == orderId)

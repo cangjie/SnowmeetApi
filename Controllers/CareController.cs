@@ -73,7 +73,7 @@ namespace SnowmeetApi.Controllers
                 }
                 */
             }
-            
+
             return care;
         }
         [HttpGet]
@@ -96,7 +96,7 @@ namespace SnowmeetApi.Controllers
             c.tasks = await _db.careTask
                 .Include(t => t.staff)
                 .Include(t => t.terminateStaff)
-                .Where(t => t.care_id == c.id).OrderBy(t=>t.id).ToListAsync();
+                .Where(t => t.care_id == c.id).OrderBy(t => t.id).ToListAsync();
             await _db.member.Entry(c.order.member).Collection(m => m.memberSocialAccounts).LoadAsync();
             return c;
         }
@@ -297,8 +297,8 @@ namespace SnowmeetApi.Controllers
             DateTime currentDate = DateTime.Now.Date;
             List<Models.Product> products = await _db.product
                 .Include(p => p.productTicketTemplate)
-                .Where(p => (p.category_id == 14 || p.category_id == 15) && ((int)p.shop_id) == shopId 
-                && p.valid == 1 && (p.end_date == null || ((DateTime)p.end_date).Date >= currentDate )
+                .Where(p => (p.category_id == 14 || p.category_id == 15) && ((int)p.shop_id) == shopId
+                && p.valid == 1 && (p.end_date == null || ((DateTime)p.end_date).Date >= currentDate)
                 )
                 .AsNoTracking().ToListAsync();
             return Ok(new ApiResult<List<Models.Product>?>()
@@ -316,7 +316,7 @@ namespace SnowmeetApi.Controllers
                 .Where(p => (p.id == 137 || p.id == 138 || p.id == 139 || p.id == 140 || p.id == 142 || p.id == 143 || p.id == 202)
                 && p.valid == 1).OrderBy(p => p.sale_price).AsNoTracking().ToListAsync();
             */
-            List<Models.Product> products = await _db.product.Where(p => (p.shop.IndexOf(shop) >= 0 || shop.IndexOf(p.shop) >= 0 ) && p.category_id == 14 && p.valid == 1)
+            List<Models.Product> products = await _db.product.Where(p => (p.shop.IndexOf(shop) >= 0 || shop.IndexOf(p.shop) >= 0) && p.category_id == 14 && p.valid == 1)
                 .OrderBy(p => p.sale_price).AsNoTracking().ToListAsync();
             return Ok(new ApiResult<List<Models.Product>?>()
             {
@@ -332,41 +332,65 @@ namespace SnowmeetApi.Controllers
             Models.Product product = null;
             for (int i = 0; i < products.Count; i++)
             {
-                if (products[i].name.IndexOf("修刃打蜡") >= 0 && products[i].name.IndexOf("立等") >= 0
-                && care.need_edge == 1 && care.need_wax == 1 && care.urgent == 1)
+                if (shop.IndexOf("万龙") >= 0)
                 {
-                    product = products[i];
-                    break;
+                    if (products[i].name.IndexOf("修刃打蜡") >= 0 && products[i].name.IndexOf("立等") >= 0
+                    && care.need_edge == 1 && care.need_wax == 1 && care.urgent == 1)
+                    {
+                        product = products[i];
+                        break;
+                    }
+                    else if (products[i].name.IndexOf("修刃") >= 0 && products[i].name.IndexOf("立等") >= 0
+                    && care.need_edge == 1 && care.need_wax == 0 && care.urgent == 1 && products[i].name.IndexOf("修刃打蜡") < 0)
+                    {
+                        product = products[i];
+                        break;
+                    }
+                    else if (products[i].name.IndexOf("打蜡") >= 0 && products[i].name.IndexOf("立等") >= 0
+                    && care.need_edge == 0 && care.need_wax == 1 && care.urgent == 1 && products[i].name.IndexOf("修刃打蜡") < 0)
+                    {
+                        product = products[i];
+                        break;
+                    }
+                    else if (products[i].name.IndexOf("修刃打蜡") >= 0 && products[i].name.IndexOf("次日") >= 0
+                    && care.need_edge == 1 && care.need_wax == 1 && care.urgent == 0)
+                    {
+                        product = products[i];
+                        break;
+                    }
+                    else if (products[i].name.IndexOf("修刃") >= 0 && products[i].name.IndexOf("次日") >= 0
+                    && care.need_edge == 1 && care.need_wax == 0 && care.urgent == 0 && products[i].name.IndexOf("修刃打蜡") < 0)
+                    {
+                        product = products[i];
+                        break;
+                    }
+                    else if (products[i].name.IndexOf("打蜡") >= 0 && products[i].name.IndexOf("次日") >= 0
+                    && care.need_edge == 0 && care.need_wax == 1 && care.urgent == 0 && products[i].name.IndexOf("修刃打蜡") < 0)
+                    {
+                        product = products[i];
+                        break;
+                    }
                 }
-                else if (products[i].name.IndexOf("修刃") >= 0 && products[i].name.IndexOf("立等") >= 0
-                && care.need_edge == 1 && care.need_wax == 0 && care.urgent == 1 && products[i].name.IndexOf("修刃打蜡") < 0)
+                else
                 {
-                    product = products[i];
-                    break;
-                }
-                else if (products[i].name.IndexOf("打蜡") >= 0 && products[i].name.IndexOf("立等") >= 0
-                && care.need_edge == 0 && care.need_wax == 1 && care.urgent == 1 && products[i].name.IndexOf("修刃打蜡") < 0 )
-                {
-                    product = products[i];
-                    break;
-                }
-                else if (products[i].name.IndexOf("修刃打蜡") >= 0 && products[i].name.IndexOf("次日") >= 0
-                && care.need_edge == 1 && care.need_wax == 1 && care.urgent == 0)
-                {
-                    product = products[i];
-                    break;
-                }
-                else if (products[i].name.IndexOf("修刃") >= 0 && products[i].name.IndexOf("次日") >= 0
-                && care.need_edge == 1 && care.need_wax == 0 && care.urgent == 0 && products[i].name.IndexOf("修刃打蜡") < 0 )
-                {
-                    product = products[i];
-                    break;
-                }
-                else if (products[i].name.IndexOf("打蜡") >= 0 && products[i].name.IndexOf("次日") >= 0
-                && care.need_edge == 0 && care.need_wax == 1 && care.urgent == 0 && products[i].name.IndexOf("修刃打蜡") < 0 )
-                {
-                    product = products[i];
-                    break;
+                    if (products[i].name.IndexOf("修刃打蜡") >= 0
+                    && care.need_edge == 1 && care.need_wax == 1)
+                    {
+                        product = products[i];
+                        break;
+                    }
+                    else if (products[i].name.IndexOf("修刃") >= 0
+                    && care.need_edge == 1 && care.need_wax == 0 && products[i].name.IndexOf("修刃打蜡") < 0)
+                    {
+                        product = products[i];
+                        break;
+                    }
+                    else if (products[i].name.IndexOf("打蜡") >= 0
+                    && care.need_edge == 0 && care.need_wax == 1 && products[i].name.IndexOf("修刃打蜡") < 0)
+                    {
+                        product = products[i];
+                        break;
+                    }
                 }
             }
             return product;
@@ -404,7 +428,7 @@ namespace SnowmeetApi.Controllers
                     create_date = DateTime.Now
                 };
                 await _db.careTask.AddAsync(taskSafe);
-                
+
                 if (care.need_edge == 1)
                 {
                     CareTask taskEdge = new CareTask()
@@ -465,7 +489,7 @@ namespace SnowmeetApi.Controllers
                     };
                     await _db.careTask.AddAsync(taskUnWax);
                 }
-                
+
                 CareTask taskFinish = new CareTask()
                 {
                     id = 0,
@@ -491,7 +515,7 @@ namespace SnowmeetApi.Controllers
             await _db.SaveChangesAsync();
         }
         [HttpGet("{careId}")]
-        public async Task<ActionResult<ApiResult<Models.Order>?>> SetPickImageId(int careId, int imageId, 
+        public async Task<ActionResult<ApiResult<Models.Order>?>> SetPickImageId(int careId, int imageId,
             string sessionKey, string sessionType = "wechat_mini_openid")
         {
             Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
@@ -515,7 +539,7 @@ namespace SnowmeetApi.Controllers
                 code = 0,
                 message = "",
                 data = order
-            
+
             });
         }
         [HttpGet("{taskId}")]

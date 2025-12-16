@@ -740,6 +740,16 @@ namespace SnowmeetApi.Controllers
             {
                 return null;
             }
+            if (share.orderShare == null)
+            {
+                share.orderShare = await _db.orderShare.Where(s => s.id == share.share_id).Include(s => s.relation)
+                    .AsNoTracking().FirstOrDefaultAsync();
+            }
+            if (share.orderShare.relation == null)
+            {
+                share.orderShare.relation = await _db.orderShareRelation.Where(r => r.id == share.orderShare.relation_id)
+                    .AsNoTracking().FirstOrDefaultAsync();
+            }
             share.submit_time = DateTime.Now;
             share.update_date = DateTime.Now;
             _db.paymentShare.Entry(share).State = EntityState.Modified;
