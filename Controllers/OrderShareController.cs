@@ -183,6 +183,7 @@ namespace SnowmeetApi.Controllers
                 .FirstOrDefault();
             if (bind == null)
             {
+                var client = await _tHelper.GetClient((int)share.payment.mch_id);
                 ////////////create relations/////////////////////
                 var req = new AddProfitSharingReceiverRequest()
                 {
@@ -191,8 +192,13 @@ namespace SnowmeetApi.Controllers
                     Account = orderShare.relation.wepay_account_num,
                     RelationType = "USER"
                 };
+                if (orderShare.relation.wepay_account_type == "MERCHANT_ID")
+                {
+                    req.Name = orderShare.relation.wepay_account_name;
+                    req = client.EncryptRequestSensitiveProperty(req);
+                }
                 //TenpayController _tHelper = new TenpayController(_db, _config, _http);
-                var client = await _tHelper.GetClient((int)share.payment.mch_id);
+                
                 var res = await client.ExecuteAddProfitSharingReceiverAsync(req);
                 string ret = res.IsSuccessful().ToString().ToLower();
                 if (ret.Equals("true"))
@@ -216,11 +222,11 @@ namespace SnowmeetApi.Controllers
                     return false;
                 }
             }
-            else if (!bind.valid)
+            else 
             {
-                return false;
+                return bind.valid;
             }
-            return false;
+            //return false;
         }
         [NonAction]
         //[HttpGet("{paymentShareId}")]
@@ -235,17 +241,18 @@ namespace SnowmeetApi.Controllers
             return Ok(await SharePayment(share));
         }
         [HttpGet]
-        public async Task<ActionResult<List<List<PaymentShare>>>> ExccuteShare(DateTime? date = null)
+        public async Task<ActionResult<List<List<PaymentShare>>>> ExecuteWLShare(DateTime? date = null)
         {
             DateTime shareDate = date == null ? DateTime.Now.AddDays(-1).Date : (((DateTime)date).Date);
             List<PaymentShare> shares = await _db.paymentShare.Include(p => p.payment)
                 .Include(s => s.orderShare).ThenInclude(o => o.order).ThenInclude(o => o.payments)
                 .ThenInclude(p => p.refunds).Include(s => s.orderShare).ThenInclude(s => s.relation)
-                .Where(s => s.submit_time == null && ((DateTime)s.orderShare.order.close_date).Date == shareDate.Date
+                .Where(s => s.submit_time == null && ((DateTime)s.orderShare.order.close_date).Date <= shareDate.Date
                 && s.orderShare.order.type == "租赁" && s.orderShare.order.shop == "万龙体验中心")
                 .AsNoTracking().ToListAsync();
             for (int i = 0; i < shares.Count; i++)
             {
+                //Console.WriteLine("Sharing PaymentShare ID: " + shares[i].id);
                 shares[i] = await SharePayment(shares[i]);
             }
             return Ok(shares);
