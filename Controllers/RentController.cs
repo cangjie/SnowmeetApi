@@ -5541,7 +5541,8 @@ namespace SnowmeetApi.Controllers
         [NonAction]
         public async Task<List<Models.RentItem>> GetUnReturnedRentItems()
         {
-            List<Models.RentItem> rentItems = await _db.rentItem.Include(r => r.logs.Where(l => l.valid == 1).OrderByDescending(l => l.id))
+            List<Models.RentItem> rentItems = await _db.rentItem
+                .Include(r => r.logs.Where(l => l.valid == 1).OrderByDescending(l => l.id)).ThenInclude(l => l.staff)
                 .Where(r => r.valid ==1 && r.logs.Count > 0 )
                 .Include(r => r.rental).ThenInclude(r => r.order)
                 .Include(r => r.category).OrderBy(r => r.id)
