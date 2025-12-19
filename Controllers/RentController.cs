@@ -5550,7 +5550,7 @@ namespace SnowmeetApi.Controllers
         }
         [HttpGet]
         public async Task<ActionResult<List<Models.RentItem>?>> GetUnReturnedRentItemsByStaff(
-            string shop, string sessionKey, string sessionType = "wechat_mini_openid")
+            string? shop, string sessionKey, string sessionType = "wechat_mini_openid")
         {
             Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
             if (staff == null || staff.title_level < 100)
@@ -5562,8 +5562,11 @@ namespace SnowmeetApi.Controllers
                     data = null
                 });
             }
-            shop = Util.UrlDecode(shop);
-            List<Models.RentItem> list = (await GetUnReturnedRentItems()).Where(l => l.rental.order.shop == shop).ToList();
+            if (shop != null)
+            {
+                shop = Util.UrlDecode(shop);
+            }
+            List<Models.RentItem> list = (await GetUnReturnedRentItems()).Where(l => (l.rental.order.shop == shop || shop == null)).ToList();
             return Ok(new ApiResult<List<Models.RentItem>>()
             {
                 code = 0,
