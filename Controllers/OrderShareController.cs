@@ -87,15 +87,21 @@ namespace SnowmeetApi.Controllers
         {
             List<OrderPayment> payments = await _db.orderPayment
                 .Where(p => p.order_id == orderShare.order_id && p.valid == 1 && p.status == "支付成功"
-                && (p.pay_method == "微信支付" || p.pay_method == "支付宝")).OrderBy(p => p.pay_method)
+                && (p.pay_method == "微信支付" || p.pay_method == "支付宝")).OrderByDescending(p => p.amount)
                 .AsNoTracking().ToListAsync();
+            double paidAmount = payments.Sum(p => p.amount);
+
             List<PaymentShare> shares = new List<PaymentShare>();
             double sharedAmount = 0;
             orderShare.amount = Math.Round(orderShare.amount, 2);
+            bool overFlow = orderShare.amount >= (paidAmount * 0.3);
             for (int i = 0; i < payments.Count && sharedAmount < orderShare.amount; i++)
             {
-                //sharedAmount += Math.Min(orderShare.amount, payments)
                 double currentAmount = Math.Min(orderShare.amount - sharedAmount, payments[i].amount * 0.29);
+                if (overFlow)
+                {
+                    currentAmount = orderShare.amount;
+                }
                 currentAmount = Math.Round(currentAmount, 2);
                 sharedAmount += currentAmount;
                 sharedAmount = Math.Round(sharedAmount, 2);
@@ -107,10 +113,15 @@ namespace SnowmeetApi.Controllers
                     amount = currentAmount,
                     valid = true,
                     out_trade_no = payments[i].out_trade_no.Trim() + "_FZ_" + (i + 1).ToString().PadLeft(2, '0'),
+                    can_not_share = overFlow,
                     create_date = DateTime.Now
                 };
                 await _db.paymentShare.AddAsync(pShare);
                 shares.Add(pShare);
+                if (overFlow)
+                {
+                    break;
+                }
             }
             if (Math.Round(sharedAmount, 2) == Math.Round(orderShare.amount, 2))
             {
@@ -248,7 +259,7 @@ namespace SnowmeetApi.Controllers
                 .Include(s => s.orderShare).ThenInclude(o => o.order).ThenInclude(o => o.payments)
                 .ThenInclude(p => p.refunds).Include(s => s.orderShare).ThenInclude(s => s.relation)
                 .Where(s => s.submit_time == null && ((DateTime)s.orderShare.order.close_date).Date <= shareDate.Date
-                && s.orderShare.order.type == "租赁" && s.orderShare.order.shop == "万龙体验中心")
+                && s.orderShare.order.type == "租赁" && s.orderShare.order.shop == "万龙体验中心" && s.can_not_share == false)
                 .AsNoTracking().ToListAsync();
             for (int i = 0; i < shares.Count; i++)
             {
