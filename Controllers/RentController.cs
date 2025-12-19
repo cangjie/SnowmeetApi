@@ -5550,7 +5550,7 @@ namespace SnowmeetApi.Controllers
             return rentItems.Where(r => r.status != "已归还").ToList();
         }
         [HttpGet]
-        public async Task<ActionResult<List<Models.RentItem>?>> GetUnReturnedRentItemsByStaff(
+        public async Task<ActionResult<List<Models.CategoryRentItem>?>> GetUnReturnedRentItemsByStaff(
             string? shop, string sessionKey, string sessionType = "wechat_mini_openid")
         {
             Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
@@ -5568,11 +5568,23 @@ namespace SnowmeetApi.Controllers
                 shop = Util.UrlDecode(shop);
             }
             List<Models.RentItem> list = (await GetUnReturnedRentItems()).Where(l => (l.rental.order.shop == shop || shop == null)).ToList();
-            return Ok(new ApiResult<List<Models.RentItem>>()
+            var g = list.GroupBy(r => r.category_id).Select(g => new {category_id = g.Key, items = g.ToList()}).ToList();
+            List<CategoryRentItem> finalList = new List<CategoryRentItem>();
+            for(int i = 0; i < g.Count; i++)
+            {
+                CategoryRentItem item = new CategoryRentItem()
+                {
+                    category_id = (int)g[i].category_id,
+                    category = g[i].items[0].category,
+                    items = g[i].items
+                };
+                finalList.Add(item);
+            }
+            return Ok(new ApiResult<List<Models.CategoryRentItem>>()
             {
                 code = 0,
                 message = "",
-                data = list
+                data = finalList
             });
         }
     }

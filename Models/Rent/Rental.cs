@@ -573,4 +573,10 @@ namespace SnowmeetApi.Models
         public Rental rental { get; set; } = null;
 
     }
+    public class CategoryRentItem
+    {
+        public int category_id { get; set; }
+        public RentCategory? category { get; set; } = null;
+        public List<RentItem> items { get; set; } = new List<RentItem>();
+    }
 } 
