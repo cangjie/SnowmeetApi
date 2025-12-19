@@ -5542,12 +5542,12 @@ namespace SnowmeetApi.Controllers
         public async Task<List<Models.RentItem>> GetUnReturnedRentItems()
         {
             List<Models.RentItem> rentItems = await _db.rentItem.Include(r => r.logs.Where(l => l.valid == 1).OrderByDescending(l => l.id))
-                .Where(r => r.valid ==1 && r.logs.Count > 0 && r.logs[r.logs.Count - 1].status != "已归还")
+                .Where(r => r.valid ==1 && r.logs.Count > 0 )
                 .Include(r => r.rental).ThenInclude(r => r.order)
                 .Include(r => r.category).OrderBy(r => r.id)
                 .Where(r => r.rental.valid == 1 && r.rental.order.valid == 1 && r.rental.order.is_test == 0)
                 .AsSplitQuery().AsNoTracking().ToListAsync();
-            return rentItems;
+            return rentItems.Where(r => r.status != "已归还").ToList();
         }
         [HttpGet]
         public async Task<ActionResult<List<Models.RentItem>?>> GetUnReturnedRentItemsByStaff(
