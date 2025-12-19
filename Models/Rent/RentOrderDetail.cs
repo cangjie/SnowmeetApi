@@ -13,66 +13,40 @@ namespace SnowmeetApi.Models.Rent
 	{
         public enum RentStatus { 未领取, 已发放, 已暂存, 已归还 }
         public int id { get; set; } = 0;
-
         public int? rent_list_id { get; set; } = 0;
-
-        //public int rent_item_id { get; set; }
-
         public string rent_item_name { get; set; } = "";
-
         public string rent_item_code { get; set; } = "";
-
         public string rent_item_class { get; set; } = "";
-
         public double deposit { get; set; } = 0;
-
         public string deposit_type { get; set; } = "立即租赁";
-
         public DateTime? start_date { get; set; } = null;
-
         public double unit_rental { get; set; } = 0;
-
         public double real_rental { get; set; } = 0;
-
         public double rental_discount { get; set; } = 0;
-
         public double rental_ticket_discount {get; set;} = 0;
-
         public int rental_count { get; set; } = 0;
-
         public DateTime? real_end_date { get; set; } = null;
-
         public string memo { get; set; } = "";
-
         public string images { get; set; } = "";
-
         public double reparation { get; set; } = 0;
-
         public double overtime_charge { get; set; } = 0;
-
         public string rent_staff { get; set; } = "";
-
         public string return_staff { get; set; } = "";
         public string? rent_status {get; set;}
         public int valid {get; set;} = 1;
         public DateTime? pick_date {get; set;} = null;
         public DateTime? return_date {get; set;} = null;
         public string? package_code {get; set;} = null;
-
         public DateTime? update_date {get; set;} = null;
         public DateTime create_date {get; set;}
         [ForeignKey("detail_id")]
         public List<RentOrderDetailLog> log { get; set; } = new List<RentOrderDetailLog>();
-
         [NotMapped]
         public RentItem _item;
-
         [NotMapped]
         public Models.Users.MiniAppUser? rentStaff { get; set; }
-
         [NotMapped]
         public Models.Users.MiniAppUser? returnStaff { get; set; }
-
         [NotMapped]
         public string rentStatus
         {
@@ -131,7 +105,6 @@ namespace SnowmeetApi.Models.Rent
                 }
                 if (log != null && log.Count > 0)
                 {
-                    //log.OrderByDescending(l => l.id)
                     List<RentOrderDetailLog> logArr = log.OrderByDescending(l => l.id).ToList();
                     for (int i = 0; i < logArr.Count; i++)
                     {
@@ -158,10 +131,8 @@ namespace SnowmeetApi.Models.Rent
                 return status.Trim();
             }
         }
-
         [NotMapped]
         public bool overTime { get; set; } = false;
-
         [NotMapped]
         public string status
         {
@@ -198,7 +169,6 @@ namespace SnowmeetApi.Models.Rent
         public string _timeLength = "";
         [NotMapped]
         public double _suggestRental = 0;
-
         [NotMapped]
         public RentItem item
         {
@@ -211,7 +181,6 @@ namespace SnowmeetApi.Models.Rent
                 _item = value;
             }
         }
-        
         public string GetLogStaffName(string status)
         {
             string name = "";
@@ -228,7 +197,6 @@ namespace SnowmeetApi.Models.Rent
         }
         [NotMapped]
         public MemberSocialAccount? returnMsa {get; set;} = null;
-
         public string pickStaffName
         {
             get
@@ -248,8 +216,6 @@ namespace SnowmeetApi.Models.Rent
                 return returnName;
             }
         }
-       
-
     }
 }
 

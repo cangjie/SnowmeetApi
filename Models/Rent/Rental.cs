@@ -495,48 +495,6 @@ namespace SnowmeetApi.Models
                 }
             }
         }
-        /*
-        [NotMapped]
-        public Staff? pickStaff
-        {
-            get
-            {
-                Staff? staff = null;
-                if (logs != null)
-                {
-                    foreach (RentItemLog log in logs)
-                    {
-                        if (log.status.Trim().Equals("已发放"))
-                        {
-                            staff = log.staff;
-                        }
-                    }
-                }
-                return staff;
-            }
-        }
-        */
-        /*
-        [NotMapped]
-        public Staff? returnStaff
-        {
-            get
-            {
-                Staff? staff = null;
-                if (logs != null)
-                {
-                    foreach (RentItemLog log in logs)
-                    {
-                        if (log.status.Trim().Equals("已归还"))
-                        {
-                            staff = log.staff;
-                        }
-                    }
-                }
-                return staff;
-            }
-        }
-        */
         [NotMapped]
         public List<RentItemLog> availableLog
         {

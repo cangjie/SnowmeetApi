@@ -5538,34 +5538,37 @@ namespace SnowmeetApi.Controllers
                 data = newList
             });
         }
-
-        /*
-        [HttpGet]
-        public async Task<ActionResult<ApiResult<List<Models.Order>>>> GetRentOrderBySettleDateByStaff(string shop, 
-            DateTime startDate, DateTime endDate, string sessionKey, string sessionType = "wechat_mini_openid")
+        [NonAction]
+        public async Task<List<Models.RentItem>> GetUnReturnedRentItems()
         {
-            shop = Util.UrlDecode(shop);
+            List<Models.RentItem> rentItems = await _db.rentItem.Include(r => r.logs.Where(l => l.valid == 1).OrderByDescending(l => l.id))
+                .Where(r => r.valid ==1 && r.logs.Count > 0 && r.logs[r.logs.Count - 1].status != "已归还")
+                .Include(r => r.rental).ThenInclude(r => r.order)
+                .Include(r => r.category).OrderBy(r => r.id)
+                .AsSplitQuery().AsNoTracking().ToListAsync();
+            return rentItems;
+        }
+        [HttpGet]
+        public async Task<ActionResult<List<Models.RentItem>?>> GetUnReturnedRentItemsByStaff(string sessionKey, 
+            string sessionType = "wechat_mini_openid")
+        {
             Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
             if (staff == null || staff.title_level < 100)
             {
-                return Ok(new ApiResult<List<Models.RentalDetail>>()
+                return Ok(new ApiResult<List<Models.RentItem>?>()
                 {
                     code = 1,
-                    message = "",
+                    message = "没有权限",
                     data = null
                 });
             }
-            OrderController _orderHelper = new OrderController(_db, _config, _httpContextAccessor);
-            List<Models.Order> orders = await _orderHelper.GetCommonOrders(null, shop, null, null,
-                "租赁", DateTime.Parse("2025-10-15"), endDate, null, null, null, null, null, null, null);
-            List<Models.Order> settledOrders = new List<Models.Order>();
-            for (int i = 0; i < orders.Count; i++)
+            List<Models.RentItem> list = await GetUnReturnedRentItems();
+            return Ok(new ApiResult<List<Models.RentItem>>()
             {
-                Models.Order order = orders[i];
-
-            }
-            return BadRequest();
+                code = 0,
+                message = "",
+                data = list
+            });
         }
-        */
     }
 }
