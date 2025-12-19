@@ -5545,6 +5545,7 @@ namespace SnowmeetApi.Controllers
                 .Where(r => r.valid ==1 && r.logs.Count > 0 && r.logs[r.logs.Count - 1].status != "已归还")
                 .Include(r => r.rental).ThenInclude(r => r.order)
                 .Include(r => r.category).OrderBy(r => r.id)
+                .Where(r => r.rental.valid == 1 && r.rental.order.valid == 1 && r.rental.order.is_test == 0)
                 .AsSplitQuery().AsNoTracking().ToListAsync();
             return rentItems;
         }
