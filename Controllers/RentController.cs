@@ -5568,7 +5568,7 @@ namespace SnowmeetApi.Controllers
                 shop = Util.UrlDecode(shop);
             }
             List<Models.RentItem> list = (await GetUnReturnedRentItems()).Where(l => (l.rental.order.shop == shop || shop == null)).ToList();
-            var g = list.GroupBy(r => r.category_id).Select(g => new {category_id = g.Key, items = g.ToList()}).ToList();
+            var g = list.GroupBy(r => r.category_id).Select(g => new {category_id = g.Key, items = g.ToList()}).OrderByDescending(g => g.items.Count).ToList();
             List<CategoryRentItem> finalList = new List<CategoryRentItem>();
             for(int i = 0; i < g.Count; i++)
             {
