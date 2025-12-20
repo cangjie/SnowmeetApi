@@ -5606,7 +5606,7 @@ namespace SnowmeetApi.Controllers
                 for(int j = 0; categories[i].rentItems != null && j < categories[i].rentItems.Count; j++)
                 {
                     Models.Order order = categories[i].rentItems[j].rental.order;
-                    if (!orders.Any(o => o.id == order.id))
+                    if (!orders.Any(o => o.id == order.id) && order.valid == 1)
                     {
                         orders.Add(order);
                     }
@@ -5615,7 +5615,7 @@ namespace SnowmeetApi.Controllers
             for(int i = 0; i < items.Count; i++)
             {
                 Models.Order order = items[i].rental.order;
-                if (!orders.Any(o => o.id == order.id))
+                if (!orders.Any(o => o.id == order.id) && order.valid == 1 )
                 {
                     orders.Add(order);
                 }

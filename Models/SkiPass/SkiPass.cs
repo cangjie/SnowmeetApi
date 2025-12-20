@@ -56,6 +56,8 @@ namespace SnowmeetApi.Models
         public SkiPassProduct? skiPassProduct {get; set;}
         [ForeignKey("product_id")]
         public Product? product {get; set;}
+        [ForeignKey("member_id")]
+        public Member? member {get; set; } = null;
         //[ForeignKey("order_id")]
         //public OrderOnline? order {get;set;}
         [ForeignKey("order_id")]

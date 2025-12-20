@@ -195,19 +195,15 @@ namespace SnowmeetApi.Controllers.SkiPass
         [HttpGet("{productId}")]
         public async Task<ActionResult<ReserveProduct>> GetReserveProductDetail(int productId, DateTime reserveDate, string sessionKey, string sessionType = "wechat_mini_openid")
         {
-            /*
-            if (!(await _memberHelper.isStaff(sessionKey, sessionType)))
-            {
-                return BadRequest();
-            }
-            */
             List<Models.SkiPass> skiPassList = await _db.skiPass
+                .Include(s => s.member).ThenInclude(m => m.memberSocialAccounts)
                 .Where(sp => (sp.resort.Trim().Equals("南山") && sp.valid == 1 && sp.is_cancel == 0
                 && ((DateTime)sp.reserve_date).Date == reserveDate.Date && sp.product_id == productId))
                 .AsNoTracking().ToListAsync();
             var l = (from reserveDetail in skiPassList
                      group reserveDetail
-                by new { reserveDetail.member_id, reserveDetail.wechat_mini_openid, reserveDetail.contact_name, reserveDetail.contact_cell }
+                //by new { reserveDetail.member_id, reserveDetail.wechat_mini_openid, reserveDetail.contact_name, reserveDetail.contact_cell }
+                by new { reserveDetail.member.id, reserveDetail.member.wechatMiniOpenId, reserveDetail.member.title, reserveDetail.member.cell}
                 into reserveSum
                      select new { reserveSum.Key, count = reserveSum.Count() }).ToList();
             Models.Product p = await _db.product.FindAsync(productId);
@@ -224,10 +220,12 @@ namespace SnowmeetApi.Controllers.SkiPass
 
                 ReserveMemberProduct member = new ReserveMemberProduct()
                 {
-                    member_id = l[i].Key.member_id,
-                    name = l[i].Key.contact_name,
-                    cell = l[i].Key.contact_cell,
-                    wechat_mini_openid = l[i].Key.wechat_mini_openid
+                    
+                    member_id = l[i].Key.id,
+                    name = l[i].Key.title,
+                    cell = l[i].Key.cell,
+                    wechat_mini_openid = l[i].Key.wechatMiniOpenId
+                    
                 };
                 for (int j = 0; j < skiPassList.Count; j++)
                 {
