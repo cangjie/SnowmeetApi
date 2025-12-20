@@ -640,6 +640,40 @@ namespace SnowmeetApi.Controllers
                 data = care
             });
         }
+        [HttpGet("{careId}")]
+         public async Task<ActionResult<ApiResult<Care?>>> VeriCareFinishCode(int careId, 
+            string code, string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            if (staff.title_level < 100)
+            {
+                return Ok(new ApiResult<Care?>()
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = null
+                });
+            }
+            Care care = await _db.care.Where(c => c.id == careId).Include(c => c.tasks).AsNoTracking().FirstOrDefaultAsync();
+            if (care.veri_code != code || care.veri_code_time == null || ((DateTime)care.veri_code_time).AddMinutes(60) < DateTime.Now)
+            {
+                return Ok(new ApiResult<Care?>()
+                {
+                    code = 1,
+                    message = "验证码错误或已过期",
+                    data = null
+                });
+            }
+            CareTask finishTask = care.tasks.Where(t => t.task_name == "发板" && t.valid == 1).FirstOrDefault();
+            await SetTaskStatus(finishTask.id, "已完成", "通过验证码核销完成养护", sessionKey, sessionType);
+            care = await _db.care.Where(c => c.id == careId).Include(c => c.tasks).AsNoTracking().FirstOrDefaultAsync();
+            return Ok(new ApiResult<Care?>()
+            {
+                code = 0,
+                message = "",
+                data = care
+            });
+        }
         /*
         [NonAction]
         public async Task<Care> GetCare(int careId)
