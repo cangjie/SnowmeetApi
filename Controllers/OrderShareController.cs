@@ -195,7 +195,6 @@ namespace SnowmeetApi.Controllers
             if (bind == null)
             {
                 var client = await _tHelper.GetClient((int)share.payment.mch_id);
-                ////////////create relations/////////////////////
                 var req = new AddProfitSharingReceiverRequest()
                 {
                     AppId = _appId,
@@ -208,8 +207,6 @@ namespace SnowmeetApi.Controllers
                     req.Name = orderShare.relation.wepay_account_name;
                     req = client.EncryptRequestSensitiveProperty(req);
                 }
-                //TenpayController _tHelper = new TenpayController(_db, _config, _http);
-                
                 var res = await client.ExecuteAddProfitSharingReceiverAsync(req);
                 string ret = res.IsSuccessful().ToString().ToLower();
                 if (ret.Equals("true"))
@@ -237,10 +234,8 @@ namespace SnowmeetApi.Controllers
             {
                 return bind.valid;
             }
-            //return false;
         }
         [NonAction]
-        //[HttpGet("{paymentShareId}")]
         public async Task<ActionResult<PaymentShare>> SharePayment(int paymentShareId)
         {
             PaymentShare share = await _db.paymentShare.Where(p => p.id == paymentShareId)

@@ -599,6 +599,47 @@ namespace SnowmeetApi.Controllers
                 data = care
             });
         }
+        [HttpGet("{careId}")]
+        public async Task<ActionResult<ApiResult<Care?>>> CreateVerifyCode(int careId, 
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            if (staff.title_level < 100)
+            {
+                return Ok(new ApiResult<Care?>()
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = null
+                });
+            }
+            string code = new Random().Next(0, 9999).ToString().PadLeft(4, '0');
+            Care care = await _db.care.Where(c => c.id == careId).FirstOrDefaultAsync();
+            Models.Order order = await _db.order.Where(o => o.id == care.order_id).FirstOrDefaultAsync();
+            care.veri_code = code;
+            care.veri_code_time = DateTime.Now;
+            care.update_date = DateTime.Now;
+            _db.care.Add(care).State = EntityState.Modified;
+            await _db.SaveChangesAsync();
+            string content = order.code + "|品牌：" + care.equipment + care.brand + "长度：" + care.scale + "|" + code;
+            try
+            {
+                string notUrl = "https://wxoa.snowmeet.top/api/TemlateMessage/SendTemplateMessage?memberId=" + order.member_id.ToString() 
+                    + "&templateId=" +   Util.UrlEncode("-FxfVcWYFq079YIWfaT6khxQn6__b-CD9Xty_M_iP1U") + "&first=" + Util.UrlEncode("") + "&keywords=" + Util.UrlEncode(content)
+                    + "&remark=" + Util.UrlDecode("") + "&url=" + Util.UrlEncode("") + "&sessionKey=" + Util.UrlEncode("abcd123!@#");
+                Util.GetWebContent(notUrl);
+            }
+            catch
+            {
+                
+            }
+            return Ok(new ApiResult<Care?>()
+            {
+                code = 0,
+                message = "",
+                data = care
+            });
+        }
         /*
         [NonAction]
         public async Task<Care> GetCare(int careId)
