@@ -556,7 +556,7 @@ namespace SnowmeetApi.Controllers.Order
             }
             */
             Staff staff = await Util.GetStaffBySessionKey(_context, sessionKey, sessionType);
-            if (staff == null && staff.title_level < 100)
+            if (staff == null || staff.title_level < 100)
             {
                 return BadRequest();
             }
