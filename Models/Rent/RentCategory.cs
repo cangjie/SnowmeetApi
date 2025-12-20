@@ -23,5 +23,6 @@ namespace SnowmeetApi.Models
         public List<RentPrice>? priceList { get; set; }
         public List<RentCategoryInfoField>? infoFields { get; set; }
         public List<RentProduct>? productList { get; set; }
+        public List<RentItem> rentItems { get; set; } = new List<RentItem>();
     }
 }

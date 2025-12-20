@@ -370,7 +370,7 @@ namespace SnowmeetApi.Models
         public enum RentItemBusinessStatus {上架, 维修, 保养, 丢失, 下架, 异地归还 }
         [Key]
         public int id { get; set; }
-        public int rental_id { get; set; } = 0;
+        public int? rental_id { get; set; } = null;
         public string class_name { get; set; } = "";
         public DateTime? pick_time { get; set; } = null;
         public DateTime? return_time { get; set; } = null;
@@ -455,7 +455,7 @@ namespace SnowmeetApi.Models
         [ForeignKey("category_id")]
         public RentCategory category { get; set; } = null;
         [ForeignKey("rental_id")]
-        public Rental rental { get; set; }
+        public Rental? rental { get; set; } = null;
         [ForeignKey(nameof(Models.RentItemLog.rent_item_id))]
         public List<Models.RentItemLog> logs { get; set; } = new List<Models.RentItemLog>();
         [NotMapped]

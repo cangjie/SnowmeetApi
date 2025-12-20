@@ -5039,7 +5039,7 @@ namespace SnowmeetApi.Controllers
                 Models.RentalDetail detail = new Models.RentalDetail()
                 {
                     id = 0,
-                    rental_id = rentItem.rental_id,
+                    rental_id = (int)rentItem.rental_id,
                     rent_item_id = rentItemId,
                     charge_type = "赔偿金",
                     rental_date = DateTime.Now,
@@ -5052,7 +5052,7 @@ namespace SnowmeetApi.Controllers
                 await _db.rentalDetail.AddAsync(detail);
             }
             await _db.SaveChangesAsync();
-            Rental rental = await GetRental(rentItem.rental_id);
+            Rental rental = await GetRental((int)rentItem.rental_id);
             return Ok(new ApiResult<Models.Rental>()
             {
                 code = 0,
@@ -5105,7 +5105,7 @@ namespace SnowmeetApi.Controllers
             };
             await _db.rentItemLog.AddAsync(log);
             await _db.SaveChangesAsync();
-            Rental rental = await GetRental(rentItem.rental_id);
+            Rental rental = await GetRental((int)rentItem.rental_id);
             bool allReturned = true;
             for (int i = 0; rental.rentItems != null && i < rental.rentItems.Count; i++)
             {
@@ -5586,6 +5586,62 @@ namespace SnowmeetApi.Controllers
                 code = 0,
                 message = "",
                 data = finalList
+            });
+        }
+        [NonAction]
+        public async Task<List<Models.Order>?> GetOrdersFuzzy(string key)
+        {
+            key = key.ToLower();
+            List<Models.RentCategory> categories = await _db.rentCategory
+                .Include(c => c.rentItems.Where(i => i.valid == 1)).ThenInclude(r => r.rental)
+                .ThenInclude(o => o.order).ThenInclude(o => o.staff)
+                .Where(c => c.valid == 1 && c.name != null && c.name.ToLower().IndexOf(key) >= 0)
+                .AsNoTracking().ToListAsync();
+            List<Models.RentItem> items = await _db.rentItem.Where(r => r.name != null && r.name.ToLower().IndexOf(key) >= 0 && r.valid == 1)
+                .Include(r => r.rental).ThenInclude(o => o.order).ThenInclude(o => o.staff)
+                .AsNoTracking().ToListAsync();
+            List<Models.Order> orders = new List<Models.Order>();
+            for(int i = 0; i < categories.Count; i++)
+            {
+                for(int j = 0; categories[i].rentItems != null && j < categories[i].rentItems.Count; j++)
+                {
+                    Models.Order order = categories[i].rentItems[j].rental.order;
+                    if (!orders.Any(o => o.id == order.id))
+                    {
+                        orders.Add(order);
+                    }
+                }
+            }
+            for(int i = 0; i < items.Count; i++)
+            {
+                Models.Order order = items[i].rental.order;
+                if (!orders.Any(o => o.id == order.id))
+                {
+                    orders.Add(order);
+                }
+            }
+            return orders.OrderByDescending(o => o.id).ToList();
+        }
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<List<Models.Order>?>>> GetOrdersFuzzyByStaff(string key,
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            if (staff == null || staff.title_level < 100)
+            {
+                return Ok(new ApiResult<List<Models.Order>?>()
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = null
+                });
+            }
+            List<Models.Order>? orders = await GetOrdersFuzzy(key);
+            return Ok(new ApiResult<List<Models.Order>?>()
+            {
+                code = 0,
+                message = "",
+                data = orders
             });
         }
     }
