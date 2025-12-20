@@ -665,7 +665,7 @@ namespace SnowmeetApi.Controllers
                 });
             }
             CareTask finishTask = care.tasks.Where(t => t.task_name == "发板" && t.valid == 1).FirstOrDefault();
-            await SetTaskStatus(finishTask.id, "已完成", "通过验证码核销完成养护", sessionKey, sessionType);
+            await SetTaskStatus(finishTask.id, "已完成", "验证码", sessionKey, sessionType);
             care = await _db.care.Where(c => c.id == careId).Include(c => c.tasks).AsNoTracking().FirstOrDefaultAsync();
             return Ok(new ApiResult<Care?>()
             {
