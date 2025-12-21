@@ -685,7 +685,7 @@ namespace SnowmeetApi.Controllers
         }
         */
         [HttpGet]
-        public async Task<ActionResult<ApiResult<List<CareReport>>>> GetReport(DateTime startDate, DateTime endDate, 
+        public async Task<ActionResult<List<CareReport>>> GetReport(DateTime startDate, DateTime endDate, 
             string sessionKey, string sessionType = "wechat_mini_openid")
         {
             Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
@@ -732,6 +732,8 @@ namespace SnowmeetApi.Controllers
                 };
                 reports.Add(report);
             }
+            return Ok(reports);
+            /*
             return Ok(new ApiResult<List<CareReport>>()
             {
                 code = 0,
