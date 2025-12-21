@@ -255,7 +255,7 @@
         rows.innerHTML = '';
         var btnCtrl = document.getElementById('btn');
         btnCtrl.disabled = true;
-        var getUrl = '../../core/MaintainLogs/GetReport?sessionKey=' + encodeURIComponent(sessionKey)
+        var getUrl = '../../api/Care/GetReport?sessionKey=' + encodeURIComponent(sessionKey)
             + '&startDate=' + formatDate(startDate) + '&endDate=' + formatDate(endDate);
         $.ajax({
             url: getUrl,
