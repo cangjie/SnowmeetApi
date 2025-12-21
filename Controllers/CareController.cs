@@ -685,7 +685,7 @@ namespace SnowmeetApi.Controllers
         }
         */
         [HttpGet]
-        public async Task<ActionResult<List<CareReport>>> GetReport(DateTime startDate, DateTime endDate, 
+        public async Task<ActionResult<ApiResult<List<CareReport>>>> GetReport(DateTime startDate, DateTime endDate, 
             string sessionKey, string sessionType = "wechat_mini_openid")
         {
             Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
@@ -698,13 +698,46 @@ namespace SnowmeetApi.Controllers
                     data = null
                 });
             }
-            List<Care> cares = await _db.care//.Where(c => c.create_date.Date >= startDate.Date && c.create_date.Date <= endDate.Date && c.valid == 1)
+            List<Care> cares = await _db.care
                 .Include(c => c.order).ThenInclude(o => o.member).ThenInclude(m => m.memberSocialAccounts.Where(m => m.valid == 1))
+                .Include(c => c.order).ThenInclude( o=> o.payments).ThenInclude(p => p.refunds)
                 .Include(c => c.order).ThenInclude(o => o.staff)
                 .Include(c => c.tasks.Where(t => t.valid == 1 )).ThenInclude(t => t.staff)
                 .Where(c => c.order.biz_date.Date >= startDate.Date && c.order.biz_date.Date <= endDate.Date && c.valid == 1 && c.order.valid == 1)
-                .OrderByDescending(c => c.id).AsSplitQuery().AsNoTracking().ToListAsync();
-            return BadRequest();
+                .OrderByDescending(c => c.order.id).AsSplitQuery().AsNoTracking().ToListAsync();
+            List<CareReport> reports = new List<CareReport>();
+            for(int i = 0; i < cares.Count; i++)
+            {
+                Care care = cares[i];
+                CareReport report = new CareReport()
+                {
+                    id = care.id,
+                    order_id = care.order.code,
+                    shop = care.order.shop,
+                    total_paid = care.order.paidAmount,
+                    task_flow_num = care.task_flow_code,
+                    equip_type = care.equipment,
+                    equip_brand = care.brand,
+                    equip_scale = care.scale,
+                    degree = care.edge_degree != null ?care.edge_degree.ToString() : "",
+                    edge = care.need_edge == 1 ? "是" : "否",
+                    vax = care.need_wax == 1 ? "是" : "否",
+                    unvax = care.need_unwax == 1 ? "是" : "否",
+                    more = (care.need_repair == 1 ? care.repair_memo : ""),
+                    memo = care.memo,
+                    jishi = "",
+                    additional_fee = care.repair_charge,
+                    staff = care.order.staff.name,
+                    logs = care.tasks
+                };
+                reports.Add(report);
+            }
+            return Ok(new ApiResult<List<CareReport>>()
+            {
+                code = 0,
+                message = "",
+                data = reports
+            });
             /*
             List<CareReport> reports = await _db.careReport.Where(c => c.create_date >= startDate && c.create_date <= endDate).ToListAsync();
             return Ok(new ApiResult<List<CareReport>>()

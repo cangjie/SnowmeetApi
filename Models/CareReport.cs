@@ -46,7 +46,7 @@ namespace SnowmeetApi.Models
 				string name = "——";
 				List<CareTask> l = logs.Where(l => l.task_name.Trim().Equals("安全检查"))
 					.OrderByDescending(l => l.id).ToList();
-				if (l.Count > 0)
+				if (l.Count > 0 && l[0].staff != null )
 				{
 					name = l[0].staff.name.Trim();
 				}
@@ -61,7 +61,7 @@ namespace SnowmeetApi.Models
 
 				List<CareTask> l = logs.Where(l => l.task_name.Trim().Equals("发板"))
 					.OrderByDescending(l => l.id).ToList();
-				if (l.Count > 0)
+				if (l.Count > 0 && l[0].staff != null)
 				{
 					name = l[0].staff.name.Trim();
 				}
@@ -73,16 +73,14 @@ namespace SnowmeetApi.Models
 			get
 			{
 				string no = "——";
-				if (order!=null && order.paymentList.Count > 0)
+				if (order!=null && order.availablePayments.Count > 0)
 				{
-					no = order.paymentList[0].out_trade_no == null? "——" :   order.paymentList[0].out_trade_no.Trim();
+					no = order.availablePayments[0].out_trade_no == null? "——" :   order.availablePayments[0].out_trade_no.Trim();
 				}
 				return no;
 			}
 		}
-		[ForeignKey("order_id")]
-		public OrderOnline? order {get; set;}
-		[ForeignKey(nameof(CareTask.care_id))]
+		public Models.Order? order {get; set;}
 		public List<CareTask> logs {get; set;} = new List<CareTask>();
 	}
 }
