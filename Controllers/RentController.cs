@@ -5464,7 +5464,7 @@ namespace SnowmeetApi.Controllers
         [HttpGet]
         public async Task<ActionResult<ApiResult<List<Models.Order>?>>> CloseOrder()
         {
-            OrderShareController _shareHelper = new OrderShareController(_db, _config, _httpContextAccessor);
+            OrderShareController _shareHelper = new OrderShareController(_db, _oriConfig, _httpContextAccessor);
             List<Models.Order> orders = await _db.order.Include(o => o.payments).ThenInclude(p => p.refunds)
                 .Where(o => o.valid == 1  && o.closed == 0 && o.close_date == null && o.type == "租赁" 
                 && o.create_date.Date > DateTime.Parse("2025-10-01").Date  ).OrderByDescending(o => o.id)

@@ -51,7 +51,6 @@
                 <td class="table_head">维修技师</td>
                 <td class="table_head">发板</td>
                 <td class="table_head">备注</td>
-                
                 <td class="table_head">附加费用</td>
                 <td class="table_head">日期</td>
                 <td class="table_head">时间</td>
@@ -81,19 +80,12 @@
         if (item.order != null && item.order.paymentList != null && item.order.paymentList.length > 0){
             payMethod = item.order.paymentList[0].pay_method;
         }
-        //newRow.style.backgroundColor = item.odd ? 'white' : '#DDDDDD';
-        //newRow.id = item.task_flow_num;
-
         var td_id = document.createElement('td');
         td_id.innerText = item.id;
         newRow.appendChild(td_id);
-
-
         var td_shop = document.createElement('td');
         td_shop.innerText = item.shop;
         newRow.appendChild(td_shop);
-
-
 
         var td_task_flow_num = document.createElement('td');
         td_task_flow_num.innerText = item.task_flow_num;

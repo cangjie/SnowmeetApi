@@ -1,5 +1,4 @@
-﻿/*
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -716,7 +715,7 @@ namespace SnowmeetApi.Controllers.Maintain
             }
             return Ok(logList);
         }
-
+/*
         [HttpGet("{id}")]
         public async Task<ActionResult<MaintainLog>> EndStep(int id, string memo, string sessionKey)
         {
@@ -808,7 +807,7 @@ namespace SnowmeetApi.Controllers.Maintain
 
             return log;
         }
-
+*/
         [HttpGet("{shopInterActId}")]
         public async Task<ActionResult<bool>> CheckReturnScan(int shopInterActId, int taskId)
         {
@@ -845,4 +844,3 @@ namespace SnowmeetApi.Controllers.Maintain
         }
     }
 }
-*/

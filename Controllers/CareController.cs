@@ -684,6 +684,37 @@ namespace SnowmeetApi.Controllers
             return care;
         }
         */
+        [HttpGet]
+        public async Task<ActionResult<List<CareReport>>> GetReport(DateTime startDate, DateTime endDate, 
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            if (staff == null || staff.title_level < 100)
+            {
+                return Ok(new ApiResult<List<CareReport>>()
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = null
+                });
+            }
+            List<Care> cares = await _db.care//.Where(c => c.create_date.Date >= startDate.Date && c.create_date.Date <= endDate.Date && c.valid == 1)
+                .Include(c => c.order).ThenInclude(o => o.member).ThenInclude(m => m.memberSocialAccounts.Where(m => m.valid == 1))
+                .Include(c => c.order).ThenInclude(o => o.staff)
+                .Include(c => c.tasks.Where(t => t.valid == 1 )).ThenInclude(t => t.staff)
+                .Where(c => c.order.biz_date.Date >= startDate.Date && c.order.biz_date.Date <= endDate.Date && c.valid == 1 && c.order.valid == 1)
+                .OrderByDescending(c => c.id).AsSplitQuery().AsNoTracking().ToListAsync();
+            return BadRequest();
+            /*
+            List<CareReport> reports = await _db.careReport.Where(c => c.create_date >= startDate && c.create_date <= endDate).ToListAsync();
+            return Ok(new ApiResult<List<CareReport>>()
+            {
+                code = 0,
+                message = "",
+                data = reports
+            });
+            */
+        }
     }
 
 }
