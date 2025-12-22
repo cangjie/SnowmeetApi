@@ -736,7 +736,7 @@ namespace SnowmeetApi.Controllers
                     edge = staffEdge != null ? staffEdge.name : "",
                     wax = staffWax != null ? staffWax.name : "",
                     unwax = staffUnWax != null ? staffUnWax.name : "",
-                    more = staffRepair != null ? staffRepair.name : "",
+                    more = care.repair_memo == null ? "" : care.repair_memo,
                     memo = care.memo,
                     jishi = staffRepair != null ? staffRepair.name : "",
                     additional_fee = care.repair_charge,
