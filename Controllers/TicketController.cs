@@ -585,7 +585,7 @@ namespace SnowmeetApi.Controllers
             List<Ticket> tickets = await GetMemberTickets(memberId);
             if (bizType != null)
             {
-                tickets = tickets.Where(t => t.biz_type == bizType).ToList();
+                tickets = tickets.Where(t => (t.biz_type == bizType) || (bizType == "养护" && t.template_id == 12)).ToList();
             }
             if (canUse != null)
             {
@@ -711,7 +711,9 @@ namespace SnowmeetApi.Controllers
                 valid = 1,
                 is_active = active?1:0,
                 start_date = startDate,
-                expire_date = expireDate
+                expire_date = expireDate,
+                biz_id = bizId,
+                biz_type = bizType
             };
             await _context.ticket.AddAsync(ticket);
             await _context.SaveChangesAsync();
