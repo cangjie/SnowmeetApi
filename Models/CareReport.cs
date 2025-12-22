@@ -19,8 +19,8 @@ namespace SnowmeetApi.Models
 		public string equip_scale { get; set; }
 		public string degree { get; set; }
 		public string edge { get; set; }
-		public string vax { get; set; }
-		public string unvax { get; set; }
+		public string wax { get; set; }
+		public string unwax { get; set; }
 		public string more { get; set; }
 		public string memo { get; set; }
 		public string orderMemo
