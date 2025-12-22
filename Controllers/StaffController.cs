@@ -51,7 +51,7 @@ namespace SnowmeetApi.Controllers
                     .ThenInclude(j => j.staffSocialAccounts.Where(s => s.valid == 1 && (s.end_date == null || s.end_date >= DateTime.Now)).OrderByDescending(s => s.start_date))
                     .ThenInclude(s => s.staff).ThenInclude(s => s.shop).AsNoTracking()
                 .Where(m => m.session_key.Trim().Equals(sessionKey) && m.session_type.Equals(sessionType) && m.valid == 1 && m.expire_date >= DateTime.Now)
-                .OrderByDescending(m => m.expire_date).AsNoTracking().ToListAsync();
+                .OrderByDescending(m => m.expire_date).AsNoTracking().AsNoTrackingWithIdentityResolution().ToListAsync();
             for(int i = 0; i < sList.Count; i++)
             {
                 MiniSession mSession = sList[i];
@@ -62,8 +62,7 @@ namespace SnowmeetApi.Controllers
                     {
                         if (jobAccount.staffSocialAccounts[k].staff != null && jobAccount.staffSocialAccounts[k].staff.valid == 1)
                         {
-                            _db.staff.Entry(jobAccount.staffSocialAccounts[k].staff).State = EntityState.Detached;
-                            await _db.SaveChangesAsync();
+                            
                             return jobAccount.staffSocialAccounts[k].staff;
                         }
                     }

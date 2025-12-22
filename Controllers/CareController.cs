@@ -42,36 +42,20 @@ namespace SnowmeetApi.Controllers
                     _db.careImage.Entry(oriImage).State = EntityState.Deleted;
                 }
             }
-            /*
-            for(int i = 0; care.tasks != null && i < care.tasks.Count; i++)
-            {
-                if (care.tasks[i].staff != null)
-                {
-                    _db.staff.Entry(care.tasks[i].staff).State = EntityState.Detached;
-                }
-            }
-            */
             try
             {
-                _db.care.Update(care);
+                care.order = null;
+                care.tasks = null;
                 care.update_date = DateTime.Now;
-                int r = await _db.SaveChangesAsync();
+                _db.care.Update(care);
+                await _db.SaveChangesAsync();
             }
-            catch
+            catch(Exception ex)
             {
-                /*
-                int? pickImageId = care.pick_image_id;
-                if (pickImageId != null)
-                {
-                    //_db.care.Entry(care).State = EntityState.Detached;
-                    int r = await _db.SaveChangesAsync();
-                    care = await _db.care.FindAsync(care.id);
-                    care.pick_image_id = pickImageId;
-                    care.update_date = DateTime.Now;
-                    _db.care.Entry(care).State = EntityState.Modified;
-                    r = await _db.SaveChangesAsync();
-                }
-                */
+                Console.WriteLine(ex.ToString());
+                care.update_date = DateTime.Now;
+                _db.care.Entry(care).State = EntityState.Modified;
+                await _db.SaveChangesAsync();
             }
 
             return care;
@@ -236,9 +220,8 @@ namespace SnowmeetApi.Controllers
             [FromQuery] string sessionKey, [FromQuery] string sessionType = "wechat_mini_openid")
         {
             //StaffController _staffHelper = new StaffController(_db);
+            
             Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
-            _db.staff.Entry(staff).State = EntityState.Detached;
-            await _db.SaveChangesAsync();
             if (staff == null || staff.title_level < 100)
             {
                 return Ok(new ApiResult<Care?>
@@ -248,13 +231,21 @@ namespace SnowmeetApi.Controllers
                     data = null
                 });
             }
+            
             scene = Util.UrlDecode(scene);
+            
             care = await UpdateCare(care, null, staff.id, scene);
+            //care = await UpdateCare(care, null, null, scene);
+
+            
             Brand brand = await UpdateBrand(care.equipment, care.brand, staff.id);
             if (brand != null && care.series != null)
             {
                 await UpdateSeries(brand, care.series, staff.id);
             }
+            
+
+
             return Ok(new ApiResult<Care>()
             {
                 code = 0,
