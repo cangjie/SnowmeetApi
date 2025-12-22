@@ -703,7 +703,8 @@ namespace SnowmeetApi.Controllers
                 .Include(c => c.order).ThenInclude( o=> o.payments).ThenInclude(p => p.refunds)
                 .Include(c => c.order).ThenInclude(o => o.staff)
                 .Include(c => c.tasks.Where(t => t.valid == 1 )).ThenInclude(t => t.staff)
-                .Where(c => c.order.biz_date.Date >= startDate.Date && c.order.biz_date.Date <= endDate.Date && c.valid == 1 && c.order.valid == 1)
+                .Where(c => c.order.biz_date.Date >= startDate.Date && c.order.biz_date.Date <= endDate.Date 
+                && c.valid == 1 && c.order.valid == 1 && c.order.is_test == 0)
                 .OrderByDescending(c => c.order.id).AsSplitQuery().AsNoTracking().ToListAsync();
             List<CareReport> reports = new List<CareReport>();
             for(int i = 0; i < cares.Count; i++)
