@@ -29,7 +29,10 @@ namespace SnowmeetApi.Models
             get
             {
                 string title = real_name + " ";
-                title += gender.Trim().Equals("男") ? "先生" : (gender.Trim().Equals("女") ? "女士" : "");
+                if (gender != null)
+                {
+                    title += gender.Trim().Equals("男") ? "先生" : (gender.Trim().Equals("女") ? "女士" : "");
+                }
                 return title.Trim();
             }
         }
