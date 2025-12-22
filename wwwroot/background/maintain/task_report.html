@@ -120,12 +120,12 @@
         td_edge.innerText = item.edge;
         newRow.appendChild(td_edge);
 
-        var td_vax = document.createElement('td');
-        td_vax.innerText = item.wax;
-        newRow.appendChild(td_vax);
+        var td_wax = document.createElement('td');
+        td_wax.innerText = item.wax;
+        newRow.appendChild(td_wax);
 
-        var td_unvax = document.createElement('td');
-        td_unvax.innerText = item.unvax;
+        var td_unwax = document.createElement('td');
+        td_unwax.innerText = item.unwax;
         newRow.appendChild(td_unwax);
 
         var td_more = document.createElement('td');
@@ -281,8 +281,8 @@
                     lineData.push(msg[i].safeCheck);
 
                     lineData.push(msg[i].edge);
-                    lineData.push(msg[i].vax);
-                    lineData.push(msg[i].unvax);
+                    lineData.push(msg[i].wax);
+                    lineData.push(msg[i].unwax);
                     lineData.push(msg[i].more.replace(',','，'));
                     lineData.push(msg[i].jishi);
                     lineData.push(msg[i].giveOut);
