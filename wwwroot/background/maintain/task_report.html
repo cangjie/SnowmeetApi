@@ -156,11 +156,11 @@
         
 
         var td_date = document.createElement('td');
-        td_date.innerText = formatDate(item.create_date);
+        td_date.innerText = formatDate(item.order.biz_date);
         newRow.appendChild(td_date);
 
         var td_time = document.createElement('td');
-        td_time.innerText = formatTime(item.create_date);
+        td_time.innerText = formatTime(item.order.biz_date);
         newRow.appendChild(td_time);
 
         var lastOrderId = '-1';
