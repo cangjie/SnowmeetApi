@@ -726,6 +726,7 @@ namespace SnowmeetApi.Controllers
                 {
                     id = care.id,
                     order_id = care.order.code,
+                    order = care.order,
                     shop = care.order.shop,
                     total_paid = care.order.paidAmount,
                     task_flow_num = care.task_flow_code,
