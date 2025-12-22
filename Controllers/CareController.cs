@@ -709,6 +709,19 @@ namespace SnowmeetApi.Controllers
             for(int i = 0; i < cares.Count; i++)
             {
                 Care care = cares[i];
+                CareTask taskEdge = care.tasks.Where(t => t.task_name == "修刃" && t.valid == 1).FirstOrDefault();
+                CareTask taskWax = care.tasks.Where(t => (t.task_name == "打蜡" || t.task_name == "热蜡")  && t.valid == 1).FirstOrDefault();
+                CareTask taskUnWax = care.tasks.Where(t => t.task_name == "刮蜡" && t.valid == 1).FirstOrDefault();
+                CareTask taskRepair = care.tasks.Where(t => t.task_name == "维修" && t.valid == 1).FirstOrDefault();
+                CareTask taskSafe = care.tasks.Where(t => t.task_name == "安全检查" && t.valid == 1).FirstOrDefault();
+                CareTask taskGiveOut = care.tasks.Where(t => t.task_name == "发板" && t.valid == 1).FirstOrDefault();
+                Staff staffEdge = taskEdge != null ? taskEdge.staff : null;
+                Staff staffWax = taskWax != null ? taskWax.staff : null;
+                Staff staffUnWax = taskUnWax != null ? taskUnWax.staff : null;
+                Staff staffRepair = taskRepair != null ? taskRepair.staff : null;
+                Staff staffSafe = taskSafe != null ? taskSafe.staff : null;
+                Staff staffGiveOut = taskGiveOut != null ? taskGiveOut.staff : null;
+
                 CareReport report = new CareReport()
                 {
                     id = care.id,
@@ -720,12 +733,12 @@ namespace SnowmeetApi.Controllers
                     equip_brand = care.brand,
                     equip_scale = care.scale,
                     degree = care.edge_degree != null ?care.edge_degree.ToString() : "",
-                    edge = care.need_edge == 1 ? "是" : "否",
-                    vax = care.need_wax == 1 ? "是" : "否",
-                    unvax = care.need_unwax == 1 ? "是" : "否",
-                    more = (care.need_repair == 1 ? care.repair_memo : ""),
+                    edge = staffEdge != null ? staffEdge.name : "",
+                    wax = staffWax != null ? staffWax.name : "",
+                    unwax = staffUnWax != null ? staffUnWax.name : "",
+                    more = staffRepair != null ? staffRepair.name : "",
                     memo = care.memo,
-                    jishi = "",
+                    jishi = staffRepair != null ? staffRepair.name : "",
                     additional_fee = care.repair_charge,
                     staff = care.order.staff.name,
                     logs = care.tasks
