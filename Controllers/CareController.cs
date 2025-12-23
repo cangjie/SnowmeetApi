@@ -44,7 +44,7 @@ namespace SnowmeetApi.Controllers
             }
             try
             {
-                care.order = null;
+                //care.order = null;
                 care.tasks = null;
                 care.update_date = DateTime.Now;
                 _db.care.Update(care);
@@ -219,8 +219,6 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<ApiResult<Care>>> UpdateCareByStaff([FromBody] Care care, [FromQuery] string scene,
             [FromQuery] string sessionKey, [FromQuery] string sessionType = "wechat_mini_openid")
         {
-            //StaffController _staffHelper = new StaffController(_db);
-            
             Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
             if (staff == null || staff.title_level < 100)
             {
@@ -231,21 +229,13 @@ namespace SnowmeetApi.Controllers
                     data = null
                 });
             }
-            
             scene = Util.UrlDecode(scene);
-            
             care = await UpdateCare(care, null, staff.id, scene);
-            //care = await UpdateCare(care, null, null, scene);
-
-            
             Brand brand = await UpdateBrand(care.equipment, care.brand, staff.id);
             if (brand != null && care.series != null)
             {
                 await UpdateSeries(brand, care.series, staff.id);
             }
-            
-
-
             return Ok(new ApiResult<Care>()
             {
                 code = 0,
