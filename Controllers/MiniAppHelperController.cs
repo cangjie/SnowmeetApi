@@ -482,7 +482,8 @@ namespace LuqinMiniAppBase.Controllers
                         member_id = member.id
                     };
                     member.memberSocialAccounts.Add(msa);
-                    _db.member.Entry(member).State = EntityState.Modified;
+                    //_db.member.Entry(member).State = EntityState.Modified;
+                    _db.member.Update(member);
                     await _db.SaveChangesAsync();
                 }
                 if (member.wechatUnionId == null)
