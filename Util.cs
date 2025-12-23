@@ -618,6 +618,12 @@ namespace SnowmeetApi
             {
                 return true;
             }
+            else if (mi7Code.StartsWith("XSD")
+                && !mi7Code.EndsWith("I") && !mi7Code.EndsWith("A")
+                && mi7Code.Length == 14)
+            {
+                return true;
+            }
             else
             {
                 return false;

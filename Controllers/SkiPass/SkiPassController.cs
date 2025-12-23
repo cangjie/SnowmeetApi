@@ -400,6 +400,7 @@ namespace SnowmeetApi.Controllers
             await CreateShare(orderId);
         }
         */
+        /*
         [NonAction]
         public async Task CreateShare(int orderId)
         {
@@ -473,25 +474,11 @@ namespace SnowmeetApi.Controllers
             }
             for(int i = 0; i<skipasses.Count; i++)
             {
-                /*
-                PaymentShare share = new PaymentShare()
-                {
-                    id = 0,
-                    payment_id = payments[0].id,
-                    order_id = orderId,
-                    kol_id = kol.id,
-                    amount = 1 * skipasses[i].count,
-                    memo = skipasses[i].product_name + "佣金",
-                    state = 0,
-                    ret_msg = "",
-                    out_trade_no = payments[0].out_trade_no + "_FZ_" + DateTime.Now.ToString("yyyyMMdd") + "_01"
-                };
-                await _context.paymentShare.AddAsync(share);
-                */
+               
             }
             await _context.SaveChangesAsync();
         }
-
+        */
         [NonAction]
         public async Task SendTicket(Models.SkiPass skipass)
         {
