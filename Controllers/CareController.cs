@@ -57,7 +57,8 @@ namespace SnowmeetApi.Controllers
                 _db.care.Entry(care).State = EntityState.Modified;
                 await _db.SaveChangesAsync();
             }
-
+            care.tasks = await _db.careTask.Where(c => c.care_id == care.id && c.valid == 1).OrderBy(t => t.id)
+                .Include(t => t.staff).AsNoTracking().ToListAsync();
             return care;
         }
         [HttpGet]
