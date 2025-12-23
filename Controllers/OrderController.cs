@@ -2369,9 +2369,9 @@ namespace SnowmeetApi.Controllers
                 return;
             }
             BizReferee referee = await _db.bizReferee
-                .Where(b => b.biz_type == "雪票" && b.order_id == orderId && b.member_id == order.member_id)
+                .Where(b => b.biz_type == "雪票"  && b.member_id == order.member_id && b.valid)
                 .AsNoTracking().FirstOrDefaultAsync();
-            if (referee == null)
+            if (referee == null && order.staff_id != null)
             {
                 BizReferee bf = new BizReferee()
                 {
