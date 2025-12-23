@@ -20,6 +20,7 @@ using System.Text.RegularExpressions;
 using SnowmeetApi.Controllers.Order;
 using NPOI.XSSF.UserModel;
 using NPOI.SS.UserModel;
+using Flurl.Util;
 namespace SnowmeetApi.Controllers.SkiPass
 {
     [Route("core/[controller]/[action]")]
@@ -73,6 +74,7 @@ namespace SnowmeetApi.Controllers.SkiPass
             public string product_name { get; set; }
             public string name { get; set; }
             public string cell { get; set; }
+            public int member_id {get; set;}
             public List<Models.SkiPass> skiPasses { get; set; } = new List<Models.SkiPass>();
         }
 
@@ -245,7 +247,7 @@ namespace SnowmeetApi.Controllers.SkiPass
         public async Task<List<Models.SkiPass>> GetSkipassesByMember(int memberId, string num = "")
         {
             DateTime startDate = DateTime.Parse("2025-10-15");
-            return await _db.skiPass.Where(s => (((memberId != 0 && s.member_id == memberId)
+            return await _db.skiPass.Include(s => s.member).Where(s => (((memberId != 0 && s.member_id == memberId)
                 || (!num.Trim().Equals("") && s.wechat_mini_openid.Trim().Equals(num))) && s.resort.Trim().Equals("南山")) 
                 && s.valid == 1 && s.reserve_date >= startDate )
                 .AsNoTracking().ToListAsync();
@@ -338,7 +340,7 @@ namespace SnowmeetApi.Controllers.SkiPass
             var reserveList = (from s in skipasses
                                where s.valid == 1
                                group s by
-                new { s.reserve_date, s.product_id, s.product_name, s.contact_cell, s.contact_name }
+                new { s.reserve_date, s.product_id, s.product_name, s.member.title, s.member.cell, s.member.id }
                 into rl
                                select new { rl.Key }).OrderByDescending(r => r.Key.reserve_date).ToList();
             List<ReserveDateProduct> ret = new List<ReserveDateProduct>();
@@ -346,8 +348,12 @@ namespace SnowmeetApi.Controllers.SkiPass
             {
                 ReserveDateProduct item = new ReserveDateProduct()
                 {
-                    name = reserveList[i].Key.contact_name,
-                    cell = reserveList[i].Key.contact_cell,
+                    
+                    name = reserveList[i].Key.title,
+                    cell = reserveList[i].Key.cell,
+                    member_id = reserveList[i].Key.id,
+                    //name ="",
+                    //cell = "",
                     reserveDate = (DateTime)reserveList[i].Key.reserve_date,
                     product_id = reserveList[i].Key.product_id,
                     product_name = reserveList[i].Key.product_name
@@ -355,11 +361,14 @@ namespace SnowmeetApi.Controllers.SkiPass
                 for (int j = 0; j < skipasses.Count; j++)
                 {
                     Models.SkiPass skp = skipasses[j];
-                    if (skp.contact_cell.Trim().Equals(item.cell.Trim())
-                        && skp.contact_name.Trim().Equals(item.name.Trim())
+                    if (
+                        skp.member_id == item.member_id
+                        //skp.contact_cell.Trim().Equals(item.cell.Trim())
+                        //&& skp.contact_name.Trim().Equals(item.name.Trim())
                         && ((DateTime)skp.reserve_date).Date == item.reserveDate.Date
                         && skp.product_id == item.product_id
-                        && skp.product_name.Trim().Equals(item.product_name.Trim()))
+                        //&& skp.product_name.Trim().Equals(item.product_name.Trim())
+                        )
                     {
                         item.skiPasses.Add(skp);
                     }
