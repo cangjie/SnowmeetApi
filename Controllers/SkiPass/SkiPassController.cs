@@ -315,6 +315,9 @@ namespace SnowmeetApi.Controllers
                 }   
             }
             TicketController _ticketHelper = new TicketController(_context, _config);
+            CoreDataModLog logOrder = CoreDataModLog.CreateManualLog("Order", "", order.id, "开始处理雪票杂项", null, null, null, null, "");
+            await _context.coreDataModLog.AddAsync(logOrder);
+            await _context.SaveChangesAsync();
             for(int i = 0; order.skipasses != null && i < order.skipasses.Count; i++)
             {
                 try
