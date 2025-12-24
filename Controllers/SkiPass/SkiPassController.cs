@@ -298,6 +298,9 @@ namespace SnowmeetApi.Controllers
                 }
             }
             await _context.SaveChangesAsync();
+            CoreDataModLog logOrderTicket = CoreDataModLog.CreateManualLog("Order", "", order.id, "开始订票", null, null, null, null, "");
+            await _context.coreDataModLog.AddAsync(logOrderTicket);
+            await _context.SaveChangesAsync();
             for(int i = 0; i < dealList.Count; i++)
             {
                 Models.SkiPass skipass = dealList[i];
