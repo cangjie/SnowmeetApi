@@ -592,6 +592,11 @@ namespace SnowmeetApi.Controllers
             skipass.reserve_no = payResult.data.orderId.ToString();
             _context.skiPass.Entry(skipass).State = EntityState.Modified;
             await _context.SaveChangesAsync();
+            _context.skiPass.Entry(skipass).State = EntityState.Detached;
+            await _context.SaveChangesAsync();
+            CoreDataModLog logTicket = CoreDataModLog.CreateManualLog("ski_pass", "", skipass.id, "万龙雪票预定成功", null, null, null, null, "");
+                await _context.coreDataModLog.AddAsync(logTicket);
+                await _context.SaveChangesAsync();
             for(int i = 0; i < 5; i++)
             {
                 System.Threading.Thread.Sleep(5000);
@@ -738,6 +743,7 @@ namespace SnowmeetApi.Controllers
                         
                         _context.skiPass.Entry(skipass).State = EntityState.Modified;
                         await _context.SaveChangesAsync();
+
                         continue;
                     }
                     if (order.vouchers.Length > 0)
@@ -803,6 +809,11 @@ namespace SnowmeetApi.Controllers
                     continue;
                 }
                 _context.skiPass.Entry(skipass).State = EntityState.Modified;
+                await _context.SaveChangesAsync();
+                _context.skiPass.Entry(skipass).State = EntityState.Detached;
+                await _context.SaveChangesAsync();
+                CoreDataModLog logTicket = CoreDataModLog.CreateManualLog("ski_pass", "", skipass.id, "万龙雪票信息更新成功", null, null, null, null, "");
+                await _context.coreDataModLog.AddAsync(logTicket);
                 await _context.SaveChangesAsync();
             }
         }
