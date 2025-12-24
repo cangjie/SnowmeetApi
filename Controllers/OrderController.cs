@@ -1624,6 +1624,7 @@ namespace SnowmeetApi.Controllers
                     {
                         await _shareHelper.CreatePaymentShare(shares[i]);
                     }
+                    
                     break;
                 default:
                     break;
