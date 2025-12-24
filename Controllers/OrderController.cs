@@ -1617,6 +1617,10 @@ namespace SnowmeetApi.Controllers
                     await _careHelper.EffectCareOrder(order.id);
                     break;
                 case "雪票":
+                    CoreDataModLog orderSkiPassLog = CoreDataModLog.CreateManualLog("Order", "", order.id, "雪票支付回调", null, null, null,
+                        paymentId.ToString(), "支付成功，开始生成雪票");
+                    await _db.coreDataModLog.AddAsync(orderSkiPassLog);
+                    await _db.SaveChangesAsync();
                     SkiPassController _skiPassHelper = new SkiPassController(_db, _config, _http);
                     await _skiPassHelper.CreateSkiPass(order.id);
                     List<OrderShare> shares = await _db.orderShare.Where(s => s.valid && s.order_id == orderId).AsNoTracking().ToListAsync();
@@ -1624,7 +1628,7 @@ namespace SnowmeetApi.Controllers
                     {
                         await _shareHelper.CreatePaymentShare(shares[i]);
                     }
-                    
+
                     break;
                 default:
                     break;
