@@ -307,7 +307,11 @@ namespace SnowmeetApi.Controllers
                 if (!skipass.resort.Trim().Equals("南山"))
                 {
                     await AutoReserve(skipass);
+                    CoreDataModLog logTicket = CoreDataModLog.CreateManualLog("ski_pass", "", skipass.id, "万龙雪票下单成功", null, null, null, null, "");
+                    await _context.coreDataModLog.AddAsync(logTicket);
+                    await _context.SaveChangesAsync();
                 }
+                /*
                 try
                 {
                     await SendTicket(skipass);
@@ -316,6 +320,7 @@ namespace SnowmeetApi.Controllers
                 {
 
                 }   
+                */
             }
             TicketController _ticketHelper = new TicketController(_context, _config);
             CoreDataModLog logOrder = CoreDataModLog.CreateManualLog("Order", "", order.id, "开始处理雪票杂项", null, null, null, null, "");
