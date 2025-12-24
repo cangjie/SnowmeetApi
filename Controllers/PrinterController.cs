@@ -27,7 +27,6 @@ namespace SnowmeetApi.Controllers
                 .AsNoTracking().ToListAsync();
             return Ok(l);
         }
-        /*
         [HttpGet]
         public async Task<ActionResult<ApiResult<List<Printer>>>> GetPrinterByScene(string shop)
         {
@@ -42,7 +41,6 @@ namespace SnowmeetApi.Controllers
                 data = l
             });
         }
-        */
         [HttpGet]
         public async Task<ActionResult<ApiResult<List<PrintTask>>>> RefreshPrintTask(string shop, DateTime startDate)
         {
