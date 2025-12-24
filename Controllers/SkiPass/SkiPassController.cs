@@ -319,7 +319,13 @@ namespace SnowmeetApi.Controllers
             {
                 try
                 {
-                    await _ticketHelper.CreateTicketBySkiPass(order.skipasses[i]);
+                    CoreDataModLog logPrev = CoreDataModLog.CreateManualLog("ticket", "create_memo", order.skipasses[i].id, "买雪票发券开始", null, null, null, null, "发券之前");
+                    await _context.coreDataModLog.AddAsync(logPrev);
+                    await _context.SaveChangesAsync();
+                    Ticket tNew = await _ticketHelper.CreateTicketBySkiPass(order.skipasses[i]);
+                    CoreDataModLog logAfter = CoreDataModLog.CreateManualLog("ticket", "create_memo", order.skipasses[i].id, "买雪票发券结束", null, null, null, null, "发券" + tNew==null?"失败":"成功");
+                    await _context.coreDataModLog.AddAsync(logAfter);
+                    await _context.SaveChangesAsync();
                     try
                     {
                         if (order.shop != "南山" && order.skipasses[i].card_no != null && order.skipasses[i].card_no != "")
