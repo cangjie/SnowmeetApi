@@ -27,6 +27,22 @@ namespace SnowmeetApi.Controllers
                 .AsNoTracking().ToListAsync();
             return Ok(l);
         }
+        
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<List<Printer>>>> GetPrinterByScene(string shop)
+        {
+            shop = Util.UrlDecode(shop);
+            List<Printer> l = await _db.printer.Where(p => p.shop == shop && p.valid 
+            && (p.color == "yellow" || p.color == "white") && p.region != null)
+                .OrderBy(p => p.region).ThenBy(p => p.color).AsNoTracking().ToListAsync();
+            return Ok(new ApiResult<List<Printer>>()
+            {
+                code = 0,
+                message = "",
+                data = l
+            });
+        }
+        
         [HttpGet]
         public async Task<ActionResult<ApiResult<List<PrintTask>>>> RefreshPrintTask(string shop, DateTime startDate)
         {
