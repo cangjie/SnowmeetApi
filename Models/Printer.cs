@@ -13,6 +13,7 @@ namespace SnowmeetApi.Models
 		public string shop { get; set; }
 		public string owner { get; set; }
 		public string color { get; set; }
+		public int sort {get; set;} = 0;
 		public string? region {get; set;} = null;
 		public bool valid {get; set;} = true;
 	}
