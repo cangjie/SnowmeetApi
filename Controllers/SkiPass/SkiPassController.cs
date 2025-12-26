@@ -836,7 +836,7 @@ namespace SnowmeetApi.Controllers
                 .Where(s => s.product_id == productId && s.valid == 1 && s.reserve_date.Date == date.Date)
                 .OrderBy(s => s.reserve_date).AsNoTracking().FirstAsync();
             Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
-            if (member.real_name == null)
+            if (member.real_name == null || member.real_name.Trim() == "" )
             {
                 member.real_name = name;
                 _context.member.Entry(member).State = EntityState.Modified;

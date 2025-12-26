@@ -384,7 +384,7 @@ namespace SnowmeetApi.Controllers.SkiPass
         {
             Models.Product product = await _db.product.Where(p => p.id == productId).AsNoTracking().FirstOrDefaultAsync();
             Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
-            if (member.real_name == null)
+            if (member.real_name == null || member.real_name.Trim() == "")
             {
                 member.real_name = name;
                 _db.member.Entry(member).State = EntityState.Modified;
