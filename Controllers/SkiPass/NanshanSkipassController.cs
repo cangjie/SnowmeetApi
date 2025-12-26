@@ -382,8 +382,16 @@ namespace SnowmeetApi.Controllers.SkiPass
         public async Task<ActionResult<object>> ReserveSkiPass(int productId, DateTime date,
             int count, string cell, string name, string sessionKey, int? refereeMemberId = null, string sessionType = "wechat_mini_openid", int? staffId = null)
         {
-            Models.Product product = await _db.product.FindAsync(productId);
+            Models.Product product = await _db.product.Where(p => p.id == productId).AsNoTracking().FirstOrDefaultAsync();
             Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
+            if (member.real_name == null)
+            {
+                member.real_name = name;
+                _db.member.Entry(member).State = EntityState.Modified;
+                await _db.SaveChangesAsync();
+                _db.member.Entry(member).State =EntityState.Detached;
+                await _db.SaveChangesAsync();
+            }
             double totalPrice = 0;
             double totalAmount = 0;
             Models.SkiPass[] skipassArr = new Models.SkiPass[count];
