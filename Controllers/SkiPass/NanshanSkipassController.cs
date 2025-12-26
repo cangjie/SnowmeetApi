@@ -427,6 +427,35 @@ namespace SnowmeetApi.Controllers.SkiPass
             {
                 staffId = referee.staff_id;
             }
+            if (staffId == null)
+            {
+                List<MemberSocialAccount> msaOaList = member.GetInfo("wechat_oa_openid");
+                if (msaOaList != null && msaOaList.Count > 0)
+                {
+                    string? oaOpenId = msaOaList[0].num.Trim();
+                    if (oaOpenId != null)
+                    {
+                        OAReceive lastScan = await _db.oAReceive.Where(o => o.FromUserName == oaOpenId 
+                            && o.create_date.Date == DateTime.Now.Date && o.EventKey.Trim().IndexOf("reserveskipassbystaff_") >= 0)
+                            .OrderByDescending(o => o.id).AsNoTracking().FirstOrDefaultAsync();
+                        if (lastScan != null)
+                        {
+                            try
+                            {
+                                string key = lastScan.EventKey.Trim();
+                                string[] keyArr = key.Split('_');
+                                staffId = int.Parse(keyArr[keyArr.Length - 1]);
+                            }
+                            catch
+                            {
+                                
+                            }
+                            
+                        }
+                    }
+                    
+                }
+            }
             if (staffId != null)
             {
                 order.staff_id = staffId;

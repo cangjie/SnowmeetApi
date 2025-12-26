@@ -17,5 +17,6 @@ namespace SnowmeetApi.Models
         public string EventKey { get; set; } = "";
         public string Content { get; set; } = "";
         public string MsgId { get; set; } = "";
+        public DateTime create_date {get; set;} = DateTime.Now;
     }
 }
