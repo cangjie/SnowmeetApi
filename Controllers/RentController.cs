@@ -21,6 +21,7 @@ using NPOI.SS.Formula.Functions;
 using SQLitePCL;
 using Microsoft.CodeAnalysis;
 using NPOI.POIFS.Properties;
+using Microsoft.EntityFrameworkCore.Metadata.Internal;
 namespace SnowmeetApi.Controllers
 {
     [Route("api/[controller]/[action]")]
@@ -5645,8 +5646,8 @@ namespace SnowmeetApi.Controllers
                 data = orders
             });
         }
-        [HttpGet("{categoryId}")]
-        public async Task<ActionResult<ApiResult<List<RentCategory>>>> GetChangeCompatibleCategory(int categoryId)
+        [NonAction]
+        public async Task<List<RentCategory>> GetChangeCompatibleCategory(int categoryId)
         {
             RentCategory? oriCategory = await _db.rentCategory.Where(c => c.id == categoryId)
                 .Include(c => c.priceList).AsNoTracking().FirstOrDefaultAsync();
@@ -5654,23 +5655,13 @@ namespace SnowmeetApi.Controllers
             string fatherCode = oriCode.Substring(0, oriCode.Length - 2);
             if (fatherCode == "")
             {
-                return Ok(new ApiResult<List<RentCategory>>()
-                {
-                    message = "",
-                    code = 0,
-                    data = new List<RentCategory>() { oriCategory }
-                });
+                return new List<RentCategory>() { oriCategory };
             }
             RentCategory? fatherCategory = await _db.rentCategory.Where(c => c.code == fatherCode)
                 .AsNoTracking().FirstOrDefaultAsync();
             if (fatherCategory == null)
             {
-                return Ok(new ApiResult<List<RentCategory>>()
-                {
-                    message = "",
-                    code = 0,
-                    data = new List<RentCategory>() { oriCategory }
-                });
+                return new List<RentCategory>() { oriCategory };
             }
             oriCategory.father = fatherCategory;
             List<RentCategory> children = new List<RentCategory>();
@@ -5696,11 +5687,132 @@ namespace SnowmeetApi.Controllers
                     }
                 }
             }
+            return children;
+        }
+        [HttpGet("{categoryId}")]
+        public async Task<ActionResult<ApiResult<RentCategory>>> QueryChangeCompatibleCategory(int categoryId)
+        {
+            List<RentCategory> children = await GetChangeCompatibleCategory(categoryId);
             return Ok(new ApiResult<List<RentCategory>>()
             {
                 code = 0,
                 message = "",
                 data = children
+            });
+        }
+        [NonAction]
+        public async Task<Models.RentItem> ChangeRentItem(Models.RentItem oriItem,
+            Models.RentItem newItem, int? staffId, string? scene = null)
+        {
+            newItem.valid = 0;
+            await _db.AddAsync(newItem);
+            int i = await _db.SaveChangesAsync();
+            if (i != 1)
+            {
+                return null;
+            }
+            DateTime nowDate = DateTime.Now;
+            RentItemLog newLog = new RentItemLog()
+            {
+                rent_item_id = newItem.id,
+                status = Models.RentItem.RentItemStatus.已发放.ToString(),
+                staff_id = staffId,
+                member_id = null,
+                valid = 1,
+                create_date = nowDate
+            };
+            await _db.rentItemLog.AddAsync(newLog);
+            RentItemLog oriLog = new RentItemLog()
+            {
+                rent_item_id = oriItem.id,
+                status = Models.RentItem.RentItemStatus.已更换.ToString(),
+                staff_id = staffId,
+                member_id = null,
+                valid = 1,
+                create_date = nowDate
+            };
+            await _db.rentItemLog.AddAsync(oriLog);
+            oriItem.update_date = DateTime.Now;
+            oriItem.next_id = newItem.id;
+            _db.rentItem.Entry(oriItem).State = EntityState.Modified;
+            newItem.prev_id = oriItem.id;
+            newItem.valid = 1;
+            newItem.update_date = nowDate;
+            _db.rentItem.Entry(newItem).State = EntityState.Modified;
+            CoreDataModLog dataLog = CoreDataModLog.CreateManualLog("rent_item", "id", oriItem.id, scene, null, staffId,
+                oriItem.id.ToString(), newItem.id.ToString(), "更换租赁物");
+            await _db.coreDataModLog.AddAsync(dataLog);
+            await _db.SaveChangesAsync();
+            _db.rentItem.Entry(newItem).State = EntityState.Detached;
+            _db.rentItem.Entry(oriItem).State = EntityState.Detached;
+            _db.rentItemLog.Entry(oriLog).State = EntityState.Detached;
+            _db.rentItemLog.Entry(newLog).State = EntityState.Detached;
+            await _db.SaveChangesAsync();
+            return newItem;
+        }
+        [HttpPost("{oriRentItemId}")]
+        public async Task<ActionResult<ApiResult<Rental?>>> ChangeRentItemByStaff([FromRoute] int oriRentItemId, [FromBody] Models.RentItem newRentItem,
+            [FromQuery] string sessionKey, [FromQuery] string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            if (staff == null || staff.title_level < 100)
+            {
+                return Ok(new ApiResult<Rental?>()
+                {
+                    code = 0,
+                    message = "",
+                    data = null
+                });
+            }
+            Models.RentItem oriRentItem = await _db.rentItem.Where(r => r.id == oriRentItemId)
+                .AsNoTracking().FirstOrDefaultAsync();
+            if (oriRentItem == null || oriRentItem.category_id == null 
+                || newRentItem == null || newRentItem.category_id == null
+                || newRentItem.rental_id != oriRentItem.rental_id 
+                || oriRentItem.rental_id == null || newRentItem.rental_id == null)
+            {
+                return Ok(new ApiResult<Rental?>()
+                {
+                    code = 1,
+                    message = "非法租赁物",
+                    data = null
+                });
+            }
+            List<RentCategory> othersCategory = await GetChangeCompatibleCategory((int)oriRentItem.category_id);
+            if (othersCategory.Where(r => r.id == newRentItem.category_id).ToList().Count == 0)
+            {
+                return Ok(new ApiResult<Rental?>()
+                {
+                    code = 1,
+                    message = "分类不符",
+                    data = null
+                });
+            }
+            if (oriRentItem.status != Models.RentItem.RentItemStatus.已发放.ToString())
+            {
+                return Ok(new ApiResult<Rental?>()
+                {
+                    code = 1,
+                    message = "状态不对",
+                    data = null
+                });
+            }
+            Models.RentItem changedItem = await ChangeRentItem(oriRentItem, newRentItem, staff.id, "租赁详情页更换租赁物");
+            if (changedItem == null)
+            {
+                return Ok(new ApiResult<Rental?>()
+                {
+                    code = 1,
+                    message = "更换失败",
+                    data = null
+                });
+            }
+            Rental rental = await GetRental((int)changedItem.rental_id);
+            return Ok(new ApiResult<Rental?>()
+            {
+                code = 0,
+                message = "",
+                data = rental
             });
         }
     }
