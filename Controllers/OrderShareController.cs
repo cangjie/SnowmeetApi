@@ -287,7 +287,7 @@ namespace SnowmeetApi.Controllers
             List<OrderPayment> payments = await _db.orderPayment
                 .Include(p => p.paymentShares.Where(s => s.valid && s.success != null && (bool)s.success).OrderByDescending(s => s.submit_time))
                 .Where(p => p.pay_method == "微信支付" && p.status == "支付成功" && p.need_share == 1 && p.share_close_date == null)
-                .AsNoTracking().ToListAsync();
+                .AsSplitQuery().AsNoTracking().ToListAsync();
             for (int i = 0; i < payments.Count; i++)
             {
                 OrderPayment payment = payments[i];

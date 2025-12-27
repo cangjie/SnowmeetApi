@@ -19,7 +19,7 @@ namespace SnowmeetApi.Models
         [NotMapped]
         public ICollection<RentCategory> children { get; set; }
         [NotMapped]
-        public RentCategory father { get; set; }
+        public RentCategory? father { get; set; } = null;
         public List<RentPrice>? priceList { get; set; }
         public List<RentCategoryInfoField>? infoFields { get; set; }
         public List<RentProduct>? productList { get; set; }

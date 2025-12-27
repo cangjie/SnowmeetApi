@@ -13,8 +13,6 @@ using SKIT.FlurlHttpClient.Wechat.TenpayV3.Models;
 using SnowmeetApi.Controllers.User;
 using SnowmeetApi.Data;
 using SnowmeetApi.Models;
-
-//using SnowmeetApi.Models.Product;
 using SnowmeetApi.Models.Users;
 using System.Text.RegularExpressions;
 using SnowmeetApi.Controllers.Order;
@@ -458,7 +456,6 @@ namespace SnowmeetApi.Controllers.SkiPass
                             {
                                 
                             }
-                            
                         }
                     }
                     

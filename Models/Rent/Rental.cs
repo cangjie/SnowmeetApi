@@ -366,7 +366,7 @@ namespace SnowmeetApi.Models
     [Table("rent_item")]
     public class RentItem
     {
-        public enum RentItemStatus { 未发放, 已发放, 暂存, 已归还 }
+        public enum RentItemStatus { 未发放, 已发放, 暂存, 已归还, 已更换 }
         public enum RentItemBusinessStatus {上架, 维修, 保养, 丢失, 下架, 异地归还 }
         [Key]
         public int id { get; set; }
@@ -379,6 +379,7 @@ namespace SnowmeetApi.Models
         public string? code { get; set; } = null;
         public int? category_id { get; set; } = null;
         public int? prev_id { get; set; } = null;
+        public int? next_id {get; set;} = null;
         public string memo { get; set; } = "";
         public int valid { get; set; } = 0;
         public int? repairation_id { get; set; } = null;

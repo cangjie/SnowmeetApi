@@ -20,6 +20,7 @@ using NPOI.SS.UserModel;
 using NPOI.SS.Formula.Functions;
 using SQLitePCL;
 using Microsoft.CodeAnalysis;
+using NPOI.POIFS.Properties;
 namespace SnowmeetApi.Controllers
 {
     [Route("api/[controller]/[action]")]
@@ -5643,6 +5644,41 @@ namespace SnowmeetApi.Controllers
                 message = "",
                 data = orders
             });
+        }
+        [HttpGet("{categoryId}")]
+        public async Task<ActionResult<ApiResult<List<RentCategory>>>> GetChangeCompatibleCategory(int categoryId)
+        {
+            RentCategory? oriCategory = await _db.rentCategory.Where(c => c.id == categoryId)
+                .Include(c => c.priceList).AsNoTracking().FirstOrDefaultAsync();
+            string oriCode = oriCategory.code;
+            string fatherCode = oriCode.Substring(0, oriCode.Length - 2);
+            if (fatherCode == "")
+            {
+                return Ok(new ApiResult<List<RentCategory>>(){
+                    message = "",
+                    code = 0,
+                    data = new List<RentCategory>(){oriCategory}
+                });
+            }
+            RentCategory? fatherCategory = await _db.rentCategory.Where(c => c.code == fatherCode)
+                .AsNoTracking().FirstOrDefaultAsync();
+            if (fatherCategory == null)
+            {
+                return Ok(new ApiResult<List<RentCategory>>(){
+                    message = "",
+                    code = 0,
+                    data = new List<RentCategory>(){oriCategory}
+                });
+            }
+            oriCategory.father = fatherCategory;
+            List<RentCategory> children = new List<RentCategory>();
+            children.Add(oriCategory);
+            List<RentCategory> others = await _db.rentCategory.Where(c => c.id != oriCategory.id 
+                && c.code.Length == oriCategory.code.Length && c.code.StartsWith(fatherCode))
+                .Include(c => c.priceList)
+                .AsNoTracking().ToListAsync();
+            
+            return BadRequest();
         }
     }
 }
