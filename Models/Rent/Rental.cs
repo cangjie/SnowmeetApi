@@ -541,6 +541,19 @@ namespace SnowmeetApi.Models
                 return returnDate;
             }
         }
+        [NotMapped]
+        public DateTime? changeDate
+        {
+            get
+            {
+                DateTime? changeDate = null;
+                if (availableLog != null && availableLog.Count > 0 && availableLog[availableLog.Count - 1].status == "已更换")
+                {
+                    changeDate = availableLog[availableLog.Count - 1].create_date;
+                }
+                return changeDate;
+            }
+        }
     }
     [Table("rent_item_log")]
     public class RentItemLog
