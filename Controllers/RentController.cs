@@ -4970,7 +4970,7 @@ namespace SnowmeetApi.Controllers
                 .Include(r => r.order)
                 .Include(r => r.guaranties).ThenInclude(g => g.guarantyPayments).ThenInclude(p => p.payment)
                 .AsNoTracking().FirstOrDefaultAsync();
-            rental.rentItems = rental.rentItems.OrderBy(i => i.next_id).ToList();
+            rental.rentItems = rental.rentItems.OrderBy(i => i.next_id).ThenByDescending(i => i.id).ToList();
             for (int i = 0; i < rental.rentItems.Count; i++)
             {
                 Models.RentItem rentItem = rental.rentItems[i];
