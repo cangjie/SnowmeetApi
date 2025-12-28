@@ -36,7 +36,7 @@ namespace SnowmeetApi.Models
         public DateTime create_date { get; set; } = DateTime.Now;
         public List<RentItem> rentItems { get; set; } = new List<RentItem>();
         public List<RentalDetail> details { get; set; } = new List<RentalDetail>();
-        
+
         [NotMapped]
         public double? _filledOverTimeCharge = null;
         public List<RentalPricePreset> pricePresets { get; set; } = null;
@@ -86,7 +86,7 @@ namespace SnowmeetApi.Models
                 {
                     return details.Where(d => d.valid == 1).OrderBy(d => d.rental_date).ToList();
                 }
-                return new List<RentalDetail>();;
+                return new List<RentalDetail>(); ;
             }
         }
         [NotMapped]
@@ -128,9 +128,9 @@ namespace SnowmeetApi.Models
 
         [ForeignKey(nameof(Discount.biz_id))]
         public List<Discount> discounts { get; set; } = new List<Discount>();
-        
 
-        
+
+
         [NotMapped]
         public List<Discount> availableDiscounts
         {
@@ -146,14 +146,14 @@ namespace SnowmeetApi.Models
                 }
             }
         }
-        
+
         public double GetDiscountAmount(bool ticket)
         {
             List<Discount> dList = availableDiscounts
                 .Where(d => (ticket && d.ticket_code != null) || !ticket).ToList();
             return dList.Sum(d => d.amount);
         }
-       
+
         [NotMapped]
         public double ticketDiscountAmount
         {
@@ -162,7 +162,7 @@ namespace SnowmeetApi.Models
                 return GetDiscountAmount(true);
             }
         }
-        
+
         [NotMapped]
         public double othersDiscountAmount
         {
@@ -198,7 +198,7 @@ namespace SnowmeetApi.Models
                 return false;
             }
         }
-        
+
         [NotMapped]
         public double totalGuarantyAmount
         {
@@ -212,7 +212,7 @@ namespace SnowmeetApi.Models
                 return amount;
             }
         }
-        
+
         [NotMapped]
         public double totalRentalAmount
         {
@@ -266,7 +266,7 @@ namespace SnowmeetApi.Models
                 .ToList();
             return dtlList.Sum(d => d.amount);
         }
-        
+
     }
     [Table("rental_detail")]
     public class RentalDetail
@@ -308,8 +308,8 @@ namespace SnowmeetApi.Models
         [ForeignKey(nameof(Discount.sub_biz_id))]
         public List<Discount> discounts { get; set; } = new List<Discount>();
 
-        
-       [NotMapped] 
+
+        [NotMapped]
         public List<Discount> availableDiscounts
         {
             get
@@ -324,7 +324,7 @@ namespace SnowmeetApi.Models
                 }
             }
         }
-        
+
         public double GetDiscountAmount(bool ticket)
         {
             List<Discount> dList = availableDiscounts
@@ -339,7 +339,7 @@ namespace SnowmeetApi.Models
                 return GetDiscountAmount(true);
             }
         }
-        
+
         [NotMapped]
         public double othersDiscountAmount
         {
@@ -367,7 +367,7 @@ namespace SnowmeetApi.Models
     public class RentItem
     {
         public enum RentItemStatus { 未发放, 已发放, 暂存, 已归还, 已更换 }
-        public enum RentItemBusinessStatus {上架, 维修, 保养, 丢失, 下架, 异地归还 }
+        public enum RentItemBusinessStatus { 上架, 维修, 保养, 丢失, 下架, 异地归还 }
         [Key]
         public int id { get; set; }
         public int? rental_id { get; set; } = null;
@@ -379,7 +379,7 @@ namespace SnowmeetApi.Models
         public string? code { get; set; } = null;
         public int? category_id { get; set; } = null;
         public int? prev_id { get; set; } = null;
-        public int? next_id {get; set;} = null;
+        public int? next_id { get; set; } = null;
         public string memo { get; set; } = "";
         public int valid { get; set; } = 0;
         public int? repairation_id { get; set; } = null;
@@ -554,6 +554,18 @@ namespace SnowmeetApi.Models
                 return changeDate;
             }
         }
+        [NotMapped]
+        public Staff? changeStaff
+        {
+            get
+            {
+                if (availableLog != null && availableLog.Count > 0 && availableLog[availableLog.Count - 1].status == "已更换")
+                {
+                    return availableLog[availableLog.Count - 1].staff;
+                }
+                return null;
+            }
+        }
     }
     [Table("rent_item_log")]
     public class RentItemLog
@@ -593,4 +605,4 @@ namespace SnowmeetApi.Models
         public RentCategory? category { get; set; } = null;
         public List<RentItem> items { get; set; } = new List<RentItem>();
     }
-} 
+}
