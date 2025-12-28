@@ -5767,9 +5767,7 @@ namespace SnowmeetApi.Controllers
             Models.RentItem oriRentItem = await _db.rentItem.Where(r => r.id == oriRentItemId)
                 .AsNoTracking().FirstOrDefaultAsync();
             if (oriRentItem == null || oriRentItem.category_id == null 
-                || newRentItem == null || newRentItem.category_id == null
-                || newRentItem.rental_id != oriRentItem.rental_id 
-                || oriRentItem.rental_id == null || newRentItem.rental_id == null)
+                || newRentItem == null || newRentItem.category_id == null)
             {
                 return Ok(new ApiResult<Rental?>()
                 {
@@ -5778,6 +5776,7 @@ namespace SnowmeetApi.Controllers
                     data = null
                 });
             }
+            newRentItem.rental_id = oriRentItem.rental_id;
             List<RentCategory> othersCategory = await GetChangeCompatibleCategory((int)oriRentItem.category_id);
             if (othersCategory.Where(r => r.id == newRentItem.category_id).ToList().Count == 0)
             {
