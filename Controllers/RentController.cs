@@ -4970,6 +4970,7 @@ namespace SnowmeetApi.Controllers
                 .Include(r => r.order)
                 .Include(r => r.guaranties).ThenInclude(g => g.guarantyPayments).ThenInclude(p => p.payment)
                 .AsNoTracking().FirstOrDefaultAsync();
+            rental.rentItems = rental.rentItems.OrderBy(i => i.next_id).ToList();
             for (int i = 0; i < rental.rentItems.Count; i++)
             {
                 Models.RentItem rentItem = rental.rentItems[i];
@@ -5705,6 +5706,9 @@ namespace SnowmeetApi.Controllers
             Models.RentItem newItem, int? staffId, string? scene = null)
         {
             newItem.valid = 0;
+            newItem.category = null;
+            newItem.rental = null;
+            newItem.logs = null;
             await _db.AddAsync(newItem);
             int i = await _db.SaveChangesAsync();
             if (i != 1)
@@ -5765,7 +5769,7 @@ namespace SnowmeetApi.Controllers
                 });
             }
             Models.RentItem oriRentItem = await _db.rentItem.Where(r => r.id == oriRentItemId)
-                .AsNoTracking().FirstOrDefaultAsync();
+                .Include(r => r.logs).AsNoTracking().FirstOrDefaultAsync();
             if (oriRentItem == null || oriRentItem.category_id == null 
                 || newRentItem == null || newRentItem.category_id == null)
             {
