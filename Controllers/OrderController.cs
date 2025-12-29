@@ -52,7 +52,7 @@ namespace SnowmeetApi.Controllers
                     .ThenInclude(i => i.logs.OrderByDescending(o => o.id))
                         .ThenInclude(l => l.staff)
                 .Include(r => r.guaranties.Where(g => g.valid == 1 && g.biz_type.Trim().Equals("租赁"))).ThenInclude(g => g.guarantyPayments).ThenInclude(g => g.payment)
-                .Where(r => r.valid == 1 && (r.appending == null || (r.appending == false && r.appent_commit_time != null))  ).AsNoTracking().ToListAsync();
+                .Where(r => r.valid == 1 && (r.appending == null || (r.appending == false && r.append_commit_time != null))  ).AsNoTracking().ToListAsync();
             order.skipasses = await _db.order.Entry(order).Collection(o => o.skipasses).Query()
                 .Where(s => s.valid == 1).Include(s => s.skiPassProduct).ThenInclude(p => p.dailyPrice).AsNoTracking().ToListAsync();
             order.discounts = await _db.order.Entry(order).Collection(o => o.discounts).Query().Where(d => d.valid == 1).ToListAsync();
@@ -113,9 +113,9 @@ namespace SnowmeetApi.Controllers
                         && o.valid == 1 && (orderId == null || o.id == orderId)
                         && (closeStartDate == null || (o.close_date != null && ((DateTime)o.close_date).Date >= ((DateTime)closeStartDate).Date))
                         && (closeEndDate == null || (o.close_date != null && ((DateTime)o.close_date).Date <= ((DateTime)closeEndDate).Date)))
-                    .Include(o => o.rentals.Where(r => r.valid == 1 && (r.appending == null || (r.appending == false && r.appent_commit_time != null)) )).ThenInclude(r => r.details.Where(d => d.valid == 1)).ThenInclude(d => d.discounts.Where(d => d.valid == 1 && d.sub_biz_type == "日租金"))
-                    .Include(o => o.rentals.Where(r => r.valid == 1 && (r.appending == null || (r.appending == false && r.appent_commit_time != null)) )).ThenInclude(r => r.discounts.Where(d => d.valid == 1 && d.biz_type == "租赁"))
-                    .Include(o => o.rentals.Where(r => r.valid == 1 && (r.appending == null || (r.appending == false && r.appent_commit_time != null)) )).ThenInclude(r => r.rentItems.Where(r => r.valid == 1))
+                    .Include(o => o.rentals.Where(r => r.valid == 1 && (r.appending == null || (r.appending == false && r.append_commit_time != null)) )).ThenInclude(r => r.details.Where(d => d.valid == 1)).ThenInclude(d => d.discounts.Where(d => d.valid == 1 && d.sub_biz_type == "日租金"))
+                    .Include(o => o.rentals.Where(r => r.valid == 1 && (r.appending == null || (r.appending == false && r.append_commit_time != null)) )).ThenInclude(r => r.discounts.Where(d => d.valid == 1 && d.biz_type == "租赁"))
+                    .Include(o => o.rentals.Where(r => r.valid == 1 && (r.appending == null || (r.appending == false && r.append_commit_time != null)) )).ThenInclude(r => r.rentItems.Where(r => r.valid == 1))
                     .Include(o => o.payments).ThenInclude(p => p.staff)
                     .Include(o => o.payments).ThenInclude(p => p.refunds)
                     .Include(o => o.refunds)
