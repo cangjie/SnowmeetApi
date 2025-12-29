@@ -78,7 +78,7 @@ namespace SnowmeetApi.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<object>>> GetSkiPassProduct(string resort, DateTime date, string tags, int showAll = 0)
         {
-            if (date == DateTime.Parse("2026-1-1") )
+            if (date >= DateTime.Parse("2026-1-1") && date <= DateTime.Parse("2026-1-2") )
             {
                 tags = "节假日";
             }
