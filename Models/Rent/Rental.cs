@@ -32,11 +32,12 @@ namespace SnowmeetApi.Models
         public bool entertain { get; set; } = false;
         public int? staff_id { get; set; } = null;
         public bool experience { get; set; } = false;
+        public bool? appending {get; set;} = true;
+        public DateTime? appent_commit_time {get; set;} = null;
         public DateTime? update_date { get; set; } = null;
         public DateTime create_date { get; set; } = DateTime.Now;
         public List<RentItem> rentItems { get; set; } = new List<RentItem>();
         public List<RentalDetail> details { get; set; } = new List<RentalDetail>();
-
         [NotMapped]
         public double? _filledOverTimeCharge = null;
         public List<RentalPricePreset> pricePresets { get; set; } = null;
