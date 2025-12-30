@@ -61,9 +61,8 @@ namespace SnowmeetApi.Controllers
         [HttpGet("{productId}")]
         public async Task<ActionResult<Product>> SetHidden(int productId, int hidden, string sessionKey, string sessionType = "wechat_mini_openid")
         {
-            MemberController _memberHelper = new MemberController(_context, _oriConfig);
-            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
-            if (member.is_admin != 1)
+            Staff staff = await Util.GetStaffBySessionKey(_context, sessionKey, sessionType);
+            if (staff == null || staff.title_level < 100)
             {
                 return BadRequest();
             }
