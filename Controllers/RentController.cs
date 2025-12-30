@@ -5900,9 +5900,12 @@ namespace SnowmeetApi.Controllers
         [NonAction]
         public async Task<Models.Order> AppendPackage(Models.Order order, int packageId)
         {
+            RentPackage package = await _db.rentPackage.Include(p => p.rentPackageCategoryList)
+                .Where(p => p.id == packageId).AsNoTracking().FirstOrDefaultAsync();
             Models.Rental rental = new Rental()
             {
                 id = 0,
+                name = package.name,
                 order_id = order.id,
                 start_date = DateTime.Now.Date,
                 package_id = packageId,
@@ -5910,8 +5913,7 @@ namespace SnowmeetApi.Controllers
                 appending = true,
                 create_date = DateTime.Now
             };
-            RentPackage package = await _db.rentPackage.Include(p => p.rentPackageCategoryList)
-                .Where(p => p.id == packageId).AsNoTracking().FirstOrDefaultAsync();
+            
             for(int i = 0; i < package.categories.Count; i++)
             {
                 Models.RentItem item = new Models.RentItem()
