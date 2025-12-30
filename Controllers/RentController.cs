@@ -5819,8 +5819,8 @@ namespace SnowmeetApi.Controllers
             });
         }
         [HttpGet("orderId")]
-        public async Task<ActionResult<ApiResult<Models.Order>>> AppendRental(int orderId, int? categoryId, int? packageId,
-            string sessionKey, string sessionType = "wechat_mini_openid")
+        public async Task<ActionResult<ApiResult<Models.Order>>> AppendRental(int orderId, string sessionKey, 
+            int? categoryId = null, int? packageId = null, string sessionType = "wechat_mini_openid")
         {
             if ((categoryId == null && packageId == null) || (categoryId != null && packageId != null))
             {
