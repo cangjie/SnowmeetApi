@@ -5818,7 +5818,7 @@ namespace SnowmeetApi.Controllers
                 data = rental
             });
         }
-        [HttpGet("orderId")]
+        [HttpGet("{orderId}")]
         public async Task<ActionResult<ApiResult<Models.Order>>> AppendRental(int orderId, string sessionKey, 
             int? categoryId = null, int? packageId = null, string sessionType = "wechat_mini_openid")
         {
