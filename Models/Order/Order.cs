@@ -120,7 +120,7 @@ namespace SnowmeetApi.Models
         public List<Care> cares { get; set; } = new List<Care>();
         public List<Rental> rentals { get; set; } = new List<Rental>();
         [NotMapped]
-        public List<Retail> appendingRetails { get; set; } = new List<Retail>();
+        public List<Rental> appendingRentals { get; set; } = new List<Rental>();
         public List<FdOrder> fdOrders { get; set; } = new List<FdOrder>();
         public List<OrderPayment>? payments { get; set; } = new List<OrderPayment>();
         public List<OrderPaymentRefund>? refunds { get; set; } = new List<OrderPaymentRefund>();

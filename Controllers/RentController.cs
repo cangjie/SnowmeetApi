@@ -5818,5 +5818,118 @@ namespace SnowmeetApi.Controllers
                 data = rental
             });
         }
+        [HttpGet("orderId")]
+        public async Task<ActionResult<ApiResult<Models.Order>>> AppendRental(int orderId, int? categoryId, int? packageId,
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            if ((categoryId == null && packageId == null) || (categoryId != null && packageId != null))
+            {
+                return Ok(new ApiResult<List<Models.Order>?>()
+                {
+                    code = 1,
+                    message = "添加为空",
+                    data = null
+                });
+            }
+
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            if (staff == null || staff.title_level < 100)
+            {
+                return Ok(new ApiResult<List<Models.Order>?>()
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = null
+                });
+            }
+            OrderController _orderHelper = new OrderController(_db, _config, _httpContextAccessor);
+            Models.Order order = await _orderHelper.GetOrder(orderId);
+            if (order.type != "租赁")
+            {
+                return Ok(new ApiResult<List<Models.Order>?>()
+                {
+                    code = 1,
+                    message = "订单类型不符",
+                    data = null
+                });
+            }
+            if (packageId != null)
+            {
+                order = await AppendPackage(order, (int)packageId);
+            }
+            if (categoryId != null)
+            {
+                order = await AppendCategory(order, (int)categoryId);
+            }
+            return Ok(new ApiResult<Models.Order>()
+            {
+                code = 0,
+                message = "",
+                data = order
+            });
+        }
+        [NonAction]
+        public async Task<Models.Order> AppendCategory(Models.Order order, int categoryId)
+        {
+            Models.Rental rental = new Rental()
+            {
+                id = 0,
+                order_id = order.id,
+                start_date = DateTime.Now.Date,
+                category_id = categoryId,
+                valid = 1,
+                appending = true,
+                create_date = DateTime.Now
+            };
+            Models.RentItem item = new Models.RentItem()
+            {
+                id = 0,
+                category_id = categoryId,
+                rental_id = rental.id,
+                valid = 1,
+                create_date = DateTime.Now
+            };
+            rental.rentItems.Add(item);
+            await _db.rental.AddAsync(rental);
+            await _db.SaveChangesAsync();
+            order.appendingRentals.Add(rental);
+            _db.rental.Entry(rental).State = EntityState.Modified;
+            await _db.SaveChangesAsync();
+            return order;
+        }
+        [NonAction]
+        public async Task<Models.Order> AppendPackage(Models.Order order, int packageId)
+        {
+            Models.Rental rental = new Rental()
+            {
+                id = 0,
+                order_id = order.id,
+                start_date = DateTime.Now.Date,
+                package_id = packageId,
+                valid = 1,
+                appending = true,
+                create_date = DateTime.Now
+            };
+            RentPackage package = await _db.rentPackage.Include(p => p.categories)
+                .Where(p => p.id == packageId).AsNoTracking().FirstOrDefaultAsync();
+            for(int i = 0; i < package.categories.Count; i++)
+            {
+                Models.RentItem item = new Models.RentItem()
+                {
+                    id = 0,
+                    rental_id = rental.id,
+                    category_id = package.categories[i].id,
+                    valid = 1,
+                    create_date = DateTime.Now
+                };
+                rental.rentItems.Add(item);
+            }
+            await _db.rental.AddAsync(rental);
+            await _db.SaveChangesAsync();
+            _db.rental.Entry(rental).State = EntityState.Modified;
+            await _db.SaveChangesAsync();
+            order.appendingRentals.Add(rental);
+            return order;
+        }
     }
 }
