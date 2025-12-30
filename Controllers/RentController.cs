@@ -5871,6 +5871,7 @@ namespace SnowmeetApi.Controllers
         [NonAction]
         public async Task<Models.Order> AppendCategory(Models.Order order, int categoryId)
         {
+            RentCategory category = await _db.rentCategory.Where(c => c.id == categoryId).AsNoTracking().FirstOrDefaultAsync();
             Models.Rental rental = new Rental()
             {
                 id = 0,
@@ -5879,6 +5880,7 @@ namespace SnowmeetApi.Controllers
                 category_id = categoryId,
                 valid = 1,
                 appending = true,
+                name = category.name,
                 create_date = DateTime.Now
             };
             Models.RentItem item = new Models.RentItem()
