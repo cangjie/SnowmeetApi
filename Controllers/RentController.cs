@@ -5910,7 +5910,7 @@ namespace SnowmeetApi.Controllers
                 appending = true,
                 create_date = DateTime.Now
             };
-            RentPackage package = await _db.rentPackage.Include(p => p.categories)
+            RentPackage package = await _db.rentPackage.Include(p => p.rentPackageCategoryList)
                 .Where(p => p.id == packageId).AsNoTracking().FirstOrDefaultAsync();
             for(int i = 0; i < package.categories.Count; i++)
             {
