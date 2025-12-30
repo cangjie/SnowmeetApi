@@ -5887,6 +5887,7 @@ namespace SnowmeetApi.Controllers
             {
                 id = 0,
                 category_id = categoryId,
+                category = category,
                 rental_id = rental.id,
                 valid = 1,
                 create_date = DateTime.Now
@@ -5902,7 +5903,8 @@ namespace SnowmeetApi.Controllers
         [NonAction]
         public async Task<Models.Order> AppendPackage(Models.Order order, int packageId)
         {
-            RentPackage package = await _db.rentPackage.Include(p => p.rentPackageCategoryList)
+            RentPackage package = await _db.rentPackage
+                .Include(p => p.rentPackageCategoryList).ThenInclude(c => c.rentCategory)
                 .Where(p => p.id == packageId).AsNoTracking().FirstOrDefaultAsync();
             Models.Rental rental = new Rental()
             {
@@ -5923,6 +5925,7 @@ namespace SnowmeetApi.Controllers
                     id = 0,
                     rental_id = rental.id,
                     category_id = package.rentPackageCategoryList[i].category_id,
+                    category = package.rentPackageCategoryList[i].rentCategory,
                     valid = 1,
                     create_date = DateTime.Now
                 };
