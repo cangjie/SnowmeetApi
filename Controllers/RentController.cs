@@ -5914,7 +5914,7 @@ namespace SnowmeetApi.Controllers
                 create_date = DateTime.Now
             };
             
-            for(int i = 0; i < package.categories.Count; i++)
+            for(int i = 0; i < package.rentPackageCategoryList.Count; i++)
             {
                 Models.RentItem item = new Models.RentItem()
                 {
