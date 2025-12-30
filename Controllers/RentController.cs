@@ -5918,7 +5918,7 @@ namespace SnowmeetApi.Controllers
                 {
                     id = 0,
                     rental_id = rental.id,
-                    category_id = package.categories[i].id,
+                    category_id = package.rentPackageCategoryList[i].category_id,
                     valid = 1,
                     create_date = DateTime.Now
                 };
