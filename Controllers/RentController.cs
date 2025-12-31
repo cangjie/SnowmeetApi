@@ -5888,7 +5888,7 @@ namespace SnowmeetApi.Controllers
             {
                 id = 0,
                 category_id = categoryId,
-                category = category,
+                //category = category,
                 rental_id = rental.id,
                 valid = 1,
                 create_date = DateTime.Now
@@ -5896,6 +5896,7 @@ namespace SnowmeetApi.Controllers
             rental.rentItems.Add(item);
             await _db.rental.AddAsync(rental);
             await _db.SaveChangesAsync();
+            item.category = category;
             order.appendingRentals.Add(rental);
             _db.rental.Entry(rental).State = EntityState.Modified;
             await _db.SaveChangesAsync();
@@ -5927,7 +5928,7 @@ namespace SnowmeetApi.Controllers
                     id = 0,
                     rental_id = rental.id,
                     category_id = package.rentPackageCategoryList[i].category_id,
-                    category = package.rentPackageCategoryList[i].rentCategory,
+                    //category = package.rentPackageCategoryList[i].rentCategory,
                     valid = 1,
                     create_date = DateTime.Now
                 };
@@ -5935,6 +5936,11 @@ namespace SnowmeetApi.Controllers
             }
             await _db.rental.AddAsync(rental);
             await _db.SaveChangesAsync();
+            for(int i = 0; i < rental.rentItems.Count; i++)
+            {
+                Models.RentItem item = rental.rentItems[i];
+                item.category = (package.rentPackageCategoryList.Where(c => c.category_id == item.category_id).FirstOrDefault()).rentCategory;
+            }
             _db.rental.Entry(rental).State = EntityState.Modified;
             await _db.SaveChangesAsync();
             order.appendingRentals.Add(rental);
