@@ -151,6 +151,7 @@ namespace SnowmeetApi.Controllers
                     .Include(o => o.member).ThenInclude(m => m.memberSocialAccounts)
                     .Where(o =>  ((o.retails.Any(r => r.retail_type == retailType) || retailType == null) ))
                     .OrderByDescending(o => o.id).AsSplitQuery().AsNoTracking().ToListAsync();
+                    //orderList = orderList.Where(o =>  ((o.retails.Any(r => r.retail_type == retailType) || retailType == null) )).ToList();
                     break;
                 case "养护":
                     orderList = await _db.order.Where(o => (o.biz_date.Date >= ((DateTime)startDate).Date && o.biz_date.Date <= ((DateTime)endDate).Date)
