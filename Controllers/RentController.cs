@@ -5881,6 +5881,7 @@ namespace SnowmeetApi.Controllers
                 valid = 1,
                 appending = true,
                 name = category.name,
+                guaranty = category.deposit,
                 create_date = DateTime.Now
             };
             Models.RentItem item = new Models.RentItem()
@@ -5915,6 +5916,7 @@ namespace SnowmeetApi.Controllers
                 package_id = packageId,
                 valid = 1,
                 appending = true,
+                guaranty = package.deposit,
                 create_date = DateTime.Now
             };
             
