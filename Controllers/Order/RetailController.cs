@@ -24,6 +24,7 @@ namespace SnowmeetApi.Controllers
             _db = context;
             _config = config;
         }
+        /*
         [HttpGet]
         public async Task ExportMi7Order(DateTime startDate)
         {
@@ -724,6 +725,9 @@ namespace SnowmeetApi.Controllers
                 workbook.Write(file);
             }
         }
+        */
+
+        /*
         [HttpGet]
         public async Task<ActionResult<List<Models.Retail1>>> ShowMi7Order(DateTime startDate)
         {
@@ -781,6 +785,7 @@ namespace SnowmeetApi.Controllers
             List<Retail1> newList = retailList.OrderBy(r => r.orders[0].create_date).ToList();
             return Ok(newList);
         }
+        */
         [HttpGet("{mi7Code}")]
         public async Task<ActionResult<ApiResult<List<Retail>?>>> GetOrdersByMi7Code(string mi7Code,
             string sessionKey, string sessionType = "wechat_mini_openid")

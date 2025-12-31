@@ -58,6 +58,7 @@ namespace SnowmeetApi.Models
         public int valid {get; set;} = 1;
         public int giveup_score { get; set; } = 0;
         public string memo { get; set; } = "";
+        public string? retail_type {get; set;} = null;
         //public bool entertain { get; set; } = false;
         public DateTime? update_date { get; set; } = null;
         public DateTime create_date {get; set;} = DateTime.Now;
