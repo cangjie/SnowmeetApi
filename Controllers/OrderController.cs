@@ -884,7 +884,7 @@ namespace SnowmeetApi.Controllers
                 //startDate = DateTime.Parse("2025-11-01");
             }
             List<SnowmeetApi.Models.Order> orders = await GetCommonOrders(orderId, shop, null, null, type, startDate, endDate, payOption,
-            isTest, isEntertain, isPackage, isOnCredit, haveDiscount, status, null, null, haveWarranty);
+            isTest, isEntertain, isPackage, isOnCredit, haveDiscount, status, null, null, haveWarranty, retailType);
             List<SnowmeetApi.Models.Order> newOrders = new List<Models.Order>();
             if (cell != null)
             {
