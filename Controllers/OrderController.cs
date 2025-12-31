@@ -107,7 +107,7 @@ namespace SnowmeetApi.Controllers
             int? staffId, string? type, DateTime? startDate, DateTime? endDate, string? payOption = null,
             bool? isTest = null, bool? isEntertain = null, bool? isPackage = null, bool? isOnCredit = null,
             bool? haveDiscount = null, string? status = null, DateTime? closeStartDate = null, DateTime? closeEndDate = null,
-            bool? haveWarranty = null)
+            bool? haveWarranty = null, string? retailType = null)
         {
             startDate = startDate == null ? DateTime.MinValue : startDate;
             endDate = endDate == null ? DateTime.MaxValue : endDate;
@@ -149,8 +149,8 @@ namespace SnowmeetApi.Controllers
                     .Include(o => o.guarantys.Where(g => g.valid == 1)).ThenInclude(g => g.guarantyPayments)//.ThenInclude(g => g.payment)
                     .Include(o => o.staff)
                     .Include(o => o.member).ThenInclude(m => m.memberSocialAccounts)
+                    .Where(o =>  ((o.retails.Any(r => r.retail_type == retailType) || retailType == null) ))
                     .OrderByDescending(o => o.id).AsSplitQuery().AsNoTracking().ToListAsync();
-
                     break;
                 case "养护":
                     orderList = await _db.order.Where(o => (o.biz_date.Date >= ((DateTime)startDate).Date && o.biz_date.Date <= ((DateTime)endDate).Date)
@@ -865,7 +865,7 @@ namespace SnowmeetApi.Controllers
             string? shop, string? type, string? subType, DateTime? startDate, DateTime? endDate, string sessionKey,
             string? payOption, string sessionType = "wechat_mini_openid", bool? isTest = null, bool? isEntertain = null,
             bool? isPackage = null, bool? isOnCredit = null, bool? haveDiscount = null, string? status = null,
-            string? cell = null, bool? haveWarranty = null)
+            string? cell = null, bool? haveWarranty = null, string? retailType = null)
         {
             //startDate = DateTime.Parse("2025-10-27");
             StaffController _staffHelper = new StaffController(_db);
