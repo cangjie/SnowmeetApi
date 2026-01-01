@@ -4968,6 +4968,7 @@ namespace SnowmeetApi.Controllers
                 .Include(r => r.guaranties).ThenInclude(g => g.guarantyPayments).ThenInclude(p => p.payment)
                 .AsNoTracking().FirstOrDefaultAsync();
             rental.rentItems = rental.rentItems.OrderBy(i => i.next_id).ThenByDescending(i => i.id).ToList();
+            /*
             Models.Order order = await _db.order.Where(o => o.id == rental.order_id).AsNoTracking().FirstOrDefaultAsync();
             Shop shop = await _db.shop.Where(s => s.name == order.shop).AsNoTracking().FirstOrDefaultAsync();
             if (rental.category_id == null)
@@ -4982,6 +4983,7 @@ namespace SnowmeetApi.Controllers
                     .Where(p => p.category_id == rental.category_id && p.valid == 1 && p.shop_id == shop.id)
                     .AsNoTracking().ToListAsync();
             }
+            */
             for (int i = 0; i < rental.rentItems.Count; i++)
             {
                 Models.RentItem rentItem = rental.rentItems[i];
