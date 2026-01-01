@@ -4958,7 +4958,6 @@ namespace SnowmeetApi.Controllers
         {
             Models.Rental rental = await _db.rental.Where(r => r.id == rentalId)
                 .Include(r => r.staff)
-                //.Include(r => r.rentItems).ThenInclude(i => i.repairationCharges)
                 .Include(r => r.rentItems).ThenInclude(i => i.logs).ThenInclude(l => l.staff)
                 .Include(r => r.rentItems).ThenInclude(i => i.category)
                 .Include(r => r.details).ThenInclude(d => d.rentPrice)
@@ -4969,6 +4968,20 @@ namespace SnowmeetApi.Controllers
                 .Include(r => r.guaranties).ThenInclude(g => g.guarantyPayments).ThenInclude(p => p.payment)
                 .AsNoTracking().FirstOrDefaultAsync();
             rental.rentItems = rental.rentItems.OrderBy(i => i.next_id).ThenByDescending(i => i.id).ToList();
+            Models.Order order = await _db.order.Where(o => o.id == rental.order_id).AsNoTracking().FirstOrDefaultAsync();
+            Shop shop = await _db.shop.Where(s => s.name == order.shop).AsNoTracking().FirstOrDefaultAsync();
+            if (rental.category_id == null)
+            {
+                rental.priceList = await _db.rentPrice
+                    .Where(p => p.package_id == rental.package_id && p.valid == 1 && p.shop_id == shop.id)
+                    .AsNoTracking().ToListAsync();
+            }
+            else
+            {
+                rental.priceList = await _db.rentPrice
+                    .Where(p => p.category_id == rental.category_id && p.valid == 1 && p.shop_id == shop.id)
+                    .AsNoTracking().ToListAsync();
+            }
             for (int i = 0; i < rental.rentItems.Count; i++)
             {
                 Models.RentItem rentItem = rental.rentItems[i];
@@ -5912,7 +5925,7 @@ namespace SnowmeetApi.Controllers
                 scene = scene
             };
             rental.pricePresets = new List<RentalPricePreset>() {preset};
-            
+
             Models.RentItem item = new Models.RentItem()
             {
                 id = 0,
@@ -5926,9 +5939,13 @@ namespace SnowmeetApi.Controllers
             await _db.rental.AddAsync(rental);
             await _db.SaveChangesAsync();
             item.category = category;
-            order.appendingRentals.Add(rental);
+            
             _db.rental.Entry(rental).State = EntityState.Modified;
             await _db.SaveChangesAsync();
+            rental.priceList = await _db.rentPrice.Where(p => (p.valid == 1 && p.category_id == categoryId && p.shop_id == shop.id))
+                .AsNoTracking().ToListAsync();
+
+            order.appendingRentals.Add(rental);
             return order;
         }
         [NonAction]
@@ -6001,6 +6018,9 @@ namespace SnowmeetApi.Controllers
             }
             _db.rental.Entry(rental).State = EntityState.Modified;
             await _db.SaveChangesAsync();
+            rental.priceList = await _db.rentPrice.Where(p => p.package_id == packageId && p.valid == 1 && p.shop_id == shop.id)
+                .AsNoTracking().ToListAsync();
+
             order.appendingRentals.Add(rental);
             return order;
         }
