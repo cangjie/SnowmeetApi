@@ -116,22 +116,10 @@ namespace SnowmeetApi.Models
         public SnowmeetApi.Models.Order? order { get; set; }
         [ForeignKey(nameof(Guaranty.biz_id))]
         public List<Guaranty> guaranties { get; set; } = new List<Guaranty>();
-
-
-
-
-
-
         [ForeignKey("package_id")]
         public RentPackage? package { get; set; } = null;
-
-
-
         [ForeignKey(nameof(Discount.biz_id))]
         public List<Discount> discounts { get; set; } = new List<Discount>();
-
-
-
         [NotMapped]
         public List<Discount> availableDiscounts
         {
@@ -163,7 +151,6 @@ namespace SnowmeetApi.Models
                 return GetDiscountAmount(true);
             }
         }
-
         [NotMapped]
         public double othersDiscountAmount
         {

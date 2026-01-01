@@ -4641,8 +4641,6 @@ namespace SnowmeetApi.Controllers
             List<Models.Order> orders = await _db.order
                 .Include(o => o.staff)
                 .Include(o => o.member).ThenInclude(m => m.memberSocialAccounts)
-                //.Include(o => o.rentals).ThenInclude(r => r.rentItems)
-                //.Include(o => o.rentals).ThenInclude(r => r.pricePresets)
                 .Where(o => o.shop.Trim().Equals(shop) && o.valid == 0 && o.recepting == 1 && o.create_date.Date == DateTime.Now.Date)
                 .OrderByDescending(o => o.id).AsNoTracking().ToListAsync();
             return Ok(new ApiResult<List<Models.Order>?>()
@@ -5871,6 +5869,23 @@ namespace SnowmeetApi.Controllers
         [NonAction]
         public async Task<Models.Order> AppendCategory(Models.Order order, int categoryId)
         {
+            Shop shop = await _db.shop.Where(s => s.name == order.shop).FirstOrDefaultAsync();
+            
+            string dayType = "平日";
+            string scene = "门市";
+            DateTime nowDate = DateTime.Now.Date;
+            switch(nowDate.DayOfWeek)
+            {
+                case DayOfWeek.Sunday:
+                case DayOfWeek.Saturday:
+                    dayType = "周末";
+                    break;
+                default:
+                    break;
+            }
+            RentPrice price = await _db.rentPrice
+                .Where(p => p.category_id == categoryId && p.shop_id == shop.id && p.scene == scene && p.rent_type == "日场" && p.day_type == dayType )
+                    .AsNoTracking().FirstOrDefaultAsync();
             RentCategory category = await _db.rentCategory.Where(c => c.id == categoryId).AsNoTracking().FirstOrDefaultAsync();
             Models.Rental rental = new Rental()
             {
@@ -5885,6 +5900,19 @@ namespace SnowmeetApi.Controllers
                 expectDays = 1,
                 create_date = DateTime.Now
             };
+            RentalPricePreset preset = new RentalPricePreset()
+            {
+                id = 0,
+                rental_id = rental.id,
+                rent_type = price.rent_type,
+                rent_date = DateTime.Now.Date,
+                price = (double)price.price,
+                discount = 0,
+                day_type = dayType,
+                scene = scene
+            };
+            rental.pricePresets = new List<RentalPricePreset>() {preset};
+            
             Models.RentItem item = new Models.RentItem()
             {
                 id = 0,
@@ -5909,6 +5937,23 @@ namespace SnowmeetApi.Controllers
             RentPackage package = await _db.rentPackage
                 .Include(p => p.rentPackageCategoryList).ThenInclude(c => c.rentCategory)
                 .Where(p => p.id == packageId).AsNoTracking().FirstOrDefaultAsync();
+            Shop shop = await _db.shop.Where(s => s.name == order.shop).FirstOrDefaultAsync();
+            string dayType = "平日";
+            string scene = "门市";
+            DateTime nowDate = DateTime.Now.Date;
+            switch(nowDate.DayOfWeek)
+            {
+                case DayOfWeek.Sunday:
+                case DayOfWeek.Saturday:
+                    dayType = "周末";
+                    break;
+                default:
+                    break;
+            }
+            RentPrice price = await _db.rentPrice
+                .Where(p => p.package_id == packageId && p.shop_id == shop.id && p.scene == scene && p.rent_type == "日场" && p.day_type == dayType )
+                    .AsNoTracking().FirstOrDefaultAsync();
+            
             Models.Rental rental = new Rental()
             {
                 id = 0,
@@ -5922,7 +5967,18 @@ namespace SnowmeetApi.Controllers
                 expectDays = 1,
                 create_date = DateTime.Now
             };
-            
+            RentalPricePreset preset = new RentalPricePreset()
+            {
+                id = 0,
+                rental_id = rental.id,
+                rent_type = price.rent_type,
+                rent_date = DateTime.Now.Date,
+                price = (double)price.price,
+                discount = 0,
+                day_type = dayType,
+                scene = scene
+            };
+            rental.pricePresets = new List<RentalPricePreset>() {preset};
             for(int i = 0; i < package.rentPackageCategoryList.Count; i++)
             {
                 Models.RentItem item = new Models.RentItem()
