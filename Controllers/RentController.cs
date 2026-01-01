@@ -6028,5 +6028,35 @@ namespace SnowmeetApi.Controllers
             order.appendingRentals.Add(rental);
             return order;
         }
+        [HttpGet("{rentalId}")]
+        public async Task<ActionResult<ApiResult<Models.Order>>> RemoveAppendingRental(int rentalId, 
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            if (staff == null || staff.title_level < 100)
+            {
+                return Ok(new ApiResult<List<Models.Order>?>()
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = null
+                });
+            }
+            Rental rental = await _db.rental
+                .Where(r => r.id == rentalId && r.appending == true && r.append_commit_time == null)
+                .AsNoTracking().FirstOrDefaultAsync();
+            rental.valid = 0;
+            _db.rental.Entry(rental).State = EntityState.Modified;
+            await _db.SaveChangesAsync();
+            OrderController _orderH = new OrderController(_db, _config, _httpContextAccessor);
+            Models.Order order = await _orderH.GetOrder((int)rental.order_id);
+            return Ok(new ApiResult<Models.Order>()
+            {
+                code = 0,
+                message = "",
+                data = order
+            });
+        }
+
     }
 }
