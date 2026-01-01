@@ -5935,6 +5935,7 @@ namespace SnowmeetApi.Controllers
                 //category = category,
                 rental_id = rental.id,
                 valid = 1,
+                noCode = true,
                 create_date = DateTime.Now
             };
             rental.rentItems.Add(item);
@@ -6007,6 +6008,7 @@ namespace SnowmeetApi.Controllers
                     category_id = package.rentPackageCategoryList[i].category_id,
                     //category = package.rentPackageCategoryList[i].rentCategory,
                     valid = 1,
+                    noCode = true,
                     create_date = DateTime.Now
                 };
                 rental.rentItems.Add(item);
