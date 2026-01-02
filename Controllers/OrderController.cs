@@ -62,7 +62,7 @@ namespace SnowmeetApi.Controllers
                 .Include(r => r.pricePresets)
                 .Include(r => r.rentItems.Where(i => i.valid == 1)).ThenInclude(r => r.category)
                 .Include(r => r.guaranties.Where(g => g.valid == 1 && g.biz_type.Trim().Equals("租赁"))).ThenInclude(g => g.guarantyPayments).ThenInclude(g => g.payment)
-                .Where(r => r.valid == 1 && r.appending == true).AsNoTracking().ToListAsync();
+                .Where(r => r.valid == 1 && r.appending != null && r.append_commit_time == null).AsNoTracking().ToListAsync();
             if (order.appendingRentals != null && order.appendingRentals.Count > 0)
             {
                 Shop shop = await _db.shop.Where(s => s.name == order.shop).AsNoTracking().FirstOrDefaultAsync();

@@ -584,7 +584,7 @@ namespace SnowmeetApi.Models
         public DateTime? update_date { get; set; }
         public DateTime create_date { get; set; } = DateTime.Now;
         [ForeignKey("rental_id")]
-        public Rental rental { get; set; } = null;
+        public Rental? rental { get; set; } = null;
 
     }
     public class CategoryRentItem

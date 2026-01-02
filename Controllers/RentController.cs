@@ -6090,8 +6090,36 @@ namespace SnowmeetApi.Controllers
         [NonAction]
         public async Task<Rental> SaveAppendingRental(Rental rental)
         {
+            rental.priceList = new List<RentPrice>();
             rental.appending = false;
-            _db.rental.Update(rental);
+            rental.update_date = DateTime.Now;
+            for(int i = 0; rental.pricePresets != null && i < rental.pricePresets.Count; i++)
+            {
+                //rental.pricePresets[i].rental = rental;
+                //rental.pricePresets[i].update_date = DateTime.Now;
+                RentalPricePreset preset = rental.pricePresets[i];
+                if (preset.id == 0)
+                {
+                    await _db.rentalPricePreset.AddAsync(preset);
+                }
+                else
+                {
+                    _db.rentalPricePreset.Entry(preset).State = EntityState.Modified;
+                }
+            }
+            for(int i = 0; rental.rentItems != null && i < rental.rentItems.Count; i++)
+            {
+                Models.RentItem rentItem = rental.rentItems[i];
+                if (rentItem.id == 0)
+                {
+                    await _db.rentItem.AddAsync(rentItem);
+                }
+                else
+                {
+                    _db.rentItem.Entry(rentItem).State = EntityState.Modified;
+                }
+            }
+            _db.rental.Entry(rental).State = EntityState.Modified;
             await _db.SaveChangesAsync();
             _db.rental.Entry(rental).State = EntityState.Detached;
             await _db.SaveChangesAsync();
