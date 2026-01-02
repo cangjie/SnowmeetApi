@@ -6057,6 +6057,45 @@ namespace SnowmeetApi.Controllers
                 data = order
             });
         }
-
+        [HttpPost("{orderId}")]
+        public async Task<ActionResult<ApiResult<Models.Order>>> SaveAppendings([FromRoute]int orderId, [FromBody] List<Rental> appendings, 
+            [FromQuery]string sessionKey, [FromQuery]string sessionType="wechat_mini_openid")
+        {
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            if (staff == null || staff.title_level < 100)
+            {
+                return Ok(new ApiResult<List<Models.Order>?>()
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = null
+                });
+            }
+            for(int i = 0; i < appendings.Count; i++)
+            {
+                if (orderId == appendings[i].order_id)
+                {
+                    await SaveAppendingRental(appendings[i]);
+                }
+            }
+            OrderController _orderH = new OrderController(_db, _config, _httpContextAccessor);
+            Models.Order order = await _orderH.GetOrder(orderId);
+            return Ok(new ApiResult<Models.Order>()
+            {
+                code = 0,
+                message = "",
+                data = order
+            });
+        }
+        [NonAction]
+        public async Task<Rental> SaveAppendingRental(Rental rental)
+        {
+            rental.appending = false;
+            _db.rental.Update(rental);
+            await _db.SaveChangesAsync();
+            _db.rental.Entry(rental).State = EntityState.Detached;
+            await _db.SaveChangesAsync();
+            return rental;
+        }
     }
 }
