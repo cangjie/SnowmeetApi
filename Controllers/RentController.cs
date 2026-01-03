@@ -4739,22 +4739,8 @@ namespace SnowmeetApi.Controllers
                     await _db.SaveChangesAsync();
                     return null;
                 }
-
-                //25-26雪季 统统门市价
-                /*
-                Models.Order order = await _db.order.Where(o => o.id == rental.order_id).AsNoTracking().FirstOrDefaultAsync();
-                if (order.member_id == null)
-                {
-                    scene = "门市";
-                }
-                else
-                {
-                    scene = "会员";
-                }
-                */
                 scene = "门市";
             }
-
             List<RentPrice> priceList = new List<RentPrice>();
             if (rental.package_id != null)
             {
@@ -4868,9 +4854,65 @@ namespace SnowmeetApi.Controllers
             return await GetRental(rentalId);
             //return null;
         }
+        [NonAction]
+        public async Task<Models.Order> EffectAppendingRentals(int orderId, int paymentId)
+        {
+            OrderController _orderH = new OrderController(_db, _oriConfig, _httpContextAccessor);
+            Models.Order order = await _orderH.GetOrder(orderId);
+            if (order.availablePayments.Where(a => a.id == paymentId).ToList().Count <= 0)
+            {
+                return null;
+            }
+            for(int i = 0; order.appendingRentals != null && i < order.appendingRentals.Count; i++)
+            {
+                Rental appendingRental = order.appendingRentals[i];
+                List<Guaranty> guaranties = appendingRental.guaranties;
+                for(int j = 0; guaranties != null && j < guaranties.Count; j++)
+                {
+                    Guaranty g = guaranties[i];
+                    if (g.payStatus != "支付成功")
+                    {
+                        GuarantyPayment gp = new GuarantyPayment()
+                        {
+                            guaranty_id = g.id,
+                            payment_id = paymentId
+                        };
+                        await _db.guarantyPayment.AddAsync(gp);
+                    }
+                }
+            }
+            await _db.SaveChangesAsync();
+            for(int i = 0; order.appendingRentals != null && i < order.appendingRentals.Count; i++)
+            {
+                Rental appendingRental = order.appendingRentals[i];
+                _db.rental.Entry(appendingRental).State = EntityState.Detached;
+                await _db.SaveChangesAsync();
+                appendingRental = await EffectRental(order.appendingRentals[i].id, order.appendingRentals[i].staff_id);
+                appendingRental.appending = false;
+                appendingRental.append_commit_time = DateTime.Now;
+                appendingRental.update_date = DateTime.Now;
+                _db.rental.Entry(appendingRental).State = EntityState.Modified;
+                await _db.SaveChangesAsync();
+            }
+            return order;
+        }
         [HttpGet]
         public async Task<Models.Order> EffectRentOrder(int orderId, int paymentId)
         {
+            try
+            {
+                List<Rental> appendingRentals = await _db.rental
+                    .Where(r => r.order_id == orderId && r.valid == 1 && r.appending != null && r.append_commit_time == null)
+                    .AsNoTracking().ToListAsync();
+                if (appendingRentals != null && appendingRentals.Count > 0)
+                {
+                    return await EffectAppendingRentals(orderId, paymentId);
+                }
+            }
+            catch
+            {
+                return null;
+            }
             OrderController _orderHelper = new OrderController(_db, _oriConfig, _httpContextAccessor);
             Models.Order order = (await _orderHelper.GetCommonOrders(orderId, null, null, null, null, null, null)).FirstOrDefault();
             OrderPayment payment = order.availablePayments.Where(p => p.id == paymentId).FirstOrDefault();
