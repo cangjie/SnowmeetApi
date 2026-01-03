@@ -4812,6 +4812,12 @@ namespace SnowmeetApi.Controllers
                 .AsNoTracking().FirstOrDefaultAsync();
             rental.valid = 1;
             rental.update_date = DateTime.Now;
+            if (rental.appending != null)
+            {
+                rental.appending = false;
+                rental.append_commit_time = DateTime.Now;
+                rental.update_date = DateTime.Now;
+            }
             _db.rental.Entry(rental).State = EntityState.Modified;
             List<Models.RentItem> items = await _db.rentItem.Where(i => i.rental_id == rentalId)
                 .AsNoTracking().ToListAsync();
@@ -4870,7 +4876,7 @@ namespace SnowmeetApi.Controllers
                 for(int j = 0; guaranties != null && j < guaranties.Count; j++)
                 {
                     Guaranty g = guaranties[i];
-                    if (g.payStatus != "支付成功")
+                    if (g.payStatus != "支付完成")
                     {
                         GuarantyPayment gp = new GuarantyPayment()
                         {
@@ -4888,11 +4894,13 @@ namespace SnowmeetApi.Controllers
                 _db.rental.Entry(appendingRental).State = EntityState.Detached;
                 await _db.SaveChangesAsync();
                 appendingRental = await EffectRental(order.appendingRentals[i].id, order.appendingRentals[i].staff_id);
+                /*
                 appendingRental.appending = false;
                 appendingRental.append_commit_time = DateTime.Now;
                 appendingRental.update_date = DateTime.Now;
                 _db.rental.Entry(appendingRental).State = EntityState.Modified;
                 await _db.SaveChangesAsync();
+                */
             }
             return order;
         }
