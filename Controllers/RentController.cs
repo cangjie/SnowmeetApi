@@ -6043,7 +6043,7 @@ namespace SnowmeetApi.Controllers
                 });
             }
             Rental rental = await _db.rental
-                .Where(r => r.id == rentalId && r.appending == true && r.append_commit_time == null)
+                .Where(r => r.id == rentalId && r.appending != null && r.append_commit_time == null)
                 .AsNoTracking().FirstOrDefaultAsync();
             rental.valid = 0;
             _db.rental.Entry(rental).State = EntityState.Modified;
