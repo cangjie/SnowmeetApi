@@ -6080,6 +6080,22 @@ namespace SnowmeetApi.Controllers
             }
             OrderController _orderH = new OrderController(_db, _config, _httpContextAccessor);
             Models.Order order = await _orderH.GetOrder(orderId);
+            double appendPayAmount = 0;
+            for(int i = 0; order.appendingRentals != null && i < order.appendingRentals.Count; i++)
+            {
+                Rental rental = order.appendingRentals[i];
+                for(int j = 0; rental.guaranties != null && j < rental.guaranties.Count; j++)
+                {
+                    Models.Guaranty guaranty = rental.guaranties[j];
+                    if (guaranty.valid == 1 && guaranty.payStatus == "未支付")
+                    {
+                        appendPayAmount += (double)guaranty.amount;
+                    }
+                }
+            }
+            order.paying_amount = appendPayAmount;
+            _db.order.Entry(order).State = EntityState.Modified;
+            await _db.SaveChangesAsync();
             return Ok(new ApiResult<Models.Order>()
             {
                 code = 0,
