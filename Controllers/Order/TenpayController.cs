@@ -401,9 +401,8 @@ namespace SnowmeetApi.Controllers
                             sucPay.status = OrderPayment.PaymentStatus.支付成功.ToString();
                             sucPay.paid_date = DateTime.Now;
                             sucPay.update_date = DateTime.Now;
+                            sucPay.valid = 1;
                             _db.OrderPayment.Entry(sucPay).State = EntityState.Modified;
-                            //await _db.SaveChangesAsync();
-
                             CoreDataModLog log = new CoreDataModLog()
                             {
                                 table_name = "Order",

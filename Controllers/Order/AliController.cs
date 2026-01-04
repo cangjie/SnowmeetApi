@@ -574,10 +574,11 @@ namespace SnowmeetApi.Controllers
                 case "trade_status_sync":
                     if (callback.tradeStatus.ToUpper().Trim().Equals("TRADE_SUCCESS"))
                     {
-                        OrderPayment payment = await _db.orderPayment.Where(p => p.valid == 1 && p.pay_method.Trim().Equals("支付宝")
+                        OrderPayment payment = await _db.orderPayment.Where(p => p.pay_method.Trim().Equals("支付宝")
                             && p.out_trade_no.Trim().Equals(callback.outTradeNo.Trim())).OrderByDescending(p => p.id).FirstOrDefaultAsync();
                         if (payment.status.Trim().Equals(OrderPayment.PaymentStatus.待支付.ToString()))
                         {
+                            payment.valid = 1;
                             payment.ali_trade_no = callback.tradeNo;
                             payment.notify_id = callback.notifyId;
                             payment.paid_date = DateTime.Now;
@@ -605,50 +606,6 @@ namespace SnowmeetApi.Controllers
                             OrderController _orderHelper = new OrderController(_db, _oriConfig, _http);
                             await _orderHelper.DealSuccessPaidOrder(payment.order_id, payment.id);
                         }
-                        /*
-                        List<OrderPayment> payments = await _db.orderPayment
-                            .Where(p => p.valid == 1 && p.request_failed == 0 && p.out_trade_no.Trim().Equals(callback.outTradeNo.Trim()))
-                            .AsNoTracking().ToListAsync();
-                        Models.Order? order = null;
-                        bool needDeal = false;
-                        for (int i = 0; i < payments.Count; i++)
-                        {
-                            OrderPayment payment = payments[i];
-                            if (order == null)
-                            {
-                                order = await _db.order.FindAsync(payment.order_id);
-                                if (order.dealed == 0)
-                                {
-                                    needDeal = true;
-                                    order.dealed = 1;
-                                    order.update_date = DateTime.Now;
-                                    _db.order.Entry(order).State = EntityState.Modified;
-                                    await _db.SaveChangesAsync();
-                                }
-                                else
-                                {
-                                    needDeal = false;
-                                }
-                            }
-                            if (needDeal)
-                            {
-                                payment.ali_trade_no = callback.tradeNo;
-                                payment.notify_id = callback.notifyId;
-                                payment.paid_date = DateTime.Now;
-                                payment.update_date = DateTime.Now;
-                                payment.ali_buyer_id = callback.buyerId;
-                                payment.status = OrderPayment.PaymentStatus.支付成功.ToString();
-                                _db.orderPayment.Entry(payment).State = EntityState.Modified;
-                            }
-                        }
-
-                        if (needDeal)
-                        {
-                            await _db.SaveChangesAsync();
-                            OrderController _orderHelper = new OrderController(_db, _oriConfig, _http);
-                            await _orderHelper.DealSuccessPaidOrder(order);
-                        }
-                        */
                     }
                     break;
                 default:
