@@ -2411,6 +2411,70 @@ namespace SnowmeetApi.Controllers
                 await _db.SaveChangesAsync();
             }
         }
+        public class OrderBalance
+        {
+            public DateTime? transDate { get; set; }
+            public string transType { get; set; }
+            public string payMethod { get; set; }
+            public double amount { get; set; }
+            public Staff staff { get; set; }
+
+        }
+        [HttpGet("{orderId}")]
+        public async Task<ActionResult<ActionResult<List<OrderBalance>?>>> GetOrderBalance(int orderId,
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            if (staff == null || staff.title_level < 100)
+            {
+                return Ok(new ApiResult<List<OrderBalance>?>()
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = null
+                });
+            }
+            Models.Order order = await GetOrder(orderId);
+            List<OrderBalance> balances = new List<OrderBalance>();
+            for (int i = 0; order.availablePayments != null && i < order.availablePayments.Count; i++)
+            {
+                OrderPayment payment = order.availablePayments[i];
+                OrderBalance b = new OrderBalance()
+                {
+                    transDate = payment.paid_date,
+                    transType = "支付",
+                    payMethod = payment.pay_method,
+                    amount = payment.amount,
+                    staff = payment.staff
+
+                };
+                balances.Add(b);
+                for (int j = 0; payment.refunds != null && j < payment.refunds.Count; j++)
+                {
+                    OrderPaymentRefund refund = payment.refunds[j];
+                    if (refund.state == 1 || refund.refund_id != "")
+                    {
+                        OrderBalance br = new OrderBalance()
+                        {
+                            transDate = refund.update_date,
+                            transType = "退款",
+                            payMethod = payment.pay_method,
+                            amount = refund.amount,
+                            staff = refund.staff
+
+                        };
+                        balances.Add(br);
+                    }
+                }
+            }
+            balances = balances.OrderBy(b => b.transDate).ToList();
+            return Ok(new ApiResult<List<OrderBalance>?>()
+            {
+                code = 0,
+                message = "",
+                data = balances
+            });
+        }
     }
 
 }
