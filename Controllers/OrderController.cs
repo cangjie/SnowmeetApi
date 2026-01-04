@@ -2456,7 +2456,7 @@ namespace SnowmeetApi.Controllers
                     {
                         OrderBalance br = new OrderBalance()
                         {
-                            transDate = refund.update_date,
+                            transDate = refund.create_date,
                             transType = "退款",
                             payMethod = payment.pay_method,
                             amount = refund.amount,
