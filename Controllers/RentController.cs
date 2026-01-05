@@ -5340,7 +5340,7 @@ namespace SnowmeetApi.Controllers
                 _db.rentalDetail.Entry(detail).State = EntityState.Modified;
                 for (int j = 0; j < logs.Count; j++)
                 {
-                    await _db.coreDataModLog.AddAsync(logs[i]);
+                    await _db.coreDataModLog.AddAsync(logs[j]);
                 }
                 await _db.SaveChangesAsync();
                 newDetails.Add(detail);
