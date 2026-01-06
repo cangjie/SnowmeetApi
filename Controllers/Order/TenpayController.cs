@@ -1302,7 +1302,7 @@ namespace SnowmeetApi.Controllers
             return Ok(count);
         }
 
-        [HttpGet]
+        [HttpGet("{mchId}")]
         public async Task RequestFlowBill(int mchId, DateTime billDate)
         {
             WepayKey k = await _db.WepayKeys.FindAsync(mchId);

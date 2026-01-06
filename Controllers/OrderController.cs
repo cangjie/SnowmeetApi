@@ -128,7 +128,7 @@ namespace SnowmeetApi.Controllers
             int? staffId, string? type, DateTime? startDate, DateTime? endDate, string? payOption = null,
             bool? isTest = null, bool? isEntertain = null, bool? isPackage = null, bool? isOnCredit = null,
             bool? haveDiscount = null, string? status = null, DateTime? closeStartDate = null, DateTime? closeEndDate = null,
-            bool? haveWarranty = null, string? retailType = null)
+            bool? haveWarranty = null, string? retailType = null, string? keyword = null)
         {
             startDate = startDate == null ? DateTime.MinValue : startDate;
             endDate = endDate == null ? DateTime.MaxValue : endDate;
@@ -240,6 +240,20 @@ namespace SnowmeetApi.Controllers
             if (haveWarranty != null)
             {
                 orderList = orderList.Where(o => o.haveWarranty == haveWarranty).ToList();
+            }
+            if (keyword != null)
+            {
+                switch(type)
+                {
+                    case "租赁":
+                        orderList = orderList.Where(o => o.memo.IndexOf(keyword) >= 0 
+                            || o.rentals.Any(r => (r.memo.IndexOf(keyword) >= 0 
+                            || r.rentItems.Any(i => i.memo.IndexOf(keyword) >=0)
+                            || r.details.Any(d => d.memo.IndexOf(keyword) >= 0)  ) )).ToList();
+                        break;
+                    default:
+                        break;
+                }
             }
             return orderList;
         }
@@ -887,7 +901,7 @@ namespace SnowmeetApi.Controllers
             string? shop, string? type, string? subType, DateTime? startDate, DateTime? endDate, string sessionKey,
             string? payOption, string sessionType = "wechat_mini_openid", bool? isTest = null, bool? isEntertain = null,
             bool? isPackage = null, bool? isOnCredit = null, bool? haveDiscount = null, string? status = null,
-            string? cell = null, bool? haveWarranty = null, string? retailType = null)
+            string? cell = null, bool? haveWarranty = null, string? retailType = null, string? keyword = null)
         {
             //startDate = DateTime.Parse("2025-10-27");
             StaffController _staffHelper = new StaffController(_db);
@@ -906,7 +920,7 @@ namespace SnowmeetApi.Controllers
                 //startDate = DateTime.Parse("2025-11-01");
             }
             List<SnowmeetApi.Models.Order> orders = await GetCommonOrders(orderId, shop, null, null, type, startDate, endDate, payOption,
-            isTest, isEntertain, isPackage, isOnCredit, haveDiscount, status, null, null, haveWarranty, retailType);
+            isTest, isEntertain, isPackage, isOnCredit, haveDiscount, status, null, null, haveWarranty, retailType, keyword);
             List<SnowmeetApi.Models.Order> newOrders = new List<Models.Order>();
             if (cell != null)
             {
