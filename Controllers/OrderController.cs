@@ -912,15 +912,15 @@ namespace SnowmeetApi.Controllers
             bool? isPackage = null, bool? isOnCredit = null, bool? haveDiscount = null, string? status = null,
             string? cell = null, bool? haveWarranty = null, string? retailType = null, string? keyword = null)
         {
-            shop = Util.UrlDecode(shop);
-            type = Util.UrlDecode(type);
-            subType = Util.UrlDecode(subType);
+            shop = shop==null? null: Util.UrlDecode(shop);
+            type = type==null? null:Util.UrlDecode(type);
+            subType = subType==null? null:Util.UrlDecode(subType);
             sessionKey = Util.UrlDecode(sessionKey);
-            payOption = Util.UrlDecode(payOption);
-            status = Util.UrlDecode(status);
-            cell = Util.UrlDecode(cell);
-            retailType = Util.UrlDecode(retailType);
-            keyword = Util.UrlDecode(keyword);
+            payOption = payOption ==null? null:Util.UrlDecode(payOption);
+            status = status == null? null:Util.UrlDecode(status);
+            cell = cell==null? null:Util.UrlDecode(cell);
+            retailType = retailType == null? null : Util.UrlDecode(retailType);
+            keyword = keyword==null? null :  Util.UrlDecode(keyword);
             //startDate = DateTime.Parse("2025-10-27");
             StaffController _staffHelper = new StaffController(_db);
             Staff staff = await _staffHelper.GetStaffBySessionKey(sessionKey, sessionType);
