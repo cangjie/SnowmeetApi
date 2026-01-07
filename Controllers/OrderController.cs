@@ -248,8 +248,10 @@ namespace SnowmeetApi.Controllers
                     case "租赁":
                         orderList = orderList.Where(o => o.memo.IndexOf(keyword) >= 0 
                             || o.rentals.Any(r => (r.memo.IndexOf(keyword) >= 0 
-                            || r.rentItems.Any(i => i.memo.IndexOf(keyword) >=0)
-                            || r.details.Any(d => d.memo.IndexOf(keyword) >= 0)  ) )).ToList();
+                                || r.rentItems.Any(i => i.memo.IndexOf(keyword) >=0 && i.valid == 1 )
+                                || r.details.Any(d => d.memo.IndexOf(keyword) >= 0 && d.valid == 1)  
+                            ) 
+                            )).ToList();
                         break;
                     case "":
                         orderList = orderList.Where(o => (o.memo.IndexOf(keyword) >= 0
@@ -910,6 +912,15 @@ namespace SnowmeetApi.Controllers
             bool? isPackage = null, bool? isOnCredit = null, bool? haveDiscount = null, string? status = null,
             string? cell = null, bool? haveWarranty = null, string? retailType = null, string? keyword = null)
         {
+            shop = Util.UrlDecode(shop);
+            type = Util.UrlDecode(type);
+            subType = Util.UrlDecode(subType);
+            sessionKey = Util.UrlDecode(sessionKey);
+            payOption = Util.UrlDecode(payOption);
+            status = Util.UrlDecode(status);
+            cell = Util.UrlDecode(cell);
+            retailType = Util.UrlDecode(retailType);
+            keyword = Util.UrlDecode(keyword);
             //startDate = DateTime.Parse("2025-10-27");
             StaffController _staffHelper = new StaffController(_db);
             Staff staff = await _staffHelper.GetStaffBySessionKey(sessionKey, sessionType);
