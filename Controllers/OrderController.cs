@@ -252,9 +252,11 @@ namespace SnowmeetApi.Controllers
                             || r.details.Any(d => d.memo.IndexOf(keyword) >= 0)  ) )).ToList();
                         break;
                     case "":
-                        orderList = orderList.Where(o => (o.memo.IndexOf(keyword) >= 0 
-                        || o.cares.Any(c => c.memo.IndexOf(keyword) >= 0 || c.repair_memo.IndexOf(keyword) >= 0
-                        || o.cares.Where(c => c.tasks.Any(t => t.memo.IndexOf(keyword)>=0))) )).ToList();
+                        orderList = orderList.Where(o => (o.memo.IndexOf(keyword) >= 0
+                            || o.cares.Any(c => (c.valid == 1 && c.memo.IndexOf(keyword) >= 0) 
+                            || c.tasks.Any(t => t.valid == 1 && t.memo.IndexOf(keyword)>=0))
+                        
+                        )).ToList();
                         break;
                     default:
                         break;
