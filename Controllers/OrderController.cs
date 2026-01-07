@@ -920,6 +920,15 @@ namespace SnowmeetApi.Controllers
             cell = cell==null? null:Util.UrlDecode(cell);
             retailType = retailType == null? null : Util.UrlDecode(retailType);
             keyword = keyword==null? null :  Util.UrlDecode(keyword);
+            if (keyword!=null && keyword.Trim() == "")
+            {
+                return Ok(new ApiResult<object?>()
+                {
+                    code = 1,
+                    message = "关键词不能为空",
+                    data = null
+                });
+            }
             //startDate = DateTime.Parse("2025-10-27");
             StaffController _staffHelper = new StaffController(_db);
             Staff staff = await _staffHelper.GetStaffBySessionKey(sessionKey, sessionType);
