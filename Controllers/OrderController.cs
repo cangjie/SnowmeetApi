@@ -257,7 +257,6 @@ namespace SnowmeetApi.Controllers
                         orderList = orderList.Where(o => ((o.memo != null && o.memo.IndexOf(keyword) >= 0)
                             || o.cares.Any(c => (c.valid == 1 && c.memo != null &&  c.memo.IndexOf(keyword) >= 0) 
                             || c.tasks.Any(t => t.valid == 1 && t.memo != null && t.memo.IndexOf(keyword)>=0))
-                        
                         )).ToList();
                         break;
                     default:
