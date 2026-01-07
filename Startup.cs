@@ -44,7 +44,8 @@ namespace SnowmeetApi
 
             services.AddControllers();
             services.AddDbContext<ApplicationDBContext>(
-                options => options.UseSqlServer(conStr).UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking)
+                options => options.UseSqlServer(conStr, o => o.CommandTimeout(3600))
+                .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking)
             );
             services.AddSwaggerGen(c =>
             {
