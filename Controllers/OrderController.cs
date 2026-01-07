@@ -246,17 +246,17 @@ namespace SnowmeetApi.Controllers
                 switch(type)
                 {
                     case "租赁":
-                        orderList = orderList.Where(o => o.memo.IndexOf(keyword) >= 0 
-                            || o.rentals.Any(r => (r.memo.IndexOf(keyword) >= 0 
-                                || r.rentItems.Any(i => i.memo.IndexOf(keyword) >=0 && i.valid == 1 )
-                                || r.details.Any(d => d.memo.IndexOf(keyword) >= 0 && d.valid == 1)  
+                        orderList = orderList.Where(o => (o.memo != null && o.memo.IndexOf(keyword) >= 0 )
+                            || o.rentals.Any(r => ((r.memo != null && r.memo.IndexOf(keyword) >= 0 )
+                                || r.rentItems.Any(i => i.memo != null && i.memo.IndexOf(keyword) >=0 && i.valid == 1 )
+                                || r.details.Any(d => d.memo != null && d.memo.IndexOf(keyword) >= 0 && d.valid == 1)  
                             ) 
                             )).ToList();
                         break;
-                    case "":
-                        orderList = orderList.Where(o => (o.memo.IndexOf(keyword) >= 0
-                            || o.cares.Any(c => (c.valid == 1 && c.memo.IndexOf(keyword) >= 0) 
-                            || c.tasks.Any(t => t.valid == 1 && t.memo.IndexOf(keyword)>=0))
+                    case "养护":
+                        orderList = orderList.Where(o => ((o.memo != null && o.memo.IndexOf(keyword) >= 0)
+                            || o.cares.Any(c => (c.valid == 1 && c.memo != null &&  c.memo.IndexOf(keyword) >= 0) 
+                            || c.tasks.Any(t => t.valid == 1 && t.memo != null && t.memo.IndexOf(keyword)>=0))
                         
                         )).ToList();
                         break;
