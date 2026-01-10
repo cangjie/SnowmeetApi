@@ -655,7 +655,7 @@ namespace SnowmeetApi.Controllers
         }
         [NonAction]
         public async Task<WebApiLog> PerformRequest(string url, string header, string payload,
-            string method = "GET", string source = "易龙雪聚小程序", string purpose = "", string memo = "")
+            string method = "GET", string source = "易龙雪聚小程序", string purpose = "", string memo = "", string? batchId = null)
         {
             WebApiLog log = new WebApiLog()
             {
@@ -666,7 +666,8 @@ namespace SnowmeetApi.Controllers
                 method = method.Trim(),
                 header = header.Trim(),
                 payload = payload.Trim(),
-                request_url = url.Trim()
+                request_url = url.Trim(),
+                batch_id = batchId
             };
             await _db.webApiLog.AddAsync(log);
             await _db.SaveChangesAsync();
