@@ -19,7 +19,6 @@ using SnowmeetApi.Controllers.Order;
 using Org.BouncyCastle.Asn1.Crmf;
 using System.Runtime.CompilerServices;
 using Microsoft.CodeAnalysis.CSharp;
-using LuqinMiniAppBase.Controllers;
 namespace SnowmeetApi.Controllers
 {
     [Route("core/[controller]/[action]")]

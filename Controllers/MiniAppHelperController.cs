@@ -28,7 +28,7 @@ using SnowmeetApi.Controllers;
 using Flurl.Util;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 
-namespace LuqinMiniAppBase.Controllers
+namespace SnowmeetApi.Controllers
 {
     [Route("api/[controller]/[action]")]
     [ApiController]

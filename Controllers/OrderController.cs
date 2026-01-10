@@ -703,6 +703,10 @@ namespace SnowmeetApi.Controllers
                         {
                             Retail retail = order.retails[i];
                             retail.valid = 1;
+                            if (retail.retail_type == null)
+                            {
+                                retail.retail_type = "零售";
+                            }
                         }
                         break;
                     case "养护":

@@ -15,7 +15,7 @@ using AlipaySDKNet.OpenAPI.Model;
 using NuGet.Packaging;
 using Microsoft.EntityFrameworkCore.Internal;
 using System.IO;
-using LuqinMiniAppBase.Controllers;
+//using LuqinMiniAppBase.Controllers;
 using SnowmeetApi.Models;
 using NPOI.XSSF.UserModel;
 using NPOI.SS.UserModel;
