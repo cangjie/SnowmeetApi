@@ -4820,7 +4820,8 @@ namespace SnowmeetApi.Controllers
             }
             _db.rental.Entry(rental).State = EntityState.Modified;
             List<Models.RentItem> items = await _db.rentItem.Where(i => i.rental_id == rentalId)
-                .AsNoTracking().ToListAsync();
+                .AsNoTracking()
+                .ToListAsync();
             for (int i = 0; i < items.Count; i++)
             {
                 Models.RentItem item = items[i];
@@ -6153,16 +6154,22 @@ namespace SnowmeetApi.Controllers
                 }
                 if (rental.noGuaranty || guarantyAmount == 0)
                 {
+                    rental.appending = false;
+                    rental.append_commit_time = DateTime.Now;
+                    _db.rental.Entry(rental).State = EntityState.Modified;
+                    await _db.SaveChangesAsync();
+
                     _db.rental.Entry(rental).State = EntityState.Detached;
                     for(int k = 0; rental.rentItems != null && k < rental.rentItems.Count; k++)
                     {
                         _db.rentItem.Entry(rental.rentItems[k]).State = EntityState.Detached;
                     }
                     await _db.SaveChangesAsync();
+                    
                     await EffectRental(rental.id, staff.id);
-                    rental.appending = false;
-                    rental.append_commit_time = DateTime.Now;
-                    _db.rental.Entry(rental).State = EntityState.Modified;
+                    //_db.rental.Entry(rental).State = EntityState.Detached;
+                    //await _db.SaveChangesAsync();
+                    
                 }
             }
             if (appendPayAmount > 0)
@@ -6252,6 +6259,10 @@ namespace SnowmeetApi.Controllers
             _db.rental.Entry(rental).State = EntityState.Modified;
             await _db.SaveChangesAsync();
             _db.rental.Entry(rental).State = EntityState.Detached;
+            for (int i = 0; rental.rentItems != null && i < rental.rentItems.Count; i++)
+            {
+                _db.rentItem.Entry(rental.rentItems[i]).State = EntityState.Detached;
+            }
             await _db.SaveChangesAsync();
             return rental;
         }
