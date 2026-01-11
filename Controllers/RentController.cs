@@ -4869,11 +4869,11 @@ namespace SnowmeetApi.Controllers
             {
                 return null;
             }
-            for(int i = 0; order.appendingRentals != null && i < order.appendingRentals.Count; i++)
+            for (int i = 0; order.appendingRentals != null && i < order.appendingRentals.Count; i++)
             {
                 Rental appendingRental = order.appendingRentals[i];
                 List<Guaranty> guaranties = appendingRental.guaranties;
-                for(int j = 0; guaranties != null && j < guaranties.Count; j++)
+                for (int j = 0; guaranties != null && j < guaranties.Count; j++)
                 {
                     Guaranty g = guaranties[i];
                     if (g.payStatus != "支付完成")
@@ -4888,7 +4888,7 @@ namespace SnowmeetApi.Controllers
                 }
             }
             await _db.SaveChangesAsync();
-            for(int i = 0; order.appendingRentals != null && i < order.appendingRentals.Count; i++)
+            for (int i = 0; order.appendingRentals != null && i < order.appendingRentals.Count; i++)
             {
                 Rental appendingRental = order.appendingRentals[i];
                 _db.rental.Entry(appendingRental).State = EntityState.Detached;
@@ -6131,10 +6131,10 @@ namespace SnowmeetApi.Controllers
             OrderController _orderH = new OrderController(_db, _config, _httpContextAccessor);
             Models.Order order = await _orderH.GetOrder(orderId);
             double appendPayAmount = 0;
-            for(int i = 0; order.appendingRentals != null && i < order.appendingRentals.Count; i++)
+            for (int i = 0; order.appendingRentals != null && i < order.appendingRentals.Count; i++)
             {
                 Rental rental = order.appendingRentals[i];
-                for(int j = 0; rental.guaranties != null && j < rental.guaranties.Count; j++)
+                for (int j = 0; rental.guaranties != null && j < rental.guaranties.Count; j++)
                 {
                     Models.Guaranty guaranty = rental.guaranties[j];
                     if (guaranty.valid == 1 && guaranty.payStatus == "未支付")
@@ -6142,9 +6142,30 @@ namespace SnowmeetApi.Controllers
                         appendPayAmount += (double)guaranty.amount;
                     }
                 }
+                double guarantyAmount = 0;
+                if (rental.guaranty != null)
+                {
+                    guarantyAmount = (double)rental.guaranty;
+                }
+                if (rental.guaranty_discount != null)
+                {
+                    guarantyAmount = guarantyAmount - (double)rental.guaranty_discount;
+                }
+                if (rental.noGuaranty || guarantyAmount == 0)
+                {
+                    await EffectRental(rental.id, staff.id);
+                    _db.rental.Entry(rental).State = EntityState.Detached;
+                    await _db.SaveChangesAsync();
+                    rental.appending = false;
+                    rental.append_commit_time = DateTime.Now;
+                    _db.rental.Entry(rental).State = EntityState.Modified;
+                }
             }
-            order.paying_amount = appendPayAmount;
-            _db.order.Entry(order).State = EntityState.Modified;
+            if (appendPayAmount > 0)
+            {
+                order.paying_amount = appendPayAmount;
+                _db.order.Entry(order).State = EntityState.Modified;
+            }
             await _db.SaveChangesAsync();
             return Ok(new ApiResult<Models.Order>()
             {
