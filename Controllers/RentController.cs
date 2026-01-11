@@ -6153,9 +6153,13 @@ namespace SnowmeetApi.Controllers
                 }
                 if (rental.noGuaranty || guarantyAmount == 0)
                 {
-                    await EffectRental(rental.id, staff.id);
                     _db.rental.Entry(rental).State = EntityState.Detached;
+                    for(int k = 0; rental.rentItems != null && k < rental.rentItems.Count; k++)
+                    {
+                        _db.rentItem.Entry(rental.rentItems[k]).State = EntityState.Detached;
+                    }
                     await _db.SaveChangesAsync();
+                    await EffectRental(rental.id, staff.id);
                     rental.appending = false;
                     rental.append_commit_time = DateTime.Now;
                     _db.rental.Entry(rental).State = EntityState.Modified;
