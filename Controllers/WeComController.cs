@@ -104,8 +104,11 @@ namespace SnowmeetApi.Controllers
         public string cropSecret = "vz9XOlLgtY63pYqqHix9HYcsSey4H3J7drQ4xUDa59M";
         public string spaceId = "s.ww3a46c4555ae069f9.767798597fsX";
         public string[] wepayBalanceFieldsArr = new string[] { "交易日期", "交易时间", "公众账号ID", "商户号", "特约商户号", "设备号", "微信订单号", "商户订单号", "用户标识", "交易类型", "付款银行", "货币种类", "应结订单金额", "代金券金额", "微信退款单号", "商户退款单号", "退款金额", "充值券退款金额", "退款状态", "商品名称", "商户数据包", "手续费", "费率", "订单金额", "申请退款金额", "费率备注" };
+        public string[] wepayFundFieldsArr = new string[] {"记账日期", "记账时间", "商户号", "微信支付业务单号", "资金流水单号", "业务名称", "业务类型", "收支类型", "收支金额(元)", "账户结余(元)", "资金变更提交申请人", "备注", "业务凭证号"};
         public string wepayBalanceDirId = "s.ww3a46c4555ae069f9.767798597fsX_d.767972774CblA";
         public string wepayBalanceFileName = "【25-26】微信支付交易账单汇总";
+        public string wepayFundDirId = "s.ww3a46c4555ae069f9.767798597fsX_d.7681092340bMJ";
+        public string wepayFundFileName = "【25-26】微信支付资金账单汇总";
         public MiniAppHelperController _mH;
 
         public WeComController(ApplicationDBContext context, IConfiguration config, IHttpContextAccessor httpContextAccessor)
@@ -114,6 +117,36 @@ namespace SnowmeetApi.Controllers
             _config = config;
             _http = httpContextAccessor;
             _mH = new MiniAppHelperController(_db, _config);
+        }
+        [HttpGet]
+        public async Task RecreateFundTable()
+        {
+            string purpose = "资金账单";
+            bool needRefresh = await CheckNeedReCreateTransTable(purpose);
+            if (!needRefresh)
+            {
+                return;
+            }
+            string batchId = DateTime.Now.ToString("yyyyMMddhhmmss");
+            string token = await GetToken(batchId, purpose);
+            if (token == null)
+            {
+                return;
+            }
+            string fileId = await GetFileId(wepayFundDirId, wepayFundFileName, batchId, token, purpose, "获取文件id");
+            for(;fileId!= null;)
+            {
+                await DeleteFile(fileId, token, purpose, "删除旧文件", batchId);  
+                fileId = await GetFileId(wepayFundDirId, wepayFundFileName, batchId, token, purpose, "获取文件id");
+            }
+            string docId = await CreateSheetDoc(wepayFundDirId, wepayFundFileName, token, purpose, "创建新表格", batchId);
+            if (docId == null)
+            {
+                return;
+            }
+            string sheetId = await GetSheetId(docId, token, batchId, purpose, "获取sheetid");
+            await CreateTransTableTitle(sheetId, docId, token, batchId, "资金账单", "更新数据", "fund");
+            await InserFundData(sheetId, docId, token, batchId, "资金账单", "更新数据");
         }
         [HttpGet]
         public async Task RecreateTransTable()
@@ -130,9 +163,10 @@ namespace SnowmeetApi.Controllers
                 return;
             }
             string fileId = await GetFileId(wepayBalanceDirId, wepayBalanceFileName, batchId, token, "交易账单", "获取文件id");
-            if (fileId != null)
+            for (;fileId != null;)
             {
                 await DeleteFile(fileId, token, "交易账单", "删除旧文件", batchId);  
+                fileId = await GetFileId(wepayBalanceDirId, wepayBalanceFileName, batchId, token, "交易账单", "获取文件id");
             }
             string docId = await CreateSheetDoc(wepayBalanceDirId, wepayBalanceFileName, token, "交易账单", "创建新表格", batchId);
             if (docId == null)
@@ -231,11 +265,11 @@ namespace SnowmeetApi.Controllers
             await _mH.PerformRequest(url, "", payload, "POST", "企业微信", purpose, memo, batchId);
         }
         [NonAction]
-        public async Task<bool> CheckNeedReCreateTransTable()
+        public async Task<bool> CheckNeedReCreateTransTable(string purpose = "交易账单")
         {
             //teTime nowDate = DateTime.Now.Date;
             string batchPrefix = DateTime.Now.ToString("yyyyMMdd");
-            WebApiLog? lastLog = await _db.webApiLog.Where(l => l.source == "企业微信" && l.purpose == "交易账单" && l.memo == "更新数据" && l.batch_id.StartsWith(batchPrefix))
+            WebApiLog? lastLog = await _db.webApiLog.Where(l => l.source == "企业微信" && l.purpose == purpose && l.memo == "更新数据" && l.batch_id.StartsWith(batchPrefix))
                 .OrderByDescending(l => l.create_date).AsNoTracking().FirstOrDefaultAsync();
             bool needRefresh = false;
             if (lastLog == null)
@@ -272,7 +306,7 @@ namespace SnowmeetApi.Controllers
             return needRefresh;
         }
         [NonAction]
-        public async Task<WebApiLog> CreateTransTableTitle(string sheetId, string docId, string token, string batchId, string purpose, string memo)
+        public async Task<WebApiLog> CreateTransTableTitle(string sheetId, string docId, string token, string batchId, string purpose, string memo, string type = "balance")
         {
             BatchUpdateRequest batchUpdateRequest = new BatchUpdateRequest()
             {
@@ -295,7 +329,12 @@ namespace SnowmeetApi.Controllers
             {
                 values = new List<Cell>()
             };
-            for (int i = 0; i < wepayBalanceFieldsArr.Length; i++)
+            string[] fields = wepayBalanceFieldsArr;
+            if (type == "fund")
+            {
+                fields = wepayFundFieldsArr;
+            }
+            for (int i = 0; i < fields.Length; i++)
             {
                 Cell cell = new Cell();
                 CellFormat cf = new CellFormat()
@@ -304,7 +343,7 @@ namespace SnowmeetApi.Controllers
                 };
                 CellValue cv = new CellValue()
                 {
-                    text = wepayBalanceFieldsArr[i].Trim()
+                    text = fields[i].Trim()
                 };
                 cell.cell_format = cf;
                 cell.cell_value = cv;
@@ -317,7 +356,7 @@ namespace SnowmeetApi.Controllers
             WebApiLog log = await _mHelper.PerformRequest("https://qyapi.weixin.qq.com/cgi-bin/wedoc/spreadsheet/batch_update?access_token=" + token, "", json, "POST", "企业微信", purpose, memo, batchId);
             return log;
         }
-        [HttpGet]
+        [NonAction]
         public async Task<List<WebApiLog>> InserTransData(string sheetId, string docId, string token, string batchId, string purpose, string memo)
         {
             MiniAppHelperController _mHelper = new MiniAppHelperController(_db, _config);
@@ -477,6 +516,123 @@ namespace SnowmeetApi.Controllers
 
                             break;
 
+                        default:
+                            break;
+                    }
+                    row.values.Add(cell);
+                }
+                gData.rows.Add(row);
+            }
+            string payloadLast = JsonConvert.SerializeObject(batchUpdateRequest);
+            WebApiLog logFinal = await _mHelper.PerformRequest("https://qyapi.weixin.qq.com/cgi-bin/wedoc/spreadsheet/batch_update?access_token=" + token, "", payloadLast, "POST", "企业微信", purpose, memo, batchId);
+            logs.Add(logFinal);
+            return logs;
+        }
+        [NonAction]
+        public async Task<List<WebApiLog>> InserFundData(string sheetId, string docId, string token, string batchId, string purpose, string memo)
+        {
+            MiniAppHelperController _mHelper = new MiniAppHelperController(_db, _config);
+            List<WebApiLog> logs = new List<WebApiLog>();
+            BatchUpdateRequest batchUpdateRequest = new BatchUpdateRequest()
+            {
+                docid = docId,
+                requests = new List<UpdateOperation>()
+            };
+            UpdateRangeRequest updateRange = new UpdateRangeRequest()
+            {
+                sheet_id = sheetId,
+                grid_data = new GridData()
+            };
+            UpdateOperation updateOperation = new UpdateOperation();
+            updateOperation.update_range_request = updateRange;
+            batchUpdateRequest.requests.Add(updateOperation);
+            GridData gData = updateRange.grid_data;
+            gData.start_column = 0;
+            gData.start_row = 1;
+            gData.rows = new List<Row>();
+            gData.start_row = 1;
+            int nextStart = 1;
+            DateTime startDate = DateTime.Parse("2025-10-15");
+            List<WepayFlowBill> bArr = await _db.wepayFlowBill.Where(b => b.bill_date_time.Date >= startDate.Date).OrderBy(b => b.mch_id).ThenBy(b => b.bill_date_time).AsNoTracking().ToListAsync();
+            for (int i = 0; i < bArr.Count; i++)
+            {
+                if (i % 200 == 0 && i > 0)
+                {
+                    //gData.start_row = lastStart;
+                    string payload = JsonConvert.SerializeObject(batchUpdateRequest);
+                    WebApiLog log = await _mHelper.PerformRequest("https://qyapi.weixin.qq.com/cgi-bin/wedoc/spreadsheet/batch_update?access_token=" + token, "", payload, "POST", "企业微信", purpose, memo, batchId);
+                    logs.Add(log);
+                    gData.rows.Clear();
+                    gData.start_row = nextStart;
+                }
+                nextStart++;
+                Row row = new Row();
+                row.values = new List<Cell>();
+                for (int j = 0; j < wepayFundFieldsArr.Length; j++)
+                {
+                    Cell cell = new Cell();
+                    cell.cell_format = new CellFormat();
+                    cell.cell_format.bold = false;
+                    /*
+                    if (bArr[i].refund_amount != 0)
+                    {
+                        cell.cell_format.color.red = 255;
+                    }
+                    */
+                    cell.cell_value = new CellValue();
+                    switch (wepayFundFieldsArr[j].Trim())
+                    {
+                        case "商户号":
+                            cell.cell_value.text = bArr[i].mch_id;
+                            break;
+                        case "记账日期":
+                            DateTime transDate = DateTime.Parse(bArr[i].bill_date_time.ToString());
+                            cell.cell_value.text = transDate.ToString("yyyy-MM-dd");
+                            break;
+                        case "记账时间":
+                            DateTime transTime = DateTime.Parse(bArr[i].bill_date_time.ToString());
+                            cell.cell_value.text = transTime.ToString("hh:mm:ss");
+                            break;
+                        case "微信支付业务单号":
+                            cell.cell_value.text = bArr[i].biz_no.ToString();
+                            break;
+                        case "资金流水单号":
+                            cell.cell_value.text = bArr[i].flow_no.ToString();
+
+                            break;
+                        case "业务名称":
+                            cell.cell_value.text = bArr[i].biz_name.ToString();
+
+                            break;
+                        case "业务类型":
+                            cell.cell_value.text = bArr[i].biz_type.ToString();
+
+                            break;
+                        case "收支类型":
+                            cell.cell_value.text = bArr[i].bill_type.ToString();
+
+                            break;
+                        case "收支金额(元)":
+                            cell.cell_value.text = bArr[i].amount.ToString();
+
+                            break;
+                        case "账户结余(元)":
+                            cell.cell_value.text = bArr[i].surplus.ToString();
+
+                            break;
+                        case "资金变更提交申请人":
+                            cell.cell_value.text = bArr[i].oper.ToString();
+
+                            break;
+                        case "备注":
+                            cell.cell_value.text = bArr[i].memo.ToString();
+
+                            break;
+                        case "业务凭证号":
+                            cell.cell_value.text = bArr[i].invoice_id.ToString();
+
+                            break;
+                        
                         default:
                             break;
                     }
