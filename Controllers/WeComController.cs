@@ -185,7 +185,7 @@ namespace SnowmeetApi.Controllers
         public async Task FillBlank(int maxLineCount, string docId, string token, string purpose, string memo, string batchId)
         {
             string url = "https://qyapi.weixin.qq.com/cgi-bin/wedoc/spreadsheet/get_sheet_properties?access_token=" + token;
-            string payload = "{ \"docid\": \"" + docId + "\" ";
+            string payload = "{ \"docid\": \"" + docId + "\" }  ";
             WebApiLog getFileLog = await _mH.PerformRequest(url, "", payload, "POST", "企业微信", purpose, memo, batchId);
             WeComApiResponse res = JsonConvert.DeserializeObject<WeComApiResponse>(getFileLog.response);
             if (res.errcode != 0)
@@ -216,9 +216,11 @@ namespace SnowmeetApi.Controllers
             int nextStart = gData.start_row;
             for (int i = 0; i < willFilledLines; i++)
             {
-                if (i % 200 == 0 && i > 0)
+                if (i % 100 == 0 && i > 0)
                 {
                     string payloadRow = JsonConvert.SerializeObject(batchUpdateRequest);
+                    Console.WriteLine("");
+                    Console.WriteLine(payloadRow);
                     WebApiLog log = await _mH.PerformRequest("https://qyapi.weixin.qq.com/cgi-bin/wedoc/spreadsheet/batch_update?access_token=" + token, "", payloadRow, "POST", "企业微信", purpose, memo, batchId);
                     //logs.Add(log);
                     gData.rows.Clear();
@@ -254,7 +256,7 @@ namespace SnowmeetApi.Controllers
             }
             string sheetId = await GetSheetId(docId, token, batchId, "交易账单", "获取sheetid");
             await CreateTransTableTitle(sheetId, docId, token, batchId, "交易账单", "更新数据");
-            await InserTransData(sheetId, docId, token, batchId, "交易账单", "更新数据");
+            //await InserTransData(sheetId, docId, token, batchId, "交易账单", "更新数据");
             await FillBlank(15000, docId, token, "交易账单", "更新数据", batchId);
         }
         [HttpGet]
