@@ -181,12 +181,26 @@ namespace SnowmeetApi.Controllers
             await InserFundData(sheetId, docId, token, batchId, "资金账单", "更新数据");
         }
         [HttpGet]
+        public async Task RefreshTransTable()
+        {
+            string docId = "dcrDFM9sIzIhyt7NC5FhjrBKJ6yC7Gz-z-xONcpuQxxX9nun1buvhIWGZW0pTfRt1KXUTkk4XGZcOSQjkUMv07AA";
+            string batchId = DateTime.Now.ToString("yyyyMMddhhmmss");
+            string token = await GetToken(batchId, "交易账单");
+            if (token == null)
+            {
+                return;
+            }
+            string sheetId = await GetSheetId(docId, token, batchId, "交易账单", "获取sheetid");
+            await CreateTransTableTitle(sheetId, docId, token, batchId, "交易账单", "更新数据");
+            await InserTransData(sheetId, docId, token, batchId, "交易账单", "更新数据");
+        }
+        [HttpGet]
         public async Task RecreateTransTable()
         {
             bool needRefresh = await CheckNeedReCreateTransTable();
             if (!needRefresh)
             {
-                return;
+                //return;
             }
             string batchId = DateTime.Now.ToString("yyyyMMddhhmmss");
             string token = await GetToken(batchId, "交易账单");
@@ -200,6 +214,7 @@ namespace SnowmeetApi.Controllers
                 await DeleteFile(fileId, token, "交易账单", "删除旧文件", batchId);
                 fileId = await GetFileId(wepayBalanceDirId, wepayBalanceFileName, batchId, token, "交易账单", "获取文件id");
             }
+
             string docId = await CreateSheetDoc(wepayBalanceDirId, wepayBalanceFileName, token, "交易账单", "创建新表格", batchId);
             if (docId == null)
             {
