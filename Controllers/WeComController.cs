@@ -179,9 +179,10 @@ namespace SnowmeetApi.Controllers
             string sheetId = await GetSheetId(docId, token, batchId, purpose, "获取sheetid");
             await CreateTransTableTitle(sheetId, docId, token, batchId, "资金账单", "更新数据", "fund");
             await InserFundData(sheetId, docId, token, batchId, "资金账单", "更新数据");
+            
         }
         [NonAction]
-        public async Task FillBlank(int macLineCount, string docId, string token, string purpose, string memo, string batchId)
+        public async Task FillBlank(int maxLineCount, string docId, string token, string purpose, string memo, string batchId)
         {
             string url = "https://qyapi.weixin.qq.com/cgi-bin/wedoc/spreadsheet/get_sheet_properties?access_token=" + token;
             string payload = "{ \"docid\": \"" + docId + "\" ";
@@ -193,6 +194,53 @@ namespace SnowmeetApi.Controllers
             }
             int rowCount = res.properties[0].row_count;
             int colCount = res.properties[0].column_count;
+            int willFilledLines = maxLineCount - rowCount;
+            BatchUpdateRequest batchUpdateRequest = new BatchUpdateRequest()
+            {
+                docid = docId,
+                requests = new List<UpdateOperation>()
+            };
+            string sheetId = await GetSheetId(docId, token, batchId, "交易账单", "获取sheetid");
+            UpdateRangeRequest updateRange = new UpdateRangeRequest()
+            {
+                sheet_id = sheetId,
+                grid_data = new GridData()
+            };
+            UpdateOperation updateOperation = new UpdateOperation();
+            updateOperation.update_range_request = updateRange;
+            batchUpdateRequest.requests.Add(updateOperation);
+            GridData gData = updateRange.grid_data;
+            gData.start_column = 0;
+            gData.start_row = rowCount + 1;
+            gData.rows = new List<Row>();
+            int nextStart = gData.start_row;
+            for (int i = 0; i < willFilledLines; i++)
+            {
+                if (i % 200 == 0 && i > 0)
+                {
+                    string payloadRow = JsonConvert.SerializeObject(batchUpdateRequest);
+                    WebApiLog log = await _mH.PerformRequest("https://qyapi.weixin.qq.com/cgi-bin/wedoc/spreadsheet/batch_update?access_token=" + token, "", payloadRow, "POST", "企业微信", purpose, memo, batchId);
+                    //logs.Add(log);
+                    gData.rows.Clear();
+                    gData.start_row = nextStart;
+                }
+                nextStart++;
+                Row row = new Row();
+                row.values = new List<Cell>();
+                for (int j = 0; j < colCount; j++)
+                {
+                    Cell cell = new Cell();
+                    cell.cell_format = new CellFormat();
+                    cell.cell_format.bold = false;
+                    cell.cell_value = new CellValue();
+                    cell.cell_value.text = "";
+                    row.values.Add(cell);
+                }
+                gData.rows.Add(row);
+            }
+            string payloadLast = JsonConvert.SerializeObject(batchUpdateRequest);
+            WebApiLog logFinal = await _mH.PerformRequest("https://qyapi.weixin.qq.com/cgi-bin/wedoc/spreadsheet/batch_update?access_token=" + token, "", payloadLast, "POST", "企业微信", purpose, memo, batchId);
+            //logs.Add(logFinal);
         }
         [HttpGet]
         public async Task RefreshTransTable()
@@ -207,6 +255,7 @@ namespace SnowmeetApi.Controllers
             string sheetId = await GetSheetId(docId, token, batchId, "交易账单", "获取sheetid");
             await CreateTransTableTitle(sheetId, docId, token, batchId, "交易账单", "更新数据");
             await InserTransData(sheetId, docId, token, batchId, "交易账单", "更新数据");
+            await FillBlank(15000, docId, token, "交易账单", "更新数据", batchId);
         }
         [HttpGet]
         public async Task RecreateTransTable()
@@ -447,7 +496,7 @@ namespace SnowmeetApi.Controllers
             gData.start_column = 0;
             gData.start_row = 1;
             gData.rows = new List<Row>();
-            gData.start_row = 1;
+            //gData.start_row = 1;
             int nextStart = 1;
             DateTime startDate = DateTime.Parse("2025-10-15");
             List<WepayBalance> bArr = await _db.wepayBalance.Where(b => b.trans_date.Date >= startDate.Date).OrderBy(b => b.mch_id).ThenBy(b => b.trans_date).AsNoTracking().ToListAsync();
@@ -619,7 +668,7 @@ namespace SnowmeetApi.Controllers
             gData.start_column = 0;
             gData.start_row = 1;
             gData.rows = new List<Row>();
-            gData.start_row = 1;
+            //gData.start_row = 1;
             int nextStart = 1;
             DateTime startDate = DateTime.Parse("2025-10-15");
             List<WepayFlowBill> bArr = await _db.wepayFlowBill.Where(b => b.bill_date_time.Date >= startDate.Date).OrderBy(b => b.mch_id).ThenBy(b => b.bill_date_time).AsNoTracking().ToListAsync();
