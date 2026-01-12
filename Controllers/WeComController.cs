@@ -95,7 +95,7 @@ namespace SnowmeetApi.Controllers
             public string? sheet_id { get; set; } = null;
             public string? title { get; set; } = null;
             public int row_count { get; set; } = 0;
-            public int column_column { get; set; } = 0;
+            public int column_count { get; set; } = 0;
         }
         public ApplicationDBContext _db;
         public IConfiguration _config;
@@ -179,6 +179,20 @@ namespace SnowmeetApi.Controllers
             string sheetId = await GetSheetId(docId, token, batchId, purpose, "获取sheetid");
             await CreateTransTableTitle(sheetId, docId, token, batchId, "资金账单", "更新数据", "fund");
             await InserFundData(sheetId, docId, token, batchId, "资金账单", "更新数据");
+        }
+        [NonAction]
+        public async Task FillBlank(int macLineCount, string docId, string token, string purpose, string memo, string batchId)
+        {
+            string url = "https://qyapi.weixin.qq.com/cgi-bin/wedoc/spreadsheet/get_sheet_properties?access_token=" + token;
+            string payload = "{ \"docid\": \"" + docId + "\" ";
+            WebApiLog getFileLog = await _mH.PerformRequest(url, "", payload, "POST", "企业微信", purpose, memo, batchId);
+            WeComApiResponse res = JsonConvert.DeserializeObject<WeComApiResponse>(getFileLog.response);
+            if (res.errcode != 0)
+            {
+                return;
+            }
+            int rowCount = res.properties[0].row_count;
+            int colCount = res.properties[0].column_count;
         }
         [HttpGet]
         public async Task RefreshTransTable()
