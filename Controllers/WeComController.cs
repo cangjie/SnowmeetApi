@@ -120,7 +120,7 @@ namespace SnowmeetApi.Controllers
             _http = httpContextAccessor;
             _mH = new MiniAppHelperController(_db, _config);
         }
-        [HttpGet]
+        [NonAction]
         public async Task RecreateAliFundTable()
         {
             string purpose = "支付宝";
@@ -148,16 +148,46 @@ namespace SnowmeetApi.Controllers
             }
             string sheetId = await GetSheetId(docId, token, batchId, purpose, "获取sheetid");
             await CreateTransTableTitle(sheetId, docId, token, batchId, "资金账单", "更新数据", "ali");
-            await InserFundData(sheetId, docId, token, batchId, "支付宝", "更新数据");
+            await InsertFundData(sheetId, docId, token, batchId, "支付宝", "更新数据");
         }
         [HttpGet]
+        public async Task RefreshAli()
+        {
+            string docId = "dc8AjUHJof3cFWORO6kf-kcwY6AD-ARg9eHDyOonC22GWSKZE5AkCeRUp2tBGIcvHlupYo6YyhaeBV9sqnYxgIlA";
+            string batchId = DateTime.Now.ToString("yyyyMMddhhmmss");
+            string token = await GetToken(batchId, "支付宝");
+            if (token == null)
+            {
+                return;
+            }
+            string sheetId = await GetSheetId(docId, token, batchId, "支付宝", "获取sheetid");
+            await CreateTransTableTitle(sheetId, docId, token, batchId, "支付宝", "更新数据", "ali");
+            await InsertAliData(sheetId, docId, token, batchId, "支付宝", "更新数据");
+            await FillBlank(10000, docId, token, "支付宝", "更新数据", batchId);
+        }
+        [HttpGet]
+        public async Task RefreshFundTable()
+        {
+            string docId = "dcVUQ5rOWF3z2uS4AKzylB1YxNcbW6kjUA411EO9H8R-V0mL7FDH8elbW36bRZj0242wPTkHb_V6UQPRcnjguEEw";
+            string batchId = DateTime.Now.ToString("yyyyMMddhhmmss");
+            string token = await GetToken(batchId, "资金账单");
+            if (token == null)
+            {
+                return;
+            }
+            string sheetId = await GetSheetId(docId, token, batchId, "资金账单", "获取sheetid");
+            await CreateTransTableTitle(sheetId, docId, token, batchId, "资金账单", "更新数据", "fund");
+            await InsertFundData(sheetId, docId, token, batchId, "资金账单", "更新数据");
+            await FillBlank(20000, docId, token, "资金账单", "更新数据", batchId);
+        }
+        [NonAction]
         public async Task RecreateFundTable()
         {
             string purpose = "资金账单";
             bool needRefresh = await CheckNeedReCreateTransTable(purpose);
             if (!needRefresh)
             {
-                return;
+                //return;
             }
             string batchId = DateTime.Now.ToString("yyyyMMddhhmmss");
             string token = await GetToken(batchId, purpose);
@@ -178,7 +208,7 @@ namespace SnowmeetApi.Controllers
             }
             string sheetId = await GetSheetId(docId, token, batchId, purpose, "获取sheetid");
             await CreateTransTableTitle(sheetId, docId, token, batchId, "资金账单", "更新数据", "fund");
-            await InserFundData(sheetId, docId, token, batchId, "资金账单", "更新数据");
+            await InsertFundData(sheetId, docId, token, batchId, "资金账单", "更新数据");
             
         }
         [NonAction]
@@ -256,10 +286,10 @@ namespace SnowmeetApi.Controllers
             }
             string sheetId = await GetSheetId(docId, token, batchId, "交易账单", "获取sheetid");
             await CreateTransTableTitle(sheetId, docId, token, batchId, "交易账单", "更新数据");
-            //await InserTransData(sheetId, docId, token, batchId, "交易账单", "更新数据");
+            await InserTransData(sheetId, docId, token, batchId, "交易账单", "更新数据");
             await FillBlank(15000, docId, token, "交易账单", "更新数据", batchId);
         }
-        [HttpGet]
+        [NonAction]
         public async Task RecreateTransTable()
         {
             bool needRefresh = await CheckNeedReCreateTransTable();
@@ -649,7 +679,7 @@ namespace SnowmeetApi.Controllers
             return logs;
         }
         [NonAction]
-        public async Task<List<WebApiLog>> InserFundData(string sheetId, string docId, string token, string batchId, string purpose, string memo)
+        public async Task<List<WebApiLog>> InsertFundData(string sheetId, string docId, string token, string batchId, string purpose, string memo)
         {
             MiniAppHelperController _mHelper = new MiniAppHelperController(_db, _config);
             List<WebApiLog> logs = new List<WebApiLog>();
@@ -766,7 +796,7 @@ namespace SnowmeetApi.Controllers
             return logs;
         }
         [NonAction]
-        public async Task<List<WebApiLog>> InserAliData(string sheetId, string docId, string token, string batchId, string purpose, string memo)
+        public async Task<List<WebApiLog>> InsertAliData(string sheetId, string docId, string token, string batchId, string purpose, string memo)
         {
             MiniAppHelperController _mHelper = new MiniAppHelperController(_db, _config);
             List<WebApiLog> logs = new List<WebApiLog>();

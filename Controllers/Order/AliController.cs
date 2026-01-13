@@ -668,7 +668,7 @@ namespace SnowmeetApi.Controllers
 
 
         }
-
+        /*
         [HttpGet("{appId}")]
         public async Task GetBill(string appId, DateTime billDate)
         {
@@ -731,6 +731,7 @@ namespace SnowmeetApi.Controllers
                 Console.WriteLine("调用失败");
             }
         }
+        */
         [HttpGet]
         public void GetFlow(DateTime startDate, DateTime endDate)
         {
@@ -762,13 +763,14 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet]
-        public async Task DataAll(DateTime billDate, string type = "signcustomer")
+        public async Task DataAll(DateTime? billDate = null, string type = "signcustomer")
         {
+            DateTime currentDate = billDate == null? DateTime.Now.Date.AddDays(-1) : (DateTime)billDate;
             IAopClient client = GetClient(appId);
             AlipayDataDataserviceBillDownloadurlQueryModel model = new AlipayDataDataserviceBillDownloadurlQueryModel();
             //model.setSmid("2088123412341234");
             model.BillType = type;
-            model.BillDate = billDate.ToString("yyyy-MM-dd");
+            model.BillDate =  currentDate.ToString("yyyy-MM-dd");
             AlipayDataDataserviceBillDownloadurlQueryRequest req = new AlipayDataDataserviceBillDownloadurlQueryRequest();
             req.SetBizModel(model);
             AlipayDataDataserviceBillDownloadurlQueryResponse res = client.CertificateExecute(req);
@@ -786,7 +788,7 @@ namespace SnowmeetApi.Controllers
             {
                 Directory.CreateDirectory(downloadPath);
             }
-            string tempFileName = billDate.ToString("yyyyMMdd") + "_" + Util.GetLongTimeStamp(DateTime.Now).ToString() + ".zip";
+            string tempFileName = currentDate.ToString("yyyyMMdd") + "_" + Util.GetLongTimeStamp(DateTime.Now).ToString() + ".zip";
             HttpWebRequest reqWeb = (HttpWebRequest)WebRequest.Create(respObj.alipay_data_dataservice_bill_downloadurl_query_response.bill_download_url.Trim());
             HttpWebResponse resWeb = (HttpWebResponse)reqWeb.GetResponse();
             Stream s = resWeb.GetResponseStream();
@@ -813,11 +815,11 @@ namespace SnowmeetApi.Controllers
                     using (var reader = new StreamReader(stream, Encoding.GetEncoding("GB2312")))
                     {
                         var str = reader.ReadToEnd();
-                        if (entry.FullName.Trim().EndsWith(billDate.ToString("yyyyMMdd") + "_TRANSFER_DETAILS.csv"))
+                        if (entry.FullName.Trim().EndsWith(currentDate.ToString("yyyyMMdd") + "_TRANSFER_DETAILS.csv"))
                         {
                             await DealTrans(str.Trim());
                         }
-                        if (entry.FullName.Trim().EndsWith(billDate.ToString("yyyyMMdd") + "_账务明细.csv"))
+                        if (entry.FullName.Trim().EndsWith(currentDate.ToString("yyyyMMdd") + "_账务明细.csv"))
                         {
                             await DealTrans(str.Trim());
                         }
