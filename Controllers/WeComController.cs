@@ -129,7 +129,7 @@ namespace SnowmeetApi.Controllers
             {
                 return;
             }
-            string batchId = DateTime.Now.ToString("yyyyMMddhhmmss");
+            string batchId = DateTime.Now.ToString("yyyyMMddHHmmss");
             string token = await GetToken(batchId, purpose);
             if (token == null)
             {
@@ -154,7 +154,7 @@ namespace SnowmeetApi.Controllers
         public async Task RefreshAli()
         {
             string docId = "dc8AjUHJof3cFWORO6kf-kcwY6AD-ARg9eHDyOonC22GWSKZE5AkCeRUp2tBGIcvHlupYo6YyhaeBV9sqnYxgIlA";
-            string batchId = DateTime.Now.ToString("yyyyMMddhhmmss");
+            string batchId = DateTime.Now.ToString("yyyyMMddHHmmss");
             string token = await GetToken(batchId, "支付宝");
             if (token == null)
             {
@@ -169,7 +169,7 @@ namespace SnowmeetApi.Controllers
         public async Task RefreshFundTable()
         {
             string docId = "dcVUQ5rOWF3z2uS4AKzylB1YxNcbW6kjUA411EO9H8R-V0mL7FDH8elbW36bRZj0242wPTkHb_V6UQPRcnjguEEw";
-            string batchId = DateTime.Now.ToString("yyyyMMddhhmmss");
+            string batchId = DateTime.Now.ToString("yyyyMMddHHmmss");
             string token = await GetToken(batchId, "资金账单");
             if (token == null)
             {
@@ -189,7 +189,7 @@ namespace SnowmeetApi.Controllers
             {
                 //return;
             }
-            string batchId = DateTime.Now.ToString("yyyyMMddhhmmss");
+            string batchId = DateTime.Now.ToString("yyyyMMddHHmmss");
             string token = await GetToken(batchId, purpose);
             if (token == null)
             {
@@ -278,7 +278,7 @@ namespace SnowmeetApi.Controllers
         public async Task RefreshTransTable()
         {
             string docId = "dcrDFM9sIzIhyt7NC5FhjrBKJ6yC7Gz-z-xONcpuQxxX9nun1buvhIWGZW0pTfRt1KXUTkk4XGZcOSQjkUMv07AA";
-            string batchId = DateTime.Now.ToString("yyyyMMddhhmmss");
+            string batchId = DateTime.Now.ToString("yyyyMMddHHmmss");
             string token = await GetToken(batchId, "交易账单");
             if (token == null)
             {
@@ -297,7 +297,7 @@ namespace SnowmeetApi.Controllers
             {
                 //return;
             }
-            string batchId = DateTime.Now.ToString("yyyyMMddhhmmss");
+            string batchId = DateTime.Now.ToString("yyyyMMddHHmmss");
             string token = await GetToken(batchId, "交易账单");
             if (token == null)
             {
@@ -564,7 +564,7 @@ namespace SnowmeetApi.Controllers
                             break;
                         case "交易时间":
                             DateTime transTime = DateTime.Parse(bArr[i].trans_date.ToString());
-                            cell.cell_value.text = transTime.ToString("hh:mm:ss");
+                            cell.cell_value.text = transTime.ToString("HH:mm:ss");
                             break;
                         case "公众账号ID":
                             cell.cell_value.text = bArr[i].app_id.ToString();
@@ -741,7 +741,7 @@ namespace SnowmeetApi.Controllers
                             break;
                         case "记账时间":
                             DateTime transTime = DateTime.Parse(bArr[i].bill_date_time.ToString());
-                            cell.cell_value.text = transTime.ToString("hh:mm:ss");
+                            cell.cell_value.text = transTime.ToString("HH:mm:ss");
                             break;
                         case "微信支付业务单号":
                             cell.cell_value.text = bArr[i].biz_no.ToString();
@@ -858,7 +858,7 @@ namespace SnowmeetApi.Controllers
                             break;
                         case "发生时间":
                             DateTime transTime = DateTime.Parse(bArr[i].trans_date.ToString());
-                            cell.cell_value.text = transTime.ToString("hh:mm:ss");
+                            cell.cell_value.text = transTime.ToString("HH:mm:ss");
                             break;
                         case "业务流水号":
                             cell.cell_value.text = bArr[i].biz_num.ToString();
