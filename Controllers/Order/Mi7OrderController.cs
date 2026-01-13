@@ -1,3 +1,4 @@
+/*
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -274,13 +275,7 @@ namespace SnowmeetApi.Controllers.Order
                     pay_method = mi7Order.order != null && mi7Order.order.paymentList.Count > 0  ?  mi7Order.order.paymentList[0].pay_method.Trim() : ""
                 };
                 ret.Add(r);
-                /*
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine(ex.Message);
-                }
-                */
+               
             }
             return Ok(ret);
         }
@@ -342,24 +337,7 @@ namespace SnowmeetApi.Controllers.Order
                 return Ok(mi7Order);
             }
         }
-/*
-        [HttpGet("{id}")]
-        public async Task<ActionResult<List<Models.StaffModLog>>> GetLogs(int id, string sessionKey,
-            string sessionType = "wechat_mini_openid")
-        {
-            sessionKey = Util.UrlDecode(sessionKey);
-            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _context);
-            if (!user.isAdmin)
-            {
-                return BadRequest();
-            }
-            List<Models.StaffModLog> logs = await _context.staffModLog
-                .Include(l => l.staffMember).ThenInclude(m => m.memberSocialAccounts)
-                .Where(l => (l.table_name.Trim().Equals("mi7_order") && l.key_id.Trim().Equals(id.ToString()) ))
-                .OrderByDescending(l => l.id).AsNoTracking().ToListAsync();
-            return Ok(logs); 
-        }
-*/
+
         [HttpGet("{id}")]
         public async Task<ActionResult<Mi7Order>> ModMi7Order(int id, string orderNum, string sessionKey, string orderType = "普通")
         {
@@ -379,39 +357,12 @@ namespace SnowmeetApi.Controllers.Order
             if (!orderNum.Trim().Equals(""))
             {
                 order.mi7_order_id = orderNum;
-                /*
-                StaffModLog log = new StaffModLog()
-                {
-                    id = 0,
-                    table_name = "mi7_order",
-                    field_name = "mi7_order_id",
-                    key_id = id.ToString(),
-                    scene = "修改七色米订单号",
-                    staff_member_id = user.member.id,
-                    prev_value = order.mi7_order_id,
-                    current_value = orderNum,
-                    create_date = DateTime.Now
-                };
-                */
+                
                 //await _context.staffModLog.AddAsync(log);
             }
             if (!order.order_type.Trim().Equals(orderType.Trim()))
             {
-                /*
-                StaffModLog log = new StaffModLog()
-                {
-                    id = 0,
-                    table_name = "mi7_order",
-                    field_name = "order_type",
-                    key_id = id.ToString(),
-                    scene = "修改七色米订单类型",
-                    staff_member_id = user.member.id,
-                    prev_value = order.order_type,
-                    current_value = orderType.Trim(),
-                    create_date = DateTime.Now
-                };
-                await _context.staffModLog.AddAsync(log);
-                */
+                
                 order.order_type = orderType.Trim();
             }
             
@@ -507,61 +458,7 @@ namespace SnowmeetApi.Controllers.Order
                 }
             }
         }
-        /*
-        [HttpGet]
-        public async Task PairWithCell()
-        {
-            List<Mi7ExportedSaleList> list = await _context.mi7ExportedSaleList
-                .Where(m => m.mi7_order_id == null).ToListAsync();
-            List<Mi7Order> mi7OrderListOri = await _context.mi7Order
-                .Include(m => m.order).ThenInclude(o => o.paymentList.Where(p => p.status.Trim().Equals("支付成功")))
-                    .ThenInclude(p => p.refunds.Where(r => r.state == 1 || !r.refund_id.Trim().Equals("")))
-                .Where(o =>  !o.mi7_order_id.StartsWith("XSD"))
-                .ToListAsync();
-            List<Mi7Order> mi7OrderList = mi7OrderListOri.Where(m => m.create_date>DateTime.Parse("2024-9-1")).ToList();
-            for(int i = 0; i < list.Count; i++)
-            {
-                //bool paired = false;
-                Mi7ExportedSaleList mi7e = list[i];
-                
-                for(int j = 0; j < mi7OrderList.Count; j++)
-                {
-                    Mi7Order order = mi7OrderList[j];
-                    
-                    if (order.member == null)
-                    {
-                        List<MemberSocialAccount> msaList = await _context.memberSocialAccount
-                            .Include(m => m.member).ThenInclude(m => m.memberSocialAccounts)
-                            .Where(m => m.num.Trim().Equals(order.order.open_id.Trim()) && m.type.Trim().Equals("wechat_mini_openid"))
-                            .ToListAsync();
-                        if (msaList != null && msaList.Count > 0)
-                        {
-                            order.member = msaList[0].member;
-                        }
-                    }
-                    string cell = order.member != null && order.member.cell != null ? order.member.cell.Trim() : "";
-                    if (cell.Equals("") || mi7e.cell.Trim().Equals(""))
-                    {
-                        continue;
-                    }
-                    if (cell.Trim().Equals(mi7e.cell.Trim()) && DateTime.Parse(mi7e.业务日期) == order.create_date.Date 
-                        && double.Parse(mi7e.实收金额) == order.order.paidAmount )
-                    {
-                        mi7e.mi7_order_id = order.id;
-                        order.mi7_order_id = mi7e.单据编号.Trim();
-                        _context.mi7ExportedSaleList.Entry(mi7e).State = EntityState.Modified;
-                        _context.mi7Order.Entry(order).State = EntityState.Modified;
-                        await _context.SaveChangesAsync();
-                    }
-                    
-                    //bool paired = false;
-                    
-                }
-
-            }
-            
-        }
-        */
+        
 
         private bool Mi7OrderExists(int id)
         {
@@ -569,3 +466,4 @@ namespace SnowmeetApi.Controllers.Order
         }
     }
 }
+*/

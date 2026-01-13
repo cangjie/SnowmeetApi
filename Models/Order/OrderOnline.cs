@@ -120,7 +120,7 @@ namespace SnowmeetApi.Models
         [NotMapped]
         public MiniAppUser? user { get; set; }
         
-        public List<Mi7Order>? mi7Orders { get; set; }
+        //public List<Mi7Order>? mi7Orders { get; set; }
         [NotMapped]
         public string status
         {

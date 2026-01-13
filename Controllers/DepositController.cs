@@ -607,9 +607,11 @@ namespace SnowmeetApi.Controllers
             await _db.SaveChangesAsync();
             return Ok(account);
         }
+        /*
         [NonAction]
         public async Task<int?> GetMi7OrderId(string mi7OrderId)
         {
+
             List<Mi7Order> mi7OrderList = await _db
                 .mi7Order.Where(o => o.mi7_order_id.Trim().Equals(mi7OrderId.Trim()) && o.order_id > 0)
                 .AsNoTracking().ToListAsync();
@@ -622,6 +624,7 @@ namespace SnowmeetApi.Controllers
                 return null;
             }
         }
+        */
         [HttpGet("{type}")]
         public async Task<ActionResult<List<DepositBalance>>> GetAllBalance(string type, DateTime start, DateTime end,
             string sessionKey, string sessionType = "wechat_mini_openid")

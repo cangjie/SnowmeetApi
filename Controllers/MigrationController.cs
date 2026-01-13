@@ -1,3 +1,4 @@
+/*
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -219,13 +220,6 @@ namespace SnowmeetApi.Controllers
 
             RentController _rHelper = new RentController(_db, _config, _http);
             StaffController _staffHelper = new StaffController(_db);
-
-            /*
-            RentOrder commonOrder = (RentOrder)((OkObjectResult)(await _rHelper.GetRentOrder(14384, "", false)).Result).Value;
-            RentOrder entOrder = (RentOrder)((OkObjectResult)(await _rHelper.GetRentOrder(14382, "", false)).Result).Value;
-            RentOrder closeOrder = (RentOrder)((OkObjectResult)(await _rHelper.GetRentOrder(13370, "", false)).Result).Value;
-            */
-
 
             List<RentOrder> rentIdList = await _db.RentOrder
             //.Where(r => r.id == 4562)
@@ -1050,3 +1044,4 @@ namespace SnowmeetApi.Controllers
         }
     }
 }
+*/

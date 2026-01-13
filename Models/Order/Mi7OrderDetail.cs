@@ -1,4 +1,5 @@
-﻿using System;
+﻿/*
+using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using static SKIT.FlurlHttpClient.Wechat.TenpayV3.Models.CreateApplyForSubMerchantApplymentRequest.Types.Business.Types.SaleScene.Types;
@@ -34,4 +35,4 @@ namespace SnowmeetApi.Models
         public DateTime update_date { get; set; } = DateTime.Now;
     }
 }
-
+*/

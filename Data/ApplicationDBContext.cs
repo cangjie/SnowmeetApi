@@ -34,7 +34,7 @@ namespace SnowmeetApi.Data
             modelBuilder.Entity<Brand>().HasKey(b => new { b.brand_name, b.brand_type });
             modelBuilder.Entity<Member>().HasMany<RentOrderLog>().WithOne(m => m.member).HasForeignKey(r => r.oper_member_id);
             
-            modelBuilder.Entity<Mi7ExportedSaleDetail>().HasNoKey();
+            //modelBuilder.Entity<Mi7ExportedSaleDetail>().HasNoKey();
             
 
             /////////////new season
@@ -63,7 +63,7 @@ namespace SnowmeetApi.Data
         public DbSet<BltDevice> BltDevice { get; set; }
 
         public DbSet<SummerMaintain> SummerMaintain { get; set; }
-        public DbSet<Mi7Order> mi7Order { get; set; }
+        //public DbSet<Mi7Order> mi7Order { get; set; }
 
         public DbSet<ShopSaleInteract> ShopSaleInteract { get; set; }
         public DbSet<OrderPayment> OrderPayment { get; set; }
@@ -72,7 +72,7 @@ namespace SnowmeetApi.Data
 
         public DbSet<Models.Maintain.MaintainLog> MaintainLog { get; set; }
         public DbSet<Models.Background.BackgroundLoginSession> BackgroundLoginSession { get; set; }
-        public DbSet<Mi7OrderDetail> mi7OrderDetail { get; set; }
+        //public DbSet<Mi7OrderDetail> mi7OrderDetail { get; set; }
         
         public DbSet<Models.SkiPassProduct> skiPassProduct { get; set; }
         public DbSet<OAReceive> oAReceive { get; set; }

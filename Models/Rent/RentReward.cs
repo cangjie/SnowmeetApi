@@ -36,7 +36,7 @@ namespace SnowmeetApi.Models.Rent
                 return amount;
             }
         }
-        [NotMapped]
-        public Mi7Order? mi7Order {get; set;} = null;
+        //[NotMapped]
+        //public Mi7Order? mi7Order {get; set;} = null;
     }
 }

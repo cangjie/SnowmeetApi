@@ -189,6 +189,7 @@ namespace SnowmeetApi.Controllers
 
             if (order.type.Trim().StartsWith("店销"))
             {
+                /*
                 desc = order.shop.Trim() + order.type.Trim();
                 var mi7Orders = await _db.mi7Order
                     .Where(o => o.order_id == order.id).ToArrayAsync();
@@ -198,6 +199,8 @@ namespace SnowmeetApi.Controllers
                     mi7Nos = mi7Nos.Trim() + " " + ((mi7Orders[i].mi7_order_id == null) ? "紧急开单" : mi7Orders[i].mi7_order_id.Trim());
                 }
                 desc = desc + mi7Nos.Trim();
+                */
+                desc = "零售商品";
             }
             else if (order.type.Trim().StartsWith("服务"))
             {
