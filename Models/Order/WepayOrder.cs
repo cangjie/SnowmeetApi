@@ -1,4 +1,5 @@
-﻿using System;
+﻿/*
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -26,3 +27,4 @@ namespace SnowmeetApi.Models
         public string prepay_id { get; set; } = "";
     }
 }
+*/

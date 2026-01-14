@@ -52,11 +52,10 @@ namespace SnowmeetApi.Data
         public DbSet<Models.Users.MiniAppUser> MiniAppUsers { get; set; }
         public DbSet<Models.Users.OfficialAccoutUser> officialAccoutUsers { get; set; }
         public DbSet<OrderOnline> OrderOnlines { get; set; }
-        public DbSet<WepayKey> WepayKeys { get; set; }
-        public DbSet<WepayOrder> WepayOrders { get; set; }
+        public DbSet<WepayKey> wepayKeys { get; set; }
+        //public DbSet<WepayOrder> WepayOrders { get; set; }
         //public DbSet<OrderOnlineTemp> OrderOnlineTemp { get; set; }
-        public DbSet<WepayOrderRefund> WePayOrderRefund { get; set; }
-
+        //public DbSet<WepayOrderRefund> WePayOrderRefund { get; set; }
         public DbSet<OrderOnlineDetail> OrderOnlineDetails { get; set; }
         public DbSet<Experience> Experience { get; set; }
 

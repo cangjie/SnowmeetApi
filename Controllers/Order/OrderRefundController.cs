@@ -62,7 +62,7 @@ namespace SnowmeetApi.Controllers.Order
                 {
                     continue;
                 }
-                WepayKey key = await _db.WepayKeys.FindAsync(p.mch_id);
+                WepayKey key = await _db.wepayKeys.FindAsync(p.mch_id);
                 var certManager = new InMemoryCertificateManager();
                 var options = new WechatTenpayClientOptions()
                 {
@@ -115,7 +115,7 @@ namespace SnowmeetApi.Controllers.Order
             {
                 return NotFound();
             }
-            WepayKey key = await _db.WepayKeys.FindAsync(mchId);
+            WepayKey key = await _db.wepayKeys.FindAsync(mchId);
 
             var certManager = new InMemoryCertificateManager();
             var options = new WechatTenpayClientOptions()
@@ -308,7 +308,7 @@ namespace SnowmeetApi.Controllers.Order
 
 
             string apiKey = "";
-            WepayKey key = _db.WepayKeys.Find(mchid);
+            WepayKey key = _db.wepayKeys.Find(mchid);
 
             if (key == null)
             {

@@ -671,7 +671,7 @@ namespace SnowmeetApi.Controllers.Order
             string postJson = await reader.ReadToEndAsync();
 
             string apiKey = "";
-            WepayKey key = _context.WepayKeys.Find(mchid);
+            WepayKey key = _context.wepayKeys.Find(mchid);
 
             if (key == null)
             {
@@ -809,7 +809,7 @@ namespace SnowmeetApi.Controllers.Order
             }
             string timeStamp = Util.getTime13().ToString();
             int mchid = GetMchId(order);
-            WepayKey key = await _context.WepayKeys.FindAsync(mchid);
+            WepayKey key = await _context.wepayKeys.FindAsync(mchid);
 
             var certManager = new InMemoryCertificateManager();
             var options = new WechatTenpayClientOptions()

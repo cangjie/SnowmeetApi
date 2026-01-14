@@ -302,7 +302,7 @@ namespace SnowmeetApi.Controllers
             string postJson = await reader.ReadToEndAsync();
 
             string apiKey = "";
-            WepayKey key = _db.WepayKeys.Find(mchid);
+            WepayKey key = _db.wepayKeys.Find(mchid);
 
             if (key == null)
             {
@@ -558,7 +558,7 @@ namespace SnowmeetApi.Controllers
 
 
             string apiKey = "";
-            WepayKey key = _db.WepayKeys.Find(mchid);
+            WepayKey key = _db.wepayKeys.Find(mchid);
 
             if (key == null)
             {
@@ -890,7 +890,7 @@ namespace SnowmeetApi.Controllers
         [NonAction]
         public async Task<WechatTenpayClient> GetClient(int mchId)
         {
-            WepayKey key = await _db.WepayKeys.Where(k => k.id == mchId)
+            WepayKey key = await _db.wepayKeys.Where(k => k.id == mchId)
                 .AsNoTracking().FirstOrDefaultAsync();
             var certManager = new InMemoryCertificateManager();
             if (key.cert != null)
@@ -1088,7 +1088,7 @@ namespace SnowmeetApi.Controllers
                 return;
             }
 
-            WepayKey k = await _db.WepayKeys.FindAsync(mchId);
+            WepayKey k = await _db.wepayKeys.FindAsync(mchId);
 
             string getUrl = "https://api.mch.weixin.qq.com/v3/bill/tradebill?bill_date=" + billDate.ToString("yyyy-MM-dd");
 
@@ -1308,7 +1308,7 @@ namespace SnowmeetApi.Controllers
         [HttpGet("{mchId}")]
         public async Task RequestFlowBill(int mchId, DateTime billDate)
         {
-            WepayKey k = await _db.WepayKeys.FindAsync(mchId);
+            WepayKey k = await _db.wepayKeys.FindAsync(mchId);
 
             string getUrl = "https://api.mch.weixin.qq.com/v3/bill/fundflowbill?bill_date=" + billDate.ToString("yyyy-MM-dd");
 
@@ -1402,7 +1402,7 @@ namespace SnowmeetApi.Controllers
 
 
 
-            var wepayKeyList = await _db.WepayKeys.ToListAsync();
+            var wepayKeyList = await _db.wepayKeys.ToListAsync();
 
             List<WepayBalance> retList = new List<WepayBalance>();
             int maxLen = 0;
@@ -1885,7 +1885,7 @@ namespace SnowmeetApi.Controllers
         public async Task<bool> ClosePayment(OrderPayment payment)
         {
             //OrderPayment payment = await _db.orderPayment.FindAsync(paymentId);
-            WepayKey key = await _db.WepayKeys.Where(k => k.id == payment.mch_id).AsNoTracking().FirstOrDefaultAsync();
+            WepayKey key = await _db.wepayKeys.Where(k => k.id == payment.mch_id).AsNoTracking().FirstOrDefaultAsync();
             int mchId = (int)payment.mch_id;
             var req = new ClosePayTransactionRequest();
             req.OutTradeNumber = payment.out_trade_no.Trim();

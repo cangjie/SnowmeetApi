@@ -17,5 +17,6 @@ namespace wechat_miniapp_base.Models
         public string api_key { get; set; }
         public int valid { get; set; }
         public string? cert {get; set;} = null;
+        public string? doc_id {get; set;} = null;
     }
 }
