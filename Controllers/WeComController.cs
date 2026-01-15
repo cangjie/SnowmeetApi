@@ -124,6 +124,97 @@ namespace SnowmeetApi.Controllers
             _http = httpContextAccessor;
             _mH = new MiniAppHelperController(_db, _config);
         }
+        [HttpGet("{mchId}")]
+        public async Task<ActionResult<int>> RefreshWepayByEachMchId(int mchId)
+        {
+            string purpose = "微信支付";
+            string memo = "分账户";
+            string batchId = DateTime.Now.ToString("yyyyMMddHHmmss");
+            string token = await GetToken(batchId, "微信支付");
+            WepayKey key = await _db.wepayKeys.Where(k => k.id == mchId).AsNoTracking().FirstOrDefaultAsync();
+            if (key == null)
+            {
+                return Ok(-3);
+            }
+            string? balanceSheetId = null;
+            string? fundSheetId = null;
+            if (key.doc_id == null)
+            {
+                string fileName = key.mch_id + "_" + key.mch_name;
+                string? fileId = await GetFileId(wepayDirId, fileName, batchId, token, purpose, memo);
+                for (; fileId != null;)
+                {
+                    await DeleteFile(fileId, token, purpose, memo, batchId);
+                    fileId = await GetFileId(wepayDirId, fileName, batchId, token, purpose, memo);
+
+                }
+                //continue;
+                string docId = await CreateSheetDoc(wepayDirId, key.mch_id + "_" + key.mch_name, token, purpose, memo, batchId);
+                key.doc_id = docId;
+                _db.wepayKeys.Entry(key).State = EntityState.Modified;
+                await _db.SaveChangesAsync();
+                List<SheetProperties> sheetProperties = await GetSheetProperties(docId, token, batchId, purpose, memo);
+
+                await CreateSheet(docId, "交易账单", 26, 5000, token, purpose, memo, batchId);
+                List<SheetProperties> sps = await CreateSheet(docId, "资金账单", 13, 5000, token, purpose, memo, batchId);
+                for (int j = 0; j < sheetProperties.Count; j++)
+                {
+                    SheetProperties sp = sheetProperties[j];
+                    if (sp.title == "Sheet1")
+                    {
+                        await DeleteSheet(docId, sheetProperties[j].sheet_id, token, purpose, memo, batchId);
+                    }
+                }
+
+                for (int j = 0; j < sps.Count; j++)
+                {
+                    switch (sps[j].title)
+                    {
+                        case "资金账单":
+                            fundSheetId = sps[j].sheet_id;
+                            break;
+                        case "交易账单":
+                            balanceSheetId = sps[j].sheet_id;
+                            break;
+                        default:
+                            break;
+                    }
+                }
+                if (balanceSheetId == null || fundSheetId == null)
+                {
+                    return Ok(-2);
+                }
+                await CreateTransTableTitle(balanceSheetId, docId, token, batchId, purpose, memo);
+                await CreateTransTableTitle(fundSheetId, docId, token, batchId, purpose, memo, "fund");
+            }
+            if (fundSheetId == null || balanceSheetId == null)
+            {
+                List<SheetProperties> sps = await GetSheetProperties(key.doc_id, token, batchId, purpose, memo);
+                for (int j = 0; j < sps.Count; j++)
+                {
+                    switch (sps[j].title)
+                    {
+                        case "资金账单":
+                            fundSheetId = sps[j].sheet_id;
+                            break;
+                        case "交易账单":
+                            balanceSheetId = sps[j].sheet_id;
+                            break;
+                        default:
+                            break;
+                    }
+                }
+            }
+            if (fundSheetId == null || balanceSheetId == null)
+            {
+                return Ok(-1);
+            }
+            await InsertFundData(fundSheetId, key.doc_id, token, batchId, purpose, memo, key.mch_id);
+            await FillBlank(5000, key.doc_id, token, purpose, memo, batchId, fundSheetId);
+            await InsertTransData(balanceSheetId, key.doc_id, token, batchId, purpose, memo, key.mch_id);
+            await FillBlank(5000, key.doc_id, token, purpose, memo, batchId, balanceSheetId);
+            return Ok(0);
+        }
         [HttpGet]
         public async Task RefreshWepayByMchId()
         {
@@ -330,7 +421,7 @@ namespace SnowmeetApi.Controllers
                 docid = docId,
                 requests = new List<UpdateOperation>()
             };
-            sheetId = sheetId == null ? sheetId = await GetSheetId(docId, token, batchId, "交易账单", "获取sheetid"): sheetId;
+            sheetId = sheetId == null ? sheetId = await GetSheetId(docId, token, batchId, "交易账单", "获取sheetid") : sheetId;
             UpdateRangeRequest updateRange = new UpdateRangeRequest()
             {
                 sheet_id = sheetId,
@@ -663,7 +754,7 @@ namespace SnowmeetApi.Controllers
             //gData.start_row = 1;
             int nextStart = 1;
             DateTime startDate = DateTime.Parse("2025-10-15");
-            List<WepayBalance> bArr = await _db.wepayBalance.Where(b => b.trans_date.Date >= startDate.Date 
+            List<WepayBalance> bArr = await _db.wepayBalance.Where(b => b.trans_date.Date >= startDate.Date
                 && (mchId == null || b.mch_id == mchId)).OrderBy(b => b.mch_id).ThenBy(b => b.trans_date).AsNoTracking().ToListAsync();
             for (int i = 0; i < bArr.Count; i++)
             {
