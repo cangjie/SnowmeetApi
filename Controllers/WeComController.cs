@@ -115,7 +115,7 @@ namespace SnowmeetApi.Controllers
         public string wepayFundFileName = "【25-26】微信支付资金账单汇总";
         public string aliFundDirId = "s.ww3a46c4555ae069f9.767798597fsX_d.767799545E4uh";
         public string aliFundFileName = "【25-26】支付宝资金账单";
-        public string[] aliFields = new string[] { "账务流水号", "业务流水号", "商户订单号", "商品名称", "发生日期", "发生时间", "对方账号", "收入金额（+元）", "支出金额（-元）", "账户余额（元）", "交易渠道", "业务类型", "备注" };
+        public string[] aliFields = new string[] { "序号", "账务流水号", "业务流水号", "商户订单号", "商品名称", "发生日期", "发生时间", "对方账号", "收入金额（+元）", "支出金额（-元）", "账户余额（元）", "交易渠道", "业务类型", "备注", "导出批次", "导出日期", "导出时间" };
         public MiniAppHelperController _mH;
         public WeComController(ApplicationDBContext context, IConfiguration config, IHttpContextAccessor httpContextAccessor)
         {
@@ -161,8 +161,50 @@ namespace SnowmeetApi.Controllers
             await ExportWepayTransData(balanceSheetId, docId, token, batchId, purpose, "更新数据", key.mch_id);
             return Ok(0);
         } 
+        [HttpGet]
+        public async Task<ActionResult<string>> CreateAliSheetFile(string? token = null, string? batchId = null, string purpose = "支付宝", string memo = "生成导出数据表格")
+        {
+            if (batchId == null)
+            {
+                batchId = DateTime.Now.ToString("yyyyMMddHHmmss");
+            }
+            if (token == null)
+            {
+                token = await GetToken(batchId, purpose);
+            }
+            string fileName = "【25-26】支付宝资金账单";
+            string? fileId = await GetFileId(aliFundDirId, fileName, batchId, token, purpose, memo);
+            for (; fileId != null;)
+            {
+                await DeleteFile(fileId, token, purpose, memo, batchId);
+                fileId = await GetFileId(aliFundDirId, fileName, batchId, token, purpose, memo);
+            }
+            string docId = await CreateSheetDoc(aliFundDirId, fileName, token, purpose, memo, batchId);
+            string sheetName = "交易账单";
+            List<SheetProperties> sheetProperties = await CreateSheet(docId, sheetName, 29, 5000, token, purpose, memo, batchId);
+            string? sheetId = null;
+            for (int j = 0; j < sheetProperties.Count; j++)
+            {
+                SheetProperties sp = sheetProperties[j];
+                if (sp.title == "Sheet1")
+                {
+                    await DeleteSheet(docId, sp.sheet_id, token, purpose, memo, batchId);
+                }
+                if (sp.title == sheetName)
+                {
+                    sheetId = sp.sheet_id;
+                }
+            }
+            if (sheetId == null)
+            {
+                return BadRequest();
+            }
+            await CreateTransTableTitle(sheetId, docId, token, batchId, purpose, memo, "ali");
+            await FillBlank(5000, docId, token, purpose, memo, batchId, sheetId);
+            return Ok("");
+        }
         [HttpGet("{mchId}")]
-        public async Task<ActionResult<string>> CreateSheetFile(int mchId, string? token = null, string? batchId = null, string purpose = "微信支付", string memo = "分账户")
+        public async Task<ActionResult<string>> CreateWepaySheetFile(int? mchId, string? token = null, string? batchId = null, string purpose = "微信支付", string memo = "分账户")
         {
             if (batchId == null)
             {
@@ -181,12 +223,12 @@ namespace SnowmeetApi.Controllers
                 fileId = await GetFileId(wepayDirId, fileName, batchId, token, purpose, memo);
 
             }
-            string docId = await CreateSheetDoc(wepayDirId, key.mch_id + "_" + key.mch_name, token, purpose, memo, batchId);
+            string docId = await CreateSheetDoc(wepayDirId, fileName, token, purpose, memo, batchId);
             string? balanceSheetId = null;
             string? fundSheetId = null;
-            await CreateSheet(docId, "交易账单", 26, 5000, token, purpose, memo, batchId);
+            await CreateSheet(docId, "交易账单", 29, 5000, token, purpose, memo, batchId);
             List<SheetProperties> sheetProperties = await GetSheetProperties(docId, token, batchId, purpose, memo);
-            List<SheetProperties> sps = await CreateSheet(docId, "资金账单", 13, 5000, token, purpose, memo, batchId);
+            List<SheetProperties> sps = await CreateSheet(docId, "资金账单", 16, 5000, token, purpose, memo, batchId);
             for (int j = 0; j < sheetProperties.Count; j++)
             {
                 SheetProperties sp = sheetProperties[j];
