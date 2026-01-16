@@ -201,7 +201,7 @@ namespace SnowmeetApi.Controllers
             }
             await CreateTransTableTitle(sheetId, docId, token, batchId, purpose, memo, "ali");
             await FillBlank(5000, docId, token, purpose, memo, batchId, sheetId);
-            return Ok("");
+            return Ok(docId);
         }
         [HttpGet("{mchId}")]
         public async Task<ActionResult<string>> CreateWepaySheetFile(int? mchId, string? token = null, string? batchId = null, string purpose = "微信支付", string memo = "分账户")
