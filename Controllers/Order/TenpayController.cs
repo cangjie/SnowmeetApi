@@ -1550,7 +1550,7 @@ namespace SnowmeetApi.Controllers
             report.items = ret;
             return Ok(report);
         }
-
+/*
         [HttpGet]
         public async Task<ActionResult<int>> CreateStatement(string mchId = "1636404775")
         {
@@ -1810,6 +1810,7 @@ namespace SnowmeetApi.Controllers
 
             return Ok(0);
         }
+        */
         [NonAction]
         public int GetMchId(Models.Order order)
         {

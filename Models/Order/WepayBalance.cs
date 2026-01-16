@@ -69,9 +69,10 @@ namespace SnowmeetApi.Models
         public double request_refund_amount { get; set; } = 0;
         //费率备注
         public string fee_rate_memo { get; set; } = "";
-
-        public int statement_id {get; set;} = 0;
-
+        public int? seq_id { get; set; } = null;
+        public int? wedoc_request_id {get; set;} = null;
+        public string ? batch_id {get; set;} = null;
+        //public int statement_id {get; set;} = 0;
         [NotMapped]
         public double drawAmount { get; set; } = 0;
         [NotMapped]

@@ -34,9 +34,9 @@ namespace SnowmeetApi.Models
         public string memo { get; set; }
         //业务凭证号
         public string invoice_id {get; set;}
-
-        public int statement_id {get; set;}
-
+        public int? seq_id { get; set; } = null;
+        public int? wedoc_request_id {get; set;} = null;
+        public string ? batch_id {get; set;} = null;
     }
 }
 

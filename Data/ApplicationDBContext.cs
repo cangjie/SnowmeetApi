@@ -107,7 +107,7 @@ namespace SnowmeetApi.Data
         public DbSet<Models.AlipayMchId> alipayMchId { get; set; }
         public DbSet<Models.Kol> kol { get; set; }
         public DbSet<Models.AliDownloadFlowBill> aliDownloadFlowBill { get; set; }
-        public DbSet<FinancialStatement> financialStatement { get; set; }
+        //public DbSet<FinancialStatement> financialStatement { get; set; }
         public DbSet<RentProductImage> rentProductImage { get; set; }
         public DbSet<Models.School.Staff> schoolStaff { get; set; }
         public DbSet<Models.School.Course> schoolCourse { get; set; }

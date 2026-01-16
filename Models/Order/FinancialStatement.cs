@@ -1,3 +1,4 @@
+/*
 using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -40,3 +41,4 @@ namespace SnowmeetApi.Models
         public double? charge {get; set;}
     }
 }
+*/
