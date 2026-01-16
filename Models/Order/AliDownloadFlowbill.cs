@@ -23,6 +23,9 @@ namespace SnowmeetApi.Models
         public string biz_type {get; set;}
 
         public string memo {get; set;}
+        public int? seq_id { get; set; } = null;
+        public int? wedoc_request_id {get; set;} = null;
+        public string ? batch_id {get; set;} = null;
 
     }
 
