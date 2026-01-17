@@ -131,7 +131,7 @@ namespace SnowmeetApi.Controllers
         public string aliDocId = "dc8zAkVJdS6omNsO72YbEk9wWZtjd1NUvXF9NwtG7UaGHn60fgBYzxdCqDxMnlh0DD1eZM2M5_PxgPMer9CkLuAw";
         public string[] aliFields = new string[] { "序号", "账务流水号", "业务流水号", "商户订单号", "商品名称", "发生日期", "发生时间", "对方账号", "收入金额（+元）", "支出金额（-元）", "账户余额（元）", "交易渠道", "业务类型", "备注", "导出批次", "导出日期", "导出时间" };
         public string[] summaryFields = new string[] { "批次号", "账户名称", "商户号", "数据类型", "数据条数", "数据起始日期", "数据结束日期", "导出日期", "导出开始时间", "导出结束时间" };
-        public string summarDocId = "dcFVpKR9pFtWcmbxek7QisVeJ8ipodKRlrwVaMPnn37BSbVaKcfNQZiIoPTx4IqPbzbbzqFSw1wCZm-1D7KoImnA";
+        public string summaryDocId = "dcuuTiB1Thea6H1ivlkyHtj5zVB7x7s_c_9jIfe9cB1JNnb8XvLDMsqAgq8Vqdmhg3KuE5oTumsjG1oUd-22UEBA";
         public string summaryDirId = "s.ww3a46c4555ae069f9.767798597fsX_d.767799247Qo73";
         public MiniAppHelperController _mH;
         public WeComController(ApplicationDBContext context, IConfiguration config, IHttpContextAccessor httpContextAccessor)
@@ -145,10 +145,11 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<List<Summary>>> GetSummary()
         {
             string token = await GetToken("", "生成汇总");
-            string[,] summaryData = await GetSheetData(summarDocId, "D4K6ja", "A2:A1000", null, "生成汇总", token);
+            string sheetId = await GetSheetId(summaryDocId, token, "", "生成汇总", "生成汇总");
+            string[,] summaryData = await GetSheetData(summaryDocId, sheetId, "A1:A1000", null, "生成汇总", token);
             string batchId = "";
-            int lastRowIndex = 1;
-            for(int i = summaryData.Length - 1; batchId == "" && i >= 0; i--)
+            int lastRowIndex = 0;
+            for(int i = summaryData.Length - 1; batchId == "" && i >= 1; i--)
             {
                 if (summaryData[i, 0] != null && summaryData[i, 0] != "")
                 {
@@ -243,10 +244,10 @@ namespace SnowmeetApi.Controllers
             sArr = sArr.OrderBy(s => s.batchId).ToList();
             BatchUpdateRequest batchUpdateRequest = new BatchUpdateRequest()
             {
-                docid = summarDocId,
+                docid = summaryDocId,
                 requests = new List<UpdateOperation>()
             };
-            string sheetId = "D4K6ja";//sheetId == null ? sheetId = await GetSheetId(docId, token, batchId, "交易账单", "获取sheetid") : sheetId;
+            //string sheetId = "D4K6ja";//sheetId == null ? sheetId = await GetSheetId(docId, token, batchId, "交易账单", "获取sheetid") : sheetId;
             UpdateRangeRequest updateRange = new UpdateRangeRequest()
             {
                 sheet_id = sheetId,
@@ -257,7 +258,7 @@ namespace SnowmeetApi.Controllers
             batchUpdateRequest.requests.Add(updateOperation);
             GridData gData = updateRange.grid_data;
             gData.start_column = 0;
-            gData.start_row = lastRowIndex+2;
+            gData.start_row = lastRowIndex+1;
             gData.rows = new List<Row>();
             for(int i = 0; i < sArr.Count; i++)
             {
