@@ -913,7 +913,7 @@ namespace SnowmeetApi.Controllers
             gData.rows = new List<Row>();
             //gData.start_row = 1;
             int nextStart = 1;
-            List<WepayBalance> updateBatch = new List<WepayBalance>();
+            List<AliDownloadFlowBill> updateBatch = new List<AliDownloadFlowBill>();
             for (int i = 0; i < bArr.Count; i++)
             {
                 if (i % 200 == 0 && i > 0)
@@ -930,17 +930,17 @@ namespace SnowmeetApi.Controllers
                             for(int j = 0; j < updateBatch.Count; j++)
                             {
                                 updateBatch[j].wedoc_request_id = log.id;
-                                _db.wepayBalance.Entry(updateBatch[j]).State = EntityState.Modified;
+                                _db.aliDownloadFlowBill.Entry(updateBatch[j]).State = EntityState.Modified;
                             }
                             await _db.SaveChangesAsync();
                             updateBatch.Clear();
-                            updateBatch = new List<WepayBalance>();
+                            updateBatch = new List<AliDownloadFlowBill>();
                         }
                     }
                     catch
                     {
                         updateBatch.Clear();
-                        updateBatch = new List<WepayBalance>();
+                        updateBatch = new List<AliDownloadFlowBill>();
                     }
                 }
                 nextStart++;
@@ -1031,7 +1031,7 @@ namespace SnowmeetApi.Controllers
             for(int i = 0; i < updateBatch.Count; i++)
             {
                 updateBatch[i].wedoc_request_id = logFinal.id;
-                _db.wepayBalance.Entry(updateBatch[i]).State = EntityState.Modified;
+                _db.aliDownloadFlowBill.Entry(updateBatch[i]).State = EntityState.Modified;
             }
             await _db.SaveChangesAsync();
         }
