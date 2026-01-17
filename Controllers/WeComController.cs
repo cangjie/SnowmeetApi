@@ -909,10 +909,10 @@ namespace SnowmeetApi.Controllers
             batchUpdateRequest.requests.Add(updateOperation);
             GridData gData = updateRange.grid_data;
             gData.start_column = 0;
-            gData.start_row = 1;
+            gData.start_row = seq;
             gData.rows = new List<Row>();
             //gData.start_row = 1;
-            int nextStart = 1;
+            int nextStart = seq;
             List<AliDownloadFlowBill> updateBatch = new List<AliDownloadFlowBill>();
             for (int i = 0; i < bArr.Count; i++)
             {
@@ -1064,10 +1064,10 @@ namespace SnowmeetApi.Controllers
             batchUpdateRequest.requests.Add(updateOperation);
             GridData gData = updateRange.grid_data;
             gData.start_column = 0;
-            gData.start_row = 1;
+            gData.start_row = seq;
             gData.rows = new List<Row>();
             //gData.start_row = 1;
-            int nextStart = 1;
+            int nextStart = seq;
             List<WepayBalance> updateBatch = new List<WepayBalance>();
             for (int i = 0; i < bArr.Count; i++)
             {
@@ -1429,10 +1429,10 @@ namespace SnowmeetApi.Controllers
             batchUpdateRequest.requests.Add(updateOperation);
             GridData gData = updateRange.grid_data;
             gData.start_column = 0;
-            gData.start_row = 1;
+            gData.start_row = seq;
             gData.rows = new List<Row>();
             //gData.start_row = 1;
-            int nextStart = 1;
+            int nextStart = seq;
             List<WepayFlowBill> updateBatch = new List<WepayFlowBill>();
             for (int i = 0; i < bArr.Count; i++)
             {
