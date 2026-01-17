@@ -115,7 +115,7 @@ namespace SnowmeetApi.Controllers
         public string wepayFundFileName = "【25-26】微信支付资金账单汇总";
         public string aliFundDirId = "s.ww3a46c4555ae069f9.767798597fsX_d.767799545E4uh";
         public string aliFundFileName = "【25-26】支付宝资金账单";
-        public string aliDocId = "dct3zTTcxB3z9Px3UE0Op0O3q1ubD24rifofvWnLlZ9m6mt7lxoQ5Vblxel0z1JV0huomN49EwwQsxnNJNkFEhVg";
+        public string aliDocId = "dcnsux-b4GLaQDSjjGrQE2B-kZz2Q6mtN-8CAfwvumLcaN2IvhqalHVj2kdaZQrZL43HQUGkN4ih5q6FcI579Gdw";
         public string[] aliFields = new string[] { "序号", "账务流水号", "业务流水号", "商户订单号", "商品名称", "发生日期", "发生时间", "对方账号", "收入金额（+元）", "支出金额（-元）", "账户余额（元）", "交易渠道", "业务类型", "备注", "导出批次", "导出日期", "导出时间" };
         public MiniAppHelperController _mH;
         public WeComController(ApplicationDBContext context, IConfiguration config, IHttpContextAccessor httpContextAccessor)
