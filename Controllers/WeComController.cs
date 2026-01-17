@@ -71,6 +71,7 @@ namespace SnowmeetApi.Controllers
             public string? docid { get; set; } = null;
             public string? url { get; set; } = null;
             public List<SheetProperties>? properties { get; set; } = null;
+            public GridData? grid_data {get; set;} = null;
         }
         public class FileItem
         {
@@ -130,7 +131,7 @@ namespace SnowmeetApi.Controllers
         public string aliDocId = "dc8zAkVJdS6omNsO72YbEk9wWZtjd1NUvXF9NwtG7UaGHn60fgBYzxdCqDxMnlh0DD1eZM2M5_PxgPMer9CkLuAw";
         public string[] aliFields = new string[] { "序号", "账务流水号", "业务流水号", "商户订单号", "商品名称", "发生日期", "发生时间", "对方账号", "收入金额（+元）", "支出金额（-元）", "账户余额（元）", "交易渠道", "业务类型", "备注", "导出批次", "导出日期", "导出时间" };
         public string[] summaryFields = new string[] { "批次号", "账户名称", "商户号", "数据类型", "数据条数", "数据起始日期", "数据结束日期", "导出日期", "导出开始时间", "导出结束时间" };
-        public string summarDocId = "";
+        public string summarDocId = "dcFVpKR9pFtWcmbxek7QisVeJ8ipodKRlrwVaMPnn37BSbVaKcfNQZiIoPTx4IqPbzbbzqFSw1wCZm-1D7KoImnA";
         public string summaryDirId = "s.ww3a46c4555ae069f9.767798597fsX_d.767799247Qo73";
         public MiniAppHelperController _mH;
         public WeComController(ApplicationDBContext context, IConfiguration config, IHttpContextAccessor httpContextAccessor)
@@ -143,22 +144,36 @@ namespace SnowmeetApi.Controllers
         [HttpGet]
         public async Task<ActionResult<List<Summary>>> GetSummary()
         {
-            //List<Summary> sArr = new List<Summary>();
-            List<Summary> wepayBalanceSummeryList = await _db.wepayBalance.Where(b => b.batch_id != null).GroupBy(b => new { b.batch_id, b.mch_id })
+            string token = await GetToken("", "生成汇总");
+            string[,] summaryData = await GetSheetData(summarDocId, "D4K6ja", "A2:A1000", null, "生成汇总", token);
+            string batchId = "";
+            int lastRowIndex = 1;
+            for(int i = summaryData.Length - 1; batchId == "" && i >= 0; i--)
+            {
+                if (summaryData[i, 0] != null && summaryData[i, 0] != "")
+                {
+                    batchId = summaryData[i, 0];
+                    lastRowIndex = i;
+                }
+            }
+            List<Summary> wepayBalanceSummeryList = await _db.wepayBalance
+                .Where(b => b.batch_id != null && (batchId == "" || ((string)b.batch_id).CompareTo(batchId) == 1)).GroupBy(b => new { b.batch_id, b.mch_id })
                 .Select(s => new Summary()
                 {
                     batchId = s.Key.batch_id,
                     mchId = s.Key.mch_id.ToString(),
                     count = s.Count(),
                 }).ToListAsync();
-            List<Summary> wepayFundSummeryList = await _db.wepayFlowBill.Where(b => b.batch_id != null).GroupBy(b => new { b.batch_id, b.mch_id })
+            List<Summary> wepayFundSummeryList = await _db.wepayFlowBill
+                .Where(b => b.batch_id != null && (batchId == "" || ((string)b.batch_id).CompareTo(batchId) == 1)).GroupBy(b => new { b.batch_id, b.mch_id })
                 .Select(s => new Summary()
                 {
                     batchId = s.Key.batch_id,
                     mchId = s.Key.mch_id.ToString(),
                     count = s.Count(),
                 }).ToListAsync();
-            List<Summary> aliSummeryList = await _db.aliDownloadFlowBill.Where(b => b.batch_id != null).GroupBy(b => new { b.batch_id })
+            List<Summary> aliSummeryList = await _db.aliDownloadFlowBill
+                .Where(b => b.batch_id != null && (batchId == "" || ((string)b.batch_id).CompareTo(batchId) == 1)).GroupBy(b => new { b.batch_id })
                 .Select(s => new Summary()
                 {
                     batchId = s.Key.batch_id,
@@ -225,6 +240,79 @@ namespace SnowmeetApi.Controllers
                         break;
                 }
             }
+            sArr = sArr.OrderBy(s => s.batchId).ToList();
+            BatchUpdateRequest batchUpdateRequest = new BatchUpdateRequest()
+            {
+                docid = summarDocId,
+                requests = new List<UpdateOperation>()
+            };
+            string sheetId = "D4K6ja";//sheetId == null ? sheetId = await GetSheetId(docId, token, batchId, "交易账单", "获取sheetid") : sheetId;
+            UpdateRangeRequest updateRange = new UpdateRangeRequest()
+            {
+                sheet_id = sheetId,
+                grid_data = new GridData()
+            };
+            UpdateOperation updateOperation = new UpdateOperation();
+            updateOperation.update_range_request = updateRange;
+            batchUpdateRequest.requests.Add(updateOperation);
+            GridData gData = updateRange.grid_data;
+            gData.start_column = 0;
+            gData.start_row = lastRowIndex+2;
+            gData.rows = new List<Row>();
+            for(int i = 0; i < sArr.Count; i++)
+            {
+                Row row = new Row();
+                row.values = new List<Cell>();
+                for(int j = 0; j < summaryFields.Length; j++)
+                {
+                    Cell cell = new Cell();
+                    cell.cell_format = new CellFormat();
+                    cell.cell_format.bold = false;
+                    cell.cell_value = new CellValue();
+                    switch(summaryFields[j].Trim())
+                    {
+                        case "批次号":
+                            cell.cell_value.text = sArr[i].batchId.Trim();
+                            break;
+                        case "账户名称":
+                            cell.cell_value.text = sArr[i].accountName == null? "" : sArr[i].accountName.Trim();
+                            break;
+                        case "商户号":
+                            cell.cell_value.text = sArr[i].mchId == null? "" : sArr[i].mchId.Trim();
+                            break;
+                        case "数据类型":
+                            cell.cell_value.text = sArr[i].type.Trim();
+                            break;
+                        case "数据条数":
+                            cell.cell_value.text = sArr[i].count.ToString();
+                            break;
+                        case "数据起始日期":
+                            cell.cell_value.text = ((DateTime)sArr[i].dataStartDate).ToShortDateString();
+                            break;
+                        case "数据结束日期":
+                            cell.cell_value.text = ((DateTime)sArr[i].dataEndDate).ToShortDateString();
+                            break;
+                        case "导出日期":
+                            cell.cell_value.text = ((DateTime)sArr[i].startDate).ToShortDateString();
+                            break;
+                        case "导出开始时间":
+                            cell.cell_value.text = ((DateTime)sArr[i].startDate).ToShortTimeString();
+                            break;
+                        case "导出结束时间":
+                            cell.cell_value.text = ((DateTime)sArr[i].endDate).ToShortTimeString();
+                            break;
+                        default:
+                            break;
+                    }
+                    row.values.Add(cell);
+                }
+                gData.rows.Add(row);
+            }
+            string json = JsonConvert.SerializeObject(batchUpdateRequest);
+            Console.WriteLine(json);
+            MiniAppHelperController _mHelper = new MiniAppHelperController(_db, _config);
+            WebApiLog log = await _mHelper.PerformRequest("https://qyapi.weixin.qq.com/cgi-bin/wedoc/spreadsheet/batch_update?access_token=" + token, 
+                "", json, "POST", "企业微信", "生成汇总", "", "");
             return Ok(sArr.OrderBy(s => s.batchId).ToList());
         }
         [HttpGet]
@@ -1199,6 +1287,36 @@ namespace SnowmeetApi.Controllers
                 _db.wepayFlowBill.Entry(updateBatch[i]).State = EntityState.Modified;
             }
             await _db.SaveChangesAsync();
+        }
+        [NonAction]
+        public async Task<string[,]> GetSheetData(string docId, string sheetId, string range, string? batchId = null, string purpose = "",string? token = null)
+        {
+            if (batchId == null)
+            {
+                batchId = DateTime.Now.ToString("yyyyMMddHHmmssfff");
+            }
+            if (token == null)
+            {
+                token = await GetToken(batchId, purpose);
+            }
+            string payload = "{	\"docid\": \"" + docId + "\", \"sheet_id\": \"" + sheetId + "\", \"range\": \"" + range + "\" }";
+            WebApiLog logFinal = await _mH.PerformRequest("https://qyapi.weixin.qq.com/cgi-bin/wedoc/spreadsheet/get_sheet_range_data?access_token=" + token, "", payload, "POST", "企业微信", purpose, "", batchId);
+            WeComApiResponse res = JsonConvert.DeserializeObject<WeComApiResponse>(logFinal.response);
+            int colCount = 0;
+            for(int i = 0; i < res.grid_data.rows.Count; i++)
+            {
+                colCount = Math.Max(colCount, res.grid_data.rows[i].values.Count);
+            }
+            string[,] data = new string[res.grid_data.rows.Count, colCount];
+            for(int i = 0; i < res.grid_data.rows.Count; i++)
+            {   
+                Row row = res.grid_data.rows[i];
+                for(int j = 0; j < colCount; j++)
+                {
+                    data[i, j] = row.values.Count > j ? (row.values[j].cell_value == null? "" : row.values[j].cell_value.text) : "";
+                }
+            }
+            return data;
         }
 
     }
