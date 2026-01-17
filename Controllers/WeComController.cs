@@ -1025,6 +1025,7 @@ namespace SnowmeetApi.Controllers
                     row.values.Add(cell);
                 }
                 gData.rows.Add(row);
+                updateBatch.Add(bArr[i]);
             }
             string payloadLast = JsonConvert.SerializeObject(batchUpdateRequest);
             WebApiLog logFinal = await _mH.PerformRequest("https://qyapi.weixin.qq.com/cgi-bin/wedoc/spreadsheet/batch_update?access_token=" + token, "", payloadLast, "POST", "企业微信", purpose, memo, batchId);
