@@ -26,6 +26,7 @@ namespace SnowmeetApi.Models
         public int ticket_template_id { get; set; }
         public double? fixed_price { get; set; } = null;
         public double? discount_rate { get; set; } = null;
+        public double? discount_amount {get; set;} = null;
         public bool valid {get; set; }
         public DateTime? update_date { get; set; } = null;
         public DateTime create_date { get; set; } = DateTime.Now;
