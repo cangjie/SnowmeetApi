@@ -552,23 +552,24 @@ namespace SnowmeetApi.Controllers
                 case "已完成":
                     careTask.end_time = DateTime.Now;
                     careTask.staff_id = staff.id;
+                    if (careTask.task_name == "发板")
+                    {
+                        try
+                        {
+                            TicketController _tHelper = new TicketController(_db, _config);
+                            Care careFinish = await _db.care.Where(c => c.id == careTask.care_id).AsNoTracking().FirstOrDefaultAsync();
+                            Models.Order order = await _db.order.Where(o => o.id == careFinish.order_id).AsNoTracking().FirstOrDefaultAsync();
+                            await _tHelper.CreateTicket(16, order.member_id, staff.id, "养护完成赠送", "养护", careFinish.id, true, DateTime.Now, null);
+                        }
+                        catch
+                        {
+
+                        }
+                    }
                     break;
                 case "强行中止":
                     careTask.end_time = DateTime.Now;
                     careTask.terminate_staff_id = staff.id;
-                    break;
-                case "发板":
-                    try
-                    {
-                        TicketController _tHelper = new TicketController(_db, _config);
-                        Care careFinish = await _db.care.Where(c => c.id == careTask.care_id).AsNoTracking().FirstOrDefaultAsync();
-                        Models.Order order = await _db.order.Where(o => o.id == careFinish.order_id).AsNoTracking().FirstOrDefaultAsync();
-                        await _tHelper.CreateTicket(16, order.member_id, staff.id, "养护完成赠送", "养护", careFinish.id, true, DateTime.Now, null);
-                    }
-                    catch
-                    {
-
-                    }
                     break;
                 default:
                     break;
