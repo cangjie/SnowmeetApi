@@ -50,7 +50,7 @@ namespace SnowmeetApi.Controllers
                 _db.care.Update(care);
                 await _db.SaveChangesAsync();
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 Console.WriteLine(ex.ToString());
                 care.update_date = DateTime.Now;
@@ -540,6 +540,7 @@ namespace SnowmeetApi.Controllers
                 });
             }
             CareTask careTask = await _db.careTask.Where(t => t.id == taskId && t.valid == 1).AsNoTracking().FirstOrDefaultAsync();
+
             CoreDataModLog log = Util.CreateCoreDataModLog("care_task", "status", taskId, careTask.status, status, null, staff.id, scene);
             careTask.status = status;
             switch (status)
@@ -555,6 +556,19 @@ namespace SnowmeetApi.Controllers
                 case "强行中止":
                     careTask.end_time = DateTime.Now;
                     careTask.terminate_staff_id = staff.id;
+                    break;
+                case "发板":
+                    try
+                    {
+                        TicketController _tHelper = new TicketController(_db, _config);
+                        Care careFinish = await _db.care.Where(c => c.id == careTask.care_id).AsNoTracking().FirstOrDefaultAsync();
+                        Models.Order order = await _db.order.Where(o => o.id == careFinish.order_id).AsNoTracking().FirstOrDefaultAsync();
+                        await _tHelper.CreateTicket(16, order.member_id, staff.id, "养护完成赠送", "养护", careFinish.id, true, DateTime.Now, null);
+                    }
+                    catch
+                    {
+
+                    }
                     break;
                 default:
                     break;
@@ -582,7 +596,7 @@ namespace SnowmeetApi.Controllers
             });
         }
         [HttpGet("{careId}")]
-        public async Task<ActionResult<ApiResult<Care?>>> CreateVerifyCode(int careId, 
+        public async Task<ActionResult<ApiResult<Care?>>> CreateVerifyCode(int careId,
             string sessionKey, string sessionType = "wechat_mini_openid")
         {
             Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
@@ -606,14 +620,14 @@ namespace SnowmeetApi.Controllers
             string content = order.code + "|品牌：" + care.equipment + care.brand + "长度：" + care.scale + "|" + code;
             try
             {
-                string notUrl = "https://wxoa.snowmeet.top/api/TemlateMessage/SendTemplateMessage?memberId=" + order.member_id.ToString() 
-                    + "&templateId=" +   Util.UrlEncode("-FxfVcWYFq079YIWfaT6khxQn6__b-CD9Xty_M_iP1U") + "&first=" + Util.UrlEncode("") + "&keywords=" + Util.UrlEncode(content)
+                string notUrl = "https://wxoa.snowmeet.top/api/TemlateMessage/SendTemplateMessage?memberId=" + order.member_id.ToString()
+                    + "&templateId=" + Util.UrlEncode("-FxfVcWYFq079YIWfaT6khxQn6__b-CD9Xty_M_iP1U") + "&first=" + Util.UrlEncode("") + "&keywords=" + Util.UrlEncode(content)
                     + "&remark=" + Util.UrlDecode("") + "&url=" + Util.UrlEncode("") + "&sessionKey=" + Util.UrlEncode("abcd123!@#");
                 Util.GetWebContent(notUrl);
             }
             catch
             {
-                
+
             }
             return Ok(new ApiResult<Care?>()
             {
@@ -623,7 +637,7 @@ namespace SnowmeetApi.Controllers
             });
         }
         [HttpGet("{careId}")]
-         public async Task<ActionResult<ApiResult<Care?>>> VeriCareFinishCode(int careId, 
+        public async Task<ActionResult<ApiResult<Care?>>> VeriCareFinishCode(int careId,
             string code, string sessionKey, string sessionType = "wechat_mini_openid")
         {
             Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
@@ -667,7 +681,7 @@ namespace SnowmeetApi.Controllers
         }
         */
         [HttpGet]
-        public async Task<ActionResult<List<CareReport>>> GetReport(DateTime startDate, DateTime endDate, 
+        public async Task<ActionResult<List<CareReport>>> GetReport(DateTime startDate, DateTime endDate,
             string sessionKey, string sessionType = "wechat_mini_openid")
         {
             Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
@@ -682,18 +696,18 @@ namespace SnowmeetApi.Controllers
             }
             List<Care> cares = await _db.care
                 .Include(c => c.order).ThenInclude(o => o.member).ThenInclude(m => m.memberSocialAccounts.Where(m => m.valid == 1))
-                .Include(c => c.order).ThenInclude( o=> o.payments).ThenInclude(p => p.refunds)
+                .Include(c => c.order).ThenInclude(o => o.payments).ThenInclude(p => p.refunds)
                 .Include(c => c.order).ThenInclude(o => o.staff)
-                .Include(c => c.tasks.Where(t => t.valid == 1 )).ThenInclude(t => t.staff)
-                .Where(c => c.order.biz_date.Date >= startDate.Date && c.order.biz_date.Date <= endDate.Date 
+                .Include(c => c.tasks.Where(t => t.valid == 1)).ThenInclude(t => t.staff)
+                .Where(c => c.order.biz_date.Date >= startDate.Date && c.order.biz_date.Date <= endDate.Date
                 && c.valid == 1 && c.order.valid == 1 && c.order.is_test == 0)
                 .OrderByDescending(c => c.order.id).AsSplitQuery().AsNoTracking().ToListAsync();
             List<CareReport> reports = new List<CareReport>();
-            for(int i = 0; i < cares.Count; i++)
+            for (int i = 0; i < cares.Count; i++)
             {
                 Care care = cares[i];
                 CareTask taskEdge = care.tasks.Where(t => t.task_name == "修刃" && t.valid == 1).FirstOrDefault();
-                CareTask taskWax = care.tasks.Where(t => (t.task_name == "打蜡" || t.task_name == "热蜡")  && t.valid == 1).FirstOrDefault();
+                CareTask taskWax = care.tasks.Where(t => (t.task_name == "打蜡" || t.task_name == "热蜡") && t.valid == 1).FirstOrDefault();
                 CareTask taskUnWax = care.tasks.Where(t => t.task_name == "刮蜡" && t.valid == 1).FirstOrDefault();
                 CareTask taskRepair = care.tasks.Where(t => t.task_name == "维修" && t.valid == 1).FirstOrDefault();
                 CareTask taskSafe = care.tasks.Where(t => t.task_name == "安全检查" && t.valid == 1).FirstOrDefault();
@@ -716,7 +730,7 @@ namespace SnowmeetApi.Controllers
                     equip_type = care.equipment,
                     equip_brand = care.brand,
                     equip_scale = care.scale,
-                    degree = care.edge_degree != null ?care.edge_degree.ToString() : "",
+                    degree = care.edge_degree != null ? care.edge_degree.ToString() : "",
                     edge = staffEdge != null ? staffEdge.name : "",
                     wax = staffWax != null ? staffWax.name : "",
                     unwax = staffUnWax != null ? staffUnWax.name : "",
