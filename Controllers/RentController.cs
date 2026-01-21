@@ -4323,7 +4323,8 @@ namespace SnowmeetApi.Controllers
         [HttpGet]
         public async Task<ActionResult<ApiResult<List<RentPackage>>>> GetRentPackageList()
         {
-            List<RentPackage> list = await _db.rentPackage
+            List<RentPackage> list = await _db.rentPackage.Include(c => c.rentPackageCategoryList)
+                .ThenInclude(rpc => rpc.rentCategory)
                 .Where(r => r.valid == 1)
                 .OrderByDescending(r => r.id).ToListAsync();
             return Ok(new ApiResult<List<RentPackage>>()
