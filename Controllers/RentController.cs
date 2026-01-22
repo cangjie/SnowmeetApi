@@ -661,6 +661,7 @@ namespace SnowmeetApi.Controllers
                 description = Util.UrlDecode(description),
                 valid = 1,
                 staff_id = staff.id,
+                item_count = 2,
                 update_date = DateTime.Now
             };
             await _db.rentPackage.AddAsync(rp);
@@ -878,7 +879,10 @@ namespace SnowmeetApi.Controllers
                 _db.rentPrice.Entry(rp).State = EntityState.Modified;
             }
             await _db.SaveChangesAsync();
-            return await GetRentPackage(packageId);
+            ApiResult<RentPackage> packageResult = (ApiResult<RentPackage>)(((OkObjectResult)((await GetRentPackage(packageId)).Result)).Value);
+            return Ok(packageResult.data);
+            //RentPackage package = (await GetRentPackage(packageId)).data;
+            //return await GetRentPackage(packageId);
         }
         [HttpGet("{categoryId}")]
         public async Task<ActionResult<RentCategoryInfoField>> CategoryInfoFieldAdd(int categoryId, string fieldName, int sort, string sessionKey, string sessionType)
@@ -4336,10 +4340,10 @@ namespace SnowmeetApi.Controllers
             //return Ok(list);
         }
         [HttpGet("{packageId}")]
-        public async Task<ActionResult<RentPackage>> GetRentPackage(int packageId)
+        public async Task<ActionResult<ApiResult<RentPackage>>> GetRentPackage(int packageId)
         {
             RentPackage rp = await _db.rentPackage
-                .Include(r => r.rentPackageCategoryList)
+                .Include(r => r.rentPackageCategoryList.Where(rc => rc.valid))
                     .ThenInclude(r => r.rentCategory)
                 .Include(r => r.rentPackagePriceList)
                 .Where(r => r.id == packageId).FirstAsync();
@@ -6267,6 +6271,63 @@ namespace SnowmeetApi.Controllers
             await _db.SaveChangesAsync();
             return rental;
         }
-
+        [HttpPost("{packageId}")]
+        public async Task<ActionResult<ApiResult<RentPackage>>> UpdatePackageRentItemCategories([FromRoute]int packageId, 
+            [FromBody] List<RentPackageItemCategories> rentItemCategories,
+            [FromQuery] string sessionKey, [FromQuery] string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            if (staff == null || staff.title_level < 100)
+            {
+                return Ok(new ApiResult<RentPackage>()
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = null
+                });
+            }
+            RentPackage package = await _db.rentPackage.Where(p => p.id == packageId).AsNoTracking().FirstOrDefaultAsync();
+            package.item_count = rentItemCategories.Count;
+            _db.rentPackage.Entry(package).State = EntityState.Modified;
+            List<RentPackageCategory> existingCategories = await _db.rentPackageCategory
+                .Where(c => c.package_id == packageId && c.valid).AsNoTracking().ToListAsync();
+            for(int i = 0; i < existingCategories.Count; i++)
+            {
+                existingCategories[i].valid = false;
+                existingCategories[i].update_date = DateTime.Now;
+                _db.rentPackageCategory.Entry(existingCategories[i]).State = EntityState.Modified;
+            }
+            for(int i = 0; i < rentItemCategories.Count; i++)
+            {
+                RentPackageItemCategories itemC = rentItemCategories[i];
+                for(int j = 0; j < itemC.categories.Count; j++)
+                {
+                    RentPackageCategory packageCategory = new RentPackageCategory()
+                    {
+                        id = 0,
+                        package_id = packageId,
+                        item_index = itemC.itemIndex,
+                        category_id = itemC.categories[j].id,
+                        valid = true,
+                        update_date = DateTime.Now,
+                        create_date = DateTime.Now
+                    };
+                    await _db.rentPackageCategory.AddAsync(packageCategory);
+                }
+            }
+            await _db.SaveChangesAsync();
+            //package = (RentPackage)(((OkObjectResult)(await GetRentPackage(packageId)).Result).Value);
+            /*
+            var result = (OkObjectResult)((await GetRentPackage(packageId)).Result);
+            var newPackage = (RentPackage)(result.Value);
+            return Ok(new ApiResult<RentPackage>()
+            {
+                code = 0,
+                message = "",
+                data = newPackage
+            });
+            */
+            return await GetRentPackage(packageId);
+        }
     }
 }

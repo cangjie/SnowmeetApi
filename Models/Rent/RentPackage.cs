@@ -19,7 +19,7 @@ namespace SnowmeetApi.Models
         public int valid { get; set; }
         public int? staff_id { get; set; } = null;
         public DateTime update_date { get; set; }
-        public List<RentPackageCategory>? rentPackageCategoryList { get; set; }
+        public List<RentPackageCategory>? rentPackageCategoryList { get; set; } = null;
         [NotMapped]
         public List<RentPackageItemCategories>? rentPackageItemCategories
         {
@@ -28,6 +28,10 @@ namespace SnowmeetApi.Models
                 List<RentPackageItemCategories> list = new List<RentPackageItemCategories>();
                 for(int i = 0; i < item_count; i++)
                 {
+                    if (rentPackageCategoryList == null || i >= rentPackageCategoryList.Count)
+                    {
+                        continue;
+                    }
                     RentPackageItemCategories itemC = new RentPackageItemCategories();
                     itemC.itemIndex = i;
                     List<RentPackageCategory> packageCategories = rentPackageCategoryList.Where(c => c.item_index == i).ToList();
@@ -68,7 +72,9 @@ namespace SnowmeetApi.Models
         public int package_id { get; set; }
         public int item_index {get; set;}
         public int category_id { get; set; }
+        public bool valid  {get; set;}
         public DateTime update_date { get; set; }
+        public DateTime create_date { get; set; }
         [ForeignKey("category_id")]
         public RentCategory rentCategory { get; set; }
         [ForeignKey("package_id")]
