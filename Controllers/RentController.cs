@@ -4328,11 +4328,11 @@ namespace SnowmeetApi.Controllers
             });
         }
         [HttpGet]
-        public async Task<ActionResult<ApiResult<List<RentPackage>>>> GetRentPackageList()
+        public async Task<ActionResult<ApiResult<List<RentPackage>>>> GetRentPackageList(string? shop = null)
         {
             List<RentPackage> list = await _db.rentPackage.Include(c => c.rentPackageCategoryList)
                 .ThenInclude(rpc => rpc.rentCategory)
-                .Where(r => r.valid == 1)
+                .Where(r => r.valid == 1 && (r.shop == null || shop == null || r.shop == shop))
                 .OrderByDescending(r => r.id).ToListAsync();
             return Ok(new ApiResult<List<RentPackage>>()
             {
