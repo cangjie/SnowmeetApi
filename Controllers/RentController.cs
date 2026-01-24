@@ -792,7 +792,8 @@ namespace SnowmeetApi.Controllers
 
 
         [HttpGet("{packageId}")]
-        public async Task<ActionResult<ApiResult<RentPackage?>>> UpdateRentPackageBaseInfo(int packageId, string name, string description, double deposit, string sessionKey, string sessionType)
+        public async Task<ActionResult<ApiResult<RentPackage?>>> UpdateRentPackageBaseInfo(int packageId, string name, string description, double deposit, 
+            string sessionKey, string sessionType, string? shop = null)
         {
             sessionKey = Util.UrlDecode(sessionKey);
             sessionType = Util.UrlDecode(sessionType);
@@ -819,6 +820,8 @@ namespace SnowmeetApi.Controllers
             p.name = Util.UrlDecode(name);
             p.description = Util.UrlDecode(description);
             p.deposit = deposit;
+            p.shop = shop;
+            p.update_date = DateTime.Now;
             List<CoreDataModLog> logs = Util.GetUpdateDifferenceLog<RentPackage>(oriP, p, null, staff.id, "修改套餐信息");
             for (int i = 0; i < logs.Count; i++)
             {
