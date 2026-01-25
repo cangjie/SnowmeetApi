@@ -4612,7 +4612,14 @@ namespace SnowmeetApi.Controllers
                         _db.rental.Remove(ori);
                     }
                 }
-                await _db.SaveChangesAsync();
+                try
+                {
+                    await _db.SaveChangesAsync();
+                }
+                catch
+                {
+
+                }
             }
 
             for (int i = 0; i < order.rentals.Count; i++)
