@@ -4656,7 +4656,7 @@ namespace SnowmeetApi.Controllers
             List<Models.Order> orders = await _db.order
                 .Include(o => o.staff)
                 .Include(o => o.member).ThenInclude(m => m.memberSocialAccounts)
-                .Where(o => (o.shop.Trim().Equals(shop) || shop == null ) && o.valid == 0 && o.recepting == 1 && o.create_date.Date == DateTime.Now.Date)
+                .Where(o => (o.shop.Trim().Equals(shop) || shop == "" || shop == null ) && o.valid == 0 && o.recepting == 1 && o.create_date.Date == DateTime.Now.Date)
                 .OrderByDescending(o => o.id).AsNoTracking().ToListAsync();
             return Ok(new ApiResult<List<Models.Order>?>()
             {
