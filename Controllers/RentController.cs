@@ -4584,12 +4584,13 @@ namespace SnowmeetApi.Controllers
                 try
                 {
                     _db.Update(order);
+                    await _db.SaveChangesAsync();
                 }
                 catch
                 {
 
                 }
-                await _db.SaveChangesAsync();
+                
                 List<Rental> rentals = order.rentals;
                 List<Models.Rental> oriRentals = await _db.rental.Include(r => r.rentItems)
                 .Where(r => r.order_id == order.id).AsNoTracking().ToListAsync();
