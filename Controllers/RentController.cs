@@ -4639,7 +4639,7 @@ namespace SnowmeetApi.Controllers
             });
         }
         [HttpGet]
-        public async Task<ActionResult<ApiResult<List<Models.Order>?>>> GetReceptingOrders(string shop,
+        public async Task<ActionResult<ApiResult<List<Models.Order>?>>> GetReceptingOrders(string? shop,
             string sessionKey, string sessionType = "wechat_mini_openid")
         {
             Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
@@ -4656,7 +4656,7 @@ namespace SnowmeetApi.Controllers
             List<Models.Order> orders = await _db.order
                 .Include(o => o.staff)
                 .Include(o => o.member).ThenInclude(m => m.memberSocialAccounts)
-                .Where(o => o.shop.Trim().Equals(shop) && o.valid == 0 && o.recepting == 1 && o.create_date.Date == DateTime.Now.Date)
+                .Where(o => (o.shop.Trim().Equals(shop) || shop == null ) && o.valid == 0 && o.recepting == 1 && o.create_date.Date == DateTime.Now.Date)
                 .OrderByDescending(o => o.id).AsNoTracking().ToListAsync();
             return Ok(new ApiResult<List<Models.Order>?>()
             {
