@@ -4581,7 +4581,14 @@ namespace SnowmeetApi.Controllers
                     }
 
                 }
-                _db.Update(order);
+                try
+                {
+                    _db.Update(order);
+                }
+                catch
+                {
+
+                }
                 await _db.SaveChangesAsync();
                 List<Rental> rentals = order.rentals;
                 List<Models.Rental> oriRentals = await _db.rental.Include(r => r.rentItems)
