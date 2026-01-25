@@ -253,14 +253,25 @@ namespace SnowmeetApi.Controllers
             List<PaymentShare> shares = await _db.paymentShare.Include(p => p.payment)
                 .Include(s => s.orderShare).ThenInclude(o => o.order).ThenInclude(o => o.payments)
                 .ThenInclude(p => p.refunds).Include(s => s.orderShare).ThenInclude(s => s.relation)
-                .Where(s => s.submit_time == null && ((DateTime)s.orderShare.order.close_date).Date <= shareDate.Date && s.orderShare.order.hide == false
+                .Where(s => s.submit_time == null && ((DateTime)s.orderShare.order.close_date).Date <= shareDate.Date //&& s.orderShare.order.hide == false
                 && s.orderShare.order.type == "租赁" && s.orderShare.order.shop == "万龙体验中心" && s.can_not_share == false)
                 .AsNoTracking().ToListAsync();
             for (int i = 0; i < shares.Count; i++)
             {
                 //Console.WriteLine("Sharing PaymentShare ID: " + shares[i].id);
-                shares[i] = await SharePayment(shares[i]);
+                if (shares[i].orderShare.order.hide)
+                {
+                    shares[i].can_not_share = true;
+                    shares[i].memo = "订单已隐藏，无法分账";
+                    shares[i].update_date = DateTime.Now;
+                    _db.paymentShare.Entry(shares[i]).State = EntityState.Modified;
+                }
+                else
+                {
+                    shares[i] = await SharePayment(shares[i]);
+                }
             }
+            await _db.SaveChangesAsync();
             return Ok(shares);
         }
         [HttpGet("{orderId}")]
