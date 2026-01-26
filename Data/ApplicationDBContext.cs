@@ -40,7 +40,6 @@ namespace SnowmeetApi.Data
             /////////////new season
             modelBuilder.Entity<MiniSession>().HasKey(m => new { m.session_key, m.session_type });
             modelBuilder.Entity<Brand>().HasKey(m => new { m.brand_name, m.brand_type });
-            modelBuilder.Entity<RentPackageCategory>().HasKey(e => new { e.package_id, e.category_id });
             modelBuilder.Entity<RentProductDetailInfo>().HasKey(i => new { i.field_id, i.product_id });
             modelBuilder.Entity<RentProductDetailInfo>().HasKey(i => new { i.product_id, i.field_id });
             modelBuilder.Entity<GuarantyPayment>().HasKey(g => new { g.guaranty_id, g.payment_id });
