@@ -5726,14 +5726,12 @@ namespace SnowmeetApi.Controllers
                     rental.append_commit_time = DateTime.Now;
                     _db.rental.Entry(rental).State = EntityState.Modified;
                     await _db.SaveChangesAsync();
-
                     _db.rental.Entry(rental).State = EntityState.Detached;
                     for(int k = 0; rental.rentItems != null && k < rental.rentItems.Count; k++)
                     {
                         _db.rentItem.Entry(rental.rentItems[k]).State = EntityState.Detached;
                     }
                     await _db.SaveChangesAsync();
-                    
                     await EffectRental(rental.id, staff.id);
                 }
             }
@@ -5877,6 +5875,41 @@ namespace SnowmeetApi.Controllers
             }
             await _db.SaveChangesAsync();
             return await GetRentPackage(packageId);
+        }
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<List<ShopRentPackage>>>> GetShopRentPackages(string? key = null)
+        {
+            List<Shop> shops = await _db.shop.AsNoTracking().ToListAsync();
+            List<ShopRentPackage> shopPackages = new List<ShopRentPackage>();
+            for(int i = 0; i < shops.Count; i++)
+            {
+                List<RentPackage> packages = await _db.rentPackage
+                    .Where(p => p.shop == shops[i].name && p.valid == 1).AsNoTracking().ToListAsync();
+                if (packages != null && packages.Count>0)
+                {
+                    ShopRentPackage srp = new ShopRentPackage()
+                    {
+                        shop = shops[i],
+                        rentPackages = packages
+                    };
+                    shopPackages.Add(srp);
+                }
+            }
+            List<RentPackage> oldPackages = await _db.rentPackage
+                    .Where(p => p.shop == null && p.valid == 1).AsNoTracking().ToListAsync();
+            ShopRentPackage srpOld = new ShopRentPackage()
+            {
+                shop = null,
+                rentPackages = oldPackages
+            };
+            shopPackages.Add(srpOld);
+            shopPackages = shopPackages.OrderByDescending(p => p.rentPackages.Count).ToList();
+            return Ok(new ApiResult<List<ShopRentPackage>>()
+            {
+                code = 0,
+                message = "",
+                data = shopPackages
+            });
         }
     }
 }

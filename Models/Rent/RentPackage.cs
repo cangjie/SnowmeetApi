@@ -6,6 +6,11 @@ using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
 namespace SnowmeetApi.Models
 {
+    public class ShopRentPackage
+    {
+        public Shop shop  {get; set;} = null;
+        public List<RentPackage> rentPackages { get; set; } = new List<RentPackage>();
+    }
     [Table("rent_package")]
     public class RentPackage
     {
