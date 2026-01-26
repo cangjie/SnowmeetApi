@@ -5892,7 +5892,8 @@ namespace SnowmeetApi.Controllers
             for(int i = 0; i < shops.Count; i++)
             {
                 List<RentPackage> packages = await _db.rentPackage
-                    .Where(p => p.shop == shops[i].name && p.valid == 1).AsNoTracking().ToListAsync();
+                    .Where(p => p.shop == shops[i].name && p.valid == 1 && (key == null || p.name.IndexOf(key) >= 0 ) )
+                    .AsNoTracking().ToListAsync();
                 if (packages != null && packages.Count>0)
                 {
                     ShopRentPackage srp = new ShopRentPackage()
@@ -5904,7 +5905,8 @@ namespace SnowmeetApi.Controllers
                 }
             }
             List<RentPackage> oldPackages = await _db.rentPackage
-                    .Where(p => p.shop == null && p.valid == 1).AsNoTracking().ToListAsync();
+                    .Where(p => p.shop == null && p.valid == 1 && (key == null || p.name.IndexOf(key) >= 0 ) )
+                    .AsNoTracking().ToListAsync();
             ShopRentPackage srpOld = new ShopRentPackage()
             {
                 shop = null,
