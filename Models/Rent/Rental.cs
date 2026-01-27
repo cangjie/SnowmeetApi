@@ -581,6 +581,7 @@ namespace SnowmeetApi.Models
         public double discount { get; set; } = 0;
         public string day_type { get; set; } = "";
         public string scene { get; set; } = "";
+        public bool manual {get; set;} = false;
         public DateTime? update_date { get; set; }
         public DateTime create_date { get; set; } = DateTime.Now;
         [ForeignKey("rental_id")]
