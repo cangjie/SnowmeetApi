@@ -4944,6 +4944,7 @@ namespace SnowmeetApi.Controllers
                 .Where(o => o.valid == 1 && o.type == "租赁"
                     && o.rentals.Any(r => r.valid == 1 && r.settled == 0
                     && r.rentItems != null && r.rentItems.Count > 0
+                    //&& o.id == 67390
                     //&& r.rentItems.Where(i => i.status != "已归还").ToList().Count > 0
                 ))
                 .AsNoTracking().ToListAsync();
@@ -4964,6 +4965,7 @@ namespace SnowmeetApi.Controllers
         [NonAction]
         public async Task ContinueRental(Models.Rental rental, DateTime rentDate)
         {
+            
             List<Models.RentalDetail> details = await _db.rentalDetail
                 .Where(d => d.valid == 1 && d.rental_date.Date == rentDate.Date && d.rental_id == rental.id)
                 .AsNoTracking().ToListAsync();
@@ -5010,6 +5012,20 @@ namespace SnowmeetApi.Controllers
                 && ((rental.package_id != null && p.package_id == rental.package_id)
                 || (rental.category_id != null && p.category_id == rental.category_id)))
                 .AsNoTracking().FirstOrDefaultAsync();
+            double newPrice = (double)(price == null ? 0 : price.price);
+            if (preset != null)
+            {
+                newPrice = preset.price;
+            }
+            else
+            {
+                RentalPricePreset manualPreset =  rental.pricePresets
+                    .Where(p =>  p.manual ).FirstOrDefault();
+                if (manualPreset != null)
+                {
+                    newPrice = manualPreset.price;
+                }
+            }
             Models.RentalDetail detail = new Models.RentalDetail()
             {
                 id = 0,
@@ -5018,7 +5034,7 @@ namespace SnowmeetApi.Controllers
                 charge_type = "租金",
                 rental_date = rentDate,
                 rent_item_id = null,
-                amount = (double)(price == null ? 0 : price.price),
+                amount = newPrice,
                 memo = "系统续租",
                 staff_id = rental.staff_id,
                 valid = 1,
