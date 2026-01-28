@@ -411,25 +411,30 @@ namespace SnowmeetApi.Controllers
             }
             type = Util.UrlDecode(type);
             subType = Util.UrlDecode(subType);
+            /*
             UnicUser user = await UnicUser.GetUnicUserAsync(sessionKey, _db);
             if (memberId != user.member.id && !user.isAdmin)
             {
                 return BadRequest();
             }
+            */
             List<DepositAccount> al = await GetMemberAccountAvaliable(memberId, type.Trim(), subType.Trim());
-
             return Ok(al);
         }
-        /*
+        
         [HttpGet]
         public async Task<ActionResult<List<DepositAccount>>> GetMyAccounts(string type, 
             string subType, string sessionKey, string sessionType = "wechat_mini_openid")
         {
-           
-            UnicUser user = await  UnicUser.GetUnicUserAsync(sessionKey, _db);
-            return await GetAccounts(user.member.id, type, subType, sessionKey, sessionType);
+            MemberController _memberHelper = new MemberController(_db, _config);
+            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
+            if (member == null)
+            {
+                return NotFound();
+            }
+            return await GetAccounts(member.id, type, subType, sessionKey, sessionType);
         }
-        */
+        
         [HttpGet]
         public async Task<ActionResult<List<Member>>> SearchMember(string key,
             string sessionKey, string sessionType = "wechat_mini_openid")
