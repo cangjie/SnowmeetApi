@@ -5207,7 +5207,7 @@ namespace SnowmeetApi.Controllers
                 .Include(r => r.category).OrderBy(r => r.id)
                 .Where(r => r.rental.valid == 1 && r.rental.order.valid == 1 && r.rental.order.is_test == 0)
                 .AsSplitQuery().AsNoTracking().ToListAsync();
-            return rentItems.Where(r => r.status != "已归还" && r.status != "已更换").ToList();
+            return rentItems.Where(r => r.status != "已归还" && r.status != "已更换" && r.status != "未发放" && r.noNeed == true ).ToList();
         }
         [HttpGet]
         public async Task<ActionResult<List<Models.CategoryRentItem>?>> GetUnReturnedRentItemsByStaff(
