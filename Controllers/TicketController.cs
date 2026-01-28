@@ -47,7 +47,10 @@ namespace SnowmeetApi.Controllers
             List<Ticket> tickets = await _context.ticket
                 .Where(t => t.member_id == member.id && t.valid == 1 && t.used == used)
                 .OrderBy(t => t.create_date).AsNoTracking().ToListAsync();
-
+            if (used == 0)
+            {
+                tickets = tickets.Where(t => t.expire_date == null ||  ((DateTime)t.expire_date).Date <= DateTime.Now.Date).ToList();
+            }
             return Ok(new ApiResult<List<Ticket>>()
             {
                 code = 0,
