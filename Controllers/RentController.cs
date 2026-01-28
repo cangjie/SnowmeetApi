@@ -4753,7 +4753,8 @@ namespace SnowmeetApi.Controllers
             bool allReturned = true;
             for (int i = 0; rental.rentItems != null && i < rental.rentItems.Count; i++)
             {
-                if (rental.rentItems[i].status != "已归还" && rental.rentItems[i].status != "未发放" && rental.rentItems[i].status != "已更换")
+                if (rental.rentItems[i].status != "已归还" && rental.rentItems[i].status != "未发放" 
+                && rental.rentItems[i].status != "已更换" && rental.rentItems[i].noNeed == false)
                 {
                     allReturned = false;
                     break;
