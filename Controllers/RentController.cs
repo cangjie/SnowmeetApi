@@ -4237,10 +4237,9 @@ namespace SnowmeetApi.Controllers
                 .AsNoTracking().ToListAsync();
             if (rentals == null || rentals.Count == 0)
             {
-                //exists = true;
-                for (int i = 0; !exists && i < rentals.Count; i++)
+                for (int i = 0; exists && i < order.rentals.Count; i++)
                 {
-                    Rental rentalExists = rentals[i];
+                    Rental rentalExists = order.rentals[i];
                     if (rentalExists.package_id != null)
                     {
                         RentPackage package = await _db.rentPackage.Where(p => p.id == rentalExists.package_id)
@@ -4253,7 +4252,7 @@ namespace SnowmeetApi.Controllers
                     }
                     else
                     {
-                        for (int j = 0; !exists && rentalExists.rentItems != null && j < rentalExists.rentItems.Count; j++)
+                        for (int j = 0; exists && rentalExists.rentItems != null && j < rentalExists.rentItems.Count; j++)
                         {
                             Models.RentItem rentItemExists = rentalExists.rentItems[j];
                             if (rentItemExists.category_id == 2
