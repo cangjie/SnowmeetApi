@@ -4248,6 +4248,8 @@ namespace SnowmeetApi.Controllers
             }
             string name = "小米对讲机";
             int categoryId = 94;
+            RentCategory category = await _db.rentCategory.Where(c => c.id == categoryId)
+                .AsNoTracking().FirstOrDefaultAsync();
             Rental rental = new Rental()
             {
                 order_id = order.id,
@@ -4266,8 +4268,10 @@ namespace SnowmeetApi.Controllers
                 category_id = categoryId,
                 valid = 1,
                 noCode = true,
-                atOnce = true
+                atOnce = true,
+                category = category
             };
+
             rental.rentItems.Add(item);
             RentalPricePreset preset = new RentalPricePreset()
             {
@@ -4287,7 +4291,7 @@ namespace SnowmeetApi.Controllers
                 valid = 1,
                 memo = "租赁装备赠送",
                 guaranty = 0,
-                noGuaranty = true
+                noGuaranty = true,
             };
             Models.RentItem item2 = new Models.RentItem()
             {
@@ -4296,7 +4300,8 @@ namespace SnowmeetApi.Controllers
                 category_id = categoryId,
                 valid = 1,
                 noCode = true,
-                atOnce = true
+                atOnce = true,
+                category = category
             };
             rental2.rentItems.Add(item2);
             RentalPricePreset preset2 = new RentalPricePreset()
