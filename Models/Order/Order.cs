@@ -1252,6 +1252,8 @@ namespace SnowmeetApi.Models
                 return paidAmount - refundAmount;
             }
         }
+        [NotMapped]
+        public bool needRender {get; set;} = false;
 
     }
 }
