@@ -4089,6 +4089,7 @@ namespace SnowmeetApi.Controllers
                     data = null
                 });
             }
+            order.needRender = false;
             for (int i = 0; i < order.rentals.Count; i++)
             {
                 order.rentals[i].details = null;
