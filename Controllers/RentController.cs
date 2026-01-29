@@ -4220,6 +4220,7 @@ namespace SnowmeetApi.Controllers
                     item.category = await _db.rentCategory.Where(c => c.id == item.category_id).AsNoTracking().FirstOrDefaultAsync();
                 }
             }
+            order = await AddInterCom(order);
             return Ok(new ApiResult<Models.Order?>()
             {
                 code = 0,
@@ -4275,7 +4276,7 @@ namespace SnowmeetApi.Controllers
                 price = 0,
                 manual = true
             };
-            rental.pricePresets.Add(preset);
+            rental.pricePresets = new List<RentalPricePreset>(){preset};
             await _db.rental.AddAsync(rental);
             Rental rental2 = new Rental()
             {
@@ -4305,11 +4306,9 @@ namespace SnowmeetApi.Controllers
                 price = 0,
                 manual = true
             };
-            rental2.pricePresets.Add(preset2);
+            rental2.pricePresets =  new List<RentalPricePreset>() {preset2};
             await _db.rental.AddAsync(rental2);
             await _db.SaveChangesAsync();
-            order.rentals.Add(rental);
-            order.rentals.Add(rental2);
             return order;
         }
         [HttpGet]
