@@ -296,8 +296,8 @@ namespace SnowmeetApi.Controllers
             }
             if (code.Length > 2)
             {
-               RentCategory rcFather = await _db.rentCategory
-                    .Where(r => r.code.Trim().Equals(code.Substring(0, code.Length - 2))).FirstOrDefaultAsync();
+                RentCategory rcFather = await _db.rentCategory
+                     .Where(r => r.code.Trim().Equals(code.Substring(0, code.Length - 2))).FirstOrDefaultAsync();
                 if (rcFather == null)
                 {
                     return NotFound();
@@ -785,7 +785,7 @@ namespace SnowmeetApi.Controllers
             });
         }
         [HttpGet("{packageId}")]
-        public async Task<ActionResult<ApiResult<RentPackage?>>> UpdateRentPackageBaseInfo(int packageId, string name, string description, double deposit, 
+        public async Task<ActionResult<ApiResult<RentPackage?>>> UpdateRentPackageBaseInfo(int packageId, string name, string description, double deposit,
             string sessionKey, string sessionType, string? shop = null)
         {
             sessionKey = Util.UrlDecode(sessionKey);
@@ -4181,7 +4181,7 @@ namespace SnowmeetApi.Controllers
                 {
 
                 }
-                
+
                 List<Rental> rentals = order.rentals;
                 List<Models.Rental> oriRentals = await _db.rental.Include(r => r.rentItems)
                 .Where(r => r.order_id == order.id).AsNoTracking().ToListAsync();
@@ -4241,7 +4241,41 @@ namespace SnowmeetApi.Controllers
             }
             else
             {
-                exists = true;
+                for (int i = 0; !exists && i < rentals.Count; i++)
+                {
+                    Rental rentalExists = rentals[i];
+                    if (rentalExists.package_id != null)
+                    {
+                        RentPackage package = await _db.rentPackage.Where(p => p.id == rentalExists.package_id)
+                            .AsNoTracking().FirstOrDefaultAsync();
+                        if (package != null && package.name.IndexOf("板") >= 0)
+                        {
+                            exists = true;
+                        }
+
+                    }
+                    else
+                    {
+                        for (int j = 0; !exists && rentalExists.rentItems != null && j < rentalExists.rentItems.Count; j++)
+                        {
+                            Models.RentItem rentItemExists = rentalExists.rentItems[j];
+                            if (rentItemExists.category_id == 2
+                            || rentItemExists.category_id == 3 
+                            || rentItemExists.category_id == 4
+                            || rentItemExists.category_id == 6
+                            || rentItemExists.category_id == 7
+                            || rentItemExists.category_id == 23
+                            || rentItemExists.category_id == 24
+                            || rentItemExists.category_id == 40
+                            || rentItemExists.category_id == 42
+                            || rentItemExists.category_id == 69)
+                            {
+                                exists = true;
+                            }
+                        }
+                    }
+
+                }
             }
             if (exists)
             {
@@ -4279,7 +4313,7 @@ namespace SnowmeetApi.Controllers
                 price = 0,
                 manual = true
             };
-            rental.pricePresets = new List<RentalPricePreset>(){preset};
+            rental.pricePresets = new List<RentalPricePreset>() { preset };
             await _db.rental.AddAsync(rental);
             Rental rental2 = new Rental()
             {
@@ -4309,7 +4343,7 @@ namespace SnowmeetApi.Controllers
                 price = 0,
                 manual = true
             };
-            rental2.pricePresets =  new List<RentalPricePreset>() {preset2};
+            rental2.pricePresets = new List<RentalPricePreset>() { preset2 };
             await _db.rental.AddAsync(rental2);
             await _db.SaveChangesAsync();
             rental.rentItems[0].category = category;
@@ -4335,7 +4369,7 @@ namespace SnowmeetApi.Controllers
             List<Models.Order> orders = await _db.order
                 .Include(o => o.staff)
                 .Include(o => o.member).ThenInclude(m => m.memberSocialAccounts)
-                .Where(o => (o.shop.Trim().Equals(shop) || shop == "" || shop == null ) && o.valid == 0 && o.recepting == 1 && o.create_date.Date == DateTime.Now.Date)
+                .Where(o => (o.shop.Trim().Equals(shop) || shop == "" || shop == null) && o.valid == 0 && o.recepting == 1 && o.create_date.Date == DateTime.Now.Date)
                 .OrderByDescending(o => o.id).AsNoTracking().ToListAsync();
             return Ok(new ApiResult<List<Models.Order>?>()
             {
@@ -4843,7 +4877,7 @@ namespace SnowmeetApi.Controllers
             bool allReturned = true;
             for (int i = 0; rental.rentItems != null && i < rental.rentItems.Count; i++)
             {
-                if (rental.rentItems[i].status != "已归还" && rental.rentItems[i].status != "未发放" 
+                if (rental.rentItems[i].status != "已归还" && rental.rentItems[i].status != "未发放"
                 && rental.rentItems[i].status != "已更换" && rental.rentItems[i].noNeed == false)
                 {
                     allReturned = false;
@@ -5056,7 +5090,7 @@ namespace SnowmeetApi.Controllers
         [NonAction]
         public async Task ContinueRental(Models.Rental rental, DateTime rentDate)
         {
-            
+
             List<Models.RentalDetail> details = await _db.rentalDetail
                 .Where(d => d.valid == 1 && d.rental_date.Date == rentDate.Date && d.rental_id == rental.id)
                 .AsNoTracking().ToListAsync();
@@ -5110,8 +5144,8 @@ namespace SnowmeetApi.Controllers
             }
             else
             {
-                RentalPricePreset manualPreset =  rental.pricePresets
-                    .Where(p =>  p.manual ).FirstOrDefault();
+                RentalPricePreset manualPreset = rental.pricePresets
+                    .Where(p => p.manual).FirstOrDefault();
                 if (manualPreset != null)
                 {
                     newPrice = manualPreset.price;
@@ -5298,7 +5332,7 @@ namespace SnowmeetApi.Controllers
                 .Include(r => r.category).OrderBy(r => r.id)
                 .Where(r => r.rental.valid == 1 && r.rental.order.valid == 1 && r.rental.order.is_test == 0)
                 .AsSplitQuery().AsNoTracking().OrderByDescending(r => r.id).ToListAsync();
-            return rentItems.Where(r => r.status != "已归还" && r.status != "已更换" && r.status != "未发放" && r.noNeed == false ).ToList();
+            return rentItems.Where(r => r.status != "已归还" && r.status != "已更换" && r.status != "未发放" && r.noNeed == false).ToList();
         }
         [HttpGet]
         public async Task<ActionResult<List<Models.CategoryRentItem>?>> GetUnReturnedRentItemsByStaff(
@@ -5842,7 +5876,7 @@ namespace SnowmeetApi.Controllers
                     _db.rental.Entry(rental).State = EntityState.Modified;
                     await _db.SaveChangesAsync();
                     _db.rental.Entry(rental).State = EntityState.Detached;
-                    for(int k = 0; rental.rentItems != null && k < rental.rentItems.Count; k++)
+                    for (int k = 0; rental.rentItems != null && k < rental.rentItems.Count; k++)
                     {
                         _db.rentItem.Entry(rental.rentItems[k]).State = EntityState.Detached;
                     }
@@ -5945,7 +5979,7 @@ namespace SnowmeetApi.Controllers
             return rental;
         }
         [HttpPost("{packageId}")]
-        public async Task<ActionResult<ApiResult<RentPackage>>> UpdatePackageRentItemCategories([FromRoute]int packageId, 
+        public async Task<ActionResult<ApiResult<RentPackage>>> UpdatePackageRentItemCategories([FromRoute] int packageId,
             [FromBody] List<RentPackageItemCategories> rentItemCategories,
             [FromQuery] string sessionKey, [FromQuery] string sessionType = "wechat_mini_openid")
         {
@@ -5964,16 +5998,16 @@ namespace SnowmeetApi.Controllers
             _db.rentPackage.Entry(package).State = EntityState.Modified;
             List<RentPackageCategory> existingCategories = await _db.rentPackageCategory
                 .Where(c => c.package_id == packageId && c.valid).AsNoTracking().ToListAsync();
-            for(int i = 0; i < existingCategories.Count; i++)
+            for (int i = 0; i < existingCategories.Count; i++)
             {
                 existingCategories[i].valid = false;
                 existingCategories[i].update_date = DateTime.Now;
                 _db.rentPackageCategory.Entry(existingCategories[i]).State = EntityState.Modified;
             }
-            for(int i = 0; i < rentItemCategories.Count; i++)
+            for (int i = 0; i < rentItemCategories.Count; i++)
             {
                 RentPackageItemCategories itemC = rentItemCategories[i];
-                for(int j = 0; j < itemC.categories.Count; j++)
+                for (int j = 0; j < itemC.categories.Count; j++)
                 {
                     RentPackageCategory packageCategory = new RentPackageCategory()
                     {
@@ -5996,12 +6030,12 @@ namespace SnowmeetApi.Controllers
         {
             List<Shop> shops = await _db.shop.AsNoTracking().ToListAsync();
             List<ShopRentPackage> shopPackages = new List<ShopRentPackage>();
-            for(int i = 0; i < shops.Count; i++)
+            for (int i = 0; i < shops.Count; i++)
             {
                 List<RentPackage> packages = await _db.rentPackage
-                    .Where(p => p.shop == shops[i].name && p.valid == 1 && (key == null || p.name.IndexOf(key) >= 0 ) )
+                    .Where(p => p.shop == shops[i].name && p.valid == 1 && (key == null || p.name.IndexOf(key) >= 0))
                     .AsNoTracking().ToListAsync();
-                if (packages != null && packages.Count>0)
+                if (packages != null && packages.Count > 0)
                 {
                     ShopRentPackage srp = new ShopRentPackage()
                     {
@@ -6012,7 +6046,7 @@ namespace SnowmeetApi.Controllers
                 }
             }
             List<RentPackage> oldPackages = await _db.rentPackage
-                    .Where(p => p.shop == null && p.valid == 1 && (key == null || p.name.IndexOf(key) >= 0 ) )
+                    .Where(p => p.shop == null && p.valid == 1 && (key == null || p.name.IndexOf(key) >= 0))
                     .AsNoTracking().ToListAsync();
             ShopRentPackage srpOld = new ShopRentPackage()
             {
