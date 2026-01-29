@@ -4232,15 +4232,12 @@ namespace SnowmeetApi.Controllers
         [NonAction]
         public async Task<Models.Order> AddInterCom(Models.Order order)
         {
-            bool exists = false;
+            bool exists = true;
             List<Rental> rentals = await _db.rental.Where(r => r.order_id == order.id && r.category_id == 94)
                 .AsNoTracking().ToListAsync();
             if (rentals == null || rentals.Count == 0)
             {
-                exists = false;
-            }
-            else
-            {
+                //exists = true;
                 for (int i = 0; !exists && i < rentals.Count; i++)
                 {
                     Rental rentalExists = rentals[i];
@@ -4250,7 +4247,7 @@ namespace SnowmeetApi.Controllers
                             .AsNoTracking().FirstOrDefaultAsync();
                         if (package != null && package.name.IndexOf("板") >= 0)
                         {
-                            exists = true;
+                            exists = false;
                         }
 
                     }
@@ -4270,13 +4267,15 @@ namespace SnowmeetApi.Controllers
                             || rentItemExists.category_id == 42
                             || rentItemExists.category_id == 69)
                             {
-                                exists = true;
+                                exists = false;
                             }
                         }
                     }
 
                 }
+
             }
+           
             if (exists)
             {
                 return order;
