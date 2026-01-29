@@ -4268,10 +4268,8 @@ namespace SnowmeetApi.Controllers
                 category_id = categoryId,
                 valid = 1,
                 noCode = true,
-                atOnce = true,
-                category = category
+                atOnce = true
             };
-
             rental.rentItems.Add(item);
             RentalPricePreset preset = new RentalPricePreset()
             {
@@ -4300,8 +4298,7 @@ namespace SnowmeetApi.Controllers
                 category_id = categoryId,
                 valid = 1,
                 noCode = true,
-                atOnce = true,
-                category = category
+                atOnce = true
             };
             rental2.rentItems.Add(item2);
             RentalPricePreset preset2 = new RentalPricePreset()
@@ -4314,6 +4311,8 @@ namespace SnowmeetApi.Controllers
             rental2.pricePresets =  new List<RentalPricePreset>() {preset2};
             await _db.rental.AddAsync(rental2);
             await _db.SaveChangesAsync();
+            rental.rentItems[0].category = category;
+            rental.rentItems[0].category = category;
             return order;
         }
         [HttpGet]
