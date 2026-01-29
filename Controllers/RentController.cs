@@ -4233,6 +4233,10 @@ namespace SnowmeetApi.Controllers
         public async Task<Models.Order> AddInterCom(Models.Order order)
         {
             bool exists = true;
+            if (order.shop.IndexOf("万龙") < 0 && order.shop.IndexOf("旗舰") < 0)
+            {
+                return order;
+            }
             List<Rental> rentals = await _db.rental.Where(r => r.order_id == order.id && r.category_id == 94)
                 .AsNoTracking().ToListAsync();
             if (rentals == null || rentals.Count == 0)
