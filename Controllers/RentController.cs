@@ -4227,6 +4227,91 @@ namespace SnowmeetApi.Controllers
                 data = order
             });
         }
+        [NonAction]
+        public async Task<Models.Order> AddInterCom(Models.Order order)
+        {
+            bool exists = false;
+            List<Rental> rentals = await _db.rental.Where(r => r.order_id == order.id && r.category_id == 94)
+                .AsNoTracking().ToListAsync();
+            if (rentals == null || rentals.Count == 0)
+            {
+                exists = false;
+            }
+            else
+            {
+                exists = true;
+            }
+            if (exists)
+            {
+                return order;
+            }
+            string name = "小米对讲机";
+            int categoryId = 94;
+            Rental rental = new Rental()
+            {
+                order_id = order.id,
+                category_id = categoryId,
+                name = name,
+                start_date = DateTime.Now.Date,
+                valid = 1,
+                memo = "租赁装备赠送",
+                guaranty = 0,
+                noGuaranty = true
+            };
+            Models.RentItem item = new Models.RentItem()
+            {
+                rental_id = rental.id,
+                class_name = name,
+                category_id = categoryId,
+                valid = 1,
+                noCode = true,
+                atOnce = true
+            };
+            rental.rentItems.Add(item);
+            RentalPricePreset preset = new RentalPricePreset()
+            {
+                rental_id = rental.id,
+                rent_type = "日场",
+                price = 0,
+                manual = true
+            };
+            rental.pricePresets.Add(preset);
+            await _db.rental.AddAsync(rental);
+            Rental rental2 = new Rental()
+            {
+                order_id = order.id,
+                category_id = categoryId,
+                name = name,
+                start_date = DateTime.Now.Date,
+                valid = 1,
+                memo = "租赁装备赠送",
+                guaranty = 0,
+                noGuaranty = true
+            };
+            Models.RentItem item2 = new Models.RentItem()
+            {
+                rental_id = rental2.id,
+                class_name = name,
+                category_id = categoryId,
+                valid = 1,
+                noCode = true,
+                atOnce = true
+            };
+            rental2.rentItems.Add(item2);
+            RentalPricePreset preset2 = new RentalPricePreset()
+            {
+                rental_id = rental.id,
+                rent_type = "日场",
+                price = 0,
+                manual = true
+            };
+            rental2.pricePresets.Add(preset2);
+            await _db.rental.AddAsync(rental2);
+            await _db.SaveChangesAsync();
+            order.rentals.Add(rental);
+            order.rentals.Add(rental2);
+            return order;
+        }
         [HttpGet]
         public async Task<ActionResult<ApiResult<List<Models.Order>?>>> GetReceptingOrders(string? shop,
             string sessionKey, string sessionType = "wechat_mini_openid")
