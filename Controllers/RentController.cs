@@ -4350,7 +4350,7 @@ namespace SnowmeetApi.Controllers
             await _db.rental.AddAsync(rental2);
             await _db.SaveChangesAsync();
             rental.rentItems[0].category = category;
-            rental.rentItems[0].category = category;
+            rental2.rentItems[0].category = category;
             order.needRender = true;
             return order;
         }
