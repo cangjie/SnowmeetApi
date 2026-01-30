@@ -731,7 +731,7 @@ namespace SnowmeetApi.Controllers
             CourseInteractLog log = new CourseInteractLog()
             {
                 id = 0,
-                open_id = sl[0].open_id.Trim(),
+                open_id = sl[0].open_id == null? "" : sl[0].open_id.Trim(),
                 act = act,
                 create_date = DateTime.Now,
                 course_student_id = courseStudentId
