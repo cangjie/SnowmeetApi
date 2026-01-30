@@ -4252,7 +4252,8 @@ namespace SnowmeetApi.Controllers
                         RentPackage package = await _db.rentPackage.Where(p => p.id == rentalExists.package_id)
                             .AsNoTracking().FirstOrDefaultAsync();
                         if (package != null 
-                            && (package.name.IndexOf("板") >= 0 || package.name.IndexOf("On套餐") >= 0))
+                            && (package.name.IndexOf("板") >= 0 || package.name.IndexOf("On套餐") >= 0
+                            || package.name.IndexOf("FIS") >= 0 ))
                         {
                             exists = false;
                         }
