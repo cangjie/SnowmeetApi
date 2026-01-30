@@ -1254,6 +1254,8 @@ namespace SnowmeetApi.Models
         }
         [NotMapped]
         public bool needRender {get; set;} = false;
+        [NotMapped]
+        public bool? needIntercom {get; set;} = true;
 
     }
 }
