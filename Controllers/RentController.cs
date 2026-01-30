@@ -4221,7 +4221,7 @@ namespace SnowmeetApi.Controllers
                     item.category = await _db.rentCategory.Where(c => c.id == item.category_id).AsNoTracking().FirstOrDefaultAsync();
                 }
             }
-            order = await AddInterCom(order);
+            //order = await AddInterCom(order);
             return Ok(new ApiResult<Models.Order?>()
             {
                 code = 0,
