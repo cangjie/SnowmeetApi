@@ -427,6 +427,9 @@ namespace SnowmeetApi.Controllers
         {
             RentCategory category = await _db.rentCategory.Where(c => c.id == id).AsNoTracking().FirstOrDefaultAsync();
             category.father = await _db.rentCategory.Where(c => (category.code.StartsWith(c.code))).AsNoTracking().FirstOrDefaultAsync();
+            category.associateCategories = await _db.rentCategoryAssociate
+                .Where(a => a.valid && a.category_id == id).Include(a => a.category).AsNoTracking().ToListAsync();
+    
             return Ok(new ApiResult<RentCategory>()
             {
                 code = 0,
