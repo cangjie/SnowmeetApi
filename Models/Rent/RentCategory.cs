@@ -24,5 +24,20 @@ namespace SnowmeetApi.Models
         public List<RentCategoryInfoField>? infoFields { get; set; }
         public List<RentProduct>? productList { get; set; }
         public List<RentItem> rentItems { get; set; } = new List<RentItem>();
+        public List<RentCategoryAssociate> associateCategories {get; set;} = new List<RentCategoryAssociate>();
+    }
+    [Table("rent_category_associate")]
+    public class RentCategoryAssociate
+    {
+        [Key]
+        public int id {get; set;}
+        public int category_id {get; set;}
+        public int associate_id {get; set;}
+        public bool valid {get; set;} = true;
+        public string? memo {get; set;} = null;
+        public DateTime? update_date {get; set;} = null;
+        public DateTime create_date {get; set;} = DateTime.Now;
+        [ForeignKey("associate_id")]
+        public RentCategory category {get; set;}
     }
 }

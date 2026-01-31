@@ -1062,10 +1062,6 @@ namespace SnowmeetApi.Controllers
                 */
             }
         }
-
-
-
-
         [HttpGet]
         public async Task<ActionResult<List<SkipassWithPrice>>> GetProductsByResort(string resort, int showHidden = 0)
         {

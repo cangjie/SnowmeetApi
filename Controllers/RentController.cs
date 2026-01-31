@@ -359,7 +359,7 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<ApiResult<List<RentCategory>>>> GetAllCategories()
         {
             var topL = await _db.rentCategory.Where(r => (r.code.Trim().Length == 2))
-                .OrderBy(r => r.code).ToListAsync();
+                .OrderBy(r => r.code).AsNoTracking().ToListAsync();
             if (topL == null || topL.Count == 0)
             {
                 return BadRequest();
@@ -367,7 +367,8 @@ namespace SnowmeetApi.Controllers
             List<RentCategory> rl = new List<RentCategory>();
             for (int i = 0; i < topL.Count; i++)
             {
-                RentCategory rc = await GetSimpleCategory(topL[i].code);
+                string code = topL[i].code;
+                RentCategory rc = await GetSimpleCategory(code);
                 rl.Add(rc);
             }
             return Ok(new ApiResult<List<RentCategory>>()
@@ -395,9 +396,19 @@ namespace SnowmeetApi.Controllers
         {
             RentCategory father = await _db.rentCategory.Where(c => c.id == fatherId).AsNoTracking().FirstOrDefaultAsync();
 
-            var topL = await _db.rentCategory.Where(r => (r.code.Trim().Length == 4 && r.code.StartsWith(father.code.Trim())))
-                .AsNoTracking().OrderBy(r => r.code).ToListAsync();
-
+            List<RentCategory> topL = await _db.rentCategory.Where(r => (r.code.Trim().Length == 4 && r.code.StartsWith(father.code.Trim())))
+                .Include(c => c.associateCategories.Where(a => a.valid))//.ThenInclude(a => a.category)
+                .AsNoTracking()
+                .OrderBy(r => r.code).ToListAsync();
+            for(int i = 0; i < topL.Count; i++)
+            {
+                for(int j = 0; j < topL[i].associateCategories.Count; j++)
+                {
+                    topL[i].associateCategories[j].category = await _db.rentCategory
+                        .Where(c => c.id == topL[i].associateCategories[j].associate_id)
+                        .AsNoTracking().FirstOrDefaultAsync();
+                }
+            }
             return Ok(new ApiResult<List<RentCategory>>()
             {
                 code = 0,
@@ -428,20 +439,37 @@ namespace SnowmeetApi.Controllers
         {
             code = code.Trim();
             RentCategory rc = await _db.rentCategory
-                .Where(r => r.code.Trim().Equals(code.Trim())).FirstAsync();
+                //.Include(r => r.associateCategories.Where(a => a.valid))//.ThenInclude(c => c.category)
+                .AsNoTracking()
+                .Where(r => r.code.Trim().Equals(code.Trim())).FirstOrDefaultAsync();
+            /*
+            for(int i = 0; i < rc.associateCategories.Count; i++)
+            {
+                rc.associateCategories[i].category = await _db.rentCategory
+                    .Where(r => r.id == rc.associateCategories[i].associate_id)
+                    .AsNoTracking().FirstOrDefaultAsync();
+            }
+            */
             if (rc == null)
             {
                 return null;
             }
             var rcL = await _db.rentCategory.AsNoTracking().Where(r => r.code.Trim().Length == code.Length + 2
-                && r.code.StartsWith(code)).OrderBy(r => r.code).ToListAsync();
+                && r.code.StartsWith(code))
+                //.Include(r => r.associateCategories.Where(a => a.valid))//.ThenInclude(c => c.category)
+                .AsNoTracking()
+                .OrderBy(r => r.code).ToListAsync();
             if (rcL != null && rcL.Count > 0)
             {
                 List<RentCategory> children = new List<RentCategory>();
                 for (int i = 0; i < rcL.Count; i++)
                 {
-                    RentCategory child = await GetSimpleCategory(rcL[i].code);
+                    string childCode = rcL[i].code;
+                    RentCategory child = await GetSimpleCategory(childCode);
                     child.infoFields = rc.infoFields;
+                    child.associateCategories = await _db.rentCategoryAssociate
+                        .Where(a => a.category_id == child.id && a.valid)
+                        .Include(a => a.category).AsNoTracking().ToListAsync();
                     if (child != null)
                     {
                         children.Add(child);
@@ -457,10 +485,17 @@ namespace SnowmeetApi.Controllers
         {
             code = code.Trim();
             RentCategory rc = await _db.rentCategory
-                .Include(r => r.priceList)
-                .Include(r => r.infoFields)
-                .Include(r => r.productList)
+                .Include(r => r.priceList).Include(r => r.infoFields).Include(r => r.productList)
+                //.Include(r => r.associateCategories.Where(r => r.valid))
                 .Where(r => r.code.Trim().Equals(code.Trim())).FirstAsync();
+            /*
+            for(int i = 0; i < rc.associateCategories.Count; i++)
+            {
+                rc.associateCategories[i].category = await _db.rentCategory
+                    .Where(r => r.id == rc.associateCategories[i].associate_id)
+                    .AsNoTracking().FirstOrDefaultAsync();
+            }
+            */
             if (rc == null)
             {
                 return NotFound();
@@ -495,11 +530,12 @@ namespace SnowmeetApi.Controllers
             {
                 rc.priceList = null;
             }
-
             var pList = (from product in rc.productList
                          where product.valid == 1
                          select product).ToList();
             rc.productList = pList;
+            rc.associateCategories = await _db.rentCategoryAssociate.Where(c => c.category_id == rc.id && c.valid)
+                .Include(a => a.category).AsNoTracking().ToListAsync();
             return Ok(rc);
         }
         [HttpGet("{code}")]
@@ -6067,6 +6103,97 @@ namespace SnowmeetApi.Controllers
                 code = 0,
                 message = "",
                 data = shopPackages
+            });
+        }
+        [NonAction]
+        public async Task<List<RentCategoryAssociate>> SetAssociateCategories(int categoryId, List<RentCategory> associateCategories)
+        {
+            List<RentCategoryAssociate> oldListAll = await _db.rentCategoryAssociate
+                .Where(c => c.category_id == categoryId).AsNoTracking().ToListAsync();
+            for(int i = 0; i < oldListAll.Count; i++)
+            {
+                RentCategoryAssociate associate = oldListAll[i];
+                if (associateCategories.Where(c => c.id == associate.category_id).ToList().Count > 0)
+                {
+                    if (!associate.valid)
+                    {
+                        associate.valid = true;
+                        associate.update_date = DateTime.Now;
+                        _db.rentCategoryAssociate.Entry(associate).State = EntityState.Modified;
+                    }
+                }
+                else
+                {
+                   if (associate.valid)
+                    {
+                        associate.valid = false;
+                        associate.update_date = DateTime.Now;
+                        _db.rentCategoryAssociate.Entry(associate).State = EntityState.Modified;
+                    }
+                }
+                
+            }
+            for(int i = 0; i < associateCategories.Count; i++)
+            {
+                RentCategory category = associateCategories[i];
+                RentCategoryAssociate asso = oldListAll.Where(o => o.associate_id == category.id).FirstOrDefault();
+                if (asso == null)
+                {
+                    asso = new RentCategoryAssociate()
+                    {
+                        id = 0,
+                        category_id = categoryId,
+                        associate_id = category.id,
+                        create_date = DateTime.Now
+                    };
+                    await _db.rentCategoryAssociate.AddAsync(asso);
+                }
+                else
+                {
+                    if (!asso.valid)
+                    {
+                        asso.valid = true;
+                        asso.update_date = DateTime.Now;
+                        _db.rentCategoryAssociate.Entry(asso).State = EntityState.Modified;
+                    }
+                }
+            }
+            await _db.SaveChangesAsync();
+            return await _db.rentCategoryAssociate.Include(c => c.category)
+                .Where(c => c.category_id == categoryId && c.valid).AsNoTracking().ToListAsync();
+        }
+        [HttpPost("{categoryId}")]
+        public async Task<ActionResult<ApiResult<RentCategory?>>> SetAssociateCategoriesByStaff([FromRoute]int categoryId, 
+            [FromBody] List<RentCategory> categories, [FromQuery] string sessionKey, [FromQuery] string? sessionType = "wechat_mini_openid")
+        {
+            StaffController _staffHelper = new StaffController(_db);
+            Staff staff = await _staffHelper.GetStaffBySessionKey(sessionKey, sessionType);
+            if (staff == null || staff.title_level < 100)
+            {
+                return Ok(new ApiResult<RentCategory?> ()
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = null
+                });
+            }
+            RentCategory category = await _db.rentCategory.Where(c => c.id == categoryId).AsNoTracking().FirstOrDefaultAsync();
+            if (category == null)
+            {
+                return Ok(new ApiResult<RentCategory?> ()
+                {
+                    code = 1,
+                    message = "未找到品类",
+                    data = null
+                });
+            }
+            List<RentCategoryAssociate> assoList = await SetAssociateCategories(categoryId, categories);
+            category.associateCategories = assoList;
+            return Ok(new ApiResult<RentCategory>()
+            {
+                code = 0,
+                message = "",
+                data = category
             });
         }
     }
