@@ -397,18 +397,25 @@ namespace SnowmeetApi.Controllers
             RentCategory father = await _db.rentCategory.Where(c => c.id == fatherId).AsNoTracking().FirstOrDefaultAsync();
 
             List<RentCategory> topL = await _db.rentCategory.Where(r => (r.code.Trim().Length == 4 && r.code.StartsWith(father.code.Trim())))
-                .Include(c => c.associateCategories.Where(a => a.valid))//.ThenInclude(a => a.category)
+                //.Include(c => c.associateCategories.Where(a => a.valid))//.ThenInclude(a => a.category).AsTracking()
                 .AsNoTracking()
                 .OrderBy(r => r.code).ToListAsync();
+            
+            
             for(int i = 0; i < topL.Count; i++)
             {
+                topL[i].associateCategories = await _db.rentCategoryAssociate.Where(a => a.valid && a.category_id == topL[i].id)
+                    .Include(a => a.category).AsNoTracking().ToListAsync();
+                /*
                 for(int j = 0; j < topL[i].associateCategories.Count; j++)
                 {
                     topL[i].associateCategories[j].category = await _db.rentCategory
                         .Where(c => c.id == topL[i].associateCategories[j].associate_id)
                         .AsNoTracking().FirstOrDefaultAsync();
                 }
+                */
             }
+            
             return Ok(new ApiResult<List<RentCategory>>()
             {
                 code = 0,
@@ -4264,12 +4271,63 @@ namespace SnowmeetApi.Controllers
             {
                 order = await AddInterCom(order);
             }
+            if (order.type == "租赁")
+            {
+                for(int i = 0; i < order.rentals.Count; i++)
+                {
+                    Rental rental = order.rentals[i];
+                    if (rental.category_id != null)
+                    {
+                        rental = await BuildAssociates(rental);
+                    }
+                }
+            }
             return Ok(new ApiResult<Models.Order?>()
             {
                 code = 0,
                 message = "",
                 data = order
             });
+        }
+        [NonAction]
+        public async Task<Rental> BuildAssociates(Rental rental)
+        {
+            Models.RentItem item = rental.rentItems.Where(r => !r.is_associate).FirstOrDefault();
+            List<RentCategoryAssociate> assoCateList = await _db.rentCategoryAssociate.Include(a => a.category)
+                .Where(a => a.valid && a.category_id == item.category_id).AsNoTracking().ToListAsync();
+            List<Models.RentItem> assoItems = rental.rentItems.Where(r => r.is_associate && r.valid == 1).ToList();
+            for(int i = 0; i < assoItems.Count; i++)
+            {
+                if (!assoCateList.Any(a => a.associate_id == assoItems[i].category_id))
+                {
+                    assoItems[i].valid = 0;
+                    assoItems[i].update_date = DateTime.Now;
+                    _db.rentItem.Entry(assoItems[i]).State = EntityState.Modified;
+                    await _db.SaveChangesAsync();
+                }
+            }
+            for(int i = 0; i < assoCateList.Count; i++)
+            {
+                if (!rental.rentItems.Any(r => r.is_associate && r.category_id == assoCateList[i].associate_id))
+                {
+                    Models.RentItem assoItem = new Models.RentItem()
+                    {
+                        id = 0,
+                        rental_id = rental.id,
+                        category_id = assoCateList[i].associate_id,
+                        class_name = assoCateList[i].category.name,
+                        valid = 1,
+                        is_associate = true,
+                        noCode = true,
+                        atOnce = true
+                    };
+                    await _db.rentItem.AddAsync(assoItem);
+                    await _db.SaveChangesAsync();
+                    assoItem.category = await _db.rentCategory.Where(c => c.id == assoItem.category_id)
+                        .AsNoTracking().FirstOrDefaultAsync();
+                }
+            }
+            return rental;
         }
         [NonAction]
         public async Task<Models.Order> AddInterCom(Models.Order order)

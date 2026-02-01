@@ -477,7 +477,16 @@ namespace SnowmeetApi
                         return JsonConvert.SerializeObject(orderResult);
                     case "paymentpaid":
                         OrderController _orderHelper = new OrderController(db, config, http);
-                        OrderPayment payment = await _orderHelper.QueryPaymentPaid((int)post.id);
+                        OrderPayment payment = new OrderPayment();
+                        try
+                        {
+                            payment = await _orderHelper.QueryPaymentPaid((int)post.id);
+                        }
+                        catch
+                        {
+                            System.Threading.Thread.Sleep(500);
+                            payment = await _orderHelper.QueryPaymentPaid((int)post.id);
+                        }
                         Models.Order orderPaid = await db.order.Where(o => o.id == payment.order_id).AsNoTracking().FirstOrDefaultAsync();
                         orderPaid.payments = await db.orderPayment.Where(p => p.order_id == payment.order_id).AsNoTracking().ToListAsync();
                         /*

@@ -242,6 +242,31 @@ namespace SnowmeetApi.Models
                 return (entertain ? 0 : totalRentalAmount) + totalOvertimeAmount + totalRepairationAmount - totalDiscountAmount;
             }
         }
+        [NotMapped]
+        public bool? withAssociates
+        {
+            get
+            {
+                if (category_id == null)
+                {
+                    return null;
+                }
+                if (rentItems == null)
+                {
+                    return null;
+                }
+                bool existsAssociate = false;
+                for(int i = 0; !existsAssociate && i < rentItems.Count; i++)
+                {
+                    if (rentItems[i].is_associate)
+                    {
+                        existsAssociate = true;
+                        break;
+                    }
+                }
+                return existsAssociate;
+            }
+        }
         public double GetTotalAmountByType(string type)
         {
             // double amount = 0;
@@ -374,6 +399,7 @@ namespace SnowmeetApi.Models
         public bool noCode { get; set; } = false;
         public bool noNeed { get; set; } = false;
         public bool atOnce { get; set; } = false;
+        public bool is_associate {get; set;} = false;
         [NotMapped]
         public Staff? pickStaff
         {
