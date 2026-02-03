@@ -243,20 +243,20 @@ namespace SnowmeetApi.Controllers
             }
             if (keyword != null)
             {
-                switch(type)
+                switch (type)
                 {
                     case "租赁":
-                        orderList = orderList.Where(o => (o.memo != null && o.memo.IndexOf(keyword) >= 0 )
-                            || o.rentals.Any(r => ((r.memo != null && r.memo.IndexOf(keyword) >= 0 )
-                                || r.rentItems.Any(i => i.memo != null && i.memo.IndexOf(keyword) >=0 && i.valid == 1 )
-                                || r.details.Any(d => d.memo != null && d.memo.IndexOf(keyword) >= 0 && d.valid == 1)  
-                            ) 
+                        orderList = orderList.Where(o => (o.memo != null && o.memo.IndexOf(keyword) >= 0)
+                            || o.rentals.Any(r => ((r.memo != null && r.memo.IndexOf(keyword) >= 0)
+                                || r.rentItems.Any(i => i.memo != null && i.memo.IndexOf(keyword) >= 0 && i.valid == 1)
+                                || r.details.Any(d => d.memo != null && d.memo.IndexOf(keyword) >= 0 && d.valid == 1)
+                            )
                             )).ToList();
                         break;
                     case "养护":
                         orderList = orderList.Where(o => ((o.memo != null && o.memo.IndexOf(keyword) >= 0)
-                            || o.cares.Any(c => (c.valid == 1 && c.memo != null &&  c.memo.IndexOf(keyword) >= 0) 
-                            || c.tasks.Any(t => t.valid == 1 && t.memo != null && t.memo.IndexOf(keyword)>=0))
+                            || o.cares.Any(c => (c.valid == 1 && c.memo != null && c.memo.IndexOf(keyword) >= 0)
+                            || c.tasks.Any(t => t.valid == 1 && t.memo != null && t.memo.IndexOf(keyword) >= 0))
                         )).ToList();
                         break;
                     default:
@@ -717,6 +717,7 @@ namespace SnowmeetApi.Controllers
                             order.biz_date = DateTime.Now;
                             Care care = order.cares[i];
                             Product product = await _careHelper.GetProduct(order.shop, care);
+
                             if (product == null || care.warranty || care.entertain)
                             {
                                 care.common_charge = 0;
@@ -724,10 +725,28 @@ namespace SnowmeetApi.Controllers
                             else
                             {
                                 care.common_charge = product.sale_price;
+                                if (care.ticket_code != null && care.ticket_code.Trim() != "")
+                                {
+                                    Ticket ticket = await _db.ticket.Where(t => t.code == care.ticket_code && t.valid == 1 && t.used == 0)
+                                        .Include(t => t.template).ThenInclude(p => p.productTicketTemplates).ThenInclude(p => p.product)
+                                        .AsNoTracking().FirstOrDefaultAsync();
+                                    if (ticket != null)
+                                    {
+                                        ProductTicketTemplate productTicketTemplate = ticket.template.productTicketTemplates
+                                            .Where(p => p.product_id == product.id).FirstOrDefault();
+                                        if (productTicketTemplate != null)
+                                        {
+                                            if (productTicketTemplate.fixed_price != null)
+                                            {
+                                                care.common_charge = (double)productTicketTemplate.fixed_price;
+                                            }
+                                            //需要减免直接else if
+                                        }
+                                    }
+
+                                }
                             }
-
                             total += (care.common_charge + care.repair_charge - care.discount - care.ticket_discount);
-
                         }
 
                         order.total_amount = total;
@@ -794,27 +813,6 @@ namespace SnowmeetApi.Controllers
             };
             await _db.coreDataModLog.AddAsync(log);
             await _db.SaveChangesAsync();
-            /*
-            if (order.paying_amount == 0)
-            {
-                switch (order.type)
-                {
-                    case "租赁":
-                        RentController _rentHelper = new RentController(_db, _config, _http);
-                        for (int i = 0; order.rentals != null && i < order.rentals.Count; i++)
-                        {
-                            Models.Rental rental = order.rentals[i];
-                            if (rental.entertain)
-                            {
-                                await _rentHelper.EffectRental(rental.id, order.staff_id);
-                            }
-                        }
-                        break;
-                    default:
-                        break;
-                }
-            }
-            */
             for (int i = 0; order.cares != null && i < order.cares.Count; i++)
             {
                 if (order.cares[i].discount > 0)
@@ -860,7 +858,6 @@ namespace SnowmeetApi.Controllers
                 }
                 CareController _careHelper = new CareController(_db, _config, _http);
                 await _careHelper.EffectCareOrder(order.id);
-                //await DealSuccessPaidOrder(order.id, null);
                 order = await GetOrder(order.id);
             }
 
@@ -915,16 +912,16 @@ namespace SnowmeetApi.Controllers
             bool? isPackage = null, bool? isOnCredit = null, bool? haveDiscount = null, string? status = null,
             string? cell = null, bool? haveWarranty = null, string? retailType = null, string? keyword = null)
         {
-            shop = shop==null? null: Util.UrlDecode(shop);
-            type = type==null? null:Util.UrlDecode(type);
-            subType = subType==null? null:Util.UrlDecode(subType);
+            shop = shop == null ? null : Util.UrlDecode(shop);
+            type = type == null ? null : Util.UrlDecode(type);
+            subType = subType == null ? null : Util.UrlDecode(subType);
             sessionKey = Util.UrlDecode(sessionKey);
-            payOption = payOption ==null? null:Util.UrlDecode(payOption);
-            status = status == null? null:Util.UrlDecode(status);
-            cell = cell==null? null:Util.UrlDecode(cell);
-            retailType = retailType == null? null : Util.UrlDecode(retailType);
-            keyword = keyword==null? null :  Util.UrlDecode(keyword);
-            if (keyword!=null && keyword.Trim() == "")
+            payOption = payOption == null ? null : Util.UrlDecode(payOption);
+            status = status == null ? null : Util.UrlDecode(status);
+            cell = cell == null ? null : Util.UrlDecode(cell);
+            retailType = retailType == null ? null : Util.UrlDecode(retailType);
+            keyword = keyword == null ? null : Util.UrlDecode(keyword);
+            if (keyword != null && keyword.Trim() == "")
             {
                 return Ok(new ApiResult<object?>()
                 {
