@@ -34,7 +34,7 @@ namespace SnowmeetApi.Models
         public bool experience { get; set; } = false;
         public bool? appending {get; set;} = null;
         public DateTime? append_commit_time {get; set;} = null;
-        public string? pick_type {get; set;} = null;
+        //public string? pick_type {get; set;} = null;
         public DateTime? update_date { get; set; } = null;
         public DateTime create_date { get; set; } = DateTime.Now;
         public List<RentItem> rentItems { get; set; } = new List<RentItem>();
