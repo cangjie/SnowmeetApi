@@ -5312,7 +5312,7 @@ namespace SnowmeetApi.Controllers
                 });
             }
             OrderController _orderHelper = new OrderController(_db, _config, _httpContextAccessor);
-            List<Models.Order> orders = (await _orderHelper.GetCommonOrders(66524, shop, null, null, "租赁",
+            List<Models.Order> orders = (await _orderHelper.GetCommonOrders(null, shop, null, null, "租赁",
                 null, null, null, false, null, false, false, null, null, startDate, endDate))
                 .OrderByDescending(o => o.code).ToList();
             List<Models.Order> confirmedOrders = new List<Models.Order>();
