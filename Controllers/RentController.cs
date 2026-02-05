@@ -4417,7 +4417,7 @@ namespace SnowmeetApi.Controllers
                 price = 0,
                 manual = true
             };
-            rental.pricePresets = new List<RentalPricePreset>() { preset };
+            rental.pricePresets.Add(preset);
             await _db.rental.AddAsync(rental);
             Rental rental2 = new Rental()
             {
@@ -4447,7 +4447,7 @@ namespace SnowmeetApi.Controllers
                 price = 0,
                 manual = true
             };
-            rental2.pricePresets = new List<RentalPricePreset>() { preset2 };
+            rental2.pricePresets.Add(preset2);
             await _db.rental.AddAsync(rental2);
             await _db.SaveChangesAsync();
             rental.rentItems[0].category = category;

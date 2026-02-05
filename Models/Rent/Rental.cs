@@ -40,7 +40,7 @@ namespace SnowmeetApi.Models
         public List<RentalDetail> details { get; set; } = new List<RentalDetail>();
         [NotMapped]
         public double? _filledOverTimeCharge = null;
-        public List<RentalPricePreset> pricePresets { get; set; } = null;
+        public List<RentalPricePreset> pricePresets { get; set; } = new List<RentalPricePreset>();
         [NotMapped]
         public DateTime? realStartDate
         {
