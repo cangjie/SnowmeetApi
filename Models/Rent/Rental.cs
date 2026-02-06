@@ -401,6 +401,7 @@ namespace SnowmeetApi.Models
         public bool noNeed { get; set; } = false;
         public bool atOnce { get; set; } = false;
         public bool is_associate {get; set;} = false;
+        public string? pick_type {get; set;} = null;
         [NotMapped]
         public Staff? pickStaff
         {
