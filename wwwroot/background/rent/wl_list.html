@@ -214,14 +214,6 @@
                                     }
                                     break;
                                 case 12:
-                                    /*
-                                    var payMethod = ''
-                                    for(var m = 0; order.availablePayments && m < order.availablePayments.length; m++){
-                                        if (payMethod.indexOf(order.availablePayments[m].pay_method)<0){
-                                            payMethod += order.availablePayments[m].pay_method + ' ';
-                                        }
-                                    }
-                                    */
                                     lineSumData[k] = '--';
                                     break;
                                 default:
@@ -231,7 +223,6 @@
                         }
                         if (display) {
                             tData.push(lineSumData);
-                            
                             for (var k = 0; order.orderShares && k < order.orderShares.length; k++) {
                                 if (order.orderShares[k].relation_id == 4) {
                                     for (var l = 0; order.orderShares[k].paymentShares && l < order.orderShares[k].paymentShares.length; l++) {

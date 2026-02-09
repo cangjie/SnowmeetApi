@@ -4511,7 +4511,7 @@ namespace SnowmeetApi.Controllers
 
         }
         [NonAction]
-        public async Task<Models.RentalDetail> SetRentalDetail(int rentalId, DateTime date, int? staffId)
+        public async Task<Models.RentalDetail?> SetRentalDetail(int rentalId, DateTime date, int? staffId)
         {
             List<Models.RentalDetail> detailList = await _db.rentalDetail
                 .Where(r => r.rental_id == rentalId && r.rental_date.Date == date.Date)
@@ -5187,10 +5187,7 @@ namespace SnowmeetApi.Controllers
                 {
                     Rental rental = orders[i].rentals[j];
                     rental.order = orders[i];
-                    if (rental.entertain != true)
-                    {
-                        await ContinueRental(rental, (DateTime)rentDate);
-                    }
+                    await ContinueRental(rental, (DateTime)rentDate);
                 }
             }
         }
