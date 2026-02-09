@@ -907,7 +907,10 @@ namespace SnowmeetApi.Models
                         amount = 0;
                     }
                     Rental rental = rentals[i];
-                    amount += rental.totalSummary;
+                    if (rental.experience == false && rental.entertain == false )
+                    {
+                        amount += rental.totalSummary;
+                    }
                 }
                 return amount;
             }
