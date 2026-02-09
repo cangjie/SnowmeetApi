@@ -1256,6 +1256,21 @@ namespace SnowmeetApi.Models
         public bool needRender {get; set;} = false;
         [NotMapped]
         public bool? needIntercom {get; set;} = true;
+        [NotMapped]
+        public double? rentRefund
+        {
+            get
+            {
+                try
+                {
+                    return availableRefunds.Where(r => r.reason == "租赁退押金").Sum(r => r.amount);
+                }
+                catch
+                {
+                    return null;
+                }
+            }
+        } 
 
     }
 }

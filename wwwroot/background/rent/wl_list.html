@@ -345,9 +345,9 @@
                             }
 
                         }
-                        if (order.paidAmount - order.refundAmount >= 1) {
+                        if (order.paidAmount - order.rentRefund >= 1) {
                             tData.push(lineData);
-                            totalAmount += (order.paidAmount - order.refundAmount);
+                            totalAmount += (order.paidAmount - order.rentRefund);
                             index++;
                         }
 
