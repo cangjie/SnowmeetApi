@@ -930,7 +930,7 @@ namespace SnowmeetApi.Models
                     Rental rental = rentals[i];
                     if (rental.experience == false && rental.entertain == false )
                     {
-                        amount += rental.totalRentalAmount;
+                        amount += (rental.totalRentalAmount - rental.totalDiscountAmount);
                     }
                 }
                 return amount;
