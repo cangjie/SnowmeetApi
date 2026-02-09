@@ -5187,7 +5187,10 @@ namespace SnowmeetApi.Controllers
                 {
                     Rental rental = orders[i].rentals[j];
                     rental.order = orders[i];
-                    await ContinueRental(rental, (DateTime)rentDate);
+                    if (rental.entertain != true)
+                    {
+                        await ContinueRental(rental, (DateTime)rentDate);
+                    }
                 }
             }
         }
