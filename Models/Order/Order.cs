@@ -916,6 +916,27 @@ namespace SnowmeetApi.Models
             }
         }
         [NotMapped]
+        public double? totalRentalSummaryAmount
+        {
+            get
+            {
+                double? amount = null;
+                for (int i = 0; rentals != null && i < rentals.Count; i++)
+                {
+                    if (amount == null)
+                    {
+                        amount = 0;
+                    }
+                    Rental rental = rentals[i];
+                    if (rental.experience == false && rental.entertain == false )
+                    {
+                        amount += rental.totalRentalAmount;
+                    }
+                }
+                return amount;
+            }
+        }
+        [NotMapped]
         public double depositPaidAmount
         {
             get
