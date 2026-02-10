@@ -65,7 +65,10 @@ namespace SnowmeetApi.Controllers
                 for (int i = 0; i < order.rentals.Count; i++)
                 {
                     Rental rental = order.rentals[i];
-                    rentalAmount += (rental.totalRentalAmount - rental.totalDiscountAmount);
+                    if (rental.entertain == false)
+                    {
+                        rentalAmount += (rental.totalRentalAmount - rental.totalDiscountAmount);
+                    }
                 }
                 OrderShare share = new OrderShare()
                 {

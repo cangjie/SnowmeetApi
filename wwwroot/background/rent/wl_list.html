@@ -176,11 +176,11 @@
                                     lineSumData[k] = '总计'
                                     break;
                                 case 7:
-                                    lineSumData[k] = order.totalRentSummaryAmount.toFixed(2);
+                                    lineSumData[k] = order.totalRentalSummaryAmount.toFixed(2);
                                     break;
                                 case 8:
                                     if (order.orderShares == null || order.orderShares.length == 0) {
-                                        lineSumData[k] = (order.totalRentSummaryAmount * 0.5).toFixed(2);
+                                        lineSumData[k] = (order.totalRentalSummaryAmount * 0.5).toFixed(2);
                                         needToShare += parseFloat(lineSumData[k])
                                     }
                                     else {
@@ -214,14 +214,6 @@
                                     }
                                     break;
                                 case 12:
-                                    /*
-                                    var payMethod = ''
-                                    for(var m = 0; order.availablePayments && m < order.availablePayments.length; m++){
-                                        if (payMethod.indexOf(order.availablePayments[m].pay_method)<0){
-                                            payMethod += order.availablePayments[m].pay_method + ' ';
-                                        }
-                                    }
-                                    */
                                     lineSumData[k] = '--';
                                     break;
                                 default:
@@ -231,7 +223,6 @@
                         }
                         if (display) {
                             tData.push(lineSumData);
-                            
                             for (var k = 0; order.orderShares && k < order.orderShares.length; k++) {
                                 if (order.orderShares[k].relation_id == 4) {
                                     for (var l = 0; order.orderShares[k].paymentShares && l < order.orderShares[k].paymentShares.length; l++) {
@@ -345,9 +336,9 @@
                             }
 
                         }
-                        if (order.paidAmount - order.refundAmount >= 1) {
+                        if (order.paidAmount - order.rentRefund >= 1) {
                             tData.push(lineData);
-                            totalAmount += (order.paidAmount - order.refundAmount);
+                            totalAmount += (order.paidAmount - order.rentRefund);
                             index++;
                         }
 

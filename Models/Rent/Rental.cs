@@ -207,7 +207,7 @@ namespace SnowmeetApi.Models
         {
             get
             {
-                if (experience)
+                if (experience || entertain)
                 {
                     return 0;
                 }

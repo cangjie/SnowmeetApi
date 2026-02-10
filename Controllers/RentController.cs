@@ -4511,7 +4511,7 @@ namespace SnowmeetApi.Controllers
 
         }
         [NonAction]
-        public async Task<Models.RentalDetail> SetRentalDetail(int rentalId, DateTime date, int? staffId)
+        public async Task<Models.RentalDetail?> SetRentalDetail(int rentalId, DateTime date, int? staffId)
         {
             List<Models.RentalDetail> detailList = await _db.rentalDetail
                 .Where(r => r.rental_id == rentalId && r.rental_date.Date == date.Date)

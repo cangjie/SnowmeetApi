@@ -907,7 +907,31 @@ namespace SnowmeetApi.Models
                         amount = 0;
                     }
                     Rental rental = rentals[i];
-                    amount += rental.totalSummary;
+                    if (rental.experience == false && rental.entertain == false )
+                    {
+                        amount += rental.totalSummary;
+                    }
+                }
+                return amount;
+            }
+        }
+        [NotMapped]
+        public double? totalRentalSummaryAmount
+        {
+            get
+            {
+                double? amount = null;
+                for (int i = 0; rentals != null && i < rentals.Count; i++)
+                {
+                    if (amount == null)
+                    {
+                        amount = 0;
+                    }
+                    Rental rental = rentals[i];
+                    if (rental.experience == false && rental.entertain == false )
+                    {
+                        amount += (rental.totalRentalAmount - rental.totalDiscountAmount);
+                    }
                 }
                 return amount;
             }
@@ -1256,6 +1280,21 @@ namespace SnowmeetApi.Models
         public bool needRender {get; set;} = false;
         [NotMapped]
         public bool? needIntercom {get; set;} = true;
+        [NotMapped]
+        public double? rentRefund
+        {
+            get
+            {
+                try
+                {
+                    return availableRefunds.Where(r => r.reason == "租赁退押金").Sum(r => r.amount);
+                }
+                catch
+                {
+                    return null;
+                }
+            }
+        } 
 
     }
 }
