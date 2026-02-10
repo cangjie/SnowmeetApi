@@ -2516,6 +2516,82 @@ namespace SnowmeetApi.Controllers
                 data = balances
             });
         }
+        [NonAction]
+        public async Task<Models.Order?> SetOrderClosedState(Models.Order order, bool closed, int staffId)
+        {
+            if (order.close_date == null)
+            {
+                return null;
+            }
+            bool isOpen = order.closed == 1? false: true;
+            if (isOpen != closed)
+            {
+                return null;
+            }
+            order.closed = closed? 1: 0;
+            order.close_date = closed ? DateTime.Now : order.close_date;
+            CoreDataModLog log = new CoreDataModLog()
+            {
+                table_name = "Order",
+                field_name = "closed",
+                key_value = order.id,
+                prev_value = isOpen? "0": "1",
+                current_value = closed? "1": "0",
+                staff_id = staffId,
+                is_manual = 1,
+                scene = closed? "订单关闭": "订单重开",
+                create_date = DateTime.Now
+            };
+            await _db.coreDataModLog.AddAsync(log);
+            _db.order.Entry(order).State = EntityState.Modified;
+            await _db.SaveChangesAsync();
+            return order;
+
+        }
+        [HttpGet("{orderId}")]
+        public async Task<ActionResult<ApiResult<Models.Order?>>> SetOrderCloseStatus(int orderId, bool closed,
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            if (staff == null || staff.title_level < 100)
+            {
+                return Ok(new ApiResult<List<OrderBalance>?>()
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = null
+                });
+            }
+            Models.Order order = await _db.order.FindAsync(orderId);
+            if (order == null)
+            {
+                return Ok(new ApiResult<Models.Order?>()
+                {
+                    code = 1,
+                    message = "没有找到订单",
+                    data = null
+                });
+            }
+            order = await SetOrderClosedState(order, closed, staff.id);
+            if (order == null)
+            {
+                return Ok(new ApiResult<List<OrderBalance>?>()
+                {
+                    code = 1,
+                    message = "无需重复操作",
+                    data = null
+                });
+            }
+            else
+            {
+                return  Ok(new ApiResult<Models.Order>()
+                {
+                    code = 0,
+                    message = "",
+                    data = order
+                });
+            }
+        }
     }
 
 }
