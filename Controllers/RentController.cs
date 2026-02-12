@@ -5085,6 +5085,44 @@ namespace SnowmeetApi.Controllers
             return rental;
         }
         [HttpPost]
+        public async Task<ActionResult<ApiResult<Models.RentItem>>> UpdateRentItemByStaff([FromBody] Models.RentItem rentItem, [FromQuery] string scene,
+            [FromQuery] string sessionKey, [FromQuery] string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            if (staff == null || staff.title_level < 100)
+            {
+                return Ok(new ApiResult<Models.Rental?>()
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = null
+                });
+            }
+            scene = Util.UrlDecode(scene);
+            Models.RentItem item = await UpdateRentItem(rentItem, scene, staff.id, null);
+            return Ok(new ApiResult<Models.RentItem>()
+            {
+                code = 0,
+                message = "",
+                data = item
+            });
+        }
+        [NonAction]
+        public async Task<Models.RentItem> UpdateRentItem(Models.RentItem rentItem, string scene, int? staffId, int? memberId)
+        {
+            Models.RentItem oriItem = await _db.rentItem.Where(r => r.id == rentItem.id).AsNoTracking().FirstOrDefaultAsync();
+            List<CoreDataModLog> logs = Util.GetUpdateDifferenceLog<Models.RentItem>(oriItem, rentItem, null, staffId, scene);
+            for (int i = 0; i < logs.Count; i++)
+            {
+                await _db.coreDataModLog.AddAsync(logs[i]);
+            }
+            _db.rentItem.Entry(rentItem).State = EntityState.Modified;
+            await _db.SaveChangesAsync();
+            rentItem.category = await _db.rentCategory.Where(c => c.id == rentItem.category_id).AsNoTracking().FirstOrDefaultAsync();
+            rentItem.logs = await _db.rentItemLog.Where(l => l.rent_item_id == rentItem.id).Include(l => l.staff).AsNoTracking().ToListAsync();
+            return rentItem;
+        }
+        [HttpPost]
         public async Task<ActionResult<ApiResult<Models.Rental?>>> UpdateRentalByStaff([FromBody] Models.Rental rental, [FromQuery] string scene,
             [FromQuery] string sessionKey, [FromQuery] string sessionType = "wechat_mini_openid")
         {
