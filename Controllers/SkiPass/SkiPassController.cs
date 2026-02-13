@@ -82,6 +82,10 @@ namespace SnowmeetApi.Controllers
             {
                 tags = tags.Replace("平日", "节假日").Replace("周六", "节假日").Replace("周日", "节假日").Replace("周末", "节假日");
             }
+            if (date.Date == DateTime.Parse("2026-2-14").Date)
+            {
+                tags = tags.Replace("节假日", "平日").Replace("周六", "平日").Replace("周日", "平日").Replace("周末", "平日");
+            }
             string[] tagArr = tags == null ? new string[] { } : Util.UrlDecode(tags.Trim()).Split(',');
             var skiPassProdustList = await _context.product.Where(p => (p.shop.Trim().Equals(resort.Trim()) && p.hidden == 0 && p.end_date >= DateTime.Now.Date))
                 .Join(_context.skiPassProduct, p => p.id, s => s.product_id,
