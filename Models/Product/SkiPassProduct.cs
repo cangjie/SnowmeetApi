@@ -101,7 +101,8 @@ namespace SnowmeetApi.Models
 				}
 				else if (tags.IndexOf("节假日") >= 0)
 				{
-					if (date.Date >= DateTime.Parse("2025-1-28") && date.Date <= DateTime.Parse("2025-2-4").Date)
+					if ((date.Date >= DateTime.Parse("2025-1-28") && date.Date <= DateTime.Parse("2025-2-4").Date)
+					|| (date.Date >= DateTime.Parse("2026-2-15") && date.Date <= DateTime.Parse("2026-2-23").Date))
 					{
 						valid = true;
 					}
