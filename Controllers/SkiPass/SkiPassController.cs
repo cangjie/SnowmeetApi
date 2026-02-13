@@ -77,11 +77,11 @@ namespace SnowmeetApi.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<object>>> GetSkiPassProduct(string resort, DateTime date, string tags, int showAll = 0)
         {
-            if (date >= DateTime.Parse("2026-1-1") && date <= DateTime.Parse("2026-1-2") )
+            if ((date >= DateTime.Parse("2026-1-1") && date <= DateTime.Parse("2026-1-2"))
+            || (date >= DateTime.Parse("2026-2-15") && date <= DateTime.Parse("2026-2-23")) )
             {
                 tags = tags.Replace("平日", "节假日").Replace("周六", "节假日").Replace("周日", "节假日").Replace("周末", "节假日");
             }
-
             if (date.Date == DateTime.Parse("2026-1-4"))
             {
                 tags = tags.Replace("节假日", "平日").Replace("周六", "平日").Replace("周日", "平日").Replace("周末", "平日");
