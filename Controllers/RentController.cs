@@ -6303,7 +6303,7 @@ namespace SnowmeetApi.Controllers
                 Models.RentalDetail detail = details[i];
                 if (detail.id == 0)
                 {
-                    if (detail._filledOthersDiscountAmount != null)
+                    if (detail._filledOthersDiscountAmount != null && detail._filledOthersDiscountAmount > 0)
                     {
                         Discount discount = new Discount()
                         {
@@ -6316,6 +6316,7 @@ namespace SnowmeetApi.Controllers
                         };
                         detail.discounts = new List<Discount>() { discount };
                     }
+                    detail.rental_id = rentalId;
                     await _db.rentalDetail.AddAsync(detail);
                 }
                 else
