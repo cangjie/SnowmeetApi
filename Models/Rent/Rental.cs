@@ -587,6 +587,8 @@ namespace SnowmeetApi.Models
                 return null;
             }
         }
+        [NotMapped]
+        public List<RentItem>? changesLog  {get; set;} = null;
     }
     [Table("rent_item_log")]
     public class RentItemLog

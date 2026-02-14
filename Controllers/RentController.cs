@@ -4849,6 +4849,74 @@ namespace SnowmeetApi.Controllers
             }
             return rental;
         }
+
+        
+        [HttpGet("{rentItemId}")]
+        public async Task<ActionResult<ApiResult<List<Models.RentItem>?>>> GetRentItemChanges(int rentItemId,
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            if (staff == null || staff.title_level < 100)
+            {
+                return Ok(new ApiResult<List<Models.RentItem>?>()
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = null
+                });
+            }
+            Models.RentItem item = await _db.rentItem.Where(r => r.id == rentItemId)
+                .AsNoTracking().FirstOrDefaultAsync();
+            if (item == null)
+            {
+                return Ok(new ApiResult<List<Models.RentItem>?>()
+                {
+                    code = 1,
+                    message = "无此租赁物",
+                    data = null
+                });
+            }
+            List<Models.RentItem> logList = await GetRentItemChangesLog(item);
+            return Ok(new ApiResult<List<Models.RentItem>?>()
+            {
+                code = 0,
+                message = "",
+                data = logList
+            });
+        }
+        
+
+        [NonAction]
+        public async Task<List<Models.RentItem>?> GetRentItemChangesLog(Models.RentItem item)
+        {
+            if (item.prev_id == null)
+            {
+                return null;
+            }
+            if (item.changesLog == null)
+            {
+                item.changesLog = new List<Models.RentItem>();
+            }
+            Models.RentItem prevItem = await _db.rentItem.Where(r => r.id == item.prev_id)
+                .Include(i => i.logs).AsNoTracking().FirstOrDefaultAsync();
+            
+            if (prevItem.prev_id == null)
+            {
+                return new List<Models.RentItem>() { prevItem };
+
+            }
+            else
+            {
+                item.changesLog.Add(prevItem);
+                List<Models.RentItem> logList = await GetRentItemChangesLog(prevItem);
+                for(int i = 0; logList != null && i < logList.Count; i++)
+                {
+                    item.changesLog.Add(logList[i]);
+                }
+                return item.changesLog;;
+            }
+
+        }
         [HttpGet("{rentalId}")]
         public async Task<ActionResult<ApiResult<Models.Rental?>>> GetRentalByStaff(int rentalId,
             string sessionKey, string sessionType = "wechat_mini_openid")
