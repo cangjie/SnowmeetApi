@@ -6303,11 +6303,11 @@ namespace SnowmeetApi.Controllers
                 Models.RentalDetail detail = details[i];
                 if (detail.id == 0)
                 {
-                    if (detail._filledDiscountAmount != null)
+                    if (detail._filledOthersDiscountAmount != null)
                     {
                         Discount discount = new Discount()
                         {
-                            amount = (double)detail._filledDiscountAmount,
+                            amount = (double)detail._filledOthersDiscountAmount,
                             biz_id = rentalId,
                             biz_type = "租赁",
                             sub_biz_id = detail.id,
@@ -6321,7 +6321,7 @@ namespace SnowmeetApi.Controllers
                 else
                 {
                     Models.RentalDetail oriDetail = oriList.Where(d => d.id == detail.id).FirstOrDefault();
-                    if (oriDetail.othersDiscountAmount != detail._filledDiscountAmount)
+                    if (oriDetail.othersDiscountAmount != detail._filledOthersDiscountAmount )
                     {
                         for (int j = 0; j < oriDetail.discounts.Count; j++)
                         {
@@ -6330,18 +6330,18 @@ namespace SnowmeetApi.Controllers
                             oriDiscount.update_date = DateTime.Now;
                             _db.discount.Entry(oriDiscount).State = EntityState.Modified;
                         }
-                        if (detail._filledDiscountAmount != null)
+                        if (detail._filledOthersDiscountAmount != null && detail._filledOthersDiscountAmount > 0)
                         {
                             Discount discount = new Discount()
                             {
-                                amount = (double)detail._filledDiscountAmount,
+                                amount = (double)detail._filledOthersDiscountAmount,
                                 biz_id = rentalId,
                                 biz_type = "租赁",
                                 sub_biz_id = detail.id,
                                 valid = 1,
                                 create_date = DateTime.Now
                             };
-                            detail.discounts = new List<Discount>() { discount };
+                            await _db.discount.AddAsync(discount);
                         }
 
                     }
