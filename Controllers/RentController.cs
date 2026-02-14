@@ -400,9 +400,9 @@ namespace SnowmeetApi.Controllers
                 //.Include(c => c.associateCategories.Where(a => a.valid))//.ThenInclude(a => a.category).AsTracking()
                 .AsNoTracking()
                 .OrderBy(r => r.code).ToListAsync();
-            
-            
-            for(int i = 0; i < topL.Count; i++)
+
+
+            for (int i = 0; i < topL.Count; i++)
             {
                 topL[i].associateCategories = await _db.rentCategoryAssociate.Where(a => a.valid && a.category_id == topL[i].id)
                     .Include(a => a.category).AsNoTracking().ToListAsync();
@@ -415,7 +415,7 @@ namespace SnowmeetApi.Controllers
                 }
                 */
             }
-            
+
             return Ok(new ApiResult<List<RentCategory>>()
             {
                 code = 0,
@@ -436,7 +436,7 @@ namespace SnowmeetApi.Controllers
             category.father = await _db.rentCategory.Where(c => (category.code.StartsWith(c.code))).AsNoTracking().FirstOrDefaultAsync();
             category.associateCategories = await _db.rentCategoryAssociate
                 .Where(a => a.valid && a.category_id == id).Include(a => a.category).AsNoTracking().ToListAsync();
-    
+
             return Ok(new ApiResult<RentCategory>()
             {
                 code = 0,
@@ -4273,7 +4273,7 @@ namespace SnowmeetApi.Controllers
             }
             if (order.type == "租赁")
             {
-                for(int i = 0; i < order.rentals.Count; i++)
+                for (int i = 0; i < order.rentals.Count; i++)
                 {
                     Rental rental = order.rentals[i];
                     if (rental.category_id != null)
@@ -4296,7 +4296,7 @@ namespace SnowmeetApi.Controllers
             List<RentCategoryAssociate> assoCateList = await _db.rentCategoryAssociate.Include(a => a.category)
                 .Where(a => a.valid && a.category_id == item.category_id).AsNoTracking().ToListAsync();
             List<Models.RentItem> assoItems = rental.rentItems.Where(r => r.is_associate && r.valid == 1).ToList();
-            for(int i = 0; i < assoItems.Count; i++)
+            for (int i = 0; i < assoItems.Count; i++)
             {
                 if (!assoCateList.Any(a => a.associate_id == assoItems[i].category_id))
                 {
@@ -4306,7 +4306,7 @@ namespace SnowmeetApi.Controllers
                     await _db.SaveChangesAsync();
                 }
             }
-            for(int i = 0; i < assoCateList.Count; i++)
+            for (int i = 0; i < assoCateList.Count; i++)
             {
                 if (!rental.rentItems.Any(r => r.is_associate && r.category_id == assoCateList[i].associate_id))
                 {
@@ -4348,9 +4348,9 @@ namespace SnowmeetApi.Controllers
                     {
                         RentPackage package = await _db.rentPackage.Where(p => p.id == rentalExists.package_id)
                             .AsNoTracking().FirstOrDefaultAsync();
-                        if (package != null 
+                        if (package != null
                             && (package.name.IndexOf("板") >= 0 || package.name.IndexOf("On套餐") >= 0
-                            || package.name.IndexOf("FIS") >= 0 ))
+                            || package.name.IndexOf("FIS") >= 0))
                         {
                             exists = false;
                         }
@@ -4362,7 +4362,7 @@ namespace SnowmeetApi.Controllers
                         {
                             Models.RentItem rentItemExists = rentalExists.rentItems[j];
                             if (rentItemExists.category_id == 2
-                            || rentItemExists.category_id == 3 
+                            || rentItemExists.category_id == 3
                             || rentItemExists.category_id == 4
                             || rentItemExists.category_id == 6
                             || rentItemExists.category_id == 7
@@ -4380,7 +4380,7 @@ namespace SnowmeetApi.Controllers
                 }
 
             }
-           
+
             if (exists)
             {
                 return order;
@@ -6207,7 +6207,7 @@ namespace SnowmeetApi.Controllers
         {
             List<RentCategoryAssociate> oldListAll = await _db.rentCategoryAssociate
                 .Where(c => c.category_id == categoryId).AsNoTracking().ToListAsync();
-            for(int i = 0; i < oldListAll.Count; i++)
+            for (int i = 0; i < oldListAll.Count; i++)
             {
                 RentCategoryAssociate associate = oldListAll[i];
                 if (associateCategories.Where(c => c.id == associate.category_id).ToList().Count > 0)
@@ -6221,16 +6221,16 @@ namespace SnowmeetApi.Controllers
                 }
                 else
                 {
-                   if (associate.valid)
+                    if (associate.valid)
                     {
                         associate.valid = false;
                         associate.update_date = DateTime.Now;
                         _db.rentCategoryAssociate.Entry(associate).State = EntityState.Modified;
                     }
                 }
-                
+
             }
-            for(int i = 0; i < associateCategories.Count; i++)
+            for (int i = 0; i < associateCategories.Count; i++)
             {
                 RentCategory category = associateCategories[i];
                 RentCategoryAssociate asso = oldListAll.Where(o => o.associate_id == category.id).FirstOrDefault();
@@ -6260,14 +6260,14 @@ namespace SnowmeetApi.Controllers
                 .Where(c => c.category_id == categoryId && c.valid).AsNoTracking().ToListAsync();
         }
         [HttpPost("{categoryId}")]
-        public async Task<ActionResult<ApiResult<RentCategory?>>> SetAssociateCategoriesByStaff([FromRoute]int categoryId, 
+        public async Task<ActionResult<ApiResult<RentCategory?>>> SetAssociateCategoriesByStaff([FromRoute] int categoryId,
             [FromBody] List<RentCategory> categories, [FromQuery] string sessionKey, [FromQuery] string? sessionType = "wechat_mini_openid")
         {
             StaffController _staffHelper = new StaffController(_db);
             Staff staff = await _staffHelper.GetStaffBySessionKey(sessionKey, sessionType);
             if (staff == null || staff.title_level < 100)
             {
-                return Ok(new ApiResult<RentCategory?> ()
+                return Ok(new ApiResult<RentCategory?>()
                 {
                     code = 1,
                     message = "没有权限",
@@ -6277,7 +6277,7 @@ namespace SnowmeetApi.Controllers
             RentCategory category = await _db.rentCategory.Where(c => c.id == categoryId).AsNoTracking().FirstOrDefaultAsync();
             if (category == null)
             {
-                return Ok(new ApiResult<RentCategory?> ()
+                return Ok(new ApiResult<RentCategory?>()
                 {
                     code = 1,
                     message = "未找到品类",
@@ -6291,6 +6291,101 @@ namespace SnowmeetApi.Controllers
                 code = 0,
                 message = "",
                 data = category
+            });
+        }
+        [NonAction]
+        public async Task<Models.Rental> UpdateRentalDetails(int rentalId, List<Models.RentalDetail> details, int staffId, string? scene = null)
+        {
+            List<Models.RentalDetail> oriList = await _db.rentalDetail.Where(d => d.rental_id == rentalId)
+                .Include(d => d.discounts).OrderBy(d => d.rental_date).AsNoTracking().ToListAsync();
+            for (int i = 0; i < details.Count; i++)
+            {
+                Models.RentalDetail detail = details[i];
+                if (detail.id == 0)
+                {
+                    if (detail._totalDiscountAmount != null)
+                    {
+                        Discount discount = new Discount()
+                        {
+                            amount = (double)detail._totalDiscountAmount,
+                            biz_id = rentalId,
+                            biz_type = "租赁",
+                            sub_biz_id = detail.id,
+                            valid = 1,
+                            create_date = DateTime.Now
+                        };
+                        detail.discounts = new List<Discount>() { discount };
+                    }
+                    await _db.rentalDetail.AddAsync(detail);
+                }
+                else
+                {
+                    Models.RentalDetail oriDetail = oriList.Where(d => d.id == detail.id).FirstOrDefault();
+                    if (oriDetail.totalDiscountAmount != detail.totalDiscountAmount)
+                    {
+                        for (int j = 0; j < oriDetail.discounts.Count; j++)
+                        {
+                            Discount oriDiscount = oriDetail.discounts[j];
+                            oriDiscount.valid = 0;
+                            oriDiscount.update_date = DateTime.Now;
+                            _db.discount.Entry(oriDiscount).State = EntityState.Modified;
+                        }
+                        if (detail._totalDiscountAmount != null)
+                        {
+                            Discount discount = new Discount()
+                            {
+                                amount = (double)detail._totalDiscountAmount,
+                                biz_id = rentalId,
+                                biz_type = "租赁",
+                                sub_biz_id = detail.id,
+                                valid = 1,
+                                create_date = DateTime.Now
+                            };
+                            detail.discounts = new List<Discount>() { discount };
+                        }
+
+                    }
+                    List<CoreDataModLog> dataLogs = Util.GetUpdateDifferenceLog<Models.RentalDetail>(oriDetail, detail, null, staffId, scene);
+                    for (int j = 0; j < dataLogs.Count; j++)
+                    {
+                        await _db.coreDataModLog.AddAsync(dataLogs[j]);
+                    }
+                    _db.rentalDetail.Entry(detail).State = EntityState.Modified;
+                }
+            }
+            await _db.SaveChangesAsync();
+            return await GetRental(rentalId);
+        }
+        [HttpPost("{rentalId}")]
+        public async Task<ActionResult<ApiResult<Models.Rental?>>> UpdateRentalDetailsByStaff([FromRoute] int rentalId,
+            [FromBody] List<Models.RentalDetail> details, [FromQuery] string sessionKey, [FromQuery] string? sessionType = "wechat_mini_openid",
+            [FromQuery] string? scene = null)
+        {
+            StaffController _staffHelper = new StaffController(_db);
+            Staff staff = await _staffHelper.GetStaffBySessionKey(sessionKey, sessionType);
+            if (staff == null || staff.title_level < 100)
+            {
+                return Ok(new ApiResult<Models.Rental?>()
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = null
+                });
+            }
+            List<Models.RentalDetail> newList = new List<Models.RentalDetail>();
+            for(int i = 0; i < details.Count; i++)
+            {
+                if (details[i].id != 0 || details[i].valid == 1 )
+                {
+                    newList.Add(details[i]);
+                }
+            }
+            Models.Rental rental = await UpdateRentalDetails(rentalId, newList, staff.id, scene);
+            return Ok(new ApiResult<Models.Rental?>()
+            {
+                code = 0,
+                message = "",
+                data = rental
             });
         }
     }

@@ -362,12 +362,17 @@ namespace SnowmeetApi.Models
                 return GetDiscountAmount(false);
             }
         }
+        public double? _totalDiscountAmount = null;
         [NotMapped]
-        public double totalDiscountAmount
+        public double? totalDiscountAmount
         {
             get
             {
                 return ticketDiscountAmount + othersDiscountAmount;
+            }
+            set
+            {
+                _totalDiscountAmount = value;
             }
         }
 

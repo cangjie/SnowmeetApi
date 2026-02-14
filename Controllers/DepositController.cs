@@ -459,12 +459,14 @@ namespace SnowmeetApi.Controllers
                 Member member = members[i];
                 await _db.member.Entry(member).Collection(m => m.memberSocialAccounts).LoadAsync();
                 member.memberSocialAccounts = member.memberSocialAccounts.Where(m => m.valid == 1).ToList();
+                
                 if (member.wechatMiniOpenId == null)
                 {
                     members.RemoveAt(i);
                     i--;
                     continue;
                 }
+                
                 member.depositAccounts = await _db.member.Entry(member).Collection(m => m.depositAccounts)
                     .Query().Where(a => a.valid == 1).ToListAsync();
 
