@@ -355,14 +355,18 @@ namespace SnowmeetApi.Models
         }
 
         [NotMapped]
-        public double othersDiscountAmount
+        public double? othersDiscountAmount
         {
             get
             {
                 return GetDiscountAmount(false);
             }
+            set
+            {
+                _filledDiscountAmount = value;
+            }
         }
-        public double? _totalDiscountAmount = null;
+        //public double? _totalDiscountAmount = null;
         [NotMapped]
         public double? totalDiscountAmount
         {
@@ -372,7 +376,7 @@ namespace SnowmeetApi.Models
             }
             set
             {
-                _totalDiscountAmount = value;
+                _filledDiscountAmount = value;
             }
         }
 

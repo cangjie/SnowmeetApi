@@ -6303,11 +6303,11 @@ namespace SnowmeetApi.Controllers
                 Models.RentalDetail detail = details[i];
                 if (detail.id == 0)
                 {
-                    if (detail._totalDiscountAmount != null)
+                    if (detail._filledDiscountAmount != null)
                     {
                         Discount discount = new Discount()
                         {
-                            amount = (double)detail._totalDiscountAmount,
+                            amount = (double)detail._filledDiscountAmount,
                             biz_id = rentalId,
                             biz_type = "租赁",
                             sub_biz_id = detail.id,
@@ -6321,7 +6321,7 @@ namespace SnowmeetApi.Controllers
                 else
                 {
                     Models.RentalDetail oriDetail = oriList.Where(d => d.id == detail.id).FirstOrDefault();
-                    if (oriDetail.totalDiscountAmount != detail.totalDiscountAmount)
+                    if (oriDetail.othersDiscountAmount != detail._filledDiscountAmount)
                     {
                         for (int j = 0; j < oriDetail.discounts.Count; j++)
                         {
@@ -6330,11 +6330,11 @@ namespace SnowmeetApi.Controllers
                             oriDiscount.update_date = DateTime.Now;
                             _db.discount.Entry(oriDiscount).State = EntityState.Modified;
                         }
-                        if (detail._totalDiscountAmount != null)
+                        if (detail._filledDiscountAmount != null)
                         {
                             Discount discount = new Discount()
                             {
-                                amount = (double)detail._totalDiscountAmount,
+                                amount = (double)detail._filledDiscountAmount,
                                 biz_id = rentalId,
                                 biz_type = "租赁",
                                 sub_biz_id = detail.id,
