@@ -5982,7 +5982,7 @@ namespace SnowmeetApi.Controllers
                     id = 0,
                     rental_id = rental.id,
                     category_id = package.rentPackageItemCategories[i].categories[0].id,
-                    category = package.rentPackageItemCategories[i].categories[0],
+                    //category = package.rentPackageItemCategories[i].categories[0],
                     valid = 1,
                     noCode = true,
                     create_date = DateTime.Now
