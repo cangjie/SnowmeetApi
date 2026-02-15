@@ -5975,14 +5975,14 @@ namespace SnowmeetApi.Controllers
                 scene = scene
             };
             rental.pricePresets = new List<RentalPricePreset>() { preset };
-            for (int i = 0; i < package.rentPackageCategoryList.Count; i++)
+            for (int i = 0; i < package.rentPackageItemCategories.Count; i++)
             {
                 Models.RentItem item = new Models.RentItem()
                 {
                     id = 0,
                     rental_id = rental.id,
-                    category_id = package.rentPackageCategoryList[i].category_id,
-                    //category = package.rentPackageCategoryList[i].rentCategory,
+                    category_id = package.rentPackageItemCategories[i].categories[0].id,
+                    category = package.rentPackageItemCategories[i].categories[0],
                     valid = 1,
                     noCode = true,
                     create_date = DateTime.Now
