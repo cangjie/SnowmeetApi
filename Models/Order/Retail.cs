@@ -71,4 +71,16 @@ namespace SnowmeetApi.Models
         [NotMapped]
         public List<CoreDataModLog> logs {get; set;} = new List<CoreDataModLog>();
     }
+    [Table("retail_image")]
+    public class RetailImage
+    {
+        [Key]
+        public int id { get; set; }
+        public int order_id { get; set; }
+        public string image_id { get; set; } = "";
+        [ForeignKey("order_id")]
+        public Models.Order? order { get; set; } = null;
+        [ForeignKey("image_id")]
+        public Models.UploadFile image { get; set; } = null;
+    }
 }
