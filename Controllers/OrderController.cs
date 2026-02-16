@@ -1995,6 +1995,24 @@ namespace SnowmeetApi.Controllers
                     }
                 }
             }
+            List<RetailImage> images = await _db.retailImage.Where(i => i.order_id == order.id).ToListAsync();
+            for(int i = 0; i < images.Count; i++)
+            {
+                if (order.retailImages.Any(r => r.id == images[i].id))
+                {
+                    images[i].valid = true;
+                }
+                else
+                {
+                    images[i].valid = false;
+                }
+                _db.retailImage.Entry(images[i]).State = EntityState.Modified;
+            }
+            List<RetailImage> newImages = order.retailImages.Where(i => i.id == 0).ToList();
+            for(int i = 0; i < newImages.Count; i++)
+            {
+                await _db.retailImage.AddAsync(newImages[i]);
+            }
             order.update_date = DateTime.Now;
             List<CoreDataModLog> orderLogs = Util.GetUpdateDifferenceLog<Models.Order>(oriOrder, order, memberId, staffId, scene);
             for (int j = 0; j < orderLogs.Count; j++)
