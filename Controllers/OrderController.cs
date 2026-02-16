@@ -1995,7 +1995,7 @@ namespace SnowmeetApi.Controllers
                     }
                 }
             }
-            List<RetailImage> images = await _db.retailImage.Where(i => i.order_id == order.id).ToListAsync();
+            List<RetailImage> images = await _db.retailImage.Where(i => i.order_id == order.id).AsNoTracking().ToListAsync();
             for(int i = 0; i < images.Count; i++)
             {
                 if (order.retailImages.Any(r => r.id == images[i].id))
@@ -2008,9 +2008,15 @@ namespace SnowmeetApi.Controllers
                 }
                 _db.retailImage.Entry(images[i]).State = EntityState.Modified;
             }
+            await _db.SaveChangesAsync();
+            for(int i = 0; i < images.Count; i++)
+            {
+                _db.retailImage.Entry(images[i]).State = EntityState.Detached;
+            }
             List<RetailImage> newImages = order.retailImages.Where(i => i.id == 0).ToList();
             for(int i = 0; i < newImages.Count; i++)
             {
+                newImages[i].valid = true;
                 await _db.retailImage.AddAsync(newImages[i]);
             }
             order.update_date = DateTime.Now;
