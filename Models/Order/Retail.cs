@@ -78,6 +78,7 @@ namespace SnowmeetApi.Models
         public int id { get; set; }
         public int order_id { get; set; }
         public int image_id { get; set; }
+        public bool valid {get; set;}
         [ForeignKey("order_id")]
         public Models.Order? order { get; set; } = null;
         [ForeignKey("image_id")]

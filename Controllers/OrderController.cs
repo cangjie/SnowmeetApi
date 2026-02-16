@@ -36,6 +36,10 @@ namespace SnowmeetApi.Controllers
                 return null;
             }
             order.retails = await _db.order.Entry(order).Collection(o => o.retails).Query().Where(r => r.valid == 1).AsNoTracking().ToListAsync();
+            if (order.type == "零售")
+            {
+                order.retailImages = await _db.retailImage.Include(i => i.image).Where(i => i.order_id == orderId && i.valid).AsNoTracking().ToListAsync();
+            }
             order.cares = await _db.order.Entry(order).Collection(o => o.cares).Query()
                 .Include(c => c.tasks.OrderBy(t => t.id)).ThenInclude(t => t.staff)
                 .Include(c => c.tasks.OrderBy(t => t.id)).ThenInclude(t => t.terminateStaff)
