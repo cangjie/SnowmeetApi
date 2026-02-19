@@ -4279,10 +4279,10 @@ namespace SnowmeetApi.Controllers
                     if (rental.category_id != null)
                     {
                         rental = await BuildAssociates(rental);
-                        if (order.shop == "崇礼旗舰店")
-                        {
-                            rental = await SetRentItemDefaults(rental);
-                        }
+                    }
+                    if (order.shop == "崇礼旗舰店")
+                    {
+                        rental = await SetRentItemDefaults(rental);
                     }
                 }
             }
