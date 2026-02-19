@@ -1295,6 +1295,7 @@ namespace SnowmeetApi.Models
                 }
             }
         } 
+        public List<RetailImage> retailImages { get; set; } = new List<RetailImage>();
 
     }
 }

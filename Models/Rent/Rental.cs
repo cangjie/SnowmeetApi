@@ -353,17 +353,22 @@ namespace SnowmeetApi.Models
                 return GetDiscountAmount(true);
             }
         }
-
+        public double? _filledOthersDiscountAmount = null;
         [NotMapped]
-        public double othersDiscountAmount
+        public double? othersDiscountAmount
         {
             get
             {
                 return GetDiscountAmount(false);
             }
+            set
+            {
+                _filledOthersDiscountAmount = value;
+            }
         }
+        //public double? _totalDiscountAmount = null;
         [NotMapped]
-        public double totalDiscountAmount
+        public double? totalDiscountAmount
         {
             get
             {
@@ -582,6 +587,8 @@ namespace SnowmeetApi.Models
                 return null;
             }
         }
+        [NotMapped]
+        public List<RentItem>? changesLog  {get; set;} = null;
     }
     [Table("rent_item_log")]
     public class RentItemLog

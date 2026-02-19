@@ -51,7 +51,7 @@ namespace SnowmeetApi.Models
 		public bool DateMatch(DateTime date)
 		{
 			bool valid = true;
-			if (date == DateTime.Parse("2026-1-3") || date == DateTime.Parse("2026-1-4"))
+			if (date == DateTime.Parse("2026-1-3") || date == DateTime.Parse("2026-1-4") || date == DateTime.Parse("2026-2-14"))
 			{
 				return true;
 			}
@@ -101,7 +101,8 @@ namespace SnowmeetApi.Models
 				}
 				else if (tags.IndexOf("节假日") >= 0)
 				{
-					if (date.Date >= DateTime.Parse("2025-1-28") && date.Date <= DateTime.Parse("2025-2-4").Date)
+					if ((date.Date >= DateTime.Parse("2025-1-28") && date.Date <= DateTime.Parse("2025-2-4").Date)
+					|| (date.Date >= DateTime.Parse("2026-2-15") && date.Date <= DateTime.Parse("2026-2-23").Date))
 					{
 						valid = true;
 					}

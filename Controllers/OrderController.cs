@@ -36,6 +36,10 @@ namespace SnowmeetApi.Controllers
                 return null;
             }
             order.retails = await _db.order.Entry(order).Collection(o => o.retails).Query().Where(r => r.valid == 1).AsNoTracking().ToListAsync();
+            if (order.type == "零售")
+            {
+                order.retailImages = await _db.retailImage.Include(i => i.image).Where(i => i.order_id == orderId && i.valid).AsNoTracking().ToListAsync();
+            }
             order.cares = await _db.order.Entry(order).Collection(o => o.cares).Query()
                 .Include(c => c.tasks.OrderBy(t => t.id)).ThenInclude(t => t.staff)
                 .Include(c => c.tasks.OrderBy(t => t.id)).ThenInclude(t => t.terminateStaff)
@@ -1990,6 +1994,30 @@ namespace SnowmeetApi.Controllers
                         await _db.coreDataModLog.AddAsync(logs[j]);
                     }
                 }
+            }
+            List<RetailImage> images = await _db.retailImage.Where(i => i.order_id == order.id).AsNoTracking().ToListAsync();
+            for(int i = 0; i < images.Count; i++)
+            {
+                if (order.retailImages.Any(r => r.id == images[i].id))
+                {
+                    images[i].valid = true;
+                }
+                else
+                {
+                    images[i].valid = false;
+                }
+                _db.retailImage.Entry(images[i]).State = EntityState.Modified;
+            }
+            await _db.SaveChangesAsync();
+            for(int i = 0; i < images.Count; i++)
+            {
+                _db.retailImage.Entry(images[i]).State = EntityState.Detached;
+            }
+            List<RetailImage> newImages = order.retailImages.Where(i => i.id == 0).ToList();
+            for(int i = 0; i < newImages.Count; i++)
+            {
+                newImages[i].valid = true;
+                await _db.retailImage.AddAsync(newImages[i]);
             }
             order.update_date = DateTime.Now;
             List<CoreDataModLog> orderLogs = Util.GetUpdateDifferenceLog<Models.Order>(oriOrder, order, memberId, staffId, scene);

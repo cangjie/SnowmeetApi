@@ -4886,6 +4886,74 @@ namespace SnowmeetApi.Controllers
             }
             return rental;
         }
+
+        
+        [HttpGet("{rentItemId}")]
+        public async Task<ActionResult<ApiResult<List<Models.RentItem>?>>> GetRentItemChanges(int rentItemId,
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            if (staff == null || staff.title_level < 100)
+            {
+                return Ok(new ApiResult<List<Models.RentItem>?>()
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = null
+                });
+            }
+            Models.RentItem item = await _db.rentItem.Where(r => r.id == rentItemId)
+                .AsNoTracking().FirstOrDefaultAsync();
+            if (item == null)
+            {
+                return Ok(new ApiResult<List<Models.RentItem>?>()
+                {
+                    code = 1,
+                    message = "无此租赁物",
+                    data = null
+                });
+            }
+            List<Models.RentItem> logList = await GetRentItemChangesLog(item);
+            return Ok(new ApiResult<List<Models.RentItem>?>()
+            {
+                code = 0,
+                message = "",
+                data = logList
+            });
+        }
+        
+
+        [NonAction]
+        public async Task<List<Models.RentItem>?> GetRentItemChangesLog(Models.RentItem item)
+        {
+            if (item.prev_id == null)
+            {
+                return null;
+            }
+            if (item.changesLog == null)
+            {
+                item.changesLog = new List<Models.RentItem>();
+            }
+            Models.RentItem prevItem = await _db.rentItem.Where(r => r.id == item.prev_id)
+                .Include(i => i.logs).AsNoTracking().FirstOrDefaultAsync();
+            
+            if (prevItem.prev_id == null)
+            {
+                return new List<Models.RentItem>() { prevItem };
+
+            }
+            else
+            {
+                item.changesLog.Add(prevItem);
+                List<Models.RentItem> logList = await GetRentItemChangesLog(prevItem);
+                for(int i = 0; logList != null && i < logList.Count; i++)
+                {
+                    item.changesLog.Add(logList[i]);
+                }
+                return item.changesLog;;
+            }
+
+        }
         [HttpGet("{rentalId}")]
         public async Task<ActionResult<ApiResult<Models.Rental?>>> GetRentalByStaff(int rentalId,
             string sessionKey, string sessionType = "wechat_mini_openid")
@@ -5120,6 +5188,44 @@ namespace SnowmeetApi.Controllers
             _db.rental.Entry(rental).State = EntityState.Modified;
             await _db.SaveChangesAsync();
             return rental;
+        }
+        [HttpPost]
+        public async Task<ActionResult<ApiResult<Models.RentItem>>> UpdateRentItemByStaff([FromBody] Models.RentItem rentItem, [FromQuery] string scene,
+            [FromQuery] string sessionKey, [FromQuery] string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            if (staff == null || staff.title_level < 100)
+            {
+                return Ok(new ApiResult<Models.Rental?>()
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = null
+                });
+            }
+            scene = Util.UrlDecode(scene);
+            Models.RentItem item = await UpdateRentItem(rentItem, scene, staff.id, null);
+            return Ok(new ApiResult<Models.RentItem>()
+            {
+                code = 0,
+                message = "",
+                data = item
+            });
+        }
+        [NonAction]
+        public async Task<Models.RentItem> UpdateRentItem(Models.RentItem rentItem, string scene, int? staffId, int? memberId)
+        {
+            Models.RentItem oriItem = await _db.rentItem.Where(r => r.id == rentItem.id).AsNoTracking().FirstOrDefaultAsync();
+            List<CoreDataModLog> logs = Util.GetUpdateDifferenceLog<Models.RentItem>(oriItem, rentItem, null, staffId, scene);
+            for (int i = 0; i < logs.Count; i++)
+            {
+                await _db.coreDataModLog.AddAsync(logs[i]);
+            }
+            _db.rentItem.Entry(rentItem).State = EntityState.Modified;
+            await _db.SaveChangesAsync();
+            rentItem.category = await _db.rentCategory.Where(c => c.id == rentItem.category_id).AsNoTracking().FirstOrDefaultAsync();
+            rentItem.logs = await _db.rentItemLog.Where(l => l.rent_item_id == rentItem.id).Include(l => l.staff).AsNoTracking().ToListAsync();
+            return rentItem;
         }
         [HttpPost]
         public async Task<ActionResult<ApiResult<Models.Rental?>>> UpdateRentalByStaff([FromBody] Models.Rental rental, [FromQuery] string scene,
@@ -5906,14 +6012,14 @@ namespace SnowmeetApi.Controllers
                 scene = scene
             };
             rental.pricePresets = new List<RentalPricePreset>() { preset };
-            for (int i = 0; i < package.rentPackageCategoryList.Count; i++)
+            for (int i = 0; i < package.rentPackageItemCategories.Count; i++)
             {
                 Models.RentItem item = new Models.RentItem()
                 {
                     id = 0,
                     rental_id = rental.id,
-                    category_id = package.rentPackageCategoryList[i].category_id,
-                    //category = package.rentPackageCategoryList[i].rentCategory,
+                    category_id = package.rentPackageItemCategories[i].categories[0].id,
+                    //category = package.rentPackageItemCategories[i].categories[0],
                     valid = 1,
                     noCode = true,
                     create_date = DateTime.Now
@@ -6290,6 +6396,102 @@ namespace SnowmeetApi.Controllers
                 code = 0,
                 message = "",
                 data = category
+            });
+        }
+        [NonAction]
+        public async Task<Models.Rental> UpdateRentalDetails(int rentalId, List<Models.RentalDetail> details, int staffId, string? scene = null)
+        {
+            List<Models.RentalDetail> oriList = await _db.rentalDetail.Where(d => d.rental_id == rentalId)
+                .Include(d => d.discounts).OrderBy(d => d.rental_date).AsNoTracking().ToListAsync();
+            for (int i = 0; i < details.Count; i++)
+            {
+                Models.RentalDetail detail = details[i];
+                if (detail.id == 0)
+                {
+                    if (detail._filledOthersDiscountAmount != null && detail._filledOthersDiscountAmount > 0)
+                    {
+                        Discount discount = new Discount()
+                        {
+                            amount = (double)detail._filledOthersDiscountAmount,
+                            biz_id = rentalId,
+                            biz_type = "租赁",
+                            sub_biz_id = detail.id,
+                            valid = 1,
+                            create_date = DateTime.Now
+                        };
+                        detail.discounts = new List<Discount>() { discount };
+                    }
+                    detail.rental_id = rentalId;
+                    await _db.rentalDetail.AddAsync(detail);
+                }
+                else
+                {
+                    Models.RentalDetail oriDetail = oriList.Where(d => d.id == detail.id).FirstOrDefault();
+                    if (oriDetail.othersDiscountAmount != detail._filledOthersDiscountAmount )
+                    {
+                        for (int j = 0; j < oriDetail.discounts.Count; j++)
+                        {
+                            Discount oriDiscount = oriDetail.discounts[j];
+                            oriDiscount.valid = 0;
+                            oriDiscount.update_date = DateTime.Now;
+                            _db.discount.Entry(oriDiscount).State = EntityState.Modified;
+                        }
+                        if (detail._filledOthersDiscountAmount != null && detail._filledOthersDiscountAmount > 0)
+                        {
+                            Discount discount = new Discount()
+                            {
+                                amount = (double)detail._filledOthersDiscountAmount,
+                                biz_id = rentalId,
+                                biz_type = "租赁",
+                                sub_biz_id = detail.id,
+                                valid = 1,
+                                create_date = DateTime.Now
+                            };
+                            await _db.discount.AddAsync(discount);
+                        }
+
+                    }
+                    List<CoreDataModLog> dataLogs = Util.GetUpdateDifferenceLog<Models.RentalDetail>(oriDetail, detail, null, staffId, scene);
+                    for (int j = 0; j < dataLogs.Count; j++)
+                    {
+                        await _db.coreDataModLog.AddAsync(dataLogs[j]);
+                    }
+                    _db.rentalDetail.Entry(detail).State = EntityState.Modified;
+                }
+            }
+            await _db.SaveChangesAsync();
+            return await GetRental(rentalId);
+        }
+        [HttpPost("{rentalId}")]
+        public async Task<ActionResult<ApiResult<Models.Rental?>>> UpdateRentalDetailsByStaff([FromRoute] int rentalId,
+            [FromBody] List<Models.RentalDetail> details, [FromQuery] string sessionKey, [FromQuery] string? sessionType = "wechat_mini_openid",
+            [FromQuery] string? scene = null)
+        {
+            StaffController _staffHelper = new StaffController(_db);
+            Staff staff = await _staffHelper.GetStaffBySessionKey(sessionKey, sessionType);
+            if (staff == null || staff.title_level < 100)
+            {
+                return Ok(new ApiResult<Models.Rental?>()
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = null
+                });
+            }
+            List<Models.RentalDetail> newList = new List<Models.RentalDetail>();
+            for(int i = 0; i < details.Count; i++)
+            {
+                if (details[i].id != 0 || details[i].valid == 1 )
+                {
+                    newList.Add(details[i]);
+                }
+            }
+            Models.Rental rental = await UpdateRentalDetails(rentalId, newList, staff.id, scene);
+            return Ok(new ApiResult<Models.Rental?>()
+            {
+                code = 0,
+                message = "",
+                data = rental
             });
         }
     }
