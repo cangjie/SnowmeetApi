@@ -4284,8 +4284,7 @@ namespace SnowmeetApi.Controllers
                     {
                         if (rental.package_id == 29 || rental.package_id == 30)
                         {
-                            rental = await SetRentItemDefaults(rental);
-                            order.needRender = true;
+                            order.needRender = await SetRentItemDefaults(rental);
                         }
                     }
                 }
@@ -4298,8 +4297,9 @@ namespace SnowmeetApi.Controllers
             });
         }
         [NonAction]
-        public async Task<Rental> SetRentItemDefaults(Rental rental)
+        public async Task<bool> SetRentItemDefaults(Rental rental)
         {
+            bool changed = false;
             for (int j = 0; j < rental.rentItems.Count; j++)
             {
                 Models.RentItem item = rental.rentItems[j];
@@ -4307,7 +4307,7 @@ namespace SnowmeetApi.Controllers
                 {
                     item.category = await _db.rentCategory.Where(c => c.id == item.category_id).AsNoTracking().FirstOrDefaultAsync();
                 }
-                item.noCode = true;
+                
                 bool unNeedFillInfo = false;
                 switch (item.category_id)
                 {
@@ -4333,9 +4333,11 @@ namespace SnowmeetApi.Controllers
                 if (item.name == null && unNeedFillInfo)
                 {
                     item.name = item.category.name.Trim();
+                    item.noCode = true;
+                    changed = true;
                 }
             }
-            return rental;
+            return changed;
         }
         [NonAction]
         public async Task<Rental> BuildAssociates(Rental rental)
