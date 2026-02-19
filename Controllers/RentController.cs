@@ -4281,40 +4281,7 @@ namespace SnowmeetApi.Controllers
                         rental = await BuildAssociates(rental);
                         if (order.shop == "崇礼旗舰店")
                         {
-                            for (int j = 0; j < rental.rentItems.Count; j++)
-                            {
-                                Models.RentItem item = rental.rentItems[j];
-                                if (item.category == null)
-                                {
-                                    item.category = await _db.rentCategory.Where(c => c.id == item.category_id).AsNoTracking().FirstOrDefaultAsync();
-                                }
-                                item.noCode = true;
-                                bool unNeedFillInfo = false;
-                                switch (item.category_id)
-                                {
-                                    case 27:
-                                    case 40:
-                                    case 42:
-                                    case 46:
-                                    case 47:
-                                    case 48:
-                                    case 76:
-                                    case 77:
-                                    case 78:
-                                    case 79:
-                                    case 80:
-                                    case 81:
-                                    case 82:
-                                        unNeedFillInfo = true;
-                                        break;
-                                    default:
-                                        break;
-                                }
-                                if (item.name == null && unNeedFillInfo)
-                                {
-                                    item.name = item.category.name.Trim();
-                                }
-                            }
+                            rental = await SetRentItemDefaults(rental);
                         }
                     }
                 }
@@ -4325,6 +4292,45 @@ namespace SnowmeetApi.Controllers
                 message = "",
                 data = order
             });
+        }
+        [NonAction]
+        public async Task<Rental> SetRentItemDefaults(Rental rental)
+        {
+            for (int j = 0; j < rental.rentItems.Count; j++)
+            {
+                Models.RentItem item = rental.rentItems[j];
+                if (item.category == null)
+                {
+                    item.category = await _db.rentCategory.Where(c => c.id == item.category_id).AsNoTracking().FirstOrDefaultAsync();
+                }
+                item.noCode = true;
+                bool unNeedFillInfo = false;
+                switch (item.category_id)
+                {
+                    case 27:
+                    case 40:
+                    case 42:
+                    case 46:
+                    case 47:
+                    case 48:
+                    case 76:
+                    case 77:
+                    case 78:
+                    case 79:
+                    case 80:
+                    case 81:
+                    case 82:
+                        unNeedFillInfo = true;
+                        break;
+                    default:
+                        break;
+                }
+                if (item.name == null && unNeedFillInfo)
+                {
+                    item.name = item.category.name.Trim();
+                }
+            }
+            return rental;
         }
         [NonAction]
         public async Task<Rental> BuildAssociates(Rental rental)
@@ -4887,7 +4893,7 @@ namespace SnowmeetApi.Controllers
             return rental;
         }
 
-        
+
         [HttpGet("{rentItemId}")]
         public async Task<ActionResult<ApiResult<List<Models.RentItem>?>>> GetRentItemChanges(int rentItemId,
             string sessionKey, string sessionType = "wechat_mini_openid")
@@ -4921,7 +4927,7 @@ namespace SnowmeetApi.Controllers
                 data = logList
             });
         }
-        
+
 
         [NonAction]
         public async Task<List<Models.RentItem>?> GetRentItemChangesLog(Models.RentItem item)
@@ -4936,7 +4942,7 @@ namespace SnowmeetApi.Controllers
             }
             Models.RentItem prevItem = await _db.rentItem.Where(r => r.id == item.prev_id)
                 .Include(i => i.logs).AsNoTracking().FirstOrDefaultAsync();
-            
+
             if (prevItem.prev_id == null)
             {
                 return new List<Models.RentItem>() { prevItem };
@@ -4946,11 +4952,11 @@ namespace SnowmeetApi.Controllers
             {
                 item.changesLog.Add(prevItem);
                 List<Models.RentItem> logList = await GetRentItemChangesLog(prevItem);
-                for(int i = 0; logList != null && i < logList.Count; i++)
+                for (int i = 0; logList != null && i < logList.Count; i++)
                 {
                     item.changesLog.Add(logList[i]);
                 }
-                return item.changesLog;;
+                return item.changesLog; ;
             }
 
         }
@@ -6427,7 +6433,7 @@ namespace SnowmeetApi.Controllers
                 else
                 {
                     Models.RentalDetail oriDetail = oriList.Where(d => d.id == detail.id).FirstOrDefault();
-                    if (oriDetail.othersDiscountAmount != detail._filledOthersDiscountAmount )
+                    if (oriDetail.othersDiscountAmount != detail._filledOthersDiscountAmount)
                     {
                         for (int j = 0; j < oriDetail.discounts.Count; j++)
                         {
@@ -6479,9 +6485,9 @@ namespace SnowmeetApi.Controllers
                 });
             }
             List<Models.RentalDetail> newList = new List<Models.RentalDetail>();
-            for(int i = 0; i < details.Count; i++)
+            for (int i = 0; i < details.Count; i++)
             {
-                if (details[i].id != 0 || details[i].valid == 1 )
+                if (details[i].id != 0 || details[i].valid == 1)
                 {
                     newList.Add(details[i]);
                 }
