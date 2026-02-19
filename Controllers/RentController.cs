@@ -4320,6 +4320,7 @@ namespace SnowmeetApi.Controllers
                     case 80:
                     case 81:
                     case 82:
+                    case 85:
                         unNeedFillInfo = true;
                         break;
                     default:
@@ -4680,7 +4681,7 @@ namespace SnowmeetApi.Controllers
 
             return detail;
         }
-        [NonAction]
+        [HttpGet]
         public async Task<Rental?> EffectRental(int rentalId, int? staffId)
         {
             Rental rental = await _db.rental.Where(r => r.id == rentalId)
