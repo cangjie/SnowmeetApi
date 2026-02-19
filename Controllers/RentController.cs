@@ -4282,7 +4282,11 @@ namespace SnowmeetApi.Controllers
                     }
                     if (order.shop == "崇礼旗舰店")
                     {
-                        rental = await SetRentItemDefaults(rental);
+                        if (rental.package_id == 29 || rental.package_id == 30)
+                        {
+                            rental = await SetRentItemDefaults(rental);
+                            order.needRender = true;
+                        }
                     }
                 }
             }
