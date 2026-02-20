@@ -21,13 +21,12 @@
     </div>
 </body>
 <script type="text/javascript">
-
+    var ua = navigator.userAgent
     if (ua.toLowerCase().indexOf("ali") >= 0) {
         var aliDiv = document.getElementById('ali')
         aliDiv.style.display = 'block'
     }
-    else {
-        var ua = navigator.userAgent
+    else {   
         var path = 'pages/payment/uni_pay'
         var query = ''
         var version = 'develop'
