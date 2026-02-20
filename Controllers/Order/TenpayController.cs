@@ -1869,6 +1869,7 @@ namespace SnowmeetApi.Controllers
                         break;
                     case "零售":
                     case "餐饮":
+                    case "聚合":
                         mchId = 9;
                         break;
                     case "雪票":
@@ -1877,7 +1878,6 @@ namespace SnowmeetApi.Controllers
                     default:
                         mchId = 9;
                         break;
-
                 }
             }
             return mchId;

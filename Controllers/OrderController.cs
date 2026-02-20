@@ -661,15 +661,18 @@ namespace SnowmeetApi.Controllers
                 data = retail
             });
         }
+        
         [HttpGet]
-        public async Task<ActionResult<string?>> CreateUnipayOrder(double amount, string? sessionKey = null,string? sessionType = null)
+        public async Task<ActionResult<OrderPayment>> CreateUnipayOrder(double amount, string? sessionKey = null,string? sessionType = null)
         {
             int? memberId = null;
+            string payMethod = "支付宝";
             if (sessionKey != null)
             {
                 MemberController _memberHelper = new MemberController(_db, _config);
                 Models.Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
                 memberId = member.id;
+                payMethod = "微信支付";
             }
             Models.Order order = new Models.Order()
             {
@@ -687,13 +690,24 @@ namespace SnowmeetApi.Controllers
                 id = 0,
                 order_id = order.id,
                 amount = amount,
-                valid = 1
+                valid = 1,
+                pay_method = payMethod
             };
             order.payments = new List<OrderPayment>();
             order.payments.Add(payment);
             await _db.order.AddAsync(order);
             await _db.SaveChangesAsync();
-            return Ok(order.code);
+            if (payMethod == "支付宝")
+            {
+                AliController _aH = new AliController(_db, _config, _http);
+                payment = await _aH.GetPaymentQrCodeUrl(payment, order);
+            }
+            else
+            {
+                TenpayController _tH = new TenpayController(_db, _config, _http);
+                payment = await _tH.TenpayRequest(payment, order, false);
+            }
+            return Ok(payment);
         }
         [HttpPost]
         public async Task<ActionResult<ApiResult<SnowmeetApi.Models.Order?>>> PlaceOrder([FromBody] SnowmeetApi.Models.Order order,
