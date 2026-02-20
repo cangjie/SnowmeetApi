@@ -29,7 +29,7 @@
   bizType: "00",   // 业务类型（如"00"表示即时到账）
   bizParams: "" // JSON格式的业务扩展参数
 }, function(result) {
-    alert(result);
+    alert(result.resultCode);
   if (result.resultCode === "9000") {
     
     console.log("支付成功");
