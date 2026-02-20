@@ -666,12 +666,14 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<OrderPayment>> CreateUnipayOrder(double amount, string? sessionKey = null,string? sessionType = null)
         {
             int? memberId = null;
+            string? openId = null;
             string payMethod = "支付宝";
             if (sessionKey != null)
             {
                 MemberController _memberHelper = new MemberController(_db, _config);
                 Models.Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
                 memberId = member.id;
+                openId = member.wechatMiniOpenId;
                 payMethod = "微信支付";
             }
             Models.Order order = new Models.Order()
@@ -704,8 +706,12 @@ namespace SnowmeetApi.Controllers
             }
             else
             {
+                order.member_id = memberId;
+                payment.open_id = openId;
+                payment.out_trade_no = order.code + "_ZF_01";
                 TenpayController _tH = new TenpayController(_db, _config, _http);
                 payment = await _tH.TenpayRequest(payment, order, false);
+
             }
             return Ok(payment);
         }
