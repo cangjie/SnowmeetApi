@@ -25,7 +25,7 @@
         }
         async function callPay() {
             AlipayJSBridge.call("tradePay", {
-  tradeNO: "abc", // 商户生成的唯一订单号
+  tradeNO: "Test_UniPay_20260220070101", // 商户生成的唯一订单号
   bizType: "00",   // 业务类型（如"00"表示即时到账）
   bizParams: "" // JSON格式的业务扩展参数
 }, function(result) {

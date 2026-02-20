@@ -406,22 +406,6 @@ namespace SnowmeetApi.Controllers
             model.Body = "test1";
             /////////////////////////////////////
             model.TotalAmount = payment.amount.ToString();
-
-            /*
-            RoyaltyInfo rInfo = new RoyaltyInfo();
-            rInfo.RoyaltyType = "ROYALTY";
-            RoyaltyDetailInfos dtl = new RoyaltyDetailInfos();
-            dtl.AmountPercentage = "30";
-            dtl.BatchNo = Util.GetLongTimeStamp(DateTime.Now).ToString();
-            dtl.TransOutType = "userId";
-            dtl.TransOut = "2088640272285174";
-            dtl.TransIn = "2088002319285895";
-            rInfo.RoyaltyDetailInfos = new List<RoyaltyDetailInfos>();
-            rInfo.RoyaltyDetailInfos.Add(dtl);
-
-            model.RoyaltyInfo = rInfo;
-            */
-
             model.ExtendParams = new ExtendParams { RoyaltyFreeze = "true" };
             model.BuyerId = "2088002319285895";
             req.SetBizModel(model);
@@ -441,6 +425,49 @@ namespace SnowmeetApi.Controllers
                 return payment;
             }
 
+        }
+        [HttpGet]
+        public ActionResult<string> TestUniPay()
+        {
+            DateTime now = DateTime.Now;
+            string outTradeNo = "Test_UniPay_" + now.ToString("yyyyMMddhhmmss");
+            AlipayTradePrecreateRequest request = new AlipayTradePrecreateRequest();
+            request.SetNotifyUrl("https://snowmeet.wanlonghuaxue.com/ali/callback");
+            //payment.notify = notify;
+            List<Aop.Api.Domain.GoodsDetail> gList = new List<GoodsDetail>();
+            //for (int i = 0; i < order.fdOrders.Count; i++)
+            //{
+                Aop.Api.Domain.GoodsDetail detail = new GoodsDetail()
+                {
+                    AlipayGoodsId = "",
+                    Body = "",
+                    CategoriesTree = "",
+                    GoodsCategory = "",
+                    GoodsId = "test",
+                    GoodsName = "unipay test",
+                    OutItemId = "",
+                    OutSkuId = "",
+                    Price = "0.01",
+                    Quantity = 1,
+                    ShowUrl = ""
+                };
+                gList.Add(detail);
+            //}
+            AlipayTradePrecreateModel model = new AlipayTradePrecreateModel();
+            model.OutTradeNo = outTradeNo.Trim();
+            model.Subject = "聚合支付测试";
+            model.Body = "支付1分钱";
+            model.TotalAmount = "0.01";
+            model.ExtendParams = new ExtendParams { RoyaltyFreeze = "false" };
+            model.QrCodeTimeoutExpress = "60m";
+            //model.ProductCode = order.id.ToString();
+            model.GoodsDetail = gList;
+            request.SetBizModel(model);
+            AlipayTradePrecreateResponse response = client.CertificateExecute(request);
+            string responseStr = response.Body.Trim();
+            Console.WriteLine(responseStr);
+            AlipayRequestResult respObj = JsonConvert.DeserializeObject<AlipayRequestResult>(responseStr);
+            return Ok(outTradeNo);
         }
         [NonAction]
         public async Task<OrderPayment> GetPaymentQrCodeUrl(Models.OrderPayment payment, Models.Order order)
