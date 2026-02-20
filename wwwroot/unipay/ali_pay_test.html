@@ -30,6 +30,9 @@
                 const outTradeNo = "JSAPI_" + new Date().getTime();
                 // Step1: 获取用户authCode
                 const authCode = await getAuthCode();
+
+                alert(authCode);
+                return
                 
                 // Step2: 调用后端接口，获取支付参数
                 const response = await fetch('/api/alipay/jsapi/createPayParams', {
