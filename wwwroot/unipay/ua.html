@@ -27,9 +27,9 @@
         aliDiv.style.display = 'block'
     }
     else {   
-        var path = 'pages/payment/uni_pay'
+        var path = 'pages/index/index'
         var query = ''
-        var version = 'develop'
+        var version = 'release'
         var wepayDiv = document.getElementById('wepay')
         wepayDiv.style.display = 'block'
         var url = '/api/MiniAppHelper/OpenMiniProgram?path=' + encodeURIComponent(path) + (query ? ('&query=' + encodeURIComponent(query)) : '') + '&version=' + encodeURIComponent(version);
