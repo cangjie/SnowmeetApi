@@ -3,10 +3,22 @@
 
     </head>
     <body>
-         <script type="text/javascript" >
-        document.write(navigator.userAgent);
-    </script>
+        <div id="ali" style="display: none;" >
+            支付宝
+        </div>
+        <div id="wepay" style="display: none;" >
+            微信
+        </div>
     </body>
-   
-
+    <script type="text/javascript" >
+        var ua = navigator.userAgent
+        if (ua.toLowerCase().indexOf("ali") >= 0){
+            var aliDiv = document.getElementById('ali')
+            aliDiv.style.display = 'block'
+        }
+        else{
+            var wepayDiv = document.getElementById('wepay')
+            wepayDiv.style.display = 'block'
+        }
+    </script>
 </html>
