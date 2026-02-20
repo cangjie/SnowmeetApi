@@ -6,6 +6,7 @@
     <title>支付宝内H5唤起支付</title>
     <!-- 引入支付宝JSAPI基础库（支付宝内打开自动加载，可省略） -->
     <script src="https://gw.alipayobjects.com/as/g/h5-lib/alipayjsapi/3.1.1/alipayjsapi.min.js"></script>
+    
 </head>
 <body>
     <button onclick="callPay()">立即支付</button>
@@ -22,8 +23,24 @@
                 });
             });
         }
+        async function callPay() {
+            AlipayJSBridge.call("tradePay", {
+  tradeNO: "abc", // 商户生成的唯一订单号
+  bizType: "00",   // 业务类型（如"00"表示即时到账）
+  bizParams: "" // JSON格式的业务扩展参数
+}, function(result) {
+    alert(result);
+  if (result.resultCode === "9000") {
+    
+    console.log("支付成功");
+  } else {
+    console.log("支付失败", result);
+  }
+});
+        }
 
         // 2. 唤起支付核心方法
+        /*
         async function callPay() {
             try {
                 // 生成唯一订单号
@@ -71,6 +88,7 @@
                 alert('唤起支付异常：' + err.message);
             }
         }
+            */
     </script>
 </body>
 </html>
