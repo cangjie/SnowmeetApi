@@ -370,6 +370,9 @@ namespace SnowmeetApi.Controllers
                 case "餐饮":
                     bizCode = "CY";
                     break;
+                case "聚合":
+                    bizCode = "JH";
+                    break;
                 default:
                     bizCode = "WZ";
                     break;
@@ -658,7 +661,40 @@ namespace SnowmeetApi.Controllers
                 data = retail
             });
         }
-
+        [HttpGet]
+        public async Task<ActionResult<string?>> CreateUnipayOrder(double amount, string? sessionKey = null,string? sessionType = null)
+        {
+            int? memberId = null;
+            if (sessionKey != null)
+            {
+                MemberController _memberHelper = new MemberController(_db, _config);
+                Models.Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
+                memberId = member.id;
+            }
+            Models.Order order = new Models.Order()
+            {
+                id = 0,
+                shop = "崇礼旗舰店",
+                type = "聚合",
+                member_id = memberId,
+                total_amount = amount,
+                paying_amount = amount,
+                valid = 1
+            };
+            await GenerateOrderCode(order);
+            OrderPayment payment = new OrderPayment()
+            {
+                id = 0,
+                order_id = order.id,
+                amount = amount,
+                valid = 1
+            };
+            order.payments = new List<OrderPayment>();
+            order.payments.Add(payment);
+            await _db.order.AddAsync(order);
+            await _db.SaveChangesAsync();
+            return Ok(order.code);
+        }
         [HttpPost]
         public async Task<ActionResult<ApiResult<SnowmeetApi.Models.Order?>>> PlaceOrder([FromBody] SnowmeetApi.Models.Order order,
             [FromQuery] string sessionKey, [FromQuery] string sessionType = "wechat_mini_openid")
