@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>支付宝内H5唤起支付</title>
+    <!-- 引入支付宝JSAPI基础库（支付宝内打开自动加载，可省略） -->
+    <script src="https://gw.alipayobjects.com/as/g/h5-lib/alipayjsapi/3.1.1/alipayjsapi.min.js"></script>
+</head>
+<body>
+    <button onclick="callPay()">立即支付</button>
+
+    <script>
+        // 1. 获取用户authCode（支付宝内H5自动授权）
+        function getAuthCode() {
+            return new Promise((resolve, reject) => {
+                // 支付宝内调用getAuthCode获取授权码
+                alipay.getAuthCode({
+                    appId: '2021004143665722',
+                    success: res => resolve(res.authCode),
+                    fail: err => reject(err)
+                });
+            });
+        }
+
+        // 2. 唤起支付核心方法
+        async function callPay() {
+            try {
+                // 生成唯一订单号
+                const outTradeNo = "JSAPI_" + new Date().getTime();
+                // Step1: 获取用户authCode
+                const authCode = await getAuthCode();
+                
+                // Step2: 调用后端接口，获取支付参数
+                const response = await fetch('/api/alipay/jsapi/createPayParams', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                    body: new URLSearchParams({
+                        outTradeNo: outTradeNo,
+                        totalAmount: '0.01', // 测试金额1分
+                        subject: '支付宝内H5测试支付',
+                        authToken: authCode // 传入用户授权码
+                    })
+                });
+                const result = await response.json();
+                
+                if (!result.success) {
+                    alert('生成支付参数失败：' + result.msg);
+                    return;
+                }
+
+                // Step3: 调用支付宝JSAPI唤起支付
+                alipay.execJS({
+                    name: 'pay',
+                    param: {
+                        orderStr: JSON.stringify(result.payParams) // 后端返回的签名后参数
+                    },
+                    success: res => {
+                        alert('支付成功！' + JSON.stringify(res));
+                        // 跳转到支付结果页
+                        window.location.href = '/pay/result?outTradeNo=' + outTradeNo;
+                    },
+                    fail: err => {
+                        alert('支付失败：' + JSON.stringify(err));
+                    }
+                });
+            } catch (err) {
+                alert('唤起支付异常：' + err.message);
+            }
+        }
+    </script>
+</body>
+</html>
