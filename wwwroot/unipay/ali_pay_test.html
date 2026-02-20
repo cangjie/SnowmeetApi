@@ -24,6 +24,10 @@
             });
         }
         async function callPay() {
+
+            window.location.href = 'https://qr.alipay.com/bax00540ec0mkud92kum00b5';
+
+            return;
             AlipayJSBridge.call("tradePay", {
   tradeNO: "Test_UniPay_20260220070101", // 商户生成的唯一订单号
   bizType: "00",   // 业务类型（如"00"表示即时到账）
