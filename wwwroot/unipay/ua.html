@@ -44,7 +44,7 @@
         //alert('pay')
         var payUrl = '/api/Order/CreateUnipayOrder?amount=' + encodeURIComponent(amount)
         $.ajax({
-            url: getTablesUrl,
+            url: payUrl,
             type: 'GET',
             success: function (msg, status) { 
                 window.location.href = msg.ali_qr_code
