@@ -693,7 +693,8 @@ namespace SnowmeetApi.Controllers
                 order_id = order.id,
                 amount = amount,
                 valid = 1,
-                pay_method = payMethod
+                pay_method = payMethod,
+                out_trade_no = order.code + "_ZF_01"
             };
             order.payments = new List<OrderPayment>();
             order.payments.Add(payment);
@@ -708,7 +709,7 @@ namespace SnowmeetApi.Controllers
             {
                 order.member_id = memberId;
                 payment.open_id = openId;
-                payment.out_trade_no = order.code + "_ZF_01";
+                
                 TenpayController _tH = new TenpayController(_db, _config, _http);
                 payment = await _tH.TenpayRequest(payment, order, false);
 
