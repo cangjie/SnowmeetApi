@@ -5,22 +5,36 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <script type="text/javascript" src="../js/jquery-3.6.1.min.js"></script>
     <script type="text/javascript" src="../js/util.js"></script>
+    <title>敬请支付</title>
 </head>
 
 <body>
     <div id="ali" style="display: none;">
         <div style="display: flex; justify-content: center;">
-            <input type="number" style="width: 300px;height:50px;font-size: 15pt;text-align: center;"
-                placeholder="请输入支付金额" inputmode="decimal" />
+            <input id="txtAmount" type="number" style="width: 300px;height:50px;font-size: 15pt;text-align: center;"
+                placeholder="请输入支付金额" inputmode="decimal" oninput="setAmount" />
         </div>
         <div style="display: flex; justify-content: center;margin-top: 50px;">
-            <input type="button" value=" 确 认 支 付 " style="width: 150px;height:50px;font-size: 15pt;" />
+            <input id="btnPay" type="button" value=" 确 认 支 付 " style="width: 150px;height:50px;font-size: 15pt;" disabled />
         </div>
     </div>
     <div id="wepay" style="display: none;">
     </div>
 </body>
 <script type="text/javascript">
+    var amount = 0
+    function setAmount(){
+        var txtAmount = document.getElementById('txtAmount')
+        var btnPay = document.getElementById('btnPay')
+        var value = txtAmount.value
+        if (value != null && value != '' && !isNaN(value)){
+            amount = parseFloat(value)
+            btnPay.disabled = false;
+        }
+        else {
+            btnPay.disabled = true;
+        }
+    }
     var ua = navigator.userAgent
     if (ua.toLowerCase().indexOf("ali") >= 0) {
         var aliDiv = document.getElementById('ali')
