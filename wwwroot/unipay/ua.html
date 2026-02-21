@@ -9,13 +9,14 @@
 </head>
 
 <body>
-    <div id="ali" >
+    <div id="ali">
         <div style="display: flex; justify-content: center;">
             <input id="txtAmount" type="number" style="width: 300px;height:50px;font-size: 15pt;text-align: center;"
                 placeholder="请输入支付金额" inputmode="decimal" input="setAmount" />
         </div>
         <div style="display: flex; justify-content: center;margin-top: 50px;">
-            <input id="btnPay" type="button" value=" 确 认 支 付 " style="width: 150px;height:50px;font-size: 15pt;" disabled />
+            <input id="btnPay" type="button" value=" 确 认 支 付 " style="width: 150px;height:50px;font-size: 15pt;"
+                disabled />
         </div>
     </div>
     <div id="wepay" style="display: none;">
@@ -27,11 +28,11 @@
     var btnPay = document.getElementById('btnPay')
     txtAmount.addEventListener('input', setAmount)
     btnPay.addEventListener('click', pay)
-    function setAmount(){
-        
+    function setAmount() {
+
         var btnPay = document.getElementById('btnPay')
         var value = txtAmount.value
-        if (value != null && value != '' && !isNaN(value)){
+        if (value != null && value != '' && !isNaN(value)) {
             amount = parseFloat(value)
             btnPay.disabled = false;
         }
@@ -39,8 +40,16 @@
             btnPay.disabled = true;
         }
     }
-    function pay(){
-        alert('pay')
+    function pay() {
+        //alert('pay')
+        var payUrl = '/api/Order/CreateUnipayOrder?amount=' + encodeURIComponent(amount)
+        $.ajax({
+            url: getTablesUrl,
+            type: 'GET',
+            success: function (msg, status) { 
+                window.location.href = msg.ali_qr_code
+            }
+        })
     }
     /*
     var ua = navigator.userAgent
