@@ -15,7 +15,7 @@
                 placeholder="请输入支付金额" inputmode="decimal" input="setAmount" />
         </div>
         <div style="display: flex; justify-content: center;margin-top: 50px;">
-            <input id="btnPay" type="button" value=" 确 认 支 付 " style="width: 150px;height:50px;font-size: 15pt;" disabled />
+            <input id="btnPay" type="button" value=" 确 认 支 付 " style="width: 150px;height:50px;font-size: 15pt;" disabled click="pay" />
         </div>
     </div>
     <div id="wepay" style="display: none;">
@@ -36,6 +36,9 @@
         else {
             btnPay.disabled = true;
         }
+    }
+    function pay(){
+        alert('pay')
     }
     /*
     var ua = navigator.userAgent
