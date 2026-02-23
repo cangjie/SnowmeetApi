@@ -684,7 +684,8 @@ namespace SnowmeetApi.Controllers
                 member_id = memberId,
                 total_amount = amount,
                 paying_amount = amount,
-                valid = 1
+                valid = 1,
+                biz_date = DateTime.Now
             };
             await GenerateOrderCode(order);
             OrderPayment payment = new OrderPayment()
