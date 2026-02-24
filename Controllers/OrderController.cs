@@ -1749,7 +1749,18 @@ namespace SnowmeetApi.Controllers
                     {
                         await _shareHelper.CreatePaymentShare(shares[i]);
                     }
+                    break;
+                case "聚合":
+                    try
+                    {
+                        TicketController _ticketHelper = new TicketController(_db, _config); 
+                        await _ticketHelper.CreateTicketByUnipayOrder(order);
 
+                    }
+                    catch
+                    {
+                        
+                    }
                     break;
                 default:
                     break;

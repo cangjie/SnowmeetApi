@@ -300,23 +300,18 @@ namespace SnowmeetApi.Controllers
         {
             using var reader = new StreamReader(Request.Body, Encoding.UTF8);
             string postJson = await reader.ReadToEndAsync();
-
             string apiKey = "";
             WepayKey key = _db.wepayKeys.Find(mchid);
-
             if (key == null)
             {
                 return NotFound();
             }
-
             apiKey = key.api_key.Trim();
-
             if (apiKey == null || apiKey.Trim().Equals(""))
             {
                 return NotFound();
             }
             string path = $"{Environment.CurrentDirectory}";
-
             if (path.StartsWith("/"))
             {
                 path = path + "/WepayCertificate/";
@@ -327,8 +322,6 @@ namespace SnowmeetApi.Controllers
             }
             string dateStr = DateTime.Now.Year.ToString() + DateTime.Now.Month.ToString().PadLeft(2, '0')
                 + DateTime.Now.Day.ToString().PadLeft(2, '0');
-            //path = path + "callback_" +  + ".txt";
-            // 此文本只添加到文件一次。
             using (StreamWriter fw = new StreamWriter(path + "callback_origin_" + dateStr + ".txt", true))
             {
                 fw.WriteLine(DateTimeOffset.Now.ToString());
@@ -446,10 +439,7 @@ namespace SnowmeetApi.Controllers
                                 await _db.SaveChangesAsync();
 
                             }
-
                         }
-
-                        //Console.WriteLine("订单 {0} 已完成支付，交易单号为 {1}", outTradeNumber, transactionId);
                     }
                 }
 

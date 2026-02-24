@@ -683,7 +683,19 @@ namespace SnowmeetApi.Controllers
             Ticket ticket = await CreateTicket(templateId, skiPass.member_id, null, skiPass.id.ToString(), "养护", null, false, null, null);
             return ticket;
         }
-        
+        [NonAction]
+        public async Task<Ticket> CreateTicketByUnipayOrder(Models.Order order)
+        {
+            string memo = "unipay_" + order.id.ToString();
+            Ticket? oriT = await _context.ticket.Where(t => t.create_memo == memo).AsNoTracking().FirstOrDefaultAsync();
+            if (oriT != null)
+            {
+                return null;
+            }
+            int templateId = 12;
+            Ticket ticket = await CreateTicket(templateId, order.member_id, null, "unipay_" + order.id.ToString(), "养护", null, true);
+            return ticket;
+        }
         [NonAction]
         public async Task<Ticket> CreateTicket(int templateId, int? memberId, int? staffId,
             string? createMemo = null, string? bizType = null, int? bizId = null, 
