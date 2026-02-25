@@ -4223,9 +4223,9 @@ namespace SnowmeetApi.Controllers
                     _db.Update(order);
                     await _db.SaveChangesAsync();
                 }
-                catch
+                catch(Exception ex)
                 {
-
+                    Console.WriteLine(ex.Message);
                 }
 
                 List<Rental> rentals = order.rentals;
@@ -4246,16 +4246,24 @@ namespace SnowmeetApi.Controllers
                         {
                             _db.rentalPricePreset.Remove(presets[j]);
                         }
-                        _db.rental.Remove(ori);
+                        try
+                        {
+                            _db.rental.Remove(ori);    
+                        }
+                        catch(Exception ex)
+                        {
+                            Console.WriteLine(ex.Message);  
+                        }
+                        
                     }
                 }
                 try
                 {
                     await _db.SaveChangesAsync();
                 }
-                catch
+                catch(Exception ex)
                 {
-
+                    Console.WriteLine(ex.Message);
                 }
             }
             for (int i = 0; i < order.rentals.Count; i++)
