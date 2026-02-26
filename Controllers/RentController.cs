@@ -5076,7 +5076,7 @@ namespace SnowmeetApi.Controllers
             for(int i = 0; i < rental.rentItems.Count; i++)
             {
                 Models.RentItem rentItem = rental.rentItems[i];
-                if (rentItem.status == "已发放")
+                if (rentItem.status == "已发放" && rentItem.noNeed != true)
                 {
                     newRental = (ActionResult<ApiResult<Models.Rental?>>)(await SetRentItemStatus(rentItem.id, "已归还", sessionKey, sessionType));
                 }
