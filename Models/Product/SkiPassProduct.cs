@@ -51,7 +51,8 @@ namespace SnowmeetApi.Models
 		public bool DateMatch(DateTime date)
 		{
 			bool valid = true;
-			if (date == DateTime.Parse("2026-1-3") || date == DateTime.Parse("2026-1-4") || date == DateTime.Parse("2026-2-14"))
+			if (date == DateTime.Parse("2026-1-3") || date == DateTime.Parse("2026-1-4") || date == DateTime.Parse("2026-2-14")
+			|| date == DateTime.Parse("2026-2-28"))
 			{
 				return true;
 			}
