@@ -5058,6 +5058,31 @@ namespace SnowmeetApi.Controllers
                 data = rental
             });
         }
+        [HttpGet("{rentalId}")]
+        public async Task<ActionResult<ApiResult<Models.Rental?>>> ReturnAllRentItems(int rentalId, string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            if (staff == null || staff.title_level < 100)
+            {
+                return Ok(new ApiResult<Models.Rental?>()
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = null
+                });
+            }
+            Rental rental = await GetRental(rentalId);
+            ActionResult<ApiResult<Models.Rental?>> newRental = null;
+            for(int i = 0; i < rental.rentItems.Count; i++)
+            {
+                Models.RentItem rentItem = rental.rentItems[i];
+                if (rentItem.status == "已发放")
+                {
+                    newRental = (ActionResult<ApiResult<Models.Rental?>>)(await SetRentItemStatus(rentItem.id, "已归还", sessionKey, sessionType));
+                }
+            }
+            return newRental;
+        }
         [HttpGet("{rentItemId}")]
         public async Task<ActionResult<ApiResult<Models.Rental?>>> SetRentItemStatus(int rentItemId,
             string status, string sessionKey, string sessionType = "wechat_mini_openid")
