@@ -132,7 +132,7 @@ namespace SnowmeetApi.Models
                 }
                 else
                 {
-                    return discounts.Where(d => d.valid == 1 && d.order_id == order_id).ToList();
+                    return discounts.Where(d => d.valid == 1 && d.biz_id == id).ToList();
                 }
             }
         }

@@ -6447,6 +6447,7 @@ namespace SnowmeetApi.Controllers
         [NonAction]
         public async Task<Models.Rental> UpdateRentalDetails(int rentalId, List<Models.RentalDetail> details, int staffId, string? scene = null)
         {
+            Models.Rental rental = await _db.rental.Where(r => r.id == rentalId).AsNoTracking().FirstOrDefaultAsync();
             List<Models.RentalDetail> oriList = await _db.rentalDetail.Where(d => d.rental_id == rentalId)
                 .Include(d => d.discounts).OrderBy(d => d.rental_date).AsNoTracking().ToListAsync();
             for (int i = 0; i < details.Count; i++)
@@ -6458,6 +6459,7 @@ namespace SnowmeetApi.Controllers
                     {
                         Discount discount = new Discount()
                         {
+                            order_id = rental.order_id,
                             amount = (double)detail._filledOthersDiscountAmount,
                             biz_id = rentalId,
                             biz_type = "租赁",
@@ -6486,6 +6488,7 @@ namespace SnowmeetApi.Controllers
                         {
                             Discount discount = new Discount()
                             {
+                                order_id = rental.id,
                                 amount = (double)detail._filledOthersDiscountAmount,
                                 biz_id = rentalId,
                                 biz_type = "租赁",
