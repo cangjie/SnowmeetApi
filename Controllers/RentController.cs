@@ -6484,7 +6484,16 @@ namespace SnowmeetApi.Controllers
                             oriDiscount.update_date = DateTime.Now;
                             _db.discount.Entry(oriDiscount).State = EntityState.Modified;
                         }
-                        if (detail._filledOthersDiscountAmount != null && detail._filledOthersDiscountAmount > 0)
+                        if (detail.valid == 0)
+                        {
+                            for (int k = 0; detail.availableDiscounts != null && k < detail.availableDiscounts.Count; k++)
+                            {
+                                detail.availableDiscounts[k].valid = 0;
+                                detail.availableDiscounts[k].update_date = DateTime.Now;
+                                _db.discount.Entry(detail.availableDiscounts[k]).State = EntityState.Modified;
+                            }
+                        }
+                        else if (detail._filledOthersDiscountAmount != null && detail._filledOthersDiscountAmount > 0)
                         {
                             Discount discount = new Discount()
                             {
