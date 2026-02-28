@@ -4223,7 +4223,7 @@ namespace SnowmeetApi.Controllers
                     _db.Update(order);
                     await _db.SaveChangesAsync();
                 }
-                catch(Exception ex)
+                catch (Exception ex)
                 {
                     Console.WriteLine(ex.Message);
                 }
@@ -4248,20 +4248,20 @@ namespace SnowmeetApi.Controllers
                         }
                         try
                         {
-                            _db.rental.Remove(ori);    
+                            _db.rental.Remove(ori);
                         }
-                        catch(Exception ex)
+                        catch (Exception ex)
                         {
-                            Console.WriteLine(ex.Message);  
+                            Console.WriteLine(ex.Message);
                         }
-                        
+
                     }
                 }
                 try
                 {
                     await _db.SaveChangesAsync();
                 }
-                catch(Exception ex)
+                catch (Exception ex)
                 {
                     Console.WriteLine(ex.Message);
                 }
@@ -4315,7 +4315,7 @@ namespace SnowmeetApi.Controllers
                 {
                     item.category = await _db.rentCategory.Where(c => c.id == item.category_id).AsNoTracking().FirstOrDefaultAsync();
                 }
-                
+
                 bool unNeedFillInfo = false;
                 switch (item.category_id)
                 {
@@ -5073,7 +5073,7 @@ namespace SnowmeetApi.Controllers
             }
             Rental rental = await GetRental(rentalId);
             ActionResult<ApiResult<Models.Rental?>> newRental = null;
-            for(int i = 0; i < rental.rentItems.Count; i++)
+            for (int i = 0; i < rental.rentItems.Count; i++)
             {
                 Models.RentItem rentItem = rental.rentItems[i];
                 if (rentItem.status == "已发放" && rentItem.noNeed != true)
@@ -6474,6 +6474,16 @@ namespace SnowmeetApi.Controllers
                 }
                 else
                 {
+                    if (detail.valid == 0)
+                    {
+                        for (int k = 0; detail.availableDiscounts != null && k < detail.availableDiscounts.Count; k++)
+                        {
+                            Discount discount = detail.availableDiscounts[k];
+                            discount.valid = 0;
+                            discount.update_date = DateTime.Now;
+                            _db.discount.Entry(discount).State = EntityState.Modified;
+                        }
+                    }
                     Models.RentalDetail oriDetail = oriList.Where(d => d.id == detail.id).FirstOrDefault();
                     if (oriDetail.othersDiscountAmount != detail._filledOthersDiscountAmount)
                     {
@@ -6484,16 +6494,8 @@ namespace SnowmeetApi.Controllers
                             oriDiscount.update_date = DateTime.Now;
                             _db.discount.Entry(oriDiscount).State = EntityState.Modified;
                         }
-                        if (detail.valid == 0)
-                        {
-                            for (int k = 0; detail.availableDiscounts != null && k < detail.availableDiscounts.Count; k++)
-                            {
-                                detail.availableDiscounts[k].valid = 0;
-                                detail.availableDiscounts[k].update_date = DateTime.Now;
-                                _db.discount.Entry(detail.availableDiscounts[k]).State = EntityState.Modified;
-                            }
-                        }
-                        else if (detail._filledOthersDiscountAmount != null && detail._filledOthersDiscountAmount > 0)
+
+                        if (detail._filledOthersDiscountAmount != null && detail._filledOthersDiscountAmount > 0)
                         {
                             Discount discount = new Discount()
                             {
