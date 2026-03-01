@@ -6574,7 +6574,7 @@ namespace SnowmeetApi.Controllers
                     }
                 }
             }
-            return item.logs.OrderBy(l => l.id).ToList();
+            return item.logs.OrderBy(l => l.rent_item_id).OrderBy(l => l.id).ToList();
         }
         [HttpGet("{itemId}")]
         public async Task<ActionResult<ApiResult<List<RentItemLog>?>>> GetRentItemLogByStaff(int itemId,
