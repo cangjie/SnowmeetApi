@@ -6554,5 +6554,50 @@ namespace SnowmeetApi.Controllers
                 data = rental
             });
         }
+        [NonAction]
+        public async Task<List<RentItemLog>> GetRentItemLog(int itemId)
+        {
+            Models.RentItem item = await _db.rentItem.Include(r => r.logs).ThenInclude(l => l.staff)
+            .Where(r => r.id == itemId).AsNoTracking().FirstOrDefaultAsync();
+            if (item.prev_id != null)
+            {
+                List<Models.RentItem> prevItems = await GetRentItemChangesLog(item);
+                for(int i = 0; i < prevItems.Count; i++)
+                {
+                    Models.RentItem prevItem = prevItems[i];
+                    prevItem.logs = await _db.rentItemLog.Where(l => l.rent_item_id == prevItem.id)
+                        .Include(l => l.staff).AsNoTracking().ToListAsync();
+                    for(int j = 0; j < prevItem.logs.Count; j++)
+                    {
+                        item.logs.Add(prevItem.logs[j]);
+                    }
+                }
+            }
+            return item.logs.OrderBy(l => l.id).ToList();
+        }
+        [HttpGet("{itemId}")]
+        public async Task<ActionResult<ApiResult<List<RentItemLog>?>>> GetRentItemLogByStaff(int itemId,
+            string sessionKey, string? sessionType = "wechat_mini_openid" )
+        {
+            StaffController _staffHelper = new StaffController(_db);
+            Staff staff = await _staffHelper.GetStaffBySessionKey(sessionKey, sessionType);
+            if (staff == null || staff.title_level < 100)
+            {
+                return Ok(new ApiResult<List<RentItemLog>?>()
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = null
+                });    
+            }
+            List<RentItemLog> logs = await GetRentItemLog(itemId);
+            return Ok(new ApiResult<List<RentItemLog>?>()
+            {
+                code = 0,
+                message = "",
+                data = logs
+            });
+        }
+            
     }
 }
