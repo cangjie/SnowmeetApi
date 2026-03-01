@@ -5787,17 +5787,7 @@ namespace SnowmeetApi.Controllers
             {
                 return null;
             }
-            DateTime nowDate = DateTime.Now;
-            RentItemLog newLog = new RentItemLog()
-            {
-                rent_item_id = newItem.id,
-                status = Models.RentItem.RentItemStatus.已发放.ToString(),
-                staff_id = staffId,
-                member_id = null,
-                valid = 1,
-                create_date = nowDate
-            };
-            await _db.rentItemLog.AddAsync(newLog);
+            //DateTime nowDate = DateTime.Now;
             RentItemLog oriLog = new RentItemLog()
             {
                 rent_item_id = oriItem.id,
@@ -5805,15 +5795,26 @@ namespace SnowmeetApi.Controllers
                 staff_id = staffId,
                 member_id = null,
                 valid = 1,
-                create_date = nowDate
+                create_date = DateTime.Now
             };
             await _db.rentItemLog.AddAsync(oriLog);
+            RentItemLog newLog = new RentItemLog()
+            {
+                rent_item_id = newItem.id,
+                status = Models.RentItem.RentItemStatus.已发放.ToString(),
+                staff_id = staffId,
+                member_id = null,
+                valid = 1,
+                create_date = DateTime.Now
+            };
+            await _db.rentItemLog.AddAsync(newLog);
+            
             oriItem.update_date = DateTime.Now;
             oriItem.next_id = newItem.id;
             _db.rentItem.Entry(oriItem).State = EntityState.Modified;
             newItem.prev_id = oriItem.id;
             newItem.valid = 1;
-            newItem.update_date = nowDate;
+            newItem.update_date = DateTime.Now;
             _db.rentItem.Entry(newItem).State = EntityState.Modified;
             CoreDataModLog dataLog = CoreDataModLog.CreateManualLog("rent_item", "id", oriItem.id, scene, null, staffId,
                 oriItem.id.ToString(), newItem.id.ToString(), "更换租赁物");
