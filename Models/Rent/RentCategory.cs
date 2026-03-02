@@ -11,6 +11,7 @@ namespace SnowmeetApi.Models
         public int id {get; set;}
         public string code { get; set; }
         public string name { get; set; }
+        public string? short_name { get; set; } = null;
         public double deposit {get; set;}
         public int valid { get; set; } = 1;
         public int? staff_id { get; set; } = null;
