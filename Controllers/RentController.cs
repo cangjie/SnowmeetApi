@@ -444,6 +444,17 @@ namespace SnowmeetApi.Controllers
                 data = category
             });
         }
+        [HttpGet("{code}")]
+        public async Task<ActionResult<ApiResult<RentCategory?>>> GetRentCategoryByCode(string code)
+        {
+            RentCategory category = await GetSimpleCategory(code);
+            return Ok(new ApiResult<RentCategory>()
+            {
+                code = 0,
+                message = "",
+                data = category
+            });
+        }
         [NonAction]
         public async Task<RentCategory?> GetSimpleCategory(string code = "")
         {
