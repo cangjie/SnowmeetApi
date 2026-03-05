@@ -5094,7 +5094,7 @@ namespace SnowmeetApi.Controllers
             }
             return newRental;
         }
-        [HttpGet("orderId")]
+        [HttpGet("{orderId}")]
         public async Task<ActionResult<ApiResult<Models.Order?>>> RetualAllRentItemInOrderByCategory(int orderId, 
             int categoryId, string sessionKey, string sessionType = "wechat_mini_openid")
         {
