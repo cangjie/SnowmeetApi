@@ -5094,6 +5094,48 @@ namespace SnowmeetApi.Controllers
             }
             return newRental;
         }
+        [HttpGet("orderId")]
+        public async Task<ActionResult<ApiResult<Models.Order?>>> RetualAllRentItemInOrderByCategory(int orderId, 
+            int categoryId, string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            if (staff == null || staff.title_level < 100)
+            {
+                return Ok(new ApiResult<Models.Rental?>()
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = null
+                });
+            }
+            OrderController _orderHelper = new OrderController(_db, _config, _httpContextAccessor);
+            Models.Order order = await _orderHelper.GetOrder(orderId);
+            for(int i = 0; order.rentals != null && i < order.rentals.Count; i++)
+            {
+                for(int j = 0; order.rentals[i].rentItems != null && j < order.rentals[i].rentItems.Count; j++)
+                {
+                    Models.RentItem item = order.rentals[i].rentItems[j];
+                    if (item.status == "已发放" && item.noNeed != true)
+                    {
+                         RentCategory fatherCategory = await _db.rentCategory
+                            .Where(c => c.id == categoryId && c.valid == 1)
+                            .AsNoTracking().FirstOrDefaultAsync();
+                        if (await _db.rentCategory.AnyAsync(c => c.id == item.category_id && c.valid == 1 && c.code.IndexOf(fatherCategory.code) == 0 ))
+                        {
+                            await SetRentItemStatus(item.id, "已归还", sessionKey, sessionType);
+                        }
+                    }
+                    
+                }
+            }
+            order = await _orderHelper.GetOrder(orderId);
+            return Ok(new ApiResult<Models.Order?>()
+            {
+                code = 0,
+                message = "",
+                data = order
+            });
+        }
         [HttpGet("{rentItemId}")]
         public async Task<ActionResult<ApiResult<Models.Rental?>>> SetRentItemStatus(int rentItemId,
             string status, string sessionKey, string sessionType = "wechat_mini_openid")
