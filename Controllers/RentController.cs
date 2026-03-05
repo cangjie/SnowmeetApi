@@ -5129,6 +5129,10 @@ namespace SnowmeetApi.Controllers
                 }
             }
             order = await _orderHelper.GetOrder(orderId);
+            for(int i = 0; order.rentals != null && i < order.rentals.Count; i++)
+            {
+                order.rentals[i] = await GetRental(order.rentals[i].id);
+            }
             return Ok(new ApiResult<Models.Order?>()
             {
                 code = 0,
