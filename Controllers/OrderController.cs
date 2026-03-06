@@ -809,6 +809,10 @@ namespace SnowmeetApi.Controllers
 
                                 }
                             }
+                            if (care.summer != null)
+                            {
+                                care.biz_type = "非雪季养护";
+                            }
                             total += (care.common_charge + care.repair_charge - care.discount - care.ticket_discount);
                         }
 
