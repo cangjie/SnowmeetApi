@@ -37,6 +37,7 @@ namespace SnowmeetApi.Models
         {
             public string orderStatus { get; set; } = "临时订单";
             public string services { get; set; } = "";
+            public bool isSummerTask {get; set; } = false;
         }
         public static void RendOrder(SnowmeetApi.Models.Order order)
         {
@@ -1242,6 +1243,19 @@ namespace SnowmeetApi.Models
                                 property.services += " 维修";
                             }
                         }
+                    }
+                    bool summer = false;
+                    for(int i = 0; !summer && i < cares.Count; i++)
+                    {
+                        if (cares[i].biz_type == "非雪季养护")
+                        {
+                            summer = true;
+                            break;
+                        }
+                    }
+                    if (summer)
+                    {
+                        property.isSummerTask = true;
                     }
                     return property;
                 }

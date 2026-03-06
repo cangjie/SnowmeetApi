@@ -971,8 +971,8 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<ApiResult<List<SnowmeetApi.Models.Order>>>> GetOrdersByStaff(int? orderId,
             string? shop, string? type, string? subType, DateTime? startDate, DateTime? endDate, string sessionKey,
             string? payOption, string sessionType = "wechat_mini_openid", bool? isTest = null, bool? isEntertain = null,
-            bool? isPackage = null, bool? isOnCredit = null, bool? haveDiscount = null, string? status = null,
-            string? cell = null, bool? haveWarranty = null, string? retailType = null, string? keyword = null)
+            bool? isPackage = null, bool? isOnCredit = null, bool? haveDiscount = null, string? status = null, string? cell = null, 
+            bool? haveWarranty = null, string? retailType = null, string? keyword = null, bool? isSummerCare = null)
         {
             shop = shop == null ? null : Util.UrlDecode(shop);
             type = type == null ? null : Util.UrlDecode(type);
@@ -1018,6 +1018,10 @@ namespace SnowmeetApi.Controllers
             else
             {
                 newOrders = orders;
+            }
+            if (isSummerCare != null)
+            {
+                newOrders = newOrders.Where(o => o.careProperties.isSummerTask == isSummerCare).ToList();
             }
             SnowmeetApi.Models.Order.RendOrderList(newOrders);
             return Ok(new ApiResult<List<SnowmeetApi.Models.Order>>()
