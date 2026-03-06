@@ -132,7 +132,7 @@ namespace SnowmeetApi.Controllers
             int? staffId, string? type, DateTime? startDate, DateTime? endDate, string? payOption = null,
             bool? isTest = null, bool? isEntertain = null, bool? isPackage = null, bool? isOnCredit = null,
             bool? haveDiscount = null, string? status = null, DateTime? closeStartDate = null, DateTime? closeEndDate = null,
-            bool? haveWarranty = null, string? retailType = null, string? keyword = null)
+            bool? haveWarranty = null, string? retailType = null, string? keyword = null, bool? isSummerCare = null)
         {
             startDate = startDate == null ? DateTime.MinValue : startDate;
             endDate = endDate == null ? DateTime.MaxValue : endDate;
@@ -183,9 +183,10 @@ namespace SnowmeetApi.Controllers
                             && (memberId == null || o.member_id == memberId) && (staffId == null || o.staff_id == staffId)
                             && (payOption == null || o.pay_option.Trim().Equals(payOption.Trim()))
                             && (shop == null || o.shop.Trim().Equals(shop.Trim())) && (type == null || o.type.Trim().Equals(type.Trim()))
-                            && o.valid == 1 && (orderId == null || o.id == orderId))
+                            && o.valid == 1 && (orderId == null || o.id == orderId)
+                            && (isSummerCare == null || (o.cares.Any(c => (c.biz_type == "非雪季养护")) == isSummerCare  ) ))
                         .Include(o => o.cares.Where(c => c.valid == 1)).ThenInclude(c => c.tasks.Where(t => t.valid == 1).OrderBy(t => t.id))
-                        .Include(o => o.cares.Where(c => c.valid == 1)).ThenInclude(c => c.careImages).ThenInclude(i => i.image)
+                        .Include(o => o.cares.Where(c => c.valid == 1 )).ThenInclude(c => c.careImages).ThenInclude(i => i.image)
                         .Include(o => o.payments).ThenInclude(p => p.staff)
                         .Include(o => o.payments).ThenInclude(p => p.refunds)
                         .Include(o => o.refunds)
@@ -1009,7 +1010,7 @@ namespace SnowmeetApi.Controllers
                 //startDate = DateTime.Parse("2025-11-01");
             }
             List<SnowmeetApi.Models.Order> orders = await GetCommonOrders(orderId, shop, null, null, type, startDate, endDate, payOption,
-            isTest, isEntertain, isPackage, isOnCredit, haveDiscount, status, null, null, haveWarranty, retailType, keyword);
+            isTest, isEntertain, isPackage, isOnCredit, haveDiscount, status, null, null, haveWarranty, retailType, keyword, isSummerCare);
             List<SnowmeetApi.Models.Order> newOrders = new List<Models.Order>();
             if (cell != null)
             {
@@ -1019,10 +1020,7 @@ namespace SnowmeetApi.Controllers
             {
                 newOrders = orders;
             }
-            if (isSummerCare != null)
-            {
-                newOrders = newOrders.Where(o => o.careProperties.isSummerTask == isSummerCare).ToList();
-            }
+            
             SnowmeetApi.Models.Order.RendOrderList(newOrders);
             return Ok(new ApiResult<List<SnowmeetApi.Models.Order>>()
             {
