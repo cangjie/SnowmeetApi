@@ -310,6 +310,15 @@ namespace SnowmeetApi.Controllers
         [NonAction]
         public async Task<Models.Product?> GetProduct(string shop, Care care)
         {
+            if (care.summer != null)
+            {
+                return new Models.Product()
+                {
+                    id = 0,
+                    sale_price = 330,
+                    valid = 1
+                };
+            }   
             List<Models.Product> products = ((ApiResult<List<Models.Product>>)((OkObjectResult)(await GetProducts(shop)).Result).Value).data;
             Models.Product product = null;
             for (int i = 0; i < products.Count; i++)
