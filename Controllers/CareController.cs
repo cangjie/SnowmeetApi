@@ -480,7 +480,28 @@ namespace SnowmeetApi.Controllers
                     };
                     await _db.careTask.AddAsync(taskUnWax);
                 }
-
+                if (care.biz_type == "非雪季养护")
+                {
+                    TicketController _tHelper = new TicketController(_db, _config);
+                    Ticket ticketSummer = await _tHelper.GenerateTicketByAction(17, (int)care.order.member_id, 1, care.order.id, "非雪季养护", "");
+                    Ticket ticketSummerDouble = await _tHelper.GenerateTicketByAction(18, (int)care.order.member_id, 1, care.order.id, "非雪季养护", "");
+                    if (care.summer == "later")
+                    {
+                        ticketSummer.used = 1;
+                        ticketSummer.used_time = DateTime.Now;
+                        ticketSummerDouble.used = 0;
+                        ticketSummerDouble.used_time = null;
+                    }
+                    else if (care.summer == "now")
+                    {
+                        ticketSummer.used = 0;
+                        ticketSummer.used_time = null;
+                        ticketSummerDouble.used = 1;
+                        ticketSummerDouble.used_time = DateTime.Now;
+                    }
+                    await _db.ticket.AddAsync(ticketSummer);
+                    await _db.ticket.AddAsync(ticketSummerDouble);
+                }
                 CareTask taskFinish = new CareTask()
                 {
                     id = 0,
