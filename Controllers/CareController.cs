@@ -499,6 +499,14 @@ namespace SnowmeetApi.Controllers
                         ticketSummerDouble.used = 1;
                         ticketSummerDouble.used_time = DateTime.Now;
                     }
+                    ticketSummer.biz_type = "养护";
+                    ticketSummer.biz_id = care.id;
+                    ticketSummer.member_id = care.order.member_id;
+                    ticketSummerDouble.biz_type = "养护";
+                    ticketSummerDouble.biz_id = care.id;
+                    ticketSummerDouble.member_id = care.order.member_id;
+                    _db.ticket.Entry(ticketSummer).State = EntityState.Modified;
+                    _db.ticket.Entry(ticketSummerDouble).State = EntityState.Modified;
                     //await _db.ticket.AddAsync(ticketSummer);
                     //await _db.ticket.AddAsync(ticketSummerDouble);
                 }
