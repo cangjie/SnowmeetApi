@@ -427,7 +427,7 @@ namespace SnowmeetApi.Controllers
                         id = 0,
                         care_id = care.id,
                         task_name = "修刃",
-                        memo = care.edge_degree.ToString(),
+                        memo = care.edge_degree == null? "89" : care.edge_degree.ToString(),
                         create_date = DateTime.Now
                     };
                     await _db.careTask.AddAsync(taskEdge);
@@ -485,22 +485,22 @@ namespace SnowmeetApi.Controllers
                     TicketController _tHelper = new TicketController(_db, _config);
                     Ticket ticketSummer = await _tHelper.GenerateTicketByAction(17, (int)care.order.member_id, 1, care.order.id, "非雪季养护", "");
                     Ticket ticketSummerDouble = await _tHelper.GenerateTicketByAction(18, (int)care.order.member_id, 1, care.order.id, "非雪季养护", "");
-                    if (care.summer == "later")
+                    if (care.summer == "now")
                     {
                         ticketSummer.used = 1;
                         ticketSummer.used_time = DateTime.Now;
                         ticketSummerDouble.used = 0;
                         ticketSummerDouble.used_time = null;
                     }
-                    else if (care.summer == "now")
+                    else if (care.summer == "later")
                     {
                         ticketSummer.used = 0;
                         ticketSummer.used_time = null;
                         ticketSummerDouble.used = 1;
                         ticketSummerDouble.used_time = DateTime.Now;
                     }
-                    await _db.ticket.AddAsync(ticketSummer);
-                    await _db.ticket.AddAsync(ticketSummerDouble);
+                    //await _db.ticket.AddAsync(ticketSummer);
+                    //await _db.ticket.AddAsync(ticketSummerDouble);
                 }
                 CareTask taskFinish = new CareTask()
                 {
