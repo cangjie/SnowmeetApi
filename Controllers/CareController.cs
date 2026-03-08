@@ -502,9 +502,11 @@ namespace SnowmeetApi.Controllers
                     ticketSummer.biz_type = "养护";
                     ticketSummer.biz_id = care.id;
                     ticketSummer.member_id = care.order.member_id;
+                    ticketSummer.valid = 1;
                     ticketSummerDouble.biz_type = "养护";
                     ticketSummerDouble.biz_id = care.id;
                     ticketSummerDouble.member_id = care.order.member_id;
+                    ticketSummerDouble.valid = 1;
                     _db.ticket.Entry(ticketSummer).State = EntityState.Modified;
                     _db.ticket.Entry(ticketSummerDouble).State = EntityState.Modified;
                     //await _db.ticket.AddAsync(ticketSummer);
