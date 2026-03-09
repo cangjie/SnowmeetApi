@@ -132,7 +132,8 @@ namespace SnowmeetApi.Controllers
             int? staffId, string? type, DateTime? startDate, DateTime? endDate, string? payOption = null,
             bool? isTest = null, bool? isEntertain = null, bool? isPackage = null, bool? isOnCredit = null,
             bool? haveDiscount = null, string? status = null, DateTime? closeStartDate = null, DateTime? closeEndDate = null,
-            bool? haveWarranty = null, string? retailType = null, string? keyword = null, bool? isSummerCare = null)
+            bool? haveWarranty = null, string? retailType = null, string? keyword = null, bool? isSummerCare = null,
+            int? rentCategoryId = null, string? rentItemName = null)
         {
             startDate = startDate == null ? DateTime.MinValue : startDate;
             endDate = endDate == null ? DateTime.MaxValue : endDate;
@@ -146,10 +147,20 @@ namespace SnowmeetApi.Controllers
                         && (shop == null || o.shop.Trim().Equals(shop.Trim())) && (type == null || o.type.Trim().Equals(type.Trim()))
                         && o.valid == 1 && (orderId == null || o.id == orderId)
                         && (closeStartDate == null || (o.close_date != null && ((DateTime)o.close_date).Date >= ((DateTime)closeStartDate).Date))
-                        && (closeEndDate == null || (o.close_date != null && ((DateTime)o.close_date).Date <= ((DateTime)closeEndDate).Date)))
+                        && (closeEndDate == null || (o.close_date != null && ((DateTime)o.close_date).Date <= ((DateTime)closeEndDate).Date))
+                        && (rentCategoryId == null || (
+                            o.rentals.Any(r => r.order_id == o.id && r.valid == 1 && r.rentItems.Any(i => i.valid == 1 && i.rental_id == r.id && i.category.father.id == rentCategoryId))
+
+                        ) )
+                        && (rentItemName == null || (
+                            o.rentals.Any(r => r.valid==1 && r.order_id == o.id && r.rentItems.Any(i => i.valid == 1 && i.rental_id == r.id && (i.name.IndexOf(rentItemName) >= 0 || i.code.IndexOf(rentItemName) >= 0 ) )  )
+                        ))
+                        
+                        )
                     .Include(o => o.rentals.Where(r => r.valid == 1 && (r.appending == null || (r.appending == false && r.append_commit_time != null)))).ThenInclude(r => r.details.Where(d => d.valid == 1)).ThenInclude(d => d.discounts.Where(d => d.valid == 1 && d.sub_biz_type == "日租金"))
                     .Include(o => o.rentals.Where(r => r.valid == 1 && (r.appending == null || (r.appending == false && r.append_commit_time != null)))).ThenInclude(r => r.discounts.Where(d => d.valid == 1 && d.biz_type == "租赁"))
                     .Include(o => o.rentals.Where(r => r.valid == 1 && (r.appending == null || (r.appending == false && r.append_commit_time != null)))).ThenInclude(r => r.rentItems.Where(r => r.valid == 1))
+                        .ThenInclude(i => i.category).ThenInclude(c => c.father)
                     .Include(o => o.payments).ThenInclude(p => p.staff)
                     .Include(o => o.payments).ThenInclude(p => p.refunds)
                     .Include(o => o.refunds)
@@ -977,7 +988,8 @@ namespace SnowmeetApi.Controllers
             string? shop, string? type, string? subType, DateTime? startDate, DateTime? endDate, string sessionKey,
             string? payOption, string sessionType = "wechat_mini_openid", bool? isTest = null, bool? isEntertain = null,
             bool? isPackage = null, bool? isOnCredit = null, bool? haveDiscount = null, string? status = null, string? cell = null, 
-            bool? haveWarranty = null, string? retailType = null, string? keyword = null, bool? isSummerCare = null)
+            bool? haveWarranty = null, string? retailType = null, string? keyword = null, bool? isSummerCare = null, 
+            int? rentCategoryId = null, string? rentItemName = null)
         {
             shop = shop == null ? null : Util.UrlDecode(shop);
             type = type == null ? null : Util.UrlDecode(type);
@@ -1014,7 +1026,8 @@ namespace SnowmeetApi.Controllers
                 //startDate = DateTime.Parse("2025-11-01");
             }
             List<SnowmeetApi.Models.Order> orders = await GetCommonOrders(orderId, shop, null, null, type, startDate, endDate, payOption,
-            isTest, isEntertain, isPackage, isOnCredit, haveDiscount, status, null, null, haveWarranty, retailType, keyword, isSummerCare);
+            isTest, isEntertain, isPackage, isOnCredit, haveDiscount, status, null, null, haveWarranty, retailType, keyword, isSummerCare,
+            rentCategoryId, rentItemName);
             List<SnowmeetApi.Models.Order> newOrders = new List<Models.Order>();
             if (cell != null)
             {
