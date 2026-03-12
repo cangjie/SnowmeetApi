@@ -160,12 +160,6 @@ namespace SnowmeetApi.Controllers
                             && father != null && i.category.code.IndexOf(father.code) == 0 && (i.name.IndexOf(rentItemName) >= 0 || i.code.IndexOf(rentItemName) >= 0 ) ))
                             
                              )
-
-                        /*
-                        && (rentItemName == null || (
-                            o.rentals.Any(r => r.valid==1 && r.order_id == o.id && r.rentItems.Any(i => i.valid == 1 && i.rental_id == r.id && (i.name.IndexOf(rentItemName) >= 0 || i.code.IndexOf(rentItemName) >= 0 ) )  )
-                        ))
-                        */
                         ))
                     .Include(o => o.rentals.Where(r => r.valid == 1 && (r.appending == null || (r.appending == false && r.append_commit_time != null)))).ThenInclude(r => r.details.Where(d => d.valid == 1)).ThenInclude(d => d.discounts.Where(d => d.valid == 1 && d.sub_biz_type == "日租金"))
                     .Include(o => o.rentals.Where(r => r.valid == 1 && (r.appending == null || (r.appending == false && r.append_commit_time != null)))).ThenInclude(r => r.discounts.Where(d => d.valid == 1 && d.biz_type == "租赁"))
