@@ -1310,6 +1310,23 @@ namespace SnowmeetApi.Models
             }
         } 
         public List<RetailImage> retailImages { get; set; } = new List<RetailImage>();
+        [NotMapped]
+        public bool useCard
+        {
+            get
+            {
+                bool useCard = false;
+                if (type == "租赁")
+                {
+                    useCard = rentals.Any(r => r.valid == 1 && r.use_card == true);
+                }
+                if (type == "养护")
+                {
+                    useCard = cares.Any(r => r.valid == 1 && r.use_card == true);
+                }
+                return useCard;
+            }
+        }
 
     }
 }
