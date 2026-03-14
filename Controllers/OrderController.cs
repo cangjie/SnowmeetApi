@@ -1008,7 +1008,7 @@ namespace SnowmeetApi.Controllers
             string? payOption, string sessionType = "wechat_mini_openid", bool? isTest = null, bool? isEntertain = null,
             bool? isPackage = null, bool? isOnCredit = null, bool? haveDiscount = null, string? status = null, string? cell = null,
             bool? haveWarranty = null, string? retailType = null, string? keyword = null, bool? isSummerCare = null,
-            int? rentCategoryId = null, string? rentItemName = null)
+            int? rentCategoryId = null, string? rentItemName = null, bool? useCard = null)
         {
             shop = shop == null ? null : Util.UrlDecode(shop);
             type = type == null ? null : Util.UrlDecode(type);
@@ -1046,7 +1046,7 @@ namespace SnowmeetApi.Controllers
             }
             List<SnowmeetApi.Models.Order> orders = await GetCommonOrders(orderId, shop, null, null, type, startDate, endDate, payOption,
             isTest, isEntertain, isPackage, isOnCredit, haveDiscount, status, null, null, haveWarranty, retailType, keyword, isSummerCare,
-            rentCategoryId, rentItemName);
+            rentCategoryId, rentItemName, useCard);
             List<SnowmeetApi.Models.Order> newOrders = new List<Models.Order>();
             if (cell != null)
             {
