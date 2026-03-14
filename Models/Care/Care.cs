@@ -58,6 +58,7 @@ namespace SnowmeetApi.Models
         public string? task_flow_code { get; set; }
         public int valid { get; set; }
         public string? summer {get; set;} = null;
+        public bool use_card {get; set;} = false;
         public DateTime? update_date { get; set; }
         public DateTime create_date { get; set; } = DateTime.Now;
         [ForeignKey("order_id")]
