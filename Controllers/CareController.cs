@@ -318,7 +318,7 @@ namespace SnowmeetApi.Controllers
                     sale_price = 330,
                     valid = 1
                 };
-            }   
+            }
             List<Models.Product> products = ((ApiResult<List<Models.Product>>)((OkObjectResult)(await GetProducts(shop)).Result).Value).data;
             Models.Product product = null;
             for (int i = 0; i < products.Count; i++)
@@ -416,78 +416,14 @@ namespace SnowmeetApi.Controllers
                     id = 0,
                     care_id = care.id,
                     task_name = "安全检查",
-                    sort  = 0,
+                    sort = 10,
                     create_date = DateTime.Now
                 };
                 await _db.careTask.AddAsync(taskSafe);
-
-                if (care.need_edge == 1)
-                {
-                    CareTask taskEdge = new CareTask()
-                    {
-                        id = 0,
-                        care_id = care.id,
-                        task_name = "修刃",
-                        memo = care.edge_degree == null? "89" : care.edge_degree.ToString(),
-                        sort = 10,
-                        create_date = DateTime.Now
-                    };
-                    await _db.careTask.AddAsync(taskEdge);
-                }
-                if (care.need_repair == 1)
-                {
-                    CareTask taskRepair = new CareTask()
-                    {
-                        id = 0,
-                        care_id = care.id,
-                        task_name = "维修",
-                        memo = care.repair_memo,
-                        sort = 5,
-                        create_date = DateTime.Now
-                    };
-                    await _db.careTask.AddAsync(taskRepair);
-                }
-                if (care.free_wax == 1)
-                {
-                    CareTask taskWax = new CareTask()
-                    {
-                        id = 0,
-                        care_id = care.id,
-                        task_name = "机打蜡",
-                        memo = "",
-                        sort = 20,
-                        create_date = DateTime.Now
-                    };
-                    await _db.careTask.AddAsync(taskWax);
-                }
-                if (care.need_wax == 1)
-                {
-                    CareTask taskWax = new CareTask()
-                    {
-                        id = 0,
-                        care_id = care.id,
-                        task_name = "热蜡",
-                        memo = "",
-                        sort = 30,
-                        create_date = DateTime.Now
-                    };
-                    await _db.careTask.AddAsync(taskWax);
-                }
-                if (care.need_unwax == 1)
-                {
-                    CareTask taskUnWax = new CareTask()
-                    {
-                        id = 0,
-                        care_id = care.id,
-                        task_name = "刮蜡",
-                        memo = "",
-                        sort = 40,
-                        create_date = DateTime.Now
-                    };
-                    await _db.careTask.AddAsync(taskUnWax);
-                }
                 if (care.biz_type == "非雪季养护")
                 {
+
+
                     TicketController _tHelper = new TicketController(_db, _config);
                     Ticket ticketSummer = await _tHelper.GenerateTicketByAction(17, (int)care.order.member_id, 1, care.order.id, "非雪季养护", "");
                     Ticket ticketSummerDouble = await _tHelper.GenerateTicketByAction(18, (int)care.order.member_id, 1, care.order.id, "非雪季养护", "");
@@ -497,6 +433,56 @@ namespace SnowmeetApi.Controllers
                         ticketSummer.used_time = DateTime.Now;
                         ticketSummerDouble.used = 0;
                         ticketSummerDouble.used_time = null;
+                        CareTask taskEdge = new CareTask()
+                        {
+                            id = 0,
+                            care_id = care.id,
+                            task_name = "修刃",
+                            memo = care.edge_degree == null ? "89" : care.edge_degree.ToString(),
+                            sort = 20,
+                            create_date = DateTime.Now
+                        };
+                        await _db.careTask.AddAsync(taskEdge);
+                        CareTask taskWax = new CareTask()
+                        {
+                            id = 0,
+                            care_id = care.id,
+                            task_name = "热蜡",
+                            memo = "",
+                            sort = 40,
+                            create_date = DateTime.Now
+                        };
+                        await _db.careTask.AddAsync(taskWax);
+                        CareTask taskSummer = new CareTask()
+                        {
+                            id = 0,
+                            care_id = care.id,
+                            task_name = "寄存或快递",
+                            memo = "",
+                            sort = 50,
+                            create_date = DateTime.Now
+                        };
+                        await _db.careTask.AddAsync(taskSummer);
+                        CareTask taskUnWax = new CareTask()
+                        {
+                            id = 0,
+                            care_id = care.id,
+                            task_name = "刮蜡",
+                            memo = "",
+                            sort = 60,
+                            create_date = DateTime.Now
+                        };
+                        await _db.careTask.AddAsync(taskUnWax);
+                        CareTask taskFinish = new CareTask()
+                        {
+                            id = 0,
+                            care_id = care.id,
+                            task_name = "发板",
+                            sort = 60,
+                            create_date = DateTime.Now
+                        };
+                        await _db.careTask.AddAsync(taskFinish);
+
                     }
                     else if (care.summer == "later")
                     {
@@ -504,6 +490,46 @@ namespace SnowmeetApi.Controllers
                         ticketSummer.used_time = null;
                         ticketSummerDouble.used = 1;
                         ticketSummerDouble.used_time = DateTime.Now;
+
+                        CareTask taskEdge = new CareTask()
+                        {
+                            id = 0,
+                            care_id = care.id,
+                            task_name = "修刃",
+                            memo = care.edge_degree == null ? "89" : care.edge_degree.ToString(),
+                            sort = 20,
+                            create_date = DateTime.Now
+                        };
+                        await _db.careTask.AddAsync(taskEdge);
+                        CareTask taskWax = new CareTask()
+                        {
+                            id = 0,
+                            care_id = care.id,
+                            task_name = "热蜡",
+                            memo = "",
+                            sort = 30,
+                            create_date = DateTime.Now
+                        };
+                        await _db.careTask.AddAsync(taskWax);
+                        CareTask taskUnWax = new CareTask()
+                        {
+                            id = 0,
+                            care_id = care.id,
+                            task_name = "刮蜡",
+                            memo = "",
+                            sort = 40,
+                            create_date = DateTime.Now
+                        };
+                        await _db.careTask.AddAsync(taskUnWax);
+                        CareTask taskFinish = new CareTask()
+                        {
+                            id = 0,
+                            care_id = care.id,
+                            task_name = "发板",
+                            sort = 50,
+                            create_date = DateTime.Now
+                        };
+                        await _db.careTask.AddAsync(taskFinish);
                     }
                     ticketSummer.biz_type = "养护";
                     ticketSummer.biz_id = care.id;
@@ -515,18 +541,91 @@ namespace SnowmeetApi.Controllers
                     ticketSummerDouble.valid = 1;
                     _db.ticket.Entry(ticketSummer).State = EntityState.Modified;
                     _db.ticket.Entry(ticketSummerDouble).State = EntityState.Modified;
+                }
+                else
+                {
+                    if (care.need_edge == 1)
+                    {
+                        CareTask taskEdge = new CareTask()
+                        {
+                            id = 0,
+                            care_id = care.id,
+                            task_name = "修刃",
+                            memo = care.edge_degree == null ? "89" : care.edge_degree.ToString(),
+                            sort = 20,
+                            create_date = DateTime.Now
+                        };
+                        await _db.careTask.AddAsync(taskEdge);
+                    }
+                    if (care.need_repair == 1)
+                    {
+                        CareTask taskRepair = new CareTask()
+                        {
+                            id = 0,
+                            care_id = care.id,
+                            task_name = "维修",
+                            memo = care.repair_memo,
+                            sort = 30,
+                            create_date = DateTime.Now
+                        };
+                        await _db.careTask.AddAsync(taskRepair);
+                    }
+                    if (care.free_wax == 1)
+                    {
+                        CareTask taskWax = new CareTask()
+                        {
+                            id = 0,
+                            care_id = care.id,
+                            task_name = "机打蜡",
+                            memo = "",
+                            sort = 40,
+                            create_date = DateTime.Now
+                        };
+                        await _db.careTask.AddAsync(taskWax);
+                    }
+                    if (care.need_wax == 1)
+                    {
+                        CareTask taskWax = new CareTask()
+                        {
+                            id = 0,
+                            care_id = care.id,
+                            task_name = "热蜡",
+                            memo = "",
+                            sort = 40,
+                            create_date = DateTime.Now
+                        };
+                        await _db.careTask.AddAsync(taskWax);
+                    }
+                    if (care.need_unwax == 1)
+                    {
+                        CareTask taskUnWax = new CareTask()
+                        {
+                            id = 0,
+                            care_id = care.id,
+                            task_name = "刮蜡",
+                            memo = "",
+                            sort = 50,
+                            create_date = DateTime.Now
+                        };
+                        await _db.careTask.AddAsync(taskUnWax);
+                    }
+                    CareTask taskFinish = new CareTask()
+                    {
+                        id = 0,
+                        care_id = care.id,
+                        task_name = "发板",
+                        sort = 60,
+                        create_date = DateTime.Now
+                    };
+                    await _db.careTask.AddAsync(taskFinish);
+                }
+                if (care.biz_type == "非雪季养护")
+                {
+
                     //await _db.ticket.AddAsync(ticketSummer);
                     //await _db.ticket.AddAsync(ticketSummerDouble);
                 }
-                CareTask taskFinish = new CareTask()
-                {
-                    id = 0,
-                    care_id = care.id,
-                    task_name = "发板",
-                    sort = 100,
-                    create_date = DateTime.Now
-                };
-                await _db.careTask.AddAsync(taskFinish);
+
                 if (care.ticket_code != null)
                 {
                     Ticket ticket = await _db.ticket.Where(t => t.code == care.ticket_code).AsNoTracking().FirstOrDefaultAsync();
