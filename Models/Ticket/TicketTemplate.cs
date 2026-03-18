@@ -33,7 +33,7 @@ namespace SnowmeetApi.Models
         [ForeignKey("ticket_template_id")]
         public TicketTemplate ticketTemplate {get; set;}
         [ForeignKey("product_id")]
-        public Product product {get; set;}
+        public Product? product {get; set;}
     }
 
     /*

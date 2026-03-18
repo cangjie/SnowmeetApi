@@ -202,5 +202,6 @@ namespace SnowmeetApi.Data
         public DbSet<BizReferee> bizReferee { get; set;}
         public DbSet<RentCategoryAssociate> rentCategoryAssociate {get; set;}
         public DbSet<RetailImage> retailImage { get; set; }
+        public DbSet<ProductTicketTemplate> productTicketTemplate {get; set;}
     }
 }

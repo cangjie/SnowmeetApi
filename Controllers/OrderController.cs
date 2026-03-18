@@ -821,12 +821,20 @@ namespace SnowmeetApi.Controllers
                                 if (care.ticket_code != null && care.ticket_code.Trim() != "")
                                 {
                                     Ticket ticket = await _db.ticket.Where(t => t.code == care.ticket_code && t.valid == 1 && t.used == 0)
-                                        .Include(t => t.template).ThenInclude(p => p.productTicketTemplates).ThenInclude(p => p.product)
+                                        .Include(t => t.template).ThenInclude(p => p.productTicketTemplates)//.ThenInclude(p => p.product)
                                         .AsNoTracking().FirstOrDefaultAsync();
+                                    /*
+                                    if (ticket.template.productTicketTemplates == null || ticket.template.productTicketTemplates.Count == 0)
+                                    {
+                                        List<ProductTicketTemplate> pttList = await _db.productTicketTemplate
+                                            .Where(p => p.valid && p.ticket_template_id == ticket.template.id ).AsNoTracking().ToListAsync();
+                                        ticket.template.productTicketTemplates = pttList;
+                                    }
+                                    */
                                     if (ticket != null)
                                     {
                                         ProductTicketTemplate productTicketTemplate = ticket.template.productTicketTemplates
-                                            .Where(p => p.product_id == product.id).FirstOrDefault();
+                                            .Where(p => p.product_id == product.id || p.product_id == 0).FirstOrDefault();
                                         if (productTicketTemplate != null)
                                         {
                                             if (productTicketTemplate.fixed_price != null)
