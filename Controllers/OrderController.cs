@@ -44,8 +44,8 @@ namespace SnowmeetApi.Controllers
             if (order.type == "养护")
             {
                 order.cares = await _db.order.Entry(order).Collection(o => o.cares).Query()
-                    .Include(c => c.tasks.OrderBy(t => t.id)).ThenInclude(t => t.staff)
-                    .Include(c => c.tasks.OrderBy(t => t.id)).ThenInclude(t => t.terminateStaff)
+                    .Include(c => c.tasks.OrderBy(t => t.sort)).ThenInclude(t => t.staff)
+                    .Include(c => c.tasks.OrderBy(t => t.sort)).ThenInclude(t => t.terminateStaff)
                     .Include(c => c.pickImage)
                     .Include(c => c.careImages).ThenInclude(i => i.image).AsSplitQuery().AsNoTracking().ToListAsync();
             }
@@ -215,7 +215,7 @@ namespace SnowmeetApi.Controllers
                             && (isSummerCare == null || (o.cares.Any(c => (c.biz_type == "非雪季养护")) == isSummerCare))
                             && (useCard == null || (useCard == o.cares.Any(c => (c.valid == 1 && c.use_card == true))))
                             )
-                        .Include(o => o.cares.Where(c => c.valid == 1)).ThenInclude(c => c.tasks.Where(t => t.valid == 1).OrderBy(t => t.id))
+                        .Include(o => o.cares.Where(c => c.valid == 1)).ThenInclude(c => c.tasks.Where(t => t.valid == 1).OrderBy(t => t.sort))
                         .Include(o => o.cares.Where(c => c.valid == 1)).ThenInclude(c => c.careImages).ThenInclude(i => i.image)
                         .Include(o => o.payments).ThenInclude(p => p.staff)
                         .Include(o => o.payments).ThenInclude(p => p.refunds)

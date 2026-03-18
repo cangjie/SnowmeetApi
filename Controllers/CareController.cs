@@ -416,6 +416,7 @@ namespace SnowmeetApi.Controllers
                     id = 0,
                     care_id = care.id,
                     task_name = "安全检查",
+                    sort  = 0,
                     create_date = DateTime.Now
                 };
                 await _db.careTask.AddAsync(taskSafe);
@@ -428,6 +429,7 @@ namespace SnowmeetApi.Controllers
                         care_id = care.id,
                         task_name = "修刃",
                         memo = care.edge_degree == null? "89" : care.edge_degree.ToString(),
+                        sort = 10,
                         create_date = DateTime.Now
                     };
                     await _db.careTask.AddAsync(taskEdge);
@@ -440,6 +442,7 @@ namespace SnowmeetApi.Controllers
                         care_id = care.id,
                         task_name = "维修",
                         memo = care.repair_memo,
+                        sort = 5,
                         create_date = DateTime.Now
                     };
                     await _db.careTask.AddAsync(taskRepair);
@@ -452,6 +455,7 @@ namespace SnowmeetApi.Controllers
                         care_id = care.id,
                         task_name = "机打蜡",
                         memo = "",
+                        sort = 20,
                         create_date = DateTime.Now
                     };
                     await _db.careTask.AddAsync(taskWax);
@@ -464,6 +468,7 @@ namespace SnowmeetApi.Controllers
                         care_id = care.id,
                         task_name = "热蜡",
                         memo = "",
+                        sort = 30,
                         create_date = DateTime.Now
                     };
                     await _db.careTask.AddAsync(taskWax);
@@ -476,6 +481,7 @@ namespace SnowmeetApi.Controllers
                         care_id = care.id,
                         task_name = "刮蜡",
                         memo = "",
+                        sort = 40,
                         create_date = DateTime.Now
                     };
                     await _db.careTask.AddAsync(taskUnWax);
