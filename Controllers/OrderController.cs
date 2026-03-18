@@ -823,14 +823,6 @@ namespace SnowmeetApi.Controllers
                                     Ticket ticket = await _db.ticket.Where(t => t.code == care.ticket_code && t.valid == 1 && t.used == 0)
                                         .Include(t => t.template).ThenInclude(p => p.productTicketTemplates)//.ThenInclude(p => p.product)
                                         .AsNoTracking().FirstOrDefaultAsync();
-                                    /*
-                                    if (ticket.template.productTicketTemplates == null || ticket.template.productTicketTemplates.Count == 0)
-                                    {
-                                        List<ProductTicketTemplate> pttList = await _db.productTicketTemplate
-                                            .Where(p => p.valid && p.ticket_template_id == ticket.template.id ).AsNoTracking().ToListAsync();
-                                        ticket.template.productTicketTemplates = pttList;
-                                    }
-                                    */
                                     if (ticket != null)
                                     {
                                         ProductTicketTemplate productTicketTemplate = ticket.template.productTicketTemplates
@@ -841,9 +833,11 @@ namespace SnowmeetApi.Controllers
                                             {
                                                 care.common_charge = (double)productTicketTemplate.fixed_price;
                                             }
-                                            //需要减免直接else if
+                                           
                                         }
                                     }
+                                    _db.ticket.Entry(ticket).State = EntityState.Detached;
+                                    
 
                                 }
                             }
@@ -879,18 +873,7 @@ namespace SnowmeetApi.Controllers
                 }
             }
 
-            /*
-            if (_http.HttpContext.Request.Host.Value != null
-                && _http.HttpContext.Request.Host.Value.Equals("mini.snowmeet.top"))
-            {
-                order.is_test = 1;
-            }
-            else
-            {
-                order.is_test = 0;
-            }
-            */
-
+ 
             if (order.staff_id == 28 || order.staff_id == 31 || order.staff_id == 34)
             {
                 order.is_test = 1;

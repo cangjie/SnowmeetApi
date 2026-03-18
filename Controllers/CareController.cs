@@ -680,13 +680,6 @@ namespace SnowmeetApi.Controllers
                     };
                     await _db.careTask.AddAsync(taskFinish);
                 }
-                if (care.biz_type == "非雪季养护")
-                {
-
-                    //await _db.ticket.AddAsync(ticketSummer);
-                    //await _db.ticket.AddAsync(ticketSummerDouble);
-                }
-
                 if (care.ticket_code != null)
                 {
                     Ticket ticket = await _db.ticket.Where(t => t.code == care.ticket_code).AsNoTracking().FirstOrDefaultAsync();
