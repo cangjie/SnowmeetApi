@@ -523,6 +523,7 @@ namespace SnowmeetApi.Controllers
                     id = 0,
                     care_id = care.id,
                     task_name = "发板",
+                    sort = 100,
                     create_date = DateTime.Now
                 };
                 await _db.careTask.AddAsync(taskFinish);
