@@ -811,7 +811,7 @@ namespace SnowmeetApi.Controllers
                             Care care = order.cares[i];
                             Product product = await _careHelper.GetProduct(order.shop, care);
 
-                            if (product == null || care.warranty || care.entertain)
+                            if (product == null || care.warranty || care.entertain )
                             {
                                 care.common_charge = 0;
                             }
@@ -821,7 +821,7 @@ namespace SnowmeetApi.Controllers
                                 if (care.ticket_code != null && care.ticket_code.Trim() != "")
                                 {
                                     Ticket ticket = await _db.ticket.Where(t => t.code == care.ticket_code && t.valid == 1 && t.used == 0)
-                                        .Include(t => t.template).ThenInclude(p => p.productTicketTemplates)//.ThenInclude(p => p.product)
+                                        .Include(t => t.template).ThenInclude(p => p.productTicketTemplates).ThenInclude(p => p.product)
                                         .AsNoTracking().FirstOrDefaultAsync();
                                     if (ticket != null)
                                     {

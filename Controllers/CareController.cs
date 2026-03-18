@@ -323,6 +323,11 @@ namespace SnowmeetApi.Controllers
             Models.Product product = null;
             for (int i = 0; i < products.Count; i++)
             {
+                if (products[i].name == "非雪季养护" && care.biz_type == "非雪季养护")
+                {
+                    product = products[i];
+                    break;
+                }
                 if (shop.IndexOf("万龙") >= 0)
                 {
                     if (products[i].name.IndexOf("修刃打蜡") >= 0 && products[i].name.IndexOf("立等") >= 0
@@ -599,6 +604,9 @@ namespace SnowmeetApi.Controllers
                             ticket.used = 1;
                             ticket.used_time = DateTime.Now;
                             _db.ticket.Entry(ticket).State = EntityState.Modified;
+                            await _db.SaveChangesAsync();
+                            _db.ticket.Entry(ticket).State = EntityState.Detached;
+                            await _db.SaveChangesAsync();
                         }
                     }
 
