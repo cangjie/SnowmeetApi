@@ -785,6 +785,14 @@ namespace SnowmeetApi.Controllers
             }
             careTask.memo = scene;
             careTask.update_date = DateTime.Now;
+            if (dealMethod != null)
+            {
+                careTask.deal_method = Util.UrlDecode(dealMethod);
+            }
+            if (storeMemo != null)
+            {
+                careTask.store_memo = Util.UrlDecode(storeMemo);
+            }
 
             await _db.coreDataModLog.AddAsync(log);
             _db.careTask.Entry(careTask).State = EntityState.Modified;
@@ -800,14 +808,7 @@ namespace SnowmeetApi.Controllers
                     nextTask.status = "已开始";
                     nextTask.start_time = DateTime.Now;
                     nextTask.staff_id = staff.id;
-                    if (dealMethod != null)
-                    {
-                        nextTask.deal_method = Util.UrlDecode(dealMethod);
-                    }
-                    if (storeMemo != null)
-                    {
-                        nextTask.store_memo = Util.UrlDecode(storeMemo);
-                    }
+
                     _db.careTask.Entry(nextTask).State = EntityState.Modified;
                     await _db.SaveChangesAsync();
                 }
