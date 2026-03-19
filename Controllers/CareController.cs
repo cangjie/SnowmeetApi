@@ -787,16 +787,21 @@ namespace SnowmeetApi.Controllers
             await _db.coreDataModLog.AddAsync(log);
             _db.careTask.Entry(careTask).State = EntityState.Modified;
             await _db.SaveChangesAsync();
-
+    
             Care care = await GetCare(careTask.care_id);
-            /*
-            if (careTask.pick_image_id != null)
+            //非雪季养护打蜡完成，下一步应该是快递和寄存步骤的开始
+            if (care.biz_type == "非雪季养护" && careTask.task_name == "打蜡" && careTask.status == "已完成")
             {
-                care.pick_image_id = careTask.pick_image_id;
-                _db.care.Entry(care).State = EntityState.Modified;
-                await _db.SaveChangesAsync();
+                CareTask nextTask = care.tasks.OrderBy(t => t.sort).Where(t => t.sort > careTask.sort).FirstOrDefault();
+                if (nextTask != null && (nextTask.task_name.IndexOf("存") >= 0 || nextTask.task_name.IndexOf("快递") >= 0))
+                {
+                    nextTask.status = "已开始";
+                    nextTask.start_time = DateTime.Now;
+                    nextTask.staff_id = staff.id;
+                    _db.careTask.Entry(nextTask).State = EntityState.Modified;
+                    await _db.SaveChangesAsync();
+                }
             }
-            */
             return Ok(new ApiResult<Care>()
             {
                 code = 0,
