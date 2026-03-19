@@ -734,7 +734,8 @@ namespace SnowmeetApi.Controllers
         }
         [HttpGet("{taskId}")]
         public async Task<ActionResult<ApiResult<Care?>>> SetTaskStatus(int taskId, string status,
-            string scene, string sessionKey, string sessionType = "wechat_mini_openid")
+            string scene, string sessionKey, string sessionType = "wechat_mini_openid",
+            string? dealMethod = null, string? storeMemo = null)
         {
             scene = Util.UrlDecode(scene);
             Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
@@ -784,10 +785,11 @@ namespace SnowmeetApi.Controllers
             }
             careTask.memo = scene;
             careTask.update_date = DateTime.Now;
+
             await _db.coreDataModLog.AddAsync(log);
             _db.careTask.Entry(careTask).State = EntityState.Modified;
             await _db.SaveChangesAsync();
-    
+
             Care care = await GetCare(careTask.care_id);
             //非雪季养护打蜡完成，下一步应该是快递和寄存步骤的开始
             if (care.biz_type == "非雪季养护" && careTask.task_name == "热蜡" && careTask.status == "已完成")
@@ -798,6 +800,14 @@ namespace SnowmeetApi.Controllers
                     nextTask.status = "已开始";
                     nextTask.start_time = DateTime.Now;
                     nextTask.staff_id = staff.id;
+                    if (dealMethod != null)
+                    {
+                        nextTask.deal_method = Util.UrlDecode(dealMethod);
+                    }
+                    if (storeMemo != null)
+                    {
+                        nextTask.store_memo = Util.UrlDecode(storeMemo);
+                    }
                     _db.careTask.Entry(nextTask).State = EntityState.Modified;
                     await _db.SaveChangesAsync();
                 }
