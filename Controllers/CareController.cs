@@ -785,15 +785,8 @@ namespace SnowmeetApi.Controllers
             }
             careTask.memo = scene;
             careTask.update_date = DateTime.Now;
-            if (dealMethod != null)
-            {
-                careTask.deal_method = Util.UrlDecode(dealMethod);
-            }
-            if (storeMemo != null)
-            {
-                careTask.store_memo = Util.UrlDecode(storeMemo);
-            }
-
+            careTask.deal_method = dealMethod != null? Util.UrlDecode(dealMethod):null;
+            careTask.store_memo = storeMemo != null ? Util.UrlDecode(storeMemo): null;
             await _db.coreDataModLog.AddAsync(log);
             _db.careTask.Entry(careTask).State = EntityState.Modified;
             await _db.SaveChangesAsync();
