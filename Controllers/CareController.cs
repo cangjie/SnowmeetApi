@@ -790,7 +790,7 @@ namespace SnowmeetApi.Controllers
     
             Care care = await GetCare(careTask.care_id);
             //非雪季养护打蜡完成，下一步应该是快递和寄存步骤的开始
-            if (care.biz_type == "非雪季养护" && careTask.task_name == "打蜡" && careTask.status == "已完成")
+            if (care.biz_type == "非雪季养护" && careTask.task_name == "热蜡" && careTask.status == "已完成")
             {
                 CareTask nextTask = care.tasks.OrderBy(t => t.sort).Where(t => t.sort > careTask.sort).FirstOrDefault();
                 if (nextTask != null && (nextTask.task_name.IndexOf("存") >= 0 || nextTask.task_name.IndexOf("快递") >= 0))
