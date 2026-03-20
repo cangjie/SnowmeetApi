@@ -44,8 +44,8 @@ namespace SnowmeetApi.Controllers
             if (order.type == "养护")
             {
                 order.cares = await _db.order.Entry(order).Collection(o => o.cares).Query()
-                    .Include(c => c.tasks.OrderBy(t => t.sort)).ThenInclude(t => t.staff)
-                    .Include(c => c.tasks.OrderBy(t => t.sort)).ThenInclude(t => t.terminateStaff)
+                    .Include(c => c.tasks.Where(t => t.valid == 1).OrderBy(t => t.sort)).ThenInclude(t => t.staff)
+                    .Include(c => c.tasks.Where(t => t.valid == 1).OrderBy(t => t.sort)).ThenInclude(t => t.terminateStaff)
                     .Include(c => c.pickImage)
                     .Include(c => c.careImages).ThenInclude(i => i.image).AsSplitQuery().AsNoTracking().ToListAsync();
             }
