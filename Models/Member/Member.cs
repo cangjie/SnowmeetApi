@@ -101,6 +101,21 @@ namespace SnowmeetApi.Models
             }
         }
         [NotMapped]
+        public string? currentCell
+        {
+            get
+            {
+                if (_cell == null || _cell == "" || _cell.Length != 11)
+                {
+                    return cell;
+                }
+                else
+                {
+                    return _cell;
+                }
+            }
+        }
+        [NotMapped]
         public string? contactNum
         {
             get

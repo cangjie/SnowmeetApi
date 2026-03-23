@@ -368,7 +368,7 @@ namespace SnowmeetApi.Controllers
             member = await _memberHelper.GetMemberBySessionKey(sessionKey, "wechat_mini_openid");
             if (cell != null && cell != "" && cell.Length == 11)
             {
-                member.cell = cell;
+                member._cell = cell;
             }
             //return Ok(_memberHelper.RemoveSensitiveInfo(member));
             return Ok(member);
