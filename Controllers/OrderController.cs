@@ -146,7 +146,7 @@ namespace SnowmeetApi.Controllers
             bool? isTest = null, bool? isEntertain = null, bool? isPackage = null, bool? isOnCredit = null,
             bool? haveDiscount = null, string? status = null, DateTime? closeStartDate = null, DateTime? closeEndDate = null,
             bool? haveWarranty = null, string? retailType = null, string? keyword = null, bool? isSummerCare = null,
-            int? rentCategoryId = null, string? rentItemName = null, bool? useCard = null)
+            int? rentCategoryId = null, string? rentItemName = null, bool? useCard = null, string? cell = null)
         {
             startDate = startDate == null ? DateTime.MinValue : startDate;
             endDate = endDate == null ? DateTime.MaxValue : endDate;
@@ -173,6 +173,7 @@ namespace SnowmeetApi.Controllers
                              )
                         )
                         && (useCard == null || useCard == o.rentals.Any(r => r.valid == 1 && r.use_card==true))
+
                     )
                     .Include(o => o.rentals.Where(r => r.valid == 1 && (r.appending == null || (r.appending == false && r.append_commit_time != null)))).ThenInclude(r => r.details.Where(d => d.valid == 1)).ThenInclude(d => d.discounts.Where(d => d.valid == 1 && d.sub_biz_type == "日租金"))
                     .Include(o => o.rentals.Where(r => r.valid == 1 && (r.appending == null || (r.appending == false && r.append_commit_time != null)))).ThenInclude(r => r.discounts.Where(d => d.valid == 1 && d.biz_type == "租赁"))
@@ -193,7 +194,9 @@ namespace SnowmeetApi.Controllers
                         && (memberId == null || o.member_id == memberId) && (staffId == null || o.staff_id == staffId)
                         && (payOption == null || o.pay_option.Trim().Equals(payOption.Trim()))
                         && (shop == null || o.shop.Trim().Equals(shop.Trim())) && (type == null || o.type.Trim().Equals(type.Trim()))
-                        && o.valid == 1 && (orderId == null || o.id == orderId))
+                        && o.valid == 1 && (orderId == null || o.id == orderId)
+                        
+                        )
                     .Include(o => o.retails.Where(r => r.valid == 1))
                     .Include(o => o.payments).ThenInclude(p => p.staff)
                     .Include(o => o.payments).ThenInclude(p => p.refunds)
@@ -214,6 +217,7 @@ namespace SnowmeetApi.Controllers
                             && o.valid == 1 && (orderId == null || o.id == orderId)
                             && (isSummerCare == null || (o.cares.Any(c => (c.biz_type == "非雪季养护")) == isSummerCare))
                             && (useCard == null || (useCard == o.cares.Any(c => (c.valid == 1 && c.use_card == true))))
+                            && (cell == null || (o.member.memberSocialAccounts.Any(msa => msa.num.EndsWith(cell)) ))
                             )
                         .Include(o => o.cares.Where(c => c.valid == 1)).ThenInclude(c => c.tasks.Where(t => t.valid == 1).OrderBy(t => t.sort))
                         .Include(o => o.cares.Where(c => c.valid == 1)).ThenInclude(c => c.careImages).ThenInclude(i => i.image)
@@ -1037,7 +1041,7 @@ namespace SnowmeetApi.Controllers
             }
             List<SnowmeetApi.Models.Order> orders = await GetCommonOrders(orderId, shop, null, null, type, startDate, endDate, payOption,
             isTest, isEntertain, isPackage, isOnCredit, haveDiscount, status, null, null, haveWarranty, retailType, keyword, isSummerCare,
-            rentCategoryId, rentItemName, useCard);
+            rentCategoryId, rentItemName, useCard, cell);
             List<SnowmeetApi.Models.Order> newOrders = new List<Models.Order>();
             if (cell != null)
             {
