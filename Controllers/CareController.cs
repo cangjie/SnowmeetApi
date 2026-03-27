@@ -82,7 +82,10 @@ namespace SnowmeetApi.Controllers
                 .Include(t => t.staff)
                 .Include(t => t.terminateStaff)
                 .Where(t => t.care_id == c.id).OrderBy(t => t.id).ToListAsync();
-            await _db.member.Entry(c.order.member).Collection(m => m.memberSocialAccounts).LoadAsync();
+            if (c.order.member != null)
+            {
+                await _db.member.Entry(c.order.member).Collection(m => m.memberSocialAccounts).LoadAsync();
+            }
             return c;
         }
         [HttpGet]

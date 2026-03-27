@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+
+<html lang="zh-CN"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>我的票券 - Ski Resort</title>
+<!-- Tailwind CSS v3 CDN -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<style data-purpose="typography">
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap');
+    body {
+      font-family: 'Noto+Sans+SC', sans-serif;
+      background-color: #F7F8FA;
+    }
+  </style>
+<style data-purpose="custom-styling">
+    .card-shadow {
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+    }
+    .active-tab-shadow {
+      box-shadow: 0 2px 10px rgba(59, 130, 246, 0.1);
+    }
+    /* Custom button states */
+    .btn-secondary:active {
+      background-color: #f3f4f6;
+    }
+    .btn-primary:active {
+      background-color: #2563eb;
+    }
+  </style>
+</head>
+<body class="min-h-screen pb-10">
+<!-- BEGIN: Main Container -->
+<main class="max-w-2xl mx-auto px-4 pt-6">
+<!-- BEGIN: Top Tabs Navigation -->
+<nav class="flex bg-gray-100 p-1.5 rounded-3xl mb-6" data-purpose="tab-navigation">
+<!-- Active Tab: Unused -->
+<button class="flex-1 py-4 bg-white rounded-[22px] text-blue-600 font-bold text-lg active-tab-shadow transition-all duration-200" data-purpose="tab-item-active">
+        未使用 (2)
+      </button>
+<!-- Inactive Tab: Used -->
+<button class="flex-1 py-4 text-gray-500 font-medium text-lg hover:text-gray-700 transition-all duration-200" data-purpose="tab-item-inactive">
+        已使用 (5)
+      </button>
+</nav>
+<!-- END: Top Tabs Navigation -->
+<!-- BEGIN: Ticket List -->
+<section class="space-y-6" data-purpose="ticket-list">
+<!-- BEGIN: Ticket Card 1 (Premium) -->
+<article class="bg-white rounded-[40px] p-8 card-shadow" data-purpose="ticket-card">
+<!-- Header Section -->
+<header class="flex justify-between items-start mb-6">
+<div class="flex flex-col gap-3">
+<span class="inline-block px-3 py-1 bg-blue-50 text-blue-500 text-xs font-bold rounded-md tracking-wider" data-purpose="badge">
+              PREMIUM ACCESS
+            </span>
+<h2 class="text-2xl font-bold text-gray-900 leading-tight">
+              【25-26雪季】6小时日场自带板滑雪票
+            </h2>
+</div>
+<span class="px-3 py-1 bg-blue-50 text-blue-600 text-sm font-medium rounded-lg" data-purpose="status-tag">
+            已取卡
+          </span>
+</header>
+<!-- Serial Number Block -->
+<div class="bg-gray-50 rounded-2xl p-5 mb-8 flex justify-between items-center" data-purpose="serial-number-container">
+<span class="text-gray-400 font-bold text-xs tracking-widest uppercase">Serial Number</span>
+<span class="text-xl font-bold text-gray-800 tracking-tight">8823 4910 2210</span>
+</div>
+<!-- Details Grid -->
+<div class="grid grid-cols-2 gap-y-8 mb-10" data-purpose="ticket-details">
+<div class="flex flex-col">
+<span class="text-gray-400 text-xs font-bold tracking-wider mb-1 uppercase">Valid Date</span>
+<span class="text-xl font-bold text-gray-900">2025-12-24</span>
+</div>
+<div class="flex flex-col text-right">
+<span class="text-gray-400 text-xs font-bold tracking-wider mb-1 uppercase">Quantity</span>
+<span class="text-xl font-bold text-gray-900">1张</span>
+</div>
+<div class="flex flex-col">
+<span class="text-gray-400 text-xs font-bold tracking-wider mb-1 uppercase">Amount</span>
+<span class="text-2xl font-bold text-blue-600">¥ 480.00</span>
+</div>
+</div>
+<!-- Action Buttons -->
+<footer class="flex gap-4" data-purpose="card-actions">
+<button class="flex-1 py-5 bg-gray-100 text-gray-600 font-bold rounded-full hover:bg-gray-200 transition-colors btn-secondary" data-purpose="cancel-button">
+            申请取消
+          </button>
+<button class="flex-1 py-5 bg-gray-100 text-gray-400 font-bold rounded-full cursor-not-allowed" data-purpose="use-now-button-disabled">
+            立即使用
+          </button>
+</footer>
+</article>
+<!-- END: Ticket Card 1 -->
+<!-- BEGIN: Ticket Card 2 (Standard) -->
+<article class="bg-white rounded-[40px] p-8 card-shadow" data-purpose="ticket-card">
+<!-- Header Section -->
+<header class="flex justify-between items-start mb-6">
+<div class="flex flex-col gap-3">
+<span class="inline-block px-3 py-1 bg-gray-100 text-gray-500 text-xs font-bold rounded-md tracking-wider" data-purpose="badge">
+              STANDARD
+            </span>
+<h2 class="text-2xl font-bold text-gray-900 leading-tight">
+              【25-26雪季】夜场畅滑雪票 (含雪具)
+            </h2>
+</div>
+<span class="px-3 py-1 bg-gray-100 text-gray-600 text-sm font-medium rounded-lg" data-purpose="status-tag">
+            待使用
+          </span>
+</header>
+<!-- Serial Number Block -->
+<div class="bg-gray-50 rounded-2xl p-5 mb-8 flex justify-between items-center" data-purpose="serial-number-container">
+<span class="text-gray-400 font-bold text-xs tracking-widest uppercase">Serial Number</span>
+<span class="text-xl font-bold text-gray-800 tracking-tight">7721 0045 1198</span>
+</div>
+<!-- Details Grid -->
+<div class="grid grid-cols-2 gap-y-8 mb-10" data-purpose="ticket-details">
+<div class="flex flex-col">
+<span class="text-gray-400 text-xs font-bold tracking-wider mb-1 uppercase">Valid Date</span>
+<span class="text-xl font-bold text-gray-900">2025-12-25</span>
+</div>
+<div class="flex flex-col text-right">
+<span class="text-gray-400 text-xs font-bold tracking-wider mb-1 uppercase">Amount</span>
+<span class="text-2xl font-bold text-gray-900">¥ 320.00</span>
+</div>
+</div>
+<!-- Action Buttons -->
+<footer class="flex gap-4" data-purpose="card-actions">
+<button class="flex-1 py-5 border border-gray-200 text-gray-700 font-bold rounded-full hover:bg-gray-50 transition-colors btn-secondary" data-purpose="cancel-button">
+            申请取消
+          </button>
+<button class="flex-1 py-5 bg-blue-600 text-white font-bold rounded-full shadow-lg shadow-blue-200 hover:bg-blue-700 transition-colors btn-primary" data-purpose="use-now-button">
+            立即使用
+          </button>
+</footer>
+</article>
+<!-- END: Ticket Card 2 -->
+</section>
+<!-- END: Ticket List -->
+</main>
+<!-- END: Main Container -->
+</body></html>
