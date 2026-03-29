@@ -1086,8 +1086,7 @@ namespace SnowmeetApi.Models
                         {
                             continue;
                         }
-                        if ((startDate == null || (rental.realStartDate != null && ((DateTime)rental.realStartDate).Date < ((DateTime)startDate).Date))
-                             && rental.start_date != null)
+                        if (startDate == null || (rental.realStartDate != null && ((DateTime)rental.realStartDate).Date < ((DateTime)startDate).Date))
                         {
                             startDate = rental.realStartDate;
                         }
