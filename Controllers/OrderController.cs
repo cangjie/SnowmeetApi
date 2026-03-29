@@ -146,7 +146,7 @@ namespace SnowmeetApi.Controllers
             bool? isTest = null, bool? isEntertain = null, bool? isPackage = null, bool? isOnCredit = null,
             bool? haveDiscount = null, string? status = null, DateTime? closeStartDate = null, DateTime? closeEndDate = null,
             bool? haveWarranty = null, string? retailType = null, string? keyword = null, bool? isSummerCare = null,
-            int? rentCategoryId = null, string? rentItemName = null, bool? useCard = null, string? cell = null)
+            int? rentCategoryId = null, string? rentItemName = null, bool? useCard = null, string? cell = null, string? rentStatus = null)
         {
             startDate = startDate == null ? DateTime.MinValue : startDate;
             endDate = endDate == null ? DateTime.MaxValue : endDate;
@@ -275,6 +275,10 @@ namespace SnowmeetApi.Controllers
             if (status != null)
             {
                 orderList = orderList.Where(o => o.orderStatus.Trim().Equals(status)).ToList();
+            }
+            if (rentStatus != null)
+            {
+                orderList = orderList.Where(o => o.rentProperties.rentStatus == rentStatus).ToList();
             }
             if (haveWarranty != null)
             {
@@ -1003,7 +1007,7 @@ namespace SnowmeetApi.Controllers
             string? payOption, string sessionType = "wechat_mini_openid", bool? isTest = null, bool? isEntertain = null,
             bool? isPackage = null, bool? isOnCredit = null, bool? haveDiscount = null, string? status = null, string? cell = null,
             bool? haveWarranty = null, string? retailType = null, string? keyword = null, bool? isSummerCare = null,
-            int? rentCategoryId = null, string? rentItemName = null, bool? useCard = null)
+            int? rentCategoryId = null, string? rentItemName = null, bool? useCard = null, string? rentStatus = null)
         {
             shop = shop == null ? null : Util.UrlDecode(shop);
             type = type == null ? null : Util.UrlDecode(type);
