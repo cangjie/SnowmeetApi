@@ -278,7 +278,7 @@ namespace SnowmeetApi.Controllers
             }
             if (rentStatus != null)
             {
-                orderList = orderList.Where(o => o.rentProperties.rentStatus == rentStatus).ToList();
+                orderList = orderList.Where(o => o.rentProperties != null &&o.rentProperties.rentStatus == rentStatus).ToList();
             }
             if (haveWarranty != null)
             {
