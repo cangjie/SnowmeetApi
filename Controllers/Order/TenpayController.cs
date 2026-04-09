@@ -689,7 +689,7 @@ namespace SnowmeetApi.Controllers
             var res = await client.ExecuteAddProfitSharingReceiverAsync(req);
             return res.IsSuccessful();
         }
-        /*
+        
         [HttpGet]
         public async Task UnFreezeAll(int mchId)
         {
@@ -709,12 +709,13 @@ namespace SnowmeetApi.Controllers
                 }
             }
         }
+        
         [HttpGet]
         public async Task ShareFinish(int paymentId, string description)
         {
             OrderPayment payment = await _db.OrderPayment.FindAsync(paymentId);
             WechatTenpayClient client = await GetClient((int)payment.mch_id);
-            WepayKey key = await _db.WepayKeys.FindAsync(payment.mch_id);
+            WepayKey key = await _db.wepayKeys.FindAsync(payment.mch_id);
             //var req = CreateProfitSharingReturnOrderRequest
             var req = new SetProfitSharingOrderUnfrozenRequest()
             {
@@ -724,7 +725,7 @@ namespace SnowmeetApi.Controllers
             };
             var res = await client.ExecuteSetProfitSharingOrderUnfrozenAsync(req);
         }
-        */
+        
         [NonAction]
         public async Task<PaymentShare> Settle(PaymentShare share)
         {

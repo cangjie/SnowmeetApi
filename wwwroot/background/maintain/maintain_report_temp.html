@@ -198,7 +198,7 @@
                     }
                     msg.data[i].id = i + 1;
                     FillItem(msg.data[i]);
-                    tData.push(msg.data[i]);
+                    //tData.push(msg.data[i]);
                     totalPaid += (msg.data[i].paidAmount - msg.data[i].refundAmount)
                     
                 }
@@ -258,7 +258,12 @@
         for (var i = 0; i < tData.length; i++) {
             lineContent = '';
             for (var j = 0; j < tHead.length; j++) {
-                lineContent += (j > 0 ? ',' : '') + tData[i][j];
+                if (j != 11){
+                    lineContent += (j > 0 ? ',' : '') + tData[i][j];
+                }
+                else{
+                    lineContent += (j > 0 ? ',' : '') + tData[i][j].name;
+                }
             }
             csvContent += lineContent + '\r\n';
         }
