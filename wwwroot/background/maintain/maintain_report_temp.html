@@ -272,7 +272,7 @@
         csvContent = csvContent.trim();
         var link = document.createElement('a');
         link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvContent);
-        link.download = encodeURIComponent('LingShou_' + formatDate(startDate) + '_' + formatDate(endDate) + '.csv');
+        link.download = encodeURIComponent('yanghu_' + formatDate(startDate) + '_' + formatDate(endDate) + '.csv');
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
