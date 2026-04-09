@@ -193,13 +193,14 @@
                 if (status != 'success') {
                     return
                 }
+                var seq = 1;
                 for (var i = 0; i < msg.data.length; i++) {
                     if (msg.data[i].paidAmount <= 0 && msg.data[i].entertain == 0){
                         continue;
                     }
-                    msg.data[i].id = i + 1;
+                    msg.data[i].id = seq;
+                    seq++;
                     FillItem(msg.data[i]);
-                    //tData.push(msg.data[i]);
                     totalPaid += (msg.data[i].paidAmount - msg.data[i].refundAmount)
                     
                 }
