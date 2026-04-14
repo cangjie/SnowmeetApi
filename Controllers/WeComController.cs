@@ -798,7 +798,7 @@ namespace SnowmeetApi.Controllers
         [NonAction]
         public async Task ExportAliData(string sheetId, string docId, string token, string batchId, string purpose, string memo)
         {
-            DateTime startDate = DateTime.Parse("2025-10-15");
+            DateTime startDate = DateTime.Parse("2025-05-01");
             List<AliDownloadFlowBill> bArr = await _db.aliDownloadFlowBill.Where(b => b.trans_date.Date >= startDate.Date && b.seq_id == null)
                 .OrderBy(b => b.trans_date).ToListAsync();
             AliDownloadFlowBill last = await _db.aliDownloadFlowBill.Where(b => b.trans_date.Date >= startDate.Date && b.seq_id != null)
