@@ -20,6 +20,7 @@ namespace SnowmeetApi.Models
         public int? item_count {get; set;}
         public string name { get; set; }
         public string description { get; set; }
+        public string? package_type { get; set; }
         public double deposit { get; set; }
         public int valid { get; set; }
         public int? staff_id { get; set; } = null;
