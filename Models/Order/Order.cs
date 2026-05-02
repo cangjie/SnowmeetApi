@@ -1291,8 +1291,9 @@ namespace SnowmeetApi.Models
         }
         [NotMapped]
         public bool needRender {get; set;} = false;
-        [NotMapped]
-        public bool? needIntercom {get; set;} = true;
+        // [NotMapped]
+        // public bool? needIntercom {get; set;} = true;
+        // 已废弃：原先用于雪板类租赁默认追加两个对讲机的逻辑，暂时停用
         [NotMapped]
         public double? rentRefund
         {

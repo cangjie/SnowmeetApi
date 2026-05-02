@@ -4286,10 +4286,11 @@ namespace SnowmeetApi.Controllers
                     item.category = await _db.rentCategory.Where(c => c.id == item.category_id).AsNoTracking().FirstOrDefaultAsync();
                 }
             }
-            if (order.needIntercom != false)
-            {
-                order = await AddInterCom(order);
-            }
+            // 已废弃：原先雪板类租赁默认追加对讲机的逻辑，暂时停用
+            // if (order.needIntercom != false)
+            // {
+            //     order = await AddInterCom(order);
+            // }
             if (order.type == "租赁")
             {
                 for (int i = 0; i < order.rentals.Count; i++)
