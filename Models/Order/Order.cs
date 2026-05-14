@@ -105,6 +105,7 @@ namespace SnowmeetApi.Models
         public double? paying_amount { get; set; } = null;
         public DateTime? update_date { get; set; } = null;
         public bool hide {get; set;} = false;
+        public bool wechat_unverified { get; set; } = false;
         [NotMapped]
         public string textColor { get; set; } = "";
         [NotMapped]

@@ -7,6 +7,12 @@ namespace SnowmeetApi.Models
     [Table("member_social_account")]
     public class MemberSocialAccount
     {
+        // 第三方 ID 类型常量（与 type 字段对照）
+        public const string TYPE_WECHAT_MINI_OPENID = "wechat_mini_openid";
+        public const string TYPE_WECHAT_UNIONID = "wechat_unionid";
+        public const string TYPE_CELL = "cell";
+        public const string TYPE_ALIPAY_PAYERID = "alipay_payerid";
+
         [Key]
         public int id { get; set; }
         public int member_id { get; set; }

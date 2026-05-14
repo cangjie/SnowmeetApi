@@ -31,6 +31,7 @@ namespace SnowmeetApi.Models
         public string? open_id { get; set; }
         public string? open_id_type {get; set;}
         public int? member_id {get; set;}
+        public bool is_proxy_pay { get; set; } = false;
         public string? app_id { get; set; }
         public string? notify { get; set; }
         public string? nonce { get; set; }
