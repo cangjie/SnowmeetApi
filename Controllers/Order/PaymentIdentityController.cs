@@ -71,7 +71,7 @@ namespace SnowmeetApi.Controllers.Order
         {
             payerType = (payerType ?? "wechat").Trim().ToLower();
             scannerId = Util.UrlDecode(scannerId ?? "").Trim();
-            var result = await _resolveStatus(paymentId, payerType, scannerId);
+            var result = await _resolveStatus(paymentId, payerType, scannerId, sessionKey);
             return Ok(new ApiResult<CheckPayerIdentityResult>
             {
                 code = result.status == "error" ? 1 : 0,
@@ -106,7 +106,7 @@ namespace SnowmeetApi.Controllers.Order
             }
             if (op0.member_id != null)
             {
-                var existing = await _resolveStatus(body.paymentId, payerType, scannerId);
+                var existing = await _resolveStatus(body.paymentId, payerType, scannerId, sessionKey);
                 return Ok(new ApiResult<CheckPayerIdentityResult>
                 {
                     code = 0,
@@ -121,18 +121,18 @@ namespace SnowmeetApi.Controllers.Order
             }
             if (action == "choose")
             {
-                return await _applyChoice(body, payerType, scannerId);
+                return await _applyChoice(body, sessionKey, payerType, scannerId);
             }
             if (action == "confirm_direct")
             {
-                return await _applyConfirmDirect(body, payerType, scannerId);
+                return await _applyConfirmDirect(body, sessionKey, payerType, scannerId);
             }
             return Ok(_err("error", "未知 action: " + action));
         }
 
         // ====== Internal: Decision Tree ======
 
-        private async Task<CheckPayerIdentityResult> _resolveStatus(int paymentId, string payerType, string scannerId)
+        private async Task<CheckPayerIdentityResult> _resolveStatus(int paymentId, string payerType, string scannerId, string sessionKey)
         {
             var result = new CheckPayerIdentityResult
             {
@@ -182,13 +182,7 @@ namespace SnowmeetApi.Controllers.Order
                 }
             }
 
-            // 3) Scanner
-            if (string.IsNullOrEmpty(scannerId))
-            {
-                result.errorCode = "scanner_id_required";
-                result.errorMessage = "缺少扫码方第三方 ID";
-                return result;
-            }
+            // 3) Scanner — 优先按 scannerId 反查；为空时退化为按 sessionKey 反查 mini_session
             string msaType = _msaTypeForPayer(payerType);
             if (msaType == null)
             {
@@ -197,7 +191,31 @@ namespace SnowmeetApi.Controllers.Order
                 return result;
             }
 
-            var scanner = await _memberHelper.GetWholeMemberByNum(scannerId, msaType);
+            Member scanner = null;
+            if (!string.IsNullOrEmpty(scannerId))
+            {
+                scanner = await _memberHelper.GetWholeMemberByNum(scannerId, msaType);
+            }
+            if (scanner == null && !string.IsNullOrEmpty(sessionKey))
+            {
+                // 兜底：用 sessionKey 反查 MiniSession → member_id（仅微信通道用 wechat_mini_openid sessionType）
+                var sk = Util.UrlDecode(sessionKey).Trim();
+                var sessionType = payerType == "alipay" ? "alipay_payerid" : "wechat_mini_openid";
+                var sess = await _db.miniSession
+                    .Where(s => s.session_key.Trim().Equals(sk)
+                                && s.session_type.Equals(sessionType)
+                                && s.valid == 1
+                                && s.expire_date >= DateTime.Now
+                                && s.member_id != null)
+                    .OrderByDescending(s => s.expire_date)
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync();
+                if (sess != null && sess.member_id != null)
+                {
+                    scanner = await _memberHelper.GetWholeMemberById((int)sess.member_id);
+                }
+            }
+
             if (scanner != null)
             {
                 result.scannerMemberId = scanner.id;
@@ -330,7 +348,7 @@ namespace SnowmeetApi.Controllers.Order
             }
 
             // 完成绑定后重新评估 status；此时 scanner 应已有 cell
-            var refreshed = await _resolveStatus(body.paymentId, payerType, scannerId);
+            var refreshed = await _resolveStatus(body.paymentId, payerType, scannerId, sessionKey);
             return Ok(new ApiResult<CheckPayerIdentityResult>
             {
                 code = refreshed.status == "error" ? 1 : 0,
@@ -340,9 +358,9 @@ namespace SnowmeetApi.Controllers.Order
         }
 
         private async Task<ActionResult<ApiResult<CheckPayerIdentityResult>>> _applyChoice(
-            ConfirmPayIdentityBody body, string payerType, string scannerId)
+            ConfirmPayIdentityBody body, string sessionKey, string payerType, string scannerId)
         {
-            var pre = await _resolveStatus(body.paymentId, payerType, scannerId);
+            var pre = await _resolveStatus(body.paymentId, payerType, scannerId, sessionKey);
             if (pre.status == "error")
             {
                 return Ok(new ApiResult<CheckPayerIdentityResult> { code = 1, message = pre.errorMessage ?? "", data = pre });
@@ -392,14 +410,14 @@ namespace SnowmeetApi.Controllers.Order
             _db.orderPayment.Entry(op).State = EntityState.Modified;
             await _db.SaveChangesAsync();
 
-            var refreshed = await _resolveStatus(body.paymentId, payerType, scannerId);
+            var refreshed = await _resolveStatus(body.paymentId, payerType, scannerId, sessionKey);
             return Ok(new ApiResult<CheckPayerIdentityResult> { code = 0, message = "", data = refreshed });
         }
 
         private async Task<ActionResult<ApiResult<CheckPayerIdentityResult>>> _applyConfirmDirect(
-            ConfirmPayIdentityBody body, string payerType, string scannerId)
+            ConfirmPayIdentityBody body, string sessionKey, string payerType, string scannerId)
         {
-            var pre = await _resolveStatus(body.paymentId, payerType, scannerId);
+            var pre = await _resolveStatus(body.paymentId, payerType, scannerId, sessionKey);
             if (pre.status == "error")
             {
                 return Ok(new ApiResult<CheckPayerIdentityResult> { code = 1, message = pre.errorMessage ?? "", data = pre });
@@ -437,7 +455,7 @@ namespace SnowmeetApi.Controllers.Order
             _db.orderPayment.Entry(op).State = EntityState.Modified;
             await _db.SaveChangesAsync();
 
-            var refreshed = await _resolveStatus(body.paymentId, payerType, scannerId);
+            var refreshed = await _resolveStatus(body.paymentId, payerType, scannerId, sessionKey);
             return Ok(new ApiResult<CheckPayerIdentityResult> { code = 0, message = "", data = refreshed });
         }
 
