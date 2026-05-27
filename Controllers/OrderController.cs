@@ -1757,6 +1757,24 @@ namespace SnowmeetApi.Controllers
             order.dealed = 1;
             order.pay_flow_status = Models.Order.PayFlowStatus.已支付.ToString();
             order.paying_amount = null;
+            // PaymentIdentity 决策时机：用户在 payment_entry 选完后仅暂存到 OrderPayment（member_id/is_proxy_pay），
+            // Order.member_id 与 wechat_unverified 在此处支付真正成功后才同步，避免中途放弃导致归属错乱。
+            if (paymentId != null)
+            {
+                OrderPayment paidOp = await _db.orderPayment.Where(p => p.id == paymentId.Value)
+                    .AsNoTracking().FirstOrDefaultAsync();
+                if (paidOp != null)
+                {
+                    if (paidOp.is_proxy_pay == false && paidOp.member_id != null && order.member_id == null)
+                    {
+                        order.member_id = paidOp.member_id;
+                    }
+                    if (paidOp.pay_method != null && paidOp.pay_method.Trim() == "支付宝" && !order.wechat_unverified)
+                    {
+                        order.wechat_unverified = true;
+                    }
+                }
+            }
             await UpdateOrder(order, null, null, "支付成功");
             CoreDataModLog orderSucLog = CoreDataModLog.CreateManualLog("Order", "", order.id, "租赁支付回调",
                 null, null, null, order.type, "支付成功，检查订单类型");

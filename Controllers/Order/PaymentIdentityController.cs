@@ -388,25 +388,19 @@ namespace SnowmeetApi.Controllers.Order
             }
 
             int scannerMemberId = (int)pre.scannerMemberId;
+            // 决策时机迁回 notify：此处只在 OrderPayment 上写付款方意图，
+            // Order.member_id / wechat_unverified 由 DealSuccessPaidOrder 在支付成功回调时同步
             if (choice == "self")
             {
-                order.member_id = scannerMemberId;
                 op.member_id = scannerMemberId;
                 op.is_proxy_pay = false;
             }
             else // proxy
             {
-                // order.member_id 不变
                 op.member_id = scannerMemberId;
                 op.is_proxy_pay = true;
             }
-            if (payerType == "alipay")
-            {
-                order.wechat_unverified = true;
-            }
             op.update_date = DateTime.Now;
-            order.update_date = DateTime.Now;
-            _db.order.Entry(order).State = EntityState.Modified;
             _db.orderPayment.Entry(op).State = EntityState.Modified;
             await _db.SaveChangesAsync();
 
@@ -439,19 +433,11 @@ namespace SnowmeetApi.Controllers.Order
             }
 
             int scannerMemberId = (int)pre.scannerMemberId;
-            if (pre.status == "direct_to_scanner")
-            {
-                order.member_id = scannerMemberId;
-            }
+            // 决策时机迁回 notify：此处只在 OrderPayment 上写付款方意图，
+            // Order.member_id / wechat_unverified 由 DealSuccessPaidOrder 在支付成功回调时同步
             op.member_id = scannerMemberId;
             op.is_proxy_pay = false;
-            if (payerType == "alipay")
-            {
-                order.wechat_unverified = true;
-            }
             op.update_date = DateTime.Now;
-            order.update_date = DateTime.Now;
-            _db.order.Entry(order).State = EntityState.Modified;
             _db.orderPayment.Entry(op).State = EntityState.Modified;
             await _db.SaveChangesAsync();
 
