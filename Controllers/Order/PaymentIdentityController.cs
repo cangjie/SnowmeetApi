@@ -223,11 +223,8 @@ namespace SnowmeetApi.Controllers.Order
             // 仅基于 order.member_id (订单归属) + scannerMemberId 决策。
             // op.member_id 是「付款方意图」,只在 _applyChoice/_applyConfirmDirect 当次返回时强制 direct,
             // 不在 _resolveStatus 里参与判断 —— 否则用户点错后刷新就无法重新选择。
-            if (!result.scannerHasCell)
-            {
-                result.status = "phone_required";
-                return result;
-            }
+            // 注意: scannerHasCell == false 不再硬阻断 (改为前端在「敬请支付」按钮上软提示弹窗,
+            // 顾客可选择「授权手机号」或「跳过,直接支付」)。本字段仍写入响应供前端判定。
             if (order.member_id == null)
             {
                 result.status = "direct_to_scanner";

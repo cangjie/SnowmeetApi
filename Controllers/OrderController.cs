@@ -2114,8 +2114,9 @@ namespace SnowmeetApi.Controllers
                 });
             }
             Models.Order order = await GetOrder(payment.order_id);
+            // 游客(member==null)允许查看待支付订单准备付款;但已支付订单仅对相关会员开放
             if (payment.status.Trim() == OrderPayment.PaymentStatus.支付成功.ToString()
-             && order.member_id != member.id && payment.member_id != member.id)
+             && (member == null || (order.member_id != member.id && payment.member_id != member.id)))
             {
                 return Ok(new ApiResult<Models.Order?>()
                 {
