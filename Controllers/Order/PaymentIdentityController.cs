@@ -92,7 +92,8 @@ namespace SnowmeetApi.Controllers.Order
             var scannerId = (body.scannerId ?? "").Trim();
             var action = (body.action ?? "").Trim();
 
-            // 幂等：已锚定身份且仍待支付 → 直接返既有状态
+            // op 守卫：必须存在且未支付。允许覆盖已有 op.member_id（用户改主意）—
+            // 因为「订单归属」由 DealSuccessPaidOrder 在支付成功后才同步，付款方意图在 op.status='待支付' 期间始终可重写。
             var op0 = await _db.orderPayment
                 .Where(p => p.id == body.paymentId && p.valid == 1)
                 .AsNoTracking().FirstOrDefaultAsync();
@@ -103,16 +104,6 @@ namespace SnowmeetApi.Controllers.Order
             if (op0.status != "待支付")
             {
                 return Ok(_err("payment_closed", "订单已支付或已取消"));
-            }
-            if (op0.member_id != null)
-            {
-                var existing = await _resolveStatus(body.paymentId, payerType, scannerId, sessionKey);
-                return Ok(new ApiResult<CheckPayerIdentityResult>
-                {
-                    code = 0,
-                    message = "已锚定身份，幂等返回",
-                    data = existing
-                });
             }
 
             if (action == "submit_phone")
@@ -229,14 +220,9 @@ namespace SnowmeetApi.Controllers.Order
             }
 
             // 4) Status
-            // 本扫码方此前已确认过付款方意图（_applyChoice/_applyConfirmDirect 写了 op.member_id = 自己）
-            // → 跳过决策直接 direct。Order.member_id 不动，订单归属仍由 DealSuccessPaidOrder 在支付成功后同步。
-            // 注意：必须 scanner-aware 判定。若 op.member_id 是「上一个扫码方」遗留意图，当前新扫码方仍要走原决策树。
-            if (op.member_id != null && result.scannerMemberId != null && op.member_id == result.scannerMemberId)
-            {
-                result.status = "direct";
-                return result;
-            }
+            // 仅基于 order.member_id (订单归属) + scannerMemberId 决策。
+            // op.member_id 是「付款方意图」,只在 _applyChoice/_applyConfirmDirect 当次返回时强制 direct,
+            // 不在 _resolveStatus 里参与判断 —— 否则用户点错后刷新就无法重新选择。
             if (!result.scannerHasCell)
             {
                 result.status = "phone_required";
@@ -412,7 +398,10 @@ namespace SnowmeetApi.Controllers.Order
             _db.orderPayment.Entry(op).State = EntityState.Modified;
             await _db.SaveChangesAsync();
 
+            // 本次点击的响应强制 direct，让前端 onIdentityRefreshed 自动调起支付。
+            // 不污染 _resolveStatus：用户若取消支付后刷新，CheckPayerIdentity 仍会按 order.member_id 重新决策，可重选。
             var refreshed = await _resolveStatus(body.paymentId, payerType, scannerId, sessionKey);
+            refreshed.status = "direct";
             return Ok(new ApiResult<CheckPayerIdentityResult> { code = 0, message = "", data = refreshed });
         }
 
@@ -449,7 +438,9 @@ namespace SnowmeetApi.Controllers.Order
             _db.orderPayment.Entry(op).State = EntityState.Modified;
             await _db.SaveChangesAsync();
 
+            // 同 _applyChoice：本次点击响应强制 direct，刷新后 _resolveStatus 仍可重新决策
             var refreshed = await _resolveStatus(body.paymentId, payerType, scannerId, sessionKey);
+            refreshed.status = "direct";
             return Ok(new ApiResult<CheckPayerIdentityResult> { code = 0, message = "", data = refreshed });
         }
 
