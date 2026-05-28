@@ -1589,6 +1589,25 @@ namespace SnowmeetApi.Controllers
                 await _db.SaveChangesAsync();
             }
 
+            // 身份验证流程 (PaymentIdentity/ConfirmPayIdentity) 已 pre-set op.member_id = 扫码方，
+            // 但 open_id 还是订单原会员的(或 null)；此处必须补写 open_id + out_trade_no 并清空 prepay 字段，
+            // 否则 TenpayRequest 拿错的 openid 申请 prepay，wx.requestPayment 会因 openid 不匹配弹不出窗
+            if (payment.member_id == member.id
+                && member.wechatMiniOpenId != null
+                && (payment.open_id == null
+                    || payment.open_id.Trim() != member.wechatMiniOpenId.Trim()))
+            {
+                payment.open_id = member.wechatMiniOpenId.Trim();
+                payment.out_trade_no = outTradeNo.Trim();
+                payment.prepay_id = null;
+                payment.timestamp = null;
+                payment.nonce = null;
+                payment.sign = null;
+                payment.update_date = DateTime.Now;
+                _db.orderPayment.Entry(payment).State = EntityState.Modified;
+                await _db.SaveChangesAsync();
+            }
+
             if (payment.prepay_id == null)
             {
                 TenpayController _tenHelper = new TenpayController(_db, _config, _http);
