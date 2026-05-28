@@ -229,6 +229,14 @@ namespace SnowmeetApi.Controllers.Order
             }
 
             // 4) Status
+            // 付款方意图已锚定（_applyChoice / _applyConfirmDirect 已写 op.member_id）→ direct
+            // Why: 决策时机迁回 notify 后，order.member_id 仅在支付成功回调时同步；
+            // 重算 status 必须看 op.member_id，否则点完「正常支付/替人代付」会一直停在 choose_identity
+            if (op.member_id != null)
+            {
+                result.status = "direct";
+                return result;
+            }
             if (!result.scannerHasCell)
             {
                 result.status = "phone_required";
