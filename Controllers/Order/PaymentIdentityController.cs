@@ -229,10 +229,10 @@ namespace SnowmeetApi.Controllers.Order
             }
 
             // 4) Status
-            // 付款方意图已锚定（_applyChoice / _applyConfirmDirect 已写 op.member_id）→ direct
-            // Why: 决策时机迁回 notify 后，order.member_id 仅在支付成功回调时同步；
-            // 重算 status 必须看 op.member_id，否则点完「正常支付/替人代付」会一直停在 choose_identity
-            if (op.member_id != null)
+            // 本扫码方此前已确认过付款方意图（_applyChoice/_applyConfirmDirect 写了 op.member_id = 自己）
+            // → 跳过决策直接 direct。Order.member_id 不动，订单归属仍由 DealSuccessPaidOrder 在支付成功后同步。
+            // 注意：必须 scanner-aware 判定。若 op.member_id 是「上一个扫码方」遗留意图，当前新扫码方仍要走原决策树。
+            if (op.member_id != null && result.scannerMemberId != null && op.member_id == result.scannerMemberId)
             {
                 result.status = "direct";
                 return result;
