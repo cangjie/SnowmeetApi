@@ -1784,7 +1784,10 @@ namespace SnowmeetApi.Controllers
                     .AsNoTracking().FirstOrDefaultAsync();
                 if (paidOp != null)
                 {
-                    if (paidOp.is_proxy_pay == false && paidOp.member_id != null && order.member_id == null)
+                    // 「正常支付（订单转归我）」语义:无论订单原本有无 member_id,都同步为付款方
+                    // 「替人代付（订单仍归原会员）」由 is_proxy_pay==true 拦截,不会误转
+                    // scanner == order 原归属 时,paidOp.member_id == order.member_id,赋值无副作用
+                    if (paidOp.is_proxy_pay == false && paidOp.member_id != null)
                     {
                         order.member_id = paidOp.member_id;
                     }
