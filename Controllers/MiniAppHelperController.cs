@@ -241,12 +241,39 @@ namespace SnowmeetApi.Controllers
                     .Include(m => m.memberSocialAccounts).ToListAsync();
                 if (memberList.Count <= 0)
                 {
-                    result.code = 1;
-                    result.message = "获取会员信息失败";
-                    result.data = null;
-                    return Ok(result);
+                    // 脏数据自我恢复:MSA 表指向 memberId 但 member 表查不到 → 自动建新会员,
+                    // 避免给前端返 code=1 + toast「获取会员信息失败」导致页面卡死(loginPromiseNew 永远 pending)
+                    Console.WriteLine($"MemberLogin: orphaned memberId {memberId} (openId={openId}), auto-creating new member");
+                    member = new Member();
+                    if (openId != null && openId.Trim().Length > 0)
+                    {
+                        member.memberSocialAccounts.Add(new MemberSocialAccount()
+                        {
+                            type = "wechat_mini_openid",
+                            num = openId.Trim(),
+                            valid = 1,
+                            memo = "",
+                            member_id = member.id
+                        });
+                    }
+                    if (unionId != null && unionId.Trim().Length > 0)
+                    {
+                        member.memberSocialAccounts.Add(new MemberSocialAccount()
+                        {
+                            type = "wechat_unionid",
+                            num = unionId.Trim(),
+                            valid = 1,
+                            memo = "",
+                            member_id = member.id
+                        });
+                    }
+                    await _db.member.AddAsync(member);
+                    await _db.SaveChangesAsync();
                 }
-                member = memberList[0];
+                else
+                {
+                    member = memberList[0];
+                }
                 if (member.wechatMiniOpenId == null)
                 {
                     MemberSocialAccount msa = new MemberSocialAccount()
