@@ -339,17 +339,12 @@ namespace SnowmeetApi.Controllers.Order
                     }
                     else
                     {
-                        // 手机号已绑别人 + scanner 是 stub(无 cell) → 迁移 scanner 上同 num+type MSA 给 phoneOwner
-                        // 2026-05-29: 删除 alreadyBoundSameType 拒绝 + 加 stub MSA invalidation
-                        await _addMsa(phoneOwner.id, scannerId, msaType);
-                        await EnsureUnionIdMsa(phoneOwner.id, phoneOwner);
-                        // 失效 stub 上的 openid+unionid MSA,避免下次 MemberLogin 还查回 stub
-                        await _invalidateMsa(scannerMember.id, scannerId, msaType);
-                        if (!string.IsNullOrEmpty(sessUnionid))
-                        {
-                            await _invalidateMsa(scannerMember.id, sessUnionid, MemberSocialAccount.TYPE_WECHAT_UNIONID);
-                        }
-                        finalMemberId = phoneOwner.id;
+                        // 手机号已绑别人 + scanner 当前 openid 已经关联了自己的 member →
+                        // 2026-05-29 修: 优先用 scanner 本身的 member, 不动 phoneOwner, 不失效 scanner 的 openid/unionid MSA
+                        //   (之前会把 scanner 的 openid/unionid MSA invalidate 然后迁移到 phoneOwner — 这个行为是错的:
+                        //    user 反馈"应该是第二次刷新后就可以拿到会员 ID 了, 用这个会员 ID 支付呀")
+                        // cell 仍归 phoneOwner, scanner 这次不绑 cell — 下次 user 进来用 scanner.id 直接支付即可
+                        finalMemberId = scannerMember.id;
                     }
                 }
                 else
