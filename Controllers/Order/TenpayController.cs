@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Newtonsoft.Json;
 using SKIT.FlurlHttpClient.Wechat.TenpayV3;
 using SKIT.FlurlHttpClient.Wechat.TenpayV3.Models;
 using SKIT.FlurlHttpClient.Wechat.TenpayV3.Settings;
@@ -127,6 +128,13 @@ namespace SnowmeetApi.Controllers
                 Detail = details.Count == 0 ? null : detail
             };
             var response = await client.ExecuteCreatePayTransactionJsapiAsync(request);
+            // 2026-05-29: 把 GenerateParameters 移到 PrepayId 检查后,避免微信返 PrepayId=null 时
+            // 抛 ArgumentNullException(latent bug)。失败时把响应序列化到日志便于排查微信侧拒绝原因。
+            if (response == null || response.PrepayId == null || response.PrepayId.Trim().Equals(""))
+            {
+                Console.WriteLine($"TenpayRequest: PrepayId null/empty for payment {payment.id}, out_trade_no={payment.out_trade_no}, open_id={payment.open_id}, response={JsonConvert.SerializeObject(response)}");
+                return null;
+            }
             var paraMap = client.GenerateParametersForJsapiPayRequest(request.AppId, response.PrepayId);
             if (response != null && response.PrepayId != null && !response.PrepayId.Trim().Equals(""))
             {
@@ -265,6 +273,13 @@ namespace SnowmeetApi.Controllers
 
 
             var response = await client.ExecuteCreatePayTransactionJsapiAsync(request);
+            // 2026-05-29: 把 GenerateParameters 移到 PrepayId 检查后,避免微信返 PrepayId=null 时
+            // 抛 ArgumentNullException(latent bug)。失败时把响应序列化到日志便于排查微信侧拒绝原因。
+            if (response == null || response.PrepayId == null || response.PrepayId.Trim().Equals(""))
+            {
+                Console.WriteLine($"TenpayRequest: PrepayId null/empty for payment {payment.id}, out_trade_no={payment.out_trade_no}, open_id={payment.open_id}, response={JsonConvert.SerializeObject(response)}");
+                return null;
+            }
             var paraMap = client.GenerateParametersForJsapiPayRequest(request.AppId, response.PrepayId);
             if (response != null && response.PrepayId != null && !response.PrepayId.Trim().Equals(""))
             {

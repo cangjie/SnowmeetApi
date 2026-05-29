@@ -1610,6 +1610,17 @@ namespace SnowmeetApi.Controllers
 
             if (payment.prepay_id == null)
             {
+                // 2026-05-29: 强制刷新 out_trade_no 到新算的值再申请 prepay。
+                // 防止三个 if 分支(1551/1560/1595)都没命中时,用 DB 里旧的 out_trade_no 申请 → 微信判重复 → PrepayId=null → crash。
+                // 例如 PaymentIdentity 已 pre-set op.member_id = scanner 且 op.open_id 已对得上时, 三个分支都跳过, 但 prepay_id 因为之前清过仍是 null,
+                // 这时申请用的 out_trade_no 是上一次失败/重发的旧值, 必然撞重复。
+                if (payment.out_trade_no != outTradeNo)
+                {
+                    payment.out_trade_no = outTradeNo;
+                    payment.update_date = DateTime.Now;
+                    _db.orderPayment.Entry(payment).State = EntityState.Modified;
+                    await _db.SaveChangesAsync();
+                }
                 TenpayController _tenHelper = new TenpayController(_db, _config, _http);
                 payment = await _tenHelper.TenpayRequest(payment, order, payment.need_share == 1 ? true : false);
             }
