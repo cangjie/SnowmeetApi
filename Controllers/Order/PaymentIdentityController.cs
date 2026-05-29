@@ -558,7 +558,8 @@ namespace SnowmeetApi.Controllers.Order
             {
                 real_name = "",
                 gender = "",
-                source = "支付前身份验证"
+                source = "支付前身份验证",
+                valid = 1   // 显式设值,不依赖 model 默认(某些 EF/DB schema 组合下默认值落库为 0)
             };
             await _db.member.AddAsync(member);
             await _db.SaveChangesAsync();

@@ -345,7 +345,9 @@ namespace SnowmeetApi.Controllers
                     id = 0,
                     member_id = memberId,
                     type = "cell",
-                    num = num.Trim()
+                    num = num.Trim(),
+                    valid = 1   // 2026-05-29 修: 之前漏设导致绑定的 cell MSA 落库为 valid=0
+                                //   → cell 查询不到 → 用户反复授权手机号但 scannerHasCell 始终 false
                 };
                 await _db.memberSocialAccount.AddAsync(msa);
             }
