@@ -187,10 +187,16 @@ namespace SnowmeetApi.Controllers
                 {
                     memberId = msaList[0].member_id;
                 }
-                SocialAccountForJob jobAccount = await _db.socialAccountForJob.Where(s => s.wechat_mini_openid == openId).AsNoTracking().FirstOrDefaultAsync();
-                if (jobAccount != null)
+                // 2026-05-29 修: 仅当 unionid 反查无果时,再用 social_account_for_job 兜底。
+                // 之前是无条件覆盖 → social_account_for_job 里存在指向死会员的脏数据(典型 id=55 指 member_id=40649,
+                // 该会员早已删除),会把刚 PaymentIdentity 建的真实会员(如 41104)立刻打回 null,触发下方孤儿清理。
+                if (memberId == null)
                 {
-                    memberId = jobAccount.member_id;
+                    SocialAccountForJob jobAccount = await _db.socialAccountForJob.Where(s => s.wechat_mini_openid == openId).AsNoTracking().FirstOrDefaultAsync();
+                    if (jobAccount != null)
+                    {
+                        memberId = jobAccount.member_id;
+                    }
                 }
             }
             if (memberId == null)
@@ -255,44 +261,10 @@ namespace SnowmeetApi.Controllers
             result.data = sessionObj;
             //_db.member.Entry(member).State = EntityState.Detached;
             //await _db.SaveChangesAsync();
-            try
-            {
-                List<SnowmeetApi.Models.MemberSocialAccount> oldMsaList = await _db.memberSocialAccount
-                    .Where(m => m.num == openId && m.member_id != memberId && m.valid == 1)
-                    .AsNoTracking().ToListAsync();
-                for (int i = 0; i < oldMsaList.Count; i++)
-                {
-                    int oldMemberId = oldMsaList[i].member_id;
-                    List<SnowmeetApi.Models.MemberSocialAccount> delMsaList = await _db.memberSocialAccount
-                        .Where(m => m.member_id == oldMemberId).AsNoTracking().ToListAsync();
-                    SnowmeetApi.Models.Member delMember = await _db.member.Where(m => m.id == oldMemberId).AsNoTracking().FirstOrDefaultAsync();
-                    if (delMember != null)
-                    {
-                        delMember.valid = 0;
-                        delMember.update_date = DateTime.Now;
-                        _db.member.Entry(delMember).State = EntityState.Modified;
-                    }
-                    for (int j = 0; j < delMsaList.Count; j++)
-                    {
-                        delMsaList[j].valid = 0;
-                        delMsaList[j].update_date = DateTime.Now;
-                        _db.memberSocialAccount.Entry(delMsaList[j]).State = EntityState.Modified;
-                    }
-                    List<SnowmeetApi.Models.Order> moveOrders = await _db.order.Where(o => o.member_id == oldMemberId).AsNoTracking().ToListAsync();
-                    for (int j = 0; j < moveOrders.Count; j++)
-                    {
-                        moveOrders[j].member_id = memberId;
-                        moveOrders[j].update_date = DateTime.Now;
-                        _db.order.Entry(moveOrders[j]);
-                    }
-                }
-                
-            }
-            catch
-            {
-                
-            }
-            await _db.SaveChangesAsync();
+            // 2026-05-29 删除「孤儿清理」整段(原 try/catch 块): 当 openid 关联到当前 memberId 之外的会员时,
+            // 把该会员 valid=0 + MSA 全部 valid=0 + 订单转移到 memberId。这段与「scanner 优先,不动 MSA」
+            // 原则直接冲突,会把刚 PaymentIdentity 建的真实会员立刻打回失效,触发新一轮散客分支建会员。
+            // 复现案例: 41104 → MemberLogin 触发后被 invalidate → 散客分支建 41105 → 下次刷新再杀一次。
             // 返回前缩 memberSocialAccounts 仅留 cell(优化网络);未注册 user 时 member 为 null,跳过
             if (member != null)
             {
