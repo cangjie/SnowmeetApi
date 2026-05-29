@@ -2101,7 +2101,16 @@ namespace SnowmeetApi.Controllers
             string sessionKey, string sessionType = "wechat_mini_openid")
         {
             MemberController _memberHelper = new MemberController(_db, _config);
-            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
+            // 散客 / sessionKey 失效 / 解析失败时不应抛 500 阻塞查待支付单。下方 member==null 兜底已就位。
+            Member member = null;
+            try
+            {
+                member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"GetMemberBySessionKey failed for paymentId={paymentId}: {ex.Message}");
+            }
 
             OrderPayment payment = await _db.orderPayment.Where(p => p.id == paymentId).AsNoTracking().FirstOrDefaultAsync();
             if (payment == null || payment.valid == 0)
