@@ -269,73 +269,102 @@ namespace SnowmeetApi.Controllers.Order
                 return Ok(_err("unsupported_payer_type", "不支持的支付通道: " + payerType));
             }
 
+            // 2026-05-29: 从 mini_session 反查本次扫码方的 openid+unionid。
+            // MemberLogin 不再自动建 stub 后,前端 globalData.member 可能为 null →
+            // 前端传的 scannerId 可能是空字符串,得用 session 里的 wechat_openid 兜底。
+            var (sessOpenid, sessUnionid, sess) = await _loadSessionContext(sessionKey);
+            if (string.IsNullOrEmpty(scannerId) && !string.IsNullOrEmpty(sessOpenid))
+            {
+                scannerId = sessOpenid;
+            }
+
             // 已绑同手机号的会员（不限当前 scanner）
             var phoneOwner = await _memberHelper.GetWholeMemberByNum(phone, MemberSocialAccount.TYPE_CELL);
             // 当前 scanner 已绑的会员（按 openid/payerid 找）
-            var scannerMember = await _memberHelper.GetWholeMemberByNum(scannerId, msaType);
+            var scannerMember = string.IsNullOrEmpty(scannerId)
+                ? null
+                : await _memberHelper.GetWholeMemberByNum(scannerId, msaType);
 
             int finalMemberId;
 
+            // helper local: 若 owner 没有当前 unionid MSA 则补一条(unionid 是微信跨小程序/跨设备的稳定标识,
+            // 长期价值高,本次建会员/绑会员都顺手补全)
+            async Task EnsureUnionIdMsa(int ownerMemberId, Member ownerMember)
+            {
+                if (payerType != "wechat" || string.IsNullOrEmpty(sessUnionid)) return;
+                bool hasUnionid = ownerMember != null && ownerMember.memberSocialAccounts != null
+                    && ownerMember.memberSocialAccounts.Any(m => m.valid == 1
+                        && m.type.Trim().Equals(MemberSocialAccount.TYPE_WECHAT_UNIONID)
+                        && m.num.Trim().Equals(sessUnionid));
+                if (!hasUnionid)
+                {
+                    await _addMsa(ownerMemberId, sessUnionid, MemberSocialAccount.TYPE_WECHAT_UNIONID);
+                }
+            }
+
             if (scannerMember == null)
             {
-                // 扫码方还未绑任何会员
+                // 扫码方未绑会员(MemberLogin 不再建 stub 后,新流程下散客都会走这里)
                 if (phoneOwner != null)
                 {
-                    // 手机号已被另一会员认证
-                    // 当前是 wechat/alipay → 看该会员是否已绑同类
-                    bool alreadyBoundSameType = phoneOwner.memberSocialAccounts != null
-                        && phoneOwner.memberSocialAccounts.Any(m => m.valid == 1 && m.type.Trim().Equals(msaType));
-                    if (alreadyBoundSameType)
-                    {
-                        return Ok(_err(payerType == "alipay" ? "alipay_conflict" : "wechat_conflict",
-                            "该手机号已绑其他账户，请换号或换" + (payerType == "alipay" ? "支付宝" : "微信")));
-                    }
-                    // 把当前 openid/payerid 链到该会员
+                    // 手机号已被另一会员认证 → 把当前 openid+unionid 链到 phoneOwner
+                    // 2026-05-29: 删除 alreadyBoundSameType 拒绝逻辑 — 一人多设备共享会员是合理的
+                    // (微信 getPhoneNumber 拿到的 cell 已被系统认证,user 能授权说明掌握该手机号)
                     await _addMsa(phoneOwner.id, scannerId, msaType);
+                    await EnsureUnionIdMsa(phoneOwner.id, phoneOwner);
                     finalMemberId = phoneOwner.id;
                 }
                 else
                 {
-                    // 全新顾客 → 注册新会员 + 两条 MSA
-                    finalMemberId = await _createNewMember(phone, scannerId, msaType);
+                    // 全新顾客 → 注册新会员 + cell + openid + (unionid)MSA
+                    finalMemberId = await _createNewMember(phone, scannerId, msaType, sessUnionid);
                 }
             }
             else
             {
-                // 扫码方已有会员
+                // 扫码方已绑会员(过渡期场景:历史脏数据 stub 仍存在,或 user 早期注册过的真实会员)
                 if (string.IsNullOrEmpty(scannerMember.cell))
                 {
                     if (phoneOwner == null)
                     {
-                        // 手机号未被认证 → 绑到 scannerMember
+                        // 手机号未被绑过 → 绑给 scannerMember(补 cell)
                         await _memberHelper.BindMemberMainCellNum(scannerMember.id, phone, "支付前身份验证", null);
+                        await EnsureUnionIdMsa(scannerMember.id, scannerMember);
                         finalMemberId = scannerMember.id;
                     }
                     else if (phoneOwner.id == scannerMember.id)
                     {
-                        // 手机号已绑同一会员（理论上 scannerMember.cell 应非空，这里兜底）
+                        // 手机号已绑同一会员(理论上 scannerMember.cell 应非空,这里兜底)
                         finalMemberId = scannerMember.id;
                     }
                     else
                     {
-                        // 手机号已绑另一会员 — PRD 1.4.1 冲突规则：换号或换通道
-                        bool alreadyBoundSameType = phoneOwner.memberSocialAccounts != null
-                            && phoneOwner.memberSocialAccounts.Any(m => m.valid == 1 && m.type.Trim().Equals(msaType));
-                        if (alreadyBoundSameType)
-                        {
-                            return Ok(_err(payerType == "alipay" ? "alipay_conflict" : "wechat_conflict",
-                                "该手机号已绑其他账户，请换号或换" + (payerType == "alipay" ? "支付宝" : "微信")));
-                        }
-                        // 把当前 openid/payerid 链到该会员
+                        // 手机号已绑别人 + scanner 是 stub(无 cell) → 迁移 scanner 上同 num+type MSA 给 phoneOwner
+                        // 2026-05-29: 删除 alreadyBoundSameType 拒绝 + 加 stub MSA invalidation
                         await _addMsa(phoneOwner.id, scannerId, msaType);
+                        await EnsureUnionIdMsa(phoneOwner.id, phoneOwner);
+                        // 失效 stub 上的 openid+unionid MSA,避免下次 MemberLogin 还查回 stub
+                        await _invalidateMsa(scannerMember.id, scannerId, msaType);
+                        if (!string.IsNullOrEmpty(sessUnionid))
+                        {
+                            await _invalidateMsa(scannerMember.id, sessUnionid, MemberSocialAccount.TYPE_WECHAT_UNIONID);
+                        }
                         finalMemberId = phoneOwner.id;
                     }
                 }
                 else
                 {
-                    // scannerMember 已有 cell → 走原 scanner
+                    // scannerMember 已有 cell → 走原 scanner(已是完整会员)
                     finalMemberId = scannerMember.id;
                 }
+            }
+
+            // 把 mini_session 的 member_id 指向 finalMemberId,这样下次 MemberLogin 之前的 session 反查可以直接拿到
+            if (sess != null && sess.member_id != finalMemberId)
+            {
+                sess.member_id = finalMemberId;
+                _db.miniSession.Entry(sess).State = EntityState.Modified;
+                await _db.SaveChangesAsync();
             }
 
             // 完成绑定后重新评估 status；此时 scanner 应已有 cell
@@ -412,7 +441,26 @@ namespace SnowmeetApi.Controllers.Order
             }
             if (pre.scannerMemberId == null)
             {
-                return Ok(_err("scanner_not_registered", "扫码方尚未注册会员，请先验证手机号"));
+                // 2026-05-29: 散客拒绝授权手机号但要继续支付 → 用 sessionKey 反查 openid+unionid,自动建会员(无 cell)
+                // MemberLogin 不再建 stub 后,这里成为「不绑手机号也建会员」的唯一入口
+                var (sessOpenidAuto, sessUnionidAuto, sessAuto) = await _loadSessionContext(sessionKey);
+                if (sessAuto == null || string.IsNullOrEmpty(sessOpenidAuto))
+                {
+                    return Ok(_err("session_not_found", "登录失效,请退出小程序重进"));
+                }
+                string msaTypeAuto = _msaTypeForPayer(payerType);
+                if (msaTypeAuto == null)
+                {
+                    return Ok(_err("unsupported_payer_type", "不支持的支付通道: " + payerType));
+                }
+                var newMemberId = await _createNewMember(null, sessOpenidAuto, msaTypeAuto, sessUnionidAuto);
+                sessAuto.member_id = newMemberId;
+                _db.miniSession.Entry(sessAuto).State = EntityState.Modified;
+                await _db.SaveChangesAsync();
+                pre.scannerMemberId = newMemberId;
+                pre.scannerHasCell = false;
+                // 同步 scannerId 用于下方 _resolveStatus 再算时能找到这个新会员
+                if (string.IsNullOrEmpty(scannerId)) scannerId = sessOpenidAuto;
             }
             if (pre.status != "direct" && pre.status != "direct_to_scanner")
             {
@@ -502,7 +550,9 @@ namespace SnowmeetApi.Controllers.Order
             await _db.SaveChangesAsync();
         }
 
-        private async Task<int> _createNewMember(string phone, string scannerId, string msaType)
+        // 2026-05-29: phone 可空(拒绝授权场景);unionId 可空(无微信 unionid 时)
+        // MemberLogin 重构后此函数成为**唯一**建会员入口,scannerId+unionId 都从 mini_session 反查
+        private async Task<int> _createNewMember(string? phone, string scannerId, string msaType, string? unionId = null)
         {
             var member = new Member
             {
@@ -513,9 +563,59 @@ namespace SnowmeetApi.Controllers.Order
             await _db.member.AddAsync(member);
             await _db.SaveChangesAsync();
 
-            await _addMsa(member.id, phone, MemberSocialAccount.TYPE_CELL);
-            await _addMsa(member.id, scannerId, msaType);
+            if (!string.IsNullOrEmpty(phone))
+            {
+                await _addMsa(member.id, phone, MemberSocialAccount.TYPE_CELL);
+            }
+            if (!string.IsNullOrEmpty(scannerId))
+            {
+                await _addMsa(member.id, scannerId, msaType);
+            }
+            if (!string.IsNullOrEmpty(unionId))
+            {
+                await _addMsa(member.id, unionId, MemberSocialAccount.TYPE_WECHAT_UNIONID);
+            }
             return member.id;
+        }
+
+        // 用 sessionKey 反查 mini_session,取出本次扫码方的 openid+unionid。
+        // 2026-05-29 新加: MemberLogin 不再建 stub,未注册 user 的 openid+unionid 暂存在 mini_session,
+        // PaymentIdentity 流程需要这俩字段建会员(_submitPhone 散客分支 / _applyConfirmDirect 散客分支)。
+        private async Task<(string? openid, string? unionid, MiniSession? session)> _loadSessionContext(string sessionKey)
+        {
+            if (string.IsNullOrEmpty(sessionKey)) return (null, null, null);
+            var sk = Util.UrlDecode(sessionKey).Trim();
+            var sess = await _db.miniSession
+                .Where(s => s.session_key.Trim().Equals(sk)
+                            && s.valid == 1
+                            && s.expire_date >= DateTime.Now)
+                .OrderByDescending(s => s.expire_date)
+                .FirstOrDefaultAsync();
+            return (sess?.wechat_openid, sess?.wechat_unionid, sess);
+        }
+
+        // 把 member 上指定 num+type 的 valid=1 MSA 全部 valid=0。
+        // 用于 _submitPhone 「stub→phoneOwner 迁移」分支:scanner stub 上同 num+type MSA 失效,
+        // 避免下次 MemberLogin(若有)再查回 stub。
+        private async Task _invalidateMsa(int memberId, string num, string type)
+        {
+            if (string.IsNullOrEmpty(num)) return;
+            var list = await _db.memberSocialAccount
+                .Where(m => m.member_id == memberId
+                            && m.num.Trim().Equals(num.Trim())
+                            && m.type.Trim().Equals(type)
+                            && m.valid == 1)
+                .ToListAsync();
+            foreach (var m in list)
+            {
+                m.valid = 0;
+                m.update_date = DateTime.Now;
+                _db.memberSocialAccount.Entry(m).State = EntityState.Modified;
+            }
+            if (list.Count > 0)
+            {
+                await _db.SaveChangesAsync();
+            }
         }
 
         private string _msaTypeForPayer(string payerType)

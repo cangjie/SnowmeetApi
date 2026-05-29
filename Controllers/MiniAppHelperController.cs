@@ -203,130 +203,46 @@ namespace SnowmeetApi.Controllers
                     memberId = msaList[0].member_id;
                 }
             }
-            Member member = new Member();
-            if (memberId == null)
+            // 2026-05-29 重构: 不再自动建 stub member。
+            // memberId 找到 → 拉出对应 member;没找到(未注册 user) → member = null
+            // 未注册 user 的 openid+unionid 暂存到 mini_session,延迟到 PaymentIdentityController(点支付按钮时)再建会员
+            Member member = null;
+            if (memberId != null)
             {
-                member.id = 0;
-                if (openId != null && openId.Trim().Length > 0)
-                {
-                    MemberSocialAccount msa = new MemberSocialAccount()
-                    {
-                        type = "wechat_mini_openid",
-                        num = openId.Trim(),
-                        valid = 1,
-                        memo = "",
-                        member_id = member.id
-                    };
-                    member.memberSocialAccounts.Add(msa);
-                }
-                if (unionId != null && unionId.Trim().Length > 0)
-                {
-                    MemberSocialAccount msa = new MemberSocialAccount()
-                    {
-                        type = "wechat_unionid",
-                        num = unionId.Trim(),
-                        valid = 1,
-                        memo = "",
-                        member_id = member.id
-                    };
-                    member.memberSocialAccounts.Add(msa);
-                }
-                await _db.member.AddAsync(member);
-                await _db.SaveChangesAsync();
-            }
-            if (member.id == 0)
-            {
-                List<Member> memberList = await _db.member
-                    .Where(m => m.id == memberId)
-                    .Include(m => m.memberSocialAccounts).ToListAsync();
-                if (memberList.Count <= 0)
-                {
-                    // 脏数据自我恢复:MSA 表指向 memberId 但 member 表查不到 → 自动建新会员,
-                    // 避免给前端返 code=1 + toast「获取会员信息失败」导致页面卡死(loginPromiseNew 永远 pending)
-                    Console.WriteLine($"MemberLogin: orphaned memberId {memberId} (openId={openId}), auto-creating new member");
-                    member = new Member();
-                    if (openId != null && openId.Trim().Length > 0)
-                    {
-                        member.memberSocialAccounts.Add(new MemberSocialAccount()
-                        {
-                            type = "wechat_mini_openid",
-                            num = openId.Trim(),
-                            valid = 1,
-                            memo = "",
-                            member_id = member.id
-                        });
-                    }
-                    if (unionId != null && unionId.Trim().Length > 0)
-                    {
-                        member.memberSocialAccounts.Add(new MemberSocialAccount()
-                        {
-                            type = "wechat_unionid",
-                            num = unionId.Trim(),
-                            valid = 1,
-                            memo = "",
-                            member_id = member.id
-                        });
-                    }
-                    await _db.member.AddAsync(member);
-                    await _db.SaveChangesAsync();
-                }
-                else
-                {
-                    member = memberList[0];
-                }
-                if (member.wechatMiniOpenId == null)
-                {
-                    MemberSocialAccount msa = new MemberSocialAccount()
-                    {
-                        type = "wechat_mini_openid",
-                        num = openId.Trim(),
-                        valid = 1,
-                        memo = "",
-                        member_id = member.id
-                    };
-                    member.memberSocialAccounts.Add(msa);
-                    //_db.member.Entry(member).State = EntityState.Modified;
-                    _db.member.Update(member);
-                    await _db.SaveChangesAsync();
-                }
-                if (member.wechatUnionId == null)
-                {
-                    MemberSocialAccount msa = new MemberSocialAccount()
-                    {
-                        type = "wechat_unionid",
-                        num = unionId.Trim(),
-                        valid = 1,
-                        memo = "",
-                        member_id = member.id
-                    };
-                    member.memberSocialAccounts.Add(msa);
-                    _db.member.Entry(member).State = EntityState.Modified;
-                    await _db.SaveChangesAsync();
-                }
+                member = await _memberHelper.GetWholeMemberById((int)memberId);
+                // member 查不到说明 MSA 表脏数据(memberId 指向不存在的 member) → 仍当未注册处理(不建恢复 stub)
+                // 此时 session 仅记 openid+unionid, 用户下次正常流程会被 PaymentIdentity 引导建会员
             }
             string sessionType = "wechat_mini_openid";
             MiniSession session = await _db.miniSession.FindAsync(sessionKey.Trim(), sessionType);
             DateTime expireDate = DateTime.Now.AddHours(2);
+            string? cleanOpenId = string.IsNullOrEmpty(openId) ? null : openId.Trim();
+            string? cleanUnionId = string.IsNullOrEmpty(unionId) ? null : unionId.Trim();
             if (session == null)
             {
                 session = new MiniSession()
                 {
                     session_key = sessionKey.Trim(),
                     session_type = sessionType.Trim(),
-                    member_id = member.id,
+                    member_id = member?.id,
+                    wechat_openid = cleanOpenId,
+                    wechat_unionid = cleanUnionId,
                     valid = 1,
                     expire_date = expireDate
                 };
                 await _db.miniSession.AddAsync(session);
-                
+
             }
             else
             {
                 session.valid = 1;
-                session.member_id = member.id;
+                session.member_id = member?.id;
+                session.wechat_openid = cleanOpenId;
+                session.wechat_unionid = cleanUnionId;
                 session.expire_date = expireDate;
                 _db.miniSession.Entry(session).State = EntityState.Modified;
             }
+            await _db.SaveChangesAsync();
             //await _db.SaveChangesAsync();
             
             sessionObj.member = member;
@@ -377,7 +293,11 @@ namespace SnowmeetApi.Controllers
                 
             }
             await _db.SaveChangesAsync();
-            member.memberSocialAccounts = member.memberSocialAccounts.Where(m => m.valid == 1 && m.type.Trim().Equals("cell")).OrderByDescending(m => m.id).ToList();
+            // 返回前缩 memberSocialAccounts 仅留 cell(优化网络);未注册 user 时 member 为 null,跳过
+            if (member != null)
+            {
+                member.memberSocialAccounts = member.memberSocialAccounts.Where(m => m.valid == 1 && m.type.Trim().Equals("cell")).OrderByDescending(m => m.id).ToList();
+            }
             return Ok(result);
         }
         
