@@ -382,7 +382,26 @@ namespace SnowmeetApi.Controllers.Order
             }
             if (pre.scannerMemberId == null)
             {
-                return Ok(_err("scanner_not_registered", "扫码方尚未注册会员，请先验证手机号"));
+                // 与 _applyConfirmDirect 对齐：游客拒绝手机号授权但点了"正常支付/替人代付"
+                // → 用 sessionKey 反查 openid/unionid，自动建一个无 cell 游客会员，然后继续 choose 流程。
+                // MemberLogin 2026-05-29 起不再建 stub，没这层兜底前端 fallback 必失败。
+                var (sessOpenidAuto, sessUnionidAuto, sessAuto) = await _loadSessionContext(sessionKey);
+                if (sessAuto == null || string.IsNullOrEmpty(sessOpenidAuto))
+                {
+                    return Ok(_err("session_not_found", "登录失效,请退出小程序重进"));
+                }
+                string msaTypeAuto = _msaTypeForPayer(payerType);
+                if (msaTypeAuto == null)
+                {
+                    return Ok(_err("unsupported_payer_type", "不支持的支付通道: " + payerType));
+                }
+                var newMemberId = await _createNewMember(null, sessOpenidAuto, msaTypeAuto, sessUnionidAuto);
+                sessAuto.member_id = newMemberId;
+                _db.miniSession.Entry(sessAuto).State = EntityState.Modified;
+                await _db.SaveChangesAsync();
+                pre.scannerMemberId = newMemberId;
+                pre.scannerHasCell = false;
+                if (string.IsNullOrEmpty(scannerId)) scannerId = sessOpenidAuto;
             }
             if (pre.status != "choose_identity")
             {
