@@ -26,11 +26,28 @@ namespace SnowmeetApi.Controllers.Order
         private readonly IConfiguration _config;
         private readonly MemberController _memberHelper;
 
+        // 支付宝小程序 appId（与商户 appId 2021004143665722 区分）。
+        // 用于 _extractPhone alipay 分支的 oauth.token + user.phone.get，证书放 AlipayCertificate/{appId}/
+        public const string ALIPAY_MINI_APP_ID = "2021006157678375";
+
         public PaymentIdentityController(ApplicationDBContext db, IConfiguration config)
         {
             _db = db;
             _config = config;
             _memberHelper = new MemberController(db, config);
+        }
+
+        // 读 alipay 小程序「接口加密方式」配置的 AES 密钥（base64，16/24/32 字节）。
+        // 部署时把密钥写入 AlipayCertificate/{appId}/aes_key.txt（与 private_key_{appId}.txt 同目录）。
+        // my.getPhoneNumber 返回的 response 字段就用这个密钥 AES-128-CBC + PKCS7 加密。
+        private string _loadAlipayAesKey()
+        {
+            string keyPath = Util.workingPath + "/AlipayCertificate/" + ALIPAY_MINI_APP_ID + "/aes_key.txt";
+            if (!System.IO.File.Exists(keyPath))
+            {
+                throw new Exception("支付宝 AES 密钥文件不存在：" + keyPath + "（在开放平台「接口加密方式」生成 AES 密钥后放此处）");
+            }
+            return System.IO.File.OpenText(keyPath).ReadToEnd().Trim();
         }
 
         // ====== DTOs ======
@@ -58,9 +75,11 @@ namespace SnowmeetApi.Controllers.Order
             public string scannerId { get; set; }   // openid (wechat) | payerid (alipay)
             public string action { get; set; }      // submit_phone | choose | confirm_direct
             public string choice { get; set; }      // self | proxy（仅 action=choose）
-            public string encData { get; set; }     // 仅 wechat + submit_phone
-            public string iv { get; set; }          // 仅 wechat + submit_phone
-            public string phoneMock { get; set; }   // alipay + submit_phone 的 stub 入参
+            // wechat + submit_phone：encData(微信加密) + iv
+            // alipay + submit_phone：encData = my.getPhoneNumber 返回的 response（AES-128-CBC + 全 0 IV 加密的 JSON），iv 不用
+            public string encData { get; set; }
+            public string iv { get; set; }
+            public string phoneMock { get; set; }   // 开发期 fallback：跳过真授权流程直接传明文手机号
         }
 
         // ====== Public Endpoints ======
@@ -526,12 +545,34 @@ namespace SnowmeetApi.Controllers.Order
             }
             if (payerType == "alipay")
             {
-                // TODO: 切换到支付宝小程序后接 alipay.system.oauth.token + alipay.user.info.share
+                // 2026-05-30：原计划走 alipay.user.phone.get（server-side API），但 AlipaySDKNet 4.8.50
+                // 不暴露该 API 的 Request/Response 类，只能换实战路径：
+                //   client（alipay_snowmeet）my.getPhoneNumber → 返回 { response, sign, signType }
+                //   response 是 alipay 用 AES-128-CBC + PKCS7 + 全 0 IV 加密的 JSON
+                //   AES 密钥来自支付宝开放平台「接口加密方式」配置（base64），放 cert 目录 aes_key.txt
+                //   解密后 JSON = { code: "10000", msg: "Success", mobile: "13xxxxxxxx" }
+                if (!string.IsNullOrEmpty(body.encData))
+                {
+                    string encResponse = Util.UrlDecode(body.encData);
+                    string aesKey = _loadAlipayAesKey();
+                    // IV 全 0：base64 编码后是 16 个 "A" 解码出 16 个 \x00 字节
+                    const string zeroIv = "AAAAAAAAAAAAAAAAAAAAAA==";
+                    string json = Util.AES_decrypt(encResponse.Trim(), aesKey, zeroIv);
+                    JToken jsonObj = (JToken)JsonConvert.DeserializeObject(json);
+                    if (jsonObj == null || jsonObj["mobile"] == null)
+                    {
+                        // 解密成功但 alipay 返回失败码（如未授权、密钥失效），抛 alipay 的 msg
+                        string aliMsg = jsonObj?["msg"]?.ToString() ?? "解密结果中无 mobile 字段";
+                        throw new Exception("支付宝 getPhoneNumber 解密失败：" + aliMsg);
+                    }
+                    return jsonObj["mobile"].ToString().Trim();
+                }
+                // 开发期 fallback：跑后端单测时不想真过支付宝授权流程，传 phoneMock 即可
                 if (!string.IsNullOrEmpty(body.phoneMock))
                 {
                     return body.phoneMock.Trim();
                 }
-                throw new NotSupportedException("支付宝手机号解密待支付宝小程序对接（可传 phoneMock 字段做开发期 mock）");
+                throw new NotSupportedException("支付宝手机号解密缺 encData（my.getPhoneNumber 的 response 字段）或 phoneMock（开发期 fallback）");
             }
             throw new Exception("不支持的支付通道: " + payerType);
         }

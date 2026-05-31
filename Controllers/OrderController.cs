@@ -12,6 +12,13 @@ using Newtonsoft.Json;
 using System.Threading;
 using NPOI.SS.Formula.Functions;
 using Humanizer;
+using Aop.Api;
+using Aop.Api.Request;
+using Aop.Api.Response;
+using Aop.Api.Util;
+// 故意不 using Aop.Api.Domain — 该命名空间下的 Member/Shop/Product 与 SnowmeetApi.Models 撞名,
+// 引入会让本 controller 里大量已有的 Member 引用变成歧义编译错误。
+// AlipayPayByOrderPayment 里用到的 AlipayTradeCreateModel / ExtendParams 都加完全限定名 Aop.Api.Domain.xxx
 namespace SnowmeetApi.Controllers
 {
     [Route("api/[controller]/[action]")]
@@ -1631,6 +1638,193 @@ namespace SnowmeetApi.Controllers
                 data = payment
             });
         }
+
+        // 支付宝小程序支付调起：对标 WechatPayByOrderPayment 的 alipay 等价。
+        // 顾客在 alipay_snowmeet/pages/payment_entry 点支付按钮时调本接口，拿 trade_no 后调 my.tradePay({tradeNO}) 完成支付。
+        // 与 wechat 版同样的 3 分支 op 字段补写：首次 / 换人 / ali_buyer_id 不匹配
+        [HttpGet("{paymentId}")]
+        public async Task<ActionResult<ApiResult<OrderPayment?>>> AlipayPayByOrderPayment(int paymentId, string sessionKey)
+        {
+            MemberController _memberHelper = new MemberController(_db, _config);
+            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, "alipay_payerid");
+            string message = "";
+            if (member == null || string.IsNullOrEmpty(member.alipayPayerId))
+            {
+                message = "未找到支付宝用户";
+            }
+            if (!message.Trim().Equals(""))
+            {
+                return Ok(new ApiResult<OrderPayment?>()
+                {
+                    code = 1,
+                    message = message,
+                    data = null
+                });
+            }
+            OrderPayment payment = await _db.orderPayment.Where(p => p.id == paymentId).AsNoTracking().FirstOrDefaultAsync();
+            if (payment == null)
+            {
+                return Ok(new ApiResult<OrderPayment?>() { code = 1, message = "支付记录不存在", data = null });
+            }
+            Models.Order order = await GetOrder(payment.order_id);
+
+            // 计算新 out_trade_no：用订单下所有 payment 的最大序号+1（与 wechat 版同算法）
+            List<OrderPayment> allPayments = await _db.orderPayment.Where(p => p.order_id == order.id)
+                .OrderByDescending(p => p.out_trade_no).AsNoTracking().ToListAsync();
+            string? outTradeNo = allPayments.Count > 0 ? allPayments[0].out_trade_no : null;
+            if (outTradeNo == null)
+            {
+                outTradeNo = order.code + "_ZF_" + allPayments.Count.ToString().PadLeft(2, '0');
+            }
+            else
+            {
+                string[] outTradeNoArr = outTradeNo.Split('_');
+                int outNum = int.Parse(outTradeNoArr[outTradeNoArr.Length - 1].Trim()) + 1;
+                outTradeNo = order.code + "_ZF_" + outNum.ToString().PadLeft(2, '0');
+            }
+
+            string buyerId = member.alipayPayerId.Trim();
+
+            // 分支 1：首次 — payment.member_id == null
+            if (payment.member_id == null)
+            {
+                payment.member_id = member.id;
+                payment.ali_buyer_id = buyerId;
+                payment.out_trade_no = outTradeNo.Trim();
+                payment.pay_method = "支付宝";
+                payment.update_date = DateTime.Now;
+                _db.orderPayment.Entry(payment).State = EntityState.Modified;
+                await _db.SaveChangesAsync();
+            }
+            // 分支 2：换人 — payment.member_id 已存在但不等于当前支付方
+            if (payment.member_id != null && payment.member_id != member.id)
+            {
+                CoreDataModLog log = new CoreDataModLog()
+                {
+                    id = 0,
+                    table_name = "order_payment",
+                    field_name = "member_id",
+                    key_value = payment.id,
+                    scene = "支付顾客换人",
+                    member_id = member.id,
+                    staff_id = null,
+                    prev_value = payment.member_id.ToString(),
+                    current_value = member.id.ToString(),
+                    trace_id = 0,
+                    is_manual = 1,
+                    manual_memo = ""
+                };
+                await _db.coreDataModLog.AddAsync(log);
+                payment.member_id = member.id;
+                payment.ali_buyer_id = buyerId;
+                payment.out_trade_no = outTradeNo.Trim();
+                payment.ali_trade_no = null;       // 清掉旧 trade_no，强制重新 trade.create
+                payment.response_data = null;
+                payment.update_date = DateTime.Now;
+                _db.orderPayment.Entry(payment).State = EntityState.Modified;
+                await _db.SaveChangesAsync();
+            }
+            // 分支 3：ali_buyer_id 不匹配 — PaymentIdentity 已 pre-set member_id = scanner，但 buyer_id 没跟着改
+            // 如果直接用旧 buyer_id 调 trade.create，支付宝会拒（user_id 与 trade 归属不一致）
+            if (payment.member_id == member.id
+                && !string.IsNullOrEmpty(buyerId)
+                && (payment.ali_buyer_id == null || payment.ali_buyer_id.Trim() != buyerId))
+            {
+                payment.ali_buyer_id = buyerId;
+                payment.out_trade_no = outTradeNo.Trim();
+                payment.ali_trade_no = null;
+                payment.response_data = null;
+                payment.update_date = DateTime.Now;
+                _db.orderPayment.Entry(payment).State = EntityState.Modified;
+                await _db.SaveChangesAsync();
+            }
+
+            // 兜底：三个分支都没命中但 ali_trade_no 是 null（如刷新后再点）—— 同步 out_trade_no
+            if (payment.ali_trade_no == null && payment.out_trade_no != outTradeNo)
+            {
+                payment.out_trade_no = outTradeNo;
+                payment.update_date = DateTime.Now;
+                _db.orderPayment.Entry(payment).State = EntityState.Modified;
+                await _db.SaveChangesAsync();
+            }
+
+            // 如果 ali_trade_no 还没生成，调 alipay.trade.create（小程序 appId 的 client）
+            if (string.IsNullOrEmpty(payment.ali_trade_no))
+            {
+                IAopClient client;
+                try
+                {
+                    client = _getAlipayMiniClientForOrder();
+                }
+                catch (Exception e)
+                {
+                    return Ok(new ApiResult<OrderPayment?>() { code = 1, message = "支付宝证书加载失败：" + e.Message, data = null });
+                }
+
+                string notifyUrl = "https://" + _http.HttpContext.Request.Host.Value + "/api/Ali/CallBack";
+                AlipayTradeCreateRequest req = new AlipayTradeCreateRequest();
+                req.SetNotifyUrl(notifyUrl);
+                Aop.Api.Domain.AlipayTradeCreateModel model = new Aop.Api.Domain.AlipayTradeCreateModel();
+                model.OutTradeNo = payment.out_trade_no.Trim();
+                model.ProductCode = "JSAPI_PAY";
+                model.OpAppId = ALIPAY_MINI_APP_ID;
+                model.Subject = order.subject?.Trim() ?? ("订单 " + order.code);
+                model.Body = string.IsNullOrEmpty(order.description) ? model.Subject : order.description.Trim();
+                model.TotalAmount = Math.Round(payment.amount, 2).ToString("0.00");
+                model.BuyerId = buyerId;
+                model.ExtendParams = new Aop.Api.Domain.ExtendParams { RoyaltyFreeze = "false" };
+                req.SetBizModel(model);
+
+                AlipayTradeCreateResponse resp;
+                try
+                {
+                    resp = client.CertificateExecute(req);
+                }
+                catch (Exception e)
+                {
+                    return Ok(new ApiResult<OrderPayment?>() { code = 1, message = "支付宝 trade.create 请求异常：" + e.Message, data = null });
+                }
+                payment.submit_time = DateTime.Now;
+                payment.response_data = resp.Body;
+                if (resp.IsError || string.IsNullOrEmpty(resp.TradeNo))
+                {
+                    payment.request_failed = 1;
+                    _db.orderPayment.Entry(payment).State = EntityState.Modified;
+                    await _db.SaveChangesAsync();
+                    return Ok(new ApiResult<OrderPayment?>() { code = 1, message = "支付宝 trade.create 失败：" + (resp.SubMsg ?? resp.Msg), data = payment });
+                }
+                payment.ali_trade_no = resp.TradeNo.Trim();
+                payment.notify = notifyUrl;
+                payment.update_date = DateTime.Now;
+                _db.orderPayment.Entry(payment).State = EntityState.Modified;
+                await _db.SaveChangesAsync();
+            }
+
+            return Ok(new ApiResult<OrderPayment?>()
+            {
+                code = 0,
+                message = "",
+                data = payment
+            });
+        }
+
+        // 创建支付宝小程序 appId 的 IAopClient（独立证书：AlipayCertificate/2021006157678375/）
+        // 与 PaymentIdentityController._getAlipayMiniClient 同构，复用证书目录但跨控制器各自维护，避免循环依赖
+        private const string ALIPAY_MINI_APP_ID = "2021006157678375";
+        private IAopClient _getAlipayMiniClientForOrder()
+        {
+            const string appId = ALIPAY_MINI_APP_ID;
+            string certPath = Util.workingPath + "/AlipayCertificate/" + appId;
+            string privateKey = System.IO.File.OpenText(certPath + "/private_key_" + appId + ".txt").ReadToEnd().Trim();
+            CertParams certParams = new CertParams
+            {
+                AlipayPublicCertPath = certPath + "/alipayCertPublicKey_RSA2.crt",
+                AppCertPath = certPath + "/appCertPublicKey_" + appId + ".crt",
+                RootCertPath = certPath + "/alipayRootCert.crt"
+            };
+            return new DefaultAopClient("https://openapi.alipay.com/gateway.do", appId, privateKey, "json", "1.0", "RSA2", "utf-8", false, certParams);
+        }
+
         [HttpGet("{orderId}")]
         public async Task<ActionResult<ApiResult<OrderPayment>>> WechatPay(int orderId, double? amount,
             string sessionKey, string sessionType = "wechat_mini_openid", bool needShare = false)

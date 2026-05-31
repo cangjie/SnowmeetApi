@@ -20,6 +20,8 @@ namespace SnowmeetApi.Models
         public int care { get; set; }
         public int rent { get; set; }
         public int restuarant { get; set; }
+        public string beacon_mac { get; set; }
+        public string beacon_uuid { get; set; }
     }
 }
 

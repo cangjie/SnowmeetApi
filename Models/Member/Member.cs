@@ -78,6 +78,20 @@ namespace SnowmeetApi.Models
                 return v;
             }
         }
+        // 支付宝小程序 user_id（对标 wechatMiniOpenId），通过 MSA 反查 type='alipay_payerid'
+        public string? alipayPayerId
+        {
+            get
+            {
+                string? v = null;
+                List<MemberSocialAccount> msaList = GetInfo("alipay_payerid");
+                if (msaList != null && msaList.Count > 0)
+                {
+                    v = msaList[0].num.Trim();
+                }
+                return v;
+            }
+        }
         [NotMapped]
         public string? cell
         {

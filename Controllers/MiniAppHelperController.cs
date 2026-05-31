@@ -27,6 +27,10 @@ using System.ComponentModel.DataAnnotations.Schema;
 using SnowmeetApi.Controllers;
 using Flurl.Util;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Aop.Api;
+using Aop.Api.Request;
+using Aop.Api.Response;
+using Aop.Api.Util;
 
 namespace SnowmeetApi.Controllers
 {
@@ -143,6 +147,11 @@ namespace SnowmeetApi.Controllers
         [HttpGet]
         public async Task<ActionResult<ApiResult<Code2Session>>> MemberLogin(string code, string openIdType)
         {
+            // 支付宝小程序登录走独立分支（用 alipay.system.oauth.token + 自家 RSA 密钥对，与微信通道完全无关）
+            if (openIdType != null && openIdType.Trim().Equals("alipay_payerid"))
+            {
+                return await _alipayMemberLogin(code);
+            }
             ApiResult<Code2Session> result = new ApiResult<Code2Session>();
             string appId = _settings.appId;
             string appSecret = _settings.appSecret;
@@ -272,7 +281,149 @@ namespace SnowmeetApi.Controllers
             }
             return Ok(result);
         }
-        
+
+        // 支付宝小程序登录：与 wechat 路径平行的实现
+        // 入参 code = my.getAuthCode 拿到的 auth_code（base scope 即可）
+        // 流程：oauth.token 换 (access_token, user_id) → MSA 反查 member → 写 MiniSession
+        // 与 wechat 同策略：未匹配会员**不建 stub**（2026-05-29 重构定调），延迟到 PaymentIdentity 建
+        private async Task<ActionResult<ApiResult<Code2Session>>> _alipayMemberLogin(string code)
+        {
+            ApiResult<Code2Session> result = new ApiResult<Code2Session>();
+            if (string.IsNullOrEmpty(code))
+            {
+                result.code = 1;
+                result.message = "auth_code 缺失";
+                result.data = null;
+                return Ok(result);
+            }
+
+            // Step 1: alipay.system.oauth.token 换 access_token + user_id
+            IAopClient client;
+            try
+            {
+                client = _getAlipayMiniClient();
+            }
+            catch (Exception e)
+            {
+                result.code = 1;
+                result.message = "支付宝证书加载失败：" + e.Message;
+                result.data = null;
+                return Ok(result);
+            }
+
+            var tokenReq = new AlipaySystemOauthTokenRequest();
+            tokenReq.GrantType = "authorization_code";
+            tokenReq.Code = code.Trim();
+            AlipaySystemOauthTokenResponse tokenResp;
+            try
+            {
+                tokenResp = client.CertificateExecute(tokenReq);
+            }
+            catch (Exception e)
+            {
+                result.code = 1;
+                result.message = "支付宝 oauth.token 请求异常：" + e.Message;
+                result.data = null;
+                return Ok(result);
+            }
+            if (tokenResp.IsError || string.IsNullOrEmpty(tokenResp.AccessToken) || string.IsNullOrEmpty(tokenResp.UserId))
+            {
+                result.code = 1;
+                result.message = "支付宝 oauth.token 失败：" + (tokenResp.SubMsg ?? tokenResp.Msg);
+                result.data = null;
+                return Ok(result);
+            }
+            string accessToken = tokenResp.AccessToken.Trim();
+            string userId = tokenResp.UserId.Trim();
+
+            // Step 2: MSA 反查会员（type='alipay_payerid'）
+            int? memberId = null;
+            List<MemberSocialAccount> msaList = await _db.memberSocialAccount
+                .Where(m => m.num.Trim().Equals(userId) && m.valid == 1 && m.type.Trim().Equals("alipay_payerid"))
+                .OrderByDescending(m => m.id).AsNoTracking().ToListAsync();
+            if (msaList.Count > 0)
+            {
+                memberId = msaList[0].member_id;
+            }
+            Member member = null;
+            if (memberId != null)
+            {
+                member = await _memberHelper.GetWholeMemberById((int)memberId);
+                // 若 MSA 指向已删 member（脏数据），仍按未注册处理，不建 stub
+            }
+
+            // Step 3: 写 / 更新 MiniSession，session_key=access_token，session_type='alipay_payerid'
+            // wechat_openid 列复用存 alipay user_id（列名虽叫 wechat 但实际是「该 session 对应方的 openid 等价物」）
+            string sessionType = "alipay_payerid";
+            MiniSession session = await _db.miniSession.FindAsync(accessToken, sessionType);
+            DateTime expireDate = DateTime.Now.AddHours(2);
+            if (session == null)
+            {
+                session = new MiniSession()
+                {
+                    session_key = accessToken,
+                    session_type = sessionType,
+                    member_id = member?.id,
+                    wechat_openid = userId,
+                    wechat_unionid = null,
+                    valid = 1,
+                    expire_date = expireDate
+                };
+                await _db.miniSession.AddAsync(session);
+            }
+            else
+            {
+                session.valid = 1;
+                session.member_id = member?.id;
+                session.wechat_openid = userId;
+                session.wechat_unionid = null;
+                session.expire_date = expireDate;
+                _db.miniSession.Entry(session).State = EntityState.Modified;
+            }
+            await _db.SaveChangesAsync();
+
+            // Step 4: 返回 Code2Session（结构同 wechat 分支：session_key + member + staff）
+            Code2Session sessionObj = new Code2Session
+            {
+                session_key = accessToken,
+                openid = "",
+                unionid = "",
+                errcode = "",
+                errmsg = "",
+                member_id = member?.id,
+                member = member
+            };
+            StaffController _staffHelper = new StaffController(_db);
+            sessionObj.staff = await _staffHelper.GetStaffBySocialNum(userId, "alipay_payerid", DateTime.Now);
+
+            // 同 wechat 路径：member 非空时仅保留 cell 类 MSA，缩减网络体积
+            if (member != null)
+            {
+                member.memberSocialAccounts = member.memberSocialAccounts.Where(m => m.valid == 1 && m.type.Trim().Equals("cell")).OrderByDescending(m => m.id).ToList();
+            }
+
+            result.code = 0;
+            result.message = "";
+            result.data = sessionObj;
+            return Ok(result);
+        }
+
+        // 创建支付宝小程序 appId 的 IAopClient（独立证书：AlipayCertificate/2021006157678375/）
+        // 与 AliController.GetClient(appId) 同模式，但 PaymentIdentity / MemberLogin 都需要自己取，直接复制以避免跨控制器依赖
+        private IAopClient _getAlipayMiniClient()
+        {
+            const string appId = "2021006157678375";
+            string certPath = Util.workingPath + "/AlipayCertificate/" + appId;
+            string privateKey = System.IO.File.OpenText(certPath + "/private_key_" + appId + ".txt").ReadToEnd().Trim();
+            CertParams certParams = new CertParams
+            {
+                AlipayPublicCertPath = certPath + "/alipayCertPublicKey_RSA2.crt",
+                AppCertPath = certPath + "/appCertPublicKey_" + appId + ".crt",
+                RootCertPath = certPath + "/alipayRootCert.crt"
+            };
+            return new DefaultAopClient("https://openapi.alipay.com/gateway.do", appId, privateKey, "json", "1.0", "RSA2", "utf-8", false, certParams);
+        }
+
         [HttpGet]
         public void RefreshAccessToken()
         {
