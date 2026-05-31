@@ -1869,9 +1869,9 @@ namespace SnowmeetApi.Controllers
             });
         }
 
-        // 创建支付宝小程序 appId 的 IAopClient（独立证书：AlipayCertificate/2021006157678375/）
+        // 创建支付宝小程序 appId 的 IAopClient（独立证书：AlipayCertificate/2021006157624571/）
         // 与 PaymentIdentityController._getAlipayMiniClient 同构，复用证书目录但跨控制器各自维护，避免循环依赖
-        private const string ALIPAY_MINI_APP_ID = "2021006157678375";
+        private const string ALIPAY_MINI_APP_ID = "2021006157624571";
         private IAopClient _getAlipayMiniClientForOrder()
         {
             const string appId = ALIPAY_MINI_APP_ID;

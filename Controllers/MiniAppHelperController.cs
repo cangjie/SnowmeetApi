@@ -408,11 +408,11 @@ namespace SnowmeetApi.Controllers
             return Ok(result);
         }
 
-        // 创建支付宝小程序 appId 的 IAopClient（独立证书：AlipayCertificate/2021006157678375/）
+        // 创建支付宝小程序 appId 的 IAopClient（独立证书：AlipayCertificate/2021006157624571/）
         // 与 AliController.GetClient(appId) 同模式，但 PaymentIdentity / MemberLogin 都需要自己取，直接复制以避免跨控制器依赖
         private IAopClient _getAlipayMiniClient()
         {
-            const string appId = "2021006157678375";
+            const string appId = "2021006157624571";
             string certPath = Util.workingPath + "/AlipayCertificate/" + appId;
             string privateKey = System.IO.File.OpenText(certPath + "/private_key_" + appId + ".txt").ReadToEnd().Trim();
             CertParams certParams = new CertParams
