@@ -1642,6 +1642,67 @@ namespace SnowmeetApi.Controllers
         // 支付宝小程序支付调起：对标 WechatPayByOrderPayment 的 alipay 等价。
         // 顾客在 alipay_snowmeet/pages/payment_entry 点支付按钮时调本接口，拿 trade_no 后调 my.tradePay({tradeNO}) 完成支付。
         // 与 wechat 版同样的 3 分支 op 字段补写：首次 / 换人 / ali_buyer_id 不匹配
+        // 给店员小程序用：建一笔 pay_method='支付宝' 的 OrderPayment，**不**调 alipay.trade.precreate
+        //（precreate 是商户扫码付的旧模式；小程序流程的 trade.create 在顾客点支付时由 AlipayPayByOrderPayment 调）
+        // 返回 paymentId，店员小程序拿它编进支付宝小程序唤起 URL 做成二维码给顾客扫
+        [HttpGet("{orderId}")]
+        public async Task<ActionResult<ApiResult<OrderPayment?>>> GetAlipayMiniPayment(int orderId, double? amount, string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            Models.Order order = await GetOrder(orderId);
+            string message = "";
+            if (order == null) message = "无此订单";
+            else if (order.closed == 1) message = "订单关闭";
+            if (!message.Trim().Equals(""))
+            {
+                return Ok(new ApiResult<OrderPayment?>() { code = 1, message = message, data = null });
+            }
+
+            StaffController _staffHelper = new StaffController(_db);
+            Staff staff = await _staffHelper.GetStaffBySessionKey(sessionKey, sessionType);
+
+            // 跟 GetWepayPayment 同模式：把同订单上其它待支付的 alipay payment 置 valid=0，再建新单
+            List<OrderPayment> prevPayments = await _db.orderPayment
+                .Where(p => p.valid == 1 && p.status.Trim().Equals(OrderPayment.PaymentStatus.待支付.ToString())
+                    && p.order_id == orderId && p.pay_method.Trim().Equals("支付宝"))
+                .AsNoTracking().ToListAsync();
+            foreach (var op in prevPayments)
+            {
+                op.valid = 0;
+                _db.orderPayment.Entry(op).State = EntityState.Modified;
+            }
+
+            double payAmount = amount == null ? (double)order.paying_amount : (double)amount;
+            List<OrderPayment> allPayments = await _db.orderPayment.Where(o => o.order_id == order.id).ToListAsync();
+            OrderPayment payment = new OrderPayment()
+            {
+                id = 0,
+                order_id = order.id,
+                amount = payAmount,
+                staff_id = staff?.id,
+                pay_method = "支付宝",
+                out_trade_no = order.code + "_ZF_" + (allPayments.Count + 1).ToString().PadLeft(2, '0'),
+                status = OrderPayment.PaymentStatus.待支付.ToString(),
+                create_date = DateTime.Now
+            };
+            await _db.orderPayment.AddAsync(payment);
+            CoreDataModLog log = new CoreDataModLog()
+            {
+                table_name = "Order",
+                field_name = "OrderState",
+                key_value = orderId,
+                prev_value = null,
+                current_value = Models.Order.OrderStatus.待支付.ToString(),
+                staff_id = staff?.id,
+                is_manual = 1,
+                scene = "准备支付宝小程序支付",
+                create_date = DateTime.Now
+            };
+            await _db.coreDataModLog.AddAsync(log);
+            await _db.SaveChangesAsync();
+
+            return Ok(new ApiResult<OrderPayment?>() { code = 0, message = "", data = payment });
+        }
+
         [HttpGet("{paymentId}")]
         public async Task<ActionResult<ApiResult<OrderPayment?>>> AlipayPayByOrderPayment(int paymentId, string sessionKey)
         {
