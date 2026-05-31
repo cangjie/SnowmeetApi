@@ -28,7 +28,7 @@ namespace SnowmeetApi.Controllers.Order
 
         // 支付宝小程序 appId（与商户 appId 2021004143665722 区分）。
         // 用于 _extractPhone alipay 分支的 oauth.token + user.phone.get，证书放 AlipayCertificate/{appId}/
-        public const string ALIPAY_MINI_APP_ID = "2021006157678375";
+        public const string ALIPAY_MINI_APP_ID = "2021006157624571";
 
         public PaymentIdentityController(ApplicationDBContext db, IConfiguration config)
         {
