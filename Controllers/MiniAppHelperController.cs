@@ -317,7 +317,7 @@ namespace SnowmeetApi.Controllers
             AlipaySystemOauthTokenResponse tokenResp;
             try
             {
-                tokenResp = client.CertificateExecute(tokenReq);
+                tokenResp = client.Execute(tokenReq);
             }
             catch (Exception e)
             {
@@ -408,20 +408,15 @@ namespace SnowmeetApi.Controllers
             return Ok(result);
         }
 
-        // 创建支付宝小程序 appId 的 IAopClient（独立证书：AlipayCertificate/2021006157678375/）
-        // 与 AliController.GetClient(appId) 同模式，但 PaymentIdentity / MemberLogin 都需要自己取，直接复制以避免跨控制器依赖
+        // 创建支付宝小程序 appId 的 IAopClient（公钥模式：AlipayCertificate/2021006157678375/）
+        // 与项目里其他 8 个 appId 走的"公钥证书模式"不同——该小程序开放平台目前配的是"密钥（公钥）模式"
         private IAopClient _getAlipayMiniClient()
         {
             const string appId = "2021006157678375";
-            string certPath = Util.workingPath + "/AlipayCertificate/" + appId;
-            string privateKey = System.IO.File.OpenText(certPath + "/private_key_" + appId + ".txt").ReadToEnd().Trim();
-            CertParams certParams = new CertParams
-            {
-                AlipayPublicCertPath = certPath + "/alipayCertPublicKey_RSA2.crt",
-                AppCertPath = certPath + "/appCertPublicKey_" + appId + ".crt",
-                RootCertPath = certPath + "/alipayRootCert.crt"
-            };
-            return new DefaultAopClient("https://openapi.alipay.com/gateway.do", appId, privateKey, "json", "1.0", "RSA2", "utf-8", false, certParams);
+            string keyPath = Util.workingPath + "/AlipayCertificate/" + appId;
+            string privateKey = System.IO.File.OpenText(keyPath + "/private_key_" + appId + ".txt").ReadToEnd().Trim();
+            string alipayPublicKey = System.IO.File.OpenText(keyPath + "/alipay_public_key_" + appId + ".txt").ReadToEnd().Trim();
+            return new DefaultAopClient("https://openapi.alipay.com/gateway.do", appId, privateKey, "json", "1.0", "RSA2", alipayPublicKey, "utf-8", false);
         }
 
         [HttpGet]
