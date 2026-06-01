@@ -391,7 +391,8 @@ namespace SnowmeetApi.Controllers
                 errcode = "",
                 errmsg = "",
                 member_id = member?.id,
-                member = member
+                member = member,
+                alipay_payerid = userId
             };
             StaffController _staffHelper = new StaffController(_db);
             sessionObj.staff = await _staffHelper.GetStaffBySocialNum(userId, "alipay_payerid", DateTime.Now);
@@ -571,6 +572,7 @@ namespace SnowmeetApi.Controllers
             public string errcode { get; set; } = "";
             public string errmsg { get; set; } = "";
             public int? member_id { get; set; } = null;
+            public string? alipay_payerid { get; set; } = null;
             [NotMapped]
             public Member member { get; set; } = null;
             [NotMapped]
