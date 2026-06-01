@@ -413,6 +413,7 @@ namespace SnowmeetApi.Controllers
         private IAopClient _getAlipayMiniClient()
         {
             const string appId = "2021006157624571";
+            //const string appId = "2021004143665722";
             string certPath = Util.workingPath + "/AlipayCertificate/" + appId;
             string privateKey = System.IO.File.OpenText(certPath + "/private_key_" + appId + ".txt").ReadToEnd().Trim();
             CertParams certParams = new CertParams
