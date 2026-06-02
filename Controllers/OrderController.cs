@@ -1287,6 +1287,58 @@ namespace SnowmeetApi.Controllers
             return discounts;
         }
         [NonAction]
+        public async Task<bool> InvalidatePendingOrderPayments(Models.Order order, int? staffId, string scene)
+        {
+            List<OrderPayment> pendings = await _db.orderPayment
+                .Where(p => p.order_id == order.id && p.valid == 1
+                    && p.status.Trim().Equals(OrderPayment.PaymentStatus.待支付.ToString()))
+                .ToListAsync();
+            if (pendings.Count == 0)
+            {
+                return true;
+            }
+            AliController _aliHelper = new AliController(_db, _config, _http);
+            TenpayController _weHelper = new TenpayController(_db, _config, _http);
+            for (int i = 0; i < pendings.Count; i++)
+            {
+                OrderPayment payment = pendings[i];
+                bool canceled = true;
+                if (payment.pay_method != null)
+                {
+                    string pm = payment.pay_method.Trim();
+                    if (pm.Equals("支付宝") && payment.ali_qr_code != null)
+                    {
+                        canceled = await _aliHelper.ClosePayment(payment);
+                    }
+                    else if (pm.Equals("微信支付") && payment.prepay_id != null)
+                    {
+                        canceled = await _weHelper.ClosePayment(payment);
+                    }
+                }
+                if (!canceled)
+                {
+                    return false;
+                }
+                payment.valid = 0;
+                payment.update_date = DateTime.Now;
+                _db.orderPayment.Entry(payment).State = EntityState.Modified;
+                CoreDataModLog log = new CoreDataModLog()
+                {
+                    table_name = "order_payment",
+                    field_name = "valid",
+                    key_value = payment.id,
+                    prev_value = "1",
+                    current_value = "0",
+                    staff_id = staffId,
+                    is_manual = 1,
+                    scene = scene,
+                    create_date = DateTime.Now
+                };
+                await _db.coreDataModLog.AddAsync(log);
+            }
+            return true;
+        }
+        [NonAction]
         public async Task<OrderPayment> GetReadyOrderPayment(Models.Order order, double? amount, string payMethod, int? memberId, string? openId, bool needShare = false)
         {
             if (order == null && order.closed == 1)
@@ -1394,13 +1446,15 @@ namespace SnowmeetApi.Controllers
                 StaffController _staffHelper = new StaffController(_db);
                 Staff staff = await _staffHelper.GetStaffBySessionKey(sessionKey, sessionType);
 
-                List<OrderPayment> prevPayments = await _db.orderPayment
-                    .Where(p => p.valid == 1 && p.status.Trim().Equals(OrderPayment.PaymentStatus.待支付.ToString())
-                    && p.order_id == orderId && p.pay_method.Trim().Equals("微信支付")).AsNoTracking().ToListAsync();
-                for (int i = 0; i < prevPayments.Count; i++)
+                bool ok = await InvalidatePendingOrderPayments(order, staff?.id, "切换为微信支付");
+                if (!ok)
                 {
-                    prevPayments[i].valid = 0;
-                    _db.orderPayment.Entry(prevPayments[i]).State = EntityState.Modified;
+                    return Ok(new ApiResult<OrderPayment?>()
+                    {
+                        code = 1,
+                        message = "原支付方式撤回失败,请重试",
+                        data = null
+                    });
                 }
                 TenpayController _tenHelper = new TenpayController(_db, _config, _http);
                 int mchId = _tenHelper.GetMchId(order);
@@ -1462,9 +1516,19 @@ namespace SnowmeetApi.Controllers
             }
             else
             {
-                OrderPayment payment = await GetReadyOrderPayment(order, amount, "支付宝", null, null);
                 StaffController _staffHelper = new StaffController(_db);
                 Staff staff = await _staffHelper.GetStaffBySessionKey(sessionKey, sessionType);
+                bool ok = await InvalidatePendingOrderPayments(order, staff?.id, "切换为支付宝");
+                if (!ok)
+                {
+                    return Ok(new ApiResult<OrderPayment>()
+                    {
+                        code = 1,
+                        message = "原支付方式撤回失败,请重试",
+                        data = null
+                    });
+                }
+                OrderPayment payment = await GetReadyOrderPayment(order, amount, "支付宝", null, null);
                 payment.staff_id = staff == null ? null : staff.id;
                 _db.orderPayment.Entry(payment).State = EntityState.Modified;
                 await _db.SaveChangesAsync();
@@ -1527,7 +1591,16 @@ namespace SnowmeetApi.Controllers
                     data = null
                 });
             }
-            OrderPayment payment = await _db.orderPayment.Where(p => p.id == paymentId).AsNoTracking().FirstOrDefaultAsync();
+            OrderPayment payment = await _db.orderPayment.Where(p => p.id == paymentId && p.valid == 1).AsNoTracking().FirstOrDefaultAsync();
+            if (payment == null)
+            {
+                return Ok(new ApiResult<OrderPayment?>()
+                {
+                    code = 1,
+                    message = "支付单已失效",
+                    data = null
+                });
+            }
             Models.Order order = await GetOrder(payment.order_id);
             ///////正式上线时去掉注释
 
@@ -1965,6 +2038,16 @@ namespace SnowmeetApi.Controllers
                     data = null
                 });
             }
+            bool ok = await InvalidatePendingOrderPayments(order, staff.id, payLater ? "切换为挂账" : "切换为" + (payMethod ?? ""));
+            if (!ok)
+            {
+                return Ok(new ApiResult<object?>()
+                {
+                    code = 1,
+                    message = "原支付方式撤回失败,请重试",
+                    data = null
+                });
+            }
             OrderPayment payment;
             if (payLater)
             {
@@ -2216,50 +2299,7 @@ namespace SnowmeetApi.Controllers
                 order.pay_flow_status = null;
                 needOrderUpdate = true;
             }
-            bool canceled = true;
-            AliController _aliHelper = new AliController(_db, _config, _http);
-            TenpayController _weHelper = new TenpayController(_db, _config, _http);
-            List<OrderPayment> payments = order.payments
-                .Where(p => p.valid == 1 && (p.pay_method.Trim().Equals("微信支付") || p.pay_method.Trim().Equals("支付宝"))
-                && !p.status.Trim().Equals(OrderPayment.PaymentStatus.支付成功.ToString())).ToList();
-            for (int i = 0; i < payments.Count; i++)
-            {
-                OrderPayment payment = payments[i];
-                OrderPayment oriPayment = await _db.orderPayment.Where(p => p.id == payment.id).AsNoTracking().FirstOrDefaultAsync();
-                switch (payment.pay_method.Trim())
-                {
-                    case "支付宝":
-                        if (payment.ali_qr_code != null)
-                        {
-                            canceled = await _aliHelper.ClosePayment(payment);
-                        }
-                        break;
-                    case "微信支付":
-                        if (payment.prepay_id != null)
-                        {
-                            canceled = await _weHelper.ClosePayment(payment);
-                        }
-                        break;
-                    default:
-                        break;
-                }
-                if (canceled)
-                {
-                    payment.valid = 0;
-                    payment.update_date = DateTime.Now;
-                    List<CoreDataModLog> logs = Util.GetUpdateDifferenceLog<OrderPayment>(oriPayment, payment, null, staff.id, "修改支付方式");
-                    for (int j = 0; j < logs.Count; j++)
-                    {
-                        await _db.coreDataModLog.AddAsync(logs[i]);
-                    }
-                    _db.orderPayment.Entry(payment).State = EntityState.Modified;
-                }
-                else
-                {
-                    break;
-                }
-                //await _db.SaveChangesAsync();
-            }
+            bool canceled = await InvalidatePendingOrderPayments(order, staff.id, "重新选择支付方式");
             await _db.SaveChangesAsync();
             if (canceled)
             {
