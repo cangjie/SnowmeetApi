@@ -12,6 +12,7 @@ using SnowmeetApi.Models;
 using SnowmeetApi.Models.Users;
 using Microsoft.Extensions.Configuration;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System.IO;
 using System.IO.Pipelines;
 using System.Text;
@@ -327,7 +328,36 @@ namespace SnowmeetApi.Controllers
                 result.data = null;
                 return Ok(result);
             }
-            if (tokenResp.IsError || string.IsNullOrEmpty(tokenResp.AccessToken) || string.IsNullOrEmpty(tokenResp.UserId))
+            string accessToken = string.IsNullOrEmpty(tokenResp.AccessToken) ? "" : tokenResp.AccessToken.Trim();
+            string? userId = string.IsNullOrEmpty(tokenResp.UserId) ? null : tokenResp.UserId.Trim();
+            string? openId = null;
+            try
+            {
+                if (!string.IsNullOrEmpty(tokenResp.Body))
+                {
+                    JObject bodyObj = JObject.Parse(tokenResp.Body);
+                    JToken? tokenNode = bodyObj["alipay_system_oauth_token_response"] ?? bodyObj;
+                    if (tokenNode != null)
+                    {
+                        if (string.IsNullOrEmpty(userId))
+                        {
+                            string? userIdFromBody = tokenNode["user_id"]?.ToString();
+                            if (!string.IsNullOrEmpty(userIdFromBody)) userId = userIdFromBody.Trim();
+                        }
+                        string? openIdFromBody = tokenNode["open_id"]?.ToString();
+                        if (!string.IsNullOrEmpty(openIdFromBody)) openId = openIdFromBody.Trim();
+                    }
+                }
+            }
+            catch
+            {
+                // no-op: body 解析失败不影响主流程，后续仍按 SDK 字段判断
+            }
+
+            // auth_base 场景下支付宝常返回 open_id 而不返回 user_id；两者都可作为 payer 标识
+            string? payerId = !string.IsNullOrEmpty(userId) ? userId : openId;
+
+            if (tokenResp.IsError || string.IsNullOrEmpty(accessToken) || string.IsNullOrEmpty(payerId))
             {
                 List<string> errParts = new List<string>();
                 if (!string.IsNullOrEmpty(tokenResp.Code)) errParts.Add("code=" + tokenResp.Code.Trim());
@@ -351,13 +381,18 @@ namespace SnowmeetApi.Controllers
                 result.data = null;
                 return Ok(result);
             }
-            string accessToken = tokenResp.AccessToken.Trim();
-            string userId = tokenResp.UserId.Trim();
+            payerId = payerId.Trim();
 
             // Step 2: MSA 反查会员（type='alipay_payerid'）
             int? memberId = null;
             List<MemberSocialAccount> msaList = await _db.memberSocialAccount
-                .Where(m => m.num.Trim().Equals(userId) && m.valid == 1 && m.type.Trim().Equals("alipay_payerid"))
+                .Where(m => m.valid == 1
+                    && m.type.Trim().Equals("alipay_payerid")
+                    && (
+                        m.num.Trim().Equals(payerId)
+                        || (!string.IsNullOrEmpty(userId) && m.num.Trim().Equals(userId))
+                        || (!string.IsNullOrEmpty(openId) && m.num.Trim().Equals(openId))
+                    ))
                 .OrderByDescending(m => m.id).AsNoTracking().ToListAsync();
             if (msaList.Count > 0)
             {
@@ -382,7 +417,7 @@ namespace SnowmeetApi.Controllers
                     session_key = accessToken,
                     session_type = sessionType,
                     member_id = member?.id,
-                    wechat_openid = userId,
+                    wechat_openid = payerId,
                     wechat_unionid = null,
                     valid = 1,
                     expire_date = expireDate
@@ -393,7 +428,7 @@ namespace SnowmeetApi.Controllers
             {
                 session.valid = 1;
                 session.member_id = member?.id;
-                session.wechat_openid = userId;
+                session.wechat_openid = payerId;
                 session.wechat_unionid = null;
                 session.expire_date = expireDate;
                 _db.miniSession.Entry(session).State = EntityState.Modified;
@@ -410,10 +445,10 @@ namespace SnowmeetApi.Controllers
                 errmsg = "",
                 member_id = member?.id,
                 member = member,
-                alipay_payerid = userId
+                alipay_payerid = payerId
             };
             StaffController _staffHelper = new StaffController(_db);
-            sessionObj.staff = await _staffHelper.GetStaffBySocialNum(userId, "alipay_payerid", DateTime.Now);
+            sessionObj.staff = await _staffHelper.GetStaffBySocialNum(payerId, "alipay_payerid", DateTime.Now);
 
             // 同 wechat 路径：member 非空时仅保留 cell 类 MSA，缩减网络体积
             if (member != null)
