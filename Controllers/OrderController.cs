@@ -1745,7 +1745,6 @@ namespace SnowmeetApi.Controllers
             }
 
             double payAmount = amount == null ? (double)order.paying_amount : (double)amount;
-            List<OrderPayment> allPayments = await _db.orderPayment.Where(o => o.order_id == order.id).ToListAsync();
             OrderPayment payment = new OrderPayment()
             {
                 id = 0,
@@ -1753,7 +1752,6 @@ namespace SnowmeetApi.Controllers
                 amount = payAmount,
                 staff_id = staff?.id,
                 pay_method = "支付宝",
-                out_trade_no = order.code + "_ZF_" + (allPayments.Count + 1).ToString().PadLeft(2, '0'),
                 status = OrderPayment.PaymentStatus.待支付.ToString(),
                 create_date = DateTime.Now
             };
