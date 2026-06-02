@@ -1733,15 +1733,15 @@ namespace SnowmeetApi.Controllers
             StaffController _staffHelper = new StaffController(_db);
             Staff staff = await _staffHelper.GetStaffBySessionKey(sessionKey, sessionType);
 
-            // 跟 GetWepayPayment 同模式：把同订单上其它待支付的 alipay payment 置 valid=0，再建新单
-            List<OrderPayment> prevPayments = await _db.orderPayment
-                .Where(p => p.valid == 1 && p.status.Trim().Equals(OrderPayment.PaymentStatus.待支付.ToString())
-                    && p.order_id == orderId && p.pay_method.Trim().Equals("支付宝"))
-                .AsNoTracking().ToListAsync();
-            foreach (var op in prevPayments)
+            bool ok = await InvalidatePendingOrderPayments(order, staff?.id, "切换为支付宝");
+            if (!ok)
             {
-                op.valid = 0;
-                _db.orderPayment.Entry(op).State = EntityState.Modified;
+                return Ok(new ApiResult<OrderPayment?>()
+                {
+                    code = 1,
+                    message = "原支付方式撤回失败,请重试",
+                    data = null
+                });
             }
 
             double payAmount = amount == null ? (double)order.paying_amount : (double)amount;
