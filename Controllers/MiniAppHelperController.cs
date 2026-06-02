@@ -322,14 +322,32 @@ namespace SnowmeetApi.Controllers
             catch (Exception e)
             {
                 result.code = 1;
-                result.message = "支付宝 oauth.token 请求异常：" + e.Message;
+                string inner = e.InnerException != null ? (" | inner=" + e.InnerException.Message) : "";
+                result.message = "支付宝 oauth.token 请求异常：" + e.GetType().Name + " | " + e.Message + inner;
                 result.data = null;
                 return Ok(result);
             }
             if (tokenResp.IsError || string.IsNullOrEmpty(tokenResp.AccessToken) || string.IsNullOrEmpty(tokenResp.UserId))
             {
+                List<string> errParts = new List<string>();
+                if (!string.IsNullOrEmpty(tokenResp.Code)) errParts.Add("code=" + tokenResp.Code.Trim());
+                if (!string.IsNullOrEmpty(tokenResp.SubCode)) errParts.Add("sub_code=" + tokenResp.SubCode.Trim());
+                if (!string.IsNullOrEmpty(tokenResp.Msg)) errParts.Add("msg=" + tokenResp.Msg.Trim());
+                if (!string.IsNullOrEmpty(tokenResp.SubMsg)) errParts.Add("sub_msg=" + tokenResp.SubMsg.Trim());
+                if (!string.IsNullOrEmpty(tokenResp.Body))
+                {
+                    string body = tokenResp.Body.Trim();
+                    if (body.Length > 400)
+                    {
+                        body = body.Substring(0, 400) + "...";
+                    }
+                    errParts.Add("body=" + body);
+                }
+
                 result.code = 1;
-                result.message = "支付宝 oauth.token 失败：" + (tokenResp.SubMsg ?? tokenResp.Msg);
+                result.message = errParts.Count > 0
+                    ? ("支付宝 oauth.token 失败：" + string.Join(" | ", errParts))
+                    : "支付宝 oauth.token 失败：支付宝返回空错误信息（msg/sub_msg/body 均为空）";
                 result.data = null;
                 return Ok(result);
             }
