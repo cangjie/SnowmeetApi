@@ -553,11 +553,36 @@ namespace SnowmeetApi.Controllers.Order
                 //   解密后 JSON = { code: "10000", msg: "Success", mobile: "13xxxxxxxx" }
                 if (!string.IsNullOrEmpty(body.encData))
                 {
+                    // 诊断日志：把入参实际形状打到 stdout，定位 `not a valid Base-64 string` 是哪一段
+                    string encRawRepr = body.encData.Length <= 40 ? body.encData : body.encData.Substring(0, 40) + "...";
+                    Console.WriteLine($"[_extractPhone:alipay] encData.Length={body.encData.Length} head40={encRawRepr}");
+
                     string encResponse = Util.UrlDecode(body.encData);
-                    string aesKey = _loadAlipayAesKey();
-                    // IV 全 0：base64 编码后是 16 个 "A" 解码出 16 个 \x00 字节
+                    string aesKey;
+                    try
+                    {
+                        aesKey = _loadAlipayAesKey();
+                    }
+                    catch (Exception ex)
+                    {
+                        throw new Exception("aes_key.txt 读取失败: " + ex.Message);
+                    }
+                    string aesKeyRepr = aesKey.Length <= 12 ? aesKey : aesKey.Substring(0, 12) + "...";
+                    Console.WriteLine($"[_extractPhone:alipay] aesKey.Length={aesKey.Length} head12={aesKeyRepr} bom={(aesKey.Length > 0 && aesKey[0] == '﻿')}");
+
+                    // 三处 base64 decode 分别 try-catch，错误时拼上 source 段区分
+                    // IV 全 0：base64 编码后是 22 字符 + "==" = 24 字符，解码出 16 个 \x00 字节
                     const string zeroIv = "AAAAAAAAAAAAAAAAAAAAAA==";
-                    string json = Util.AES_decrypt(encResponse.Trim(), aesKey, zeroIv);
+                    try { var _ = Convert.FromBase64String(aesKey); }
+                    catch (FormatException fe) { throw new Exception("aesKey 不是合法 base64 (len=" + aesKey.Length + " head12=" + aesKeyRepr + "): " + fe.Message); }
+                    try { var _ = Convert.FromBase64String(zeroIv); }
+                    catch (FormatException fe) { throw new Exception("zeroIv 不是合法 base64 (硬编码 bug?): " + fe.Message); }
+                    string encTrimmed = encResponse.Trim();
+                    try { var _ = Convert.FromBase64String(encTrimmed); }
+                    catch (FormatException fe) { throw new Exception("encData 不是合法 base64 (len=" + encTrimmed.Length + " head40=" + (encTrimmed.Length <= 40 ? encTrimmed : encTrimmed.Substring(0, 40) + "...") + "): " + fe.Message); }
+
+                    string json = Util.AES_decrypt(encTrimmed, aesKey, zeroIv);
+                    Console.WriteLine($"[_extractPhone:alipay] decrypt OK, json head80={(json.Length <= 80 ? json : json.Substring(0, 80) + "...")}");
                     JToken jsonObj = (JToken)JsonConvert.DeserializeObject(json);
                     if (jsonObj == null || jsonObj["mobile"] == null)
                     {
