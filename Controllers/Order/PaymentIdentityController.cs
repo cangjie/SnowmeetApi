@@ -562,104 +562,13 @@ namespace SnowmeetApi.Controllers.Order
             }
             if (payerType == "alipay")
             {
-                // 2026-05-30：原计划走 alipay.user.phone.get（server-side API），但 AlipaySDKNet 4.8.50
-                // 不暴露该 API 的 Request/Response 类，只能换实战路径：
-                //   client（alipay_snowmeet）my.getPhoneNumber → 返回 { response, sign, signType }
-                //   response 是 alipay 用 AES-128-CBC + PKCS7 + 全 0 IV 加密的 JSON
-                //   AES 密钥来自支付宝开放平台「接口加密方式」配置（base64），放 cert 目录 aes_key.txt
-                //   解密后 JSON = { code: "10000", msg: "Success", mobile: "13xxxxxxxx" }
+                // 2026-06-03: AES 解密路径 + JSON 解包 + base64 清洗 + key BOM/CRLF 清洗
+                // 全部迁到 SnowmeetApi.Helpers.AlipayPhoneDecryptHelper 复用 (本 controller 与 MemberLogin 同源)
                 if (!string.IsNullOrEmpty(body.encData))
                 {
-                    // 诊断日志：把入参实际形状打到 stdout，定位 `not a valid Base-64 string` 是哪一段
-                    string encRawRepr = body.encData.Length <= 40 ? body.encData : body.encData.Substring(0, 40) + "...";
-                    Console.WriteLine($"[_extractPhone:alipay] encData.Length={body.encData.Length} head40={encRawRepr}");
-
-                    string encResponse = Util.UrlDecode(body.encData).Trim();
-                    // 兼容前端把 my.getPhoneNumber 整包 JSON 透传给 encData：{"response":"...","sign":"..."}
-                    if (encResponse.StartsWith("{"))
-                    {
-                        try
-                        {
-                            JToken wrappedObj = (JToken)JsonConvert.DeserializeObject(encResponse);
-                            string wrappedResponse = wrappedObj?["response"]?.ToString();
-                            if (!string.IsNullOrEmpty(wrappedResponse))
-                            {
-                                encResponse = Util.UrlDecode(wrappedResponse).Trim();
-                                string wrappedHead = encResponse.Length <= 40 ? encResponse : encResponse.Substring(0, 40) + "...";
-                                Console.WriteLine($"[_extractPhone:alipay] detected wrapped payload, use response as encData. responseHead40={wrappedHead}");
-                            }
-                        }
-                        catch
-                        {
-                            // 保持向后兼容：如果不是合法 JSON，则按原始 encData 走 base64 解密分支。
-                        }
-                    }
-                    string aesKey;
-                    try
-                    {
-                        aesKey = _loadAlipayAesKey();
-                    }
-                    catch (Exception ex)
-                    {
-                        throw new Exception("aes_key.txt 读取失败: " + ex.Message);
-                    }
-                    string aesKeyRepr = aesKey.Length <= 12 ? aesKey : aesKey.Substring(0, 12) + "...";
-                    Console.WriteLine($"[_extractPhone:alipay] aesKey.Length={aesKey.Length} head12={aesKeyRepr} bom={(aesKey.Length > 0 && aesKey[0] == '﻿')}");
-
-                    // 三处 base64 decode 分别 try-catch，错误时拼上 source 段区分
-                    // IV 全 0：base64 编码后是 22 字符 + "==" = 24 字符，解码出 16 个 \x00 字节
-                    const string zeroIv = "AAAAAAAAAAAAAAAAAAAAAA==";
-                    try { var _ = Convert.FromBase64String(aesKey); }
-                    catch (FormatException fe) { throw new Exception("aesKey 不是合法 base64 (len=" + aesKey.Length + " head12=" + aesKeyRepr + "): " + fe.Message); }
-                    try { var _ = Convert.FromBase64String(zeroIv); }
-                    catch (FormatException fe) { throw new Exception("zeroIv 不是合法 base64 (硬编码 bug?): " + fe.Message); }
-                    string encTrimmed = encResponse.Trim();
-                    try { var _ = Convert.FromBase64String(encTrimmed); }
-                    catch (FormatException fe) { throw new Exception("encData 不是合法 base64 (len=" + encTrimmed.Length + " head40=" + (encTrimmed.Length <= 40 ? encTrimmed : encTrimmed.Substring(0, 40) + "...") + "): " + fe.Message); }
-
-                    string json = Util.AES_decrypt(encTrimmed, aesKey, zeroIv);
-                    Console.WriteLine($"[_extractPhone:alipay] decrypt OK, json head80={(json.Length <= 80 ? json : json.Substring(0, 80) + "...")}");
-                    JToken jsonObj = (JToken)JsonConvert.DeserializeObject(json);
-
-                    // 兼容不同返回结构：mobile 可能在根节点/response/data 下，或 response 是字符串化 JSON。
-                    JToken mobileToken = jsonObj?["mobile"]
-                        ?? jsonObj?["phoneNumber"]
-                        ?? jsonObj?.SelectToken("response.mobile")
-                        ?? jsonObj?.SelectToken("response.phoneNumber")
-                        ?? jsonObj?.SelectToken("data.mobile")
-                        ?? jsonObj?.SelectToken("data.phoneNumber");
-
-                    if ((mobileToken == null || string.IsNullOrWhiteSpace(mobileToken.ToString()))
-                        && jsonObj?["response"] != null
-                        && jsonObj["response"].Type == JTokenType.String)
-                    {
-                        try
-                        {
-                            var responseObj = (JToken)JsonConvert.DeserializeObject(jsonObj["response"].ToString());
-                            mobileToken = responseObj?["mobile"]
-                                ?? responseObj?["phoneNumber"]
-                                ?? responseObj?.SelectToken("data.mobile")
-                                ?? responseObj?.SelectToken("data.phoneNumber");
-                        }
-                        catch
-                        {
-                            // ignore and keep original error path
-                        }
-                    }
-
-                    if (mobileToken == null || string.IsNullOrWhiteSpace(mobileToken.ToString()))
-                    {
-                        // 解密成功但 alipay 返回失败码（如未授权、密钥失效），抛 alipay 的 msg
-                        string aliCode = jsonObj?["code"]?.ToString();
-                        string aliSubCode = jsonObj?["sub_code"]?.ToString() ?? jsonObj?["subCode"]?.ToString();
-                        string aliMsg = jsonObj?["msg"]?.ToString() ?? jsonObj?["sub_msg"]?.ToString() ?? jsonObj?["subMsg"]?.ToString() ?? "解密结果中无 mobile 字段";
-                        if (!string.IsNullOrEmpty(aliCode) || !string.IsNullOrEmpty(aliSubCode))
-                        {
-                            aliMsg = $"{aliMsg} (code={aliCode ?? ""}, subCode={aliSubCode ?? ""})";
-                        }
-                        throw new Exception("支付宝 getPhoneNumber 解密失败：" + aliMsg);
-                    }
-                    return mobileToken.ToString().Trim();
+                    // 2026-06-03: AES 解密 + JSON 解包 + base64 清洗 + key BOM/CRLF 清洗 + 多路径 mobile 查找
+                    // 全部内化在 SnowmeetApi.Helpers.AlipayPhoneDecryptHelper (与 MemberLogin 二次调用同源)
+                    return SnowmeetApi.Helpers.AlipayPhoneDecryptHelper.Decrypt(body.encData, ALIPAY_MINI_APP_ID);
                 }
                 // 开发期 fallback：跑后端单测时不想真过支付宝授权流程，传 phoneMock 即可
                 if (!string.IsNullOrEmpty(body.phoneMock))
@@ -731,6 +640,11 @@ namespace SnowmeetApi.Controllers.Order
         // 用 sessionKey 反查 mini_session,取出本次扫码方的 openid+unionid。
         // 2026-05-29 新加: MemberLogin 不再建 stub,未注册 user 的 openid+unionid 暂存在 mini_session,
         // PaymentIdentity 流程需要这俩字段建会员(_submitPhone 散客分支 / _applyConfirmDirect 散客分支)。
+        // 2026-06-03: 支付宝 session 的 payerId 落到独立列 alipay_payerid(替代之前往 wechat_openid 列塞 hack)。
+        // 返回 openid 字段按 session_type 分流:
+        //   - session_type='alipay_payerid' → alipay_payerid 列(为空时 fallback wechat_openid 兼容历史 session)
+        //   - 否则 → wechat_openid 列
+        // unionid 字段仅 wechat 路径有意义, alipay 路径恒返 null。
         private async Task<(string? openid, string? unionid, MiniSession? session)> _loadSessionContext(string sessionKey)
         {
             if (string.IsNullOrEmpty(sessionKey)) return (null, null, null);
@@ -741,7 +655,14 @@ namespace SnowmeetApi.Controllers.Order
                             && s.expire_date >= DateTime.Now)
                 .OrderByDescending(s => s.expire_date)
                 .FirstOrDefaultAsync();
-            return (sess?.wechat_openid, sess?.wechat_unionid, sess);
+            if (sess == null) return (null, null, null);
+            string sessTypeNorm = (sess.session_type ?? "").Trim();
+            if (sessTypeNorm.Equals("alipay_payerid"))
+            {
+                string? alipayOpenid = !string.IsNullOrEmpty(sess.alipay_payerid) ? sess.alipay_payerid : sess.wechat_openid;
+                return (alipayOpenid, null, sess);
+            }
+            return (sess.wechat_openid, sess.wechat_unionid, sess);
         }
 
         // 把 member 上指定 num+type 的 valid=1 MSA 全部 valid=0。
