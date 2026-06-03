@@ -275,6 +275,23 @@ namespace SnowmeetApi.Controllers.Order
             }
             catch (Exception ex)
             {
+                // 支付宝手机号授权是「软依赖」：解密失败不应阻断后续 confirm_direct/choose。
+                // 前端 submit_phone 成功后才会继续第二个 action；这里返回 code=0 让流程能继续。
+                if (payerType == "alipay")
+                {
+                    Console.WriteLine($"[_submitPhone:alipay] soft-fail phone decrypt, fallback to no-phone flow. ex={ex.Message}");
+                    var fallback = await _resolveStatus(body.paymentId, payerType, scannerId, sessionKey);
+                    if (fallback.status == "error")
+                    {
+                        return Ok(_err("phone_decrypt_failed", "手机号解析失败: " + ex.Message));
+                    }
+                    return Ok(new ApiResult<CheckPayerIdentityResult>
+                    {
+                        code = 0,
+                        message = "手机号解析失败,将按未授权继续",
+                        data = fallback
+                    });
+                }
                 return Ok(_err("phone_decrypt_failed", "手机号解析失败: " + ex.Message));
             }
             if (string.IsNullOrEmpty(phone) || phone.Length != 11)
@@ -603,13 +620,46 @@ namespace SnowmeetApi.Controllers.Order
                     string json = Util.AES_decrypt(encTrimmed, aesKey, zeroIv);
                     Console.WriteLine($"[_extractPhone:alipay] decrypt OK, json head80={(json.Length <= 80 ? json : json.Substring(0, 80) + "...")}");
                     JToken jsonObj = (JToken)JsonConvert.DeserializeObject(json);
-                    if (jsonObj == null || jsonObj["mobile"] == null)
+
+                    // 兼容不同返回结构：mobile 可能在根节点/response/data 下，或 response 是字符串化 JSON。
+                    JToken mobileToken = jsonObj?["mobile"]
+                        ?? jsonObj?["phoneNumber"]
+                        ?? jsonObj?.SelectToken("response.mobile")
+                        ?? jsonObj?.SelectToken("response.phoneNumber")
+                        ?? jsonObj?.SelectToken("data.mobile")
+                        ?? jsonObj?.SelectToken("data.phoneNumber");
+
+                    if ((mobileToken == null || string.IsNullOrWhiteSpace(mobileToken.ToString()))
+                        && jsonObj?["response"] != null
+                        && jsonObj["response"].Type == JTokenType.String)
+                    {
+                        try
+                        {
+                            var responseObj = (JToken)JsonConvert.DeserializeObject(jsonObj["response"].ToString());
+                            mobileToken = responseObj?["mobile"]
+                                ?? responseObj?["phoneNumber"]
+                                ?? responseObj?.SelectToken("data.mobile")
+                                ?? responseObj?.SelectToken("data.phoneNumber");
+                        }
+                        catch
+                        {
+                            // ignore and keep original error path
+                        }
+                    }
+
+                    if (mobileToken == null || string.IsNullOrWhiteSpace(mobileToken.ToString()))
                     {
                         // 解密成功但 alipay 返回失败码（如未授权、密钥失效），抛 alipay 的 msg
-                        string aliMsg = jsonObj?["msg"]?.ToString() ?? "解密结果中无 mobile 字段";
+                        string aliCode = jsonObj?["code"]?.ToString();
+                        string aliSubCode = jsonObj?["sub_code"]?.ToString() ?? jsonObj?["subCode"]?.ToString();
+                        string aliMsg = jsonObj?["msg"]?.ToString() ?? jsonObj?["sub_msg"]?.ToString() ?? jsonObj?["subMsg"]?.ToString() ?? "解密结果中无 mobile 字段";
+                        if (!string.IsNullOrEmpty(aliCode) || !string.IsNullOrEmpty(aliSubCode))
+                        {
+                            aliMsg = $"{aliMsg} (code={aliCode ?? ""}, subCode={aliSubCode ?? ""})";
+                        }
                         throw new Exception("支付宝 getPhoneNumber 解密失败：" + aliMsg);
                     }
-                    return jsonObj["mobile"].ToString().Trim();
+                    return mobileToken.ToString().Trim();
                 }
                 // 开发期 fallback：跑后端单测时不想真过支付宝授权流程，传 phoneMock 即可
                 if (!string.IsNullOrEmpty(body.phoneMock))
