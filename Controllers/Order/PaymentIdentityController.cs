@@ -285,10 +285,12 @@ namespace SnowmeetApi.Controllers.Order
                     {
                         return Ok(_err("phone_decrypt_failed", "手机号解析失败: " + ex.Message));
                     }
+                    // 2026-06-03: 把 helper 的 ex.Message 也带回前端 (含诊断信息: aesKeyLen/encDataLen/JSON wrap 等),
+                    // 不用 SSH 也能看出解密哪一步炸
                     return Ok(new ApiResult<CheckPayerIdentityResult>
                     {
                         code = 0,
-                        message = "手机号解析失败,将按未授权继续",
+                        message = "手机号解析失败,将按未授权继续: " + ex.Message,
                         data = fallback
                     });
                 }
@@ -350,9 +352,29 @@ namespace SnowmeetApi.Controllers.Order
                     await EnsureUnionIdMsa(phoneOwner.id, phoneOwner);
                     finalMemberId = phoneOwner.id;
                 }
+                else if (payerType == "alipay")
+                {
+                    // 2026-06-03 用户原则: 支付宝路径不在 PaymentIdentity 里建新会员,
+                    // 会员推迟到支付宝 notify(AliController.CallBack)收到支付成功后再兜底建。
+                    // 这里只把解出的 phone 暂存到 mini_session.cell, OP.member_id 不动 (留给后续支付成功后回填)
+                    if (sess != null)
+                    {
+                        sess.cell = phone;
+                        sess.expire_date = DateTime.Now.AddHours(2);
+                        _db.miniSession.Entry(sess).State = EntityState.Modified;
+                        await _db.SaveChangesAsync();
+                    }
+                    var refreshedAli = await _resolveStatus(body.paymentId, payerType, scannerId, sessionKey);
+                    return Ok(new ApiResult<CheckPayerIdentityResult>
+                    {
+                        code = refreshedAli.status == "error" ? 1 : 0,
+                        message = refreshedAli.errorMessage ?? "",
+                        data = refreshedAli
+                    });
+                }
                 else
                 {
-                    // 全新顾客 → 注册新会员 + cell + openid + (unionid)MSA
+                    // wechat 全新顾客 → 注册新会员 + cell + openid + (unionid)MSA (维持原行为)
                     finalMemberId = await _createNewMember(phone, scannerId, msaType, sessUnionid);
                 }
             }
@@ -418,26 +440,33 @@ namespace SnowmeetApi.Controllers.Order
             }
             if (pre.scannerMemberId == null)
             {
-                // 与 _applyConfirmDirect 对齐：游客拒绝手机号授权但点了"正常支付/替人代付"
-                // → 用 sessionKey 反查 openid/unionid，自动建一个无 cell 游客会员，然后继续 choose 流程。
-                // MemberLogin 2026-05-29 起不再建 stub，没这层兜底前端 fallback 必失败。
-                var (sessOpenidAuto, sessUnionidAuto, sessAuto) = await _loadSessionContext(sessionKey);
-                if (sessAuto == null || string.IsNullOrEmpty(sessOpenidAuto))
+                if (payerType == "alipay")
                 {
-                    return Ok(_err("session_not_found", "登录失效,请退出小程序重进"));
+                    // 2026-06-03 用户原则: alipay 路径不在 PaymentIdentity 建会员,
+                    // member 推迟到 AliController.CallBack 收到支付成功后兜底建。
+                    // 此处 OP.member_id 留 null,仅写 is_proxy_pay 意图。下方逻辑统一处理。
                 }
-                string msaTypeAuto = _msaTypeForPayer(payerType);
-                if (msaTypeAuto == null)
+                else
                 {
-                    return Ok(_err("unsupported_payer_type", "不支持的支付通道: " + payerType));
+                    // wechat: 维持原行为, 游客拒绝授权时建无 cell 会员
+                    var (sessOpenidAuto, sessUnionidAuto, sessAuto) = await _loadSessionContext(sessionKey);
+                    if (sessAuto == null || string.IsNullOrEmpty(sessOpenidAuto))
+                    {
+                        return Ok(_err("session_not_found", "登录失效,请退出小程序重进"));
+                    }
+                    string msaTypeAuto = _msaTypeForPayer(payerType);
+                    if (msaTypeAuto == null)
+                    {
+                        return Ok(_err("unsupported_payer_type", "不支持的支付通道: " + payerType));
+                    }
+                    var newMemberId = await _createNewMember(null, sessOpenidAuto, msaTypeAuto, sessUnionidAuto);
+                    sessAuto.member_id = newMemberId;
+                    _db.miniSession.Entry(sessAuto).State = EntityState.Modified;
+                    await _db.SaveChangesAsync();
+                    pre.scannerMemberId = newMemberId;
+                    pre.scannerHasCell = false;
+                    if (string.IsNullOrEmpty(scannerId)) scannerId = sessOpenidAuto;
                 }
-                var newMemberId = await _createNewMember(null, sessOpenidAuto, msaTypeAuto, sessUnionidAuto);
-                sessAuto.member_id = newMemberId;
-                _db.miniSession.Entry(sessAuto).State = EntityState.Modified;
-                await _db.SaveChangesAsync();
-                pre.scannerMemberId = newMemberId;
-                pre.scannerHasCell = false;
-                if (string.IsNullOrEmpty(scannerId)) scannerId = sessOpenidAuto;
             }
             if (pre.status != "choose_identity")
             {
@@ -457,19 +486,12 @@ namespace SnowmeetApi.Controllers.Order
                 return Ok(_err("order_not_found", "订单或支付记录消失"));
             }
 
-            int scannerMemberId = (int)pre.scannerMemberId;
-            // 决策时机迁回 notify：此处只在 OrderPayment 上写付款方意图，
-            // Order.member_id / wechat_unverified 由 DealSuccessPaidOrder 在支付成功回调时同步
-            if (choice == "self")
-            {
-                op.member_id = scannerMemberId;
-                op.is_proxy_pay = false;
-            }
-            else // proxy
-            {
-                op.member_id = scannerMemberId;
-                op.is_proxy_pay = true;
-            }
+            // 决策时机迁回 notify：此处只在 OrderPayment 上写付款方意图,
+            // Order.member_id / wechat_unverified 由 DealSuccessPaidOrder 在支付成功回调时同步。
+            // alipay 路径 scannerMemberId 可能仍为 null (用户原则: 推迟到支付成功后建会员) → OP.member_id 也留 null
+            int? scannerMemberId = pre.scannerMemberId;
+            op.member_id = scannerMemberId;
+            op.is_proxy_pay = (choice == "proxy");
             op.update_date = DateTime.Now;
             _db.orderPayment.Entry(op).State = EntityState.Modified;
             await _db.SaveChangesAsync();
@@ -491,26 +513,33 @@ namespace SnowmeetApi.Controllers.Order
             }
             if (pre.scannerMemberId == null)
             {
-                // 2026-05-29: 散客拒绝授权手机号但要继续支付 → 用 sessionKey 反查 openid+unionid,自动建会员(无 cell)
-                // MemberLogin 不再建 stub 后,这里成为「不绑手机号也建会员」的唯一入口
-                var (sessOpenidAuto, sessUnionidAuto, sessAuto) = await _loadSessionContext(sessionKey);
-                if (sessAuto == null || string.IsNullOrEmpty(sessOpenidAuto))
+                if (payerType == "alipay")
                 {
-                    return Ok(_err("session_not_found", "登录失效,请退出小程序重进"));
+                    // 2026-06-03 用户原则: alipay 路径不在 PaymentIdentity 建会员,
+                    // member 推迟到 AliController.CallBack 收到支付成功后兜底建。
+                    // OP.member_id 留 null, is_proxy_pay=false (确认直付意图)。
                 }
-                string msaTypeAuto = _msaTypeForPayer(payerType);
-                if (msaTypeAuto == null)
+                else
                 {
-                    return Ok(_err("unsupported_payer_type", "不支持的支付通道: " + payerType));
+                    // wechat: 维持原行为, 散客拒绝授权手机号要继续支付 → 反查 openid+unionid 自动建无 cell 会员
+                    var (sessOpenidAuto, sessUnionidAuto, sessAuto) = await _loadSessionContext(sessionKey);
+                    if (sessAuto == null || string.IsNullOrEmpty(sessOpenidAuto))
+                    {
+                        return Ok(_err("session_not_found", "登录失效,请退出小程序重进"));
+                    }
+                    string msaTypeAuto = _msaTypeForPayer(payerType);
+                    if (msaTypeAuto == null)
+                    {
+                        return Ok(_err("unsupported_payer_type", "不支持的支付通道: " + payerType));
+                    }
+                    var newMemberId = await _createNewMember(null, sessOpenidAuto, msaTypeAuto, sessUnionidAuto);
+                    sessAuto.member_id = newMemberId;
+                    _db.miniSession.Entry(sessAuto).State = EntityState.Modified;
+                    await _db.SaveChangesAsync();
+                    pre.scannerMemberId = newMemberId;
+                    pre.scannerHasCell = false;
+                    if (string.IsNullOrEmpty(scannerId)) scannerId = sessOpenidAuto;
                 }
-                var newMemberId = await _createNewMember(null, sessOpenidAuto, msaTypeAuto, sessUnionidAuto);
-                sessAuto.member_id = newMemberId;
-                _db.miniSession.Entry(sessAuto).State = EntityState.Modified;
-                await _db.SaveChangesAsync();
-                pre.scannerMemberId = newMemberId;
-                pre.scannerHasCell = false;
-                // 同步 scannerId 用于下方 _resolveStatus 再算时能找到这个新会员
-                if (string.IsNullOrEmpty(scannerId)) scannerId = sessOpenidAuto;
             }
             if (pre.status != "direct" && pre.status != "direct_to_scanner")
             {
@@ -524,9 +553,10 @@ namespace SnowmeetApi.Controllers.Order
                 return Ok(_err("order_not_found", "订单或支付记录消失"));
             }
 
-            int scannerMemberId = (int)pre.scannerMemberId;
-            // 决策时机迁回 notify：此处只在 OrderPayment 上写付款方意图，
-            // Order.member_id / wechat_unverified 由 DealSuccessPaidOrder 在支付成功回调时同步
+            // 决策时机迁回 notify: 此处只在 OrderPayment 上写付款方意图,
+            // Order.member_id / wechat_unverified 由 DealSuccessPaidOrder 在支付成功回调时同步。
+            // alipay 路径 scannerMemberId 可能仍为 null (用户原则: 推迟到支付成功后建会员) → OP.member_id 也留 null
+            int? scannerMemberId = pre.scannerMemberId;
             op.member_id = scannerMemberId;
             op.is_proxy_pay = false;
             op.update_date = DateTime.Now;

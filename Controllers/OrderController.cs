@@ -1777,22 +1777,30 @@ namespace SnowmeetApi.Controllers
         [HttpGet("{paymentId}")]
         public async Task<ActionResult<ApiResult<OrderPayment?>>> AlipayPayByOrderPayment(int paymentId, string sessionKey)
         {
-            MemberController _memberHelper = new MemberController(_db, _config);
-            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, "alipay_payerid");
-            string message = "";
-            if (member == null || string.IsNullOrEmpty(member.alipayPayerId))
-            {
-                message = "未找到支付宝用户";
-            }
-            if (!message.Trim().Equals(""))
+            // 2026-06-03: 用户原则 alipay 路径推迟建会员到支付成功 notify。
+            // 这里不再强制要求 session 有 member, 改为直接读 mini_session.alipay_payerid 取 buyerId,
+            // session.member_id 可空(guest 流程), 注册阶段交给 AliController.CallBack 兜底。
+            string sk = Util.UrlDecode(sessionKey ?? "").Trim();
+            MiniSession sess = await _db.miniSession
+                .Where(s => s.session_key.Trim().Equals(sk)
+                            && s.session_type.Trim().Equals("alipay_payerid")
+                            && s.valid == 1
+                            && s.expire_date >= DateTime.Now)
+                .OrderByDescending(s => s.expire_date)
+                .AsNoTracking()
+                .FirstOrDefaultAsync();
+            if (sess == null || string.IsNullOrEmpty(sess.alipay_payerid))
             {
                 return Ok(new ApiResult<OrderPayment?>()
                 {
                     code = 1,
-                    message = message,
+                    message = "未找到支付宝用户(session 失效)",
                     data = null
                 });
             }
+            string buyerId = sess.alipay_payerid.Trim();
+            int? sessionMemberId = sess.member_id;
+
             OrderPayment payment = await _db.orderPayment.Where(p => p.id == paymentId).AsNoTracking().FirstOrDefaultAsync();
             if (payment == null)
             {
@@ -1815,12 +1823,10 @@ namespace SnowmeetApi.Controllers
                 outTradeNo = order.code + "_ZF_" + outNum.ToString().PadLeft(2, '0');
             }
 
-            string buyerId = member.alipayPayerId.Trim();
-
-            // 分支 1：首次 — payment.member_id == null
+            // 分支 1: 首次 — payment.member_id == null (sessionMemberId 可空, 一并赋值即可)
             if (payment.member_id == null)
             {
-                payment.member_id = member.id;
+                payment.member_id = sessionMemberId;
                 payment.ali_buyer_id = buyerId;
                 payment.out_trade_no = outTradeNo.Trim();
                 payment.pay_method = "支付宝";
@@ -1828,8 +1834,9 @@ namespace SnowmeetApi.Controllers
                 _db.orderPayment.Entry(payment).State = EntityState.Modified;
                 await _db.SaveChangesAsync();
             }
-            // 分支 2：换人 — payment.member_id 已存在但不等于当前支付方
-            if (payment.member_id != null && payment.member_id != member.id)
+            // 分支 2: 换人 — payment.member_id 已存在但 sessionMemberId 不一致(且非 null)
+            // sessionMemberId == null 时跳过本分支(guest 接续, 不视为换人), 由分支 3 仅更新 buyer_id/out_trade_no
+            if (payment.member_id != null && sessionMemberId != null && payment.member_id != sessionMemberId)
             {
                 CoreDataModLog log = new CoreDataModLog()
                 {
@@ -1838,16 +1845,16 @@ namespace SnowmeetApi.Controllers
                     field_name = "member_id",
                     key_value = payment.id,
                     scene = "支付顾客换人",
-                    member_id = member.id,
+                    member_id = sessionMemberId,
                     staff_id = null,
                     prev_value = payment.member_id.ToString(),
-                    current_value = member.id.ToString(),
+                    current_value = sessionMemberId.ToString(),
                     trace_id = 0,
                     is_manual = 1,
                     manual_memo = ""
                 };
                 await _db.coreDataModLog.AddAsync(log);
-                payment.member_id = member.id;
+                payment.member_id = sessionMemberId;
                 payment.ali_buyer_id = buyerId;
                 payment.out_trade_no = outTradeNo.Trim();
                 payment.ali_trade_no = null;       // 清掉旧 trade_no，强制重新 trade.create
@@ -1856,9 +1863,8 @@ namespace SnowmeetApi.Controllers
                 _db.orderPayment.Entry(payment).State = EntityState.Modified;
                 await _db.SaveChangesAsync();
             }
-            // 分支 3：ali_buyer_id 不匹配 — PaymentIdentity 已 pre-set member_id = scanner，但 buyer_id 没跟着改
-            // 如果直接用旧 buyer_id 调 trade.create，支付宝会拒（user_id 与 trade 归属不一致）
-            if (payment.member_id == member.id
+            // 分支 3: ali_buyer_id 不匹配 — payment.member_id 与 sessionMemberId 同(含两者都 null) 但 buyer_id 没跟上
+            if (payment.member_id == sessionMemberId
                 && !string.IsNullOrEmpty(buyerId)
                 && (payment.ali_buyer_id == null || payment.ali_buyer_id.Trim() != buyerId))
             {
