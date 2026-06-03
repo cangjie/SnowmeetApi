@@ -557,7 +557,26 @@ namespace SnowmeetApi.Controllers.Order
                     string encRawRepr = body.encData.Length <= 40 ? body.encData : body.encData.Substring(0, 40) + "...";
                     Console.WriteLine($"[_extractPhone:alipay] encData.Length={body.encData.Length} head40={encRawRepr}");
 
-                    string encResponse = Util.UrlDecode(body.encData);
+                    string encResponse = Util.UrlDecode(body.encData).Trim();
+                    // 兼容前端把 my.getPhoneNumber 整包 JSON 透传给 encData：{"response":"...","sign":"..."}
+                    if (encResponse.StartsWith("{"))
+                    {
+                        try
+                        {
+                            JToken wrappedObj = (JToken)JsonConvert.DeserializeObject(encResponse);
+                            string wrappedResponse = wrappedObj?["response"]?.ToString();
+                            if (!string.IsNullOrEmpty(wrappedResponse))
+                            {
+                                encResponse = Util.UrlDecode(wrappedResponse).Trim();
+                                string wrappedHead = encResponse.Length <= 40 ? encResponse : encResponse.Substring(0, 40) + "...";
+                                Console.WriteLine($"[_extractPhone:alipay] detected wrapped payload, use response as encData. responseHead40={wrappedHead}");
+                            }
+                        }
+                        catch
+                        {
+                            // 保持向后兼容：如果不是合法 JSON，则按原始 encData 走 base64 解密分支。
+                        }
+                    }
                     string aesKey;
                     try
                     {
