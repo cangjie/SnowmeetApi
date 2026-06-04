@@ -285,12 +285,13 @@ namespace SnowmeetApi.Controllers.Order
                     {
                         return Ok(_err("phone_decrypt_failed", "手机号解析失败: " + ex.Message));
                     }
-                    // 软失败不再把底层诊断文案回传前端，避免用户端反复出现技术错误提示。
-                    // 具体失败原因保留在 server log 里（上面的 Console.WriteLine）。
+                    string decryptErrMsg = "手机号解析失败: " + ex.Message;
+                    fallback.errorCode = "phone_decrypt_failed";
+                    fallback.errorMessage = decryptErrMsg;
                     return Ok(new ApiResult<CheckPayerIdentityResult>
                     {
                         code = 0,
-                        message = "",
+                        message = decryptErrMsg,
                         data = fallback
                     });
                 }
