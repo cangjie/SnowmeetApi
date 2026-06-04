@@ -146,12 +146,14 @@ namespace SnowmeetApi.Controllers
             return "success";
         }
         [HttpGet]
-        public async Task<ActionResult<ApiResult<Code2Session>>> MemberLogin(string code, string openIdType)
+        public async Task<ActionResult<ApiResult<Code2Session>>> MemberLogin(string code, string openIdType, string? aliSessionKey = null, string? aliEncData = null)
         {
             // 支付宝小程序登录走独立分支（用 alipay.system.oauth.token + 自家 RSA 密钥对，与微信通道完全无关）
+            // 2026-06-03: aliSessionKey+aliEncData 两参数支持二次调用（取手机号 + MSA cell 兜底匹配会员）
+            // (微信分支的局部变量 sessionKey 与之同名会冲突, 故 alipay 参数加 ali 前缀)
             if (openIdType != null && openIdType.Trim().Equals("alipay_payerid"))
             {
-                return await _alipayMemberLogin(code);
+                return await _alipayMemberLogin(code, aliSessionKey, aliEncData);
             }
             ApiResult<Code2Session> result = new ApiResult<Code2Session>();
             string appId = _settings.appId;
@@ -284,10 +286,36 @@ namespace SnowmeetApi.Controllers
         }
 
         // 支付宝小程序登录：与 wechat 路径平行的实现
-        // 入参 code = my.getAuthCode 拿到的 auth_code（base scope 即可）
-        // 流程：oauth.token 换 (access_token, user_id) → MSA 反查 member → 写 MiniSession
-        // 与 wechat 同策略：未匹配会员**不建 stub**（2026-05-29 重构定调），延迟到 PaymentIdentity 建
-        private async Task<ActionResult<ApiResult<Code2Session>>> _alipayMemberLogin(string code)
+        // 入参:
+        //   code = my.getAuthCode 拿到的 auth_code(首次调用必填; 二次调用可空)
+        //   sessionKey = 首次调用返回的 session_key(即 access_token), 二次调用必填
+        //   encData = my.getPhoneNumber 返回 response 字段, 二次调用必填
+        //
+        // 流程概览(2026-06-03 重构):
+        //   首次调用(有 code, 无 sessionKey/encData):
+        //     1. oauth.token 换 access_token + payerId
+        //     2. MSA(type=alipay_payerid, num=payerId) 反查 memberId
+        //     3. memberId 命中且 MSA(type=cell) 有 valid=1 一条 → 直接成功(needPhone=false)
+        //     4. 否则写 mini_session + needPhone=true 返回, 等客户端补 encData 二次调用
+        //   二次调用(有 sessionKey+encData):
+        //     1. 反查 mini_session(sessionKey, session_type='alipay_payerid')
+        //     2. AlipayPhoneDecryptHelper.Decrypt 解出 phone
+        //     3. session.member_id 仍为 null → MSA(type=cell, num=phone) 反查 memberId
+        //     4. memberId 命中 + MSA 无该 payerId 的 alipay_payerid 记录 → INSERT(_ensureAlipayPayerIdMsa)
+        //     5. 更新 mini_session(cell, member_id, expire_date) 返回
+        //   策略约束: 未匹配会员**永不建 Member**(5-29 定调), 散客建会员留给 PaymentIdentity 流程
+        private async Task<ActionResult<ApiResult<Code2Session>>> _alipayMemberLogin(string code, string? sessionKey, string? encData)
+        {
+            // 二次调用分支(sessionKey + encData 同时存在)
+            if (!string.IsNullOrEmpty(sessionKey) && !string.IsNullOrEmpty(encData))
+            {
+                return await _alipayMemberLoginSecondCall(sessionKey, encData);
+            }
+            // 否则当首次调用处理(必须有 code)
+            return await _alipayMemberLoginFirstCall(code);
+        }
+
+        private async Task<ActionResult<ApiResult<Code2Session>>> _alipayMemberLoginFirstCall(string code)
         {
             ApiResult<Code2Session> result = new ApiResult<Code2Session>();
             if (string.IsNullOrEmpty(code))
@@ -403,10 +431,24 @@ namespace SnowmeetApi.Controllers
             {
                 member = await _memberHelper.GetWholeMemberById((int)memberId);
                 // 若 MSA 指向已删 member（脏数据），仍按未注册处理，不建 stub
+                if (member == null)
+                {
+                    memberId = null;
+                }
             }
 
-            // Step 3: 写 / 更新 MiniSession，session_key=access_token，session_type='alipay_payerid'
-            // wechat_openid 列复用存 alipay user_id（列名虽叫 wechat 但实际是「该 session 对应方的 openid 等价物」）
+            // Step 3: 直查 MSA 表看会员是否已绑 valid=1 cell(不走 Member.cell getter, 避免 Include 漏判)
+            bool memberHasCell = false;
+            if (memberId != null)
+            {
+                memberHasCell = await _db.memberSocialAccount.AnyAsync(m =>
+                    m.member_id == memberId
+                    && m.type.Trim().Equals("cell")
+                    && m.valid == 1);
+            }
+
+            // Step 4: 写 / 更新 MiniSession，session_key=access_token，session_type='alipay_payerid'
+            // 2026-06-03: payerId 写入新建的 alipay_payerid 列(替代之前 wechat_openid 列的 hack)
             string sessionType = "alipay_payerid";
             MiniSession session = await _db.miniSession.FindAsync(accessToken, sessionType);
             DateTime expireDate = DateTime.Now.AddHours(2);
@@ -416,8 +458,10 @@ namespace SnowmeetApi.Controllers
                 {
                     session_key = accessToken,
                     session_type = sessionType,
-                    member_id = member?.id,
-                    wechat_openid = payerId,
+                    member_id = memberId,
+                    alipay_payerid = payerId,
+                    cell = null,
+                    wechat_openid = null,
                     wechat_unionid = null,
                     valid = 1,
                     expire_date = expireDate
@@ -427,15 +471,18 @@ namespace SnowmeetApi.Controllers
             else
             {
                 session.valid = 1;
-                session.member_id = member?.id;
-                session.wechat_openid = payerId;
+                session.member_id = memberId;
+                session.alipay_payerid = payerId;
+                // 二次调用回来才填 cell, 首次保持原值不动(覆盖式重置只在 alipay_payerid 上做)
+                session.wechat_openid = null;
                 session.wechat_unionid = null;
                 session.expire_date = expireDate;
                 _db.miniSession.Entry(session).State = EntityState.Modified;
             }
             await _db.SaveChangesAsync();
 
-            // Step 4: 返回 Code2Session（结构同 wechat 分支：session_key + member + staff）
+            // Step 5: 组装 Code2Session 返回(needPhone 信号: 缺会员 或 会员无 cell)
+            bool needPhone = (memberId == null) || (!memberHasCell);
             Code2Session sessionObj = new Code2Session
             {
                 session_key = accessToken,
@@ -443,9 +490,11 @@ namespace SnowmeetApi.Controllers
                 unionid = "",
                 errcode = "",
                 errmsg = "",
-                member_id = member?.id,
+                member_id = memberId,
                 member = member,
-                alipay_payerid = payerId
+                alipay_payerid = payerId,
+                cell = null,
+                needPhone = needPhone
             };
             StaffController _staffHelper = new StaffController(_db);
             sessionObj.staff = await _staffHelper.GetStaffBySocialNum(payerId, "alipay_payerid", DateTime.Now);
@@ -460,6 +509,154 @@ namespace SnowmeetApi.Controllers
             result.message = "";
             result.data = sessionObj;
             return Ok(result);
+        }
+
+        // 二次调用: 用首次返回的 sessionKey(access_token)反查 mini_session, 解 encData → phone, 用 phone 做 MSA(cell)兜底匹配
+        private async Task<ActionResult<ApiResult<Code2Session>>> _alipayMemberLoginSecondCall(string sessionKey, string encData)
+        {
+            ApiResult<Code2Session> result = new ApiResult<Code2Session>();
+            const string sessionType = "alipay_payerid";
+
+            // Step 1: 反查 mini_session
+            string sk = Util.UrlDecode(sessionKey ?? "").Trim();
+            MiniSession session = await _db.miniSession.FindAsync(sk, sessionType);
+            if (session == null || session.valid != 1 || session.expire_date < DateTime.Now)
+            {
+                result.code = 1;
+                result.message = "session 过期或不存在,请重新登录";
+                result.data = null;
+                return Ok(result);
+            }
+            string payerId = session.alipay_payerid;
+            if (string.IsNullOrEmpty(payerId))
+            {
+                // 历史 session(2026-06-03 之前)把 payerId 写在 wechat_openid 列, 兼容回退
+                payerId = session.wechat_openid;
+            }
+
+            // Step 2: 解密 encData → phone
+            string phone;
+            try
+            {
+                phone = SnowmeetApi.Helpers.AlipayPhoneDecryptHelper.Decrypt(encData, SnowmeetApi.Controllers.Order.PaymentIdentityController.ALIPAY_MINI_APP_ID);
+            }
+            catch (Exception ex)
+            {
+                result.code = 1;
+                result.message = "手机号解析失败: " + ex.Message;
+                result.data = null;
+                return Ok(result);
+            }
+            if (string.IsNullOrEmpty(phone))
+            {
+                result.code = 1;
+                result.message = "手机号解析为空";
+                result.data = null;
+                return Ok(result);
+            }
+
+            int? memberId = session.member_id;
+
+            // Step 3: session.member_id 仍为 null → 用 phone 反查 MSA(cell)
+            if (memberId == null)
+            {
+                List<MemberSocialAccount> cellMsaList = await _db.memberSocialAccount
+                    .Where(m => m.valid == 1
+                        && m.type.Trim().Equals("cell")
+                        && m.num.Trim().Equals(phone))
+                    .OrderByDescending(m => m.id).AsNoTracking().ToListAsync();
+                if (cellMsaList.Count > 0)
+                {
+                    memberId = cellMsaList[0].member_id;
+                }
+            }
+
+            // Step 4: 若现在 memberId 命中, 且 MSA 表无该 payerId 的 alipay_payerid 记录 → INSERT
+            Member member = null;
+            if (memberId != null)
+            {
+                member = await _memberHelper.GetWholeMemberById((int)memberId);
+                if (member == null)
+                {
+                    // MSA 指向死会员的脏数据 → 当未注册处理(不建 stub)
+                    memberId = null;
+                }
+                else if (!string.IsNullOrEmpty(payerId))
+                {
+                    await _ensureAlipayPayerIdMsa((int)memberId, payerId);
+                }
+            }
+
+            // Step 5: 更新 mini_session(cell + member_id + expire_date 续期)
+            session.cell = phone;
+            session.member_id = memberId;
+            session.expire_date = DateTime.Now.AddHours(2);
+            _db.miniSession.Entry(session).State = EntityState.Modified;
+            await _db.SaveChangesAsync();
+
+            // Step 6: 组装返回
+            Code2Session sessionObj = new Code2Session
+            {
+                session_key = sk,
+                openid = "",
+                unionid = "",
+                errcode = "",
+                errmsg = "",
+                member_id = memberId,
+                member = member,
+                alipay_payerid = payerId,
+                cell = phone,
+                needPhone = false
+            };
+            StaffController _staffHelper = new StaffController(_db);
+            if (!string.IsNullOrEmpty(payerId))
+            {
+                sessionObj.staff = await _staffHelper.GetStaffBySocialNum(payerId, "alipay_payerid", DateTime.Now);
+            }
+
+            if (member != null)
+            {
+                member.memberSocialAccounts = member.memberSocialAccounts.Where(m => m.valid == 1 && m.type.Trim().Equals("cell")).OrderByDescending(m => m.id).ToList();
+            }
+
+            result.code = 0;
+            result.message = "";
+            result.data = sessionObj;
+            return Ok(result);
+        }
+
+        // INSERT MSA(type=alipay_payerid, num=payerId, member_id) 若不存在; 存在但 valid=0 → revive
+        // 与 PaymentIdentityController._addMsa 同语义, 但本 controller 内独立持有避免跨控制器依赖
+        private async Task _ensureAlipayPayerIdMsa(int memberId, string payerId)
+        {
+            if (string.IsNullOrEmpty(payerId)) return;
+            string pid = payerId.Trim();
+            var existing = await _db.memberSocialAccount
+                .Where(m => m.member_id == memberId
+                    && m.type.Trim().Equals("alipay_payerid")
+                    && m.num.Trim().Equals(pid))
+                .FirstOrDefaultAsync();
+            if (existing != null)
+            {
+                if (existing.valid != 1)
+                {
+                    existing.valid = 1;
+                    existing.update_date = DateTime.Now;
+                    _db.memberSocialAccount.Entry(existing).State = EntityState.Modified;
+                    await _db.SaveChangesAsync();
+                }
+                return;
+            }
+            var msa = new MemberSocialAccount
+            {
+                id = 0,
+                member_id = memberId,
+                type = "alipay_payerid",
+                num = pid,
+                valid = 1
+            };
+            await _db.memberSocialAccount.AddAsync(msa);
+            await _db.SaveChangesAsync();
         }
 
         // 创建支付宝小程序 appId 的 IAopClient（独立证书：AlipayCertificate/2021006157624571/）
@@ -626,6 +823,10 @@ namespace SnowmeetApi.Controllers
             public string errmsg { get; set; } = "";
             public int? member_id { get; set; } = null;
             public string? alipay_payerid { get; set; } = null;
+            public string? cell { get; set; } = null;
+            // 2026-06-03: 支付宝 MemberLogin 二次调用语义信号 — true 表示首次未命中会员或会员无 cell,
+            // 客户端需 my.getPhoneNumber 拿 encData 后再发起二次调用 MemberLogin(sessionKey, encData)
+            public bool needPhone { get; set; } = false;
             [NotMapped]
             public Member member { get; set; } = null;
             [NotMapped]

@@ -285,10 +285,12 @@ namespace SnowmeetApi.Controllers.Order
                     {
                         return Ok(_err("phone_decrypt_failed", "手机号解析失败: " + ex.Message));
                     }
+                    // 软失败不再把底层诊断文案回传前端，避免用户端反复出现技术错误提示。
+                    // 具体失败原因保留在 server log 里（上面的 Console.WriteLine）。
                     return Ok(new ApiResult<CheckPayerIdentityResult>
                     {
                         code = 0,
-                        message = "手机号解析失败,将按未授权继续",
+                        message = "",
                         data = fallback
                     });
                 }
@@ -350,9 +352,29 @@ namespace SnowmeetApi.Controllers.Order
                     await EnsureUnionIdMsa(phoneOwner.id, phoneOwner);
                     finalMemberId = phoneOwner.id;
                 }
+                else if (payerType == "alipay")
+                {
+                    // 2026-06-03 用户原则: 支付宝路径不在 PaymentIdentity 里建新会员,
+                    // 会员推迟到支付宝 notify(AliController.CallBack)收到支付成功后再兜底建。
+                    // 这里只把解出的 phone 暂存到 mini_session.cell, OP.member_id 不动 (留给后续支付成功后回填)
+                    if (sess != null)
+                    {
+                        sess.cell = phone;
+                        sess.expire_date = DateTime.Now.AddHours(2);
+                        _db.miniSession.Entry(sess).State = EntityState.Modified;
+                        await _db.SaveChangesAsync();
+                    }
+                    var refreshedAli = await _resolveStatus(body.paymentId, payerType, scannerId, sessionKey);
+                    return Ok(new ApiResult<CheckPayerIdentityResult>
+                    {
+                        code = refreshedAli.status == "error" ? 1 : 0,
+                        message = refreshedAli.errorMessage ?? "",
+                        data = refreshedAli
+                    });
+                }
                 else
                 {
-                    // 全新顾客 → 注册新会员 + cell + openid + (unionid)MSA
+                    // wechat 全新顾客 → 注册新会员 + cell + openid + (unionid)MSA (维持原行为)
                     finalMemberId = await _createNewMember(phone, scannerId, msaType, sessUnionid);
                 }
             }
@@ -418,26 +440,33 @@ namespace SnowmeetApi.Controllers.Order
             }
             if (pre.scannerMemberId == null)
             {
-                // 与 _applyConfirmDirect 对齐：游客拒绝手机号授权但点了"正常支付/替人代付"
-                // → 用 sessionKey 反查 openid/unionid，自动建一个无 cell 游客会员，然后继续 choose 流程。
-                // MemberLogin 2026-05-29 起不再建 stub，没这层兜底前端 fallback 必失败。
-                var (sessOpenidAuto, sessUnionidAuto, sessAuto) = await _loadSessionContext(sessionKey);
-                if (sessAuto == null || string.IsNullOrEmpty(sessOpenidAuto))
+                if (payerType == "alipay")
                 {
-                    return Ok(_err("session_not_found", "登录失效,请退出小程序重进"));
+                    // 2026-06-03 用户原则: alipay 路径不在 PaymentIdentity 建会员,
+                    // member 推迟到 AliController.CallBack 收到支付成功后兜底建。
+                    // 此处 OP.member_id 留 null,仅写 is_proxy_pay 意图。下方逻辑统一处理。
                 }
-                string msaTypeAuto = _msaTypeForPayer(payerType);
-                if (msaTypeAuto == null)
+                else
                 {
-                    return Ok(_err("unsupported_payer_type", "不支持的支付通道: " + payerType));
+                    // wechat: 维持原行为, 游客拒绝授权时建无 cell 会员
+                    var (sessOpenidAuto, sessUnionidAuto, sessAuto) = await _loadSessionContext(sessionKey);
+                    if (sessAuto == null || string.IsNullOrEmpty(sessOpenidAuto))
+                    {
+                        return Ok(_err("session_not_found", "登录失效,请退出小程序重进"));
+                    }
+                    string msaTypeAuto = _msaTypeForPayer(payerType);
+                    if (msaTypeAuto == null)
+                    {
+                        return Ok(_err("unsupported_payer_type", "不支持的支付通道: " + payerType));
+                    }
+                    var newMemberId = await _createNewMember(null, sessOpenidAuto, msaTypeAuto, sessUnionidAuto);
+                    sessAuto.member_id = newMemberId;
+                    _db.miniSession.Entry(sessAuto).State = EntityState.Modified;
+                    await _db.SaveChangesAsync();
+                    pre.scannerMemberId = newMemberId;
+                    pre.scannerHasCell = false;
+                    if (string.IsNullOrEmpty(scannerId)) scannerId = sessOpenidAuto;
                 }
-                var newMemberId = await _createNewMember(null, sessOpenidAuto, msaTypeAuto, sessUnionidAuto);
-                sessAuto.member_id = newMemberId;
-                _db.miniSession.Entry(sessAuto).State = EntityState.Modified;
-                await _db.SaveChangesAsync();
-                pre.scannerMemberId = newMemberId;
-                pre.scannerHasCell = false;
-                if (string.IsNullOrEmpty(scannerId)) scannerId = sessOpenidAuto;
             }
             if (pre.status != "choose_identity")
             {
@@ -457,19 +486,12 @@ namespace SnowmeetApi.Controllers.Order
                 return Ok(_err("order_not_found", "订单或支付记录消失"));
             }
 
-            int scannerMemberId = (int)pre.scannerMemberId;
-            // 决策时机迁回 notify：此处只在 OrderPayment 上写付款方意图，
-            // Order.member_id / wechat_unverified 由 DealSuccessPaidOrder 在支付成功回调时同步
-            if (choice == "self")
-            {
-                op.member_id = scannerMemberId;
-                op.is_proxy_pay = false;
-            }
-            else // proxy
-            {
-                op.member_id = scannerMemberId;
-                op.is_proxy_pay = true;
-            }
+            // 决策时机迁回 notify：此处只在 OrderPayment 上写付款方意图,
+            // Order.member_id / wechat_unverified 由 DealSuccessPaidOrder 在支付成功回调时同步。
+            // alipay 路径 scannerMemberId 可能仍为 null (用户原则: 推迟到支付成功后建会员) → OP.member_id 也留 null
+            int? scannerMemberId = pre.scannerMemberId;
+            op.member_id = scannerMemberId;
+            op.is_proxy_pay = (choice == "proxy");
             op.update_date = DateTime.Now;
             _db.orderPayment.Entry(op).State = EntityState.Modified;
             await _db.SaveChangesAsync();
@@ -491,26 +513,33 @@ namespace SnowmeetApi.Controllers.Order
             }
             if (pre.scannerMemberId == null)
             {
-                // 2026-05-29: 散客拒绝授权手机号但要继续支付 → 用 sessionKey 反查 openid+unionid,自动建会员(无 cell)
-                // MemberLogin 不再建 stub 后,这里成为「不绑手机号也建会员」的唯一入口
-                var (sessOpenidAuto, sessUnionidAuto, sessAuto) = await _loadSessionContext(sessionKey);
-                if (sessAuto == null || string.IsNullOrEmpty(sessOpenidAuto))
+                if (payerType == "alipay")
                 {
-                    return Ok(_err("session_not_found", "登录失效,请退出小程序重进"));
+                    // 2026-06-03 用户原则: alipay 路径不在 PaymentIdentity 建会员,
+                    // member 推迟到 AliController.CallBack 收到支付成功后兜底建。
+                    // OP.member_id 留 null, is_proxy_pay=false (确认直付意图)。
                 }
-                string msaTypeAuto = _msaTypeForPayer(payerType);
-                if (msaTypeAuto == null)
+                else
                 {
-                    return Ok(_err("unsupported_payer_type", "不支持的支付通道: " + payerType));
+                    // wechat: 维持原行为, 散客拒绝授权手机号要继续支付 → 反查 openid+unionid 自动建无 cell 会员
+                    var (sessOpenidAuto, sessUnionidAuto, sessAuto) = await _loadSessionContext(sessionKey);
+                    if (sessAuto == null || string.IsNullOrEmpty(sessOpenidAuto))
+                    {
+                        return Ok(_err("session_not_found", "登录失效,请退出小程序重进"));
+                    }
+                    string msaTypeAuto = _msaTypeForPayer(payerType);
+                    if (msaTypeAuto == null)
+                    {
+                        return Ok(_err("unsupported_payer_type", "不支持的支付通道: " + payerType));
+                    }
+                    var newMemberId = await _createNewMember(null, sessOpenidAuto, msaTypeAuto, sessUnionidAuto);
+                    sessAuto.member_id = newMemberId;
+                    _db.miniSession.Entry(sessAuto).State = EntityState.Modified;
+                    await _db.SaveChangesAsync();
+                    pre.scannerMemberId = newMemberId;
+                    pre.scannerHasCell = false;
+                    if (string.IsNullOrEmpty(scannerId)) scannerId = sessOpenidAuto;
                 }
-                var newMemberId = await _createNewMember(null, sessOpenidAuto, msaTypeAuto, sessUnionidAuto);
-                sessAuto.member_id = newMemberId;
-                _db.miniSession.Entry(sessAuto).State = EntityState.Modified;
-                await _db.SaveChangesAsync();
-                pre.scannerMemberId = newMemberId;
-                pre.scannerHasCell = false;
-                // 同步 scannerId 用于下方 _resolveStatus 再算时能找到这个新会员
-                if (string.IsNullOrEmpty(scannerId)) scannerId = sessOpenidAuto;
             }
             if (pre.status != "direct" && pre.status != "direct_to_scanner")
             {
@@ -524,9 +553,10 @@ namespace SnowmeetApi.Controllers.Order
                 return Ok(_err("order_not_found", "订单或支付记录消失"));
             }
 
-            int scannerMemberId = (int)pre.scannerMemberId;
-            // 决策时机迁回 notify：此处只在 OrderPayment 上写付款方意图，
-            // Order.member_id / wechat_unverified 由 DealSuccessPaidOrder 在支付成功回调时同步
+            // 决策时机迁回 notify: 此处只在 OrderPayment 上写付款方意图,
+            // Order.member_id / wechat_unverified 由 DealSuccessPaidOrder 在支付成功回调时同步。
+            // alipay 路径 scannerMemberId 可能仍为 null (用户原则: 推迟到支付成功后建会员) → OP.member_id 也留 null
+            int? scannerMemberId = pre.scannerMemberId;
             op.member_id = scannerMemberId;
             op.is_proxy_pay = false;
             op.update_date = DateTime.Now;
@@ -562,104 +592,13 @@ namespace SnowmeetApi.Controllers.Order
             }
             if (payerType == "alipay")
             {
-                // 2026-05-30：原计划走 alipay.user.phone.get（server-side API），但 AlipaySDKNet 4.8.50
-                // 不暴露该 API 的 Request/Response 类，只能换实战路径：
-                //   client（alipay_snowmeet）my.getPhoneNumber → 返回 { response, sign, signType }
-                //   response 是 alipay 用 AES-128-CBC + PKCS7 + 全 0 IV 加密的 JSON
-                //   AES 密钥来自支付宝开放平台「接口加密方式」配置（base64），放 cert 目录 aes_key.txt
-                //   解密后 JSON = { code: "10000", msg: "Success", mobile: "13xxxxxxxx" }
+                // 2026-06-03: AES 解密路径 + JSON 解包 + base64 清洗 + key BOM/CRLF 清洗
+                // 全部迁到 SnowmeetApi.Helpers.AlipayPhoneDecryptHelper 复用 (本 controller 与 MemberLogin 同源)
                 if (!string.IsNullOrEmpty(body.encData))
                 {
-                    // 诊断日志：把入参实际形状打到 stdout，定位 `not a valid Base-64 string` 是哪一段
-                    string encRawRepr = body.encData.Length <= 40 ? body.encData : body.encData.Substring(0, 40) + "...";
-                    Console.WriteLine($"[_extractPhone:alipay] encData.Length={body.encData.Length} head40={encRawRepr}");
-
-                    string encResponse = Util.UrlDecode(body.encData).Trim();
-                    // 兼容前端把 my.getPhoneNumber 整包 JSON 透传给 encData：{"response":"...","sign":"..."}
-                    if (encResponse.StartsWith("{"))
-                    {
-                        try
-                        {
-                            JToken wrappedObj = (JToken)JsonConvert.DeserializeObject(encResponse);
-                            string wrappedResponse = wrappedObj?["response"]?.ToString();
-                            if (!string.IsNullOrEmpty(wrappedResponse))
-                            {
-                                encResponse = Util.UrlDecode(wrappedResponse).Trim();
-                                string wrappedHead = encResponse.Length <= 40 ? encResponse : encResponse.Substring(0, 40) + "...";
-                                Console.WriteLine($"[_extractPhone:alipay] detected wrapped payload, use response as encData. responseHead40={wrappedHead}");
-                            }
-                        }
-                        catch
-                        {
-                            // 保持向后兼容：如果不是合法 JSON，则按原始 encData 走 base64 解密分支。
-                        }
-                    }
-                    string aesKey;
-                    try
-                    {
-                        aesKey = _loadAlipayAesKey();
-                    }
-                    catch (Exception ex)
-                    {
-                        throw new Exception("aes_key.txt 读取失败: " + ex.Message);
-                    }
-                    string aesKeyRepr = aesKey.Length <= 12 ? aesKey : aesKey.Substring(0, 12) + "...";
-                    Console.WriteLine($"[_extractPhone:alipay] aesKey.Length={aesKey.Length} head12={aesKeyRepr} bom={(aesKey.Length > 0 && aesKey[0] == '﻿')}");
-
-                    // 三处 base64 decode 分别 try-catch，错误时拼上 source 段区分
-                    // IV 全 0：base64 编码后是 22 字符 + "==" = 24 字符，解码出 16 个 \x00 字节
-                    const string zeroIv = "AAAAAAAAAAAAAAAAAAAAAA==";
-                    try { var _ = Convert.FromBase64String(aesKey); }
-                    catch (FormatException fe) { throw new Exception("aesKey 不是合法 base64 (len=" + aesKey.Length + " head12=" + aesKeyRepr + "): " + fe.Message); }
-                    try { var _ = Convert.FromBase64String(zeroIv); }
-                    catch (FormatException fe) { throw new Exception("zeroIv 不是合法 base64 (硬编码 bug?): " + fe.Message); }
-                    string encTrimmed = encResponse.Trim();
-                    try { var _ = Convert.FromBase64String(encTrimmed); }
-                    catch (FormatException fe) { throw new Exception("encData 不是合法 base64 (len=" + encTrimmed.Length + " head40=" + (encTrimmed.Length <= 40 ? encTrimmed : encTrimmed.Substring(0, 40) + "...") + "): " + fe.Message); }
-
-                    string json = Util.AES_decrypt(encTrimmed, aesKey, zeroIv);
-                    Console.WriteLine($"[_extractPhone:alipay] decrypt OK, json head80={(json.Length <= 80 ? json : json.Substring(0, 80) + "...")}");
-                    JToken jsonObj = (JToken)JsonConvert.DeserializeObject(json);
-
-                    // 兼容不同返回结构：mobile 可能在根节点/response/data 下，或 response 是字符串化 JSON。
-                    JToken mobileToken = jsonObj?["mobile"]
-                        ?? jsonObj?["phoneNumber"]
-                        ?? jsonObj?.SelectToken("response.mobile")
-                        ?? jsonObj?.SelectToken("response.phoneNumber")
-                        ?? jsonObj?.SelectToken("data.mobile")
-                        ?? jsonObj?.SelectToken("data.phoneNumber");
-
-                    if ((mobileToken == null || string.IsNullOrWhiteSpace(mobileToken.ToString()))
-                        && jsonObj?["response"] != null
-                        && jsonObj["response"].Type == JTokenType.String)
-                    {
-                        try
-                        {
-                            var responseObj = (JToken)JsonConvert.DeserializeObject(jsonObj["response"].ToString());
-                            mobileToken = responseObj?["mobile"]
-                                ?? responseObj?["phoneNumber"]
-                                ?? responseObj?.SelectToken("data.mobile")
-                                ?? responseObj?.SelectToken("data.phoneNumber");
-                        }
-                        catch
-                        {
-                            // ignore and keep original error path
-                        }
-                    }
-
-                    if (mobileToken == null || string.IsNullOrWhiteSpace(mobileToken.ToString()))
-                    {
-                        // 解密成功但 alipay 返回失败码（如未授权、密钥失效），抛 alipay 的 msg
-                        string aliCode = jsonObj?["code"]?.ToString();
-                        string aliSubCode = jsonObj?["sub_code"]?.ToString() ?? jsonObj?["subCode"]?.ToString();
-                        string aliMsg = jsonObj?["msg"]?.ToString() ?? jsonObj?["sub_msg"]?.ToString() ?? jsonObj?["subMsg"]?.ToString() ?? "解密结果中无 mobile 字段";
-                        if (!string.IsNullOrEmpty(aliCode) || !string.IsNullOrEmpty(aliSubCode))
-                        {
-                            aliMsg = $"{aliMsg} (code={aliCode ?? ""}, subCode={aliSubCode ?? ""})";
-                        }
-                        throw new Exception("支付宝 getPhoneNumber 解密失败：" + aliMsg);
-                    }
-                    return mobileToken.ToString().Trim();
+                    // 2026-06-03: AES 解密 + JSON 解包 + base64 清洗 + key BOM/CRLF 清洗 + 多路径 mobile 查找
+                    // 全部内化在 SnowmeetApi.Helpers.AlipayPhoneDecryptHelper (与 MemberLogin 二次调用同源)
+                    return SnowmeetApi.Helpers.AlipayPhoneDecryptHelper.Decrypt(body.encData, ALIPAY_MINI_APP_ID);
                 }
                 // 开发期 fallback：跑后端单测时不想真过支付宝授权流程，传 phoneMock 即可
                 if (!string.IsNullOrEmpty(body.phoneMock))
@@ -731,6 +670,11 @@ namespace SnowmeetApi.Controllers.Order
         // 用 sessionKey 反查 mini_session,取出本次扫码方的 openid+unionid。
         // 2026-05-29 新加: MemberLogin 不再建 stub,未注册 user 的 openid+unionid 暂存在 mini_session,
         // PaymentIdentity 流程需要这俩字段建会员(_submitPhone 散客分支 / _applyConfirmDirect 散客分支)。
+        // 2026-06-03: 支付宝 session 的 payerId 落到独立列 alipay_payerid(替代之前往 wechat_openid 列塞 hack)。
+        // 返回 openid 字段按 session_type 分流:
+        //   - session_type='alipay_payerid' → alipay_payerid 列(为空时 fallback wechat_openid 兼容历史 session)
+        //   - 否则 → wechat_openid 列
+        // unionid 字段仅 wechat 路径有意义, alipay 路径恒返 null。
         private async Task<(string? openid, string? unionid, MiniSession? session)> _loadSessionContext(string sessionKey)
         {
             if (string.IsNullOrEmpty(sessionKey)) return (null, null, null);
@@ -741,7 +685,14 @@ namespace SnowmeetApi.Controllers.Order
                             && s.expire_date >= DateTime.Now)
                 .OrderByDescending(s => s.expire_date)
                 .FirstOrDefaultAsync();
-            return (sess?.wechat_openid, sess?.wechat_unionid, sess);
+            if (sess == null) return (null, null, null);
+            string sessTypeNorm = (sess.session_type ?? "").Trim();
+            if (sessTypeNorm.Equals("alipay_payerid"))
+            {
+                string? alipayOpenid = !string.IsNullOrEmpty(sess.alipay_payerid) ? sess.alipay_payerid : sess.wechat_openid;
+                return (alipayOpenid, null, sess);
+            }
+            return (sess.wechat_openid, sess.wechat_unionid, sess);
         }
 
         // 把 member 上指定 num+type 的 valid=1 MSA 全部 valid=0。
