@@ -316,6 +316,20 @@ namespace SnowmeetApi.Controllers.Order
                 scannerId = sessOpenid;
             }
 
+            // 只要支付宝手机号解密成功,就把手机号写回 mini_session.cell,
+            // 便于后续链路校验解密结果与支付成功回填时复用。
+            if (payerType == "alipay" && sess != null)
+            {
+                bool needUpdateCell = string.IsNullOrEmpty(sess.cell) || !sess.cell.Trim().Equals(phone);
+                if (needUpdateCell)
+                {
+                    sess.cell = phone;
+                    sess.expire_date = DateTime.Now.AddHours(2);
+                    _db.miniSession.Entry(sess).State = EntityState.Modified;
+                    await _db.SaveChangesAsync();
+                }
+            }
+
             // 已绑同手机号的会员（不限当前 scanner）
             var phoneOwner = await _memberHelper.GetWholeMemberByNum(phone, MemberSocialAccount.TYPE_CELL);
             // 当前 scanner 已绑的会员（按 openid/payerid 找）
@@ -356,14 +370,7 @@ namespace SnowmeetApi.Controllers.Order
                 {
                     // 2026-06-03 用户原则: 支付宝路径不在 PaymentIdentity 里建新会员,
                     // 会员推迟到支付宝 notify(AliController.CallBack)收到支付成功后再兜底建。
-                    // 这里只把解出的 phone 暂存到 mini_session.cell, OP.member_id 不动 (留给后续支付成功后回填)
-                    if (sess != null)
-                    {
-                        sess.cell = phone;
-                        sess.expire_date = DateTime.Now.AddHours(2);
-                        _db.miniSession.Entry(sess).State = EntityState.Modified;
-                        await _db.SaveChangesAsync();
-                    }
+                    // 手机号已在上游统一回写到 mini_session.cell；这里继续保持 OP.member_id 不动。
                     var refreshedAli = await _resolveStatus(body.paymentId, payerType, scannerId, sessionKey);
                     return Ok(new ApiResult<CheckPayerIdentityResult>
                     {
