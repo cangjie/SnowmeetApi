@@ -285,12 +285,12 @@ namespace SnowmeetApi.Controllers.Order
                     {
                         return Ok(_err("phone_decrypt_failed", "手机号解析失败: " + ex.Message));
                     }
-                    // 2026-06-03: 把 helper 的 ex.Message 也带回前端 (含诊断信息: aesKeyLen/encDataLen/JSON wrap 等),
-                    // 不用 SSH 也能看出解密哪一步炸
+                    // 软失败不再把底层诊断文案回传前端，避免用户端反复出现技术错误提示。
+                    // 具体失败原因保留在 server log 里（上面的 Console.WriteLine）。
                     return Ok(new ApiResult<CheckPayerIdentityResult>
                     {
                         code = 0,
-                        message = "手机号解析失败,将按未授权继续: " + ex.Message,
+                        message = "",
                         data = fallback
                     });
                 }
