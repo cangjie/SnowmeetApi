@@ -66,6 +66,7 @@ namespace SnowmeetApi.Controllers.Order
             public string scannerMaskedCell { get; set; }
             public string errorCode { get; set; }
             public string errorMessage { get; set; }
+            public string debugInfo { get; set; }
         }
 
         public class ConfirmPayIdentityBody
@@ -289,6 +290,7 @@ namespace SnowmeetApi.Controllers.Order
                     // 软失败降噪：手机号授权失败不再污染前端状态字段，避免误判为流程阻断。
                     fallback.errorCode = null;
                     fallback.errorMessage = null;
+                    fallback.debugInfo = $"phone_soft_fail|encMeta={encMeta}|ex={ex.Message}";
                     return Ok(new ApiResult<CheckPayerIdentityResult>
                     {
                         code = 0,
