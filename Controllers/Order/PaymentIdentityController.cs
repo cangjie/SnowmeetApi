@@ -263,6 +263,7 @@ namespace SnowmeetApi.Controllers.Order
         private async Task<ActionResult<ApiResult<CheckPayerIdentityResult>>> _submitPhone(
             ConfirmPayIdentityBody body, string sessionKey, string payerType, string scannerId)
         {
+            string encMeta = payerType == "alipay" ? _summarizeAlipayEncData(body?.encData) : "";
             string phone;
             try
             {
@@ -279,19 +280,19 @@ namespace SnowmeetApi.Controllers.Order
                 // 前端 submit_phone 成功后才会继续第二个 action；这里返回 code=0 让流程能继续。
                 if (payerType == "alipay")
                 {
-                    Console.WriteLine($"[_submitPhone:alipay] soft-fail phone decrypt, fallback to no-phone flow. ex={ex.Message}");
+                    Console.WriteLine($"[_submitPhone:alipay] soft-fail phone decrypt, fallback to no-phone flow. appId={ALIPAY_MINI_APP_ID}, scannerId={(scannerId ?? "").Trim()}, encMeta={encMeta}, ex={ex.Message}");
                     var fallback = await _resolveStatus(body.paymentId, payerType, scannerId, sessionKey);
                     if (fallback.status == "error")
                     {
                         return Ok(_err("phone_decrypt_failed", "手机号解析失败: " + ex.Message));
                     }
-                    string decryptErrMsg = "手机号解析失败: " + ex.Message;
-                    fallback.errorCode = "phone_decrypt_failed";
-                    fallback.errorMessage = decryptErrMsg;
+                    // 软失败降噪：手机号授权失败不再污染前端状态字段，避免误判为流程阻断。
+                    fallback.errorCode = null;
+                    fallback.errorMessage = null;
                     return Ok(new ApiResult<CheckPayerIdentityResult>
                     {
                         code = 0,
-                        message = decryptErrMsg,
+                        message = "",
                         data = fallback
                     });
                 }
@@ -732,6 +733,39 @@ namespace SnowmeetApi.Controllers.Order
             if (payerType == "wechat") return MemberSocialAccount.TYPE_WECHAT_MINI_OPENID;
             if (payerType == "alipay") return MemberSocialAccount.TYPE_ALIPAY_PAYERID;
             return null;
+        }
+
+        private string _summarizeAlipayEncData(string rawEncData)
+        {
+            if (string.IsNullOrEmpty(rawEncData))
+            {
+                return "empty";
+            }
+
+            string raw = rawEncData.Trim();
+            string decoded = Util.UrlDecode(raw);
+            string normalized = (decoded ?? "").Trim();
+            bool startsJson = normalized.StartsWith("{");
+
+            if (!startsJson)
+            {
+                return $"shape=base64_like,rawLen={raw.Length},decodedLen={normalized.Length}";
+            }
+
+            try
+            {
+                JToken obj = (JToken)JsonConvert.DeserializeObject(normalized);
+                string signType = obj?["signType"]?.ToString() ?? "";
+                string subCode = obj?["subCode"]?.ToString() ?? obj?["sub_code"]?.ToString() ?? "";
+                bool hasResponse = obj?["response"] != null;
+                bool hasCode = obj?["code"] != null;
+                bool hasSign = obj?["sign"] != null;
+                return $"shape=json_wrap,rawLen={raw.Length},decodedLen={normalized.Length},hasResponse={hasResponse},hasCode={hasCode},hasSign={hasSign},signType={signType},subCode={subCode}";
+            }
+            catch (Exception ex)
+            {
+                return $"shape=json_parse_failed,rawLen={raw.Length},decodedLen={normalized.Length},err={ex.GetType().Name}";
+            }
         }
 
         private string _maskCell(string cell)
