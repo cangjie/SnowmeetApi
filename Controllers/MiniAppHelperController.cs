@@ -382,20 +382,18 @@ namespace SnowmeetApi.Controllers
                 // no-op: body 解析失败不影响主流程，后续仍按 SDK 字段判断
             }
 
-            // 严格区分两个标识：
-            // - payerId 仅来自 user_id（用于后续需要 user_id 的交易链路）
-            // - openId 仅来自 open_id
-            // 不再用 open_id 回退填充 payerId，避免两字段被误写成同值。
+            // 2026-06-06: 用户要求后续系统只依赖支付宝 open_id。
+            // payerId(user_id) 若缺失则忽略，不再阻断登录；openId 作为唯一必要标识继续后续流程。
             string? payerId = !string.IsNullOrEmpty(userId) ? userId : null;
 
-            if (tokenResp.IsError || string.IsNullOrEmpty(accessToken) || string.IsNullOrEmpty(payerId))
+            if (tokenResp.IsError || string.IsNullOrEmpty(accessToken) || string.IsNullOrEmpty(openId))
             {
                 List<string> errParts = new List<string>();
                 if (!string.IsNullOrEmpty(tokenResp.Code)) errParts.Add("code=" + tokenResp.Code.Trim());
                 if (!string.IsNullOrEmpty(tokenResp.SubCode)) errParts.Add("sub_code=" + tokenResp.SubCode.Trim());
                 if (!string.IsNullOrEmpty(tokenResp.Msg)) errParts.Add("msg=" + tokenResp.Msg.Trim());
                 if (!string.IsNullOrEmpty(tokenResp.SubMsg)) errParts.Add("sub_msg=" + tokenResp.SubMsg.Trim());
-                if (string.IsNullOrEmpty(payerId)) errParts.Add("hint=oauth.token 未返回 user_id（payer_id），请确认支付宝授权范围是否满足）");
+                if (string.IsNullOrEmpty(openId)) errParts.Add("hint=oauth.token 未返回 open_id");
                 if (!string.IsNullOrEmpty(tokenResp.Body))
                 {
                     string body = tokenResp.Body.Trim();
@@ -413,17 +411,21 @@ namespace SnowmeetApi.Controllers
                 result.data = null;
                 return Ok(result);
             }
-            payerId = payerId.Trim();
+            openId = openId.Trim();
+            if (!string.IsNullOrEmpty(payerId))
+            {
+                payerId = payerId.Trim();
+            }
 
-            // Step 2: MSA 反查会员（type='alipay_payerid'）
+            // Step 2: 反查会员。当前没有独立 alipay_openid 类型，先沿用 alipay_payerid 这条历史 MSA 通道兼容老数据。
             int? memberId = null;
             List<MemberSocialAccount> msaList = await _db.memberSocialAccount
                 .Where(m => m.valid == 1
                     && m.type.Trim().Equals("alipay_payerid")
                     && (
-                        m.num.Trim().Equals(payerId)
+                        m.num.Trim().Equals(openId)
                         || (!string.IsNullOrEmpty(userId) && m.num.Trim().Equals(userId))
-                        || (!string.IsNullOrEmpty(openId) && m.num.Trim().Equals(openId))
+                        || (!string.IsNullOrEmpty(payerId) && m.num.Trim().Equals(payerId))
                     ))
                 .OrderByDescending(m => m.id).AsNoTracking().ToListAsync();
             if (msaList.Count > 0)
@@ -451,8 +453,8 @@ namespace SnowmeetApi.Controllers
                     && m.valid == 1);
             }
 
-            // Step 4: 写 / 更新 MiniSession，session_key=access_token，session_type='alipay_payerid'
-            // 2026-06-03: payerId 写入新建的 alipay_payerid 列(替代之前 wechat_openid 列的 hack)
+            // Step 4: 写 / 更新 MiniSession。session_type 先保留 alipay_payerid 兼容既有调用方，
+            // 但业务主标识改为 alipay_openid；alipay_payerid 若缺失则允许为 null。
             string sessionType = "alipay_payerid";
             MiniSession session = await _db.miniSession.FindAsync(accessToken, sessionType);
             DateTime expireDate = DateTime.Now.AddHours(2);
@@ -504,7 +506,7 @@ namespace SnowmeetApi.Controllers
                 needPhone = needPhone
             };
             StaffController _staffHelper = new StaffController(_db);
-            sessionObj.staff = await _staffHelper.GetStaffBySocialNum(payerId, "alipay_payerid", DateTime.Now);
+            sessionObj.staff = await _staffHelper.GetStaffBySocialNum(openId, "alipay_payerid", DateTime.Now);
 
             // 同 wechat 路径：member 非空时仅保留 cell 类 MSA，缩减网络体积
             if (member != null)
@@ -535,11 +537,6 @@ namespace SnowmeetApi.Controllers
                 return Ok(result);
             }
             string payerId = session.alipay_payerid;
-            if (string.IsNullOrEmpty(payerId))
-            {
-                // 历史 session(2026-06-03 之前)把 payerId 写在 wechat_openid 列, 兼容回退
-                payerId = session.wechat_openid;
-            }
 
             // Step 2: 解密 encData → phone
             string phone;
@@ -578,7 +575,7 @@ namespace SnowmeetApi.Controllers
                 }
             }
 
-            // Step 4: 若现在 memberId 命中, 且 MSA 表无该 payerId 的 alipay_payerid 记录 → INSERT
+            // Step 4: 若现在 memberId 命中, 且 MSA 表无该 openId 的 alipay_payerid 记录 → INSERT
             Member member = null;
             if (memberId != null)
             {
@@ -588,9 +585,9 @@ namespace SnowmeetApi.Controllers
                     // MSA 指向死会员的脏数据 → 当未注册处理(不建 stub)
                     memberId = null;
                 }
-                else if (!string.IsNullOrEmpty(payerId))
+                else if (!string.IsNullOrEmpty(session.alipay_openid))
                 {
-                    await _ensureAlipayPayerIdMsa((int)memberId, payerId);
+                    await _ensureAlipayPayerIdMsa((int)memberId, session.alipay_openid);
                 }
             }
 
@@ -617,9 +614,9 @@ namespace SnowmeetApi.Controllers
                 needPhone = false
             };
             StaffController _staffHelper = new StaffController(_db);
-            if (!string.IsNullOrEmpty(payerId))
+            if (!string.IsNullOrEmpty(session.alipay_openid))
             {
-                sessionObj.staff = await _staffHelper.GetStaffBySocialNum(payerId, "alipay_payerid", DateTime.Now);
+                sessionObj.staff = await _staffHelper.GetStaffBySocialNum(session.alipay_openid, "alipay_payerid", DateTime.Now);
             }
 
             if (member != null)

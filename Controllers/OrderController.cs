@@ -1778,8 +1778,8 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<ApiResult<OrderPayment?>>> AlipayPayByOrderPayment(int paymentId, string sessionKey)
         {
             // 2026-06-03: 用户原则 alipay 路径推迟建会员到支付成功 notify。
-            // 这里不再强制要求 session 有 member, buyerId 优先读 mini_session.alipay_openid,
-            // 缺失时回退 mini_session.alipay_payerid。
+            // 2026-06-06: 用户要求后续下单只提交支付宝 open_id，不再依赖 payer_id。
+            // 因此这里仅读取 mini_session.alipay_openid。
             // session.member_id 可空(guest 流程), 注册阶段交给 AliController.CallBack 兜底。
             string sk = Util.UrlDecode(sessionKey ?? "").Trim();
             MiniSession sess = await _db.miniSession
@@ -1790,27 +1790,16 @@ namespace SnowmeetApi.Controllers
                 .OrderByDescending(s => s.expire_date)
                 .AsNoTracking()
                 .FirstOrDefaultAsync();
-            if (sess == null || (string.IsNullOrEmpty(sess.alipay_openid) && string.IsNullOrEmpty(sess.alipay_payerid)))
+            if (sess == null || string.IsNullOrEmpty(sess.alipay_openid))
             {
                 return Ok(new ApiResult<OrderPayment?>()
                 {
                     code = 1,
-                    message = "未找到支付宝用户(session 失效)",
+                    message = "未找到支付宝用户 open_id(session 失效)",
                     data = null
                 });
             }
-            string buyerOpenId = string.IsNullOrEmpty(sess.alipay_openid) ? null : sess.alipay_openid.Trim();
-            string buyerPayerId = string.IsNullOrEmpty(sess.alipay_payerid) ? null : sess.alipay_payerid.Trim();
-            string buyerId = _resolveAlipayBuyerId(buyerOpenId, buyerPayerId);
-            if (string.IsNullOrEmpty(buyerId))
-            {
-                return Ok(new ApiResult<OrderPayment?>()
-                {
-                    code = 1,
-                    message = "支付宝用户标识无效：open_id/payer_id 都不是合法 user_id（需 16 位数字）",
-                    data = null
-                });
-            }
+            string buyerId = sess.alipay_openid.Trim();
             int? sessionMemberId = sess.member_id;
 
             OrderPayment payment = await _db.orderPayment.Where(p => p.id == paymentId).AsNoTracking().FirstOrDefaultAsync();
@@ -1956,26 +1945,6 @@ namespace SnowmeetApi.Controllers
                 message = "",
                 data = payment
             });
-        }
-
-        [NonAction]
-        private static string _resolveAlipayBuyerId(string openId, string payerId)
-        {
-            if (_isValidAlipayUserId(openId)) return openId;
-            if (_isValidAlipayUserId(payerId)) return payerId;
-            return null;
-        }
-
-        [NonAction]
-        private static bool _isValidAlipayUserId(string value)
-        {
-            if (string.IsNullOrEmpty(value)) return false;
-            if (value.Length != 16) return false;
-            for (int i = 0; i < value.Length; i++)
-            {
-                if (!char.IsDigit(value[i])) return false;
-            }
-            return true;
         }
 
         // 创建支付宝小程序 appId 的 IAopClient（独立证书：AlipayCertificate/2021006157624571/）
