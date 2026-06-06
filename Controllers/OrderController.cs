@@ -1910,7 +1910,7 @@ namespace SnowmeetApi.Controllers
                 model.Subject = order.subject?.Trim() ?? ("订单 " + order.code);
                 model.Body = string.IsNullOrEmpty(order.description) ? model.Subject : order.description.Trim();
                 model.TotalAmount = Math.Round(payment.amount, 2).ToString("0.00");
-                model.BuyerId = buyerId;
+                model.BuyerOpenId = buyerId;
                 model.ExtendParams = new Aop.Api.Domain.ExtendParams { RoyaltyFreeze = "false" };
                 req.SetBizModel(model);
 
