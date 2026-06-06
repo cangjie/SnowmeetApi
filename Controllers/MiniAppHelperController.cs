@@ -459,6 +459,7 @@ namespace SnowmeetApi.Controllers
                     session_key = accessToken,
                     session_type = sessionType,
                     member_id = memberId,
+                    alipay_openid = openId,
                     alipay_payerid = payerId,
                     cell = null,
                     wechat_openid = null,
@@ -472,6 +473,7 @@ namespace SnowmeetApi.Controllers
             {
                 session.valid = 1;
                 session.member_id = memberId;
+                session.alipay_openid = openId;
                 session.alipay_payerid = payerId;
                 // 二次调用回来才填 cell, 首次保持原值不动(覆盖式重置只在 alipay_payerid 上做)
                 session.wechat_openid = null;
@@ -492,6 +494,7 @@ namespace SnowmeetApi.Controllers
                 errmsg = "",
                 member_id = memberId,
                 member = member,
+                alipay_openid = openId,
                 alipay_payerid = payerId,
                 cell = null,
                 needPhone = needPhone
@@ -604,6 +607,7 @@ namespace SnowmeetApi.Controllers
                 errmsg = "",
                 member_id = memberId,
                 member = member,
+                alipay_openid = session.alipay_openid,
                 alipay_payerid = payerId,
                 cell = phone,
                 needPhone = false
@@ -822,6 +826,7 @@ namespace SnowmeetApi.Controllers
             public string errcode { get; set; } = "";
             public string errmsg { get; set; } = "";
             public int? member_id { get; set; } = null;
+            public string? alipay_openid { get; set; } = null;
             public string? alipay_payerid { get; set; } = null;
             public string? cell { get; set; } = null;
             // 2026-06-03: 支付宝 MemberLogin 二次调用语义信号 — true 表示首次未命中会员或会员无 cell,

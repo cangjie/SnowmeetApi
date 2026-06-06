@@ -18,6 +18,7 @@ namespace SnowmeetApi.Models
         // 等点支付按钮时再由 PaymentIdentityController 用这俩字段建会员或绑给已有 phoneOwner。
         public string? wechat_openid { get; set; } = null;
         public string? wechat_unionid { get; set; } = null;
+        public string? alipay_openid { get; set; } = null;
         public string? alipay_payerid { get; set; } = null;
         public string? cell { get; set; } = null;
         public DateTime create_date { get; set; } = DateTime.Now;
