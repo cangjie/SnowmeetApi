@@ -382,8 +382,11 @@ namespace SnowmeetApi.Controllers
                 // no-op: body 解析失败不影响主流程，后续仍按 SDK 字段判断
             }
 
-            // auth_base 场景下支付宝常返回 open_id 而不返回 user_id；两者都可作为 payer 标识
-            string? payerId = !string.IsNullOrEmpty(userId) ? userId : openId;
+            // 严格区分两个标识：
+            // - payerId 仅来自 user_id（用于后续需要 user_id 的交易链路）
+            // - openId 仅来自 open_id
+            // 不再用 open_id 回退填充 payerId，避免两字段被误写成同值。
+            string? payerId = !string.IsNullOrEmpty(userId) ? userId : null;
 
             if (tokenResp.IsError || string.IsNullOrEmpty(accessToken) || string.IsNullOrEmpty(payerId))
             {
@@ -392,6 +395,7 @@ namespace SnowmeetApi.Controllers
                 if (!string.IsNullOrEmpty(tokenResp.SubCode)) errParts.Add("sub_code=" + tokenResp.SubCode.Trim());
                 if (!string.IsNullOrEmpty(tokenResp.Msg)) errParts.Add("msg=" + tokenResp.Msg.Trim());
                 if (!string.IsNullOrEmpty(tokenResp.SubMsg)) errParts.Add("sub_msg=" + tokenResp.SubMsg.Trim());
+                if (string.IsNullOrEmpty(payerId)) errParts.Add("hint=oauth.token 未返回 user_id（payer_id），请确认支付宝授权范围是否满足）");
                 if (!string.IsNullOrEmpty(tokenResp.Body))
                 {
                     string body = tokenResp.Body.Trim();

@@ -1799,9 +1799,18 @@ namespace SnowmeetApi.Controllers
                     data = null
                 });
             }
-            string buyerId = !string.IsNullOrEmpty(sess.alipay_openid)
-                ? sess.alipay_openid.Trim()
-                : sess.alipay_payerid.Trim();
+            string buyerOpenId = string.IsNullOrEmpty(sess.alipay_openid) ? null : sess.alipay_openid.Trim();
+            string buyerPayerId = string.IsNullOrEmpty(sess.alipay_payerid) ? null : sess.alipay_payerid.Trim();
+            string buyerId = _resolveAlipayBuyerId(buyerOpenId, buyerPayerId);
+            if (string.IsNullOrEmpty(buyerId))
+            {
+                return Ok(new ApiResult<OrderPayment?>()
+                {
+                    code = 1,
+                    message = "支付宝用户标识无效：open_id/payer_id 都不是合法 user_id（需 16 位数字）",
+                    data = null
+                });
+            }
             int? sessionMemberId = sess.member_id;
 
             OrderPayment payment = await _db.orderPayment.Where(p => p.id == paymentId).AsNoTracking().FirstOrDefaultAsync();
@@ -1947,6 +1956,26 @@ namespace SnowmeetApi.Controllers
                 message = "",
                 data = payment
             });
+        }
+
+        [NonAction]
+        private static string _resolveAlipayBuyerId(string openId, string payerId)
+        {
+            if (_isValidAlipayUserId(openId)) return openId;
+            if (_isValidAlipayUserId(payerId)) return payerId;
+            return null;
+        }
+
+        [NonAction]
+        private static bool _isValidAlipayUserId(string value)
+        {
+            if (string.IsNullOrEmpty(value)) return false;
+            if (value.Length != 16) return false;
+            for (int i = 0; i < value.Length; i++)
+            {
+                if (!char.IsDigit(value[i])) return false;
+            }
+            return true;
         }
 
         // 创建支付宝小程序 appId 的 IAopClient（独立证书：AlipayCertificate/2021006157624571/）
