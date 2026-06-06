@@ -71,6 +71,7 @@ namespace SnowmeetApi.Controllers
         public ApplicationDBContext _db;
         public IConfiguration _oriConfig;
         public IHttpContextAccessor _http;
+        public const string ALIPAY_MINI_APP_ID = "2021006157624571";
         public string appId = "2021004143665722";
         public IAopClient client;
         public AliController(ApplicationDBContext context, IConfiguration config, IHttpContextAccessor httpContextAccessor)
@@ -655,6 +656,56 @@ namespace SnowmeetApi.Controllers
                 default:
                     break;
             }
+            return Ok("success");
+        }
+
+        [HttpGet]
+        [HttpPost]
+        public async Task<ActionResult<string>> AppGateway()
+        {
+            string queryText = Request.QueryString.HasValue ? Request.QueryString.Value : "";
+            string formText = "";
+            if (Request.HasFormContentType)
+            {
+                var form = await Request.ReadFormAsync();
+                formText = string.Join("&", form.Select(kvp =>
+                    kvp.Key + "=" + string.Join(",", kvp.Value.Select(v => v ?? ""))));
+            }
+
+            Request.EnableBuffering();
+            string bodyText;
+            using (var sr = new StreamReader(Request.Body, Encoding.UTF8, true, 1024, true))
+            {
+                bodyText = await sr.ReadToEndAsync();
+            }
+            Request.Body.Position = 0;
+
+            string miniCertPath = Util.workingPath + "/AlipayCertificate/" + ALIPAY_MINI_APP_ID;
+            string certPath = Directory.Exists(miniCertPath)
+                ? miniCertPath
+                : (Util.workingPath + "/AlipayCertificate/" + appId);
+            string logPath = certPath + "/alipay_app_gateway_" + DateTime.Now.ToString("yyyyMMdd") + ".txt";
+            string line = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
+                + "\tmethod=" + (Request.Method ?? "")
+                + "\tpath=" + (Request.Path.HasValue ? Request.Path.Value : "")
+                + "\tquery=" + queryText
+                + "\tform=" + formText
+                + "\tbody=" + (bodyText ?? "")
+                + "\r\n";
+            System.IO.File.AppendAllText(logPath, line);
+
+            string challenge = Request.Query["challenge"].ToString();
+            if (string.IsNullOrEmpty(challenge) && Request.HasFormContentType)
+            {
+                var form = await Request.ReadFormAsync();
+                challenge = form["challenge"].ToString();
+            }
+
+            if (!string.IsNullOrEmpty(challenge))
+            {
+                return Ok(challenge);
+            }
+
             return Ok("success");
         }
 

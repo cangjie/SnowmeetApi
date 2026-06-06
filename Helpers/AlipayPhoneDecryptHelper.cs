@@ -100,6 +100,13 @@ namespace SnowmeetApi.Helpers
                     ?? jsonObj?["sub_msg"]?.ToString()
                     ?? jsonObj?["subMsg"]?.ToString()
                     ?? "解密结果中无 mobile 字段";
+
+                if (!string.IsNullOrEmpty(aliSubCode)
+                    && aliSubCode.Trim().Equals("isv.missing-default-signature-type", StringComparison.OrdinalIgnoreCase))
+                {
+                    aliMsg += "；请在支付宝开放平台为该小程序应用配置默认签名方式（通常为 RSA2）并确认公私钥已生效";
+                }
+
                 if (!string.IsNullOrEmpty(aliCode) || !string.IsNullOrEmpty(aliSubCode))
                 {
                     aliMsg = $"{aliMsg} (code={aliCode ?? ""}, subCode={aliSubCode ?? ""})";
