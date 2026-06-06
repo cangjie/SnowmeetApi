@@ -1778,7 +1778,8 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<ApiResult<OrderPayment?>>> AlipayPayByOrderPayment(int paymentId, string sessionKey)
         {
             // 2026-06-03: 用户原则 alipay 路径推迟建会员到支付成功 notify。
-            // 这里不再强制要求 session 有 member, 改为直接读 mini_session.alipay_payerid 取 buyerId,
+            // 这里不再强制要求 session 有 member, buyerId 优先读 mini_session.alipay_openid,
+            // 缺失时回退 mini_session.alipay_payerid。
             // session.member_id 可空(guest 流程), 注册阶段交给 AliController.CallBack 兜底。
             string sk = Util.UrlDecode(sessionKey ?? "").Trim();
             MiniSession sess = await _db.miniSession
@@ -1789,7 +1790,7 @@ namespace SnowmeetApi.Controllers
                 .OrderByDescending(s => s.expire_date)
                 .AsNoTracking()
                 .FirstOrDefaultAsync();
-            if (sess == null || string.IsNullOrEmpty(sess.alipay_payerid))
+            if (sess == null || (string.IsNullOrEmpty(sess.alipay_openid) && string.IsNullOrEmpty(sess.alipay_payerid)))
             {
                 return Ok(new ApiResult<OrderPayment?>()
                 {
@@ -1798,7 +1799,9 @@ namespace SnowmeetApi.Controllers
                     data = null
                 });
             }
-            string buyerId = sess.alipay_payerid.Trim();
+            string buyerId = !string.IsNullOrEmpty(sess.alipay_openid)
+                ? sess.alipay_openid.Trim()
+                : sess.alipay_payerid.Trim();
             int? sessionMemberId = sess.member_id;
 
             OrderPayment payment = await _db.orderPayment.Where(p => p.id == paymentId).AsNoTracking().FirstOrDefaultAsync();
