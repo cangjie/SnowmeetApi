@@ -2433,6 +2433,18 @@ namespace SnowmeetApi.Controllers
                     data = null
                 });
             }
+            // 顾客扫码打开支付页时落「已扫码」时间戳（仅首次、仅待支付），供收银端实时显示状态。
+            // 只更这一个字段，不影响下方只读取单逻辑。
+            if (payment.customer_open_date == null
+                && payment.status.Trim() == OrderPayment.PaymentStatus.待支付.ToString())
+            {
+                OrderPayment trackedPayment = await _db.orderPayment.FirstOrDefaultAsync(p => p.id == paymentId);
+                if (trackedPayment != null && trackedPayment.customer_open_date == null)
+                {
+                    trackedPayment.customer_open_date = DateTime.Now;
+                    await _db.SaveChangesAsync();
+                }
+            }
             Models.Order order = await GetOrder(payment.order_id);
             // 游客(member==null)允许查看待支付订单准备付款;但已支付订单仅对相关会员开放
             if (payment.status.Trim() == OrderPayment.PaymentStatus.支付成功.ToString()
@@ -2450,6 +2462,63 @@ namespace SnowmeetApi.Controllers
                 code = 0,
                 message = "",
                 data = order
+            });
+        }
+        // 支付二维码实时状态：供收银端轮询。只读、店员鉴权。
+        // stage：waiting(等待扫码) / scanned(顾客已扫码,打开了支付页) / paying(顾客已发起支付) / paid(已支付) / cancelled(已取消)
+        [HttpGet("{paymentId}")]
+        public async Task<ActionResult<ApiResult<object>>> GetPaymentLiveStatus(int paymentId,
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            sessionType = Util.UrlDecode(sessionType);
+            StaffController _staffHelper = new StaffController(_db);
+            Staff staff = await _staffHelper.GetStaffBySessionKey(sessionKey, sessionType);
+            if (staff == null || staff.title_level < 100)
+            {
+                return Ok(new ApiResult<object>() { code = 1, message = "没有权限", data = null });
+            }
+            OrderPayment payment = await _db.orderPayment.Where(p => p.id == paymentId).AsNoTracking().FirstOrDefaultAsync();
+            if (payment == null)
+            {
+                return Ok(new ApiResult<object>() { code = 1, message = "没有找到", data = null });
+            }
+            string status = (payment.status ?? "").Trim();
+            string stage;
+            if (status == OrderPayment.PaymentStatus.支付成功.ToString())
+            {
+                stage = "paid";
+            }
+            else if (payment.valid == 0 || status == OrderPayment.PaymentStatus.取消.ToString())
+            {
+                stage = "cancelled";
+            }
+            else if (payment.submit_time != null || payment.prepay_id != null
+                || (payment.open_id != null && payment.open_id.Trim() != ""))
+            {
+                // 顾客已发起支付：出码时 GetWepayPayment 不会预置这些字段，
+                // 它们被写上意味着顾客侧已走到 WechatPayByOrderPayment 申请预支付。
+                stage = "paying";
+            }
+            else if (payment.customer_open_date != null)
+            {
+                stage = "scanned";
+            }
+            else
+            {
+                stage = "waiting";
+            }
+            return Ok(new ApiResult<object>()
+            {
+                code = 0,
+                message = "",
+                data = new
+                {
+                    paymentId = payment.id,
+                    stage = stage,
+                    status = payment.status,
+                    paid = (stage == "paid")
+                }
             });
         }
         [NonAction]

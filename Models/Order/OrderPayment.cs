@@ -65,6 +65,9 @@ namespace SnowmeetApi.Models
         public string? deposit_type { get; set; } = null;
         public string? deposit_sub_type {get; set; } = null;
         public DateTime? submit_time { get; set; } = null;
+        // 顾客扫码打开支付落地页的时间（GetOrderFromPaymentByCustomer 首次命中时落戳）。
+        // 供收银端实时显示「顾客已扫码」状态。null = 尚未打开。
+        public DateTime? customer_open_date { get; set; } = null;
         [ForeignKey(nameof(PaymentShare.payment_id))]
         public List<PaymentShare> paymentShares { get; set; } = new List<PaymentShare>();
         public string shop
