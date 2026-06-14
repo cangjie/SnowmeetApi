@@ -5407,7 +5407,7 @@ namespace SnowmeetApi.Controllers
             });
         }
 
-        // 按天一次性修改：当天租金 + 当天减免 + 当天超时费（超时费按天独立存储，无则新建/清零则作废）
+        // 按天一次性修改：当天租金 + 当天减免 + 超时费（超时费按 rental 维度单条存储，无则新建/清零则作废）
         [HttpPost("{rentalId}")]
         public async Task<ActionResult<ApiResult<Models.Rental?>>> UpdateRentalDayChargesByStaff([FromRoute] int rentalId,
             [FromQuery] int rentDetailId, [FromQuery] double rent, [FromQuery] double overtime, [FromQuery] double discount,
@@ -5453,12 +5453,11 @@ namespace SnowmeetApi.Controllers
                 await _orderHelper.UpdateSingleDiscount((int)rental.order_id, "租赁", rental.id, "日租金",
                     rentDetail.id, discount, staff.id, scene);
             }
-            // 3) 当天超时费明细 upsert（按天独立存储）
-            DateTime dayStart = rentDetail.rental_date.Date;
-            DateTime dayEnd = dayStart.AddDays(1);
+            // 3) 超时费明细 upsert（按 rental 维度单条存储，不分天）：
+            //    命中键 = rental_id + charge_type='超时费' + valid=1
+            //    超时费=0：命中则作废（valid=0），不命中不处理；超时费≠0：命中则改 amount，不命中则插入
             Models.RentalDetail otDetail = await _db.rentalDetail
-                .Where(d => d.rental_id == rentalId && d.charge_type == "超时费" && d.valid == 1
-                    && d.rental_date >= dayStart && d.rental_date < dayEnd)
+                .Where(d => d.rental_id == rentalId && d.charge_type == "超时费" && d.valid == 1)
                 .OrderByDescending(d => d.id).FirstOrDefaultAsync();
             if (otDetail != null)
             {
