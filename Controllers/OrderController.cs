@@ -2438,7 +2438,7 @@ namespace SnowmeetApi.Controllers
             if (payment.customer_open_date == null
                 && payment.status.Trim() == OrderPayment.PaymentStatus.待支付.ToString())
             {
-                OrderPayment trackedPayment = await _db.orderPayment.FirstOrDefaultAsync(p => p.id == paymentId);
+                OrderPayment trackedPayment = await _db.orderPayment.AsTracking().FirstOrDefaultAsync(p => p.id == paymentId);
                 if (trackedPayment != null && trackedPayment.customer_open_date == null)
                 {
                     trackedPayment.customer_open_date = DateTime.Now;
