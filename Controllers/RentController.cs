@@ -5406,6 +5406,105 @@ namespace SnowmeetApi.Controllers
                 data = newDetails
             });
         }
+
+        // 按天一次性修改：当天租金 + 当天减免 + 当天超时费（超时费按天独立存储，无则新建/清零则作废）
+        [HttpPost("{rentalId}")]
+        public async Task<ActionResult<ApiResult<Models.Rental?>>> UpdateRentalDayChargesByStaff([FromRoute] int rentalId,
+            [FromQuery] int rentDetailId, [FromQuery] double rent, [FromQuery] double overtime, [FromQuery] double discount,
+            [FromQuery] string scene, [FromQuery] string sessionKey, [FromQuery] string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            scene = Util.UrlDecode(scene);
+            if (staff == null || staff.title_level < 100)
+            {
+                return Ok(new ApiResult<Models.Rental?>() { code = 1, message = "没有权限", data = null });
+            }
+            Models.Rental rental = await _db.rental.Where(r => r.id == rentalId).AsNoTracking().FirstOrDefaultAsync();
+            if (rental == null || rental.order_id == null)
+            {
+                return Ok(new ApiResult<Models.Rental?>() { code = 1, message = "无此租赁", data = null });
+            }
+            // 当天租金明细：用 id 定位（每一行的真理之源），同时也确定"当天"
+            Models.RentalDetail rentDetail = await _db.rentalDetail
+                .Where(d => d.id == rentDetailId && d.rental_id == rentalId).FirstOrDefaultAsync();
+            if (rentDetail == null)
+            {
+                return Ok(new ApiResult<Models.Rental?>() { code = 1, message = "无此租金明细", data = null });
+            }
+            // 1) 当天租金金额
+            if (rentDetail.amount != rent)
+            {
+                await _db.coreDataModLog.AddAsync(CoreDataModLog.CreateManualLog("rental_detail", "amount",
+                    rentDetail.id, scene, null, staff.id, rentDetail.amount.ToString(), rent.ToString(), "修改租金"));
+                rentDetail.amount = rent;
+                rentDetail.update_date = DateTime.Now;
+                await _db.SaveChangesAsync();
+            }
+            // 2) 当天减免（归属于当天租金明细）。仅在与现有减免不同时才写：
+            //    UpdateSingleDiscount 在 amount==0 且无现有减免行时会走 else 分支取 discount.id 触发 NRE，必须先比对
+            var existDiscount = await _db.discount.Where(d => d.order_id == rental.order_id
+                && d.biz_type == "租赁" && d.biz_id == rental.id && d.sub_biz_type == "日租金"
+                && d.sub_biz_id == rentDetail.id && d.ticket_code == null && d.valid == 1)
+                .AsNoTracking().FirstOrDefaultAsync();
+            double curDiscount = existDiscount == null ? 0 : existDiscount.amount;
+            if (curDiscount != discount)
+            {
+                OrderController _orderHelper = new OrderController(_db, _oriConfig, _httpContextAccessor);
+                await _orderHelper.UpdateSingleDiscount((int)rental.order_id, "租赁", rental.id, "日租金",
+                    rentDetail.id, discount, staff.id, scene);
+            }
+            // 3) 当天超时费明细 upsert（按天独立存储）
+            DateTime dayStart = rentDetail.rental_date.Date;
+            DateTime dayEnd = dayStart.AddDays(1);
+            Models.RentalDetail otDetail = await _db.rentalDetail
+                .Where(d => d.rental_id == rentalId && d.charge_type == "超时费" && d.valid == 1
+                    && d.rental_date >= dayStart && d.rental_date < dayEnd)
+                .OrderByDescending(d => d.id).FirstOrDefaultAsync();
+            if (otDetail != null)
+            {
+                if (overtime <= 0)
+                {
+                    await _db.coreDataModLog.AddAsync(CoreDataModLog.CreateManualLog("rental_detail", "valid",
+                        otDetail.id, scene, null, staff.id, otDetail.valid.ToString(), "0", "清空超时费"));
+                    otDetail.valid = 0;
+                    otDetail.update_date = DateTime.Now;
+                    await _db.SaveChangesAsync();
+                }
+                else if (otDetail.amount != overtime)
+                {
+                    await _db.coreDataModLog.AddAsync(CoreDataModLog.CreateManualLog("rental_detail", "amount",
+                        otDetail.id, scene, null, staff.id, otDetail.amount.ToString(), overtime.ToString(), "修改超时费"));
+                    otDetail.amount = overtime;
+                    otDetail.update_date = DateTime.Now;
+                    await _db.SaveChangesAsync();
+                }
+            }
+            else if (overtime > 0)
+            {
+                Models.RentalDetail newOt = new Models.RentalDetail()
+                {
+                    id = 0,
+                    rental_id = rentalId,
+                    rent_item_id = null,
+                    charge_type = "超时费",
+                    rental_date = rentDetail.rental_date,
+                    rent_price_id = null,
+                    amount = overtime,
+                    memo = "",
+                    staff_id = staff.id,
+                    valid = 1,
+                    create_date = DateTime.Now
+                };
+                await _db.rentalDetail.AddAsync(newOt);
+                await _db.SaveChangesAsync();
+                await _db.coreDataModLog.AddAsync(CoreDataModLog.CreateManualLog("rental_detail", "amount",
+                    newOt.id, scene, null, staff.id, "0", overtime.ToString(), "新增超时费"));
+                await _db.SaveChangesAsync();
+            }
+            Rental updatedRental = await GetRental(rentalId);
+            return Ok(new ApiResult<Models.Rental?>() { code = 0, message = "", data = updatedRental });
+        }
+
         [HttpGet]
         public async Task ContinueRentOrder(DateTime? rentDate = null)
         {
