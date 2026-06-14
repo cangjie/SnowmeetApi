@@ -62,9 +62,27 @@ namespace SnowmeetApi.Controllers
                     {
                         if (jobAccount.staffSocialAccounts[k].staff != null && jobAccount.staffSocialAccounts[k].staff.valid == 1)
                         {
-                            
                             return jobAccount.staffSocialAccounts[k].staff;
                         }
+                    }
+                }
+            }
+            // Fallback：session.member_id 与 social_account_for_job.member_id 不一致时（脏数据/member 合并场景），
+            // 改用 session.wechat_openid 直接匹配 social_account_for_job.wechat_mini_openid。
+            string? openIdForLookup = sList.Select(s => s.wechat_openid).FirstOrDefault(o => !string.IsNullOrEmpty(o));
+            if (!string.IsNullOrEmpty(openIdForLookup))
+            {
+                SocialAccountForJob? jobByOpenId = await _db.socialAccountForJob
+                    .Include(j => j.staffSocialAccounts.Where(s => s.valid == 1 && (s.end_date == null || s.end_date >= DateTime.Now)).OrderByDescending(s => s.start_date))
+                        .ThenInclude(s => s.staff)
+                    .Where(j => j.wechat_mini_openid == openIdForLookup)
+                    .AsNoTracking().FirstOrDefaultAsync();
+                if (jobByOpenId != null && jobByOpenId.staffSocialAccounts != null)
+                {
+                    foreach (var ssa in jobByOpenId.staffSocialAccounts)
+                    {
+                        if (ssa.staff != null && ssa.staff.valid == 1)
+                            return ssa.staff;
                     }
                 }
             }
