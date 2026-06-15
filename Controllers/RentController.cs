@@ -5407,11 +5407,13 @@ namespace SnowmeetApi.Controllers
             });
         }
 
-        // 按天一次性修改：当天租金 + 当天减免 + 超时费（超时费按 rental 维度单条存储，无则新建/清零则作废）
+        // 按天一次性修改：当天租金 + 当天减免 + 当天超时费（按天 upsert）；
+        // waived=true 时免除当天全部费用（valid 置 0、金额保留），取消勾选即恢复
         [HttpPost("{rentalId}")]
         public async Task<ActionResult<ApiResult<Models.Rental?>>> UpdateRentalDayChargesByStaff([FromRoute] int rentalId,
             [FromQuery] int rentDetailId, [FromQuery] double rent, [FromQuery] double overtime, [FromQuery] double discount,
-            [FromQuery] string scene, [FromQuery] string sessionKey, [FromQuery] string sessionType = "wechat_mini_openid")
+            [FromQuery] string scene, [FromQuery] string sessionKey, [FromQuery] bool waived = false,
+            [FromQuery] string sessionType = "wechat_mini_openid")
         {
             Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
             scene = Util.UrlDecode(scene);
@@ -5431,18 +5433,74 @@ namespace SnowmeetApi.Controllers
             {
                 return Ok(new ApiResult<Models.Rental?>() { code = 1, message = "无此租金明细", data = null });
             }
-            // 1) 当天租金金额
+            DateTime theDay = rentDetail.rental_date.Date;
+            OrderController _orderHelper = new OrderController(_db, _oriConfig, _httpContextAccessor);
+
+            if (waived)
+            {
+                // ===== 路径 A：免除当天全部费用（valid→0，金额保留）=====
+                // 1) 当天租金明细
+                if (rentDetail.valid == 1)
+                {
+                    await _db.coreDataModLog.AddAsync(CoreDataModLog.CreateManualLog("rental_detail", "valid",
+                        rentDetail.id, scene, null, staff.id, rentDetail.valid.ToString(), "0", "免除当日租金"));
+                    rentDetail.valid = 0;
+                    rentDetail.update_date = DateTime.Now;
+                    _db.Entry(rentDetail).State = EntityState.Modified;
+                    await _db.SaveChangesAsync();
+                }
+                // 2) 当天超时费（按天定位）
+                Models.RentalDetail otDetailW = await _db.rentalDetail
+                    .Where(d => d.rental_id == rentalId && d.rental_date.Date == theDay
+                        && d.charge_type == "超时费" && d.valid == 1)
+                    .OrderByDescending(d => d.id).FirstOrDefaultAsync();
+                if (otDetailW != null)
+                {
+                    await _db.coreDataModLog.AddAsync(CoreDataModLog.CreateManualLog("rental_detail", "valid",
+                        otDetailW.id, scene, null, staff.id, otDetailW.valid.ToString(), "0", "免除当日超时费"));
+                    otDetailW.valid = 0;
+                    otDetailW.update_date = DateTime.Now;
+                    _db.Entry(otDetailW).State = EntityState.Modified;
+                    await _db.SaveChangesAsync();
+                }
+                // 3) 当天减免：仅在有 valid=1 减免时才作废（避免 UpdateSingleDiscount(amount=0,无行) NRE）
+                var existDiscountW = await _db.discount.Where(d => d.order_id == rental.order_id
+                    && d.biz_type == "租赁" && d.biz_id == rental.id && d.sub_biz_type == "日租金"
+                    && d.sub_biz_id == rentDetail.id && d.ticket_code == null && d.valid == 1)
+                    .AsNoTracking().FirstOrDefaultAsync();
+                if (existDiscountW != null)
+                {
+                    await _orderHelper.UpdateSingleDiscount((int)rental.order_id, "租赁", rental.id, "日租金",
+                        rentDetail.id, 0, staff.id, scene);
+                }
+                Rental waivedRental = await GetRental(rentalId);
+                return Ok(new ApiResult<Models.Rental?>() { code = 0, message = "", data = waivedRental });
+            }
+
+            // ===== 路径 B：正常更新 / 从免除恢复 =====
+            // 1) 当天租金额 + 复活（"金额是否变" 与 "是否需复活" 相互独立）
+            bool rentDirty = false;
             if (rentDetail.amount != rent)
             {
                 await _db.coreDataModLog.AddAsync(CoreDataModLog.CreateManualLog("rental_detail", "amount",
                     rentDetail.id, scene, null, staff.id, rentDetail.amount.ToString(), rent.ToString(), "修改租金"));
                 rentDetail.amount = rent;
+                rentDirty = true;
+            }
+            if (rentDetail.valid != 1)
+            {
+                await _db.coreDataModLog.AddAsync(CoreDataModLog.CreateManualLog("rental_detail", "valid",
+                    rentDetail.id, scene, null, staff.id, rentDetail.valid.ToString(), "1", "恢复当日租金"));
+                rentDetail.valid = 1;
+                rentDirty = true;
+            }
+            if (rentDirty)
+            {
                 rentDetail.update_date = DateTime.Now;
                 _db.Entry(rentDetail).State = EntityState.Modified;
                 await _db.SaveChangesAsync();
             }
-            // 2) 当天减免（归属于当天租金明细）。仅在与现有减免不同时才写：
-            //    UpdateSingleDiscount 在 amount==0 且无现有减免行时会走 else 分支取 discount.id 触发 NRE，必须先比对
+            // 2) 当天减免（与现有不同才写；UpdateSingleDiscount 自带"非0复活/0作废"）
             var existDiscount = await _db.discount.Where(d => d.order_id == rental.order_id
                 && d.biz_type == "租赁" && d.biz_id == rental.id && d.sub_biz_type == "日租金"
                 && d.sub_biz_id == rentDetail.id && d.ticket_code == null && d.valid == 1)
@@ -5450,35 +5508,50 @@ namespace SnowmeetApi.Controllers
             double curDiscount = existDiscount == null ? 0 : existDiscount.amount;
             if (curDiscount != discount)
             {
-                OrderController _orderHelper = new OrderController(_db, _oriConfig, _httpContextAccessor);
                 await _orderHelper.UpdateSingleDiscount((int)rental.order_id, "租赁", rental.id, "日租金",
                     rentDetail.id, discount, staff.id, scene);
             }
-            // 3) 超时费明细 upsert（按 rental 维度单条存储，不分天）：
-            //    命中键 = rental_id + charge_type='超时费' + valid=1
-            //    超时费=0：命中则作废（valid=0），不命中不处理；超时费≠0：命中则改 amount，不命中则插入
+            // 3) 当天超时费 upsert（按天：rental_id + 当天 + 超时费；不限 valid 以支持恢复）
             Models.RentalDetail otDetail = await _db.rentalDetail
-                .Where(d => d.rental_id == rentalId && d.charge_type == "超时费" && d.valid == 1)
+                .Where(d => d.rental_id == rentalId && d.rental_date.Date == theDay && d.charge_type == "超时费")
                 .OrderByDescending(d => d.id).FirstOrDefaultAsync();
             if (otDetail != null)
             {
                 if (overtime <= 0)
                 {
-                    await _db.coreDataModLog.AddAsync(CoreDataModLog.CreateManualLog("rental_detail", "valid",
-                        otDetail.id, scene, null, staff.id, otDetail.valid.ToString(), "0", "清空超时费"));
-                    otDetail.valid = 0;
-                    otDetail.update_date = DateTime.Now;
-                    _db.Entry(otDetail).State = EntityState.Modified;
-                    await _db.SaveChangesAsync();
+                    if (otDetail.valid == 1)
+                    {
+                        await _db.coreDataModLog.AddAsync(CoreDataModLog.CreateManualLog("rental_detail", "valid",
+                            otDetail.id, scene, null, staff.id, otDetail.valid.ToString(), "0", "清空超时费"));
+                        otDetail.valid = 0;
+                        otDetail.update_date = DateTime.Now;
+                        _db.Entry(otDetail).State = EntityState.Modified;
+                        await _db.SaveChangesAsync();
+                    }
                 }
-                else if (otDetail.amount != overtime)
+                else
                 {
-                    await _db.coreDataModLog.AddAsync(CoreDataModLog.CreateManualLog("rental_detail", "amount",
-                        otDetail.id, scene, null, staff.id, otDetail.amount.ToString(), overtime.ToString(), "修改超时费"));
-                    otDetail.amount = overtime;
-                    otDetail.update_date = DateTime.Now;
-                    _db.Entry(otDetail).State = EntityState.Modified;
-                    await _db.SaveChangesAsync();
+                    bool otDirty = false;
+                    if (otDetail.amount != overtime)
+                    {
+                        await _db.coreDataModLog.AddAsync(CoreDataModLog.CreateManualLog("rental_detail", "amount",
+                            otDetail.id, scene, null, staff.id, otDetail.amount.ToString(), overtime.ToString(), "修改超时费"));
+                        otDetail.amount = overtime;
+                        otDirty = true;
+                    }
+                    if (otDetail.valid != 1)
+                    {
+                        await _db.coreDataModLog.AddAsync(CoreDataModLog.CreateManualLog("rental_detail", "valid",
+                            otDetail.id, scene, null, staff.id, otDetail.valid.ToString(), "1", "恢复超时费"));
+                        otDetail.valid = 1;
+                        otDirty = true;
+                    }
+                    if (otDirty)
+                    {
+                        otDetail.update_date = DateTime.Now;
+                        _db.Entry(otDetail).State = EntityState.Modified;
+                        await _db.SaveChangesAsync();
+                    }
                 }
             }
             else if (overtime > 0)
