@@ -100,6 +100,62 @@ namespace SnowmeetApi.Controllers.Order
             });
         }
 
+        // 顾客扫码进小程序、MemberLogin 后调用：纯身份核验（不涉及任何支付）。
+        // 扫码人 == 订单会员 → order.wechat_unverified = true 持久化（注意：1 = 已核验为本人，命名与字面相反）。
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<object>>> VerifyWechatIdentity(int orderId, string sessionKey)
+        {
+            var (sessOpenid, sessUnionid, sess) = await _loadSessionContext(sessionKey);
+            int? scannerMemberId = (sess != null) ? sess.member_id : null;
+            if (scannerMemberId == null)
+            {
+                return Ok(new ApiResult<object> { code = 1, message = "未识别扫码人身份，请重新登录", data = new { matched = false } });
+            }
+            var order = await _db.order.Where(o => o.id == orderId && o.valid == 1).FirstOrDefaultAsync();
+            if (order == null)
+            {
+                return Ok(new ApiResult<object> { code = 1, message = "订单不存在", data = new { matched = false } });
+            }
+            if (order.member_id == null)
+            {
+                return Ok(new ApiResult<object> { code = 1, message = "订单无会员，无法核验", data = new { matched = false } });
+            }
+            bool matched = (order.member_id == scannerMemberId);
+            if (matched)
+            {
+                if (!order.wechat_unverified)
+                {
+                    order.wechat_unverified = true;
+                    // 全局 NoTracking：必须显式 State=Modified 否则不持久化
+                    _db.order.Entry(order).State = EntityState.Modified;
+                    CoreDataModLog log = CoreDataModLog.CreateManualLog("Order", "wechat_unverified", order.id,
+                        "微信身份核验", scannerMemberId, null, "0", "1", "顾客扫码核验本人，置 wechat_unverified=1");
+                    await _db.coreDataModLog.AddAsync(log);
+                    await _db.SaveChangesAsync();
+                }
+                return Ok(new ApiResult<object> { code = 0, message = "", data = new { matched = true } });
+            }
+            string masked = null;
+            var orderMember = await _memberHelper.GetWholeMemberById((int)order.member_id);
+            if (orderMember != null) masked = _maskCell(orderMember.cell);
+            return Ok(new ApiResult<object> { code = 0, message = "", data = new { matched = false, orderMemberMaskedCell = masked } });
+        }
+
+        // 店员端轮询：该订单是否已通过微信身份核验（wechat_unverified == true 即已核验本人）。
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<object>>> GetWechatVerifyStatus(int orderId, string sessionKey,
+            string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            if (staff == null)
+            {
+                return Ok(new ApiResult<object> { code = 1, message = "没有权限", data = new { verified = false } });
+            }
+            var order = await _db.order.Where(o => o.id == orderId).AsNoTracking().FirstOrDefaultAsync();
+            bool verified = (order != null && order.wechat_unverified);
+            return Ok(new ApiResult<object> { code = 0, message = "", data = new { verified = verified } });
+        }
+
         [HttpPost]
         public async Task<ActionResult<ApiResult<CheckPayerIdentityResult>>> ConfirmPayIdentity(
             [FromBody] ConfirmPayIdentityBody body, [FromQuery] string sessionKey)

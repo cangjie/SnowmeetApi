@@ -2145,10 +2145,16 @@ namespace SnowmeetApi.Controllers
                     {
                         order.member_id = paidOp.member_id;
                     }
-                    if (paidOp.pay_method != null && paidOp.pay_method.Trim() == "支付宝" && !order.wechat_unverified)
-                    {
-                        order.wechat_unverified = true;
-                    }
+                    // wechat_unverified 语义注意：本字段 1 = 「已通过微信核验为本人」，与字面相反（历史命名）。
+                    // 规则：仅当「微信支付 + 非代付 + 付款人 member_id == 订单 member_id」时置 true；
+                    // 其余（含本人支付宝、代付、会员不符）一律 false。上面非代付时已把 order.member_id
+                    // 同步为付款方，故此处相等即代表本人微信支付。每次成功都显式赋值，满足「否则都设 0」。
+                    order.wechat_unverified =
+                        paidOp.pay_method != null
+                        && paidOp.pay_method.Trim() == "微信支付"
+                        && paidOp.is_proxy_pay == false
+                        && paidOp.member_id != null
+                        && paidOp.member_id == order.member_id;
                 }
             }
             await UpdateOrder(order, null, null, "支付成功");
