@@ -173,21 +173,7 @@ namespace SnowmeetApi.Models
 
 
         [NotMapped]
-        public bool isPackage
-        {
-            get
-            {
-                if (package_id != null)
-                {
-                    return true;
-                }
-                if (rentItems != null && rentItems.Count > 1)
-                {
-                    return true;
-                }
-                return false;
-            }
-        }
+        public bool isPackage => package_id != null;
 
         [NotMapped]
         public double totalGuarantyAmount
