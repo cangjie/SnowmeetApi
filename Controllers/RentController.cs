@@ -5438,6 +5438,7 @@ namespace SnowmeetApi.Controllers
                     rentDetail.id, scene, null, staff.id, rentDetail.amount.ToString(), rent.ToString(), "修改租金"));
                 rentDetail.amount = rent;
                 rentDetail.update_date = DateTime.Now;
+                _db.Entry(rentDetail).State = EntityState.Modified;
                 await _db.SaveChangesAsync();
             }
             // 2) 当天减免（归属于当天租金明细）。仅在与现有减免不同时才写：
@@ -5467,6 +5468,7 @@ namespace SnowmeetApi.Controllers
                         otDetail.id, scene, null, staff.id, otDetail.valid.ToString(), "0", "清空超时费"));
                     otDetail.valid = 0;
                     otDetail.update_date = DateTime.Now;
+                    _db.Entry(otDetail).State = EntityState.Modified;
                     await _db.SaveChangesAsync();
                 }
                 else if (otDetail.amount != overtime)
@@ -5475,6 +5477,7 @@ namespace SnowmeetApi.Controllers
                         otDetail.id, scene, null, staff.id, otDetail.amount.ToString(), overtime.ToString(), "修改超时费"));
                     otDetail.amount = overtime;
                     otDetail.update_date = DateTime.Now;
+                    _db.Entry(otDetail).State = EntityState.Modified;
                     await _db.SaveChangesAsync();
                 }
             }
