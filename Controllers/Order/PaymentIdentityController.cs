@@ -559,6 +559,8 @@ namespace SnowmeetApi.Controllers.Order
             int? scannerMemberId = pre.scannerMemberId;
             op.member_id = scannerMemberId;
             op.is_proxy_pay = (choice == "proxy");
+            // 落库扫码方第三方 openid（此前只写 member_id，openid 已解析却漏写表）
+            await _persistPayerOpenId(op, payerType, scannerId, sessionKey);
             op.update_date = DateTime.Now;
             _db.orderPayment.Entry(op).State = EntityState.Modified;
             await _db.SaveChangesAsync();
@@ -626,6 +628,8 @@ namespace SnowmeetApi.Controllers.Order
             int? scannerMemberId = pre.scannerMemberId;
             op.member_id = scannerMemberId;
             op.is_proxy_pay = false;
+            // 落库扫码方第三方 openid（此前只写 member_id，openid 已解析却漏写表）
+            await _persistPayerOpenId(op, payerType, scannerId, sessionKey);
             op.update_date = DateTime.Now;
             _db.orderPayment.Entry(op).State = EntityState.Modified;
             await _db.SaveChangesAsync();
@@ -637,6 +641,32 @@ namespace SnowmeetApi.Controllers.Order
         }
 
         // ====== Helpers ======
+
+        // 把扫码方（付款方）的第三方 openid 落到 order_payment：微信→open_id，支付宝→ali_buyer_id。
+        // scannerId 为空时用 sessionKey 反查 mini_session 兜底（与建会员分支同源）。
+        // 仅赋值，由调用方统一 SaveChanges。修复：身份确认只写 member_id、openid 漏写表的问题，
+        // 保证每笔微信/支付宝 order_payment 自身份确认起就带 openid（不必等顾客真正发起支付才补）。
+        private async Task _persistPayerOpenId(OrderPayment op, string payerType, string scannerId, string sessionKey)
+        {
+            string openId = (scannerId ?? "").Trim();
+            if (string.IsNullOrEmpty(openId))
+            {
+                var (sessOpenid, _, _) = await _loadSessionContext(sessionKey);
+                openId = (sessOpenid ?? "").Trim();
+            }
+            if (string.IsNullOrEmpty(openId))
+            {
+                return;
+            }
+            if (payerType == "alipay")
+            {
+                op.ali_buyer_id = openId;
+            }
+            else
+            {
+                op.open_id = openId;
+            }
+        }
 
         private string _extractPhone(ConfirmPayIdentityBody body, string sessionKey, string payerType)
         {
