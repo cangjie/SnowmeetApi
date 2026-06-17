@@ -6451,6 +6451,22 @@ namespace SnowmeetApi.Controllers
                     _db.rentItem.Entry(rentItem).State = EntityState.Modified;
                 }
             }
+            await SyncRentalGuaranty(rental);
+            _db.rental.Entry(rental).State = EntityState.Modified;
+            await _db.SaveChangesAsync();
+            _db.rental.Entry(rental).State = EntityState.Detached;
+            for (int i = 0; rental.rentItems != null && i < rental.rentItems.Count; i++)
+            {
+                _db.rentItem.Entry(rental.rentItems[i]).State = EntityState.Detached;
+            }
+            await _db.SaveChangesAsync();
+            return rental;
+        }
+        // 依据 rental.guaranty - guaranty_discount 同步未支付的 Guaranty 记录（>0 建/改，否则置 valid=0）。
+        // 仅暂存改动，由调用方负责 SaveChangesAsync。
+        [NonAction]
+        public async Task SyncRentalGuaranty(Rental rental)
+        {
             if (rental.noGuaranty != true)
             {
                 double gAmount = Math.Round((double)rental.guaranty - (double)rental.guaranty_discount, 2);
@@ -6492,15 +6508,76 @@ namespace SnowmeetApi.Controllers
                     }
                 }
             }
+        }
+        // 员工在订单详情页调整某 rental 的押金（仅未支付押金；已支付须走退款）。amount=0 即全免。
+        [HttpPost("{rentalId}")]
+        public async Task<ActionResult<ApiResult<Models.Rental?>>> UpdateRentalGuarantyByStaff(
+            [FromRoute] int rentalId, [FromQuery] double amount, [FromQuery] string scene,
+            [FromQuery] string sessionKey, [FromQuery] string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            if (staff == null || staff.title_level < 100)
+            {
+                return Ok(new ApiResult<Models.Rental?>() { code = 1, message = "没有权限", data = null });
+            }
+            if (amount < 0)
+            {
+                return Ok(new ApiResult<Models.Rental?>() { code = 1, message = "押金不能为负", data = null });
+            }
+            scene = Util.UrlDecode(scene);
+            Models.Rental rental = await GetRental(rentalId);
+            if (rental == null)
+            {
+                return Ok(new ApiResult<Models.Rental?>() { code = 1, message = "无此租赁", data = null });
+            }
+            Models.Guaranty existingGuaranty = null;
+            for (int i = 0; rental.guaranties != null && i < rental.guaranties.Count; i++)
+            {
+                Models.Guaranty g = rental.guaranties[i];
+                if (g.valid == 1 && g.biz_type == "租赁" && g.biz_id == rentalId)
+                {
+                    existingGuaranty = g;
+                    break;
+                }
+            }
+            if (existingGuaranty != null && existingGuaranty.payStatus != "未支付")
+            {
+                return Ok(new ApiResult<Models.Rental?>() { code = 1, message = "押金已支付，请走退款流程", data = null });
+            }
+            if (rental.guaranty == null)
+            {
+                rental.guaranty = 0;
+            }
+            rental.guaranty_discount = (double)rental.guaranty - amount;
             _db.rental.Entry(rental).State = EntityState.Modified;
+            await SyncRentalGuaranty(rental);
             await _db.SaveChangesAsync();
             _db.rental.Entry(rental).State = EntityState.Detached;
-            for (int i = 0; rental.rentItems != null && i < rental.rentItems.Count; i++)
+            List<Models.Guaranty> orderGuaranties = await _db.guaranty
+                .Where(g => g.valid == 1 && g.order_id == rental.order_id)
+                .Include(g => g.guarantyPayments).ThenInclude(p => p.payment)
+                .AsNoTracking().ToListAsync();
+            double payAmount = 0;
+            for (int i = 0; i < orderGuaranties.Count; i++)
             {
-                _db.rentItem.Entry(rental.rentItems[i]).State = EntityState.Detached;
+                if (orderGuaranties[i].payStatus == "未支付")
+                {
+                    payAmount += (double)orderGuaranties[i].amount;
+                }
             }
-            await _db.SaveChangesAsync();
-            return rental;
+            Models.Order order = await _db.order.Where(o => o.id == rental.order_id).AsNoTracking().FirstOrDefaultAsync();
+            if (order != null)
+            {
+                order.paying_amount = payAmount;
+                _db.order.Entry(order).State = EntityState.Modified;
+                await _db.SaveChangesAsync();
+            }
+            return Ok(new ApiResult<Models.Rental?>()
+            {
+                code = 0,
+                message = "",
+                data = await GetRental(rentalId)
+            });
         }
         [HttpPost("{packageId}")]
         public async Task<ActionResult<ApiResult<RentPackage>>> UpdatePackageRentItemCategories([FromRoute] int packageId,
