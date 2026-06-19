@@ -595,12 +595,13 @@ namespace SnowmeetApi.Controllers
         [HttpPost]
         public async Task<ActionResult<string>> CallBack()
         {
-            string certPath = Util.workingPath + "/AlipayCertificate/" + appId;
             StreamReader sr = new StreamReader(Request.Body);
             string postStr = await sr.ReadToEndAsync();
             sr.Close();
-            System.IO.File.AppendAllText(certPath + "/alipay_callback_" + DateTime.Now.ToString("yyyyMMdd") + ".txt", DateTime.Now.ToString() + "\t" + postStr + "\r\n");
             AliCallBackModel callback = ParseCallBack(postStr);
+            string callbackAppId = !string.IsNullOrEmpty(callback.appId) ? callback.appId.Trim() : appId;
+            string certPath = Util.workingPath + "/AlipayCertificate/" + callbackAppId;
+            System.IO.File.AppendAllText(certPath + "/alipay_callback_" + DateTime.Now.ToString("yyyyMMdd") + ".txt", DateTime.Now.ToString() + "\t" + postStr + "\r\n");
             switch (callback.notifyType.Trim())
             {
                 case "trade_status_sync":
