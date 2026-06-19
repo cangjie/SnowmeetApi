@@ -535,7 +535,12 @@ namespace SnowmeetApi.Controllers.Order
                     if (string.IsNullOrEmpty(scannerId)) scannerId = sessOpenidAuto;
                 }
             }
-            if (pre.status != "choose_identity")
+            // 正常情况：choose_identity（订单归别人，二选一）。
+            // 但扫码方在点选前刚授权手机号、被识别成订单本人时，状态会合法地翻成 direct
+            // （扫码方 == 订单会员，"代付"已无意义）。此时不能报 unexpected_state 把人卡死，
+            // 按直付处理即可，让前端照常发起支付。
+            bool nowDirect = pre.status == "direct" || pre.status == "direct_to_scanner";
+            if (pre.status != "choose_identity" && !nowDirect)
             {
                 return Ok(_err("unexpected_state", "当前状态非 choose_identity: " + pre.status));
             }
@@ -544,6 +549,11 @@ namespace SnowmeetApi.Controllers.Order
             if (choice != "self" && choice != "proxy")
             {
                 return Ok(_err("invalid_choice", "choice 必须是 self 或 proxy"));
+            }
+            // 扫码方就是订单本人 → 代付无意义，强制按直付(self)落库，不写 is_proxy_pay / cell
+            if (nowDirect)
+            {
+                choice = "self";
             }
 
             var order = await _db.order.Where(o => o.id == pre.orderId).FirstOrDefaultAsync();

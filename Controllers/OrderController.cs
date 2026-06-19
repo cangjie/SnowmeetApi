@@ -1078,6 +1078,71 @@ namespace SnowmeetApi.Controllers
                 data = newOrders
             });
         }
+        public class PagedOrderResult
+        {
+            public List<SnowmeetApi.Models.Order> items { get; set; } = new();
+            public int total { get; set; } = 0;
+        }
+
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<PagedOrderResult>>> GetOrdersByStaffPaged(int? orderId,
+            string? shop, string? type, string? subType, DateTime? startDate, DateTime? endDate, string sessionKey,
+            string? payOption, string sessionType = "wechat_mini_openid", bool? isTest = null, bool? isEntertain = null,
+            bool? isPackage = null, bool? isOnCredit = null, bool? haveDiscount = null, string? status = null, string? cell = null,
+            bool? haveWarranty = null, string? retailType = null, string? keyword = null, bool? isSummerCare = null,
+            int? rentCategoryId = null, string? rentItemName = null, bool? useCard = null, string? rentStatus = null,
+            int pageIndex = 1, int pageSize = 10)
+        {
+            shop = shop == null ? null : Util.UrlDecode(shop);
+            type = type == null ? null : Util.UrlDecode(type);
+            subType = subType == null ? null : Util.UrlDecode(subType);
+            sessionKey = Util.UrlDecode(sessionKey);
+            payOption = payOption == null ? null : Util.UrlDecode(payOption);
+            status = status == null ? null : Util.UrlDecode(status);
+            cell = cell == null ? null : Util.UrlDecode(cell);
+            retailType = retailType == null ? null : Util.UrlDecode(retailType);
+            keyword = keyword == null ? null : Util.UrlDecode(keyword);
+            if (keyword != null && keyword.Trim() == "")
+            {
+                return Ok(new ApiResult<PagedOrderResult>()
+                {
+                    code = 1,
+                    message = "关键词不能为空",
+                    data = null
+                });
+            }
+            StaffController _staffHelper = new StaffController(_db);
+            Staff staff = await _staffHelper.GetStaffBySessionKey(sessionKey, sessionType);
+            if (staff == null)
+            {
+                return Ok(new ApiResult<PagedOrderResult>()
+                {
+                    code = 1,
+                    message = "不是管理员",
+                    data = null
+                });
+            }
+            List<SnowmeetApi.Models.Order> orders = await GetCommonOrders(orderId, shop, null, null, type, startDate, endDate, payOption,
+                isTest, isEntertain, isPackage, isOnCredit, haveDiscount, status, null, null, haveWarranty, retailType, keyword, isSummerCare,
+                rentCategoryId, rentItemName, useCard, cell, rentStatus);
+            List<SnowmeetApi.Models.Order> filtered = cell != null
+                ? orders.Where(o => o.customerCell.EndsWith(cell)).ToList()
+                : orders;
+            int total = filtered.Count;
+            List<SnowmeetApi.Models.Order> paged = filtered
+                .OrderByDescending(o => o.biz_date)
+                .Skip((pageIndex - 1) * pageSize)
+                .Take(pageSize)
+                .ToList();
+            SnowmeetApi.Models.Order.RendOrderList(paged);
+            return Ok(new ApiResult<PagedOrderResult>()
+            {
+                code = 0,
+                message = "",
+                data = new PagedOrderResult { items = paged, total = total }
+            });
+        }
+
         [HttpGet("{orderId}")]
         public async Task<ActionResult<ApiResult<Models.Order>>> GetOrderByCustomer(int orderId,
             string sessionKey, string sessionType = "wechat_mini_openid")
