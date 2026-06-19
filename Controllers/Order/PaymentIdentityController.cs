@@ -561,6 +561,12 @@ namespace SnowmeetApi.Controllers.Order
             op.is_proxy_pay = (choice == "proxy");
             // 落库扫码方第三方 openid（此前只写 member_id，openid 已解析却漏写表）
             await _persistPayerOpenId(op, payerType, scannerId, sessionKey);
+            // 代付(is_proxy_pay=1)：把代付人手机号落到 order_payment.cell（软提示可跳过 → 拿不到就留空，不阻断）
+            if (choice == "proxy")
+            {
+                string proxyCell = await _resolveProxyPayerCell(scannerMemberId, sessionKey);
+                if (!string.IsNullOrEmpty(proxyCell)) op.cell = proxyCell;
+            }
             op.update_date = DateTime.Now;
             _db.orderPayment.Entry(op).State = EntityState.Modified;
             await _db.SaveChangesAsync();
@@ -666,6 +672,20 @@ namespace SnowmeetApi.Controllers.Order
             {
                 op.open_id = openId;
             }
+        }
+
+        // 解析代付人(扫码付款方)手机号：微信取会员档案 cell；支付宝会员推迟到 notify 创建，取 mini_session.cell 兜底。
+        // 仅返回手机号，由调用方决定是否写入 op.cell（与 _persistPayerOpenId 同风格）。
+        private async Task<string> _resolveProxyPayerCell(int? scannerMemberId, string sessionKey)
+        {
+            if (scannerMemberId != null)
+            {
+                var m = await _memberHelper.GetWholeMemberById((int)scannerMemberId);
+                if (m != null && !string.IsNullOrEmpty(m.cell)) return m.cell.Trim();
+            }
+            var (_, _, sess) = await _loadSessionContext(sessionKey);
+            if (sess != null && !string.IsNullOrEmpty(sess.cell)) return sess.cell.Trim();
+            return null;
         }
 
         private string _extractPhone(ConfirmPayIdentityBody body, string sessionKey, string payerType)

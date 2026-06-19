@@ -42,6 +42,7 @@ namespace SnowmeetApi.Models
         public string? staff_open_id { get; set; }
         public string? response_data { get; set; } = null;
         public string? ali_buyer_id { get; set; } = null;
+        public string? cell { get; set; } = null;   // 代付人手机号（is_proxy_pay=1 时写入），对齐 DB order_payment.cell varchar(16)
         public int need_share { get; set; } = 0;
         public int queryed { get; set; } = 0;
         public int? staff_id { get; set; }
