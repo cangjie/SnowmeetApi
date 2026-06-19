@@ -539,6 +539,7 @@ namespace SnowmeetApi.Controllers
             public string appId { get; set; } = "";
             public string sellerId { get; set; } = "";
             public string buyerId { get; set; } = "";
+            public string buyerOpenId { get; set; } = "";
             public string outTradeNo { get; set; } = "";
             public string notifyId { get; set; } = "";
             public string notifyType { get; set; } = "";
@@ -565,6 +566,9 @@ namespace SnowmeetApi.Controllers
                         break;
                     case "buyer_id":
                         callback.buyerId = value.Trim();
+                        break;
+                    case "buyer_open_id":
+                        callback.buyerOpenId = value.Trim();
                         break;
                     case "trade_status":
                         callback.tradeStatus = value.Trim();
@@ -611,7 +615,18 @@ namespace SnowmeetApi.Controllers
                             payment.notify_id = callback.notifyId;
                             payment.paid_date = DateTime.Now;
                             payment.update_date = DateTime.Now;
-                            payment.ali_buyer_id = callback.buyerId;
+                            // OpenID 模式：trade.create 用 BuyerOpenId 创建，notify 回传的是 buyer_open_id（无 buyer_id）。
+                            // 把支付宝 open_id 落到 open_id 字段；同步 ali_buyer_id（2026-06-06 起该列也存 open_id），
+                            // 且不要用空 buyer_id 覆盖下单时已写好的值。
+                            string payerOpenId = !string.IsNullOrEmpty(callback.buyerOpenId)
+                                ? callback.buyerOpenId.Trim()
+                                : (callback.buyerId ?? "").Trim();
+                            if (!string.IsNullOrEmpty(payerOpenId))
+                            {
+                                payment.open_id = payerOpenId;
+                                payment.open_id_type = "alipay_openid";
+                                payment.ali_buyer_id = payerOpenId;
+                            }
                             payment.status = OrderPayment.PaymentStatus.支付成功.ToString();
                             payment.update_date = DateTime.Now;
                             _db.orderPayment.Entry(payment).State = EntityState.Modified;
@@ -637,9 +652,9 @@ namespace SnowmeetApi.Controllers
                             // 这里收到 trade_success 后,按 buyer_id → MSA(alipay_payerid) → 命中即用;
                             // 没命中再从最新 alipay 会话拿 cell → MSA(cell) 命中即用 + 补 MSA(alipay_payerid);
                             // 都没命中 → 建新 Member + MSA(alipay_payerid)[+ MSA(cell) 若有], 最后写回 payment.member_id, 再调 DSP。
-                            if (payment.member_id == null && !string.IsNullOrEmpty(callback.buyerId))
+                            if (payment.member_id == null && !string.IsNullOrEmpty(payerOpenId))
                             {
-                                payment.member_id = await _materializeAlipayMemberOnPaid(payment, callback.buyerId);
+                                payment.member_id = await _materializeAlipayMemberOnPaid(payment, payerOpenId);
                                 if (payment.member_id != null)
                                 {
                                     payment.update_date = DateTime.Now;
