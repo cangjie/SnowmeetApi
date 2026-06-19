@@ -285,13 +285,25 @@ namespace SnowmeetApi.Controllers
             }
             if (rentStatus != null)
             {
-                if (rentStatus != "临时订单")
+                if (rentStatus == "临时订单")
                 {
-                    orderList = orderList.Where(o => o.rentProperties != null &&o.rentProperties.rentStatus == rentStatus).ToList();
+                    orderList = orderList.Where(o => o.rentProperties == null).ToList();
+                }
+                else if (rentStatus == "未支付")
+                {
+                    // 未支付：顾客还没付清（待生成/待支付/部分支付 且应付>0）。挂账/已付/关闭/免费单不算。
+                    orderList = orderList.Where(o =>
+                        (o.orderStatus == "待生成" || o.orderStatus == "待支付" || o.orderStatus == "部分支付")
+                        && (o.totalCharge - o.paidAmount > 0.005)).ToList();
                 }
                 else
                 {
-                    orderList = orderList.Where(o => o.rentProperties == null).ToList();
+                    // 其它 rentStatus（未开始/租赁中/…）只返回「已付清」的单，与列表 chip「未支付优先」一致：
+                    // 未付清的单一律归到「未支付」，不混进 未开始/租赁中。
+                    orderList = orderList.Where(o => o.rentProperties != null
+                        && o.rentProperties.rentStatus == rentStatus
+                        && !((o.orderStatus == "待生成" || o.orderStatus == "待支付" || o.orderStatus == "部分支付")
+                             && (o.totalCharge - o.paidAmount > 0.005))).ToList();
                 }
             }
             if (haveWarranty != null)
