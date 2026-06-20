@@ -5780,7 +5780,9 @@ namespace SnowmeetApi.Controllers
             OrderController _orderHelper = new OrderController(_db, _oriConfig, _httpContextAccessor);
             for (int i = 0; i < orders.Count; i++)
             {
-                if (orders[i].availablePayments.Count <= 0)
+                // 有押金要求但从未付款：废单，直接关闭（¥0 订单不在此处处理，走完整检查）
+                if (orders[i].availablePayments.Count <= 0
+                    && orders[i].paying_amount.HasValue && orders[i].paying_amount.Value > 0)
                 {
                     orders[i].closed = 1;
                     orders[i].close_date = null;
@@ -5797,8 +5799,10 @@ namespace SnowmeetApi.Controllers
                         allSettled = false;
                     }
                 }
+                // 应支付金额必须等于实际支付金额（未足额收款不关单）
+                bool paymentFulfilled = Math.Round(order.paidAmount - (double)(order.paying_amount ?? 0), 2) == 0;
                 bool finished = false;
-                if (allSettled)
+                if (allSettled && paymentFulfilled)
                 {
                     if (order.rentProperties == null && order.refundAmount > 0)
                     {
