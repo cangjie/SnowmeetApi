@@ -1179,11 +1179,15 @@ namespace SnowmeetApi.Models
                     // 状态 6-8：全部归还 + 退押金状态
                     else if (settledCount == totalCount)
                     {
-                        if (relieveGuarantyAmount <= 0)
+                        // 退押金状态以「实际退款」为准（refundAmount = payment_refund 汇总）。
+                        // 不能用 relieve 标记：归还全部租赁物时 RentController 会把 guaranty.relieve 置 1
+                        // （仅表示押金占用解除、可退），并不代表已退款。应退押金 = 已收押金 − 应收费用 + 储值付租金。
+                        double needRefund = (totalGuarantyAmount ?? 0) - (totalRentSummaryAmount ?? 0) + depositPaidAmount;
+                        if (refundAmount <= 0.001)
                         {
                             status = RentStatus.全部归还.ToString();
                         }
-                        else if (relieveGuarantyAmount < paidGuarantyAmount)
+                        else if (refundAmount + 0.001 < needRefund)
                         {
                             status = RentStatus.部分退押金.ToString();
                         }
