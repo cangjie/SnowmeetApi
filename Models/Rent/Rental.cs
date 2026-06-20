@@ -48,13 +48,22 @@ namespace SnowmeetApi.Models
         {
             get
             {
-                DateTime? startDate = null;
                 if (availabelRentDetails != null && availabelRentDetails.Count > 0)
                 {
                     return availabelRentDetails[0].rental_date.Date;
                 }
-
-                return startDate;
+                // 回退：无有效计费明细（如当日租金被免除/清零）时，按租赁物实际发放事件取最早起租，
+                // 避免归还后仍因明细缺失被误判为「未开始」。
+                DateTime? earliestPick = null;
+                for (int i = 0; rentItems != null && i < rentItems.Count; i++)
+                {
+                    DateTime? pd = rentItems[i].pickDate;
+                    if (pd != null && (earliestPick == null || pd < earliestPick))
+                    {
+                        earliestPick = pd;
+                    }
+                }
+                return earliestPick;
             }
         }
         [NotMapped]
@@ -62,22 +71,26 @@ namespace SnowmeetApi.Models
         {
             get
             {
-                if (settled == 1)
-                {
-                    if (availabelRentDetails != null && availabelRentDetails.Count > 0)
-                    {
-                        return availabelRentDetails[availabelRentDetails.Count - 1].rental_date.Date;
-                    }
-                    else
-                    {
-                        return null;
-                    }
-                }
-                else
+                if (settled != 1)
                 {
                     return null;
                 }
-
+                if (availabelRentDetails != null && availabelRentDetails.Count > 0)
+                {
+                    return availabelRentDetails[availabelRentDetails.Count - 1].rental_date.Date;
+                }
+                // 回退：settled=1 但无有效计费明细时，按租赁物实际归还事件取最晚退租，
+                // 让免除/清零唯一明细的单仍能显示退租日期、状态正常推进到「全部归还」。
+                DateTime? latestReturn = null;
+                for (int i = 0; rentItems != null && i < rentItems.Count; i++)
+                {
+                    DateTime? rd = rentItems[i].returnDate;
+                    if (rd != null && (latestReturn == null || rd > latestReturn))
+                    {
+                        latestReturn = rd;
+                    }
+                }
+                return latestReturn;
             }
         }
         [NotMapped]
