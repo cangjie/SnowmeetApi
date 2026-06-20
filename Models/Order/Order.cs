@@ -17,7 +17,7 @@ namespace SnowmeetApi.Models
         public enum OrderStatus { 待生成, 待支付, 部分支付, 支付成功, 挂账, 全额退款, 部分退款, 退款失败, 订单关闭, 已下单, 已完成 }
         public enum PayFlowStatus { 待生成, 已生成, 待支付, 支付中, 已支付, 已关闭, 部分退款, 全额退款 }
         public enum PayType { 整单支付, 分付, 无需支付, 未支付, 招待 }
-        public enum RentStatus { 未开始, 租赁中, 部分归还, 全部归还, 部分退押金, 全额退押金, 了结关闭 };
+        public enum RentStatus { 未支付, 未开始, 租赁中, 部分归还, 全部归还, 部分退押金, 全额退押金, 了结关闭 };
         public class RentPropertySet
         {
             public string? rentStatus { get; set; } = null;
@@ -1065,21 +1065,31 @@ namespace SnowmeetApi.Models
             {
                 try
                 {
+                    // 状态 8：了结关闭（最高优先，覆盖一切）
+                    if (closed == 1)
+                    {
+                        return new RentPropertySet { rentStatus = RentStatus.了结关闭.ToString() };
+                    }
+
                     if (rentals == null || rentals.Count == 0)
                     {
                         return null;
                     }
-                    DateTime? startDate = null;
-                    DateTime? endDate = DateTime.MinValue;
-                    double paidGuarantyAmount = 0;
-                    int paidGuarantyCount = 0;
-                    int relieveGuarantyCount = 0;
-                    double relieveGuarantyAmount = 0;
+
+                    // 状态 2：未支付（有押金要求但尚未收到任何款项）
+                    // paying_amount 由 PlaceRentOrder 设置；paying_amount=0 或 null 表示无需支付，直接进入后续状态
+                    if (paying_amount.HasValue && paying_amount.Value > 0 && paidAmount == 0)
+                    {
+                        return new RentPropertySet { rentStatus = RentStatus.未支付.ToString() };
+                    }
+
+                    int totalCount = 0;
                     int settledCount = 0;
-                    int packageCount = 0;
-                    int categoryCount = 0;
+                    bool allStartDatesAfterNow = true;
+                    bool allItemsIssuedOrNoNeed = true;
+                    DateTime? earliestStartDate = null;
                     double currentRentalAmount = 0;
-                    double summary = 0;
+
                     for (int i = 0; i < rentals.Count; i++)
                     {
                         Rental rental = rentals[i];
@@ -1087,102 +1097,117 @@ namespace SnowmeetApi.Models
                         {
                             continue;
                         }
-                        if (startDate == null || (rental.realStartDate != null && ((DateTime)rental.realStartDate).Date < ((DateTime)startDate).Date))
-                        {
-                            startDate = rental.realStartDate;
-                        }
-                        if (rental.realEndDate == null)
-                        {
-                            endDate = null;
-                        }
-                        else if (endDate != null)
-                        {
-                            if (((DateTime)endDate).Date < ((DateTime)rental.realEndDate).Date)
-                            {
-                                endDate = rental.end_date;
-                            }
-                        }
-                        for (int j = 0; j < rental.guaranties.Count; j++)
-                        {
-                            Guaranty g = rental.guaranties[j];
-                            if (g.payStatus == "支付完成")
-                            {
-                                paidGuarantyCount++;
-                                paidGuarantyAmount += (double)g.amount;
-                                if (g.relieve == 1)
-                                {
-                                    relieveGuarantyCount++;
-                                    relieveGuarantyAmount += (double)g.amount;
-                                }
-                            }
-                        }
+                        totalCount++;
+
                         if (rental.settled == 1)
                         {
                             settledCount++;
                         }
-                        if (rental.package_id != null)
+
+                        // 状态 3（未开始）检查：用 rental.start_date（staff 录入的意向起租时间）
+                        if (rental.start_date == null || rental.start_date.Value <= DateTime.Now)
                         {
-                            packageCount++;
+                            allStartDatesAfterNow = false;
                         }
-                        else
+                        else if (earliestStartDate == null || rental.start_date.Value < earliestStartDate.Value)
                         {
-                            categoryCount++;
+                            earliestStartDate = rental.start_date;
                         }
+
+                        // 状态 4（租赁中）检查：rentItem 级别，所有非 noNeed 物品必须已发放或暂存
+                        if (allItemsIssuedOrNoNeed && rental.rentItems != null)
+                        {
+                            for (int j = 0; j < rental.rentItems.Count; j++)
+                            {
+                                var item = rental.rentItems[j];
+                                if (item.noNeed)
+                                {
+                                    continue;
+                                }
+                                string itemStatus = item.status;
+                                if (itemStatus != "已发放" && itemStatus != "暂存")
+                                {
+                                    allItemsIssuedOrNoNeed = false;
+                                    break;
+                                }
+                            }
+                        }
+
                         currentRentalAmount += rental.totalRentalAmount;
-                        summary += rental.totalSummary;
                     }
-                    string status = "";
-                    if (startDate == null || ((DateTime)startDate).Date > DateTime.Now.Date)
+
+                    if (totalCount == 0)
+                    {
+                        return null;
+                    }
+
+                    // 押金退还金额：从 order 级别 guarantys 汇总（已由 GetCommonOrders Include 加载）
+                    double paidGuarantyAmount = 0;
+                    double relieveGuarantyAmount = 0;
+                    if (guarantys != null)
+                    {
+                        foreach (var g in guarantys)
+                        {
+                            if (g.payStatus == "支付完成")
+                            {
+                                paidGuarantyAmount += (double)(g.amount ?? 0);
+                                if (g.relieve == 1)
+                                {
+                                    relieveGuarantyAmount += (double)(g.amount ?? 0);
+                                }
+                            }
+                        }
+                    }
+
+                    string status;
+
+                    // 状态 3：未开始（已付款，所有 rental.start_date 均在当前时间之后）
+                    if (allStartDatesAfterNow)
                     {
                         status = RentStatus.未开始.ToString();
                     }
-                    else
+                    // 状态 4：租赁中（所有租赁物已发放或标记不需要，且尚无归还）
+                    else if (allItemsIssuedOrNoNeed && settledCount == 0)
                     {
-                        if (endDate == null)
-                        {
-                            status = RentStatus.租赁中.ToString();
-                        }
-                        if (settledCount < packageCount + categoryCount
-                            && settledCount > 0)
-                        {
-                            status = RentStatus.部分归还.ToString();
-                        }
-                        if (settledCount == packageCount + categoryCount)
+                        status = RentStatus.租赁中.ToString();
+                    }
+                    // 状态 5：部分归还
+                    else if (settledCount > 0 && settledCount < totalCount)
+                    {
+                        status = RentStatus.部分归还.ToString();
+                    }
+                    // 状态 6-8：全部归还 + 退押金状态
+                    else if (settledCount == totalCount)
+                    {
+                        if (relieveGuarantyAmount <= 0)
                         {
                             status = RentStatus.全部归还.ToString();
                         }
-                        if (refundAmount > 0)
+                        else if (relieveGuarantyAmount < paidGuarantyAmount)
                         {
-                            if (paidAmount - summary <= refundAmount)
-                            {
-                                if (closed == 1)
-                                {
-                                    status = RentStatus.了结关闭.ToString();
-                                }
-                                else
-                                {
-                                    status = RentStatus.全额退押金.ToString();
-                                }
-                            }
-                            else
-                            {
-                                status = RentStatus.部分退押金.ToString();
-                            }
+                            status = RentStatus.部分退押金.ToString();
+                        }
+                        else
+                        {
+                            status = RentStatus.全额退押金.ToString();
                         }
                     }
-                    RentPropertySet property = new RentPropertySet()
+                    else
+                    {
+                        // fallback：已付款，起租时间已过，但装备尚未全部发放
+                        status = RentStatus.未开始.ToString();
+                    }
+
+                    return new RentPropertySet()
                     {
                         rentStatus = status,
-                        startDate = startDate,
-                        endDate = endDate,
+                        startDate = earliestStartDate,
                         totalPaidGuarantyAmount = paidGuarantyAmount,
-                        relieveGuarantyAmount = relieveGuarantyAmount
-
+                        relieveGuarantyAmount = relieveGuarantyAmount,
+                        currentRentalAmount = currentRentalAmount
                     };
-                    return property;
                 }
                 catch
-
                 {
                     return null;
                 }
