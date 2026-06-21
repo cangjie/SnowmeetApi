@@ -4147,6 +4147,12 @@ namespace SnowmeetApi.Controllers
                 });
             }
             order.needRender = false;
+            // 找回中断单时前端会原样带回 GetReceptingOrder 包含的 member / memberSocialAccounts 导航对象。
+            // 下面 else 分支的 _db.Update(order) 会把整图标脏级联更新（含 member 子图），SaveChanges 抛错被
+            // try/catch 静默吞掉 → 租金修改、新增套餐全都不落库。SaveRentRecept 只管 order 标量 + rentals 子图，
+            // member_id / staff_id 是独立标量列，置空导航对象不影响归属。与下面 details / category 同属防级联清理。
+            order.member = null;
+            order.staff = null;
             for (int i = 0; i < order.rentals.Count; i++)
             {
                 order.rentals[i].details = null;
