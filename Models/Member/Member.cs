@@ -52,30 +52,33 @@ namespace SnowmeetApi.Models
             }
             return msaList;
         }
+        // 取第一个 num 非空的账号。同一会员可能存在 num 为空的脏 MSA 占位记录（建会员时先占位、
+        // 后补真实标识），若直接取 msaList[0] 会拿到空串 —— 典型后果：代付/支付时 op.open_id 写空、
+        // 微信 prepay 拿不到付款人 openid → 支付不了（实例：op 42639，member 41125 有空 + 真实两条
+        // wechat_mini_openid，空的排在前）。
+        private static string? FirstNonEmptyNum(List<MemberSocialAccount> msaList)
+        {
+            for (int i = 0; msaList != null && i < msaList.Count; i++)
+            {
+                if (msaList[i].num != null && msaList[i].num.Trim() != "")
+                {
+                    return msaList[i].num.Trim();
+                }
+            }
+            return null;
+        }
         public string? wechatMiniOpenId
         {
             get
             {
-                string? v = null;
-                List<MemberSocialAccount> msaList = GetInfo("wechat_mini_openid");
-                if (msaList != null && msaList.Count > 0)
-                {
-                    v = msaList[0].num.Trim();
-                }
-                return v;
+                return FirstNonEmptyNum(GetInfo("wechat_mini_openid"));
             }
         }
         public string? wechatUnionId
         {
             get
             {
-                string? v = null;
-                List<MemberSocialAccount> msaList = GetInfo("wechat_unionid");
-                if (msaList != null && msaList.Count > 0)
-                {
-                    v = msaList[0].num.Trim();
-                }
-                return v;
+                return FirstNonEmptyNum(GetInfo("wechat_unionid"));
             }
         }
         // 支付宝小程序 user_id（对标 wechatMiniOpenId），通过 MSA 反查 type='alipay_payerid'
@@ -83,13 +86,7 @@ namespace SnowmeetApi.Models
         {
             get
             {
-                string? v = null;
-                List<MemberSocialAccount> msaList = GetInfo("alipay_payerid");
-                if (msaList != null && msaList.Count > 0)
-                {
-                    v = msaList[0].num.Trim();
-                }
-                return v;
+                return FirstNonEmptyNum(GetInfo("alipay_payerid"));
             }
         }
         [NotMapped]
