@@ -648,16 +648,16 @@ namespace SnowmeetApi.Controllers
                             await _db.coreDataModLog.AddAsync(log);
                             await _db.SaveChangesAsync();
 
-                            // 2026-06-03 用户原则: alipay 路径会员推迟到支付成功后建。
-                            // PaymentIdentity / AlipayPayByOrderPayment 都允许 OP.member_id 为 null,
-                            // 这里收到 trade_success 后,按 buyer_id → MSA(alipay_payerid) → 命中即用;
-                            // 没命中再从最新 alipay 会话拿 cell → MSA(cell) 命中即用 + 补 MSA(alipay_payerid);
-                            // 都没命中 → 建新 Member + MSA(alipay_payerid)[+ MSA(cell) 若有], 最后写回 payment.member_id, 再调 DSP。
-                            if (payment.member_id == null && !string.IsNullOrEmpty(payerOpenId))
+                            // 支付成功后「以手机号为锚」关联会员 + 补绑支付宝 openid（详见 _materializeAlipayMemberOnPaid）。
+                            // 不再只在 member_id==null 时跑：本人/代付单（member_id 已知）也要把 openid 补绑到对应会员，
+                            // 否则该支付宝账号永远绑不上、下次仍要靠 session 兜底、alipayPayerId getter 也取不到。
+                            // member_id 已知时不覆盖订单归属，仅补绑 openid；为空时用物化结果回填。
+                            if (!string.IsNullOrEmpty(payerOpenId))
                             {
-                                payment.member_id = await _materializeAlipayMemberOnPaid(payment, payerOpenId);
-                                if (payment.member_id != null)
+                                int? resolvedMemberId = await _materializeAlipayMemberOnPaid(payment, payerOpenId);
+                                if (resolvedMemberId != null && payment.member_id == null)
                                 {
+                                    payment.member_id = resolvedMemberId;
                                     payment.update_date = DateTime.Now;
                                     _db.orderPayment.Entry(payment).State = EntityState.Modified;
                                     await _db.SaveChangesAsync();
@@ -725,92 +725,101 @@ namespace SnowmeetApi.Controllers
             return Ok("success");
         }
 
-        // 2026-06-03: alipay 支付成功后兜底建会员/查会员, 与「PaymentIdentity 推迟建会员」原则配套。
-        // 返回 memberId (可能是已有的 / 新建的); 永远不返 null (保证后续 DSP 能 sync Order.member_id)。
-        // 调用前提: payment.member_id == null, buyerId 非空。
+        // 2026-06-21: 支付宝支付成功后「以手机号为锚」关联会员 + 补绑支付宝 openid（用户拍板规则）。
+        //   1) 取该支付宝顾客本次拿到的手机号（alipay session.cell；buyer_open_id 兼容 alipay_openid / alipay_payerid 两列）。
+        //   2) 目标会员：
+        //      - payment.member_id 已知（本人 / 代付 / 已选身份）→ 用它，不改订单归属（仅补绑 openid）；
+        //      - 否则按手机号反查会员：命中即用；有手机号未命中 → 用手机号注册新会员；无手机号 → 建无手机号会员兜底。
+        //   3) 目标会员名下若「没有 valid=1 且非空的 alipay_payerid」，把本次 openid 绑上去（顺手停用 num 为空的脏占位 MSA）。
+        //      已有有效支付宝 openid 则不动（幂等、且符合「没有才绑」）。
+        //   返回 memberId（永不 null，保证 DSP 能 sync Order.member_id）。
         private async Task<int?> _materializeAlipayMemberOnPaid(OrderPayment payment, string buyerId)
         {
             string buyerIdTrim = buyerId.Trim();
 
-            // 1. 用 alipay_payerid 反查 MSA 命中已有会员
-            var alipayMsa = await _db.memberSocialAccount
-                .Where(m => m.valid == 1
-                    && m.type.Trim().Equals("alipay_payerid")
-                    && m.num.Trim().Equals(buyerIdTrim))
-                .OrderByDescending(m => m.id).AsNoTracking().FirstOrDefaultAsync();
-            if (alipayMsa != null)
-            {
-                return alipayMsa.member_id;
-            }
-
-            // 2. 没命中 → 从最新一个 alipay session 拿 cell, 用 cell 反查 MSA
-            //    session 必须是「这位 alipay 顾客的 session」即 alipay_payerid == buyerId
+            // 1. 取本次支付宝顾客的手机号：该顾客的 alipay session.cell
             var sess = await _db.miniSession
                 .Where(s => s.session_type.Trim().Equals("alipay_payerid")
-                    && s.alipay_payerid != null
-                    && s.alipay_payerid.Trim().Equals(buyerIdTrim))
+                    && ((s.alipay_openid != null && s.alipay_openid.Trim().Equals(buyerIdTrim))
+                     || (s.alipay_payerid != null && s.alipay_payerid.Trim().Equals(buyerIdTrim))))
                 .OrderByDescending(s => s.expire_date)
                 .AsNoTracking()
                 .FirstOrDefaultAsync();
             string sessCell = sess?.cell?.Trim();
-            int? memberId = null;
 
-            if (!string.IsNullOrEmpty(sessCell))
-            {
-                var cellMsa = await _db.memberSocialAccount
-                    .Where(m => m.valid == 1
-                        && m.type.Trim().Equals("cell")
-                        && m.num.Trim().Equals(sessCell))
-                    .OrderByDescending(m => m.id).AsNoTracking().FirstOrDefaultAsync();
-                if (cellMsa != null)
-                {
-                    memberId = cellMsa.member_id;
-                }
-            }
-
-            // 3. 仍未命中 → 建新 Member (无 cell 也建; cell 有则一并写 MSA)
+            // 2. 确定目标会员
+            int? memberId = payment.member_id;   // 已知归属（本人/代付/已选身份）优先，不覆盖
             if (memberId == null)
             {
-                var newMember = new SnowmeetApi.Models.Member
-                {
-                    real_name = "",
-                    gender = "",
-                    source = "支付宝支付成功",
-                    valid = 1
-                };
-                await _db.member.AddAsync(newMember);
-                await _db.SaveChangesAsync();
-                memberId = newMember.id;
-
+                // 以手机号为锚反查会员
                 if (!string.IsNullOrEmpty(sessCell))
                 {
-                    await _db.memberSocialAccount.AddAsync(new MemberSocialAccount
+                    var cellMsa = await _db.memberSocialAccount
+                        .Where(m => m.valid == 1
+                            && m.type.Trim().Equals("cell")
+                            && m.num.Trim().Equals(sessCell))
+                        .OrderByDescending(m => m.id).AsNoTracking().FirstOrDefaultAsync();
+                    if (cellMsa != null)
                     {
-                        id = 0,
-                        member_id = newMember.id,
-                        type = "cell",
-                        num = sessCell,
+                        memberId = cellMsa.member_id;
+                    }
+                }
+                // 手机号匹配不到会员（或无手机号）→ 注册新会员（有手机号则一并写 cell MSA）
+                if (memberId == null)
+                {
+                    var newMember = new SnowmeetApi.Models.Member
+                    {
+                        real_name = "",
+                        gender = "",
+                        source = "支付宝支付成功",
                         valid = 1
-                    });
+                    };
+                    await _db.member.AddAsync(newMember);
                     await _db.SaveChangesAsync();
+                    memberId = newMember.id;
+
+                    if (!string.IsNullOrEmpty(sessCell))
+                    {
+                        await _db.memberSocialAccount.AddAsync(new MemberSocialAccount
+                        {
+                            id = 0,
+                            member_id = newMember.id,
+                            type = "cell",
+                            num = sessCell,
+                            valid = 1
+                        });
+                        await _db.SaveChangesAsync();
+                    }
                 }
             }
 
-            // 4. 不论是建新会员还是命中已有 cell 会员, 都补一条 MSA(alipay_payerid) 把 payerId 绑到该会员
-            await _db.memberSocialAccount.AddAsync(new MemberSocialAccount
+            // 3. 目标会员若没有「valid=1 且非空」的 alipay_payerid，则绑定本次 openid（顺手停用 num 为空的脏占位）
+            var payerids = await _db.memberSocialAccount
+                .Where(m => m.member_id == memberId && m.type.Trim().Equals("alipay_payerid"))
+                .AsNoTracking().ToListAsync();
+            bool hasValidPayerid = payerids.Any(m => m.valid == 1 && m.num != null && m.num.Trim() != "");
+            if (!hasValidPayerid)
             {
-                id = 0,
-                member_id = (int)memberId,
-                type = "alipay_payerid",
-                num = buyerIdTrim,
-                valid = 1
-            });
-            await _db.SaveChangesAsync();
+                foreach (var dirty in payerids.Where(m => m.valid == 1 && (m.num == null || m.num.Trim() == "")))
+                {
+                    dirty.valid = 0;
+                    dirty.update_date = DateTime.Now;
+                    _db.memberSocialAccount.Entry(dirty).State = EntityState.Modified;
+                }
+                await _db.memberSocialAccount.AddAsync(new MemberSocialAccount
+                {
+                    id = 0,
+                    member_id = (int)memberId,
+                    type = "alipay_payerid",
+                    num = buyerIdTrim,
+                    valid = 1
+                });
+                await _db.SaveChangesAsync();
+            }
 
-            // 5. session.member_id 也回填 (若该 session 还没绑会员), 下次同一 session 走 PaymentIdentity 不用再走兜底
+            // 4. session.member_id 回填（若该 session 还没绑会员），下次同一 session 不用再走兜底
             if (sess != null && sess.member_id == null)
             {
-                // 重新 attach (我们用的是 AsNoTracking 拿的)
                 var sessTracked = await _db.miniSession.FindAsync(sess.session_key, sess.session_type);
                 if (sessTracked != null)
                 {
