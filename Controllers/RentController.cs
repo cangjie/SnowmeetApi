@@ -4577,7 +4577,9 @@ namespace SnowmeetApi.Controllers
                 .Include(o => o.rentals).ThenInclude(r => r.pricePresets)
                 .Include(o => o.member).ThenInclude(m => m.memberSocialAccounts)
                 .Where(o => o.id == orderId).FirstOrDefaultAsync();
-            order.rentals = order.rentals.OrderByDescending(r => r.id).ToList();
+            // 找回中断单的购物车按「添加时间正序」（先添加在上），id 自增=创建先后。
+            // 原 OrderByDescending 会让后加的排最上，与开单页期望相反。
+            order.rentals = order.rentals.OrderBy(r => r.id).ToList();
             return Ok(new ApiResult<Models.Order?>()
             {
                 code = 0,
