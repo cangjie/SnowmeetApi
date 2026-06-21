@@ -3020,7 +3020,8 @@ namespace SnowmeetApi.Controllers
                     data = null
                 });
             }
-            if (order.depositPaidAmount == 0)
+            // payingAmount<=0（如租金已免除）时不插 ¥0 储值支付记录（否则攒一堆无意义的 0 元支付单）
+            if (order.depositPaidAmount == 0 && payingAmount > 0)
             {
                 DepositController _depositHelper = new DepositController(_db, _config);
                 OrderPayment payment = new OrderPayment()
