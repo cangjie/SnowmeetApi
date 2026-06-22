@@ -5588,6 +5588,38 @@ namespace SnowmeetApi.Controllers
             return Ok(new ApiResult<Models.Rental?>() { code = 0, message = "", data = updatedRental });
         }
 
+        // 员工在订单详情页把某个 rental 设/撤「招待」。招待是派生豁免：
+        // rental.entertain=true 时 totalRentalAmount→0、totalSummary 不计租金，
+        // 订单应收（Order.cs 计算属性）也自动排除该 rental，无需改动 rental_detail。
+        [HttpPost("{rentalId}")]
+        public async Task<ActionResult<ApiResult<Models.Rental?>>> SetRentalEntertainByStaff(
+            [FromRoute] int rentalId, [FromQuery] bool entertain, [FromQuery] string scene,
+            [FromQuery] string sessionKey, [FromQuery] string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            if (staff == null || staff.title_level < 100)
+            {
+                return Ok(new ApiResult<Models.Rental?>() { code = 1, message = "没有权限", data = null });
+            }
+            scene = Util.UrlDecode(scene);
+            Models.Rental rental = await _db.rental.Where(r => r.id == rentalId).FirstOrDefaultAsync();
+            if (rental == null)
+            {
+                return Ok(new ApiResult<Models.Rental?>() { code = 1, message = "无此租赁", data = null });
+            }
+            if (rental.entertain != entertain)
+            {
+                await _db.coreDataModLog.AddAsync(CoreDataModLog.CreateManualLog("rental", "entertain",
+                    rental.id, scene, null, staff.id, rental.entertain.ToString(), entertain.ToString(),
+                    entertain ? "设为招待" : "取消招待"));
+                rental.entertain = entertain;
+                rental.update_date = DateTime.Now;
+                _db.rental.Entry(rental).State = EntityState.Modified;
+                await _db.SaveChangesAsync();
+            }
+            return Ok(new ApiResult<Models.Rental?>() { code = 0, message = "", data = await GetRental(rentalId) });
+        }
+
         [HttpGet]
         public async Task ContinueRentOrder(DateTime? rentDate = null)
         {
