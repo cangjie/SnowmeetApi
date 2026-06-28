@@ -5902,6 +5902,7 @@ namespace SnowmeetApi.Controllers
                 .Include(r => r.logs.Where(l => l.valid == 1).OrderByDescending(l => l.id)).ThenInclude(l => l.staff)
                 .Where(r => r.valid == 1 && r.logs.Count > 0)
                 .Include(r => r.rental).ThenInclude(r => r.order).ThenInclude(o => o.member)
+                    .ThenInclude(m => m.memberSocialAccounts)
                 .Include(r => r.category).OrderBy(r => r.id)
                 .Where(r => r.rental.valid == 1 && r.rental.order.valid == 1 && r.rental.order.is_test == 0)
                 .AsSplitQuery().AsNoTracking().OrderByDescending(r => r.id).ToListAsync();
@@ -5918,6 +5919,19 @@ namespace SnowmeetApi.Controllers
                     continue;
                 }
                 string normalizedCell = (order.customerCell ?? "").Trim();
+                if (string.IsNullOrWhiteSpace(normalizedCell)
+                    && order.member != null
+                    && order.member.memberSocialAccounts != null)
+                {
+                    MemberSocialAccount? msaCell = order.member.memberSocialAccounts
+                        .Where(m => m.valid == 1 && m.type.Trim().Equals(MemberSocialAccount.TYPE_CELL))
+                        .OrderByDescending(m => m.id)
+                        .FirstOrDefault();
+                    if (msaCell != null && !string.IsNullOrWhiteSpace(msaCell.num))
+                    {
+                        normalizedCell = msaCell.num.Trim();
+                    }
+                }
                 if (string.IsNullOrWhiteSpace(order.contact_num) && !string.IsNullOrWhiteSpace(normalizedCell))
                 {
                     order.contact_num = normalizedCell;
