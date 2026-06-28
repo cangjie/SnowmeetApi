@@ -5905,7 +5905,25 @@ namespace SnowmeetApi.Controllers
                 .Include(r => r.category).OrderBy(r => r.id)
                 .Where(r => r.rental.valid == 1 && r.rental.order.valid == 1 && r.rental.order.is_test == 0)
                 .AsSplitQuery().AsNoTracking().OrderByDescending(r => r.id).ToListAsync();
-            return rentItems.Where(r => r.status != "已归还" && r.status != "已更换" && r.status != "未发放" && r.noNeed == false).ToList();
+            List<Models.RentItem> unreturned = rentItems
+                .Where(r => r.status != "已归还" && r.status != "已更换" && r.status != "未发放" && r.noNeed == false)
+                .ToList();
+
+            // 对齐订单明细手机号口径：确保未归还列表里的 order.contact_num 至少等于 order.customerCell。
+            for (int i = 0; i < unreturned.Count; i++)
+            {
+                Models.Order? order = unreturned[i].rental?.order;
+                if (order == null)
+                {
+                    continue;
+                }
+                string normalizedCell = (order.customerCell ?? "").Trim();
+                if (string.IsNullOrWhiteSpace(order.contact_num) && !string.IsNullOrWhiteSpace(normalizedCell))
+                {
+                    order.contact_num = normalizedCell;
+                }
+            }
+            return unreturned;
         }
         [HttpGet]
         public async Task<ActionResult<List<Models.CategoryRentItem>?>> GetUnReturnedRentItemsByStaff(
