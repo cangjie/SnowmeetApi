@@ -5895,7 +5895,7 @@ namespace SnowmeetApi.Controllers
             List<Models.RentItem> rentItems = await _db.rentItem
                 .Include(r => r.logs.Where(l => l.valid == 1).OrderByDescending(l => l.id)).ThenInclude(l => l.staff)
                 .Where(r => r.valid == 1 && r.logs.Count > 0)
-                .Include(r => r.rental).ThenInclude(r => r.order)
+                .Include(r => r.rental).ThenInclude(r => r.order).ThenInclude(o => o.member)
                 .Include(r => r.category).OrderBy(r => r.id)
                 .Where(r => r.rental.valid == 1 && r.rental.order.valid == 1 && r.rental.order.is_test == 0)
                 .AsSplitQuery().AsNoTracking().OrderByDescending(r => r.id).ToListAsync();
