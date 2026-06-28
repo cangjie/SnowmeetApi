@@ -6243,7 +6243,7 @@ namespace SnowmeetApi.Controllers
         }
         [HttpGet("{orderId}")]
         public async Task<ActionResult<ApiResult<Models.Order>>> AppendRental(int orderId, string sessionKey,
-            int? categoryId = null, int? packageId = null, string sessionType = "wechat_mini_openid")
+            int? categoryId = null, int? packageId = null, int? rentProductId = null, string sessionType = "wechat_mini_openid")
         {
             // 分类/套餐二选一；两者都不传 = 无码物品（建无分类空白草稿）；都传则冲突
             if (categoryId != null && packageId != null)
@@ -6283,7 +6283,7 @@ namespace SnowmeetApi.Controllers
             }
             else if (categoryId != null)
             {
-                order = await AppendCategory(order, (int)categoryId);
+                order = await AppendCategory(order, (int)categoryId, rentProductId);
             }
             else
             {
@@ -6334,7 +6334,7 @@ namespace SnowmeetApi.Controllers
             return order;
         }
         [NonAction]
-        public async Task<Models.Order> AppendCategory(Models.Order order, int categoryId)
+        public async Task<Models.Order> AppendCategory(Models.Order order, int categoryId, int? rentProductId = null)
         {
             Shop shop = await _db.shop.Where(s => s.name == order.shop).FirstOrDefaultAsync();
 
@@ -6354,6 +6354,12 @@ namespace SnowmeetApi.Controllers
                 .Where(p => p.category_id == categoryId && p.shop_id == shop.id && p.scene == scene && p.rent_type == "日场" && p.day_type == dayType)
                     .AsNoTracking().FirstOrDefaultAsync();
             RentCategory category = await _db.rentCategory.Where(c => c.id == categoryId).AsNoTracking().FirstOrDefaultAsync();
+            // 搜索单品选中具体租赁物时，取其 barcode/name 填主项编码（同开单 onAddSingleProduct）
+            RentProduct rentProduct = null;
+            if (rentProductId != null)
+            {
+                rentProduct = await _db.rentProduct.Where(p => p.id == rentProductId).AsNoTracking().FirstOrDefaultAsync();
+            }
             Models.Rental rental = new Rental()
             {
                 id = 0,
@@ -6389,7 +6395,10 @@ namespace SnowmeetApi.Controllers
                 class_name = category?.name,
                 rental_id = rental.id,
                 valid = 1,
-                noCode = true,
+                noCode = (rentProduct == null),
+                name = rentProduct != null ? rentProduct.name : null,
+                code = rentProduct != null ? rentProduct.barcode : null,
+                rent_product_id = rentProduct != null ? (int?)rentProduct.id : null,
                 pick_type = "立即租赁",
                 atOnce = true,
                 create_date = DateTime.Now
