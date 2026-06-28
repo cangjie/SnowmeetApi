@@ -5663,8 +5663,11 @@ namespace SnowmeetApi.Controllers
             {
                 return;
             }
+            // 只有「生效」的 rental 才按天计费：至少一件装备当前真在外（已发放/暂存）。
+            // 旧条件 i.status != "已归还" 会把「未发放」「已更换」也算成在租 → 从没发出去的装备也天天计租金（虚账根因）。
+            // status 由 RentItemLog 派生（无领还事件=「未发放」），外层 ContinueRentOrder 已 Include rentItems.logs。
             if (rental.settled == 1 || rental.valid == 0
-            || rental.rentItems.Where(i => i.status != "已归还").Count() == 0
+            || rental.rentItems.Where(i => i.status == "已发放" || i.status == "暂存").Count() == 0
             || rental.details.Where(d => ((DateTime)d.rental_date).Date == rentDate.Date).Count() > 0)
             {
                 return;
@@ -5839,8 +5842,11 @@ namespace SnowmeetApi.Controllers
                         allSettled = false;
                     }
                 }
-                // 应支付金额必须等于实际支付金额（未足额收款不关单）
-                bool paymentFulfilled = Math.Round(order.paidAmount - (double)(order.paying_amount ?? 0), 2) == 0;
+                // 未足额收款不关单。paying_amount 表示「尚欠应收」：DealSuccessPaidOrder 在支付成功后会将其置 null（已收齐），
+                // 故 null 或 <=0 视为已收齐、允许关单；仍为正值说明还有应收未到账，不关单。
+                // 注意：不能用 paidAmount - paying_amount == 0 判定——支付成功后 paying_amount 恒为 null，
+                // 会退化成「paidAmount==0」，导致任何已付款订单都永远关不掉（2026-06-21~ 全停关单的根因）。
+                bool paymentFulfilled = order.paying_amount == null || Math.Round((double)order.paying_amount, 2) <= 0;
                 bool finished = false;
                 if (allSettled && paymentFulfilled)
                 {
