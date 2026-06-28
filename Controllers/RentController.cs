@@ -4752,6 +4752,18 @@ namespace SnowmeetApi.Controllers
                         null, null, null, null, "立即发放");
                     await _db.coreDataModLog.AddAsync(logI);
                     await _db.rentItemLog.AddAsync(log);
+                    // 立即发放：同步把库存租赁物标记为「租赁中」（与手动发放 SetRentItemStatus 口径一致，
+                    // 否则立即租赁生效后 rentItem 已发放但 rent_product.status 仍是「正常」，库存占用统计出错）
+                    if (item.rent_product_id != null)
+                    {
+                        RentProduct rp = await _db.rentProduct.Where(p => p.id == item.rent_product_id).FirstOrDefaultAsync();
+                        if (rp != null)
+                        {
+                            rp.status = "租赁中";
+                            rp.update_date = DateTime.Now;
+                            _db.rentProduct.Entry(rp).State = EntityState.Modified;
+                        }
+                    }
                 }
             }
             CoreDataModLog logR = CoreDataModLog.CreateManualLog("Rental", "", rentalId, "租赁开单",
