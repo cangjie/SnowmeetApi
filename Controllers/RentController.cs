@@ -6453,9 +6453,36 @@ namespace SnowmeetApi.Controllers
                 .AsNoTracking().FirstOrDefaultAsync();
             rental.valid = 0;
             _db.rental.Entry(rental).State = EntityState.Modified;
+            // 清掉该追加项的押金应收记录（已确认待支付项可能已建 Guaranty），避免删除后残留虚账
+            List<Models.Guaranty> gs = await _db.guaranty
+                .Where(g => g.valid == 1 && g.order_id == rental.order_id && g.biz_type == "租赁" && g.biz_id == rental.id)
+                .ToListAsync();
+            for (int gi = 0; gi < gs.Count; gi++)
+            {
+                gs[gi].valid = 0;
+                gs[gi].update_date = DateTime.Now;
+                _db.guaranty.Entry(gs[gi]).State = EntityState.Modified;
+            }
             await _db.SaveChangesAsync();
             OrderController _orderH = new OrderController(_db, _config, _httpContextAccessor);
             Models.Order order = await _orderH.GetOrder((int)rental.order_id);
+            // 重算订单待支付金额 = 剩余待支付追加项的未支付 Guaranty 合计（删光则置 0）
+            double remainPay = 0;
+            for (int ri = 0; order.appendingRentals != null && ri < order.appendingRentals.Count; ri++)
+            {
+                Rental ar = order.appendingRentals[ri];
+                for (int gj = 0; ar.guaranties != null && gj < ar.guaranties.Count; gj++)
+                {
+                    if (ar.guaranties[gj].valid == 1 && ar.guaranties[gj].payStatus == "未支付")
+                    {
+                        remainPay += (double)ar.guaranties[gj].amount;
+                    }
+                }
+            }
+            order.paying_amount = remainPay > 0 ? remainPay : 0;
+            _db.order.Entry(order).State = EntityState.Modified;
+            await _db.SaveChangesAsync();
+            order = await _orderH.GetOrder((int)rental.order_id);
             return Ok(new ApiResult<Models.Order>()
             {
                 code = 0,
