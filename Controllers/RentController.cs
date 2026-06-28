@@ -5194,6 +5194,30 @@ namespace SnowmeetApi.Controllers
             };
             await _db.rentItemLog.AddAsync(log);
             await _db.SaveChangesAsync();
+
+            RentProduct? rentProduct = null;
+            if (rentItem.rent_product_id != null)
+            {
+                rentProduct = await _db.rentProduct.Where(p => p.id == rentItem.rent_product_id).FirstOrDefaultAsync();
+            }
+            if (rentProduct != null)
+            {
+                if (log.status == "已发放")
+                {
+                    rentProduct.status = "租赁中";
+                    rentProduct.update_date = DateTime.Now;
+                    _db.rentProduct.Entry(rentProduct).State = EntityState.Modified;
+                    await _db.SaveChangesAsync();
+                }
+                else if (log.status == "已归还")
+                {
+                    rentProduct.status = "正常";
+                    rentProduct.update_date = DateTime.Now;
+                    _db.rentProduct.Entry(rentProduct).State = EntityState.Modified;
+                    await _db.SaveChangesAsync();
+                }
+            }
+
             Rental rental = await GetRental((int)rentItem.rental_id);
             bool allReturned = true;
             for (int i = 0; rental.rentItems != null && i < rental.rentItems.Count; i++)

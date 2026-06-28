@@ -25,6 +25,7 @@ namespace SnowmeetApi.Models
         public int is_destroyed { get; set; } = 0;
         public int? staff_id { get; set; }
         public int available { get; set; } = 1;
+        public string? status { get; set; } = null;
         public DateTime? update_date { get; set; }
         public DateTime create_date { get; set; } = DateTime.Now;
         public List<RentProductImage>? images { get; set; }
