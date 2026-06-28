@@ -6304,13 +6304,14 @@ namespace SnowmeetApi.Controllers
             {
                 id = 0,
                 order_id = order.id,
-                start_date = DateTime.Now.Date,
+                start_date = DateTime.Now,
                 category_id = categoryId,
                 valid = 1,
                 appending = true,
                 name = category.name,
                 guaranty = category.deposit,
                 expectDays = 1,
+                pick_type = "立即租赁",
                 create_date = DateTime.Now
             };
             RentalPricePreset preset = new RentalPricePreset()
@@ -6335,6 +6336,8 @@ namespace SnowmeetApi.Controllers
                 rental_id = rental.id,
                 valid = 1,
                 noCode = true,
+                pick_type = "立即租赁",
+                atOnce = true,
                 create_date = DateTime.Now
             };
             rental.rentItems.Add(item);
@@ -6378,12 +6381,13 @@ namespace SnowmeetApi.Controllers
                 id = 0,
                 name = package.name,
                 order_id = order.id,
-                start_date = DateTime.Now.Date,
+                start_date = DateTime.Now,
                 package_id = packageId,
                 valid = 1,
                 appending = true,
                 guaranty = package.deposit,
                 expectDays = 1,
+                pick_type = "立即租赁",
                 create_date = DateTime.Now
             };
             RentalPricePreset preset = new RentalPricePreset()
@@ -6408,6 +6412,8 @@ namespace SnowmeetApi.Controllers
                     //category = package.rentPackageItemCategories[i].categories[0],
                     valid = 1,
                     noCode = true,
+                    pick_type = "立即租赁",
+                    atOnce = true,
                     create_date = DateTime.Now
                 };
                 rental.rentItems.Add(item);
