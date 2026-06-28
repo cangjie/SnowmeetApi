@@ -6233,12 +6233,13 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<ApiResult<Models.Order>>> AppendRental(int orderId, string sessionKey,
             int? categoryId = null, int? packageId = null, string sessionType = "wechat_mini_openid")
         {
-            if ((categoryId == null && packageId == null) || (categoryId != null && packageId != null))
+            // 分类/套餐二选一；两者都不传 = 无码物品（建无分类空白草稿）；都传则冲突
+            if (categoryId != null && packageId != null)
             {
                 return Ok(new ApiResult<List<Models.Order>?>()
                 {
                     code = 1,
-                    message = "添加为空",
+                    message = "参数冲突",
                     data = null
                 });
             }
@@ -6268,9 +6269,13 @@ namespace SnowmeetApi.Controllers
             {
                 order = await AppendPackage(order, (int)packageId);
             }
-            if (categoryId != null)
+            else if (categoryId != null)
             {
                 order = await AppendCategory(order, (int)categoryId);
+            }
+            else
+            {
+                order = await AppendBlank(order);
             }
             return Ok(new ApiResult<Models.Order>()
             {
@@ -6278,6 +6283,43 @@ namespace SnowmeetApi.Controllers
                 message = "",
                 data = order
             });
+        }
+        [NonAction]
+        public async Task<Models.Order> AppendBlank(Models.Order order)
+        {
+            // 无码物品：建一个无分类草稿 rental + 一个 noCode 主项 rentItem（category_id=null）。
+            // 前端加载后默认展开，用户点卡片「分类」行选定品类后由组件联动拉价格 / 重建附件（同开单无码物品流程）。
+            Models.Rental rental = new Rental()
+            {
+                id = 0,
+                order_id = order.id,
+                start_date = DateTime.Now,
+                category_id = null,
+                valid = 1,
+                appending = true,
+                name = "",
+                guaranty = 0,
+                expectDays = 1,
+                pick_type = "立即租赁",
+                create_date = DateTime.Now
+            };
+            Models.RentItem item = new Models.RentItem()
+            {
+                id = 0,
+                rental_id = rental.id,
+                category_id = null,
+                valid = 1,
+                noCode = true,
+                is_associate = false,
+                pick_type = "立即租赁",
+                atOnce = true,
+                create_date = DateTime.Now
+            };
+            rental.rentItems.Add(item);
+            await _db.rental.AddAsync(rental);
+            await _db.SaveChangesAsync();
+            order.appendingRentals.Add(rental);
+            return order;
         }
         [NonAction]
         public async Task<Models.Order> AppendCategory(Models.Order order, int categoryId)
