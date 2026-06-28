@@ -6331,6 +6331,7 @@ namespace SnowmeetApi.Controllers
                 id = 0,
                 category_id = categoryId,
                 //category = category,
+                class_name = category?.name,
                 rental_id = rental.id,
                 valid = 1,
                 noCode = true,
@@ -6417,6 +6418,7 @@ namespace SnowmeetApi.Controllers
             {
                 Models.RentItem item = rental.rentItems[i];
                 item.category = (package.rentPackageCategoryList.Where(c => c.category_id == item.category_id).FirstOrDefault()).rentCategory;
+                item.class_name = item.category?.name;
             }
             _db.rental.Entry(rental).State = EntityState.Modified;
             await _db.SaveChangesAsync();
