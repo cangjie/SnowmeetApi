@@ -6465,7 +6465,7 @@ namespace SnowmeetApi.Controllers
         }
         [HttpPost("{orderId}")]
         public async Task<ActionResult<ApiResult<Models.Order>>> SaveAppendings([FromRoute] int orderId, [FromBody] List<Rental> appendings,
-            [FromQuery] string sessionKey, [FromQuery] string sessionType = "wechat_mini_openid")
+            [FromQuery] string sessionKey, [FromQuery] string sessionType = "wechat_mini_openid", [FromQuery] bool commit = true)
         {
             Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
             if (staff == null || staff.title_level < 100)
@@ -6481,11 +6481,14 @@ namespace SnowmeetApi.Controllers
             {
                 if (orderId == appendings[i].order_id)
                 {
-                    await SaveAppendingRental(appendings[i]);
+                    await SaveAppendingRental(appendings[i], commit);
                 }
             }
             OrderController _orderH = new OrderController(_db, _config, _httpContextAccessor);
             Models.Order order = await _orderH.GetOrder(orderId);
+            // commit=false：实时保存草稿（只持久化字段，保持 appending=true，不提交/不生效/不算应付）
+            if (commit)
+            {
             double appendPayAmount = 0;
             for (int i = 0; order.appendingRentals != null && i < order.appendingRentals.Count; i++)
             {
@@ -6528,6 +6531,7 @@ namespace SnowmeetApi.Controllers
                 _db.order.Entry(order).State = EntityState.Modified;
             }
             await _db.SaveChangesAsync();
+            }
             return Ok(new ApiResult<Models.Order>()
             {
                 code = 0,
@@ -6536,10 +6540,10 @@ namespace SnowmeetApi.Controllers
             });
         }
         [NonAction]
-        public async Task<Rental> SaveAppendingRental(Rental rental)
+        public async Task<Rental> SaveAppendingRental(Rental rental, bool commit = true)
         {
             rental.priceList = new List<RentPrice>();
-            rental.appending = false;
+            rental.appending = commit ? false : true;
             rental.update_date = DateTime.Now;
             for (int i = 0; rental.pricePresets != null && i < rental.pricePresets.Count; i++)
             {
@@ -6565,7 +6569,11 @@ namespace SnowmeetApi.Controllers
                     _db.rentItem.Entry(rentItem).State = EntityState.Modified;
                 }
             }
-            await SyncRentalGuaranty(rental);
+            // 押金应收记录只在确认提交（commit）时建/改；实时保存草稿阶段不建，避免中途删草稿残留 Guaranty
+            if (commit)
+            {
+                await SyncRentalGuaranty(rental);
+            }
             _db.rental.Entry(rental).State = EntityState.Modified;
             await _db.SaveChangesAsync();
             _db.rental.Entry(rental).State = EntityState.Detached;
