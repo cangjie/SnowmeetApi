@@ -4783,7 +4783,7 @@ namespace SnowmeetApi.Controllers
                 List<Guaranty> guaranties = appendingRental.guaranties;
                 for (int j = 0; guaranties != null && j < guaranties.Count; j++)
                 {
-                    Guaranty g = guaranties[i];
+                    Guaranty g = guaranties[j];
                     if (g.payStatus != "支付完成")
                     {
                         GuarantyPayment gp = new GuarantyPayment()
