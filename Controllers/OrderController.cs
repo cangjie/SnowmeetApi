@@ -2788,6 +2788,26 @@ namespace SnowmeetApi.Controllers
             }
             order = await GetOrder(orderId);
 
+            // 全部退款后（确有退款且应退押金已退完）：清理订单上未确认的追加草稿（appending=true、append_commit_time=null）。
+            // 草稿阶段不建 Guaranty、不影响 paying_amount，直接置 valid=0 即可。
+            if (order.refundAmount > 0 && Math.Round((double)order.totalRentUnRefund, 2) == 0)
+            {
+                List<Rental> draftAppendings = await _db.rental
+                    .Where(r => r.order_id == orderId && r.valid == 1 && r.appending == true && r.append_commit_time == null)
+                    .ToListAsync();
+                for (int di = 0; di < draftAppendings.Count; di++)
+                {
+                    draftAppendings[di].valid = 0;
+                    draftAppendings[di].update_date = DateTime.Now;
+                    _db.rental.Entry(draftAppendings[di]).State = EntityState.Modified;
+                }
+                if (draftAppendings.Count > 0)
+                {
+                    await _db.SaveChangesAsync();
+                    order = await GetOrder(orderId);
+                }
+            }
+
             try
             {
                 if (order.type == "租赁" && order.shop == "万龙体验中心" && order.hide == false && order.valid == 1 && order.paidAmount > 0
