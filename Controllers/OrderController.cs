@@ -180,7 +180,8 @@ namespace SnowmeetApi.Controllers
 
                              )
                         )
-                        && (useCard == null || useCard == o.rentals.Any(r => r.valid == 1 && r.use_card==true))
+                        && (useCard == null || useCard == (o.rentals.Any(r => r.valid == 1 && r.use_card==true)
+                            || _db.punchCardUsed.Any(u => u.order_id == o.id && u.valid)))
 
                     )
                     .Include(o => o.rentals.Where(r => r.valid == 1 && (r.appending == null || (r.appending == false && r.append_commit_time != null)))).ThenInclude(r => r.details.Where(d => d.valid == 1)).ThenInclude(d => d.discounts.Where(d => d.valid == 1 && d.sub_biz_type == "日租金"))
@@ -225,7 +226,8 @@ namespace SnowmeetApi.Controllers
                             && (shop == null || o.shop.Trim().Equals(shop.Trim())) && (type == null || o.type.Trim().Equals(type.Trim()))
                             && o.valid == 1 && (orderId == null || o.id == orderId)
                             && (isSummerCare == null || (o.cares.Any(c => (c.biz_type == "非雪季养护")) == isSummerCare))
-                            && (useCard == null || (useCard == o.cares.Any(c => (c.valid == 1 && c.use_card == true))))
+                            && (useCard == null || (useCard == (o.cares.Any(c => (c.valid == 1 && c.use_card == true))
+                                || _db.punchCardUsed.Any(u => u.order_id == o.id && u.valid))))
                             && (cell == null || (o.member.memberSocialAccounts.Any(msa => msa.num.EndsWith(cell)) ))
                             )
                         .Include(o => o.cares.Where(c => c.valid == 1)).ThenInclude(c => c.tasks.Where(t => t.valid == 1).OrderBy(t => t.sort))
