@@ -1139,6 +1139,15 @@ namespace SnowmeetApi.Controllers
                 .Skip((pageIndex - 1) * pageSize)
                 .Take(pageSize)
                 .ToList();
+            // 标记本页订单是否用过次卡（punch_card_used 有有效记录）→ 列表「卡」标签
+            List<int> pagedIds = paged.Select(o => o.id).ToList();
+            List<int> punchOrderIds = await _db.punchCardUsed
+                .Where(u => u.valid && pagedIds.Contains(u.order_id))
+                .AsNoTracking().Select(u => u.order_id).Distinct().ToListAsync();
+            for (int i = 0; i < paged.Count; i++)
+            {
+                paged[i].usePunchCard = punchOrderIds.Contains(paged[i].id);
+            }
             SnowmeetApi.Models.Order.RendOrderList(paged);
             return Ok(new ApiResult<PagedOrderResult>()
             {

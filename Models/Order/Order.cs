@@ -110,6 +110,9 @@ namespace SnowmeetApi.Models
         public string textColor { get; set; } = "";
         [NotMapped]
         public string backgroundColor { get; set; } = "";
+        // 该订单是否使用过次卡（punch_card_used 有有效记录）—— 列表「卡」标签用，由查询接口填充
+        [NotMapped]
+        public bool usePunchCard { get; set; } = false;
         public DateTime create_date { get; set; } = DateTime.Now;
         [ForeignKey("staff_id")]
         public Staff staff { get; set; } = null;
