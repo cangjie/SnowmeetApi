@@ -5671,7 +5671,7 @@ namespace SnowmeetApi.Controllers
             Models.Order order = await _db.order.Where(o => o.id == orderId).AsNoTracking().FirstOrDefaultAsync();
             if (order == null || order.member_id == null)
             {
-                return Ok(new ApiResult<object>() { code = 0, message = "", data = new { cards = new object[0], skiRentals = new object[0], totalPunchNeed = 0 } });
+                return Ok(new ApiResult<object>() { code = 0, message = "", data = new { cards = new object[0], skiRentals = new object[0], totalPunchNeed = 0, usedPunches = 0 } });
             }
             List<PunchCard> cards = await _db.punchCard
                 .Where(c => c.member_id == order.member_id && c.biz_type == "租赁" && c.total > c.punches)
@@ -5701,6 +5701,11 @@ namespace SnowmeetApi.Controllers
                 totalPunchNeed += dateAmts.Count;
                 skiRentals.Add(new { rental_id = r.id, name = r.name, punchDays = dateAmts.Count, rentalDates = dateAmts });
             }
+            // 该订单已核销次卡次数（已用过则前端显示「已核销 N 次」+ 复选框勾选锁定）
+            List<PunchCardUsed> usedList = await _db.punchCardUsed
+                .Where(u => u.order_id == orderId && u.valid).AsNoTracking().ToListAsync();
+            int usedPunches = 0;
+            for (int i = 0; i < usedList.Count; i++) usedPunches += usedList[i].punch_count;
             return Ok(new ApiResult<object>()
             {
                 code = 0,
@@ -5709,7 +5714,8 @@ namespace SnowmeetApi.Controllers
                 {
                     cards = cards.Select(c => new { c.id, c.card_name, c.total, c.punches, remaining = c.total - c.punches }).ToList(),
                     skiRentals = skiRentals,
-                    totalPunchNeed = totalPunchNeed
+                    totalPunchNeed = totalPunchNeed,
+                    usedPunches = usedPunches
                 }
             });
         }
