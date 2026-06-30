@@ -746,6 +746,8 @@ namespace SnowmeetApi.Controllers
                 }
             }
             payment.status = "支付成功";
+            // 储值消费即时成功 → 落支付时间（否则 paid_date 为 null，前端支付明细显示 1970-01-01 08:00:00）
+            payment.paid_date = DateTime.Now;
             try
             {
                 _db.OrderPayment.Entry(payment).State = EntityState.Modified;
