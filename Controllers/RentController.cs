@@ -5656,6 +5656,157 @@ namespace SnowmeetApi.Controllers
             return Ok(new ApiResult<Models.Rental?>() { code = 0, message = "", data = await GetRental(rentalId) });
         }
 
+        // 次卡消费：查询会员名下租赁次卡 + 本订单含雪板雪鞋的租赁商品本次需扣次数。
+        // 含雪板雪鞋 rental = rentItems.category.code 前两位 ∈ {01双板,02单板,03双板鞋,04单板鞋}。
+        // 某 rental 的次卡天数 = 其 rental_detail 中 charge_type='租金' && valid=1 去重 rental_date 计数（实际计费天数）。
+        [HttpGet("{orderId}")]
+        public async Task<ActionResult<ApiResult<object>>> GetRentalPunchCardInfo(int orderId,
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            if (staff == null || staff.title_level < 100)
+            {
+                return Ok(new ApiResult<object>() { code = 1, message = "没有权限", data = null });
+            }
+            Models.Order order = await _db.order.Where(o => o.id == orderId).AsNoTracking().FirstOrDefaultAsync();
+            if (order == null || order.member_id == null)
+            {
+                return Ok(new ApiResult<object>() { code = 0, message = "", data = new { cards = new object[0], skiRentals = new object[0], totalPunchNeed = 0 } });
+            }
+            List<PunchCard> cards = await _db.punchCard
+                .Where(c => c.member_id == order.member_id && c.biz_type == "租赁" && c.total > c.punches)
+                .AsNoTracking().ToListAsync();
+            List<Models.Rental> rentals = await _db.rental
+                .Where(r => r.order_id == orderId && r.valid == 1
+                    && (r.appending == null || (r.appending == false && r.append_commit_time != null)))
+                .Include(r => r.rentItems.Where(i => i.valid == 1)).ThenInclude(i => i.category)
+                .AsNoTracking().ToListAsync();
+            string[] skiPrefix = new string[] { "01", "02", "03", "04" };
+            List<object> skiRentals = new List<object>();
+            int totalPunchNeed = 0;
+            for (int i = 0; i < rentals.Count; i++)
+            {
+                Models.Rental r = rentals[i];
+                bool isSki = r.rentItems != null && r.rentItems.Any(it => it.category != null
+                    && it.category.code != null && it.category.code.Length >= 2
+                    && skiPrefix.Contains(it.category.code.Substring(0, 2)));
+                if (!isSki) continue;
+                List<Models.RentalDetail> details = await _db.rentalDetail
+                    .Where(d => d.rental_id == r.id && d.charge_type == "租金" && d.valid == 1)
+                    .AsNoTracking().ToListAsync();
+                var dateAmts = details.GroupBy(d => d.rental_date.Date)
+                    .Select(g => new { date = g.Key.ToString("yyyy-MM-dd"), amount = g.Sum(x => x.amount) })
+                    .OrderBy(x => x.date).ToList();
+                if (dateAmts.Count <= 0) continue;
+                totalPunchNeed += dateAmts.Count;
+                skiRentals.Add(new { rental_id = r.id, name = r.name, punchDays = dateAmts.Count, rentalDates = dateAmts });
+            }
+            return Ok(new ApiResult<object>()
+            {
+                code = 0,
+                message = "",
+                data = new
+                {
+                    cards = cards.Select(c => new { c.id, c.card_name, c.total, c.punches, remaining = c.total - c.punches }).ToList(),
+                    skiRentals = skiRentals,
+                    totalPunchNeed = totalPunchNeed
+                }
+            });
+        }
+
+        public class PunchCardUseRequest
+        {
+            public int card_id { get; set; }
+            public int punch_count { get; set; }
+        }
+
+        // 次卡核销：用指定次卡抵 punch_count 次。把订单内含雪板雪鞋 rental 的 valid=1 租金 detail
+        // 按 rental_date 升序排队，逐天免除前 punch_count 条（valid=0），写 punch_card_used（每个被触及 rental 一条）+ 扣 punches。
+        [HttpPost("{orderId}")]
+        public async Task<ActionResult<ApiResult<Models.Order?>>> UseRentalPunchCard(int orderId,
+            [FromBody] PunchCardUseRequest req, string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            if (staff == null || staff.title_level < 100)
+            {
+                return Ok(new ApiResult<Models.Order?>() { code = 1, message = "没有权限", data = null });
+            }
+            Models.Order order = await _db.order.Where(o => o.id == orderId).AsNoTracking().FirstOrDefaultAsync();
+            if (order == null || order.member_id == null)
+            {
+                return Ok(new ApiResult<Models.Order?>() { code = 1, message = "未找到订单/会员", data = null });
+            }
+            PunchCard card = await _db.punchCard.Where(c => c.id == req.card_id).FirstOrDefaultAsync();
+            if (card == null || card.member_id != order.member_id || card.biz_type != "租赁")
+            {
+                return Ok(new ApiResult<Models.Order?>() { code = 1, message = "次卡不属于该会员", data = null });
+            }
+            if (req.punch_count <= 0)
+            {
+                return Ok(new ApiResult<Models.Order?>() { code = 1, message = "扣除次数无效", data = null });
+            }
+            if (req.punch_count > (card.total - card.punches))
+            {
+                return Ok(new ApiResult<Models.Order?>() { code = 1, message = "次卡剩余次数不足", data = null });
+            }
+            List<Models.Rental> rentals = await _db.rental
+                .Where(r => r.order_id == orderId && r.valid == 1
+                    && (r.appending == null || (r.appending == false && r.append_commit_time != null)))
+                .Include(r => r.rentItems.Where(i => i.valid == 1)).ThenInclude(i => i.category)
+                .AsNoTracking().ToListAsync();
+            string[] skiPrefix = new string[] { "01", "02", "03", "04" };
+            // 所有含雪板雪鞋 rental 的 valid=1 租金 detail，按 rental_date 升序排队（tracked，待改 valid）
+            List<Models.RentalDetail> queue = new List<Models.RentalDetail>();
+            for (int i = 0; i < rentals.Count; i++)
+            {
+                Models.Rental r = rentals[i];
+                bool isSki = r.rentItems != null && r.rentItems.Any(it => it.category != null
+                    && it.category.code != null && it.category.code.Length >= 2
+                    && skiPrefix.Contains(it.category.code.Substring(0, 2)));
+                if (!isSki) continue;
+                List<Models.RentalDetail> details = await _db.rentalDetail
+                    .Where(d => d.rental_id == r.id && d.charge_type == "租金" && d.valid == 1)
+                    .OrderBy(d => d.rental_date).ToListAsync();
+                queue.AddRange(details);
+            }
+            int need = req.punch_count;
+            if (need > queue.Count) need = queue.Count;   // 兜底：不超过实际可免天数
+            Dictionary<int, int> perRental = new Dictionary<int, int>();   // rental_id → 被免天数
+            for (int i = 0; i < need; i++)
+            {
+                Models.RentalDetail d = queue[i];
+                d.valid = 0;
+                d.update_date = DateTime.Now;
+                _db.rentalDetail.Entry(d).State = EntityState.Modified;   // 全局 NoTracking，必须显式
+                if (!perRental.ContainsKey(d.rental_id)) perRental[d.rental_id] = 0;
+                perRental[d.rental_id] += 1;
+            }
+            foreach (KeyValuePair<int, int> kv in perRental)
+            {
+                PunchCardUsed used = new PunchCardUsed()
+                {
+                    card_id = card.id,
+                    order_id = orderId,
+                    biz_type = "租赁",
+                    biz_id = kv.Key,
+                    payment_id = null,
+                    punch_count = kv.Value,
+                    valid = true,
+                    create_date = DateTime.Now
+                };
+                await _db.punchCardUsed.AddAsync(used);
+                await _db.coreDataModLog.AddAsync(CoreDataModLog.CreateManualLog("rental", "次卡消费",
+                    kv.Key, "次卡消费", null, staff.id, "0", kv.Value.ToString(), "次卡免除租金"));
+            }
+            card.punches += need;
+            card.update_date = DateTime.Now;
+            _db.punchCard.Entry(card).State = EntityState.Modified;
+            await _db.SaveChangesAsync();
+            OrderController _orderH = new OrderController(_db, _config, _httpContextAccessor);
+            Models.Order updated = await _orderH.GetOrder(orderId);
+            return Ok(new ApiResult<Models.Order?>() { code = 0, message = "", data = updated });
+        }
+
         [HttpGet]
         public async Task ContinueRentOrder(DateTime? rentDate = null)
         {
