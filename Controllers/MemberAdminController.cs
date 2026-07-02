@@ -268,6 +268,129 @@ namespace SnowmeetApi.Controllers
             return Ok(new ApiResult<object>() { code = 0, message = "", data = new { tags } });
         }
 
+        // ───────────────────────── 3b. 标签库维护（合并/删除/新增，只管 member_tag_preset）─────────────────────────
+        // 库标签 + 每个被多少会员使用（用量>0 不允许删除，只能先合并）
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<object>>> GetTagLibraryWithStats(string sessionKey,
+            string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await GetStaff(sessionKey, sessionType);
+            if (staff == null || staff.title_level < MIN_LEVEL)
+                return Ok(new ApiResult<object>() { code = 1, message = "没有权限", data = null });
+            var presets = await _db.memberTagPreset.Where(t => t.valid)
+                .OrderBy(t => t.sort).ThenBy(t => t.id)
+                .Select(t => new { t.tag, t.group_name }).AsNoTracking().ToListAsync();
+            // 每个 tag 被多少会员使用（member_tag valid，去重 member_id）
+            var usage = await _db.memberTag.Where(t => t.valid)
+                .GroupBy(t => t.tag)
+                .Select(g => new { tag = g.Key, cnt = g.Select(x => x.member_id).Distinct().Count() })
+                .AsNoTracking().ToListAsync();
+            var tags = presets.Select(p => new
+            {
+                tag = p.tag,
+                group = p.group_name,
+                count = usage.Where(u => u.tag == p.tag).Select(u => u.cnt).FirstOrDefault()
+            }).ToList();
+            return Ok(new ApiResult<object>() { code = 0, message = "", data = new { tags } });
+        }
+
+        // 合并：把标签 from 迁到 to —— 会员身上的 from 改成 to（已有 to 则去重），from 从标签库移除
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<object>>> MergeTagPreset(string from, string to,
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await GetStaff(sessionKey, sessionType);
+            if (staff == null || staff.title_level < MIN_LEVEL)
+                return Ok(new ApiResult<object>() { code = 1, message = "没有权限", data = null });
+            from = (from ?? "").Trim();
+            to = (to ?? "").Trim();
+            if (from == "" || to == "" || from == to)
+                return Ok(new ApiResult<object>() { code = 1, message = "合并参数无效", data = null });
+
+            // 已经拥有 to 的会员集合（valid）
+            var haveTo = await _db.memberTag.Where(t => t.valid && t.tag == to)
+                .Select(t => t.member_id).Distinct().ToListAsync();
+            // 会员身上所有 valid 的 from 标签行
+            List<MemberTag> fromRows = await _db.memberTag.Where(t => t.valid && t.tag == from).ToListAsync();
+            var seen = new HashSet<int>(haveTo);
+            for (int i = 0; i < fromRows.Count; i++)
+            {
+                MemberTag r = fromRows[i];
+                if (seen.Contains(r.member_id))
+                {
+                    r.valid = false;           // 该会员已有 to，去重掉 from
+                }
+                else
+                {
+                    r.tag = to;                // 迁移到 to
+                    seen.Add(r.member_id);
+                }
+                _db.memberTag.Entry(r).State = EntityState.Modified;
+            }
+            // from 从标签库移除；确保 to 在库里（不在则加）
+            List<MemberTagPreset> fromPresets = await _db.memberTagPreset.Where(p => p.valid && p.tag == from).ToListAsync();
+            for (int i = 0; i < fromPresets.Count; i++)
+            {
+                fromPresets[i].valid = false;
+                _db.memberTagPreset.Entry(fromPresets[i]).State = EntityState.Modified;
+            }
+            bool toExists = await _db.memberTagPreset.AnyAsync(p => p.valid && p.tag == to);
+            if (!toExists)
+            {
+                await _db.memberTagPreset.AddAsync(new MemberTagPreset() { id = 0, tag = to, sort = 0, valid = true, create_date = DateTime.Now });
+            }
+            await _db.SaveChangesAsync();
+            return Ok(new ApiResult<object>() { code = 0, message = "", data = new { moved = fromRows.Count } });
+        }
+
+        // 删除库标签：仅当没有会员在用（member_tag valid 用量=0）才允许
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<object>>> DeleteTagPreset(string tag,
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await GetStaff(sessionKey, sessionType);
+            if (staff == null || staff.title_level < MIN_LEVEL)
+                return Ok(new ApiResult<object>() { code = 1, message = "没有权限", data = null });
+            tag = (tag ?? "").Trim();
+            if (tag == "")
+                return Ok(new ApiResult<object>() { code = 1, message = "标签为空", data = null });
+            int used = await _db.memberTag.Where(t => t.valid && t.tag == tag).Select(t => t.member_id).Distinct().CountAsync();
+            if (used > 0)
+                return Ok(new ApiResult<object>() { code = 1, message = "已被 " + used + " 个会员使用，不能删除（请先合并）", data = null });
+            List<MemberTagPreset> rows = await _db.memberTagPreset.Where(p => p.valid && p.tag == tag).ToListAsync();
+            for (int i = 0; i < rows.Count; i++)
+            {
+                rows[i].valid = false;
+                _db.memberTagPreset.Entry(rows[i]).State = EntityState.Modified;
+            }
+            if (rows.Count > 0) await _db.SaveChangesAsync();
+            return Ok(new ApiResult<object>() { code = 0, message = "", data = new { deleted = rows.Count } });
+        }
+
+        // 新增库标签
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<object>>> AddTagPreset(string tag, string sessionKey,
+            string? groupName = null, string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await GetStaff(sessionKey, sessionType);
+            if (staff == null || staff.title_level < MIN_LEVEL)
+                return Ok(new ApiResult<object>() { code = 1, message = "没有权限", data = null });
+            tag = (tag ?? "").Trim();
+            if (tag == "")
+                return Ok(new ApiResult<object>() { code = 1, message = "标签为空", data = null });
+            bool exists = await _db.memberTagPreset.AnyAsync(p => p.valid && p.tag == tag);
+            if (!exists)
+            {
+                await _db.memberTagPreset.AddAsync(new MemberTagPreset()
+                {
+                    id = 0, tag = tag, group_name = string.IsNullOrWhiteSpace(groupName) ? null : groupName.Trim(),
+                    sort = 999, valid = true, create_date = DateTime.Now
+                });
+                await _db.SaveChangesAsync();
+            }
+            return Ok(new ApiResult<object>() { code = 0, message = "", data = new { tag } });
+        }
+
         // ───────────────────────── 4. 手机号注册会员 ─────────────────────────
         public class RegisterRequest
         {
