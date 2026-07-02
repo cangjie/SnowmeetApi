@@ -173,7 +173,7 @@ namespace SnowmeetApi.Controllers
             var recentOrders = await _db.order
                 .Where(o => o.member_id == memberId && o.valid == 1)
                 .OrderByDescending(o => o.id).Take(8)
-                .Select(o => new { code = o.code, type = o.type, bizDate = o.biz_date })
+                .Select(o => new { id = o.id, code = o.code, type = o.type, bizDate = o.biz_date })
                 .AsNoTracking().ToListAsync();
 
             // 名下次卡
