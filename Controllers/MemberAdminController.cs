@@ -249,6 +249,21 @@ namespace SnowmeetApi.Controllers
             return Ok(new ApiResult<object>() { code = 0, message = "", data = new { custom = customTags } });
         }
 
+        // 标签库（可后台维护的预设标签字典）
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<object>>> GetTagLibrary(string sessionKey,
+            string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await GetStaff(sessionKey, sessionType);
+            if (staff == null || staff.title_level < MIN_LEVEL)
+                return Ok(new ApiResult<object>() { code = 1, message = "没有权限", data = null });
+            var tags = await _db.memberTagPreset
+                .Where(t => t.valid)
+                .OrderBy(t => t.sort).ThenBy(t => t.id)
+                .Select(t => new { tag = t.tag, group = t.group_name }).AsNoTracking().ToListAsync();
+            return Ok(new ApiResult<object>() { code = 0, message = "", data = new { tags } });
+        }
+
         // ───────────────────────── 4. 手机号注册会员 ─────────────────────────
         public class RegisterRequest
         {
