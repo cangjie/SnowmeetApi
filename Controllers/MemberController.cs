@@ -525,7 +525,7 @@ namespace SnowmeetApi.Controllers
                     table_name = "member",
                     key_value = member.id,
                     scene = scene.Trim(),
-                    field_name = "real_name",
+                    field_name = "gender",
                     prev_value = oriMember.gender.Trim(),
                     current_value = member.gender.Trim(),
                     is_manual = 1,

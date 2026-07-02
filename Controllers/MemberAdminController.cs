@@ -201,6 +201,60 @@ namespace SnowmeetApi.Controllers
             return Ok(new ApiResult<object>() { code = 0, message = "", data = data });
         }
 
+        // ───────────────────────── 2b. 修改会员资料（姓名/性别/手机号，全程留 core_data_mod_log）─────────────────────────
+        public class UpdateProfileRequest
+        {
+            public int memberId { get; set; }
+            public string? realName { get; set; }
+            public string? gender { get; set; }
+            public string? cell { get; set; }
+        }
+
+        [HttpPost]
+        public async Task<ActionResult<ApiResult<object>>> UpdateMemberProfile([FromBody] UpdateProfileRequest req,
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await GetStaff(sessionKey, sessionType);
+            if (staff == null || staff.title_level < MIN_LEVEL)
+                return Ok(new ApiResult<object>() { code = 1, message = "没有权限", data = null });
+            if (req == null)
+                return Ok(new ApiResult<object>() { code = 1, message = "参数为空", data = null });
+
+            MemberController memberHelper = new MemberController(_db, _config);
+            Member ori = await memberHelper.GetWholeMemberById(req.memberId);
+            if (ori == null)
+                return Ok(new ApiResult<object>() { code = 1, message = "会员不存在", data = null });
+
+            // 1) 手机号改绑（先做；被他人占用则整单不改）—— 复用 Unbind/Bind，两者各写 core_data_mod_log
+            string newCell = (req.cell ?? "").Trim();
+            string curCell = (ori.cell ?? "").Trim();
+            if (newCell != "" && newCell != curCell)
+            {
+                bool takenByOther = await _db.memberSocialAccount.AnyAsync(m =>
+                    m.valid == 1 && m.type == "cell" && m.num == newCell && m.member_id != req.memberId);
+                if (takenByOther)
+                    return Ok(new ApiResult<object>() { code = 1, message = "手机号已被他人绑定", data = null });
+                if (curCell != "")
+                    await memberHelper.UnbindMemberMainCellNum(req.memberId, curCell, "会员详情修改手机号", staff);
+                MemberSocialAccount msa = await memberHelper.BindMemberMainCellNum(req.memberId, newCell, "会员详情修改手机号", staff);
+                if (msa == null)
+                    return Ok(new ApiResult<object>() { code = 1, message = "手机号绑定失败", data = null });
+            }
+
+            // 2) 姓名/性别（复用 UpdateMemberInfo 内置的 real_name/gender 差异日志）
+            Member m = new Member()
+            {
+                id = req.memberId,
+                real_name = req.realName != null ? req.realName.Trim() : (ori.real_name ?? ""),
+                gender = req.gender != null ? req.gender.Trim() : (ori.gender ?? ""),
+                currentContactNum = null,
+                memberSocialAccounts = new List<MemberSocialAccount>()
+            };
+            await memberHelper.UpdateMemberInfo(m, staff, "会员详情修改资料");
+
+            return Ok(new ApiResult<object>() { code = 0, message = "", data = new { id = req.memberId } });
+        }
+
         // ───────────────────────── 3. 标签维护 ─────────────────────────
         [HttpGet]
         public async Task<ActionResult<ApiResult<object>>> AddMemberTag(int memberId, string tag,
