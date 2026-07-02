@@ -172,6 +172,70 @@ namespace SnowmeetApi.Controllers
                 };
                 await _db.coreDataModLog.AddAsync(logDeposit);
             }
+            List<Point> pointList = await _db.point.Where(p => p.member_id == sourceId).ToListAsync();
+            for (int i = 0; i < pointList.Count; i++)
+            {
+                Point point = pointList[i];
+                point.member_id = targetId;
+                _db.point.Entry(point).State = EntityState.Modified;
+                CoreDataModLog logPoint = new CoreDataModLog()
+                {
+                    id = 0,
+                    trace_id = traceId,
+                    table_name = "user_point_balance",
+                    key_value = point.id,
+                    scene = "用户批量合并",
+                    field_name = "member_id",
+                    prev_value = sourceId.ToString(),
+                    current_value = targetId.ToString(),
+                    is_manual = 1,
+                    manual_memo = "龙珠迁移"
+                };
+                await _db.coreDataModLog.AddAsync(logPoint);
+            }
+            List<PunchCard> punchCardList = await _db.punchCard.Where(p => p.member_id == sourceId).ToListAsync();
+            for (int i = 0; i < punchCardList.Count; i++)
+            {
+                PunchCard card = punchCardList[i];
+                card.member_id = targetId;
+                card.update_date = DateTime.Now;
+                _db.punchCard.Entry(card).State = EntityState.Modified;
+                CoreDataModLog logPunchCard = new CoreDataModLog()
+                {
+                    id = 0,
+                    trace_id = traceId,
+                    table_name = "punch_card",
+                    key_value = card.id,
+                    scene = "用户批量合并",
+                    field_name = "member_id",
+                    prev_value = sourceId.ToString(),
+                    current_value = targetId.ToString(),
+                    is_manual = 1,
+                    manual_memo = "次卡迁移"
+                };
+                await _db.coreDataModLog.AddAsync(logPunchCard);
+            }
+            List<Ticket> ticketList = await _db.ticket.Where(t => t.member_id == sourceId).ToListAsync();
+            for (int i = 0; i < ticketList.Count; i++)
+            {
+                Ticket ticket = ticketList[i];
+                ticket.member_id = targetId;
+                _db.ticket.Entry(ticket).State = EntityState.Modified;
+                CoreDataModLog logTicket = new CoreDataModLog()
+                {
+                    id = 0,
+                    trace_id = traceId,
+                    table_name = "ticket",
+                    key_value = 0,
+                    scene = "用户批量合并",
+                    field_name = "member_id",
+                    prev_value = sourceId.ToString(),
+                    current_value = targetId.ToString(),
+                    is_manual = 1,
+                    manual_memo = "优惠券迁移 code=" + ticket.code
+                };
+                await _db.coreDataModLog.AddAsync(logTicket);
+            }
             await _db.SaveChangesAsync();
             if (cell != null && targetMember.memberSocialAccounts.Where(m => m.type.Trim().Equals("cell") && m.num.Trim().Equals(cell.Trim())).ToList().Count == 0)
             {

@@ -672,5 +672,29 @@ namespace SnowmeetApi.Controllers
             }
             return Ok(new ApiResult<object>() { code = 0, message = "", data = new { granted } });
         }
+
+        // ───────────────────────── 8. 会员合并（当前会员 → 目标会员） ─────────────────────────
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<object>>> MergeMemberByStaff(int sourceMemberId, int targetMemberId,
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await GetStaff(sessionKey, sessionType);
+            if (staff == null || staff.title_level < MIN_LEVEL)
+                return Ok(new ApiResult<object>() { code = 1, message = "没有权限", data = null });
+            if (sourceMemberId == targetMemberId)
+                return Ok(new ApiResult<object>() { code = 1, message = "不能合并到自己", data = null });
+            Member source = await _db.member.AsNoTracking().FirstOrDefaultAsync(m => m.id == sourceMemberId);
+            Member target = await _db.member.AsNoTracking().FirstOrDefaultAsync(m => m.id == targetMemberId);
+            if (source == null || target == null)
+                return Ok(new ApiResult<object>() { code = 1, message = "会员不存在", data = null });
+            if (source.is_merge == 1)
+                return Ok(new ApiResult<object>() { code = 1, message = "该会员已被合并过", data = null });
+            if (target.is_merge == 1)
+                return Ok(new ApiResult<object>() { code = 1, message = "目标会员已被合并，不能作为合并目标", data = null });
+
+            MemberController memberHelper = new MemberController(_db, _config);
+            await memberHelper.MergeMember(sourceMemberId, targetMemberId);
+            return Ok(new ApiResult<object>() { code = 0, message = "", data = new { sourceMemberId, targetMemberId } });
+        }
     }
 }
