@@ -2201,6 +2201,42 @@ namespace SnowmeetApi.Controllers
                 data = order
             });
         }
+
+        // 订单支付成功/确认后：若归属会员的姓名或性别为空，用订单里的姓名/性别快照(contact_name/contact_gender)补上。
+        [NonAction]
+        public async Task SupplementMemberProfileFromOrder(Models.Order order)
+        {
+            if (order == null || order.member_id == null)
+            {
+                return;
+            }
+            Models.Member member = await _db.member.Where(m => m.id == order.member_id).FirstOrDefaultAsync();
+            if (member == null)
+            {
+                return;
+            }
+            bool changed = false;
+            if (string.IsNullOrWhiteSpace(member.real_name) && !string.IsNullOrWhiteSpace(order.contact_name))
+            {
+                member.real_name = order.contact_name.Trim();
+                changed = true;
+            }
+            if (string.IsNullOrWhiteSpace(member.gender) && !string.IsNullOrWhiteSpace(order.contact_gender))
+            {
+                member.gender = order.contact_gender.Trim();
+                changed = true;
+            }
+            if (changed)
+            {
+                member.update_date = DateTime.Now;
+                _db.member.Entry(member).State = EntityState.Modified;   // 全局 NoTracking，必须显式标记
+                CoreDataModLog log = CoreDataModLog.CreateManualLog("member", "", member.id, "支付成功补全会员资料",
+                    null, null, null, member.real_name + "/" + member.gender, "订单快照补全空姓名/性别");
+                await _db.coreDataModLog.AddAsync(log);
+                await _db.SaveChangesAsync();
+            }
+        }
+
         [HttpGet]
         public async Task DealSuccessPaidOrder(int orderId, int? paymentId = null)
         {
@@ -2237,6 +2273,8 @@ namespace SnowmeetApi.Controllers
                 }
             }
             await UpdateOrder(order, null, null, "支付成功");
+            // 归属会员姓名/性别为空时，用订单快照补全（支付成功 + EffectUnpaidOrder 确认均汇聚于此）
+            await SupplementMemberProfileFromOrder(order);
             CoreDataModLog orderSucLog = CoreDataModLog.CreateManualLog("Order", "", order.id, "租赁支付回调",
                 null, null, null, order.type, "支付成功，检查订单类型");
             await _db.coreDataModLog.AddAsync(orderSucLog);
