@@ -172,7 +172,7 @@ namespace SnowmeetApi.Controllers
             // 最近订单（轻量直查，避免 GetCommonOrders 重 include）
             var recentOrders = await _db.order
                 .Where(o => o.member_id == memberId && o.valid == 1)
-                .OrderByDescending(o => o.id).Take(8)
+                .OrderByDescending(o => o.id).Take(30)
                 .Select(o => new { id = o.id, code = o.code, type = o.type, bizDate = o.biz_date })
                 .AsNoTracking().ToListAsync();
 
