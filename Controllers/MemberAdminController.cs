@@ -42,7 +42,7 @@ namespace SnowmeetApi.Controllers
         // ───────────────────────── 1. 列表搜索（分页） ─────────────────────────
         [HttpGet]
         public async Task<ActionResult<ApiResult<object>>> SearchMembersByStaff(string sessionKey,
-            string? name = null, string? cell = null, string? gender = null, string? bizType = null,
+            string? name = null, string? cell = null, string? gender = null, string? bizTypes = null,
             string? tags = null, int pageIndex = 1, int pageSize = 20, string sessionType = "wechat_mini_openid")
         {
             Staff staff = await GetStaff(sessionKey, sessionType);
@@ -69,9 +69,13 @@ namespace SnowmeetApi.Controllers
                 q = q.Where(m => _db.memberSocialAccount.Any(a =>
                     a.member_id == m.id && a.valid == 1 && a.type == "cell" && a.num.Contains(cl)));
             }
-            if (!string.IsNullOrWhiteSpace(bizType))
+            // 参与业务多选：需同时参与所选全部业务（AND，与自定义标签一致）
+            List<string> bizList = string.IsNullOrWhiteSpace(bizTypes)
+                ? new List<string>()
+                : bizTypes.Split(',').Select(t => t.Trim()).Where(t => t != "").ToList();
+            foreach (string btRaw in bizList)
             {
-                string bt = bizType.Trim();
+                string bt = btRaw;
                 q = q.Where(m => _db.order.Any(o => o.member_id == m.id && o.valid == 1 && o.type == bt));
             }
             List<string> tagList = string.IsNullOrWhiteSpace(tags)
