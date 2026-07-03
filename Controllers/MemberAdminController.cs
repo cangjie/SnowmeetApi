@@ -33,6 +33,7 @@ namespace SnowmeetApi.Controllers
         // 业务标签集合（系统标签 = 会员参与过的业务类型）
         static readonly string[] BIZ_TAGS = { "租赁", "养护", "零售", "雪票", "二手回收", "水吧餐厅" };
         const int MIN_LEVEL = 200; // 店长/管理员
+        const int ADMIN_LEVEL = 300; // 系统管理员（会员合并等高危操作）
 
         private async Task<Staff?> GetStaff(string sessionKey, string sessionType)
         {
@@ -65,9 +66,10 @@ namespace SnowmeetApi.Controllers
             }
             if (!string.IsNullOrWhiteSpace(cell))
             {
+                // contact = 合并会员时保留的联系手机号，也参与搜索（客人可能报被合并前的旧号）
                 string cl = cell.Trim();
                 q = q.Where(m => _db.memberSocialAccount.Any(a =>
-                    a.member_id == m.id && a.valid == 1 && a.type == "cell" && a.num.Contains(cl)));
+                    a.member_id == m.id && a.valid == 1 && (a.type == "cell" || a.type == "contact") && a.num.Contains(cl)));
             }
             // 参与业务多选：需同时参与所选全部业务（AND，与自定义标签一致）
             List<string> bizList = string.IsNullOrWhiteSpace(bizTypes)
@@ -160,13 +162,14 @@ namespace SnowmeetApi.Controllers
             List<string> customTags = await _db.memberTag
                 .Where(t => t.member_id == memberId && t.valid).Select(t => t.tag).AsNoTracking().ToListAsync();
 
-            // 绑定账户（只读展示）
+            // 绑定账户（只读展示）；contactCells = 合并会员时保留的联系手机号
             var accounts = new
             {
                 wechatOpenId = msaAll.Where(a => a.type == "wechat_mini_openid").Select(a => a.num).FirstOrDefault(),
                 wechatUnionId = msaAll.Where(a => a.type == "wechat_unionid").Select(a => a.num).FirstOrDefault(),
                 alipayPayerId = msaAll.Where(a => a.type == "alipay_payerid").Select(a => a.num).FirstOrDefault(),
-                cell = cell
+                cell = cell,
+                contactCells = msaAll.Where(a => a.type == "contact").Select(a => a.num).ToList()
             };
 
             // 最近订单（轻量直查，避免 GetCommonOrders 重 include）
@@ -679,7 +682,7 @@ namespace SnowmeetApi.Controllers
             string sessionKey, string sessionType = "wechat_mini_openid")
         {
             Staff staff = await GetStaff(sessionKey, sessionType);
-            if (staff == null || staff.title_level < MIN_LEVEL)
+            if (staff == null || staff.title_level < ADMIN_LEVEL)
                 return Ok(new ApiResult<object>() { code = 1, message = "没有权限", data = null });
             if (sourceMemberId == targetMemberId)
                 return Ok(new ApiResult<object>() { code = 1, message = "不能合并到自己", data = null });

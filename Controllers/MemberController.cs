@@ -237,16 +237,19 @@ namespace SnowmeetApi.Controllers
                 await _db.coreDataModLog.AddAsync(logTicket);
             }
             await _db.SaveChangesAsync();
-            if (cell != null && targetMember.memberSocialAccounts.Where(m => m.type.Trim().Equals("cell") && m.num.Trim().Equals(cell.Trim())).ToList().Count == 0)
+            // 源会员的微信/支付宝等社交账号不迁移（上面已全部 valid=0）；
+            // 仅把源会员手机号以 type=contact（联系手机号）挂到目标会员，不作为登录/身份主手机号（type=cell）
+            if (cell != null && targetMember.memberSocialAccounts.Where(m => (m.type.Trim().Equals("cell") || m.type.Trim().Equals("contact"))
+                && m.valid == 1 && m.num.Trim().Equals(cell.Trim())).ToList().Count == 0)
             {
                 MemberSocialAccount msaNew = new MemberSocialAccount()
                 {
                     id = 0,
                     member_id = targetId,
-                    type = "cell",
+                    type = "contact",
                     num = cell.Trim(),
                     valid = 1,
-                    memo = "批量合并用户时添加的手机号"
+                    memo = "批量合并用户时添加的联系手机号"
                 };
                 await _db.memberSocialAccount.AddAsync(msaNew);
                 await _db.SaveChangesAsync();
