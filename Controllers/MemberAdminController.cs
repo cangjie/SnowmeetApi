@@ -66,10 +66,10 @@ namespace SnowmeetApi.Controllers
             }
             if (!string.IsNullOrWhiteSpace(cell))
             {
-                // contact = 合并会员时保留的联系手机号，也参与搜索（客人可能报被合并前的旧号）
+                // 只按主手机号（type=cell）匹配；contact 是开单/合并时的联系方式快照，不代表会员本人，不参与搜索
                 string cl = cell.Trim();
                 q = q.Where(m => _db.memberSocialAccount.Any(a =>
-                    a.member_id == m.id && a.valid == 1 && (a.type == "cell" || a.type == "contact") && a.num.Contains(cl)));
+                    a.member_id == m.id && a.valid == 1 && a.type == "cell" && a.num.Contains(cl)));
             }
             // 参与业务多选：需同时参与所选全部业务（AND，与自定义标签一致）
             List<string> bizList = string.IsNullOrWhiteSpace(bizTypes)

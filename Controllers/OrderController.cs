@@ -228,7 +228,7 @@ namespace SnowmeetApi.Controllers
                             && (isSummerCare == null || (o.cares.Any(c => (c.biz_type == "非雪季养护")) == isSummerCare))
                             && (useCard == null || (useCard == (o.cares.Any(c => (c.valid == 1 && c.use_card == true))
                                 || _db.punchCardUsed.Any(u => u.order_id == o.id && u.valid))))
-                            && (cell == null || (o.member.memberSocialAccounts.Any(msa => msa.num.EndsWith(cell)) ))
+                            && (cell == null || (o.member.memberSocialAccounts.Any(msa => msa.type.Trim().Equals("cell") && msa.num.EndsWith(cell)) ))
                             )
                         .Include(o => o.cares.Where(c => c.valid == 1)).ThenInclude(c => c.tasks.Where(t => t.valid == 1).OrderBy(t => t.sort))
                         .Include(o => o.cares.Where(c => c.valid == 1)).ThenInclude(c => c.careImages).ThenInclude(i => i.image)
