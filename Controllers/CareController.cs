@@ -982,6 +982,137 @@ namespace SnowmeetApi.Controllers
             });
             */
         }
+        [HttpPost]
+        public async Task<ActionResult<ApiResult<Models.Order?>>> SaveCareRecept([FromBody] Models.Order order,
+            [FromQuery] string sessionKey, [FromQuery] string sessionType = "wechat_mini_openid")
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            if (staff == null || staff.title_level < 100)
+            {
+                return Ok(new ApiResult<Models.Order?>()
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = null
+                });
+            }
+            order.needRender = false;
+            // 防级联清理（同 SaveRentRecept）：JSON 往返回来的 member/staff 子图会让 _db.Update(order)
+            // 在 TrackGraph 阶段抛 Value cannot be null (key)。本接口只管 order 标量 + cares 子图，
+            // member_id / staff_id 标量列不受影响。care 的 tasks 只由 EffectCareOrder / SetTaskStatus 维护，
+            // careImages.image 置空只留 image_id 标量，避免把 UploadFile 行标脏。
+            order.member = null;
+            order.staff = null;
+            order.rentals = null;
+            for (int i = 0; order.cares != null && i < order.cares.Count; i++)
+            {
+                Care care = order.cares[i];
+                care.order = null;
+                care.tasks = null;
+                care.pickImage = null;
+                for (int j = 0; care.careImages != null && j < care.careImages.Count; j++)
+                {
+                    care.careImages[j].care = null;
+                    care.careImages[j].image = null;
+                }
+            }
+            if (order.id == 0)
+            {
+                if (_http.HttpContext.Request.Host.Value != null
+                    && _http.HttpContext.Request.Host.Value.Equals("mini.snowmeet.top"))
+                {
+                    order.is_test = 0;
+                }
+                else
+                {
+                    order.is_test = 1;
+                }
+                order.type = "养护";
+                order.staff_id = staff.id;
+                order.create_date = DateTime.Now;
+                order.valid = 0;
+                order.recepting = 1;
+                for (int i = 0; order.cares != null && i < order.cares.Count; i++)
+                {
+                    Care care = order.cares[i];
+                    care.valid = 0;
+                    care.create_date = DateTime.Now;
+                }
+                await _db.order.AddAsync(order);
+                await _db.SaveChangesAsync();
+            }
+            else
+            {
+                for (int i = 0; order.cares != null && i < order.cares.Count; i++)
+                {
+                    Care care = order.cares[i];
+                    if (care.id == 0)
+                    {
+                        care.order_id = order.id;
+                        care.valid = 0;
+                        care.create_date = DateTime.Now;
+                    }
+                    else
+                    {
+                        care.update_date = DateTime.Now;
+                    }
+                }
+                try
+                {
+                    _db.Update(order);
+                    await _db.SaveChangesAsync();
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine(ex.Message);
+                }
+                // 购物车里被删掉的 care 物理删除（连带 care_image 行）。
+                // EffectCareOrder 加载 order.cares 不过滤 valid，软删会让已删除的板照样生成任务。
+                List<Care> oriCares = await _db.care.Include(c => c.careImages)
+                    .Where(c => c.order_id == order.id).AsNoTracking().ToListAsync();
+                for (int i = 0; i < oriCares.Count; i++)
+                {
+                    Care ori = oriCares[i];
+                    if (order.cares == null || order.cares.Where(c => c.id == ori.id).ToList().Count == 0)
+                    {
+                        for (int j = 0; ori.careImages != null && j < ori.careImages.Count; j++)
+                        {
+                            _db.careImage.Remove(ori.careImages[j]);
+                        }
+                        _db.care.Remove(ori);
+                    }
+                    else
+                    {
+                        // 已有 care：payload 里不再包含的照片行显式删除（graph Update 不会删缺失子行）
+                        Care posted = order.cares.Where(c => c.id == ori.id).First();
+                        for (int j = 0; ori.careImages != null && j < ori.careImages.Count; j++)
+                        {
+                            CareImage oriImage = ori.careImages[j];
+                            if (posted.careImages == null
+                                || posted.careImages.Where(ci => ci.id == oriImage.id).ToList().Count == 0)
+                            {
+                                _db.careImage.Remove(oriImage);
+                            }
+                        }
+                    }
+                }
+                try
+                {
+                    await _db.SaveChangesAsync();
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine(ex.Message);
+                }
+            }
+            return Ok(new ApiResult<Models.Order?>()
+            {
+                code = 0,
+                message = "",
+                data = order
+            });
+        }
     }
 
 }

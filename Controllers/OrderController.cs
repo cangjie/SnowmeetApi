@@ -2965,6 +2965,155 @@ namespace SnowmeetApi.Controllers
                 data = order
             });
         }
+        [HttpGet("{tempOrderId}")]
+        public async Task<ActionResult<ApiResult<Models.Order>>> PlaceCareOrder(int tempOrderId,
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            if (staff == null || staff.title_level < 100)
+            {
+                return Ok(new ApiResult<Models.Order?>()
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = null
+                });
+            }
+            Models.Order order = await _db.order.Include(o => o.cares)
+                .Where(o => o.id == tempOrderId && o.valid == 0 && o.type == "养护")
+                .AsNoTracking().FirstOrDefaultAsync();
+            if (order == null || order.cares == null || order.cares.Count == 0)
+            {
+                return Ok(new ApiResult<Models.Order?>()
+                {
+                    code = 1,
+                    message = "无订单数据",
+                    data = null
+                });
+            }
+            // 非雪季养护生效时会给会员发 17/18 票券（EffectCareOrder 里 (int)member_id 强转），
+            // 散客单必须先匹配会员，否则生效阶段直接抛异常
+            for (int i = 0; i < order.cares.Count; i++)
+            {
+                if (order.cares[i].summer != null && order.member_id == null)
+                {
+                    return Ok(new ApiResult<Models.Order?>()
+                    {
+                        code = 1,
+                        message = "非雪季养护需要匹配会员，请先录入顾客手机号",
+                        data = null
+                    });
+                }
+            }
+            CareController _careHelper = new CareController(_db, _config, _http);
+            double total = 0;
+            for (int i = 0; i < order.cares.Count; i++)
+            {
+                Care care = order.cares[i];
+                if (care.summer != null)
+                {
+                    care.biz_type = "非雪季养护";
+                }
+                // 定价以服务端为准（与旧 PlaceOrder 养护分支一致），前端 common_charge 仅作展示估价
+                Product product = await _careHelper.GetProduct(order.shop, care);
+                if (product == null || care.warranty || care.entertain)
+                {
+                    care.common_charge = 0;
+                }
+                else
+                {
+                    care.common_charge = product.sale_price;
+                    if (care.ticket_code != null && care.ticket_code.Trim() != "")
+                    {
+                        Ticket ticket = await _db.ticket.Where(t => t.code == care.ticket_code && t.valid == 1 && t.used == 0)
+                            .Include(t => t.template).ThenInclude(p => p.productTicketTemplates).ThenInclude(p => p.product)
+                            .AsNoTracking().FirstOrDefaultAsync();
+                        if (ticket != null)
+                        {
+                            ProductTicketTemplate productTicketTemplate = ticket.template.productTicketTemplates
+                                .Where(p => p.product_id == product.id || p.product_id == 0).FirstOrDefault();
+                            if (productTicketTemplate != null && productTicketTemplate.fixed_price != null)
+                            {
+                                care.common_charge = (double)productTicketTemplate.fixed_price;
+                            }
+                        }
+                    }
+                }
+                care.member_pick_date = care.urgent == 1 ? DateTime.Now.Date : DateTime.Now.Date.AddDays(1);
+                care.valid = 1;
+                care.update_date = DateTime.Now;
+                _db.care.Entry(care).State = EntityState.Modified;
+                total += (care.common_charge + care.repair_charge - care.discount - care.ticket_discount);
+            }
+            order.valid = 1;
+            order.recepting = 0;
+            order.biz_date = DateTime.Now;
+            order.update_date = DateTime.Now;
+            order.staff_id = staff.id;
+            order.total_amount = total;
+            order.paying_amount = total;
+            if (total == 0)
+            {
+                order.dealed = 1;
+            }
+            // EffectCareOrder 用 order.code.Split('_') 生成 task_flow_code，必须先生成订单号
+            await GenerateOrderCode(order);
+            _db.order.Entry(order).State = EntityState.Modified;
+            await _db.SaveChangesAsync();
+            _db.order.Entry(order).State = EntityState.Detached;
+            for (int i = 0; i < order.cares.Count; i++)
+            {
+                _db.care.Entry(order.cares[i]).State = EntityState.Detached;
+            }
+            for (int i = 0; i < order.cares.Count; i++)
+            {
+                Care care = order.cares[i];
+                if (care.discount > 0)
+                {
+                    Discount discount = new Discount()
+                    {
+                        id = 0,
+                        order_id = order.id,
+                        biz_type = "养护",
+                        biz_id = care.id,
+                        amount = care.discount,
+                        valid = 1,
+                        staff_id = order.staff_id,
+                        create_date = DateTime.Now
+                    };
+                    await _db.discount.AddAsync(discount);
+                }
+                if (care.ticket_discount > 0)
+                {
+                    Discount discount = new Discount()
+                    {
+                        id = 0,
+                        order_id = order.id,
+                        biz_type = "养护",
+                        biz_id = care.id,
+                        amount = care.ticket_discount,
+                        valid = 1,
+                        staff_id = order.staff_id,
+                        ticket_code = care.ticket_code,
+                        create_date = DateTime.Now
+                    };
+                    await _db.discount.AddAsync(discount);
+                }
+            }
+            await _db.SaveChangesAsync();
+            // 0 元单（质保/招待/全减免）没有支付回调，place 即生效生成养护任务
+            if (order.paying_amount == 0)
+            {
+                await _careHelper.EffectCareOrder(order.id);
+                order = await GetOrder(order.id);
+            }
+            return Ok(new ApiResult<Models.Order>()
+            {
+                code = 0,
+                message = "",
+                data = order
+            });
+        }
         [NonAction]
         public async Task<Discount> UpdateSingleDiscount(int orderId, string bizType, int bizId, string? subBizType,
             int? subBizId, double amount, int? staffId, string scene, string memo = "", string? ticketCode = null)
