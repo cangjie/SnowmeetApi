@@ -509,6 +509,9 @@ namespace SnowmeetApi.Controllers
             public int memberId { get; set; }
             public string depositType { get; set; } = "C";
             public double amount { get; set; }
+            public string? chargeType { get; set; }   // 充值类型：储值送装备/二手回收/零售赠送/预定/其他赠送 → deposit_balance.biz_type
+            public string? mi7Code { get; set; }      // 七色米订单号 → deposit_balance.biz_id
+            public string? memo { get; set; }         // 备注 → deposit_balance.memo
         }
 
         [HttpPost]
@@ -520,6 +523,8 @@ namespace SnowmeetApi.Controllers
                 return Ok(new ApiResult<object>() { code = 1, message = "没有权限", data = null });
             if (req == null || req.amount <= 0)
                 return Ok(new ApiResult<object>() { code = 1, message = "金额无效", data = null });
+            if (string.IsNullOrWhiteSpace(req.chargeType))
+                return Ok(new ApiResult<object>() { code = 1, message = "请选择充值类型", data = null });
             bool memberExists = await _db.member.AnyAsync(m => m.id == req.memberId && m.valid == 1);
             if (!memberExists)
                 return Ok(new ApiResult<object>() { code = 1, message = "会员不存在", data = null });
@@ -528,7 +533,7 @@ namespace SnowmeetApi.Controllers
             DepositController depositHelper = new DepositController(_db, _config);
             await depositHelper.DepositCharge(req.memberId, 0, Math.Round(req.amount, 2),
                 DateTime.Now.AddYears(50), sessionKey, sessionType,
-                "服务储值", "", "", "会员管理充值", "店员充值");
+                "服务储值", "", (req.mi7Code ?? "").Trim(), req.chargeType.Trim(), (req.memo ?? "").Trim());
 
             double depositTotal = await _db.depositAccount
                 .Where(a => a.member_id == req.memberId && a.valid == 1)
