@@ -730,5 +730,134 @@ namespace SnowmeetApi.Controllers
                 data = new { depositTotal = Math.Round(depositTotal, 2), points, punchRemaining }
             });
         }
+
+        // ───────────────────────── 10. 储值账户管理（列表 + 详情） ─────────────────────────
+        // 列表：按手机号搜会员，按会员分组返回名下储值账户（总储值/已消费/可用）
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<object>>> SearchDepositAccountsByStaff(string? cell,
+            int pageIndex = 1, int pageSize = 20, string sessionKey = "", string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await GetStaff(sessionKey, sessionType);
+            if (staff == null || staff.title_level < MIN_LEVEL)
+                return Ok(new ApiResult<object>() { code = 1, message = "没有权限", data = null });
+            if (pageIndex < 1) pageIndex = 1;
+            if (pageSize < 1 || pageSize > 100) pageSize = 20;
+
+            var q = _db.depositAccount.Where(a => a.valid == 1);
+            if (!string.IsNullOrWhiteSpace(cell))
+            {
+                // 只按主手机号（type=cell）匹配；contact 联系手机号不参与搜索（与会员搜索同一原则）
+                string cl = cell.Trim();
+                q = q.Where(a => _db.memberSocialAccount.Any(m =>
+                    m.member_id == a.member_id && m.valid == 1 && m.type == "cell" && m.num.Contains(cl)));
+            }
+
+            // 按会员分组分页（最新开户的会员排前）
+            var memberGroups = q.GroupBy(a => a.member_id)
+                .Select(g => new { memberId = g.Key, maxAccountId = g.Max(a => a.id) });
+            int total = await memberGroups.CountAsync();
+            List<int> pageMemberIds = await memberGroups.OrderByDescending(g => g.maxAccountId)
+                .Skip((pageIndex - 1) * pageSize).Take(pageSize)
+                .Select(g => g.memberId).ToListAsync();
+
+            var accounts = await _db.depositAccount
+                .Where(a => a.valid == 1 && pageMemberIds.Contains(a.member_id))
+                .Select(a => new { a.id, a.member_id, a.type, a.sub_type, a.income_amount, a.consume_amount, a.create_date })
+                .AsNoTracking().ToListAsync();
+            var membersInfo = await _db.member.Where(m => pageMemberIds.Contains(m.id))
+                .Select(m => new { m.id, m.real_name, m.gender }).AsNoTracking().ToListAsync();
+            var cells = await _db.memberSocialAccount
+                .Where(m => pageMemberIds.Contains(m.member_id) && m.valid == 1 && m.type == "cell")
+                .Select(m => new { m.member_id, m.num }).AsNoTracking().ToListAsync();
+
+            var items = pageMemberIds.Select(mid =>
+            {
+                var mi = membersInfo.FirstOrDefault(m => m.id == mid);
+                return new
+                {
+                    memberId = mid,
+                    name = mi != null ? mi.real_name : "",
+                    gender = mi != null ? mi.gender : "",
+                    phone = cells.Where(c => c.member_id == mid).Select(c => c.num).FirstOrDefault() ?? "",
+                    accounts = accounts.Where(a => a.member_id == mid).OrderByDescending(a => a.id)
+                        .Select(a => new
+                        {
+                            id = a.id,
+                            type = a.type,
+                            subType = a.sub_type,
+                            income = Math.Round(a.income_amount, 2),
+                            consume = Math.Round(a.consume_amount, 2),
+                            available = Math.Round(a.income_amount - a.consume_amount, 2),
+                            createDate = a.create_date
+                        }).ToList()
+                };
+            }).ToList();
+
+            return Ok(new ApiResult<object>() { code = 0, message = "", data = new { items, total } });
+        }
+
+        // 详情：账户 + 会员 + 流水（充值行带 biz_type/biz_id/memo，消费行带关联订单）
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<object>>> GetDepositAccountDetailByStaff(int accountId,
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await GetStaff(sessionKey, sessionType);
+            if (staff == null || staff.title_level < MIN_LEVEL)
+                return Ok(new ApiResult<object>() { code = 1, message = "没有权限", data = null });
+
+            var acct = await _db.depositAccount.Where(a => a.id == accountId)
+                .Select(a => new { a.id, a.member_id, a.type, a.sub_type, a.income_amount, a.consume_amount, a.expire_date, a.create_date })
+                .AsNoTracking().FirstOrDefaultAsync();
+            if (acct == null)
+                return Ok(new ApiResult<object>() { code = 1, message = "账户不存在", data = null });
+
+            var mi = await _db.member.Where(m => m.id == acct.member_id)
+                .Select(m => new { m.real_name, m.gender }).AsNoTracking().FirstOrDefaultAsync();
+            string phone = await _db.memberSocialAccount
+                .Where(m => m.member_id == acct.member_id && m.valid == 1 && m.type == "cell")
+                .Select(m => m.num).FirstOrDefaultAsync() ?? "";
+
+            var balances = await _db.depositBalance
+                .Where(b => b.deposit_id == accountId && b.valid == 1)
+                .OrderByDescending(b => b.id)
+                .Select(b => new
+                {
+                    id = b.id,
+                    amount = Math.Round(b.amount, 2),
+                    isCharge = b.amount > 0,
+                    bizType = b.biz_type,
+                    bizId = b.biz_id,
+                    memo = b.memo,
+                    orderId = b.order_id,
+                    orderCode = b.order != null ? b.order.code : null,
+                    orderType = b.order != null ? b.order.type : null,
+                    createDate = b.create_date
+                })
+                .AsNoTracking().ToListAsync();
+
+            return Ok(new ApiResult<object>()
+            {
+                code = 0, message = "",
+                data = new
+                {
+                    account = new
+                    {
+                        id = acct.id,
+                        memberId = acct.member_id,
+                        name = mi != null ? mi.real_name : "",
+                        gender = mi != null ? mi.gender : "",
+                        phone = phone,
+                        type = acct.type,
+                        subType = acct.sub_type,
+                        income = Math.Round(acct.income_amount, 2),
+                        consume = Math.Round(acct.consume_amount, 2),
+                        available = Math.Round(acct.income_amount - acct.consume_amount, 2),
+                        expireDate = acct.expire_date,
+                        createDate = acct.create_date
+                    },
+                    balances
+                }
+            });
+        }
     }
 }
