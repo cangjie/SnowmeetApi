@@ -53,7 +53,8 @@ namespace SnowmeetApi.Controllers
             if (pageIndex < 1) pageIndex = 1;
             if (pageSize < 1 || pageSize > 100) pageSize = 20;
 
-            var q = _db.member.Where(m => m.valid == 1);
+            // merge_id 非空 = 已被合并进其他会员的源会员，不出现在会员列表
+            var q = _db.member.Where(m => m.valid == 1 && m.merge_id == null);
             if (!string.IsNullOrWhiteSpace(name))
             {
                 string nm = name.Trim();
@@ -703,6 +704,31 @@ namespace SnowmeetApi.Controllers
             MemberController memberHelper = new MemberController(_db, _config);
             await memberHelper.MergeMember(sourceMemberId, targetMemberId);
             return Ok(new ApiResult<object>() { code = 0, message = "", data = new { sourceMemberId, targetMemberId } });
+        }
+
+        // ───────────────────────── 9. 会员资产速览（开单页会员条用；店员级 100 可读，仅返回聚合数） ─────────────────────────
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<object>>> GetMemberAssetsByStaff(int memberId,
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await GetStaff(sessionKey, sessionType);
+            if (staff == null || staff.title_level < 100)
+                return Ok(new ApiResult<object>() { code = 1, message = "没有权限", data = null });
+
+            double depositTotal = await _db.depositAccount
+                .Where(a => a.member_id == memberId && a.valid == 1)
+                .SumAsync(a => (double?)(a.income_amount - a.consume_amount)) ?? 0;
+            int points = await _db.point.Where(p => p.member_id == memberId && p.valid == 1)
+                .SumAsync(p => (int?)p.points) ?? 0;
+            var cards = await _db.punchCard.Where(c => c.member_id == memberId)
+                .Select(c => new { c.total, c.punches }).AsNoTracking().ToListAsync();
+            int punchRemaining = cards.Sum(c => c.total - c.punches);
+
+            return Ok(new ApiResult<object>()
+            {
+                code = 0, message = "",
+                data = new { depositTotal = Math.Round(depositTotal, 2), points, punchRemaining }
+            });
         }
     }
 }
