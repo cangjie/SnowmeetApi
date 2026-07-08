@@ -982,6 +982,49 @@ namespace SnowmeetApi.Controllers
             });
             */
         }
+        // 会员在本系统养护过的装备（按装备类型），开单时快速带出品牌/长度。
+        // 只取 valid=1（已下单生效）的 care；按 brand+scale 去重，每件装备取最近一次养护时间，按时间倒序
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<object>>> GetMemberCaredEquipments([FromQuery] int memberId,
+            [FromQuery] string equipment, [FromQuery] string sessionKey, [FromQuery] string sessionType = "wechat_mini_openid")
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            if (staff == null || staff.title_level < 100)
+            {
+                return Ok(new ApiResult<object>() { code = 1, message = "没有权限", data = null });
+            }
+            equipment = Util.UrlDecode(equipment).Trim();
+            List<Care> cares = await _db.care
+                .Where(c => c.valid == 1 && c.equipment != null && c.equipment.Trim() == equipment
+                    && c.order.member_id == memberId
+                    && c.brand != null && c.brand.Trim() != "")
+                .OrderByDescending(c => c.create_date)
+                .AsNoTracking().ToListAsync();
+            List<object> list = new List<object>();
+            HashSet<string> seen = new HashSet<string>();
+            foreach (Care c in cares)
+            {
+                string key = (c.brand ?? "").Trim() + "|" + (c.scale ?? "").Trim();
+                if (seen.Contains(key))
+                {
+                    continue;
+                }
+                seen.Add(key);
+                list.Add(new
+                {
+                    brand = c.brand,
+                    scale = c.scale,
+                    boot_length = c.boot_length,
+                    serials = c.serials,
+                    year = c.year,
+                    with_pole = c.with_pole,
+                    last_care_date = c.create_date
+                });
+            }
+            return Ok(new ApiResult<object>() { code = 0, message = "", data = list });
+        }
+
         [HttpPost]
         public async Task<ActionResult<ApiResult<Models.Order?>>> SaveCareRecept([FromBody] Models.Order order,
             [FromQuery] string sessionKey, [FromQuery] string sessionType = "wechat_mini_openid")
