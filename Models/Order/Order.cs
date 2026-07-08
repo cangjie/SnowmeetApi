@@ -372,8 +372,9 @@ namespace SnowmeetApi.Models
             get
             {
                 //已付押金 未支付 已关闭 全部归还 已退款  已完成 免押金
+                // 养护/零售等非租赁订单 rentals 可能为 null 或空（原 && 写法在 null 时仍求值 .Count 抛 NRE）
                 string? s = null;
-                if (rentals == null && rentals.Count <= 0)
+                if (rentals == null || rentals.Count <= 0)
                 {
                     return null;
                 }
@@ -1351,11 +1352,11 @@ namespace SnowmeetApi.Models
                 bool useCard = false;
                 if (type == "租赁")
                 {
-                    useCard = rentals.Any(r => r.valid == 1 && r.use_card == true);
+                    useCard = rentals != null && rentals.Any(r => r.valid == 1 && r.use_card == true);
                 }
                 if (type == "养护")
                 {
-                    useCard = cares.Any(r => r.valid == 1 && r.use_card == true);
+                    useCard = cares != null && cares.Any(r => r.valid == 1 && r.use_card == true);
                 }
                 return useCard;
             }
