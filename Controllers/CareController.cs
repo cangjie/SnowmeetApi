@@ -1071,6 +1071,9 @@ namespace SnowmeetApi.Controllers
                 // EffectCareOrder 加载 order.cares 不过滤 valid，软删会让已删除的板照样生成任务。
                 List<Care> oriCares = await _db.care.Include(c => c.careImages)
                     .Where(c => c.order_id == order.id).AsNoTracking().ToListAsync();
+                // 删除一律用 Entry().State = Deleted 而不是 Remove()：Remove 会沿导航图遍历，
+                // careImage.care 经 Include fixup 指向 AsNoTracking 加载的 Care 实例，附加时与上面
+                // _db.Update(order) 已跟踪的同 id posted Care 撞键 → InvalidOperationException（曾报 care 25631）
                 for (int i = 0; i < oriCares.Count; i++)
                 {
                     Care ori = oriCares[i];
@@ -1078,9 +1081,9 @@ namespace SnowmeetApi.Controllers
                     {
                         for (int j = 0; ori.careImages != null && j < ori.careImages.Count; j++)
                         {
-                            _db.careImage.Remove(ori.careImages[j]);
+                            _db.Entry(ori.careImages[j]).State = EntityState.Deleted;
                         }
-                        _db.care.Remove(ori);
+                        _db.Entry(ori).State = EntityState.Deleted;
                     }
                     else
                     {
@@ -1092,7 +1095,7 @@ namespace SnowmeetApi.Controllers
                             if (posted.careImages == null
                                 || posted.careImages.Where(ci => ci.id == oriImage.id).ToList().Count == 0)
                             {
-                                _db.careImage.Remove(oriImage);
+                                _db.Entry(oriImage).State = EntityState.Deleted;
                             }
                         }
                     }
