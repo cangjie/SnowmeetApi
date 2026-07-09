@@ -731,6 +731,39 @@ namespace SnowmeetApi.Controllers
             });
         }
 
+        // ───────────────────────── 9b. 开单页会员卡列表（次卡/季卡等各类卡，含上次使用时间） ─────────────────────────
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<object>>> GetMemberCardsByStaff(int memberId,
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await GetStaff(sessionKey, sessionType);
+            if (staff == null || staff.title_level < 100)
+                return Ok(new ApiResult<object>() { code = 1, message = "没有权限", data = null });
+
+            var cards = await _db.punchCard.Where(c => c.member_id == memberId)
+                .OrderByDescending(c => c.id)
+                .Select(c => new { c.id, c.biz_type, c.card_name, c.total, c.punches })
+                .AsNoTracking().ToListAsync();
+            List<int> cardIds = cards.Select(c => c.id).ToList();
+            var lastUsed = await _db.punchCardUsed
+                .Where(u => cardIds.Contains(u.card_id) && u.valid)
+                .GroupBy(u => u.card_id)
+                .Select(g => new { card_id = g.Key, lastUsedDate = g.Max(u => u.create_date) })
+                .AsNoTracking().ToListAsync();
+            var data = cards.Select(c => new
+            {
+                c.id,
+                c.biz_type,
+                c.card_name,
+                c.total,
+                c.punches,
+                remaining = c.total - c.punches,
+                lastUsedDate = lastUsed.Where(l => l.card_id == c.id)
+                    .Select(l => (DateTime?)l.lastUsedDate).FirstOrDefault()
+            }).ToList();
+            return Ok(new ApiResult<object>() { code = 0, message = "", data = data });
+        }
+
         // ───────────────────────── 10. 储值账户管理（列表 + 详情） ─────────────────────────
         // 列表：按手机号搜会员，按会员分组返回名下储值账户（总储值/已消费/可用）
         [HttpGet]
