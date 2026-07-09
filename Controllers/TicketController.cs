@@ -479,6 +479,8 @@ namespace SnowmeetApi.Controllers
                 order_id = orderId == 0 ? null : orderId,
                 create_memo = createMemo,
                 is_active = isActive,
+                member_id = memberId,
+                valid = 1,
 
             };
             await _context.ticket.AddAsync(ticket);
