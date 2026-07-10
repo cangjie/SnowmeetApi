@@ -732,15 +732,19 @@ namespace SnowmeetApi.Controllers
         }
 
         // ───────────────────────── 9b. 开单页会员卡列表（次卡/季卡等各类卡，含上次使用时间） ─────────────────────────
+        // bizType 传「养护」/「租赁」按业务线过滤（养护开单不显示租赁卡），不传返回全部
         [HttpGet]
         public async Task<ActionResult<ApiResult<object>>> GetMemberCardsByStaff(int memberId,
-            string sessionKey, string sessionType = "wechat_mini_openid")
+            string? bizType, string sessionKey, string sessionType = "wechat_mini_openid")
         {
             Staff staff = await GetStaff(sessionKey, sessionType);
             if (staff == null || staff.title_level < 100)
                 return Ok(new ApiResult<object>() { code = 1, message = "没有权限", data = null });
 
-            var cards = await _db.punchCard.Where(c => c.member_id == memberId)
+            var q = _db.punchCard.Where(c => c.member_id == memberId);
+            if (!string.IsNullOrWhiteSpace(bizType))
+                q = q.Where(c => c.biz_type == bizType.Trim());
+            var cards = await q
                 .OrderByDescending(c => c.id)
                 .Select(c => new { c.id, c.biz_type, c.card_name, c.total, c.punches })
                 .AsNoTracking().ToListAsync();
