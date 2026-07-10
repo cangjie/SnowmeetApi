@@ -561,7 +561,8 @@ namespace SnowmeetApi.Controllers
             Staff staff = await GetStaff(sessionKey, sessionType);
             if (staff == null || staff.title_level < MIN_LEVEL)
                 return Ok(new ApiResult<object>() { code = 1, message = "没有权限", data = null });
-            var presets = await _db.punchCard
+            // 季卡（total=NULL）不进发卡/注册礼包预设：发放路径按次卡语义要求 total>0
+            var presets = await _db.punchCard.Where(c => c.total != null)
                 .Select(c => new { c.biz_type, c.card_name, c.total }).Distinct()
                 .OrderBy(c => c.biz_type).ThenBy(c => c.card_name).AsNoTracking().ToListAsync();
             return Ok(new ApiResult<object>() { code = 0, message = "", data = new { presets } });
@@ -722,7 +723,8 @@ namespace SnowmeetApi.Controllers
                 .SumAsync(p => (int?)p.points) ?? 0;
             var cards = await _db.punchCard.Where(c => c.member_id == memberId)
                 .Select(c => new { c.total, c.punches }).AsNoTracking().ToListAsync();
-            int punchRemaining = cards.Sum(c => c.total - c.punches);
+            // 次卡剩余聚合：季卡（total=NULL 不限次数）不计入
+            int punchRemaining = cards.Where(c => c.total != null).Sum(c => (c.total ?? 0) - (c.punches ?? 0));
 
             return Ok(new ApiResult<object>()
             {
@@ -760,8 +762,9 @@ namespace SnowmeetApi.Controllers
                 c.biz_type,
                 c.card_name,
                 c.total,
-                c.punches,
-                remaining = c.total - c.punches,
+                punches = c.punches ?? 0,
+                remaining = c.total == null ? (int?)null : c.total - (c.punches ?? 0),
+                isSeason = c.total == null,   // total=NULL 即季卡（不限次数）
                 lastUsedDate = lastUsed.Where(l => l.card_id == c.id)
                     .Select(l => (DateTime?)l.lastUsedDate).FirstOrDefault()
             }).ToList();

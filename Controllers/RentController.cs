@@ -5675,8 +5675,10 @@ namespace SnowmeetApi.Controllers
             {
                 return Ok(new ApiResult<object>() { code = 0, message = "", data = new { cards = new object[0], skiRentals = new object[0], totalPunchNeed = 0, usedPunches = 0 } });
             }
+            // 季卡（total=NULL 不限次数）暂不参与租赁次卡核销，核销语义定义后再放开
             List<PunchCard> cards = await _db.punchCard
-                .Where(c => c.member_id == order.member_id && c.biz_type == "租赁" && c.total > c.punches)
+                .Where(c => c.member_id == order.member_id && c.biz_type == "租赁"
+                    && c.total != null && c.total > (c.punches ?? 0))
                 .AsNoTracking().ToListAsync();
             List<Models.Rental> rentals = await _db.rental
                 .Where(r => r.order_id == orderId && r.valid == 1
@@ -5714,7 +5716,7 @@ namespace SnowmeetApi.Controllers
                 message = "",
                 data = new
                 {
-                    cards = cards.Select(c => new { c.id, c.card_name, c.total, c.punches, remaining = c.total - c.punches }).ToList(),
+                    cards = cards.Select(c => new { c.id, c.card_name, c.total, punches = c.punches ?? 0, remaining = (c.total ?? 0) - (c.punches ?? 0) }).ToList(),
                     skiRentals = skiRentals,
                     totalPunchNeed = totalPunchNeed,
                     usedPunches = usedPunches
@@ -5753,7 +5755,8 @@ namespace SnowmeetApi.Controllers
             {
                 return Ok(new ApiResult<Models.Order?>() { code = 1, message = "扣除次数无效", data = null });
             }
-            if (req.punch_count > (card.total - card.punches))
+            // total=NULL 季卡不限次数，跳过剩余校验（当前列表不返回季卡，属防御）
+            if (card.total != null && req.punch_count > (card.total.Value - (card.punches ?? 0)))
             {
                 return Ok(new ApiResult<Models.Order?>() { code = 1, message = "次卡剩余次数不足", data = null });
             }
@@ -5806,7 +5809,7 @@ namespace SnowmeetApi.Controllers
                 await _db.coreDataModLog.AddAsync(CoreDataModLog.CreateManualLog("rental", "次卡消费",
                     kv.Key, "次卡消费", null, staff.id, "0", kv.Value.ToString(), "次卡免除租金"));
             }
-            card.punches += need;
+            card.punches = (card.punches ?? 0) + need;
             card.update_date = DateTime.Now;
             _db.punchCard.Entry(card).State = EntityState.Modified;
             await _db.SaveChangesAsync();
