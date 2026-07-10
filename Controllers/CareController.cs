@@ -394,6 +394,74 @@ namespace SnowmeetApi.Controllers
             }
             return product;
         }
+        // 养护服务费定价（真理之源，CalcCareCharge 开单实时计费与 PlaceCareOrder 下单落库共用）：
+        // 选会员卡按 0（2026-07-09 用户拍板，核销链路另做）/ 质保招待 0 / summer 330（GetProduct 内置）
+        // / 其余 GetProduct 名称匹配 sale_price + 票券 fixed_price 覆盖；券16 减免 双项30/单项20
+        [NonAction]
+        public async Task<(double commonCharge, double ticketDiscount)> CalcCharge(string shop, Care care, Ticket? ticket)
+        {
+            if (care.use_card || care.warranty || care.entertain)
+            {
+                return (0, 0);
+            }
+            Models.Product product = await GetProduct(shop, care);
+            double commonCharge = product == null ? 0 : product.sale_price;
+            double ticketDiscount = 0;
+            if (ticket != null)
+            {
+                if (product != null && ticket.template != null && ticket.template.productTicketTemplates != null)
+                {
+                    ProductTicketTemplate productTicketTemplate = ticket.template.productTicketTemplates
+                        .Where(p => p.product_id == product.id || p.product_id == 0).FirstOrDefault();
+                    if (productTicketTemplate != null && productTicketTemplate.fixed_price != null)
+                    {
+                        commonCharge = (double)productTicketTemplate.fixed_price;
+                    }
+                }
+                if (ticket.template_id == 16)
+                {
+                    if (care.need_edge == 1 && care.need_wax == 1)
+                    {
+                        ticketDiscount = 30;
+                    }
+                    else if (care.need_edge == 1 || care.need_wax == 1)
+                    {
+                        ticketDiscount = 20;
+                    }
+                }
+            }
+            return (commonCharge, ticketDiscount);
+        }
+        // 开单页实时计费：客户端提交 care（含项目/券码/use_card）+ 店铺，服务端算服务费与券16减免。
+        // memberId 现阶段仅收参（卡规则未来扩展），不参与计算
+        [HttpPost]
+        public async Task<ActionResult<ApiResult<object>>> CalcCareCharge([FromBody] Care care,
+            string shop, int? memberId, string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            if (staff == null || staff.title_level < 100)
+            {
+                return Ok(new ApiResult<object>() { code = 1, message = "没有权限", data = null });
+            }
+            if (care == null || string.IsNullOrWhiteSpace(shop))
+            {
+                return Ok(new ApiResult<object>() { code = 1, message = "参数为空", data = null });
+            }
+            Ticket ticket = null;
+            if (care.ticket_code != null && care.ticket_code.Trim() != "")
+            {
+                ticket = await _db.ticket.Where(t => t.code == care.ticket_code && t.valid == 1 && t.used == 0)
+                    .Include(t => t.template).ThenInclude(p => p.productTicketTemplates).ThenInclude(p => p.product)
+                    .AsNoTracking().FirstOrDefaultAsync();
+            }
+            var (commonCharge, ticketDiscount) = await CalcCharge(shop.Trim(), care, ticket);
+            return Ok(new ApiResult<object>()
+            {
+                code = 0,
+                message = "",
+                data = new { commonCharge, ticketDiscount }
+            });
+        }
         [HttpGet]
         public async Task EffectCareOrder(int orderId)
         {

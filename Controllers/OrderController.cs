@@ -3014,30 +3014,20 @@ namespace SnowmeetApi.Controllers
                 {
                     care.biz_type = "非雪季养护";
                 }
-                // 定价以服务端为准（与旧 PlaceOrder 养护分支一致），前端 common_charge 仅作展示估价
-                Product product = await _careHelper.GetProduct(order.shop, care);
-                if (product == null || care.warranty || care.entertain)
+                // 定价以服务端为准：与开单页 Care/CalcCareCharge 共用 CareController.CalcCharge
+                Ticket ticket = null;
+                if (care.ticket_code != null && care.ticket_code.Trim() != "")
                 {
-                    care.common_charge = 0;
+                    ticket = await _db.ticket.Where(t => t.code == care.ticket_code && t.valid == 1 && t.used == 0)
+                        .Include(t => t.template).ThenInclude(p => p.productTicketTemplates).ThenInclude(p => p.product)
+                        .AsNoTracking().FirstOrDefaultAsync();
                 }
-                else
+                var (commonCharge, ticketDiscount) = await _careHelper.CalcCharge(order.shop, care, ticket);
+                care.common_charge = commonCharge;
+                if (ticketDiscount > 0)
                 {
-                    care.common_charge = product.sale_price;
-                    if (care.ticket_code != null && care.ticket_code.Trim() != "")
-                    {
-                        Ticket ticket = await _db.ticket.Where(t => t.code == care.ticket_code && t.valid == 1 && t.used == 0)
-                            .Include(t => t.template).ThenInclude(p => p.productTicketTemplates).ThenInclude(p => p.product)
-                            .AsNoTracking().FirstOrDefaultAsync();
-                        if (ticket != null)
-                        {
-                            ProductTicketTemplate productTicketTemplate = ticket.template.productTicketTemplates
-                                .Where(p => p.product_id == product.id || p.product_id == 0).FirstOrDefault();
-                            if (productTicketTemplate != null && productTicketTemplate.fixed_price != null)
-                            {
-                                care.common_charge = (double)productTicketTemplate.fixed_price;
-                            }
-                        }
-                    }
+                    // 券16 减免服务端权威化，覆盖前端透传值；其余情况 discount 维持店员录入
+                    care.discount = ticketDiscount;
                 }
                 care.member_pick_date = care.urgent == 1 ? DateTime.Now.Date : DateTime.Now.Date.AddDays(1);
                 care.valid = 1;
