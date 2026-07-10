@@ -748,7 +748,8 @@ namespace SnowmeetApi.Controllers
                 q = q.Where(c => c.biz_type == bizType.Trim());
             var cards = await q
                 .OrderByDescending(c => c.id)
-                .Select(c => new { c.id, c.biz_type, c.card_name, c.total, c.punches })
+                .Select(c => new { c.id, c.biz_type, c.card_name, c.total, c.punches,
+                    c.equip_type, c.equip_brand, c.equip_scale, c.equip_serial })
                 .AsNoTracking().ToListAsync();
             List<int> cardIds = cards.Select(c => c.id).ToList();
             var lastUsed = await _db.punchCardUsed
@@ -765,6 +766,14 @@ namespace SnowmeetApi.Controllers
                 punches = c.punches ?? 0,
                 remaining = c.total == null ? (int?)null : c.total - (c.punches ?? 0),
                 isSeason = c.total == null,   // total=NULL 即季卡（不限次数）
+                c.equip_type,
+                c.equip_brand,
+                c.equip_scale,
+                c.equip_serial,
+                // 限装备季卡：三个展示字段全非空即绑定（serial 暂不参与限制，未来启用序列号校验再加）
+                equipBound = !string.IsNullOrWhiteSpace(c.equip_type)
+                    && !string.IsNullOrWhiteSpace(c.equip_brand)
+                    && !string.IsNullOrWhiteSpace(c.equip_scale),
                 lastUsedDate = lastUsed.Where(l => l.card_id == c.id)
                     .Select(l => (DateTime?)l.lastUsedDate).FirstOrDefault()
             }).ToList();

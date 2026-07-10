@@ -15,6 +15,11 @@ namespace SnowmeetApi.Models
         public string? mi7_code { get; set; }
         public int? total { get; set; }            // 总次数；NULL = 季卡（不限次数，2026-07-09 起）
         public int? punches { get; set; }          // 已用次数累计（可空，空视为 0）
+        // 季卡绑定装备（2026-07-09 起）：type/brand/scale 全非空即「限装备」季卡；serial 暂不参与限制
+        public string? equip_type { get; set; }    // 双板/单板
+        public string? equip_brand { get; set; }
+        public string? equip_scale { get; set; }
+        public string? equip_serial { get; set; }
         public DateTime? update_date { get; set; }
         public DateTime create_date { get; set; } = DateTime.Now;
 
