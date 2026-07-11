@@ -432,11 +432,66 @@ namespace SnowmeetApi.Controllers
             }
             return (commonCharge, ticketDiscount);
         }
+        // 按所选券/卡推导默认服务项（换券/换卡时刻调用）：先清空服务项再套默认，
+        // 与前端「更改券/卡先清空已选服务」同一口径。规则：卡名含「双项」→ 修刃+热蜡+刮蜡；
+        // 卡名含「机打蜡」（如机打蜡季卡）→ 机打蜡；券12 → 机打蜡；券17/18 → 非雪季 now/later；其余不默认
+        [NonAction]
+        public void ApplyDefaultServices(Care care, PunchCard card, Ticket ticket)
+        {
+            care.need_edge = 0;
+            care.edge_degree = null;
+            care.need_wax = 0;
+            care.need_unwax = 0;
+            care.free_wax = 0;
+            care.summer = null;
+            if (care.biz_type == "非雪季养护")
+            {
+                care.biz_type = null;
+            }
+            if (card != null)
+            {
+                string name = (card.card_name ?? "").Trim();
+                if (name.IndexOf("双项") >= 0)
+                {
+                    care.need_edge = 1;
+                    care.edge_degree = "89";
+                    care.need_wax = 1;
+                    care.need_unwax = 1;
+                }
+                else if (name.IndexOf("机打蜡") >= 0)
+                {
+                    care.free_wax = 1;
+                }
+            }
+            else if (ticket != null)
+            {
+                switch (ticket.template_id)
+                {
+                    case 12:
+                        care.free_wax = 1;
+                        break;
+                    case 17:
+                        care.summer = "now";
+                        care.biz_type = "非雪季养护";
+                        break;
+                    case 18:
+                        care.need_edge = 1;
+                        care.edge_degree = "89";
+                        care.need_wax = 1;
+                        care.need_unwax = 1;
+                        care.summer = "later";
+                        care.biz_type = "非雪季养护";
+                        break;
+                }
+            }
+        }
         // 开单页实时计费：客户端提交 care（含项目/券码/use_card）+ 店铺，服务端算服务费与券16减免。
-        // memberId 现阶段仅收参（卡规则未来扩展），不参与计算
+        // deriveServices=true（换券/换卡时传，配 cardId）：先按新选择推导服务项再计价，
+        // 响应 services 返回最终服务项供前端回填（如机打蜡季卡 → 机打蜡）；平时项目开关计价不传，不动服务项
         [HttpPost]
         public async Task<ActionResult<ApiResult<object>>> CalcCareCharge([FromBody] Care care,
-            string shop, int? memberId, string sessionKey, string sessionType = "wechat_mini_openid")
+            string shop, int? memberId, int? cardId, bool deriveServices = false,
+            string sessionKey = "", string sessionType = "wechat_mini_openid")
         {
             Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
             if (staff == null || staff.title_level < 100)
@@ -454,12 +509,36 @@ namespace SnowmeetApi.Controllers
                     .Include(t => t.template).ThenInclude(p => p.productTicketTemplates).ThenInclude(p => p.product)
                     .AsNoTracking().FirstOrDefaultAsync();
             }
+            PunchCard card = null;
+            if (cardId != null)
+            {
+                card = await _db.punchCard.Where(c => c.id == cardId).AsNoTracking().FirstOrDefaultAsync();
+                if (card != null && memberId != null && card.member_id != memberId)
+                {
+                    card = null;   // 卡不属于该会员，忽略
+                }
+            }
+            object services = null;
+            if (deriveServices)
+            {
+                ApplyDefaultServices(care, card, ticket);
+                services = new
+                {
+                    care.need_edge,
+                    care.edge_degree,
+                    care.need_wax,
+                    care.need_unwax,
+                    care.free_wax,
+                    care.summer,
+                    care.biz_type
+                };
+            }
             var (commonCharge, ticketDiscount) = await CalcCharge(shop.Trim(), care, ticket);
             return Ok(new ApiResult<object>()
             {
                 code = 0,
                 message = "",
-                data = new { commonCharge, ticketDiscount }
+                data = new { commonCharge, ticketDiscount, services }
             });
         }
         [HttpGet]
