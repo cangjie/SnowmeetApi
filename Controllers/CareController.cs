@@ -487,13 +487,68 @@ namespace SnowmeetApi.Controllers
         }
         // 开单页实时计费请求：每次界面操作都提交当前界面的全量状态——
         // 店铺 / 会员 / care（装备信息、服务项、券码、use_card、card_id/card_name、附加费、减免）。
-        // 卡选择跟着单件装备（care）走，不在订单级，所以卡信息只在 care 内、不设平级字段
+        // 卡选择跟着单件装备（care）走，不在订单级，所以卡信息只在 care 内、不设平级字段。
+        // changedField = 本次界面操作改动的字段名（need_wax/free_wax/need_edge/summer 等），
+        // 服务联动规则按它判定（联动是事件语义：开热蜡带上刮蜡 ≠ 开着热蜡手动关刮蜡）
         public class CalcCareChargeRequest
         {
             public string shop { get; set; }
             public int? memberId { get; set; }
             public bool deriveServices { get; set; } = false;
+            public string? changedField { get; set; } = null;
             public Care care { get; set; }
+        }
+        // 服务项联动规则（真理之源，前端不再本地联动；未来新增联动只改这里）：
+        // 开/关热蜡 → 刮蜡跟随；开热蜡与机打蜡互斥；开机打蜡清热蜡/刮蜡；
+        // 开修刃默认角度 89；非雪季 later→修刃+热蜡+刮蜡 / now→清三项，非雪季下取消立等
+        [NonAction]
+        public void ApplyServiceLinkage(Care care, string changedField)
+        {
+            switch (changedField)
+            {
+                case "need_wax":
+                    care.need_unwax = care.need_wax;
+                    if (care.need_wax == 1)
+                    {
+                        care.free_wax = 0;
+                    }
+                    break;
+                case "free_wax":
+                    if (care.free_wax == 1)
+                    {
+                        care.need_wax = 0;
+                        care.need_unwax = 0;
+                    }
+                    break;
+                case "need_edge":
+                    if (care.need_edge == 1 && string.IsNullOrWhiteSpace(care.edge_degree))
+                    {
+                        care.edge_degree = "89";
+                    }
+                    break;
+                case "summer":
+                    if (care.summer == "later")
+                    {
+                        care.need_edge = 1;
+                        care.need_wax = 1;
+                        care.need_unwax = 1;
+                    }
+                    else if (care.summer == "now")
+                    {
+                        care.need_edge = 0;
+                        care.need_wax = 0;
+                        care.need_unwax = 0;
+                    }
+                    if (care.summer != null)
+                    {
+                        care.urgent = 0;
+                        if (string.IsNullOrWhiteSpace(care.edge_degree))
+                        {
+                            care.edge_degree = "89";
+                        }
+                    }
+                    break;
+            }
         }
         // 开单页实时计费：POST 全量状态（见 CalcCareChargeRequest），服务端算服务费与券16减免。
         // deriveServices=true（换券/换卡时传）：先按新选择推导服务项再计价，
@@ -532,27 +587,29 @@ namespace SnowmeetApi.Controllers
                     card = null;   // 卡不属于该会员，忽略
                 }
             }
-            object services = null;
             if (req.deriveServices)
             {
+                // 换券/换卡：按新选择推导默认服务项
                 ApplyDefaultServices(care, card, ticket);
-                services = new
-                {
-                    care.need_edge,
-                    care.edge_degree,
-                    care.need_wax,
-                    care.need_unwax,
-                    care.free_wax,
-                    care.summer,
-                    care.biz_type
-                };
+            }
+            else if (!string.IsNullOrWhiteSpace(req.changedField))
+            {
+                // 普通界面操作：按本次改动字段应用服务联动
+                ApplyServiceLinkage(care, req.changedField.Trim());
             }
             var (commonCharge, ticketDiscount) = await CalcCharge(shop.Trim(), care, ticket);
+            care.common_charge = commonCharge;
+            if (ticketDiscount > 0)
+            {
+                // 券16 减免服务端权威化（与 PlaceCareOrder 同口径）；其余情况保留店员录入的减免
+                care.discount = ticketDiscount;
+            }
+            // 返回整个 care：联动/推导后的服务项 + 计费结果都在其中，前端以此为真理之源回填
             return Ok(new ApiResult<object>()
             {
                 code = 0,
                 message = "",
-                data = new { commonCharge, ticketDiscount, services }
+                data = new { commonCharge, ticketDiscount, care }
             });
         }
         [HttpGet]
