@@ -486,13 +486,12 @@ namespace SnowmeetApi.Controllers
             }
         }
         // 开单页实时计费请求：每次界面操作都提交当前界面的全量状态——
-        // 店铺 / 会员 / 所选卡（id+名称）/ care（装备信息、服务项、券码、use_card、附加费、减免）
+        // 店铺 / 会员 / care（装备信息、服务项、券码、use_card、card_id/card_name、附加费、减免）。
+        // 卡选择跟着单件装备（care）走，不在订单级，所以卡信息只在 care 内、不设平级字段
         public class CalcCareChargeRequest
         {
             public string shop { get; set; }
             public int? memberId { get; set; }
-            public int? cardId { get; set; }
-            public string? cardName { get; set; }
             public bool deriveServices { get; set; } = false;
             public Care care { get; set; }
         }
@@ -515,8 +514,8 @@ namespace SnowmeetApi.Controllers
                 return Ok(new ApiResult<object>() { code = 1, message = "参数为空", data = null });
             }
             int? memberId = req.memberId;
-            // 卡 id 以顶层 cardId 为主、care.card_id 兜底（[NotMapped] 随 care 全程携带）
-            int? cardId = req.cardId ?? care.card_id;
+            // 卡选择跟着 care 走：卡 id 取 care.card_id（DB 实体列，随草稿持久化）
+            int? cardId = care.card_id;
             Ticket ticket = null;
             if (care.ticket_code != null && care.ticket_code.Trim() != "")
             {

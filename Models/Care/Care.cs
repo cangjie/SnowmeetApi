@@ -59,11 +59,9 @@ namespace SnowmeetApi.Models
         public int valid { get; set; }
         public string? summer {get; set;} = null;
         public bool use_card {get; set;} = false;
-        // 所选会员卡（无 DB 列，[NotMapped] 让 JSON 绑定/回显随 care 全程携带，
-        // SaveCareRecept / CalcCareCharge 的 payload 不再依赖前端标量接力）
-        [NotMapped]
+        // 所选会员卡（2026-07-09 加 DB 列）：卡选择跟着单件装备（care）走，
+        // 随 SaveCareRecept 草稿持久化，中断找回可还原
         public int? card_id { get; set; } = null;
-        [NotMapped]
         public string? card_name { get; set; } = null;
         public DateTime? update_date { get; set; }
         public DateTime create_date { get; set; } = DateTime.Now;
