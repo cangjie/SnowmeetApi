@@ -485,12 +485,22 @@ namespace SnowmeetApi.Controllers
                 }
             }
         }
-        // 开单页实时计费：客户端提交 care（含项目/券码/use_card）+ 店铺，服务端算服务费与券16减免。
-        // deriveServices=true（换券/换卡时传，配 cardId）：先按新选择推导服务项再计价，
+        // 开单页实时计费请求：每次界面操作都提交当前界面的全量状态——
+        // 店铺 / 会员 / 所选卡（id+名称）/ care（装备信息、服务项、券码、use_card、附加费、减免）
+        public class CalcCareChargeRequest
+        {
+            public string shop { get; set; }
+            public int? memberId { get; set; }
+            public int? cardId { get; set; }
+            public string? cardName { get; set; }
+            public bool deriveServices { get; set; } = false;
+            public Care care { get; set; }
+        }
+        // 开单页实时计费：POST 全量状态（见 CalcCareChargeRequest），服务端算服务费与券16减免。
+        // deriveServices=true（换券/换卡时传）：先按新选择推导服务项再计价，
         // 响应 services 返回最终服务项供前端回填（如机打蜡季卡 → 机打蜡）；平时项目开关计价不传，不动服务项
         [HttpPost]
-        public async Task<ActionResult<ApiResult<object>>> CalcCareCharge([FromBody] Care care,
-            string shop, int? memberId, int? cardId, bool deriveServices = false,
+        public async Task<ActionResult<ApiResult<object>>> CalcCareCharge([FromBody] CalcCareChargeRequest req,
             string sessionKey = "", string sessionType = "wechat_mini_openid")
         {
             Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
@@ -498,10 +508,15 @@ namespace SnowmeetApi.Controllers
             {
                 return Ok(new ApiResult<object>() { code = 1, message = "没有权限", data = null });
             }
+            Care care = req == null ? null : req.care;
+            string shop = req == null ? null : req.shop;
             if (care == null || string.IsNullOrWhiteSpace(shop))
             {
                 return Ok(new ApiResult<object>() { code = 1, message = "参数为空", data = null });
             }
+            int? memberId = req.memberId;
+            // 卡 id 以顶层 cardId 为主、care.card_id 兜底（[NotMapped] 随 care 全程携带）
+            int? cardId = req.cardId ?? care.card_id;
             Ticket ticket = null;
             if (care.ticket_code != null && care.ticket_code.Trim() != "")
             {
@@ -519,7 +534,7 @@ namespace SnowmeetApi.Controllers
                 }
             }
             object services = null;
-            if (deriveServices)
+            if (req.deriveServices)
             {
                 ApplyDefaultServices(care, card, ticket);
                 services = new
