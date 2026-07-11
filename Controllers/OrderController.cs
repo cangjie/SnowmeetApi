@@ -3022,7 +3022,17 @@ namespace SnowmeetApi.Controllers
                         .Include(t => t.template).ThenInclude(p => p.productTicketTemplates).ThenInclude(p => p.product)
                         .AsNoTracking().FirstOrDefaultAsync();
                 }
-                var (commonCharge, ticketDiscount) = await _careHelper.CalcCharge(order.shop, care, ticket);
+                // 所选会员卡随 care.card_id 持久化，下单重算时同样参与定价（机打蜡季卡加价规则等）
+                PunchCard card = null;
+                if (care.use_card && care.card_id != null)
+                {
+                    card = await _db.punchCard.Where(c => c.id == care.card_id).AsNoTracking().FirstOrDefaultAsync();
+                    if (card != null && order.member_id != null && card.member_id != order.member_id)
+                    {
+                        card = null;   // 卡不属于该会员，忽略（与 CalcCareCharge 同口径）
+                    }
+                }
+                var (commonCharge, ticketDiscount) = await _careHelper.CalcCharge(order.shop, care, ticket, card);
                 care.common_charge = commonCharge;
                 if (ticketDiscount > 0)
                 {

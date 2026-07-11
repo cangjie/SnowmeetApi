@@ -396,12 +396,38 @@ namespace SnowmeetApi.Controllers
         }
         // 养护服务费定价（真理之源，CalcCareCharge 开单实时计费与 PlaceCareOrder 下单落库共用）：
         // 选会员卡按 0（2026-07-09 用户拍板，核销链路另做）/ 质保招待 0 / summer 330（GetProduct 内置）
-        // / 其余 GetProduct 名称匹配 sale_price + 票券 fixed_price 覆盖；券16 减免 双项30/单项20
+        // / 其余 GetProduct 名称匹配 sale_price + 票券 fixed_price 覆盖；券16 减免 双项30/单项20。
+        // 例外：机打蜡季卡（卡名含「机打蜡」）升级热蜡/增加修刃的加价规则与免费打蜡券（券12模板）一致
         [NonAction]
-        public async Task<(double commonCharge, double ticketDiscount)> CalcCharge(string shop, Care care, Ticket? ticket)
+        public async Task<(double commonCharge, double ticketDiscount)> CalcCharge(string shop, Care care, Ticket? ticket, PunchCard? card = null)
         {
             if (care.use_card || care.warranty || care.entertain)
             {
+                // 机打蜡季卡：默认机打蜡免费（无匹配产品 → 0）；升级热蜡/加修刃按当前服务匹配产品，
+                // 再用券12模板的 fixed_price 覆盖——与使用免费打蜡券完全同一套加价规则
+                if (care.use_card && !care.warranty && !care.entertain
+                    && card != null && (card.card_name ?? "").IndexOf("机打蜡") >= 0)
+                {
+                    Models.Product upProduct = await GetProduct(shop, care);
+                    if (upProduct == null)
+                    {
+                        return (0, 0);
+                    }
+                    double upCharge = upProduct.sale_price;
+                    TicketTemplate tpl12 = await _db.ticketTemplate.Where(t => t.id == 12)
+                        .Include(t => t.productTicketTemplates).ThenInclude(p => p.product)
+                        .AsNoTracking().FirstOrDefaultAsync();
+                    if (tpl12 != null && tpl12.productTicketTemplates != null)
+                    {
+                        ProductTicketTemplate productTicketTemplate = tpl12.productTicketTemplates
+                            .Where(p => p.product_id == upProduct.id || p.product_id == 0).FirstOrDefault();
+                        if (productTicketTemplate != null && productTicketTemplate.fixed_price != null)
+                        {
+                            upCharge = (double)productTicketTemplate.fixed_price;
+                        }
+                    }
+                    return (upCharge, 0);
+                }
                 return (0, 0);
             }
             Models.Product product = await GetProduct(shop, care);
@@ -597,7 +623,7 @@ namespace SnowmeetApi.Controllers
                 // 普通界面操作：按本次改动字段应用服务联动
                 ApplyServiceLinkage(care, req.changedField.Trim());
             }
-            var (commonCharge, ticketDiscount) = await CalcCharge(shop.Trim(), care, ticket);
+            var (commonCharge, ticketDiscount) = await CalcCharge(shop.Trim(), care, ticket, card);
             care.common_charge = commonCharge;
             if (ticketDiscount > 0)
             {
