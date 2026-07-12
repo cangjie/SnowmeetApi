@@ -81,6 +81,8 @@ namespace SnowmeetApi.Models
         public string sub_type { get; set; } = "";
         public int is_package { get; set; } = 0;
         public string pay_option { get; set; } = "普通";
+        // 店员开单时勾选「使用储值支付」的意向标记（本期仅记录，实际扣款/身份核验后续专门规划）
+        public bool pay_with_deposit { get; set; } = false;
         public int? member_id { get; set; }
         public string? name { get; set; }
         public string? gender { get; set; }

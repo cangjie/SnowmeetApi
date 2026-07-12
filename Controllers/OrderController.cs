@@ -2967,7 +2967,7 @@ namespace SnowmeetApi.Controllers
         }
         [HttpGet("{tempOrderId}")]
         public async Task<ActionResult<ApiResult<Models.Order>>> PlaceCareOrder(int tempOrderId,
-            string sessionKey, string sessionType = "wechat_mini_openid")
+            string sessionKey, string sessionType = "wechat_mini_openid", bool useDeposit = false)
         {
             Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
             if (staff == null || staff.title_level < 100)
@@ -3052,6 +3052,8 @@ namespace SnowmeetApi.Controllers
             order.staff_id = staff.id;
             order.total_amount = total;
             order.paying_amount = total;
+            // 记录店员开单时勾选的「使用储值支付」意向（本期仅落库，实际扣款/身份核验后续专门规划）
+            order.pay_with_deposit = useDeposit;
             if (total == 0)
             {
                 order.dealed = 1;
