@@ -114,18 +114,25 @@ namespace SnowmeetApi.Models
         {
             get
             {
-                if (currentStep == null)
+                // 任务链在 EffectCareOrder 生效时一次性全量创建（末条恒为发板），
+                // 不能用「最后一条任务的名字」判进度（老语义=工序做一步插一行，已失效），
+                // 必须看任务自身的执行状态：发板/强行索回 已完成 → 已完成；任一任务动过 → 进行中；否则 未开始
+                var validTasks = tasks == null ? null : tasks.Where(t => t.valid == 1).ToList();
+                if (validTasks == null || validTasks.Count == 0)
                 {
                     return "未开始";
                 }
-                if (currentStep.Trim().Equals("发板") || currentStep.Trim().Equals("强行索回"))
+                var finishTask = validTasks.FirstOrDefault(t => t.task_name != null
+                    && (t.task_name.Trim().Equals("发板") || t.task_name.Trim().Equals("强行索回")));
+                if (finishTask != null && finishTask.status != null && finishTask.status.Trim().Equals("已完成"))
                 {
                     return "已完成";
                 }
-                else
+                if (validTasks.Any(t => t.status != null && !t.status.Trim().Equals("未开始")))
                 {
                     return "进行中";
                 }
+                return "未开始";
             }
         }
         public List<CareImage> careImages { get; set; } = new List<CareImage>();
