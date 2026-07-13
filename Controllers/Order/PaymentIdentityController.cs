@@ -295,6 +295,17 @@ namespace SnowmeetApi.Controllers.Order
                 result.scannerHasCell = false;
             }
 
+            // 养护微信支付：必须订单会员本人（当前会员绑定的微信）扫码支付，非本人拦截。
+            // 散客养护单（无会员）不受此约束；仅养护 + 微信通道生效，不影响租赁/零售/雪票及支付宝。
+            if (order.type != null && order.type.Trim() == "养护"
+                && payerType == "wechat"
+                && order.member_id != null
+                && result.scannerMemberId != order.member_id)
+            {
+                result.status = "care_member_required";
+                return result;
+            }
+
             // 4) Status
             // 仅基于 order.member_id (订单归属) + scannerMemberId 决策。
             // op.member_id 是「付款方意图」,只在 _applyChoice/_applyConfirmDirect 当次返回时强制 direct,

@@ -947,6 +947,41 @@ namespace SnowmeetApi.Controllers
                         _db.ticket.Entry(ticket).State = EntityState.Modified;
                     }
                 }
+                // 次卡核销：本单该 care 用了会员卡 → 抵 1 次 + 写 punch_card_used。
+                // 季卡（total==null）不扣次数、仍记录使用（供「上次使用时间」）。幂等：已有本 care 记录则跳过，
+                // 防支付回调 / 重复调用 EffectCareOrder 重复扣。镜像 RentController.UseRentalPunchCard。
+                if (care.use_card && care.card_id != null)
+                {
+                    bool alreadyUsed = await _db.punchCardUsed.AnyAsync(u => u.card_id == care.card_id
+                        && u.order_id == order.id && u.biz_id == care.id && u.biz_type == "养护" && u.valid);
+                    if (!alreadyUsed)
+                    {
+                        PunchCard punchCard = await _db.punchCard.Where(c => c.id == care.card_id).FirstOrDefaultAsync();
+                        if (punchCard != null && (order.member_id == null || punchCard.member_id == order.member_id))
+                        {
+                            PunchCardUsed cardUsed = new PunchCardUsed()
+                            {
+                                card_id = punchCard.id,
+                                order_id = order.id,
+                                biz_type = "养护",
+                                biz_id = care.id,
+                                payment_id = null,
+                                punch_count = 1,
+                                valid = true,
+                                create_date = DateTime.Now
+                            };
+                            await _db.punchCardUsed.AddAsync(cardUsed);
+                            if (punchCard.total != null)   // 非季卡才扣次数
+                            {
+                                punchCard.punches = (punchCard.punches ?? 0) + 1;
+                                punchCard.update_date = DateTime.Now;
+                                _db.punchCard.Entry(punchCard).State = EntityState.Modified;   // 全局 NoTracking，必须显式
+                            }
+                            await _db.coreDataModLog.AddAsync(CoreDataModLog.CreateManualLog("care", "次卡消费",
+                                care.id, "养护次卡消费", null, order.staff_id, "0", "1", "养护核销扣次卡"));
+                        }
+                    }
+                }
             }
             _db.order.Entry(order).State = EntityState.Detached;
             await _db.SaveChangesAsync();

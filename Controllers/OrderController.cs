@@ -3052,9 +3052,14 @@ namespace SnowmeetApi.Controllers
             order.staff_id = staff.id;
             order.total_amount = total;
             order.paying_amount = total;
-            // 记录店员开单时勾选的「使用储值支付」意向（本期仅落库，实际扣款/身份核验后续专门规划）
+            // 记录店员开单时勾选的「使用储值支付」意向
             order.pay_with_deposit = useDeposit;
-            if (total == 0)
+            // 用了会员权益（储值意向 / 会员卡 / 优惠券）的 0 元单：不立即生效，去结算页做「微信核验会员本人 + 核销」。
+            // 纯质保/招待 0 元单（无权益消耗）照旧立即生效。
+            bool usedBenefit = useDeposit
+                || order.cares.Any(c => c.use_card)
+                || order.cares.Any(c => !string.IsNullOrWhiteSpace(c.ticket_code));
+            if (total == 0 && !usedBenefit)
             {
                 order.dealed = 1;
             }
@@ -3103,8 +3108,9 @@ namespace SnowmeetApi.Controllers
                 }
             }
             await _db.SaveChangesAsync();
-            // 0 元单（质保/招待/全减免）没有支付回调，place 即生效生成养护任务
-            if (order.paying_amount == 0)
+            // 无权益的 0 元单（质保/招待/全减免）没有支付回调，place 即生效生成养护任务；
+            // 用了储值/卡券的 0 元单留待结算页微信核验会员本人后再 WriteoffCareOrder 生效
+            if (order.paying_amount == 0 && !usedBenefit)
             {
                 await _careHelper.EffectCareOrder(order.id);
                 order = await GetOrder(order.id);
@@ -3290,6 +3296,88 @@ namespace SnowmeetApi.Controllers
                 data = order
             });
         }
+        // 养护 0 元单 / 储值全额覆盖单：微信核验会员本人（wechat_unverified==1）后核销并生效。
+        // 储值实扣走 PayWithDeposit（内含 EffectCareOrder）；纯券/卡 0 元单直接 EffectCareOrder（券/卡核销在其内完成）。
+        [HttpGet("{orderId}")]
+        public async Task<ActionResult<ApiResult<Models.Order?>>> WriteoffCareOrder(int orderId,
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            if (staff == null || staff.title_level < 100)
+            {
+                return Ok(new ApiResult<Models.Order?>() { code = 1, message = "没有权限", data = null });
+            }
+            Models.Order order = await _db.order.Include(o => o.cares)
+                .Where(o => o.id == orderId && o.valid == 1 && o.type == "养护")
+                .AsNoTracking().FirstOrDefaultAsync();
+            if (order == null || order.cares == null || order.cares.Count == 0)
+            {
+                return Ok(new ApiResult<Models.Order?>() { code = 1, message = "未找到养护订单", data = null });
+            }
+            // 幂等：已生效（EffectCareOrder 生成过 task_flow_code）直接返回，避免重复扣款/重复建任务
+            if (order.cares.Any(c => c.task_flow_code != null))
+            {
+                return Ok(new ApiResult<Models.Order?>() { code = 0, message = "", data = await GetOrder(orderId) });
+            }
+            if (!order.wechat_unverified)
+            {
+                return Ok(new ApiResult<Models.Order?>() { code = 1, message = "请先完成微信身份核验", data = null });
+            }
+            // 储值实扣（勾选了储值支付时）—— 镜像 PayWithDeposit 的储值消费段，自控 dealed 便于失败回退
+            if (order.pay_with_deposit)
+            {
+                if (order.member_id == null)
+                {
+                    return Ok(new ApiResult<Models.Order?>() { code = 1, message = "未找到会员，无法用储值支付", data = null });
+                }
+                MemberController _memberHelper = new MemberController(_db, _config);
+                Member member = await _memberHelper.GetWholeMemberById((int)order.member_id);
+                if (member == null)
+                {
+                    return Ok(new ApiResult<Models.Order?>() { code = 1, message = "未找到会员信息", data = null });
+                }
+                double payingAmount = Math.Round((double)(order.paying_amount ?? 0), 2);
+                if (payingAmount > Math.Round(member.availableDeposit, 2))
+                {
+                    return Ok(new ApiResult<Models.Order?>() { code = 1, message = "储值余额不足", data = null });
+                }
+                if (payingAmount > 0)
+                {
+                    DepositController _depositHelper = new DepositController(_db, _config);
+                    OrderPayment payment = new OrderPayment()
+                    {
+                        id = 0,
+                        order_id = order.id,
+                        pay_method = "储值支付",
+                        staff_id = staff.id,
+                        member_id = order.member_id,
+                        amount = payingAmount,
+                        status = OrderPayment.PaymentStatus.待支付.ToString(),
+                        deposit_type = "服务储值",
+                        create_date = DateTime.Now
+                    };
+                    await _db.orderPayment.AddAsync(payment);
+                    await _db.SaveChangesAsync();
+                    List<DepositBalance> balances = await _depositHelper.ConsumeDeposit(payment);
+                    if (balances == null)
+                    {
+                        return Ok(new ApiResult<Models.Order?>() { code = 1, message = "储值消费失败", data = null });
+                    }
+                }
+            }
+            // 消费成功后标记已了结（与支付成功路径一致）+ 生效（券/卡核销在 EffectCareOrder 内完成）
+            Models.Order dealOrder = await _db.order.Where(o => o.id == orderId).AsNoTracking().FirstOrDefaultAsync();
+            dealOrder.dealed = 1;
+            dealOrder.pay_flow_status = Models.Order.PayFlowStatus.已支付.ToString();
+            dealOrder.paying_amount = null;
+            _db.order.Entry(dealOrder).State = EntityState.Modified;
+            await _db.SaveChangesAsync();
+            _db.order.Entry(dealOrder).State = EntityState.Detached;
+            CareController _careHelper = new CareController(_db, _config, _http);
+            await _careHelper.EffectCareOrder(orderId);
+            return Ok(new ApiResult<Models.Order?>() { code = 0, message = "", data = await GetOrder(orderId) });
+        }
+
         [NonAction]
         public async Task SetReferee(int orderId, int? bizId)
         {
