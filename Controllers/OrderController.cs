@@ -2839,7 +2839,9 @@ namespace SnowmeetApi.Controllers
 
             // 全部退款后（确有退款且应退押金已退完）：清理订单上未确认的追加草稿（appending=true、append_commit_time=null）。
             // 草稿阶段不建 Guaranty、不影响 paying_amount，直接置 valid=0 即可。
-            if (order.refundAmount > 0 && Math.Round((double)order.totalRentUnRefund, 2) == 0)
+            // 「追加」是租赁专属功能，非租赁订单（如养护）totalRentUnRefund 恒为 null，必须先判 type 短路，
+            // 否则 (double) 强转 null 抛 InvalidOperationException（同下方 order.type == "租赁" 判断同理）。
+            if (order.type == "租赁" && order.refundAmount > 0 && Math.Round((double)order.totalRentUnRefund, 2) == 0)
             {
                 List<Rental> draftAppendings = await _db.rental
                     .Where(r => r.order_id == orderId && r.valid == 1 && r.appending == true && r.append_commit_time == null)
