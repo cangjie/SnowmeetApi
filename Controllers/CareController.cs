@@ -1017,7 +1017,8 @@ namespace SnowmeetApi.Controllers
         [HttpGet("{taskId}")]
         public async Task<ActionResult<ApiResult<Care?>>> SetTaskStatus(int taskId, string status,
             string scene, string sessionKey, string sessionType = "wechat_mini_openid",
-            string? dealMethod = null, string? storeMemo = null)
+            string? dealMethod = null, string? storeMemo = null, string? taskMemo = null,
+            bool isCancel = false, string? cancelReason = null)
         {
             scene = Util.UrlDecode(scene);
             Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
@@ -1045,16 +1046,35 @@ namespace SnowmeetApi.Controllers
                     careTask.staff_id = staff.id;
                     if (careTask.task_name == "发板")
                     {
-                        try
+                        if (isCancel)
                         {
-                            TicketController _tHelper = new TicketController(_db, _config);
-                            Care careFinish = await _db.care.Where(c => c.id == careTask.care_id).AsNoTracking().FirstOrDefaultAsync();
-                            Models.Order order = await _db.order.Where(o => o.id == careFinish.order_id).AsNoTracking().FirstOrDefaultAsync();
-                            await _tHelper.CreateTicket(16, order.member_id, staff.id, "养护完成赠送", "养护", careFinish.id, true, DateTime.Now, null);
+                            // 取消：装备未真正完成养护，跳过"养护完成赠送"券，改记 Care.is_cancel/cancel_reason
+                            Care careCancel = await _db.care.Where(c => c.id == careTask.care_id).AsNoTracking().FirstOrDefaultAsync();
+                            if (careCancel != null)
+                            {
+                                careCancel.is_cancel = true;
+                                careCancel.cancel_reason = cancelReason != null ? Util.UrlDecode(cancelReason) : null;
+                                careCancel.update_date = DateTime.Now;
+                                _db.care.Entry(careCancel).State = EntityState.Modified;
+                                CoreDataModLog cancelLog = CoreDataModLog.CreateManualLog("care", "is_cancel", careCancel.id,
+                                    scene, null, staff.id, "0", "1",
+                                    "取消发板" + (string.IsNullOrEmpty(careCancel.cancel_reason) ? "" : "，原因：" + careCancel.cancel_reason));
+                                await _db.coreDataModLog.AddAsync(cancelLog);
+                            }
                         }
-                        catch
+                        else
                         {
+                            try
+                            {
+                                TicketController _tHelper = new TicketController(_db, _config);
+                                Care careFinish = await _db.care.Where(c => c.id == careTask.care_id).AsNoTracking().FirstOrDefaultAsync();
+                                Models.Order order = await _db.order.Where(o => o.id == careFinish.order_id).AsNoTracking().FirstOrDefaultAsync();
+                                await _tHelper.CreateTicket(16, order.member_id, staff.id, "养护完成赠送", "养护", careFinish.id, true, DateTime.Now, null);
+                            }
+                            catch
+                            {
 
+                            }
                         }
                     }
                     break;
@@ -1065,7 +1085,9 @@ namespace SnowmeetApi.Controllers
                 default:
                     break;
             }
-            careTask.memo = scene;
+            // taskMemo 显式传入（哪怕空串）时代表调用方要写真实备注，覆盖默认的 "memo=场景字符串" 行为；
+            // 不传（null）时保持旧语义不变——memo 记录本次状态变更的场景，供审计追溯
+            careTask.memo = taskMemo != null ? Util.UrlDecode(taskMemo) : scene;
             careTask.update_date = DateTime.Now;
             careTask.deal_method = dealMethod != null? Util.UrlDecode(dealMethod):null;
             careTask.store_memo = storeMemo != null ? Util.UrlDecode(storeMemo): null;
@@ -1138,7 +1160,8 @@ namespace SnowmeetApi.Controllers
         }
         [HttpGet("{careId}")]
         public async Task<ActionResult<ApiResult<Care?>>> VeriCareFinishCode(int careId,
-            string code, string sessionKey, string sessionType = "wechat_mini_openid")
+            string code, string sessionKey, string sessionType = "wechat_mini_openid",
+            bool isCancel = false, string? cancelReason = null)
         {
             Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
             if (staff.title_level < 100)
@@ -1161,7 +1184,8 @@ namespace SnowmeetApi.Controllers
                 });
             }
             CareTask finishTask = care.tasks.Where(t => t.task_name == "发板" && t.valid == 1).FirstOrDefault();
-            await SetTaskStatus(finishTask.id, "已完成", "验证码", sessionKey, sessionType);
+            await SetTaskStatus(finishTask.id, "已完成", "验证码", sessionKey, sessionType,
+                null, null, null, isCancel, cancelReason);
             care = await _db.care.Where(c => c.id == careId).Include(c => c.tasks).AsNoTracking().FirstOrDefaultAsync();
             return Ok(new ApiResult<Care?>()
             {
@@ -1302,6 +1326,48 @@ namespace SnowmeetApi.Controllers
                 });
             }
             return Ok(new ApiResult<object>() { code = 0, message = "", data = list });
+        }
+
+        // 会员 + 该装备类型的最近一次安全检查数值，供新单默认预填（身高/体重/脱落值/角度）。
+        // 只取 valid=1 且已填过身高的记录（身高是安检必填项，用它当"这条记录确实做过安检"的锚点），
+        // 不按 brand/scale 去重——身高体重是顾客本人身体数据、脱落值/角度也常年沿用，取最近一次即可。
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<object>>> GetMemberLatestSafeCheck([FromQuery] int memberId,
+            [FromQuery] string equipment, [FromQuery] string sessionKey, [FromQuery] string sessionType = "wechat_mini_openid")
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            if (staff == null || staff.title_level < 100)
+            {
+                return Ok(new ApiResult<object>() { code = 1, message = "没有权限", data = null });
+            }
+            equipment = Util.UrlDecode(equipment).Trim();
+            Care care = await _db.care
+                .Where(c => c.valid == 1 && c.equipment != null && c.equipment.Trim() == equipment
+                    && c.order.member_id == memberId
+                    && c.height != null && c.height.Trim() != "")
+                .OrderByDescending(c => c.create_date)
+                .AsNoTracking().FirstOrDefaultAsync();
+            if (care == null)
+            {
+                return Ok(new ApiResult<object>() { code = 0, message = "", data = null });
+            }
+            return Ok(new ApiResult<object>()
+            {
+                code = 0,
+                message = "",
+                data = new
+                {
+                    height = care.height,
+                    weight = care.weight,
+                    gap = care.gap,
+                    front_din = care.front_din,
+                    rear_din = care.rear_din,
+                    left_angle = care.left_angle,
+                    right_angle = care.right_angle,
+                    last_care_date = care.create_date
+                }
+            });
         }
 
         [HttpPost]
