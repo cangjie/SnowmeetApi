@@ -1017,7 +1017,7 @@ namespace SnowmeetApi.Controllers
         [HttpGet("{taskId}")]
         public async Task<ActionResult<ApiResult<Care?>>> SetTaskStatus(int taskId, string status,
             string scene, string sessionKey, string sessionType = "wechat_mini_openid",
-            string? dealMethod = null, string? storeMemo = null)
+            string? dealMethod = null, string? storeMemo = null, string? taskMemo = null)
         {
             scene = Util.UrlDecode(scene);
             Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
@@ -1065,7 +1065,9 @@ namespace SnowmeetApi.Controllers
                 default:
                     break;
             }
-            careTask.memo = scene;
+            // taskMemo 显式传入（哪怕空串）时代表调用方要写真实备注，覆盖默认的 "memo=场景字符串" 行为；
+            // 不传（null）时保持旧语义不变——memo 记录本次状态变更的场景，供审计追溯
+            careTask.memo = taskMemo != null ? Util.UrlDecode(taskMemo) : scene;
             careTask.update_date = DateTime.Now;
             careTask.deal_method = dealMethod != null? Util.UrlDecode(dealMethod):null;
             careTask.store_memo = storeMemo != null ? Util.UrlDecode(storeMemo): null;
@@ -1302,6 +1304,48 @@ namespace SnowmeetApi.Controllers
                 });
             }
             return Ok(new ApiResult<object>() { code = 0, message = "", data = list });
+        }
+
+        // 会员 + 该装备类型的最近一次安全检查数值，供新单默认预填（身高/体重/脱落值/角度）。
+        // 只取 valid=1 且已填过身高的记录（身高是安检必填项，用它当"这条记录确实做过安检"的锚点），
+        // 不按 brand/scale 去重——身高体重是顾客本人身体数据、脱落值/角度也常年沿用，取最近一次即可。
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<object>>> GetMemberLatestSafeCheck([FromQuery] int memberId,
+            [FromQuery] string equipment, [FromQuery] string sessionKey, [FromQuery] string sessionType = "wechat_mini_openid")
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            if (staff == null || staff.title_level < 100)
+            {
+                return Ok(new ApiResult<object>() { code = 1, message = "没有权限", data = null });
+            }
+            equipment = Util.UrlDecode(equipment).Trim();
+            Care care = await _db.care
+                .Where(c => c.valid == 1 && c.equipment != null && c.equipment.Trim() == equipment
+                    && c.order.member_id == memberId
+                    && c.height != null && c.height.Trim() != "")
+                .OrderByDescending(c => c.create_date)
+                .AsNoTracking().FirstOrDefaultAsync();
+            if (care == null)
+            {
+                return Ok(new ApiResult<object>() { code = 0, message = "", data = null });
+            }
+            return Ok(new ApiResult<object>()
+            {
+                code = 0,
+                message = "",
+                data = new
+                {
+                    height = care.height,
+                    weight = care.weight,
+                    gap = care.gap,
+                    front_din = care.front_din,
+                    rear_din = care.rear_din,
+                    left_angle = care.left_angle,
+                    right_angle = care.right_angle,
+                    last_care_date = care.create_date
+                }
+            });
         }
 
         [HttpPost]
