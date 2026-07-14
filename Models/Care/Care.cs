@@ -63,6 +63,10 @@ namespace SnowmeetApi.Models
         // 随 SaveCareRecept 草稿持久化，中断找回可还原
         public int? card_id { get; set; } = null;
         public string? card_name { get; set; } = null;
+        // 取消发板（2026-07-14 加 DB 列）：详情页「取消」入口走发板同款核销流程，
+        // 核验通过后 SetTaskStatus 置位（跳过完成赠券），供列表/报表识别本件未真正完成
+        public bool is_cancel { get; set; } = false;
+        public string? cancel_reason { get; set; } = null;
         public DateTime? update_date { get; set; }
         public DateTime create_date { get; set; } = DateTime.Now;
         [ForeignKey("order_id")]

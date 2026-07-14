@@ -1017,7 +1017,8 @@ namespace SnowmeetApi.Controllers
         [HttpGet("{taskId}")]
         public async Task<ActionResult<ApiResult<Care?>>> SetTaskStatus(int taskId, string status,
             string scene, string sessionKey, string sessionType = "wechat_mini_openid",
-            string? dealMethod = null, string? storeMemo = null, string? taskMemo = null)
+            string? dealMethod = null, string? storeMemo = null, string? taskMemo = null,
+            bool isCancel = false, string? cancelReason = null)
         {
             scene = Util.UrlDecode(scene);
             Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
@@ -1045,16 +1046,35 @@ namespace SnowmeetApi.Controllers
                     careTask.staff_id = staff.id;
                     if (careTask.task_name == "发板")
                     {
-                        try
+                        if (isCancel)
                         {
-                            TicketController _tHelper = new TicketController(_db, _config);
-                            Care careFinish = await _db.care.Where(c => c.id == careTask.care_id).AsNoTracking().FirstOrDefaultAsync();
-                            Models.Order order = await _db.order.Where(o => o.id == careFinish.order_id).AsNoTracking().FirstOrDefaultAsync();
-                            await _tHelper.CreateTicket(16, order.member_id, staff.id, "养护完成赠送", "养护", careFinish.id, true, DateTime.Now, null);
+                            // 取消：装备未真正完成养护，跳过"养护完成赠送"券，改记 Care.is_cancel/cancel_reason
+                            Care careCancel = await _db.care.Where(c => c.id == careTask.care_id).AsNoTracking().FirstOrDefaultAsync();
+                            if (careCancel != null)
+                            {
+                                careCancel.is_cancel = true;
+                                careCancel.cancel_reason = cancelReason != null ? Util.UrlDecode(cancelReason) : null;
+                                careCancel.update_date = DateTime.Now;
+                                _db.care.Entry(careCancel).State = EntityState.Modified;
+                                CoreDataModLog cancelLog = CoreDataModLog.CreateManualLog("care", "is_cancel", careCancel.id,
+                                    scene, null, staff.id, "0", "1",
+                                    "取消发板" + (string.IsNullOrEmpty(careCancel.cancel_reason) ? "" : "，原因：" + careCancel.cancel_reason));
+                                await _db.coreDataModLog.AddAsync(cancelLog);
+                            }
                         }
-                        catch
+                        else
                         {
+                            try
+                            {
+                                TicketController _tHelper = new TicketController(_db, _config);
+                                Care careFinish = await _db.care.Where(c => c.id == careTask.care_id).AsNoTracking().FirstOrDefaultAsync();
+                                Models.Order order = await _db.order.Where(o => o.id == careFinish.order_id).AsNoTracking().FirstOrDefaultAsync();
+                                await _tHelper.CreateTicket(16, order.member_id, staff.id, "养护完成赠送", "养护", careFinish.id, true, DateTime.Now, null);
+                            }
+                            catch
+                            {
 
+                            }
                         }
                     }
                     break;
@@ -1140,7 +1160,8 @@ namespace SnowmeetApi.Controllers
         }
         [HttpGet("{careId}")]
         public async Task<ActionResult<ApiResult<Care?>>> VeriCareFinishCode(int careId,
-            string code, string sessionKey, string sessionType = "wechat_mini_openid")
+            string code, string sessionKey, string sessionType = "wechat_mini_openid",
+            bool isCancel = false, string? cancelReason = null)
         {
             Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
             if (staff.title_level < 100)
@@ -1163,7 +1184,8 @@ namespace SnowmeetApi.Controllers
                 });
             }
             CareTask finishTask = care.tasks.Where(t => t.task_name == "发板" && t.valid == 1).FirstOrDefault();
-            await SetTaskStatus(finishTask.id, "已完成", "验证码", sessionKey, sessionType);
+            await SetTaskStatus(finishTask.id, "已完成", "验证码", sessionKey, sessionType,
+                null, null, null, isCancel, cancelReason);
             care = await _db.care.Where(c => c.id == careId).Include(c => c.tasks).AsNoTracking().FirstOrDefaultAsync();
             return Ok(new ApiResult<Care?>()
             {
