@@ -625,9 +625,10 @@ namespace SnowmeetApi.Controllers
             }
             var (commonCharge, ticketDiscount) = await CalcCharge(shop.Trim(), care, ticket, card);
             care.common_charge = commonCharge;
-            if (ticketDiscount > 0)
+            if (ticketDiscount > 0 && care.discount < ticketDiscount)
             {
-                // 券16 减免服务端权威化（与 PlaceCareOrder 同口径）；其余情况保留店员录入的减免
+                // 券16 减免取「保底」不取「覆盖」（与 PlaceCareOrder 同口径）：选券自动带出券面减免，
+                // 店员之后手动加大的减免（如老板临时再让利）保留，不被重算碾回券面值；低于券面才补齐
                 care.discount = ticketDiscount;
             }
             // 返回整个 care：联动/推导后的服务项 + 计费结果都在其中，前端以此为真理之源回填

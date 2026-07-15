@@ -3041,9 +3041,10 @@ namespace SnowmeetApi.Controllers
                 }
                 var (commonCharge, ticketDiscount) = await _careHelper.CalcCharge(order.shop, care, ticket, card);
                 care.common_charge = commonCharge;
-                if (ticketDiscount > 0)
+                if (ticketDiscount > 0 && care.discount < ticketDiscount)
                 {
-                    // 券16 减免服务端权威化，覆盖前端透传值；其余情况 discount 维持店员录入
+                    // 券16 减免取「保底」不取「覆盖」（与 CalcCareCharge 同口径）：店员手动加大的减免保留，
+                    // 低于券面才补齐。曾把店员录入 229.99 无条件碾回 30 → 界面 0.01 下单后变 200（2026-07-15）
                     care.discount = ticketDiscount;
                 }
                 care.member_pick_date = care.urgent == 1 ? DateTime.Now.Date : DateTime.Now.Date.AddDays(1);
