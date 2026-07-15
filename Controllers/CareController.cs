@@ -957,7 +957,12 @@ namespace SnowmeetApi.Controllers
                     if (!alreadyUsed)
                     {
                         PunchCard punchCard = await _db.punchCard.Where(c => c.id == care.card_id).FirstOrDefaultAsync();
-                        if (punchCard != null && (order.member_id == null || punchCard.member_id == order.member_id))
+                        // 不再比对 punchCard.member_id == order.member_id：卡归属在 PlaceCareOrder 定价时
+                        // 已按下单会员校验（不符会清 care.card_id），而 order.member_id 会在支付成功时被
+                        // DealSuccessPaidOrder 改写为付款方（同人跨通道两个会员号即触发，实录 71884：
+                        // 15506 下单选卡 → 支付宝付款方 41137 → 归属改写 → 旧守卫静默跳过核销）。
+                        // 定价已享卡权益的单，生效时必须落 punch_card_used，否则计次卡白嫖、季卡丢使用记录。
+                        if (punchCard != null)
                         {
                             PunchCardUsed cardUsed = new PunchCardUsed()
                             {

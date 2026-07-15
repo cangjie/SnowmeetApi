@@ -3032,6 +3032,11 @@ namespace SnowmeetApi.Controllers
                     if (card != null && order.member_id != null && card.member_id != order.member_id)
                     {
                         card = null;   // 卡不属于该会员，忽略（与 CalcCareCharge 同口径）
+                        // 一并清掉 care 上的卡引用，保证「定价没享卡权益的单，生效时也不会核销卡」——
+                        // EffectCareOrder 已不再比对卡归属（order.member_id 支付时可能被改写），全靠这里把关
+                        care.use_card = false;
+                        care.card_id = null;
+                        care.card_name = null;
                     }
                 }
                 var (commonCharge, ticketDiscount) = await _careHelper.CalcCharge(order.shop, care, ticket, card);
