@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>食材库存</title>
+<link rel="stylesheet" href="mat.css">
+</head>
+<body>
+
+<header class="header">
+  <div>
+    <h1>食材库存</h1>
+    <div class="sub">效期台账 · 到期提醒</div>
+  </div>
+  <button class="hbtn" onclick="location.href='new.html'" aria-label="录入批次">
+    <svg class="ic" viewBox="0 0 24 24"><path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z"/></svg>
+  </button>
+</header>
+
+<div class="search-row">
+  <svg class="ic" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 1 0-.7.7l.27.28v.79l5 4.99L20.49 19zm-6 0A4.5 4.5 0 1 1 14 9.5A4.5 4.5 0 0 1 9.5 14"/></svg>
+  <input id="kw" type="text" placeholder="搜索名称 / 批次号" oninput="render()">
+  <button onclick="MAT.showToast('扫码录入后续开放')" aria-label="扫码" style="color:inherit;display:flex">
+    <svg class="ic" viewBox="0 0 24 24"><path d="M3 3h6v2H5v4H3zm12 0h6v6h-2V5h-4zM3 15h2v4h4v2H3zm18 0v6h-6v-2h4v-4zM7 7h4v4H7zm6 0h4v4h-4zM7 13h4v4H7zm6 0h2v2h-2zm2 2h2v2h-2z"/></svg>
+  </button>
+</div>
+
+<div class="chips" id="chips"></div>
+
+<div class="list" id="list"><div class="loading">加载中…</div></div>
+
+<button class="fab" onclick="location.href='new.html'" aria-label="录入批次">
+  <svg class="ic" viewBox="0 0 24 24"><path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z"/></svg>
+</button>
+
+<!-- more_vert 动作面板 -->
+<div class="mask" id="mask" onclick="closeSheet()"></div>
+<div class="sheet" id="sheet">
+  <div class="stitle" id="sheetTitle"></div>
+  <button class="sopt" onclick="doDispose('用完')">标记用完</button>
+  <button class="sopt" onclick="doDispose('报废')">标记报废</button>
+  <button class="sopt" onclick="doEdit()">编辑</button>
+  <button class="sopt warn" onclick="doDelete()">删除</button>
+  <button class="sopt scancel" onclick="closeSheet()">取消</button>
+</div>
+
+<script src="mat.js"></script>
+<script>
+var today = '';
+var batches = [];
+var filter = '全部';
+var curBatch = null;   // 动作面板当前批次
+var STATUSES = ['全部', '已过期', '今日', '临期', '正常', '已处理'];
+var BADGE_CLS = { '已过期': 'expired', '今日': 'today', '临期': 'warning', '正常': 'normal', '已处理': 'done' };
+
+async function load() {
+  try {
+    var data = await MAT.api('GetBatches');
+    today = data.today;
+    batches = data.batches || [];
+    render();
+  } catch (e) {
+    if (e.message !== '会话失效') {
+      document.getElementById('list').innerHTML = '<div class="empty">加载失败：' + MAT.esc(e.message) + '</div>';
+    }
+  }
+}
+
+function badgeHtml(b) {
+  var st = MAT.deriveStatus(b, today);
+  var e = (b.expire_date || '').slice(0, 10);
+  var txt, ic = '';
+  if (st === '已处理') {
+    txt = b.dispose_status === '报废' ? '已报废' : '已用完';
+  } else if (st === '已过期') {
+    txt = '逾期 ' + MAT.daysBetween(e, today) + ' 天';
+    ic = '<svg class="ic" viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20a10 10 0 0 0 0-20m-1 5h2v6h-2zm0 8h2v2h-2z"/></svg>';
+  } else if (st === '今日') {
+    txt = '今日到期';
+  } else {
+    txt = '剩 ' + MAT.daysBetween(today, e) + ' 天';
+  }
+  return '<span class="badge ' + BADGE_CLS[st] + '">' + ic + txt + '</span>';
+}
+
+function render() {
+  var kw = document.getElementById('kw').value.trim().toLowerCase();
+  // 各状态计数（计数不受搜索影响，反映全量）
+  var counts = { '全部': batches.length };
+  STATUSES.slice(1).forEach(function (s) { counts[s] = 0; });
+  batches.forEach(function (b) { counts[MAT.deriveStatus(b, today)]++; });
+
+  document.getElementById('chips').innerHTML = STATUSES.map(function (s) {
+    return '<button class="chip' + (filter === s ? ' on' : '') + '" onclick="setFilter(\'' + s + '\')">'
+      + s + '<span class="cnt">' + counts[s] + '</span></button>';
+  }).join('');
+
+  var rows = batches.filter(function (b) {
+    if (filter !== '全部' && MAT.deriveStatus(b, today) !== filter) { return false; }
+    if (kw && (b.name || '').toLowerCase().indexOf(kw) < 0 && (b.batch_no || '').toLowerCase().indexOf(kw) < 0) { return false; }
+    return true;
+  });
+  // 默认按到期升序（后端已排）；「已处理」下按处置时间倒序
+  if (filter === '已处理') {
+    rows = rows.slice().sort(function (a, b) { return (b.dispose_date || '') > (a.dispose_date || '') ? 1 : -1; });
+  }
+
+  if (rows.length === 0) {
+    document.getElementById('list').innerHTML = '<div class="empty">' + (batches.length === 0 ? '还没有批次，点右下角录入' : '没有匹配的批次') + '</div>';
+    return;
+  }
+  document.getElementById('list').innerHTML = rows.map(function (b) {
+    var st = MAT.deriveStatus(b, today);
+    var e = (b.expire_date || '').slice(0, 10);
+    return '<div class="bcard' + (st === '已处理' ? ' disposed' : '') + '">'
+      + '<div class="bl">'
+      +   '<div class="bname">' + MAT.esc(b.name) + '</div>'
+      +   '<div class="bmeta"><span>' + MAT.esc(b.batch_no) + '</span><span>到期 ' + e.slice(5).replace('-', '/') + '</span></div>'
+      + '</div>'
+      + '<div class="br">' + badgeHtml(b)
+      +   '<button class="more-btn" onclick="openSheet(' + b.id + ')" aria-label="操作">'
+      +     '<svg class="ic" viewBox="0 0 24 24"><path d="M12 8a2 2 0 1 1 0-4a2 2 0 0 1 0 4m0 6a2 2 0 1 1 0-4a2 2 0 0 1 0 4m0 6a2 2 0 1 1 0-4a2 2 0 0 1 0 4"/></svg>'
+      +   '</button>'
+      + '</div></div>';
+  }).join('');
+}
+
+function setFilter(s) { filter = s; render(); }
+
+function openSheet(id) {
+  curBatch = batches.find(function (b) { return b.id === id; });
+  if (!curBatch) { return; }
+  document.getElementById('sheetTitle').textContent = curBatch.name + ' · ' + curBatch.batch_no;
+  document.getElementById('mask').classList.add('show');
+  document.getElementById('sheet').classList.add('show');
+}
+function closeSheet() {
+  document.getElementById('mask').classList.remove('show');
+  document.getElementById('sheet').classList.remove('show');
+}
+
+async function doDispose(action) {
+  if (!curBatch) { return; }
+  closeSheet();
+  try {
+    await MAT.api('DisposeBatch', { params: { id: curBatch.id, action: action } });
+    MAT.showToast('已标记' + action);
+    load();
+  } catch (e) { MAT.showToast(e.message); }
+}
+function doEdit() {
+  if (!curBatch) { return; }
+  location.href = 'new.html?id=' + curBatch.id;
+}
+async function doDelete() {
+  if (!curBatch) { return; }
+  if (!confirm('删除「' + curBatch.name + '」？删除后列表不再显示。')) { return; }
+  closeSheet();
+  try {
+    await MAT.api('DeleteBatch', { params: { id: curBatch.id } });
+    MAT.showToast('已删除');
+    load();
+  } catch (e) { MAT.showToast(e.message); }
+}
+
+MAT.ensureSession().then(function (ok) { if (ok) { load(); } });
+</script>
+</body>
+</html>

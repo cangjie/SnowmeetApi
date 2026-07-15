@@ -207,5 +207,7 @@ namespace SnowmeetApi.Data
         public DbSet<RentCategoryAssociate> rentCategoryAssociate {get; set;}
         public DbSet<RetailImage> retailImage { get; set; }
         public DbSet<ProductTicketTemplate> productTicketTemplate {get; set;}
+        public DbSet<Models.Fnb.FnbMaterialBatch> fnbMaterialBatch { get; set; }
+        public DbSet<Models.Fnb.FnbMaterialAlertLog> fnbMaterialAlertLog { get; set; }
     }
 }

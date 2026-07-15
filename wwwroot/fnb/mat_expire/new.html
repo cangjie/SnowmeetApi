@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>录入批次</title>
+<link rel="stylesheet" href="mat.css">
+</head>
+<body>
+
+<header class="header">
+  <div>
+    <h1 id="pageTitle">录入批次</h1>
+    <div class="sub">登记效期 · 加入到期提醒</div>
+  </div>
+</header>
+
+<div class="form">
+
+  <!-- 基本信息 -->
+  <div class="section">
+    <div class="shead"><span class="st">基本信息</span></div>
+    <div class="fgroup">
+      <div class="flabel">名称<span class="req">*</span></div>
+      <input class="finput" id="fName" type="text" placeholder="如：鲜牛奶（巴氏）" oninput="refresh()">
+    </div>
+    <div class="fgroup">
+      <div class="flabel">批次号<span class="req">*</span><span class="hint">· 可自动生成</span></div>
+      <div class="frow">
+        <input class="finput" id="fBatchNo" type="text" placeholder="输入或点右侧生成" oninput="refresh()">
+        <button class="gen-btn" onclick="genNo()">
+          <svg class="ic" viewBox="0 0 24 24"><path d="M12 6V3L8 7l4 4V8a4 4 0 0 1 4 4a4 4 0 0 1-.6 2.1l1.46 1.46A6 6 0 0 0 12 6m0 10a4 4 0 0 1-4-4a4 4 0 0 1 .6-2.1L7.14 8.44A6 6 0 0 0 12 18v3l4-4l-4-4z"/></svg>生成
+        </button>
+      </div>
+    </div>
+    <div class="fgroup">
+      <div class="flabel">现场照片<span class="hint">· 选填，可拍照或从相册上传</span></div>
+      <div class="photo-grid" id="photoGrid">
+        <button class="photo-add" onclick="document.getElementById('fFile').click()">
+          <svg class="ic" viewBox="0 0 24 24"><path d="M12 15.2a3.2 3.2 0 1 0 0-6.4a3.2 3.2 0 0 0 0 6.4M9 3L7.17 5H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-3.17L15 3zm3 15a5 5 0 1 1 0-10a5 5 0 0 1 0 10"/></svg>
+          拍照/上传
+        </button>
+      </div>
+      <input id="fFile" type="file" accept="image/*" capture="environment" multiple style="display:none" onchange="onFiles(this.files)">
+    </div>
+  </div>
+
+  <!-- 效期 -->
+  <div class="section">
+    <div class="shead"><span class="st">效期</span><span class="sd">生产日期 + 保质期自动推算到期日</span></div>
+    <div class="fgroup">
+      <div class="flabel">生产日期</div>
+      <input class="finput" id="fProduce" type="date" onchange="autoExpire()">
+    </div>
+    <div class="fgroup">
+      <div class="flabel">保质期</div>
+      <div class="frow">
+        <input class="finput" id="fShelf" type="number" inputmode="numeric" min="0" placeholder="数值" oninput="autoExpire()">
+        <div class="seg">
+          <button id="unitDay" class="on" onclick="setUnit('天')">天</button>
+          <button id="unitMonth" onclick="setUnit('月')">月</button>
+        </div>
+      </div>
+    </div>
+    <div class="fgroup">
+      <div class="flabel">到期日期<span class="req">*</span><span class="hint">· 自动计算，可手动修改</span></div>
+      <div class="frow">
+        <input class="finput" id="fExpire" type="date" onchange="onExpireManual()">
+        <span class="auto-tag" id="autoTag" style="display:none">自动</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 提醒 -->
+  <div class="section">
+    <div class="shead"><span class="st">提醒</span></div>
+    <div class="fgroup">
+      <div class="flabel">到期预警提前<span class="req">*</span><span class="hint">· 默认 3 天，可自定义</span></div>
+      <div class="stepper">
+        <button class="sbtn" onclick="stepWarn(-1)"><svg class="ic" viewBox="0 0 24 24"><path d="M5 11h14v2H5z"/></svg></button>
+        <div class="sval">
+          <input id="fWarn" type="number" inputmode="numeric" min="0" value="3" oninput="refresh()">
+          <span>天</span>
+        </div>
+        <button class="sbtn" onclick="stepWarn(1)"><svg class="ic" viewBox="0 0 24 24"><path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z"/></svg></button>
+      </div>
+      <div class="step-hint" id="warnHint">到期前 3 天进入临期提醒</div>
+    </div>
+  </div>
+
+  <!-- 状态预览 -->
+  <div class="preview" id="preview" style="display:none">
+    <svg class="ic" viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20a10 10 0 0 0 0-20m.5 5v5.25l4.5 2.67l-.75 1.23L11 13V7z"/></svg>
+    <div>
+      <div class="pt" id="pvTitle"></div>
+      <div class="pm" id="pvMeta"></div>
+    </div>
+  </div>
+
+</div>
+
+<div class="footer">
+  <button class="btn btn-plain" onclick="history.length > 1 ? history.back() : location.href='index.html'">取消</button>
+  <button class="btn btn-primary" id="saveBtn" disabled onclick="save()">
+    <svg class="ic" viewBox="0 0 24 24"><path d="M17 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7zm2 16H5V5h11.17L19 7.83zm-7-7a3 3 0 1 0 0 6a3 3 0 0 0 0-6M6 6h9v4H6z"/></svg>
+    <span id="saveBtnText">保存并加入提醒</span>
+  </button>
+</div>
+
+<script src="mat.js"></script>
+<script>
+var editId = 0;
+var unit = '天';           // 保质期单位
+var expireManual = false;  // 到期日被手改后不再自动覆盖
+var photos = [];           // [{id, path}]
+var uploading = 0;
+var todayStr = MAT.fmtDate(new Date());  // 预览仅展示用，落库判定以服务端为准
+
+function $(id) { return document.getElementById(id); }
+
+function setUnit(u) {
+  unit = u;
+  $('unitDay').classList.toggle('on', u === '天');
+  $('unitMonth').classList.toggle('on', u === '月');
+  autoExpire();
+}
+
+// 生产日期 + 保质期 → 到期日（手改后不再覆盖）
+function autoExpire() {
+  if (expireManual) { refresh(); return; }
+  var p = $('fProduce').value;
+  var n = parseInt($('fShelf').value, 10);
+  if (p && n > 0) {
+    var d = new Date(p + 'T00:00:00');
+    if (unit === '月') { d.setMonth(d.getMonth() + n); } else { d.setDate(d.getDate() + n); }
+    $('fExpire').value = MAT.fmtDate(d);
+    $('autoTag').style.display = '';
+  }
+  refresh();
+}
+function onExpireManual() {
+  expireManual = true;
+  $('autoTag').style.display = 'none';
+  refresh();
+}
+
+function stepWarn(delta) {
+  var v = parseInt($('fWarn').value, 10);
+  if (isNaN(v)) { v = 3; }
+  v = Math.max(0, v + delta);
+  $('fWarn').value = v;
+  refresh();
+}
+
+function refresh() {
+  var warn = parseInt($('fWarn').value, 10);
+  if (isNaN(warn) || warn < 0) { warn = 0; }
+  $('warnHint').textContent = '到期前 ' + warn + ' 天进入临期提醒';
+
+  var expire = $('fExpire').value;
+  if (expire) {
+    var st = MAT.deriveStatus({ expire_date: expire, warn_days: warn, dispose_status: null }, todayStr);
+    var days = MAT.daysBetween(todayStr, expire);
+    var cls = { '已过期': 'expired', '今日': 'today', '临期': 'warning', '正常': 'normal' }[st] || '';
+    var pv = $('preview');
+    pv.style.display = '';
+    pv.className = 'preview ' + cls;
+    $('pvTitle').textContent = '录入后状态：' + st;
+    $('pvMeta').textContent = (days < 0 ? '已逾期 ' + (-days) + ' 天' : days === 0 ? '今日到期' : '距到期还有 ' + days + ' 天')
+      + ' · 到期 ' + expire.replace(/-/g, '/');
+  } else {
+    $('preview').style.display = 'none';
+  }
+
+  var ok = $('fName').value.trim() && $('fBatchNo').value.trim() && expire && uploading === 0;
+  $('saveBtn').disabled = !ok;
+}
+
+async function genNo() {
+  try {
+    var data = await MAT.api('GenBatchNo');
+    $('fBatchNo').value = data.batchNo;
+    refresh();
+  } catch (e) { MAT.showToast(e.message); }
+}
+
+// ---- 照片：即传即得 id ----
+function renderPhotos() {
+  var grid = $('photoGrid');
+  grid.querySelectorAll('.phwrap').forEach(function (n) { n.remove(); });
+  var addBtn = grid.querySelector('.photo-add');
+  photos.forEach(function (p, i) {
+    var w = document.createElement('div');
+    w.className = 'phwrap';
+    w.innerHTML = '<img class="ph" src="' + MAT.esc(p.path) + '"><button class="phdel" data-i="' + i + '">×</button>';
+    w.querySelector('.phdel').onclick = function () { photos.splice(i, 1); renderPhotos(); };
+    grid.insertBefore(w, addBtn);
+  });
+}
+
+async function onFiles(files) {
+  for (var i = 0; i < files.length; i++) {
+    var fd = new FormData();
+    fd.append('file', files[i]);
+    uploading++;
+    refresh();
+    try {
+      var data = await MAT.api('UploadPhoto', { formData: fd });
+      photos.push({ id: data.id, path: data.file_path_name });
+      renderPhotos();
+    } catch (e) {
+      MAT.showToast('照片上传失败：' + e.message);
+    } finally {
+      uploading--;
+      refresh();
+    }
+  }
+  $('fFile').value = '';
+}
+
+// ---- 保存 ----
+async function save() {
+  var body = {
+    id: editId,
+    name: $('fName').value.trim(),
+    batch_no: $('fBatchNo').value.trim(),
+    produce_date: $('fProduce').value || null,
+    shelf_life_value: $('fShelf').value ? parseInt($('fShelf').value, 10) : null,
+    shelf_life_unit: $('fShelf').value ? unit : null,
+    expire_date: $('fExpire').value,
+    warn_days: Math.max(0, parseInt($('fWarn').value, 10) || 0),
+    image_ids: photos.length ? photos.map(function (p) { return p.id; }).join(',') : null
+  };
+  $('saveBtn').disabled = true;
+  try {
+    await MAT.api('SaveBatch', { body: body });
+    MAT.showToast('已保存');
+    setTimeout(function () { location.replace('index.html'); }, 400);
+  } catch (e) {
+    MAT.showToast(e.message);
+    $('saveBtn').disabled = false;
+  }
+}
+
+// ---- 编辑模式回填 ----
+async function loadForEdit(id) {
+  try {
+    var data = await MAT.api('GetBatches');
+    todayStr = data.today;
+    var b = (data.batches || []).find(function (x) { return x.id === id; });
+    if (!b) { MAT.showToast('批次不存在'); return; }
+    $('pageTitle').textContent = '编辑批次';
+    $('saveBtnText').textContent = '保存修改';
+    $('fName').value = b.name || '';
+    $('fBatchNo').value = b.batch_no || '';
+    $('fProduce').value = (b.produce_date || '').slice(0, 10);
+    $('fShelf').value = b.shelf_life_value == null ? '' : b.shelf_life_value;
+    if (b.shelf_life_unit === '月') { setUnit('月'); }
+    $('fExpire').value = (b.expire_date || '').slice(0, 10);
+    $('fWarn').value = b.warn_days == null ? 3 : b.warn_days;
+    // 编辑模式到期日视为「已定」，不被生产日期/保质期联动覆盖
+    expireManual = true;
+    $('autoTag').style.display = 'none';
+    if (b.image_ids) {
+      var imgs = await MAT.api('GetImages', { params: { ids: b.image_ids } });
+      photos = (imgs || []).map(function (im) { return { id: im.id, path: im.file_path_name }; });
+      renderPhotos();
+    }
+    refresh();
+  } catch (e) {
+    if (e.message !== '会话失效') { MAT.showToast(e.message); }
+  }
+}
+
+MAT.ensureSession().then(function (ok) {
+  if (!ok) { return; }
+  var id = parseInt(new URLSearchParams(location.search).get('id'), 10) || 0;
+  if (id > 0) {
+    editId = id;
+    loadForEdit(id);
+  } else {
+    refresh();
+  }
+});
+</script>
+</body>
+</html>

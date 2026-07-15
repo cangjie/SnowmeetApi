@@ -412,6 +412,7 @@ ASALocalRun/
 .localhistory/
 /WepayCertificate/*.txt
 config.sqlServer
+config.fnbAlertReceivers
 *.dll
 *.a
 *.so
