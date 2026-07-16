@@ -22,7 +22,7 @@
     <div class="shead"><span class="st">基本信息</span></div>
     <div class="fgroup">
       <div class="flabel">名称<span class="req">*</span></div>
-      <input class="finput" id="fName" type="text" placeholder="如：鲜牛奶（巴氏）" oninput="refresh()">
+      <input class="finput" id="fName" type="text" placeholder="如：鲜牛奶（巴氏）" oninput="onNameInput()">
     </div>
     <div class="fgroup">
       <div class="flabel">批次号<span class="req">*</span><span class="hint">· 可自动生成</span></div>
@@ -55,7 +55,7 @@
     <div class="fgroup">
       <div class="flabel">保质期</div>
       <div class="frow">
-        <input class="finput" id="fShelf" type="number" inputmode="numeric" min="0" placeholder="数值" oninput="autoExpire()">
+        <input class="finput" id="fShelf" type="number" inputmode="numeric" min="0" placeholder="数值" oninput="onShelfInput()">
         <div class="seg">
           <button id="unitDay" class="on" onclick="setUnit('天')">天</button>
           <button id="unitMonth" onclick="setUnit('月')">月</button>
@@ -114,6 +114,9 @@ var unit = '天';           // 保质期单位
 var photos = [];           // [{id, path}]
 var uploading = 0;
 var todayStr = MAT.fmtDate(new Date());  // 预览仅展示用，落库判定以服务端为准
+var allBatches = null;     // 新建模式：全量批次，供同名食材带出上次保质期
+var shelfAutoFilled = false;  // 保质期当前值是自动带出的（可被新的同名匹配覆盖）；用户手输后清除
+var nameTimer = null;
 
 function $(id) { return document.getElementById(id); }
 
@@ -140,6 +143,37 @@ function autoExpire() {
 function onExpireManual() {
   $('autoTag').style.display = 'none';
   refresh();
+}
+
+function onNameInput() {
+  refresh();
+  clearTimeout(nameTimer);
+  nameTimer = setTimeout(applyShelfDefault, 600);
+}
+
+function onShelfInput() {
+  shelfAutoFilled = false;  // 用户手输，之后同名匹配不再覆盖
+  autoExpire();
+}
+
+// 新建时按名称找同名食材的最近批次（id 最大），带出其保质期作默认值。
+// 只填「空白或此前自动带出」的保质期，不碰用户手输的值
+function applyShelfDefault() {
+  if (editId > 0 || !allBatches) { return; }
+  var name = $('fName').value.trim();
+  if (!name) { return; }
+  if ($('fShelf').value && !shelfAutoFilled) { return; }
+  var hit = null;
+  for (var i = 0; i < allBatches.length; i++) {
+    var b = allBatches[i];
+    if ((b.name || '').trim() === name && b.shelf_life_value > 0 && (!hit || b.id > hit.id)) { hit = b; }
+  }
+  if (!hit) { return; }
+  var u = hit.shelf_life_unit === '月' ? '月' : '天';
+  $('fShelf').value = hit.shelf_life_value;
+  shelfAutoFilled = true;
+  MAT.showToast('已按上次记录默认保质期 ' + hit.shelf_life_value + ' ' + u);
+  setUnit(u);  // setUnit 内部调 autoExpire → 到期日跟着推算
 }
 
 function stepWarn(delta) {
@@ -288,6 +322,12 @@ MAT.ensureSession().then(function (ok) {
     // 用户以为已填 → 保质期联动不触发。默认真值消除假象；与包装不符时店员自行改
     $('fProduce').value = todayStr;
     refresh();
+    // 拉全量批次供同名食材带出保质期；失败静默降级（不影响录入）
+    MAT.api('GetBatches').then(function (data) {
+      todayStr = data.today || todayStr;
+      allBatches = data.batches || [];
+      applyShelfDefault();  // 数据回来前用户可能已输完名称，补一次匹配
+    }).catch(function () {});
   }
 });
 </script>
