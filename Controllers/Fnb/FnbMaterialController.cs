@@ -452,17 +452,14 @@ namespace SnowmeetApi.Controllers.Fnb
         }
 
         // 扫「未处置 且 已过期/今日/临期」批次 → 组图文推企微 → 逐批次写 alert_log。
-        // 当天已成功提醒过的批次跳过（防重复骚扰）。本期手动触发，未来 crontab 定时 curl 同一接口。
+        // 当天已成功提醒过的批次跳过（防重复骚扰）。
+        // 无鉴权（用户拍板 2026-07-16）：供 crontab 定时 curl 直接触发，不受 session 30 天过期影响；
+        // 滥用风险由当天去重兜底（同批次一天最多推一次）。sessionKey 选传，仅用于日志记录触发人。
         // touser 仅联调覆盖用（传自己的 UserId 避免打扰全员），缺省走配置文件
         [HttpGet]
-        public async Task<ActionResult<ApiResult<object>>> PushExpireAlert(string sessionKey, string touser = null)
+        public async Task<ActionResult<ApiResult<object>>> PushExpireAlert(string touser = null, string sessionKey = null)
         {
-            var ctx = await _requireStaff(sessionKey);
-            if (ctx == null)
-            {
-                return _sessionExpired();
-            }
-            string userId = ctx.Value.userId;
+            string userId = await _getWecomUserId(sessionKey);  // 可为 null：定时任务/无 session 触发
             string receivers = string.IsNullOrWhiteSpace(touser) ? _loadAlertReceivers() : Util.UrlDecode(touser).Trim();
             DateTime today = DateTime.Now.Date;
 
