@@ -50,7 +50,7 @@
     <div class="shead"><span class="st">效期</span><span class="sd">生产日期 + 保质期自动推算到期日</span></div>
     <div class="fgroup">
       <div class="flabel">生产日期</div>
-      <input class="finput" id="fProduce" type="date" onchange="autoExpire()">
+      <input class="finput" id="fProduce" type="date" oninput="autoExpire()" onchange="autoExpire()">
     </div>
     <div class="fgroup">
       <div class="flabel">保质期</div>
@@ -65,7 +65,7 @@
     <div class="fgroup">
       <div class="flabel">到期日期<span class="req">*</span><span class="hint">· 自动计算，可手动修改</span></div>
       <div class="frow">
-        <input class="finput" id="fExpire" type="date" onchange="onExpireManual()">
+        <input class="finput" id="fExpire" type="date" oninput="onExpireManual()" onchange="onExpireManual()">
         <span class="auto-tag" id="autoTag" style="display:none">自动</span>
       </div>
     </div>
@@ -111,7 +111,6 @@
 <script>
 var editId = 0;
 var unit = '天';           // 保质期单位
-var expireManual = false;  // 到期日被手改后不再自动覆盖
 var photos = [];           // [{id, path}]
 var uploading = 0;
 var todayStr = MAT.fmtDate(new Date());  // 预览仅展示用，落库判定以服务端为准
@@ -125,9 +124,9 @@ function setUnit(u) {
   autoExpire();
 }
 
-// 生产日期 + 保质期 → 到期日（手改后不再覆盖）
+// 生产日期 + 保质期 → 到期日。生产日期/保质期/单位任一变化都重新推算，
+// 手动改过的到期日只保留到下一次动这些源字段（动源 = 想重算）
 function autoExpire() {
-  if (expireManual) { refresh(); return; }
   var p = $('fProduce').value;
   var n = parseInt($('fShelf').value, 10);
   if (p && n > 0) {
@@ -139,7 +138,6 @@ function autoExpire() {
   refresh();
 }
 function onExpireManual() {
-  expireManual = true;
   $('autoTag').style.display = 'none';
   refresh();
 }
@@ -258,8 +256,7 @@ async function loadForEdit(id) {
     if (b.shelf_life_unit === '月') { setUnit('月'); }
     $('fExpire').value = (b.expire_date || '').slice(0, 10);
     $('fWarn').value = b.warn_days == null ? 3 : b.warn_days;
-    // 编辑模式到期日视为「已定」，不被生产日期/保质期联动覆盖
-    expireManual = true;
+    // 回填的到期日是已存值，不标「自动」；用户再动生产日期/保质期时照常重新推算
     $('autoTag').style.display = 'none';
     if (b.image_ids) {
       var imgs = await MAT.api('GetImages', { params: { ids: b.image_ids } });
