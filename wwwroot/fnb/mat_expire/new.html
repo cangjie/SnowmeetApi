@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>录入批次</title>
-<link rel="stylesheet" href="mat.css">
+<link rel="stylesheet" href="mat.css?v=260716">
 </head>
 <body>
 
@@ -107,7 +107,7 @@
   </button>
 </div>
 
-<script src="mat.js"></script>
+<script src="mat.js?v=260716"></script>
 <script>
 var editId = 0;
 var unit = '天';           // 保质期单位
@@ -276,6 +276,9 @@ MAT.ensureSession().then(function (ok) {
     editId = id;
     loadForEdit(id);
   } else {
+    // 生产日期默认今天并真实落值：date 输入框空值时 Safari 会浅色显示今天的假象，
+    // 用户以为已填 → 保质期联动不触发。默认真值消除假象；与包装不符时店员自行改
+    $('fProduce').value = todayStr;
     refresh();
   }
 });
