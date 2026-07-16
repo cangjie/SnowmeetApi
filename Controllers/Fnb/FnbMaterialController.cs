@@ -17,8 +17,11 @@ namespace SnowmeetApi.Controllers.Fnb
     /// <summary>
     /// 餐饮食材过期提醒（H5：wwwroot/fnb/mat_expire/）。
     /// 认证：企业微信 OAuth（snsapi_base）换 UserId → mini_session（session_type='wecom_userid'，UserId 存 wechat_openid 列）。
-    /// 鉴权粒度：应用可见范围内的企业成员即可读写，不接 staff 权限体系。
-    /// 推送接收人：app 目录纯文本文件 config.fnbAlertReceivers（@all 或 userid|userid…），每次推送现读，缺省 @all。
+    /// 鉴权：必须关联到在职 staff 才能使用 —— 企微 UserId → member_social_account(type='wecom', num=UserId)
+    /// → member → social_account_for_job → staff_social_account(时间窗) → staff(valid=1)。
+    /// OAuthLogin 关联不上直接拒绝不发 session；业务接口每次请求都重新校验（离职后旧 session 立即失效，
+    /// 统一返 code=2 让前端重走 OAuth 并在 OAuthLogin 处收到明确拒绝话术）。新增批次落录入人 staff_id。
+    /// 推送接收人：app 目录纯文本文件 config.fnbAlertReceivers（@all 或 企微UserId|企微UserId…），每次推送现读，缺省 @all。
     /// </summary>
     [Route("api/[controller]/[action]")]
     [ApiController]
@@ -31,6 +34,7 @@ namespace SnowmeetApi.Controllers.Fnb
         private readonly IConfiguration _config;
         private readonly FnbWeComController _wecomHelper;
         private readonly MiniAppHelperController _mH;
+        private readonly StaffController _staffHelper;
 
         public FnbMaterialController(ApplicationDBContext db, IConfiguration config)
         {
@@ -38,6 +42,7 @@ namespace SnowmeetApi.Controllers.Fnb
             _config = config;
             _wecomHelper = new FnbWeComController(db, config);
             _mH = new MiniAppHelperController(db, config);
+            _staffHelper = new StaffController(db);
         }
 
         // ====== 认证 ======
@@ -77,6 +82,12 @@ namespace SnowmeetApi.Controllers.Fnb
                 {
                     // 非企业成员（企微只返 openid 不返 userid）
                     return Ok(new ApiResult<object>() { code = 1, message = "仅限企业成员使用", data = null });
+                }
+                // 进入闸门：必须关联到在职 staff，否则不发 session
+                int? staffId = await _resolveStaffId(userid.Trim());
+                if (staffId == null)
+                {
+                    return Ok(new ApiResult<object>() { code = 1, message = "仅限在职员工使用，请联系管理员开通", data = null });
                 }
                 MiniSession sess = new MiniSession()
                 {
@@ -127,6 +138,40 @@ namespace SnowmeetApi.Controllers.Fnb
             return Ok(new ApiResult<object>() { code = 2, message = "会话失效", data = null });
         }
 
+        // 企微 UserId → member_social_account(type='wecom') → member → 在职时间窗 staff（且 staff.valid=1）。
+        // 未录入 wecom MSA / 无在职绑定 / staff 已停用 → null
+        [NonAction]
+        private async Task<int?> _resolveStaffId(string wecomUserId)
+        {
+            try
+            {
+                Staff staff = await _staffHelper.GetStaffBySocialNum(wecomUserId, MemberSocialAccount.TYPE_WECOM);
+                return (staff == null || staff.valid != 1) ? (int?)null : staff.id;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        // 业务接口统一鉴权：会话有效 且 当前仍关联在职 staff。失败返 null（调用方统一 code=2 →
+        // 前端清 key 重走 OAuth，离职员工在 OAuthLogin 处被明确拒绝）
+        [NonAction]
+        private async Task<(string userId, int staffId)?> _requireStaff(string sessionKey)
+        {
+            string userId = await _getWecomUserId(sessionKey);
+            if (userId == null)
+            {
+                return null;
+            }
+            int? staffId = await _resolveStaffId(userId);
+            if (staffId == null)
+            {
+                return null;
+            }
+            return (userId, (int)staffId);
+        }
+
         // ====== 状态派生（唯一口径，前端 deriveStatus 与此一致） ======
 
         [NonAction]
@@ -158,11 +203,12 @@ namespace SnowmeetApi.Controllers.Fnb
         [HttpGet]
         public async Task<ActionResult<ApiResult<object>>> GetBatches(string sessionKey)
         {
-            string userId = await _getWecomUserId(sessionKey);
-            if (userId == null)
+            var ctx = await _requireStaff(sessionKey);
+            if (ctx == null)
             {
                 return _sessionExpired();
             }
+            string userId = ctx.Value.userId;
             List<FnbMaterialBatch> batches = await _db.fnbMaterialBatch
                 .Where(b => b.valid == 1).OrderBy(b => b.expire_date).ThenBy(b => b.id)
                 .AsNoTracking().ToListAsync();
@@ -178,11 +224,12 @@ namespace SnowmeetApi.Controllers.Fnb
         [HttpPost]
         public async Task<ActionResult<ApiResult<object>>> SaveBatch([FromBody] FnbMaterialBatch posted, [FromQuery] string sessionKey)
         {
-            string userId = await _getWecomUserId(sessionKey);
-            if (userId == null)
+            var ctx = await _requireStaff(sessionKey);
+            if (ctx == null)
             {
                 return _sessionExpired();
             }
+            string userId = ctx.Value.userId;
             if (posted == null || string.IsNullOrWhiteSpace(posted.name) || string.IsNullOrWhiteSpace(posted.batch_no))
             {
                 return Ok(new ApiResult<object>() { code = 1, message = "名称和批次号必填", data = null });
@@ -198,6 +245,7 @@ namespace SnowmeetApi.Controllers.Fnb
             if (posted.id == 0)
             {
                 posted.create_userid = userId;
+                posted.staff_id = ctx.Value.staffId;
                 posted.valid = 1;
                 posted.create_date = DateTime.Now;
                 posted.update_date = null;
@@ -232,11 +280,12 @@ namespace SnowmeetApi.Controllers.Fnb
         [HttpGet]
         public async Task<ActionResult<ApiResult<object>>> DisposeBatch(int id, string action, string sessionKey)
         {
-            string userId = await _getWecomUserId(sessionKey);
-            if (userId == null)
+            var ctx = await _requireStaff(sessionKey);
+            if (ctx == null)
             {
                 return _sessionExpired();
             }
+            string userId = ctx.Value.userId;
             action = Util.UrlDecode(action ?? "").Trim();
             if (!action.Equals("用完") && !action.Equals("报废"))
             {
@@ -265,11 +314,12 @@ namespace SnowmeetApi.Controllers.Fnb
         [HttpGet]
         public async Task<ActionResult<ApiResult<object>>> DeleteBatch(int id, string sessionKey)
         {
-            string userId = await _getWecomUserId(sessionKey);
-            if (userId == null)
+            var ctx = await _requireStaff(sessionKey);
+            if (ctx == null)
             {
                 return _sessionExpired();
             }
+            string userId = ctx.Value.userId;
             FnbMaterialBatch batch = await _db.fnbMaterialBatch
                 .Where(b => b.id == id && b.valid == 1).FirstOrDefaultAsync();
             if (batch == null)
@@ -287,11 +337,12 @@ namespace SnowmeetApi.Controllers.Fnb
         [HttpGet]
         public async Task<ActionResult<ApiResult<object>>> GenBatchNo(string sessionKey)
         {
-            string userId = await _getWecomUserId(sessionKey);
-            if (userId == null)
+            var ctx = await _requireStaff(sessionKey);
+            if (ctx == null)
             {
                 return _sessionExpired();
             }
+            string userId = ctx.Value.userId;
             string prefix = "B" + DateTime.Now.ToString("yyMMdd") + "-";
             int count = await _db.fnbMaterialBatch.Where(b => b.batch_no.StartsWith(prefix)).CountAsync();
             return Ok(new ApiResult<object>()
@@ -307,11 +358,12 @@ namespace SnowmeetApi.Controllers.Fnb
         [HttpPost]
         public async Task<ActionResult<ApiResult<object>>> UploadPhoto(IFormFile file, [FromQuery] string sessionKey)
         {
-            string userId = await _getWecomUserId(sessionKey);
-            if (userId == null)
+            var ctx = await _requireStaff(sessionKey);
+            if (ctx == null)
             {
                 return _sessionExpired();
             }
+            string userId = ctx.Value.userId;
             if (file == null || file.Length == 0)
             {
                 return Ok(new ApiResult<object>() { code = 1, message = "缺少文件", data = null });
@@ -353,11 +405,12 @@ namespace SnowmeetApi.Controllers.Fnb
         [HttpGet]
         public async Task<ActionResult<ApiResult<object>>> GetImages(string ids, string sessionKey)
         {
-            string userId = await _getWecomUserId(sessionKey);
-            if (userId == null)
+            var ctx = await _requireStaff(sessionKey);
+            if (ctx == null)
             {
                 return _sessionExpired();
             }
+            string userId = ctx.Value.userId;
             List<int> idList = new List<int>();
             foreach (string s in (ids ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries))
             {
@@ -404,11 +457,12 @@ namespace SnowmeetApi.Controllers.Fnb
         [HttpGet]
         public async Task<ActionResult<ApiResult<object>>> PushExpireAlert(string sessionKey, string touser = null)
         {
-            string userId = await _getWecomUserId(sessionKey);
-            if (userId == null)
+            var ctx = await _requireStaff(sessionKey);
+            if (ctx == null)
             {
                 return _sessionExpired();
             }
+            string userId = ctx.Value.userId;
             string receivers = string.IsNullOrWhiteSpace(touser) ? _loadAlertReceivers() : Util.UrlDecode(touser).Trim();
             DateTime today = DateTime.Now.Date;
 

@@ -12,6 +12,7 @@ namespace SnowmeetApi.Models
         public const string TYPE_WECHAT_UNIONID = "wechat_unionid";
         public const string TYPE_CELL = "cell";
         public const string TYPE_ALIPAY_PAYERID = "alipay_payerid";
+        public const string TYPE_WECOM = "wecom";
 
         [Key]
         public int id { get; set; }

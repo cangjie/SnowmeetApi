@@ -19,6 +19,13 @@ var MAT = (function () {
       + '请在<b>企业微信</b>中打开本页面<br><span style="font-size:12px;color:#6f7881">（调试可在 URL 加 ?sessionKey=…）</span></div>';
   }
 
+  // 登录被拒（如非在职员工）：整页提示，不进系统
+  function showBlockHint(msg) {
+    document.body.innerHTML = '<div style="padding:80px 32px;text-align:center;color:#3f4850;font-size:14px;line-height:2">'
+      + '<b>无法进入系统</b><br>' + esc(msg || '登录失败')
+      + '<br><span style="font-size:12px;color:#6f7881">如需开通请联系管理员</span></div>';
+  }
+
   function gotoOAuth() {
     if (!inWeCom()) {
       showEnvHint();
@@ -58,7 +65,8 @@ var MAT = (function () {
           setSessionKey(json.data.sessionKey);
           return true;
         }
-        showToast(json.message || '登录失败');
+        clearSessionKey();
+        showBlockHint(json.message);
         return false;
       } catch (e) {
         showToast('网络异常，请重试');
