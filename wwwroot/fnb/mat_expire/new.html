@@ -256,6 +256,14 @@ async function loadForEdit(id) {
     if (b.shelf_life_unit === '月') { setUnit('月'); }
     $('fExpire').value = (b.expire_date || '').slice(0, 10);
     $('fWarn').value = b.warn_days == null ? 3 : b.warn_days;
+    // 存量批次 produce_date 可能为空（旧版页面无默认值）：有保质期时按 到期日−保质期 反推并真实落值，
+    // 否则编辑时改保质期没有推算基准、联动不生效
+    if (!$('fProduce').value && b.shelf_life_value > 0 && $('fExpire').value) {
+      var pd = new Date($('fExpire').value + 'T00:00:00');
+      if (b.shelf_life_unit === '月') { pd.setMonth(pd.getMonth() - b.shelf_life_value); }
+      else { pd.setDate(pd.getDate() - b.shelf_life_value); }
+      $('fProduce').value = MAT.fmtDate(pd);
+    }
     // 回填的到期日是已存值，不标「自动」；用户再动生产日期/保质期时照常重新推算
     $('autoTag').style.display = 'none';
     if (b.image_ids) {
