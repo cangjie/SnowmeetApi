@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>录入批次</title>
-<link rel="stylesheet" href="mat.css?v=260716">
+<link rel="stylesheet" href="mat.css?v=260716b">
 </head>
 <body>
 
@@ -88,13 +88,22 @@
     </div>
   </div>
 
-  <!-- 批次操作（编辑模式才显示；已处理批次只留删除） -->
+  <!-- 批次操作（编辑模式才显示；已处理批次只留 返回列表/删除） -->
   <div class="section" id="opsSection" style="display:none">
     <div class="shead"><span class="st">操作</span></div>
-    <div class="ops-row">
-      <button class="btn btn-plain" id="opDone" onclick="doDispose('用完')">标记用完</button>
-      <button class="btn btn-plain" id="opScrap" onclick="doDispose('报废')">标记报废</button>
-      <button class="btn btn-plain op-danger" onclick="doDelete()">删除</button>
+    <div class="ops-grid">
+      <button class="op-btn op-done" id="opDone" onclick="doDispose('用完')">
+        <svg class="ic" viewBox="0 0 24 24"><path d="M9 16.2L4.8 12l-1.4 1.4L9 19L21 7l-1.4-1.4z"/></svg>标记用完
+      </button>
+      <button class="op-btn op-scrap" id="opScrap" onclick="doDispose('报废')">
+        <svg class="ic" viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20a10 10 0 0 0 0-20m-1 5h2v6h-2zm0 8h2v2h-2z"/></svg>标记报废
+      </button>
+      <button class="op-btn op-back" onclick="location.replace('index.html')">
+        <svg class="ic" viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8l8 8l1.41-1.41L7.83 13H20z"/></svg>返回列表
+      </button>
+      <button class="op-btn op-del" onclick="doDelete()">
+        <svg class="ic" viewBox="0 0 24 24"><path d="M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6zM19 4h-3.5l-1-1h-5l-1 1H5v2h14z"/></svg>删除
+      </button>
     </div>
   </div>
 

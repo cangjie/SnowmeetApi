@@ -255,9 +255,17 @@ svg.ic { width: 20px; height: 20px; fill: currentColor; flex-shrink: 0; }
 .btn-primary { color: #fff; background: var(--primary); font-weight: 700; }
 .btn-primary:disabled { background: var(--muted-bg); color: var(--text-3); }
 
-/* 详情页（编辑模式）批次操作行 */
-.ops-row { display: flex; gap: 10px; }
-.op-danger { color: #ba1a1a; }
+/* 详情页（编辑模式）批次操作：2×2 网格，按语义分色 */
+.ops-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.op-btn {
+  height: 44px; border-radius: 12px;
+  font-size: 14.5px; font-weight: 600;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+}
+.op-done { background: #dcfce7; color: #15803d; }   /* 用完：绿（正常消耗完） */
+.op-scrap { background: #fef3c7; color: #92400e; }  /* 报废：琥珀（警示） */
+.op-del { background: #fee2e2; color: #b91c1c; }    /* 删除：红（危险） */
+.op-back { background: var(--card); color: var(--text-2); border: 1px solid var(--line); }  /* 返回：中性 */
 
 /* toast */
 #mat-toast {
