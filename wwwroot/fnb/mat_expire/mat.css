@@ -270,15 +270,31 @@ svg.ic { width: 20px; height: 20px; fill: currentColor; flex-shrink: 0; }
   text-align: center; color: #fff; font-size: 14px;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
 }
-.scan-cands {
+.scan-bottom {
   position: absolute; left: 12px; right: 12px;
   bottom: calc(30px + env(safe-area-inset-bottom));
-  display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;
+  display: flex; flex-direction: column; gap: 12px; align-items: center;
 }
+.scan-cands { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
 .scan-chip {
   padding: 10px 16px; border-radius: 999px;
   background: rgba(255, 255, 255, 0.95); color: var(--text);
   font-size: 15px; font-weight: 600;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.scan-chip.on { background: var(--primary); color: #fff; }
+.scan-chip-n {
+  width: 18px; height: 18px; border-radius: 50%;
+  background: rgba(255, 255, 255, 0.25); color: #fff;
+  font-size: 12px; font-weight: 700;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.scan-confirm {
+  padding: 12px 24px; border-radius: 999px;
+  background: var(--primary); color: #fff;
+  font-size: 15px; font-weight: 700;
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
 }
 .scan-close {
   position: absolute; top: calc(14px + env(safe-area-inset-top)); right: 14px;

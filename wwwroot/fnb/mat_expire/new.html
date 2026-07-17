@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>录入批次</title>
-<link rel="stylesheet" href="mat.css?v=260716c">
+<link rel="stylesheet" href="mat.css?v=260716d">
 </head>
 <body>
 
@@ -128,7 +128,10 @@
   <video id="scanVideo" playsinline autoplay muted></video>
   <div class="scan-frame"></div>
   <div class="scan-tip" id="scanTip">对准食材包装上的名称</div>
-  <div class="scan-cands" id="scanCands"></div>
+  <div class="scan-bottom">
+    <button class="scan-confirm" id="scanConfirm" style="display:none" onclick="confirmPick()"></button>
+    <div class="scan-cands" id="scanCands"></div>
+  </div>
   <button class="scan-close" onclick="stopScan()" aria-label="关闭">×</button>
 </div>
 <canvas id="scanCanvas" style="display:none"></canvas>
@@ -329,8 +332,10 @@ async function save() {
   }
 }
 
-// ---- 名称实时扫描：getUserMedia 取景 → 每 1.3s 抓帧发 OCR → 候选点选填入 ----
+// ---- 名称实时扫描：getUserMedia 取景 → 每 1.3s 抓帧发 OCR → 候选多选按顺序拼接名称 ----
 var scanStream = null, scanTimer = null, scanBusy = false, scanDeadline = 0;
+var lastCands = [];   // 最近一帧候选文本（未选中的随帧刷新）
+var scanPicked = [];  // 已选词，按点击顺序拼接成名称；选中期间暂停抓帧防列表跳动
 
 async function startScan() {
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -346,8 +351,11 @@ async function startScan() {
   $('scanVideo').srcObject = scanStream;
   $('scanLayer').style.display = '';
   $('scanCands').innerHTML = '';
+  $('scanConfirm').style.display = 'none';
   $('scanTip').textContent = '对准食材包装上的名称';
   scanBusy = false;
+  lastCands = [];
+  scanPicked = [];
   scanDeadline = Date.now() + 30000;   // 30s 无果自动停帧（节流云调用），层保留可手动关
   scanTimer = setInterval(captureFrame, 1300);
 }
@@ -388,15 +396,51 @@ async function captureFrame() {
 }
 
 function renderCands(cands) {
-  if (!scanStream || cands.length === 0) { return; }
-  $('scanTip').textContent = '点击候选词填入名称，或继续对准重新识别';
-  $('scanCands').innerHTML = cands.map(function (cd) {
-    return '<button class="scan-chip" data-t="' + MAT.esc(cd.text) + '" onclick="pickCand(this)">' + MAT.esc(cd.text) + '</button>';
-  }).join('');
+  if (!scanStream) { return; }
+  if (cands.length > 0) {
+    lastCands = cands.map(function (cd) { return cd.text; });
+  }
+  renderChips();
 }
 
-function pickCand(btn) {
-  $('fName').value = btn.getAttribute('data-t');
+// 已选词固定在前（带序号高亮），未选候选随帧刷新排在后
+function renderChips() {
+  var texts = scanPicked.concat(lastCands.filter(function (t) { return scanPicked.indexOf(t) < 0; }));
+  if (texts.length === 0) { return; }
+  $('scanTip').textContent = scanPicked.length > 0
+    ? '按顺序继续点选，完成后点下方按钮填入'
+    : '点击候选词可多选，按点击顺序组成名称';
+  $('scanCands').innerHTML = texts.map(function (t) {
+    var i = scanPicked.indexOf(t);
+    return '<button class="scan-chip' + (i >= 0 ? ' on' : '') + '" data-t="' + MAT.esc(t) + '" onclick="toggleCand(this)">'
+      + (i >= 0 ? '<span class="scan-chip-n">' + (i + 1) + '</span>' : '') + MAT.esc(t) + '</button>';
+  }).join('');
+  var btn = $('scanConfirm');
+  if (scanPicked.length > 0) {
+    btn.style.display = '';
+    btn.textContent = '填入：' + scanPicked.join('');
+  } else {
+    btn.style.display = 'none';
+  }
+}
+
+function toggleCand(btn) {
+  var t = btn.getAttribute('data-t');
+  var i = scanPicked.indexOf(t);
+  if (i >= 0) { scanPicked.splice(i, 1); } else { scanPicked.push(t); }
+  // 开始选词后暂停抓帧（候选固定不跳动、省 OCR 调用）；全部取消则恢复识别
+  if (scanPicked.length > 0) {
+    if (scanTimer) { clearInterval(scanTimer); scanTimer = null; }
+  } else if (!scanTimer && scanStream) {
+    scanDeadline = Date.now() + 30000;
+    scanTimer = setInterval(captureFrame, 1300);
+  }
+  renderChips();
+}
+
+function confirmPick() {
+  if (scanPicked.length === 0) { return; }
+  $('fName').value = scanPicked.join('');
   stopScan();
   onNameInput();   // 触发同名批次带出保质期/预警 + refresh
 }
