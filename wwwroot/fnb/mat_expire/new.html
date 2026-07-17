@@ -88,6 +88,16 @@
     </div>
   </div>
 
+  <!-- 批次操作（编辑模式才显示；已处理批次只留删除） -->
+  <div class="section" id="opsSection" style="display:none">
+    <div class="shead"><span class="st">操作</span></div>
+    <div class="ops-row">
+      <button class="btn btn-plain" id="opDone" onclick="doDispose('用完')">标记用完</button>
+      <button class="btn btn-plain" id="opScrap" onclick="doDispose('报废')">标记报废</button>
+      <button class="btn btn-plain op-danger" onclick="doDelete()">删除</button>
+    </div>
+  </div>
+
   <!-- 状态预览 -->
   <div class="preview" id="preview" style="display:none">
     <svg class="ic" viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20a10 10 0 0 0 0-20m.5 5v5.25l4.5 2.67l-.75 1.23L11 13V7z"/></svg>
@@ -274,6 +284,28 @@ async function save() {
   }
 }
 
+// ---- 批次操作（编辑模式，与列表页动作面板同一套接口/文案） ----
+var curName = '';  // 删除确认文案用
+
+async function doDispose(action) {
+  if (!editId) { return; }
+  try {
+    await MAT.api('DisposeBatch', { params: { id: editId, action: action } });
+    MAT.showToast('已标记' + action);
+    setTimeout(function () { location.replace('index.html'); }, 400);
+  } catch (e) { MAT.showToast(e.message); }
+}
+
+async function doDelete() {
+  if (!editId) { return; }
+  if (!confirm('删除「' + curName + '」？删除后列表不再显示。')) { return; }
+  try {
+    await MAT.api('DeleteBatch', { params: { id: editId } });
+    MAT.showToast('已删除');
+    setTimeout(function () { location.replace('index.html'); }, 400);
+  } catch (e) { MAT.showToast(e.message); }
+}
+
 // ---- 编辑模式回填 ----
 async function loadForEdit(id) {
   try {
@@ -283,6 +315,13 @@ async function loadForEdit(id) {
     if (!b) { MAT.showToast('批次不存在'); return; }
     $('pageTitle').textContent = '编辑批次';
     $('saveBtnText').textContent = '保存修改';
+    curName = b.name || '';
+    $('opsSection').style.display = '';
+    if (b.dispose_status) {
+      // 已处理批次不再显示标记按钮（后端本就幂等，纯 UI 收敛），删除仍可用
+      $('opDone').style.display = 'none';
+      $('opScrap').style.display = 'none';
+    }
     $('fName').value = b.name || '';
     $('fBatchNo').value = b.batch_no || '';
     $('fProduce').value = (b.produce_date || '').slice(0, 10);

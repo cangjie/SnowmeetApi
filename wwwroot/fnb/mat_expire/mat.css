@@ -255,6 +255,10 @@ svg.ic { width: 20px; height: 20px; fill: currentColor; flex-shrink: 0; }
 .btn-primary { color: #fff; background: var(--primary); font-weight: 700; }
 .btn-primary:disabled { background: var(--muted-bg); color: var(--text-3); }
 
+/* 详情页（编辑模式）批次操作行 */
+.ops-row { display: flex; gap: 10px; }
+.op-danger { color: #ba1a1a; }
+
 /* toast */
 #mat-toast {
   position: fixed; left: 50%; bottom: 18%; z-index: 99;
