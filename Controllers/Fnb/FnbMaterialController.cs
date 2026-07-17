@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -11,6 +12,10 @@ using Newtonsoft.Json.Linq;
 using SnowmeetApi.Data;
 using SnowmeetApi.Models;
 using SnowmeetApi.Models.Fnb;
+using TencentCloud.Common;
+using TencentCloud.Common.Profile;
+using TencentCloud.Ocr.V20181119;
+using TencentCloud.Ocr.V20181119.Models;
 
 namespace SnowmeetApi.Controllers.Fnb
 {
@@ -428,6 +433,92 @@ namespace SnowmeetApi.Controllers.Fnb
             var images = await _db.UploadFile.Where(f => idList.Contains(f.id))
                 .Select(f => new { f.id, f.file_path_name }).AsNoTracking().ToListAsync();
             return Ok(new ApiResult<object>() { code = 0, message = "", data = images });
+        }
+
+        // ====== 名称实时扫描（OCR） ======
+
+        public class OcrScanBody
+        {
+            public string image { get; set; }   // JPEG base64（不含 data: 前缀）
+        }
+
+        // H5 相机逐帧识别名称候选：前端 ~1.3s/帧节流调用、有候选即暂停，帧不落盘。
+        // 返回按字高降序的候选文本行（滤掉日期/纯数字/净含量/包装说明等噪声），店员点选确认
+        [HttpPost]
+        public async Task<ActionResult<ApiResult<object>>> OcrScanName([FromBody] OcrScanBody body, [FromQuery] string sessionKey)
+        {
+            var ctx = await _requireStaff(sessionKey);
+            if (ctx == null)
+            {
+                return _sessionExpired();
+            }
+            if (body == null || string.IsNullOrWhiteSpace(body.image))
+            {
+                return Ok(new ApiResult<object>() { code = 1, message = "缺少图像", data = null });
+            }
+            try
+            {
+                Credential cred = new Credential
+                {
+                    SecretId = _config.GetSection("Settings").GetSection("TencentCloudId").Value.Trim(),
+                    SecretKey = _config.GetSection("Settings").GetSection("TencentCloudSecret").Value.Trim()
+                };
+                ClientProfile clientProfile = new ClientProfile();
+                HttpProfile httpProfile = new HttpProfile();
+                httpProfile.Endpoint = "ocr.tencentcloudapi.com";
+                clientProfile.HttpProfile = httpProfile;
+                OcrClient client = new OcrClient(cred, "", clientProfile);
+                GeneralBasicOCRRequest req = new GeneralBasicOCRRequest();
+                req.ImageBase64 = body.image;
+                GeneralBasicOCRResponse resp = client.GeneralBasicOCRSync(req);
+                var candidates = (resp.TextDetections ?? new TextDetection[0])
+                    .Where(t => !string.IsNullOrWhiteSpace(t.DetectedText))
+                    .Select(t => new
+                    {
+                        text = t.DetectedText.Trim(),
+                        height = t.ItemPolygon == null ? 0L : (t.ItemPolygon.Height ?? 0L)
+                    })
+                    .Where(t => IsNameCandidate(t.text))
+                    .OrderByDescending(t => t.height)
+                    .Take(5).ToList();
+                return Ok(new ApiResult<object>() { code = 0, message = "", data = new { candidates } });
+            }
+            catch (Exception ex)
+            {
+                return Ok(new ApiResult<object>() { code = 1, message = "识别失败：" + ex.Message, data = null });
+            }
+        }
+
+        // 名称候选过滤：剔除日期/纯数字（条码/喷码）/净含量/包装常见说明行
+        [NonAction]
+        public static bool IsNameCandidate(string s)
+        {
+            if (s.Length < 2 || s.Length > 20)
+            {
+                return false;
+            }
+            if (Regex.IsMatch(s, @"^[\d\s./:>-]+$"))
+            {
+                return false;   // 纯数字/条码/喷码日期
+            }
+            if (Regex.IsMatch(s, @"\d{4}[年/.-]\d{1,2}|\d{1,2}月\d{1,2}日"))
+            {
+                return false;   // 含日期
+            }
+            if (Regex.IsMatch(s, @"^净含量|\d+\s*(g|kg|ml|mL|L|克|千克|毫升|升)\s*$"))
+            {
+                return false;   // 净含量/规格
+            }
+            string[] stop = { "生产日期", "保质期", "配料", "贮存", "储存", "执行标准", "生产许可", "地址", "电话",
+                "营养成分", "食用方法", "此日期前", "有效期", "产品标准", "生产商", "制造商", "经销商", "客服", "扫码", "官网" };
+            foreach (string w in stop)
+            {
+                if (s.Contains(w))
+                {
+                    return false;
+                }
+            }
+            return true;
         }
 
         // ====== 推送提醒 ======

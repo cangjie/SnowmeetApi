@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>录入批次</title>
-<link rel="stylesheet" href="mat.css?v=260716b">
+<link rel="stylesheet" href="mat.css?v=260716c">
 </head>
 <body>
 
@@ -22,7 +22,12 @@
     <div class="shead"><span class="st">基本信息</span></div>
     <div class="fgroup">
       <div class="flabel">名称<span class="req">*</span></div>
-      <input class="finput" id="fName" type="text" placeholder="如：鲜牛奶（巴氏）" oninput="onNameInput()">
+      <div class="frow">
+        <input class="finput" id="fName" type="text" placeholder="如：鲜牛奶（巴氏）" oninput="onNameInput()">
+        <button class="gen-btn" onclick="startScan()">
+          <svg class="ic" viewBox="0 0 24 24"><path d="M12 15.2a3.2 3.2 0 1 0 0-6.4a3.2 3.2 0 0 0 0 6.4M9 3L7.17 5H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-3.17L15 3zm3 15a5 5 0 1 1 0-10a5 5 0 0 1 0 10"/></svg>扫描
+        </button>
+      </div>
     </div>
     <div class="fgroup">
       <div class="flabel">批次号<span class="req">*</span><span class="hint">· 可自动生成</span></div>
@@ -79,7 +84,7 @@
       <div class="stepper">
         <button class="sbtn" onclick="stepWarn(-1)"><svg class="ic" viewBox="0 0 24 24"><path d="M5 11h14v2H5z"/></svg></button>
         <div class="sval">
-          <input id="fWarn" type="number" inputmode="numeric" min="0" value="3" oninput="refresh()">
+          <input id="fWarn" type="number" inputmode="numeric" min="0" value="3" oninput="onWarnInput()">
           <span>天</span>
         </div>
         <button class="sbtn" onclick="stepWarn(1)"><svg class="ic" viewBox="0 0 24 24"><path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z"/></svg></button>
@@ -118,6 +123,16 @@
 
 </div>
 
+<!-- 名称实时扫描层（getUserMedia 取景 + 逐帧 OCR 候选点选，不存照片） -->
+<div class="scan-layer" id="scanLayer" style="display:none">
+  <video id="scanVideo" playsinline autoplay muted></video>
+  <div class="scan-frame"></div>
+  <div class="scan-tip" id="scanTip">对准食材包装上的名称</div>
+  <div class="scan-cands" id="scanCands"></div>
+  <button class="scan-close" onclick="stopScan()" aria-label="关闭">×</button>
+</div>
+<canvas id="scanCanvas" style="display:none"></canvas>
+
 <div class="footer">
   <button class="btn btn-plain" onclick="history.length > 1 ? history.back() : location.href='index.html'">取消</button>
   <button class="btn btn-primary" id="saveBtn" disabled onclick="save()">
@@ -133,8 +148,9 @@ var unit = '天';           // 保质期单位
 var photos = [];           // [{id, path}]
 var uploading = 0;
 var todayStr = MAT.fmtDate(new Date());  // 预览仅展示用，落库判定以服务端为准
-var allBatches = null;     // 新建模式：全量批次，供同名食材带出上次保质期
+var allBatches = null;     // 新建模式：全量批次，供同名食材带出上次保质期/预警天数
 var shelfAutoFilled = false;  // 保质期当前值是自动带出的（可被新的同名匹配覆盖）；用户手输后清除
+var warnTouched = false;      // 预警天数被用户手动改过（输入或步进）后，同名匹配不再覆盖
 var nameTimer = null;
 
 function $(id) { return document.getElementById(id); }
@@ -175,24 +191,43 @@ function onShelfInput() {
   autoExpire();
 }
 
-// 新建时按名称找同名食材的最近批次（id 最大），带出其保质期作默认值。
-// 只填「空白或此前自动带出」的保质期，不碰用户手输的值
+// 新建时按名称找同名食材的最近批次（id 最大），带出其 保质期 + 预警提前天数 作默认值。
+// 各字段独立判定：只覆盖「空白/初始默认或此前自动带出」的值，不碰用户手动改过的
 function applyShelfDefault() {
   if (editId > 0 || !allBatches) { return; }
   var name = $('fName').value.trim();
   if (!name) { return; }
-  if ($('fShelf').value && !shelfAutoFilled) { return; }
   var hit = null;
   for (var i = 0; i < allBatches.length; i++) {
     var b = allBatches[i];
-    if ((b.name || '').trim() === name && b.shelf_life_value > 0 && (!hit || b.id > hit.id)) { hit = b; }
+    if ((b.name || '').trim() === name && (!hit || b.id > hit.id)) { hit = b; }
   }
   if (!hit) { return; }
-  var u = hit.shelf_life_unit === '月' ? '月' : '天';
-  $('fShelf').value = hit.shelf_life_value;
-  shelfAutoFilled = true;
-  MAT.showToast('已按上次记录默认保质期 ' + hit.shelf_life_value + ' ' + u);
-  setUnit(u);  // setUnit 内部调 autoExpire → 到期日跟着推算
+  var parts = [];
+  var shelfUnit = null;
+  if (hit.shelf_life_value > 0 && (!$('fShelf').value || shelfAutoFilled)) {
+    shelfUnit = hit.shelf_life_unit === '月' ? '月' : '天';
+    $('fShelf').value = hit.shelf_life_value;
+    shelfAutoFilled = true;
+    parts.push('保质期 ' + hit.shelf_life_value + ' ' + shelfUnit);
+  }
+  if (hit.warn_days != null && hit.warn_days >= 0 && !warnTouched
+      && String(hit.warn_days) !== $('fWarn').value) {
+    $('fWarn').value = hit.warn_days;
+    parts.push('预警提前 ' + hit.warn_days + ' 天');
+  }
+  if (parts.length === 0) { return; }
+  MAT.showToast('已按上次记录默认：' + parts.join(' · '));
+  if (shelfUnit !== null) {
+    setUnit(shelfUnit);  // setUnit 内部调 autoExpire → 到期日跟着推算 + refresh
+  } else {
+    refresh();           // 只带出预警天数时也要刷新提示文案/状态预览
+  }
+}
+
+function onWarnInput() {
+  warnTouched = true;
+  refresh();
 }
 
 function stepWarn(delta) {
@@ -200,6 +235,7 @@ function stepWarn(delta) {
   if (isNaN(v)) { v = 3; }
   v = Math.max(0, v + delta);
   $('fWarn').value = v;
+  warnTouched = true;
   refresh();
 }
 
@@ -291,6 +327,78 @@ async function save() {
     MAT.showToast(e.message);
     $('saveBtn').disabled = false;
   }
+}
+
+// ---- 名称实时扫描：getUserMedia 取景 → 每 1.3s 抓帧发 OCR → 候选点选填入 ----
+var scanStream = null, scanTimer = null, scanBusy = false, scanDeadline = 0;
+
+async function startScan() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    MAT.showToast('当前环境不支持相机，请手动输入');
+    return;
+  }
+  try {
+    scanStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+  } catch (e) {
+    MAT.showToast('无法打开相机，请检查授权');
+    return;
+  }
+  $('scanVideo').srcObject = scanStream;
+  $('scanLayer').style.display = '';
+  $('scanCands').innerHTML = '';
+  $('scanTip').textContent = '对准食材包装上的名称';
+  scanBusy = false;
+  scanDeadline = Date.now() + 30000;   // 30s 无果自动停帧（节流云调用），层保留可手动关
+  scanTimer = setInterval(captureFrame, 1300);
+}
+
+function stopScan() {
+  clearInterval(scanTimer);
+  scanTimer = null;
+  if (scanStream) {
+    scanStream.getTracks().forEach(function (t) { t.stop(); });
+    scanStream = null;
+  }
+  $('scanLayer').style.display = 'none';
+  scanBusy = false;
+}
+
+async function captureFrame() {
+  if (scanBusy || !scanStream) { return; }
+  if (Date.now() > scanDeadline) {
+    $('scanTip').textContent = '未识别到名称，可换角度重试或关闭后手动输入';
+    clearInterval(scanTimer);
+    scanTimer = null;
+    return;
+  }
+  var v = $('scanVideo');
+  if (!v.videoWidth) { return; }
+  var c = $('scanCanvas');
+  var w = Math.min(1000, v.videoWidth);
+  c.width = w;
+  c.height = Math.round(v.videoHeight * w / v.videoWidth);
+  c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
+  var b64 = c.toDataURL('image/jpeg', 0.7).split(',')[1];
+  scanBusy = true;
+  try {
+    var data = await MAT.api('OcrScanName', { body: { image: b64 } });
+    renderCands((data && data.candidates) || []);
+  } catch (e) { /* 单帧失败静默，继续下一帧 */ }
+  scanBusy = false;
+}
+
+function renderCands(cands) {
+  if (!scanStream || cands.length === 0) { return; }
+  $('scanTip').textContent = '点击候选词填入名称，或继续对准重新识别';
+  $('scanCands').innerHTML = cands.map(function (cd) {
+    return '<button class="scan-chip" data-t="' + MAT.esc(cd.text) + '" onclick="pickCand(this)">' + MAT.esc(cd.text) + '</button>';
+  }).join('');
+}
+
+function pickCand(btn) {
+  $('fName').value = btn.getAttribute('data-t');
+  stopScan();
+  onNameInput();   // 触发同名批次带出保质期/预警 + refresh
 }
 
 // ---- 批次操作（编辑模式，与列表页动作面板同一套接口/文案） ----

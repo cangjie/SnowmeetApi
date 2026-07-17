@@ -257,6 +257,36 @@ svg.ic { width: 20px; height: 20px; fill: currentColor; flex-shrink: 0; }
 .btn-primary { color: #fff; background: var(--primary); font-weight: 700; }
 .btn-primary:disabled { background: var(--muted-bg); color: var(--text-3); }
 
+/* 名称实时扫描层：全屏取景 + 暗角遮罩取景框 + 底部候选词 */
+.scan-layer { position: fixed; inset: 0; z-index: 50; background: #000; }
+.scan-layer video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.scan-frame {
+  position: absolute; left: 8%; right: 8%; top: 18%; height: 30%;
+  border: 2px solid rgba(255, 255, 255, 0.9); border-radius: 14px;
+  box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.45);
+}
+.scan-tip {
+  position: absolute; left: 16px; right: 16px; top: calc(48% + 16px);
+  text-align: center; color: #fff; font-size: 14px;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+.scan-cands {
+  position: absolute; left: 12px; right: 12px;
+  bottom: calc(30px + env(safe-area-inset-bottom));
+  display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;
+}
+.scan-chip {
+  padding: 10px 16px; border-radius: 999px;
+  background: rgba(255, 255, 255, 0.95); color: var(--text);
+  font-size: 15px; font-weight: 600;
+}
+.scan-close {
+  position: absolute; top: calc(14px + env(safe-area-inset-top)); right: 14px;
+  width: 38px; height: 38px; border-radius: 50%;
+  background: rgba(0, 0, 0, 0.5); color: #fff; font-size: 22px;
+  display: flex; align-items: center; justify-content: center;
+}
+
 /* 详情页（编辑模式）批次操作：2×2 网格，按语义分色 */
 .ops-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .op-btn {
