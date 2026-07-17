@@ -55,7 +55,12 @@
     <div class="shead"><span class="st">效期</span><span class="sd">生产日期 + 保质期自动推算到期日</span></div>
     <div class="fgroup">
       <div class="flabel">生产日期</div>
-      <input class="finput" id="fProduce" type="date" oninput="autoExpire()" onchange="autoExpire()">
+      <div class="frow">
+        <input class="finput" id="fProduce" type="date" oninput="autoExpire()" onchange="autoExpire()">
+        <button class="gen-btn" onclick="startScan()">
+          <svg class="ic" viewBox="0 0 24 24"><path d="M12 15.2a3.2 3.2 0 1 0 0-6.4a3.2 3.2 0 0 0 0 6.4M9 3L7.17 5H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-3.17L15 3zm3 15a5 5 0 1 1 0-10a5 5 0 0 1 0 10"/></svg>扫描
+        </button>
+      </div>
     </div>
     <div class="fgroup">
       <div class="flabel">保质期</div>
