@@ -31,7 +31,9 @@ var MAT = (function () {
       showEnvHint();
       return;
     }
-    var redirect = encodeURIComponent(location.origin + location.pathname);
+    // 带上现有查询参数（如提醒消息深链的 ?id=5），否则 OAuth 回跳后丢参落到空白新建页；
+    // code/state 在消费时已从 URL 清掉，不会重复携带
+    var redirect = encodeURIComponent(location.origin + location.pathname + location.search);
     location.replace('https://open.weixin.qq.com/connect/oauth2/authorize?appid=' + CORP_ID
       + '&redirect_uri=' + redirect + '&response_type=code&scope=snsapi_base&agentid=' + AGENT_ID
       + '#wechat_redirect');

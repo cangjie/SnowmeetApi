@@ -29,6 +29,8 @@ namespace SnowmeetApi.Controllers.Fnb
     {
         public const string SESSION_TYPE_WECOM = "wecom_userid";
         public const string H5_URL = "https://mini.snowmeet.top/fnb/mat_expire/index.html";
+        public const string H5_BATCH_URL = "https://mini.snowmeet.top/fnb/mat_expire/new.html";  // 批次详情/编辑页，?id={batch.id}
+        public const string PIC_HOST = "https://mini.snowmeet.top";  // 图文消息图片前缀（批次照片/占位 logo）
 
         private readonly ApplicationDBContext _db;
         private readonly IConfiguration _config;
@@ -485,31 +487,54 @@ namespace SnowmeetApi.Controllers.Fnb
             int expired = candidates.Count(b => DeriveStatus(b, today) == "已过期");
             int dueToday = candidates.Count(b => DeriveStatus(b, today) == "今日");
             int warning = candidates.Count(b => DeriveStatus(b, today) == "临期");
-            string topNames = string.Join("、", candidates.Take(3).Select(b => b.name.Trim()));
-            if (candidates.Count > 3)
-            {
-                topNames += " 等";
-            }
-            var articles = new List<FnbWeComController.NewsArticle>()
-            {
-                new FnbWeComController.NewsArticle()
-                {
-                    title = "食材到期提醒：" + candidates.Count + " 项需处理",
-                    description = "已过期 " + expired + " · 今日到期 " + dueToday + " · 临期 " + warning + "。" + topNames,
-                    url = H5_URL
-                }
-            };
-            FnbWeComController.WeComSendResponse res = await _wecomHelper.SendNews(articles, receivers, "食材过期提醒");
-            bool ok = res != null && res.errcode == 0;
-            string errMsg = res == null ? "企业微信接口调用失败" : (res.errcode == 0 ? null : (res.errcode + " " + (res.errmsg ?? "")));
 
+            // 批次首图：image_ids 第一个 id → upload_file 路径 → 完整 URL；无照片用站内占位图
+            var firstImgIds = new Dictionary<int, int>();  // batch.id → 首图 upload_file.id
             foreach (FnbMaterialBatch b in candidates)
             {
+                string first = (b.image_ids ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
+                if (first != null && int.TryParse(first.Trim(), out int imgId))
+                {
+                    firstImgIds[b.id] = imgId;
+                }
+            }
+            var imgPaths = firstImgIds.Count == 0
+                ? new Dictionary<int, string>()
+                : await _db.UploadFile.Where(f => firstImgIds.Values.Contains(f.id))
+                    .AsNoTracking().ToDictionaryAsync(f => f.id, f => f.file_path_name);
+
+            // 每个批次一条独立图文消息（图=该批次首图）；单批失败不阻断其余批次
+            int sent = 0;
+            var failed = new List<string>();
+            foreach (FnbMaterialBatch b in candidates)
+            {
+                string status = DeriveStatus(b, today);
+                int days = (b.expire_date.Date - today).Days;
+                string daysText = days < 0 ? "已逾期 " + (-days) + " 天" : (days == 0 ? "今日到期" : "还剩 " + days + " 天");
+                string picUrl = PIC_HOST + "/images/logo.png";
+                if (firstImgIds.TryGetValue(b.id, out int fid) && imgPaths.TryGetValue(fid, out string p) && !string.IsNullOrWhiteSpace(p))
+                {
+                    picUrl = PIC_HOST + p.Trim();
+                }
+                var articles = new List<FnbWeComController.NewsArticle>()
+                {
+                    new FnbWeComController.NewsArticle()
+                    {
+                        title = "【" + status + "】" + b.name.Trim(),
+                        description = "批次 " + b.batch_no.Trim() + " · 到期 " + b.expire_date.ToString("yyyy/MM/dd") + " · " + daysText,
+                        url = H5_BATCH_URL + "?id=" + b.id,
+                        picurl = picUrl
+                    }
+                };
+                FnbWeComController.WeComSendResponse res = await _wecomHelper.SendNews(articles, receivers, "食材过期提醒");
+                bool ok = res != null && res.errcode == 0;
+                string errMsg = res == null ? "企业微信接口调用失败" : (res.errcode == 0 ? null : (res.errcode + " " + (res.errmsg ?? "")));
+                if (ok) { sent++; } else { failed.Add(b.name.Trim() + "：" + errMsg); }
                 await _db.fnbMaterialAlertLog.AddAsync(new FnbMaterialAlertLog()
                 {
                     id = 0,
                     batch_id = b.id,
-                    alert_status = DeriveStatus(b, today),
+                    alert_status = status,
                     expire_date = b.expire_date.Date,
                     touser = receivers,
                     msgid = res == null ? null : res.msgid,
@@ -521,15 +546,20 @@ namespace SnowmeetApi.Controllers.Fnb
             }
             await _db.SaveChangesAsync();
 
-            if (!ok)
+            if (sent == 0)
             {
-                return Ok(new ApiResult<object>() { code = 1, message = "推送失败：" + errMsg, data = new { count = candidates.Count } });
+                return Ok(new ApiResult<object>()
+                {
+                    code = 1,
+                    message = "推送失败：" + string.Join("；", failed),
+                    data = new { count = candidates.Count, sent, failed }
+                });
             }
             return Ok(new ApiResult<object>()
             {
                 code = 0,
                 message = "",
-                data = new { count = candidates.Count, expired, dueToday, warning, touser = receivers, msgid = res.msgid }
+                data = new { count = candidates.Count, sent, failed, expired, dueToday, warning, touser = receivers }
             });
         }
     }
