@@ -212,7 +212,7 @@ namespace SnowmeetApi.Controllers.Fnb
             }
             string userId = ctx.Value.userId;
             List<FnbMaterialBatch> batches = await _db.fnbMaterialBatch
-                .Where(b => b.valid == 1).OrderBy(b => b.expire_date).ThenBy(b => b.id)
+                .Where(b => b.valid).OrderBy(b => b.expire_date).ThenBy(b => b.id)
                 .AsNoTracking().ToListAsync();
             return Ok(new ApiResult<object>()
             {
@@ -248,7 +248,7 @@ namespace SnowmeetApi.Controllers.Fnb
             {
                 posted.create_userid = userId;
                 posted.staff_id = ctx.Value.staffId;
-                posted.valid = 1;
+                posted.valid = true;
                 posted.create_date = DateTime.Now;
                 posted.update_date = null;
                 posted.dispose_status = null;
@@ -259,7 +259,7 @@ namespace SnowmeetApi.Controllers.Fnb
                 return Ok(new ApiResult<object>() { code = 0, message = "", data = posted });
             }
             FnbMaterialBatch batch = await _db.fnbMaterialBatch
-                .Where(b => b.id == posted.id && b.valid == 1).FirstOrDefaultAsync();
+                .Where(b => b.id == posted.id && b.valid).FirstOrDefaultAsync();
             if (batch == null)
             {
                 return Ok(new ApiResult<object>() { code = 1, message = "批次不存在", data = null });
@@ -294,7 +294,7 @@ namespace SnowmeetApi.Controllers.Fnb
                 return Ok(new ApiResult<object>() { code = 1, message = "处置类型不支持", data = null });
             }
             FnbMaterialBatch batch = await _db.fnbMaterialBatch
-                .Where(b => b.id == id && b.valid == 1).FirstOrDefaultAsync();
+                .Where(b => b.id == id && b.valid).FirstOrDefaultAsync();
             if (batch == null)
             {
                 return Ok(new ApiResult<object>() { code = 1, message = "批次不存在", data = null });
@@ -323,12 +323,12 @@ namespace SnowmeetApi.Controllers.Fnb
             }
             string userId = ctx.Value.userId;
             FnbMaterialBatch batch = await _db.fnbMaterialBatch
-                .Where(b => b.id == id && b.valid == 1).FirstOrDefaultAsync();
+                .Where(b => b.id == id && b.valid).FirstOrDefaultAsync();
             if (batch == null)
             {
                 return Ok(new ApiResult<object>() { code = 1, message = "批次不存在", data = null });
             }
-            batch.valid = 0;
+            batch.valid = false;
             batch.update_date = DateTime.Now;
             _db.fnbMaterialBatch.Entry(batch).State = EntityState.Modified;
             await _db.SaveChangesAsync();
@@ -466,7 +466,7 @@ namespace SnowmeetApi.Controllers.Fnb
             DateTime today = DateTime.Now.Date;
 
             List<FnbMaterialBatch> all = await _db.fnbMaterialBatch
-                .Where(b => b.valid == 1 && (b.dispose_status == null || b.dispose_status.Trim() == ""))
+                .Where(b => b.valid && (b.dispose_status == null || b.dispose_status.Trim() == ""))
                 .AsNoTracking().ToListAsync();
             List<FnbMaterialBatch> candidates = all
                 .Where(b => DeriveStatus(b, today) != "正常")

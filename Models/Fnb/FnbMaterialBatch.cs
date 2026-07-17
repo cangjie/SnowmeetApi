@@ -27,7 +27,7 @@ namespace SnowmeetApi.Models.Fnb
         public DateTime? dispose_date { get; set; } = null;
         public string? create_userid { get; set; } = null;      // 录入人（企微 UserId）
         public int? staff_id { get; set; } = null;              // 录入人 staff.id（企微 UserId → msa(type=wecom) → member → 在职 staff 关联；关联不上留 NULL）
-        public int valid { get; set; } = 1;
+        public bool valid { get; set; } = true;   // DB 列 bit（2026-07-16 由 int 改）
         public DateTime create_date { get; set; } = DateTime.Now;
         public DateTime? update_date { get; set; } = null;
     }
