@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>录入批次</title>
-<link rel="stylesheet" href="mat.css?v=260716d">
+<link rel="stylesheet" href="mat.css?v=260716e">
 </head>
 <body>
 
@@ -334,8 +334,10 @@ async function save() {
 
 // ---- 名称实时扫描：getUserMedia 取景 → 每 1.3s 抓帧发 OCR → 候选多选按顺序拼接名称 ----
 var scanStream = null, scanTimer = null, scanBusy = false, scanDeadline = 0;
-var lastCands = [];   // 最近一帧候选文本（未选中的随帧刷新）
-var scanPicked = [];  // 已选词，按点击顺序拼接成名称；选中期间暂停抓帧防列表跳动
+var lastCands = [];   // 最近一帧名称候选文本（未选中的随帧刷新）
+var lastDates = [];   // 最近一帧日期候选（yyyy-MM-dd，归一化自中英文各种格式）
+var scanPicked = [];  // 已选名称词，按点击顺序拼接；有选择期间暂停抓帧防列表跳动
+var scanDate = null;  // 已选生产日期（单选）
 
 async function startScan() {
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -355,7 +357,9 @@ async function startScan() {
   $('scanTip').textContent = '对准食材包装上的名称';
   scanBusy = false;
   lastCands = [];
+  lastDates = [];
   scanPicked = [];
+  scanDate = null;
   scanDeadline = Date.now() + 30000;   // 30s 无果自动停帧（节流云调用），层保留可手动关
   scanTimer = setInterval(captureFrame, 1300);
 }
@@ -390,37 +394,58 @@ async function captureFrame() {
   scanBusy = true;
   try {
     var data = await MAT.api('OcrScanName', { body: { image: b64 } });
-    renderCands((data && data.candidates) || []);
+    renderCands((data && data.candidates) || [], (data && data.dates) || []);
   } catch (e) { /* 单帧失败静默，继续下一帧 */ }
   scanBusy = false;
 }
 
-function renderCands(cands) {
+function renderCands(cands, dates) {
   if (!scanStream) { return; }
   if (cands.length > 0) {
     lastCands = cands.map(function (cd) { return cd.text; });
   }
+  if (dates.length > 0) {
+    lastDates = dates;
+  }
   renderChips();
 }
 
-// 已选词固定在前（带序号高亮），未选候选随帧刷新排在后
+// 名称：已选固定在前（带序号高亮）；日期：📅 chip 单选；未选候选随帧刷新
 function renderChips() {
   var texts = scanPicked.concat(lastCands.filter(function (t) { return scanPicked.indexOf(t) < 0; }));
-  if (texts.length === 0) { return; }
-  $('scanTip').textContent = scanPicked.length > 0
-    ? '按顺序继续点选，完成后点下方按钮填入'
-    : '点击候选词可多选，按点击顺序组成名称';
-  $('scanCands').innerHTML = texts.map(function (t) {
+  var dates = (scanDate && lastDates.indexOf(scanDate) < 0 ? [scanDate] : []).concat(lastDates);
+  if (texts.length === 0 && dates.length === 0) { return; }
+  $('scanTip').textContent = (scanPicked.length > 0 || scanDate)
+    ? '继续点选，完成后点下方按钮填入'
+    : '点选名称词（可多选拼接）和 📅 生产日期';
+  var html = texts.map(function (t) {
     var i = scanPicked.indexOf(t);
     return '<button class="scan-chip' + (i >= 0 ? ' on' : '') + '" data-t="' + MAT.esc(t) + '" onclick="toggleCand(this)">'
       + (i >= 0 ? '<span class="scan-chip-n">' + (i + 1) + '</span>' : '') + MAT.esc(t) + '</button>';
   }).join('');
+  html += dates.map(function (d) {
+    return '<button class="scan-chip date' + (scanDate === d ? ' on' : '') + '" data-t="' + MAT.esc(d) + '" onclick="toggleDate(this)">📅 ' + MAT.esc(d) + '</button>';
+  }).join('');
+  $('scanCands').innerHTML = html;
   var btn = $('scanConfirm');
-  if (scanPicked.length > 0) {
+  var parts = [];
+  if (scanPicked.length > 0) { parts.push(scanPicked.join('')); }
+  if (scanDate) { parts.push('生产日期 ' + scanDate); }
+  if (parts.length > 0) {
     btn.style.display = '';
-    btn.textContent = '填入：' + scanPicked.join('');
+    btn.textContent = '填入：' + parts.join(' · ');
   } else {
     btn.style.display = 'none';
+  }
+}
+
+// 有任何选择即暂停抓帧（候选固定不跳动、省 OCR 调用）；全部取消则恢复识别
+function _syncScanPause() {
+  if (scanPicked.length > 0 || scanDate) {
+    if (scanTimer) { clearInterval(scanTimer); scanTimer = null; }
+  } else if (!scanTimer && scanStream) {
+    scanDeadline = Date.now() + 30000;
+    scanTimer = setInterval(captureFrame, 1300);
   }
 }
 
@@ -428,21 +453,31 @@ function toggleCand(btn) {
   var t = btn.getAttribute('data-t');
   var i = scanPicked.indexOf(t);
   if (i >= 0) { scanPicked.splice(i, 1); } else { scanPicked.push(t); }
-  // 开始选词后暂停抓帧（候选固定不跳动、省 OCR 调用）；全部取消则恢复识别
-  if (scanPicked.length > 0) {
-    if (scanTimer) { clearInterval(scanTimer); scanTimer = null; }
-  } else if (!scanTimer && scanStream) {
-    scanDeadline = Date.now() + 30000;
-    scanTimer = setInterval(captureFrame, 1300);
-  }
+  _syncScanPause();
+  renderChips();
+}
+
+// 生产日期单选：再点取消，点别的换选
+function toggleDate(btn) {
+  var d = btn.getAttribute('data-t');
+  scanDate = scanDate === d ? null : d;
+  _syncScanPause();
   renderChips();
 }
 
 function confirmPick() {
-  if (scanPicked.length === 0) { return; }
-  $('fName').value = scanPicked.join('');
+  if (scanPicked.length === 0 && !scanDate) { return; }
+  if (scanPicked.length > 0) {
+    $('fName').value = scanPicked.join('');
+  }
+  if (scanDate) {
+    $('fProduce').value = scanDate;
+  }
   stopScan();
-  onNameInput();   // 触发同名批次带出保质期/预警 + refresh
+  autoExpire();      // 生产日期落值后立即推算（保质期已有值时）
+  if (scanPicked.length > 0) {
+    onNameInput();   // 触发同名批次带出保质期/预警 + refresh
+  }
 }
 
 // ---- 批次操作（编辑模式，与列表页动作面板同一套接口/文案） ----

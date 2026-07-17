@@ -471,8 +471,9 @@ namespace SnowmeetApi.Controllers.Fnb
                 GeneralBasicOCRRequest req = new GeneralBasicOCRRequest();
                 req.ImageBase64 = body.image;
                 GeneralBasicOCRResponse resp = client.GeneralBasicOCRSync(req);
-                var candidates = (resp.TextDetections ?? new TextDetection[0])
-                    .Where(t => !string.IsNullOrWhiteSpace(t.DetectedText))
+                var allLines = (resp.TextDetections ?? new TextDetection[0])
+                    .Where(t => !string.IsNullOrWhiteSpace(t.DetectedText)).ToList();
+                var candidates = allLines
                     .Select(t => new
                     {
                         text = t.DetectedText.Trim(),
@@ -481,12 +482,110 @@ namespace SnowmeetApi.Controllers.Fnb
                     .Where(t => IsNameCandidate(t.text))
                     .OrderByDescending(t => t.height)
                     .Take(5).ToList();
-                return Ok(new ApiResult<object>() { code = 0, message = "", data = new { candidates } });
+                // 日期候选用全部原始行提取（名称过滤会剔掉含日期的行）
+                List<string> dates = ExtractDates(allLines.Select(t => t.DetectedText));
+                return Ok(new ApiResult<object>() { code = 0, message = "", data = new { candidates, dates } });
             }
             catch (Exception ex)
             {
                 return Ok(new ApiResult<object>() { code = 1, message = "识别失败：" + ex.Message, data = null });
             }
+        }
+
+        // 从 OCR 文本行提取日期候选，归一化 yyyy-MM-dd 去重（最多 6 个）。
+        // 覆盖：2026年7月16日 / 2026-07-16 / 2026/7/16 / 2026.07.16 / 20260716 / 260716（喷码）
+        //      / 16-07-2026（DD/MM/YYYY，>12 侧判日）/ 16 JUL 2026 / JUL 16, 2026 / 16JUL26
+        [NonAction]
+        public static List<string> ExtractDates(IEnumerable<string> lines)
+        {
+            var found = new List<string>();
+            foreach (string raw in lines)
+            {
+                if (string.IsNullOrWhiteSpace(raw))
+                {
+                    continue;
+                }
+                string s = raw.Trim();
+                // 2026年7月16日（「日」可省）
+                foreach (Match m in Regex.Matches(s, @"(20\d{2})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日?"))
+                {
+                    _addDate(found, m.Groups[1].Value, m.Groups[2].Value, m.Groups[3].Value);
+                }
+                // 2026-07-16 / 2026/7/16 / 2026.07.16
+                foreach (Match m in Regex.Matches(s, @"(?<!\d)(20\d{2})\s*[./\-]\s*(\d{1,2})\s*[./\-]\s*(\d{1,2})(?!\d)"))
+                {
+                    _addDate(found, m.Groups[1].Value, m.Groups[2].Value, m.Groups[3].Value);
+                }
+                // 8 位连续喷码 20260716
+                foreach (Match m in Regex.Matches(s, @"(?<!\d)(20\d{2})(\d{2})(\d{2})(?!\d)"))
+                {
+                    _addDate(found, m.Groups[1].Value, m.Groups[2].Value, m.Groups[3].Value);
+                }
+                // 6 位连续喷码 260716 → 2026-07-16（首位 2 限定 202x-203x 年代，降低条码误匹配）
+                foreach (Match m in Regex.Matches(s, @"(?<!\d)(2\d)(\d{2})(\d{2})(?!\d)"))
+                {
+                    _addDate(found, "20" + m.Groups[1].Value, m.Groups[2].Value, m.Groups[3].Value);
+                }
+                // 16-07-2026 / 16.07.2026（日月年；两段都 ≤12 时默认 DD/MM）
+                foreach (Match m in Regex.Matches(s, @"(?<!\d)(\d{1,2})\s*[./\-]\s*(\d{1,2})\s*[./\-]\s*(20\d{2})(?!\d)"))
+                {
+                    int a = int.Parse(m.Groups[1].Value), b = int.Parse(m.Groups[2].Value);
+                    if (a > 12)
+                    {
+                        _addDate(found, m.Groups[3].Value, b.ToString(), a.ToString());
+                    }
+                    else if (b > 12)
+                    {
+                        _addDate(found, m.Groups[3].Value, a.ToString(), b.ToString());
+                    }
+                    else
+                    {
+                        _addDate(found, m.Groups[3].Value, b.ToString(), a.ToString());
+                    }
+                }
+                // 英文：16 JUL 2026 / 16JUL26 / 16 JUL. 2026
+                string up = s.ToUpper();
+                foreach (Match m in Regex.Matches(up, @"(?<!\d)(\d{1,2})\s*(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)[A-Z]*\.?[,\s]*(\d{4}|\d{2})(?!\d)"))
+                {
+                    _addDate(found, _fixYear(m.Groups[3].Value), _monthNum(m.Groups[2].Value), m.Groups[1].Value);
+                }
+                // 英文：JUL 16, 2026
+                foreach (Match m in Regex.Matches(up, @"(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)[A-Z]*\.?\s*(\d{1,2})[,\s]+(\d{4}|\d{2})(?!\d)"))
+                {
+                    _addDate(found, _fixYear(m.Groups[3].Value), _monthNum(m.Groups[1].Value), m.Groups[2].Value);
+                }
+            }
+            return found.Distinct().Take(6).ToList();
+        }
+
+        private static string _fixYear(string y)
+        {
+            return y.Length == 2 ? "20" + y : y;
+        }
+
+        private static string _monthNum(string mon)
+        {
+            string[] names = { "JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC" };
+            return (Array.IndexOf(names, mon) + 1).ToString();
+        }
+
+        // 合法 + 合理（2015~2039）才收，归一化 yyyy-MM-dd
+        private static void _addDate(List<string> list, string ys, string ms, string ds)
+        {
+            if (!int.TryParse(ys, out int y) || !int.TryParse(ms, out int mo) || !int.TryParse(ds, out int d))
+            {
+                return;
+            }
+            if (y < 2015 || y > 2039 || mo < 1 || mo > 12 || d < 1 || d > 31)
+            {
+                return;
+            }
+            try
+            {
+                DateTime dt = new DateTime(y, mo, d);
+                list.Add(dt.ToString("yyyy-MM-dd"));
+            }
+            catch { }
         }
 
         // 名称候选过滤：剔除日期/纯数字（条码/喷码）/净含量/包装常见说明行
