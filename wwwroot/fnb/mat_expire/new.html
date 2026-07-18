@@ -77,6 +77,9 @@
       <div class="frow">
         <input class="finput" id="fExpire" type="date" oninput="onExpireManual()" onchange="onExpireManual()">
         <span class="auto-tag" id="autoTag" style="display:none">自动</span>
+        <button class="gen-btn" onclick="startScan('expire')">
+          <svg class="ic" viewBox="0 0 24 24"><path d="M12 15.2a3.2 3.2 0 1 0 0-6.4a3.2 3.2 0 0 0 0 6.4M9 3L7.17 5H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-3.17L15 3zm3 15a5 5 0 1 1 0-10a5 5 0 0 1 0 10"/></svg>扫描
+        </button>
       </div>
     </div>
   </div>
@@ -340,13 +343,14 @@ async function save() {
 // ---- 名称实时扫描：getUserMedia 取景 → 每 1.3s 抓帧发 OCR → 候选多选按顺序拼接名称 ----
 var scanStream = null, scanTimer = null, scanBusy = false, scanDeadline = 0;
 var lastCands = [];   // 最近一帧名称候选文本（未选中的随帧刷新）
-var lastDates = [];   // 最近一帧日期候选（yyyy-MM-dd，归一化自中英文各种格式）
+var lastDates = [];       // 最近一帧日期候选（yyyy-MM-dd，归一化自中英文各种格式）
+var lastExpireDates = []; // 其中带到期锚词（保质期至/前食用/到期/EXP…）行的日期，expire 模式首选
 var scanPicked = [];  // 已选名称词，按点击顺序拼接；有选择期间暂停抓帧防列表跳动
-var scanDate = null;  // 已选生产日期（单选）
-var scanMode = 'all'; // 'all'=名称入口（名称+日期候选）；'date'=生产日期入口（只显示日期候选）
+var scanDate = null;  // 已选日期（单选；按模式填生产日期或到期日期）
+var scanMode = 'all'; // 'all'=名称入口；'date'=生产日期入口（纯日期）；'expire'=到期日期入口（锚词日期优先）
 
 async function startScan(mode) {
-  scanMode = mode === 'date' ? 'date' : 'all';
+  scanMode = (mode === 'date' || mode === 'expire') ? mode : 'all';
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
     MAT.showToast('当前环境不支持相机，请手动输入');
     return;
@@ -361,10 +365,12 @@ async function startScan(mode) {
   $('scanLayer').style.display = '';
   $('scanCands').innerHTML = '';
   $('scanConfirm').style.display = 'none';
-  $('scanTip').textContent = scanMode === 'date' ? '对准包装上的生产日期' : '对准食材包装上的名称';
+  $('scanTip').textContent = scanMode === 'date' ? '对准包装上的生产日期'
+    : (scanMode === 'expire' ? '对准包装上的到期日期 / 保质期标注' : '对准食材包装上的名称');
   scanBusy = false;
   lastCands = [];
   lastDates = [];
+  lastExpireDates = [];
   scanPicked = [];
   scanDate = null;
   scanDeadline = Date.now() + 30000;   // 30s 无果自动停帧（节流云调用），层保留可手动关
@@ -401,12 +407,12 @@ async function captureFrame() {
   scanBusy = true;
   try {
     var data = await MAT.api('OcrScanName', { body: { image: b64 } });
-    renderCands((data && data.candidates) || [], (data && data.dates) || []);
+    renderCands((data && data.candidates) || [], (data && data.dates) || [], (data && data.expireDates) || []);
   } catch (e) { /* 单帧失败静默，继续下一帧 */ }
   scanBusy = false;
 }
 
-function renderCands(cands, dates) {
+function renderCands(cands, dates, expireDates) {
   if (!scanStream) { return; }
   if (cands.length > 0) {
     lastCands = cands.map(function (cd) { return cd.text; });
@@ -414,20 +420,28 @@ function renderCands(cands, dates) {
   if (dates.length > 0) {
     lastDates = dates;
   }
+  if (expireDates.length > 0) {
+    lastExpireDates = expireDates;
+  }
   renderChips();
 }
 
 // 名称：已选固定在前（带序号高亮）；日期：📅 chip 单选；未选候选随帧刷新。
-// date 模式（生产日期入口）只显示日期候选，名称词不渲染
+// date/expire 模式只显示日期候选；expire 模式带到期锚词的日期优先（有锚词命中就只列它们）
 function renderChips() {
-  var texts = scanMode === 'date'
+  var texts = scanMode !== 'all'
     ? []
     : scanPicked.concat(lastCands.filter(function (t) { return scanPicked.indexOf(t) < 0; }));
-  var dates = (scanDate && lastDates.indexOf(scanDate) < 0 ? [scanDate] : []).concat(lastDates);
+  var dateSrc = scanMode === 'expire'
+    ? (lastExpireDates.length > 0 ? lastExpireDates : lastDates)
+    : lastDates;
+  var dates = (scanDate && dateSrc.indexOf(scanDate) < 0 ? [scanDate] : []).concat(dateSrc);
   if (texts.length === 0 && dates.length === 0) { return; }
   $('scanTip').textContent = (scanPicked.length > 0 || scanDate)
     ? '继续点选，完成后点下方按钮填入'
-    : (scanMode === 'date' ? '点选 📅 生产日期' : '点选名称词（可多选拼接）和 📅 生产日期');
+    : (scanMode === 'expire'
+        ? (lastExpireDates.length > 0 ? '已识别到期标注，点选 📅 日期' : '点选 📅 到期日期')
+        : (scanMode === 'date' ? '点选 📅 生产日期' : '点选名称词（可多选拼接）和 📅 生产日期'));
   var html = texts.map(function (t) {
     var i = scanPicked.indexOf(t);
     return '<button class="scan-chip' + (i >= 0 ? ' on' : '') + '" data-t="' + MAT.esc(t) + '" onclick="toggleCand(this)">'
@@ -440,7 +454,7 @@ function renderChips() {
   var btn = $('scanConfirm');
   var parts = [];
   if (scanPicked.length > 0) { parts.push(scanPicked.join('')); }
-  if (scanDate) { parts.push('生产日期 ' + scanDate); }
+  if (scanDate) { parts.push((scanMode === 'expire' ? '到期日期 ' : '生产日期 ') + scanDate); }
   if (parts.length > 0) {
     btn.style.display = '';
     btn.textContent = '填入：' + parts.join(' · ');
@@ -477,6 +491,16 @@ function toggleDate(btn) {
 
 function confirmPick() {
   if (scanPicked.length === 0 && !scanDate) { return; }
+  if (scanMode === 'expire') {
+    // 到期日期：等同手改语义 —— 直接落值、去「自动」标，不调 autoExpire（防被 生产日期+保质期 重算覆盖）
+    if (scanDate) {
+      $('fExpire').value = scanDate;
+      $('autoTag').style.display = 'none';
+    }
+    stopScan();
+    refresh();
+    return;
+  }
   if (scanPicked.length > 0) {
     $('fName').value = scanPicked.join('');
   }

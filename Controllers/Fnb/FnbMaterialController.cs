@@ -482,9 +482,9 @@ namespace SnowmeetApi.Controllers.Fnb
                     .Where(t => IsNameCandidate(t.text))
                     .OrderByDescending(t => t.height)
                     .Take(5).ToList();
-                // 日期候选用全部原始行提取（名称过滤会剔掉含日期的行）
-                List<string> dates = ExtractDates(allLines.Select(t => t.DetectedText));
-                return Ok(new ApiResult<object>() { code = 0, message = "", data = new { candidates, dates } });
+                // 日期候选用全部原始行提取（名称过滤会剔掉含日期的行）；expireDates=带到期锚词行的日期
+                var (dates, expireDates) = ExtractDates(allLines.Select(t => t.DetectedText));
+                return Ok(new ApiResult<object>() { code = 0, message = "", data = new { candidates, dates, expireDates } });
             }
             catch (Exception ex)
             {
@@ -492,13 +492,27 @@ namespace SnowmeetApi.Controllers.Fnb
             }
         }
 
+        // 行内含到期锚词（保质期至/前食用/到期/EXP/BEST BEFORE…）时，该行日期视为到期日期首选。
+        // 「保质期」不带日期的行（如 保质期：12个月）没有日期可提取，宽锚词无副作用
+        private static readonly string[] EXPIRE_HINTS = {
+            "此日期前", "前食用", "前使用", "前饮用", "保质期", "到期", "有效期", "赏味",
+            "EXP", "BEST BEFORE", "USE BY", "BBE" };
+
+        private static bool _hasExpireHint(string line)
+        {
+            string up = line.ToUpper();
+            return EXPIRE_HINTS.Any(h => up.Contains(h));
+        }
+
         // 从 OCR 文本行提取日期候选，归一化 yyyy-MM-dd 去重（最多 6 个）。
         // 覆盖：2026年7月16日 / 2026-07-16 / 2026/7/16 / 2026.07.16 / 20260716 / 260716（喷码）
         //      / 16-07-2026（DD/MM/YYYY，>12 侧判日）/ 16 JUL 2026 / JUL 16, 2026 / 16JUL26
+        // 返回 (all=全部日期, expire=其中带到期锚词行的日期)
         [NonAction]
-        public static List<string> ExtractDates(IEnumerable<string> lines)
+        public static (List<string> all, List<string> expire) ExtractDates(IEnumerable<string> lines)
         {
-            var found = new List<string>();
+            var all = new List<string>();
+            var expire = new List<string>();
             foreach (string raw in lines)
             {
                 if (string.IsNullOrWhiteSpace(raw))
@@ -506,6 +520,7 @@ namespace SnowmeetApi.Controllers.Fnb
                     continue;
                 }
                 string s = raw.Trim();
+                var found = new List<string>();   // 本行提取结果
                 // 2026年7月16日（「日」可省）
                 foreach (Match m in Regex.Matches(s, @"(20\d{2})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日?"))
                 {
@@ -554,8 +569,13 @@ namespace SnowmeetApi.Controllers.Fnb
                 {
                     _addDate(found, _fixYear(m.Groups[3].Value), _monthNum(m.Groups[1].Value), m.Groups[2].Value);
                 }
+                all.AddRange(found);
+                if (found.Count > 0 && _hasExpireHint(s))
+                {
+                    expire.AddRange(found);
+                }
             }
-            return found.Distinct().Take(6).ToList();
+            return (all.Distinct().Take(6).ToList(), expire.Distinct().Take(6).ToList());
         }
 
         private static string _fixYear(string y)
