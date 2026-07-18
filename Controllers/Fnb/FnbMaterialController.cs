@@ -484,7 +484,8 @@ namespace SnowmeetApi.Controllers.Fnb
                     .Take(5).ToList();
                 // 日期候选用全部原始行提取（名称过滤会剔掉含日期的行）；expireDates=带到期锚词行的日期
                 var (dates, expireDates) = ExtractDates(allLines.Select(t => t.DetectedText));
-                return Ok(new ApiResult<object>() { code = 0, message = "", data = new { candidates, dates, expireDates } });
+                List<ShelfLifeCandidate> shelfLives = ExtractShelfLives(allLines.Select(t => t.DetectedText));
+                return Ok(new ApiResult<object>() { code = 0, message = "", data = new { candidates, dates, expireDates, shelfLives } });
             }
             catch (Exception ex)
             {
@@ -606,6 +607,94 @@ namespace SnowmeetApi.Controllers.Fnb
                 list.Add(dt.ToString("yyyy-MM-dd"));
             }
             catch { }
+        }
+
+        public class ShelfLifeCandidate
+        {
+            public int value { get; set; }
+            public string unit { get; set; }   // 归一化：天 / 月（「日」→天、「年」→月×12）
+        }
+
+        // 从 OCR 文本行提取保质期候选：N天 / N个月 / N日 / N年，支持阿拉伯数字和中文数字（十二个月/一百八十天）。
+        // 先剔除行内日期串，防「2026年7月3日」的「7月」「3日」误判成保质期
+        [NonAction]
+        public static List<ShelfLifeCandidate> ExtractShelfLives(IEnumerable<string> lines)
+        {
+            var res = new List<ShelfLifeCandidate>();
+            foreach (string raw in lines)
+            {
+                if (string.IsNullOrWhiteSpace(raw))
+                {
+                    continue;
+                }
+                string s = raw.Trim();
+                s = Regex.Replace(s, @"(20\d{2})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日?", " ");
+                s = Regex.Replace(s, @"(?<!\d)(20\d{2})\s*[./\-]\s*\d{1,2}\s*[./\-]\s*\d{1,2}(?!\d)", " ");
+                s = Regex.Replace(s, @"(?<!\d)\d{1,2}\s*[./\-]\s*\d{1,2}\s*[./\-]\s*20\d{2}(?!\d)", " ");
+                s = Regex.Replace(s, @"(?<!\d)20\d{6}(?!\d)", " ");
+                // 阿拉伯数字：12个月 / 180天 / 30日 / 2年
+                foreach (Match m in Regex.Matches(s, @"(?<!\d)(\d{1,3})\s*(个月|月|天|日|年)"))
+                {
+                    _addShelf(res, int.Parse(m.Groups[1].Value), m.Groups[2].Value);
+                }
+                // 中文数字：十二个月 / 一百八十天 / 九十天 / 一年 / 两年
+                foreach (Match m in Regex.Matches(s, @"([一二三四五六七八九十百两零]+)\s*(个月|月|天|日|年)"))
+                {
+                    _addShelf(res, _cnNumParse(m.Groups[1].Value), m.Groups[2].Value);
+                }
+            }
+            return res.GroupBy(x => x.value + "|" + x.unit).Select(g => g.First()).Take(4).ToList();
+        }
+
+        private static void _addShelf(List<ShelfLifeCandidate> res, int v, string unit)
+        {
+            if (unit == "年")
+            {
+                v = v * 12;
+                unit = "月";
+            }
+            else if (unit == "天" || unit == "日")
+            {
+                unit = "天";
+            }
+            else
+            {
+                unit = "月";
+            }
+            if (unit == "天" && (v < 1 || v > 999))
+            {
+                return;
+            }
+            if (unit == "月" && (v < 1 || v > 99))
+            {
+                return;
+            }
+            res.Add(new ShelfLifeCandidate { value = v, unit = unit });
+        }
+
+        // 中文数字解析（百以内 + 一百八十 类）：十二→12、九十→90、一百八十→180、两→2
+        private static int _cnNumParse(string s)
+        {
+            int section = 0, digit = 0;
+            foreach (char c in s)
+            {
+                switch (c)
+                {
+                    case '零': break;
+                    case '一': digit = 1; break;
+                    case '二': case '两': digit = 2; break;
+                    case '三': digit = 3; break;
+                    case '四': digit = 4; break;
+                    case '五': digit = 5; break;
+                    case '六': digit = 6; break;
+                    case '七': digit = 7; break;
+                    case '八': digit = 8; break;
+                    case '九': digit = 9; break;
+                    case '十': section += (digit == 0 ? 1 : digit) * 10; digit = 0; break;
+                    case '百': section += (digit == 0 ? 1 : digit) * 100; digit = 0; break;
+                }
+            }
+            return section + digit;
         }
 
         // 名称候选过滤：剔除日期/纯数字（条码/喷码）/净含量/包装常见说明行

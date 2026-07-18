@@ -285,6 +285,8 @@ svg.ic { width: 20px; height: 20px; fill: currentColor; flex-shrink: 0; }
 .scan-chip.on { background: var(--primary); color: #fff; }
 .scan-chip.date { background: rgba(254, 243, 199, 0.95); color: #92400e; }  /* 日期候选：浅琥珀区分名称词 */
 .scan-chip.date.on { background: var(--primary); color: #fff; }
+.scan-chip.shelf { background: rgba(220, 252, 231, 0.95); color: #15803d; }  /* 保质期候选：浅绿 */
+.scan-chip.shelf.on { background: var(--primary); color: #fff; }
 .scan-chip-n {
   width: 18px; height: 18px; border-radius: 50%;
   background: rgba(255, 255, 255, 0.25); color: #fff;
