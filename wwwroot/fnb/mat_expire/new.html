@@ -350,8 +350,7 @@ var lastDates = [];       // 最近一帧日期候选（yyyy-MM-dd，归一化�
 var lastExpireDates = []; // 其中带到期锚词（保质期至/前食用/到期/EXP…）行的日期，expire 模式首选
 var lastShelfLives = [];  // 保质期候选 [{value, unit}]（N天/N个月，阿拉伯+中文数字，后端归一化）
 var scanPicked = [];  // 已选名称词，按点击顺序拼接；有选择期间暂停抓帧防列表跳动
-var scanDate = null;  // 已选日期（单选；按模式填生产日期或到期日期）
-var scanShelf = null; // 已选保质期 'value|unit'（shelf 模式单选）
+var scanDate = null;  // all 模式顺带选中的生产日期（date/expire/shelf 模式点 chip 即填即关，无选中态）
 var scanMode = 'all'; // 'all'=名称入口；'date'=生产日期；'expire'=到期日期（锚词优先）；'shelf'=保质期
 
 async function startScan(mode) {
@@ -380,7 +379,6 @@ async function startScan(mode) {
   lastShelfLives = [];
   scanPicked = [];
   scanDate = null;
-  scanShelf = null;
   scanDeadline = Date.now() + 30000;   // 30s 无果自动停帧（节流云调用），层保留可手动关
   scanTimer = setInterval(captureFrame, 1300);
 }
@@ -451,12 +449,12 @@ function renderChips() {
   var dates = (scanDate && dateSrc.indexOf(scanDate) < 0 ? [scanDate] : []).concat(dateSrc);
   var shelfs = scanMode === 'shelf' ? lastShelfLives : [];
   if (texts.length === 0 && dates.length === 0 && shelfs.length === 0) { return; }
-  $('scanTip').textContent = (scanPicked.length > 0 || scanDate || scanShelf)
+  $('scanTip').textContent = (scanPicked.length > 0 || scanDate)
     ? '继续点选，完成后点下方按钮填入'
-    : (scanMode === 'shelf' ? '点选 ⏳ 保质期'
+    : (scanMode === 'shelf' ? '点 ⏳ 保质期直接填入'
     : (scanMode === 'expire'
-        ? (lastExpireDates.length > 0 ? '已识别到期标注，点选 📅 日期' : '点选 📅 到期日期')
-        : (scanMode === 'date' ? '点选 📅 生产日期' : '点选名称词（可多选拼接）和 📅 生产日期')));
+        ? (lastExpireDates.length > 0 ? '已识别到期标注，点 📅 日期直接填入' : '点 📅 到期日期直接填入')
+        : (scanMode === 'date' ? '点 📅 生产日期直接填入' : '点选名称词（可多选拼接）和 📅 生产日期')));
   var html = texts.map(function (t) {
     var i = scanPicked.indexOf(t);
     return '<button class="scan-chip' + (i >= 0 ? ' on' : '') + '" data-t="' + MAT.esc(t) + '" onclick="toggleCand(this)">'
@@ -467,18 +465,14 @@ function renderChips() {
   }).join('');
   html += shelfs.map(function (sl) {
     var key = sl.value + '|' + sl.unit;
-    return '<button class="scan-chip shelf' + (scanShelf === key ? ' on' : '') + '" data-t="' + key + '" onclick="toggleShelf(this)">⏳ '
+    return '<button class="scan-chip shelf" data-t="' + key + '" onclick="toggleShelf(this)">⏳ '
       + sl.value + ' ' + (sl.unit === '月' ? '个月' : '天') + '</button>';
   }).join('');
   $('scanCands').innerHTML = html;
   var btn = $('scanConfirm');
   var parts = [];
   if (scanPicked.length > 0) { parts.push(scanPicked.join('')); }
-  if (scanDate) { parts.push((scanMode === 'expire' ? '到期日期 ' : '生产日期 ') + scanDate); }
-  if (scanShelf) {
-    var sp = scanShelf.split('|');
-    parts.push('保质期 ' + sp[0] + ' ' + (sp[1] === '月' ? '个月' : '天'));
-  }
+  if (scanDate) { parts.push('生产日期 ' + scanDate); }
   if (parts.length > 0) {
     btn.style.display = '';
     btn.textContent = '填入：' + parts.join(' · ');
@@ -489,7 +483,7 @@ function renderChips() {
 
 // 有任何选择即暂停抓帧（候选固定不跳动、省 OCR 调用）；全部取消则恢复识别
 function _syncScanPause() {
-  if (scanPicked.length > 0 || scanDate || scanShelf) {
+  if (scanPicked.length > 0 || scanDate) {
     if (scanTimer) { clearInterval(scanTimer); scanTimer = null; }
   } else if (!scanTimer && scanStream) {
     scanDeadline = Date.now() + 30000;
@@ -497,12 +491,14 @@ function _syncScanPause() {
   }
 }
 
-// 保质期单选：再点取消，点别的换选
+// 保质期 chip（仅 shelf 模式）：点一次直接填入并关层。
+// 扫描点选视同手输 —— 之后同名匹配不覆盖
 function toggleShelf(btn) {
-  var k = btn.getAttribute('data-t');
-  scanShelf = scanShelf === k ? null : k;
-  _syncScanPause();
-  renderChips();
+  var p = btn.getAttribute('data-t').split('|');
+  $('fShelf').value = p[0];
+  shelfAutoFilled = false;
+  stopScan();
+  setUnit(p[1] === '月' ? '月' : '天');   // 内部 autoExpire → 联动到期日 + refresh
 }
 
 function toggleCand(btn) {
@@ -513,40 +509,32 @@ function toggleCand(btn) {
   renderChips();
 }
 
-// 生产日期单选：再点取消，点别的换选
+// 日期 chip：date/expire 模式点一次直接填入并关层（单值无需确认）；
+// all 模式（名称扫描顺带的日期）保持单选切换，随名称一起确认
 function toggleDate(btn) {
   var d = btn.getAttribute('data-t');
+  if (scanMode === 'date') {
+    $('fProduce').value = d;
+    stopScan();
+    autoExpire();   // 生产日期落值 → 有保质期时立即推算到期日
+    return;
+  }
+  if (scanMode === 'expire') {
+    $('fExpire').value = d;
+    $('autoTag').style.display = 'none';   // 等同手改语义，不反向推算
+    stopScan();
+    refresh();
+    return;
+  }
   scanDate = scanDate === d ? null : d;
   _syncScanPause();
   renderChips();
 }
 
+// 确认按钮仅名称扫描（all 模式）使用：多选拼接名称 + 顺带选中的生产日期一起填入。
+// date/expire/shelf 模式点 chip 即填即关，不经此处
 function confirmPick() {
-  if (scanPicked.length === 0 && !scanDate && !scanShelf) { return; }
-  if (scanMode === 'shelf') {
-    // 保质期：填值 + 切单位（setUnit 内部 autoExpire → 有生产日期时立即推算到期日）。
-    // 扫描点选是用户主动行为，视同手输 —— 之后同名匹配不覆盖
-    if (scanShelf) {
-      var sp = scanShelf.split('|');
-      $('fShelf').value = sp[0];
-      shelfAutoFilled = false;
-      stopScan();
-      setUnit(sp[1] === '月' ? '月' : '天');
-    } else {
-      stopScan();
-    }
-    return;
-  }
-  if (scanMode === 'expire') {
-    // 到期日期：等同手改语义 —— 直接落值、去「自动」标，不调 autoExpire（防被 生产日期+保质期 重算覆盖）
-    if (scanDate) {
-      $('fExpire').value = scanDate;
-      $('autoTag').style.display = 'none';
-    }
-    stopScan();
-    refresh();
-    return;
-  }
+  if (scanPicked.length === 0 && !scanDate) { return; }
   if (scanPicked.length > 0) {
     $('fName').value = scanPicked.join('');
   }
