@@ -57,7 +57,7 @@
       <div class="flabel">生产日期</div>
       <div class="frow">
         <input class="finput" id="fProduce" type="date" oninput="autoExpire()" onchange="autoExpire()">
-        <button class="gen-btn" onclick="startScan()">
+        <button class="gen-btn" onclick="startScan('date')">
           <svg class="ic" viewBox="0 0 24 24"><path d="M12 15.2a3.2 3.2 0 1 0 0-6.4a3.2 3.2 0 0 0 0 6.4M9 3L7.17 5H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-3.17L15 3zm3 15a5 5 0 1 1 0-10a5 5 0 0 1 0 10"/></svg>扫描
         </button>
       </div>
@@ -343,8 +343,10 @@ var lastCands = [];   // 最近一帧名称候选文本（未选中的随帧刷�
 var lastDates = [];   // 最近一帧日期候选（yyyy-MM-dd，归一化自中英文各种格式）
 var scanPicked = [];  // 已选名称词，按点击顺序拼接；有选择期间暂停抓帧防列表跳动
 var scanDate = null;  // 已选生产日期（单选）
+var scanMode = 'all'; // 'all'=名称入口（名称+日期候选）；'date'=生产日期入口（只显示日期候选）
 
-async function startScan() {
+async function startScan(mode) {
+  scanMode = mode === 'date' ? 'date' : 'all';
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
     MAT.showToast('当前环境不支持相机，请手动输入');
     return;
@@ -359,7 +361,7 @@ async function startScan() {
   $('scanLayer').style.display = '';
   $('scanCands').innerHTML = '';
   $('scanConfirm').style.display = 'none';
-  $('scanTip').textContent = '对准食材包装上的名称';
+  $('scanTip').textContent = scanMode === 'date' ? '对准包装上的生产日期' : '对准食材包装上的名称';
   scanBusy = false;
   lastCands = [];
   lastDates = [];
@@ -415,14 +417,17 @@ function renderCands(cands, dates) {
   renderChips();
 }
 
-// 名称：已选固定在前（带序号高亮）；日期：📅 chip 单选；未选候选随帧刷新
+// 名称：已选固定在前（带序号高亮）；日期：📅 chip 单选；未选候选随帧刷新。
+// date 模式（生产日期入口）只显示日期候选，名称词不渲染
 function renderChips() {
-  var texts = scanPicked.concat(lastCands.filter(function (t) { return scanPicked.indexOf(t) < 0; }));
+  var texts = scanMode === 'date'
+    ? []
+    : scanPicked.concat(lastCands.filter(function (t) { return scanPicked.indexOf(t) < 0; }));
   var dates = (scanDate && lastDates.indexOf(scanDate) < 0 ? [scanDate] : []).concat(lastDates);
   if (texts.length === 0 && dates.length === 0) { return; }
   $('scanTip').textContent = (scanPicked.length > 0 || scanDate)
     ? '继续点选，完成后点下方按钮填入'
-    : '点选名称词（可多选拼接）和 📅 生产日期';
+    : (scanMode === 'date' ? '点选 📅 生产日期' : '点选名称词（可多选拼接）和 📅 生产日期');
   var html = texts.map(function (t) {
     var i = scanPicked.indexOf(t);
     return '<button class="scan-chip' + (i >= 0 ? ' on' : '') + '" data-t="' + MAT.esc(t) + '" onclick="toggleCand(this)">'
