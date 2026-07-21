@@ -40,6 +40,22 @@ namespace SnowmeetApi.Controllers
                 data = l
             });
         }
+        // 食材过期提醒·标签打印：全表查询（不按 shop 过滤——FnbMaterialBatch 本身不分店，
+        // BLE 扫描的物理距离已经是唯一有效的筛选边界，拉全表不会导致跨店误连）。
+        // 与 GetPrinters（未包 ApiResult，两个存量调用方依赖原始数组返回，不可改）、
+        // GetPrinterByScene（按店过滤，服务养护流程）是三个并存但语义不同的口子，勿合并。
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<List<Printer>>>> GetAllPrinters()
+        {
+            List<Printer> l = await _db.printer.Where(p => p.valid)
+                .OrderBy(p => p.region).ThenBy(p => p.sort).AsNoTracking().ToListAsync();
+            return Ok(new ApiResult<List<Printer>>()
+            {
+                code = 0,
+                message = "",
+                data = l
+            });
+        }
         [HttpGet]
         public async Task<ActionResult<ApiResult<List<PrintTask>>>> RefreshPrintTask(string shop, DateTime startDate)
         {

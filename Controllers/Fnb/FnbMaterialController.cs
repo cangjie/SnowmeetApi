@@ -162,21 +162,31 @@ namespace SnowmeetApi.Controllers.Fnb
         }
 
         // 业务接口统一鉴权：会话有效 且 当前仍关联在职 staff。失败返 null（调用方统一 code=2 →
-        // 前端清 key 重走 OAuth，离职员工在 OAuthLogin 处被明确拒绝）
+        // 前端清 key 重走 OAuth，离职员工在 OAuthLogin 处被明确拒绝）。
+        // 2026-07-21 新增小程序旁路：企微 H5 走 wecom_userid session（第一分支，字节不变，老用户
+        // 零行为差异）；失败时退回小程序自身的员工会话（session_type=wechat_mini_openid），复用
+        // Util.GetStaffBySessionKey（MemberAdminController/CareController/RentController 同款，内部
+        // 已校验 staff.valid==1，不额外加 title_level 门槛——任何能登录小程序的在职员工即可用）。
+        // 落库审计字符串（create_userid/dispose_userid/UploadFile.owner）此路径下不是真企微 UserId，
+        // 用 "mini#{staff.id}:{staff.name}" 代替，本控制器内没有代码把它当企微 UserId 反查，纯审计可读。
         [NonAction]
         private async Task<(string userId, int staffId)?> _requireStaff(string sessionKey)
         {
             string userId = await _getWecomUserId(sessionKey);
-            if (userId == null)
+            if (userId != null)
+            {
+                int? staffId = await _resolveStaffId(userId);
+                if (staffId != null)
+                {
+                    return (userId, (int)staffId);
+                }
+            }
+            Staff miniStaff = await Util.GetStaffBySessionKey(_db, sessionKey, "wechat_mini_openid");
+            if (miniStaff == null)
             {
                 return null;
             }
-            int? staffId = await _resolveStaffId(userId);
-            if (staffId == null)
-            {
-                return null;
-            }
-            return (userId, (int)staffId);
+            return ("mini#" + miniStaff.id + ":" + miniStaff.name, miniStaff.id);
         }
 
         // ====== 状态派生（唯一口径，前端 deriveStatus 与此一致） ======
