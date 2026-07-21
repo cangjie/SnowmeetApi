@@ -306,8 +306,8 @@ async function onFiles(files) {
     uploading++;
     refresh();
     try {
-      var data = await MAT.api('UploadPhoto', { formData: fd });
-      photos.push({ id: data.id, path: data.file_path_name });
+      var data = await MAT.uploadPhoto(fd);
+      photos.push({ id: data.id, path: MAT.imgUrl(data.file_path_name) });
       renderPhotos();
     } catch (e) {
       MAT.showToast('照片上传失败：' + e.message);
@@ -605,7 +605,7 @@ async function loadForEdit(id) {
     $('autoTag').style.display = 'none';
     if (b.image_ids) {
       var imgs = await MAT.api('GetImages', { params: { ids: b.image_ids } });
-      photos = (imgs || []).map(function (im) { return { id: im.id, path: im.file_path_name }; });
+      photos = (imgs || []).map(function (im) { return { id: im.id, path: MAT.imgUrl(im.file_path_name) }; });
       renderPhotos();
     }
     refresh();

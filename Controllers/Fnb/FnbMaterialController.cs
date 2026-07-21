@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -372,7 +373,11 @@ namespace SnowmeetApi.Controllers.Fnb
 
         // 现场照片薄上传：存盘 + UploadFile 落库逻辑照抄 UploadFileController.UploadFileWithThumb，
         // 但鉴权走 wecom 会话（原接口要求 staff，与本 H5 用户体系不兼容）。staff_id=null、owner=企微 UserId
+        // 2026-07-21：图片统一落这台服务器（部署为 snowmeet.wanlonghuaxue.com）磁盘；H5 页面托管在
+        // mini.snowmeet.top，跨域调用本接口需要 CORS（见 Startup.cs MatExpireUpload 策略）；小程序端
+        // wx.uploadFile 不受浏览器 CORS 约束，天然生效
         [HttpPost]
+        [EnableCors("MatExpireUpload")]
         public async Task<ActionResult<ApiResult<object>>> UploadPhoto(IFormFile file, [FromQuery] string sessionKey)
         {
             var ctx = await _requireStaff(sessionKey);

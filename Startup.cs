@@ -42,6 +42,17 @@ namespace SnowmeetApi
             string conStr = Util.GetSqlServerConnectionString();
 
 
+            // 2026-07-21：mat_expire H5（企微内浏览器，托管于 mini.snowmeet.top）改为把图片上传到
+            // snowmeet.wanlonghuaxue.com（与养护开单/小程序端一致），这是浏览器场景下的真跨域请求，
+            // 需要服务端放行 CORS 才能读到 JSON 响应。只给这一个上传接口开（[EnableCors] 精确打标），
+            // 不设默认策略，其余接口不受影响。
+            services.AddCors(options =>
+            {
+                options.AddPolicy("MatExpireUpload", policy =>
+                {
+                    policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader();
+                });
+            });
             services.AddControllers();
             services.AddDbContext<ApplicationDBContext>(
                 options => options.UseSqlServer(conStr, o => o.CommandTimeout(3600))
@@ -73,6 +84,7 @@ namespace SnowmeetApi
                 c.SwaggerEndpoint("/swagger/v2/swagger.json", "SnowmeetApi v2");
             });
             app.UseRouting();
+            app.UseCors(); // 不带默认策略名——只有标了 [EnableCors("...")] 的接口会应用对应策略
             app.UseAuthorization();
             app.UseEndpoints(endpoints =>
             {

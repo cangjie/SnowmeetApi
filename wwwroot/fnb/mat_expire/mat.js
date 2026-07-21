@@ -5,6 +5,10 @@ var MAT = (function () {
   var CORP_ID = 'ww3a46c4555ae069f9';   // 与 FnbWeComController.CORP_ID 一致
   var AGENT_ID = 1000009;               // 餐饮通知自建应用
   var API_BASE = '/api/FnbMaterial/';
+  // 2026-07-21：图片统一落 snowmeet.wanlonghuaxue.com（与小程序端/养护开单一致），与其余业务接口
+  // （相对路径 API_BASE，同源随 H5 部署域名走）分开——只有 UploadPhoto 走这个跨域绝对地址
+  var IMG_HOST = 'https://snowmeet.wanlonghuaxue.com';
+  var UPLOAD_BASE = IMG_HOST + '/api/FnbMaterial/';
   var SK_KEY = 'fnb_mat_sessionKey';
 
   function getSessionKey() { return localStorage.getItem(SK_KEY) || ''; }
@@ -107,6 +111,29 @@ var MAT = (function () {
     return json.data;
   }
 
+  // 照片上传专用：跨域 fetch 到 UPLOAD_BASE（snowmeet.wanlonghuaxue.com），与 api() 走的同源
+  // API_BASE 不同域，后端已对 UploadPhoto 开 CORS（见 Startup.cs MatExpireUpload 策略）
+  async function uploadPhoto(formData) {
+    var qs = new URLSearchParams();
+    qs.set('sessionKey', getSessionKey());
+    var res = await fetch(UPLOAD_BASE + 'UploadPhoto?' + qs.toString(), { method: 'POST', body: formData });
+    if (!res.ok) { throw new Error('HTTP ' + res.status); }
+    var json = await res.json();
+    if (json.code === 2) {
+      clearSessionKey();
+      gotoOAuth();
+      throw new Error('会话失效');
+    }
+    if (json.code !== 0) { throw new Error(json.message || '上传失败'); }
+    return json.data;
+  }
+
+  // file_path_name（相对路径）→ 绝对图片地址；已是绝对地址（http 开头）时原样返回
+  function imgUrl(p) {
+    if (!p) { return ''; }
+    return p.indexOf('http') === 0 ? p : IMG_HOST + p;
+  }
+
   // ---- 状态派生（与后端 FnbMaterialController.DeriveStatus 同口径）----
   // batch.expire_date 形如 '2026-07-15T00:00:00'；today 用 GetBatches 返回的服务器日期 'yyyy-MM-dd'
   function deriveStatus(batch, today) {
@@ -155,6 +182,8 @@ var MAT = (function () {
   return {
     ensureSession: ensureSession,
     api: api,
+    uploadPhoto: uploadPhoto,
+    imgUrl: imgUrl,
     deriveStatus: deriveStatus,
     addDays: addDays,
     fmtDate: fmtDate,
