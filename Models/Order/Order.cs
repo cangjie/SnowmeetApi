@@ -695,6 +695,16 @@ namespace SnowmeetApi.Models
                 return discounts.Count > 0;
             }
         }
+        // 本单是否挂着有效的零售子订单（如租赁退押金时顺带卖出的次卡，见 FinalizePunchCardSale）——
+        // 列表页「零」标签 / 筛选用，不区分具体是哪种零售。
+        [NotMapped]
+        public bool hasRetail
+        {
+            get
+            {
+                return retails != null && retails.Any(r => r.valid == 1);
+            }
+        }
         [NotMapped]
         public string orderStatus
         {

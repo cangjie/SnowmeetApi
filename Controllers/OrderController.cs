@@ -158,7 +158,8 @@ namespace SnowmeetApi.Controllers
             bool? isTest = null, bool? isEntertain = null, bool? isPackage = null, bool? isOnCredit = null,
             bool? haveDiscount = null, string? status = null, DateTime? closeStartDate = null, DateTime? closeEndDate = null,
             bool? haveWarranty = null, string? retailType = null, string? keyword = null, bool? isSummerCare = null,
-            int? rentCategoryId = null, string? rentItemName = null, bool? useCard = null, string? cell = null, string? rentStatus = null)
+            int? rentCategoryId = null, string? rentItemName = null, bool? useCard = null, string? cell = null, string? rentStatus = null,
+            bool? hasRetail = null)
         {
             startDate = startDate == null ? DateTime.MinValue : startDate;
             endDate = endDate == null ? DateTime.MaxValue : endDate;
@@ -186,6 +187,7 @@ namespace SnowmeetApi.Controllers
                         )
                         && (useCard == null || useCard == (o.rentals.Any(r => r.valid == 1 && r.use_card==true)
                             || _db.punchCardUsed.Any(u => u.order_id == o.id && u.valid)))
+                        && (hasRetail == null || hasRetail == o.retails.Any(r => r.valid == 1))
 
                     )
                     .Include(o => o.rentals.Where(r => r.valid == 1 && (r.appending == null || (r.appending == false && r.append_commit_time != null)))).ThenInclude(r => r.details.Where(d => d.valid == 1)).ThenInclude(d => d.discounts.Where(d => d.valid == 1 && d.sub_biz_type == "日租金"))
@@ -1120,7 +1122,7 @@ namespace SnowmeetApi.Controllers
             bool? isPackage = null, bool? isOnCredit = null, bool? haveDiscount = null, string? status = null, string? cell = null,
             bool? haveWarranty = null, string? retailType = null, string? keyword = null, bool? isSummerCare = null,
             int? rentCategoryId = null, string? rentItemName = null, bool? useCard = null, string? rentStatus = null,
-            int pageIndex = 1, int pageSize = 10)
+            bool? hasRetail = null, int pageIndex = 1, int pageSize = 10)
         {
             shop = shop == null ? null : Util.UrlDecode(shop);
             type = type == null ? null : Util.UrlDecode(type);
@@ -1153,7 +1155,7 @@ namespace SnowmeetApi.Controllers
             }
             List<SnowmeetApi.Models.Order> orders = await GetCommonOrders(orderId, shop, null, null, type, startDate, endDate, payOption,
                 isTest, isEntertain, isPackage, isOnCredit, haveDiscount, status, null, null, haveWarranty, retailType, keyword, isSummerCare,
-                rentCategoryId, rentItemName, useCard, cell, rentStatus);
+                rentCategoryId, rentItemName, useCard, cell, rentStatus, hasRetail);
             List<SnowmeetApi.Models.Order> filtered = cell != null
                 ? orders.Where(o => o.customerCell.EndsWith(cell)).ToList()
                 : orders;
