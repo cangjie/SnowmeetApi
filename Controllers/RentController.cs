@@ -6023,6 +6023,7 @@ namespace SnowmeetApi.Controllers
                 product_id = req.productId,
                 deal_price = calc.product.sale_price,
                 sale_price = calc.product.sale_price,
+                order_type = "租赁附加",
                 retail_type = "租赁卡类",
                 valid = 0,
                 memo = "购买次卡待补差价"
@@ -6176,6 +6177,7 @@ namespace SnowmeetApi.Controllers
                     product_id = req.productId,
                     deal_price = calc.product.sale_price,
                     sale_price = calc.product.sale_price,
+                    order_type = "租赁附加",
                     retail_type = "租赁卡类",
                     valid = 1,
                     memo = "购买次卡"

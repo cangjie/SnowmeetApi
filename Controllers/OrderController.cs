@@ -844,6 +844,10 @@ namespace SnowmeetApi.Controllers
                                 }
                                 retail.deal_price = product.sale_price;
                                 retail.sale_price = product.sale_price;
+                                if (retail.order_type == null)
+                                {
+                                    retail.order_type = "租赁附加";
+                                }
                             }
                         }
                         break;
