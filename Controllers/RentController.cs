@@ -5941,13 +5941,14 @@ namespace SnowmeetApi.Controllers
                 calc.errorMessage = "本单应核销次数超过次卡总次数，无法购买";
                 return calc;
             }
-            calc.freedRentValue = q.queue.Take(punchCountNow).Sum(d => d.amount);
+            calc.freedRentValue = Math.Round(q.queue.Take(punchCountNow).Sum(d => d.amount), 2);
             // 核销前应退押金：照抄前端已验证的公式（不信任 order.totalRentNeedToRefundAmount，
             // 该 getter 在 GetOrder 路径下因 guarantys 未 Include 恒为 0）
-            calc.refundableDepositBeforeCard = Math.Min(order.totalGuarantyAmount ?? 0, order.paidAmount)
-                - (order.totalRentSummaryAmount ?? 0) + order.depositPaidAmount;
-            calc.totalBenefit = calc.refundableDepositBeforeCard + calc.freedRentValue;
-            calc.priceDiff = product.sale_price - calc.totalBenefit;
+            calc.refundableDepositBeforeCard = Math.Round(Math.Min(order.totalGuarantyAmount ?? 0, order.paidAmount)
+                - (order.totalRentSummaryAmount ?? 0) + order.depositPaidAmount, 2);
+            calc.totalBenefit = Math.Round(calc.refundableDepositBeforeCard + calc.freedRentValue, 2);
+            // 浮点数直接相减会有精度误差（如 0.03-0.02 显示成 0.00999999999999998），四舍五入到分
+            calc.priceDiff = Math.Round(product.sale_price - calc.totalBenefit, 2);
             return calc;
         }
 
@@ -6154,41 +6155,9 @@ namespace SnowmeetApi.Controllers
                 await _db.orderPayment.AddAsync(cashPayment);
                 await _db.SaveChangesAsync();
             }
-            else if (method == "deposit")
-            {
-                if (calc.priceDiff <= 0)
-                {
-                    return Ok(new ApiResult<Models.Order?>() { code = 1, message = "本次无需补差价", data = null });
-                }
-                MemberController _memberHelperLocal = new MemberController(_db, _config);
-                Member member = await _memberHelperLocal.GetWholeMemberById((int)order.member_id);
-                if (member == null || Math.Round(member.availableDeposit, 2) < Math.Round(calc.priceDiff, 2))
-                {
-                    return Ok(new ApiResult<Models.Order?>() { code = 1, message = "储值余额不足", data = null });
-                }
-                DepositController _depositHelper = new DepositController(_db, _config);
-                OrderPayment depositPayment = new OrderPayment()
-                {
-                    id = 0,
-                    order_id = orderId,
-                    pay_method = "储值支付",
-                    staff_id = staff.id,
-                    member_id = order.member_id,
-                    amount = calc.priceDiff,
-                    status = "待支付",
-                    deposit_type = "服务储值",
-                    create_date = DateTime.Now
-                };
-                await _db.orderPayment.AddAsync(depositPayment);
-                await _db.SaveChangesAsync();
-                List<DepositBalance> balances = await _depositHelper.ConsumeDeposit(depositPayment);
-                if (balances == null)
-                {
-                    return Ok(new ApiResult<Models.Order?>() { code = 1, message = "储值消费失败", data = null });
-                }
-            }
             else
             {
+                // 购买次卡不支持储值扣款结算（不信任客户端传来的 method，服务端明确拒绝）
                 return Ok(new ApiResult<Models.Order?>() { code = 1, message = "未知的结算方式", data = null });
             }
 
