@@ -38,6 +38,7 @@ namespace SnowmeetApi.Models
         public DateTime create_date { get; set; } = DateTime.Now;
         public int sell_out { get; set; } = 0;
         public int? award_score { get; set; } = null;
+        public int? punch_total { get; set; } = null; // 仅 type=="租赁次卡" 时有意义：该 SKU 赠送的总次数
         [ForeignKey("category_id")]
         public Category? category { get; set; } = null;
         public ProductTicketTemplate? productTicketTemplate {get; set;} = null;

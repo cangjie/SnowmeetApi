@@ -22,6 +22,10 @@ namespace SnowmeetApi.Models
         public string? equip_serial { get; set; }
         public DateTime? update_date { get; set; }
         public DateTime create_date { get; set; } = DateTime.Now;
+        public int? source_retail_id { get; set; } = null;   // 该卡由哪笔 retail 销售生成；GrantPunchCard 白送/旧数据为 null
+
+        [ForeignKey("source_retail_id")]
+        public Retail? sourceRetail { get; set; } = null;
 
         [NotMapped]
         public int? remaining => total == null ? null : total.Value - (punches ?? 0);   // 剩余次数；季卡 NULL

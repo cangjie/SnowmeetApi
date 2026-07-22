@@ -65,6 +65,8 @@ namespace SnowmeetApi.Controllers
             }
             if (order.type == "租赁")
             {
+                // 一个租赁订单也可能挂零售明细（如购买次卡的销售记录，见 FinalizePunchCardSale），一并加载
+                order.retails = await _db.order.Entry(order).Collection(o => o.retails).Query().Where(r => r.valid == 1).AsNoTracking().ToListAsync();
                 order.rentals = await _db.order.Entry(order).Collection(o => o.rentals).Query().AsNoTracking()
                     .Include(r => r.discounts.Where(d => d.valid == 1 && d.biz_type.Trim().Equals("租赁"))).AsNoTracking()
                     .Include(r => r.details.Where(d => d.valid == 1)).AsNoTracking()
@@ -189,6 +191,8 @@ namespace SnowmeetApi.Controllers
                     .Include(o => o.rentals.Where(r => r.valid == 1 && (r.appending == null || (r.appending == false && r.append_commit_time != null)))).ThenInclude(r => r.rentItems.Where(r => r.valid == 1))
                         .ThenInclude(i => i.category)//.ThenInclude(c => c.father)
                     .Include(o => o.rentals.Where(r => r.valid == 1 && (r.appending == null || (r.appending == false && r.append_commit_time != null)))).ThenInclude(r => r.rentItems.Where(r => r.valid == 1)).ThenInclude(i => i.logs)
+                    // 一个租赁订单也可能挂零售明细（如购买次卡的销售记录，见 FinalizePunchCardSale），一并加载
+                    .Include(o => o.retails.Where(r => r.valid == 1))
                     .Include(o => o.payments).ThenInclude(p => p.staff)
                     .Include(o => o.payments).ThenInclude(p => p.refunds)
                     .Include(o => o.refunds)
@@ -826,6 +830,20 @@ namespace SnowmeetApi.Controllers
                             if (retail.retail_type == null)
                             {
                                 retail.retail_type = "零售";
+                            }
+                            // 关联了商品目录（如次卡类 SKU）的行：价格由服务端从 Product.sale_price 取，
+                            // 不信任客户端传来的 deal_price/sale_price——只影响带 product_id 的行，
+                            // 现有"店员手输价格"的零售单（product_id 为空）行为不变。
+                            if (retail.product_id != null)
+                            {
+                                Product product = await _db.product.Where(p => p.id == retail.product_id
+                                    && p.valid == 1 && p.on_shelves == 1).AsNoTracking().FirstOrDefaultAsync();
+                                if (product == null)
+                                {
+                                    return Ok(new ApiResult<Models.Order?>() { code = 1, message = "商品不存在或已下架", data = null });
+                                }
+                                retail.deal_price = product.sale_price;
+                                retail.sale_price = product.sale_price;
                             }
                         }
                         break;
@@ -2298,6 +2316,36 @@ namespace SnowmeetApi.Controllers
                     CareController _careHelper = new CareController(_db, _config, _http);
                     await _careHelper.EffectCareOrder(order.id);
                     break;
+                case "零售":
+                    // 顾客自助购买次卡：支付成功后自动发卡。punch_card_id==null 天然做幂等守卫，
+                    // 防止支付回调重复触发时重复发卡（order 本身是裸加载，未 Include retails，需现查）。
+                    List<Retail> retailsToGrant = await _db.retail
+                        .Where(r => r.order_id == order.id && r.valid == 1 && r.product_id != null && r.punch_card_id == null)
+                        .ToListAsync();
+                    for (int ri = 0; ri < retailsToGrant.Count; ri++)
+                    {
+                        Retail retail = retailsToGrant[ri];
+                        Product product = await _db.product.Where(p => p.id == retail.product_id).AsNoTracking().FirstOrDefaultAsync();
+                        if (product != null && product.punch_total != null && order.member_id != null)
+                        {
+                            PunchCard card = new PunchCard()
+                            {
+                                biz_type = "租赁",
+                                card_name = product.name,
+                                member_id = (int)order.member_id,
+                                total = product.punch_total,
+                                punches = 0,
+                                source_retail_id = retail.id,
+                                create_date = DateTime.Now
+                            };
+                            await _db.punchCard.AddAsync(card);
+                            await _db.SaveChangesAsync();   // 先落 card.id，供下面回填
+                            retail.punch_card_id = card.id;
+                            _db.retail.Entry(retail).State = EntityState.Modified;
+                        }
+                    }
+                    await _db.SaveChangesAsync();
+                    break;
                 case "雪票":
                     CoreDataModLog orderSkiPassLog = CoreDataModLog.CreateManualLog("Order", "", order.id, "雪票支付回调", null, null, null,
                         paymentId.ToString(), "支付成功，开始生成雪票");
@@ -2759,21 +2807,14 @@ namespace SnowmeetApi.Controllers
                 data = order
             });
         }
-        [HttpPost("{orderId}")]
-        public async Task<ActionResult<ApiResult<Models.Order?>>> Refund([FromRoute] int orderId,
-        [FromBody] List<OrderPaymentRefund> refunds, [FromQuery] string sessionKey, [FromQuery] string sessionType = "wechat_mini_openid")
+        // 共享：Refund 的核心逻辑（按支付记录分摊校验 + 第三方退款调用 + 全额退完后的收尾清理）。
+        // 抽出来是为了让 RentController.FinalizePunchCardSale（购买次卡的"多退"结算腿）能直接复用，
+        // 不用再走一遍 HTTP、也不用重复实现"按支付记录分摊+调支付宝/微信退款"这段逻辑。
+        // 调用方负责准备好 order（已 GetOrder 加载）、staff、和已经算好金额的 refunds 列表。
+        [NonAction]
+        public async Task<ApiResult<Models.Order?>> RefundCore(Models.Order order, Staff staff, List<OrderPaymentRefund> refunds)
         {
-            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
-            if (staff == null || staff.title_level < 100)
-            {
-                return Ok(new ApiResult<Models.Order?>()
-                {
-                    code = 1,
-                    message = "没有权限",
-                    data = null
-                });
-            }
-            Models.Order order = await GetOrder(orderId);
+            int orderId = order.id;
             string message = "";
             for (int i = 0; i < refunds.Count; i++)
             {
@@ -2809,12 +2850,7 @@ namespace SnowmeetApi.Controllers
             }
             if (!message.Trim().Equals(""))
             {
-                return Ok(new ApiResult<Models.Order?>()
-                {
-                    code = 1,
-                    message = message,
-                    data = null
-                });
+                return new ApiResult<Models.Order?>() { code = 1, message = message, data = null };
             }
             await _db.SaveChangesAsync();
             AliController _aliHelper = new AliController(_db, _config, _http);
@@ -2873,12 +2909,51 @@ namespace SnowmeetApi.Controllers
 
             }
 
-            return Ok(new ApiResult<Models.Order?>()
+            return new ApiResult<Models.Order?>() { code = 0, message = "", data = order };
+        }
+
+        // 共享：把一笔待退款金额，按顺序贪心分摊到订单当前可退的支付记录上（排除储值支付——
+        // 储值付租金不走这条退款通道）。照抄前端 rent_order_detail.js 里 _allocateRefund 的口径，
+        // 服务端复刻一份供 FinalizePunchCardSale 这类"服务端权威算金额、不接受客户端分摊结果"的
+        // 新流程使用；amount 不足以被现有支付记录覆盖时返回 null。
+        [NonAction]
+        public List<OrderPaymentRefund> AllocateRefundAcrossPayments(Models.Order order, double amount, string reason)
+        {
+            amount = Math.Round(amount, 2);
+            if (amount <= 0) return new List<OrderPaymentRefund>();
+            List<OrderPaymentRefund> refunds = new List<OrderPaymentRefund>();
+            double remain = amount;
+            foreach (OrderPayment p in order.availablePayments)
             {
-                code = 0,
-                message = "",
-                data = order
-            });
+                if (remain <= 0) break;
+                if (p.status != "支付成功" || (p.pay_method != null && p.pay_method.Trim() == "储值支付")) continue;
+                double payable = Math.Round(p.unRefundedAmount, 2);
+                if (payable <= 0) continue;
+                double take = Math.Min(payable, remain);
+                refunds.Add(new OrderPaymentRefund() { payment_id = p.id, amount = take, reason = reason });
+                remain = Math.Round(remain - take, 2);
+            }
+            if (remain > 0.001) return null;   // 现有支付记录覆盖不了这个金额
+            return refunds;
+        }
+
+        [HttpPost("{orderId}")]
+        public async Task<ActionResult<ApiResult<Models.Order?>>> Refund([FromRoute] int orderId,
+        [FromBody] List<OrderPaymentRefund> refunds, [FromQuery] string sessionKey, [FromQuery] string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            if (staff == null || staff.title_level < 100)
+            {
+                return Ok(new ApiResult<Models.Order?>()
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = null
+                });
+            }
+            Models.Order order = await GetOrder(orderId);
+            ApiResult<Models.Order?> result = await RefundCore(order, staff, refunds);
+            return Ok(result);
         }
         [HttpGet("{tempOrderId}")]
         public async Task<ActionResult<ApiResult<Models.Order>>> PlaceRentOrder(int tempOrderId,

@@ -60,6 +60,8 @@ namespace SnowmeetApi.Models
         public string memo { get; set; } = "";
         public string? retail_type {get; set;} = null;
         //public bool entertain { get; set; } = false;
+        public int? product_id { get; set; } = null;      // 关联 product 目录（次卡类 SKU 必填；旧的手工零售行仍为 null）
+        public int? punch_card_id { get; set; } = null;    // 该次销售最终生成的次卡（结算完成后回填）
         public DateTime? update_date { get; set; } = null;
         public DateTime create_date {get; set;} = DateTime.Now;
         [NotMapped]
@@ -68,6 +70,10 @@ namespace SnowmeetApi.Models
         public string backgroundColor { get; set; } = "";
         [ForeignKey("order_id")]
         public Order? order {get; set;} = null;
+        [ForeignKey("product_id")]
+        public Product? product { get; set; } = null;
+        [ForeignKey("punch_card_id")]
+        public PunchCard? punchCard { get; set; } = null;
         [NotMapped]
         public List<CoreDataModLog> logs {get; set;} = new List<CoreDataModLog>();
     }

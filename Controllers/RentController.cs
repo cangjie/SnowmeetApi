@@ -5658,6 +5658,76 @@ namespace SnowmeetApi.Controllers
             return Ok(new ApiResult<Models.Rental?>() { code = 0, message = "", data = await GetRental(rentalId) });
         }
 
+        public class SkiRentPunchQueueResult
+        {
+            public List<Models.Rental> skiRentals { get; set; } = new List<Models.Rental>();
+            public List<Models.RentalDetail> queue { get; set; } = new List<Models.RentalDetail>(); // 全局按 rental_date 升序
+        }
+
+        // 共享：本单所有含雪板雪鞋(装备品类代码前两位∈01双板/02单板/03双板鞋/04单板鞋)租赁物的
+        // valid=1 租金 rental_detail，全局按 rental_date 升序排列（跨 rental 合并排序，修正此前
+        // "每个 rental 内部排序、rental 之间按遍历顺序拼接"的细微不一致）。
+        // GetRentalPunchCardInfo / UseRentalPunchCard / PreparePunchCardSale / FinalizePunchCardSale 共用同一份，
+        // 保证"应核销天数"预览与"实际免除哪几天"完全对应。
+        private async Task<SkiRentPunchQueueResult> BuildSkiRentPunchQueue(int orderId)
+        {
+            List<Models.Rental> rentals = await _db.rental
+                .Where(r => r.order_id == orderId && r.valid == 1
+                    && (r.appending == null || (r.appending == false && r.append_commit_time != null)))
+                .Include(r => r.rentItems.Where(i => i.valid == 1)).ThenInclude(i => i.category)
+                .AsNoTracking().ToListAsync();
+            string[] skiPrefix = new string[] { "01", "02", "03", "04" };
+            List<Models.Rental> skiRentals = rentals.Where(r => r.rentItems != null && r.rentItems.Any(it => it.category != null
+                    && it.category.code != null && it.category.code.Length >= 2
+                    && skiPrefix.Contains(it.category.code.Substring(0, 2)))).ToList();
+            List<Models.RentalDetail> queue = new List<Models.RentalDetail>();
+            if (skiRentals.Count > 0)
+            {
+                List<int> skiRentalIds = skiRentals.Select(r => r.id).ToList();
+                queue = await _db.rentalDetail
+                    .Where(d => skiRentalIds.Contains(d.rental_id) && d.charge_type == "租金" && d.valid == 1)
+                    .OrderBy(d => d.rental_date).ToListAsync();
+            }
+            return new SkiRentPunchQueueResult { skiRentals = skiRentals, queue = queue };
+        }
+
+        // 共享：从（已按日期全局排序的）队列里取前 need 条翻 valid=0，按 rental 分组写 PunchCardUsed，扣卡 punches。
+        // 只改内存 + AddAsync，不调用 SaveChangesAsync——调用方负责在自己的事务边界内提交
+        // （UseRentalPunchCard 单独提交；FinalizePunchCardSale 会连同 Retail/PunchCard 一起原子提交）。
+        private async Task WriteOffSkiPunches(PunchCard card, List<Models.RentalDetail> queue, int need, int orderId, int staffId)
+        {
+            Dictionary<int, int> perRental = new Dictionary<int, int>();   // rental_id → 被免天数
+            for (int i = 0; i < need; i++)
+            {
+                Models.RentalDetail d = queue[i];
+                d.valid = 0;
+                d.update_date = DateTime.Now;
+                _db.rentalDetail.Entry(d).State = EntityState.Modified;   // 全局 NoTracking，必须显式
+                if (!perRental.ContainsKey(d.rental_id)) perRental[d.rental_id] = 0;
+                perRental[d.rental_id] += 1;
+            }
+            foreach (KeyValuePair<int, int> kv in perRental)
+            {
+                PunchCardUsed used = new PunchCardUsed()
+                {
+                    card_id = card.id,
+                    order_id = orderId,
+                    biz_type = "租赁",
+                    biz_id = kv.Key,
+                    payment_id = null,
+                    punch_count = kv.Value,
+                    valid = true,
+                    create_date = DateTime.Now
+                };
+                await _db.punchCardUsed.AddAsync(used);
+                await _db.coreDataModLog.AddAsync(CoreDataModLog.CreateManualLog("rental", "次卡消费",
+                    kv.Key, "次卡消费", null, staffId, "0", kv.Value.ToString(), "次卡免除租金"));
+            }
+            card.punches = (card.punches ?? 0) + need;
+            card.update_date = DateTime.Now;
+            _db.punchCard.Entry(card).State = EntityState.Modified;
+        }
+
         // 次卡消费：查询会员名下租赁次卡 + 本订单含雪板雪鞋的租赁商品本次需扣次数。
         // 含雪板雪鞋 rental = rentItems.category.code 前两位 ∈ {01双板,02单板,03双板鞋,04单板鞋}。
         // 某 rental 的次卡天数 = 其 rental_detail 中 charge_type='租金' && valid=1 去重 rental_date 计数（实际计费天数）。
@@ -5680,25 +5750,13 @@ namespace SnowmeetApi.Controllers
                 .Where(c => c.member_id == order.member_id && c.biz_type == "租赁"
                     && c.total != null && c.total > (c.punches ?? 0))
                 .AsNoTracking().ToListAsync();
-            List<Models.Rental> rentals = await _db.rental
-                .Where(r => r.order_id == orderId && r.valid == 1
-                    && (r.appending == null || (r.appending == false && r.append_commit_time != null)))
-                .Include(r => r.rentItems.Where(i => i.valid == 1)).ThenInclude(i => i.category)
-                .AsNoTracking().ToListAsync();
-            string[] skiPrefix = new string[] { "01", "02", "03", "04" };
+            SkiRentPunchQueueResult q = await BuildSkiRentPunchQueue(orderId);
             List<object> skiRentals = new List<object>();
             int totalPunchNeed = 0;
-            for (int i = 0; i < rentals.Count; i++)
+            foreach (Models.Rental r in q.skiRentals)
             {
-                Models.Rental r = rentals[i];
-                bool isSki = r.rentItems != null && r.rentItems.Any(it => it.category != null
-                    && it.category.code != null && it.category.code.Length >= 2
-                    && skiPrefix.Contains(it.category.code.Substring(0, 2)));
-                if (!isSki) continue;
-                List<Models.RentalDetail> details = await _db.rentalDetail
-                    .Where(d => d.rental_id == r.id && d.charge_type == "租金" && d.valid == 1)
-                    .AsNoTracking().ToListAsync();
-                var dateAmts = details.GroupBy(d => d.rental_date.Date)
+                var dateAmts = q.queue.Where(d => d.rental_id == r.id)
+                    .GroupBy(d => d.rental_date.Date)
                     .Select(g => new { date = g.Key.ToString("yyyy-MM-dd"), amount = g.Sum(x => x.amount) })
                     .OrderBy(x => x.date).ToList();
                 if (dateAmts.Count <= 0) continue;
@@ -5760,60 +5818,423 @@ namespace SnowmeetApi.Controllers
             {
                 return Ok(new ApiResult<Models.Order?>() { code = 1, message = "次卡剩余次数不足", data = null });
             }
-            List<Models.Rental> rentals = await _db.rental
-                .Where(r => r.order_id == orderId && r.valid == 1
-                    && (r.appending == null || (r.appending == false && r.append_commit_time != null)))
-                .Include(r => r.rentItems.Where(i => i.valid == 1)).ThenInclude(i => i.category)
-                .AsNoTracking().ToListAsync();
-            string[] skiPrefix = new string[] { "01", "02", "03", "04" };
-            // 所有含雪板雪鞋 rental 的 valid=1 租金 detail，按 rental_date 升序排队（tracked，待改 valid）
-            List<Models.RentalDetail> queue = new List<Models.RentalDetail>();
-            for (int i = 0; i < rentals.Count; i++)
-            {
-                Models.Rental r = rentals[i];
-                bool isSki = r.rentItems != null && r.rentItems.Any(it => it.category != null
-                    && it.category.code != null && it.category.code.Length >= 2
-                    && skiPrefix.Contains(it.category.code.Substring(0, 2)));
-                if (!isSki) continue;
-                List<Models.RentalDetail> details = await _db.rentalDetail
-                    .Where(d => d.rental_id == r.id && d.charge_type == "租金" && d.valid == 1)
-                    .OrderBy(d => d.rental_date).ToListAsync();
-                queue.AddRange(details);
-            }
+            SkiRentPunchQueueResult q = await BuildSkiRentPunchQueue(orderId);
             int need = req.punch_count;
-            if (need > queue.Count) need = queue.Count;   // 兜底：不超过实际可免天数
-            Dictionary<int, int> perRental = new Dictionary<int, int>();   // rental_id → 被免天数
-            for (int i = 0; i < need; i++)
-            {
-                Models.RentalDetail d = queue[i];
-                d.valid = 0;
-                d.update_date = DateTime.Now;
-                _db.rentalDetail.Entry(d).State = EntityState.Modified;   // 全局 NoTracking，必须显式
-                if (!perRental.ContainsKey(d.rental_id)) perRental[d.rental_id] = 0;
-                perRental[d.rental_id] += 1;
-            }
-            foreach (KeyValuePair<int, int> kv in perRental)
-            {
-                PunchCardUsed used = new PunchCardUsed()
-                {
-                    card_id = card.id,
-                    order_id = orderId,
-                    biz_type = "租赁",
-                    biz_id = kv.Key,
-                    payment_id = null,
-                    punch_count = kv.Value,
-                    valid = true,
-                    create_date = DateTime.Now
-                };
-                await _db.punchCardUsed.AddAsync(used);
-                await _db.coreDataModLog.AddAsync(CoreDataModLog.CreateManualLog("rental", "次卡消费",
-                    kv.Key, "次卡消费", null, staff.id, "0", kv.Value.ToString(), "次卡免除租金"));
-            }
-            card.punches = (card.punches ?? 0) + need;
-            card.update_date = DateTime.Now;
-            _db.punchCard.Entry(card).State = EntityState.Modified;
+            if (need > q.queue.Count) need = q.queue.Count;   // 兜底：不超过实际可免天数
+            await WriteOffSkiPunches(card, q.queue, need, orderId, staff.id);
             await _db.SaveChangesAsync();
             OrderController _orderH = new OrderController(_db, _config, _httpContextAccessor);
+            Models.Order updated = await _orderH.GetOrder(orderId);
+            return Ok(new ApiResult<Models.Order?>() { code = 0, message = "", data = updated });
+        }
+
+        // 次卡商品目录：租赁次卡类 SKU（type=="租赁次卡"，已上架且有效）。会话级即可，无需 staff 权限——
+        // 纯目录浏览，供退押金卖卡弹窗与顾客自助购买页共用。
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<object>>> GetPunchCardProducts(string? shop, string sessionKey = "")
+        {
+            var q = _db.product.Where(p => p.type == "租赁次卡" && p.valid == 1 && p.on_shelves == 1 && p.punch_total != null);
+            if (!string.IsNullOrWhiteSpace(shop))
+            {
+                string shopName = Util.UrlDecode(shop).Trim();
+                q = q.Where(p => p.shop == null || p.shop == shopName);
+            }
+            var products = await q.OrderBy(p => p.sort).ThenBy(p => p.id)
+                .Select(p => new { p.id, p.name, p.sale_price, p.punch_total, p.shop })
+                .AsNoTracking().ToListAsync();
+            return Ok(new ApiResult<object>() { code = 0, message = "", data = products });
+        }
+
+        // 次卡商品管理·列表（店长/管理员 title_level≥200）：不过滤 valid/on_shelves，管理页要能看到已下架的行。
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<object>>> GetAllPunchCardProducts(string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            if (staff == null || staff.title_level < 200)
+            {
+                return Ok(new ApiResult<object>() { code = 1, message = "没有权限", data = null });
+            }
+            var products = await _db.product.Where(p => p.type == "租赁次卡")
+                .OrderByDescending(p => p.id)
+                .Select(p => new { p.id, p.name, p.sale_price, p.punch_total, p.shop, p.valid, p.on_shelves })
+                .AsNoTracking().ToListAsync();
+            return Ok(new ApiResult<object>() { code = 0, message = "", data = products });
+        }
+
+        // 我的次卡：解析会话对应的会员本人，列出其名下租赁次卡（顾客自助购买页用，member_id 不由调用方传入）。
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<object>>> GetMyPunchCards(string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
+            if (member == null)
+            {
+                return Ok(new ApiResult<object>() { code = 1, message = "未找到会员", data = null });
+            }
+            List<PunchCard> cards = await _db.punchCard
+                .Where(c => c.member_id == member.id && c.biz_type == "租赁")
+                .OrderByDescending(c => c.id).AsNoTracking().ToListAsync();
+            var data = cards.Select(c => new
+            {
+                c.id,
+                c.card_name,
+                c.total,
+                punches = c.punches ?? 0,
+                remaining = c.total == null ? (int?)null : c.total - (c.punches ?? 0),
+                isSeason = c.total == null
+            }).ToList();
+            return Ok(new ApiResult<object>() { code = 0, message = "", data = data });
+        }
+
+        public class PunchCardSaleCalc
+        {
+            public Models.Order order { get; set; }
+            public Product product { get; set; }
+            public SkiRentPunchQueueResult skiQueue { get; set; }
+            public int punchCountNow { get; set; }
+            public double freedRentValue { get; set; }
+            public double refundableDepositBeforeCard { get; set; }
+            public double totalBenefit { get; set; }
+            public double priceDiff { get; set; }
+            public string errorMessage { get; set; } = null;   // 非 null 代表试算失败，不应继续往下走
+        }
+
+        // 共享：购买次卡的核心试算逻辑。每次调用都重新从数据库现算，不接受/信任任何客户端传来的价格或次数——
+        // PreparePunchCardSale（只读预览）、StartPunchCardSaleQr、FinalizePunchCardSale 都调这一份，
+        // 保证"预览看到的数字"和"最终结算用的数字"永远是同一套计算口径。
+        private async Task<PunchCardSaleCalc> ComputePunchCardSaleCalc(int orderId, int productId)
+        {
+            PunchCardSaleCalc calc = new PunchCardSaleCalc();
+            OrderController _orderH = new OrderController(_db, _config, _httpContextAccessor);
+            Models.Order order = await _orderH.GetOrder(orderId);
+            if (order == null || order.member_id == null)
+            {
+                calc.errorMessage = "未找到订单/会员";
+                return calc;
+            }
+            calc.order = order;
+            Product product = await _db.product.Where(p => p.id == productId && p.type == "租赁次卡"
+                && p.valid == 1 && p.on_shelves == 1 && p.punch_total != null).AsNoTracking().FirstOrDefaultAsync();
+            if (product == null)
+            {
+                calc.errorMessage = "商品不存在或已下架";
+                return calc;
+            }
+            calc.product = product;
+            SkiRentPunchQueueResult q = await BuildSkiRentPunchQueue(orderId);
+            calc.skiQueue = q;
+            int totalPunchNeed = 0;
+            foreach (Models.Rental r in q.skiRentals)
+            {
+                int days = q.queue.Where(d => d.rental_id == r.id).Select(d => d.rental_date.Date).Distinct().Count();
+                totalPunchNeed += days;
+            }
+            List<PunchCardUsed> usedList = await _db.punchCardUsed
+                .Where(u => u.order_id == orderId && u.valid).AsNoTracking().ToListAsync();
+            int usedPunches = 0;
+            for (int i = 0; i < usedList.Count; i++) usedPunches += usedList[i].punch_count;
+            int punchCountNow = totalPunchNeed - usedPunches;
+            if (punchCountNow < 0) punchCountNow = 0;
+            calc.punchCountNow = punchCountNow;
+            if (punchCountNow > product.punch_total.Value)
+            {
+                calc.errorMessage = "本单应核销次数超过次卡总次数，无法购买";
+                return calc;
+            }
+            calc.freedRentValue = q.queue.Take(punchCountNow).Sum(d => d.amount);
+            // 核销前应退押金：照抄前端已验证的公式（不信任 order.totalRentNeedToRefundAmount，
+            // 该 getter 在 GetOrder 路径下因 guarantys 未 Include 恒为 0）
+            calc.refundableDepositBeforeCard = Math.Min(order.totalGuarantyAmount ?? 0, order.paidAmount)
+                - (order.totalRentSummaryAmount ?? 0) + order.depositPaidAmount;
+            calc.totalBenefit = calc.refundableDepositBeforeCard + calc.freedRentValue;
+            calc.priceDiff = product.sale_price - calc.totalBenefit;
+            return calc;
+        }
+
+        // 购买次卡·试算（只读，不写库）：算出本单应核销次数、这些次数立即免除的租金金额、核销前的应退押金，
+        // 与次卡价格比较得出多退/需补的差额。供退押金卖卡弹窗第二步展示；服务端权威计算，前端不得自行拼数字。
+        [HttpGet("{orderId}")]
+        public async Task<ActionResult<ApiResult<object>>> PreparePunchCardSale(int orderId, int productId,
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            if (staff == null || staff.title_level < 100)
+            {
+                return Ok(new ApiResult<object>() { code = 1, message = "没有权限", data = null });
+            }
+            PunchCardSaleCalc calc = await ComputePunchCardSaleCalc(orderId, productId);
+            if (calc.errorMessage != null)
+            {
+                return Ok(new ApiResult<object>() { code = 1, message = calc.errorMessage, data = null });
+            }
+            return Ok(new ApiResult<object>()
+            {
+                code = 0,
+                message = "",
+                data = new
+                {
+                    productId = calc.product.id,
+                    cardName = calc.product.name,
+                    price = calc.product.sale_price,
+                    punchTotal = calc.product.punch_total,
+                    punchCountNow = calc.punchCountNow,
+                    freedRentValue = calc.freedRentValue,
+                    refundableDepositBeforeCard = calc.refundableDepositBeforeCard,
+                    totalBenefit = calc.totalBenefit,
+                    priceDiff = calc.priceDiff
+                }
+            });
+        }
+
+        public class StartPunchCardSaleQrRequest
+        {
+            public int productId { get; set; }
+        }
+
+        // 购买次卡·发起补差价（仅"扫码"结算方式需要，因为它是唯一真正跨请求异步的场景）：
+        // 创建一个 valid=0 的 pending 零售行，代表"一次购买尝试已发起、钱还没到"。返回 priceDiff
+        // 供前端接着调现成的 Order/GetWepayPayment 或 Order/GetAlipayMiniPayment（amount=priceDiff）
+        // 生成二维码——不在这里内部调用那两个接口（它们是另一个 controller 上的 HTTP action，
+        // 直接方法调用要拆它们的 ActionResult 包装类型，不如让前端走既有 HTTP 调用路径干净）。
+        // 如果顾客后续一直不扫码，这个 pending 行和随之产生的待支付单就永远停留在无效/待支付状态，
+        // 无需清理，订单其余状态（rentals/rental_detail/押金）完全不受影响。
+        [HttpPost("{orderId}")]
+        public async Task<ActionResult<ApiResult<object>>> StartPunchCardSaleQr(int orderId,
+            [FromBody] StartPunchCardSaleQrRequest req, string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            if (staff == null || staff.title_level < 100)
+            {
+                return Ok(new ApiResult<object>() { code = 1, message = "没有权限", data = null });
+            }
+            PunchCardSaleCalc calc = await ComputePunchCardSaleCalc(orderId, req.productId);
+            if (calc.errorMessage != null)
+            {
+                return Ok(new ApiResult<object>() { code = 1, message = calc.errorMessage, data = null });
+            }
+            if (calc.priceDiff <= 0)
+            {
+                return Ok(new ApiResult<object>() { code = 1, message = "本次购买无需补差价，请使用多退结算方式", data = null });
+            }
+            Retail retail = new Retail()
+            {
+                order_id = orderId,
+                product_id = req.productId,
+                deal_price = calc.product.sale_price,
+                sale_price = calc.product.sale_price,
+                retail_type = "租赁卡类",
+                valid = 0,
+                memo = "购买次卡待补差价"
+            };
+            await _db.retail.AddAsync(retail);
+            await _db.SaveChangesAsync();
+            return Ok(new ApiResult<object>()
+            {
+                code = 0,
+                message = "",
+                data = new { retailId = retail.id, priceDiff = calc.priceDiff }
+            });
+        }
+
+        public class FinalizePunchCardSaleSettlement
+        {
+            public string method { get; set; }          // "refund" | "cash" | "deposit" | "qr"
+            public int? retailId { get; set; }          // qr 方式：StartPunchCardSaleQr 建的 pending retail id
+            public int? qrPaymentId { get; set; }       // qr 方式：顾客已扫码支付成功的 OrderPayment id
+            public string payMethodLabel { get; set; }  // cash 方式：具体收款方式文案，如"现金"
+        }
+
+        public class FinalizePunchCardSaleRequest
+        {
+            public int productId { get; set; }
+            public FinalizePunchCardSaleSettlement settlement { get; set; }
+        }
+
+        // 购买次卡·确认落地：服务端重新算一遍数字（绝不信任客户端传来的价格/差额），把结算腿的钱
+        // 落地之后，才创建/翻有效 retail + 建 PunchCard + 核销本单次数，全部在同一个 SaveChangesAsync
+        // 事务里完成。任何一步失败都不会出现"钱扣了但卡没建"或"卡建了但钱没结算"的半成品状态——
+        // 钱没落地之前，什么都不写；money 之后才写 retail(valid=1)/PunchCard/PunchCardUsed。
+        [HttpPost("{orderId}")]
+        public async Task<ActionResult<ApiResult<Models.Order?>>> FinalizePunchCardSale(int orderId,
+            [FromBody] FinalizePunchCardSaleRequest req, string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            if (staff == null || staff.title_level < 100)
+            {
+                return Ok(new ApiResult<Models.Order?>() { code = 1, message = "没有权限", data = null });
+            }
+            OrderController _orderH = new OrderController(_db, _config, _httpContextAccessor);
+            // 幂等守卫：这单这个商品已经成功卖过（valid=1），直接返回既有结果，不重复处理
+            bool already = await _db.retail.AnyAsync(r => r.order_id == orderId && r.product_id == req.productId && r.valid == 1);
+            if (already)
+            {
+                return Ok(new ApiResult<Models.Order?>() { code = 0, message = "", data = await _orderH.GetOrder(orderId) });
+            }
+            PunchCardSaleCalc calc = await ComputePunchCardSaleCalc(orderId, req.productId);
+            if (calc.errorMessage != null)
+            {
+                return Ok(new ApiResult<Models.Order?>() { code = 1, message = calc.errorMessage, data = null });
+            }
+            Models.Order order = calc.order;
+            string method = (req.settlement?.method ?? "").Trim();
+
+            // 身份核验门槛：wechat_unverified==true（含此前已核验过 / qr 结算腿刚好是顾客本人付款——
+            // 后者由 DealSuccessPaidOrder 在微信/支付宝支付成功回调里自动同步，这里重新读到的就是最新值）
+            // 才放行；否则一律拒绝，要求先完成核验（复用"次卡消费"/"储值付租金"同一套扫码核验入口）。
+            if (!order.wechat_unverified)
+            {
+                return Ok(new ApiResult<Models.Order?>() { code = 1, message = "请先完成微信身份核验", data = null });
+            }
+
+            Retail retail = null;
+            if (method == "qr")
+            {
+                if (req.settlement.retailId == null || req.settlement.qrPaymentId == null)
+                {
+                    return Ok(new ApiResult<Models.Order?>() { code = 1, message = "缺少扫码支付信息", data = null });
+                }
+                retail = await _db.retail.Where(r => r.id == req.settlement.retailId.Value && r.order_id == orderId
+                    && r.product_id == req.productId && r.valid == 0).FirstOrDefaultAsync();
+                if (retail == null)
+                {
+                    return Ok(new ApiResult<Models.Order?>() { code = 1, message = "未找到待结算的购卡记录", data = null });
+                }
+                // 不信任客户端"已支付"的说法，自己重新查一遍支付表
+                OrderPayment qrPayment = await _db.orderPayment.Where(p => p.id == req.settlement.qrPaymentId.Value
+                    && p.order_id == orderId).AsNoTracking().FirstOrDefaultAsync();
+                if (qrPayment == null || qrPayment.status != "支付成功"
+                    || Math.Round(qrPayment.amount, 2) != Math.Round(calc.priceDiff, 2))
+                {
+                    return Ok(new ApiResult<Models.Order?>() { code = 1, message = "支付尚未完成", data = null });
+                }
+            }
+            else if (method == "refund")
+            {
+                if (calc.priceDiff > 0)
+                {
+                    return Ok(new ApiResult<Models.Order?>() { code = 1, message = "需要补差价，不能走退款方式结算", data = null });
+                }
+                double refundAmt = Math.Round(-calc.priceDiff, 2);
+                if (refundAmt > 0)
+                {
+                    List<OrderPaymentRefund> refunds = _orderH.AllocateRefundAcrossPayments(order, refundAmt, "购买次卡多退");
+                    if (refunds == null)
+                    {
+                        return Ok(new ApiResult<Models.Order?>() { code = 1, message = "可退金额不足，无法自动分摊退款", data = null });
+                    }
+                    if (refunds.Count > 0)
+                    {
+                        ApiResult<Models.Order?> refundResult = await _orderH.RefundCore(order, staff, refunds);
+                        if (refundResult.code != 0)
+                        {
+                            return Ok(new ApiResult<Models.Order?>() { code = 1, message = refundResult.message, data = null });
+                        }
+                        order = refundResult.data;
+                    }
+                }
+            }
+            else if (method == "cash")
+            {
+                if (calc.priceDiff <= 0)
+                {
+                    return Ok(new ApiResult<Models.Order?>() { code = 1, message = "本次无需补差价", data = null });
+                }
+                OrderPayment cashPayment = new OrderPayment()
+                {
+                    id = 0,
+                    order_id = orderId,
+                    pay_method = string.IsNullOrWhiteSpace(req.settlement.payMethodLabel) ? "现金" : req.settlement.payMethodLabel,
+                    staff_id = staff.id,
+                    member_id = order.member_id,
+                    amount = calc.priceDiff,
+                    status = "支付成功",
+                    paid_date = DateTime.Now,
+                    create_date = DateTime.Now
+                };
+                await _db.orderPayment.AddAsync(cashPayment);
+                await _db.SaveChangesAsync();
+            }
+            else if (method == "deposit")
+            {
+                if (calc.priceDiff <= 0)
+                {
+                    return Ok(new ApiResult<Models.Order?>() { code = 1, message = "本次无需补差价", data = null });
+                }
+                MemberController _memberHelperLocal = new MemberController(_db, _config);
+                Member member = await _memberHelperLocal.GetWholeMemberById((int)order.member_id);
+                if (member == null || Math.Round(member.availableDeposit, 2) < Math.Round(calc.priceDiff, 2))
+                {
+                    return Ok(new ApiResult<Models.Order?>() { code = 1, message = "储值余额不足", data = null });
+                }
+                DepositController _depositHelper = new DepositController(_db, _config);
+                OrderPayment depositPayment = new OrderPayment()
+                {
+                    id = 0,
+                    order_id = orderId,
+                    pay_method = "储值支付",
+                    staff_id = staff.id,
+                    member_id = order.member_id,
+                    amount = calc.priceDiff,
+                    status = "待支付",
+                    deposit_type = "服务储值",
+                    create_date = DateTime.Now
+                };
+                await _db.orderPayment.AddAsync(depositPayment);
+                await _db.SaveChangesAsync();
+                List<DepositBalance> balances = await _depositHelper.ConsumeDeposit(depositPayment);
+                if (balances == null)
+                {
+                    return Ok(new ApiResult<Models.Order?>() { code = 1, message = "储值消费失败", data = null });
+                }
+            }
+            else
+            {
+                return Ok(new ApiResult<Models.Order?>() { code = 1, message = "未知的结算方式", data = null });
+            }
+
+            // 钱已经落地：建/翻有效 retail → 建 PunchCard → 核销本单次数 → 互相回填。
+            if (method == "qr")
+            {
+                retail.valid = 1;
+                retail.update_date = DateTime.Now;
+                _db.retail.Entry(retail).State = EntityState.Modified;
+            }
+            else
+            {
+                retail = new Retail()
+                {
+                    order_id = orderId,
+                    product_id = req.productId,
+                    deal_price = calc.product.sale_price,
+                    sale_price = calc.product.sale_price,
+                    retail_type = "租赁卡类",
+                    valid = 1,
+                    memo = "购买次卡"
+                };
+                await _db.retail.AddAsync(retail);
+            }
+            PunchCard card = new PunchCard()
+            {
+                biz_type = "租赁",
+                card_name = calc.product.name,
+                member_id = (int)order.member_id,
+                total = calc.product.punch_total,
+                punches = calc.punchCountNow,
+                create_date = DateTime.Now
+            };
+            await _db.punchCard.AddAsync(card);
+            await _db.SaveChangesAsync();   // 先落 retail.id / card.id，供下面互相回填引用
+
+            if (calc.punchCountNow > 0)
+            {
+                await WriteOffSkiPunches(card, calc.skiQueue.queue, calc.punchCountNow, orderId, staff.id);
+            }
+            card.source_retail_id = retail.id;
+            _db.punchCard.Entry(card).State = EntityState.Modified;
+            retail.punch_card_id = card.id;
+            _db.retail.Entry(retail).State = EntityState.Modified;
+            await _db.SaveChangesAsync();
+
             Models.Order updated = await _orderH.GetOrder(orderId);
             return Ok(new ApiResult<Models.Order?>() { code = 0, message = "", data = updated });
         }
