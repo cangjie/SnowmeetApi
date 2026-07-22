@@ -1349,6 +1349,7 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<ApiResult<PagedCareItemResult>>> GetUnpickedCareItemsByStaff(
             string? shop, string? equipment, string? brand, string? cell,
             string sessionKey, string sessionType = "wechat_mini_openid",
+            bool? isTest = null, bool? isSummerCare = null, string sortOrder = "asc",
             int pageIndex = 1, int pageSize = 10)
         {
             sessionKey = Util.UrlDecode(sessionKey);
@@ -1373,6 +1374,8 @@ namespace SnowmeetApi.Controllers
                         (c.order.contact_num != null && c.order.contact_num.Contains(cell)) ||
                         (c.order.member != null && c.order.member.memberSocialAccounts.Any(msa =>
                             msa.type.Trim().Equals("cell") && msa.num.Contains(cell))))
+                    && (isTest == null || c.order.is_test == ((bool)isTest ? 1 : 0))
+                    && (isSummerCare == null || (c.biz_type == "非雪季养护") == isSummerCare)
                 )
                 .Include(c => c.tasks.Where(t => t.valid == 1))
                 .Include(c => c.careImages).ThenInclude(i => i.image)
@@ -1380,13 +1383,15 @@ namespace SnowmeetApi.Controllers
                 .AsSplitQuery().AsNoTracking()
                 .ToListAsync();
 
-            List<Care> unpicked = candidates.Where(c =>
+            IEnumerable<Care> filtered = candidates.Where(c =>
             {
                 CareTask finishTask = c.tasks?.Where(t => t.task_name == "发板").FirstOrDefault();
                 return finishTask != null && finishTask.status != "已完成" && finishTask.status != "强行中止";
-            })
-            .OrderBy(c => c.create_date)
-            .ToList();
+            });
+            List<Care> unpicked = (sortOrder != null && sortOrder.Trim().ToLower() == "desc"
+                    ? filtered.OrderByDescending(c => c.create_date)
+                    : filtered.OrderBy(c => c.create_date))
+                .ToList();
 
             int total = unpicked.Count;
             List<Care> paged = unpicked.Skip((pageIndex - 1) * pageSize).Take(pageSize).ToList();
