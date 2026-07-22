@@ -1334,6 +1334,71 @@ namespace SnowmeetApi.Controllers
             return Ok(new ApiResult<object>() { code = 0, message = "", data = list });
         }
 
+        public class PagedCareItemResult
+        {
+            public List<Care> items { get; set; } = new();
+            public int total { get; set; } = 0;
+        }
+
+        // 养护已生效订单里所有"未发板"的装备（顾客已送来养护、还没取走）。一件装备一条，供店员
+        // 催取用。"已生效"= task_flow_code!=null（EffectCareOrder 跑过）；"未发板"= 该 care 任务链里
+        // task_name=="发板" 那条的 status 不是 已完成/强行中止（is_cancel=true 时发板任务本身已是
+        // "已完成"，天然被这条判定排除，无需额外处理）。分页与 Order/GetOrdersByStaffPaged 同款：
+        // 先按条件查出全量再内存 Skip/Take（这个"店里正压着的未取件装备"工作集本身有界，不算大列表）。
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<PagedCareItemResult>>> GetUnpickedCareItemsByStaff(
+            string? shop, string? equipment, string? brand, string? cell,
+            string sessionKey, string sessionType = "wechat_mini_openid",
+            int pageIndex = 1, int pageSize = 10)
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            shop = shop == null ? null : Util.UrlDecode(shop);
+            equipment = equipment == null ? null : Util.UrlDecode(equipment);
+            brand = brand == null ? null : Util.UrlDecode(brand);
+            cell = cell == null ? null : Util.UrlDecode(cell);
+
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            if (staff == null)
+            {
+                return Ok(new ApiResult<PagedCareItemResult>() { code = 1, message = "不是管理员", data = null });
+            }
+
+            List<Care> candidates = await _db.care
+                .Where(c => c.valid == 1 && c.task_flow_code != null
+                    && c.order.valid == 1 && c.order.type == "养护"
+                    && (shop == null || c.order.shop.Trim().Equals(shop.Trim()))
+                    && (equipment == null || c.equipment.Trim().Equals(equipment.Trim()))
+                    && (brand == null || (c.brand != null && c.brand.Contains(brand)))
+                    && (cell == null ||
+                        (c.order.contact_num != null && c.order.contact_num.Contains(cell)) ||
+                        (c.order.member != null && c.order.member.memberSocialAccounts.Any(msa =>
+                            msa.type.Trim().Equals("cell") && msa.num.Contains(cell))))
+                )
+                .Include(c => c.tasks.Where(t => t.valid == 1))
+                .Include(c => c.careImages).ThenInclude(i => i.image)
+                .Include(c => c.order).ThenInclude(o => o.member).ThenInclude(m => m.memberSocialAccounts)
+                .AsSplitQuery().AsNoTracking()
+                .ToListAsync();
+
+            List<Care> unpicked = candidates.Where(c =>
+            {
+                CareTask finishTask = c.tasks?.Where(t => t.task_name == "发板").FirstOrDefault();
+                return finishTask != null && finishTask.status != "已完成" && finishTask.status != "强行中止";
+            })
+            .OrderBy(c => c.create_date)
+            .ToList();
+
+            int total = unpicked.Count;
+            List<Care> paged = unpicked.Skip((pageIndex - 1) * pageSize).Take(pageSize).ToList();
+
+            return Ok(new ApiResult<PagedCareItemResult>()
+            {
+                code = 0,
+                message = "",
+                data = new PagedCareItemResult { items = paged, total = total }
+            });
+        }
+
         // 会员 + 该装备类型的最近一次安全检查数值，供新单默认预填（身高/体重/脱落值/角度）。
         // 只取 valid=1 且已填过身高的记录（身高是安检必填项，用它当"这条记录确实做过安检"的锚点），
         // 不按 brand/scale 去重——身高体重是顾客本人身体数据、脱落值/角度也常年沿用，取最近一次即可。
