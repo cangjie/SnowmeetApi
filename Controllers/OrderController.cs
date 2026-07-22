@@ -65,8 +65,10 @@ namespace SnowmeetApi.Controllers
             }
             if (order.type == "租赁")
             {
-                // 一个租赁订单也可能挂零售明细（如购买次卡的销售记录，见 FinalizePunchCardSale），一并加载
-                order.retails = await _db.order.Entry(order).Collection(o => o.retails).Query().Where(r => r.valid == 1).AsNoTracking().ToListAsync();
+                // 一个租赁订单也可能挂零售明细（如购买次卡的销售记录，见 FinalizePunchCardSale），一并加载。
+                // 带上 product/punchCard 导航属性，前端展示"次卡销售"时才能读到商品名/卡信息。
+                order.retails = await _db.order.Entry(order).Collection(o => o.retails).Query().Where(r => r.valid == 1)
+                    .Include(r => r.product).Include(r => r.punchCard).AsNoTracking().ToListAsync();
                 order.rentals = await _db.order.Entry(order).Collection(o => o.rentals).Query().AsNoTracking()
                     .Include(r => r.discounts.Where(d => d.valid == 1 && d.biz_type.Trim().Equals("租赁"))).AsNoTracking()
                     .Include(r => r.details.Where(d => d.valid == 1)).AsNoTracking()

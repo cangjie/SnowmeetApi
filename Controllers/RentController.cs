@@ -6163,9 +6163,28 @@ namespace SnowmeetApi.Controllers
             }
 
             // 钱已经落地：建/翻有效 retail → 建 PunchCard → 核销本单次数 → 互相回填。
+            // memo 里把「买了什么卡、本单核销几次、结算方式与金额」写清楚，作为这笔销售自带的可读记录——
+            // 订单详情页展示"次卡销售"时直接读这段 memo，不需要另外回溯支付/退款记录去拼凑结算细节。
+            string settlementDesc;
+            if (method == "qr")
+            {
+                settlementDesc = $"扫码支付补差价 ¥{Math.Round(calc.priceDiff, 2):0.00}";
+            }
+            else if (method == "cash")
+            {
+                string label = string.IsNullOrWhiteSpace(req.settlement.payMethodLabel) ? "现金" : req.settlement.payMethodLabel;
+                settlementDesc = $"{label}补差价 ¥{Math.Round(calc.priceDiff, 2):0.00}";
+            }
+            else
+            {
+                double refundAmt = Math.Round(-calc.priceDiff, 2);
+                settlementDesc = refundAmt > 0 ? $"多退 ¥{refundAmt:0.00}（已退款）" : "价格与应退押金及免租金额相抵，无需补退";
+            }
+            string saleMemo = $"购买『{calc.product.name}』次卡（共{calc.product.punch_total}次，¥{calc.product.sale_price:0.00}）；本单核销{calc.punchCountNow}次；{settlementDesc}";
             if (method == "qr")
             {
                 retail.valid = 1;
+                retail.memo = saleMemo;
                 retail.update_date = DateTime.Now;
                 _db.retail.Entry(retail).State = EntityState.Modified;
             }
@@ -6180,7 +6199,7 @@ namespace SnowmeetApi.Controllers
                     order_type = "租赁附加",
                     retail_type = "租赁卡类",
                     valid = 1,
-                    memo = "购买次卡"
+                    memo = saleMemo
                 };
                 await _db.retail.AddAsync(retail);
             }
