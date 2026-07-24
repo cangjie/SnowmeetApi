@@ -5131,7 +5131,7 @@ namespace SnowmeetApi.Controllers
                     data = null
                 });
             }
-            OrderController _orderHelper = new OrderController(_db, _config, _httpContextAccessor);
+            OrderController _orderHelper = new OrderController(_db, _oriConfig, _httpContextAccessor);
             Models.Order order = await _orderHelper.GetOrder(orderId);
             for(int i = 0; order.rentals != null && i < order.rentals.Count; i++)
             {
@@ -5823,7 +5823,7 @@ namespace SnowmeetApi.Controllers
             if (need > q.queue.Count) need = q.queue.Count;   // 兜底：不超过实际可免天数
             await WriteOffSkiPunches(card, q.queue, need, orderId, staff.id);
             await _db.SaveChangesAsync();
-            OrderController _orderH = new OrderController(_db, _config, _httpContextAccessor);
+            OrderController _orderH = new OrderController(_db, _oriConfig, _httpContextAccessor);
             Models.Order updated = await _orderH.GetOrder(orderId);
             return Ok(new ApiResult<Models.Order?>() { code = 0, message = "", data = updated });
         }
@@ -5905,7 +5905,7 @@ namespace SnowmeetApi.Controllers
         private async Task<PunchCardSaleCalc> ComputePunchCardSaleCalc(int orderId, int productId)
         {
             PunchCardSaleCalc calc = new PunchCardSaleCalc();
-            OrderController _orderH = new OrderController(_db, _config, _httpContextAccessor);
+            OrderController _orderH = new OrderController(_db, _oriConfig, _httpContextAccessor);
             Models.Order order = await _orderH.GetOrder(orderId);
             if (order == null || order.member_id == null)
             {
@@ -6065,7 +6065,7 @@ namespace SnowmeetApi.Controllers
             {
                 return Ok(new ApiResult<Models.Order?>() { code = 1, message = "没有权限", data = null });
             }
-            OrderController _orderH = new OrderController(_db, _config, _httpContextAccessor);
+            OrderController _orderH = new OrderController(_db, _oriConfig, _httpContextAccessor);
             // 幂等守卫：这单这个商品已经成功卖过（valid=1），直接返回既有结果，不重复处理
             bool already = await _db.retail.AnyAsync(r => r.order_id == orderId && r.product_id == req.productId && r.valid == 1);
             if (already)
@@ -6394,7 +6394,7 @@ namespace SnowmeetApi.Controllers
                     data = null
                 });
             }
-            OrderController _orderHelper = new OrderController(_db, _config, _httpContextAccessor);
+            OrderController _orderHelper = new OrderController(_db, _oriConfig, _httpContextAccessor);
             List<Models.Order> orders = (await _orderHelper.GetCommonOrders(null, shop, null, null, "租赁",
                 null, null, null, false, null, false, false, null, null, startDate, endDate))
                 .OrderByDescending(o => o.biz_date).ToList();
@@ -6849,7 +6849,7 @@ namespace SnowmeetApi.Controllers
                     data = null
                 });
             }
-            OrderController _orderHelper = new OrderController(_db, _config, _httpContextAccessor);
+            OrderController _orderHelper = new OrderController(_db, _oriConfig, _httpContextAccessor);
             Models.Order order = await _orderHelper.GetOrder(orderId);
             if (order.type != "租赁")
             {
@@ -7110,7 +7110,7 @@ namespace SnowmeetApi.Controllers
                 _db.guaranty.Entry(gs[gi]).State = EntityState.Modified;
             }
             await _db.SaveChangesAsync();
-            OrderController _orderH = new OrderController(_db, _config, _httpContextAccessor);
+            OrderController _orderH = new OrderController(_db, _oriConfig, _httpContextAccessor);
             Models.Order order = await _orderH.GetOrder((int)rental.order_id);
             // 重算订单待支付金额 = 剩余待支付追加项的未支付 Guaranty 合计（删光则置 0）
             double remainPay = 0;
@@ -7157,7 +7157,7 @@ namespace SnowmeetApi.Controllers
                     await SaveAppendingRental(appendings[i], commit);
                 }
             }
-            OrderController _orderH = new OrderController(_db, _config, _httpContextAccessor);
+            OrderController _orderH = new OrderController(_db, _oriConfig, _httpContextAccessor);
             Models.Order order = await _orderH.GetOrder(orderId);
             // commit=false：实时保存草稿（只持久化字段，保持 appending=true，不提交/不生效/不算应付）
             if (commit)
