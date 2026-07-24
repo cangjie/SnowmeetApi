@@ -6181,6 +6181,16 @@ namespace SnowmeetApi.Controllers
                 settlementDesc = refundAmt > 0 ? $"多退 ¥{refundAmt:0.00}（已退款）" : "价格与应退押金及免租金额相抵，无需补退";
             }
             string saleMemo = $"购买『{calc.product.name}』次卡（共{calc.product.punch_total}次，¥{calc.product.sale_price:0.00}）；本单核销{calc.punchCountNow}次；{settlementDesc}";
+            // 挂了这笔零售子订单后，本单变成"复合型订单"（子订单跨了 租赁/零售 两种业务类型）——
+            // order.is_package 就是为这个概念设计的字段，一直没人写过；这里补上。用轻量单独查询
+            // （不带任何导航），避免对 calc.order 这种已加载了 member/rentals 等一堆导航属性的
+            // 完整对象做 Entry().State=Modified 时可能触发的 TrackGraph 附加问题（同 VerifyWechatIdentity 写法）。
+            Models.Order orderRow = await _db.order.Where(o => o.id == orderId).FirstOrDefaultAsync();
+            if (orderRow != null && orderRow.is_package != 1)
+            {
+                orderRow.is_package = 1;
+                _db.order.Entry(orderRow).State = EntityState.Modified;
+            }
             if (method == "qr")
             {
                 retail.valid = 1;

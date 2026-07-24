@@ -696,13 +696,15 @@ namespace SnowmeetApi.Models
             }
         }
         // 本单是否挂着有效的零售子订单（如租赁退押金时顺带卖出的次卡，见 FinalizePunchCardSale）——
-        // 列表页「零」标签 / 筛选用，不区分具体是哪种零售。
+        // 列表页「零」标签 / 筛选用。is_package 就是"复合型订单（子订单跨了不同业务类型）"这个概念
+        // 本来就有的字段（此前一直闲置未写），FinalizePunchCardSale 挂零售子订单时已回填它，这里
+        // 直接读它即可，不需要再遍历 retails 集合（也不再依赖调用方是否 Include 了 retails）。
         [NotMapped]
         public bool hasRetail
         {
             get
             {
-                return retails != null && retails.Any(r => r.valid == 1);
+                return is_package == 1;
             }
         }
         [NotMapped]

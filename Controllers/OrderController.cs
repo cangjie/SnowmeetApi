@@ -187,7 +187,7 @@ namespace SnowmeetApi.Controllers
                         )
                         && (useCard == null || useCard == (o.rentals.Any(r => r.valid == 1 && r.use_card==true)
                             || _db.punchCardUsed.Any(u => u.order_id == o.id && u.valid)))
-                        && (hasRetail == null || hasRetail == o.retails.Any(r => r.valid == 1))
+                        && (hasRetail == null || hasRetail == (o.is_package == 1))
 
                     )
                     .Include(o => o.rentals.Where(r => r.valid == 1 && (r.appending == null || (r.appending == false && r.append_commit_time != null)))).ThenInclude(r => r.details.Where(d => d.valid == 1)).ThenInclude(d => d.discounts.Where(d => d.valid == 1 && d.sub_biz_type == "日租金"))
