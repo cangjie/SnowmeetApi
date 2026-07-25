@@ -38,7 +38,11 @@ namespace SnowmeetApi.Models
         public DateTime create_date { get; set; } = DateTime.Now;
         public int sell_out { get; set; } = 0;
         public int? award_score { get; set; } = null;
-        public int? punch_total { get; set; } = null; // 仅 type=="租赁次卡" 时有意义：该 SKU 赠送的总次数
+        public int? punch_total { get; set; } = null; // 仅次卡类商品有意义：该 SKU 赠送的总次数
+        // 关联 category.code（稳定手工维护值，不随 category_id 自增变化）。次卡类商品的权威识别方式
+        // 是 category_code 命中 category 表中 biz_type="租赁"/"养护" 且 name="次卡" 的那一行的 code，
+        // 不再用 type 字符串（type 仍保留写入，兼容存量/其它用途，但查询判定一律以 category_code 为准）。
+        public string? category_code { get; set; } = null;
         [ForeignKey("category_id")]
         public Category? category { get; set; } = null;
         public ProductTicketTemplate? productTicketTemplate {get; set;} = null;

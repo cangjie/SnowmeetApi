@@ -5828,12 +5828,30 @@ namespace SnowmeetApi.Controllers
             return Ok(new ApiResult<Models.Order?>() { code = 0, message = "", data = updated });
         }
 
-        // 次卡商品目录：租赁次卡类 SKU（type=="租赁次卡"，已上架且有效）。会话级即可，无需 staff 权限——
-        // 纯目录浏览，供退押金卖卡弹窗与顾客自助购买页共用。
+        // 次卡类商品的权威识别方式：category_code 命中 category 表里 biz_type/name 匹配的那一行的 code
+        // （code 是人工维护、不随 category_id 自增变化的稳定值）。不再用 product.type 字符串判定——
+        // type 字段仍保留写入供其它场景兼容，但查询过滤一律走这里。找不到该 category 行时返回 null，
+        // 调用方必须显式处理"找不到"（绝不能把 null 传进 Where 里当成"category_code 为空"去匹配，
+        // 那会误伤所有还没设置 category_code 的无关商品）。
+        [NonAction]
+        private async Task<string> ResolveNextCardCategoryCode(string bizType)
+        {
+            return await _db.category
+                .Where(c => c.biz_type == bizType && c.name == "次卡" && c.valid == 1)
+                .Select(c => c.code).FirstOrDefaultAsync();
+        }
+
+        // 次卡商品目录：租赁次卡类 SKU（category_code 命中 category.biz_type=="租赁" && name=="次卡"，
+        // 已上架且有效）。会话级即可，无需 staff 权限——纯目录浏览，供退押金卖卡弹窗与顾客自助购买页共用。
         [HttpGet]
         public async Task<ActionResult<ApiResult<object>>> GetPunchCardProducts(string? shop, string sessionKey = "")
         {
-            var q = _db.product.Where(p => p.type == "租赁次卡" && p.valid == 1 && p.on_shelves == 1 && p.punch_total != null);
+            string catCode = await ResolveNextCardCategoryCode("租赁");
+            if (string.IsNullOrEmpty(catCode))
+            {
+                return Ok(new ApiResult<object>() { code = 0, message = "", data = new List<object>() });
+            }
+            var q = _db.product.Where(p => p.category_code == catCode && p.valid == 1 && p.on_shelves == 1 && p.punch_total != null);
             if (!string.IsNullOrWhiteSpace(shop))
             {
                 string shopName = Util.UrlDecode(shop).Trim();
@@ -5854,11 +5872,34 @@ namespace SnowmeetApi.Controllers
             {
                 return Ok(new ApiResult<object>() { code = 1, message = "没有权限", data = null });
             }
-            var products = await _db.product.Where(p => p.type == "租赁次卡")
+            string catCode = await ResolveNextCardCategoryCode("租赁");
+            if (string.IsNullOrEmpty(catCode))
+            {
+                return Ok(new ApiResult<object>() { code = 0, message = "", data = new List<object>() });
+            }
+            var products = await _db.product.Where(p => p.category_code == catCode)
                 .OrderByDescending(p => p.id)
                 .Select(p => new { p.id, p.name, p.sale_price, p.punch_total, p.shop, p.valid, p.on_shelves })
                 .AsNoTracking().ToListAsync();
             return Ok(new ApiResult<object>() { code = 0, message = "", data = products });
+        }
+
+        // 次卡商品管理页新建/编辑时用来回填 category_code（该商品分类当前的稳定 code 值，人工维护、
+        // 不随 category_id 自增变化）。staff≥200，同 GetAllPunchCardProducts 权限档。
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<object>>> GetPunchCardCategoryCode(string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            if (staff == null || staff.title_level < 200)
+            {
+                return Ok(new ApiResult<object>() { code = 1, message = "没有权限", data = null });
+            }
+            string catCode = await ResolveNextCardCategoryCode("租赁");
+            if (string.IsNullOrEmpty(catCode))
+            {
+                return Ok(new ApiResult<object>() { code = 1, message = "未找到「租赁/次卡」分类，请先在分类管理里建好该行并设置 code", data = null });
+            }
+            return Ok(new ApiResult<object>() { code = 0, message = "", data = new { categoryCode = catCode } });
         }
 
         // 我的次卡：解析会话对应的会员本人，列出其名下租赁次卡（顾客自助购买页用，member_id 不由调用方传入）。
@@ -5913,7 +5954,8 @@ namespace SnowmeetApi.Controllers
                 return calc;
             }
             calc.order = order;
-            Product product = await _db.product.Where(p => p.id == productId && p.type == "租赁次卡"
+            string calcCatCode = await ResolveNextCardCategoryCode("租赁");
+            Product product = string.IsNullOrEmpty(calcCatCode) ? null : await _db.product.Where(p => p.id == productId && p.category_code == calcCatCode
                 && p.valid == 1 && p.on_shelves == 1 && p.punch_total != null).AsNoTracking().FirstOrDefaultAsync();
             if (product == null)
             {
