@@ -430,7 +430,13 @@ namespace SnowmeetApi.Controllers
             await _db.product.Entry(product).Collection(p => p.properties).LoadAsync();
             await _db.product.Entry(product).Collection(p => p.stocks).LoadAsync();
             await _db.product.Entry(product).Reference(p => p.category).LoadAsync();
-            await _db.category.Entry(product.category).Collection(c => c.properties).LoadAsync();
+            // product.category_id 是可空的：次卡/季卡类商品按设计只写 category_code（稳定的人工维护值）、
+            // 不写 category_id，所以这里 product.category 可能为 null。直接 Entry(null) 会抛
+            // ArgumentNullException(Parameter 'entity')，必须先判空；无分类的商品自然也没有分类属性可加载。
+            if (product.category != null)
+            {
+                await _db.category.Entry(product.category).Collection(c => c.properties).LoadAsync();
+            }
             for (int i = 0; i < product.properties.Count; i++)
             {
                 ProductProperty pp = product.properties[i];
@@ -445,22 +451,25 @@ namespace SnowmeetApi.Controllers
                 ProductImage pi = product.images[i];
                 await _db.Entry(pi).Reference(p => p.uploadFile).LoadAsync();
             }
-            for (int i = 0; i < product.category.properties.Count; i++)
+            if (product.category != null)
             {
-                CategoryProperty cp = product.category.properties[i];
-                await _db.Entry(cp).Collection(c => c.options).LoadAsync();
-                for (int j = 0; j < cp.options.Count; j++)
+                for (int i = 0; i < product.category.properties.Count; i++)
                 {
-                    CategoryPropertyOption cpo = cp.options[j];
-                    ProductProperty? pp = product.availableProperties
-                        .Where(p => p.category_property_id == cp.id && p.option_id == cpo.id).FirstOrDefault();
-                    if (pp != null)
+                    CategoryProperty cp = product.category.properties[i];
+                    await _db.Entry(cp).Collection(c => c.options).LoadAsync();
+                    for (int j = 0; j < cp.options.Count; j++)
                     {
-                        cpo.is_checked = true;
-                    }
-                    else
-                    {
-                        cpo.is_checked = false;
+                        CategoryPropertyOption cpo = cp.options[j];
+                        ProductProperty? pp = product.availableProperties
+                            .Where(p => p.category_property_id == cp.id && p.option_id == cpo.id).FirstOrDefault();
+                        if (pp != null)
+                        {
+                            cpo.is_checked = true;
+                        }
+                        else
+                        {
+                            cpo.is_checked = false;
+                        }
                     }
                 }
             }
