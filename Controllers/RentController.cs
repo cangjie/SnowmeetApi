@@ -5828,17 +5828,65 @@ namespace SnowmeetApi.Controllers
             return Ok(new ApiResult<Models.Order?>() { code = 0, message = "", data = updated });
         }
 
-        // 次卡类商品的权威识别方式：category_code 命中 category 表里 biz_type/name 匹配的那一行的 code
+        // 次卡/季卡类商品的权威识别方式：category_code 命中 category 表里 biz_type/name 匹配的那一行的 code
         // （code 是人工维护、不随 category_id 自增变化的稳定值）。不再用 product.type 字符串判定——
-        // type 字段仍保留写入供其它场景兼容，但查询过滤一律走这里。找不到该 category 行时返回 null，
-        // 调用方必须显式处理"找不到"（绝不能把 null 传进 Where 里当成"category_code 为空"去匹配，
-        // 那会误伤所有还没设置 category_code 的无关商品）。
+        // type 字段仍保留写入供其它场景兼容，但查询过滤一律走这里。
+        // createIfMissing=false：找不到该 category 行时返回 null，调用方必须显式处理"找不到"
+        //（绝不能把 null 传进 Where 里当成"category_code 为空"去匹配，那会误伤所有还没设置 category_code 的无关商品）。
+        // createIfMissing=true：找不到就自动新建一行（养护/租赁 × 次卡/季卡 4 种组合首次在商品维护页
+        // 新建商品时兜底建分类，code 一经生成永久稳定，后续同组合直接复用，不会重复创建）。
+        [NonAction]
+        private async Task<string> ResolveCardCategoryCode(string bizType, string cardType, bool createIfMissing, int? staffId)
+        {
+            string code = await _db.category
+                .Where(c => c.biz_type == bizType && c.name == cardType && c.valid == 1)
+                .Select(c => c.code).FirstOrDefaultAsync();
+            if (!string.IsNullOrEmpty(code))
+            {
+                return code;
+            }
+            if (!createIfMissing)
+            {
+                return null;
+            }
+            string bizToken = bizType == "养护" ? "CARE" : "RENT";
+            string cardToken = cardType == "季卡" ? "SEASON" : "PUNCH";
+            Category newCategory = new Category()
+            {
+                id = 0,
+                biz_type = bizType,
+                name = cardType,
+                code = bizToken + "_" + cardToken,
+                valid = 1,
+                hide = 0,
+                on_shelves = 1,
+                sort = 100
+            };
+            await _db.category.AddAsync(newCategory);
+            CoreDataModLog log = new CoreDataModLog()
+            {
+                id = 0,
+                table_name = "category",
+                field_name = null,
+                key_value = 0,
+                scene = "自动创建次卡/季卡分类",
+                member_id = null,
+                staff_id = staffId,
+                prev_value = null,
+                current_value = newCategory.code,
+                trace_id = 0,
+                is_manual = 1,
+                manual_memo = bizType + cardType
+            };
+            await _db.coreDataModLog.AddAsync(log);
+            await _db.SaveChangesAsync();
+            return newCategory.code;
+        }
+
         [NonAction]
         private async Task<string> ResolveNextCardCategoryCode(string bizType)
         {
-            return await _db.category
-                .Where(c => c.biz_type == bizType && c.name == "次卡" && c.valid == 1)
-                .Select(c => c.code).FirstOrDefaultAsync();
+            return await ResolveCardCategoryCode(bizType, "次卡", false, null);
         }
 
         // 次卡商品目录：某个 biz_type 下的次卡类 SKU（category_code 命中 category.biz_type==bizType &&
@@ -5864,42 +5912,76 @@ namespace SnowmeetApi.Controllers
             return Ok(new ApiResult<object>() { code = 0, message = "", data = products });
         }
 
-        // 次卡商品管理·列表（店长/管理员 title_level≥200）：不过滤 valid/on_shelves，管理页要能看到已下架的行。
+        // 次卡/季卡商品管理·列表（店长/管理员 title_level≥200）：不过滤 valid/on_shelves，管理页要能看到已下架的行。
+        // bizType/cardType 都传时按单一组合查；都不传时遍历 养护/租赁 × 次卡/季卡 4 种组合合并返回，
+        // 每行附带 bizType/cardType 供列表页筛选/打标签。缺失的组合直接跳过（GET 不应有建分类的副作用）。
         [HttpGet]
-        public async Task<ActionResult<ApiResult<object>>> GetAllPunchCardProducts(string sessionKey, string sessionType = "wechat_mini_openid")
+        public async Task<ActionResult<ApiResult<object>>> GetAllPunchCardProducts(string sessionKey,
+            string sessionType = "wechat_mini_openid", string bizType = null, string cardType = null)
         {
             Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
             if (staff == null || staff.title_level < 200)
             {
                 return Ok(new ApiResult<object>() { code = 1, message = "没有权限", data = null });
             }
-            string catCode = await ResolveNextCardCategoryCode("租赁");
-            if (string.IsNullOrEmpty(catCode))
+            List<(string bizType, string cardType)> combos;
+            if (!string.IsNullOrEmpty(bizType) && !string.IsNullOrEmpty(cardType))
             {
-                return Ok(new ApiResult<object>() { code = 0, message = "", data = new List<object>() });
+                combos = new List<(string, string)>() { (bizType, cardType) };
             }
-            var products = await _db.product.Where(p => p.category_code == catCode)
-                .OrderByDescending(p => p.id)
-                .Select(p => new { p.id, p.name, p.sale_price, p.punch_total, p.shop, p.valid, p.on_shelves })
-                .AsNoTracking().ToListAsync();
-            return Ok(new ApiResult<object>() { code = 0, message = "", data = products });
+            else
+            {
+                combos = new List<(string, string)>()
+                {
+                    ("养护", "次卡"), ("养护", "季卡"), ("租赁", "次卡"), ("租赁", "季卡")
+                };
+            }
+            List<object> result = new List<object>();
+            foreach (var combo in combos)
+            {
+                string catCode = await ResolveCardCategoryCode(combo.bizType, combo.cardType, false, null);
+                if (string.IsNullOrEmpty(catCode))
+                {
+                    continue;
+                }
+                List<Product> products = await _db.product.Include(p => p.images)
+                    .Where(p => p.category_code == catCode)
+                    .OrderByDescending(p => p.id)
+                    .AsNoTracking().ToListAsync();
+                foreach (Product p in products)
+                {
+                    ProductImage headImage = p.images.Where(i => i.valid == 1).OrderBy(i => i.sort).FirstOrDefault();
+                    result.Add(new
+                    {
+                        p.id,
+                        p.name,
+                        p.sale_price,
+                        p.punch_total,
+                        p.shop,
+                        p.valid,
+                        p.on_shelves,
+                        imageUrl = headImage == null ? null : headImage.image_url,
+                        bizType = combo.bizType,
+                        cardType = combo.cardType
+                    });
+                }
+            }
+            return Ok(new ApiResult<object>() { code = 0, message = "", data = result });
         }
 
-        // 次卡商品管理页新建/编辑时用来回填 category_code（该商品分类当前的稳定 code 值，人工维护、
-        // 不随 category_id 自增变化）。staff≥200，同 GetAllPunchCardProducts 权限档。
+        // 次卡/季卡商品管理页新建/编辑时用来回填 category_code（该商品分类当前的稳定 code 值，人工维护、
+        // 不随 category_id 自增变化）。staff≥200，同 GetAllPunchCardProducts 权限档。找不到分类会自动
+        // 创建（养护/租赁 × 次卡/季卡 4 种组合首次使用时兜底建分类，code 一经生成永久稳定）。
         [HttpGet]
-        public async Task<ActionResult<ApiResult<object>>> GetPunchCardCategoryCode(string sessionKey, string sessionType = "wechat_mini_openid")
+        public async Task<ActionResult<ApiResult<object>>> GetPunchCardCategoryCode(string sessionKey,
+            string sessionType = "wechat_mini_openid", string bizType = "租赁", string cardType = "次卡")
         {
             Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
             if (staff == null || staff.title_level < 200)
             {
                 return Ok(new ApiResult<object>() { code = 1, message = "没有权限", data = null });
             }
-            string catCode = await ResolveNextCardCategoryCode("租赁");
-            if (string.IsNullOrEmpty(catCode))
-            {
-                return Ok(new ApiResult<object>() { code = 1, message = "未找到「租赁/次卡」分类，请先在分类管理里建好该行并设置 code", data = null });
-            }
+            string catCode = await ResolveCardCategoryCode(bizType, cardType, true, staff.id);
             return Ok(new ApiResult<object>() { code = 0, message = "", data = new { categoryCode = catCode } });
         }
 
