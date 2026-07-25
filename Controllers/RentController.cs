@@ -6104,6 +6104,85 @@ namespace SnowmeetApi.Controllers
             return Ok(new ApiResult<object>() { code = 0, message = "", data = data });
         }
 
+        // 我的次卡·使用明细：这张卡被哪些订单核销过，每单核销了几次。
+        // punch_card_used 是"每条 rental / 每件 care 一行"的粒度，同一订单可能有多行，
+        // 所以按 order_id 汇总 punch_count 后再回填订单号和业务日期。
+        // ⚠️ 必须校验卡属于会话本人：cardId 是前端传的，不校验就能改个数字看别人的核销记录。
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<object>>> GetMyPunchCardUsages(int cardId, string sessionKey,
+            string sessionType = "wechat_mini_openid")
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
+            if (member == null)
+            {
+                return Ok(new ApiResult<object>() { code = 1, message = "未找到会员", data = null });
+            }
+            PunchCard card = await _db.punchCard.Where(c => c.id == cardId && c.member_id == member.id)
+                .AsNoTracking().FirstOrDefaultAsync();
+            if (card == null)
+            {
+                return Ok(new ApiResult<object>() { code = 1, message = "次卡不存在", data = null });
+            }
+            var grouped = await _db.punchCardUsed.Where(u => u.card_id == cardId && u.valid)
+                .GroupBy(u => u.order_id)
+                .Select(g => new
+                {
+                    orderId = g.Key,
+                    punchCount = g.Sum(x => x.punch_count),
+                    usedDate = g.Max(x => x.create_date)
+                })
+                .AsNoTracking().ToListAsync();
+            List<int> orderIds = grouped.Select(g => g.orderId).ToList();
+            var orders = await _db.order.Where(o => orderIds.Contains(o.id))
+                .Select(o => new { o.id, o.code, o.biz_date, o.type })
+                .AsNoTracking().ToListAsync();
+            var usages = grouped.Select(g =>
+            {
+                var o = orders.Where(x => x.id == g.orderId).FirstOrDefault();
+                return new
+                {
+                    orderId = g.orderId,
+                    // 未生成正式订单号的历史数据回退显示内部 id，与订单卡片一贯口径一致
+                    orderCode = (o == null || string.IsNullOrEmpty(o.code)) ? ("#" + g.orderId) : o.code,
+                    orderType = o == null ? "" : o.type,
+                    bizDate = o == null ? (DateTime?)null : o.biz_date,
+                    // 日期在服务端格式化好，免得各端各自解析 ISO 串（iOS 对 new Date('yyyy-MM-dd HH:mm') 挑食）
+                    bizDateStr = o == null ? "" : o.biz_date.ToString("yyyy-MM-dd HH:mm"),
+                    punchCount = g.punchCount
+                };
+            })
+            .OrderByDescending(u => u.bizDate ?? DateTime.MinValue).ThenByDescending(u => u.orderId).ToList();
+            int usedTotal = 0;
+            for (int i = 0; i < usages.Count; i++)
+            {
+                usedTotal += usages[i].punchCount;
+            }
+            return Ok(new ApiResult<object>()
+            {
+                code = 0,
+                message = "",
+                data = new
+                {
+                    card = new
+                    {
+                        card.id,
+                        card.card_name,
+                        card.biz_type,
+                        card.total,
+                        punches = card.punches ?? 0,
+                        remaining = card.remaining,
+                        isSeason = card.total == null,
+                        createDateStr = card.create_date.ToString("yyyy-MM-dd")
+                    },
+                    // 这里的合计取自核销明细本身，和 punch_card.punches 是两个来源，
+                    // 对不上就说明有历史数据没走 punch_card_used（见 2026-06-26 的回补脚本）
+                    usedTotal = usedTotal,
+                    usages = usages
+                }
+            });
+        }
+
         public class PunchCardSaleCalc
         {
             public Models.Order order { get; set; }
