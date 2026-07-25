@@ -5932,8 +5932,9 @@ namespace SnowmeetApi.Controllers
                 bizType = bizType,
                 cardType = cardType,
                 isSeason = isSeason,
-                content = p.content,                             // 富文本原文，详情页 rich-text 渲染
+                content = p.content,                             // 富文本简介原文，详情页 rich-text 渲染
                 intro = StripHtmlToPlainText(p.content, 60),     // 纯文本摘要，首页卡片一行简介
+                usageRules = p.usage_rules,                      // 富文本使用规则；空则顾客端回退默认规则
                 imageUrl = headImage == null ? null : headImage.imageUrl
             };
         }

@@ -43,6 +43,9 @@ namespace SnowmeetApi.Models
         // 是 category_code 命中 category 表中 biz_type="租赁"/"养护" 且 name="次卡" 的那一行的 code，
         // 不再用 type 字符串（type 仍保留写入，兼容存量/其它用途，但查询判定一律以 category_code 为准）。
         public string? category_code { get; set; } = null;
+        // 使用规则（富文本，后台商品维护页编辑）。次卡/季卡详情页「使用规则」卡片渲染它；
+        // 为空时顾客端回退到按次数/期限/本人专属自动生成的默认规则，存量商品不会显示空白。
+        public string? usage_rules { get; set; } = null;
         [ForeignKey("category_id")]
         public Category? category { get; set; } = null;
         public ProductTicketTemplate? productTicketTemplate {get; set;} = null;
