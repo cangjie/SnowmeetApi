@@ -5892,27 +5892,114 @@ namespace SnowmeetApi.Controllers
             return await ResolveCardCategoryCode(bizType, "次卡", false, null);
         }
 
-        // 次卡商品目录：某个 biz_type 下的次卡类 SKU（category_code 命中 category.biz_type==bizType &&
-        // name=="次卡"，已上架且有效）。bizType 默认"租赁"，兼容退押金卖卡弹窗/次卡详情页等只买租赁卡的
-        // 现有调用方；顾客自助购买首页会分别传"租赁"/"养护"取两类卡合并展示。会话级即可，无需 staff 权限。
-        [HttpGet]
-        public async Task<ActionResult<ApiResult<object>>> GetPunchCardProducts(string? shop, string sessionKey = "", string bizType = "租赁")
+        // 富文本简介 → 纯文本摘要。商品维护页的「简介」是 <editor> 产出的 HTML，列表卡片那一行小字
+        // 不能直接塞 HTML（会露标签），统一在服务端剥好再下发，保证各顾客端页面摘要口径一致。
+        [NonAction]
+        private static string StripHtmlToPlainText(string html, int maxLen)
         {
-            string catCode = await ResolveNextCardCategoryCode(bizType);
-            if (string.IsNullOrEmpty(catCode))
+            if (string.IsNullOrWhiteSpace(html))
             {
-                return Ok(new ApiResult<object>() { code = 0, message = "", data = new List<object>() });
+                return "";
             }
-            var q = _db.product.Where(p => p.category_code == catCode && p.valid == 1 && p.on_shelves == 1 && p.punch_total != null);
-            if (!string.IsNullOrWhiteSpace(shop))
+            string text = System.Text.RegularExpressions.Regex.Replace(html, "<[^>]+>", " ");
+            text = System.Net.WebUtility.HtmlDecode(text);
+            // .NET 的 \s 等价于 [\f\n\r\t\v\x85\p{Z}]，\p{Z} 已含 U+00A0（&nbsp; 解码后就是它），
+            // 富文本编辑器爱产的不间断空格在这里会被一并压掉，不需要额外单独替换
+            text = System.Text.RegularExpressions.Regex.Replace(text, @"\s+", " ").Trim();
+            if (maxLen > 0 && text.Length > maxLen)
             {
-                string shopName = Util.UrlDecode(shop).Trim();
-                q = q.Where(p => p.shop == null || p.shop == shopName);
+                text = text.Substring(0, maxLen) + "…";
             }
-            var products = await q.OrderBy(p => p.sort).ThenBy(p => p.id)
-                .Select(p => new { p.id, p.name, p.sale_price, p.punch_total, p.shop })
-                .AsNoTracking().ToListAsync();
-            return Ok(new ApiResult<object>() { code = 0, message = "", data = products });
+            return text;
+        }
+
+        // 次卡/季卡商品下发给顾客端的统一视图。名称/价格/次数/门店/图片/简介**全部来自 product 表**——
+        // 顾客端不得再自己拼任何商品文案（首页那行简介一度硬编码在 punchcard_shop.js 里，
+        // 商品维护页编的 content 和图片根本没传到顾客端，改了后台顾客也看不到变化）。
+        [NonAction]
+        private object BuildPunchCardProductView(Product p, string bizType, string cardType)
+        {
+            ProductImage headImage = p.images == null ? null
+                : p.images.Where(i => i.valid == 1).OrderBy(i => i.sort).ThenBy(i => i.id).FirstOrDefault();
+            bool isSeason = cardType == "季卡";
+            return new
+            {
+                p.id,
+                p.name,
+                p.sale_price,
+                punch_total = isSeason ? null : p.punch_total,   // 季卡不限次数，次数字段对它无意义
+                p.shop,
+                bizType = bizType,
+                cardType = cardType,
+                isSeason = isSeason,
+                content = p.content,                             // 富文本原文，详情页 rich-text 渲染
+                intro = StripHtmlToPlainText(p.content, 60),     // 纯文本摘要，首页卡片一行简介
+                imageUrl = headImage == null ? null : headImage.imageUrl
+            };
+        }
+
+        // 次卡/季卡商品目录：某个 biz_type 下的卡类 SKU（category_code 命中 category.biz_type==bizType &&
+        // name==cardType，已上架且有效）。bizType 默认"租赁"、cardType 默认"次卡"，兼容退押金卖卡弹窗等
+        // 只买租赁次卡的现有调用方；cardType 传空则返回该 bizType 下 次卡+季卡 的合并列表（顾客自助购买
+        // 首页用，季卡也能自助买）。会话级即可，无需 staff 权限。
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<object>>> GetPunchCardProducts(string? shop, string sessionKey = "",
+            string bizType = "租赁", string cardType = "次卡")
+        {
+            List<string> cardTypes = string.IsNullOrWhiteSpace(cardType)
+                ? new List<string>() { "次卡", "季卡" }
+                : new List<string>() { cardType.Trim() };
+            string shopName = string.IsNullOrWhiteSpace(shop) ? null : Util.UrlDecode(shop).Trim();
+            List<object> result = new List<object>();
+            foreach (string ct in cardTypes)
+            {
+                string catCode = await ResolveCardCategoryCode(bizType, ct, false, null);
+                if (string.IsNullOrEmpty(catCode))
+                {
+                    continue;
+                }
+                var q = _db.product.Where(p => p.category_code == catCode && p.valid == 1 && p.on_shelves == 1);
+                // 次卡没配总次数就发不出卡，不允许上架销售；季卡不限次数、punch_total 本就恒空，不参与该过滤
+                if (ct != "季卡")
+                {
+                    q = q.Where(p => p.punch_total != null);
+                }
+                if (shopName != null)
+                {
+                    q = q.Where(p => p.shop == null || p.shop == shopName);
+                }
+                List<Product> products = await q.Include(p => p.images).ThenInclude(i => i.uploadFile)
+                    .OrderBy(p => p.sort).ThenBy(p => p.id).AsNoTracking().ToListAsync();
+                foreach (Product p in products)
+                {
+                    result.Add(BuildPunchCardProductView(p, bizType, ct));
+                }
+            }
+            return Ok(new ApiResult<object>() { code = 0, message = "", data = result });
+        }
+
+        // 次卡/季卡商品·单条查询（顾客端详情页用）：只按 productId 查，自己反查该商品属于哪个
+        // biz_type/card_type 组合，不要求调用方传 bizType——详情页可能从首页跳进来、也可能从分享或
+        // 扫码直接进来。（原详情页是在"租赁次卡"列表里按 id 找商品，养护卡点进去必然报"商品不存在"。）
+        [HttpGet("{productId}")]
+        public async Task<ActionResult<ApiResult<object>>> GetPunchCardProduct(int productId, string sessionKey = "")
+        {
+            Product p = await _db.product.Include(x => x.images).ThenInclude(i => i.uploadFile)
+                .Where(x => x.id == productId && x.valid == 1 && x.on_shelves == 1)
+                .AsNoTracking().FirstOrDefaultAsync();
+            Category cat = (p == null || string.IsNullOrEmpty(p.category_code)) ? null
+                : await _db.category.Where(c => c.code == p.category_code && c.valid == 1
+                    && (c.name == "次卡" || c.name == "季卡")).AsNoTracking().FirstOrDefaultAsync();
+            if (cat == null)
+            {
+                return Ok(new ApiResult<object>() { code = 1, message = "商品不存在或已下架", data = null });
+            }
+            return Ok(new ApiResult<object>()
+            {
+                code = 0,
+                message = "",
+                data = BuildPunchCardProductView(p, cat.biz_type, cat.name)
+            });
         }
 
         // 次卡/季卡商品管理·列表（店长/管理员 title_level≥200）：不过滤 valid/on_shelves，管理页要能看到已下架的行。
@@ -5998,13 +6085,16 @@ namespace SnowmeetApi.Controllers
             {
                 return Ok(new ApiResult<object>() { code = 1, message = "未找到会员", data = null });
             }
+            // 不按 biz_type 过滤：顾客自助可以买养护卡，只查"租赁"会让买到的养护卡在「我的次卡」里凭空消失。
+            // biz_type 随行下发，前端负责打标签区分租赁/养护。
             List<PunchCard> cards = await _db.punchCard
-                .Where(c => c.member_id == member.id && c.biz_type == "租赁")
+                .Where(c => c.member_id == member.id)
                 .OrderByDescending(c => c.id).AsNoTracking().ToListAsync();
             var data = cards.Select(c => new
             {
                 c.id,
                 c.card_name,
+                c.biz_type,
                 c.total,
                 punches = c.punches ?? 0,
                 remaining = c.total == null ? (int?)null : c.total - (c.punches ?? 0),

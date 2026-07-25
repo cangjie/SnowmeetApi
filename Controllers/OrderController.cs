@@ -2334,14 +2334,34 @@ namespace SnowmeetApi.Controllers
                     {
                         Retail retail = retailsToGrant[ri];
                         Product product = await _db.product.Where(p => p.id == retail.product_id).AsNoTracking().FirstOrDefaultAsync();
-                        if (product != null && product.punch_total != null && order.member_id != null)
+                        if (product == null || order.member_id == null || string.IsNullOrEmpty(product.category_code))
+                        {
+                            continue;
+                        }
+                        // 「这是不是卡类商品」「是租赁卡还是养护卡」「是次卡还是季卡」全部由 product.category_code
+                        // 命中的那行 category 决定（次卡/季卡的权威识别方式，见 RentController.ResolveCardCategoryCode）。
+                        // 原来 biz_type 写死"租赁"——顾客买养护次卡会发成租赁卡；且要求 punch_total 非空——
+                        // 季卡不限次数、punch_total 恒空，永远发不出来。
+                        Category cardCategory = await _db.category
+                            .Where(c => c.code == product.category_code && c.valid == 1
+                                && (c.name == "次卡" || c.name == "季卡"))
+                            .AsNoTracking().FirstOrDefaultAsync();
+                        if (cardCategory == null)
+                        {
+                            continue;   // 普通零售商品，本来就不该发卡
+                        }
+                        bool isSeasonCard = cardCategory.name == "季卡";
+                        if (!isSeasonCard && product.punch_total == null)
+                        {
+                            continue;   // 次卡没配总次数，发不出卡
+                        }
                         {
                             PunchCard card = new PunchCard()
                             {
-                                biz_type = "租赁",
+                                biz_type = cardCategory.biz_type,
                                 card_name = product.name,
                                 member_id = (int)order.member_id,
-                                total = product.punch_total,
+                                total = isSeasonCard ? null : product.punch_total,   // 季卡 total=null 即"不限次数"
                                 punches = 0,
                                 source_retail_id = retail.id,
                                 create_date = DateTime.Now
