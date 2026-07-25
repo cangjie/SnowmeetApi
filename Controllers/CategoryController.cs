@@ -422,6 +422,10 @@ namespace SnowmeetApi.Controllers
         public async Task<Product> GetProduct(int productId)
         {
             Product product = await _db.product.FindAsync(productId);
+            if (product == null)
+            {
+                return null;
+            }
             await _db.product.Entry(product).Collection(p => p.images).LoadAsync();
             await _db.product.Entry(product).Collection(p => p.properties).LoadAsync();
             await _db.product.Entry(product).Collection(p => p.stocks).LoadAsync();
