@@ -5841,12 +5841,13 @@ namespace SnowmeetApi.Controllers
                 .Select(c => c.code).FirstOrDefaultAsync();
         }
 
-        // 次卡商品目录：租赁次卡类 SKU（category_code 命中 category.biz_type=="租赁" && name=="次卡"，
-        // 已上架且有效）。会话级即可，无需 staff 权限——纯目录浏览，供退押金卖卡弹窗与顾客自助购买页共用。
+        // 次卡商品目录：某个 biz_type 下的次卡类 SKU（category_code 命中 category.biz_type==bizType &&
+        // name=="次卡"，已上架且有效）。bizType 默认"租赁"，兼容退押金卖卡弹窗/次卡详情页等只买租赁卡的
+        // 现有调用方；顾客自助购买首页会分别传"租赁"/"养护"取两类卡合并展示。会话级即可，无需 staff 权限。
         [HttpGet]
-        public async Task<ActionResult<ApiResult<object>>> GetPunchCardProducts(string? shop, string sessionKey = "")
+        public async Task<ActionResult<ApiResult<object>>> GetPunchCardProducts(string? shop, string sessionKey = "", string bizType = "租赁")
         {
-            string catCode = await ResolveNextCardCategoryCode("租赁");
+            string catCode = await ResolveNextCardCategoryCode(bizType);
             if (string.IsNullOrEmpty(catCode))
             {
                 return Ok(new ApiResult<object>() { code = 0, message = "", data = new List<object>() });
