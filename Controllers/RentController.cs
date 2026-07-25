@@ -5849,14 +5849,17 @@ namespace SnowmeetApi.Controllers
             {
                 return null;
             }
-            string bizToken = bizType == "养护" ? "CARE" : "RENT";
-            string cardToken = cardType == "季卡" ? "SEASON" : "PUNCH";
+            // 数字两段式编码，与人工已建的 3 条分类对齐：租赁=01/养护=02，次卡=01/季卡=02
+            // （租赁次卡=0101、养护次卡=0201、养护季卡=0202 均已由人工建好；这里只会在还没
+            // 建过的组合——目前是「租赁季卡」=0102——首次使用时兜底自动创建，同规则续号）。
+            string bizToken = bizType == "养护" ? "02" : "01";
+            string cardToken = cardType == "季卡" ? "02" : "01";
             Category newCategory = new Category()
             {
                 id = 0,
                 biz_type = bizType,
                 name = cardType,
-                code = bizToken + "_" + cardToken,
+                code = bizToken + cardToken,
                 valid = 1,
                 hide = 0,
                 on_shelves = 1,
