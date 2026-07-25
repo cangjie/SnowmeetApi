@@ -947,7 +947,10 @@ namespace SnowmeetApi.Controllers
                 key_value = order.id,
                 prev_value = null,
                 current_value = Models.Order.OrderStatus.待生成.ToString(),
-                staff_id = staff.id,
+                // 顾客自助下单（如自己买次卡）时会话里没有 staff，这里必须可空取值。
+                // 写死 staff.id 会让顾客侧 PlaceOrder 直接 NRE 500——本方法开头就已经允许
+                // "staff 为空、member 非空"的顾客分支了，日志这里却没跟上。
+                staff_id = staff?.id,
                 is_manual = 1,
                 scene = "开单",
                 create_date = DateTime.Now

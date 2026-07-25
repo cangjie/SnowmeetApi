@@ -6104,6 +6104,166 @@ namespace SnowmeetApi.Controllers
             return Ok(new ApiResult<object>() { code = 0, message = "", data = data });
         }
 
+        // 顾客自助购买次卡·确认页数据：订单里买了什么、几张、多少钱，外加商品的简介和使用规则，
+        // 让顾客在真正掏钱之前能核对清楚（尤其是使用规则）。金额一律服务端从 retail 行现算，
+        // 不接受前端传数字。
+        [HttpGet("{orderId}")]
+        public async Task<ActionResult<ApiResult<object>>> GetMyPunchCardOrder(int orderId, string sessionKey,
+            string sessionType = "wechat_mini_openid")
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
+            if (member == null)
+            {
+                return Ok(new ApiResult<object>() { code = 1, message = "未找到会员", data = null });
+            }
+            Models.Order order = await _db.order.Where(o => o.id == orderId).AsNoTracking().FirstOrDefaultAsync();
+            // 归属校验：顾客只能看自己的订单，orderId 是前端传的
+            if (order == null || order.valid != 1 || order.member_id != member.id)
+            {
+                return Ok(new ApiResult<object>() { code = 1, message = "订单不存在", data = null });
+            }
+            List<Retail> retails = await _db.retail.Where(r => r.order_id == orderId && r.valid == 1)
+                .AsNoTracking().ToListAsync();
+            if (retails.Count == 0 || retails[0].product_id == null)
+            {
+                return Ok(new ApiResult<object>() { code = 1, message = "订单内容异常", data = null });
+            }
+            Product p = await _db.product.Include(x => x.images).ThenInclude(i => i.uploadFile)
+                .Where(x => x.id == retails[0].product_id).AsNoTracking().FirstOrDefaultAsync();
+            Category cat = (p == null || string.IsNullOrEmpty(p.category_code)) ? null
+                : await _db.category.Where(c => c.code == p.category_code && c.valid == 1
+                    && (c.name == "次卡" || c.name == "季卡")).AsNoTracking().FirstOrDefaultAsync();
+            if (cat == null)
+            {
+                return Ok(new ApiResult<object>() { code = 1, message = "订单内容异常", data = null });
+            }
+            double amount = 0;
+            for (int i = 0; i < retails.Count; i++)
+            {
+                amount += retails[i].deal_price;
+            }
+            amount = Math.Round(amount, 2);
+            double paid = await _db.orderPayment
+                .Where(op => op.order_id == orderId && op.valid == 1
+                    && op.status == OrderPayment.PaymentStatus.支付成功.ToString())
+                .SumAsync(op => (double?)op.amount) ?? 0;
+            return Ok(new ApiResult<object>()
+            {
+                code = 0,
+                message = "",
+                data = new
+                {
+                    orderId = order.id,
+                    orderCode = string.IsNullOrEmpty(order.code) ? ("#" + order.id) : order.code,
+                    quantity = retails.Count,
+                    amount = amount,
+                    paidAmount = Math.Round(paid, 2),
+                    paid = Math.Round(paid, 2) >= amount,   // 已付清则确认页只显示结果、不再给支付按钮
+                    closed = order.closed == 1,
+                    product = BuildPunchCardProductView(p, cat.biz_type, cat.name)
+                }
+            });
+        }
+
+        // 顾客自助购买次卡·发起微信支付：给自己的订单建一笔待支付的微信支付单，返回 paymentId，
+        // 前端接着调现成的 Order/WechatPayByOrderPayment 换预支付参数再 wx.requestPayment。
+        // ⚠️ 不能复用 Order/GetWepayPayment——那是店员开单收银用的，内部直接取 staff.id，
+        // 顾客会话拿不到 staff 会 NRE；而且它会把订单上其它待支付单一并作废，语义也不对。
+        [HttpGet("{orderId}")]
+        public async Task<ActionResult<ApiResult<object>>> StartMyPunchCardPayment(int orderId, string sessionKey,
+            string sessionType = "wechat_mini_openid")
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
+            if (member == null)
+            {
+                return Ok(new ApiResult<object>() { code = 1, message = "未找到会员", data = null });
+            }
+            Models.Order order = await _db.order.Where(o => o.id == orderId).AsNoTracking().FirstOrDefaultAsync();
+            if (order == null || order.valid != 1 || order.member_id != member.id)
+            {
+                return Ok(new ApiResult<object>() { code = 1, message = "订单不存在", data = null });
+            }
+            if (order.closed == 1)
+            {
+                return Ok(new ApiResult<object>() { code = 1, message = "订单已关闭", data = null });
+            }
+            List<Retail> retails = await _db.retail.Where(r => r.order_id == orderId && r.valid == 1)
+                .AsNoTracking().ToListAsync();
+            double amount = 0;
+            for (int i = 0; i < retails.Count; i++)
+            {
+                amount += retails[i].deal_price;
+            }
+            amount = Math.Round(amount, 2);
+            if (amount <= 0)
+            {
+                return Ok(new ApiResult<object>() { code = 1, message = "订单金额异常", data = null });
+            }
+            double paid = await _db.orderPayment
+                .Where(op => op.order_id == orderId && op.valid == 1
+                    && op.status == OrderPayment.PaymentStatus.支付成功.ToString())
+                .SumAsync(op => (double?)op.amount) ?? 0;
+            if (Math.Round(paid, 2) >= amount)
+            {
+                return Ok(new ApiResult<object>() { code = 1, message = "订单已支付", data = null });
+            }
+            // 复用已有的待支付单：顾客反复退出/进入确认页不该攒出一堆待支付记录，
+            // 金额对得上就直接接着用（金额变了说明订单变了，作废重建）
+            OrderPayment payment = await _db.orderPayment
+                .Where(op => op.order_id == orderId && op.valid == 1
+                    && op.status == OrderPayment.PaymentStatus.待支付.ToString()
+                    && op.pay_method == "微信支付")
+                .OrderByDescending(op => op.id).FirstOrDefaultAsync();
+            if (payment != null && Math.Round(payment.amount, 2) != amount)
+            {
+                payment.valid = 0;
+                payment.update_date = DateTime.Now;
+                _db.orderPayment.Entry(payment).State = EntityState.Modified;
+                await _db.SaveChangesAsync();
+                payment = null;
+            }
+            if (payment == null)
+            {
+                TenpayController _tenHelper = new TenpayController(_db, _oriConfig, _httpContextAccessor);
+                payment = new OrderPayment()
+                {
+                    id = 0,
+                    order_id = order.id,
+                    amount = amount,
+                    staff_id = null,          // 顾客自助，没有经手店员
+                    member_id = member.id,
+                    pay_method = "微信支付",
+                    mch_id = _tenHelper.GetMchId(order),
+                    create_date = DateTime.Now
+                };
+                await _db.orderPayment.AddAsync(payment);
+                CoreDataModLog log = new CoreDataModLog()
+                {
+                    id = 0,
+                    table_name = "Order",
+                    field_name = "OrderState",
+                    key_value = order.id,
+                    scene = "顾客自助购买次卡",
+                    member_id = member.id,
+                    staff_id = null,
+                    prev_value = null,
+                    current_value = Models.Order.OrderStatus.待支付.ToString(),
+                    trace_id = 0,
+                    is_manual = 1
+                };
+                await _db.coreDataModLog.AddAsync(log);
+                await _db.SaveChangesAsync();
+            }
+            return Ok(new ApiResult<object>()
+            {
+                code = 0,
+                message = "",
+                data = new { paymentId = payment.id, amount = amount }
+            });
+        }
+
         // 我的次卡·使用明细：这张卡被哪些订单核销过，每单核销了几次。
         // punch_card_used 是"每条 rental / 每件 care 一行"的粒度，同一订单可能有多行，
         // 所以按 order_id 汇总 punch_count 后再回填订单号和业务日期。
