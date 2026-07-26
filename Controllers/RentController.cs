@@ -6108,7 +6108,10 @@ namespace SnowmeetApi.Controllers
                 punches = c.punches ?? 0,
                 remaining = c.total == null ? (int?)null : c.total - (c.punches ?? 0),
                 isSeason = c.total == null,
-                isRefund = c.is_refund
+                isRefund = c.is_refund,
+                // 开卡日期在服务端格式化好下发，与使用明细页 createDateStr 同一口径，
+                // 免得各端各自解析 ISO 串（iOS 对 new Date('yyyy-MM-dd HH:mm') 挑食）
+                createDateStr = c.create_date.ToString("yyyy-MM-dd")
             }).ToList();
             return Ok(new ApiResult<object>() { code = 0, message = "", data = data });
         }
