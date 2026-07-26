@@ -1000,6 +1000,8 @@ namespace SnowmeetApi.Controllers
                 {
                     _db.care.Entry(order.cares[i]).State = EntityState.Detached;
                 }
+                // 0 元单没有支付回调，生效即在此处收口 → 会员空姓名/性别在这里补（见 SupplementMemberProfileFromOrder）
+                await SupplementMemberProfileFromOrder(order);
                 CareController _careHelper = new CareController(_db, _config, _http);
                 await _careHelper.EffectCareOrder(order.id);
                 order = await GetOrder(order.id);
@@ -2231,7 +2233,17 @@ namespace SnowmeetApi.Controllers
             });
         }
 
-        // 订单支付成功/确认后：若归属会员的姓名或性别为空，用订单里的姓名/性别快照(contact_name/contact_gender)补上。
+        // 订单生效后：若归属会员的姓名或性别为空，用开单时填的姓名/性别快照(contact_name/contact_gender)补上。
+        // 只填空、不覆盖已有值；散客单(member_id==null)直接跳过；重复调用无副作用（幂等）。
+        //
+        // ⚠️ 必须挂在「所有让订单生效的路径」上，不是只挂支付成功——生效路径散落在 5 处：
+        //   ① DealSuccessPaidOrder    微信/支付宝支付回调（EffectUnpaidOrder 的现金/挂账确认也转调它）
+        //   ② PlaceOrder              旧版开单：0 元养护单 place 即生效
+        //   ③ PlaceCareOrder          新版养护开单：无权益的 0 元单 place 即生效
+        //   ④ PayWithDeposit          储值支付（租赁付租金 / 养护全额）
+        //   ⑤ WriteoffCareOrder       养护 0 元核销 / 储值全覆盖单核销
+        // 后三条压根不经过支付回调，2026-06-30 首版只挂了 ①，养护/储值/0 元单一律补不上（2026-07-26 补齐）。
+        // 今后新增任何「订单生效」入口，都要在那里补一次调用。
         [NonAction]
         public async Task SupplementMemberProfileFromOrder(Models.Order order)
         {
@@ -2239,7 +2251,16 @@ namespace SnowmeetApi.Controllers
             {
                 return;
             }
-            Models.Member member = await _db.member.Where(m => m.id == order.member_id).FirstOrDefaultAsync();
+            // 跟踪器里可能已经有同 id 的 Member 实例：调用方（如 PayWithDeposit）对 order 做过
+            // Entry().State=Modified，EF 会沿导航图把 order.member 一并附加进来。这时再 attach
+            // 一个新查出来的实例就会撞键（"another instance with the same key value is already
+            // being tracked"）。优先复用已跟踪的那个，让 5 个调用点都不必操心各自的跟踪状态。
+            Models.Member member = _db.member.Local.Where(m => m.id == order.member_id).FirstOrDefault();
+            bool alreadyTracked = member != null;
+            if (member == null)
+            {
+                member = await _db.member.Where(m => m.id == order.member_id).FirstOrDefaultAsync();
+            }
             if (member == null)
             {
                 return;
@@ -2258,9 +2279,15 @@ namespace SnowmeetApi.Controllers
             if (changed)
             {
                 member.update_date = DateTime.Now;
-                _db.member.Entry(member).State = EntityState.Modified;   // 全局 NoTracking，必须显式标记
-                CoreDataModLog log = CoreDataModLog.CreateManualLog("member", "", member.id, "支付成功补全会员资料",
-                    null, null, null, member.real_name + "/" + member.gender, "订单快照补全空姓名/性别");
+                // 全局 NoTracking，未被跟踪的实例必须显式标记才会写库；
+                // 已被跟踪的实例（上面复用来的）由变更跟踪自动识别，再 attach 一次反而会撞键
+                if (!alreadyTracked)
+                {
+                    _db.member.Entry(member).State = EntityState.Modified;
+                }
+                CoreDataModLog log = CoreDataModLog.CreateManualLog("member", "", member.id, "订单生效补全会员资料",
+                    null, null, null, member.real_name + "/" + member.gender,
+                    "订单 " + (string.IsNullOrEmpty(order.code) ? ("#" + order.id) : order.code) + " 快照补全空姓名/性别");
                 await _db.coreDataModLog.AddAsync(log);
                 await _db.SaveChangesAsync();
             }
@@ -3120,6 +3147,9 @@ namespace SnowmeetApi.Controllers
             }
             CareController _careHelper = new CareController(_db, _config, _http);
             double total = 0;
+            // 本单已用掉的季卡：季卡每天限一次，同一张卡在本单多件装备上重复选也要拦
+            // （下单这一刻它们都还没落 punch_card_used，只查库看不出来）
+            List<int> seasonCardUsedInThisOrder = new List<int>();
             for (int i = 0; i < order.cares.Count; i++)
             {
                 Care care = order.cares[i];
@@ -3149,6 +3179,27 @@ namespace SnowmeetApi.Controllers
                         care.use_card = false;
                         care.card_id = null;
                         care.card_name = null;
+                    }
+                    // 季卡「每天限用一次」：季卡不限总次数，没有这道闸就等于无限次免费养护。
+                    // 前端选卡列表已按 usedToday 禁选，这里是服务端兜底——前端能绕过。
+                    // 两种冲突都要拦：① 今天已经在别的单上核销过 ② 同一张卡在本单多件装备上重复选
+                    if (card != null && card.total == null)
+                    {
+                        bool usedToday = await _db.punchCardUsed.AnyAsync(u => u.card_id == card.id && u.valid
+                            && u.create_date >= DateTime.Now.Date && u.create_date < DateTime.Now.Date.AddDays(1));
+                        bool dupInThisOrder = seasonCardUsedInThisOrder.Contains(card.id);
+                        if (usedToday || dupInThisOrder)
+                        {
+                            return Ok(new ApiResult<Models.Order>()
+                            {
+                                code = 1,
+                                message = dupInThisOrder
+                                    ? "「" + card.card_name + "」每天只能使用一次，同一订单内不能重复使用"
+                                    : "「" + card.card_name + "」今天已经使用过，每天只能使用一次",
+                                data = null
+                            });
+                        }
+                        seasonCardUsedInThisOrder.Add(card.id);
                     }
                 }
                 var (commonCharge, ticketDiscount) = await _careHelper.CalcCharge(order.shop, care, ticket, card);
@@ -3232,6 +3283,8 @@ namespace SnowmeetApi.Controllers
             // 用了储值/卡券的 0 元单留待结算页微信核验会员本人后再 WriteoffCareOrder 生效
             if (order.paying_amount == 0 && !usedBenefit)
             {
+                // 这条路径不经过支付回调，会员空姓名/性别在这里补（见 SupplementMemberProfileFromOrder）
+                await SupplementMemberProfileFromOrder(order);
                 await _careHelper.EffectCareOrder(order.id);
                 order = await GetOrder(order.id);
             }
@@ -3402,6 +3455,10 @@ namespace SnowmeetApi.Controllers
             await _db.SaveChangesAsync();
             _db.order.Entry(order).State = EntityState.Detached;
             await _db.SaveChangesAsync();
+            // 储值支付不经过支付回调，会员空姓名/性别在这里补（见 SupplementMemberProfileFromOrder）。
+            // 放在业务生效之前、且不限业务类型：租赁「储值付租金」这条分支下面不调 Effect，
+            // 挂在 EffectCareOrder 旁边会漏掉它
+            await SupplementMemberProfileFromOrder(order);
             CareController _careHelper = new CareController(_db, _config, _http);
 
             if (order.type == "养护")
@@ -3493,6 +3550,8 @@ namespace SnowmeetApi.Controllers
             _db.order.Entry(dealOrder).State = EntityState.Modified;
             await _db.SaveChangesAsync();
             _db.order.Entry(dealOrder).State = EntityState.Detached;
+            // 核销生效同样不经过支付回调，会员空姓名/性别在这里补（见 SupplementMemberProfileFromOrder）
+            await SupplementMemberProfileFromOrder(dealOrder);
             CareController _careHelper = new CareController(_db, _config, _http);
             await _careHelper.EffectCareOrder(orderId);
             return Ok(new ApiResult<Models.Order?>() { code = 0, message = "", data = await GetOrder(orderId) });

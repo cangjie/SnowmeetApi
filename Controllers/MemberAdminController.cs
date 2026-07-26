@@ -852,7 +852,12 @@ namespace SnowmeetApi.Controllers
                     && !string.IsNullOrWhiteSpace(c.equip_brand)
                     && !string.IsNullOrWhiteSpace(c.equip_scale),
                 lastUsedDate = lastUsed.Where(l => l.card_id == c.id)
-                    .Select(l => (DateTime?)l.lastUsedDate).FirstOrDefault()
+                    .Select(l => (DateTime?)l.lastUsedDate).FirstOrDefault(),
+                // 季卡「每天限用一次」：季卡不限总次数，没有这道闸就等于无限次免费。
+                // 今天已核销过的季卡在开单选卡列表里禁选（服务端 PlaceCareOrder 也会再拦一道）。
+                // 次卡靠剩余次数天然受限，不受此规则约束。
+                usedToday = c.total == null && lastUsed.Any(l => l.card_id == c.id
+                    && l.lastUsedDate.Date == DateTime.Now.Date)
             }).ToList();
             return Ok(new ApiResult<object>() { code = 0, message = "", data = data });
         }
