@@ -458,6 +458,33 @@ namespace SnowmeetApi.Controllers
             }
             return (commonCharge, ticketDiscount);
         }
+        // 季卡是否「还没开卡」：三项装备信息都为空 = 尚未绑定到具体装备，第一次用它养护时才绑。
+        // 判定口径必须与前端 care_recept_form 的「即将开卡」提示一致，否则会出现
+        // 「界面提示要开卡、生效时却没写」或反过来的情况。
+        // serial 不参与判定（CLAUDE.md：serial 暂不参与限制，很多装备本来就没序列号）。
+        [NonAction]
+        public static bool IsSeasonCardUnbound(PunchCard card)
+        {
+            if (card == null || card.total != null)
+            {
+                return false;   // 只有季卡（total=NULL 不限次数）才有开卡这回事
+            }
+            return string.IsNullOrWhiteSpace(card.equip_type)
+                && string.IsNullOrWhiteSpace(card.equip_brand)
+                && string.IsNullOrWhiteSpace(card.equip_scale);
+        }
+
+        // 本次养护的装备信息是否够写进卡：类型/品牌/长度三项齐全才算。
+        // 缺一项就不开卡——写进去一张残缺的绑定，这张季卡以后就再也匹配不上任何装备了
+        [NonAction]
+        public static bool HasFullEquipInfo(Care care)
+        {
+            return care != null
+                && !string.IsNullOrWhiteSpace(care.equipment)
+                && !string.IsNullOrWhiteSpace(care.brand)
+                && !string.IsNullOrWhiteSpace(care.scale);
+        }
+
         // 按所选券/卡推导默认服务项（换券/换卡时刻调用）：先清空服务项再套默认，
         // 与前端「更改券/卡先清空已选服务」同一口径。规则：双项卡 → 修刃+热蜡+刮蜡；
         // 卡名含「机打蜡」（如机打蜡季卡）→ 机打蜡；券12 → 机打蜡；券17/18 → 非雪季 now/later；其余不默认。
@@ -993,6 +1020,24 @@ namespace SnowmeetApi.Controllers
                                 punchCard.punches = (punchCard.punches ?? 0) + 1;
                                 punchCard.update_date = DateTime.Now;
                                 _db.punchCard.Entry(punchCard).State = EntityState.Modified;   // 全局 NoTracking，必须显式
+                            }
+                            // 季卡「开卡」：季卡是绑定装备的（equip_type/brand/scale 三项全非空即已限定装备），
+                            // 但发卡/售卡时并不知道顾客拿哪块板来，三项是空的。第一次真正用它养护时，
+                            // 就把这次养护的装备写进卡——此后这张季卡只能给这块板用。
+                            // 只在三项**都为空**时写（已开卡的不覆盖），且本次装备信息要够全，
+                            // 免得写进去一张残缺的绑定把卡废掉。
+                            if (IsSeasonCardUnbound(punchCard) && HasFullEquipInfo(care))
+                            {
+                                punchCard.equip_type = (care.equipment ?? "").Trim();
+                                punchCard.equip_brand = (care.brand ?? "").Trim();
+                                punchCard.equip_scale = (care.scale ?? "").Trim();
+                                punchCard.equip_serial = (care.serials ?? "").Trim();
+                                punchCard.update_date = DateTime.Now;
+                                _db.punchCard.Entry(punchCard).State = EntityState.Modified;
+                                await _db.coreDataModLog.AddAsync(CoreDataModLog.CreateManualLog(
+                                    "punch_card", "equip", punchCard.id, "季卡开卡绑定装备", null, order.staff_id,
+                                    null, punchCard.equip_type + " " + punchCard.equip_brand + " " + punchCard.equip_scale,
+                                    "首次使用该季卡养护，按本次装备开卡"));
                             }
                             await _db.coreDataModLog.AddAsync(CoreDataModLog.CreateManualLog("care", "次卡消费",
                                 care.id, "养护次卡消费", null, order.staff_id, "0", "1", "养护核销扣次卡"));
