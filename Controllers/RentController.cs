@@ -6499,7 +6499,11 @@ namespace SnowmeetApi.Controllers
             }
             if (card.source_retail_id == null)
             {
-                eval.blockReason = "这张卡是赠送发放的，没有支付记录可退";
+                // 没有 source_retail_id 的两类卡：店员手工发放（GrantPunchCard / 注册开卡礼包），
+                // 以及 2026-07-22 次卡销售功能上线前的全部存量卡。系统里都没有可退的线上支付记录，
+                // 但其中可能有线下收过钱的，不能武断说"是赠送的"，一律引导找店员人工判断。
+                eval.contactStaff = true;
+                eval.blockReason = "这张卡没有关联的线上支付记录，不支持自助退款；如需退款请联系店员";
                 return eval;
             }
             Retail retail = await _db.retail.Where(r => r.id == card.source_retail_id.Value && r.valid == 1)
