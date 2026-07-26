@@ -5941,6 +5941,7 @@ namespace SnowmeetApi.Controllers
                 content = p.content,                             // 富文本简介原文，详情页 rich-text 渲染
                 intro = StripHtmlToPlainText(p.content, 60),     // 纯文本摘要，首页卡片一行简介
                 usageRules = p.usage_rules,                      // 富文本使用规则；空则顾客端回退默认规则
+                careProjectCount = p.care_project_count,         // 养护次卡：1=单项 / 2=双项，非养护次卡为 null
                 imageUrl = headImage == null ? null : headImage.imageUrl
             };
         }
@@ -6054,6 +6055,7 @@ namespace SnowmeetApi.Controllers
                         p.name,
                         p.sale_price,
                         p.punch_total,
+                        p.care_project_count,   // 养护次卡：1=单项 / 2=双项
                         p.shop,
                         p.valid,
                         p.on_shelves,

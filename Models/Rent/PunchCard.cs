@@ -23,6 +23,9 @@ namespace SnowmeetApi.Models
         public DateTime? update_date { get; set; }
         public DateTime create_date { get; set; } = DateTime.Now;
         public int? source_retail_id { get; set; } = null;   // 该卡由哪笔 retail 销售生成；GrantPunchCard 白送/旧数据为 null
+        // 养护次卡专用：一次核销覆盖几个养护项目。1=单项（修刃 或 热蜡）、2=双项（修刃 + 热打蜡）。
+        // 发卡/售卡时从 product.care_project_count 复制而来；历史卡为 NULL，核销时回退按卡名含「双项」判断。
+        public int? care_project_count { get; set; } = null;
         // 已退款（2026-07-25 起）：顾客在「我的次卡」详情页对一次未核销过的卡自助退款成功后置 true。
         // 置位后该卡在所有核销入口一律不可用（租赁/养护定价、选卡列表、资产聚合都要排除它）。
         public bool is_refund { get; set; } = false;

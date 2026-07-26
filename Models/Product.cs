@@ -46,6 +46,11 @@ namespace SnowmeetApi.Models
         // 使用规则（富文本，后台商品维护页编辑）。次卡/季卡详情页「使用规则」卡片渲染它；
         // 为空时顾客端回退到按次数/期限/本人专属自动生成的默认规则，存量商品不会显示空白。
         public string? usage_rules { get; set; } = null;
+        // 养护次卡专用：一次核销覆盖几个养护项目。1=单项（修刃 或 热蜡，二选一）、
+        // 2=双项（修刃 + 热打蜡）。非养护次卡为 NULL。
+        // 发卡/售卡时复制到 punch_card.care_project_count，核销时优先用它判默认服务项，
+        // 不再只靠卡名里有没有「双项」两个字（历史卡没有该字段，仍回退按卡名匹配）。
+        public int? care_project_count { get; set; } = null;
         [ForeignKey("category_id")]
         public Category? category { get; set; } = null;
         public ProductTicketTemplate? productTicketTemplate {get; set;} = null;

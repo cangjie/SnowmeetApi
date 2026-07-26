@@ -599,6 +599,7 @@ namespace SnowmeetApi.Controllers
                     card_name = p.name,
                     total = isSeason ? null : p.punch_total,   // 季卡不限次数
                     isSeason = isSeason,
+                    careProjectCount = p.care_project_count,   // 养护次卡：1=单项 / 2=双项
                     // 下架的卡种仍可发放（可能是不对外售卖的赠品卡），但要让店员看得出来
                     onShelves = p.on_shelves == 1
                 };
@@ -640,6 +641,8 @@ namespace SnowmeetApi.Controllers
                 member_id = req.memberId,
                 total = isSeason ? null : p.punch_total,   // 季卡 total=null 即"不限次数"
                 punches = 0,
+                // 养护次卡的单项/双项跟着卡走：核销时按它推默认服务项，不再只靠卡名里有没有「双项」
+                care_project_count = p.care_project_count,
                 create_date = DateTime.Now
             };
             await _db.punchCard.AddAsync(card);

@@ -2366,6 +2366,8 @@ namespace SnowmeetApi.Controllers
                                 member_id = (int)order.member_id,
                                 total = isSeasonCard ? null : product.punch_total,   // 季卡 total=null 即"不限次数"
                                 punches = 0,
+                                // 养护次卡的单项/双项跟着卡走（与店员发卡 GrantPunchCard 同口径）
+                                care_project_count = product.care_project_count,
                                 source_retail_id = retail.id,
                                 create_date = DateTime.Now
                             };

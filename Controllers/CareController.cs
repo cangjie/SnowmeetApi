@@ -459,8 +459,10 @@ namespace SnowmeetApi.Controllers
             return (commonCharge, ticketDiscount);
         }
         // 按所选券/卡推导默认服务项（换券/换卡时刻调用）：先清空服务项再套默认，
-        // 与前端「更改券/卡先清空已选服务」同一口径。规则：卡名含「双项」→ 修刃+热蜡+刮蜡；
-        // 卡名含「机打蜡」（如机打蜡季卡）→ 机打蜡；券12 → 机打蜡；券17/18 → 非雪季 now/later；其余不默认
+        // 与前端「更改券/卡先清空已选服务」同一口径。规则：双项卡 → 修刃+热蜡+刮蜡；
+        // 卡名含「机打蜡」（如机打蜡季卡）→ 机打蜡；券12 → 机打蜡；券17/18 → 非雪季 now/later；其余不默认。
+        // 「是不是双项卡」优先看 punch_card.care_project_count（商品维护页定义、发卡时复制过来），
+        // 该字段为空的历史卡才回退到「卡名含双项」的老口径。
         [NonAction]
         public void ApplyDefaultServices(Care care, PunchCard card, Ticket ticket)
         {
@@ -477,7 +479,10 @@ namespace SnowmeetApi.Controllers
             if (card != null)
             {
                 string name = (card.card_name ?? "").Trim();
-                if (name.IndexOf("双项") >= 0)
+                bool isDoubleProject = card.care_project_count != null
+                    ? card.care_project_count == 2
+                    : name.IndexOf("双项") >= 0;   // 历史卡没有该字段，回退老口径
+                if (isDoubleProject)
                 {
                     care.need_edge = 1;
                     care.edge_degree = "89";
