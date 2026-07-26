@@ -547,13 +547,24 @@ namespace SnowmeetApi.Controllers
             });
         }
 
-        // ───────────────────────── 6. 发放次卡（预置卡种） ─────────────────────────
+        // ───────────────────────── 6. 发放次卡/季卡（卡种来自商品目录） ─────────────────────────
         public class PunchCardRequest
         {
             public int memberId { get; set; }
-            public string bizType { get; set; }   // 租赁 / 养护
-            public string cardName { get; set; }
-            public int total { get; set; }
+            // 卡种只传商品 id：业务类型/卡名/次数一律服务端从 product + category 现取，
+            // 不接受前端传字符串（前端传名称的话，改个字就能发出一张目录里根本没有的卡）
+            public int productId { get; set; }
+        }
+
+        // 卡类商品的权威识别方式：product.category_code 命中 category 表中
+        // biz_type ∈ {租赁, 养护} 且 name ∈ {次卡, 季卡} 的那几行（与 RentController 同一套口径）
+        [NonAction]
+        private async Task<List<Category>> GetCardCategories()
+        {
+            return await _db.category
+                .Where(c => c.valid == 1 && (c.name == "次卡" || c.name == "季卡")
+                    && (c.biz_type == "租赁" || c.biz_type == "养护"))
+                .AsNoTracking().ToListAsync();
         }
 
         [HttpGet]
@@ -563,10 +574,38 @@ namespace SnowmeetApi.Controllers
             Staff staff = await GetStaff(sessionKey, sessionType);
             if (staff == null || staff.title_level < MIN_LEVEL)
                 return Ok(new ApiResult<object>() { code = 1, message = "没有权限", data = null });
-            // 季卡（total=NULL）不进发卡/注册礼包预设：发放路径按次卡语义要求 total>0
-            var presets = await _db.punchCard.Where(c => c.total != null)
-                .Select(c => new { c.biz_type, c.card_name, c.total }).Distinct()
-                .OrderBy(c => c.biz_type).ThenBy(c => c.card_name).AsNoTracking().ToListAsync();
+            // 卡种来自「次卡/季卡商品维护」那批商品，不再从 punch_card 表 DISTINCT 已发出去的卡——
+            // 那样会把历史遗留叫法一并列出来（同一种卡既有"单项10次卡"又有"养护单项10次卡"），
+            // 而且新建的卡种在发出第一张之前根本不会出现在列表里。
+            List<Category> cardCats = await GetCardCategories();
+            List<string> codes = cardCats.Where(c => !string.IsNullOrEmpty(c.code)).Select(c => c.code).ToList();
+            if (codes.Count == 0)
+            {
+                return Ok(new ApiResult<object>() { code = 0, message = "", data = new { presets = new List<object>() } });
+            }
+            List<Product> products = await _db.product
+                .Where(p => p.valid == 1 && p.category_code != null && codes.Contains(p.category_code))
+                .AsNoTracking().ToListAsync();
+            var presets = products.Select(p =>
+            {
+                Category cat = cardCats.Where(c => c.code == p.category_code).FirstOrDefault();
+                bool isSeason = cat != null && cat.name == "季卡";
+                return new
+                {
+                    productId = p.id,
+                    // 字段名沿用 biz_type / card_name / total，前端按业务类型过滤的既有逻辑不用改
+                    biz_type = cat == null ? "" : cat.biz_type,
+                    card_type = cat == null ? "" : cat.name,
+                    card_name = p.name,
+                    total = isSeason ? null : p.punch_total,   // 季卡不限次数
+                    isSeason = isSeason,
+                    // 下架的卡种仍可发放（可能是不对外售卖的赠品卡），但要让店员看得出来
+                    onShelves = p.on_shelves == 1
+                };
+            })
+            // 次卡没配次数就发不出卡，不列出来
+            .Where(x => x.isSeason || x.total != null)
+            .OrderBy(x => x.biz_type).ThenBy(x => x.card_type).ThenBy(x => x.card_name).ToList();
             return Ok(new ApiResult<object>() { code = 0, message = "", data = new { presets } });
         }
 
@@ -577,19 +616,29 @@ namespace SnowmeetApi.Controllers
             Staff staff = await GetStaff(sessionKey, sessionType);
             if (staff == null || staff.title_level < MIN_LEVEL)
                 return Ok(new ApiResult<object>() { code = 1, message = "没有权限", data = null });
-            if (req == null || req.total <= 0 || string.IsNullOrWhiteSpace(req.cardName) || string.IsNullOrWhiteSpace(req.bizType))
+            if (req == null || req.productId <= 0)
                 return Ok(new ApiResult<object>() { code = 1, message = "参数无效", data = null });
             bool memberExists = await _db.member.AnyAsync(m => m.id == req.memberId && m.valid == 1);
             if (!memberExists)
                 return Ok(new ApiResult<object>() { code = 1, message = "会员不存在", data = null });
+            Product p = await _db.product.Where(x => x.id == req.productId && x.valid == 1)
+                .AsNoTracking().FirstOrDefaultAsync();
+            List<Category> cardCats = await GetCardCategories();
+            Category cat = (p == null || string.IsNullOrEmpty(p.category_code)) ? null
+                : cardCats.Where(c => c.code == p.category_code).FirstOrDefault();
+            if (cat == null)
+                return Ok(new ApiResult<object>() { code = 1, message = "卡种不存在", data = null });
+            bool isSeason = cat.name == "季卡";
+            if (!isSeason && (p.punch_total == null || p.punch_total <= 0))
+                return Ok(new ApiResult<object>() { code = 1, message = "该卡种未配置次数", data = null });
 
             PunchCard card = new PunchCard()
             {
                 id = 0,
-                biz_type = req.bizType.Trim(),
-                card_name = req.cardName.Trim(),
+                biz_type = cat.biz_type,
+                card_name = p.name,
                 member_id = req.memberId,
-                total = req.total,
+                total = isSeason ? null : p.punch_total,   // 季卡 total=null 即"不限次数"
                 punches = 0,
                 create_date = DateTime.Now
             };
