@@ -6113,6 +6113,109 @@ namespace SnowmeetApi.Controllers
             return Ok(new ApiResult<object>() { code = 0, message = "", data = data });
         }
 
+        // 顾客自助购买次卡·下单。
+        // ⚠️ 不能复用 Order/PlaceOrder —— 它开头是这么分流的：
+        //     if (staff != null && staff.title_level >= 100)  order.staff_id = staff.id;
+        //     else if (member != null && order.member_id == null)  order.member_id = member.id;
+        //   是 if/else：只要下单的人本身是店员（店员也会用小程序给自己买卡），就只写 staff_id、
+        //   member_id 一直是 null，订单没有归属会员，后面"这单是不是我的"全都判不了。
+        //   又不能把它改成"总是填 member_id"——店员给散客开单时 member_id 本来就该空，
+        //   填上会把散客单错记到店员自己名下。所以顾客自助单独走这条，订单必归属购买人。
+        // 商品、价格、数量全部服务端校验/现算，不接受前端传金额。
+        [HttpGet("{productId}")]
+        public async Task<ActionResult<ApiResult<object>>> PlaceMyPunchCardOrder(int productId, int quantity,
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
+            if (member == null)
+            {
+                return Ok(new ApiResult<object>() { code = 1, message = "未找到会员", data = null });
+            }
+            if (quantity < 1 || quantity > 9)
+            {
+                return Ok(new ApiResult<object>() { code = 1, message = "购买数量不正确", data = null });
+            }
+            Product p = await _db.product.Where(x => x.id == productId && x.valid == 1 && x.on_shelves == 1)
+                .AsNoTracking().FirstOrDefaultAsync();
+            Category cat = (p == null || string.IsNullOrEmpty(p.category_code)) ? null
+                : await _db.category.Where(c => c.code == p.category_code && c.valid == 1
+                    && (c.name == "次卡" || c.name == "季卡")).AsNoTracking().FirstOrDefaultAsync();
+            if (cat == null)
+            {
+                return Ok(new ApiResult<object>() { code = 1, message = "商品不存在或已下架", data = null });
+            }
+            if (cat.name == "次卡" && p.punch_total == null)
+            {
+                return Ok(new ApiResult<object>() { code = 1, message = "商品未配置次数，暂不可购买", data = null });
+            }
+            // 订单必须落到某个店（GenerateOrderCode 取店铺前缀、GetMchId 按店选微信商户号）。
+            // 不限门店的商品目前没有约定归属哪个店，先明确拒绝，不猜一个店把钱记错账。
+            if (string.IsNullOrWhiteSpace(p.shop))
+            {
+                return Ok(new ApiResult<object>() { code = 1, message = "该商品尚未配置门店，暂不支持自助购买", data = null });
+            }
+            double amount = Math.Round(p.sale_price * quantity, 2);
+            Models.Order order = new Models.Order()
+            {
+                id = 0,
+                type = "零售",
+                shop = p.shop.Trim(),
+                member_id = member.id,   // ← 自助购买：订单归属购买人本人
+                staff_id = null,
+                recepting = 0,
+                valid = 1,
+                is_test = 0,
+                total_amount = amount,
+                paying_amount = amount,
+                biz_date = DateTime.Now,
+                create_date = DateTime.Now
+            };
+            OrderController _orderH = new OrderController(_db, _oriConfig, _httpContextAccessor);
+            await _orderH.GenerateOrderCode(order);
+            await _db.order.AddAsync(order);
+            await _db.SaveChangesAsync();
+            for (int i = 0; i < quantity; i++)
+            {
+                Retail retail = new Retail()
+                {
+                    id = 0,
+                    order_id = order.id,
+                    product_id = p.id,
+                    sale_price = p.sale_price,
+                    deal_price = p.sale_price,
+                    // order_type 是 DB NOT NULL 列，新建 Retail 必须显式给值（踩过 NULL 插入报错）
+                    order_type = "普通",
+                    retail_type = cat.biz_type + "卡类",
+                    valid = 1,
+                    create_date = DateTime.Now
+                };
+                await _db.retail.AddAsync(retail);
+            }
+            CoreDataModLog log = new CoreDataModLog()
+            {
+                id = 0,
+                table_name = "Order",
+                field_name = "OrderState",
+                key_value = order.id,
+                scene = "顾客自助购买次卡",
+                member_id = member.id,
+                staff_id = null,
+                prev_value = null,
+                current_value = Models.Order.OrderStatus.待支付.ToString(),
+                trace_id = 0,
+                is_manual = 1
+            };
+            await _db.coreDataModLog.AddAsync(log);
+            await _db.SaveChangesAsync();
+            return Ok(new ApiResult<object>()
+            {
+                code = 0,
+                message = "",
+                data = new { orderId = order.id, orderCode = order.code, amount = amount, quantity = quantity }
+            });
+        }
+
         // 顾客自助购买次卡·确认页数据：订单里买了什么、几张、多少钱，外加商品的简介和使用规则，
         // 让顾客在真正掏钱之前能核对清楚（尤其是使用规则）。金额一律服务端从 retail 行现算，
         // 不接受前端传数字。
