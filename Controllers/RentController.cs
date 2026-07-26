@@ -5950,6 +5950,8 @@ namespace SnowmeetApi.Controllers
         // name==cardType，已上架且有效）。bizType 默认"租赁"、cardType 默认"次卡"，兼容退押金卖卡弹窗等
         // 只买租赁次卡的现有调用方；cardType 传 "all" 则返回该 bizType 下 次卡+季卡 的合并列表
         // （顾客自助购买首页用，季卡也能自助买）。会话级即可，无需 staff 权限。
+        // shop 参数保留只为兼容既有调用方的 URL，**不参与过滤**：卡是全店通用的，
+        // product.shop 只表示收款归哪个门店账户（详见方法体内说明）。
         [HttpGet]
         public async Task<ActionResult<ApiResult<object>>> GetPunchCardProducts(string? shop, string sessionKey = "",
             string bizType = "租赁", string cardType = "次卡")
@@ -5961,7 +5963,6 @@ namespace SnowmeetApi.Controllers
                     || cardType.Trim().Equals("all", StringComparison.OrdinalIgnoreCase))
                 ? new List<string>() { "次卡", "季卡" }
                 : new List<string>() { cardType.Trim() };
-            string shopName = string.IsNullOrWhiteSpace(shop) ? null : Util.UrlDecode(shop).Trim();
             List<object> result = new List<object>();
             foreach (string ct in cardTypes)
             {
@@ -5976,10 +5977,10 @@ namespace SnowmeetApi.Controllers
                 {
                     q = q.Where(p => p.punch_total != null);
                 }
-                if (shopName != null)
-                {
-                    q = q.Where(p => p.shop == null || p.shop == shopName);
-                }
+                // ⚠️ 不按 shop 过滤。product.shop 是「购买款项收到哪个门店账户」的归属属性
+                // （决定下单时 order.shop → GetMchId 选哪个微信商户号），**不代表限制在哪个门店使用**。
+                // 卡买到手全店通用，所以任何门店的目录都要列出全部卡种；
+                // 早先这里按 shop 过滤是把它误当成「适用门店」了。
                 List<Product> products = await q.Include(p => p.images).ThenInclude(i => i.uploadFile)
                     .OrderBy(p => p.sort).ThenBy(p => p.id).AsNoTracking().ToListAsync();
                 foreach (Product p in products)
@@ -6176,6 +6177,24 @@ namespace SnowmeetApi.Controllers
             return Ok(new ApiResult<object>() { code = 0, message = "", data = data });
         }
 
+        // 顾客自助购买次卡·前置校验：本人有没有验证过手机号。
+        // 微信小程序里 getPhoneNumber 只能由 <button open-type="getPhoneNumber"> 直接触发、JS 无法程序调起，
+        // 所以前端必须**在点购买之前**就知道要不要把按钮渲染成授权按钮，不能等下单报错再补。
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<object>>> CheckMyPunchCardPurchase(string sessionKey,
+            string sessionType = "wechat_mini_openid")
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
+            bool hasCell = member != null && !string.IsNullOrWhiteSpace(member.cell);
+            return Ok(new ApiResult<object>()
+            {
+                code = 0,
+                message = "",
+                data = new { hasCell = hasCell }
+            });
+        }
+
         // 顾客自助购买次卡·下单。
         // ⚠️ 不能复用 Order/PlaceOrder —— 它开头是这么分流的：
         //     if (staff != null && staff.title_level >= 100)  order.staff_id = staff.id;
@@ -6199,6 +6218,12 @@ namespace SnowmeetApi.Controllers
             {
                 return Ok(new ApiResult<object>() { code = 1, message = "购买数量不正确", data = null });
             }
+            // 必须验证过手机号才能买卡：卡是记名资产（只能本人核销），没手机号后续既联系不上顾客、
+            // 也无法在线下核对身份。前端会先弹微信授权，这里是服务端兜底——前端判断能绕过。
+            if (string.IsNullOrWhiteSpace(member.cell))
+            {
+                return Ok(new ApiResult<object>() { code = 1, message = "请先验证手机号", data = null });
+            }
             Product p = await _db.product.Where(x => x.id == productId && x.valid == 1 && x.on_shelves == 1)
                 .AsNoTracking().FirstOrDefaultAsync();
             Category cat = (p == null || string.IsNullOrEmpty(p.category_code)) ? null
@@ -6212,11 +6237,12 @@ namespace SnowmeetApi.Controllers
             {
                 return Ok(new ApiResult<object>() { code = 1, message = "商品未配置次数，暂不可购买", data = null });
             }
-            // 订单必须落到某个店（GenerateOrderCode 取店铺前缀、GetMchId 按店选微信商户号）。
-            // 不限门店的商品目前没有约定归属哪个店，先明确拒绝，不猜一个店把钱记错账。
+            // product.shop = 收款归属门店：订单落在这个店下，GetMchId 据此选微信商户号、
+            // GenerateOrderCode 据此取订单号前缀，也就是这笔钱进哪个门店的账。
+            // 它**不限制卡在哪儿使用**（卡全店通用），但没有它就不知道该收到谁的账上，所以必填。
             if (string.IsNullOrWhiteSpace(p.shop))
             {
-                return Ok(new ApiResult<object>() { code = 1, message = "该商品尚未配置门店，暂不支持自助购买", data = null });
+                return Ok(new ApiResult<object>() { code = 1, message = "该商品未设置收款门店，暂不支持购买", data = null });
             }
             double amount = Math.Round(p.sale_price * quantity, 2);
             Models.Order order = new Models.Order()
@@ -6363,6 +6389,12 @@ namespace SnowmeetApi.Controllers
             if (order.closed == 1)
             {
                 return Ok(new ApiResult<object>() { code = 1, message = "订单已关闭", data = null });
+            }
+            // 同 PlaceMyPunchCardOrder 的手机号门槛，这里再拦一道：
+            // 立规矩之前建的旧订单可能还没验手机号，别让它们绕过去付款
+            if (string.IsNullOrWhiteSpace(member.cell))
+            {
+                return Ok(new ApiResult<object>() { code = 1, message = "请先验证手机号", data = null });
             }
             List<Retail> retails = await _db.retail.Where(r => r.order_id == orderId && r.valid == 1)
                 .AsNoTracking().ToListAsync();
