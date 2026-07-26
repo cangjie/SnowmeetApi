@@ -180,10 +180,12 @@ namespace SnowmeetApi.Controllers
                 .Select(o => new { id = o.id, code = o.code, type = o.type, bizDate = o.biz_date })
                 .AsNoTracking().ToListAsync();
 
-            // 名下次卡
+            // 名下次卡（已退款的卡一并列出，带 is_refund 供前端标灰——不能让它凭空消失，
+            // 店员查会员时需要能看到"这张卡退过款"）
             var punchCards = await _db.punchCard
                 .Where(c => c.member_id == memberId)
-                .Select(c => new { c.id, c.biz_type, c.card_name, c.total, c.punches }).AsNoTracking().ToListAsync();
+                .Select(c => new { c.id, c.biz_type, c.card_name, c.total, c.punches, c.is_refund })
+                .AsNoTracking().ToListAsync();
 
             var data = new
             {
@@ -721,7 +723,8 @@ namespace SnowmeetApi.Controllers
                 .SumAsync(a => (double?)(a.income_amount - a.consume_amount)) ?? 0;
             int points = await _db.point.Where(p => p.member_id == memberId && p.valid == 1)
                 .SumAsync(p => (int?)p.points) ?? 0;
-            var cards = await _db.punchCard.Where(c => c.member_id == memberId)
+            // 已退款的卡（is_refund）钱已退回顾客，不算会员资产
+            var cards = await _db.punchCard.Where(c => c.member_id == memberId && !c.is_refund)
                 .Select(c => new { c.total, c.punches }).AsNoTracking().ToListAsync();
             // 次卡剩余聚合：季卡（total=NULL 不限次数）不计入
             int punchRemaining = cards.Where(c => c.total != null).Sum(c => (c.total ?? 0) - (c.punches ?? 0));
@@ -743,7 +746,8 @@ namespace SnowmeetApi.Controllers
             if (staff == null || staff.title_level < 100)
                 return Ok(new ApiResult<object>() { code = 1, message = "没有权限", data = null });
 
-            var q = _db.punchCard.Where(c => c.member_id == memberId);
+            // 已退款的卡（is_refund）不出现在开单选卡列表里——钱已退回顾客，不能再用来抵扣
+            var q = _db.punchCard.Where(c => c.member_id == memberId && !c.is_refund);
             if (!string.IsNullOrWhiteSpace(bizType))
                 q = q.Where(c => c.biz_type == bizType.Trim());
             var cards = await q

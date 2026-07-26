@@ -612,6 +612,10 @@ namespace SnowmeetApi.Controllers
                 {
                     card = null;   // 卡不属于该会员，忽略
                 }
+                if (card != null && card.is_refund)
+                {
+                    card = null;   // 已退款的卡钱已退回顾客，不再享受卡权益（不参与定价）
+                }
             }
             if (req.deriveServices)
             {
@@ -963,7 +967,9 @@ namespace SnowmeetApi.Controllers
                         // DealSuccessPaidOrder 改写为付款方（同人跨通道两个会员号即触发，实录 71884：
                         // 15506 下单选卡 → 支付宝付款方 41137 → 归属改写 → 旧守卫静默跳过核销）。
                         // 定价已享卡权益的单，生效时必须落 punch_card_used，否则计次卡白嫖、季卡丢使用记录。
-                        if (punchCard != null)
+                        // is_refund 例外：卡已退款（钱退回顾客）不得核销——PlaceCareOrder 定价时已清掉这类
+                        // 卡引用，这里是防御（万一是先下单、后退卡的时序）
+                        if (punchCard != null && !punchCard.is_refund)
                         {
                             PunchCardUsed cardUsed = new PunchCardUsed()
                             {

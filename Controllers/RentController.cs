@@ -5745,9 +5745,10 @@ namespace SnowmeetApi.Controllers
             {
                 return Ok(new ApiResult<object>() { code = 0, message = "", data = new { cards = new object[0], skiRentals = new object[0], totalPunchNeed = 0, usedPunches = 0 } });
             }
-            // 季卡（total=NULL 不限次数）暂不参与租赁次卡核销，核销语义定义后再放开
+            // 季卡（total=NULL 不限次数）暂不参与租赁次卡核销，核销语义定义后再放开。
+            // 已退款的卡（is_refund）钱已经退回顾客，一律不得再参与核销
             List<PunchCard> cards = await _db.punchCard
-                .Where(c => c.member_id == order.member_id && c.biz_type == "租赁"
+                .Where(c => c.member_id == order.member_id && c.biz_type == "租赁" && !c.is_refund
                     && c.total != null && c.total > (c.punches ?? 0))
                 .AsNoTracking().ToListAsync();
             SkiRentPunchQueueResult q = await BuildSkiRentPunchQueue(orderId);
@@ -5808,6 +5809,11 @@ namespace SnowmeetApi.Controllers
             if (card == null || card.member_id != order.member_id || card.biz_type != "租赁")
             {
                 return Ok(new ApiResult<Models.Order?>() { code = 1, message = "次卡不属于该会员", data = null });
+            }
+            // 已退款的卡钱已退回顾客，不能再拿来抵租金（列表本就不返回它，这里是防御）
+            if (card.is_refund)
+            {
+                return Ok(new ApiResult<Models.Order?>() { code = 1, message = "该次卡已退款，不能使用", data = null });
             }
             if (req.punch_count <= 0)
             {
@@ -6091,6 +6097,8 @@ namespace SnowmeetApi.Controllers
             List<PunchCard> cards = await _db.punchCard
                 .Where(c => c.member_id == member.id)
                 .OrderByDescending(c => c.id).AsNoTracking().ToListAsync();
+            // 已退款的卡照样列出来（只是标记 isRefund，前端置灰显示「已退款」）——退过款的卡凭空消失，
+            // 顾客会以为卡丢了；留着并标明状态才对得上他的认知
             var data = cards.Select(c => new
             {
                 c.id,
@@ -6099,7 +6107,8 @@ namespace SnowmeetApi.Controllers
                 c.total,
                 punches = c.punches ?? 0,
                 remaining = c.total == null ? (int?)null : c.total - (c.punches ?? 0),
-                isSeason = c.total == null
+                isSeason = c.total == null,
+                isRefund = c.is_refund
             }).ToList();
             return Ok(new ApiResult<object>() { code = 0, message = "", data = data });
         }
@@ -6318,6 +6327,9 @@ namespace SnowmeetApi.Controllers
             {
                 usedTotal += usages[i].punchCount;
             }
+            // 退款可行性由服务端判定并下发（前端不自己拼规则）：详情页据此决定显示「申请退款」按钮、
+            // 「请联系店员」提示，还是什么都不显示。与真正执行退款走同一份 EvaluatePunchCardRefund。
+            PunchCardRefundEval refundEval = await EvaluatePunchCardRefund(card, member.id);
             return Ok(new ApiResult<object>()
             {
                 code = 0,
@@ -6333,13 +6345,179 @@ namespace SnowmeetApi.Controllers
                         punches = card.punches ?? 0,
                         remaining = card.remaining,
                         isSeason = card.total == null,
+                        isRefund = card.is_refund,
                         createDateStr = card.create_date.ToString("yyyy-MM-dd")
+                    },
+                    refund = new
+                    {
+                        isRefund = card.is_refund,
+                        canRefund = refundEval.canRefund,
+                        contactStaff = refundEval.contactStaff,
+                        blockReason = refundEval.blockReason,
+                        refundAmount = refundEval.refundAmount
                     },
                     // 这里的合计取自核销明细本身，和 punch_card.punches 是两个来源，
                     // 对不上就说明有历史数据没走 punch_card_used（见 2026-06-26 的回补脚本）
                     usedTotal = usedTotal,
                     usages = usages
                 }
+            });
+        }
+
+        public class PunchCardRefundEval
+        {
+            public bool canRefund { get; set; } = false;        // 可顾客自助退款
+            public bool contactStaff { get; set; } = false;      // 不能自助、但引导顾客联系店员处理
+            public string blockReason { get; set; } = null;      // 不可自助退款的原因（直接展示给顾客的文案）
+            public double refundAmount { get; set; } = 0;        // 应退金额 = 这张卡的购买价
+            public Models.Order order { get; set; } = null;
+            public Retail retail { get; set; } = null;
+            public List<OrderPaymentRefund> refunds { get; set; } = null;   // 已按支付记录分摊好的退款腿
+        }
+
+        // 共享：判断一张次卡此刻能不能顾客自助退款，要退多少、从哪几笔支付里退。
+        // GetMyPunchCardUsages（只读预判，决定详情页显示什么）和 RefundMyPunchCard（真退款）调同一份，
+        // 保证"页面上看到的判断"和"点下去之后的判断"永远一致（同 ComputePunchCardSaleCalc 的做法）。
+        private async Task<PunchCardRefundEval> EvaluatePunchCardRefund(PunchCard card, int memberId)
+        {
+            PunchCardRefundEval eval = new PunchCardRefundEval();
+            if (card.is_refund)
+            {
+                eval.blockReason = "这张卡已退款";
+                return eval;
+            }
+            // 「一次未使用过」双重校验：punches 与 punch_card_used 是两个来源，历史数据可能对不上
+            // （见 2026-06-26 的回补脚本），任一显示用过就不许退。
+            if ((card.punches ?? 0) > 0
+                || await _db.punchCardUsed.AnyAsync(u => u.card_id == card.id && u.valid))
+            {
+                eval.blockReason = "这张卡已经使用过，不支持退款";
+                return eval;
+            }
+            if (card.source_retail_id == null)
+            {
+                eval.blockReason = "这张卡是赠送发放的，没有支付记录可退";
+                return eval;
+            }
+            Retail retail = await _db.retail.Where(r => r.id == card.source_retail_id.Value && r.valid == 1)
+                .AsNoTracking().FirstOrDefaultAsync();
+            if (retail == null || retail.order_id == null)
+            {
+                eval.contactStaff = true;
+                eval.blockReason = "没有找到这张卡的购买记录，请联系店员";
+                return eval;
+            }
+            eval.retail = retail;
+            eval.refundAmount = Math.Round(retail.deal_price, 2);
+            if (eval.refundAmount <= 0)
+            {
+                eval.blockReason = "这张卡的购买金额为 0，无需退款";
+                return eval;
+            }
+            OrderController _orderH = new OrderController(_db, _oriConfig, _httpContextAccessor);
+            Models.Order order = await _orderH.GetOrder(retail.order_id.Value);
+            if (order == null)
+            {
+                eval.contactStaff = true;
+                eval.blockReason = "没有找到这张卡的购买订单，请联系店员";
+                return eval;
+            }
+            eval.order = order;
+            // 退多少：这张卡的购买价，从订单当前可退余额里按支付记录顺序分摊。
+            // 店员在退押金时卖卡的场景，卡钱本质是"少退给顾客的押金"，退卡就等于把这笔押金补退回去，
+            // 与顾客自助买卡（纯零售单原路退）是同一个口径，不需要按购买路径分叉。
+            List<OrderPaymentRefund> refunds = _orderH.AllocateRefundAcrossPayments(order, eval.refundAmount, "退次卡");
+            if (refunds == null || refunds.Count == 0)
+            {
+                eval.contactStaff = true;
+                eval.blockReason = "这笔订单当前可退金额不足，请联系店员";
+                return eval;
+            }
+            // 顾客自助只做微信/支付宝原路退款，现金/挂账等一律转人工。
+            // （储值支付已被 AllocateRefundAcrossPayments 排除在外，凑不满金额会在上一步被拦掉）
+            for (int i = 0; i < refunds.Count; i++)
+            {
+                OrderPayment p = order.availablePayments.Where(x => x.id == refunds[i].payment_id).FirstOrDefault();
+                string payMethod = (p == null || p.pay_method == null) ? "" : p.pay_method.Trim();
+                if (payMethod != "微信支付" && payMethod != "支付宝")
+                {
+                    eval.contactStaff = true;
+                    eval.blockReason = "这张卡不是微信或支付宝支付的，请联系店员办理退款";
+                    return eval;
+                }
+                refunds[i].oper_member_id = memberId;   // 顾客自助没有经手店员，发起人记在会员维度
+            }
+            eval.refunds = refunds;
+            eval.canRefund = true;
+            return eval;
+        }
+
+        // 我的次卡·自助退款：一次都没核销过的卡，顾客可以自己在详情页申请退款，服务端直接调
+        // 微信/支付宝退款接口原路退回。退成功后置 punch_card.is_refund=1，该卡在所有核销入口一律不可用。
+        // ⚠️ 严格顺序：先把钱退成功、再置标志位。反过来会出现"卡废了但钱没退"。
+        [HttpPost("{cardId}")]
+        public async Task<ActionResult<ApiResult<object>>> RefundMyPunchCard(int cardId, string sessionKey,
+            string sessionType = "wechat_mini_openid")
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
+            if (member == null)
+            {
+                return Ok(new ApiResult<object>() { code = 1, message = "未找到会员", data = null });
+            }
+            // 归属校验：cardId 是前端传的，不校验就能退别人的卡
+            PunchCard card = await _db.punchCard.Where(c => c.id == cardId && c.member_id == member.id)
+                .FirstOrDefaultAsync();
+            if (card == null)
+            {
+                return Ok(new ApiResult<object>() { code = 1, message = "次卡不存在", data = null });
+            }
+            // 幂等：已退过的卡再点（连击/网络重试）直接返回成功，不重复调退款
+            if (card.is_refund)
+            {
+                return Ok(new ApiResult<object>()
+                {
+                    code = 0, message = "", data = new { refunded = true, refundAmount = 0.0 }
+                });
+            }
+            PunchCardRefundEval eval = await EvaluatePunchCardRefund(card, member.id);
+            if (!eval.canRefund)
+            {
+                return Ok(new ApiResult<object>()
+                {
+                    code = 1, message = eval.blockReason ?? "这张卡当前不支持退款", data = null
+                });
+            }
+            OrderController _orderH = new OrderController(_db, _oriConfig, _httpContextAccessor);
+            // staff 传 null：顾客自助没有经手店员，payment_refund.staff_id 留空、发起人记在 oper_member_id
+            ApiResult<Models.Order?> refundResult = await _orderH.RefundCore(eval.order, null, eval.refunds);
+            if (refundResult.code != 0)
+            {
+                return Ok(new ApiResult<object>() { code = 1, message = refundResult.message, data = null });
+            }
+            // 钱已经退成功：置标志位 + 在销售记录 memo 上留退款痕迹（retail 行保留 valid=1，
+            // 让订单里这笔"卖出又退回"的销售不至于凭空消失）
+            card.is_refund = true;
+            card.update_date = DateTime.Now;
+            _db.punchCard.Entry(card).State = EntityState.Modified;   // 全局 NoTracking，必须显式
+            Retail retailRow = await _db.retail.Where(r => r.id == card.source_retail_id.Value).FirstOrDefaultAsync();
+            if (retailRow != null)
+            {
+                string refundMemo = $"顾客自助退款 ¥{eval.refundAmount:0.00}（{DateTime.Now:yyyy-MM-dd HH:mm}）";
+                retailRow.memo = string.IsNullOrEmpty(retailRow.memo) ? refundMemo : (retailRow.memo + "；" + refundMemo);
+                retailRow.update_date = DateTime.Now;
+                _db.retail.Entry(retailRow).State = EntityState.Modified;
+            }
+            string orderLabel = string.IsNullOrEmpty(eval.order.code) ? ("#" + eval.order.id) : eval.order.code;
+            await _db.coreDataModLog.AddAsync(CoreDataModLog.CreateManualLog("punch_card", "is_refund", card.id,
+                "次卡自助退款", member.id, null, "0", "1",
+                $"退款 ¥{eval.refundAmount:0.00}，订单 {orderLabel}"));
+            await _db.SaveChangesAsync();
+            return Ok(new ApiResult<object>()
+            {
+                code = 0,
+                message = "",
+                data = new { refunded = true, refundAmount = eval.refundAmount }
             });
         }
 

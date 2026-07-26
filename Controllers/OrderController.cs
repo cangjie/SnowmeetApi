@@ -2842,8 +2842,11 @@ namespace SnowmeetApi.Controllers
         // 抽出来是为了让 RentController.FinalizePunchCardSale（购买次卡的"多退"结算腿）能直接复用，
         // 不用再走一遍 HTTP、也不用重复实现"按支付记录分摊+调支付宝/微信退款"这段逻辑。
         // 调用方负责准备好 order（已 GetOrder 加载）、staff、和已经算好金额的 refunds 列表。
+        // staff 可为 null：顾客自助发起的退款（如「我的次卡」自助退卡）没有经手店员，
+        // payment_refund.staff_id 留空即可（同 StartMyPunchCardPayment 里顾客自助支付单 staff_id=null 的先例）；
+        // 这类调用方应在传入的 refunds 上预填 oper_member_id，把"谁发起的"记在会员维度。
         [NonAction]
-        public async Task<ApiResult<Models.Order?>> RefundCore(Models.Order order, Staff staff, List<OrderPaymentRefund> refunds)
+        public async Task<ApiResult<Models.Order?>> RefundCore(Models.Order order, Staff? staff, List<OrderPaymentRefund> refunds)
         {
             int orderId = order.id;
             string message = "";
@@ -2865,7 +2868,7 @@ namespace SnowmeetApi.Controllers
                 {
                     refund.out_refund_no = payment.out_trade_no + "_TK_" + (payment.refunds.Count + 1).ToString().PadLeft(2, '0');
                     refund.order_id = orderId;
-                    refund.staff_id = staff.id;
+                    refund.staff_id = staff?.id;
                     refund.create_date = DateTime.Now;
                     if (payment.pay_method != "微信支付" && payment.pay_method != "支付宝")
                     {
@@ -3135,9 +3138,10 @@ namespace SnowmeetApi.Controllers
                 if (care.use_card && care.card_id != null)
                 {
                     card = await _db.punchCard.Where(c => c.id == care.card_id).AsNoTracking().FirstOrDefaultAsync();
-                    if (card != null && order.member_id != null && card.member_id != order.member_id)
+                    // 卡不属于该会员、或卡已退款（钱已退回顾客）→ 一律不认这张卡（与 CalcCareCharge 同口径）
+                    if (card != null && ((order.member_id != null && card.member_id != order.member_id) || card.is_refund))
                     {
-                        card = null;   // 卡不属于该会员，忽略（与 CalcCareCharge 同口径）
+                        card = null;
                         // 一并清掉 care 上的卡引用，保证「定价没享卡权益的单，生效时也不会核销卡」——
                         // EffectCareOrder 已不再比对卡归属（order.member_id 支付时可能被改写），全靠这里把关
                         care.use_card = false;
