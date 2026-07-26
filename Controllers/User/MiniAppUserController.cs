@@ -291,6 +291,85 @@ namespace SnowmeetApi.Controllers
             return Ok(mUser);
         }
 
+        // 会话还没有关联会员时（新顾客第一次授权手机号），按手机号定位或新建会员，并把 openid/unionid
+        // 链到该会员、回填 mini_session.member_id。语义与 PaymentIdentityController._submitPhone
+        // 的「扫码方未绑会员」分支一致：手机号已属于某会员 → 把当前 openid 链过去（一人多设备共享会员）；
+        // 手机号没人用过 → 建新会员。
+        [NonAction]
+        public async Task<Member> ResolveOrCreateMemberByCell(string sessionKey, string cell)
+        {
+            if (string.IsNullOrWhiteSpace(cell))
+            {
+                return null;
+            }
+            cell = cell.Trim();
+            MiniSession sess = await _context.miniSession
+                .Where(s => s.session_key.Trim().Equals(sessionKey)
+                    && s.session_type.Equals("wechat_mini_openid")
+                    && s.valid == 1 && s.expire_date >= DateTime.Now)
+                .OrderByDescending(s => s.expire_date).FirstOrDefaultAsync();
+            if (sess == null)
+            {
+                return null;
+            }
+            string openId = (sess.wechat_openid ?? "").Trim();
+            string unionId = (sess.wechat_unionid ?? "").Trim();
+
+            Member member = await _memberHelper.GetWholeMemberByNum(cell, MemberSocialAccount.TYPE_CELL);
+            if (member == null)
+            {
+                // 全新顾客：建会员。valid 显式置 1，不依赖模型默认值
+                //（某些 EF/DB schema 组合下默认值会落库成 0，会员随即"查不到"）
+                member = new Member()
+                {
+                    real_name = "",
+                    gender = "",
+                    source = "小程序手机号验证",
+                    valid = 1
+                };
+                await _context.member.AddAsync(member);
+                await _context.SaveChangesAsync();
+                await AddMsaIfMissing(member.id, cell, MemberSocialAccount.TYPE_CELL);
+            }
+            // 把当前微信身份链到该会员（已存在则不重复加）
+            if (!string.IsNullOrEmpty(openId))
+            {
+                await AddMsaIfMissing(member.id, openId, MemberSocialAccount.TYPE_WECHAT_MINI_OPENID);
+            }
+            if (!string.IsNullOrEmpty(unionId))
+            {
+                await AddMsaIfMissing(member.id, unionId, MemberSocialAccount.TYPE_WECHAT_UNIONID);
+            }
+            // 回填会话归属，下次 GetMemberBySessionKey 就能直接命中，不用再走这条兜底
+            if (sess.member_id == null)
+            {
+                sess.member_id = member.id;
+                _context.miniSession.Entry(sess).State = EntityState.Modified;
+                await _context.SaveChangesAsync();
+            }
+            return await _memberHelper.GetWholeMemberById(member.id);
+        }
+
+        [NonAction]
+        public async Task AddMsaIfMissing(int memberId, string num, string type)
+        {
+            bool exists = await _context.memberSocialAccount.AnyAsync(m => m.valid == 1
+                && m.member_id == memberId && m.type.Trim().Equals(type) && m.num.Trim().Equals(num));
+            if (exists)
+            {
+                return;
+            }
+            await _context.memberSocialAccount.AddAsync(new MemberSocialAccount()
+            {
+                id = 0,
+                member_id = memberId,
+                type = type,
+                num = num,
+                valid = 1   // 显式置 1：模型默认值在部分环境下会落库成 0，导致绑了等于没绑
+            });
+            await _context.SaveChangesAsync();
+        }
+
         [HttpGet]
         public async Task<ActionResult<Member>> UpdateWechatMemberCell(string sessionKey, string encData, string iv)
         {
@@ -347,6 +426,20 @@ namespace SnowmeetApi.Controllers
             }
 
             Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, "wechat_mini_openid");
+
+            // 2026-05-29 起 MemberLogin 不再自动建 stub 会员：没注册过的用户 mini_session.member_id 是 null，
+            // GetMemberBySessionKey 直接返回 null。本方法后面要用 member.id 拼 LINQ 条件，
+            // member 为 null 会在「求值查询参数」阶段抛 NRE（500）。
+            // 而"刚授权手机号的新顾客"恰恰就是这种人，所以这里必须能按手机号找会员 / 建会员。
+            if (member == null)
+            {
+                member = await ResolveOrCreateMemberByCell(sessionKey, cell);
+            }
+            if (member == null)
+            {
+                // 手机号没解出来（解密失败/授权被拒），无从定位会员，明确报错好过继续往下 NRE
+                return NotFound();
+            }
 
             var cellList = await _context.memberSocialAccount
                 .Where(m => (m.type.Trim().Equals("cell") && m.num.Trim().Equals(cell.Trim()) && m.member_id == member.id))
