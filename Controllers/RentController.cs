@@ -6042,8 +6042,10 @@ namespace SnowmeetApi.Controllers
                 {
                     continue;
                 }
+                // 不过滤 on_shelves（管理页要能看到已下架的行），但要过滤 valid——
+                // valid=0 是「已删除」，删完还留在列表里等于没删
                 List<Product> products = await _db.product.Include(p => p.images)
-                    .Where(p => p.category_code == catCode)
+                    .Where(p => p.category_code == catCode && p.valid == 1)
                     .OrderByDescending(p => p.id)
                     .AsNoTracking().ToListAsync();
                 foreach (Product p in products)
@@ -6082,6 +6084,58 @@ namespace SnowmeetApi.Controllers
             }
             string catCode = await ResolveCardCategoryCode(bizType, cardType, true, staff.id);
             return Ok(new ApiResult<object>() { code = 0, message = "", data = new { categoryCode = catCode } });
+        }
+
+        // 次卡/季卡商品·删除（软删除，valid=0）。staff≥200，同商品维护页权限档。
+        // 不物理删行：已售出的 retail.product_id、已发出的 punch_card 都还引用它，删行会让历史订单查不到商品。
+        // 删除后该商品从 顾客端目录 / 发卡预设 / 管理列表 三处一起消失（它们都过滤 valid=1），
+        // 但**已经发出去的卡不受影响**——卡上的名称/次数是发卡时复制过去的，不依赖商品行还在不在。
+        [HttpGet("{productId}")]
+        public async Task<ActionResult<ApiResult<object>>> DeletePunchCardProduct(int productId, string sessionKey,
+            string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            if (staff == null || staff.title_level < 200)
+            {
+                return Ok(new ApiResult<object>() { code = 1, message = "没有权限", data = null });
+            }
+            Product p = await _db.product.Where(x => x.id == productId).FirstOrDefaultAsync();
+            // 只允许删卡类商品，别让这个接口变成通用的商品删除入口
+            Category cat = (p == null || string.IsNullOrEmpty(p.category_code)) ? null
+                : await _db.category.Where(c => c.code == p.category_code && c.valid == 1
+                    && (c.name == "次卡" || c.name == "季卡")).AsNoTracking().FirstOrDefaultAsync();
+            if (cat == null)
+            {
+                return Ok(new ApiResult<object>() { code = 1, message = "商品不存在", data = null });
+            }
+            if (p.valid == 0)
+            {
+                // 幂等：重复删除按成功返回，前端不用区分处理
+                return Ok(new ApiResult<object>() { code = 0, message = "", data = new { id = p.id } });
+            }
+            p.valid = 0;
+            p.update_date = DateTime.Now;
+            // 全局 QueryTrackingBehavior.NoTracking：查出来的实体不被跟踪，
+            // 不显式标记 Modified 的话 SaveChanges 会静默什么都不写
+            _db.product.Entry(p).State = EntityState.Modified;
+            CoreDataModLog log = new CoreDataModLog()
+            {
+                id = 0,
+                table_name = "product",
+                field_name = "valid",
+                key_value = p.id,
+                scene = "删除次卡商品",
+                member_id = null,
+                staff_id = staff.id,
+                prev_value = "1",
+                current_value = "0",
+                trace_id = 0,
+                is_manual = 1,
+                manual_memo = cat.biz_type + cat.name + "：" + p.name
+            };
+            await _db.coreDataModLog.AddAsync(log);
+            await _db.SaveChangesAsync();
+            return Ok(new ApiResult<object>() { code = 0, message = "", data = new { id = p.id } });
         }
 
         // 我的次卡：解析会话对应的会员本人，列出其名下租赁次卡（顾客自助购买页用，member_id 不由调用方传入）。
