@@ -6379,27 +6379,22 @@ namespace SnowmeetApi.Controllers
             });
         }
 
-        // 我的次卡·使用明细：这张卡被哪些订单核销过，每单核销了几次。
+        private class PunchCardUsageView
+        {
+            public object card { get; set; }
+            public int usedTotal { get; set; }
+            public object usages { get; set; }
+        }
+
+        // 共享：把一张次卡的核销记录组装成前端要的形状（卡片摘要 + 按订单汇总的明细 + 合计）。
         // punch_card_used 是"每条 rental / 每件 care 一行"的粒度，同一订单可能有多行，
         // 所以按 order_id 汇总 punch_count 后再回填订单号和业务日期。
-        // ⚠️ 必须校验卡属于会话本人：cardId 是前端传的，不校验就能改个数字看别人的核销记录。
-        [HttpGet]
-        public async Task<ActionResult<ApiResult<object>>> GetMyPunchCardUsages(int cardId, string sessionKey,
-            string sessionType = "wechat_mini_openid")
+        // 顾客侧 GetMyPunchCardUsages 与店员侧 GetPunchCardUsagesByStaff 共用这一份——
+        // 两者只是「谁有权看这张卡」的判断不同，展示口径必须完全一致。
+        [NonAction]
+        private async Task<PunchCardUsageView> BuildPunchCardUsageView(PunchCard card)
         {
-            sessionKey = Util.UrlDecode(sessionKey);
-            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
-            if (member == null)
-            {
-                return Ok(new ApiResult<object>() { code = 1, message = "未找到会员", data = null });
-            }
-            PunchCard card = await _db.punchCard.Where(c => c.id == cardId && c.member_id == member.id)
-                .AsNoTracking().FirstOrDefaultAsync();
-            if (card == null)
-            {
-                return Ok(new ApiResult<object>() { code = 1, message = "次卡不存在", data = null });
-            }
-            var grouped = await _db.punchCardUsed.Where(u => u.card_id == cardId && u.valid)
+            var grouped = await _db.punchCardUsed.Where(u => u.card_id == card.id && u.valid)
                 .GroupBy(u => u.order_id)
                 .Select(g => new
                 {
@@ -6433,6 +6428,46 @@ namespace SnowmeetApi.Controllers
             {
                 usedTotal += usages[i].punchCount;
             }
+            return new PunchCardUsageView()
+            {
+                card = new
+                {
+                    card.id,
+                    card.card_name,
+                    card.biz_type,
+                    card.total,
+                    punches = card.punches ?? 0,
+                    remaining = card.remaining,
+                    isSeason = card.total == null,
+                    isRefund = card.is_refund,
+                    createDateStr = card.create_date.ToString("yyyy-MM-dd")
+                },
+                // 这里的合计取自核销明细本身，和 punch_card.punches 是两个来源，
+                // 对不上就说明有历史数据没走 punch_card_used（见 2026-06-26 的回补脚本）
+                usedTotal = usedTotal,
+                usages = usages
+            };
+        }
+
+        // 我的次卡·使用明细（顾客侧）：这张卡被哪些订单核销过，每单核销了几次。
+        // ⚠️ 必须校验卡属于会话本人：cardId 是前端传的，不校验就能改个数字看别人的核销记录。
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<object>>> GetMyPunchCardUsages(int cardId, string sessionKey,
+            string sessionType = "wechat_mini_openid")
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
+            if (member == null)
+            {
+                return Ok(new ApiResult<object>() { code = 1, message = "未找到会员", data = null });
+            }
+            PunchCard card = await _db.punchCard.Where(c => c.id == cardId && c.member_id == member.id)
+                .AsNoTracking().FirstOrDefaultAsync();
+            if (card == null)
+            {
+                return Ok(new ApiResult<object>() { code = 1, message = "次卡不存在", data = null });
+            }
+            PunchCardUsageView view = await BuildPunchCardUsageView(card);
             // 退款可行性由服务端判定并下发（前端不自己拼规则）：详情页据此决定显示「申请退款」按钮、
             // 「请联系店员」提示，还是什么都不显示。与真正执行退款走同一份 EvaluatePunchCardRefund。
             PunchCardRefundEval refundEval = await EvaluatePunchCardRefund(card, member.id);
@@ -6442,18 +6477,7 @@ namespace SnowmeetApi.Controllers
                 message = "",
                 data = new
                 {
-                    card = new
-                    {
-                        card.id,
-                        card.card_name,
-                        card.biz_type,
-                        card.total,
-                        punches = card.punches ?? 0,
-                        remaining = card.remaining,
-                        isSeason = card.total == null,
-                        isRefund = card.is_refund,
-                        createDateStr = card.create_date.ToString("yyyy-MM-dd")
-                    },
+                    view.card,
                     refund = new
                     {
                         isRefund = card.is_refund,
@@ -6462,11 +6486,37 @@ namespace SnowmeetApi.Controllers
                         blockReason = refundEval.blockReason,
                         refundAmount = refundEval.refundAmount
                     },
-                    // 这里的合计取自核销明细本身，和 punch_card.punches 是两个来源，
-                    // 对不上就说明有历史数据没走 punch_card_used（见 2026-06-26 的回补脚本）
-                    usedTotal = usedTotal,
-                    usages = usages
+                    view.usedTotal,
+                    view.usages
                 }
+            });
+        }
+
+        // 次卡使用明细（店员侧）：会员详情页点某张卡看核销记录，展示口径与顾客侧完全一致。
+        // 与顾客侧的差别只有鉴权：这里按 staff 权限放行（能看会员详情就能看他名下卡的核销记录），
+        // 不做"卡属于我"的归属校验；同时**不下发 refund** ——「申请退款」是顾客自助入口，
+        // 店员替顾客退款要走店员自己的退款流程，不能在这里给按钮。
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<object>>> GetPunchCardUsagesByStaff(int cardId, string sessionKey,
+            string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            if (staff == null || staff.title_level < 200)
+            {
+                return Ok(new ApiResult<object>() { code = 1, message = "没有权限", data = null });
+            }
+            PunchCard card = await _db.punchCard.Where(c => c.id == cardId)
+                .AsNoTracking().FirstOrDefaultAsync();
+            if (card == null)
+            {
+                return Ok(new ApiResult<object>() { code = 1, message = "次卡不存在", data = null });
+            }
+            PunchCardUsageView view = await BuildPunchCardUsageView(card);
+            return Ok(new ApiResult<object>()
+            {
+                code = 0,
+                message = "",
+                data = new { view.card, view.usedTotal, view.usages }
             });
         }
 
