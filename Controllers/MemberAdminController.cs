@@ -777,14 +777,35 @@ namespace SnowmeetApi.Controllers
                 .SumAsync(p => (int?)p.points) ?? 0;
             // 已退款的卡（is_refund）钱已退回顾客，不算会员资产
             var cards = await _db.punchCard.Where(c => c.member_id == memberId && !c.is_refund)
-                .Select(c => new { c.total, c.punches }).AsNoTracking().ToListAsync();
+                .Select(c => new { c.total, c.punches, c.biz_type }).AsNoTracking().ToListAsync();
             // 次卡剩余聚合：季卡（total=NULL 不限次数）不计入
             int punchRemaining = cards.Where(c => c.total != null).Sum(c => (c.total ?? 0) - (c.punches ?? 0));
+            // 按业务线拆开：开单页会员条要按当前业务显示，否则养护开单看到「次卡 20 次」
+            // （其实是租赁次卡）会让店员以为这单能用卡
+            int rentPunchRemaining = cards.Where(c => c.total != null && c.biz_type == "租赁")
+                .Sum(c => (c.total ?? 0) - (c.punches ?? 0));
+            int carePunchRemaining = cards.Where(c => c.total != null && c.biz_type == "养护")
+                .Sum(c => (c.total ?? 0) - (c.punches ?? 0));
+            // 季卡（total=NULL 即不限次数）单独计张数——它不占次数，但顾客确实"有卡"，
+            // 原来只统计次卡剩余次数，导致只有季卡的会员在会员条上什么都不显示
+            int rentSeasonCount = cards.Count(c => c.total == null && c.biz_type == "租赁");
+            int careSeasonCount = cards.Count(c => c.total == null && c.biz_type == "养护");
+            // 可用优惠券：与开单选券弹层 GetMemberTicketsByStaff 同口径（valid + is_active + 未使用 + 未过期）
+            DateTime today = DateTime.Now.Date;
+            int ticketCount = await _db.ticket.Where(t => t.member_id == memberId
+                && t.valid == 1 && t.is_active == 1 && t.used == 0
+                && (t.expire_date == null || t.expire_date >= today)).CountAsync();
 
             return Ok(new ApiResult<object>()
             {
                 code = 0, message = "",
-                data = new { depositTotal = Math.Round(depositTotal, 2), points, punchRemaining }
+                data = new
+                {
+                    depositTotal = Math.Round(depositTotal, 2), points, punchRemaining,
+                    ticketCount,
+                    rentPunchRemaining, carePunchRemaining,
+                    rentSeasonCount, careSeasonCount
+                }
             });
         }
 
