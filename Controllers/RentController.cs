@@ -5948,13 +5948,17 @@ namespace SnowmeetApi.Controllers
 
         // 次卡/季卡商品目录：某个 biz_type 下的卡类 SKU（category_code 命中 category.biz_type==bizType &&
         // name==cardType，已上架且有效）。bizType 默认"租赁"、cardType 默认"次卡"，兼容退押金卖卡弹窗等
-        // 只买租赁次卡的现有调用方；cardType 传空则返回该 bizType 下 次卡+季卡 的合并列表（顾客自助购买
-        // 首页用，季卡也能自助买）。会话级即可，无需 staff 权限。
+        // 只买租赁次卡的现有调用方；cardType 传 "all" 则返回该 bizType 下 次卡+季卡 的合并列表
+        // （顾客自助购买首页用，季卡也能自助买）。会话级即可，无需 staff 权限。
         [HttpGet]
         public async Task<ActionResult<ApiResult<object>>> GetPunchCardProducts(string? shop, string sessionKey = "",
             string bizType = "租赁", string cardType = "次卡")
         {
-            List<string> cardTypes = string.IsNullOrWhiteSpace(cardType)
+            // ⚠️ 「要全部卡类」必须用显式哨兵 all，不能靠传空串：
+            // ASP.NET Core 对「查询串里参数存在但值为空」（?cardType=）的可选参数会**回落到默认值**，
+            // 也就是 cardType 变回 "次卡"，判空分支根本执行不到——顾客购买页因此只显示次卡、季卡消失。
+            List<string> cardTypes = (string.IsNullOrWhiteSpace(cardType)
+                    || cardType.Trim().Equals("all", StringComparison.OrdinalIgnoreCase))
                 ? new List<string>() { "次卡", "季卡" }
                 : new List<string>() { cardType.Trim() };
             string shopName = string.IsNullOrWhiteSpace(shop) ? null : Util.UrlDecode(shop).Trim();
