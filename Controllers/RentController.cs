@@ -6596,8 +6596,11 @@ namespace SnowmeetApi.Controllers
         //   · source_retail_id 为空            → 赠送（店员 GrantPunchCard 白送，或历史数据）
         //   · 关联零售行挂在租赁订单上          → 随订单购买（退押金时加购，FinalizePunchCardSale）
         //   · 其余（挂在零售订单上）            → 顾客自助购买（PlaceMyPunchCardOrder）
+        // saleType 传 赠送 / 随订单购买 / 顾客自助购买 之一即按该方式过滤，不传或传空 = 全部。
+        // 返回里带筛选后全集的张数与销售额合计（不只是当前页）。
         [HttpGet]
         public async Task<ActionResult<ApiResult<object>>> GetPunchCardSalesByStaff(string? keyword,
+            DateTime? startDate = null, DateTime? endDate = null, string? saleType = null,
             int pageIndex = 1, int pageSize = 20, string sessionKey = "", string sessionType = "wechat_mini_openid")
         {
             Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
@@ -6610,6 +6613,20 @@ namespace SnowmeetApi.Controllers
             keyword = string.IsNullOrWhiteSpace(keyword) ? null : Util.UrlDecode(keyword).Trim();
 
             var q = _db.punchCard.AsQueryable();
+            // 日期按开卡/购买时间（create_date）筛，与列表上显示的那个时间同一口径。
+            // 有关键字时放宽到全时段：默认区间是「今天」，不放宽的话按手机号找一张老卡永远搜不到
+            //（与租赁/养护订单列表「手机/备注搜索放宽到全时段」同一约定）
+            if (keyword == null)
+            {
+                if (startDate != null)
+                {
+                    q = q.Where(c => c.create_date >= ((DateTime)startDate).Date);
+                }
+                if (endDate != null)
+                {
+                    q = q.Where(c => c.create_date < ((DateTime)endDate).Date.AddDays(1));
+                }
+            }
             if (keyword != null)
             {
                 // 关键字匹配 卡名 / 顾客姓名 / 手机号：后两者要先按会员反查，
@@ -6623,10 +6640,58 @@ namespace SnowmeetApi.Controllers
                 hitMemberIds.AddRange(nameHits);
                 q = q.Where(c => c.card_name.Contains(keyword) || hitMemberIds.Contains(c.member_id));
             }
-            int total = await q.CountAsync();
-            List<PunchCard> cards = await q.OrderByDescending(c => c.id)
-                .Skip((pageIndex - 1) * pageSize).Take(pageSize)
+            // 销售方式要走「卡 → retail → order.type」两跳，PunchCard 上没有导航属性、写不进 SQL 过滤，
+            // 只能把关键字/日期收敛后的候选集拉回内存分类。punch_card 数据量很小（一个雪季几百条），
+            // 而且分页前必须拿到全集才能算「筛选后共几张、销售额合计多少」，代价可以接受。
+            var candidates = await q.Select(c => new { c.id, c.source_retail_id, c.is_refund })
                 .AsNoTracking().ToListAsync();
+            List<int> candRetailIds = candidates.Where(c => c.source_retail_id != null)
+                .Select(c => (int)c.source_retail_id).Distinct().ToList();
+            var candRetails = await _db.retail.Where(r => candRetailIds.Contains(r.id))
+                .Select(r => new { r.id, r.order_id, r.deal_price }).AsNoTracking().ToListAsync();
+            List<int> candOrderIds = candRetails.Where(r => r.order_id != null)
+                .Select(r => (int)r.order_id).Distinct().ToList();
+            var candOrders = await _db.order.Where(o => candOrderIds.Contains(o.id))
+                .Select(o => new { o.id, o.type, o.code }).AsNoTracking().ToListAsync();
+
+            Dictionary<int, string> saleTypeMap = new Dictionary<int, string>();
+            Dictionary<int, double?> salePriceMap = new Dictionary<int, double?>();
+            Dictionary<int, string> orderCodeMap = new Dictionary<int, string>();
+            foreach (var c in candidates)
+            {
+                var r = c.source_retail_id == null ? null
+                    : candRetails.Where(x => x.id == (int)c.source_retail_id).FirstOrDefault();
+                var o = (r == null || r.order_id == null) ? null
+                    : candOrders.Where(x => x.id == (int)r.order_id).FirstOrDefault();
+                saleTypeMap[c.id] = r == null ? "赠送"
+                    : (o != null && o.type == "租赁" ? "随订单购买" : "顾客自助购买");
+                salePriceMap[c.id] = r == null ? (double?)null : r.deal_price;
+                orderCodeMap[c.id] = o == null ? "" : (o.code ?? "");
+            }
+
+            saleType = string.IsNullOrWhiteSpace(saleType) ? null : Util.UrlDecode(saleType).Trim();
+            var matched = candidates.Where(c => saleType == null || saleTypeMap[c.id] == saleType).ToList();
+
+            // 销售额只累计没退款的：钱已经原路退回去了，计进合计等于虚增。
+            // 退款的张数/金额单独给出来，界面上标一句，免得看着"对不上"
+            int total = matched.Count;
+            double totalAmount = 0;
+            int refundCount = 0;
+            double refundAmount = 0;
+            foreach (var c in matched)
+            {
+                double price = salePriceMap[c.id] ?? 0;
+                if (c.is_refund) { refundCount++; refundAmount += price; }
+                else { totalAmount += price; }
+            }
+            totalAmount = Math.Round(totalAmount, 2);
+            refundAmount = Math.Round(refundAmount, 2);
+
+            List<int> pageIds = matched.Select(c => c.id).OrderByDescending(x => x)
+                .Skip((pageIndex - 1) * pageSize).Take(pageSize).ToList();
+            List<PunchCard> cards = await _db.punchCard.Where(c => pageIds.Contains(c.id))
+                .AsNoTracking().ToListAsync();
+            cards = cards.OrderByDescending(c => c.id).ToList();
 
             // 会员姓名/性别/手机号：批量取，避免逐行走 Member.cell 计算属性（那要带出整个 MSA 集合）
             List<int> memberIds = cards.Select(c => c.member_id).Distinct().ToList();
@@ -6637,25 +6702,10 @@ namespace SnowmeetApi.Controllers
                     && m.type.Trim().Equals("cell") && m.num != null && m.num != "")
                 .Select(m => new { m.member_id, m.num }).AsNoTracking().ToListAsync();
 
-            // 销售方式：卡 → source_retail → order
-            List<int> retailIds = cards.Where(c => c.source_retail_id != null)
-                .Select(c => (int)c.source_retail_id).Distinct().ToList();
-            var retails = await _db.retail.Where(r => retailIds.Contains(r.id))
-                .Select(r => new { r.id, r.order_id, r.deal_price }).AsNoTracking().ToListAsync();
-            List<int> orderIds = retails.Where(r => r.order_id != null)
-                .Select(r => (int)r.order_id).Distinct().ToList();
-            var orders = await _db.order.Where(o => orderIds.Contains(o.id))
-                .Select(o => new { o.id, o.type, o.code }).AsNoTracking().ToListAsync();
-
+            // 销售方式 / 售价 / 关联订单号在上面分类那一轮已经解析好，这里直接取
             var items = cards.Select(c =>
             {
                 var m = members.Where(x => x.id == c.member_id).FirstOrDefault();
-                var retail = c.source_retail_id == null ? null
-                    : retails.Where(r => r.id == (int)c.source_retail_id).FirstOrDefault();
-                var order = retail == null || retail.order_id == null ? null
-                    : orders.Where(o => o.id == (int)retail.order_id).FirstOrDefault();
-                string saleType = retail == null ? "赠送"
-                    : (order != null && order.type == "租赁" ? "随订单购买" : "顾客自助购买");
                 return new
                 {
                     c.id,
@@ -6671,9 +6721,9 @@ namespace SnowmeetApi.Controllers
                     memberGender = m == null ? "" : (m.gender ?? ""),
                     memberCell = cells.Where(x => x.member_id == c.member_id)
                         .Select(x => x.num).FirstOrDefault() ?? "",
-                    saleType,
-                    orderCode = order == null ? "" : (order.code ?? ""),
-                    salePrice = retail == null ? (double?)null : retail.deal_price,
+                    saleType = saleTypeMap[c.id],
+                    orderCode = orderCodeMap[c.id],
+                    salePrice = salePriceMap[c.id],
                     createDateStr = c.create_date.ToString("yyyy-MM-dd HH:mm")
                 };
             }).ToList();
@@ -6681,15 +6731,22 @@ namespace SnowmeetApi.Controllers
             return Ok(new ApiResult<object>()
             {
                 code = 0, message = "",
-                data = new { items, total, pageIndex, pageSize }
+                data = new { items, total, totalAmount, refundCount, refundAmount, pageIndex, pageSize }
             });
         }
 
-        // 修改季卡绑定的装备品牌/长度（管理后台，staff≥200）。
-        // 只允许改品牌和长度：装备类型换了等于换一块板，不是"改信息"而是"换卡"，不在此开放。
+        // 修改季卡绑定的装备类型/品牌/长度（管理后台，staff≥200）。
+        // 开卡时是按第一次养护的装备自动绑的，绑错了（类型选错、品牌填错）只能在这里改。
+        // 三项**必须要么全填、要么全空**：
+        //   全空 = 退回「未开卡」，下次用这张卡养护时按当次装备重新开卡
+        //         （口径见 CareController.IsSeasonCardUnbound——它要求三项都空才算未绑定）
+        //   缺一项 = 残缺绑定，这张季卡以后再也匹配不上任何装备，等于废掉，所以直接拒绝
+        // serial 不作为编辑项（很多装备本来就没序列号，也不参与匹配），但三项清空时一并清掉，
+        // 让卡干净地回到未开卡状态。
         [HttpGet("{cardId}")]
         public async Task<ActionResult<ApiResult<object>>> UpdatePunchCardEquipByStaff(int cardId,
-            string? brand, string? scale, string sessionKey, string sessionType = "wechat_mini_openid")
+            string? equipType, string? brand, string? scale, string sessionKey,
+            string sessionType = "wechat_mini_openid")
         {
             Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
             if (staff == null || staff.title_level < 200)
@@ -6705,16 +6762,38 @@ namespace SnowmeetApi.Controllers
             {
                 return Ok(new ApiResult<object>() { code = 1, message = "只有季卡才绑定装备", data = null });
             }
+            string newType = (Util.UrlDecode(equipType ?? "")).Trim();
             string newBrand = (Util.UrlDecode(brand ?? "")).Trim();
             string newScale = (Util.UrlDecode(scale ?? "")).Trim();
-            string prev = (card.equip_brand ?? "") + " / " + (card.equip_scale ?? "");
+            // 装备类型必须是养护业务认的那两种，否则养护开单永远匹配不上这张卡
+            if (newType != "" && newType != "双板" && newType != "单板")
+            {
+                return Ok(new ApiResult<object>() { code = 1, message = "装备类型只能是双板或单板", data = null });
+            }
+            int filled = (newType == "" ? 0 : 1) + (newBrand == "" ? 0 : 1) + (newScale == "" ? 0 : 1);
+            if (filled != 0 && filled != 3)
+            {
+                return Ok(new ApiResult<object>()
+                {
+                    code = 1,
+                    message = "装备类型、品牌、长度要么全部填写，要么全部留空（留空表示这张卡退回未开卡状态）",
+                    data = null
+                });
+            }
+            string prev = (card.equip_type ?? "") + " / " + (card.equip_brand ?? "") + " / " + (card.equip_scale ?? "");
+            card.equip_type = newType == "" ? null : newType;
             card.equip_brand = newBrand == "" ? null : newBrand;
             card.equip_scale = newScale == "" ? null : newScale;
+            if (filled == 0)
+            {
+                card.equip_serial = null;   // 三项清空 = 退回未开卡，残留的序列号一并清掉
+            }
             card.update_date = DateTime.Now;
             _db.punchCard.Entry(card).State = EntityState.Modified;   // 全局 NoTracking，必须显式
             await _db.coreDataModLog.AddAsync(CoreDataModLog.CreateManualLog("punch_card", "equip",
-                card.id, "修改季卡绑定装备", null, staff.id, prev,
-                (card.equip_brand ?? "") + " / " + (card.equip_scale ?? ""), "管理后台卡销售明细页修改"));
+                card.id, filled == 0 ? "清空季卡绑定装备" : "修改季卡绑定装备", null, staff.id, prev,
+                (card.equip_type ?? "") + " / " + (card.equip_brand ?? "") + " / " + (card.equip_scale ?? ""),
+                "管理后台卡销售明细页修改"));
             await _db.SaveChangesAsync();
             return Ok(new ApiResult<object>() { code = 0, message = "", data = new { id = card.id } });
         }
