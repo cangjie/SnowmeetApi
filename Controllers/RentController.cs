@@ -7340,7 +7340,9 @@ namespace SnowmeetApi.Controllers
                 card_name = calc.product.name,
                 member_id = (int)order.member_id,
                 total = calc.product.punch_total,
-                punches = calc.punchCountNow,
+                // 初始已用次数必须从 0 开始；本单需要核销的次数由 WriteOffSkiPunches 统一累加。
+                // 之前这里先写 calc.punchCountNow，后面又 WriteOff 一次，导致「剩余次数」被双扣。
+                punches = 0,
                 create_date = DateTime.Now
             };
             await _db.punchCard.AddAsync(card);

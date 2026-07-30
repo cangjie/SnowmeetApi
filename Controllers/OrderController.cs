@@ -1127,7 +1127,7 @@ namespace SnowmeetApi.Controllers
             bool? isPackage = null, bool? isOnCredit = null, bool? haveDiscount = null, string? status = null, string? cell = null,
             bool? haveWarranty = null, string? retailType = null, string? keyword = null, bool? isSummerCare = null,
             int? rentCategoryId = null, string? rentItemName = null, bool? useCard = null, string? rentStatus = null,
-            bool? hasRetail = null, int pageIndex = 1, int pageSize = 10)
+            string? hasRetail = null, int pageIndex = 1, int pageSize = 10)
         {
             shop = shop == null ? null : Util.UrlDecode(shop);
             type = type == null ? null : Util.UrlDecode(type);
@@ -1138,6 +1138,7 @@ namespace SnowmeetApi.Controllers
             cell = cell == null ? null : Util.UrlDecode(cell);
             retailType = retailType == null ? null : Util.UrlDecode(retailType);
             keyword = keyword == null ? null : Util.UrlDecode(keyword);
+            hasRetail = hasRetail == null ? null : Util.UrlDecode(hasRetail);
             if (keyword != null && keyword.Trim() == "")
             {
                 return Ok(new ApiResult<PagedOrderResult>()
@@ -1146,6 +1147,32 @@ namespace SnowmeetApi.Controllers
                     message = "关键词不能为空",
                     data = null
                 });
+            }
+            bool? hasRetailFilter = null;
+            if (!string.IsNullOrWhiteSpace(hasRetail))
+            {
+                string hasRetailNorm = hasRetail.Trim().ToLower();
+                if (hasRetailNorm == "1")
+                {
+                    hasRetailFilter = true;
+                }
+                else if (hasRetailNorm == "0")
+                {
+                    hasRetailFilter = false;
+                }
+                else if (hasRetailNorm == "true" || hasRetailNorm == "false")
+                {
+                    hasRetailFilter = bool.Parse(hasRetailNorm);
+                }
+                else
+                {
+                    return Ok(new ApiResult<PagedOrderResult>()
+                    {
+                        code = 1,
+                        message = "hasRetail 仅支持 true/false/1/0",
+                        data = null
+                    });
+                }
             }
             StaffController _staffHelper = new StaffController(_db);
             Staff staff = await _staffHelper.GetStaffBySessionKey(sessionKey, sessionType);
@@ -1160,7 +1187,7 @@ namespace SnowmeetApi.Controllers
             }
             List<SnowmeetApi.Models.Order> orders = await GetCommonOrders(orderId, shop, null, null, type, startDate, endDate, payOption,
                 isTest, isEntertain, isPackage, isOnCredit, haveDiscount, status, null, null, haveWarranty, retailType, keyword, isSummerCare,
-                rentCategoryId, rentItemName, useCard, cell, rentStatus, hasRetail);
+                rentCategoryId, rentItemName, useCard, cell, rentStatus, hasRetailFilter);
             List<SnowmeetApi.Models.Order> filtered = cell != null
                 ? orders.Where(o => o.customerCell.EndsWith(cell)).ToList()
                 : orders;
