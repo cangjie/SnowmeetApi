@@ -6520,6 +6520,24 @@ namespace SnowmeetApi.Controllers
             {
                 usedTotal += usages[i].punchCount;
             }
+
+            // 历史数据纠偏：以 punch_card_used 明细汇总作为真值。
+            // 2026-07-30 修过一次「发卡即核销」双扣 bug，存量卡可能出现 punches 比实际核销合计偏大。
+            // 这里在读取使用明细时自动回正，避免继续展示错误的“剩余次数”。
+            if (card.total != null && (card.punches ?? 0) != usedTotal)
+            {
+                PunchCard trackedCard = await _db.punchCard.Where(c => c.id == card.id).FirstOrDefaultAsync();
+                if (trackedCard != null)
+                {
+                    trackedCard.punches = usedTotal;
+                    trackedCard.update_date = DateTime.Now;
+                    _db.punchCard.Entry(trackedCard).State = EntityState.Modified;
+                    await _db.SaveChangesAsync();
+                }
+                card.punches = usedTotal;
+            }
+
+            int? remaining = card.total == null ? (int?)null : card.total.Value - (card.punches ?? 0);
             return new PunchCardUsageView()
             {
                 card = new
@@ -6529,7 +6547,7 @@ namespace SnowmeetApi.Controllers
                     card.biz_type,
                     card.total,
                     punches = card.punches ?? 0,
-                    remaining = card.remaining,
+                    remaining = remaining,
                     isSeason = card.total == null,
                     isRefund = card.is_refund,
                     // 季卡绑定装备：管理后台明细页可改品牌/长度
