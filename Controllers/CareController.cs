@@ -1416,10 +1416,17 @@ namespace SnowmeetApi.Controllers
             public List<string> thumbUrls { get; set; } = new();
         }
 
+        public class CarePendingTaskStat
+        {
+            public string taskName { get; set; } = "";
+            public int count { get; set; } = 0;
+        }
+
         public class PagedCareProgressItemResult
         {
             public List<CareProgressItem> items { get; set; } = new();
             public int total { get; set; } = 0;
+            public List<CarePendingTaskStat> taskStats { get; set; } = new();
         }
 
         // 养护已生效订单里所有"未发板"的装备（顾客已送来养护、还没取走）。一件装备一条，供店员
@@ -1582,6 +1589,29 @@ namespace SnowmeetApi.Controllers
                     ? progressItems.OrderByDescending(c => c.create_date)
                     : progressItems.OrderBy(c => c.create_date));
             List<CareProgressItem> ordered = filtered.ToList();
+
+            Dictionary<string, int> taskCountMap = new Dictionary<string, int>();
+            foreach (CareProgressItem item in ordered)
+            {
+                foreach (string taskName in item.pendingTasks.Distinct())
+                {
+                    if (string.IsNullOrWhiteSpace(taskName))
+                    {
+                        continue;
+                    }
+                    if (!taskCountMap.ContainsKey(taskName))
+                    {
+                        taskCountMap[taskName] = 0;
+                    }
+                    taskCountMap[taskName] += 1;
+                }
+            }
+            List<CarePendingTaskStat> taskStats = taskCountMap
+                .Select(kv => new CarePendingTaskStat { taskName = kv.Key, count = kv.Value })
+                .OrderByDescending(s => s.count)
+                .ThenBy(s => s.taskName)
+                .ToList();
+
             int total = ordered.Count;
             List<CareProgressItem> paged = ordered.Skip((pageIndex - 1) * pageSize).Take(pageSize).ToList();
 
@@ -1589,7 +1619,7 @@ namespace SnowmeetApi.Controllers
             {
                 code = 0,
                 message = "",
-                data = new PagedCareProgressItemResult { items = paged, total = total }
+                data = new PagedCareProgressItemResult { items = paged, total = total, taskStats = taskStats }
             });
         }
 
