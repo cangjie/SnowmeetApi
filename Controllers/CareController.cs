@@ -1413,6 +1413,7 @@ namespace SnowmeetApi.Controllers
             public int pendingCount { get; set; }
             public List<string> completedTasks { get; set; } = new();
             public List<string> pendingTasks { get; set; } = new();
+            public List<string> thumbUrls { get; set; } = new();
         }
 
         public class PagedCareProgressItemResult
@@ -1497,6 +1498,7 @@ namespace SnowmeetApi.Controllers
             string? shop, string? equipment, string? brand, string? cell,
             string sessionKey, string sessionType = "wechat_mini_openid",
             bool? isTest = null, bool? isSummerCare = null, string sortOrder = "asc",
+            DateTime? startDate = null, DateTime? endDate = null,
             int pageIndex = 1, int pageSize = 10)
         {
             sessionKey = Util.UrlDecode(sessionKey);
@@ -1517,6 +1519,8 @@ namespace SnowmeetApi.Controllers
                     && (shop == null || c.order.shop.Trim().Equals(shop.Trim()))
                     && (equipment == null || c.equipment != null && c.equipment.Trim().Equals(equipment.Trim()))
                     && (brand == null || (c.brand != null && c.brand.Contains(brand)))
+                    && (startDate == null || c.create_date.Date >= ((DateTime)startDate).Date)
+                    && (endDate == null || c.create_date.Date <= ((DateTime)endDate).Date)
                     && (cell == null ||
                         (c.order.contact_num != null && c.order.contact_num.Contains(cell)) ||
                         (c.order.member != null && c.order.member.memberSocialAccounts.Any(msa =>
@@ -1525,6 +1529,7 @@ namespace SnowmeetApi.Controllers
                     && (isSummerCare == null || (c.biz_type == "非雪季养护") == isSummerCare)
                 )
                 .Include(c => c.tasks.Where(t => t.valid == 1))
+                .Include(c => c.careImages).ThenInclude(i => i.image)
                 .Include(c => c.order).ThenInclude(o => o.member).ThenInclude(m => m.memberSocialAccounts)
                 .AsSplitQuery().AsNoTracking()
                 .ToListAsync();
@@ -1533,11 +1538,13 @@ namespace SnowmeetApi.Controllers
             foreach (Care care in candidates)
             {
                 List<CareTask> validTasks = care.tasks?.Where(t => t.valid == 1).OrderBy(t => t.sort).ThenBy(t => t.create_date).ToList() ?? new();
-                List<string> completedTasks = validTasks.Where(t => t.status == "已完成")
+                // "养护项目"只统计真实工序，排除发板终态任务（它不是养护加工项目本身）。
+                List<CareTask> serviceTasks = validTasks.Where(t => t.task_name != null && t.task_name.Trim() != "发板").ToList();
+                List<string> completedTasks = serviceTasks.Where(t => t.status == "已完成")
                     .Select(t => t.task_name?.Trim() ?? "")
                     .Where(t => !string.IsNullOrWhiteSpace(t))
                     .ToList();
-                List<string> pendingTasks = validTasks.Where(t => t.status != "已完成" && t.status != "强行中止")
+                List<string> pendingTasks = serviceTasks.Where(t => t.status != "已完成" && t.status != "强行中止")
                     .Select(t => t.task_name?.Trim() ?? "")
                     .Where(t => !string.IsNullOrWhiteSpace(t))
                     .ToList();
@@ -1562,7 +1569,12 @@ namespace SnowmeetApi.Controllers
                     completedCount = completedTasks.Count,
                     pendingCount = pendingTasks.Count,
                     completedTasks = completedTasks,
-                    pendingTasks = pendingTasks
+                    pendingTasks = pendingTasks,
+                    thumbUrls = care.careImages == null
+                        ? new List<string>()
+                        : care.careImages.Where(i => i.image != null && i.image.thumbUrl != null && i.image.thumbUrl.Trim() != "")
+                            .Select(i => i.image.thumbUrl)
+                            .ToList()
                 });
             }
 
