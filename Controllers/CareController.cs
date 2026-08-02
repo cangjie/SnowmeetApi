@@ -1557,7 +1557,7 @@ namespace SnowmeetApi.Controllers
                     brand = care.brand,
                     scale = care.scale,
                     create_date = care.create_date,
-                    customerName = care.order?.customerCalledName ?? care.order?.member?.name,
+                    customerName = care.order?.customerCalledName ?? care.order?.member?.real_name,
                     customerCell = care.order?.contact_num ?? (care.order?.member?.memberSocialAccounts?.FirstOrDefault(msa => msa.type.Trim().Equals("cell"))?.num),
                     completedCount = completedTasks.Count,
                     pendingCount = pendingTasks.Count,
