@@ -1396,6 +1396,39 @@ namespace SnowmeetApi.Controllers
             public int total { get; set; } = 0;
         }
 
+        public class CareProgressItem
+        {
+            public int id { get; set; }
+            public int order_id { get; set; }
+            public string order_code { get; set; } = "";
+            public string shop { get; set; } = "";
+            public string? biz_type { get; set; }
+            public string equipment { get; set; } = "";
+            public string? brand { get; set; }
+            public string? scale { get; set; }
+            public DateTime create_date { get; set; }
+            public string? customerName { get; set; }
+            public string? customerCell { get; set; }
+            public int completedCount { get; set; }
+            public int pendingCount { get; set; }
+            public List<string> completedTasks { get; set; } = new();
+            public List<string> pendingTasks { get; set; } = new();
+            public List<string> thumbUrls { get; set; } = new();
+        }
+
+        public class CarePendingTaskStat
+        {
+            public string taskName { get; set; } = "";
+            public int count { get; set; } = 0;
+        }
+
+        public class PagedCareProgressItemResult
+        {
+            public List<CareProgressItem> items { get; set; } = new();
+            public int total { get; set; } = 0;
+            public List<CarePendingTaskStat> taskStats { get; set; } = new();
+        }
+
         // 养护已生效订单里所有"未发板"的装备（顾客已送来养护、还没取走）。一件装备一条，供店员
         // 催取用。"已生效"= task_flow_code!=null（EffectCareOrder 跑过）；"未发板"= 该 care 任务链里
         // task_name=="发板" 那条的 status 不是 已完成/强行中止（is_cancel=true 时发板任务本身已是
@@ -1441,8 +1474,15 @@ namespace SnowmeetApi.Controllers
 
             IEnumerable<Care> filtered = candidates.Where(c =>
             {
-                CareTask finishTask = c.tasks?.Where(t => t.task_name == "发板").FirstOrDefault();
-                return finishTask != null && finishTask.status != "已完成" && finishTask.status != "强行中止";
+                List<CareTask> validTasks = c.tasks?.Where(t => t.valid == 1).OrderBy(t => t.sort).ThenBy(t => t.create_date).ToList() ?? new();
+                CareTask finishTask = validTasks.Where(t => t.task_name == "发板").FirstOrDefault();
+                if (finishTask == null || finishTask.status == "已完成" || finishTask.status == "强行中止")
+                {
+                    return false;
+                }
+
+                bool hasPendingNonGiveOut = validTasks.Any(t => t.task_name != "发板" && t.status != "已完成" && t.status != "强行中止");
+                return !hasPendingNonGiveOut;
             });
             List<Care> unpicked = (sortOrder != null && sortOrder.Trim().ToLower() == "desc"
                     ? filtered.OrderByDescending(c => c.create_date)
@@ -1457,6 +1497,129 @@ namespace SnowmeetApi.Controllers
                 code = 0,
                 message = "",
                 data = new PagedCareItemResult { items = paged, total = total }
+            });
+        }
+
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<PagedCareProgressItemResult>>> GetIncompleteCareItemsByStaff(
+            string? shop, string? equipment, string? brand, string? cell,
+            string sessionKey, string sessionType = "wechat_mini_openid",
+            bool? isTest = null, bool? isSummerCare = null, string sortOrder = "asc",
+            DateTime? startDate = null, DateTime? endDate = null,
+            int pageIndex = 1, int pageSize = 10)
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            shop = shop == null ? null : Util.UrlDecode(shop);
+            equipment = equipment == null ? null : Util.UrlDecode(equipment);
+            brand = brand == null ? null : Util.UrlDecode(brand);
+            cell = cell == null ? null : Util.UrlDecode(cell);
+
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            if (staff == null)
+            {
+                return Ok(new ApiResult<PagedCareProgressItemResult>() { code = 1, message = "不是管理员", data = null });
+            }
+
+            List<Care> candidates = await _db.care
+                .Where(c => c.valid == 1 && c.task_flow_code != null && c.is_cancel != true
+                    && c.order.valid == 1 && c.order.type == "养护"
+                    && (shop == null || c.order.shop.Trim().Equals(shop.Trim()))
+                    && (equipment == null || c.equipment != null && c.equipment.Trim().Equals(equipment.Trim()))
+                    && (brand == null || (c.brand != null && c.brand.Contains(brand)))
+                    && (startDate == null || c.create_date.Date >= ((DateTime)startDate).Date)
+                    && (endDate == null || c.create_date.Date <= ((DateTime)endDate).Date)
+                    && (cell == null ||
+                        (c.order.contact_num != null && c.order.contact_num.Contains(cell)) ||
+                        (c.order.member != null && c.order.member.memberSocialAccounts.Any(msa =>
+                            msa.type.Trim().Equals("cell") && msa.num.Contains(cell))))
+                    && (isTest == null || c.order.is_test == ((bool)isTest ? 1 : 0))
+                    && (isSummerCare == null || (c.biz_type == "非雪季养护") == isSummerCare)
+                )
+                .Include(c => c.tasks.Where(t => t.valid == 1))
+                .Include(c => c.careImages).ThenInclude(i => i.image)
+                .Include(c => c.order).ThenInclude(o => o.member).ThenInclude(m => m.memberSocialAccounts)
+                .AsSplitQuery().AsNoTracking()
+                .ToListAsync();
+
+            List<CareProgressItem> progressItems = new();
+            foreach (Care care in candidates)
+            {
+                List<CareTask> validTasks = care.tasks?.Where(t => t.valid == 1).OrderBy(t => t.sort).ThenBy(t => t.create_date).ToList() ?? new();
+                // "养护项目"只统计真实工序，排除发板终态任务（它不是养护加工项目本身）。
+                List<CareTask> serviceTasks = validTasks.Where(t => t.task_name != null && t.task_name.Trim() != "发板").ToList();
+                List<string> completedTasks = serviceTasks.Where(t => t.status == "已完成")
+                    .Select(t => t.task_name?.Trim() ?? "")
+                    .Where(t => !string.IsNullOrWhiteSpace(t))
+                    .ToList();
+                List<string> pendingTasks = serviceTasks.Where(t => t.status != "已完成" && t.status != "强行中止")
+                    .Select(t => t.task_name?.Trim() ?? "")
+                    .Where(t => !string.IsNullOrWhiteSpace(t))
+                    .ToList();
+                if (pendingTasks.Count == 0)
+                {
+                    continue;
+                }
+
+                progressItems.Add(new CareProgressItem
+                {
+                    id = care.id,
+                    order_id = care.order_id ?? 0,
+                    order_code = care.order?.code ?? "",
+                    shop = care.order?.shop ?? "",
+                    biz_type = care.biz_type,
+                    equipment = care.equipment ?? "",
+                    brand = care.brand,
+                    scale = care.scale,
+                    create_date = care.create_date,
+                    customerName = care.order?.customerCalledName ?? care.order?.member?.real_name,
+                    customerCell = care.order?.contact_num ?? (care.order?.member?.memberSocialAccounts?.FirstOrDefault(msa => msa.type.Trim().Equals("cell"))?.num),
+                    completedCount = completedTasks.Count,
+                    pendingCount = pendingTasks.Count,
+                    completedTasks = completedTasks,
+                    pendingTasks = pendingTasks,
+                    thumbUrls = care.careImages == null
+                        ? new List<string>()
+                        : care.careImages.Where(i => i.image != null && i.image.thumbUrl != null && i.image.thumbUrl.Trim() != "")
+                            .Select(i => i.image.thumbUrl)
+                            .ToList()
+                });
+            }
+
+            IEnumerable<CareProgressItem> filtered = (sortOrder != null && sortOrder.Trim().ToLower() == "desc"
+                    ? progressItems.OrderByDescending(c => c.create_date)
+                    : progressItems.OrderBy(c => c.create_date));
+            List<CareProgressItem> ordered = filtered.ToList();
+
+            Dictionary<string, int> taskCountMap = new Dictionary<string, int>();
+            foreach (CareProgressItem item in ordered)
+            {
+                foreach (string taskName in item.pendingTasks.Distinct())
+                {
+                    if (string.IsNullOrWhiteSpace(taskName))
+                    {
+                        continue;
+                    }
+                    if (!taskCountMap.ContainsKey(taskName))
+                    {
+                        taskCountMap[taskName] = 0;
+                    }
+                    taskCountMap[taskName] += 1;
+                }
+            }
+            List<CarePendingTaskStat> taskStats = taskCountMap
+                .Select(kv => new CarePendingTaskStat { taskName = kv.Key, count = kv.Value })
+                .OrderByDescending(s => s.count)
+                .ThenBy(s => s.taskName)
+                .ToList();
+
+            int total = ordered.Count;
+            List<CareProgressItem> paged = ordered.Skip((pageIndex - 1) * pageSize).Take(pageSize).ToList();
+
+            return Ok(new ApiResult<PagedCareProgressItemResult>()
+            {
+                code = 0,
+                message = "",
+                data = new PagedCareProgressItemResult { items = paged, total = total, taskStats = taskStats }
             });
         }
 

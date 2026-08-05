@@ -107,6 +107,28 @@ namespace SnowmeetApi.Controllers.Order
         {
             var (sessOpenid, sessUnionid, sess) = await _loadSessionContext(sessionKey);
             int? scannerMemberId = (sess != null) ? sess.member_id : null;
+            if (scannerMemberId == null && sess != null && !string.IsNullOrEmpty(sess.wechat_openid))
+            {
+                var scannerByOpenId = await _memberHelper.GetWholeMemberByNum(sess.wechat_openid, MemberSocialAccount.TYPE_WECHAT_MINI_OPENID);
+                if (scannerByOpenId != null)
+                {
+                    scannerMemberId = scannerByOpenId.id;
+                    sess.member_id = scannerMemberId;
+                    _db.miniSession.Entry(sess).State = EntityState.Modified;
+                    await _db.SaveChangesAsync();
+                }
+            }
+            if (scannerMemberId == null && sess != null && !string.IsNullOrEmpty(sess.cell))
+            {
+                var scannerByCell = await _memberHelper.GetWholeMemberByNum(sess.cell, MemberSocialAccount.TYPE_CELL);
+                if (scannerByCell != null)
+                {
+                    scannerMemberId = scannerByCell.id;
+                    sess.member_id = scannerMemberId;
+                    _db.miniSession.Entry(sess).State = EntityState.Modified;
+                    await _db.SaveChangesAsync();
+                }
+            }
             if (scannerMemberId == null)
             {
                 return Ok(new ApiResult<object> { code = 1, message = "未识别扫码人身份，请重新登录", data = new { matched = false } });
