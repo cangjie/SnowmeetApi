@@ -166,8 +166,8 @@ namespace SnowmeetApi.Controllers
             {
                 return BadRequest();
             }
-            List<Models.SkiPass> l = await _context.skiPass.Where(s => ( s.valid == 1
-                && (s.member_id == member.id || s.wechat_mini_openid.Trim().Equals(member.wechatMiniOpenId.Trim())  )))
+            List<Models.SkiPass> l = await _context.skiPass.Where(s => s.valid == 1
+                && s.member_id == member.id)
                 .OrderByDescending(s => s.create_date).AsNoTracking().ToListAsync();
             
             return Ok(l);
