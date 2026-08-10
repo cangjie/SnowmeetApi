@@ -21,6 +21,35 @@ namespace SnowmeetApi.Controllers
         private IConfiguration _oriConfig;
         public string _appId = "";
 
+        // 硬编码：允许转赠的优惠券模板（12=免费打蜡券，16=老顾客优惠券）。
+        // 不同模板的转赠规则可能不同，目前两者规则一致（未使用+未过期即可转），后续如需差异化按 template_id 拆分判断。
+        private static readonly HashSet<int> TransferableTemplateIds = new HashSet<int> { 12, 16 };
+
+        // 转赠接受前必须关注公众号：用扫码关注生成的 scene（ticket_gift_{code}）去核对
+        // oa_receive（微信公众号事件回调落库表，MiniAppHelperController.PushMessage 实时写入）里
+        // 有没有对应的 subscribe/SCAN 事件——这两个事件分别对应"扫码后新关注"和"已关注用户再次扫码"，
+        // 命中任一个都说明这次扫码确实完成了关注动作。
+        [NonAction]
+        private static string BuildTransferFollowScene(string ticketCode)
+        {
+            return "ticket_gift_" + ticketCode.Trim();
+        }
+        [NonAction]
+        public async Task<bool> HasFollowedForTransfer(string code)
+        {
+            string scene = BuildTransferFollowScene(code);
+            string sceneWithPrefix = "qrscene_" + scene;
+            return await _context.oAReceive.AnyAsync(r => r.MsgType == "event"
+                && (r.Event == "subscribe" || r.Event == "SCAN")
+                && (r.EventKey == scene || r.EventKey == sceneWithPrefix));
+        }
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<bool>>> CheckTransferFollow(string code)
+        {
+            bool followed = await HasFollowedForTransfer(code);
+            return Ok(new ApiResult<bool>() { code = 0, message = "", data = followed });
+        }
+
         public TicketController(ApplicationDBContext context, IConfiguration config)
         {
             _context = context;
@@ -93,17 +122,31 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet("{code}")]
-        public async Task<ActionResult<Ticket>> SetTicketToShare(string code, string sessionKey)
+        public async Task<ActionResult<ApiResult<Ticket>>> SetTicketToShare(string code, string sessionKey, string sessionType = "wechat_mini_openid")
         {
             sessionKey = Util.UrlDecode(sessionKey);
 
-            UnicUser user = await UnicUser.GetUnicUserAsync(sessionKey, _context);
+            MemberController _memberHelper = new MemberController(_context, _oriConfig);
+            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
+            if (member == null)
+            {
+                return Ok(new ApiResult<Ticket>() { code = 1, message = "用户未登录", data = null });
+            }
 
             Ticket ticket = await _context.ticket.FindAsync(code);
-            if (ticket == null || !ticket.open_id.Trim().Equals(user.miniAppOpenId.Trim()))
+            if (ticket == null || ticket.member_id != member.id)
             {
-                return NotFound();
+                return Ok(new ApiResult<Ticket>() { code = 1, message = "优惠券不存在", data = null });
             }
+            if (!TransferableTemplateIds.Contains(ticket.template_id))
+            {
+                return Ok(new ApiResult<Ticket>() { code = 1, message = "该优惠券不支持转赠", data = null });
+            }
+            if (ticket.valid != 1 || ticket.used == 1)
+            {
+                return Ok(new ApiResult<Ticket>() { code = 1, message = "该优惠券当前不可转赠", data = null });
+            }
+
             ticket.shared = 1;
             ticket.shared_time = DateTime.Now;
 
@@ -112,36 +155,52 @@ namespace SnowmeetApi.Controllers
 
             ticket.open_id = "";
 
-            return Ok(ticket);
+            return Ok(new ApiResult<Ticket>() { code = 0, message = "", data = ticket });
         }
 
         [HttpGet("{code}")]
-        public async Task<ActionResult<Ticket>> AcceptTicket(string code, string memo, string sessionKey)
+        public async Task<ActionResult<ApiResult<Ticket>>> AcceptTicket(string code, string memo, string sessionKey, string sessionType = "wechat_mini_openid")
         {
             memo = Util.UrlDecode(memo).Trim();
             sessionKey = Util.UrlDecode(sessionKey);
 
-            UnicUser user = await UnicUser.GetUnicUserAsync(sessionKey, _context);
+            MemberController _memberHelper = new MemberController(_context, _oriConfig);
+            Member accepter = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
+            if (accepter == null)
+            {
+                return Ok(new ApiResult<Ticket>() { code = 1, message = "用户未登录", data = null });
+            }
 
             Ticket ticket = await _context.ticket.FindAsync(code);
-
-            if (ticket.shared != 1)
+            if (ticket == null || ticket.shared != 1)
             {
-                return NotFound();
+                return Ok(new ApiResult<Ticket>() { code = 1, message = "该优惠券当前不可接受，链接可能已失效", data = null });
             }
+            if (ticket.member_id == accepter.id)
+            {
+                return Ok(new ApiResult<Ticket>() { code = 1, message = "不能转赠给自己", data = null });
+            }
+            if (!await HasFollowedForTransfer(code))
+            {
+                return Ok(new ApiResult<Ticket>() { code = 1, message = "请先关注公众号后再接受这张优惠券", data = null });
+            }
+
+            Member sender = ticket.member_id == null ? null : await _context.member.FindAsync(ticket.member_id);
 
             TicketLog log = new TicketLog()
             {
                 code = ticket.code,
-                sender_open_id = ticket.open_id.Trim(),
-                accepter_open_id = user.miniAppOpenId.Trim(),
+                sender_open_id = (sender?.wechatMiniOpenId ?? ticket.open_id ?? "").Trim(),
+                accepter_open_id = (accepter.wechatMiniOpenId ?? "").Trim(),
                 memo = memo,
                 transact_time = DateTime.Now
             };
             await _context.AddAsync(log);
-            await _context.SaveChangesAsync();
 
-            ticket.open_id = user.miniAppOpenId.Trim();
+            ticket.member_id = accepter.id;
+            ticket.open_id = (accepter.wechatMiniOpenId ?? "").Trim();
+            ticket.shared = 0;
+            ticket.shared_time = null;
 
             _context.Entry(ticket).State = EntityState.Modified;
 
@@ -149,10 +208,7 @@ namespace SnowmeetApi.Controllers
 
             ticket.open_id = "";
 
-            return Ok(ticket);
-
-
-
+            return Ok(new ApiResult<Ticket>() { code = 0, message = "", data = ticket });
         }
 
         // GET: api/Ticket/5
