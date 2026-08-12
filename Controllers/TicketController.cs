@@ -29,15 +29,17 @@ namespace SnowmeetApi.Controllers
         // oa_receive（微信公众号事件回调落库表，MiniAppHelperController.PushMessage 实时写入）里
         // 有没有对应的 subscribe/SCAN 事件——这两个事件分别对应"扫码后新关注"和"已关注用户再次扫码"，
         // 命中任一个都说明这次扫码确实完成了关注动作。
+        // 场景值必须绑定"这一次分享"（ticket.shared_time），不能只绑定券的 code——
+        // 否则同一张券换了收件人再转赠时，会复用到上一个收件人（甚至完全无关的人）
+        // 历史上留下的扫码/关注记录，导致新收件人明明没扫码却直接判定"已关注"（2026-08-12 真实事故）
         [NonAction]
-        private static string BuildTransferFollowScene(string ticketCode)
+        public async Task<bool> HasFollowedForTransfer(Ticket ticket)
         {
-            return "ticket_gift_" + ticketCode.Trim();
-        }
-        [NonAction]
-        public async Task<bool> HasFollowedForTransfer(string code)
-        {
-            string scene = BuildTransferFollowScene(code);
+            if (ticket == null || ticket.shared_time == null)
+            {
+                return false;
+            }
+            string scene = ticket.transfer_scene;
             string sceneWithPrefix = "qrscene_" + scene;
             return await _context.oAReceive.AnyAsync(r => r.MsgType == "event"
                 && (r.Event == "subscribe" || r.Event == "SCAN")
@@ -46,7 +48,8 @@ namespace SnowmeetApi.Controllers
         [HttpGet]
         public async Task<ActionResult<ApiResult<bool>>> CheckTransferFollow(string code)
         {
-            bool followed = await HasFollowedForTransfer(code);
+            Ticket ticket = await _context.ticket.FindAsync(code);
+            bool followed = await HasFollowedForTransfer(ticket);
             return Ok(new ApiResult<bool>() { code = 0, message = "", data = followed });
         }
 
@@ -180,7 +183,7 @@ namespace SnowmeetApi.Controllers
             {
                 return Ok(new ApiResult<Ticket>() { code = 1, message = "不能转赠给自己", data = null });
             }
-            if (!await HasFollowedForTransfer(code))
+            if (!await HasFollowedForTransfer(ticket))
             {
                 return Ok(new ApiResult<Ticket>() { code = 1, message = "请先关注公众号后再接受这张优惠券", data = null });
             }

@@ -58,6 +58,20 @@ namespace SnowmeetApi.Models
 
             }
         }
+        // 转赠关注校验用的场景值：绑定在"这一次分享"（shared_time）上，不是绑定在券本身，
+        // 避免同一张券换收件人转赠时，复用到别人之前留下的扫码/关注记录（2026-08-12 踩坑修复）
+        [NotMapped]
+        public string transfer_scene
+        {
+            get
+            {
+                if (shared_time == null)
+                {
+                    return null;
+                }
+                return "ticket_gift_" + code.Trim() + "_" + shared_time.Value.Ticks;
+            }
+        }
         [ForeignKey("member_id")]
         public Member ownerMember { get; set; }
         [ForeignKey("template_id")]
