@@ -211,6 +211,49 @@ namespace SnowmeetApi.Controllers
             return Ok(new ApiResult<Ticket>() { code = 0, message = "", data = ticket });
         }
 
+        [HttpGet("{code}")]
+        public async Task<ActionResult<ApiResult<Ticket>>> CancelShare(string code, string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+
+            MemberController _memberHelper = new MemberController(_context, _oriConfig);
+            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
+            if (member == null)
+            {
+                return Ok(new ApiResult<Ticket>() { code = 1, message = "用户未登录", data = null });
+            }
+
+            Ticket ticket = await _context.ticket.FindAsync(code);
+            if (ticket == null || ticket.member_id != member.id)
+            {
+                return Ok(new ApiResult<Ticket>() { code = 1, message = "优惠券不存在", data = null });
+            }
+            if (ticket.shared != 1)
+            {
+                return Ok(new ApiResult<Ticket>() { code = 1, message = "该优惠券当前不是分享中状态", data = null });
+            }
+
+            TicketLog log = new TicketLog()
+            {
+                code = ticket.code,
+                sender_open_id = (member.wechatMiniOpenId ?? "").Trim(),
+                accepter_open_id = "",
+                memo = "撤回分享",
+                transact_time = DateTime.Now
+            };
+            await _context.AddAsync(log);
+
+            ticket.shared = 0;
+            ticket.shared_time = null;
+
+            _context.Entry(ticket).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
+
+            ticket.open_id = "";
+
+            return Ok(new ApiResult<Ticket>() { code = 0, message = "", data = ticket });
+        }
+
         // GET: api/Ticket/5
         [HttpGet("{code}")]
         public async Task<ActionResult<ApiResult<Ticket>>> GetTicket(string code)
