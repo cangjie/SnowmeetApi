@@ -245,9 +245,41 @@ namespace SnowmeetApi.Controllers
 
             await _context.SaveChangesAsync();
 
+            NotifyAcceptedByOA(ticket, accepter);
+
             ticket.open_id = "";
 
             return Ok(new ApiResult<Ticket>() { code = 0, message = "", data = ticket });
+        }
+
+        // 接受成功后，通过公众号给接收人推一条确认消息（点进去直接是"我的优惠券"）。
+        // 用公众号而不是小程序内提示，是因为很多人接受的时候刚从"扫码关注"流程过来，
+        // 人还留在微信对话里，不一定会回到小程序页面。
+        // 发送失败不影响已经成功的接受动作，所以吞掉异常。
+        [NonAction]
+        public void NotifyAcceptedByOA(Ticket ticket, Member accepter)
+        {
+            try
+            {
+                List<MemberSocialAccount> msaOaList = accepter.GetInfo("wechat_oa_openid");
+                if (msaOaList == null || msaOaList.Count == 0)
+                {
+                    return;
+                }
+                string oaOpenId = msaOaList[0].num?.Trim();
+                if (string.IsNullOrEmpty(oaOpenId))
+                {
+                    return;
+                }
+                string content = "您已经接受了" + ticket.name.Trim() + "，"
+                    + "<a data-miniprogram-appid=\"wxd1310896f2aa68bb\" data-miniprogram-path=\"/pages/mine/ticket/ticket_list\" >点击查看</a>。";
+                string notifyUrl = "https://wxoa.snowmeet.top/api/OfficialAccountApi/SendTextMessageByOpenId?openId="
+                    + Util.UrlEncode(oaOpenId) + "&content=" + Util.UrlEncode(content);
+                Util.GetWebContent(notifyUrl);
+            }
+            catch
+            {
+            }
         }
 
         [HttpGet("{code}")]
