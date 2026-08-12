@@ -25,7 +25,33 @@ namespace SnowmeetApi.Controllers
         // 不同模板的转赠规则可能不同，目前两者规则一致（未使用+未过期即可转），后续如需差异化按 template_id 拆分判断。
         private static readonly HashSet<int> TransferableTemplateIds = new HashSet<int> { 12, 16 };
 
-        // 转赠接受前必须关注公众号：用扫码关注生成的 scene（ticket_gift_{code}）去核对
+        // 判断某会员当前是否处于关注状态：取该会员公众号 openid 在 oa_receive 里最新一条
+        // subscribe/SCAN/unsubscribe 事件，若最新一条不是 unsubscribe 就认为当前在关注。
+        // 用于「已经关注过、这次换了张新券转赠，不应该要求再扫一次码」的场景。
+        [NonAction]
+        public async Task<bool> IsCurrentlyFollowingOA(Member member)
+        {
+            if (member == null)
+            {
+                return false;
+            }
+            List<MemberSocialAccount> msaOaList = member.GetInfo("wechat_oa_openid");
+            if (msaOaList == null || msaOaList.Count == 0)
+            {
+                return false;
+            }
+            string? oaOpenId = msaOaList[0].num?.Trim();
+            if (string.IsNullOrEmpty(oaOpenId))
+            {
+                return false;
+            }
+            OAReceive lastEvent = await _context.oAReceive
+                .Where(r => r.MsgType == "event" && r.FromUserName == oaOpenId
+                    && (r.Event == "subscribe" || r.Event == "SCAN" || r.Event == "unsubscribe"))
+                .OrderByDescending(r => r.id).AsNoTracking().FirstOrDefaultAsync();
+            return lastEvent != null && lastEvent.Event != "unsubscribe";
+        }
+        // 转赠接受前必须关注公众号：用扫码关注生成的 scene（ticket.transfer_scene）去核对
         // oa_receive（微信公众号事件回调落库表，MiniAppHelperController.PushMessage 实时写入）里
         // 有没有对应的 subscribe/SCAN 事件——这两个事件分别对应"扫码后新关注"和"已关注用户再次扫码"，
         // 命中任一个都说明这次扫码确实完成了关注动作。
@@ -33,7 +59,7 @@ namespace SnowmeetApi.Controllers
         // 否则同一张券换了收件人再转赠时，会复用到上一个收件人（甚至完全无关的人）
         // 历史上留下的扫码/关注记录，导致新收件人明明没扫码却直接判定"已关注"（2026-08-12 真实事故）
         [NonAction]
-        public async Task<bool> HasFollowedForTransfer(Ticket ticket)
+        public async Task<bool> HasFollowedForTransfer(Ticket ticket, Member accepter = null)
         {
             if (ticket == null || ticket.shared_time == null)
             {
@@ -41,15 +67,25 @@ namespace SnowmeetApi.Controllers
             }
             string scene = ticket.transfer_scene;
             string sceneWithPrefix = "qrscene_" + scene;
-            return await _context.oAReceive.AnyAsync(r => r.MsgType == "event"
+            bool scannedThisShare = await _context.oAReceive.AnyAsync(r => r.MsgType == "event"
                 && (r.Event == "subscribe" || r.Event == "SCAN")
                 && (r.EventKey == scene || r.EventKey == sceneWithPrefix));
+            if (scannedThisShare)
+            {
+                return true;
+            }
+            // 没扫这一次的专属二维码，但如果这个人本来就已经是关注状态（比如接受上一张券时刚关注过），
+            // 也应该直接放行，不用每张新券都强制重新扫一次码
+            return await IsCurrentlyFollowingOA(accepter);
         }
         [HttpGet]
-        public async Task<ActionResult<ApiResult<bool>>> CheckTransferFollow(string code)
+        public async Task<ActionResult<ApiResult<bool>>> CheckTransferFollow(string code, string sessionKey, string sessionType = "wechat_mini_openid")
         {
+            sessionKey = Util.UrlDecode(sessionKey);
+            MemberController _memberHelper = new MemberController(_context, _oriConfig);
+            Member accepter = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
             Ticket ticket = await _context.ticket.FindAsync(code);
-            bool followed = await HasFollowedForTransfer(ticket);
+            bool followed = await HasFollowedForTransfer(ticket, accepter);
             return Ok(new ApiResult<bool>() { code = 0, message = "", data = followed });
         }
 
@@ -183,7 +219,7 @@ namespace SnowmeetApi.Controllers
             {
                 return Ok(new ApiResult<Ticket>() { code = 1, message = "不能转赠给自己", data = null });
             }
-            if (!await HasFollowedForTransfer(ticket))
+            if (!await HasFollowedForTransfer(ticket, accepter))
             {
                 return Ok(new ApiResult<Ticket>() { code = 1, message = "请先关注公众号后再接受这张优惠券", data = null });
             }
