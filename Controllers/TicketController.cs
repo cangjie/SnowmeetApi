@@ -25,31 +25,14 @@ namespace SnowmeetApi.Controllers
         // 不同模板的转赠规则可能不同，目前两者规则一致（未使用+未过期即可转），后续如需差异化按 template_id 拆分判断。
         private static readonly HashSet<int> TransferableTemplateIds = new HashSet<int> { 12, 16 };
 
-        // 判断某会员当前是否处于关注状态：取该会员公众号 openid 在 oa_receive 里最新一条
-        // subscribe/SCAN/unsubscribe 事件，若最新一条不是 unsubscribe 就认为当前在关注。
+        // 判断某会员当前是否处于关注状态：直接读 member.following_wechat——这个字段由
+        // SnowmeetOfficialAccount 的 SetFollowingStatus 在每次收到 subscribe/SCAN/unsubscribe
+        // 事件时同步维护，是当前关注状态的直接来源，不用再反查 oa_receive 事件历史去推断。
         // 用于「已经关注过、这次换了张新券转赠，不应该要求再扫一次码」的场景。
         [NonAction]
-        public async Task<bool> IsCurrentlyFollowingOA(Member member)
+        public bool IsCurrentlyFollowingOA(Member member)
         {
-            if (member == null)
-            {
-                return false;
-            }
-            List<MemberSocialAccount> msaOaList = member.GetInfo("wechat_oa_openid");
-            if (msaOaList == null || msaOaList.Count == 0)
-            {
-                return false;
-            }
-            string? oaOpenId = msaOaList[0].num?.Trim();
-            if (string.IsNullOrEmpty(oaOpenId))
-            {
-                return false;
-            }
-            OAReceive lastEvent = await _context.oAReceive
-                .Where(r => r.MsgType == "event" && r.FromUserName == oaOpenId
-                    && (r.Event == "subscribe" || r.Event == "SCAN" || r.Event == "unsubscribe"))
-                .OrderByDescending(r => r.id).AsNoTracking().FirstOrDefaultAsync();
-            return lastEvent != null && lastEvent.Event != "unsubscribe";
+            return member != null && member.following_wechat == 1;
         }
         // 转赠接受前必须关注公众号：用扫码关注生成的 scene（ticket.transfer_scene）去核对
         // oa_receive（微信公众号事件回调落库表，MiniAppHelperController.PushMessage 实时写入）里
@@ -76,7 +59,7 @@ namespace SnowmeetApi.Controllers
             }
             // 没扫这一次的专属二维码，但如果这个人本来就已经是关注状态（比如接受上一张券时刚关注过），
             // 也应该直接放行，不用每张新券都强制重新扫一次码
-            return await IsCurrentlyFollowingOA(accepter);
+            return IsCurrentlyFollowingOA(accepter);
         }
         [HttpGet]
         public async Task<ActionResult<ApiResult<bool>>> CheckTransferFollow(string code, string sessionKey, string sessionType = "wechat_mini_openid")
