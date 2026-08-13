@@ -209,19 +209,43 @@ namespace SnowmeetApi.Controllers
             {
                 return Ok(new ApiResult<Ticket>() { code = 1, message = "用户未登录", data = null });
             }
+            return Ok(await AcceptTicketCore(code, accepter, memo));
+        }
 
+        // 公众号那边收到"扫码关注"事件后，直接调这个接口自动完成接受，不再依赖小程序端轮询触发。
+        // 用 oaOpenId（不是 sessionKey）定位接受人，因为触发点是公众号服务器回调，
+        // 压根没有小程序会话——只有微信推给我们的这个关注者的公众号 openid。
+        // 没有额外鉴权：安全性完全靠 AcceptTicketCore 内部的 HasFollowedForTransfer 兜底——
+        // 就算有人猜到券码和某人的 openid 直接调这个接口，没有一条真实的 subscribe/SCAN 事件
+        // 命中这张券当前的场景值，一样会被拒绝，伪造不出关注记录。
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<Ticket>>> AcceptTicketByOaFollow(string code, string oaOpenId)
+        {
+            oaOpenId = Util.UrlDecode(oaOpenId).Trim();
+            MemberController _memberHelper = new MemberController(_context, _oriConfig);
+            Member accepter = await _memberHelper.GetWholeMemberByNum(oaOpenId, "wechat_oa_openid");
+            if (accepter == null)
+            {
+                return Ok(new ApiResult<Ticket>() { code = 1, message = "未找到对应会员", data = null });
+            }
+            return Ok(await AcceptTicketCore(code, accepter, "扫码关注公众号后自动接受"));
+        }
+
+        [NonAction]
+        public async Task<ApiResult<Ticket>> AcceptTicketCore(string code, Member accepter, string memo)
+        {
             Ticket ticket = await _context.ticket.FindAsync(code);
             if (ticket == null || ticket.shared != 1)
             {
-                return Ok(new ApiResult<Ticket>() { code = 1, message = "该优惠券当前不可接受，链接可能已失效", data = null });
+                return new ApiResult<Ticket>() { code = 1, message = "该优惠券当前不可接受，链接可能已失效", data = null };
             }
             if (ticket.member_id == accepter.id)
             {
-                return Ok(new ApiResult<Ticket>() { code = 1, message = "不能转赠给自己", data = null });
+                return new ApiResult<Ticket>() { code = 1, message = "不能转赠给自己", data = null };
             }
             if (!await HasFollowedForTransfer(ticket, accepter))
             {
-                return Ok(new ApiResult<Ticket>() { code = 1, message = "请先关注公众号后再接受这张优惠券", data = null });
+                return new ApiResult<Ticket>() { code = 1, message = "请先关注公众号后再接受这张优惠券", data = null };
             }
 
             Member sender = ticket.member_id == null ? null : await _context.member.FindAsync(ticket.member_id);
@@ -249,7 +273,7 @@ namespace SnowmeetApi.Controllers
 
             ticket.open_id = "";
 
-            return Ok(new ApiResult<Ticket>() { code = 0, message = "", data = ticket });
+            return new ApiResult<Ticket>() { code = 0, message = "", data = ticket };
         }
 
         // 接受成功后，通过公众号给接收人推一条确认消息（点进去直接是"我的优惠券"）。
