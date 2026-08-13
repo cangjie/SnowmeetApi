@@ -167,6 +167,7 @@ namespace SnowmeetApi.Controllers
             HashSet<string> pendingCodes = pending.Select(t => t.code).ToHashSet();
             List<Ticket> merged = pending
                 .Concat(accepted.Where(t => !pendingCodes.Contains(t.code)))
+                .GroupBy(t => t.code).Select(g => g.First())   // 按 code 兜底去重
                 .OrderByDescending(t => t.shared_time ?? t.create_date)
                 .ToList();
 
