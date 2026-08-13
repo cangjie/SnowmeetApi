@@ -109,6 +109,74 @@ namespace SnowmeetApi.Controllers
                 data = tickets
             });
         }
+
+        // "我的优惠券-已分享"列表：包含两部分——① 我当前还持有、正在分享中等对方接受的券；
+        // ② 我曾经转赠出去、对方已经接受的券（此时 ticket.member_id 已经改成对方了，
+        // 单靠 ticket 表按 member_id 查是查不到的，所以这部分要从 ticket_log 里找"我作为
+        // sender、且确实有 accepter"的转赠成功记录反查券码）。这样即使券已经转出去了，
+        // 在我这边也能留一份"送出去过"的历史记录，而不是转赠成功后就凭空消失。
+        //
+        // 注意"来回转赠"的情况：我送给对方、对方又送回给我、我又接受了——这时这张券的
+        // "最新一次转赠成功"记录里 sender 是对方不是我，它现在就是我手上一张普通未使用的券，
+        // 不应该再挂在我的"已分享"历史里。所以判断标准是"这张券最新一条转赠成功记录的
+        // sender 是不是我"，不是"我有没有转赠成功过"——同一张券反复转手，只认最后一次。
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<List<Ticket>>>> GetMySharedTickets(string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            MemberController _memberHelper = new MemberController(_context, _oriConfig);
+            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
+            if (member == null)
+            {
+                return Ok(new ApiResult<List<Ticket>>() { code = 0, message = "用户未登录", data = null });
+            }
+
+            List<Ticket> pending = await _context.ticket
+                .Where(t => t.member_id == member.id && t.shared == 1 && t.valid == 1)
+                .AsNoTracking().ToListAsync();
+
+            string myOpenId = (member.wechatMiniOpenId ?? "").Trim();
+            List<Ticket> accepted = new List<Ticket>();
+            if (!myOpenId.Equals(""))
+            {
+                List<TicketLog> myAcceptLogs = await _context.ticketLog
+                    .Where(l => l.sender_open_id == myOpenId && l.accepter_open_id != "")
+                    .AsNoTracking().ToListAsync();
+                List<string> candidateCodes = myAcceptLogs.Select(l => l.code).Distinct().ToList();
+
+                if (candidateCodes.Count > 0)
+                {
+                    List<TicketLog> allAcceptLogsForCandidates = await _context.ticketLog
+                        .Where(l => candidateCodes.Contains(l.code) && l.accepter_open_id != "")
+                        .AsNoTracking().ToListAsync();
+                    HashSet<string> stillMineToShow = allAcceptLogsForCandidates
+                        .GroupBy(l => l.code)
+                        .Where(g => g.OrderByDescending(x => x.transact_time).ThenByDescending(x => x.id)
+                            .First().sender_open_id == myOpenId)
+                        .Select(g => g.Key)
+                        .ToHashSet();
+                    if (stillMineToShow.Count > 0)
+                    {
+                        accepted = await _context.ticket
+                            .Where(t => stillMineToShow.Contains(t.code) && t.valid == 1)
+                            .AsNoTracking().ToListAsync();
+                    }
+                }
+            }
+
+            HashSet<string> pendingCodes = pending.Select(t => t.code).ToHashSet();
+            List<Ticket> merged = pending
+                .Concat(accepted.Where(t => !pendingCodes.Contains(t.code)))
+                .OrderByDescending(t => t.shared_time ?? t.create_date)
+                .ToList();
+
+            return Ok(new ApiResult<List<Ticket>>()
+            {
+                code = 0,
+                message = "",
+                data = merged
+            });
+        }
         /// <summary>
         /// Old Season
         /// </summary>
