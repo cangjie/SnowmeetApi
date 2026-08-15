@@ -31,13 +31,18 @@ namespace SnowmeetApi.Helpers
             return value.Length <= max ? value : value.Substring(0, max);
         }
 
+        // 时间段连接符必须是**半角** ~ (U+007E)：微信文档规定的就是这个字符。
+        // 用全角 ～ (U+FF5E) 会被判 47003 argument invalid! data.timeN.value invalid
+        // ——2026-08-15 真机踩到，中文输入法下极易打成全角，改动这里千万别手滑。
+        private const string RangeSeparator = "~";
+
         /// <summary>
-        /// 订阅消息 time 类型字段。只到日，起止用 ～ 连接。
+        /// 订阅消息 time 类型字段。只到日，起止用半角 ~ 连接。
         /// </summary>
         public static string FormatValidityRange(DateTime? start, DateTime expire)
         {
             string end = FormatDay(expire);
-            return start == null ? end : FormatDay(start.Value) + "～" + end;
+            return start == null ? end : FormatDay(start.Value) + RangeSeparator + end;
         }
 
         private static string FormatDay(DateTime d)

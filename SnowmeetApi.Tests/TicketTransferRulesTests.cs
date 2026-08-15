@@ -70,16 +70,27 @@ namespace SnowmeetApi.Tests
         }
     }
 
-    // time2 是 time 类型，只到日、用 ～ 连接时间段
+    // time2 是 time 类型，只到日、用半角 ~ 连接时间段。
+    // 连接符必须是半角 U+007E：微信文档写的就是 '~'，用全角 '～'(U+FF5E) 会被判
+    // 47003 argument invalid! data.time2.value invalid（2026-08-15 真机踩到）。
     public class FormatValidityRangeTests
     {
         [Fact]
-        public void 起止都有时输出时间段()
+        public void 起止用半角波浪号连接()
         {
-            Assert.Equal("2026年8月14日～2027年4月30日",
+            Assert.Equal("2026年8月14日~2027年4月30日",
                 TicketTransferRules.FormatValidityRange(
                     new DateTime(2026, 8, 14, 11, 55, 0),
                     new DateTime(2027, 4, 30, 23, 59, 59)));
+        }
+
+        [Fact]
+        public void 连接符不能是全角波浪号()
+        {
+            string s = TicketTransferRules.FormatValidityRange(
+                new DateTime(2026, 8, 14), new DateTime(2027, 4, 30));
+            Assert.DoesNotContain('～', s);   // ～ 全角
+            Assert.Contains('~', s);              // ~ 半角
         }
 
         [Fact]
