@@ -7,6 +7,14 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
+    <!-- 单元测试工程放在本工程目录下（这样它跟主工程在同一个 git 仓库里、能跨机同步），
+         必须从主工程的源码/内容 glob 里排除，否则 SnowmeetApi.csproj 会去编译测试代码。 -->
+    <Compile Remove="SnowmeetApi.Tests\**" />
+    <Content Remove="SnowmeetApi.Tests\**" />
+    <None Remove="SnowmeetApi.Tests\**" />
+    <EmbeddedResource Remove="SnowmeetApi.Tests\**" />
+  </ItemGroup>
+  <ItemGroup>
     <None Remove="Microsoft.EntityFrameworkCore" />
     <None Remove="Models\" />
     <None Remove="Data\" />

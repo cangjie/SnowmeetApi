@@ -10,6 +10,7 @@ using Microsoft.Extensions.Configuration;
 using SnowmeetApi.Models.Users;
 using SnowmeetApi.Controllers.User;
 using SnowmeetApi.Models;
+using SnowmeetApi.Helpers;
 namespace SnowmeetApi.Controllers
 {
     [Route("api/[controller]/[action]")]
@@ -24,6 +25,17 @@ namespace SnowmeetApi.Controllers
         // 硬编码：允许转赠的优惠券模板（12=免费打蜡券，16=老顾客优惠券）。
         // 不同模板的转赠规则可能不同，目前两者规则一致（未使用+未过期即可转），后续如需差异化按 template_id 拆分判断。
         private static readonly HashSet<int> TransferableTemplateIds = new HashSet<int> { 12, 16 };
+
+        // 领取上限：名下同模板"真正还能用的"券达到这个数就不许再领分享来的券，防止个人囤券。
+        // 注意回赠（RewardSenderForAcceptedTransfer）不走这道门槛，分享人自己可能超过上限——
+        // 这是业务有意为之：防的是"到处领别人的券"，不是"自己转赠攒下的奖励"。别当 bug 改掉。
+        private const int MaxUsableTicketsPerTemplate = 3;
+
+        // 小程序订阅消息：优惠券领取成功提醒（模版编号 38451）
+        // 字段 thing1=优惠券名称 / time2=有效期 / thing3=备注，thing 类型上限 20 字
+        private const string TransferAcceptedTemplateId = "TsWgivHWG5TT8OVI5hN7n56yCWJ5K8THFBtmmACfek4";
+        private const string MyTicketListPage = "pages/mine/ticket/ticket_list";
+        private const string AcceptedRewardRemark = "对方已领取，回赠您一张同款券";
 
         // 判断某会员当前是否处于关注状态：直接读 member.following_wechat——这个字段由
         // SnowmeetOfficialAccount 的 SetFollowingStatus 在每次收到 subscribe/SCAN/unsubscribe
@@ -100,7 +112,9 @@ namespace SnowmeetApi.Controllers
                 .OrderBy(t => t.create_date).AsNoTracking().ToListAsync();
             if (used == 0)
             {
-                tickets = tickets.Where(t => t.expire_date == null ||  ((DateTime)t.expire_date).Date <= DateTime.Now.Date).ToList();
+                // 这里原本写的是 <=，保留的恰好是已过期的券、把真正还能用的券藏了起来
+                // （2026-08-14 修正；口径见 TicketTransferRules.IsNotExpired）
+                tickets = tickets.Where(t => TicketTransferRules.IsNotExpired(t, DateTime.Now)).ToList();
             }
             return Ok(new ApiResult<List<Ticket>>()
             {
@@ -303,6 +317,20 @@ namespace SnowmeetApi.Controllers
             {
                 return new ApiResult<Ticket>() { code = 1, message = "不能转赠给自己", data = null };
             }
+            // 领取上限查在关注校验之前：否则用户白关注一次公众号，才被告知自己券太多领不了。
+            // 计数口径见 TicketTransferRules.UsableTicketFilter（分享中的计入、过期和已核销的不计入）。
+            int usableCount = await _context.ticket.AsNoTracking()
+                .CountAsync(TicketTransferRules.UsableTicketFilter(accepter.id, ticket.template_id, DateTime.Now));
+            if (usableCount >= MaxUsableTicketsPerTemplate)
+            {
+                return new ApiResult<Ticket>()
+                {
+                    code = 1,
+                    message = "您名下未使用的「" + (ticket.name ?? "").Trim() + "」已有 " + usableCount.ToString()
+                        + " 张，用掉一些再来领吧",
+                    data = null
+                };
+            }
             if (!await HasFollowedForTransfer(ticket, accepter))
             {
                 return new ApiResult<Ticket>() { code = 1, message = "请先关注公众号后再接受这张优惠券", data = null };
@@ -330,10 +358,59 @@ namespace SnowmeetApi.Controllers
             await _context.SaveChangesAsync();
 
             NotifyAcceptedByOA(ticket, accepter);
+            await RewardSenderForAcceptedTransfer(ticket, sender);
 
             ticket.open_id = "";
 
             return new ApiResult<Ticket>() { code = 0, message = "", data = ticket };
+        }
+
+        // 对方领取成功后，回赠分享人一张同款券，并用小程序订阅消息通知他。
+        //
+        // 为什么通知分享人只能走小程序订阅消息、不能走公众号客服消息：客服消息有额度窗口，
+        // 「关注服务号」「扫描二维码」都只有 3 条 / 1 分钟（「用户主动发消息」才是 5 条 / 48 小时）。
+        // 分享人在对方领取的那一刻早就不在任何窗口里，公众号那条路发不出去。
+        //
+        // 顺序上先发券、发成功了才发消息——不能让消息说"已回赠"但券其实没发出来。
+        // 整个方法吞异常：接受动作已经落库成功，回赠或通知失败绝不能反过来把它弄失败。
+        [NonAction]
+        public async Task RewardSenderForAcceptedTransfer(Ticket acceptedTicket, Member sender)
+        {
+            try
+            {
+                if (sender == null)
+                {
+                    return;
+                }
+                string senderOpenId = (sender.wechatMiniOpenId ?? "").Trim();
+                if (senderOpenId.Equals(""))
+                {
+                    // 没有小程序 openid，既发不了券（GenerateTicketByAction 要写 open_id）也发不了消息
+                    return;
+                }
+                DateTime seasonEnd = TicketTransferRules.SeasonEndDate(DateTime.Now);
+                // 有效期必须现算，不能抄模板：template 12「免费打蜡券」的 expire_date 是 2024-12-07
+                // 早就过期，template 16 是 NULL 会被写成 9999 年，照抄两个都是废值。
+                Ticket reward = await GenerateTicketByAction(acceptedTicket.template_id, sender.id,
+                    1, 0, "转赠被领取回赠", "", seasonEnd);
+                if (reward == null)
+                {
+                    return;
+                }
+                Dictionary<string, string> data = new Dictionary<string, string>()
+                {
+                    ["thing1"] = TicketTransferRules.TruncateThing((reward.name ?? "").Trim()),
+                    ["time2"] = TicketTransferRules.FormatValidityRange(reward.start_date,
+                        reward.expire_date == null ? seasonEnd : (DateTime)reward.expire_date),
+                    ["thing3"] = TicketTransferRules.TruncateThing(AcceptedRewardRemark)
+                };
+                SubscribeMessageHelper msgHelper = new SubscribeMessageHelper(_context, _oriConfig);
+                await msgHelper.Send(senderOpenId, TransferAcceptedTemplateId, MyTicketListPage, data);
+            }
+            catch
+            {
+                // 见方法头注释：绝不能把已经成功的接受动作弄失败
+            }
         }
 
         // 接受成功后，通过公众号给接收人推一条确认消息（点进去直接是"我的优惠券"）。
@@ -691,7 +768,9 @@ namespace SnowmeetApi.Controllers
 
 
         [NonAction]
-        public async Task<Ticket> GenerateTicketByAction(int templateId, int memberId, int isActive = 1, int orderId = 0, string createMemo = "", string channel = "")
+        // expireDate：不传则维持原有行为（抄模板的 expire_date，模板为空则 DateTime.MaxValue）；
+        // 传了就用传进来的，给"回赠券按雪季末算有效期"这种需要现算的场景用。
+        public async Task<Ticket> GenerateTicketByAction(int templateId, int memberId, int isActive = 1, int orderId = 0, string createMemo = "", string channel = "", DateTime? expireDate = null)
         {
             TicketTemplate template = await _context.ticketTemplate.FindAsync(templateId);
             if (template == null)
@@ -724,7 +803,12 @@ namespace SnowmeetApi.Controllers
                 accepted_time = DateTime.Now,
                 name = template.name.Trim(),
                 memo = template.memo.Trim(),
-                expire_date = template.expire_date == null ? DateTime.MaxValue : (DateTime)template.expire_date,
+                expire_date = expireDate != null ? (DateTime)expireDate
+                    : (template.expire_date == null ? DateTime.MaxValue : (DateTime)template.expire_date),
+                // 补 start_date：原来这里不写，券落库后 start_date 为空。语义上等价于"立即生效"
+                // （GetMyTickets 的已生效判断是 start_date == null || start_date <= today），
+                // 但订阅消息要显示"有效期从哪天起"，得有个真值可取。
+                start_date = DateTime.Now,
                 oper_open_id = "",
                 printed = 0,
                 miniapp_recept_path = "",
