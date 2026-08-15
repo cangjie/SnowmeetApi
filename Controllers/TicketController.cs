@@ -336,7 +336,14 @@ namespace SnowmeetApi.Controllers
                 return new ApiResult<Ticket>() { code = 1, message = "请先关注公众号后再接受这张优惠券", data = null };
             }
 
-            Member sender = ticket.member_id == null ? null : await _context.member.FindAsync(ticket.member_id);
+            // 必须用 GetWholeMemberById 而不是 FindAsync：wechatMiniOpenId 是遍历
+            // memberSocialAccounts 算出来的计算属性，而 FindAsync 不加载导航属性、
+            // 项目也没开延迟加载 —— 拿到的 sender 那个属性恒为空。
+            // 原来只写 ticket_log 时有 `?? ticket.open_id` 兜底所以看不出来，但回赠要靠
+            // 这个 openid 发券和发订阅消息，取不到就会静默跳过（2026-08-15 实测踩到）。
+            MemberController _senderHelper = new MemberController(_context, _oriConfig);
+            Member sender = ticket.member_id == null ? null
+                : await _senderHelper.GetWholeMemberById((int)ticket.member_id);
 
             TicketLog log = new TicketLog()
             {
