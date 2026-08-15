@@ -82,6 +82,14 @@ namespace SnowmeetApi.Models
         [NotMapped]
         public bool transferredOut { get; set; } = false;
 
+        // 卡片上那行时间，由各列表接口按所在 tab 算好下发（见 TicketTransferRules.ResolveDisplayTime）。
+        // 后端直接给格式化好的字符串，前端不做任何日期解析——iOS 上
+        // new Date('2026-08-16 10:30:00') 会得到 Invalid Date。
+        [NotMapped]
+        public string displayTimeLabel { get; set; } = "";
+        [NotMapped]
+        public string displayTimeText { get; set; } = "";
+
         [ForeignKey("member_id")]
         public Member ownerMember { get; set; }
         [ForeignKey("template_id")]

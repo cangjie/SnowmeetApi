@@ -4,6 +4,24 @@ using SnowmeetApi.Models;
 
 namespace SnowmeetApi.Helpers
 {
+    /// <summary>券出现在哪个列表里——同一张券在不同 tab 下该显示的时间不一样。</summary>
+    public enum TicketListContext
+    {
+        Unused,          // 未使用
+        Used,            // 已使用
+        SharedPending,   // 已分享，对方还没接受
+        SharedAccepted   // 已分享，对方已接受（券已经不在我名下了）
+    }
+
+    /// <summary>券卡片上那行时间的最终展示形态。</summary>
+    public class TicketDisplayTime
+    {
+        public DateTime? Time { get; set; }
+        public string Label { get; set; } = "";
+        /// <summary>预格式化好的 "yyyy-MM-dd HH:mm"，没有时间时是空串。</summary>
+        public string Text { get; set; } = "";
+    }
+
     /// <summary>
     /// 优惠券转赠的纯规则：雪季末、订阅消息字段格式、领取上限计数口径。
     /// 全是无副作用的静态方法，单元测试直接覆盖（SnowmeetApi.Tests/TicketTransferRulesTests.cs）。
@@ -59,6 +77,49 @@ namespace SnowmeetApi.Helpers
         public static bool IsExemptFromReceiveLimit(Staff staff)
         {
             return staff != null && staff.title_level >= 100;
+        }
+
+        /// <summary>
+        /// 券卡片上那行时间显示什么。
+        ///
+        /// ⚠️ 千万别用 ticket.accepted_time —— 名字像"接受时间"，实际只在建券时赋 DateTime.Now、
+        /// 转赠接受时不更新（生产库 12164 张券它全部等于 create_date）。真正的接受时间只存在于
+        /// ticket_log.transact_time，所以要由调用方查好了从 transferTime 传进来。
+        ///
+        /// 时间在这里就格式化成字符串下发：iOS 上 new Date('2026-08-16 10:30:00') 会得到
+        /// Invalid Date，让前端自己解析日期是给自己找麻烦。
+        /// </summary>
+        public static TicketDisplayTime ResolveDisplayTime(Ticket ticket, TicketListContext context,
+            DateTime? transferTime)
+        {
+            DateTime? time;
+            string label;
+            switch (context)
+            {
+                case TicketListContext.Used:
+                    time = ticket.used_time;
+                    label = "核销时间";
+                    break;
+                case TicketListContext.SharedPending:
+                    time = ticket.shared_time;
+                    label = "分享时间";
+                    break;
+                case TicketListContext.SharedAccepted:
+                    time = transferTime;
+                    label = "对方领取时间";
+                    break;
+                default:
+                    // 未使用：转赠得来的显示领取时间，自己获得的显示获得时间
+                    time = transferTime ?? ticket.create_date;
+                    label = transferTime != null ? "领取时间" : "获得时间";
+                    break;
+            }
+            return new TicketDisplayTime()
+            {
+                Time = time,
+                Label = time == null ? "" : label,
+                Text = time == null ? "" : ((DateTime)time).ToString("yyyy-MM-dd HH:mm")
+            };
         }
 
         /// <summary>

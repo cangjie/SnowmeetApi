@@ -116,12 +116,52 @@ namespace SnowmeetApi.Controllers
                 // （2026-08-14 修正；口径见 TicketTransferRules.IsNotExpired）
                 tickets = tickets.Where(t => TicketTransferRules.IsNotExpired(t, DateTime.Now)).ToList();
             }
+            await FillDisplayTime(tickets,
+                used == 1 ? TicketListContext.Used : TicketListContext.Unused,
+                (member.wechatMiniOpenId ?? "").Trim());
             return Ok(new ApiResult<List<Ticket>>()
             {
                 code = 0,
                 message = "",
                 data = tickets
             });
+        }
+
+        // 给一批券补上卡片要显示的那行时间。
+        // "我领取的时间"只存在于 ticket_log，所以这里一次性把这批券的转赠记录批量捞回来，
+        // 不要在循环里逐张查（N+1）。
+        [NonAction]
+        public async Task FillDisplayTime(List<Ticket> tickets, TicketListContext context, string myOpenId)
+        {
+            if (tickets == null || tickets.Count == 0)
+            {
+                return;
+            }
+            Dictionary<string, DateTime> transferTimes = new Dictionary<string, DateTime>();
+            // 未使用列表要区分"转赠领来的"和"自己获得的"，已分享-已接受要拿最后一次转赠时间；
+            // 已使用 / 已分享-未接受 用不到转赠记录，省掉这次查询。
+            if (context == TicketListContext.Unused || context == TicketListContext.SharedAccepted)
+            {
+                List<string> codes = tickets.Select(t => t.code).Distinct().ToList();
+                List<TicketLog> logs = await _context.ticketLog
+                    .Where(l => codes.Contains(l.code)
+                                && l.accepter_open_id != ""
+                                && l.accepter_open_id != l.sender_open_id
+                                && (context == TicketListContext.SharedAccepted || l.accepter_open_id == myOpenId))
+                    .AsNoTracking().ToListAsync();
+                foreach (IGrouping<string, TicketLog> g in logs.GroupBy(l => l.code))
+                {
+                    transferTimes[g.Key] = g.OrderByDescending(x => x.transact_time)
+                        .ThenByDescending(x => x.id).First().transact_time;
+                }
+            }
+            foreach (Ticket t in tickets)
+            {
+                DateTime? tt = transferTimes.ContainsKey(t.code) ? transferTimes[t.code] : (DateTime?)null;
+                TicketDisplayTime d = TicketTransferRules.ResolveDisplayTime(t, context, tt);
+                t.displayTimeLabel = d.Label;
+                t.displayTimeText = d.Text;
+            }
         }
 
         // "我的优惠券-已分享"列表：包含两部分——① 我当前还持有、正在分享中等对方接受的券；
@@ -185,6 +225,11 @@ namespace SnowmeetApi.Controllers
                     }
                 }
             }
+
+            // 两个桶要显示的时间不一样：还在等对方接受的显示"分享时间"，
+            // 已经被对方领走的显示"对方领取时间"，所以分开算再合并。
+            await FillDisplayTime(pending, TicketListContext.SharedPending, myOpenId);
+            await FillDisplayTime(accepted, TicketListContext.SharedAccepted, myOpenId);
 
             HashSet<string> pendingCodes = pending.Select(t => t.code).ToHashSet();
             List<Ticket> merged = pending
