@@ -319,17 +319,25 @@ namespace SnowmeetApi.Controllers
             }
             // 领取上限查在关注校验之前：否则用户白关注一次公众号，才被告知自己券太多领不了。
             // 计数口径见 TicketTransferRules.UsableTicketFilter（分享中的计入、过期和已核销的不计入）。
-            int usableCount = await _context.ticket.AsNoTracking()
-                .CountAsync(TicketTransferRules.UsableTicketFilter(accepter.id, ticket.template_id, DateTime.Now));
-            if (usableCount >= MaxUsableTicketsPerTemplate)
+            // 店员豁免：按接受人的小程序 openid 反查在职店员（GetStaffBySocialNum 内含在职时间窗判断）。
+            // 反查不到就按普通顾客处理，限制照常生效。
+            StaffController _staffHelper = new StaffController(_context);
+            Staff accepterStaff = await _staffHelper.GetStaffBySocialNum(
+                (accepter.wechatMiniOpenId ?? "").Trim(), "wechat_mini_openid", DateTime.Now);
+            if (!TicketTransferRules.IsExemptFromReceiveLimit(accepterStaff))
             {
-                return new ApiResult<Ticket>()
+                int usableCount = await _context.ticket.AsNoTracking()
+                    .CountAsync(TicketTransferRules.UsableTicketFilter(accepter.id, ticket.template_id, DateTime.Now));
+                if (usableCount >= MaxUsableTicketsPerTemplate)
                 {
-                    code = 1,
-                    message = "您名下未使用的「" + (ticket.name ?? "").Trim() + "」已有 " + usableCount.ToString()
-                        + " 张，用掉一些再来领吧",
-                    data = null
-                };
+                    return new ApiResult<Ticket>()
+                    {
+                        code = 1,
+                        message = "您名下未使用的「" + (ticket.name ?? "").Trim() + "」已有 " + usableCount.ToString()
+                            + " 张，用掉一些再来领吧",
+                        data = null
+                    };
+                }
             }
             if (!await HasFollowedForTransfer(ticket, accepter))
             {
