@@ -72,6 +72,16 @@ namespace SnowmeetApi.Models
                 return "ticket_gift_" + code.Trim() + "_" + shared_time.Value.Ticks;
             }
         }
+        // 「这张券已经转赠出去、不在我名下了」——只由 GetMySharedTickets 给"已分享"列表里
+        // 那批已被对方接受的券置位，前端据此显示"对方已接受"。
+        // 不能让前端拿 shared==1 反推"还在我名下、分享中"：shared 只描述券自己的状态，
+        // 不描述归属。两种情况都会出现"券不是我的、shared 却是 1"：
+        //   1. 对方接受后又转赠给了第三个人（他那次分享把 shared 置回了 1）；
+        //   2. 2019~2023 旧转赠流程接受时没复位 shared 的历史数据。
+        // 此时前端若显示成"分享中"并给出撤回按钮，点了必然被 CancelShare 的归属校验拒掉。
+        [NotMapped]
+        public bool transferredOut { get; set; } = false;
+
         [ForeignKey("member_id")]
         public Member ownerMember { get; set; }
         [ForeignKey("template_id")]
