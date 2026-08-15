@@ -686,11 +686,25 @@ namespace SnowmeetApi.Controllers
         {
             GetAccessToken();
         }
+        // forceRefresh：丢掉本地缓存、重新向微信要一个 token。
+        // 缓存只按「拿到超过 1 小时」判断新鲜度，但同一个 appid 被多方获取时
+        // （本项目两台服务器各自部署，另有 legacy get_token.aspx），后取的会让先取的失效，
+        // 缓存这边不知情、继续用就是 42001。调用方拿到 token 类错误时用这个参数重试一次。
         [NonAction]
-        public string GetAccessToken()
+        public string GetAccessToken(bool forceRefresh = false)
         {
             string tokenFilePath = $"{Environment.CurrentDirectory}";
             tokenFilePath = tokenFilePath + "/access_token.official_account";
+            if (forceRefresh && System.IO.File.Exists(tokenFilePath))
+            {
+                try
+                {
+                    System.IO.File.Delete(tokenFilePath);
+                }
+                catch
+                {
+                }
+            }
             string token = "";
             string tokenTime = Util.GetLongTimeStamp(DateTime.Parse("1970-1-1"));
             string nowTime = Util.GetLongTimeStamp(DateTime.Now);

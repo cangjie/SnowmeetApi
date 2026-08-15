@@ -59,16 +59,51 @@ namespace SnowmeetApi.Helpers
         }
 
         /// <summary>
+        /// 响应是不是「token 不行了」——这种要强制刷新 token 重试，跟 43101（用户没订阅额度）、
+        /// 47003（参数不符模板）这类业务错误要区分开：后者重试多少次都一样。
+        /// 非 JSON（比如网关吐了个 HTML 错误页）一律当作不重试，不要在这里抛异常。
+        /// </summary>
+        public static bool IsTokenInvalidResponse(string wechatResponse)
+        {
+            if (string.IsNullOrWhiteSpace(wechatResponse))
+            {
+                return false;
+            }
+            try
+            {
+                JsonElement root = JsonDocument.Parse(wechatResponse).RootElement;
+                if (root.ValueKind != JsonValueKind.Object || !root.TryGetProperty("errcode", out JsonElement code))
+                {
+                    return false;
+                }
+                int errcode = code.ValueKind == JsonValueKind.Number ? code.GetInt32() : 0;
+                // 40001 凭证无效 / 40014 access_token 非法 / 42001 access_token 过期
+                return errcode == 40001 || errcode == 40014 || errcode == 42001;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
         /// 发送并落库留痕。返回微信原始响应体，由调用方判断成败。
         /// 落库放在这里而不是各调用方，是为了保证每一次发送都有记录。
+        /// token 失效时强制刷新重试一次（原因见 IsTokenInvalidResponse）。
         /// </summary>
         public async Task<string> Send(string openId, string templateId, string page,
             Dictionary<string, string> data, string miniprogramState = "formal")
         {
             string json = BuildPayload(openId, templateId, page, data, miniprogramState);
-            string token = new MiniAppHelperController(_db, _config).GetAccessToken();
-            string url = "https://api.weixin.qq.com/cgi-bin/message/subscribe/send?access_token=" + token.Trim();
-            string ret = Util.GetWebContent(url, json);
+            MiniAppHelperController tokenHelper = new MiniAppHelperController(_db, _config);
+            string url = "https://api.weixin.qq.com/cgi-bin/message/subscribe/send?access_token=";
+            string ret = Util.GetWebContent(url + tokenHelper.GetAccessToken().Trim(), json);
+            bool retried = false;
+            if (IsTokenInvalidResponse(ret))
+            {
+                retried = true;
+                ret = Util.GetWebContent(url + tokenHelper.GetAccessToken(true).Trim(), json);
+            }
             try
             {
                 await _db.AddAsync(new TemplateMessage()
@@ -78,7 +113,7 @@ namespace SnowmeetApi.Helpers
                     to = openId,
                     first = "",
                     keywords = json,
-                    remark = "小程序订阅消息",
+                    remark = retried ? "小程序订阅消息(token失效已重试)" : "小程序订阅消息",
                     url = page,
                     ret_message = ret == null ? "" : ret
                 });
