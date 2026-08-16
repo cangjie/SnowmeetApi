@@ -79,6 +79,41 @@ namespace SnowmeetApi.Helpers
             return staff != null && staff.title_level >= 100;
         }
 
+        // 到期日为空、或是 GenerateTicketByAction 给"模板没设到期日"写的 DateTime.MaxValue，
+        // 都表示这张券不会过期
+        private static bool NoExpiry(DateTime? expire)
+        {
+            return expire == null || ((DateTime)expire).Year >= 9999;
+        }
+
+        /// <summary>
+        /// 券列表卡片上的有效期文案。格式化在服务端做，前端不做日期解析
+        /// （iOS 上 new Date('2026-04-01 00:00:00') 是 Invalid Date）。
+        /// </summary>
+        public static string FormatExpire(DateTime? expire)
+        {
+            if (NoExpiry(expire))
+            {
+                return "长期有效";
+            }
+            DateTime d = (DateTime)expire;
+            return d.Year + "." + d.Month + "." + d.Day;
+        }
+
+        /// <summary>
+        /// 是否临期（默认 30 天内到期），列表上标红提醒。
+        /// 已核销的不提醒；已经过期的归"已过期"状态处理，不该再顶着"即将到期"的红字。
+        /// </summary>
+        public static bool IsExpiringSoon(Ticket ticket, DateTime now, int days = 30)
+        {
+            if (ticket.used == 1 || NoExpiry(ticket.expire_date))
+            {
+                return false;
+            }
+            DateTime d = ((DateTime)ticket.expire_date).Date;
+            return d >= now.Date && d <= now.Date.AddDays(days);
+        }
+
         /// <summary>
         /// 哪条 ticket_log 才算「一次真转赠」。
         ///

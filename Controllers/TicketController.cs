@@ -116,7 +116,7 @@ namespace SnowmeetApi.Controllers
                 // （2026-08-14 修正；口径见 TicketTransferRules.IsNotExpired）
                 tickets = tickets.Where(t => TicketTransferRules.IsNotExpired(t, DateTime.Now)).ToList();
             }
-            await FillDisplayTime(tickets,
+            await FillCardFields(tickets,
                 used == 1 ? TicketListContext.Used : TicketListContext.Unused,
                 (member.wechatMiniOpenId ?? "").Trim());
             return Ok(new ApiResult<List<Ticket>>()
@@ -127,11 +127,11 @@ namespace SnowmeetApi.Controllers
             });
         }
 
-        // 给一批券补上卡片要显示的那行时间。
-        // "我领取的时间"只存在于 ticket_log，所以这里一次性把这批券的转赠记录批量捞回来，
-        // 不要在循环里逐张查（N+1）。
+        // 给一批券补上卡片要显示的派生字段：那行时间、票根面额、有效期文案、临期标记。
+        // 两处数据都要批量捞，不要在循环里逐张查（N+1）：
+        //   "我领取的时间"只存在于 ticket_log；面额在 ticket_template 上。
         [NonAction]
-        public async Task FillDisplayTime(List<Ticket> tickets, TicketListContext context, string myOpenId)
+        public async Task FillCardFields(List<Ticket> tickets, TicketListContext context, string myOpenId)
         {
             if (tickets == null || tickets.Count == 0)
             {
@@ -155,12 +155,25 @@ namespace SnowmeetApi.Controllers
                         .ThenByDescending(x => x.id).First().transact_time;
                 }
             }
+            // 票根面额来自模板，一次批量查
+            List<int> templateIds = tickets.Select(t => t.template_id).Distinct().ToList();
+            var templateValues = await _context.ticketTemplate
+                .Where(tt => templateIds.Contains(tt.id))
+                .Select(tt => new { tt.id, tt.currency_value })
+                .AsNoTracking().ToListAsync();
+
+            DateTime now = DateTime.Now;
             foreach (Ticket t in tickets)
             {
                 DateTime? tt = transferTimes.ContainsKey(t.code) ? transferTimes[t.code] : (DateTime?)null;
                 TicketDisplayTime d = TicketTransferRules.ResolveDisplayTime(t, context, tt);
                 t.displayTimeLabel = d.Label;
                 t.displayTimeText = d.Text;
+
+                var tv = templateValues.FirstOrDefault(x => x.id == t.template_id);
+                t.currencyValue = tv != null ? tv.currency_value : 0;
+                t.expireText = TicketTransferRules.FormatExpire(t.expire_date);
+                t.expireUrgent = TicketTransferRules.IsExpiringSoon(t, now);
             }
         }
 
@@ -231,8 +244,8 @@ namespace SnowmeetApi.Controllers
 
             // 两个桶要显示的时间不一样：还在等对方接受的显示"分享时间"，
             // 已经被对方领走的显示"对方领取时间"，所以分开算再合并。
-            await FillDisplayTime(pending, TicketListContext.SharedPending, myOpenId);
-            await FillDisplayTime(accepted, TicketListContext.SharedAccepted, myOpenId);
+            await FillCardFields(pending, TicketListContext.SharedPending, myOpenId);
+            await FillCardFields(accepted, TicketListContext.SharedAccepted, myOpenId);
 
             HashSet<string> pendingCodes = pending.Select(t => t.code).ToHashSet();
             List<Ticket> merged = pending

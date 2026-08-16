@@ -12,6 +12,9 @@ namespace SnowmeetApi.Models
         public string type { get; set; }
         public string name { get; set; }
         public string memo { get; set; }
+        // 券面额。DB 里一直有这列、模型此前没映射；当前全库都是 0（体验券），
+        // 券列表左侧票根显示的就是它
+        public double currency_value { get; set; } = 0;
         public int hide {get; set;} = 0;
         public string miniapp_recept_path { get; set; }
         public DateTime? expire_date { get; set; } = DateTime.MaxValue;

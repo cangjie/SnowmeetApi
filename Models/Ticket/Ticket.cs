@@ -90,6 +90,15 @@ namespace SnowmeetApi.Models
         [NotMapped]
         public string displayTimeText { get; set; } = "";
 
+        // 券列表卡片用：左侧票根的面额（取自模板）、有效期文案、是否临期。
+        // 有效期同样由服务端格式化好下发，前端不做日期解析。
+        [NotMapped]
+        public double currencyValue { get; set; } = 0;
+        [NotMapped]
+        public string expireText { get; set; } = "";
+        [NotMapped]
+        public bool expireUrgent { get; set; } = false;
+
         [ForeignKey("member_id")]
         public Member ownerMember { get; set; }
         [ForeignKey("template_id")]
