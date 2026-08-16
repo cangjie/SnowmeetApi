@@ -143,11 +143,11 @@ namespace SnowmeetApi.Controllers
             if (context == TicketListContext.Unused || context == TicketListContext.SharedAccepted)
             {
                 List<string> codes = tickets.Select(t => t.code).Distinct().ToList();
+                bool anySender = context == TicketListContext.SharedAccepted;
                 List<TicketLog> logs = await _context.ticketLog
+                    .Where(TicketTransferRules.TransferLogFilter())
                     .Where(l => codes.Contains(l.code)
-                                && l.accepter_open_id != ""
-                                && l.accepter_open_id != l.sender_open_id
-                                && (context == TicketListContext.SharedAccepted || l.accepter_open_id == myOpenId))
+                                && (anySender || l.accepter_open_id == myOpenId))
                     .AsNoTracking().ToListAsync();
                 foreach (IGrouping<string, TicketLog> g in logs.GroupBy(l => l.code))
                 {
@@ -193,20 +193,23 @@ namespace SnowmeetApi.Controllers
             List<Ticket> accepted = new List<Ticket>();
             if (!myOpenId.Equals(""))
             {
-                // accepter == sender 的不是转赠：旧系统把"发券给本人"也写进 ticket_log
-                // （memo 形如"养护订单获得，ID:xxx"、"体验订单获得"、"test"），收发是同一个 openid。
-                // 不排掉的话，从没转赠过的券会混进"已分享"列表。
+                // 只认真转赠的日志，口径统一走 TicketTransferRules.TransferLogFilter()。
+                // 原来这里只判 "accepter 非空且不等于 sender"，会把核销日志（sender 是空串）
+                // 和店员开单发券日志（收发本来就是两个人）都当成转赠——店员账号的"已分享"
+                // 会被塞满他从没转赠过的顾客券（2026-08-15 生产库实测：4158 条 vs 真实 17 条）。
                 List<TicketLog> myAcceptLogs = await _context.ticketLog
-                    .Where(l => l.sender_open_id == myOpenId && l.accepter_open_id != ""
-                                && l.accepter_open_id != l.sender_open_id)
+                    .Where(TicketTransferRules.TransferLogFilter())
+                    .Where(l => l.sender_open_id == myOpenId)
                     .AsNoTracking().ToListAsync();
                 List<string> candidateCodes = myAcceptLogs.Select(l => l.code).Distinct().ToList();
 
                 if (candidateCodes.Count > 0)
                 {
+                    // 同一份口径：否则核销日志会成为该券"最新一条转赠记录"（它的 sender 是空串），
+                    // 导致转赠出去又被对方核销的券从我的"已分享"里凭空消失。
                     List<TicketLog> allAcceptLogsForCandidates = await _context.ticketLog
-                        .Where(l => candidateCodes.Contains(l.code) && l.accepter_open_id != ""
-                                    && l.accepter_open_id != l.sender_open_id)
+                        .Where(TicketTransferRules.TransferLogFilter())
+                        .Where(l => candidateCodes.Contains(l.code))
                         .AsNoTracking().ToListAsync();
                     HashSet<string> stillMineToShow = allAcceptLogsForCandidates
                         .GroupBy(l => l.code)
