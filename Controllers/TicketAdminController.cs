@@ -267,6 +267,130 @@ namespace SnowmeetApi.Controllers
             });
         }
 
+        // ───────────────────────── 单张券详情 + 操作流水 ─────────────────────────
+        // ticket_log 此前没有任何读接口，这是第一个。
+        // 流水**全量**显示（转赠/核销/撤回/发放都列），不像转赠次数那样只数真转赠——
+        // 店员排查一张券时，核销和撤回同样是关键线索。
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<object>>> GetTicketDetailByStaff(string code,
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await GetStaff(Util.UrlDecode(sessionKey), sessionType);
+            if (staff == null || staff.title_level < MIN_LEVEL)
+            {
+                return Ok(new ApiResult<object>() { code = 1, message = "没有权限", data = null });
+            }
+            code = Util.UrlDecode(code).Trim();
+            Ticket t = await _db.ticket.AsNoTracking().FirstOrDefaultAsync(x => x.code == code);
+            if (t == null)
+            {
+                return Ok(new ApiResult<object>() { code = 1, message = "优惠券不存在", data = null });
+            }
+            DateTime now = DateTime.Now;
+
+            TicketTemplate tpl = await _db.ticketTemplate.AsNoTracking()
+                .FirstOrDefaultAsync(x => x.id == t.template_id);
+            Member owner = t.member_id == null ? null
+                : await _db.member.AsNoTracking().FirstOrDefaultAsync(m => m.id == t.member_id);
+            string ownerPhone = "";
+            if (t.member_id != null)
+            {
+                MemberSocialAccount msa = await _db.memberSocialAccount.AsNoTracking()
+                    .FirstOrDefaultAsync(m => m.member_id == t.member_id && m.valid == 1 && m.type == "cell");
+                ownerPhone = msa != null ? (msa.num ?? "").Trim() : "";
+            }
+
+            List<TicketLog> logs = await _db.ticketLog.Where(l => l.code == code)
+                .OrderBy(l => l.transact_time).ThenBy(l => l.id).AsNoTracking().ToListAsync();
+
+            // 流水里的 sender/accepter 是小程序 openid，一次性批量反查成姓名，别在循环里逐条查
+            List<string> openIds = logs.Select(l => (l.sender_open_id ?? "").Trim())
+                .Concat(logs.Select(l => (l.accepter_open_id ?? "").Trim()))
+                .Where(s => s != "").Distinct().ToList();
+            Dictionary<string, string> nameByOpenId = new Dictionary<string, string>();
+            if (openIds.Count > 0)
+            {
+                var msaRows = await _db.memberSocialAccount
+                    .Where(m => m.type == "wechat_mini_openid" && m.valid == 1 && openIds.Contains(m.num))
+                    .Select(m => new { m.num, m.member_id }).AsNoTracking().ToListAsync();
+                List<int> mids = msaRows.Select(x => x.member_id).Distinct().ToList();
+                var names = await _db.member.Where(m => mids.Contains(m.id))
+                    .Select(m => new { m.id, m.real_name }).AsNoTracking().ToListAsync();
+                foreach (var r in msaRows)
+                {
+                    var n = names.FirstOrDefault(x => x.id == r.member_id);
+                    string display = n != null && !string.IsNullOrWhiteSpace(n.real_name)
+                        ? n.real_name.Trim() : ("会员 " + r.member_id);
+                    if (!nameByOpenId.ContainsKey(r.num))
+                    {
+                        nameByOpenId[r.num] = display;
+                    }
+                }
+            }
+
+            var logItems = logs.Select(l =>
+            {
+                TicketStateView v = TicketAdminRules.DescribeLogEntry(l);
+                return new
+                {
+                    timeStr = l.transact_time.ToString("yyyy-MM-dd HH:mm"),
+                    typeLabel = v.Label,
+                    typeCls = v.Cls,
+                    fromName = ResolveName(nameByOpenId, l.sender_open_id),
+                    toName = ResolveName(nameByOpenId, l.accepter_open_id),
+                    memo = (l.memo ?? "").Trim()
+                };
+            }).ToList();
+
+            TicketStateView st = TicketAdminRules.DescribeState(t, now);
+            int transferCount = logs.Count(l => TicketAdminRules.DescribeLogEntry(l).Cls == "transfer");
+
+            return Ok(new ApiResult<object>()
+            {
+                code = 0,
+                message = "",
+                data = new
+                {
+                    code = t.code,
+                    name = (t.name ?? "").Trim(),
+                    templateId = t.template_id,
+                    templateName = tpl != null ? (tpl.name ?? "").Trim() : "",
+                    currencyValue = tpl != null ? tpl.currency_value : 0,
+                    memberId = t.member_id ?? 0,
+                    memberName = owner != null ? (owner.real_name ?? "").Trim() : "",
+                    memberGender = owner != null ? (owner.gender ?? "").Trim() : "",
+                    memberPhone = ownerPhone,
+                    createDateStr = t.create_date.ToString("yyyy-MM-dd HH:mm"),
+                    startDateStr = FormatMinute(t.start_date),
+                    expireDateStr = FormatDay(t.expire_date),
+                    used = t.used,
+                    usedTimeStr = t.used == 1 ? FormatMinute(t.used_time) : "",
+                    shared = t.shared,
+                    sharedTimeStr = FormatMinute(t.shared_time),
+                    valid = t.valid,
+                    isActive = t.is_active,
+                    channel = (t.channel ?? "").Trim(),
+                    createMemo = (t.create_memo ?? "").Trim(),
+                    usageMemo = (t.memo ?? "").Trim(),
+                    stateLabel = st.Label,
+                    stateCls = st.Cls,
+                    transferCount = transferCount,
+                    logs = logItems
+                }
+            });
+        }
+
+        [NonAction]
+        private static string ResolveName(Dictionary<string, string> nameByOpenId, string openId)
+        {
+            string k = (openId ?? "").Trim();
+            if (k == "")
+            {
+                return "";
+            }
+            return nameByOpenId.ContainsKey(k) ? nameByOpenId[k] : "未知用户";
+        }
+
         // ───────────────────────── 模板下拉 ─────────────────────────
         // 不复用 MemberAdmin/GetCouponTemplates（门槛 200，店员会拿到"没有权限"），
         // 也不复用 Ticket/GetTemplateList（零鉴权 + 返回整实体带导航属性）。

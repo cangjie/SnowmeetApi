@@ -46,6 +46,47 @@ namespace SnowmeetApi.Helpers
         }
 
         /// <summary>
+        /// 券详情页的操作流水：把一条 ticket_log 归成人看得懂的类型。
+        ///
+        /// 与 TicketTransferRules.TransferLogFilter 的分工：那个只挑"真转赠"用来计数，
+        /// 这里要把**每一条**都归类——店员排查一张券时，核销和撤回同样是关键线索，
+        /// 不能像统计转赠次数那样把它们滤掉。
+        ///
+        /// ticket_log 的 5 个写入方见 TicketController：
+        ///   AcceptTicketCore(转赠) / CancelShare(撤回) / Use(核销) /
+        ///   ExperienceController、MaintainLogsController(开单发券)
+        /// </summary>
+        public static TicketStateView DescribeLogEntry(TicketLog log)
+        {
+            string memo = (log.memo ?? "").Trim();
+            string sender = (log.sender_open_id ?? "").Trim();
+            string accepter = (log.accepter_open_id ?? "").Trim();
+
+            if (memo == "核销")
+            {
+                return new TicketStateView() { Label = "核销", Cls = "use" };
+            }
+            if (memo == "撤回分享" || (sender != "" && accepter == ""))
+            {
+                return new TicketStateView() { Label = "撤回分享", Cls = "cancel" };
+            }
+            if (memo.StartsWith("体验订单获得") || memo.StartsWith("养护订单获得") || memo == "管理员赠送")
+            {
+                return new TicketStateView() { Label = "发放", Cls = "grant" };
+            }
+            // 收发同一个人 = 旧系统的"发券给本人"，不是转赠
+            if (sender != "" && accepter != "" && sender != accepter && memo != "")
+            {
+                return new TicketStateView() { Label = "转赠成功", Cls = "transfer" };
+            }
+            if (sender != "" && sender == accepter)
+            {
+                return new TicketStateView() { Label = "发放", Cls = "grant" };
+            }
+            return new TicketStateView() { Label = "其它", Cls = "other" };
+        }
+
+        /// <summary>
         /// 分页参数护栏。上限 100 是因为明细视图分页后要按 code 批量捞 ticket_log，
         /// 参数个数不能失控（SQL Server 参数上限 2100）。
         /// </summary>
