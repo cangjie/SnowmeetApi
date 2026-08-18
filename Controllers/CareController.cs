@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using SnowmeetApi.Data;
+using SnowmeetApi.Helpers;
 using SnowmeetApi.Models;
 namespace SnowmeetApi.Controllers
 {
@@ -396,15 +397,20 @@ namespace SnowmeetApi.Controllers
         }
         // 养护服务费定价（真理之源，CalcCareCharge 开单实时计费与 PlaceCareOrder 下单落库共用）：
         // 选会员卡按 0（2026-07-09 用户拍板，核销链路另做）/ 质保招待 0 / summer 330（GetProduct 内置）
-        // / 其余 GetProduct 名称匹配 sale_price + 票券 fixed_price 覆盖；券16 减免 双项30/单项20。
-        // 例外：机打蜡季卡（卡名含「机打蜡」）升级热蜡/增加修刃的加价规则与免费打蜡券（券12模板）一致
+        // / 其余 GetProduct 名称匹配 sale_price，再按券的商品优惠规则调整。
+        // 例外：机打蜡季卡（卡名含「机打蜡」）升级热蜡/加修刃的加价规则与免费打蜡券（券12模板）一致
+        //
+        // 2026-08-18：券的优惠口径统一收到 TicketTemplateRules.ResolveProductDiscount，
+        // 一口价 > 折扣率 > 立减金额。此前只读 fixed_price，券16 的立减 双项30/单项20 是这里
+        // 按 template_id == 16 硬编码的（且不看门店）；现在改为读 product_ticket_template.discount_amount。
+        // 迁移脚本已给南山 677/678/679 补上 30/20/20，保证行为不变（万龙 139/140/143 本就配好）。
         [NonAction]
         public async Task<(double commonCharge, double ticketDiscount)> CalcCharge(string shop, Care care, Ticket? ticket, PunchCard? card = null)
         {
             if (care.use_card || care.warranty || care.entertain)
             {
                 // 机打蜡季卡：默认机打蜡免费（无匹配产品 → 0）；升级热蜡/加修刃按当前服务匹配产品，
-                // 再用券12模板的 fixed_price 覆盖——与使用免费打蜡券完全同一套加价规则
+                // 再套券12模板的商品优惠规则——与使用免费打蜡券完全同一套加价规则
                 if (care.use_card && !care.warranty && !care.entertain
                     && card != null && (card.card_name ?? "").IndexOf("机打蜡") >= 0)
                 {
@@ -417,14 +423,14 @@ namespace SnowmeetApi.Controllers
                     TicketTemplate tpl12 = await _db.ticketTemplate.Where(t => t.id == 12)
                         .Include(t => t.productTicketTemplates).ThenInclude(p => p.product)
                         .AsNoTracking().FirstOrDefaultAsync();
-                    if (tpl12 != null && tpl12.productTicketTemplates != null)
+                    if (tpl12 != null)
                     {
-                        ProductTicketTemplate productTicketTemplate = tpl12.productTicketTemplates
-                            .Where(p => p.product_id == upProduct.id || p.product_id == 0).FirstOrDefault();
-                        if (productTicketTemplate != null && productTicketTemplate.fixed_price != null)
-                        {
-                            upCharge = (double)productTicketTemplate.fixed_price;
-                        }
+                        ProductTicketTemplate rule = TicketTemplateRules
+                            .MatchProductRule(tpl12.productTicketTemplates, upProduct.id);
+                        var (cardCharge, cardDiscount) = TicketTemplateRules
+                            .ResolveProductDiscount(rule, upCharge);
+                        // 季卡升级只调服务费，不走券减免那一路（这里没有券）
+                        upCharge = cardCharge - cardDiscount;
                     }
                     return (upCharge, 0);
                 }
@@ -433,28 +439,12 @@ namespace SnowmeetApi.Controllers
             Models.Product product = await GetProduct(shop, care);
             double commonCharge = product == null ? 0 : product.sale_price;
             double ticketDiscount = 0;
-            if (ticket != null)
+            if (ticket != null && product != null && ticket.template != null)
             {
-                if (product != null && ticket.template != null && ticket.template.productTicketTemplates != null)
-                {
-                    ProductTicketTemplate productTicketTemplate = ticket.template.productTicketTemplates
-                        .Where(p => p.product_id == product.id || p.product_id == 0).FirstOrDefault();
-                    if (productTicketTemplate != null && productTicketTemplate.fixed_price != null)
-                    {
-                        commonCharge = (double)productTicketTemplate.fixed_price;
-                    }
-                }
-                if (ticket.template_id == 16)
-                {
-                    if (care.need_edge == 1 && care.need_wax == 1)
-                    {
-                        ticketDiscount = 30;
-                    }
-                    else if (care.need_edge == 1 || care.need_wax == 1)
-                    {
-                        ticketDiscount = 20;
-                    }
-                }
+                ProductTicketTemplate rule = TicketTemplateRules
+                    .MatchProductRule(ticket.template.productTicketTemplates, product.id);
+                (commonCharge, ticketDiscount) = TicketTemplateRules
+                    .ResolveProductDiscount(rule, commonCharge);
             }
             return (commonCharge, ticketDiscount);
         }

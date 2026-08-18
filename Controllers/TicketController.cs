@@ -882,8 +882,10 @@ namespace SnowmeetApi.Controllers
                 accepted_time = DateTime.Now,
                 name = template.name.Trim(),
                 memo = template.memo.Trim(),
+                // 调用方显式传的 expireDate 优先（转赠回赠按雪季末），否则按模板口径算：
+                // 固定截止日 > 启用后 N 天 > 永久（MaxValue）。这里 start_date 就是下面写的 DateTime.Now。
                 expire_date = expireDate != null ? (DateTime)expireDate
-                    : (template.expire_date == null ? DateTime.MaxValue : (DateTime)template.expire_date),
+                    : TicketTemplateRules.ResolveTicketExpireDate(template, DateTime.Now),
                 // 补 start_date：原来这里不写，券落库后 start_date 为空。语义上等价于"立即生效"
                 // （GetMyTickets 的已生效判断是 start_date == null || start_date <= today），
                 // 但订阅消息要显示"有效期从哪天起"，得有个真值可取。
@@ -1007,7 +1009,11 @@ namespace SnowmeetApi.Controllers
             List<Ticket> tickets = await GetMemberTickets(memberId);
             if (bizType != null)
             {
-                tickets = tickets.Where(t => (t.biz_type == bizType) || (bizType == "养护" && t.template_id == 12)).ToList();
+                // 2026-08-18：改按**模板**的 biz_type 过滤（模板上 biz_type 为空 = 不参与开单）。
+                // 原来过滤的是 ticket.biz_type（券自己的列），它是发券时逐张写的，
+                // 漏写就选不到——那个 template_id == 12 的硬编码补丁正是在兜模板 12 的 4 张漏写券。
+                // 回填后 type='养护券' 的 9 个模板 biz_type 全是"养护"，与原口径 1:1 等价（已在生产库对过集合）。
+                tickets = tickets.Where(t => t.template != null && t.template.biz_type == bizType).ToList();
             }
             if (canUse != null)
             {
@@ -1139,7 +1145,11 @@ namespace SnowmeetApi.Controllers
                 valid = 1,
                 is_active = active?1:0,
                 start_date = startDate,
-                expire_date = expireDate,
+                // 未激活且没给启用日的券（雪票赠券取卡前）到期日算不出来，保持 null，
+                // 由激活路径（ActiveSkipassTicket）写死；其余按模板口径算。
+                expire_date = expireDate ?? ((startDate != null || active)
+                    ? TicketTemplateRules.ResolveTicketExpireDate(template, startDate ?? DateTime.Now)
+                    : (DateTime?)null),
                 biz_id = bizId,
                 biz_type = bizType
             };
