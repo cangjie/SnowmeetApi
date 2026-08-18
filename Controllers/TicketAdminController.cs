@@ -355,7 +355,6 @@ namespace SnowmeetApi.Controllers
                     name = (t.name ?? "").Trim(),
                     templateId = t.template_id,
                     templateName = tpl != null ? (tpl.name ?? "").Trim() : "",
-                    currencyValue = tpl != null ? tpl.currency_value : 0,
                     memberId = t.member_id ?? 0,
                     memberName = owner != null ? (owner.real_name ?? "").Trim() : "",
                     memberGender = owner != null ? (owner.gender ?? "").Trim() : "",
@@ -429,7 +428,7 @@ namespace SnowmeetApi.Controllers
 
             List<int> templateIds = tickets.Select(t => t.template_id).Distinct().ToList();
             var templates = await _db.ticketTemplate.Where(x => templateIds.Contains(x.id))
-                .Select(x => new { x.id, x.name, x.currency_value }).AsNoTracking().ToListAsync();
+                .Select(x => new { x.id, x.name }).AsNoTracking().ToListAsync();
 
             var items = tickets.Select(t =>
             {
@@ -441,7 +440,6 @@ namespace SnowmeetApi.Controllers
                     code = t.code,
                     name = (t.name ?? "").Trim(),
                     templateName = tpl != null ? (tpl.name ?? "").Trim() : "",
-                    currencyValue = tpl != null ? tpl.currency_value : 0,
                     bucket = bucket,
                     stateLabel = bucket == "used" ? "已核销" : (bucket == "expired" ? "已过期"
                         : (t.shared == 1 ? "分享中" : "未使用")),

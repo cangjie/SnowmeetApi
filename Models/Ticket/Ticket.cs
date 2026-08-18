@@ -90,10 +90,9 @@ namespace SnowmeetApi.Models
         [NotMapped]
         public string displayTimeText { get; set; } = "";
 
-        // 券列表卡片用：左侧票根的面额（取自模板）、有效期文案、是否临期。
-        // 有效期同样由服务端格式化好下发，前端不做日期解析。
-        [NotMapped]
-        public double currencyValue { get; set; } = 0;
+        // 券列表卡片用：有效期文案、是否临期。由服务端格式化好下发，前端不做日期解析。
+        // （曾经还有个 currencyValue 票根面额，2026-08-15 按业务要求全系统去掉了金额显示：
+        //   优惠券绝大多数是 0 元，打折券的力度又随商品而变，一个金额表达不了信息）
         [NotMapped]
         public string expireText { get; set; } = "";
         [NotMapped]

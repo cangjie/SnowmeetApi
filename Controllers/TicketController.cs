@@ -127,9 +127,8 @@ namespace SnowmeetApi.Controllers
             });
         }
 
-        // 给一批券补上卡片要显示的派生字段：那行时间、票根面额、有效期文案、临期标记。
-        // 两处数据都要批量捞，不要在循环里逐张查（N+1）：
-        //   "我领取的时间"只存在于 ticket_log；面额在 ticket_template 上。
+        // 给一批券补上卡片要显示的派生字段：那行时间、有效期文案、临期标记。
+        // "我领取的时间"只存在于 ticket_log，所以批量捞回来，不要在循环里逐张查（N+1）。
         [NonAction]
         public async Task FillCardFields(List<Ticket> tickets, TicketListContext context, string myOpenId)
         {
@@ -155,13 +154,6 @@ namespace SnowmeetApi.Controllers
                         .ThenByDescending(x => x.id).First().transact_time;
                 }
             }
-            // 票根面额来自模板，一次批量查
-            List<int> templateIds = tickets.Select(t => t.template_id).Distinct().ToList();
-            var templateValues = await _context.ticketTemplate
-                .Where(tt => templateIds.Contains(tt.id))
-                .Select(tt => new { tt.id, tt.currency_value })
-                .AsNoTracking().ToListAsync();
-
             DateTime now = DateTime.Now;
             foreach (Ticket t in tickets)
             {
@@ -170,8 +162,6 @@ namespace SnowmeetApi.Controllers
                 t.displayTimeLabel = d.Label;
                 t.displayTimeText = d.Text;
 
-                var tv = templateValues.FirstOrDefault(x => x.id == t.template_id);
-                t.currencyValue = tv != null ? tv.currency_value : 0;
                 t.expireText = TicketTransferRules.FormatExpire(t.expire_date);
                 t.expireUrgent = TicketTransferRules.IsExpiringSoon(t, now);
             }
