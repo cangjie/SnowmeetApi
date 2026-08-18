@@ -391,6 +391,87 @@ namespace SnowmeetApi.Controllers
             return nameByOpenId.ContainsKey(k) ? nameByOpenId[k] : "未知用户";
         }
 
+        // ───────────────────────── 某会员名下全部券（会员详情页折叠区用）─────────────────────────
+        // 不分页：生产库里会员名下券数平均 2.1 张、最多 129 张，一次拉全再由前端按
+        // 未使用/已核销/已过期 切换，比每切一次筛选打一次接口体验好得多。
+        //
+        // 三个状态是**完备互斥**的划分（每张券恰好落在一个桶里）：
+        //   已核销 = used==1；已过期 = 未核销且过期；未使用 = 其余（含分享中）
+        // 与 DescribeState 的区别：那个把"分享中"单列，这里并进"未使用"——
+        // 站在店员视角，分享中的券依然是"还没用掉"。
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<object>>> GetMemberCouponsByStaff(int memberId,
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await GetStaff(Util.UrlDecode(sessionKey), sessionType);
+            if (staff == null || staff.title_level < MIN_LEVEL)
+            {
+                return Ok(new ApiResult<object>() { code = 1, message = "没有权限", data = null });
+            }
+            DateTime now = DateTime.Now;
+
+            List<Ticket> tickets = await _db.ticket.AsNoTracking()
+                .Where(t => t.member_id == memberId)
+                .OrderByDescending(t => t.create_date).ThenBy(t => t.code)
+                .ToListAsync();
+
+            // 转赠次数一次批量捞（口径同列表页）
+            List<string> codes = tickets.Select(t => t.code).ToList();
+            Dictionary<string, int> transferCount = new Dictionary<string, int>();
+            if (codes.Count > 0)
+            {
+                var rows = await _db.ticketLog.Where(TicketTransferRules.TransferLogFilter())
+                    .Where(l => codes.Contains(l.code))
+                    .GroupBy(l => l.code).Select(g => new { code = g.Key, n = g.Count() })
+                    .AsNoTracking().ToListAsync();
+                transferCount = rows.ToDictionary(x => x.code, x => x.n);
+            }
+
+            List<int> templateIds = tickets.Select(t => t.template_id).Distinct().ToList();
+            var templates = await _db.ticketTemplate.Where(x => templateIds.Contains(x.id))
+                .Select(x => new { x.id, x.name, x.currency_value }).AsNoTracking().ToListAsync();
+
+            var items = tickets.Select(t =>
+            {
+                var tpl = templates.FirstOrDefault(x => x.id == t.template_id);
+                bool expired = !TicketTransferRules.IsNotExpired(t, now);
+                string bucket = t.used == 1 ? "used" : (expired ? "expired" : "unused");
+                return new
+                {
+                    code = t.code,
+                    name = (t.name ?? "").Trim(),
+                    templateName = tpl != null ? (tpl.name ?? "").Trim() : "",
+                    currencyValue = tpl != null ? tpl.currency_value : 0,
+                    bucket = bucket,
+                    stateLabel = bucket == "used" ? "已核销" : (bucket == "expired" ? "已过期"
+                        : (t.shared == 1 ? "分享中" : "未使用")),
+                    stateCls = bucket == "used" ? "used" : (bucket == "expired" ? "expired"
+                        : (t.shared == 1 ? "shared" : "unused")),
+                    createDateStr = t.create_date.ToString("yyyy-MM-dd"),
+                    expireDateStr = FormatDay(t.expire_date),
+                    usedTimeStr = t.used == 1 ? FormatMinute(t.used_time) : "",
+                    transferCount = transferCount.ContainsKey(t.code) ? transferCount[t.code] : 0,
+                    valid = t.valid,
+                    isActive = t.is_active,
+                    createMemo = (t.create_memo ?? "").Trim()
+                };
+            }).ToList();
+
+            return Ok(new ApiResult<object>()
+            {
+                code = 0,
+                message = "",
+                data = new
+                {
+                    items,
+                    total = items.Count,
+                    unusedCount = items.Count(x => x.bucket == "unused"),
+                    usedCount = items.Count(x => x.bucket == "used"),
+                    expiredCount = items.Count(x => x.bucket == "expired")
+                }
+            });
+        }
+
         // ───────────────────────── 模板下拉 ─────────────────────────
         // 不复用 MemberAdmin/GetCouponTemplates（门槛 200，店员会拿到"没有权限"），
         // 也不复用 Ticket/GetTemplateList（零鉴权 + 返回整实体带导航属性）。
