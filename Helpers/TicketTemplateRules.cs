@@ -18,6 +18,12 @@ namespace SnowmeetApi.Helpers
     public static class TicketTemplateRules
     {
         /// <summary>
+        /// 业务线取值域。与 [order].type 对齐（生产库该列就是这四个值 + 雪票/聚合），
+        /// 因为 biz_type 的作用就是把券路由到对应的开单流程。
+        /// </summary>
+        public static readonly string[] BizTypeOptions = new string[] { "零售", "养护", "租赁", "餐饮" };
+
+        /// <summary>
         /// 模板字段校验。返回空列表 = 通过。
         /// 前端编辑页用 radio 三选一让互斥在 UI 上不可能违反，这里是服务端的第二道。
         /// </summary>
@@ -36,6 +42,14 @@ namespace SnowmeetApi.Helpers
             if (string.IsNullOrWhiteSpace(template.type))
             {
                 errors.Add("模板类型不能为空");
+            }
+            if (string.IsNullOrWhiteSpace(template.biz_type))
+            {
+                errors.Add("请选择业务类型");
+            }
+            else if (Array.IndexOf(BizTypeOptions, template.biz_type.Trim()) < 0)
+            {
+                errors.Add("业务类型只能是 " + string.Join("/", BizTypeOptions));
             }
             // 用户口径：两者必须有一个为 null。都为空是合法的，语义是"永久有效"。
             if (template.available_days != null && template.expire_date != null)

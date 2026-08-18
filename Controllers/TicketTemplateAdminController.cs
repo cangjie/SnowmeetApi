@@ -34,9 +34,6 @@ namespace SnowmeetApi.Controllers
 
         const int MIN_LEVEL = 200;
 
-        /// <summary>业务线取值域。空字符串 = 不参与开单（存 NULL）。</summary>
-        public static readonly string[] BizTypeOptions = new string[] { "养护", "租赁" };
-
         private async Task<Staff?> GetStaff(string sessionKey, string sessionType)
         {
             return await Util.GetStaffBySessionKey(_db, Util.UrlDecode(sessionKey), sessionType);
@@ -89,7 +86,8 @@ namespace SnowmeetApi.Controllers
                 name = t.name,
                 type = t.type,
                 bizType = t.biz_type,
-                bizTypeText = string.IsNullOrWhiteSpace(t.biz_type) ? "不参与开单" : t.biz_type,
+                bizTypeText = string.IsNullOrWhiteSpace(t.biz_type) ? "未设业务类型" : t.biz_type,
+                bizTypeMissing = string.IsNullOrWhiteSpace(t.biz_type),
                 // WXML 不支持方法调用，展示文案一律服务端派生
                 validityText = TicketTemplateRules.DescribeValidity(t),
                 // 两个有效期字段同时非空 = 存量遗留的冲突态，列表上要能一眼挑出来去修
@@ -186,7 +184,7 @@ namespace SnowmeetApi.Controllers
                     needPoints = t.need_points,
                     currencyValue = t.currency_value,
                     rules = ruleItems,
-                    bizTypeOptions = BizTypeOptions
+                    bizTypeOptions = TicketTemplateRules.BizTypeOptions
                 }
             });
         }

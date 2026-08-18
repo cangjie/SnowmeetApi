@@ -17,11 +17,11 @@ namespace SnowmeetApi.Tests
     public class TicketTemplateRulesTests
     {
         private static TicketTemplate Tpl(int? availableDays = null, DateTime? expire = null,
-            string name = "养护券", string type = "养护券")
+            string name = "养护券", string type = "养护券", string bizType = "养护")
         {
             return new TicketTemplate()
             {
-                id = 99, name = name, type = type, memo = "备注",
+                id = 99, name = name, type = type, memo = "备注", biz_type = bizType,
                 miniapp_recept_path = "", available_days = availableDays, expire_date = expire
             };
         }
@@ -83,6 +83,34 @@ namespace SnowmeetApi.Tests
             List<string> errors = TicketTemplateRules.ValidateTemplate(t);
             Assert.Contains(errors, e => e.Contains("名称"));
             Assert.Contains(errors, e => e.Contains("类型"));
+        }
+
+        [Fact]
+        public void Validate_业务类型为空_被拒()
+        {
+            // 取值域只有 零售/养护/租赁/餐饮 四个，没有"不参与开单"这一档，所以必须选一个
+            Assert.Contains(TicketTemplateRules.ValidateTemplate(Tpl(availableDays: 30, bizType: null)),
+                e => e.Contains("业务类型"));
+            Assert.Contains(TicketTemplateRules.ValidateTemplate(Tpl(availableDays: 30, bizType: " ")),
+                e => e.Contains("业务类型"));
+        }
+
+        [Fact]
+        public void Validate_业务类型不在取值域_被拒()
+        {
+            Assert.Contains(TicketTemplateRules.ValidateTemplate(Tpl(availableDays: 30, bizType: "雪票")),
+                e => e.Contains("业务类型"));
+        }
+
+        [Theory]
+        [InlineData("零售")]
+        [InlineData("养护")]
+        [InlineData("租赁")]
+        [InlineData("餐饮")]
+        public void Validate_四个业务类型都通过(string bizType)
+        {
+            // 与 [order].type 对齐：生产库订单类型就是这四个（外加雪票/聚合两个不发券的）
+            Assert.Empty(TicketTemplateRules.ValidateTemplate(Tpl(availableDays: 30, bizType: bizType)));
         }
 
         [Fact]
