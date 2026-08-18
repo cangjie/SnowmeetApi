@@ -98,6 +98,13 @@ namespace SnowmeetApi.Models
         [NotMapped]
         public bool expireUrgent { get; set; } = false;
 
+        // 券种 banner：配色 class + 短标签，由券名关键词判定（TicketTransferRules.ResolveBanner）。
+        // 放后端算是为了四个页面（顾客列表/后台列表/会员详情/券详情）口径一致。
+        [NotMapped]
+        public string bannerCls { get; set; } = "wax";
+        [NotMapped]
+        public string bannerLabel { get; set; } = "";
+
         [ForeignKey("member_id")]
         public Member ownerMember { get; set; }
         [ForeignKey("template_id")]

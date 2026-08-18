@@ -115,6 +115,84 @@ namespace SnowmeetApi.Helpers
         }
 
         /// <summary>
+        /// 券种 banner：按券名关键词判定配色 class 与短标签。
+        ///
+        /// 为什么不用 ticket_template.type：它虽然有 9 种取值，但粒度不对——「养护券」下面
+        /// 同时装着打蜡、修刃、双项、代金，而这几种恰恰是要区分的；反过来「租赁券」「消费券」
+        /// 又只有一两个模板。按券名关键词判定能覆盖现有全部 18 个模板，新增模板自动适配。
+        ///
+        /// 规则**有序**，先匹配先赢：「双项」必须排在「打蜡」「修刃」前面，否则
+        /// 「万龙店修板打蜡券」会被判成单项。
+        /// </summary>
+        public static TicketStateView ResolveBanner(string templateName)
+        {
+            string n = (templateName ?? "").Trim();
+            bool Has(string k) { return n.Contains(k); }
+
+            // 双项：显式写了「双项」，或同时含修刃和打蜡
+            if (Has("双项") || ((Has("修板") || Has("修刃")) && Has("打蜡")))
+            {
+                return Banner("dual", "双项");
+            }
+            if (Has("热打蜡") || Has("热蜡"))
+            {
+                return Banner("hotwax", "热打蜡");
+            }
+            if (Has("修板") || Has("修刃"))
+            {
+                return Banner("edge", "修刃");
+            }
+            if (Has("打蜡"))
+            {
+                return Banner("wax", "机打蜡");
+            }
+            if (Has("课程") || Has("教练"))
+            {
+                return Banner("course", "课程");
+            }
+            if (Has("试滑"))
+            {
+                return Banner("pass", "试滑");
+            }
+            if (Has("体验") || Has("租赁"))
+            {
+                return Banner("pass", "体验");
+            }
+            if (Has("满减"))
+            {
+                return Banner("cash", "满减");
+            }
+            if (Has("代金"))
+            {
+                return Banner("cash", "代金");
+            }
+            if (Has("消费"))
+            {
+                return Banner("cash", "消费");
+            }
+            if (Has("优惠") || Has("内购"))
+            {
+                return Banner("cash", "优惠");
+            }
+            if (Has("非雪季"))
+            {
+                return Banner("wax", "非雪季");
+            }
+            // 兜底：主蓝 + 券名去掉「券」字后最多 4 个字
+            string label = n.Replace("券", "").Trim();
+            if (label.Length > 4)
+            {
+                label = label.Substring(0, 4);
+            }
+            return Banner("wax", label == "" ? "优惠" : label);
+        }
+
+        private static TicketStateView Banner(string cls, string label)
+        {
+            return new TicketStateView() { Cls = cls, Label = label };
+        }
+
+        /// <summary>
         /// 哪条 ticket_log 才算「一次真转赠」。
         ///
         /// ticket_log 有 5 个写入方，只有 AcceptTicketCore 那条是真转赠：

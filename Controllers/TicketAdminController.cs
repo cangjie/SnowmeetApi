@@ -136,6 +136,8 @@ namespace SnowmeetApi.Controllers
                 var mi = t.member_id == null ? null : members.FirstOrDefault(x => x.id == t.member_id);
                 var cell = t.member_id == null ? null : cells.FirstOrDefault(x => x.member_id == t.member_id);
                 TicketStateView st = TicketAdminRules.DescribeState(t, now);
+                TicketStateView bn = TicketTransferRules.ResolveBanner(
+                    tpl != null && !string.IsNullOrWhiteSpace(tpl.name) ? tpl.name : t.name);
                 int tc = transferCount.ContainsKey(t.code) ? transferCount[t.code] : 0;
                 return new
                 {
@@ -159,7 +161,9 @@ namespace SnowmeetApi.Controllers
                     channel = (t.channel ?? "").Trim(),
                     createMemo = (t.create_memo ?? "").Trim(),
                     stateLabel = st.Label,
-                    stateCls = st.Cls
+                    stateCls = st.Cls,
+                    bannerCls = bn.Cls,
+                    bannerLabel = bn.Label
                 };
             }).ToList();
 
@@ -343,6 +347,8 @@ namespace SnowmeetApi.Controllers
             }).ToList();
 
             TicketStateView st = TicketAdminRules.DescribeState(t, now);
+            TicketStateView bn = TicketTransferRules.ResolveBanner(
+                tpl != null && !string.IsNullOrWhiteSpace(tpl.name) ? tpl.name : t.name);
             int transferCount = logs.Count(l => TicketAdminRules.DescribeLogEntry(l).Cls == "transfer");
 
             return Ok(new ApiResult<object>()
@@ -373,6 +379,8 @@ namespace SnowmeetApi.Controllers
                     usageMemo = (t.memo ?? "").Trim(),
                     stateLabel = st.Label,
                     stateCls = st.Cls,
+                    bannerCls = bn.Cls,
+                    bannerLabel = bn.Label,
                     transferCount = transferCount,
                     logs = logItems
                 }
@@ -435,8 +443,12 @@ namespace SnowmeetApi.Controllers
                 var tpl = templates.FirstOrDefault(x => x.id == t.template_id);
                 bool expired = !TicketTransferRules.IsNotExpired(t, now);
                 string bucket = t.used == 1 ? "used" : (expired ? "expired" : "unused");
+                TicketStateView bn = TicketTransferRules.ResolveBanner(
+                    tpl != null && !string.IsNullOrWhiteSpace(tpl.name) ? tpl.name : t.name);
                 return new
                 {
+                    bannerCls = bn.Cls,
+                    bannerLabel = bn.Label,
                     code = t.code,
                     name = (t.name ?? "").Trim(),
                     templateName = tpl != null ? (tpl.name ?? "").Trim() : "",

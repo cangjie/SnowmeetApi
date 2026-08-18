@@ -127,6 +127,18 @@ namespace SnowmeetApi.Controllers
             });
         }
 
+        // 券自身的派生字段（有效期文案、临期、券种 banner）——与"在哪个列表里"无关，
+        // 所以 GetTicket 这种单张查询也要填，否则详情页的 banner 和有效期会是空的。
+        [NonAction]
+        public static void FillIntrinsicFields(Ticket t, DateTime now)
+        {
+            t.expireText = TicketTransferRules.FormatExpire(t.expire_date);
+            t.expireUrgent = TicketTransferRules.IsExpiringSoon(t, now);
+            TicketStateView bn = TicketTransferRules.ResolveBanner(t.name);
+            t.bannerCls = bn.Cls;
+            t.bannerLabel = bn.Label;
+        }
+
         // 给一批券补上卡片要显示的派生字段：那行时间、有效期文案、临期标记。
         // "我领取的时间"只存在于 ticket_log，所以批量捞回来，不要在循环里逐张查（N+1）。
         [NonAction]
@@ -162,8 +174,7 @@ namespace SnowmeetApi.Controllers
                 t.displayTimeLabel = d.Label;
                 t.displayTimeText = d.Text;
 
-                t.expireText = TicketTransferRules.FormatExpire(t.expire_date);
-                t.expireUrgent = TicketTransferRules.IsExpiringSoon(t, now);
+                FillIntrinsicFields(t, now);
             }
         }
 
@@ -564,6 +575,8 @@ namespace SnowmeetApi.Controllers
             }
 
             ticket.open_id = "";
+            // 详情页要用的券种 banner / 有效期文案，跟列表页同一份口径
+            FillIntrinsicFields(ticket, DateTime.Now);
 
             return Ok(new ApiResult<Ticket>()
             {
