@@ -135,6 +135,7 @@ namespace SnowmeetApi.Controllers
             Dictionary<int, Product> productById = (await _db.product
                 .Where(p => productIds.Contains(p.id)).AsNoTracking().ToListAsync())
                 .ToDictionary(p => p.id, p => p);
+            Dictionary<int, string> shopById = await GetShopNames();
 
             var ruleItems = rules.Select(r =>
             {
@@ -146,7 +147,7 @@ namespace SnowmeetApi.Controllers
                     id = r.id,
                     productId = r.product_id,
                     productName = productName,
-                    productShop = pr != null ? pr.shop : "",
+                    productShop = pr != null ? ResolveShopName(pr, shopById) : "",
                     salePrice = pr != null ? pr.sale_price : 0d,
                     fixedPrice = r.fixed_price,
                     discountRate = r.discount_rate,
@@ -187,6 +188,41 @@ namespace SnowmeetApi.Controllers
                     bizTypeOptions = TicketTemplateRules.BizTypeOptions
                 }
             });
+        }
+
+        /// <summary>
+        /// 商品的店铺名。三级取值：product.shop 文本 &gt; shop_list 按 shop_id 反查 &gt; 兜底。
+        ///
+        /// 两个来源都不可靠所以都要试：养护类商品 shop 有文本（万龙/南山/崇礼旗舰店）但
+        /// shop_id 未必对得上（137-143 的 shop 是"万龙"、shop_id 却是 10 万龙体验中心）；
+        /// 餐饮类商品反过来，shop 是 NULL，shop_id 是 45855+ 这种七色米侧的号，shop_list 里没有。
+        /// 都取不到就是"没绑门店"——这条优惠规则对该业务线所有门店都生效。
+        /// </summary>
+        [NonAction]
+        private async Task<Dictionary<int, string>> GetShopNames()
+        {
+            // shop_list 只有 7 行，整表捞回来做字典，别在循环里逐个查
+            return (await _db.shop.AsNoTracking().ToListAsync())
+                .ToDictionary(x => x.id, x => (x.name ?? "").Trim());
+        }
+
+        [NonAction]
+        private static string ResolveShopName(Product p, Dictionary<int, string> shopById)
+        {
+            if (p == null)
+            {
+                return "全部门店";
+            }
+            string shop = (p.shop ?? "").Trim();
+            if (shop != "")
+            {
+                return shop;
+            }
+            if (p.shop_id != null && shopById.ContainsKey((int)p.shop_id))
+            {
+                return shopById[(int)p.shop_id];
+            }
+            return "全部门店";
         }
 
         [NonAction]
@@ -410,34 +446,57 @@ namespace SnowmeetApi.Controllers
         // ── 商品选择器 ──────────────────────────────────────────────────────
 
         [HttpGet]
-        public async Task<ActionResult<ApiResult<object>>> GetProductOptionsByStaff(string? keyword,
-            string sessionKey, string sessionType = "wechat_mini_openid")
+        public async Task<ActionResult<ApiResult<object>>> GetProductOptionsByStaff(string bizType,
+            string? keyword, string sessionKey, string sessionType = "wechat_mini_openid")
         {
             Staff staff = await GetStaff(sessionKey, sessionType);
             if (staff == null || staff.title_level < MIN_LEVEL)
             {
                 return Ok(Deny());
             }
-            // 雪票有 596 条且按场次/日期铺开，进这个选择器只会淹没真正要配的服务类商品
+            bizType = Util.UrlDecode(bizType ?? "").Trim();
+            if (bizType == "")
+            {
+                return Ok(new ApiResult<object>()
+                {
+                    code = 1, message = "请先选择业务类型", data = null
+                });
+            }
+
+            // 商品的业务线不在 product 表上，而在 category.biz_type（category 是扁平表，
+            // biz_type + code + name，与 RentCategory 那套层级树完全无关）。
+            // 表只有十几行，先取 id 集合再筛商品，比 join 简单也一定翻得成 SQL。
+            List<int> categoryIds = await _db.category.AsNoTracking()
+                .Where(c => c.biz_type == bizType).Select(c => c.id).ToListAsync();
+
+            // 次卡/季卡类商品（租赁10次卡、机打蜡季卡、修刃打蜡10次卡）category_id 是空的，
+            // 严格按分类筛会把它们漏掉。它们的 product.type 本身就带业务线前缀
+            // （养护次卡 / 养护季卡 / 租赁次卡），用它兜一下；"课程""雪票"不会被误收。
             IQueryable<Product> q = _db.product.AsNoTracking()
-                .Where(p => p.valid == 1 && p.type != "雪票");
+                .Where(p => p.valid == 1
+                    && ((p.category_id != null && categoryIds.Contains((int)p.category_id))
+                        || (p.category_id == null && p.type != null && p.type.StartsWith(bizType))));
             if (!string.IsNullOrWhiteSpace(keyword))
             {
                 string k = Util.UrlDecode(keyword).Trim();
                 q = q.Where(p => p.name.Contains(k));
             }
-            var rows = await q.OrderBy(p => p.shop).ThenBy(p => p.name).Take(200)
-                .Select(p => new { p.id, p.name, p.shop, p.type, p.sale_price })
-                .ToListAsync();
+            List<Product> rows = await q.OrderBy(p => p.shop).ThenBy(p => p.name).Take(200).ToListAsync();
+            Dictionary<int, string> shopById = await GetShopNames();
+
             // label 在内存里拼：double 拼进字符串 EF 翻不成 SQL，放在 Select 里会运行时炸
-            var items = rows.Select(p => new
+            var items = rows.Select(p =>
             {
-                id = p.id,
-                name = p.name,
-                shop = p.shop,
-                type = p.type,
-                salePrice = p.sale_price,
-                label = p.name + "（" + p.shop + " ¥" + p.sale_price + "）"
+                string shopName = ResolveShopName(p, shopById);
+                return new
+                {
+                    id = p.id,
+                    name = p.name,
+                    shop = shopName,
+                    type = p.type,
+                    salePrice = p.sale_price,
+                    label = "【" + shopName + "】" + p.name + "（¥" + p.sale_price + "）"
+                };
             }).ToList();
 
             return Ok(new ApiResult<object>()
