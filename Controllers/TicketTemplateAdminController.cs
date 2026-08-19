@@ -465,17 +465,24 @@ namespace SnowmeetApi.Controllers
 
             // 商品的业务线不在 product 表上，而在 category.biz_type（category 是扁平表，
             // biz_type + code + name，与 RentCategory 那套层级树完全无关）。
-            // 表只有十几行，先取 id 集合再筛商品，比 join 简单也一定翻得成 SQL。
-            List<int> categoryIds = await _db.category.AsNoTracking()
-                .Where(c => c.biz_type == bizType).Select(c => c.id).ToListAsync();
+            // 先按 biz_type 取出分类，再拿分类去筛商品——分类表只有十几行，
+            // 取集合再 Contains 比 join 简单，也一定翻得成 SQL。
+            var categories = await _db.category.AsNoTracking()
+                .Where(c => c.biz_type == bizType)
+                .Select(c => new { c.id, c.code }).ToListAsync();
+            List<int> categoryIds = categories.Select(c => c.id).ToList();
+            // 商品挂分类有两种写法：普通商品写 category_id，次卡/季卡类按设计只写 category_code
+            // （人工维护的稳定值，不随 category_id 自增变化）。两种都要认，否则
+            // 租赁10次卡 / 机打蜡季卡 / 修刃打蜡10次卡 会整批漏掉。
+            // 空 code 必须剔除：category 14 等的 code 是空串，留着会把所有 code 为空的商品全捞进来。
+            List<string> categoryCodes = categories.Select(c => c.code)
+                .Where(c => !string.IsNullOrWhiteSpace(c)).ToList();
 
-            // 次卡/季卡类商品（租赁10次卡、机打蜡季卡、修刃打蜡10次卡）category_id 是空的，
-            // 严格按分类筛会把它们漏掉。它们的 product.type 本身就带业务线前缀
-            // （养护次卡 / 养护季卡 / 租赁次卡），用它兜一下；"课程""雪票"不会被误收。
             IQueryable<Product> q = _db.product.AsNoTracking()
                 .Where(p => p.valid == 1
                     && ((p.category_id != null && categoryIds.Contains((int)p.category_id))
-                        || (p.category_id == null && p.type != null && p.type.StartsWith(bizType))));
+                        || (p.category_code != null && p.category_code != ""
+                            && categoryCodes.Contains(p.category_code))));
             if (!string.IsNullOrWhiteSpace(keyword))
             {
                 string k = Util.UrlDecode(keyword).Trim();

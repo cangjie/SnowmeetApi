@@ -294,16 +294,30 @@ namespace SnowmeetApi.Controllers
                 data = products
             });
         }
+        // 2026-08-19：门店匹配改为 shop_id 关联 shop_list。
+        //
+        // 原来是 product.shop 与传入店名**双向子串**匹配
+        // （p.shop.IndexOf(shop) >= 0 || shop.IndexOf(p.shop) >= 0）：
+        // 商品 137~143 的 shop 存的是"万龙"，靠"万龙服务中心"包含"万龙"才蒙对。
+        // 任何一边改个写法（"万龙店"、"万龙服务中心 "）就会静默失配，
+        // GetProduct 返回 null → CalcCharge 的 commonCharge 变成 0，养护直接免费，且没有任何报错。
+        //
+        // 配套数据修正见 sql/2026-08-19_product_shop_id_fix.sql（137~143、715 的 shop_id 改成 1
+        // 万龙服务中心；它们原本指向 10 万龙体验中心，而那个店的 care 标志是 0，根本不做养护）。
+        // **那段 SQL 必须先于本版本部署**，否则万龙服务中心一个商品都匹配不到。
         [HttpGet]
         public async Task<ActionResult<ApiResult<List<Models.Product>?>>> GetProducts(string shop)
         {
-            /*
-            List<Models.Product> products = await _db.product
-                .Where(p => (p.id == 137 || p.id == 138 || p.id == 139 || p.id == 140 || p.id == 142 || p.id == 143 || p.id == 202)
-                && p.valid == 1).OrderBy(p => p.sale_price).AsNoTracking().ToListAsync();
-            */
-            List<Models.Product> products = await _db.product.Where(p => (p.shop.IndexOf(shop) >= 0 || shop.IndexOf(p.shop) >= 0) && p.category_id == 14 && p.valid == 1)
-                .OrderBy(p => p.sale_price).AsNoTracking().ToListAsync();
+            shop = (shop ?? "").Trim();
+            int? shopId = await _db.shop.AsNoTracking()
+                .Where(s => s.name.Trim() == shop).Select(s => (int?)s.id).FirstOrDefaultAsync();
+            // 店名在 shop_list 里查不到就没有商品可匹配。返回空列表与"该店没配养护商品"同义，
+            // 上层 CalcCharge 会算出 0 —— 与改造前店名对不上时的结果一致。
+            List<Models.Product> products = shopId == null
+                ? new List<Models.Product>()
+                : await _db.product
+                    .Where(p => p.shop_id == shopId && p.category_id == 14 && p.valid == 1)
+                    .OrderBy(p => p.sale_price).AsNoTracking().ToListAsync();
             return Ok(new ApiResult<List<Models.Product>?>()
             {
                 code = 0,
@@ -311,11 +325,19 @@ namespace SnowmeetApi.Controllers
                 data = products
             });
         }
+        // 挑商品：**服务组合从 care 表读，商品表只提供价格**。
+        // 口径收在 CarePricingRules（修刃/热打蜡各算一项，机打蜡与刮蜡不计费），
+        // 由 CarePricingRulesTests 按生产库实付价格逐条锁死。
+        //
+        // 2026-08-19 之前这里是几十行商品名关键词匹配（IndexOf("修刃打蜡") / IndexOf("立等") …）。
+        // 商品目录改名成 双项/单项/双项加急/单项加急 之后那些关键词一个都命中不了，
+        // 所有非次卡养护单的服务费会静默变成 0，且不报任何错。
         [NonAction]
         public async Task<Models.Product?> GetProduct(string shop, Care care)
         {
             if (care.summer != null)
             {
+                // 非雪季养护走固定价，不查商品表（这条早于商品目录存在）
                 return new Models.Product()
                 {
                     id = 0,
@@ -324,80 +346,12 @@ namespace SnowmeetApi.Controllers
                 };
             }
             List<Models.Product> products = ((ApiResult<List<Models.Product>>)((OkObjectResult)(await GetProducts(shop)).Result).Value).data;
-            Models.Product product = null;
-            for (int i = 0; i < products.Count; i++)
-            {
-                if (products[i].name == "非雪季养护" && care.biz_type == "非雪季养护")
-                {
-                    product = products[i];
-                    break;
-                }
-                if (shop.IndexOf("万龙") >= 0)
-                {
-                    if (products[i].name.IndexOf("修刃打蜡") >= 0 && products[i].name.IndexOf("立等") >= 0
-                    && care.need_edge == 1 && care.need_wax == 1 && care.urgent == 1)
-                    {
-                        product = products[i];
-                        break;
-                    }
-                    else if (products[i].name.IndexOf("修刃") >= 0 && products[i].name.IndexOf("立等") >= 0
-                    && care.need_edge == 1 && care.need_wax == 0 && care.urgent == 1 && products[i].name.IndexOf("修刃打蜡") < 0)
-                    {
-                        product = products[i];
-                        break;
-                    }
-                    else if (products[i].name.IndexOf("打蜡") >= 0 && products[i].name.IndexOf("立等") >= 0
-                    && care.need_edge == 0 && care.need_wax == 1 && care.urgent == 1 && products[i].name.IndexOf("修刃打蜡") < 0)
-                    {
-                        product = products[i];
-                        break;
-                    }
-                    else if (products[i].name.IndexOf("修刃打蜡") >= 0 && products[i].name.IndexOf("次日") >= 0
-                    && care.need_edge == 1 && care.need_wax == 1 && care.urgent == 0)
-                    {
-                        product = products[i];
-                        break;
-                    }
-                    else if (products[i].name.IndexOf("修刃") >= 0 && products[i].name.IndexOf("次日") >= 0
-                    && care.need_edge == 1 && care.need_wax == 0 && care.urgent == 0 && products[i].name.IndexOf("修刃打蜡") < 0)
-                    {
-                        product = products[i];
-                        break;
-                    }
-                    else if (products[i].name.IndexOf("打蜡") >= 0 && products[i].name.IndexOf("次日") >= 0
-                    && care.need_edge == 0 && care.need_wax == 1 && care.urgent == 0 && products[i].name.IndexOf("修刃打蜡") < 0)
-                    {
-                        product = products[i];
-                        break;
-                    }
-                }
-                else
-                {
-                    if (products[i].name.IndexOf("修刃打蜡") >= 0
-                    && care.need_edge == 1 && care.need_wax == 1)
-                    {
-                        product = products[i];
-                        break;
-                    }
-                    else if (products[i].name.IndexOf("修刃") >= 0
-                    && care.need_edge == 1 && care.need_wax == 0 && products[i].name.IndexOf("修刃打蜡") < 0)
-                    {
-                        product = products[i];
-                        break;
-                    }
-                    else if (products[i].name.IndexOf("打蜡") >= 0
-                    && care.need_edge == 0 && care.need_wax == 1 && products[i].name.IndexOf("修刃打蜡") < 0)
-                    {
-                        product = products[i];
-                        break;
-                    }
-                }
-            }
-            return product;
+            return CarePricingRules.MatchProduct(products, care);
         }
+
         // 养护服务费定价（真理之源，CalcCareCharge 开单实时计费与 PlaceCareOrder 下单落库共用）：
         // 选会员卡按 0（2026-07-09 用户拍板，核销链路另做）/ 质保招待 0 / summer 330（GetProduct 内置）
-        // / 其余 GetProduct 名称匹配 sale_price，再按券的商品优惠规则调整。
+        // / 其余 GetProduct 按 shop_id + 服务项匹配商品取 sale_price，再按券的商品优惠规则调整。
         // 例外：机打蜡季卡（卡名含「机打蜡」）升级热蜡/加修刃的加价规则与免费打蜡券（券12模板）一致
         //
         // 2026-08-18：券的优惠口径统一收到 TicketTemplateRules.ResolveProductDiscount，
