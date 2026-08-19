@@ -11,11 +11,11 @@ using SnowmeetApi.Models;
 
 namespace SnowmeetApi.Controllers
 {
-    // 养护价格维护（后台）。鉴权 staff.title_level >= 200。
+    // 养护价格维护（后台）。鉴权 staff.title_level >= 300（系统管理员）。
     //
     // 维护 product.category_id = 14 这批商品——它们就是养护定价的价目表：
     // CareController.CalcCharge 按门店 + 服务组合（CarePricingRules）从里面取 sale_price。
-    // 改这里 = 改线上收费，所以门槛跟优惠券模板设置一样是 200，不是店员级的 100。
+    // 改这里 = 改线上收费，门槛比优惠券模板设置（200）还高一档。
     //
     // 不复用 Category/ModProduct（门槛 100，且收整个 Product 实体连带 images/properties，
     // 一不小心就把没打算改的列一起覆盖了）——这里只开放养护真正需要维护的几个字段。
@@ -32,7 +32,7 @@ namespace SnowmeetApi.Controllers
             _config = config;
         }
 
-        const int MIN_LEVEL = 200;
+        const int MIN_LEVEL = 300;
 
         private async Task<Staff?> GetStaff(string sessionKey, string sessionType)
         {
@@ -46,7 +46,7 @@ namespace SnowmeetApi.Controllers
 
         [HttpGet]
         public async Task<ActionResult<ApiResult<object>>> GetCareProductsByStaff(int? shopId,
-            bool includeInvalid, string sessionKey, string sessionType = "wechat_mini_openid")
+            string sessionKey, string sessionType = "wechat_mini_openid")
         {
             Staff staff = await GetStaff(sessionKey, sessionType);
             if (staff == null || staff.title_level < MIN_LEVEL)
@@ -54,12 +54,9 @@ namespace SnowmeetApi.Controllers
                 return Ok(Deny());
             }
 
+            // 已停用的（valid = 0）一律不列：它们不参与计价，摆出来只会干扰
             IQueryable<Product> q = _db.product.AsNoTracking()
-                .Where(p => p.category_id == CareProductRules.CareCategoryId);
-            if (!includeInvalid)
-            {
-                q = q.Where(p => p.valid == 1);
-            }
+                .Where(p => p.category_id == CareProductRules.CareCategoryId && p.valid == 1);
             if (shopId != null && shopId > 0)
             {
                 q = q.Where(p => p.shop_id == shopId);

@@ -93,11 +93,49 @@ namespace SnowmeetApi.Tests
                 C(edge: edge, wax: wax, urgent: urgent)));
         }
 
+        // ── 非雪季两种走法 ────────────────────────────────────────────────
+        // CareController.ApplyDefaultServices：券17 → summer="now" 且服务项清零；
+        //                                      券18 → summer="later" 且打开修刃+热蜡。
+        // 两者 biz_type 都是「非雪季养护」，只看 biz_type 会把 later 也误判成整包。
+
         [Fact]
-        public void 商品名_非雪季养护走独立名字()
+        public void 非雪季_直接寄存走非雪季养护商品()
         {
+            Assert.Equal("非雪季养护", CarePricingRules.ResolveProductName(
+                C(summer: "now", bizType: "非雪季养护")));
+        }
+
+        [Fact]
+        public void 非雪季_先双项晚点寄存按双项算()
+        {
+            // 券18 会把修刃+热蜡打开，这次做的就是双项，寄存留到下次凭券17 来
+            Assert.Equal("双项", CarePricingRules.ResolveProductName(
+                C(edge: 1, wax: 1, unwax: 1, summer: "later", bizType: "非雪季养护")));
+        }
+
+        [Fact]
+        public void 非雪季_只有bizType且无服务项时仍按整包()
+        {
+            // 老数据有 biz_type 已写、summer 还没落的情况
             Assert.Equal("非雪季养护",
+                CarePricingRules.ResolveProductName(C(bizType: "非雪季养护")));
+        }
+
+        [Fact]
+        public void 非雪季_bizType配着服务项时按服务项算()
+        {
+            Assert.Equal("双项",
                 CarePricingRules.ResolveProductName(C(edge: 1, wax: 1, bizType: "非雪季养护")));
+        }
+
+        [Fact]
+        public void 非雪季_匹配到715真商品而不是假商品()
+        {
+            // 关键回归：只有匹配到真商品，模板17 配在 715 上的一口价 0 才能生效
+            Product p = CarePricingRules.MatchProduct(Wanlong(), C(summer: "now", bizType: "非雪季养护"));
+            Assert.NotNull(p);
+            Assert.Equal(715, p.id);
+            Assert.Equal(330, p.sale_price);
         }
 
         // ── 商品匹配 ───────────────────────────────────────────────────────
@@ -156,7 +194,7 @@ namespace SnowmeetApi.Tests
         public void 匹配_非雪季养护命中330()
         {
             Assert.Equal(715, CarePricingRules.MatchProduct(
-                Wanlong(), C(edge: 1, wax: 1, bizType: "非雪季养护")).id);
+                Wanlong(), C(summer: "now", bizType: "非雪季养护")).id);
         }
 
         [Fact]
@@ -180,6 +218,52 @@ namespace SnowmeetApi.Tests
             // 也不能拿单项价冒充双项价去收钱
             List<Product> only = new List<Product>() { P(140, "单项", 170) };
             Assert.Null(CarePricingRules.MatchProduct(only, C(edge: 1, wax: 1)));
+        }
+        // ── 老规则兜底 ─────────────────────────────────────────────────────
+        // 表里没配规则时回退到 2026-08-18 之前写死在 CareController 里的那套：
+        // 老顾客券（模板16）双项减 30、单项减 20，不看门店。
+
+        [Theory]
+        [InlineData(1, 1, 30.0)]   // 双项
+        [InlineData(1, 0, 20.0)]   // 只修刃
+        [InlineData(0, 1, 20.0)]   // 只热蜡
+        [InlineData(0, 0, 0.0)]    // 无计费项
+        public void 老规则兜底_券16按项数减(int edge, int wax, double expected)
+        {
+            Assert.Equal(expected, CarePricingRules.LegacyTicketDiscount(
+                16, C(edge: edge, wax: wax), 230));
+        }
+
+        [Fact]
+        public void 老规则兜底_机打蜡与刮蜡不影响项数()
+        {
+            // 老代码判的是 need_edge/need_wax，与新口径一致，机蜡刮蜡都不参与
+            Assert.Equal(30, CarePricingRules.LegacyTicketDiscount(
+                16, C(edge: 1, wax: 1, freeWax: 1, unwax: 1), 230));
+        }
+
+        [Theory]
+        [InlineData(12)]
+        [InlineData(17)]
+        [InlineData(18)]
+        [InlineData(0)]
+        public void 老规则兜底_只对券16生效(int templateId)
+        {
+            Assert.Equal(0, CarePricingRules.LegacyTicketDiscount(
+                templateId, C(edge: 1, wax: 1), 230));
+        }
+
+        [Fact]
+        public void 老规则兜底_减免不超过原价()
+        {
+            Assert.Equal(10, CarePricingRules.LegacyTicketDiscount(16, C(edge: 1, wax: 1), 10));
+            Assert.Equal(0, CarePricingRules.LegacyTicketDiscount(16, C(edge: 1, wax: 1), 0));
+        }
+
+        [Fact]
+        public void 老规则兜底_care为空不抛异常()
+        {
+            Assert.Equal(0, CarePricingRules.LegacyTicketDiscount(16, null, 230));
         }
     }
 }

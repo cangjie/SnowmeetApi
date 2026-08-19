@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using SnowmeetApi.Models;
@@ -25,10 +26,38 @@ namespace SnowmeetApi.Helpers
     {
         public const string SummerBizType = "非雪季养护";
         public const string SummerProductName = "非雪季养护";
+        /// <summary>直接寄存：这次做的就是"非雪季养护"整包，没有单项服务。</summary>
+        public const string SummerNow = "now";
+        /// <summary>先双项、晚点寄存：这次做的是双项，寄存留到下次凭券来。</summary>
+        public const string SummerLater = "later";
 
         private const string TwoItems = "双项";
         private const string OneItem = "单项";
         private const string UrgentSuffix = "加急";
+
+        /// <summary>
+        /// 表里没配规则时的兜底：2026-08-18 之前写死在 CareController.CalcCharge 里的那套。
+        ///
+        /// 当时只有一条——老顾客优惠券（模板 16）双项减 30、单项减 20，且**不看门店**。
+        /// 现在这套优惠已经进了 product_ticket_template，正常走表；
+        /// 但万一某个门店的商品漏配规则，回退到这里而不是一分不减，
+        /// 免得顾客拿着券却发现没优惠。
+        ///
+        /// 减免不超过原价（原价 0 的项不倒找钱）。
+        /// </summary>
+        public static double LegacyTicketDiscount(int templateId, Care care, double basePrice)
+        {
+            if (templateId != LegacyDiscountTemplateId)
+            {
+                return 0;
+            }
+            int items = CountChargeableItems(care);
+            double discount = items >= 2 ? 30 : (items == 1 ? 20 : 0);
+            return Math.Min(discount, Math.Max(basePrice, 0));
+        }
+
+        /// <summary>老顾客优惠券。唯一一个曾经写死在代码里的券优惠。</summary>
+        public const int LegacyDiscountTemplateId = 16;
 
         /// <summary>计费项数：修刃 + 热打蜡，各算一项；机打蜡和刮蜡不计。</summary>
         public static int CountChargeableItems(Care care)
@@ -50,9 +79,20 @@ namespace SnowmeetApi.Helpers
             {
                 return "";
             }
-            if (care.biz_type != null && care.biz_type.Trim() == SummerBizType)
+            // 非雪季两种走法（CareController.ApplyDefaultServices 里由券模板决定）：
+            //   券17 非雪季养护券 → summer = "now"，服务项全清零 → 对应商品「非雪季养护」
+            //   券18 非雪季赠双项 → summer = "later"，打开修刃+热蜡 → 就是普通「双项」
+            // 所以 later 不能也返回「非雪季养护」，它得落回下面的按项数逻辑。
+            string summer = (care.summer ?? "").Trim();
+            if (summer != SummerLater)
             {
-                return SummerProductName;
+                bool isSummerPackage = summer == SummerNow
+                    || (care.biz_type != null && care.biz_type.Trim() == SummerBizType
+                        && CountChargeableItems(care) == 0);
+                if (isSummerPackage)
+                {
+                    return SummerProductName;
+                }
             }
             int items = CountChargeableItems(care);
             if (items <= 0)

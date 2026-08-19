@@ -335,18 +335,25 @@ namespace SnowmeetApi.Controllers
         [NonAction]
         public async Task<Models.Product?> GetProduct(string shop, Care care)
         {
-            if (care.summer != null)
-            {
-                // 非雪季养护走固定价，不查商品表（这条早于商品目录存在）
-                return new Models.Product()
-                {
-                    id = 0,
-                    sale_price = 330,
-                    valid = 1
-                };
-            }
             List<Models.Product> products = ((ApiResult<List<Models.Product>>)((OkObjectResult)(await GetProducts(shop)).Result).Value).data;
-            return CarePricingRules.MatchProduct(products, care);
+            Models.Product product = CarePricingRules.MatchProduct(products, care);
+            if (product != null)
+            {
+                return product;
+            }
+            // 兜底：非雪季养护原来是在这里写死 330 返回一个 id = 0 的假商品的。
+            // 假商品让针对真商品 715「非雪季养护」配的券规则永远匹配不上，
+            // 非雪季养护券（模板17，一口价 0）因此从没生效过 —— 2026-08-19 改成正常查商品表。
+            //
+            // 只有万龙服务中心配了 715，这是对的：**南山和崇礼旗舰店不接非雪季养护的订单**
+            // （2026-08-19 用户确认），别给它们补建这个商品。
+            // 这条兜底因此正常情况下不会触发，留着纯粹是防呆——万一哪天误配出这种单，
+            // 宁可按 330 收也不要静默变成 0 元。
+            if (CarePricingRules.ResolveProductName(care) == CarePricingRules.SummerProductName)
+            {
+                return new Models.Product() { id = 0, sale_price = 330, valid = 1 };
+            }
+            return null;
         }
 
         // 养护服务费定价（真理之源，CalcCareCharge 开单实时计费与 PlaceCareOrder 下单落库共用）：
@@ -357,7 +364,8 @@ namespace SnowmeetApi.Controllers
         // 2026-08-18：券的优惠口径统一收到 TicketTemplateRules.ResolveProductDiscount，
         // 一口价 > 折扣率 > 立减金额。此前只读 fixed_price，券16 的立减 双项30/单项20 是这里
         // 按 template_id == 16 硬编码的（且不看门店）；现在改为读 product_ticket_template.discount_amount。
-        // 迁移脚本已给南山 677/678/679 补上 30/20/20，保证行为不变（万龙 139/140/143 本就配好）。
+        // 表里没配到规则时回退到那套老写死规则（CarePricingRules.LegacyTicketDiscount），
+        // 所以漏配门店的商品也不会让顾客的券白拿。季卡（use_card）分支维持原状，不受这次改动影响。
         [NonAction]
         public async Task<(double commonCharge, double ticketDiscount)> CalcCharge(string shop, Care care, Ticket? ticket, PunchCard? card = null)
         {
@@ -397,8 +405,18 @@ namespace SnowmeetApi.Controllers
             {
                 ProductTicketTemplate rule = TicketTemplateRules
                     .MatchProductRule(ticket.template.productTicketTemplates, product.id);
-                (commonCharge, ticketDiscount) = TicketTemplateRules
-                    .ResolveProductDiscount(rule, commonCharge);
+                if (TicketTemplateRules.HasAnyDiscount(rule))
+                {
+                    (commonCharge, ticketDiscount) = TicketTemplateRules
+                        .ResolveProductDiscount(rule, commonCharge);
+                }
+                else
+                {
+                    // 表里没给这个商品配规则（或配了但三个优惠字段都空）→ 回退到
+                    // 2026-08-18 之前写死在这里的老规则，免得顾客拿着券却一分不减。
+                    ticketDiscount = CarePricingRules
+                        .LegacyTicketDiscount(ticket.template_id, care, commonCharge);
+                }
             }
             return (commonCharge, ticketDiscount);
         }

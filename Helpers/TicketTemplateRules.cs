@@ -127,6 +127,16 @@ namespace SnowmeetApi.Helpers
         }
 
         /// <summary>
+        /// 这条规则是否真的配了优惠。三个字段全空的规则等于没配——
+        /// 调用方据此决定要不要回退到代码里写死的那套老规则。
+        /// </summary>
+        public static bool HasAnyDiscount(ProductTicketTemplate rule)
+        {
+            return rule != null
+                && (rule.fixed_price != null || rule.discount_rate != null || rule.discount_amount != null);
+        }
+
+        /// <summary>
         /// 给定商品挑规则。product_id == 0 是通配兜底（沿用 CareController 原有语义），
         /// 精确命中优先于兜底。已软删（valid=false）的规则跳过。
         /// </summary>
