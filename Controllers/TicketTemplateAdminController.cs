@@ -477,13 +477,9 @@ namespace SnowmeetApi.Controllers
             List<string> categoryCodes = categories.Select(c => c.code)
                 .Where(c => !string.IsNullOrWhiteSpace(c)).ToList();
 
-            // hidden == 1 = 不在顾客端商城露出的「内部服务商品」，正是券要打折的对象
-            // （养护的 单项/双项/加急、非雪季养护）。hidden == 0 的是顾客自己能买的上架商品
-            // （次卡、季卡、饮品），不该出现在券的商品优惠里。
-            // ⚠️ 这一列的存量数据不一致：崇礼旗舰店的 712/713 是养护服务却标了 hidden=0，
-            //    会被这条规则挡掉。要让它们出现，把这两个商品的 hidden 改成 1。
+            // hidden == 0 才是「显示」，hidden == 1 是隐藏——与 SkiPassController 等处一致。
             IQueryable<Product> q = _db.product.AsNoTracking()
-                .Where(p => p.valid == 1 && p.hidden == 1
+                .Where(p => p.valid == 1 && p.hidden == 0
                     && ((p.category_id != null && categoryIds.Contains((int)p.category_id))
                         || (p.category_code != null && p.category_code != ""
                             && categoryCodes.Contains(p.category_code))));
