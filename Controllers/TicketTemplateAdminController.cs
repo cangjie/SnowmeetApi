@@ -190,14 +190,6 @@ namespace SnowmeetApi.Controllers
             });
         }
 
-        /// <summary>
-        /// 商品的店铺名。三级取值：product.shop 文本 &gt; shop_list 按 shop_id 反查 &gt; 兜底。
-        ///
-        /// 两个来源都不可靠所以都要试：养护类商品 shop 有文本（万龙/南山/崇礼旗舰店）但
-        /// shop_id 未必对得上（137-143 的 shop 是"万龙"、shop_id 却是 10 万龙体验中心）；
-        /// 餐饮类商品反过来，shop 是 NULL，shop_id 是 45855+ 这种七色米侧的号，shop_list 里没有。
-        /// 都取不到就是"没绑门店"——这条优惠规则对该业务线所有门店都生效。
-        /// </summary>
         [NonAction]
         private async Task<Dictionary<int, string>> GetShopNames()
         {
@@ -206,6 +198,17 @@ namespace SnowmeetApi.Controllers
                 .ToDictionary(x => x.id, x => (x.name ?? "").Trim());
         }
 
+        /// <summary>
+        /// 商品的店铺名，**以 shop_list 为准**：shop_id 反查 &gt; product.shop 文本 &gt; 兜底。
+        ///
+        /// 先查 shop_list 而不是先读 product.shop，是因为那个文本列写法不统一——
+        /// 137/138/139/140 存的是"万龙"、715 存的是"万龙服务中心"，其实是同一个店（shop_id 都是 1），
+        /// 直接显示文本会让同一个列表里出现【万龙】和【万龙服务中心】两种叫法。
+        ///
+        /// 文本列留作兜底：次卡/季卡类商品 shop_id 是空的、只有文本；
+        /// 餐饮类两边都不可用（shop 为 NULL，shop_id 是 45855+ 那种七色米侧的号，shop_list 里没有），
+        /// 落到"全部门店"——语义上也成立，这条优惠规则对该业务线所有门店都生效。
+        /// </summary>
         [NonAction]
         private static string ResolveShopName(Product p, Dictionary<int, string> shopById)
         {
@@ -213,16 +216,12 @@ namespace SnowmeetApi.Controllers
             {
                 return "全部门店";
             }
-            string shop = (p.shop ?? "").Trim();
-            if (shop != "")
-            {
-                return shop;
-            }
             if (p.shop_id != null && shopById.ContainsKey((int)p.shop_id))
             {
                 return shopById[(int)p.shop_id];
             }
-            return "全部门店";
+            string shop = (p.shop ?? "").Trim();
+            return shop != "" ? shop : "全部门店";
         }
 
         [NonAction]
@@ -478,8 +477,13 @@ namespace SnowmeetApi.Controllers
             List<string> categoryCodes = categories.Select(c => c.code)
                 .Where(c => !string.IsNullOrWhiteSpace(c)).ToList();
 
+            // hidden == 1 = 不在顾客端商城露出的「内部服务商品」，正是券要打折的对象
+            // （养护的 单项/双项/加急、非雪季养护）。hidden == 0 的是顾客自己能买的上架商品
+            // （次卡、季卡、饮品），不该出现在券的商品优惠里。
+            // ⚠️ 这一列的存量数据不一致：崇礼旗舰店的 712/713 是养护服务却标了 hidden=0，
+            //    会被这条规则挡掉。要让它们出现，把这两个商品的 hidden 改成 1。
             IQueryable<Product> q = _db.product.AsNoTracking()
-                .Where(p => p.valid == 1
+                .Where(p => p.valid == 1 && p.hidden == 1
                     && ((p.category_id != null && categoryIds.Contains((int)p.category_id))
                         || (p.category_code != null && p.category_code != ""
                             && categoryCodes.Contains(p.category_code))));
