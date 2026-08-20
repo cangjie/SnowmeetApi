@@ -44,6 +44,21 @@ namespace SnowmeetApi.Controllers
             return new ApiResult<object>() { code = 1, message = "没有权限", data = null };
         }
 
+        /// <summary>
+        /// 养护服务分类。按 category.code 查出当前 id —— code 稳定、id 会变
+        /// （2026-08-19 之前这里写死 14）。返回 (id, code)：老商品可能只有 category_id、
+        /// 新建的两个都写，所以筛选时两个条件取或。
+        /// </summary>
+        [NonAction]
+        private async Task<(int? id, string code)> ResolveCareCategory()
+        {
+            string code = CareProductRules.CareCategoryCode;
+            int? id = await _db.category.AsNoTracking()
+                .Where(c => c.code == code && c.valid == 1)
+                .Select(c => (int?)c.id).FirstOrDefaultAsync();
+            return (id, code);
+        }
+
         [HttpGet]
         public async Task<ActionResult<ApiResult<object>>> GetCareProductsByStaff(int? shopId,
             string sessionKey, string sessionType = "wechat_mini_openid")
@@ -54,9 +69,11 @@ namespace SnowmeetApi.Controllers
                 return Ok(Deny());
             }
 
+            var (careCatId, careCatCode) = await ResolveCareCategory();
             // 已停用的（valid = 0）一律不列：它们不参与计价，摆出来只会干扰
             IQueryable<Product> q = _db.product.AsNoTracking()
-                .Where(p => p.category_id == CareProductRules.CareCategoryId && p.valid == 1);
+                .Where(p => (p.category_id == careCatId || p.category_code == careCatCode)
+                    && p.valid == 1);
             if (shopId != null && shopId > 0)
             {
                 q = q.Where(p => p.shop_id == shopId);
@@ -84,7 +101,7 @@ namespace SnowmeetApi.Controllers
                     name = p.name,
                     shopId = p.shop_id,
                     shopName = p.shop_id != null && shopById.ContainsKey((int)p.shop_id)
-                        ? shopById[(int)p.shop_id] : (p.shop ?? "").Trim(),
+                        ? shopById[(int)p.shop_id] : "",
                     salePrice = p.sale_price,
                     valid = p.valid,
                     hidden = p.hidden,
@@ -143,6 +160,15 @@ namespace SnowmeetApi.Controllers
                 return Ok(new ApiResult<object>() { code = 1, message = "门店不存在", data = null });
             }
 
+            var (careCatId, careCatCode) = await ResolveCareCategory();
+            if (careCatId == null)
+            {
+                return Ok(new ApiResult<object>()
+                {
+                    code = 1, message = "养护分类（code " + careCatCode + "）不存在", data = null
+                });
+            }
+
             bool isNew = req.id <= 0;
             Product p = isNew ? null
                 : await _db.product.FirstOrDefaultAsync(x => x.id == req.id);
@@ -150,7 +176,7 @@ namespace SnowmeetApi.Controllers
             {
                 return Ok(new ApiResult<object>() { code = 1, message = "商品不存在", data = null });
             }
-            if (!isNew && p.category_id != CareProductRules.CareCategoryId)
+            if (!isNew && p.category_id != careCatId && p.category_code != careCatCode)
             {
                 // 防止拿别的分类的商品 id 从这个入口改价
                 return Ok(new ApiResult<object>() { code = 1, message = "该商品不属于养护分类", data = null });
@@ -159,7 +185,9 @@ namespace SnowmeetApi.Controllers
             {
                 p = new Product()
                 {
-                    category_id = CareProductRules.CareCategoryId,
+                    // 两个都写：category_code 是稳定键，category_id 供运行期连接
+                    category_id = careCatId,
+                    category_code = careCatCode,
                     type = "服务",
                     valid = 1,
                     on_shelves = 0,   // 养护服务不在顾客端商城直接售卖，与现有同类商品一致
@@ -169,9 +197,6 @@ namespace SnowmeetApi.Controllers
 
             p.name = req.name.Trim();
             p.shop_id = req.shopId;
-            // shop 文本列与 shop_list 保持一致：历史上 137~140 存"万龙"、715 存"万龙服务中心"，
-            // 同一个店两种写法，是旧的双向子串匹配留下的烂摊子，新数据不再制造这种分歧
-            p.shop = shop.name.Trim();
             p.sale_price = (double)req.salePrice;
             p.hidden = req.hidden;
             p.sort = req.sort;
@@ -199,8 +224,9 @@ namespace SnowmeetApi.Controllers
             {
                 return Ok(Deny());
             }
+            var (careCatId, careCatCode) = await ResolveCareCategory();
             Product p = await _db.product.FirstOrDefaultAsync(x => x.id == id);
-            if (p == null || p.category_id != CareProductRules.CareCategoryId)
+            if (p == null || (p.category_id != careCatId && p.category_code != careCatCode))
             {
                 return Ok(new ApiResult<object>() { code = 1, message = "商品不存在", data = null });
             }

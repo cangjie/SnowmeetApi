@@ -74,5 +74,13 @@ namespace SnowmeetApi.Tests
         {
             Assert.Equal(expected, CareProductRules.IsPricingRecognizedName(name));
         }
+        [Fact]
+        public void 养护分类以code认不以id认()
+        {
+            // category.id 会变（分类重建就换号），code 是人工维护的稳定值。
+            // 2026-08-19 之前这里是 const int CareCategoryId = 14，分类一换号
+            // 养护定价就取不到商品、服务费全变 0。
+            Assert.Equal("0203", CareProductRules.CareCategoryCode);
+        }
     }
 }

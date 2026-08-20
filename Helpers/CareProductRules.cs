@@ -19,8 +19,12 @@ namespace SnowmeetApi.Helpers
     /// </summary>
     public static class CareProductRules
     {
-        /// <summary>养护服务商品固定挂在这个分类下。</summary>
-        public const int CareCategoryId = 14;
+        /// <summary>
+        /// 养护服务商品挂的分类，**以 category.code 认，不认 id**。
+        /// category.id 是自增值、分类重建/迁移就会换号；code 是人工维护的稳定值。
+        /// 2026-08-19 之前这里写死 id = 14，分类一换号养护定价就取不到商品、服务费全变 0。
+        /// </summary>
+        public const string CareCategoryCode = "0203";
 
         /// <summary>
         /// 维护页的状态。优先级：已停用 &gt; 已隐藏 &gt; 在售。

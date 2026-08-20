@@ -1151,7 +1151,10 @@ namespace SnowmeetApi.Controllers
                     ? TicketTemplateRules.ResolveTicketExpireDate(template, startDate ?? DateTime.Now)
                     : (DateTime?)null),
                 biz_id = bizId,
-                biz_type = bizType
+                biz_type = bizType,
+                // 2026-08-19：这个参数一直收着却没存，导致 12252 张券里 staff_id 全是 NULL、
+                // 后台看不到发券人。养护完成赠送（近一年 1909 张）就是从这里进来的。
+                staff_id = staffId
             };
             await _context.ticket.AddAsync(ticket);
             await _context.SaveChangesAsync();

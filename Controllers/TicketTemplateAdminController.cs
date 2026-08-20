@@ -199,15 +199,11 @@ namespace SnowmeetApi.Controllers
         }
 
         /// <summary>
-        /// 商品的店铺名，**以 shop_list 为准**：shop_id 反查 &gt; product.shop 文本 &gt; 兜底。
+        /// 商品的店铺名，取自 shop_id 关联的 shop_list。
         ///
-        /// 先查 shop_list 而不是先读 product.shop，是因为那个文本列写法不统一——
-        /// 137/138/139/140 存的是"万龙"、715 存的是"万龙服务中心"，其实是同一个店（shop_id 都是 1），
-        /// 直接显示文本会让同一个列表里出现【万龙】和【万龙服务中心】两种叫法。
-        ///
-        /// 文本列留作兜底：次卡/季卡类商品 shop_id 是空的、只有文本；
-        /// 餐饮类两边都不可用（shop 为 NULL，shop_id 是 45855+ 那种七色米侧的号，shop_list 里没有），
-        /// 落到"全部门店"——语义上也成立，这条优惠规则对该业务线所有门店都生效。
+        /// shop_id 落不到 shop_list 时显示"全部门店"——餐饮类商品就是这种情况
+        /// （shop_id 是 45855+ 那种七色米侧的号，不在 shop_list 里）。
+        /// 这个说法语义上也成立：没绑门店的规则对该业务线所有门店都生效。
         /// </summary>
         [NonAction]
         private static string ResolveShopName(Product p, Dictionary<int, string> shopById)
@@ -216,12 +212,8 @@ namespace SnowmeetApi.Controllers
             {
                 return "全部门店";
             }
-            if (p.shop_id != null && shopById.ContainsKey((int)p.shop_id))
-            {
-                return shopById[(int)p.shop_id];
-            }
-            string shop = (p.shop ?? "").Trim();
-            return shop != "" ? shop : "全部门店";
+            return (p.shop_id != null && shopById.ContainsKey((int)p.shop_id))
+                ? shopById[(int)p.shop_id] : "全部门店";
         }
 
         [NonAction]
@@ -488,7 +480,7 @@ namespace SnowmeetApi.Controllers
                 string k = Util.UrlDecode(keyword).Trim();
                 q = q.Where(p => p.name.Contains(k));
             }
-            List<Product> rows = await q.OrderBy(p => p.shop).ThenBy(p => p.name).Take(200).ToListAsync();
+            List<Product> rows = await q.OrderBy(p => p.shop_id).ThenBy(p => p.name).Take(200).ToListAsync();
             Dictionary<int, string> shopById = await GetShopNames();
 
             // label 在内存里拼：double 拼进字符串 EF 翻不成 SQL，放在 Select 里会运行时炸

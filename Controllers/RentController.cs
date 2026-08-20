@@ -5922,8 +5922,35 @@ namespace SnowmeetApi.Controllers
         // 次卡/季卡商品下发给顾客端的统一视图。名称/价格/次数/门店/图片/简介**全部来自 product 表**——
         // 顾客端不得再自己拼任何商品文案（首页那行简介一度硬编码在 punchcard_shop.js 里，
         // 商品维护页编的 content 和图片根本没传到顾客端，改了后台顾客也看不到变化）。
+        /// <summary>
+        /// shop_list 整表拿成 id → 店名 字典。表只有 7 行，比在循环里逐个查划算。
+        /// </summary>
         [NonAction]
-        private object BuildPunchCardProductView(Product p, string bizType, string cardType)
+        private async Task<Dictionary<int, string>> GetShopNameMap()
+        {
+            return (await _db.shop.AsNoTracking().ToListAsync())
+                .ToDictionary(x => x.id, x => (x.name ?? "").Trim());
+        }
+
+        /// <summary>
+        /// 商品的收款归属门店名，取自 shop_id 关联的 shop_list——2026-08-19 起是唯一来源。
+        /// 原来的 product.shop 自由文本列已随该次改造删除（同一个店存过"万龙"和"万龙服务中心"）。
+        /// 这个名字要写进 order.shop，再由 GetMchId 按子串判定选微信商户号，错不得。
+        /// </summary>
+        [NonAction]
+        private static string ResolveProductShopName(Product p, Dictionary<int, string> shopById)
+        {
+            if (p == null)
+            {
+                return "";
+            }
+            return (p.shop_id != null && shopById.ContainsKey((int)p.shop_id))
+                ? shopById[(int)p.shop_id] : "";
+        }
+
+        [NonAction]
+        private object BuildPunchCardProductView(Product p, string bizType, string cardType,
+            Dictionary<int, string> shopById)
         {
             ProductImage headImage = p.images == null ? null
                 : p.images.Where(i => i.valid == 1).OrderBy(i => i.sort).ThenBy(i => i.id).FirstOrDefault();
@@ -5934,7 +5961,8 @@ namespace SnowmeetApi.Controllers
                 p.name,
                 p.sale_price,
                 punch_total = isSeason ? null : p.punch_total,   // 季卡不限次数，次数字段对它无意义
-                p.shop,
+                shop = ResolveProductShopName(p, shopById),
+                shopId = p.shop_id,
                 bizType = bizType,
                 cardType = cardType,
                 isSeason = isSeason,
@@ -5951,7 +5979,7 @@ namespace SnowmeetApi.Controllers
         // 只买租赁次卡的现有调用方；cardType 传 "all" 则返回该 bizType 下 次卡+季卡 的合并列表
         // （顾客自助购买首页用，季卡也能自助买）。会话级即可，无需 staff 权限。
         // shop 参数保留只为兼容既有调用方的 URL，**不参与过滤**：卡是全店通用的，
-        // product.shop 只表示收款归哪个门店账户（详见方法体内说明）。
+        // 收款归属门店只表示钱进哪个门店账户（详见方法体内说明）。
         [HttpGet]
         public async Task<ActionResult<ApiResult<object>>> GetPunchCardProducts(string? shop, string sessionKey = "",
             string bizType = "租赁", string cardType = "次卡")
@@ -5963,6 +5991,7 @@ namespace SnowmeetApi.Controllers
                     || cardType.Trim().Equals("all", StringComparison.OrdinalIgnoreCase))
                 ? new List<string>() { "次卡", "季卡" }
                 : new List<string>() { cardType.Trim() };
+            Dictionary<int, string> shopById = await GetShopNameMap();
             List<object> result = new List<object>();
             foreach (string ct in cardTypes)
             {
@@ -5977,7 +6006,7 @@ namespace SnowmeetApi.Controllers
                 {
                     q = q.Where(p => p.punch_total != null);
                 }
-                // ⚠️ 不按 shop 过滤。product.shop 是「购买款项收到哪个门店账户」的归属属性
+                // ⚠️ 不按门店过滤。商品的门店（shop_id）是「购买款项收到哪个门店账户」的归属属性
                 // （决定下单时 order.shop → GetMchId 选哪个微信商户号），**不代表限制在哪个门店使用**。
                 // 卡买到手全店通用，所以任何门店的目录都要列出全部卡种；
                 // 早先这里按 shop 过滤是把它误当成「适用门店」了。
@@ -5985,7 +6014,7 @@ namespace SnowmeetApi.Controllers
                     .OrderBy(p => p.sort).ThenBy(p => p.id).AsNoTracking().ToListAsync();
                 foreach (Product p in products)
                 {
-                    result.Add(BuildPunchCardProductView(p, bizType, ct));
+                    result.Add(BuildPunchCardProductView(p, bizType, ct, shopById));
                 }
             }
             return Ok(new ApiResult<object>() { code = 0, message = "", data = result });
@@ -6011,7 +6040,7 @@ namespace SnowmeetApi.Controllers
             {
                 code = 0,
                 message = "",
-                data = BuildPunchCardProductView(p, cat.biz_type, cat.name)
+                data = BuildPunchCardProductView(p, cat.biz_type, cat.name, await GetShopNameMap())
             });
         }
 
@@ -6039,6 +6068,7 @@ namespace SnowmeetApi.Controllers
                     ("养护", "次卡"), ("养护", "季卡"), ("租赁", "次卡"), ("租赁", "季卡")
                 };
             }
+            Dictionary<int, string> shopByIdAll = await GetShopNameMap();
             List<object> result = new List<object>();
             foreach (var combo in combos)
             {
@@ -6063,7 +6093,8 @@ namespace SnowmeetApi.Controllers
                         p.sale_price,
                         p.punch_total,
                         p.care_project_count,   // 养护次卡：1=单项 / 2=双项
-                        p.shop,
+                        shop = ResolveProductShopName(p, shopByIdAll),
+                        shopId = p.shop_id,
                         p.valid,
                         p.on_shelves,
                         imageUrl = headImage == null ? null : headImage.image_url,
@@ -6237,10 +6268,16 @@ namespace SnowmeetApi.Controllers
             {
                 return Ok(new ApiResult<object>() { code = 1, message = "商品未配置次数，暂不可购买", data = null });
             }
-            // product.shop = 收款归属门店：订单落在这个店下，GetMchId 据此选微信商户号、
+            // 收款归属门店：订单落在这个店下，GetMchId 据此选微信商户号、
             // GenerateOrderCode 据此取订单号前缀，也就是这笔钱进哪个门店的账。
             // 它**不限制卡在哪儿使用**（卡全店通用），但没有它就不知道该收到谁的账上，所以必填。
-            if (string.IsNullOrWhiteSpace(p.shop))
+            //
+            // 2026-08-19 起认 product.shop_id 关联 shop_list，不再抄 product.shop 那个自由文本列
+            // （同一个店存过"万龙"和"万龙服务中心"两种写法）。写进 order.shop 的仍是店名，
+            // 只是来源换成了主数据。
+            Models.Shop payShop = p.shop_id == null ? null
+                : await _db.shop.AsNoTracking().FirstOrDefaultAsync(x => x.id == p.shop_id);
+            if (payShop == null || string.IsNullOrWhiteSpace(payShop.name))
             {
                 return Ok(new ApiResult<object>() { code = 1, message = "该商品未设置收款门店，暂不支持购买", data = null });
             }
@@ -6249,7 +6286,7 @@ namespace SnowmeetApi.Controllers
             {
                 id = 0,
                 type = "零售",
-                shop = p.shop.Trim(),
+                shop = payShop.name.Trim(),
                 member_id = member.id,   // ← 自助购买：订单归属购买人本人
                 staff_id = null,
                 recepting = 0,
@@ -6362,7 +6399,7 @@ namespace SnowmeetApi.Controllers
                     paidAmount = Math.Round(paid, 2),
                     paid = Math.Round(paid, 2) >= amount,   // 已付清则确认页只显示结果、不再给支付按钮
                     closed = order.closed == 1,
-                    product = BuildPunchCardProductView(p, cat.biz_type, cat.name)
+                    product = BuildPunchCardProductView(p, cat.biz_type, cat.name, await GetShopNameMap())
                 }
             });
         }

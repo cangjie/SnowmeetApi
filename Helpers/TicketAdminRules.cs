@@ -102,5 +102,72 @@ namespace SnowmeetApi.Helpers
             }
             return (pageIndex, pageSize);
         }
+        /// <summary>
+        /// 发券来源的一句话描述。**仅在券上没有 staff_id 时**用它兜底。
+        ///
+        /// 背景：ticket.staff_id 这一列 2026-08-19 之前全库为 NULL —— CreateTicket 收了
+        /// staffId 参数却没存。所以历史券没有"发券人"这个人，只能从 create_memo / channel
+        /// 反推是哪条路发出来的。新券会带上真实店员。
+        ///
+        /// create_memo 是纯数字时代表雪票 id（买雪票赠券那条路存的就是 skiPass.id）。
+        /// </summary>
+        public static string DescribeIssueSource(string createMemo, string channel)
+        {
+            string memo = (createMemo ?? "").Trim();
+            string ch = (channel ?? "").Trim();
+            if (memo == "养护完成赠送")
+            {
+                return "养护完成自动发放";
+            }
+            if (memo == "非雪季养护" || memo == "非雪季赠双项")
+            {
+                return "非雪季养护下单";
+            }
+            if (memo == "转赠被领取回赠")
+            {
+                return "转赠回赠（系统）";
+            }
+            if (memo == "扫码领取")
+            {
+                return "顾客扫码领取";
+            }
+            if (memo == "买雪票增券" || IsAllDigits(memo))
+            {
+                return "买雪票赠券";
+            }
+            if (memo.StartsWith("unipay_"))
+            {
+                return "养护订单赠券";
+            }
+            if (memo.StartsWith("体验订单获得"))
+            {
+                return "体验订单赠券";
+            }
+            if (memo.StartsWith("养护订单获得"))
+            {
+                return "养护订单赠券";
+            }
+            if (ch != "")
+            {
+                return ch;
+            }
+            return memo != "" ? memo : "系统发放";
+        }
+
+        private static bool IsAllDigits(string s)
+        {
+            if (string.IsNullOrEmpty(s))
+            {
+                return false;
+            }
+            foreach (char c in s)
+            {
+                if (c < '0' || c > '9')
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
     }
 }

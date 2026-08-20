@@ -191,5 +191,52 @@ namespace SnowmeetApi.Tests
             Assert.Equal((1, 20), TicketAdminRules.ClampPaging(1, 101));
             Assert.Equal((1, 100), TicketAdminRules.ClampPaging(1, 100));
         }
+        // ── 发券来源（staff_id 为空时的兜底文案）────────────────────────
+        // ticket.staff_id 2026-08-19 之前全库 NULL（CreateTicket 收了参数没存），
+        // 历史券只能从 create_memo / channel 反推来源。期望值取自近一年实际分布。
+
+        [Theory]
+        [InlineData("养护完成赠送", "", "养护完成自动发放")]   // 1909 张
+        [InlineData("非雪季养护", "", "非雪季养护下单")]        // 336 张
+        [InlineData("非雪季赠双项", "", "非雪季养护下单")]      // 26 张
+        [InlineData("转赠被领取回赠", "", "转赠回赠（系统）")]  // 4 张
+        [InlineData("扫码领取", "", "顾客扫码领取")]
+        [InlineData("买雪票增券", "", "买雪票赠券")]
+        [InlineData("unipay_69798", "", "养护订单赠券")]
+        [InlineData("体验订单获得,ID:12", "", "体验订单赠券")]
+        [InlineData("养护订单获得,ID:12", "", "养护订单赠券")]
+        public void 发券来源_按create_memo识别(string memo, string channel, string expected)
+        {
+            Assert.Equal(expected, TicketAdminRules.DescribeIssueSource(memo, channel));
+        }
+
+        [Theory]
+        [InlineData("7353")]
+        [InlineData("963")]
+        public void 发券来源_纯数字memo是雪票id(string memo)
+        {
+            // 买雪票赠券那条路 create_memo 存的是 skiPass.id，近一年 963 张
+            Assert.Equal("买雪票赠券", TicketAdminRules.DescribeIssueSource(memo, ""));
+        }
+
+        [Fact]
+        public void 发券来源_memo为空时退回channel()
+        {
+            Assert.Equal("店员发放", TicketAdminRules.DescribeIssueSource("", "店员发放"));
+            Assert.Equal("店员发放", TicketAdminRules.DescribeIssueSource(null, "店员发放"));
+        }
+
+        [Fact]
+        public void 发券来源_两者都空时不留白()
+        {
+            Assert.Equal("系统发放", TicketAdminRules.DescribeIssueSource("", ""));
+            Assert.Equal("系统发放", TicketAdminRules.DescribeIssueSource(null, null));
+        }
+
+        [Fact]
+        public void 发券来源_认不出的memo原样显示()
+        {
+            Assert.Equal("管理员赠送", TicketAdminRules.DescribeIssueSource("管理员赠送", ""));
+        }
     }
 }

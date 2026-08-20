@@ -19,7 +19,10 @@ namespace SnowmeetApi.Models
         public double? market_price { get; set; } = null;
         public double? cost { get; set; } = null;
         public string? type { get; set; } = null;
-        public string? shop { get; set; } = null;
+        // shop（门店名文本列）2026-08-19 移除：门店归属统一由 shop_id 关联 shop_list 决定。
+        // 那一列写法不统一（同一个店存过"万龙"和"万龙服务中心"），还被当成雪场名用过
+        // （崇礼旗舰店卖万龙雪场的票，导致按 resort 查雪票查不出来）。DDL 见
+        // snowmeet_ai_doc/sql/2026-08-19_drop_product_shop.sql
         public int hidden { get; set; } = 1;
         public int valid { get; set; } = 0;
         public int on_shelves { get; set; } = 0;

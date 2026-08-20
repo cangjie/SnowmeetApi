@@ -437,6 +437,14 @@ namespace SnowmeetApi.Controllers
         public async Task UpdateSkipassProduct(string keyword)
         {
             ProductQueryResult originProductInfo = (ProductQueryResult)((OkObjectResult)(await GetProductList(keyword)).Result).Value;
+            // 万龙自我游同步过来的都是「崇礼旗舰店卖的万龙雪场票」：
+            // 门店 = 崇礼旗舰店（shop_id 关联 shop_list），雪场 = 万龙（category「万龙雪票」）。
+            // 分类必须写，否则新同步进来的商品不会出现在按分类筛的雪票列表里。
+            int? syncShopId = await _context.shop.AsNoTracking()
+                .Where(x => x.name == "崇礼旗舰店").Select(x => (int?)x.id).FirstOrDefaultAsync();
+            int? syncCategoryId = await _context.category.AsNoTracking()
+                .Where(c => c.biz_type == "雪票" && c.name == "万龙雪票" && c.valid == 1)
+                .Select(c => (int?)c.id).FirstOrDefaultAsync();
             for (int i = 0; i < originProductInfo.data.results.Length; i++)
             {
                 ZiwoyouSkipassProduct skipassProduct = originProductInfo.data.results[i];
@@ -470,7 +478,8 @@ namespace SnowmeetApi.Controllers
                         market_price = skipassProduct.salePrice,
                         cost = skipassProduct.settlementPrice,
                         type = "雪票",
-                        shop = "崇礼旗舰店",
+                        shop_id = syncShopId,
+                        category_id = syncCategoryId,
                         hidden = 0,
                         start_date = DateTime.Parse("2024-10-1"),
                         end_date = DateTime.Parse("2025-6-1"),
@@ -502,7 +511,7 @@ namespace SnowmeetApi.Controllers
         {
             var l = await _context.skiPassProduct.Include(s => s.dailyPrice)
                 .Join(_context.product, s => s.product_id, p => p.id,
-                (s, p) => new { s.product_id, s.resort, s.rules, s.source, s.third_party_no, p.name, p.shop, p.sale_price, p.market_price, p.cost, p.type, s.dailyPrice })
+                (s, p) => new { s.product_id, s.resort, s.rules, s.source, s.third_party_no, p.name, p.shop_id, p.sale_price, p.market_price, p.cost, p.type, s.dailyPrice })
                 .Where(p => p.type.Trim().Equals("雪票") && p.product_id == id
                 && p.third_party_no != null)
                 .AsNoTracking().ToListAsync();
@@ -510,7 +519,17 @@ namespace SnowmeetApi.Controllers
             {
                 return NotFound();
             }
-            return Ok(l[0]);
+            // 门店名以 shop_id 关联 shop_list 为准，product.shop 自由文本只作兜底
+            var row = l[0];
+            string shopName = "";
+            if (row.shop_id != null)
+            {
+                Models.Shop sh = await _context.shop.AsNoTracking()
+                    .FirstOrDefaultAsync(x => x.id == row.shop_id);
+                shopName = sh == null ? "" : (sh.name ?? "").Trim();
+            }
+            return Ok(new { row.product_id, row.resort, row.rules, row.source, row.third_party_no,
+                row.name, shop = shopName, row.sale_price, row.market_price, row.cost, row.type, row.dailyPrice });
         }
 
 

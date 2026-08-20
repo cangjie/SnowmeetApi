@@ -103,6 +103,23 @@ namespace SnowmeetApi.Controllers.SkiPass
         }
 
 
+
+        [NonAction]
+        private async Task<string> ResolveProductShopName(Models.Product p)
+        {
+            if (p == null)
+            {
+                return "";
+            }
+            if (p.shop_id == null)
+            {
+                return "";
+            }
+            Models.Shop sh = await _db.shop.AsNoTracking()
+                .FirstOrDefaultAsync(x => x.id == p.shop_id);
+            return sh == null ? "" : (sh.name ?? "").Trim();
+        }
+
         [HttpGet]
         public async Task<ActionResult<List<ReserveSummary>>> GetReserve(DateTime date, string sessionKey, string sessionType = "wechat_mini_openid")
         {
@@ -422,7 +439,9 @@ namespace SnowmeetApi.Controllers.SkiPass
                 id = 0,
                 member_id = member.id,
                 type = "雪票",
-                shop = product.shop.Trim(),
+                // 门店名以 shop_id 关联 shop_list 为准，product.shop 自由文本只作兜底：
+                // 这个值写进 order.shop 后由 GetMchId 按子串判定选微信商户号，错不得
+                shop = await ResolveProductShopName(product),
                 total_amount = totalAmount,
                 paying_amount = totalPrice,
                 create_date = DateTime.Now,

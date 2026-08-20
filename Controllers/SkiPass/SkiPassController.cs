@@ -44,6 +44,44 @@ namespace SnowmeetApi.Controllers
             _zwHelper = new WanlongZiwoyouHelper(context, config);
             _http = http;
         }
+
+        /// <summary>
+        /// 雪场名 → 雪票分类 id。分类表里 biz_type = "雪票" 的两条是「南山雪票」(0301) / 「万龙雪票」(0302)。
+        ///
+        /// 2026-08-19 之前这里是拿 product.shop 去比 resort —— 那是**门店**比**雪场**，
+        /// 只因为南山的门店名和雪场名恰好相同才没出事；崇礼旗舰店卖的是万龙雪场的票
+        /// （product.shop = "崇礼旗舰店"、resort = "万龙"），resort="万龙" 一条也查不出来。
+        /// 生产实测：按分类筛 南山 80 条 / 万龙 74 条，与按 skiPassProduct.resort 筛逐条相同。
+        /// </summary>
+        [NonAction]
+        private async Task<int?> ResolveSkiPassCategoryId(string resort)
+        {
+            string name = (resort ?? "").Trim() + "雪票";
+            return await _context.category.AsNoTracking()
+                .Where(c => c.biz_type == "雪票" && c.name == name && c.valid == 1)
+                .Select(c => (int?)c.id).FirstOrDefaultAsync();
+        }
+
+        /// <summary>
+        /// 商品的门店名，以 shop_id 关联 shop_list 为准，product.shop 文本只作兜底。
+        /// 这个名字要写进 order.shop，再由 GetMchId 按子串判定选微信商户号，不能取自自由文本列。
+        /// </summary>
+        [NonAction]
+        private async Task<string> ResolveProductShopName(Models.Product p)
+        {
+            if (p == null)
+            {
+                return "";
+            }
+            if (p.shop_id == null)
+            {
+                return "";
+            }
+            Models.Shop sh = await _context.shop.AsNoTracking()
+                .FirstOrDefaultAsync(x => x.id == p.shop_id);
+            return sh == null ? "" : (sh.name ?? "").Trim();
+        }
+
         [HttpGet]
         public  ActionResult<List<string>> GetResorts()
         {
@@ -87,7 +125,8 @@ namespace SnowmeetApi.Controllers
                 tags = tags.Replace("节假日", "平日").Replace("周六", "平日").Replace("周日", "平日").Replace("周末", "平日");
             }
             string[] tagArr = tags == null ? new string[] { } : Util.UrlDecode(tags.Trim()).Split(',');
-            var skiPassProdustList = await _context.product.Where(p => (p.shop.Trim().Equals(resort.Trim()) && p.hidden == 0 && p.end_date >= DateTime.Now.Date))
+            int? skiPassCategoryId = await ResolveSkiPassCategoryId(resort);
+            var skiPassProdustList = await _context.product.Where(p => (p.category_id == skiPassCategoryId && p.hidden == 0 && p.end_date >= DateTime.Now.Date))
                 .Join(_context.skiPassProduct, p => p.id, s => s.product_id,
                 (p, s) => new {
                     p.id,
@@ -858,7 +897,7 @@ namespace SnowmeetApi.Controllers
                 id = 0,
                 member_id = member.id,
                 type = "雪票",
-                shop = product.shop.Trim(),
+                shop = await ResolveProductShopName(product),
                 total_amount = (double)skipass.deal_price * count,
                 paying_amount = (double)skipass.deal_price * count,
                 create_date = DateTime.Now,
@@ -1066,7 +1105,7 @@ namespace SnowmeetApi.Controllers
             resort = Util.UrlDecode(resort);
             var l = await _context.skiPassProduct//.Include(s => s.dailyPrice)
                 .Join(_context.product, s=>s.product_id, p=>p.id,
-                (s, p)=> new {s.product_id, s.resort, s.rules, s.source, s.third_party_no, p.name, p.shop, 
+                (s, p)=> new {s.product_id, s.resort, s.rules, s.source, s.third_party_no, p.name, p.shop_id,
                 s.commonDayDealPrice, s.weekendDealPrice, 
                 //s.dailyPrice, 
                 //s.avaliablePriceList,
@@ -1076,6 +1115,9 @@ namespace SnowmeetApi.Controllers
                 && ((p.hidden == 0 && showHidden == 0) || (showHidden == 1))
                 ).OrderBy(p => p.market_price).AsNoTracking().ToListAsync();
             
+            // 门店名以 shop_list 为准；shop_list 只有 7 行，整表拿成字典
+            Dictionary<int, string> shopById = (await _context.shop.AsNoTracking().ToListAsync())
+                .ToDictionary(x => x.id, x => (x.name ?? "").Trim());
             List<SkipassWithPrice> ret = new List<SkipassWithPrice>();
             for(int i = 0; i < l.Count; i++)
             {
@@ -1098,7 +1140,8 @@ namespace SnowmeetApi.Controllers
                     source = skipass.source,
                     third_party_no = skipass.third_party_no,
                     name = p.name,
-                    shop = p.shop,
+                    shop = (p.shop_id != null && shopById.ContainsKey((int)p.shop_id))
+                        ? shopById[(int)p.shop_id] : "",
                     commonDayDealPrice = skipass.commonDayDealPrice,
                     weekendDealPrice = skipass.weekendDealPrice,
                     dailyPrice = skipass.dailyPrice,
@@ -1152,7 +1195,7 @@ namespace SnowmeetApi.Controllers
                 source = skipass.source,
                 third_party_no = skipass.third_party_no,
                 name = p.name,
-                shop = p.shop,
+                shop = await ResolveProductShopName(p),
                 commonDayDealPrice = skipass.commonDayDealPrice,
                 weekendDealPrice = skipass.weekendDealPrice,
                 dailyPrice = skipass.dailyPrice,

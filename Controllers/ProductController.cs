@@ -35,12 +35,28 @@ namespace SnowmeetApi.Controllers
 
         }
 
+
+        /// <summary>
+        /// 雪场名 → 雪票分类 id（category.biz_type = "雪票"：南山雪票 0301 / 万龙雪票 0302）。
+        /// 原来是拿 product.shop 比 resort —— 门店比雪场，崇礼旗舰店卖的是万龙雪场的票，
+        /// resort="万龙" 一条也查不出来。改按分类筛后 南山 80 条 / 万龙 74 条，与按 resort 筛等价。
+        /// </summary>
+        [NonAction]
+        private async Task<int?> ResolveSkiPassCategoryId(string resort)
+        {
+            string name = (resort ?? "").Trim() + "雪票";
+            return await _context.category.AsNoTracking()
+                .Where(c => c.biz_type == "雪票" && c.name == name && c.valid == 1)
+                .Select(c => (int?)c.id).FirstOrDefaultAsync();
+        }
+
         [HttpGet]
         [ActionName("GetNanshanTodaySkipass")]
         public async Task<ActionResult<IEnumerable<Product>>> GetNanshanTodaySkipass()
         {
+            int? nanshanCategoryId = await ResolveSkiPassCategoryId("南山");
             return await _context.product
-                .Where(p => (p.name.Trim().IndexOf("当日票") >= 0 && p.shop.Trim().Equals("南山") && p.type.Trim().Equals("雪票") && p.end_date > DateTime.Now ))
+                .Where(p => (p.name.Trim().IndexOf("当日票") >= 0 && p.category_id == nanshanCategoryId && p.end_date > DateTime.Now))
                 .ToListAsync();
         }
 
@@ -82,7 +98,8 @@ namespace SnowmeetApi.Controllers
         {
             string[] tagArr = tags == null? new string[] { } : Util.UrlDecode(tags.Trim()).Split(',');
             
-            var skiPassProdustList = await _context.Product.Where(p => (p.shop.Trim().Equals(resort.Trim()) && p.hidden == 0))
+            int? skiPassCategoryId = await ResolveSkiPassCategoryId(resort);
+            var skiPassProdustList = await _context.Product.Where(p => (p.category_id == skiPassCategoryId && p.hidden == 0))
                 .Join(_context.skiPass, p => p.id, s => s.product_id,
                 (p, s) => new { p.id, p.name, p.sale_price, p.deposit, s.product_id,
                     s.resort, s.end_sale_time, s.rules,

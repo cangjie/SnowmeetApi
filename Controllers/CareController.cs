@@ -277,13 +277,30 @@ namespace SnowmeetApi.Controllers
                     });
             }
         }
+        /// <summary>
+        /// 养护服务分类。按 category.code 查出当前 id —— code 稳定、id 会变。
+        /// 返回 (id, code)：商品两边都可能挂（老数据只有 category_id，
+        /// 新建的两个都写），所以筛选时两个条件取或。
+        /// </summary>
+        [NonAction]
+        private async Task<(int? id, string code)> ResolveCareCategory()
+        {
+            string code = CareProductRules.CareCategoryCode;
+            int? id = await _db.category.AsNoTracking()
+                .Where(c => c.code == code && c.valid == 1)
+                .Select(c => (int?)c.id).FirstOrDefaultAsync();
+            return (id, code);
+        }
+
         [HttpGet]
         public async Task<ActionResult<ApiResult<List<Models.Product>?>>> GetCareProducts(int shopId)
         {
             DateTime currentDate = DateTime.Now.Date;
+            var (careCatId, careCatCode) = await ResolveCareCategory();
             List<Models.Product> products = await _db.product
                 .Include(p => p.productTicketTemplate)
-                .Where(p => (p.category_id == 14 || p.category_id == 15) && ((int)p.shop_id) == shopId
+                .Where(p => (p.category_id == careCatId || p.category_code == careCatCode)
+                && ((int)p.shop_id) == shopId
                 && p.valid == 1 && (p.end_date == null || ((DateTime)p.end_date).Date >= currentDate)
                 )
                 .AsNoTracking().ToListAsync();
@@ -313,10 +330,13 @@ namespace SnowmeetApi.Controllers
                 .Where(s => s.name.Trim() == shop).Select(s => (int?)s.id).FirstOrDefaultAsync();
             // 店名在 shop_list 里查不到就没有商品可匹配。返回空列表与"该店没配养护商品"同义，
             // 上层 CalcCharge 会算出 0 —— 与改造前店名对不上时的结果一致。
+            var (careCatId, careCatCode) = await ResolveCareCategory();
             List<Models.Product> products = shopId == null
                 ? new List<Models.Product>()
                 : await _db.product
-                    .Where(p => p.shop_id == shopId && p.category_id == 14 && p.valid == 1)
+                    .Where(p => p.shop_id == shopId
+                        && (p.category_id == careCatId || p.category_code == careCatCode)
+                        && p.valid == 1)
                     .OrderBy(p => p.sale_price).AsNoTracking().ToListAsync();
             return Ok(new ApiResult<List<Models.Product>?>()
             {

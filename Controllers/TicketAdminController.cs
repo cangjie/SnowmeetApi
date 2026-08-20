@@ -47,7 +47,8 @@ namespace SnowmeetApi.Controllers
         /// </summary>
         [NonAction]
         private IQueryable<Ticket> BuildFilteredQuery(DateTime? startDate, DateTime? endDate,
-            int? templateId, bool? used, bool? transferred, bool includeWasted, DateTime now)
+            int? templateId, bool? used, bool? transferred, bool includeWasted, DateTime now,
+            string issuer = null)
         {
             IQueryable<Ticket> q = _db.ticket.AsNoTracking();
 
@@ -81,6 +82,24 @@ namespace SnowmeetApi.Controllers
                     ? q.Where(t => transferLogs.Any(l => l.code == t.code))
                     : q.Where(t => !transferLogs.Any(l => l.code == t.code));
             }
+            // 发券人：空 = 全部；"system" = 系统自动发放（staff_id 为空）；数字 = 指定店员。
+            // "system" 这一档现在几乎等于全库——staff_id 2026-08-19 之前从没被写入过。
+            if (!string.IsNullOrWhiteSpace(issuer))
+            {
+                string key = issuer.Trim();
+                if (key == "system")
+                {
+                    q = q.Where(t => t.staff_id == null);
+                }
+                else
+                {
+                    int sid;
+                    if (int.TryParse(key, out sid))
+                    {
+                        q = q.Where(t => t.staff_id == sid);
+                    }
+                }
+            }
             return q;
         }
 
@@ -89,6 +108,7 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<ApiResult<object>>> SearchTicketsByStaff(string sessionKey,
             DateTime? startDate = null, DateTime? endDate = null, int? templateId = null,
             bool? used = null, bool? transferred = null, bool includeWasted = false,
+            string issuer = null,
             int pageIndex = 1, int pageSize = 20, string sessionType = "wechat_mini_openid")
         {
             Staff staff = await GetStaff(Util.UrlDecode(sessionKey), sessionType);
@@ -100,7 +120,7 @@ namespace SnowmeetApi.Controllers
             DateTime now = DateTime.Now;
 
             IQueryable<Ticket> q = BuildFilteredQuery(startDate, endDate, templateId, used,
-                transferred, includeWasted, now);
+                transferred, includeWasted, now, issuer);
 
             int total = await q.CountAsync();
             List<Ticket> page = await q.OrderByDescending(t => t.create_date).ThenBy(t => t.code)
@@ -129,6 +149,12 @@ namespace SnowmeetApi.Controllers
             var cells = await _db.memberSocialAccount
                 .Where(m => memberIds.Contains(m.member_id) && m.valid == 1 && m.type == "cell")
                 .Select(m => new { m.member_id, m.num }).AsNoTracking().ToListAsync();
+            // 发券人：ticket.staff_id。2026-08-19 之前这一列全库为空（CreateTicket 收了
+            // staffId 却没存），所以存量券取不到人，下面回退成"发券来源"文案。
+            List<int> staffIds = page.Where(t => t.staff_id != null)
+                .Select(t => (int)t.staff_id).Distinct().ToList();
+            var staffs = await _db.staff.Where(x => staffIds.Contains(x.id))
+                .Select(x => new { x.id, x.name }).AsNoTracking().ToListAsync();
 
             var items = page.Select(t =>
             {
@@ -139,6 +165,8 @@ namespace SnowmeetApi.Controllers
                 TicketStateView bn = TicketTransferRules.ResolveBanner(
                     tpl != null && !string.IsNullOrWhiteSpace(tpl.name) ? tpl.name : t.name);
                 int tc = transferCount.ContainsKey(t.code) ? transferCount[t.code] : 0;
+                var issuerStaff = t.staff_id == null ? null : staffs.FirstOrDefault(x => x.id == t.staff_id);
+                string issuerName = issuerStaff != null ? (issuerStaff.name ?? "").Trim() : "";
                 return new
                 {
                     code = t.code,
@@ -150,6 +178,12 @@ namespace SnowmeetApi.Controllers
                     memberGender = mi != null ? (mi.gender ?? "").Trim() : "",
                     memberPhone = cell != null ? (cell.num ?? "").Trim() : "",
                     createDateStr = t.create_date.ToString("yyyy-MM-dd HH:mm"),
+                    // 有店员就报人名，没有就说清是哪条路发出来的——WXML 不支持方法调用，
+                    // 这类二选一的文案必须服务端派生好
+                    issuerText = issuerName != ""
+                        ? issuerName
+                        : TicketAdminRules.DescribeIssueSource(t.create_memo, t.channel),
+                    issuerIsStaff = issuerName != "",
                     expireDateStr = FormatDay(t.expire_date),
                     used = t.used,
                     usedTimeStr = t.used == 1 ? FormatMinute(t.used_time) : "",
@@ -195,6 +229,7 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<ApiResult<object>>> SearchTicketMembersByStaff(string sessionKey,
             DateTime? startDate = null, DateTime? endDate = null, int? templateId = null,
             bool? used = null, bool? transferred = null, bool includeWasted = false,
+            string issuer = null,
             int pageIndex = 1, int pageSize = 20, string sessionType = "wechat_mini_openid")
         {
             Staff staff = await GetStaff(Util.UrlDecode(sessionKey), sessionType);
@@ -206,7 +241,7 @@ namespace SnowmeetApi.Controllers
             DateTime now = DateTime.Now;
 
             IQueryable<Ticket> q = BuildFilteredQuery(startDate, endDate, templateId, used,
-                transferred, includeWasted, now);
+                transferred, includeWasted, now, issuer);
 
             // 券数 / 已核销数在 SQL 里 GroupBy 直接算掉，不用回查。
             // ⚠️ 已核销必须用 used == 1，不能用 used_time != null——
@@ -485,6 +520,32 @@ namespace SnowmeetApi.Controllers
         // ───────────────────────── 模板下拉 ─────────────────────────
         // 不复用 MemberAdmin/GetCouponTemplates（门槛 200，店员会拿到"没有权限"），
         // 也不复用 Ticket/GetTemplateList（零鉴权 + 返回整实体带导航属性）。
+        /// <summary>
+        /// 发券人下拉。返回在职店员 + 一个「系统/自动发放」的哨兵档
+        /// （staff_id 为空的券——存量券全在这一档，见 SearchTicketsByStaff 的说明）。
+        /// </summary>
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<object>>> GetIssuerOptions(string sessionKey,
+            string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await GetStaff(Util.UrlDecode(sessionKey), sessionType);
+            if (staff == null || staff.title_level < MIN_LEVEL)
+            {
+                return Ok(new ApiResult<object>() { code = 1, message = "没有权限", data = null });
+            }
+            var rows = await _db.staff.Where(x => x.valid == 1)
+                .OrderByDescending(x => x.title_level).ThenBy(x => x.id)
+                .Select(x => new { x.id, x.name }).AsNoTracking().ToListAsync();
+            var items = rows.Where(x => !string.IsNullOrWhiteSpace(x.name))
+                .Select(x => new { key = x.id.ToString(), name = x.name.Trim() }).ToList();
+            return Ok(new ApiResult<object>()
+            {
+                code = 0,
+                message = "",
+                data = new { staffs = items }
+            });
+        }
+
         [HttpGet]
         public async Task<ActionResult<ApiResult<object>>> GetTemplateOptions(string sessionKey,
             string sessionType = "wechat_mini_openid")
