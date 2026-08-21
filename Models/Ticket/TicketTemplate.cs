@@ -27,6 +27,14 @@ namespace SnowmeetApi.Models
         public string name { get; set; }
         public string memo { get; set; }
         public int hide {get; set;} = 0;
+
+        /// <summary>
+        /// 是否允许店员通过小程序卡片分享发券（员工发券三条途径之二）。
+        /// 0 = 不可分享（默认）/ 1 = 可分享。
+        /// 默认 0：像「非雪季赠双项」这类随单自动发的券，误分享就是白送一张。
+        /// 2026-08-20 新增，DDL 见 sql/2026-08-20_ticket_template_sharable.sql。
+        /// </summary>
+        public int sharable { get; set; } = 0;
         public string miniapp_recept_path { get; set; }
 
         /// <summary>

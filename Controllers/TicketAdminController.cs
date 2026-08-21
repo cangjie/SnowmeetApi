@@ -82,22 +82,22 @@ namespace SnowmeetApi.Controllers
                     ? q.Where(t => transferLogs.Any(l => l.code == t.code))
                     : q.Where(t => !transferLogs.Any(l => l.code == t.code));
             }
-            // 发券人：空 = 全部；"system" = 系统自动发放（staff_id 为空）；数字 = 指定店员。
-            // "system" 这一档现在几乎等于全库——staff_id 2026-08-19 之前从没被写入过。
+            // 发券人：逗号分隔的 staff id，可多选；空 = 不筛。
+            // 只认 ticket.staff_id，没有这一列的券（2026-08-19 之前发的全部）在选了人时一律不出现。
             if (!string.IsNullOrWhiteSpace(issuer))
             {
-                string key = issuer.Trim();
-                if (key == "system")
-                {
-                    q = q.Where(t => t.staff_id == null);
-                }
-                else
+                List<int> issuerIds = new List<int>();
+                foreach (string part in issuer.Split(','))
                 {
                     int sid;
-                    if (int.TryParse(key, out sid))
+                    if (int.TryParse(part.Trim(), out sid))
                     {
-                        q = q.Where(t => t.staff_id == sid);
+                        issuerIds.Add(sid);
                     }
+                }
+                if (issuerIds.Count > 0)
+                {
+                    q = q.Where(t => t.staff_id != null && issuerIds.Contains((int)t.staff_id));
                 }
             }
             return q;
@@ -178,12 +178,8 @@ namespace SnowmeetApi.Controllers
                     memberGender = mi != null ? (mi.gender ?? "").Trim() : "",
                     memberPhone = cell != null ? (cell.num ?? "").Trim() : "",
                     createDateStr = t.create_date.ToString("yyyy-MM-dd HH:mm"),
-                    // 有店员就报人名，没有就说清是哪条路发出来的——WXML 不支持方法调用，
-                    // 这类二选一的文案必须服务端派生好
-                    issuerText = issuerName != ""
-                        ? issuerName
-                        : TicketAdminRules.DescribeIssueSource(t.create_memo, t.channel),
-                    issuerIsStaff = issuerName != "",
+                    // 发券人只认 ticket.staff_id 关联的店员；没有就是空，不做来源推测
+                    issuerText = issuerName,
                     expireDateStr = FormatDay(t.expire_date),
                     used = t.used,
                     usedTimeStr = t.used == 1 ? FormatMinute(t.used_time) : "",
@@ -521,8 +517,8 @@ namespace SnowmeetApi.Controllers
         // 不复用 MemberAdmin/GetCouponTemplates（门槛 200，店员会拿到"没有权限"），
         // 也不复用 Ticket/GetTemplateList（零鉴权 + 返回整实体带导航属性）。
         /// <summary>
-        /// 发券人下拉。返回在职店员 + 一个「系统/自动发放」的哨兵档
-        /// （staff_id 为空的券——存量券全在这一档，见 SearchTicketsByStaff 的说明）。
+        /// 发券人选项。**在职（valid=1）排在前面**，同组按姓名排序；离职的仍要列出来，
+        /// 否则查历史券时找不到已离职的经手人。
         /// </summary>
         [HttpGet]
         public async Task<ActionResult<ApiResult<object>>> GetIssuerOptions(string sessionKey,
@@ -533,11 +529,11 @@ namespace SnowmeetApi.Controllers
             {
                 return Ok(new ApiResult<object>() { code = 1, message = "没有权限", data = null });
             }
-            var rows = await _db.staff.Where(x => x.valid == 1)
-                .OrderByDescending(x => x.title_level).ThenBy(x => x.id)
-                .Select(x => new { x.id, x.name }).AsNoTracking().ToListAsync();
+            var rows = await _db.staff
+                .OrderByDescending(x => x.valid).ThenBy(x => x.name)
+                .Select(x => new { x.id, x.name, x.valid }).AsNoTracking().ToListAsync();
             var items = rows.Where(x => !string.IsNullOrWhiteSpace(x.name))
-                .Select(x => new { key = x.id.ToString(), name = x.name.Trim() }).ToList();
+                .Select(x => new { id = x.id, name = x.name.Trim(), valid = x.valid }).ToList();
             return Ok(new ApiResult<object>()
             {
                 code = 0,

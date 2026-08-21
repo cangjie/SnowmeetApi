@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using SnowmeetApi.Data;
+using SnowmeetApi.Helpers;
 using SnowmeetApi.Models;
 using SnowmeetApi.Models.Users;
 
@@ -692,8 +693,10 @@ namespace SnowmeetApi.Controllers
 
             string openId = member.wechatMiniOpenId ?? "";
             DateTime now = DateTime.Now;
-            DateTime expire = (tpl.expire_date != null && tpl.expire_date != DateTime.MaxValue)
-                ? (DateTime)tpl.expire_date : now.AddDays(30);
+            // 有效期与其它发券路径共用同一份口径：固定截止日 > 启用后 N 天 > 永久。
+            // 原来这里是「模板有 expire_date 就抄，否则写死 30 天」，完全不看 available_days——
+            // 模板 16 老顾客券配的是 2000 天，从后台发出去却只有 30 天。
+            DateTime expire = TicketTemplateRules.ResolveTicketExpireDate(tpl, now);
 
             int granted = 0;
             for (int i = 0; i < req.count; i++)
@@ -725,7 +728,10 @@ namespace SnowmeetApi.Controllers
                     valid = 1,
                     shared = 0,
                     printed = 0,
-                    channel = "店员发放",
+                    // 会员详情页发券 = 员工发券三条途径里的第一条（另两条：分享小程序卡片、
+                    // 扫固定二维码，尚未落地）。channel 标明来源、staff_id 记下经手人，
+                    // 后台「优惠券管理」的发券人显示与筛选只认 staff_id 这一列。
+                    channel = "系统后台",
                     staff_id = staff.id,
                     miniapp_recept_path = (tpl.miniapp_recept_path ?? "").Trim(),
                     create_date = now

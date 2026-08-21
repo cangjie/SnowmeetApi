@@ -94,6 +94,7 @@ namespace SnowmeetApi.Controllers
                 hasConflict = t.available_days != null && t.expire_date != null,
                 hide = t.hide,
                 valid = t.valid,
+                sharable = t.sharable,
                 ticketTotal = totalById.ContainsKey(t.id) ? totalById[t.id] : 0,
                 ticketRecent = recentById.ContainsKey(t.id) ? recentById[t.id] : 0,
                 ruleCount = rulesById.ContainsKey(t.id) ? rulesById[t.id] : 0
@@ -181,6 +182,7 @@ namespace SnowmeetApi.Controllers
                     miniappReceptPath = t.miniapp_recept_path,
                     hide = t.hide,
                     valid = t.valid,
+                    sharable = t.sharable,
                     experience = t.experience,
                     needPoints = t.need_points,
                     currencyValue = t.currency_value,
@@ -250,6 +252,8 @@ namespace SnowmeetApi.Controllers
             public string? miniappReceptPath { get; set; }
             public int hide { get; set; } = 0;
             public int valid { get; set; } = 1;
+            /// <summary>0 = 不可分享 / 1 = 允许店员用小程序卡片分享发券</summary>
+            public int sharable { get; set; } = 0;
         }
 
         [HttpPost]
@@ -303,6 +307,7 @@ namespace SnowmeetApi.Controllers
             t.expire_date = expireDate;
             t.hide = req.hide;
             t.valid = req.valid;
+            t.sharable = req.sharable;
 
             List<string> errors = TicketTemplateRules.ValidateTemplate(t);
             if (errors.Count > 0)
@@ -432,6 +437,248 @@ namespace SnowmeetApi.Controllers
             _db.Entry(rule).State = EntityState.Modified;
             await _db.SaveChangesAsync();
             return Ok(new ApiResult<object>() { code = 0, message = "", data = new { id = id } });
+        }
+
+        /// <summary>
+        /// 店员分享发券（员工发券三条途径之二）：建一条分享批次，返回卡片 path。
+        ///
+        /// 两种模式都走批次，区别只在领取上限：
+        ///   personal 分享给好友 —— 上限 1，一张卡片只有第一个点开的人能领
+        ///   group    分享到群   —— 不限人数，但每人只能领一张
+        ///
+        /// 微信分不出卡片最终是发给个人还是发到群（onShareAppMessage 拿不到结果），
+        /// 所以模式由店员分享前自己选，这里只按传进来的模式建批次。
+        ///
+        /// 券在**被领取时**才生成（见 TicketShareController.ClaimSharedTicket），
+        /// 这里不预生成——群模式一张卡片要发多张券，预生成没有意义。
+        /// </summary>
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<object>>> ShareTemplateByStaff(int templateId,
+            string shareType, string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await GetStaff(sessionKey, sessionType);
+            if (staff == null || staff.title_level < MIN_LEVEL)
+            {
+                return Ok(Deny());
+            }
+            string mode = (shareType ?? "").Trim();
+            if (mode != TicketShareBatch.SharePersonal && mode != TicketShareBatch.ShareGroup)
+            {
+                return Ok(new ApiResult<object>() { code = 1, message = "分享方式无效", data = null });
+            }
+            TicketTemplate tpl = await _db.ticketTemplate.AsNoTracking()
+                .FirstOrDefaultAsync(t => t.id == templateId);
+            if (tpl == null)
+            {
+                return Ok(new ApiResult<object>() { code = 1, message = "模板不存在", data = null });
+            }
+            if (tpl.sharable != 1)
+            {
+                return Ok(new ApiResult<object>() { code = 1, message = "该模板未开放分享", data = null });
+            }
+            if (tpl.valid != 1)
+            {
+                return Ok(new ApiResult<object>() { code = 1, message = "该模板已停用", data = null });
+            }
+
+            TicketShareBatch batch = new TicketShareBatch()
+            {
+                template_id = tpl.id,
+                staff_id = staff.id,
+                share_type = mode,
+                max_claims = mode == TicketShareBatch.SharePersonal ? 1 : (int?)null,
+                claim_count = 0,
+                valid = 1,
+                create_date = DateTime.Now
+            };
+            await _db.ticketShareBatch.AddAsync(batch);
+            await _db.SaveChangesAsync();
+
+            return Ok(new ApiResult<object>()
+            {
+                code = 0,
+                message = "",
+                data = new
+                {
+                    batchId = batch.id,
+                    templateName = (tpl.name ?? "").Trim(),
+                    shareType = mode,
+                    sharePath = "/pages/mine/ticket/ticket_claim/ticket_claim?batch=" + batch.id
+                }
+            });
+        }
+
+        /// <summary>
+        /// 生成/取回固定二维码批次（员工发券三条途径之三）。
+        ///
+        /// 一个 (店员, 模板, 投放场景 channel) 组合 = **一张**固定二维码，所以这个接口是幂等的：
+        /// 同样的三要素再调一次，返回的是同一条批次、同一个 scene，二维码不会变。
+        /// 否则店员每点一次就多一张码，已经印出去的物料会作废。
+        ///
+        /// 二维码图片由公众号侧的 GetOALimitQrCodeBySessionKey 生成（QR_LIMIT_STR_SCENE 永久码），
+        /// 这里只负责给出 scene；前端拿 scene 去换图片 URL。
+        /// </summary>
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<object>>> CreateQrCodeBatchByStaff(int templateId,
+            string channel, string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await GetStaff(sessionKey, sessionType);
+            if (staff == null || staff.title_level < MIN_LEVEL)
+            {
+                return Ok(Deny());
+            }
+            string ch = Util.UrlDecode(channel ?? "").Trim();
+            if (ch == "")
+            {
+                return Ok(new ApiResult<object>() { code = 1, message = "请填写投放场景", data = null });
+            }
+            TicketTemplate tpl = await _db.ticketTemplate.AsNoTracking()
+                .FirstOrDefaultAsync(t => t.id == templateId);
+            if (tpl == null)
+            {
+                return Ok(new ApiResult<object>() { code = 1, message = "模板不存在", data = null });
+            }
+            if (tpl.sharable != 1)
+            {
+                return Ok(new ApiResult<object>() { code = 1, message = "该模板未开放分享", data = null });
+            }
+            if (tpl.valid != 1)
+            {
+                return Ok(new ApiResult<object>() { code = 1, message = "该模板已停用", data = null });
+            }
+
+            // 幂等：三要素相同就复用已有批次，连已撤回的也一并恢复
+            //（店员的本意显然是"我要这张码"，而不是"再来一张新的"）
+            TicketShareBatch batch = await _db.ticketShareBatch.FirstOrDefaultAsync(
+                b => b.staff_id == staff.id && b.template_id == templateId
+                    && b.share_type == TicketShareBatch.ShareQrCode && b.channel == ch);
+            if (batch == null)
+            {
+                batch = new TicketShareBatch()
+                {
+                    template_id = tpl.id,
+                    staff_id = staff.id,
+                    share_type = TicketShareBatch.ShareQrCode,
+                    channel = ch,
+                    max_claims = null,   // 固定码不限总数，限的是"一人一天一张"
+                    claim_count = 0,
+                    valid = 1,
+                    create_date = DateTime.Now
+                };
+                await _db.ticketShareBatch.AddAsync(batch);
+                await _db.SaveChangesAsync();
+            }
+            else if (batch.valid != 1)
+            {
+                batch.valid = 1;
+                batch.update_date = DateTime.Now;
+                _db.Entry(batch).State = EntityState.Modified;
+                await _db.SaveChangesAsync();
+            }
+
+            return Ok(new ApiResult<object>()
+            {
+                code = 0,
+                message = "",
+                data = new
+                {
+                    batchId = batch.id,
+                    templateName = (tpl.name ?? "").Trim(),
+                    channel = ch,
+                    scene = batch.share_scene,
+                    claimCount = batch.claim_count
+                }
+            });
+        }
+
+        /// <summary>
+        /// 我发起的分享批次（默认只看自己的——撤回别人的分享不合适，也没这个需求）。
+        /// 传 templateId 就只看该模板的，模板设置页用的就是这种。
+        /// </summary>
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<object>>> GetMyShareBatches(int? templateId,
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await GetStaff(sessionKey, sessionType);
+            if (staff == null || staff.title_level < MIN_LEVEL)
+            {
+                return Ok(Deny());
+            }
+            IQueryable<TicketShareBatch> q = _db.ticketShareBatch.AsNoTracking()
+                .Where(b => b.staff_id == staff.id);
+            if (templateId != null)
+            {
+                q = q.Where(b => b.template_id == templateId);
+            }
+            List<TicketShareBatch> rows = await q.OrderByDescending(b => b.id).Take(50).ToListAsync();
+
+            List<int> tplIds = rows.Select(b => b.template_id).Distinct().ToList();
+            var templates = await _db.ticketTemplate.Where(t => tplIds.Contains(t.id))
+                .Select(t => new { t.id, t.name }).AsNoTracking().ToListAsync();
+            // 最后一次领取时间，按批次批量捞，不在循环里逐个查
+            List<int> batchIds = rows.Select(b => b.id).ToList();
+            var lastClaims = await _db.ticketShareClaim.AsNoTracking()
+                .Where(c => batchIds.Contains(c.batch_id))
+                .GroupBy(c => c.batch_id)
+                .Select(g => new { batchId = g.Key, last = g.Max(x => x.create_date) })
+                .ToListAsync();
+
+            var items = rows.Select(b =>
+            {
+                var tpl = templates.FirstOrDefault(x => x.id == b.template_id);
+                var lc = lastClaims.FirstOrDefault(x => x.batchId == b.id);
+                TicketStateView st = TicketShareRules.DescribeBatchState(b);
+                return new
+                {
+                    batchId = b.id,
+                    templateId = b.template_id,
+                    templateName = tpl != null ? (tpl.name ?? "").Trim() : "",
+                    shareTypeText = TicketShareRules.DescribeShareType(b.share_type),
+                    progressText = TicketShareRules.DescribeProgress(b),
+                    claimCount = b.claim_count,
+                    stateLabel = st.Label,
+                    stateCls = st.Cls,
+                    canRevoke = b.valid == 1,
+                    createDateStr = b.create_date.ToString("yyyy-MM-dd HH:mm"),
+                    lastClaimTimeStr = lc != null ? lc.last.ToString("yyyy-MM-dd HH:mm") : ""
+                };
+            }).ToList();
+
+            return Ok(new ApiResult<object>()
+            {
+                code = 0, message = "", data = new { items = items, total = items.Count }
+            });
+        }
+
+        /// <summary>
+        /// 撤回分享：批次置 valid = 0，链接当场失效，已经领走的券不受影响
+        /// （券已经是别人的了，收不回来也不该收回）。
+        /// </summary>
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<object>>> RevokeShareBatch(int batchId,
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await GetStaff(sessionKey, sessionType);
+            if (staff == null || staff.title_level < MIN_LEVEL)
+            {
+                return Ok(Deny());
+            }
+            TicketShareBatch batch = await _db.ticketShareBatch
+                .FirstOrDefaultAsync(b => b.id == batchId);
+            if (batch == null)
+            {
+                return Ok(new ApiResult<object>() { code = 1, message = "分享不存在", data = null });
+            }
+            if (batch.staff_id != staff.id)
+            {
+                // 只能撤自己发起的：撤别人的分享既没需求，也容易误操作
+                return Ok(new ApiResult<object>() { code = 1, message = "只能撤回自己发起的分享", data = null });
+            }
+            batch.valid = 0;
+            batch.update_date = DateTime.Now;
+            _db.Entry(batch).State = EntityState.Modified;
+            await _db.SaveChangesAsync();
+            return Ok(new ApiResult<object>() { code = 0, message = "", data = new { batchId = batchId } });
         }
 
         // ── 商品选择器 ──────────────────────────────────────────────────────

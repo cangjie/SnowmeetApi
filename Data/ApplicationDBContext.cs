@@ -181,6 +181,8 @@ namespace SnowmeetApi.Data
         public DbSet<Recept> recept { get; set; }
         public DbSet<Ticket> ticket { get; set; }
         public DbSet<TicketTemplate> ticketTemplate { get; set; }
+        public DbSet<TicketShareBatch> ticketShareBatch { get; set; }
+        public DbSet<TicketShareClaim> ticketShareClaim { get; set; }
         public DbSet<Card> card { get; set; }
         public DbSet<Printer> printer { get; set; }
         public DbSet<PrintTask> printTask { get; set; }
