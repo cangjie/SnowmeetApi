@@ -95,6 +95,13 @@ namespace SnowmeetApi.Controllers
                 hide = t.hide,
                 valid = t.valid,
                 sharable = t.sharable,
+                    coverUploadId = t.cover_upload_id,
+                    posterWidth = t.poster_width,
+                    posterHeight = t.poster_height,
+                    qrX = t.qr_x,
+                    qrY = t.qr_y,
+                    qrWidth = t.qr_width,
+                    qrHeight = t.qr_height,
                 ticketTotal = totalById.ContainsKey(t.id) ? totalById[t.id] : 0,
                 ticketRecent = recentById.ContainsKey(t.id) ? recentById[t.id] : 0,
                 ruleCount = rulesById.ContainsKey(t.id) ? rulesById[t.id] : 0
@@ -125,6 +132,9 @@ namespace SnowmeetApi.Controllers
             {
                 return Ok(new ApiResult<object>() { code = 1, message = "模板不存在", data = null });
             }
+            UploadFile cover = t.cover_upload_id == null ? null
+                : await _db.UploadFile.AsNoTracking().FirstOrDefaultAsync(x => x.id == t.cover_upload_id);
+            string coverUrl = cover == null ? "" : cover.file_path_name;
 
             // 先取规则、再批量取商品，在内存里拼。
             // 不用 join：那是 INNER JOIN，规则指向的商品要是被删了，这条规则会从维护页上
@@ -183,6 +193,14 @@ namespace SnowmeetApi.Controllers
                     hide = t.hide,
                     valid = t.valid,
                     sharable = t.sharable,
+                    coverUploadId = t.cover_upload_id,
+                    coverUrl = coverUrl,
+                    posterWidth = t.poster_width,
+                    posterHeight = t.poster_height,
+                    qrX = t.qr_x,
+                    qrY = t.qr_y,
+                    qrWidth = t.qr_width,
+                    qrHeight = t.qr_height,
                     experience = t.experience,
                     needPoints = t.need_points,
                     currencyValue = t.currency_value,
@@ -254,6 +272,13 @@ namespace SnowmeetApi.Controllers
             public int valid { get; set; } = 1;
             /// <summary>0 = 不可分享 / 1 = 允许店员用小程序卡片分享发券</summary>
             public int sharable { get; set; } = 0;
+            public int? coverUploadId { get; set; }
+            public int posterWidth { get; set; } = 1080;
+            public int posterHeight { get; set; } = 1440;
+            public int qrX { get; set; } = 0;
+            public int qrY { get; set; } = 0;
+            public int qrWidth { get; set; } = 240;
+            public int qrHeight { get; set; } = 240;
         }
 
         [HttpPost]
@@ -308,6 +333,20 @@ namespace SnowmeetApi.Controllers
             t.hide = req.hide;
             t.valid = req.valid;
             t.sharable = req.sharable;
+            t.cover_upload_id = req.coverUploadId;
+            t.poster_width = req.posterWidth > 0 ? req.posterWidth : 1080;
+            t.poster_height = req.posterHeight > 0 ? req.posterHeight : 1440;
+            t.qr_x = Math.Max(0, req.qrX);
+            t.qr_y = Math.Max(0, req.qrY);
+            t.qr_width = req.qrWidth > 0 ? req.qrWidth : 240;
+            t.qr_height = req.qrHeight > 0 ? req.qrHeight : 240;
+            if (t.qr_x + t.qr_width > t.poster_width || t.qr_y + t.qr_height > t.poster_height)
+            {
+                return Ok(new ApiResult<object>()
+                {
+                    code = 1, message = "二维码必须完全位于海报范围内", data = null
+                });
+            }
 
             List<string> errors = TicketTemplateRules.ValidateTemplate(t);
             if (errors.Count > 0)
@@ -480,6 +519,10 @@ namespace SnowmeetApi.Controllers
             {
                 return Ok(new ApiResult<object>() { code = 1, message = "该模板已停用", data = null });
             }
+            if (tpl.cover_upload_id == null)
+            {
+                return Ok(new ApiResult<object>() { code = 1, message = "请先上传分享海报", data = null });
+            }
 
             TicketShareBatch batch = new TicketShareBatch()
             {
@@ -494,6 +537,9 @@ namespace SnowmeetApi.Controllers
             await _db.ticketShareBatch.AddAsync(batch);
             await _db.SaveChangesAsync();
 
+            string posterUrl = "https://mini.snowmeet.top/api/TicketPoster/Generate?batchId="
+                + batch.id + "&sessionKey=" + Uri.EscapeDataString(sessionKey ?? "");
+
             return Ok(new ApiResult<object>()
             {
                 code = 0,
@@ -503,7 +549,8 @@ namespace SnowmeetApi.Controllers
                     batchId = batch.id,
                     templateName = (tpl.name ?? "").Trim(),
                     shareType = mode,
-                    sharePath = "/pages/mine/ticket/ticket_claim/ticket_claim?batch=" + batch.id
+                    sharePath = "/pages/mine/ticket/ticket_claim/ticket_claim?batch=" + batch.id,
+                    posterUrl = posterUrl
                 }
             });
         }

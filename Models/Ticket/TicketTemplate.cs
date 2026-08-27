@@ -49,6 +49,14 @@ namespace SnowmeetApi.Models
         public int need_points { get; set; } = 0;
         public double currency_value { get; set; } = 0;
 
+        public int? cover_upload_id { get; set; } = null;
+        public int poster_width { get; set; } = 1080;
+        public int poster_height { get; set; } = 1440;
+        public int qr_x { get; set; } = 0;
+        public int qr_y { get; set; } = 0;
+        public int qr_width { get; set; } = 240;
+        public int qr_height { get; set; } = 240;
+
         public List<ProductTicketTemplate> productTicketTemplates {get; set;} = new List<ProductTicketTemplate>();
     }
     [Table("product_ticket_template")]
