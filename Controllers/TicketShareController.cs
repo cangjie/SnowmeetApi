@@ -80,9 +80,12 @@ namespace SnowmeetApi.Controllers
                 return Ok(new ApiResult<object>() { code = 1, message = "券模板不存在", data = null });
             }
 
+            DateTime today = DateTime.Now.Date;
             TicketShareClaim mine = member == null ? null
                 : await _db.ticketShareClaim.AsNoTracking()
-                    .FirstOrDefaultAsync(c => c.batch_id == batchId && c.member_id == member.id);
+                    .FirstOrDefaultAsync(c => c.batch_id == batchId && c.member_id == member.id
+                        && (batch.share_type != TicketShareBatch.ShareGroup
+                            || (c.claim_date >= today && c.claim_date < today.AddDays(1))));
             bool followed = await HasFollowedForBatch(batch, member);
             bool soldOut = !TicketShareRules.IsClaimable(batch);
 
@@ -134,8 +137,12 @@ namespace SnowmeetApi.Controllers
             }
 
             // 同一批次每人只能领一张。库里还有唯一索引兜底，并发下两个请求同时进来也不会重复发。
+            DateTime now = DateTime.Now;
+            DateTime today = now.Date;
             bool claimed = await _db.ticketShareClaim.AsNoTracking()
-                .AnyAsync(c => c.batch_id == batchId && c.member_id == member.id);
+                .AnyAsync(c => c.batch_id == batchId && c.member_id == member.id
+                    && (batch.share_type != TicketShareBatch.ShareGroup
+                        || (c.claim_date >= today && c.claim_date < today.AddDays(1))));
             if (claimed)
             {
                 return Ok(new ApiResult<object>() { code = 1, message = "你已经领过这张券了", data = null });
@@ -180,7 +187,6 @@ namespace SnowmeetApi.Controllers
                 });
             }
 
-            DateTime now = DateTime.Now;
             TicketController _tHelper = new TicketController(_db, _config);
             string code = await _tHelper.GetNewTicketCode();
             Ticket ticket = new Ticket()
@@ -211,6 +217,125 @@ namespace SnowmeetApi.Controllers
                 batch_id = batch.id,
                 member_id = member.id,
                 ticket_code = code,
+                claim_date = today,
+                create_date = now
+            });
+            batch.claim_count = batch.claim_count + 1;
+            batch.update_date = now;
+            _db.Entry(batch).State = EntityState.Modified;
+            await _db.SaveChangesAsync();
+
+            return Ok(new ApiResult<object>()
+            {
+                code = 0,
+                message = "",
+                data = new { code = ticket.code, name = ticket.name }
+            });
+        }
+
+        /// <summary>
+        /// 公众号扫码关注后的自动领取。公众号回调没有小程序 session，直接用 OA openid
+        /// 定位会员；前端轮询仍保留，作为回调延迟或用户已关注时的兜底。
+        /// </summary>
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<object>>> ClaimSharedTicketByOaFollow(
+            int batchId, string oaOpenId)
+        {
+            oaOpenId = Util.UrlDecode(oaOpenId ?? "").Trim();
+            MemberController _memberHelper = new MemberController(_db, _config);
+            Member member = await _memberHelper.GetWholeMemberByNum(oaOpenId, "wechat_oa_openid");
+            if (member == null)
+            {
+                return Ok(new ApiResult<object>() { code = 1, message = "未找到对应会员", data = null });
+            }
+
+            TicketShareBatch batch = await _db.ticketShareBatch
+                .FirstOrDefaultAsync(b => b.id == batchId);
+            if (batch == null || batch.valid != 1)
+            {
+                return Ok(new ApiResult<object>() { code = 1, message = "分享链接已失效", data = null });
+            }
+            TicketTemplate tpl = await _db.ticketTemplate.AsNoTracking()
+                .FirstOrDefaultAsync(t => t.id == batch.template_id);
+            if (tpl == null || tpl.valid != 1)
+            {
+                return Ok(new ApiResult<object>() { code = 1, message = "该券已停用", data = null });
+            }
+
+            DateTime now = DateTime.Now;
+            DateTime today = now.Date;
+            bool claimed = await _db.ticketShareClaim.AsNoTracking()
+                .AnyAsync(c => c.batch_id == batchId && c.member_id == member.id
+                    && (batch.share_type != TicketShareBatch.ShareGroup
+                        || (c.claim_date >= today && c.claim_date < today.AddDays(1))));
+            if (claimed)
+            {
+                return Ok(new ApiResult<object>() { code = 1, message = "你今天已经领过这张优惠券了", data = null });
+            }
+            if (!TicketShareRules.IsClaimable(batch))
+            {
+                return Ok(new ApiResult<object>()
+                {
+                    code = 1,
+                    message = batch.share_type == TicketShareBatch.SharePersonal
+                        ? "这张券已经被别人领走了" : "这次分享的券已经领完了",
+                    data = null
+                });
+            }
+            if (!await HasFollowedForBatch(batch, member))
+            {
+                return Ok(new ApiResult<object>() { code = 1, message = "请先关注公众号后再领取", data = null });
+            }
+
+            StaffController _staffHelper = new StaffController(_db);
+            Staff claimerStaff = await _staffHelper.GetStaffBySocialNum(
+                (member.wechatMiniOpenId ?? "").Trim(), "wechat_mini_openid", now);
+            if (!TicketTransferRules.IsExemptFromReceiveLimit(claimerStaff))
+            {
+                int usableCount = await _db.ticket.AsNoTracking()
+                    .CountAsync(TicketTransferRules.UsableTicketFilter(member.id, batch.template_id, now));
+                if (usableCount >= MaxUsableTicketsPerTemplate)
+                {
+                    return Ok(new ApiResult<object>()
+                    {
+                        code = 1,
+                        message = "您名下未使用的「" + (tpl.name ?? "").Trim() + "」已有 "
+                            + usableCount.ToString() + " 张，用掉一些再来领吧",
+                        data = null
+                    });
+                }
+            }
+
+            TicketController _tHelper = new TicketController(_db, _config);
+            string code = await _tHelper.GetNewTicketCode();
+            Ticket ticket = new Ticket()
+            {
+                code = code,
+                template_id = tpl.id,
+                name = (tpl.name ?? "").Trim(),
+                memo = (tpl.memo ?? "").Trim(),
+                member_id = member.id,
+                open_id = (member.wechatMiniOpenId ?? "").Trim(),
+                oper_open_id = oaOpenId,
+                start_date = now,
+                expire_date = TicketTemplateRules.ResolveTicketExpireDate(tpl, now),
+                used = 0,
+                is_active = 1,
+                valid = 1,
+                shared = 0,
+                printed = 0,
+                staff_id = batch.staff_id,
+                channel = "店员分享",
+                miniapp_recept_path = (tpl.miniapp_recept_path ?? "").Trim(),
+                create_date = now
+            };
+            await _db.ticket.AddAsync(ticket);
+            await _db.ticketShareClaim.AddAsync(new TicketShareClaim()
+            {
+                batch_id = batch.id,
+                member_id = member.id,
+                ticket_code = code,
+                claim_date = today,
                 create_date = now
             });
             batch.claim_count = batch.claim_count + 1;
