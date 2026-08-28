@@ -65,22 +65,21 @@ namespace SnowmeetApi.Controllers
             using Image poster = Image.Load(coverBytes);
             using Image qr = Image.Load(qrBytes);
 
-            int width = template.poster_width > 0 ? template.poster_width : poster.Width;
-            int height = template.poster_height > 0 ? template.poster_height : poster.Height;
-            if (poster.Width != width || poster.Height != height)
-            {
-                poster.Mutate(x => x.Resize(width, height));
-            }
-            int qrWidth = Math.Max(1, template.qr_width);
-            int qrHeight = Math.Max(1, template.qr_height);
-            if (template.qr_x < 0 || template.qr_y < 0
-                || template.qr_x + qrWidth > width || template.qr_y + qrHeight > height)
+            int referenceWidth = template.poster_width > 0 ? template.poster_width : 1080;
+            int referenceHeight = template.poster_height > 0 ? template.poster_height : 1440;
+            // 二维码必须保持正方形：位置可分别按横纵坐标映射，尺寸统一按横向比例缩放。
+            double qrScale = poster.Width / (double)referenceWidth;
+            int qrWidth = Math.Max(1, (int)Math.Round(template.qr_width * qrScale));
+            int qrHeight = Math.Max(1, (int)Math.Round(template.qr_height * qrScale));
+            int qrX = (int)Math.Round(template.qr_x * poster.Width / (double)referenceWidth);
+            int qrY = (int)Math.Round(template.qr_y * poster.Height / (double)referenceHeight);
+            if (qrX < 0 || qrY < 0 || qrX + qrWidth > poster.Width || qrY + qrHeight > poster.Height)
             {
                 return BadRequest(new { code = 1, message = "二维码布局超出海报范围" });
             }
             qr.Mutate(x => x.Resize(qrWidth, qrHeight));
             poster.Mutate(x => x.DrawImage(qr,
-                new SixLabors.ImageSharp.Point(template.qr_x, template.qr_y), 1f));
+                new SixLabors.ImageSharp.Point(qrX, qrY), 1f));
 
             string date = DateTime.Now.ToString("yyyyMMdd");
             string directory = Path.Combine(Util.workingPath, "wwwroot", "upload", date);
