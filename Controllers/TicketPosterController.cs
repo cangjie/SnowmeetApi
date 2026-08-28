@@ -59,7 +59,7 @@ namespace SnowmeetApi.Controllers
             string qrUrl = "https://mini.snowmeet.top/api/MediaHelper/ShowImageFromOfficialAccount?img="
                 + Uri.EscapeDataString("show_wechat_temp_qrcode.aspx?scene=" + batch.share_scene);
             using HttpClient client = new HttpClient();
-            string coverUrl = "https://snowmeet.wanlonghuaxue.com" + cover.file_path_name.Trim();
+            string coverUrl = "https://mini.snowmeet.top" + cover.file_path_name.Trim();
             byte[] coverBytes = await client.GetByteArrayAsync(coverUrl);
             byte[] qrBytes = await client.GetByteArrayAsync(qrUrl);
             using Image poster = Image.Load(coverBytes);
