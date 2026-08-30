@@ -641,10 +641,12 @@ namespace SnowmeetApi.Controllers
         /// <summary>
         /// 我发起的分享批次（默认只看自己的——撤回别人的分享不合适，也没这个需求）。
         /// 传 templateId 就只看该模板的，模板设置页用的就是这种。
+        /// startDate / endDate 按发起日期（create_date）筛，两端都含当天；不传就是不限日期。
         /// </summary>
         [HttpGet]
         public async Task<ActionResult<ApiResult<object>>> GetMyShareBatches(int? templateId,
-            string sessionKey, string sessionType = "wechat_mini_openid")
+            string sessionKey, DateTime? startDate = null, DateTime? endDate = null,
+            string sessionType = "wechat_mini_openid")
         {
             Staff staff = await GetStaff(sessionKey, sessionType);
             if (staff == null || staff.title_level < MIN_LEVEL)
@@ -656,6 +658,16 @@ namespace SnowmeetApi.Controllers
             if (templateId != null)
             {
                 q = q.Where(b => b.template_id == templateId);
+            }
+            if (startDate != null)
+            {
+                DateTime s = ((DateTime)startDate).Date;
+                q = q.Where(b => b.create_date >= s);
+            }
+            if (endDate != null)
+            {
+                DateTime e = ((DateTime)endDate).Date.AddDays(1);
+                q = q.Where(b => b.create_date < e);
             }
             List<TicketShareBatch> rows = await q.OrderByDescending(b => b.id).Take(50).ToListAsync();
 
