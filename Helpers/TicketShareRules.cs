@@ -28,10 +28,16 @@ namespace SnowmeetApi.Helpers
             return new TicketStateView() { Label = "分享中", Cls = "sharing" };
         }
 
-        /// <summary>分享方式文案。</summary>
+        /// <summary>
+        /// 分享方式文案。只按**载体**分两类：小程序卡片 / 海报。
+        /// 群分享（group）和固定二维码（qrcode）发出去的都是海报，发到群还是朋友圈由店员在微信侧决定，
+        /// 小程序拿不到也不需要区分。
+        /// </summary>
         public static string DescribeShareType(string shareType)
         {
-            return (shareType ?? "").Trim() == TicketShareBatch.ShareGroup ? "分享到群" : "分享给好友";
+            string t = (shareType ?? "").Trim();
+            return (t == TicketShareBatch.ShareGroup || t == TicketShareBatch.ShareQrCode)
+                ? "海报" : "小程序卡片";
         }
 
         /// <summary>

@@ -44,11 +44,12 @@ namespace SnowmeetApi.Tests
         }
 
         [Theory]
-        [InlineData("personal", "分享给好友")]
-        [InlineData("group", "分享到群")]
-        [InlineData("", "分享给好友")]
-        [InlineData(null, "分享给好友")]
-        public void 分享方式文案(string type, string expected)
+        [InlineData("personal", "小程序卡片")]
+        [InlineData("group", "海报")]
+        [InlineData("qrcode", "海报")]
+        [InlineData("", "小程序卡片")]
+        [InlineData(null, "小程序卡片")]
+        public void 分享方式文案_只分卡片与海报两类(string type, string expected)
         {
             Assert.Equal(expected, TicketShareRules.DescribeShareType(type));
         }
