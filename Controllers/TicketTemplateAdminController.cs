@@ -639,12 +639,14 @@ namespace SnowmeetApi.Controllers
         }
 
         /// <summary>
-        /// 我发起的分享批次（默认只看自己的——撤回别人的分享不合适，也没这个需求）。
+        /// 分享批次列表。**列出全店所有员工发起的**（谁在发这个模板的券，进得来的人都该看得到），
+        /// 每条带发起人姓名；但撤回仍然只能撤自己发起的，别人的行不给撤回按钮
+        /// （RevokeShareBatch 服务端也会再挡一道）。
         /// 传 templateId 就只看该模板的，模板设置页用的就是这种。
         /// startDate / endDate 按发起日期（create_date）筛，两端都含当天；不传就是不限日期。
         /// </summary>
         [HttpGet]
-        public async Task<ActionResult<ApiResult<object>>> GetMyShareBatches(int? templateId,
+        public async Task<ActionResult<ApiResult<object>>> GetShareBatches(int? templateId,
             string sessionKey, DateTime? startDate = null, DateTime? endDate = null,
             string sessionType = "wechat_mini_openid")
         {
@@ -653,8 +655,7 @@ namespace SnowmeetApi.Controllers
             {
                 return Ok(Deny());
             }
-            IQueryable<TicketShareBatch> q = _db.ticketShareBatch.AsNoTracking()
-                .Where(b => b.staff_id == staff.id);
+            IQueryable<TicketShareBatch> q = _db.ticketShareBatch.AsNoTracking();
             if (templateId != null)
             {
                 q = q.Where(b => b.template_id == templateId);
@@ -675,6 +676,10 @@ namespace SnowmeetApi.Controllers
             var templates = await _db.ticketTemplate.Where(t => tplIds.Contains(t.id))
                 .Select(t => new { t.id, t.name }).AsNoTracking().ToListAsync();
             // 最后一次领取时间，按批次批量捞，不在循环里逐个查
+            // 发起人姓名，口径同优惠券管理页的「发券人」：按 staff_id 批量捞，不在循环里逐个查
+            List<int> staffIds = rows.Select(b => b.staff_id).Distinct().ToList();
+            var staffs = await _db.staff.Where(x => staffIds.Contains(x.id))
+                .Select(x => new { x.id, x.name }).AsNoTracking().ToListAsync();
             List<int> batchIds = rows.Select(b => b.id).ToList();
             var lastClaims = await _db.ticketShareClaim.AsNoTracking()
                 .Where(c => batchIds.Contains(c.batch_id))
@@ -687,6 +692,7 @@ namespace SnowmeetApi.Controllers
                 var tpl = templates.FirstOrDefault(x => x.id == b.template_id);
                 var lc = lastClaims.FirstOrDefault(x => x.batchId == b.id);
                 TicketStateView st = TicketShareRules.DescribeBatchState(b);
+                var sf = staffs.FirstOrDefault(x => x.id == b.staff_id);
                 return new
                 {
                     batchId = b.id,
@@ -695,9 +701,13 @@ namespace SnowmeetApi.Controllers
                     shareTypeText = TicketShareRules.DescribeShareType(b.share_type),
                     progressText = TicketShareRules.DescribeProgress(b),
                     claimCount = b.claim_count,
+                    staffId = b.staff_id,
+                    staffName = sf != null ? (sf.name ?? "").Trim() : "",
+                    isMine = b.staff_id == staff.id,
                     stateLabel = st.Label,
                     stateCls = st.Cls,
-                    canRevoke = b.valid == 1,
+                    // 只有自己发起的才给撤回入口；服务端 RevokeShareBatch 同样会挡
+                    canRevoke = b.valid == 1 && b.staff_id == staff.id,
                     createDateStr = b.create_date.ToString("yyyy-MM-dd HH:mm"),
                     lastClaimTimeStr = lc != null ? lc.last.ToString("yyyy-MM-dd HH:mm") : ""
                 };
