@@ -126,6 +126,7 @@ namespace SnowmeetApi.Data
         public DbSet<Models.MemberTagPreset> memberTagPreset { get; set; }
         public DbSet<Models.Users.CellWhiteList> cellWhiteList { get; set; }
         public DbSet<Models.WebApiLog> webApiLog { get; set; }
+        public DbSet<Models.AdminAiRequestLog> adminAiRequestLog { get; set; }
         //public DbSet<Models.StaffModLog> staffModLog {get; set;}
         public DbSet<Models.Mi7ExportedSaleList> mi7ExportedSaleList { get; set; }
         public DbSet<Models.Mi7ExportedSaleDetail> mi7ExportedSaleDetail { get; set; }

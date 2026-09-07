@@ -67,6 +67,10 @@ namespace SnowmeetApi
                 options.CustomSchemaIds(x => x.FullName);
             });
             services.TryAddSingleton<IHttpContextAccessor, HttpContextAccessor>();
+            services.AddHttpClient("Reqai", client =>
+            {
+                client.Timeout = TimeSpan.FromSeconds(Configuration.GetValue<int?>("Reqai:TimeoutSeconds") ?? 90);
+            });
             services.AddControllers().AddJsonOptions(options =>{
                 options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
             });
