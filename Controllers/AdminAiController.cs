@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using SnowmeetApi.Data;
+using SnowmeetApi.Helpers;
 using SnowmeetApi.Models;
 
 namespace SnowmeetApi.Controllers
@@ -155,6 +156,7 @@ namespace SnowmeetApi.Controllers
                     intent.start_date, intent.end_date, null, intent.is_test, intent.is_entertain, null, null,
                     intent.have_discount, null, null, null, null, intent.keyword, null, null, null,
                     null, intent.use_card, intent.cell_suffix, intent.rent_status, null);
+                orders = OrderQueryRules.FilterByCustomerCellSuffix(orders, intent.cell_suffix);
                 if (orders.Count > 200) orders = orders.OrderByDescending(o => o.biz_date).Take(200).ToList();
                 var statusCounts = orders.GroupBy(o => o.rentProperties?.rentStatus ?? "临时订单")
                     .ToDictionary(group => group.Key, group => group.Count());

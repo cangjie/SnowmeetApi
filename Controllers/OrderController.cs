@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using SnowmeetApi.Data;
+using SnowmeetApi.Helpers;
 using SnowmeetApi.Models;
 using System;
 using System.Collections.Generic;
@@ -1096,15 +1097,7 @@ namespace SnowmeetApi.Controllers
             List<SnowmeetApi.Models.Order> orders = await GetCommonOrders(orderId, shop, null, null, type, startDate, endDate, payOption,
             isTest, isEntertain, isPackage, isOnCredit, haveDiscount, status, null, null, haveWarranty, retailType, keyword, isSummerCare,
             rentCategoryId, rentItemName, useCard, cell, rentStatus);
-            List<SnowmeetApi.Models.Order> newOrders = new List<Models.Order>();
-            if (cell != null)
-            {
-                newOrders = orders.Where(o => o.customerCell.EndsWith(cell)).ToList();
-            }
-            else
-            {
-                newOrders = orders;
-            }
+            List<SnowmeetApi.Models.Order> newOrders = OrderQueryRules.FilterByCustomerCellSuffix(orders, cell);
 
             SnowmeetApi.Models.Order.RendOrderList(newOrders);
             return Ok(new ApiResult<List<SnowmeetApi.Models.Order>>()
@@ -1188,9 +1181,7 @@ namespace SnowmeetApi.Controllers
             List<SnowmeetApi.Models.Order> orders = await GetCommonOrders(orderId, shop, null, null, type, startDate, endDate, payOption,
                 isTest, isEntertain, isPackage, isOnCredit, haveDiscount, status, null, null, haveWarranty, retailType, keyword, isSummerCare,
                 rentCategoryId, rentItemName, useCard, cell, rentStatus, hasRetailFilter);
-            List<SnowmeetApi.Models.Order> filtered = cell != null
-                ? orders.Where(o => o.customerCell.EndsWith(cell)).ToList()
-                : orders;
+            List<SnowmeetApi.Models.Order> filtered = OrderQueryRules.FilterByCustomerCellSuffix(orders, cell);
             int total = filtered.Count;
             List<SnowmeetApi.Models.Order> paged = filtered
                 .OrderByDescending(o => o.biz_date)
