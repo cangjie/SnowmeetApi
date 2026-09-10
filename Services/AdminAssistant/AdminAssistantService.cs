@@ -16,9 +16,8 @@ namespace SnowmeetApi.Services.AdminAssistant
     public sealed class AdminAssistantService : IAdminAssistantService
     {
         private static readonly string[] DefaultMetrics = { "order_count", "charge_total", "paid_total", "refund_total", "unpaid_count" };
-        private static readonly Regex PhoneLike = new(@"(?<!\d)(?:\+?86[-\s]?)?1\d{10}(?!\d)", RegexOptions.Compiled);
-        private static readonly Regex SensitiveValue = new("\\b(?:service[_-]?token|access[_-]?token|refresh[_-]?token|token|cookie|openid|payment(?:[_-]?(?:id|no|token))?|transaction(?:[_-]?id)?)\\b\\s*(?:[:=]\\s*|\"\\s*:\\s*\")(?:(?:\"[^\"]*\")|[^\\s,;，；}]*)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
-        private static readonly Regex SensitiveMarker = new(@"\b(?:service[_-]?token|access[_-]?token|refresh[_-]?token|token|cookie|openid|payment(?:[_-]?(?:id|no|token))?|transaction(?:[_-]?id)?)\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        private static readonly Regex PhoneLike = new(@"(?<!\d)(?:\+?86[\s-]*)?1[3-9]\d(?:[\s-]*\d{4}){2}(?!\d)", RegexOptions.Compiled);
+        private static readonly Regex SensitiveCredential = new("(?<![\\p{L}\\p{N}_-])(?:authorization|password|secret|api[_-]?key|service[_-]?token|access[_-]?token|refresh[_-]?token|token|cookie|openid|payment(?:[_-]?(?:id|no|token))?|transaction(?:[_-]?id)?)\\b\\s*(?:=\\s*|:\\s*|\"\\s*:\\s*\")(?:\"(?:\\\\.|[^\"\\\\])*\"|'(?:\\\\.|[^'\\\\])*'|[^\\r\\n,;，；}\\]]+)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
         private readonly IReqaiAdminAssistantClient _reqai;
         private readonly IRentalOrderQueryExecutor _query;
 
@@ -327,8 +326,7 @@ namespace SnowmeetApi.Services.AdminAssistant
         {
             if (value == null) return null;
             string withoutPhones = PhoneLike.Replace(value, "[已隐去手机号]");
-            string withoutSensitiveValues = SensitiveValue.Replace(withoutPhones, "[已隐去敏感信息]");
-            return SensitiveMarker.Replace(withoutSensitiveValues, "[已隐去敏感信息]");
+            return SensitiveCredential.Replace(withoutPhones, "[已隐去敏感信息]");
         }
 
         private static string ProtocolPayload(string plannerJson)

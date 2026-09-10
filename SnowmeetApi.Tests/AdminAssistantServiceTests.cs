@@ -163,9 +163,11 @@ namespace SnowmeetApi.Tests
         }
 
         [Fact]
-        public async Task Finalize请求和失败审计均不会泄露完整手机号或敏感自由文本()
+        public async Task Finalize请求和失败审计会隐去格式化手机号及凭据赋值()
         {
-            const string fullCell = "13812345678";
+            const string fullCell = "13800138000";
+            const string spacedCell = "138 0013 8000";
+            const string prefixedCell = "+86-138-0013-8000";
             CapturingReqaiHandler handler = new(PrivacyPlan(fullCell));
             IConfiguration configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
             {
@@ -174,22 +176,38 @@ namespace SnowmeetApi.Tests
             }).Build();
             ReqaiAdminAssistantClient reqai = new(new StaticHttpClientFactory(handler), configuration);
             AdminAssistantRequest request = Request();
-            request.question = "查询 " + fullCell + " token=very-secret Cookie=session OPENID=user payment_id=pay-001";
+            request.question = "查询订单 " + spacedCell + "、" + prefixedCell +
+                "；authorization=Bearer TOP-SECRET-ABC; password=\"quoted password value\"; secret='private phrase'; " +
+                "api-key=API KEY VALUE; token=TOKEN VALUE; Cookie=COOKIE VALUE; OpenID=OPENID VALUE; payment_id=PAYMENT VALUE";
 
             AdminAssistantExecutionResult result = await Service(reqai, FakeQuery()).AskAsync(request, Staff(100), "trace", true, default);
             string finalizeBody = handler.finalizeBody!;
             string errorAudit = JsonSerializer.Serialize(result.audit);
+            string finalizeQuestion = JsonDocument.Parse(finalizeBody).RootElement.GetProperty("question").GetString()!;
 
             Assert.Equal("finalize_failed", result.audit.error);
-            Assert.Contains("\"cell_suffix\":\"5678\"", finalizeBody);
+            Assert.Contains("\"cell_suffix\":\"8000\"", finalizeBody);
             Assert.DoesNotContain(fullCell, finalizeBody);
+            Assert.DoesNotContain(spacedCell, finalizeBody);
+            Assert.DoesNotContain(prefixedCell, finalizeBody);
             Assert.DoesNotContain(fullCell, errorAudit);
-            Assert.DoesNotContain("token", finalizeBody, StringComparison.OrdinalIgnoreCase);
-            Assert.DoesNotContain("cookie", finalizeBody, StringComparison.OrdinalIgnoreCase);
-            Assert.DoesNotContain("openid", finalizeBody, StringComparison.OrdinalIgnoreCase);
-            Assert.DoesNotContain("payment", finalizeBody, StringComparison.OrdinalIgnoreCase);
-            Assert.DoesNotContain("very-secret", finalizeBody);
-            Assert.DoesNotContain("very-secret", errorAudit);
+            Assert.DoesNotContain("TOP-SECRET-ABC", finalizeBody);
+            Assert.DoesNotContain("quoted password value", finalizeBody);
+            Assert.DoesNotContain("private phrase", finalizeBody);
+            Assert.DoesNotContain("API KEY VALUE", finalizeBody);
+            Assert.DoesNotContain("TOKEN VALUE", finalizeBody);
+            Assert.DoesNotContain("COOKIE VALUE", finalizeBody);
+            Assert.DoesNotContain("OPENID VALUE", finalizeBody);
+            Assert.DoesNotContain("PAYMENT VALUE", finalizeBody);
+            Assert.DoesNotContain("TOP-SECRET-ABC", errorAudit);
+            Assert.DoesNotContain("quoted password value", errorAudit);
+            Assert.DoesNotContain("private phrase", errorAudit);
+            Assert.DoesNotContain("API KEY VALUE", errorAudit);
+            Assert.DoesNotContain("TOKEN VALUE", errorAudit);
+            Assert.DoesNotContain("COOKIE VALUE", errorAudit);
+            Assert.DoesNotContain("OPENID VALUE", errorAudit);
+            Assert.DoesNotContain("PAYMENT VALUE", errorAudit);
+            Assert.Contains("查询订单", finalizeQuestion);
         }
 
         [Fact]
@@ -251,8 +269,29 @@ namespace SnowmeetApi.Tests
         private static FakeQueryExecutor FakeQuery() => new(Summary(0));
         private static AdminAssistantService Service(IReqaiAdminAssistantClient reqai, IRentalOrderQueryExecutor query) => new(reqai, query);
 
-        private static string PrivacyPlan(string fullCell) =>
-            "{\"version\":\"1\",\"reply\":{\"text\":\"openid=planner-user\",\"citations\":[]},\"actions\":[{\"id\":\"a1\",\"type\":\"rental_order.query\",\"mode\":\"replace\",\"arguments\":{\"start_date\":\"2026-04-01\",\"end_date\":\"2026-04-30\",\"cell_suffix\":\"" + fullCell + "\",\"keyword\":\"token=planner-secret\"},\"aggregation\":{\"metrics\":[\"order_count\"],\"group_by\":[]}}]}";
+        private static string PrivacyPlan(string fullCell) => JsonSerializer.Serialize(new
+        {
+            version = "1",
+            reply = new
+            {
+                text = "authorization=Bearer TOP-SECRET-ABC; password=\"quoted password value\"; secret='private phrase'; " +
+                    "api-key=API KEY VALUE; token=TOKEN VALUE; Cookie=COOKIE VALUE; OpenID=OPENID VALUE; payment_id=PAYMENT VALUE",
+                citations = Array.Empty<string>()
+            },
+            actions = new[]
+            {
+                new
+                {
+                    id = "a1", type = "rental_order.query", mode = "replace",
+                    arguments = new
+                    {
+                        start_date = "2026-04-01", end_date = "2026-04-30", cell_suffix = fullCell,
+                        keyword = "authorization=Bearer TOP-SECRET-ABC; secret='private phrase'; api-key=API KEY VALUE"
+                    },
+                    aggregation = new { metrics = new[] { "order_count" }, group_by = Array.Empty<string>() }
+                }
+            }
+        });
 
         private sealed class FakeReqaiClient : IReqaiAdminAssistantClient
         {
