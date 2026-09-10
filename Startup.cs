@@ -73,6 +73,8 @@ namespace SnowmeetApi
                 client.Timeout = TimeSpan.FromSeconds(Configuration.GetValue<int?>("Reqai:TimeoutSeconds") ?? 90);
             });
             services.AddScoped<IRentalOrderQueryExecutor, RentalOrderQueryExecutor>();
+            services.AddScoped<IReqaiAdminAssistantClient, ReqaiAdminAssistantClient>();
+            services.AddScoped<IAdminAssistantService, AdminAssistantService>();
             services.AddControllers().AddJsonOptions(options =>{
                 options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
             });
