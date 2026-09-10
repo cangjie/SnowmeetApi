@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -13,6 +15,8 @@ using Microsoft.Extensions.Configuration;
 using SnowmeetApi.Data;
 using SnowmeetApi.Helpers;
 using SnowmeetApi.Models;
+using SnowmeetApi.Models.AdminAssistant;
+using SnowmeetApi.Services.AdminAssistant;
 
 namespace SnowmeetApi.Controllers
 {
@@ -25,14 +29,16 @@ namespace SnowmeetApi.Controllers
         private readonly IConfiguration _config;
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly IHttpContextAccessor _httpContextAccessor;
+        private readonly IAdminAssistantService _adminAssistant;
 
         public AdminAiController(ApplicationDBContext db, IConfiguration config, IHttpClientFactory httpClientFactory,
-            IHttpContextAccessor httpContextAccessor)
+            IHttpContextAccessor httpContextAccessor, IAdminAssistantService adminAssistant)
         {
             _db = db;
             _config = config;
             _httpClientFactory = httpClientFactory;
             _httpContextAccessor = httpContextAccessor;
+            _adminAssistant = adminAssistant;
         }
 
         public class HelpRequest
@@ -45,6 +51,216 @@ namespace SnowmeetApi.Controllers
         public class NaturalLanguageQueryRequest
         {
             public string question { get; set; } = "";
+        }
+
+        [HttpPost]
+        public async Task<ActionResult<ApiResult<AdminAssistantResponse>>> AskAdminAssistantByStaff(
+            [FromBody] AdminAssistantRequest request, string sessionKey,
+            string sessionType = "wechat_mini_openid", CancellationToken cancellationToken = default)
+        {
+            if (!IsValidClientRequest(request))
+            {
+                return BadRequest(new ApiResult<AdminAssistantResponse> { code = 1, message = "请求参数不合法" });
+            }
+
+            request.question = request.question.Trim();
+            Staff? staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            if (staff == null)
+            {
+                return Ok(new ApiResult<AdminAssistantResponse> { code = 1, message = "没有权限" });
+            }
+
+            string traceId = Guid.NewGuid().ToString("N");
+            bool structuredEnabled = _config.GetValue<bool>("AdminAssistant:StructuredProtocolEnabled");
+            return await ExecuteAndAudit(request, staff, traceId, structuredEnabled, sessionType, cancellationToken);
+        }
+
+        private async Task<ActionResult<ApiResult<AdminAssistantResponse>>> ExecuteAndAudit(AdminAssistantRequest request,
+            Staff staff, string traceId, bool structuredEnabled, string sessionType, CancellationToken cancellationToken)
+        {
+            AdminAiRequestLog log = new()
+            {
+                staff_id = staff.id,
+                session_type = sessionType,
+                trace_id = traceId,
+                provider = structuredEnabled ? "reqai" : "reqai_legacy",
+                operation = "admin_assistant",
+                page_key = request.page_key,
+                request_url = "/api/AdminAi/AskAdminAssistantByStaff",
+                request_payload = SafeAuditJson(new
+                {
+                    request.version,
+                    request.page_key,
+                    request.question,
+                    request.conversation,
+                    request.context,
+                    structured_protocol_enabled = structuredEnabled
+                })
+            };
+            await _db.AddAsync(log, cancellationToken);
+            await _db.SaveChangesAsync(cancellationToken);
+            Stopwatch stopwatch = Stopwatch.StartNew();
+
+            try
+            {
+                AdminAssistantExecutionResult execution = await _adminAssistant.AskAsync(
+                    request, staff, traceId, structuredEnabled, cancellationToken);
+                ApiResult<AdminAssistantResponse> response = new() { data = execution.response };
+                await CompleteAssistantLog(log, stopwatch, true, 200, execution.audit, response);
+                return Ok(response);
+            }
+            catch (AdminAssistantClarificationException error)
+            {
+                AdminAssistantResponse response = FailureResponse(traceId, "请补充查询条件后重试。");
+                ApiResult<AdminAssistantResponse> body = new() { data = response };
+                await CompleteAssistantLog(log, stopwatch, true, 200, error.audit, body);
+                return Ok(body);
+            }
+            catch (AdminAssistantPermissionException error)
+            {
+                AdminAssistantResponse response = FailureResponse(traceId, "没有权限");
+                ApiResult<AdminAssistantResponse> body = new() { code = 1, message = "没有权限", data = response };
+                await CompleteAssistantLog(log, stopwatch, false, 200, error.audit, body);
+                return Ok(body);
+            }
+            catch (AdminAssistantOperationException error)
+            {
+                string message = error.stage == AdminAssistantFailureStage.Execution
+                    ? "租赁订单查询暂不可用，请稍后重试。"
+                    : "管理员助手服务暂不可用，请稍后重试。";
+                AdminAssistantResponse response = FailureResponse(traceId, message);
+                ApiResult<AdminAssistantResponse> body = new() { code = 1, message = message, data = response };
+                await CompleteAssistantLog(log, stopwatch, false, 502, error.audit, body);
+                return StatusCode(502, body);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception)
+            {
+                AdminAssistantResponse response = FailureResponse(traceId, "管理员助手服务暂不可用，请稍后重试。");
+                ApiResult<AdminAssistantResponse> body = new() { code = 1, message = response.reply.text, data = response };
+                await CompleteAssistantLog(log, stopwatch, false, 502,
+                    new AdminAssistantAuditData { validation_result = "rejected", error = "unexpected_failure" }, body);
+                return StatusCode(502, body);
+            }
+        }
+
+        private static bool IsValidClientRequest(AdminAssistantRequest? request)
+        {
+            if (request == null || request.version != "1" || string.IsNullOrWhiteSpace(request.page_key) ||
+                !request.page_key.StartsWith("pages/admin/", StringComparison.Ordinal) || request.page_key.Length > 255 ||
+                request.question == null || request.question.Trim().Length is < 1 or > 2000 || request.conversation == null ||
+                request.conversation.Count > 20)
+            {
+                return false;
+            }
+
+            int totalLength = 0;
+            foreach (AssistantConversationMessage message in request.conversation)
+            {
+                if (message == null || (message.role != "user" && message.role != "assistant") || message.content == null ||
+                    message.content.Length > 2000)
+                {
+                    return false;
+                }
+                totalLength += message.content.Length;
+                if (totalLength > 12000) return false;
+            }
+            return true;
+        }
+
+        private static AdminAssistantResponse FailureResponse(string traceId, string text) => new()
+        {
+            version = "1",
+            trace_id = traceId,
+            reply = new AssistantReply { text = text },
+            actions = new List<ClientAssistantAction>(),
+            context = new AdminAssistantContext { rental_order_query = null }
+        };
+
+        private async Task CompleteAssistantLog(AdminAiRequestLog log, Stopwatch stopwatch, bool success, int statusCode,
+            AdminAssistantAuditData audit, ApiResult<AdminAssistantResponse> response)
+        {
+            log.success = success;
+            log.response_status_code = statusCode;
+            log.response_payload = SafeAuditJson(new
+            {
+                response,
+                audit = new
+                {
+                    planner_json = SafePlannerJson(audit.planner_json),
+                    audit.validation_result,
+                    audit.query,
+                    audit.summary,
+                    audit.error
+                }
+            });
+            log.error_message = audit.error;
+            log.completed_date = DateTime.Now;
+            log.duration_ms = (int)stopwatch.ElapsedMilliseconds;
+            _db.Update(log);
+            await _db.SaveChangesAsync();
+        }
+
+        private static string? SafePlannerJson(string? plannerJson)
+        {
+            if (string.IsNullOrWhiteSpace(plannerJson)) return plannerJson;
+            try
+            {
+                using JsonDocument document = JsonDocument.Parse(plannerJson);
+                return SafeAuditJson(document.RootElement);
+            }
+            catch (JsonException)
+            {
+                return plannerJson;
+            }
+        }
+
+        private static string SafeAuditJson(object value)
+        {
+            using JsonDocument document = JsonDocument.Parse(JsonSerializer.Serialize(value));
+            using MemoryStream stream = new();
+            using Utf8JsonWriter writer = new(stream);
+            WriteSafeAuditJson(writer, document.RootElement);
+            writer.Flush();
+            return Encoding.UTF8.GetString(stream.ToArray());
+        }
+
+        private static void WriteSafeAuditJson(Utf8JsonWriter writer, JsonElement value)
+        {
+            switch (value.ValueKind)
+            {
+                case JsonValueKind.Object:
+                    writer.WriteStartObject();
+                    foreach (JsonProperty property in value.EnumerateObject())
+                    {
+                        if (IsSensitiveAuditProperty(property.Name)) continue;
+                        writer.WritePropertyName(property.Name);
+                        WriteSafeAuditJson(writer, property.Value);
+                    }
+                    writer.WriteEndObject();
+                    break;
+                case JsonValueKind.Array:
+                    writer.WriteStartArray();
+                    foreach (JsonElement item in value.EnumerateArray()) WriteSafeAuditJson(writer, item);
+                    writer.WriteEndArray();
+                    break;
+                default:
+                    value.WriteTo(writer);
+                    break;
+            }
+        }
+
+        private static bool IsSensitiveAuditProperty(string name)
+        {
+            string normalized = name.Replace("_", "", StringComparison.Ordinal).ToLowerInvariant();
+            return normalized.Contains("token", StringComparison.Ordinal) || normalized.Contains("cookie", StringComparison.Ordinal) ||
+                normalized.Contains("secret", StringComparison.Ordinal) || normalized.Contains("authorization", StringComparison.Ordinal) ||
+                normalized.Contains("openid", StringComparison.Ordinal) || normalized.Contains("payment", StringComparison.Ordinal) ||
+                normalized.Contains("transaction", StringComparison.Ordinal) || normalized is "orders" or "order" or "orderrows" or
+                "orderdetails" or "orderitems" or "contactname" or "realname" or "cell" or "phone" or "mobile";
         }
 
         private class RentQueryIntentResponse

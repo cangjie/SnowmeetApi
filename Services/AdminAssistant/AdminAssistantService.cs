@@ -14,6 +14,7 @@ namespace SnowmeetApi.Services.AdminAssistant
 {
     public sealed class AdminAssistantService : IAdminAssistantService
     {
+        private static readonly string[] DefaultMetrics = { "order_count", "charge_total", "paid_total", "refund_total", "unpaid_count" };
         private readonly IReqaiAdminAssistantClient _reqai;
         private readonly IRentalOrderQueryExecutor _query;
 
@@ -27,7 +28,7 @@ namespace SnowmeetApi.Services.AdminAssistant
             string traceId, bool structuredEnabled, CancellationToken cancellationToken)
         {
             if (!structuredEnabled)
-                throw new InvalidOperationException("结构化管理员助手未启用");
+                return await AskLegacyAsync(request, staff, traceId, cancellationToken);
 
             string? plannerJson = null;
             ReqaiPlanResponse plan;
@@ -116,6 +117,103 @@ namespace SnowmeetApi.Services.AdminAssistant
                 }
             };
         }
+
+        private async Task<AdminAssistantExecutionResult> AskLegacyAsync(AdminAssistantRequest request, Staff staff,
+            string traceId, CancellationToken cancellationToken)
+        {
+            LegacyRentIntent intent;
+            string? legacyIntentJson = null;
+            try
+            {
+                intent = await _reqai.LegacyRentIntentAsync(request.question, cancellationToken);
+                legacyIntentJson = JsonSerializer.Serialize(intent);
+            }
+            catch (Exception error) when (error is not OperationCanceledException)
+            {
+                throw new AdminAssistantOperationException(AdminAssistantFailureStage.Planner, error,
+                    Audit(legacyIntentJson, "rejected", null, null, "legacy_intent_failed"));
+            }
+
+            if (intent.status == "ready")
+            {
+                RequireLevel(staff, 100, Audit(legacyIntentJson, "rejected", null, null, "permission_denied"));
+                RentalOrderQueryState state = LegacyIntentToState(intent);
+                try
+                {
+                    AdminAssistantProtocolRules.ValidateQuery(state);
+                }
+                catch (AdminAssistantClarificationException error)
+                {
+                    throw new AdminAssistantClarificationException(error.Message,
+                        Audit(legacyIntentJson, "clarification_required", state, null, "clarification_required"));
+                }
+                catch (Exception error)
+                {
+                    throw new AdminAssistantOperationException(AdminAssistantFailureStage.Execution, error,
+                        Audit(legacyIntentJson, "rejected", state, null, "query_validation_failed"));
+                }
+
+                try
+                {
+                    RentalOrderQueryExecution execution = await _query.ExecuteAsync(state, DefaultMetrics, Array.Empty<string>(), cancellationToken);
+                    return new AdminAssistantExecutionResult
+                    {
+                        response = CompletedQuery(traceId, "legacy_query", DeterministicReply(execution.summary), execution),
+                        audit = Audit(legacyIntentJson, "accepted", state, execution.summary, null)
+                    };
+                }
+                catch (Exception error) when (error is not OperationCanceledException)
+                {
+                    throw new AdminAssistantOperationException(AdminAssistantFailureStage.Execution, error,
+                        Audit(legacyIntentJson, "accepted", state, null, "execution_failed"));
+                }
+            }
+
+            if (intent.status == "clarification_required")
+            {
+                return new AdminAssistantExecutionResult
+                {
+                    response = TextOnly(traceId, new AssistantReply { text = intent.clarification ?? "请补充查询日期范围。" }, request.context),
+                    audit = Audit(legacyIntentJson, "clarification_required", null, null, "clarification_required")
+                };
+            }
+
+            if (intent.status != "unsupported")
+            {
+                throw new AdminAssistantOperationException(AdminAssistantFailureStage.Planner,
+                    new InvalidOperationException("旧查询意图无效"), Audit(legacyIntentJson, "rejected", null, null, "legacy_intent_invalid"));
+            }
+
+            RequireLevel(staff, 200, Audit(legacyIntentJson, "rejected", null, null, "permission_denied"));
+            try
+            {
+                AssistantReply help = await _reqai.LegacyPageHelpAsync(request, staff.id, traceId, cancellationToken);
+                return new AdminAssistantExecutionResult
+                {
+                    response = TextOnly(traceId, help, request.context),
+                    audit = Audit(legacyIntentJson, "accepted", null, null, null)
+                };
+            }
+            catch (Exception error) when (error is not OperationCanceledException)
+            {
+                throw new AdminAssistantOperationException(AdminAssistantFailureStage.Planner, error,
+                    Audit(legacyIntentJson, "accepted", null, null, "legacy_help_failed"));
+            }
+        }
+
+        private static RentalOrderQueryState LegacyIntentToState(LegacyRentIntent intent) => new()
+        {
+            start_date = intent.start_date,
+            end_date = intent.end_date,
+            shop = intent.shop,
+            rent_status = intent.rent_status,
+            is_test = intent.is_test,
+            is_entertain = intent.is_entertain,
+            have_discount = intent.have_discount,
+            use_card = intent.use_card,
+            cell_suffix = intent.cell_suffix,
+            keyword = intent.keyword
+        };
 
         private static ReqaiPlanRequest BuildPlanRequest(AdminAssistantRequest request, Staff staff, string traceId) => new()
         {
