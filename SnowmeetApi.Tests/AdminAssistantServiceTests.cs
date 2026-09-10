@@ -1,8 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.Net;
 using System.Net.Http;
+using System.Text;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
 using SnowmeetApi.Helpers;
 using SnowmeetApi.Models;
 using SnowmeetApi.Models.AdminAssistant;
@@ -141,6 +145,36 @@ namespace SnowmeetApi.Tests
         }
 
         [Fact]
+        public async Task Finalize请求和失败审计均不会泄露完整手机号或敏感自由文本()
+        {
+            const string fullCell = "13812345678";
+            CapturingReqaiHandler handler = new(PrivacyPlan(fullCell));
+            IConfiguration configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Reqai:BaseUrl"] = "https://reqai.test",
+                ["Reqai:ServiceToken"] = "service-token"
+            }).Build();
+            ReqaiAdminAssistantClient reqai = new(new StaticHttpClientFactory(handler), configuration);
+            AdminAssistantRequest request = Request();
+            request.question = "查询 " + fullCell + " token=very-secret Cookie=session OPENID=user payment_id=pay-001";
+
+            AdminAssistantExecutionResult result = await Service(reqai, FakeQuery()).AskAsync(request, Staff(100), "trace", true, default);
+            string finalizeBody = handler.finalizeBody!;
+            string errorAudit = JsonSerializer.Serialize(result.audit);
+
+            Assert.Equal("finalize_failed", result.audit.error);
+            Assert.Contains("\"cell_suffix\":\"5678\"", finalizeBody);
+            Assert.DoesNotContain(fullCell, finalizeBody);
+            Assert.DoesNotContain(fullCell, errorAudit);
+            Assert.DoesNotContain("token", finalizeBody, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("cookie", finalizeBody, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("openid", finalizeBody, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("payment", finalizeBody, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("very-secret", finalizeBody);
+            Assert.DoesNotContain("very-secret", errorAudit);
+        }
+
+        [Fact]
         public async Task 纯文字回复保留现有上下文且不查询()
         {
             AdminAssistantRequest request = Request();
@@ -197,7 +231,10 @@ namespace SnowmeetApi.Tests
         private static FakeReqaiClient QueryPlanClient() => new(plan: QueryPlan("rental_order.query"));
         private static FakeReqaiClient TextPlanClient() => new(plan: TextPlan("页面说明"));
         private static FakeQueryExecutor FakeQuery() => new(Summary(0));
-        private static AdminAssistantService Service(FakeReqaiClient reqai, FakeQueryExecutor query) => new(reqai, query);
+        private static AdminAssistantService Service(IReqaiAdminAssistantClient reqai, IRentalOrderQueryExecutor query) => new(reqai, query);
+
+        private static string PrivacyPlan(string fullCell) =>
+            "{\"version\":\"1\",\"reply\":{\"text\":\"openid=planner-user\",\"citations\":[]},\"actions\":[{\"id\":\"a1\",\"type\":\"rental_order.query\",\"mode\":\"replace\",\"arguments\":{\"start_date\":\"2026-04-01\",\"end_date\":\"2026-04-30\",\"cell_suffix\":\"" + fullCell + "\",\"keyword\":\"token=planner-secret\"},\"aggregation\":{\"metrics\":[\"order_count\"],\"group_by\":[]}}]}";
 
         private sealed class FakeReqaiClient : IReqaiAdminAssistantClient
         {
@@ -248,6 +285,37 @@ namespace SnowmeetApi.Tests
                 if (_error != null) throw _error;
                 return Task.FromResult(new RentalOrderQueryExecution(state, _summary));
             }
+        }
+
+        private sealed class StaticHttpClientFactory : IHttpClientFactory
+        {
+            private readonly HttpClient _client;
+
+            public StaticHttpClientFactory(HttpMessageHandler handler) => _client = new HttpClient(handler);
+
+            public HttpClient CreateClient(string name) => _client;
+        }
+
+        private sealed class CapturingReqaiHandler : HttpMessageHandler
+        {
+            private readonly string _plan;
+            public string? finalizeBody { get; private set; }
+
+            public CapturingReqaiHandler(string plan) => _plan = plan;
+
+            protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+            {
+                if (request.RequestUri!.AbsolutePath.EndsWith("/plan", StringComparison.Ordinal))
+                    return Task.FromResult(JsonResponse(HttpStatusCode.OK, _plan));
+
+                finalizeBody = request.Content!.ReadAsStringAsync(cancellationToken).GetAwaiter().GetResult();
+                return Task.FromResult(JsonResponse(HttpStatusCode.BadGateway, "{\"detail\":\"unavailable\"}"));
+            }
+
+            private static HttpResponseMessage JsonResponse(HttpStatusCode statusCode, string body) => new(statusCode)
+            {
+                Content = new StringContent(body, Encoding.UTF8, "application/json")
+            };
         }
     }
 }

@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using SnowmeetApi.Helpers;
@@ -15,6 +16,9 @@ namespace SnowmeetApi.Services.AdminAssistant
     public sealed class AdminAssistantService : IAdminAssistantService
     {
         private static readonly string[] DefaultMetrics = { "order_count", "charge_total", "paid_total", "refund_total", "unpaid_count" };
+        private static readonly Regex PhoneLike = new(@"(?<!\d)(?:\+?86[-\s]?)?1\d{10}(?!\d)", RegexOptions.Compiled);
+        private static readonly Regex SensitiveValue = new("\\b(?:service[_-]?token|access[_-]?token|refresh[_-]?token|token|cookie|openid|payment(?:[_-]?(?:id|no|token))?|transaction(?:[_-]?id)?)\\b\\s*(?:[:=]\\s*|\"\\s*:\\s*\")(?:(?:\"[^\"]*\")|[^\\s,;，；}]*)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        private static readonly Regex SensitiveMarker = new(@"\b(?:service[_-]?token|access[_-]?token|refresh[_-]?token|token|cookie|openid|payment(?:[_-]?(?:id|no|token))?|transaction(?:[_-]?id)?)\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
         private readonly IReqaiAdminAssistantClient _reqai;
         private readonly IRentalOrderQueryExecutor _query;
 
@@ -49,14 +53,7 @@ namespace SnowmeetApi.Services.AdminAssistant
                 return new AdminAssistantExecutionResult
                 {
                     response = TextOnly(traceId, plan.reply!, request.context),
-                    audit = new AdminAssistantAuditData
-                    {
-                        planner_json = plannerJson,
-                        validation_result = "accepted",
-                        query = null,
-                        summary = null,
-                        error = null
-                    }
+                    audit = Audit(plannerJson, "accepted", null, null, null)
                 };
             }
 
@@ -107,14 +104,8 @@ namespace SnowmeetApi.Services.AdminAssistant
             return new AdminAssistantExecutionResult
             {
                 response = CompletedQuery(traceId, action.id, finalReply, execution),
-                audit = new AdminAssistantAuditData
-                {
-                    planner_json = plannerJson,
-                    validation_result = "accepted",
-                    query = state,
-                    summary = execution.summary,
-                    error = finalizationFailed ? "finalize_failed" : null
-                }
+                    audit = Audit(plannerJson, "accepted", state, execution.summary,
+                        finalizationFailed ? "finalize_failed" : null)
             };
         }
 
@@ -233,9 +224,9 @@ namespace SnowmeetApi.Services.AdminAssistant
         {
             version = "1",
             trace_id = traceId,
-            question = request.question,
-            planner_reply = plannerReply,
-            query = execution.state,
+            question = RedactFreeText(request.question) ?? string.Empty,
+            planner_reply = PrivacySafeReply(plannerReply),
+            query = PrivacySafeQuery(execution.state),
             aggregation = aggregation,
             summary = ToReqaiSummary(execution.summary)
         };
@@ -302,12 +293,43 @@ namespace SnowmeetApi.Services.AdminAssistant
         private static AdminAssistantAuditData Audit(string? plannerJson, string validationResult,
             RentalOrderQueryState? state, RentalOrderQuerySummary? summary, string? error) => new()
         {
-            planner_json = plannerJson,
+            planner_json = RedactFreeText(plannerJson),
             validation_result = validationResult,
-            query = state,
+            query = state == null ? null : PrivacySafeQuery(state),
             summary = summary,
             error = error
         };
+
+        private static AssistantReply? PrivacySafeReply(AssistantReply? reply) => reply == null ? null : new AssistantReply
+        {
+            text = RedactFreeText(reply.text) ?? "[已隐去敏感信息]",
+            citations = new List<JsonElement>()
+        };
+
+        private static RentalOrderQueryState PrivacySafeQuery(RentalOrderQueryState state) => new()
+        {
+            start_date = state.start_date,
+            end_date = state.end_date,
+            shop = state.shop,
+            rent_status = state.rent_status,
+            is_test = state.is_test,
+            is_entertain = state.is_entertain,
+            have_discount = state.have_discount,
+            use_card = state.use_card,
+            has_retail = state.has_retail,
+            cell_suffix = LastFour(state.cell_suffix),
+            keyword = RedactFreeText(state.keyword)
+        };
+
+        private static string? LastFour(string? value) => value == null ? null : value.Length <= 4 ? value : value[^4..];
+
+        private static string? RedactFreeText(string? value)
+        {
+            if (value == null) return null;
+            string withoutPhones = PhoneLike.Replace(value, "[已隐去手机号]");
+            string withoutSensitiveValues = SensitiveValue.Replace(withoutPhones, "[已隐去敏感信息]");
+            return SensitiveMarker.Replace(withoutSensitiveValues, "[已隐去敏感信息]");
+        }
 
         private static string ProtocolPayload(string plannerJson)
         {
