@@ -81,9 +81,15 @@ namespace SnowmeetApi.Tests
         public async Task 成功审计保留安全规划细节且手机号仅记录后四位()
         {
             const string fullCell = "13800138000";
+            const string formattedPhone = "+86 138 0013 8000";
+            const string bearer = "TOP-SECRET-ABC";
+            const string password = "quoted password value";
+            const string apiKey = "multi token credential";
             const string plannerJson = "{\"version\":\"1\",\"reply\":{\"text\":\"我来查询。\",\"citations\":[]},\"actions\":[{\"id\":\"a1\",\"type\":\"rental_order.query\",\"mode\":\"replace\",\"arguments\":{\"start_date\":\"2026-04-01\",\"end_date\":\"2026-04-30\",\"shop\":\"万龙\",\"rent_status\":null,\"has_retail\":true,\"cell_suffix\":\"13800138000\",\"keyword\":\"雪板\"},\"aggregation\":{\"metrics\":[\"order_count\",\"charge_total\"],\"group_by\":[\"shop\"]}}]}";
             AdminAssistantRequest request = ValidRequest();
-            request.question = "查询 13800138000，service_token=planner-secret; Cookie=session-secret; openid=member-secret; payment_id=payment-secret; authorization=auth-secret";
+            request.question = "查询 13800138000，" + formattedPhone + " service_token=planner-secret; Cookie=session-secret; " +
+                "openid=member-secret; payment_id=payment-secret; authorization=Bearer " + bearer + " " +
+                "password=\"" + password + "\" api-key='" + apiKey + "'";
             request.context.rental_order_query = QueryState(fullCell);
 
             (ActionResult<ApiResult<AdminAssistantResponse>> action, AdminAiRequestLog audit) =
@@ -101,6 +107,11 @@ namespace SnowmeetApi.Tests
             Assert.DoesNotContain("member-secret", audit.request_payload);
             Assert.DoesNotContain("payment-secret", audit.request_payload);
             Assert.DoesNotContain("auth-secret", audit.request_payload);
+            Assert.DoesNotContain(formattedPhone, audit.request_payload);
+            Assert.DoesNotContain("138 0013 8000", audit.request_payload);
+            Assert.DoesNotContain(bearer, audit.request_payload);
+            Assert.DoesNotContain(password, audit.request_payload);
+            Assert.DoesNotContain(apiKey, audit.request_payload);
             Assert.Contains("\"cell_suffix\":\"8000\"", audit.request_payload);
             Assert.Contains("\"cell_suffix\":\"8000\"", audit.response_payload);
             JsonElement plannerAction = JsonDocument.Parse(audit.response_payload!).RootElement
@@ -142,6 +153,88 @@ namespace SnowmeetApi.Tests
             Assert.DoesNotContain("error-auth", serialized);
             Assert.DoesNotContain("planner_payload_status\":\"malformed\"", audit.request_payload);
             Assert.Contains("planner_payload_status\":\"malformed\"", audit.response_payload);
+        }
+
+        [Fact]
+        public async Task 审计会完整抹除带分隔符手机号和带引号的多词凭据()
+        {
+            const string formattedPhone = "+86 138 0013 8000";
+            const string bearer = "TOP-SECRET-ABC";
+            const string password = "quoted password value";
+            const string apiKey = "multi token credential";
+            AdminAssistantRequest request = ValidRequest();
+            request.question = "查询 " + formattedPhone + " authorization=Bearer " + bearer +
+                " password=\"" + password + "\" api-key='" + apiKey + "'";
+            request.context.rental_order_query = new RentalOrderQueryState { keyword = formattedPhone + " cookie=ctx cookie" };
+            string plannerJson = "{\"version\":\"1\",\"reply\":{\"text\":\"authorization=Bearer " + bearer + "\",\"citations\":[]},\"actions\":[{\"id\":\"a1\",\"type\":\"rental_order.query\",\"mode\":\"patch\",\"arguments\":{\"keyword\":\"" + formattedPhone + " api-key='" + apiKey + "'\"},\"aggregation\":{\"metrics\":[\"order_count\"],\"group_by\":[]}}]}";
+
+            AdminAiRequestLog audit = await RecordPlannerFailure(plannerJson, request,
+                "password=\"" + password + "\" authorization=Bearer " + bearer + " " + formattedPhone);
+
+            string serialized = audit.request_payload + audit.response_payload + (audit.error_message ?? "");
+            Assert.DoesNotContain(formattedPhone, serialized);
+            Assert.DoesNotContain("138 0013 8000", serialized);
+            Assert.DoesNotContain("8000", serialized);
+            Assert.DoesNotContain(bearer, serialized);
+            Assert.DoesNotContain(password, serialized);
+            Assert.DoesNotContain(apiKey, serialized);
+            Assert.DoesNotContain("ctx cookie", serialized);
+        }
+
+        [Fact]
+        public async Task 权限拒绝返回403且保留安全v1失败响应()
+        {
+            using SqliteConnection connection = new("Data Source=:memory:");
+            await connection.OpenAsync();
+            DbContextOptions<ApplicationDBContext> options = new DbContextOptionsBuilder<ApplicationDBContext>()
+                .UseSqlite(connection).Options;
+            await using ApplicationDBContext db = new(options);
+            await db.Database.EnsureCreatedAsync();
+            await AddTrustedStaffSession(db);
+            AdminAiController controller = new(db, Configuration(), new EmptyHttpClientFactory(), new HttpContextAccessor(),
+                new PermissionAssistantService());
+
+            ActionResult<ApiResult<AdminAssistantResponse>> action = await controller.AskAdminAssistantByStaff(ValidRequest(), "trusted-session");
+
+            ObjectResult result = Assert.IsType<ObjectResult>(action.Result);
+            Assert.Equal(403, result.StatusCode);
+            ApiResult<AdminAssistantResponse> body = Assert.IsType<ApiResult<AdminAssistantResponse>>(result.Value);
+            Assert.Equal(1, body.code);
+            Assert.Equal("没有权限", body.message);
+            Assert.NotNull(body.data);
+            Assert.False(string.IsNullOrWhiteSpace(body.data!.trace_id));
+            Assert.Empty(body.data.actions);
+            Assert.Null(body.data.context.rental_order_query);
+            AdminAiRequestLog audit = await db.adminAiRequestLog.SingleAsync();
+            Assert.Equal(403, audit.response_status_code);
+            Assert.Equal("permission_denied", audit.error_message);
+        }
+
+        [Fact]
+        public async Task 未识别的员工会返回403和安全v1失败响应()
+        {
+            using SqliteConnection connection = new("Data Source=:memory:");
+            await connection.OpenAsync();
+            DbContextOptions<ApplicationDBContext> options = new DbContextOptionsBuilder<ApplicationDBContext>()
+                .UseSqlite(connection).Options;
+            await using ApplicationDBContext db = new(options);
+            await db.Database.EnsureCreatedAsync();
+            RejectingAssistantService assistant = new();
+            AdminAiController controller = new(db, Configuration(), new EmptyHttpClientFactory(), new HttpContextAccessor(), assistant);
+
+            ActionResult<ApiResult<AdminAssistantResponse>> action = await controller.AskAdminAssistantByStaff(ValidRequest(), "unknown-session");
+
+            ObjectResult result = Assert.IsType<ObjectResult>(action.Result);
+            Assert.Equal(403, result.StatusCode);
+            ApiResult<AdminAssistantResponse> body = Assert.IsType<ApiResult<AdminAssistantResponse>>(result.Value);
+            Assert.Equal(1, body.code);
+            Assert.Equal("没有权限", body.message);
+            Assert.NotNull(body.data);
+            Assert.False(string.IsNullOrWhiteSpace(body.data!.trace_id));
+            Assert.Empty(body.data.actions);
+            Assert.Null(body.data.context.rental_order_query);
+            Assert.False(assistant.wasCalled);
+            Assert.Empty(await db.adminAiRequestLog.ToListAsync());
         }
 
         private static async Task<AdminAiRequestLog> RecordPlannerFailure(string plannerJson, AdminAssistantRequest? request = null,
@@ -305,6 +398,16 @@ namespace SnowmeetApi.Tests
                     }
                 });
             }
+        }
+
+        private sealed class PermissionAssistantService : IAdminAssistantService
+        {
+            public Task<AdminAssistantExecutionResult> AskAsync(AdminAssistantRequest request, Staff staff, string traceId,
+                bool structuredEnabled, CancellationToken cancellationToken) =>
+                throw new AdminAssistantPermissionException(new AdminAssistantAuditData
+                {
+                    validation_result = "rejected", error = "permission_denied"
+                });
         }
 
         private sealed class EmptyHttpClientFactory : IHttpClientFactory

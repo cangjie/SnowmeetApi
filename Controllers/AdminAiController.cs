@@ -26,9 +26,8 @@ namespace SnowmeetApi.Controllers
     public class AdminAiController : ControllerBase
     {
         private const int MinStaffLevel = 200;
-        private static readonly Regex PhoneLike = new(@"(?<!\d)(?:\+?86[-\s]?)?1\d{10}(?!\d)", RegexOptions.Compiled);
-        private static readonly Regex SensitiveValue = new("\\b(?:service[_-]?token|access[_-]?token|refresh[_-]?token|token|cookie|secret|authorization|openid|payment(?:[_-]?(?:id|no|token))?|transaction(?:[_-]?id)?)\\b\\s*(?:[:=]\\s*|\"\\s*:\\s*\")(?:(?:\"[^\"]*\")|[^\\s,;，；}]*)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
-        private static readonly Regex SensitiveMarker = new(@"\b(?:service[_-]?token|access[_-]?token|refresh[_-]?token|token|cookie|secret|authorization|openid|payment(?:[_-]?(?:id|no|token))?|transaction(?:[_-]?id)?)\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        private static readonly Regex PhoneLike = new(@"(?<!\d)(?:\+?86[\s-]*)?1[3-9]\d(?:[\s-]*\d{4}){2}(?!\d)", RegexOptions.Compiled);
+        private static readonly Regex SensitiveCredential = new("(?<![\\p{L}\\p{N}_-])(?:authorization|password|secret|api[_-]?key|service[_-]?token|access[_-]?token|refresh[_-]?token|token|cookie|openid|payment(?:[_-]?(?:id|no|token))?|transaction(?:[_-]?id)?)\\b\\s*(?:=\\s*|:\\s*|\"\\s*:\\s*\")(?:\"(?:\\\\.|[^\"\\\\])*\"|'(?:\\\\.|[^'\\\\])*'|[^\\r\\n,;，；}\\]]+)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
         private readonly ApplicationDBContext _db;
         private readonly IConfiguration _config;
         private readonly IHttpClientFactory _httpClientFactory;
@@ -72,7 +71,14 @@ namespace SnowmeetApi.Controllers
             Staff? staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
             if (staff == null)
             {
-                return Ok(new ApiResult<AdminAssistantResponse> { code = 1, message = "没有权限" });
+                string deniedTraceId = Guid.NewGuid().ToString("N");
+                AdminAssistantResponse deniedResponse = FailureResponse(deniedTraceId, "没有权限");
+                return StatusCode(403, new ApiResult<AdminAssistantResponse>
+                {
+                    code = 1,
+                    message = "没有权限",
+                    data = deniedResponse
+                });
             }
 
             string traceId = Guid.NewGuid().ToString("N");
@@ -125,8 +131,8 @@ namespace SnowmeetApi.Controllers
             {
                 AdminAssistantResponse response = FailureResponse(traceId, "没有权限");
                 ApiResult<AdminAssistantResponse> body = new() { code = 1, message = "没有权限", data = response };
-                await CompleteAssistantLog(log, stopwatch, false, 200, error.audit, body);
-                return Ok(body);
+                await CompleteAssistantLog(log, stopwatch, false, 403, error.audit, body);
+                return StatusCode(403, body);
             }
             catch (AdminAssistantOperationException error)
             {
@@ -430,8 +436,7 @@ namespace SnowmeetApi.Controllers
         {
             if (value == null) return null;
             string withoutPhones = PhoneLike.Replace(value, "[已隐去手机号]");
-            string withoutSensitiveValues = SensitiveValue.Replace(withoutPhones, "[已隐去敏感信息]");
-            return SensitiveMarker.Replace(withoutSensitiveValues, "[已隐去敏感信息]");
+            return SensitiveCredential.Replace(withoutPhones, "[已隐去敏感信息]");
         }
 
         private class RentQueryIntentResponse
