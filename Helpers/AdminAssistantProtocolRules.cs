@@ -87,7 +87,7 @@ namespace SnowmeetApi.Helpers
         {
             if (state.start_date == null || state.end_date == null)
                 throw new AdminAssistantClarificationException("请明确查询日期范围。");
-            if (state.end_date < state.start_date || state.end_date > state.start_date.Value.AddDays(365))
+            if (state.end_date < state.start_date || state.end_date.Value.Date - state.start_date.Value.Date > TimeSpan.FromDays(365))
                 throw new InvalidOperationException("查询日期范围不能超过 365 天");
             if (state.rent_status != null && !RentStatuses.Contains(state.rent_status))
                 throw new InvalidOperationException("租赁状态不支持");

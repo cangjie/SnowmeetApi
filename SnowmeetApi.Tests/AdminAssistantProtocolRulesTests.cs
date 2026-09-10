@@ -92,6 +92,15 @@ namespace SnowmeetApi.Tests
         }
 
         [Fact]
+        public void 查询日期靠近DateTime上界且不超过365天时有效()
+        {
+            AdminAssistantProtocolRules.ValidateQuery(new RentalOrderQueryState
+            {
+                start_date = D("9999-01-01"), end_date = D("9999-12-31")
+            });
+        }
+
+        [Fact]
         public void 查询拒绝非法状态和手机号后缀()
         {
             Assert.Throws<InvalidOperationException>(() => AdminAssistantProtocolRules.ValidateQuery(new RentalOrderQueryState
