@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Net.Http;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
@@ -30,7 +29,7 @@ namespace SnowmeetApi.Services.AdminAssistant
             if (!structuredEnabled)
                 throw new InvalidOperationException("结构化管理员助手未启用");
 
-            string plannerJson;
+            string? plannerJson = null;
             ReqaiPlanResponse plan;
             try
             {
@@ -39,12 +38,13 @@ namespace SnowmeetApi.Services.AdminAssistant
             }
             catch (Exception error) when (error is not OperationCanceledException)
             {
-                throw new AdminAssistantOperationException(AdminAssistantFailureStage.Planner, error);
+                throw new AdminAssistantOperationException(AdminAssistantFailureStage.Planner, error,
+                    Audit(plannerJson, "rejected", null, null, "planner_failed"));
             }
 
             if (plan.actions.Count == 0)
             {
-                RequireLevel(staff, 200);
+                RequireLevel(staff, 200, Audit(plannerJson, "rejected", null, null, "permission_denied"));
                 return new AdminAssistantExecutionResult
                 {
                     response = TextOnly(traceId, plan.reply!, request.context),
@@ -59,32 +59,35 @@ namespace SnowmeetApi.Services.AdminAssistant
                 };
             }
 
-            RequireLevel(staff, 100);
+            RequireLevel(staff, 100, Audit(plannerJson, "rejected", null, null, "permission_denied"));
             ReqaiPlanAction action = plan.actions.Single();
-            RentalOrderQueryState state;
+            RentalOrderQueryState? state = null;
             try
             {
                 state = AdminAssistantProtocolRules.Merge(action.mode,
                     request.context?.rental_order_query ?? new RentalOrderQueryState(), action.arguments);
                 AdminAssistantProtocolRules.ValidateQuery(state);
             }
-            catch (AdminAssistantClarificationException)
+            catch (AdminAssistantClarificationException error)
             {
-                throw;
+                throw new AdminAssistantClarificationException(error.Message,
+                    Audit(plannerJson, "clarification_required", state, null, "clarification_required"));
             }
             catch (Exception error)
             {
-                throw new AdminAssistantOperationException(AdminAssistantFailureStage.Execution, error);
+                throw new AdminAssistantOperationException(AdminAssistantFailureStage.Execution, error,
+                    Audit(plannerJson, "rejected", state, null, "query_validation_failed"));
             }
 
             RentalOrderQueryExecution execution;
             try
             {
-                execution = await _query.ExecuteAsync(state, action.aggregation.metrics, action.aggregation.group_by, cancellationToken);
+                execution = await _query.ExecuteAsync(state!, action.aggregation.metrics, action.aggregation.group_by, cancellationToken);
             }
             catch (Exception error) when (error is not OperationCanceledException)
             {
-                throw new AdminAssistantOperationException(AdminAssistantFailureStage.Execution, error);
+                throw new AdminAssistantOperationException(AdminAssistantFailureStage.Execution, error,
+                    Audit(plannerJson, "accepted", state, null, "execution_failed"));
             }
 
             AssistantReply finalReply;
@@ -94,7 +97,7 @@ namespace SnowmeetApi.Services.AdminAssistant
                 finalReply = await _reqai.FinalizeAsync(BuildFinalizeRequest(request, traceId, plan.reply, execution, action.aggregation), cancellationToken);
                 if (string.IsNullOrWhiteSpace(finalReply.text)) throw new ReqaiException();
             }
-            catch (Exception error) when (error is ReqaiException or HttpRequestException or TaskCanceledException)
+            catch (Exception)
             {
                 finalizationFailed = true;
                 finalReply = DeterministicReply(execution.summary);
@@ -193,10 +196,20 @@ namespace SnowmeetApi.Services.AdminAssistant
             };
         }
 
-        private static void RequireLevel(Staff staff, int requiredLevel)
+        private static void RequireLevel(Staff staff, int requiredLevel, AdminAssistantAuditData audit)
         {
-            if (staff.title_level < requiredLevel) throw new AdminAssistantPermissionException();
+            if (staff.title_level < requiredLevel) throw new AdminAssistantPermissionException(audit);
         }
+
+        private static AdminAssistantAuditData Audit(string? plannerJson, string validationResult,
+            RentalOrderQueryState? state, RentalOrderQuerySummary? summary, string? error) => new()
+        {
+            planner_json = plannerJson,
+            validation_result = validationResult,
+            query = state,
+            summary = summary,
+            error = error
+        };
 
         private static string ProtocolPayload(string plannerJson)
         {

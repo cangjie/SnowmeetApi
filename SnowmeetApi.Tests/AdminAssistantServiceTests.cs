@@ -43,7 +43,11 @@ namespace SnowmeetApi.Tests
 
             Assert.Contains("12", result.reply.text);
             Assert.Equal("completed", Assert.Single(result.actions).status);
+            Assert.Equal("accepted", execution.audit.validation_result);
             Assert.Equal("finalize_failed", execution.audit.error);
+            Assert.NotNull(execution.audit.planner_json);
+            Assert.Equal("2026-04-01", execution.audit.query!.start_date?.ToString("yyyy-MM-dd"));
+            Assert.Equal(12d, execution.audit.summary!.metrics["order_count"]);
         }
 
         [Theory]
@@ -51,8 +55,74 @@ namespace SnowmeetApi.Tests
         [InlineData(199, false)]
         public async Task 权限按action而不是统一门槛判断(int level, bool query)
         {
-            await Assert.ThrowsAsync<AdminAssistantPermissionException>(() =>
+            AdminAssistantPermissionException error = await Assert.ThrowsAsync<AdminAssistantPermissionException>(() =>
                 Service(query ? QueryPlanClient() : TextPlanClient(), FakeQuery()).AskAsync(Request(), Staff(level), "trace", true, default));
+
+            Assert.NotNull(error.audit);
+            Assert.Equal("permission_denied", error.audit!.error);
+            Assert.NotNull(error.audit.planner_json);
+        }
+
+        [Fact]
+        public async Task 非法规划响应保留原始响应和稳定审计()
+        {
+            const string plannerJson = "{not json";
+
+            AdminAssistantOperationException error = await Assert.ThrowsAsync<AdminAssistantOperationException>(() =>
+                Service(new FakeReqaiClient(plan: plannerJson), FakeQuery()).AskAsync(Request(), Staff(100), "trace", true, default));
+
+            Assert.Equal(AdminAssistantFailureStage.Planner, error.stage);
+            Assert.Equal(plannerJson, error.audit.planner_json);
+            Assert.Equal("rejected", error.audit.validation_result);
+            Assert.Equal("planner_failed", error.audit.error);
+            Assert.Null(error.audit.query);
+            Assert.Null(error.audit.summary);
+        }
+
+        [Fact]
+        public async Task 澄清错误保留合并后的条件审计()
+        {
+            FakeReqaiClient reqai = new(plan: PatchPlan("{\"rent_status\":\"未支付\"}"));
+
+            AdminAssistantClarificationException error = await Assert.ThrowsAsync<AdminAssistantClarificationException>(() =>
+                Service(reqai, FakeQuery()).AskAsync(Request(), Staff(100), "trace", true, default));
+
+            Assert.NotNull(error.audit);
+            Assert.Equal("clarification_required", error.audit!.validation_result);
+            Assert.Equal("clarification_required", error.audit.error);
+            Assert.Equal("未支付", error.audit.query!.rent_status);
+            Assert.Null(error.audit.summary);
+        }
+
+        [Fact]
+        public async Task 执行失败保留完整条件和稳定错误审计()
+        {
+            FakeQueryExecutor query = new(Summary(0), new InvalidOperationException("database details"));
+
+            AdminAssistantOperationException error = await Assert.ThrowsAsync<AdminAssistantOperationException>(() =>
+                Service(QueryPlanClient(), query).AskAsync(Request(), Staff(100), "trace", true, default));
+
+            Assert.Equal(AdminAssistantFailureStage.Execution, error.stage);
+            Assert.Equal("accepted", error.audit.validation_result);
+            Assert.Equal("execution_failed", error.audit.error);
+            Assert.Equal("2026-04-01", error.audit.query!.start_date?.ToString("yyyy-MM-dd"));
+            Assert.Null(error.audit.summary);
+        }
+
+        [Fact]
+        public async Task 合并后的非法条件保留状态和验证失败审计()
+        {
+            FakeReqaiClient reqai = new(plan: QueryPlanWithDates("2026-04-30", "2026-04-01"));
+
+            AdminAssistantOperationException error = await Assert.ThrowsAsync<AdminAssistantOperationException>(() =>
+                Service(reqai, FakeQuery()).AskAsync(Request(), Staff(100), "trace", true, default));
+
+            Assert.Equal(AdminAssistantFailureStage.Execution, error.stage);
+            Assert.Equal("rejected", error.audit.validation_result);
+            Assert.Equal("query_validation_failed", error.audit.error);
+            Assert.Equal("2026-04-30", error.audit.query!.start_date?.ToString("yyyy-MM-dd"));
+            Assert.Equal("2026-04-01", error.audit.query.end_date?.ToString("yyyy-MM-dd"));
+            Assert.Null(error.audit.summary);
         }
 
         [Fact]
@@ -118,6 +188,12 @@ namespace SnowmeetApi.Tests
         private static string TextPlan(string text) =>
             "{\"version\":\"1\",\"reply\":{\"text\":\"" + text + "\",\"citations\":[]},\"actions\":[]}";
 
+        private static string PatchPlan(string arguments) =>
+            "{\"version\":\"1\",\"reply\":null,\"actions\":[{\"id\":\"a1\",\"type\":\"rental_order.query\",\"mode\":\"patch\",\"arguments\":" + arguments + ",\"aggregation\":{\"metrics\":[\"order_count\"],\"group_by\":[]}}]}";
+
+        private static string QueryPlanWithDates(string startDate, string endDate) =>
+            "{\"version\":\"1\",\"reply\":null,\"actions\":[{\"id\":\"a1\",\"type\":\"rental_order.query\",\"mode\":\"replace\",\"arguments\":{\"start_date\":\"" + startDate + "\",\"end_date\":\"" + endDate + "\"},\"aggregation\":{\"metrics\":[\"order_count\"],\"group_by\":[]}}]}";
+
         private static FakeReqaiClient QueryPlanClient() => new(plan: QueryPlan("rental_order.query"));
         private static FakeReqaiClient TextPlanClient() => new(plan: TextPlan("页面说明"));
         private static FakeQueryExecutor FakeQuery() => new(Summary(0));
@@ -156,14 +232,20 @@ namespace SnowmeetApi.Tests
         private sealed class FakeQueryExecutor : IRentalOrderQueryExecutor
         {
             private readonly RentalOrderQuerySummary _summary;
+            private readonly Exception? _error;
             public bool wasCalled { get; private set; }
 
-            public FakeQueryExecutor(RentalOrderQuerySummary summary) => _summary = summary;
+            public FakeQueryExecutor(RentalOrderQuerySummary summary, Exception? error = null)
+            {
+                _summary = summary;
+                _error = error;
+            }
 
             public Task<RentalOrderQueryExecution> ExecuteAsync(RentalOrderQueryState state,
                 IReadOnlyCollection<string> metrics, IReadOnlyList<string> groupBy, CancellationToken cancellationToken)
             {
                 wasCalled = true;
+                if (_error != null) throw _error;
                 return Task.FromResult(new RentalOrderQueryExecution(state, _summary));
             }
         }

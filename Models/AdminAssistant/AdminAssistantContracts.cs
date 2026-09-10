@@ -117,14 +117,33 @@ namespace SnowmeetApi.Models.AdminAssistant
         public string? keyword { get; set; }
     }
 
-    public sealed class AdminAssistantClarificationException : Exception
+    public interface IAdminAssistantAuditedFailure
     {
-        public AdminAssistantClarificationException(string message) : base(message) { }
+        AdminAssistantAuditData audit { get; }
     }
 
-    public sealed class AdminAssistantPermissionException : Exception
+    public sealed class AdminAssistantClarificationException : Exception, IAdminAssistantAuditedFailure
     {
-        public AdminAssistantPermissionException() : base("没有权限") { }
+        public AdminAssistantAuditData audit { get; }
+
+        public AdminAssistantClarificationException(string message) : this(message, new AdminAssistantAuditData()) { }
+
+        public AdminAssistantClarificationException(string message, AdminAssistantAuditData audit) : base(message)
+        {
+            this.audit = audit;
+        }
+    }
+
+    public sealed class AdminAssistantPermissionException : Exception, IAdminAssistantAuditedFailure
+    {
+        public AdminAssistantAuditData audit { get; }
+
+        public AdminAssistantPermissionException() : this(new AdminAssistantAuditData()) { }
+
+        public AdminAssistantPermissionException(AdminAssistantAuditData audit) : base("没有权限")
+        {
+            this.audit = audit;
+        }
     }
 
     public enum AdminAssistantFailureStage
@@ -133,14 +152,21 @@ namespace SnowmeetApi.Models.AdminAssistant
         Execution
     }
 
-    public sealed class AdminAssistantOperationException : Exception
+    public sealed class AdminAssistantOperationException : Exception, IAdminAssistantAuditedFailure
     {
         public AdminAssistantFailureStage stage { get; }
+        public AdminAssistantAuditData audit { get; }
 
         public AdminAssistantOperationException(AdminAssistantFailureStage stage, Exception innerException)
+            : this(stage, innerException, new AdminAssistantAuditData())
+        {
+        }
+
+        public AdminAssistantOperationException(AdminAssistantFailureStage stage, Exception innerException, AdminAssistantAuditData audit)
             : base(stage == AdminAssistantFailureStage.Planner ? "管理员助手规划暂不可用" : "租赁订单查询暂不可用", innerException)
         {
             this.stage = stage;
+            this.audit = audit;
         }
     }
 
