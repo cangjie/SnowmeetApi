@@ -22,6 +22,7 @@ using System.Threading;
 using Newtonsoft.Json;
 using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using SnowmeetApi.Services.AdminAssistant;
 
 namespace SnowmeetApi
 {
@@ -71,6 +72,7 @@ namespace SnowmeetApi
             {
                 client.Timeout = TimeSpan.FromSeconds(Configuration.GetValue<int?>("Reqai:TimeoutSeconds") ?? 90);
             });
+            services.AddScoped<IRentalOrderQueryExecutor, RentalOrderQueryExecutor>();
             services.AddControllers().AddJsonOptions(options =>{
                 options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
             });
