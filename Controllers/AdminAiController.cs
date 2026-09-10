@@ -55,7 +55,7 @@ namespace SnowmeetApi.Controllers
 
         [HttpPost]
         public async Task<ActionResult<ApiResult<AdminAssistantResponse>>> AskAdminAssistantByStaff(
-            [FromBody] AdminAssistantRequest request, string sessionKey,
+            [ModelBinder(BinderType = typeof(AdminAssistantRequestModelBinder))] AdminAssistantRequest? request, string sessionKey,
             string sessionType = "wechat_mini_openid", CancellationToken cancellationToken = default)
         {
             if (!IsValidClientRequest(request))
@@ -63,7 +63,8 @@ namespace SnowmeetApi.Controllers
                 return BadRequest(new ApiResult<AdminAssistantResponse> { code = 1, message = "请求参数不合法" });
             }
 
-            request.question = request.question.Trim();
+            AdminAssistantRequest validRequest = request!;
+            validRequest.question = validRequest.question.Trim();
             Staff? staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
             if (staff == null)
             {
@@ -72,7 +73,7 @@ namespace SnowmeetApi.Controllers
 
             string traceId = Guid.NewGuid().ToString("N");
             bool structuredEnabled = _config.GetValue<bool>("AdminAssistant:StructuredProtocolEnabled");
-            return await ExecuteAndAudit(request, staff, traceId, structuredEnabled, sessionType, cancellationToken);
+            return await ExecuteAndAudit(validRequest, staff, traceId, structuredEnabled, sessionType, cancellationToken);
         }
 
         private async Task<ActionResult<ApiResult<AdminAssistantResponse>>> ExecuteAndAudit(AdminAssistantRequest request,
@@ -190,7 +191,7 @@ namespace SnowmeetApi.Controllers
                 response,
                 audit = new
                 {
-                    planner_json = SafePlannerJson(audit.planner_json),
+                    planner = SafePlannerAudit(audit.planner_json),
                     audit.validation_result,
                     audit.query,
                     audit.summary,
@@ -204,18 +205,81 @@ namespace SnowmeetApi.Controllers
             await _db.SaveChangesAsync();
         }
 
-        private static string? SafePlannerJson(string? plannerJson)
+        private static Dictionary<string, object?> SafePlannerAudit(string? plannerJson)
         {
-            if (string.IsNullOrWhiteSpace(plannerJson)) return plannerJson;
+            if (string.IsNullOrWhiteSpace(plannerJson))
+            {
+                return new Dictionary<string, object?> { ["planner_payload_status"] = "missing" };
+            }
             try
             {
                 using JsonDocument document = JsonDocument.Parse(plannerJson);
-                return SafeAuditJson(document.RootElement);
+                if (document.RootElement.ValueKind != JsonValueKind.Object)
+                {
+                    return new Dictionary<string, object?> { ["planner_payload_status"] = "invalid_shape" };
+                }
+                return new Dictionary<string, object?>
+                {
+                    ["planner_payload_status"] = HasOnlyProperties(document.RootElement, "version", "reply", "actions", "model", "effort")
+                        ? "parsed" : "rejected_shape",
+                    ["planner"] = ProjectPlannerProtocol(document.RootElement)
+                };
             }
             catch (JsonException)
             {
-                return plannerJson;
+                return new Dictionary<string, object?> { ["planner_payload_status"] = "malformed" };
             }
+        }
+
+        private static Dictionary<string, object?> ProjectPlannerProtocol(JsonElement payload)
+        {
+            Dictionary<string, object?> result = new();
+            if (payload.TryGetProperty("version", out JsonElement version) && version.ValueKind == JsonValueKind.String)
+                result["version"] = SafePlannerString(version.GetString(), 32);
+            if (payload.TryGetProperty("reply", out JsonElement reply) && reply.ValueKind == JsonValueKind.Object &&
+                reply.TryGetProperty("text", out JsonElement text) && text.ValueKind == JsonValueKind.String)
+                result["reply"] = new Dictionary<string, object?> { ["text"] = SafePlannerString(text.GetString(), 2000) };
+            if (payload.TryGetProperty("actions", out JsonElement actions) && actions.ValueKind == JsonValueKind.Array)
+            {
+                List<Dictionary<string, object?>> projectedActions = new();
+                foreach (JsonElement action in actions.EnumerateArray())
+                {
+                    if (action.ValueKind != JsonValueKind.Object) continue;
+                    Dictionary<string, object?> projected = new();
+                    CopyPlannerString(action, projected, "id", 64);
+                    CopyPlannerString(action, projected, "type", 64);
+                    CopyPlannerString(action, projected, "mode", 16);
+                    projectedActions.Add(projected);
+                }
+                result["actions"] = projectedActions;
+            }
+            return result;
+        }
+
+        private static void CopyPlannerString(JsonElement source, Dictionary<string, object?> target, string property, int maximumLength)
+        {
+            if (source.TryGetProperty(property, out JsonElement value) && value.ValueKind == JsonValueKind.String)
+                target[property] = SafePlannerString(value.GetString(), maximumLength);
+        }
+
+        private static string SafePlannerString(string? value, int maximumLength)
+        {
+            if (string.IsNullOrEmpty(value)) return value ?? "";
+            string normalized = value.Length > maximumLength ? value.Substring(0, maximumLength) : value;
+            return normalized.Contains("token", StringComparison.OrdinalIgnoreCase) || normalized.Contains("cookie", StringComparison.OrdinalIgnoreCase) ||
+                normalized.Contains("secret", StringComparison.OrdinalIgnoreCase) || normalized.Contains("authorization", StringComparison.OrdinalIgnoreCase) ||
+                normalized.Contains("openid", StringComparison.OrdinalIgnoreCase) ? "[redacted]" : normalized;
+        }
+
+        private static bool HasOnlyProperties(JsonElement element, params string[] allowed)
+        {
+            HashSet<string> names = new(allowed, StringComparer.Ordinal);
+            HashSet<string> seen = new(StringComparer.Ordinal);
+            foreach (JsonProperty property in element.EnumerateObject())
+            {
+                if (!names.Contains(property.Name) || !seen.Add(property.Name)) return false;
+            }
+            return true;
         }
 
         private static string SafeAuditJson(object value)

@@ -43,6 +43,40 @@ namespace SnowmeetApi.Tests
         [Fact]
         public async Task 失败会写入脱敏审计并返回清空的查询上下文()
         {
+            AdminAiRequestLog audit = await RecordPlannerFailure("{\"trace\":\"trace-secret\",\"service_token\":\"secret\",\"Cookie\":\"cookie\",\"openid\":\"openid\",\"orders\":[{\"id\":1}]}");
+
+            Assert.Equal("admin_assistant", audit.operation);
+            Assert.Equal(7, audit.staff_id);
+            Assert.False(audit.success);
+            Assert.Equal("planner_failed", audit.error_message);
+            Assert.Equal(502, audit.response_status_code);
+            Assert.DoesNotContain("trace-secret", audit.response_payload);
+            Assert.Contains("validation_result", audit.response_payload);
+            Assert.DoesNotContain("service_token", audit.response_payload);
+            Assert.DoesNotContain("Cookie", audit.response_payload);
+            Assert.DoesNotContain("openid", audit.response_payload);
+            Assert.DoesNotContain("orders", audit.response_payload);
+            Assert.DoesNotContain("database details", audit.response_payload);
+        }
+
+        [Theory]
+        [InlineData("service_token=secret; Cookie=secret; contact_name=Jane; cell=13800138000")]
+        [InlineData("{\"version\":\"1\",\"reply\":{\"text\":\"safe\",\"citations\":[]},\"actions\":[],\"debug\":{\"orders\":[{\"contact_name\":\"Jane\",\"cell\":\"13800138000\"}]}}")]
+        public async Task 拒绝的规划内容只记录安全协议投影(string plannerJson)
+        {
+            AdminAiRequestLog audit = await RecordPlannerFailure(plannerJson);
+
+            Assert.DoesNotContain("secret", audit.response_payload);
+            Assert.DoesNotContain("Cookie", audit.response_payload);
+            Assert.DoesNotContain("Jane", audit.response_payload);
+            Assert.DoesNotContain("13800138000", audit.response_payload);
+            Assert.DoesNotContain("orders", audit.response_payload);
+            Assert.DoesNotContain("debug", audit.response_payload);
+            Assert.Contains("planner_payload_status", audit.response_payload);
+        }
+
+        private static async Task<AdminAiRequestLog> RecordPlannerFailure(string plannerJson)
+        {
             using SqliteConnection connection = new("Data Source=:memory:");
             await connection.OpenAsync();
             DbContextOptions<ApplicationDBContext> options = new DbContextOptionsBuilder<ApplicationDBContext>()
@@ -50,7 +84,7 @@ namespace SnowmeetApi.Tests
             await using ApplicationDBContext db = new(options);
             await db.Database.EnsureCreatedAsync();
             await AddTrustedStaffSession(db);
-            ThrowingAssistantService assistant = new();
+            ThrowingAssistantService assistant = new(plannerJson);
             AdminAiController controller = new(db, Configuration(new Dictionary<string, string?>
             {
                 ["AdminAssistant:StructuredProtocolEnabled"] = "true"
@@ -67,20 +101,7 @@ namespace SnowmeetApi.Tests
             Assert.Empty(body.data!.actions);
             Assert.Null(body.data.context.rental_order_query);
             Assert.True(assistant.wasCalled);
-
-            AdminAiRequestLog audit = await db.adminAiRequestLog.SingleAsync();
-            Assert.Equal("admin_assistant", audit.operation);
-            Assert.Equal(7, audit.staff_id);
-            Assert.False(audit.success);
-            Assert.Equal("planner_failed", audit.error_message);
-            Assert.Equal(502, audit.response_status_code);
-            Assert.Contains("trace-secret", audit.response_payload);
-            Assert.Contains("validation_result", audit.response_payload);
-            Assert.DoesNotContain("service_token", audit.response_payload);
-            Assert.DoesNotContain("Cookie", audit.response_payload);
-            Assert.DoesNotContain("openid", audit.response_payload);
-            Assert.DoesNotContain("orders", audit.response_payload);
-            Assert.DoesNotContain("database details", audit.response_payload);
+            return await db.adminAiRequestLog.SingleAsync();
         }
 
         private static IConfiguration Configuration(IDictionary<string, string?>? values = null) =>
@@ -127,7 +148,13 @@ namespace SnowmeetApi.Tests
 
         private sealed class ThrowingAssistantService : IAdminAssistantService
         {
+            private readonly string _plannerJson;
             public bool wasCalled { get; private set; }
+
+            public ThrowingAssistantService(string plannerJson)
+            {
+                _plannerJson = plannerJson;
+            }
 
             public Task<AdminAssistantExecutionResult> AskAsync(AdminAssistantRequest request, Staff staff, string traceId,
                 bool structuredEnabled, CancellationToken cancellationToken)
@@ -135,7 +162,7 @@ namespace SnowmeetApi.Tests
                 wasCalled = true;
                 AdminAssistantAuditData audit = new()
                 {
-                    planner_json = "{\"trace\":\"trace-secret\",\"service_token\":\"secret\",\"Cookie\":\"cookie\",\"openid\":\"openid\",\"orders\":[{\"id\":1}]}",
+                    planner_json = _plannerJson,
                     validation_result = "rejected",
                     error = "planner_failed"
                 };
