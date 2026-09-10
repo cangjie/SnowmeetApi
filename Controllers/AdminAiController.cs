@@ -6,6 +6,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
@@ -25,6 +26,9 @@ namespace SnowmeetApi.Controllers
     public class AdminAiController : ControllerBase
     {
         private const int MinStaffLevel = 200;
+        private static readonly Regex PhoneLike = new(@"(?<!\d)(?:\+?86[-\s]?)?1\d{10}(?!\d)", RegexOptions.Compiled);
+        private static readonly Regex SensitiveValue = new("\\b(?:service[_-]?token|access[_-]?token|refresh[_-]?token|token|cookie|secret|authorization|openid|payment(?:[_-]?(?:id|no|token))?|transaction(?:[_-]?id)?)\\b\\s*(?:[:=]\\s*|\"\\s*:\\s*\")(?:(?:\"[^\"]*\")|[^\\s,;，；}]*)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        private static readonly Regex SensitiveMarker = new(@"\b(?:service[_-]?token|access[_-]?token|refresh[_-]?token|token|cookie|secret|authorization|openid|payment(?:[_-]?(?:id|no|token))?|transaction(?:[_-]?id)?)\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
         private readonly ApplicationDBContext _db;
         private readonly IConfiguration _config;
         private readonly IHttpClientFactory _httpClientFactory;
@@ -198,7 +202,7 @@ namespace SnowmeetApi.Controllers
                     audit.error
                 }
             });
-            log.error_message = audit.error;
+            log.error_message = RedactAuditText(audit.error);
             log.completed_date = DateTime.Now;
             log.duration_ms = (int)stopwatch.ElapsedMilliseconds;
             _db.Update(log);
@@ -343,9 +347,7 @@ namespace SnowmeetApi.Controllers
         {
             if (string.IsNullOrEmpty(value)) return value ?? "";
             string normalized = value.Length > maximumLength ? value.Substring(0, maximumLength) : value;
-            return normalized.Contains("token", StringComparison.OrdinalIgnoreCase) || normalized.Contains("cookie", StringComparison.OrdinalIgnoreCase) ||
-                normalized.Contains("secret", StringComparison.OrdinalIgnoreCase) || normalized.Contains("authorization", StringComparison.OrdinalIgnoreCase) ||
-                normalized.Contains("openid", StringComparison.OrdinalIgnoreCase) ? "[redacted]" : normalized;
+            return RedactAuditText(normalized) ?? "";
         }
 
         private static string SafeCellSuffix(string? value)
@@ -402,6 +404,9 @@ namespace SnowmeetApi.Controllers
                     foreach (JsonElement item in value.EnumerateArray()) WriteSafeAuditJson(writer, item);
                     writer.WriteEndArray();
                     break;
+                case JsonValueKind.String:
+                    writer.WriteStringValue(RedactAuditText(value.GetString()));
+                    break;
                 default:
                     value.WriteTo(writer);
                     break;
@@ -420,6 +425,14 @@ namespace SnowmeetApi.Controllers
 
         private static bool IsCellSuffixAuditProperty(string name) =>
             string.Equals(name, "cell_suffix", StringComparison.Ordinal);
+
+        private static string? RedactAuditText(string? value)
+        {
+            if (value == null) return null;
+            string withoutPhones = PhoneLike.Replace(value, "[已隐去手机号]");
+            string withoutSensitiveValues = SensitiveValue.Replace(withoutPhones, "[已隐去敏感信息]");
+            return SensitiveMarker.Replace(withoutSensitiveValues, "[已隐去敏感信息]");
+        }
 
         private class RentQueryIntentResponse
         {

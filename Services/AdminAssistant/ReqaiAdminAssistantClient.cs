@@ -78,13 +78,11 @@ namespace SnowmeetApi.Services.AdminAssistant
                     answer.ValueKind != JsonValueKind.String || string.IsNullOrWhiteSpace(answer.GetString()))
                     throw new ReqaiException();
 
-                List<JsonElement> citations = new();
                 if (root.TryGetProperty("citations", out JsonElement citationElement))
                 {
                     if (citationElement.ValueKind != JsonValueKind.Array) throw new ReqaiException();
-                    foreach (JsonElement citation in citationElement.EnumerateArray()) citations.Add(citation.Clone());
                 }
-                return new AssistantReply { text = answer.GetString()!, citations = citations };
+                return new AssistantReply { text = answer.GetString()!, citations = new List<JsonElement>() };
             }
             catch (JsonException)
             {

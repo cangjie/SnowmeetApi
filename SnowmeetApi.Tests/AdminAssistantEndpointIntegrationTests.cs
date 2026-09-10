@@ -28,6 +28,11 @@ namespace SnowmeetApi.Tests
         [InlineData("null")]
         [InlineData("")]
         [InlineData("{\"version\":1,\"page_key\":\"pages/admin/member/member_list\",\"question\":\"help\"}")]
+        [InlineData("{\"Version\":\"1\",\"page_key\":\"pages/admin/member/member_list\",\"question\":\"help\"}")]
+        [InlineData("{\"version\":\"1\",\"version\":\"1\",\"page_key\":\"pages/admin/member/member_list\",\"question\":\"help\"}")]
+        [InlineData("{\"version\":\"1\",\"page_key\":\"pages/admin/member/member_list\",\"question\":\"help\",\"unknown\":true}")]
+        [InlineData("{\"version\":\"1\",\"page_key\":\"pages/admin/member/member_list\",\"question\":\"help\",\"context\":{\"rental_order_query\":{\"Cell_Suffix\":\"1234\"}}}")]
+        [InlineData("{\"version\":\"1\",\"page_key\":\"pages/admin/member/member_list\",\"question\":\"help\",\"context\":{\"rental_order_query\":{\"cell_suffix\":\"1234\",\"cell_suffix\":\"5678\"}}}")]
         public async Task 无效请求体始终返回统一v1错误信封(string payload)
         {
             using TestServer server = CreateServer();

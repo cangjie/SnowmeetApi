@@ -130,6 +130,24 @@ namespace SnowmeetApi.Tests
         }
 
         [Fact]
+        public async Task 执行器前拒绝客户端上下文保留的非法条件()
+        {
+            AdminAssistantRequest request = Request();
+            request.context.rental_order_query = new RentalOrderQueryState
+            {
+                start_date = new DateTime(2026, 4, 1), end_date = new DateTime(2026, 4, 30), shop = " "
+            };
+            FakeQueryExecutor query = FakeQuery();
+
+            AdminAssistantOperationException error = await Assert.ThrowsAsync<AdminAssistantOperationException>(() =>
+                Service(new FakeReqaiClient(plan: PatchPlan("{}")), query).AskAsync(request, Staff(100), "trace", true, default));
+
+            Assert.Equal(AdminAssistantFailureStage.Execution, error.stage);
+            Assert.Equal("query_validation_failed", error.audit.error);
+            Assert.False(query.wasCalled);
+        }
+
+        [Fact]
         public async Task Finalize只接收完整条件和严格汇总()
         {
             FakeReqaiClient reqai = new(plan: QueryPlan(), final: Reply("完成。"));

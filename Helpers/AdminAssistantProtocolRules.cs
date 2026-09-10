@@ -87,8 +87,14 @@ namespace SnowmeetApi.Helpers
         {
             if (state.start_date == null || state.end_date == null)
                 throw new AdminAssistantClarificationException("请明确查询日期范围。");
+            if (state.start_date.Value.TimeOfDay != TimeSpan.Zero || state.end_date.Value.TimeOfDay != TimeSpan.Zero)
+                throw new InvalidOperationException("查询日期必须是 yyyy-MM-dd");
             if (state.end_date < state.start_date || state.end_date.Value.Date - state.start_date.Value.Date > TimeSpan.FromDays(365))
                 throw new InvalidOperationException("查询日期范围不能超过 365 天");
+            state.shop = NormalizeOptional(state.shop, "门店", 64);
+            state.rent_status = NormalizeOptional(state.rent_status, "租赁状态", 64);
+            state.keyword = NormalizeOptional(state.keyword, "关键词", 100);
+            state.cell_suffix = NormalizeOptional(state.cell_suffix, "手机号条件", 15);
             if (state.rent_status != null && !RentStatuses.Contains(state.rent_status))
                 throw new InvalidOperationException("租赁状态不支持");
             if (state.cell_suffix != null && (state.cell_suffix.Length < 4 || state.cell_suffix.Length > 15 || !state.cell_suffix.All(char.IsDigit)))
@@ -105,7 +111,6 @@ namespace SnowmeetApi.Helpers
             if (element.TryGetProperty("citations", out JsonElement citationElement))
             {
                 if (citationElement.ValueKind != JsonValueKind.Array) throw new InvalidOperationException("citations 必须是数组");
-                citations.AddRange(citationElement.EnumerateArray().Select(value => value.Clone()));
             }
             return new AssistantReply { text = text, citations = citations };
         }
@@ -212,6 +217,15 @@ namespace SnowmeetApi.Helpers
             string value = element.GetString()!;
             if (value.Length > maxLength) throw new InvalidOperationException(name + " 过长");
             return value;
+        }
+
+        private static string? NormalizeOptional(string? value, string name, int maxLength)
+        {
+            if (value == null) return null;
+            string normalized = value.Trim();
+            if (normalized.Length == 0) throw new InvalidOperationException(name + " 不能为空");
+            if (normalized.Length > maxLength) throw new InvalidOperationException(name + " 过长");
+            return normalized;
         }
 
         private static bool ParseBool(JsonElement element, string name)

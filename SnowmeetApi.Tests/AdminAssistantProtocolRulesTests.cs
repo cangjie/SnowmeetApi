@@ -113,6 +113,56 @@ namespace SnowmeetApi.Tests
             }));
         }
 
+        [Theory]
+        [InlineData("patch")]
+        [InlineData("replace")]
+        public void 合并会复制全部十一项条件(string mode)
+        {
+            RentalOrderQueryState current = new()
+            {
+                start_date = D("2026-03-01"), end_date = D("2026-03-02"), shop = "旧门店", rent_status = "未支付",
+                is_test = false, is_entertain = false, have_discount = false, use_card = false, has_retail = false,
+                cell_suffix = "1111", keyword = "旧关键词"
+            };
+            RentalOrderQueryPatch patch = AdminAssistantProtocolRules.ParseArguments("{\"start_date\":\"2026-04-01\",\"end_date\":\"2026-04-30\",\"shop\":\" 万龙 \",\"rent_status\":\" 未支付 \",\"is_test\":true,\"is_entertain\":true,\"have_discount\":true,\"use_card\":true,\"has_retail\":true,\"cell_suffix\":\"13800138000\",\"keyword\":\" 雪板 \"}");
+
+            RentalOrderQueryState merged = AdminAssistantProtocolRules.Merge(mode, current, patch);
+            AdminAssistantProtocolRules.ValidateQuery(merged);
+
+            Assert.Equal(D("2026-04-01"), merged.start_date);
+            Assert.Equal(D("2026-04-30"), merged.end_date);
+            Assert.Equal("万龙", merged.shop);
+            Assert.Equal("未支付", merged.rent_status);
+            Assert.True(merged.is_test);
+            Assert.True(merged.is_entertain);
+            Assert.True(merged.have_discount);
+            Assert.True(merged.use_card);
+            Assert.True(merged.has_retail);
+            Assert.Equal("13800138000", merged.cell_suffix);
+            Assert.Equal("雪板", merged.keyword);
+        }
+
+        [Theory]
+        [InlineData(" ", "雪板", "1234")]
+        [InlineData("万龙", " ", "1234")]
+        [InlineData("万龙", "雪板", "123a")]
+        public void 合并后保留的非法文本条件会被拒绝(string shop, string keyword, string cellSuffix)
+        {
+            Assert.Throws<InvalidOperationException>(() => AdminAssistantProtocolRules.ValidateQuery(new RentalOrderQueryState
+            {
+                start_date = D("2026-04-01"), end_date = D("2026-04-30"), shop = shop, keyword = keyword, cell_suffix = cellSuffix
+            }));
+        }
+
+        [Fact]
+        public void 规划引用不携带任意内容()
+        {
+            ReqaiPlanResponse plan = AdminAssistantProtocolRules.ParsePlan(
+                "{\"version\":\"1\",\"reply\":{\"text\":\"ok\",\"citations\":[{\"contact_name\":\"Jane\",\"cell\":\"13800138000\"}]},\"actions\":[]}");
+
+            Assert.Empty(plan.reply!.citations);
+        }
+
         private static DateTime D(string value) => DateTime.Parse(value, CultureInfo.InvariantCulture);
 
         private static string PlanJson(string actionType) =>

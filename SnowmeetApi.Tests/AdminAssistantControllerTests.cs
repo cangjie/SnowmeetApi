@@ -83,6 +83,7 @@ namespace SnowmeetApi.Tests
             const string fullCell = "13800138000";
             const string plannerJson = "{\"version\":\"1\",\"reply\":{\"text\":\"我来查询。\",\"citations\":[]},\"actions\":[{\"id\":\"a1\",\"type\":\"rental_order.query\",\"mode\":\"replace\",\"arguments\":{\"start_date\":\"2026-04-01\",\"end_date\":\"2026-04-30\",\"shop\":\"万龙\",\"rent_status\":null,\"has_retail\":true,\"cell_suffix\":\"13800138000\",\"keyword\":\"雪板\"},\"aggregation\":{\"metrics\":[\"order_count\",\"charge_total\"],\"group_by\":[\"shop\"]}}]}";
             AdminAssistantRequest request = ValidRequest();
+            request.question = "查询 13800138000，service_token=planner-secret; Cookie=session-secret; openid=member-secret; payment_id=payment-secret; authorization=auth-secret";
             request.context.rental_order_query = QueryState(fullCell);
 
             (ActionResult<ApiResult<AdminAssistantResponse>> action, AdminAiRequestLog audit) =
@@ -95,9 +96,14 @@ namespace SnowmeetApi.Tests
 
             Assert.DoesNotContain(fullCell, audit.request_payload);
             Assert.DoesNotContain(fullCell, audit.response_payload);
+            Assert.DoesNotContain("planner-secret", audit.request_payload);
+            Assert.DoesNotContain("session-secret", audit.request_payload);
+            Assert.DoesNotContain("member-secret", audit.request_payload);
+            Assert.DoesNotContain("payment-secret", audit.request_payload);
+            Assert.DoesNotContain("auth-secret", audit.request_payload);
             Assert.Contains("\"cell_suffix\":\"8000\"", audit.request_payload);
             Assert.Contains("\"cell_suffix\":\"8000\"", audit.response_payload);
-            JsonElement plannerAction = JsonDocument.Parse(audit.response_payload).RootElement
+            JsonElement plannerAction = JsonDocument.Parse(audit.response_payload!).RootElement
                 .GetProperty("audit").GetProperty("planner").GetProperty("planner").GetProperty("actions")[0];
             JsonElement arguments = plannerAction.GetProperty("arguments");
             Assert.Equal("replace", plannerAction.GetProperty("mode").GetString());
@@ -113,7 +119,33 @@ namespace SnowmeetApi.Tests
             Assert.DoesNotContain("service_token", audit.response_payload);
         }
 
-        private static async Task<AdminAiRequestLog> RecordPlannerFailure(string plannerJson)
+        [Fact]
+        public async Task 失败审计不会保留自由文本中的手机号或敏感标记()
+        {
+            const string fullCell = "13800138000";
+            AdminAssistantRequest request = ValidRequest();
+            request.question = "查询 " + fullCell + " token=question-secret cookie=question-cookie authorization=question-auth";
+            AdminAiRequestLog audit = await RecordPlannerFailure(
+                "malformed service_token=planner-secret; openid=planner-openid; payment_id=planner-payment; authorization=planner-auth; " + fullCell, request,
+                "execution failed token=error-secret authorization=error-auth " + fullCell);
+
+            string serialized = audit.request_payload + audit.response_payload + (audit.error_message ?? "");
+            Assert.DoesNotContain(fullCell, serialized);
+            Assert.DoesNotContain("question-secret", serialized);
+            Assert.DoesNotContain("question-cookie", serialized);
+            Assert.DoesNotContain("planner-secret", serialized);
+            Assert.DoesNotContain("planner-openid", serialized);
+            Assert.DoesNotContain("planner-payment", serialized);
+            Assert.DoesNotContain("error-secret", serialized);
+            Assert.DoesNotContain("question-auth", serialized);
+            Assert.DoesNotContain("planner-auth", serialized);
+            Assert.DoesNotContain("error-auth", serialized);
+            Assert.DoesNotContain("planner_payload_status\":\"malformed\"", audit.request_payload);
+            Assert.Contains("planner_payload_status\":\"malformed\"", audit.response_payload);
+        }
+
+        private static async Task<AdminAiRequestLog> RecordPlannerFailure(string plannerJson, AdminAssistantRequest? request = null,
+            string error = "planner_failed")
         {
             using SqliteConnection connection = new("Data Source=:memory:");
             await connection.OpenAsync();
@@ -122,13 +154,13 @@ namespace SnowmeetApi.Tests
             await using ApplicationDBContext db = new(options);
             await db.Database.EnsureCreatedAsync();
             await AddTrustedStaffSession(db);
-            ThrowingAssistantService assistant = new(plannerJson);
+            ThrowingAssistantService assistant = new(plannerJson, error);
             AdminAiController controller = new(db, Configuration(new Dictionary<string, string?>
             {
                 ["AdminAssistant:StructuredProtocolEnabled"] = "true"
             }), new EmptyHttpClientFactory(), new HttpContextAccessor(), assistant);
 
-            ActionResult<ApiResult<AdminAssistantResponse>> action = await controller.AskAdminAssistantByStaff(ValidRequest(), "trusted-session");
+            ActionResult<ApiResult<AdminAssistantResponse>> action = await controller.AskAdminAssistantByStaff(request ?? ValidRequest(), "trusted-session");
 
             ObjectResult result = Assert.IsType<ObjectResult>(action.Result);
             Assert.Equal(502, result.StatusCode);
@@ -216,11 +248,13 @@ namespace SnowmeetApi.Tests
         private sealed class ThrowingAssistantService : IAdminAssistantService
         {
             private readonly string _plannerJson;
+            private readonly string _error;
             public bool wasCalled { get; private set; }
 
-            public ThrowingAssistantService(string plannerJson)
+            public ThrowingAssistantService(string plannerJson, string error = "planner_failed")
             {
                 _plannerJson = plannerJson;
+                _error = error;
             }
 
             public Task<AdminAssistantExecutionResult> AskAsync(AdminAssistantRequest request, Staff staff, string traceId,
@@ -231,7 +265,7 @@ namespace SnowmeetApi.Tests
                 {
                     planner_json = _plannerJson,
                     validation_result = "rejected",
-                    error = "planner_failed"
+                    error = _error
                 };
                 throw new AdminAssistantOperationException(AdminAssistantFailureStage.Planner,
                     new InvalidOperationException("database details"), audit);
