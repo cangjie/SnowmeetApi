@@ -236,9 +236,8 @@ namespace SnowmeetApi.Controllers
             Dictionary<string, object?> result = new();
             if (payload.TryGetProperty("version", out JsonElement version) && version.ValueKind == JsonValueKind.String)
                 result["version"] = SafePlannerString(version.GetString(), 32);
-            if (payload.TryGetProperty("reply", out JsonElement reply) && reply.ValueKind == JsonValueKind.Object &&
-                reply.TryGetProperty("text", out JsonElement text) && text.ValueKind == JsonValueKind.String)
-                result["reply"] = new Dictionary<string, object?> { ["text"] = SafePlannerString(text.GetString(), 2000) };
+            if (payload.TryGetProperty("reply", out JsonElement reply) && reply.ValueKind == JsonValueKind.Object)
+                result["reply"] = ProjectPlannerReply(reply);
             if (payload.TryGetProperty("actions", out JsonElement actions) && actions.ValueKind == JsonValueKind.Array)
             {
                 List<Dictionary<string, object?>> projectedActions = new();
@@ -249,6 +248,10 @@ namespace SnowmeetApi.Controllers
                     CopyPlannerString(action, projected, "id", 64);
                     CopyPlannerString(action, projected, "type", 64);
                     CopyPlannerString(action, projected, "mode", 16);
+                    if (action.TryGetProperty("arguments", out JsonElement arguments) && arguments.ValueKind == JsonValueKind.Object)
+                        projected["arguments"] = ProjectPlannerArguments(arguments);
+                    if (action.TryGetProperty("aggregation", out JsonElement aggregation) && aggregation.ValueKind == JsonValueKind.Object)
+                        projected["aggregation"] = ProjectPlannerAggregation(aggregation);
                     projectedActions.Add(projected);
                 }
                 result["actions"] = projectedActions;
@@ -256,10 +259,84 @@ namespace SnowmeetApi.Controllers
             return result;
         }
 
+        private static Dictionary<string, object?> ProjectPlannerReply(JsonElement reply)
+        {
+            Dictionary<string, object?> result = new();
+            CopyPlannerString(reply, result, "text", 2000);
+            if (reply.TryGetProperty("citations", out JsonElement citations) && citations.ValueKind == JsonValueKind.Array &&
+                citations.GetArrayLength() == 0)
+                result["citations"] = new List<object?>();
+            return result;
+        }
+
+        private static Dictionary<string, object?> ProjectPlannerArguments(JsonElement arguments)
+        {
+            Dictionary<string, object?> result = new();
+            CopyPlannerString(arguments, result, "start_date", 10);
+            CopyPlannerString(arguments, result, "end_date", 10);
+            CopyPlannerString(arguments, result, "shop", 64);
+            CopyPlannerString(arguments, result, "rent_status", 64);
+            CopyPlannerBoolean(arguments, result, "is_test");
+            CopyPlannerBoolean(arguments, result, "is_entertain");
+            CopyPlannerBoolean(arguments, result, "have_discount");
+            CopyPlannerBoolean(arguments, result, "use_card");
+            CopyPlannerBoolean(arguments, result, "has_retail");
+            CopyPlannerCellSuffix(arguments, result);
+            CopyPlannerString(arguments, result, "keyword", 100);
+            return result;
+        }
+
+        private static Dictionary<string, object?> ProjectPlannerAggregation(JsonElement aggregation)
+        {
+            Dictionary<string, object?> result = new();
+            CopyPlannerStringArray(aggregation, result, "metrics", 32);
+            CopyPlannerStringArray(aggregation, result, "group_by", 32);
+            return result;
+        }
+
         private static void CopyPlannerString(JsonElement source, Dictionary<string, object?> target, string property, int maximumLength)
         {
-            if (source.TryGetProperty(property, out JsonElement value) && value.ValueKind == JsonValueKind.String)
+            if (!source.TryGetProperty(property, out JsonElement value)) return;
+            if (value.ValueKind == JsonValueKind.Null)
+                target[property] = null;
+            else if (value.ValueKind == JsonValueKind.String)
                 target[property] = SafePlannerString(value.GetString(), maximumLength);
+        }
+
+        private static void CopyPlannerBoolean(JsonElement source, Dictionary<string, object?> target, string property)
+        {
+            if (!source.TryGetProperty(property, out JsonElement value)) return;
+            if (value.ValueKind == JsonValueKind.Null)
+                target[property] = null;
+            else if (value.ValueKind == JsonValueKind.True || value.ValueKind == JsonValueKind.False)
+                target[property] = value.GetBoolean();
+        }
+
+        private static void CopyPlannerCellSuffix(JsonElement source, Dictionary<string, object?> target)
+        {
+            if (!source.TryGetProperty("cell_suffix", out JsonElement value)) return;
+            if (value.ValueKind == JsonValueKind.Null)
+                target["cell_suffix"] = null;
+            else if (value.ValueKind == JsonValueKind.String)
+                target["cell_suffix"] = SafeCellSuffix(value.GetString());
+        }
+
+        private static void CopyPlannerStringArray(JsonElement source, Dictionary<string, object?> target, string property, int maximumLength)
+        {
+            if (!source.TryGetProperty(property, out JsonElement values)) return;
+            if (values.ValueKind == JsonValueKind.Null)
+            {
+                target[property] = null;
+                return;
+            }
+            if (values.ValueKind != JsonValueKind.Array) return;
+            List<string> projected = new();
+            foreach (JsonElement value in values.EnumerateArray())
+            {
+                if (value.ValueKind == JsonValueKind.String)
+                    projected.Add(SafePlannerString(value.GetString(), maximumLength));
+            }
+            target[property] = projected;
         }
 
         private static string SafePlannerString(string? value, int maximumLength)
@@ -269,6 +346,12 @@ namespace SnowmeetApi.Controllers
             return normalized.Contains("token", StringComparison.OrdinalIgnoreCase) || normalized.Contains("cookie", StringComparison.OrdinalIgnoreCase) ||
                 normalized.Contains("secret", StringComparison.OrdinalIgnoreCase) || normalized.Contains("authorization", StringComparison.OrdinalIgnoreCase) ||
                 normalized.Contains("openid", StringComparison.OrdinalIgnoreCase) ? "[redacted]" : normalized;
+        }
+
+        private static string SafeCellSuffix(string? value)
+        {
+            if (string.IsNullOrEmpty(value)) return value ?? "";
+            return value.Length <= 4 ? value : value.Substring(value.Length - 4);
         }
 
         private static bool HasOnlyProperties(JsonElement element, params string[] allowed)
@@ -302,6 +385,14 @@ namespace SnowmeetApi.Controllers
                     {
                         if (IsSensitiveAuditProperty(property.Name)) continue;
                         writer.WritePropertyName(property.Name);
+                        if (IsCellSuffixAuditProperty(property.Name))
+                        {
+                            if (property.Value.ValueKind == JsonValueKind.String)
+                                writer.WriteStringValue(SafeCellSuffix(property.Value.GetString()));
+                            else
+                                property.Value.WriteTo(writer);
+                            continue;
+                        }
                         WriteSafeAuditJson(writer, property.Value);
                     }
                     writer.WriteEndObject();
@@ -326,6 +417,9 @@ namespace SnowmeetApi.Controllers
                 normalized.Contains("transaction", StringComparison.Ordinal) || normalized is "orders" or "order" or "orderrows" or
                 "orderdetails" or "orderitems" or "contactname" or "realname" or "cell" or "phone" or "mobile";
         }
+
+        private static bool IsCellSuffixAuditProperty(string name) =>
+            string.Equals(name, "cell_suffix", StringComparison.Ordinal);
 
         private class RentQueryIntentResponse
         {

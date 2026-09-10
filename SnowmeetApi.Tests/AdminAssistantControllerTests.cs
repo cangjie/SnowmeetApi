@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Net.Http;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
@@ -10,6 +11,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using SnowmeetApi.Controllers;
 using SnowmeetApi.Data;
+using SnowmeetApi.Helpers;
 using SnowmeetApi.Models;
 using SnowmeetApi.Models.AdminAssistant;
 using SnowmeetApi.Services.AdminAssistant;
@@ -75,6 +77,42 @@ namespace SnowmeetApi.Tests
             Assert.Contains("planner_payload_status", audit.response_payload);
         }
 
+        [Fact]
+        public async Task 成功审计保留安全规划细节且手机号仅记录后四位()
+        {
+            const string fullCell = "13800138000";
+            const string plannerJson = "{\"version\":\"1\",\"reply\":{\"text\":\"我来查询。\",\"citations\":[]},\"actions\":[{\"id\":\"a1\",\"type\":\"rental_order.query\",\"mode\":\"replace\",\"arguments\":{\"start_date\":\"2026-04-01\",\"end_date\":\"2026-04-30\",\"shop\":\"万龙\",\"rent_status\":null,\"has_retail\":true,\"cell_suffix\":\"13800138000\",\"keyword\":\"雪板\"},\"aggregation\":{\"metrics\":[\"order_count\",\"charge_total\"],\"group_by\":[\"shop\"]}}]}";
+            AdminAssistantRequest request = ValidRequest();
+            request.context.rental_order_query = QueryState(fullCell);
+
+            (ActionResult<ApiResult<AdminAssistantResponse>> action, AdminAiRequestLog audit) =
+                await RecordSuccessfulQuery(request, plannerJson, fullCell);
+
+            OkObjectResult result = Assert.IsType<OkObjectResult>(action.Result);
+            ApiResult<AdminAssistantResponse> body = Assert.IsType<ApiResult<AdminAssistantResponse>>(result.Value);
+            Assert.Equal(fullCell, body.data!.context.rental_order_query!.cell_suffix);
+            Assert.Equal(fullCell, Assert.Single(body.data.actions).state.cell_suffix);
+
+            Assert.DoesNotContain(fullCell, audit.request_payload);
+            Assert.DoesNotContain(fullCell, audit.response_payload);
+            Assert.Contains("\"cell_suffix\":\"8000\"", audit.request_payload);
+            Assert.Contains("\"cell_suffix\":\"8000\"", audit.response_payload);
+            JsonElement plannerAction = JsonDocument.Parse(audit.response_payload).RootElement
+                .GetProperty("audit").GetProperty("planner").GetProperty("planner").GetProperty("actions")[0];
+            JsonElement arguments = plannerAction.GetProperty("arguments");
+            Assert.Equal("replace", plannerAction.GetProperty("mode").GetString());
+            Assert.Equal("2026-04-01", arguments.GetProperty("start_date").GetString());
+            Assert.Equal(JsonValueKind.Null, arguments.GetProperty("rent_status").ValueKind);
+            Assert.True(arguments.GetProperty("has_retail").GetBoolean());
+            Assert.Equal("雪板", arguments.GetProperty("keyword").GetString());
+            Assert.Equal("8000", arguments.GetProperty("cell_suffix").GetString());
+            JsonElement aggregation = plannerAction.GetProperty("aggregation");
+            Assert.Equal("order_count", aggregation.GetProperty("metrics")[0].GetString());
+            Assert.Equal("charge_total", aggregation.GetProperty("metrics")[1].GetString());
+            Assert.Equal("shop", aggregation.GetProperty("group_by")[0].GetString());
+            Assert.DoesNotContain("service_token", audit.response_payload);
+        }
+
         private static async Task<AdminAiRequestLog> RecordPlannerFailure(string plannerJson)
         {
             using SqliteConnection connection = new("Data Source=:memory:");
@@ -104,6 +142,28 @@ namespace SnowmeetApi.Tests
             return await db.adminAiRequestLog.SingleAsync();
         }
 
+        private static async Task<(ActionResult<ApiResult<AdminAssistantResponse>> action, AdminAiRequestLog audit)> RecordSuccessfulQuery(
+            AdminAssistantRequest request, string plannerJson, string cellSuffix)
+        {
+            using SqliteConnection connection = new("Data Source=:memory:");
+            await connection.OpenAsync();
+            DbContextOptions<ApplicationDBContext> options = new DbContextOptionsBuilder<ApplicationDBContext>()
+                .UseSqlite(connection).Options;
+            await using ApplicationDBContext db = new(options);
+            await db.Database.EnsureCreatedAsync();
+            await AddTrustedStaffSession(db);
+            SuccessfulAssistantService assistant = new(plannerJson, cellSuffix);
+            AdminAiController controller = new(db, Configuration(new Dictionary<string, string?>
+            {
+                ["AdminAssistant:StructuredProtocolEnabled"] = "true"
+            }), new EmptyHttpClientFactory(), new HttpContextAccessor(), assistant);
+
+            ActionResult<ApiResult<AdminAssistantResponse>> action = await controller.AskAdminAssistantByStaff(request, "trusted-session");
+
+            Assert.True(assistant.wasCalled);
+            return (action, await db.adminAiRequestLog.SingleAsync());
+        }
+
         private static IConfiguration Configuration(IDictionary<string, string?>? values = null) =>
             new ConfigurationBuilder().AddInMemoryCollection(values).Build();
 
@@ -113,6 +173,13 @@ namespace SnowmeetApi.Tests
             page_key = "pages/admin/member/member_list",
             question = "查询四月租赁订单",
             context = new AdminAssistantContext()
+        };
+
+        private static RentalOrderQueryState QueryState(string cellSuffix) => new()
+        {
+            start_date = new DateTime(2026, 4, 1),
+            end_date = new DateTime(2026, 4, 30),
+            cell_suffix = cellSuffix
         };
 
         private static async Task AddTrustedStaffSession(ApplicationDBContext db)
@@ -168,6 +235,41 @@ namespace SnowmeetApi.Tests
                 };
                 throw new AdminAssistantOperationException(AdminAssistantFailureStage.Planner,
                     new InvalidOperationException("database details"), audit);
+            }
+        }
+
+        private sealed class SuccessfulAssistantService : IAdminAssistantService
+        {
+            private readonly string _plannerJson;
+            private readonly string _cellSuffix;
+            public bool wasCalled { get; private set; }
+
+            public SuccessfulAssistantService(string plannerJson, string cellSuffix)
+            {
+                _plannerJson = plannerJson;
+                _cellSuffix = cellSuffix;
+            }
+
+            public Task<AdminAssistantExecutionResult> AskAsync(AdminAssistantRequest request, Staff staff, string traceId,
+                bool structuredEnabled, CancellationToken cancellationToken)
+            {
+                wasCalled = true;
+                RentalOrderQueryState state = QueryState(_cellSuffix);
+                RentalOrderQuerySummary summary = new(new Dictionary<string, double> { ["order_count"] = 2 },
+                    new List<RentalOrderQuerySummaryGroup>());
+                return Task.FromResult(new AdminAssistantExecutionResult
+                {
+                    response = new AdminAssistantResponse
+                    {
+                        version = "1", trace_id = traceId, reply = new AssistantReply { text = "完成。" },
+                        actions = new List<ClientAssistantAction> { new() { id = "a1", state = state, summary = summary } },
+                        context = new AdminAssistantContext { rental_order_query = state }
+                    },
+                    audit = new AdminAssistantAuditData
+                    {
+                        planner_json = _plannerJson, validation_result = "accepted", query = state, summary = summary
+                    }
+                });
             }
         }
 
