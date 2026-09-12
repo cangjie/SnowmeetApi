@@ -165,7 +165,7 @@ namespace SnowmeetApi.Tests
             AdminAssistantRequest request = ValidRequest();
             request.question = "查询 " + formattedPhone + " authorization=Bearer " + bearer +
                 " password=\"" + password + "\" api-key='" + apiKey + "'";
-            request.context.rental_order_query = new RentalOrderQueryState { keyword = formattedPhone + " cookie=ctx cookie" };
+            request.context.rental_order_query = new AdminAssistantQueryState { keyword = formattedPhone + " cookie=ctx cookie" };
             string plannerJson = "{\"version\":\"1\",\"reply\":{\"text\":\"authorization=Bearer " + bearer + "\",\"citations\":[]},\"actions\":[{\"id\":\"a1\",\"type\":\"rental_order.query\",\"mode\":\"patch\",\"arguments\":{\"keyword\":\"" + formattedPhone + " api-key='" + apiKey + "'\"},\"aggregation\":{\"metrics\":[\"order_count\"],\"group_by\":[]}}]}";
 
             AdminAiRequestLog audit = await RecordPlannerFailure(plannerJson, request,
@@ -300,7 +300,7 @@ namespace SnowmeetApi.Tests
             context = new AdminAssistantContext()
         };
 
-        private static RentalOrderQueryState QueryState(string cellSuffix) => new()
+        private static AdminAssistantQueryState QueryState(string cellSuffix) => new()
         {
             start_date = new DateTime(2026, 4, 1),
             end_date = new DateTime(2026, 4, 30),
@@ -381,9 +381,12 @@ namespace SnowmeetApi.Tests
                 bool structuredEnabled, CancellationToken cancellationToken)
             {
                 wasCalled = true;
-                RentalOrderQueryState state = QueryState(_cellSuffix);
-                RentalOrderQuerySummary summary = new(new Dictionary<string, double> { ["order_count"] = 2 },
-                    new List<RentalOrderQuerySummaryGroup>());
+                AdminAssistantQueryState state = QueryState(_cellSuffix);
+                QuerySummary summary = new()
+                {
+                    metrics = new Dictionary<string, double> { ["order_count"] = 2 },
+                    groups = new List<QuerySummaryGroup>()
+                };
                 return Task.FromResult(new AdminAssistantExecutionResult
                 {
                     response = new AdminAssistantResponse

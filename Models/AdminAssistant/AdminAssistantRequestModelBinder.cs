@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
+using SnowmeetApi.Helpers;
 
 namespace SnowmeetApi.Models.AdminAssistant
 {
@@ -51,18 +53,44 @@ namespace SnowmeetApi.Models.AdminAssistant
             return true;
         }
 
+        /// <summary>
+        /// 上下文按业务域分键保存，另带一个 active_query_type 指明当前进行中的是哪个域。
+        /// 各域的字段白名单来自 AdminAssistantDomains，和协议校验用的是同一张表。
+        /// </summary>
         private static bool IsContext(JsonElement context)
         {
-            if (!HasOnlyProperties(context, "rental_order_query")) return false;
-            if (!context.TryGetProperty("rental_order_query", out JsonElement state) || state.ValueKind == JsonValueKind.Null) return true;
-            if (!HasOnlyProperties(state, "start_date", "end_date", "shop", "rent_status", "is_test", "is_entertain",
-                "have_discount", "use_card", "has_retail", "cell_suffix", "keyword")) return false;
-            return IsOptionalDate(state, "start_date") && IsOptionalDate(state, "end_date") &&
-                IsOptionalString(state, "shop") && IsOptionalString(state, "rent_status") &&
-                IsOptionalBoolean(state, "is_test") && IsOptionalBoolean(state, "is_entertain") &&
-                IsOptionalBoolean(state, "have_discount") && IsOptionalBoolean(state, "use_card") &&
-                IsOptionalBoolean(state, "has_retail") && IsOptionalString(state, "cell_suffix") &&
-                IsOptionalString(state, "keyword");
+            List<string> allowed = new() { "active_query_type" };
+            allowed.AddRange(AdminAssistantDomains.ContextKeys);
+            if (!HasOnlyProperties(context, allowed.ToArray())) return false;
+            if (!IsOptionalString(context, "active_query_type")) return false;
+            if (context.TryGetProperty("active_query_type", out JsonElement activeType) &&
+                activeType.ValueKind == JsonValueKind.String &&
+                AdminAssistantDomains.Find(activeType.GetString()) == null) return false;
+
+            foreach (AdminAssistantDomain domain in AdminAssistantDomains.All.Values)
+            {
+                if (!context.TryGetProperty(domain.contextKey, out JsonElement state) ||
+                    state.ValueKind == JsonValueKind.Null) continue;
+                if (!IsDomainState(state, domain)) return false;
+            }
+            return true;
+        }
+
+        private static bool IsDomainState(JsonElement state, AdminAssistantDomain domain)
+        {
+            if (!HasOnlyProperties(state, domain.fields.ToArray())) return false;
+            foreach (string field in domain.fields)
+            {
+                bool ok = field switch
+                {
+                    "start_date" or "end_date" => IsOptionalDate(state, field),
+                    "is_test" or "is_entertain" or "have_discount" or "use_card"
+                        or "has_retail" or "is_summer_care" => IsOptionalBoolean(state, field),
+                    _ => IsOptionalString(state, field)
+                };
+                if (!ok) return false;
+            }
+            return true;
         }
 
         private static bool HasOnlyProperties(JsonElement value, params string[] names)

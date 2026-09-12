@@ -42,7 +42,7 @@ namespace SnowmeetApi.Tests
             Assert.Equal("accepted", execution.audit.validation_result);
         }
 
-        private static AdminAssistantService Service(FakeReqaiClient reqai) => new(reqai, new FakeQueryExecutor());
+        private static AdminAssistantService Service(FakeReqaiClient reqai) => new(reqai, new IAdminAssistantQueryExecutor[] { new FakeQueryExecutor() });
 
         private static AdminAssistantRequest Request(string question = "查询四月租赁订单") => new()
         {
@@ -97,12 +97,18 @@ namespace SnowmeetApi.Tests
             }
         }
 
-        private sealed class FakeQueryExecutor : IRentalOrderQueryExecutor
+        private sealed class FakeQueryExecutor : IAdminAssistantQueryExecutor
         {
-            public Task<RentalOrderQueryExecution> ExecuteAsync(RentalOrderQueryState state,
-                IReadOnlyCollection<string> metrics, IReadOnlyList<string> groupBy, CancellationToken cancellationToken) =>
-                Task.FromResult(new RentalOrderQueryExecution(state, new RentalOrderQuerySummary(
-                    new Dictionary<string, double> { ["order_count"] = 3d }, new List<RentalOrderQuerySummaryGroup>())));
+            public string actionType => "rental_order.query";
+
+            public Task<AdminAssistantQueryExecution> ExecuteAsync(AdminAssistantQueryState state,
+                AdminAssistantDomain domain, IReadOnlyCollection<string> metrics, IReadOnlyList<string> groupBy,
+                CancellationToken cancellationToken) =>
+                Task.FromResult(new AdminAssistantQueryExecution(state, new QuerySummary
+                {
+                    metrics = new Dictionary<string, double> { ["order_count"] = 3d },
+                    groups = new List<QuerySummaryGroup>()
+                }));
         }
     }
 }

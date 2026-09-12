@@ -133,7 +133,7 @@ namespace SnowmeetApi.Tests
         public async Task 执行器前拒绝客户端上下文保留的非法条件()
         {
             AdminAssistantRequest request = Request();
-            request.context.rental_order_query = new RentalOrderQueryState
+            request.context.rental_order_query = new AdminAssistantQueryState
             {
                 start_date = new DateTime(2026, 4, 1), end_date = new DateTime(2026, 4, 30), shop = " "
             };
@@ -151,15 +151,16 @@ namespace SnowmeetApi.Tests
         public async Task Finalize只接收完整条件和严格汇总()
         {
             FakeReqaiClient reqai = new(plan: QueryPlan(), final: Reply("完成。"));
-            RentalOrderQuerySummary summary = Summary(12);
+            QuerySummary summary = Summary(12);
 
             await Service(reqai, new FakeQueryExecutor(summary)).AskAsync(Request(), Staff(100), "trace", true, default);
 
             Assert.NotNull(reqai.finalizeRequest);
             Assert.Equal("查询今年四月租赁订单", reqai.finalizeRequest!.question);
-            Assert.Equal("2026-04-01", reqai.finalizeRequest.query.start_date?.ToString("yyyy-MM-dd"));
-            Assert.Equal(12d, reqai.finalizeRequest.summary.metrics["order_count"]);
-            Assert.Empty(reqai.finalizeRequest.summary.groups);
+            Assert.Equal("rental_order.query", reqai.finalizeRequest.executed.type);
+            Assert.Equal("2026-04-01", reqai.finalizeRequest.executed.query["start_date"]);
+            Assert.Equal(12d, reqai.finalizeRequest.executed.summary.metrics["order_count"]);
+            Assert.Empty(reqai.finalizeRequest.executed.summary.groups);
         }
 
         [Fact]
@@ -214,7 +215,7 @@ namespace SnowmeetApi.Tests
         public async Task 纯文字回复保留现有上下文且不查询()
         {
             AdminAssistantRequest request = Request();
-            request.context.rental_order_query = new RentalOrderQueryState
+            request.context.rental_order_query = new AdminAssistantQueryState
             {
                 start_date = new DateTime(2026, 4, 1), end_date = new DateTime(2026, 4, 30)
             };
@@ -238,8 +239,9 @@ namespace SnowmeetApi.Tests
 
         private static Staff Staff(int level) => new() { id = 7, title_level = level };
 
-        private static RentalOrderQuerySummary Summary(int orderCount) => new(
-            new Dictionary<string, double>
+        private static QuerySummary Summary(int orderCount) => new()
+        {
+            metrics = new Dictionary<string, double>
             {
                 ["order_count"] = orderCount,
                 ["charge_total"] = 0,
@@ -247,9 +249,115 @@ namespace SnowmeetApi.Tests
                 ["refund_total"] = 0,
                 ["unpaid_count"] = 0
             },
-            new List<RentalOrderQuerySummaryGroup>());
+            groups = new List<QuerySummaryGroup>()
+        };
 
         private static AssistantReply Reply(string text) => new() { text = text };
+
+        [Fact]
+        public async Task 未开放的域明确拒答而不是执行查询()
+        {
+            // 发布顺序要求 API 先只开租赁：旧版小程序不认识 care_order.show_results。
+            FakeReqaiClient reqai = new(plan: QueryPlan("care_order.query"));
+            FakeQueryExecutor care = new(Summary(3), type: "care_order.query");
+            AdminAssistantService service = new(reqai, new[] { (IAdminAssistantQueryExecutor)care }, configuration: null);
+
+            AdminAssistantUnsupportedException error = await Assert.ThrowsAsync<AdminAssistantUnsupportedException>(() =>
+                service.AskAsync(Request(), Staff(100), "trace", true, default));
+
+            Assert.False(care.wasCalled);
+            Assert.Equal("domain_disabled", error.audit.error);
+            Assert.Equal("养护订单列表", error.detail.suggested_page);
+        }
+
+        [Fact]
+        public async Task 养护查询走养护执行器并下发养护的客户端指令()
+        {
+            FakeReqaiClient reqai = new(plan: QueryPlan("care_order.query"), final: Reply("共 3 单。"));
+            FakeQueryExecutor care = new(Summary(3), type: "care_order.query");
+
+            AdminAssistantExecutionResult execution =
+                await Service(reqai, care).AskAsync(Request(), Staff(100), "trace", true, default);
+
+            Assert.True(care.wasCalled);
+            Assert.Equal("养护", care.calledDomain!.bizType);
+            Assert.Equal("care_order.show_results", Assert.Single(execution.response.actions).type);
+            Assert.NotNull(execution.response.context.care_order_query);
+            Assert.Null(execution.response.context.rental_order_query);
+            Assert.Equal("care_order.query", execution.response.context.active_query_type);
+        }
+
+        [Fact]
+        public async Task 别的域的条件进不了本域查询()
+        {
+            // 这正是线上那个 bug 的形状：养护查询里夹带租赁状态，必须在执行器之前被拒。
+            FakeReqaiClient reqai = new(plan:
+                "{\"version\":\"1\",\"reply\":null,\"actions\":[{\"id\":\"a1\",\"type\":\"care_order.query\"," +
+                "\"mode\":\"replace\",\"arguments\":{\"start_date\":\"2026-04-01\",\"end_date\":\"2026-04-30\"," +
+                "\"rent_status\":\"未支付\"},\"aggregation\":{\"metrics\":[\"order_count\"],\"group_by\":[]}}]}");
+            FakeQueryExecutor care = new(Summary(0), type: "care_order.query");
+
+            await Assert.ThrowsAsync<AdminAssistantOperationException>(() =>
+                Service(reqai, care).AskAsync(Request(), Staff(100), "trace", true, default));
+
+            Assert.False(care.wasCalled);
+        }
+
+        [Fact]
+        public async Task 关键词夹带业务概念时明确拒答而不是去查一个错口径()
+        {
+            FakeReqaiClient reqai = new(plan:
+                "{\"version\":\"1\",\"reply\":null,\"actions\":[{\"id\":\"a1\",\"type\":\"rental_order.query\"," +
+                "\"mode\":\"replace\",\"arguments\":{\"start_date\":\"2026-04-01\",\"end_date\":\"2026-04-30\"," +
+                "\"keyword\":\"养护\"},\"aggregation\":{\"metrics\":[\"order_count\"],\"group_by\":[]}}]}");
+            FakeQueryExecutor query = FakeQuery();
+
+            AdminAssistantUnsupportedException error = await Assert.ThrowsAsync<AdminAssistantUnsupportedException>(() =>
+                Service(reqai, query).AskAsync(Request(), Staff(100), "trace", true, default));
+
+            Assert.False(query.wasCalled);
+            Assert.Equal("unsupported_filter", error.detail.reason);
+            Assert.Equal("租赁订单列表", error.detail.suggested_page);
+            Assert.Equal("keyword_rejected", error.audit.error);
+        }
+
+        [Fact]
+        public async Task 规划器说做不了时保留文字且不执行查询()
+        {
+            FakeReqaiClient reqai = new(plan:
+                "{\"version\":\"1\",\"reply\":{\"text\":\"暂时还不能查这个业务，请到对应页面自行筛选。\",\"citations\":[]}," +
+                "\"actions\":[],\"unsupported\":{\"reason\":\"unknown_domain\",\"target_domain\":\"unknown\"," +
+                "\"detail\":\"工资单不属于可查询业务\",\"suggested_page\":\"无\"}}");
+            FakeQueryExecutor query = FakeQuery();
+
+            AdminAssistantExecutionResult execution =
+                await Service(reqai, query).AskAsync(Request(), Staff(200), "trace", true, default);
+
+            Assert.False(query.wasCalled);
+            Assert.Empty(execution.response.actions);
+            Assert.Contains("暂时还不能查", execution.response.reply.text);
+            Assert.Equal("unsupported", execution.audit.validation_result);
+            Assert.Equal("unknown_domain", execution.audit.unsupported_reason);
+        }
+
+        [Fact]
+        public async Task 跨域的增量修改会要求说清查哪个业务()
+        {
+            // 养护上下文里说「改成五月」，模型却给了租赁的 patch —— 合并出来的条件看着合法、口径是错的。
+            FakeReqaiClient reqai = new(plan: PatchPlan("{\"end_date\":\"2026-05-31\"}"));
+            AdminAssistantRequest request = Request();
+            request.context.active_query_type = "care_order.query";
+            request.context.care_order_query = new AdminAssistantQueryState
+            {
+                start_date = new DateTime(2026, 4, 1), end_date = new DateTime(2026, 4, 30)
+            };
+            FakeQueryExecutor query = FakeQuery();
+
+            await Assert.ThrowsAsync<AdminAssistantClarificationException>(() =>
+                Service(reqai, query).AskAsync(request, Staff(100), "trace", true, default));
+
+            Assert.False(query.wasCalled);
+        }
 
         private static string QueryPlan(string actionType = "rental_order.query") =>
             "{\"version\":\"1\",\"reply\":{\"text\":\"我来查询。\",\"citations\":[]},\"actions\":[{\"id\":\"a1\",\"type\":\"" + actionType +
@@ -267,7 +375,15 @@ namespace SnowmeetApi.Tests
         private static FakeReqaiClient QueryPlanClient() => new(plan: QueryPlan("rental_order.query"));
         private static FakeReqaiClient TextPlanClient() => new(plan: TextPlan("页面说明"));
         private static FakeQueryExecutor FakeQuery() => new(Summary(0));
-        private static AdminAssistantService Service(IReqaiAdminAssistantClient reqai, IRentalOrderQueryExecutor query) => new(reqai, query);
+        private static AdminAssistantService Service(IReqaiAdminAssistantClient reqai, IAdminAssistantQueryExecutor query) =>
+            new(reqai, new[] { query }, AllDomainsEnabled());
+
+        /// <summary>线上按域灰度（默认只开租赁），但单元测试要覆盖全部四个域。</summary>
+        private static IConfiguration AllDomainsEnabled() => new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["AdminAssistant:EnabledDomains"] = "all"
+            }).Build();
 
         private static string PrivacyPlan(string fullCell) => JsonSerializer.Serialize(new
         {
@@ -286,7 +402,9 @@ namespace SnowmeetApi.Tests
                     arguments = new
                     {
                         start_date = "2026-04-01", end_date = "2026-04-30", cell_suffix = fullCell,
-                        keyword = "authorization=Bearer TOP-SECRET-ABC; secret='private phrase'; api-key=API KEY VALUE"
+                        // keyword 现在限长 40 且不许含空格，所以这里用一个短的凭据赋值：
+                        // 形状合法、能进到 finalize，正好验证脱敏本身仍然生效。
+                        keyword = "token=TOP-SECRET-ABC"
                     },
                     aggregation = new { metrics = new[] { "order_count" }, group_by = Array.Empty<string>() }
                 }
@@ -323,24 +441,30 @@ namespace SnowmeetApi.Tests
                 Task.FromResult(Reply("页面说明"));
         }
 
-        private sealed class FakeQueryExecutor : IRentalOrderQueryExecutor
+        private sealed class FakeQueryExecutor : IAdminAssistantQueryExecutor
         {
-            private readonly RentalOrderQuerySummary _summary;
+            private readonly QuerySummary _summary;
             private readonly Exception? _error;
             public bool wasCalled { get; private set; }
+            public AdminAssistantDomain? calledDomain { get; private set; }
 
-            public FakeQueryExecutor(RentalOrderQuerySummary summary, Exception? error = null)
+            public FakeQueryExecutor(QuerySummary summary, Exception? error = null, string type = "rental_order.query")
             {
                 _summary = summary;
                 _error = error;
+                actionType = type;
             }
 
-            public Task<RentalOrderQueryExecution> ExecuteAsync(RentalOrderQueryState state,
-                IReadOnlyCollection<string> metrics, IReadOnlyList<string> groupBy, CancellationToken cancellationToken)
+            public string actionType { get; }
+
+            public Task<AdminAssistantQueryExecution> ExecuteAsync(AdminAssistantQueryState state,
+                AdminAssistantDomain domain, IReadOnlyCollection<string> metrics, IReadOnlyList<string> groupBy,
+                CancellationToken cancellationToken)
             {
                 wasCalled = true;
+                calledDomain = domain;
                 if (_error != null) throw _error;
-                return Task.FromResult(new RentalOrderQueryExecution(state, _summary));
+                return Task.FromResult(new AdminAssistantQueryExecution(state, _summary));
             }
         }
 

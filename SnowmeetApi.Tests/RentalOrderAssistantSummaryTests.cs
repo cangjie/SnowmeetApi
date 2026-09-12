@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using SnowmeetApi.Helpers;
+using SnowmeetApi.Models.AdminAssistant;
 using Xunit;
 
 namespace SnowmeetApi.Tests
@@ -13,8 +14,8 @@ namespace SnowmeetApi.Tests
         public void 汇总不截断200单并可按状态门店分组()
         {
             string[] allMetrics = { "order_count", "charge_total", "paid_total", "refund_total", "unpaid_count" };
-            List<RentalOrderAggregateRow> rows = Enumerable.Range(1, 250)
-                .Select(i => new RentalOrderAggregateRow(
+            List<AssistantAggregateRow> rows = Enumerable.Range(1, 250)
+                .Select(i => new AssistantAggregateRow(
                     i,
                     i % 2 == 0 ? "万龙" : "南山",
                     D("2026-04-01"),
@@ -25,7 +26,7 @@ namespace SnowmeetApi.Tests
                     i % 3 == 0))
                 .ToList();
 
-            RentalOrderQuerySummary summary = RentalOrderAssistantSummary.Build(rows, allMetrics, new[] { "shop", "rent_status" });
+            QuerySummary summary = AdminAssistantSummary.Build(rows, AdminAssistantDomains.Require("rental_order.query"), allMetrics, new[] { "shop", "rent_status" });
 
             Assert.Equal(250, summary.metrics["order_count"]);
             Assert.Equal(25000d, summary.metrics["charge_total"]);
