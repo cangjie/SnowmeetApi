@@ -228,10 +228,26 @@ namespace SnowmeetApi.Services.AdminAssistant
                     throw new AdminAssistantClarificationException(error.Message,
                         Audit(legacyIntentJson, "clarification_required", state, null, "clarification_required"));
                 }
+                catch (AdminAssistantKeywordException error)
+                {
+                    // 旧意图接口只认租赁，问到别的业务时它会把业务名塞进 keyword ——
+                    // 正是本次要根治的那个 bug。关键词护栏拦住了它，但拦住之后要给店员
+                    // 一句有用的话，而不是笼统的「订单查询暂不可用」。
+                    throw new AdminAssistantUnsupportedException(
+                        "这个条件我暂时没法表达，所以没有执行查询。请到" + legacyDomain.pageHint + "页自行筛选。",
+                        new AdminAssistantUnsupported
+                        {
+                            reason = "unsupported_filter",
+                            target_domain = legacyDomain.domain,
+                            detail = error.Message,
+                            suggested_page = legacyDomain.pageHint
+                        },
+                        Audit(legacyIntentJson, "unsupported", legacyDomain.actionType, state, null, "keyword_rejected"));
+                }
                 catch (Exception error)
                 {
                     throw new AdminAssistantOperationException(AdminAssistantFailureStage.Execution, error,
-                        Audit(legacyIntentJson, "rejected", state, null, "query_validation_failed"));
+                        Audit(legacyIntentJson, "rejected", state, null, "query_validation_failed"), legacyDomain.label);
                 }
 
                 try
@@ -249,7 +265,7 @@ namespace SnowmeetApi.Services.AdminAssistant
                 catch (Exception error) when (error is not OperationCanceledException)
                 {
                     throw new AdminAssistantOperationException(AdminAssistantFailureStage.Execution, error,
-                        Audit(legacyIntentJson, "accepted", state, null, "execution_failed"));
+                        Audit(legacyIntentJson, "accepted", state, null, "execution_failed"), legacyDomain.label);
                 }
             }
 
