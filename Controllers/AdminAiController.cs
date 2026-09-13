@@ -82,7 +82,8 @@ namespace SnowmeetApi.Controllers
             }
 
             string traceId = Guid.NewGuid().ToString("N");
-            bool structuredEnabled = _config.GetValue<bool>("AdminAssistant:StructuredProtocolEnabled");
+            // 默认走结构化协议。旧的单域链路只保留作为回退：配置里显式写 false 才会用它。
+            bool structuredEnabled = _config.GetValue<bool?>("AdminAssistant:StructuredProtocolEnabled") ?? true;
             return await ExecuteAndAudit(validRequest, staff, traceId, structuredEnabled, sessionType, cancellationToken);
         }
 

@@ -33,19 +33,23 @@ namespace SnowmeetApi.Services.AdminAssistant
         }
 
         /// <summary>
-        /// 按域灰度。默认只开租赁：小程序要先发布才认识别的域的 show_results，
-        /// 提前放开会让旧版小程序收到不认识的 action 直接报「当前版本暂不支持」。
-        /// appsettings.json 不随代码发布，所以默认值必须写在代码里。
+        /// 按域灰度，默认四个域全开。
+        ///
+        /// appsettings.json 不随代码发布、要手改、也没有校验，所以默认值必须是「开箱即用」的那个，
+        /// 否则发布完还得上服务器改一次配置，漏改的表现又是一句看不出原因的「暂不支持」。
+        ///
+        /// 代价是发布顺序不再有代码兜底：小程序对不认识的 action 一律拒绝，所以新增业务域时
+        /// **必须先发小程序再发 API**。要临时收窄就在配置里显式列出，例如 "rental,care"。
         /// </summary>
         private static IReadOnlySet<string> ReadEnabledDomains(IConfiguration? configuration)
         {
+            HashSet<string> everything = AdminAssistantDomains.All.Values
+                .Select(item => item.domain).ToHashSet(StringComparer.OrdinalIgnoreCase);
             string? configured = configuration?["AdminAssistant:EnabledDomains"];
-            if (string.IsNullOrWhiteSpace(configured))
-                return new HashSet<string>(StringComparer.Ordinal) { "rental" };
-            if (configured.Trim() == "all")
-                return AdminAssistantDomains.All.Values.Select(item => item.domain).ToHashSet(StringComparer.Ordinal);
+            if (string.IsNullOrWhiteSpace(configured) || configured.Trim() == "all") return everything;
+            // 大小写不敏感：这份配置是手改的，拼错大小写不该让某个域悄悄开不了。
             return configured.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                .ToHashSet(StringComparer.Ordinal);
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
         }
 
         public async Task<AdminAssistantExecutionResult> AskAsync(AdminAssistantRequest request, Staff staff,

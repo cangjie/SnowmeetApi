@@ -255,12 +255,31 @@ namespace SnowmeetApi.Tests
         private static AssistantReply Reply(string text) => new() { text = text };
 
         [Fact]
-        public async Task 未开放的域明确拒答而不是执行查询()
+        public async Task 不配置时四个业务域默认全开()
         {
-            // 发布顺序要求 API 先只开租赁：旧版小程序不认识 care_order.show_results。
-            FakeReqaiClient reqai = new(plan: QueryPlan("care_order.query"));
+            // 配置文件是手改的、不随发布走，所以默认值必须开箱即用，
+            // 否则发完还得上服务器改一次，漏改的表现是一句看不出原因的「暂不支持」。
+            FakeReqaiClient reqai = new(plan: QueryPlan("care_order.query"), final: Reply("共 3 单。"));
             FakeQueryExecutor care = new(Summary(3), type: "care_order.query");
             AdminAssistantService service = new(reqai, new[] { (IAdminAssistantQueryExecutor)care }, configuration: null);
+
+            AdminAssistantExecutionResult execution =
+                await service.AskAsync(Request(), Staff(100), "trace", true, default);
+
+            Assert.True(care.wasCalled);
+            Assert.Equal("care_order.show_results", Assert.Single(execution.response.actions).type);
+        }
+
+        [Theory]
+        [InlineData("rental")]
+        [InlineData("RENTAL")]
+        public async Task 配置显式收窄时未列出的域明确拒答(string enabled)
+        {
+            // 大小写不敏感：这份配置手改且没有校验，拼错大小写不该让某个域悄悄开不了。
+            FakeReqaiClient reqai = new(plan: QueryPlan("care_order.query"));
+            FakeQueryExecutor care = new(Summary(3), type: "care_order.query");
+            AdminAssistantService service = new(reqai, new[] { (IAdminAssistantQueryExecutor)care },
+                DomainsEnabled(enabled));
 
             AdminAssistantUnsupportedException error = await Assert.ThrowsAsync<AdminAssistantUnsupportedException>(() =>
                 service.AskAsync(Request(), Staff(100), "trace", true, default));
@@ -378,11 +397,12 @@ namespace SnowmeetApi.Tests
         private static AdminAssistantService Service(IReqaiAdminAssistantClient reqai, IAdminAssistantQueryExecutor query) =>
             new(reqai, new[] { query }, AllDomainsEnabled());
 
-        /// <summary>线上按域灰度（默认只开租赁），但单元测试要覆盖全部四个域。</summary>
-        private static IConfiguration AllDomainsEnabled() => new ConfigurationBuilder()
+        private static IConfiguration AllDomainsEnabled() => DomainsEnabled("all");
+
+        private static IConfiguration DomainsEnabled(string value) => new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["AdminAssistant:EnabledDomains"] = "all"
+                ["AdminAssistant:EnabledDomains"] = value
             }).Build();
 
         private static string PrivacyPlan(string fullCell) => JsonSerializer.Serialize(new
