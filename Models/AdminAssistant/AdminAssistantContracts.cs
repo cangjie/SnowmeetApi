@@ -62,7 +62,9 @@ namespace SnowmeetApi.Models.AdminAssistant
         public string trace_id { get; set; } = "";
         public AssistantReply reply { get; set; } = new();
         public List<ClientAssistantAction> actions { get; set; } = new();
-        public AdminAssistantContext context { get; set; } = new();
+
+        /// <summary>下发形状：active_query_type + 每个域一个键，各自按域裁剪。</summary>
+        public Dictionary<string, object?> context { get; set; } = new();
     }
 
     public sealed class AssistantReply
@@ -82,7 +84,9 @@ namespace SnowmeetApi.Models.AdminAssistant
         public string id { get; init; } = "";
         public string type { get; init; } = "";
         public string status { get; } = CompletedStatus;
-        public AdminAssistantQueryState state { get; init; } = new();
+
+        /// <summary>按域裁剪后的条件，键集合必须恰好是该域的字段（见 AdminAssistantWire）。</summary>
+        public Dictionary<string, object?> state { get; init; } = new();
         public QuerySummary summary { get; init; } = new();
     }
 

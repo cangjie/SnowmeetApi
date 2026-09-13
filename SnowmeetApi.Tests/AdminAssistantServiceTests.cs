@@ -225,7 +225,8 @@ namespace SnowmeetApi.Tests
 
             Assert.Equal("页面说明", result.reply.text);
             Assert.Empty(result.actions);
-            Assert.Same(request.context.rental_order_query, result.context.rental_order_query);
+            Assert.Equal(request.context.rental_order_query!.rent_status,
+                Assert.IsType<Dictionary<string, object?>>(result.context["rental_order_query"])["rent_status"]);
             Assert.False(query.wasCalled);
         }
 
@@ -301,9 +302,9 @@ namespace SnowmeetApi.Tests
             Assert.True(care.wasCalled);
             Assert.Equal("养护", care.calledDomain!.bizType);
             Assert.Equal("care_order.show_results", Assert.Single(execution.response.actions).type);
-            Assert.NotNull(execution.response.context.care_order_query);
-            Assert.Null(execution.response.context.rental_order_query);
-            Assert.Equal("care_order.query", execution.response.context.active_query_type);
+            Assert.NotNull(execution.response.context["care_order_query"]);
+            Assert.Null(execution.response.context["rental_order_query"]);
+            Assert.Equal("care_order.query", execution.response.context["active_query_type"]);
         }
 
         [Fact]

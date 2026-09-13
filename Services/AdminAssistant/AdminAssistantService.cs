@@ -373,20 +373,12 @@ namespace SnowmeetApi.Services.AdminAssistant
         };
 
         /// <summary>
-        /// 只保留本域有的字段。reqai 那边每个域的模型都是 extra=forbid 的，
-        /// 多带一个别域的 null 字段整个请求就会被拒。
+        /// 只保留本域有的字段。reqai 与小程序两侧都是按域严格校验的，
+        /// 多带一个别域的 null 字段就会让整个请求或响应被判非法。
         /// </summary>
         private static Dictionary<string, object?> DomainShapedQuery(
-            AdminAssistantQueryState state, AdminAssistantDomain domain)
-        {
-            Dictionary<string, object?> shaped = new(StringComparer.Ordinal);
-            foreach (string field in domain.fields)
-            {
-                object? value = state.Read(field);
-                shaped[field] = value is DateTime date ? date.ToString("yyyy-MM-dd") : value;
-            }
-            return shaped;
-        }
+            AdminAssistantQueryState state, AdminAssistantDomain domain) =>
+            AdminAssistantWire.State(state, domain);
 
         private static ReqaiQuerySummary ToReqaiSummary(QuerySummary summary, AdminAssistantDomain domain) => new()
         {
@@ -407,7 +399,7 @@ namespace SnowmeetApi.Services.AdminAssistant
             trace_id = traceId,
             reply = reply,
             actions = new List<ClientAssistantAction>(),
-            context = context ?? new AdminAssistantContext()
+            context = AdminAssistantWire.Context(context)
         };
 
         private static AdminAssistantResponse CompletedQuery(string traceId, string actionId, AssistantReply reply,
@@ -435,11 +427,11 @@ namespace SnowmeetApi.Services.AdminAssistant
                     {
                         id = actionId,
                         type = domain.clientActionType,
-                        state = execution.state,
+                        state = AdminAssistantWire.State(execution.state, domain),
                         summary = execution.summary
                     }
                 },
-                context = context
+                context = AdminAssistantWire.Context(context)
             };
         }
 

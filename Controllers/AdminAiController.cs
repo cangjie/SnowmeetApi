@@ -198,7 +198,7 @@ namespace SnowmeetApi.Controllers
             trace_id = traceId,
             reply = new AssistantReply { text = text },
             actions = new List<ClientAssistantAction>(),
-            context = new AdminAssistantContext()
+            context = AdminAssistantWire.Context(null)
         };
 
         private async Task CompleteAssistantLog(AdminAiRequestLog log, Stopwatch stopwatch, bool success, int statusCode,
