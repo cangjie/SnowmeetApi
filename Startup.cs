@@ -72,7 +72,12 @@ namespace SnowmeetApi
             {
                 client.Timeout = TimeSpan.FromSeconds(Configuration.GetValue<int?>("Reqai:TimeoutSeconds") ?? 90);
             });
-            services.AddScoped<IRentalOrderQueryExecutor, RentalOrderQueryExecutor>();
+            // 每个业务域一个执行器；AdminAssistantService 按 action type 索引它们。
+            // 注册表里加了域却漏了这里，解析阶段会明确报「缺少执行器」，而不是去查错一张表。
+            services.AddScoped<IAdminAssistantQueryExecutor, RentalOrderQueryExecutor>();
+            services.AddScoped<IAdminAssistantQueryExecutor, CareOrderQueryExecutor>();
+            services.AddScoped<IAdminAssistantQueryExecutor, RetailOrderQueryExecutor>();
+            services.AddScoped<IAdminAssistantQueryExecutor, SkiPassQueryExecutor>();
             services.AddScoped<IReqaiAdminAssistantClient, ReqaiAdminAssistantClient>();
             services.AddScoped<IAdminAssistantService, AdminAssistantService>();
             services.AddControllers().AddJsonOptions(options =>{

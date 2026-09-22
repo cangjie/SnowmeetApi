@@ -42,7 +42,7 @@ namespace SnowmeetApi.Tests
             Assert.Equal("accepted", execution.audit.validation_result);
         }
 
-        private static AdminAssistantService Service(FakeReqaiClient reqai) => new(reqai, new FakeQueryExecutor());
+        private static AdminAssistantService Service(FakeReqaiClient reqai) => new(reqai, new IAdminAssistantQueryExecutor[] { new FakeQueryExecutor() });
 
         private static AdminAssistantRequest Request(string question = "查询四月租赁订单") => new()
         {
@@ -52,6 +52,28 @@ namespace SnowmeetApi.Tests
         };
 
         private static Staff Staff(int level) => new() { id = 7, title_level = level };
+
+        [Fact]
+        public async Task 旧意图把业务域塞进关键词时给出可用的拒答而不是笼统的暂不可用()
+        {
+            // 线上复现：开关仍关着时，店员在养护页问养护订单，旧意图接口只会把「养护」
+            // 塞进 keyword（正是本次要根治的 bug）。新的关键词护栏拦住了它，但拦住之后
+            // 不能只回一句「订单查询暂不可用」——那既没解释原因，也没告诉店员去哪儿查。
+            FakeReqaiClient reqai = new(new LegacyRentIntent
+            {
+                status = "ready",
+                start_date = DateTime.Parse("2026-04-01"),
+                end_date = DateTime.Parse("2026-04-10"),
+                keyword = "养护"
+            });
+
+            AdminAssistantUnsupportedException error = await Assert.ThrowsAsync<AdminAssistantUnsupportedException>(() =>
+                Service(reqai).AskAsync(Request("查询下今年4月上旬的养护订单"), Staff(100), "trace", false, default));
+
+            Assert.Equal("unsupported_filter", error.detail.reason);
+            Assert.Equal("租赁订单列表", error.detail.suggested_page);
+            Assert.Equal("keyword_rejected", error.audit.error);
+        }
 
         private static LegacyRentIntent ReadyIntent(string startDate, string endDate) => new()
         {
@@ -97,12 +119,18 @@ namespace SnowmeetApi.Tests
             }
         }
 
-        private sealed class FakeQueryExecutor : IRentalOrderQueryExecutor
+        private sealed class FakeQueryExecutor : IAdminAssistantQueryExecutor
         {
-            public Task<RentalOrderQueryExecution> ExecuteAsync(RentalOrderQueryState state,
-                IReadOnlyCollection<string> metrics, IReadOnlyList<string> groupBy, CancellationToken cancellationToken) =>
-                Task.FromResult(new RentalOrderQueryExecution(state, new RentalOrderQuerySummary(
-                    new Dictionary<string, double> { ["order_count"] = 3d }, new List<RentalOrderQuerySummaryGroup>())));
+            public string actionType => "rental_order.query";
+
+            public Task<AdminAssistantQueryExecution> ExecuteAsync(AdminAssistantQueryState state,
+                AdminAssistantDomain domain, IReadOnlyCollection<string> metrics, IReadOnlyList<string> groupBy,
+                CancellationToken cancellationToken) =>
+                Task.FromResult(new AdminAssistantQueryExecution(state, new QuerySummary
+                {
+                    metrics = new Dictionary<string, double> { ["order_count"] = 3d },
+                    groups = new List<QuerySummaryGroup>()
+                }));
         }
     }
 }

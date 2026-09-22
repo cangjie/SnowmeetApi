@@ -82,7 +82,8 @@ namespace SnowmeetApi.Controllers
             }
 
             string traceId = Guid.NewGuid().ToString("N");
-            bool structuredEnabled = _config.GetValue<bool>("AdminAssistant:StructuredProtocolEnabled");
+            // 默认走结构化协议。旧的单域链路只保留作为回退：配置里显式写 false 才会用它。
+            bool structuredEnabled = _config.GetValue<bool?>("AdminAssistant:StructuredProtocolEnabled") ?? true;
             return await ExecuteAndAudit(validRequest, staff, traceId, structuredEnabled, sessionType, cancellationToken);
         }
 
@@ -134,10 +135,19 @@ namespace SnowmeetApi.Controllers
                 await CompleteAssistantLog(log, stopwatch, false, 403, error.audit, body);
                 return StatusCode(403, body);
             }
+            catch (AdminAssistantUnsupportedException error)
+            {
+                // 明确拒答不是失败：店员拿到的是「这个查不了 + 去哪儿自己筛」，
+                // 200 返回，审计里记下原因，便于统计店员最想要哪个还没做的能力。
+                AdminAssistantResponse response = FailureResponse(traceId, error.Message);
+                ApiResult<AdminAssistantResponse> body = new() { data = response };
+                await CompleteAssistantLog(log, stopwatch, true, 200, error.audit, body);
+                return Ok(body);
+            }
             catch (AdminAssistantOperationException error)
             {
                 string message = error.stage == AdminAssistantFailureStage.Execution
-                    ? "租赁订单查询暂不可用，请稍后重试。"
+                    ? (error.domainLabel ?? "订单") + "查询暂不可用，请稍后重试。"
                     : "管理员助手服务暂不可用，请稍后重试。";
                 AdminAssistantResponse response = FailureResponse(traceId, message);
                 ApiResult<AdminAssistantResponse> body = new() { code = 1, message = message, data = response };
@@ -188,7 +198,7 @@ namespace SnowmeetApi.Controllers
             trace_id = traceId,
             reply = new AssistantReply { text = text },
             actions = new List<ClientAssistantAction>(),
-            context = new AdminAssistantContext { rental_order_query = null }
+            context = AdminAssistantWire.Context(null)
         };
 
         private async Task CompleteAssistantLog(AdminAiRequestLog log, Stopwatch stopwatch, bool success, int statusCode,

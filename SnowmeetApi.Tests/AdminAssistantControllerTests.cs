@@ -21,6 +21,13 @@ namespace SnowmeetApi.Tests
 {
     public class AdminAssistantControllerTests
     {
+        private static readonly AdminAssistantDomain RentalDomain =
+            AdminAssistantDomains.Require("rental_order.query");
+
+        /// <summary>下发的上下文是按域裁剪后的字典，测试按键读取。</summary>
+        private static Dictionary<string, object?> RentalContext(AdminAssistantResponse response) =>
+            Assert.IsType<Dictionary<string, object?>>(response.context["rental_order_query"]);
+
         [Fact]
         public async Task 无效v1请求返回400且不调用助手()
         {
@@ -97,8 +104,8 @@ namespace SnowmeetApi.Tests
 
             OkObjectResult result = Assert.IsType<OkObjectResult>(action.Result);
             ApiResult<AdminAssistantResponse> body = Assert.IsType<ApiResult<AdminAssistantResponse>>(result.Value);
-            Assert.Equal(fullCell, body.data!.context.rental_order_query!.cell_suffix);
-            Assert.Equal(fullCell, Assert.Single(body.data.actions).state.cell_suffix);
+            Assert.Equal(fullCell, RentalContext(body.data!)["cell_suffix"]);
+            Assert.Equal(fullCell, Assert.Single(body.data.actions).state["cell_suffix"]);
 
             Assert.DoesNotContain(fullCell, audit.request_payload);
             Assert.DoesNotContain(fullCell, audit.response_payload);
@@ -165,7 +172,7 @@ namespace SnowmeetApi.Tests
             AdminAssistantRequest request = ValidRequest();
             request.question = "查询 " + formattedPhone + " authorization=Bearer " + bearer +
                 " password=\"" + password + "\" api-key='" + apiKey + "'";
-            request.context.rental_order_query = new RentalOrderQueryState { keyword = formattedPhone + " cookie=ctx cookie" };
+            request.context.rental_order_query = new AdminAssistantQueryState { keyword = formattedPhone + " cookie=ctx cookie" };
             string plannerJson = "{\"version\":\"1\",\"reply\":{\"text\":\"authorization=Bearer " + bearer + "\",\"citations\":[]},\"actions\":[{\"id\":\"a1\",\"type\":\"rental_order.query\",\"mode\":\"patch\",\"arguments\":{\"keyword\":\"" + formattedPhone + " api-key='" + apiKey + "'\"},\"aggregation\":{\"metrics\":[\"order_count\"],\"group_by\":[]}}]}";
 
             AdminAiRequestLog audit = await RecordPlannerFailure(plannerJson, request,
@@ -204,7 +211,7 @@ namespace SnowmeetApi.Tests
             Assert.NotNull(body.data);
             Assert.False(string.IsNullOrWhiteSpace(body.data!.trace_id));
             Assert.Empty(body.data.actions);
-            Assert.Null(body.data.context.rental_order_query);
+            Assert.Null(body.data.context["rental_order_query"]);
             AdminAiRequestLog audit = await db.adminAiRequestLog.SingleAsync();
             Assert.Equal(403, audit.response_status_code);
             Assert.Equal("permission_denied", audit.error_message);
@@ -232,7 +239,7 @@ namespace SnowmeetApi.Tests
             Assert.NotNull(body.data);
             Assert.False(string.IsNullOrWhiteSpace(body.data!.trace_id));
             Assert.Empty(body.data.actions);
-            Assert.Null(body.data.context.rental_order_query);
+            Assert.Null(body.data.context["rental_order_query"]);
             Assert.False(assistant.wasCalled);
             Assert.Empty(await db.adminAiRequestLog.ToListAsync());
         }
@@ -262,7 +269,7 @@ namespace SnowmeetApi.Tests
             Assert.DoesNotContain("database details", body.message);
             Assert.NotNull(body.data);
             Assert.Empty(body.data!.actions);
-            Assert.Null(body.data.context.rental_order_query);
+            Assert.Null(body.data.context["rental_order_query"]);
             Assert.True(assistant.wasCalled);
             return await db.adminAiRequestLog.SingleAsync();
         }
@@ -300,7 +307,7 @@ namespace SnowmeetApi.Tests
             context = new AdminAssistantContext()
         };
 
-        private static RentalOrderQueryState QueryState(string cellSuffix) => new()
+        private static AdminAssistantQueryState QueryState(string cellSuffix) => new()
         {
             start_date = new DateTime(2026, 4, 1),
             end_date = new DateTime(2026, 4, 30),
@@ -381,16 +388,28 @@ namespace SnowmeetApi.Tests
                 bool structuredEnabled, CancellationToken cancellationToken)
             {
                 wasCalled = true;
-                RentalOrderQueryState state = QueryState(_cellSuffix);
-                RentalOrderQuerySummary summary = new(new Dictionary<string, double> { ["order_count"] = 2 },
-                    new List<RentalOrderQuerySummaryGroup>());
+                AdminAssistantQueryState state = QueryState(_cellSuffix);
+                QuerySummary summary = new()
+                {
+                    metrics = new Dictionary<string, double> { ["order_count"] = 2 },
+                    groups = new List<QuerySummaryGroup>()
+                };
                 return Task.FromResult(new AdminAssistantExecutionResult
                 {
                     response = new AdminAssistantResponse
                     {
                         version = "1", trace_id = traceId, reply = new AssistantReply { text = "完成。" },
-                        actions = new List<ClientAssistantAction> { new() { id = "a1", state = state, summary = summary } },
-                        context = new AdminAssistantContext { rental_order_query = state }
+                        actions = new List<ClientAssistantAction>
+                        {
+                            new()
+                            {
+                                id = "a1",
+                                type = RentalDomain.clientActionType,
+                                state = AdminAssistantWire.State(state, RentalDomain),
+                                summary = summary
+                            }
+                        },
+                        context = AdminAssistantWire.Context(new AdminAssistantContext { rental_order_query = state })
                     },
                     audit = new AdminAssistantAuditData
                     {
