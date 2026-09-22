@@ -5,6 +5,7 @@ using System;
 using SKIT.FlurlHttpClient.Wechat.TenpayV3.Models;
 using SnowmeetApi.Models.UTV;
 using SnowmeetApi.Models.Rent;
+using SnowmeetApi.Models.Fnb;
 
 //using Aop.Api.Domain;
 namespace SnowmeetApi.Data
@@ -18,6 +19,9 @@ namespace SnowmeetApi.Data
         }
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
+            FnbSchemaConfiguration.Configure(modelBuilder);
+            modelBuilder.Entity<Order>().Property(x => x.order_source).HasColumnType("varchar(32)");
+            modelBuilder.Entity<Order>().Property(x => x.source_order_no).HasColumnType("varchar(128)");
             modelBuilder.Entity<MaintainLive>().HasKey(c => c.id);
             //modelBuilder.Entity<Brand>().HasNoKey();
             modelBuilder.Entity<Models.Users.UnionId>().HasKey(u => new { u.union_id, u.open_id });
@@ -212,5 +216,22 @@ namespace SnowmeetApi.Data
         public DbSet<ProductTicketTemplate> productTicketTemplate {get; set;}
         public DbSet<Models.Fnb.FnbMaterialBatch> fnbMaterialBatch { get; set; }
         public DbSet<Models.Fnb.FnbMaterialAlertLog> fnbMaterialAlertLog { get; set; }
+        public DbSet<FnbUnit> fnbUnit { get; set; }
+        public DbSet<FnbMaterialCategory> fnbMaterialCategory { get; set; }
+        public DbSet<FnbShelfLifeRule> fnbShelfLifeRule { get; set; }
+        public DbSet<FnbMaterialItem> fnbMaterialItem { get; set; }
+        public DbSet<FnbMaterialBatchStock> fnbMaterialBatchStock { get; set; }
+        public DbSet<FnbDishSpec> fnbDishSpec { get; set; }
+        public DbSet<FnbRecipe> fnbRecipe { get; set; }
+        public DbSet<FnbRecipeLine> fnbRecipeLine { get; set; }
+        public DbSet<FnbOrder> fnbOrder { get; set; }
+        public DbSet<FnbOrderLine> fnbOrderLine { get; set; }
+        public DbSet<FnbOrderImport> fnbOrderImport { get; set; }
+        public DbSet<FnbStockDocument> fnbStockDocument { get; set; }
+        public DbSet<FnbStockDocumentLine> fnbStockDocumentLine { get; set; }
+        public DbSet<FnbStockMovement> fnbStockMovement { get; set; }
+        public DbSet<FnbStocktakeLine> fnbStocktakeLine { get; set; }
+        public DbSet<FnbMaterialStockView> fnbMaterialStockView { get; set; }
+        public DbSet<FnbMaterialLossView> fnbMaterialLossView { get; set; }
     }
 }

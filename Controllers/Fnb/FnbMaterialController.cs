@@ -227,8 +227,13 @@ namespace SnowmeetApi.Controllers.Fnb
                 return _sessionExpired();
             }
             string userId = ctx.Value.userId;
+            int? shopId = await _db.staff.Where(s => s.id == ctx.Value.staffId && s.valid == 1)
+                .Select(s => s.base_shop_id).FirstOrDefaultAsync();
+            if (shopId == null) return _sessionExpired();
+            // Legacy H5 must not reveal another shop's newly managed batches.
             List<FnbMaterialBatch> batches = await _db.fnbMaterialBatch
-                .Where(b => b.valid).OrderBy(b => b.expire_date).ThenBy(b => b.id)
+                .Where(b => b.valid && _db.fnbMaterialBatchStock.Any(s => s.batch_id == b.id && s.shop_id == shopId))
+                .OrderBy(b => b.expire_date).ThenBy(b => b.id)
                 .AsNoTracking().ToListAsync();
             return Ok(new ApiResult<object>()
             {
@@ -262,17 +267,7 @@ namespace SnowmeetApi.Controllers.Fnb
             }
             if (posted.id == 0)
             {
-                posted.create_userid = userId;
-                posted.staff_id = ctx.Value.staffId;
-                posted.valid = true;
-                posted.create_date = DateTime.Now;
-                posted.update_date = null;
-                posted.dispose_status = null;
-                posted.dispose_userid = null;
-                posted.dispose_date = null;
-                await _db.fnbMaterialBatch.AddAsync(posted);
-                await _db.SaveChangesAsync();
-                return Ok(new ApiResult<object>() { code = 0, message = "", data = posted });
+                return Ok(new ApiResult<object>() { code = 1, message = "请使用食材库存入库接口新增批次", data = null });
             }
             FnbMaterialBatch batch = await _db.fnbMaterialBatch
                 .Where(b => b.id == posted.id && b.valid).FirstOrDefaultAsync();
@@ -280,6 +275,8 @@ namespace SnowmeetApi.Controllers.Fnb
             {
                 return Ok(new ApiResult<object>() { code = 1, message = "批次不存在", data = null });
             }
+            if (await _db.fnbMaterialBatchStock.AnyAsync(s => s.batch_id == posted.id))
+                return Ok(new ApiResult<object>() { code = 1, message = "库存批次不能从旧接口直接修改，请使用库存单据", data = null });
             batch.name = posted.name.Trim();
             batch.batch_no = posted.batch_no.Trim();
             batch.produce_date = posted.produce_date;
@@ -315,6 +312,8 @@ namespace SnowmeetApi.Controllers.Fnb
             {
                 return Ok(new ApiResult<object>() { code = 1, message = "批次不存在", data = null });
             }
+            if (await _db.fnbMaterialBatchStock.AnyAsync(s => s.batch_id == id))
+                return Ok(new ApiResult<object>() { code = 1, message = "库存批次不能从旧接口处置，请使用库存报损单", data = null });
             if (batch.dispose_status != null && !batch.dispose_status.Trim().Equals(""))
             {
                 return Ok(new ApiResult<object>() { code = 0, message = "", data = batch });
@@ -344,6 +343,8 @@ namespace SnowmeetApi.Controllers.Fnb
             {
                 return Ok(new ApiResult<object>() { code = 1, message = "批次不存在", data = null });
             }
+            if (await _db.fnbMaterialBatchStock.AnyAsync(s => s.batch_id == id))
+                return Ok(new ApiResult<object>() { code = 1, message = "库存批次不能从旧接口删除", data = null });
             batch.valid = false;
             batch.update_date = DateTime.Now;
             _db.fnbMaterialBatch.Entry(batch).State = EntityState.Modified;
@@ -780,7 +781,8 @@ namespace SnowmeetApi.Controllers.Fnb
             DateTime today = DateTime.Now.Date;
 
             List<FnbMaterialBatch> all = await _db.fnbMaterialBatch
-                .Where(b => b.valid && (b.dispose_status == null || b.dispose_status.Trim() == ""))
+                .Where(b => b.valid && (b.dispose_status == null || b.dispose_status.Trim() == "")
+                    && _db.fnbMaterialBatchStock.Any(s => s.batch_id == b.id && s.quantity > 0 && !s.is_destroyed))
                 .AsNoTracking().ToListAsync();
             List<FnbMaterialBatch> candidates = all
                 .Where(b => DeriveStatus(b, today) != "正常")

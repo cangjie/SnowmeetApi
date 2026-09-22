@@ -1,0 +1,238 @@
+using Microsoft.EntityFrameworkCore;
+using SnowmeetApi.Data;
+using SnowmeetApi.Models;
+using SnowmeetApi.Models.Fnb;
+using SnowmeetApi.Services.Fnb;
+
+namespace SnowmeetApi.Tests;
+
+public sealed class FnbSqlServerFactAttribute : FactAttribute
+{
+    public FnbSqlServerFactAttribute()
+    {
+        if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("SNOWMEET_FNB_TEST_SQLSERVER")))
+            Skip = "通过 SQL Server 隔离库运行器执行本组集成测试";
+    }
+}
+
+// Run with SNOWMEET_FNB_TEST_SQLSERVER set to an isolated SQL Server database
+// initialized with the applied inventory DDL. Never point this at a business database.
+public class FnbSqlServerIntegrationTests
+{
+    private static int _shopSequence;
+
+    private static ApplicationDBContext OpenTestDatabase()
+    {
+        string? connection = Environment.GetEnvironmentVariable("SNOWMEET_FNB_TEST_SQLSERVER");
+        if (string.IsNullOrWhiteSpace(connection))
+            throw new InvalidOperationException("必须通过 SQL Server 隔离库运行器执行本组集成测试");
+        var databaseName = new Microsoft.Data.SqlClient.SqlConnectionStringBuilder(connection).InitialCatalog;
+        if (!databaseName.StartsWith("snowmeet_fnb_test_", StringComparison.Ordinal))
+            throw new InvalidOperationException("集成测试只能连接 snowmeet_fnb_test_ 前缀的隔离数据库");
+        return new ApplicationDBContext(new DbContextOptionsBuilder<ApplicationDBContext>()
+            .UseSqlServer(connection).Options);
+    }
+
+    private sealed record Seed(int ShopId, int StaffId, int PhotoId, int RawItemId, int? PreparedItemId,
+        FnbAccess.Actor Actor);
+
+    private static async Task<Seed> SeedAsync(ApplicationDBContext db, bool withPrepared = false)
+    {
+        string key = Guid.NewGuid().ToString("N")[..12];
+        var shop = new Shop { name = "测试店" + key,
+            code = "T" + System.Threading.Interlocked.Increment(ref _shopSequence).ToString("D2") };
+        db.shop.Add(shop);
+        await db.SaveChangesAsync();
+        var staff = new Staff { name = "测试员工" + key, gender = "男", title_level = 200,
+            valid = 1, base_shop_id = shop.id };
+        db.staff.Add(staff);
+        var photo = new UploadFile { file_path_name = "/test/" + key + ".jpg", purpose = "食材批次",
+            staff_id = staff.id, file_type = "jpg" };
+        await db.SaveChangesAsync();
+        photo.staff_id = staff.id;
+        db.UploadFile.Add(photo);
+        await db.SaveChangesAsync();
+        var parent = new FnbMaterialCategory { level = 1, name = "测试大类" + key, valid = true };
+        db.fnbMaterialCategory.Add(parent);
+        await db.SaveChangesAsync();
+        var child = new FnbMaterialCategory { parent_id = parent.id, level = 2, name = "测试小类" + key,
+            default_storage = "ambient", default_unit_code = "g", warn_days = 3, valid = true };
+        db.fnbMaterialCategory.Add(child);
+        await db.SaveChangesAsync();
+        var raw = new FnbMaterialItem { code = "raw" + key, name = "面粉", category_id = child.id,
+            item_type = "raw", base_unit_code = "g", default_input_unit_code = "g", valid = true };
+        db.fnbMaterialItem.Add(raw);
+        FnbMaterialItem? prepared = null;
+        if (withPrepared)
+        {
+            prepared = new FnbMaterialItem { code = "prep" + key, name = "面团", category_id = child.id,
+                item_type = "prepared", base_unit_code = "g", default_input_unit_code = "g", valid = true };
+            db.fnbMaterialItem.Add(prepared);
+        }
+        await db.SaveChangesAsync();
+        return new Seed(shop.id, staff.id, photo.id, raw.id, prepared?.id,
+            new FnbAccess.Actor(staff, "mini", "mini#" + staff.id + ":员工"));
+    }
+
+    private static ReceiptInput Receipt(Seed seed, decimal quantity, decimal unitPrice, string form = "bulk",
+        decimal? packSize = null, string? packUnitName = null, string? openStorage = null, int? openDays = null)
+    {
+        return new ReceiptInput(seed.ShopId, Guid.NewGuid(), seed.RawItemId, "LOT" + Guid.NewGuid().ToString("N")[..8],
+            form, "ambient", null, quantity, "g", unitPrice, null, null, null,
+            DateOnly.FromDateTime(DateTime.UtcNow.AddDays(30)), 3, [seed.PhotoId], packSize, packUnitName,
+            openStorage, openDays, "manual", null);
+    }
+
+    [FnbSqlServerFact]
+    public async Task ManualOrderCreatesLocalKitchenOrderWithoutSkuAndCanServeAfterRecipeIsReady()
+    {
+        await using var db = OpenTestDatabase();
+        var seed = await SeedAsync(db);
+        string key = Guid.NewGuid().ToString("N")[..8];
+        var category = new Category { biz_type = "餐饮", name = "测试餐饮" + key, valid = 1 };
+        db.category.Add(category);
+        await db.SaveChangesAsync();
+        var product = new Product { category_id = category.id, shop_id = seed.ShopId,
+            name = "测试菜" + key, sale_price = 20, valid = 1 };
+        db.product.Add(product);
+        await db.SaveChangesAsync();
+        var service = new FnbManualOrderService(db);
+        var input = new ManualKitchenOrderInput(seed.ShopId, Guid.NewGuid(), null, "A1", "少盐",
+            [new ManualKitchenLineInput(product.id, 1, null)]);
+        var first = await service.CreateAsync(input, seed.Actor);
+        var replay = await service.CreateAsync(input, seed.Actor);
+        Assert.Equal(first.OrderId, replay.OrderId);
+        Assert.True(replay.Replayed);
+        Assert.Equal("pending", first.ReviewStatus);
+        var spec = await db.fnbDishSpec.SingleAsync(x => x.product_id == product.id);
+        Assert.Equal("default", spec.spec_code);
+        Assert.Equal(1, await db.fnbOrderImport.CountAsync(x => x.order_id == first.OrderId && x.source_method == "internal"));
+        await service.CancelAsync(seed.ShopId, first.OrderId);
+        Assert.Equal("cancelled", (await db.fnbOrder.SingleAsync(x => x.id == first.OrderId)).order_status);
+
+        await new FnbReceiptService(db).PostAsync(Receipt(seed, 100m, 0.01m), seed.Actor);
+        var recipe = new FnbRecipe { shop_id = seed.ShopId, recipe_type = "dish", dish_spec_id = spec.id,
+            output_qty = 1, version_no = 1, status = "published", published_at = DateTime.UtcNow };
+        db.fnbRecipe.Add(recipe);
+        await db.SaveChangesAsync();
+        db.fnbRecipeLine.Add(new FnbRecipeLine { recipe_id = recipe.id, item_id = seed.RawItemId, quantity = 100m });
+        await db.SaveChangesAsync();
+        var second = await service.CreateAsync(input with { RequestId = Guid.NewGuid() }, seed.Actor);
+        Assert.Equal("verified", second.ReviewStatus);
+        var served = await new FnbServeService(db).PostAsync(seed.ShopId, second.OrderId, Guid.NewGuid(), seed.Actor);
+        Assert.Equal(100m, Assert.Single(served.Needs).ActualQuantity);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.CancelAsync(seed.ShopId, second.OrderId));
+    }
+
+    [FnbSqlServerFact]
+    public async Task ReceiptCreatesLegacyBatchAndStockLedgerExactlyOnce()
+    {
+        await using var db = OpenTestDatabase();
+        var seed = await SeedAsync(db);
+        var input = Receipt(seed, 200m, 0.02m);
+        var service = new FnbReceiptService(db);
+        var first = await service.PostAsync(input, seed.Actor);
+        var replay = await service.PostAsync(input, seed.Actor);
+        Assert.True(replay.Replayed);
+        Assert.Equal(first.DocumentId, replay.DocumentId);
+        Assert.Equal(200m, first.Quantity);
+        Assert.Equal(4m, first.Amount);
+        Assert.Single(await db.fnbStockMovement.Where(x => x.batch_id == first.BatchId).ToListAsync());
+        Assert.Equal(200m, (await db.fnbMaterialBatchStock.SingleAsync(x => x.batch_id == first.BatchId)).quantity);
+    }
+
+    [FnbSqlServerFact]
+    public async Task OpeningAndWastePreserveCostAndRejectDuplicatePosting()
+    {
+        await using var db = OpenTestDatabase();
+        var seed = await SeedAsync(db);
+        var receipt = Receipt(seed, 2m, 10m, "sealed", 500m, "袋", "ambient", 2);
+        var received = await new FnbReceiptService(db).PostAsync(receipt, seed.Actor);
+        var posting = new FnbStockPostingService(db);
+        var opened = await posting.PostOpenAsync(new OpenInput(seed.ShopId, Guid.NewGuid(), received.BatchId, 1, null), seed.Actor);
+        Assert.Equal(500m, opened.Quantity);
+        Assert.Equal(10m, opened.Amount);
+        Assert.Equal(500m, (await db.fnbMaterialBatchStock.SingleAsync(x => x.batch_id == received.BatchId)).quantity);
+        var requestId = Guid.NewGuid();
+        var wasted = await posting.PostWasteAsync(new WasteInput(seed.ShopId, requestId, opened.BatchId, 500m, "damage", "破损"), seed.Actor);
+        var replay = await posting.PostWasteAsync(new WasteInput(seed.ShopId, requestId, opened.BatchId, 500m, "damage", "破损"), seed.Actor);
+        Assert.True(replay.Replayed);
+        Assert.Equal(wasted.DocumentId, replay.DocumentId);
+        Assert.True((await db.fnbMaterialBatchStock.SingleAsync(x => x.batch_id == opened.BatchId)).is_destroyed);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => posting.PostWasteAsync(
+            new WasteInput(seed.ShopId, requestId, received.BatchId, 500m, "damage", "破损"), seed.Actor));
+    }
+
+    [FnbSqlServerFact]
+    public async Task PreparationConsumesIngredientAndTransfersActualCost()
+    {
+        await using var db = OpenTestDatabase();
+        var seed = await SeedAsync(db, withPrepared: true);
+        var received = await new FnbReceiptService(db).PostAsync(Receipt(seed, 1000m, 0.01m), seed.Actor);
+        var recipe = new FnbRecipe { shop_id = seed.ShopId, recipe_type = "prep", output_item_id = seed.PreparedItemId,
+            output_qty = 1000m, version_no = 1, status = "published", published_at = DateTime.UtcNow };
+        db.fnbRecipe.Add(recipe);
+        await db.SaveChangesAsync();
+        db.fnbRecipeLine.Add(new FnbRecipeLine { recipe_id = recipe.id, item_id = seed.RawItemId, quantity = 500m });
+        await db.SaveChangesAsync();
+        var made = await new FnbPreparationService(db).PostAsync(new PreparationInput(seed.ShopId, Guid.NewGuid(), recipe.id,
+            500m, "DOUGH" + Guid.NewGuid().ToString("N")[..8], "ambient", null,
+            DateOnly.FromDateTime(DateTime.UtcNow.AddDays(20)), 3, [seed.PhotoId], "人工确认"), seed.Actor);
+        Assert.Equal(500m, made.Quantity);
+        Assert.Equal(2.5m, made.Amount);
+        Assert.Equal(750m, (await db.fnbMaterialBatchStock.SingleAsync(x => x.batch_id == received.BatchId)).quantity);
+    }
+
+    [FnbSqlServerFact]
+    public async Task ServingRecordsShortageWithoutNegativeStock()
+    {
+        await using var db = OpenTestDatabase();
+        var seed = await SeedAsync(db);
+        var received = await new FnbReceiptService(db).PostAsync(Receipt(seed, 150m, 0.01m), seed.Actor);
+        var product = new Product { name = "测试菜", shop_id = seed.ShopId, sale_price = 10 };
+        db.product.Add(product);
+        await db.SaveChangesAsync();
+        var spec = new FnbDishSpec { shop_id = seed.ShopId, product_id = product.id, spec_code = "std",
+            name = "标准份", valid = true };
+        db.fnbDishSpec.Add(spec);
+        await db.SaveChangesAsync();
+        var recipe = new FnbRecipe { shop_id = seed.ShopId, recipe_type = "dish", dish_spec_id = spec.id,
+            output_qty = 1, version_no = 1, status = "published", published_at = DateTime.UtcNow };
+        db.fnbRecipe.Add(recipe);
+        await db.SaveChangesAsync();
+        db.fnbRecipeLine.Add(new FnbRecipeLine { recipe_id = recipe.id, item_id = seed.RawItemId, quantity = 100m });
+        var order = new FnbOrder { shop_id = seed.ShopId, source_type = "manual", display_no = "K1",
+            business_date = DateTime.Today, ordered_at = DateTime.UtcNow, order_status = "pending",
+            review_status = "verified" };
+        db.fnbOrder.Add(order);
+        await db.SaveChangesAsync();
+        db.fnbOrderLine.Add(new FnbOrderLine { order_id = order.id, shop_id = seed.ShopId, line_key = "1",
+            item_name = "测试菜", quantity = 2, is_inventory_line = true, dish_spec_id = spec.id });
+        await db.SaveChangesAsync();
+        var service = new FnbServeService(db);
+        var requestId = Guid.NewGuid();
+        var served = await service.PostAsync(seed.ShopId, order.id, requestId, seed.Actor);
+        Assert.True((await service.PostAsync(seed.ShopId, order.id, requestId, seed.Actor)).Replayed);
+        Assert.Equal(50m, Assert.Single(served.Needs).ShortageQuantity);
+        Assert.Equal(0m, (await db.fnbMaterialBatchStock.SingleAsync(x => x.batch_id == received.BatchId)).quantity);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.PostAsync(seed.ShopId, order.id, Guid.NewGuid(), seed.Actor));
+    }
+
+    [FnbSqlServerFact]
+    public async Task StocktakeChecksSnapshotAndPostsAdjustmentOnce()
+    {
+        await using var db = OpenTestDatabase();
+        var seed = await SeedAsync(db);
+        var received = await new FnbReceiptService(db).PostAsync(Receipt(seed, 150m, 0.01m), seed.Actor);
+        var stocktake = new FnbStocktakeService(db);
+        long documentId = await stocktake.CreateSnapshotAsync(seed.ShopId, Guid.NewGuid(), [seed.RawItemId], seed.Actor);
+        var row = await db.fnbStocktakeLine.SingleAsync(x => x.document_id == documentId);
+        await stocktake.SaveCountAsync(new CountInput(seed.ShopId, documentId, seed.RawItemId, 100m,
+            Convert.ToBase64String(row.row_version)), seed.Actor);
+        Assert.False(Assert.Single(await stocktake.PreviewAsync(seed.ShopId, documentId)).SnapshotChanged);
+        await stocktake.PostAsync(new PostStocktakeInput(seed.ShopId, documentId, []), seed.Actor);
+        await stocktake.PostAsync(new PostStocktakeInput(seed.ShopId, documentId, []), seed.Actor);
+        Assert.Equal(100m, (await db.fnbMaterialBatchStock.SingleAsync(x => x.batch_id == received.BatchId)).quantity);
+        Assert.Equal("posted", (await db.fnbStockDocument.SingleAsync(x => x.id == documentId)).status);
+    }
+}

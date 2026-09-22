@@ -73,6 +73,8 @@ namespace SnowmeetApi.Models
         [Key]
         public int id { get; set; }
         public string? code { get; set; } = null;
+        public string? order_source { get; set; } = null;
+        public string? source_order_no { get; set; } = null;
         public string shop { get; set; }
         public string type { get; set; }
         public string? contact_num { get; set; } = null;
