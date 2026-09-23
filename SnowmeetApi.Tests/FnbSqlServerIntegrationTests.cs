@@ -235,4 +235,61 @@ public class FnbSqlServerIntegrationTests
         Assert.Equal(100m, (await db.fnbMaterialBatchStock.SingleAsync(x => x.batch_id == received.BatchId)).quantity);
         Assert.Equal("posted", (await db.fnbStockDocument.SingleAsync(x => x.id == documentId)).status);
     }
+
+    [FnbSqlServerFact]
+    public async Task SaveDishCreatesRestaurantDishAndListShowsRecipeState()
+    {
+        await using var db = OpenTestDatabase();
+        var seed = await SeedAsync(db);
+        var other = await SeedAsync(db);
+        string key = Guid.NewGuid().ToString("N")[..8];
+        var service = new FnbDishService(db);
+        var saved = await service.SaveAsync(new DishInput(seed.ShopId, 0, "酸菜白肉锅" + key, 68m, null, "热菜" + key, true));
+        var product = await db.product.SingleAsync(x => x.id == saved.ProductId);
+        Assert.Equal(seed.ShopId, product.shop_id);
+        Assert.Equal(1, product.valid);
+        Assert.Equal(0, product.hidden);
+        Assert.Equal("餐饮", (await db.category.SingleAsync(x => x.id == product.category_id)).biz_type);
+        var spec = await db.fnbDishSpec.SingleAsync(x => x.product_id == saved.ProductId);
+        Assert.True(spec.is_default);
+        Assert.Equal(spec.id, saved.SpecId);
+
+        var again = await service.SaveAsync(new DishInput(seed.ShopId, 0, "麻婆豆腐" + key, 32m, null, "热菜" + key, true));
+        Assert.Equal(saved.CategoryId, again.CategoryId);
+        await service.SaveAsync(new DishInput(other.ShopId, 0, "别店菜" + key, 10m, saved.CategoryId, null, true));
+
+        var listed = await service.ListAsync(seed.ShopId);
+        var row = Assert.Single(listed.Dishes, x => x.ProductId == saved.ProductId);
+        Assert.Null(row.PublishedRecipeId);
+        Assert.DoesNotContain(listed.Dishes, x => x.Name == "别店菜" + key);
+        Assert.Contains(listed.Categories, x => x.Id == saved.CategoryId);
+
+        var recipe = new FnbRecipe { shop_id = seed.ShopId, recipe_type = "dish", dish_spec_id = spec.id,
+            output_qty = 1, version_no = 1, status = "published", published_at = DateTime.UtcNow };
+        db.fnbRecipe.Add(recipe);
+        await db.SaveChangesAsync();
+        row = Assert.Single((await service.ListAsync(seed.ShopId)).Dishes, x => x.ProductId == saved.ProductId);
+        Assert.Equal(recipe.id, row.PublishedRecipeId);
+        Assert.Equal(1, row.PublishedVersion);
+
+        await service.SaveAsync(new DishInput(seed.ShopId, saved.ProductId, "酸菜白肉锅" + key, 68m, saved.CategoryId, null, false));
+        Assert.DoesNotContain((await service.ListAsync(seed.ShopId)).Dishes, x => x.ProductId == saved.ProductId);
+    }
+
+    [FnbSqlServerFact]
+    public async Task SaveDishRejectsNonRestaurantCategoryAndOtherShopDish()
+    {
+        await using var db = OpenTestDatabase();
+        var seed = await SeedAsync(db);
+        var other = await SeedAsync(db);
+        string key = Guid.NewGuid().ToString("N")[..8];
+        var retail = new Category { biz_type = "零售", name = "零售" + key, valid = 1 };
+        db.category.Add(retail);
+        await db.SaveChangesAsync();
+        var service = new FnbDishService(db);
+        await Assert.ThrowsAsync<ArgumentException>(() => service.SaveAsync(new DishInput(seed.ShopId, 0, "菜" + key, 1m, retail.id, null, true)));
+        await Assert.ThrowsAsync<ArgumentException>(() => service.SaveAsync(new DishInput(seed.ShopId, 0, "菜" + key, 1m, null, null, true)));
+        var foreign = await service.SaveAsync(new DishInput(other.ShopId, 0, "别店菜" + key, 1m, null, "热菜" + key, true));
+        await Assert.ThrowsAsync<ArgumentException>(() => service.SaveAsync(new DishInput(seed.ShopId, foreign.ProductId, "改名" + key, 1m, foreign.CategoryId, null, true)));
+    }
 }

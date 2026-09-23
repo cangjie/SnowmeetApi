@@ -25,6 +25,23 @@ public sealed class FnbRecipeController(ApplicationDBContext db) : ControllerBas
     }
 
     [HttpGet]
+    public async Task<ApiResult<object>> ListDishes(string sessionKey, int shopId)
+    {
+        int p = await Permission(sessionKey, shopId);
+        if (p != 0) return Result(p, "会话失效或无门店权限");
+        return Result(0, "", await new FnbDishService(db).ListAsync(shopId));
+    }
+
+    [HttpPost]
+    public async Task<ApiResult<object>> SaveDish([FromQuery] string sessionKey, [FromBody] DishInput input)
+    {
+        int p = await Permission(sessionKey, input.ShopId, true);
+        if (p != 0) return Result(p, "会话失效或需要门店管理权限");
+        try { return Result(0, "", await new FnbDishService(db).SaveAsync(input)); }
+        catch (ArgumentException ex) { return Result(1, ex.Message); }
+    }
+
+    [HttpGet]
     public async Task<ApiResult<object>> ListDishSpecs(string sessionKey, int shopId, int? productId = null)
     {
         int p = await Permission(sessionKey, shopId);
