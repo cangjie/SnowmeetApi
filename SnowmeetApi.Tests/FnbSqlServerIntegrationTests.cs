@@ -292,4 +292,36 @@ public class FnbSqlServerIntegrationTests
         var foreign = await service.SaveAsync(new DishInput(other.ShopId, 0, "别店菜" + key, 1m, null, "热菜" + key, true));
         await Assert.ThrowsAsync<ArgumentException>(() => service.SaveAsync(new DishInput(seed.ShopId, foreign.ProductId, "改名" + key, 1m, foreign.CategoryId, null, true)));
     }
+
+    [FnbSqlServerFact]
+    public async Task DeleteCategoryRejectsWhileValidMaterialsRemainAndCascadesFromParent()
+    {
+        await using var db = OpenTestDatabase();
+        var seed = await SeedAsync(db);
+        int childId = (await db.fnbMaterialItem.AsNoTracking().SingleAsync(x => x.id == seed.RawItemId)).category_id;
+        int parentId = (await db.fnbMaterialCategory.AsNoTracking().SingleAsync(x => x.id == childId)).parent_id!.Value;
+        var empty = new FnbMaterialCategory { parent_id = parentId, level = 2, name = "空小类" + seed.ShopId,
+            default_storage = "chilled", default_unit_code = "g", warn_days = 1, valid = true };
+        db.fnbMaterialCategory.Add(empty);
+        await db.SaveChangesAsync();
+        var service = new FnbCategoryService(db);
+        async Task<bool> Valid(int id) => (await db.fnbMaterialCategory.AsNoTracking().SingleAsync(x => x.id == id)).valid;
+
+        var child = await Assert.ThrowsAsync<ArgumentException>(() => service.DeleteAsync(childId));
+        Assert.Contains("1 种可用食材", child.Message);
+        await Assert.ThrowsAsync<ArgumentException>(() => service.DeleteAsync(parentId));
+        Assert.True(await Valid(childId));
+        Assert.True(await Valid(parentId));
+
+        Assert.Equal(new[] { empty.id }, await service.DeleteAsync(empty.id));
+        Assert.False(await Valid(empty.id));
+        Assert.True(await Valid(parentId));
+
+        await db.fnbMaterialItem.Where(x => x.id == seed.RawItemId).ExecuteUpdateAsync(s => s.SetProperty(x => x.valid, false));
+        Assert.Equal(new[] { parentId, childId }, (await service.DeleteAsync(parentId)).Order());
+        Assert.False(await Valid(parentId));
+        Assert.False(await Valid(childId));
+        Assert.Equal(childId, (await db.fnbMaterialItem.AsNoTracking().SingleAsync(x => x.id == seed.RawItemId)).category_id);
+        await Assert.ThrowsAsync<ArgumentException>(() => service.DeleteAsync(parentId));
+    }
 }

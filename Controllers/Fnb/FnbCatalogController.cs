@@ -90,6 +90,7 @@ public sealed class FnbCatalogController(ApplicationDBContext db) : ControllerBa
         var row = input.Id == 0 ? new FnbMaterialCategory { created_at = DateTime.UtcNow } : await db.fnbMaterialCategory.AsTracking().FirstOrDefaultAsync(x => x.id == input.Id);
         if (row == null) return Result(1, "分类不存在");
         if (input.Id != 0 && row.level != input.Level) return Result(1, "分类层级不可修改");
+        if (input.Id != 0 && row.valid && !input.Valid) return Result(1, "删除分类请使用删除操作");
         row.parent_id = input.ParentId; row.level = input.Level; row.name = input.Name.Trim();
         row.default_storage = input.DefaultStorage; row.default_unit_code = input.DefaultUnitCode;
         row.warn_days = input.WarnDays; row.default_open_storage = input.DefaultOpenStorage;
@@ -98,6 +99,17 @@ public sealed class FnbCatalogController(ApplicationDBContext db) : ControllerBa
         if (input.Id == 0) db.fnbMaterialCategory.Add(row);
         await db.SaveChangesAsync();
         return Result(0, "", row);
+    }
+
+    public sealed record CategoryDeleteInput(int ShopId, int Id);
+
+    [HttpPost]
+    public async Task<ApiResult<object>> DeleteCategory([FromQuery] string sessionKey, [FromBody] CategoryDeleteInput input)
+    {
+        int p = await Permission(sessionKey, input.ShopId, true);
+        if (p != 0) return Result(p, p == 2 ? "会话失效" : "需要门店管理权限");
+        try { return Result(0, "", new { ids = await new FnbCategoryService(db).DeleteAsync(input.Id) }); }
+        catch (ArgumentException ex) { return Result(1, ex.Message); }
     }
 
     public sealed record RuleInput(int ShopId, int Id, int CategoryId, string StorageType, byte ProductionMonth,
