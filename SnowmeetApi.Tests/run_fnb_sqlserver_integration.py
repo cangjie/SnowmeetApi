@@ -73,11 +73,10 @@ def bootstrap() -> None:
                 f"DEFAULT {definition} FOR [{column}]"
             )
 
-        cursor.execute(
-            (ROOT / "snowmeet_ai_doc/sql/2026-09-22_fnb_inventory_other_tables.sql").read_text()
-        )
-        while cursor.nextset():
-            pass
+        for script in ("2026-09-22_fnb_inventory_other_tables.sql", "2026-09-24_fnb_item_expiry_settings.sql"):
+            cursor.execute((ROOT / "snowmeet_ai_doc/sql" / script).read_text(encoding="utf-8"))
+            while cursor.nextset():
+                pass
         actual_tables = cursor.execute(
             "SELECT COUNT(*) FROM sys.tables WHERE name LIKE 'fnb_%'"
         ).fetchone()[0]

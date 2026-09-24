@@ -190,31 +190,43 @@ def scenarios(ctx: dict) -> None:
     l1 = post("FnbCatalog/SaveCategory", mgr, {"shopId": shop, "id": 0, "parentId": None, "level": 1, "name": "生鲜", "sort": 1, "valid": True})
     check("店长建一级分类", ok(l1), l1)
     l2 = post("FnbCatalog/SaveCategory", mgr, {"shopId": shop, "id": 0, "parentId": data(l1)["id"], "level": 2, "name": "蔬菜类",
-                                                  "defaultStorage": "chilled", "defaultUnitCode": "kg", "warnDays": 1,
-                                                  "defaultOpenStorage": "chilled", "defaultOpenDays": 2, "sort": 1, "valid": True})
-    check("店长建二级分类（带默认值）", ok(l2), l2)
+                                                  "defaultStorage": "chilled", "sort": 1, "valid": True})
+    check("店长建二级分类（只填名称和储存方式）", ok(l2), l2)
+    no_storage = post("FnbCatalog/SaveCategory", mgr, {"shopId": shop, "id": 0, "parentId": data(l1)["id"], "level": 2, "name": "无储存",
+                                                        "sort": 2, "valid": True})
+    check("二级分类不选储存方式被拒 code 1", no_storage[1].get("code") == 1, no_storage)
     sub = data(l2)["id"]
-    rules = [post("FnbCatalog/SaveShelfLifeRule", mgr, {"shopId": shop, "id": 0, "categoryId": sub, "storageType": "chilled",
-                                                         "productionMonth": m, "shelfLifeValue": 7 if m in (6, 7, 8, 9) else 10,
-                                                         "shelfLifeUnit": "day", "remark": None, "valid": True}) for m in range(1, 13)]
-    check("12 个月的冷藏规则全部写入", all(ok(r) for r in rules), [r for r in rules if not ok(r)][:1])
-    dup = post("FnbCatalog/SaveShelfLifeRule", mgr, {"shopId": shop, "id": 0, "categoryId": sub, "storageType": "chilled",
-                                                      "productionMonth": 1, "shelfLifeValue": 3, "shelfLifeUnit": "day", "valid": True})
-    check("同月重复规则被拒 code 1", dup[1].get("code") == 1, dup)
     items = {}
-    for code, name, kind, base_unit, input_unit in (("VEG001", "大白菜", "raw", "g", "kg"), ("SAU001", "番茄酱", "raw", "ml", "ml"),
-                                                    ("DGH001", "面团", "prepared", "piece", "piece"), ("POT001", "土豆", "raw", "g", "g")):
+    for code, name, kind, base_unit, input_unit, open_days in (("VEG001", "大白菜", "raw", "g", "kg", None), ("SAU001", "番茄酱", "raw", "ml", "ml", 7),
+                                                               ("DGH001", "面团", "prepared", "piece", "piece", None), ("POT001", "土豆", "raw", "g", "g", None)):
         saved = post("FnbCatalog/SaveMaterial", mgr, {"shopId": shop, "id": 0, "code": code, "name": name, "categoryId": sub,
                                                       "itemType": kind, "baseUnitCode": base_unit, "defaultInputUnitCode": input_unit,
-                                                      "imageId": None, "remark": None, "valid": True})
+                                                      "warnDays": 1, "defaultOpenStorage": "chilled" if open_days else None,
+                                                      "defaultOpenDays": open_days, "imageId": None, "remark": None, "valid": True})
         check(f"店长建食材 {name}", ok(saved), saved)
         items[name] = data(saved)["id"]
+    sauce = get("FnbCatalog/GetMaterial", cook, shopId=shop, id=items["番茄酱"])
+    check("食材保存开封后默认", ok(sauce) and data(sauce)["default_open_storage"] == "chilled" and data(sauce)["default_open_days"] == 7, sauce)
+    no_warn = post("FnbCatalog/SaveMaterial", mgr, {"shopId": shop, "id": 0, "code": "BAD001", "name": "缺提醒", "categoryId": sub,
+                                                     "itemType": "raw", "baseUnitCode": "g", "defaultInputUnitCode": "g", "valid": True})
+    check("食材缺临期提醒天数被拒 code 1", no_warn[1].get("code") == 1, no_warn)
+    rules = [post("FnbCatalog/SaveShelfLifeRule", mgr, {"shopId": shop, "id": 0, "itemId": items["大白菜"], "storageType": "chilled",
+                                                         "productionMonth": m, "shelfLifeValue": 7 if m in (6, 7, 8, 9) else 10,
+                                                         "shelfLifeUnit": "day", "remark": None, "valid": True}) for m in range(1, 13)]
+    check("大白菜 12 个月的冷藏规则全部写入", all(ok(r) for r in rules), [r for r in rules if not ok(r)][:1])
+    dup = post("FnbCatalog/SaveShelfLifeRule", mgr, {"shopId": shop, "id": 0, "itemId": items["大白菜"], "storageType": "chilled",
+                                                      "productionMonth": 1, "shelfLifeValue": 3, "shelfLifeUnit": "day", "valid": True})
+    check("同食材同月重复规则被拒 code 1", dup[1].get("code") == 1, dup)
+    own_rules = get("FnbCatalog/ListShelfLifeRules", cook, shopId=shop, itemId=items["大白菜"])
+    check("按食材查规则 12 条", ok(own_rules) and len(data(own_rules)) == 12, own_rules)
     listed = get("FnbCatalog/ListMaterials", cook, shopId=shop, categoryId=sub)
     check("员工按分类查食材", ok(listed) and data(listed)["total"] == 4, listed)
     preview = get("FnbInventory/PreviewExpiry", cook, shopId=shop, itemId=items["大白菜"], storageType="chilled", productionDate="2026-07-10")
     check("PreviewExpiry 按 7 月（高温档）规则 = 生产日 + 7 天", ok(preview) and data(preview)["expireDate"] == "2026-07-17", preview)
     none_rule = get("FnbInventory/PreviewExpiry", cook, shopId=shop, itemId=items["大白菜"], storageType="frozen", productionDate="2026-07-10")
     check("无规则储存方式返回 rule=null", ok(none_rule) and data(none_rule)["rule"] is None, none_rule)
+    sibling = get("FnbInventory/PreviewExpiry", cook, shopId=shop, itemId=items["土豆"], storageType="chilled", productionDate="2026-07-10")
+    check("同分类其他食材不继承大白菜的规则", ok(sibling) and data(sibling)["rule"] is None, sibling)
 
     print("\n[入库与幂等]")
     request_id = str(uuid4())

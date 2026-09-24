@@ -28,7 +28,7 @@ public sealed class FnbInventoryController(ApplicationDBContext db) : Controller
         if (p != 0) return Result(p, "会话失效或无门店权限");
         var item = await db.fnbMaterialItem.AsNoTracking().FirstOrDefaultAsync(x => x.id == itemId && x.valid);
         if (item == null) return Result(1, "食材不存在");
-        var rule = await db.fnbShelfLifeRule.AsNoTracking().FirstOrDefaultAsync(x => x.category_id == item.category_id
+        var rule = await db.fnbShelfLifeRule.AsNoTracking().FirstOrDefaultAsync(x => x.item_id == item.id
             && x.storage_type == storageType && x.production_month == productionDate.Month && x.valid);
         if (rule == null) return Result(0, "", new { rule = (object?)null, expireDate = (string?)null });
         try

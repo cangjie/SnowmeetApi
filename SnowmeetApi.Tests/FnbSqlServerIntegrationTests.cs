@@ -56,7 +56,7 @@ public class FnbSqlServerIntegrationTests
         db.fnbMaterialCategory.Add(parent);
         await db.SaveChangesAsync();
         var child = new FnbMaterialCategory { parent_id = parent.id, level = 2, name = "测试小类" + key,
-            default_storage = "ambient", default_unit_code = "g", warn_days = 3, valid = true };
+            default_storage = "ambient", valid = true };
         db.fnbMaterialCategory.Add(child);
         await db.SaveChangesAsync();
         var raw = new FnbMaterialItem { code = "raw" + key, name = "面粉", category_id = child.id,
@@ -139,6 +139,32 @@ public class FnbSqlServerIntegrationTests
         Assert.Equal(4m, first.Amount);
         Assert.Single(await db.fnbStockMovement.Where(x => x.batch_id == first.BatchId).ToListAsync());
         Assert.Equal(200m, (await db.fnbMaterialBatchStock.SingleAsync(x => x.batch_id == first.BatchId)).quantity);
+    }
+
+    [FnbSqlServerFact]
+    public async Task ReceiptByShelfLifeRuleAcceptsOnlyTheItemsOwnRule()
+    {
+        await using var db = OpenTestDatabase();
+        var seed = await SeedAsync(db, withPrepared: true);
+        var produced = DateOnly.FromDateTime(DateTime.UtcNow);
+        FnbShelfLifeRule Rule(int itemId) => new() { item_id = itemId, storage_type = "ambient",
+            production_month = (byte)produced.Month, shelf_life_value = 10, shelf_life_unit = "day", valid = true };
+        var own = Rule(seed.RawItemId);
+        var sibling = Rule(seed.PreparedItemId!.Value);
+        db.fnbShelfLifeRule.AddRange(own, sibling);
+        await db.SaveChangesAsync();
+        var expire = FnbInventoryRules.CalculateExpiry(produced, 10, "day");
+        ReceiptInput ByRule(int ruleId) => Receipt(seed, 100m, 0.01m) with { ProductionDate = produced, ShelfLifeValue = 10,
+            ShelfLifeUnit = "day", ExpireDate = expire, ExpirySource = "category", ShelfLifeRuleId = ruleId };
+        var service = new FnbReceiptService(db);
+
+        // 同一分类下另一个食材的规则不能拿来算本食材的效期
+        var error = await Assert.ThrowsAsync<ArgumentException>(() => service.PostAsync(ByRule(sibling.id), seed.Actor));
+        Assert.Contains("食材保质期规则", error.Message);
+        var posted = await service.PostAsync(ByRule(own.id), seed.Actor);
+        var stock = await db.fnbMaterialBatchStock.SingleAsync(x => x.batch_id == posted.BatchId);
+        Assert.Equal(own.id, stock.shelf_life_rule_id);
+        Assert.Equal("category", stock.expiry_source);
     }
 
     [FnbSqlServerFact]
@@ -301,7 +327,7 @@ public class FnbSqlServerIntegrationTests
         int childId = (await db.fnbMaterialItem.AsNoTracking().SingleAsync(x => x.id == seed.RawItemId)).category_id;
         int parentId = (await db.fnbMaterialCategory.AsNoTracking().SingleAsync(x => x.id == childId)).parent_id!.Value;
         var empty = new FnbMaterialCategory { parent_id = parentId, level = 2, name = "空小类" + seed.ShopId,
-            default_storage = "chilled", default_unit_code = "g", warn_days = 1, valid = true };
+            default_storage = "chilled", valid = true };
         db.fnbMaterialCategory.Add(empty);
         await db.SaveChangesAsync();
         var service = new FnbCategoryService(db);

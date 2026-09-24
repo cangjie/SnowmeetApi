@@ -38,14 +38,15 @@ public sealed class FnbCatalogController(ApplicationDBContext db) : ControllerBa
         return Result(0, "", await db.fnbMaterialCategory.AsNoTracking().OrderBy(x => x.level).ThenBy(x => x.sort).ThenBy(x => x.id).ToListAsync());
     }
 
+    // 只返回食材规则；2026-09-24 前的分类规则已全部停用，仅供旧批次追溯
     [HttpGet]
-    public async Task<ApiResult<object>> ListShelfLifeRules(string sessionKey, int shopId, int? categoryId = null)
+    public async Task<ApiResult<object>> ListShelfLifeRules(string sessionKey, int shopId, int? itemId = null)
     {
         int p = await Permission(sessionKey, shopId, false);
         if (p != 0) return Result(p, p == 2 ? "会话失效" : "无门店权限");
-        var q = db.fnbShelfLifeRule.AsNoTracking().AsQueryable();
-        if (categoryId.HasValue) q = q.Where(x => x.category_id == categoryId.Value);
-        return Result(0, "", await q.OrderBy(x => x.category_id).ThenBy(x => x.storage_type).ThenBy(x => x.production_month).ToListAsync());
+        var q = db.fnbShelfLifeRule.AsNoTracking().Where(x => x.item_id != null);
+        if (itemId.HasValue) q = q.Where(x => x.item_id == itemId.Value);
+        return Result(0, "", await q.OrderBy(x => x.item_id).ThenBy(x => x.storage_type).ThenBy(x => x.production_month).ToListAsync());
     }
 
     [HttpGet]
@@ -71,9 +72,9 @@ public sealed class FnbCatalogController(ApplicationDBContext db) : ControllerBa
         return item == null ? Result(1, "食材不存在") : Result(0, "", item);
     }
 
+    // 二级分类只有名称和建议储存方式；计量、临期、开封默认和保质期规则在食材上维护
     public sealed record CategoryInput(int ShopId, int Id, int? ParentId, byte Level, string Name,
-        string? DefaultStorage, string? DefaultUnitCode, int? WarnDays, string? DefaultOpenStorage,
-        int? DefaultOpenDays, int Sort, bool Valid);
+        string? DefaultStorage, int Sort, bool Valid);
 
     [HttpPost]
     public async Task<ApiResult<object>> SaveCategory([FromQuery] string sessionKey, [FromBody] CategoryInput input)
@@ -81,20 +82,18 @@ public sealed class FnbCatalogController(ApplicationDBContext db) : ControllerBa
         int p = await Permission(sessionKey, input.ShopId, true);
         if (p != 0) return Result(p, p == 2 ? "会话失效" : "需要门店管理权限");
         if (string.IsNullOrWhiteSpace(input.Name) || !FnbText.FitsChineseVarchar(input.Name.Trim(), 100) || input.Level is not (1 or 2)) return Result(1, "分类名称或层级无效");
-        if (input.Level == 1 && (input.ParentId != null || input.DefaultStorage != null || input.DefaultUnitCode != null || input.WarnDays != null || input.DefaultOpenStorage != null || input.DefaultOpenDays != null)) return Result(1, "一级分类不能设置二级默认值");
+        if (input.Level == 1 && (input.ParentId != null || input.DefaultStorage != null)) return Result(1, "一级分类不能设置储存方式");
         if (input.Level == 2)
         {
             if (input.ParentId == null || !await db.fnbMaterialCategory.AnyAsync(x => x.id == input.ParentId && x.level == 1 && x.valid)) return Result(1, "父分类必须是有效一级分类");
-            if (!Storage(input.DefaultStorage) || string.IsNullOrWhiteSpace(input.DefaultUnitCode) || !await db.fnbUnit.AnyAsync(x => x.code == input.DefaultUnitCode && x.valid) || input.WarnDays is null or < 0 || input.DefaultOpenDays < 0 || input.DefaultOpenStorage != null && !Storage(input.DefaultOpenStorage)) return Result(1, "二级分类默认值无效");
+            if (!Storage(input.DefaultStorage)) return Result(1, "请选择建议储存方式");
         }
         var row = input.Id == 0 ? new FnbMaterialCategory { created_at = DateTime.UtcNow } : await db.fnbMaterialCategory.AsTracking().FirstOrDefaultAsync(x => x.id == input.Id);
         if (row == null) return Result(1, "分类不存在");
         if (input.Id != 0 && row.level != input.Level) return Result(1, "分类层级不可修改");
         if (input.Id != 0 && row.valid && !input.Valid) return Result(1, "删除分类请使用删除操作");
         row.parent_id = input.ParentId; row.level = input.Level; row.name = input.Name.Trim();
-        row.default_storage = input.DefaultStorage; row.default_unit_code = input.DefaultUnitCode;
-        row.warn_days = input.WarnDays; row.default_open_storage = input.DefaultOpenStorage;
-        row.default_open_days = input.DefaultOpenDays; row.sort = input.Sort; row.valid = input.Valid;
+        row.default_storage = input.DefaultStorage; row.sort = input.Sort; row.valid = input.Valid;
         row.updated_at = DateTime.UtcNow;
         if (input.Id == 0) db.fnbMaterialCategory.Add(row);
         await db.SaveChangesAsync();
@@ -112,7 +111,7 @@ public sealed class FnbCatalogController(ApplicationDBContext db) : ControllerBa
         catch (ArgumentException ex) { return Result(1, ex.Message); }
     }
 
-    public sealed record RuleInput(int ShopId, int Id, int CategoryId, string StorageType, byte ProductionMonth,
+    public sealed record RuleInput(int ShopId, int Id, int ItemId, string StorageType, byte ProductionMonth,
         int ShelfLifeValue, string ShelfLifeUnit, string? Remark, bool Valid);
 
     [HttpPost]
@@ -120,12 +119,13 @@ public sealed class FnbCatalogController(ApplicationDBContext db) : ControllerBa
     {
         int p = await Permission(sessionKey, input.ShopId, true);
         if (p != 0) return Result(p, p == 2 ? "会话失效" : "需要门店管理权限");
-        if (!await db.fnbMaterialCategory.AnyAsync(x => x.id == input.CategoryId && x.level == 2 && x.valid) || !Storage(input.StorageType)
+        if (!await db.fnbMaterialItem.AnyAsync(x => x.id == input.ItemId && x.valid) || !Storage(input.StorageType)
             || input.ProductionMonth is < 1 or > 12 || input.ShelfLifeValue <= 0 || input.ShelfLifeUnit is not ("day" or "month")) return Result(1, "保质期规则无效");
-        if (input.Valid && await db.fnbShelfLifeRule.AnyAsync(x => x.id != input.Id && x.category_id == input.CategoryId && x.storage_type == input.StorageType && x.production_month == input.ProductionMonth && x.valid)) return Result(1, "该月份已有启用规则");
+        if (input.Valid && await db.fnbShelfLifeRule.AnyAsync(x => x.id != input.Id && x.item_id == input.ItemId && x.storage_type == input.StorageType && x.production_month == input.ProductionMonth && x.valid)) return Result(1, "该月份已有启用规则");
         var row = input.Id == 0 ? new FnbShelfLifeRule { created_at = DateTime.UtcNow } : await db.fnbShelfLifeRule.AsTracking().FirstOrDefaultAsync(x => x.id == input.Id);
         if (row == null) return Result(1, "规则不存在");
-        row.category_id = input.CategoryId; row.storage_type = input.StorageType; row.production_month = input.ProductionMonth;
+        if (input.Id != 0 && row.item_id != input.ItemId) return Result(1, "规则不属于该食材");
+        row.item_id = input.ItemId; row.storage_type = input.StorageType; row.production_month = input.ProductionMonth;
         row.shelf_life_value = input.ShelfLifeValue; row.shelf_life_unit = input.ShelfLifeUnit; row.remark = input.Remark;
         row.valid = input.Valid; row.updated_at = DateTime.UtcNow;
         if (input.Id == 0) db.fnbShelfLifeRule.Add(row);
@@ -134,7 +134,8 @@ public sealed class FnbCatalogController(ApplicationDBContext db) : ControllerBa
     }
 
     public sealed record MaterialInput(int ShopId, int Id, string Code, string Name, int CategoryId, string ItemType,
-        string BaseUnitCode, string DefaultInputUnitCode, int? ImageId, string? Remark, bool Valid);
+        string BaseUnitCode, string DefaultInputUnitCode, int? WarnDays, string? DefaultOpenStorage, int? DefaultOpenDays,
+        int? ImageId, string? Remark, bool Valid);
 
     [HttpPost]
     public async Task<ApiResult<object>> SaveMaterial([FromQuery] string sessionKey, [FromBody] MaterialInput input)
@@ -143,6 +144,8 @@ public sealed class FnbCatalogController(ApplicationDBContext db) : ControllerBa
         if (p != 0) return Result(p, p == 2 ? "会话失效" : "需要门店管理权限");
         if (string.IsNullOrWhiteSpace(input.Code) || !FnbText.FitsChineseVarchar(input.Code.Trim(), 64) || string.IsNullOrWhiteSpace(input.Name) || !FnbText.FitsChineseVarchar(input.Name.Trim(), 200) ||
             !FnbText.FitsChineseVarchar(input.Remark, 1000) || input.ItemType is not ("raw" or "prepared") || input.BaseUnitCode is not ("g" or "ml" or "piece")) return Result(1, "食材资料无效");
+        if (input.WarnDays is null or < 0) return Result(1, "临期提前提醒天数须为不小于 0 的整数");
+        if (input.DefaultOpenStorage != null && !Storage(input.DefaultOpenStorage) || input.DefaultOpenDays < 0) return Result(1, "开封后默认值无效");
         if (!await db.fnbMaterialCategory.AnyAsync(x => x.id == input.CategoryId && x.level == 2 && x.valid)) return Result(1, "须选择有效二级分类");
         var baseUnit = await db.fnbUnit.AsNoTracking().FirstOrDefaultAsync(x => x.code == input.BaseUnitCode && x.valid);
         var inputUnit = await db.fnbUnit.AsNoTracking().FirstOrDefaultAsync(x => x.code == input.DefaultInputUnitCode && x.valid);
@@ -155,7 +158,9 @@ public sealed class FnbCatalogController(ApplicationDBContext db) : ControllerBa
         if (input.Id != 0 && row.base_unit_code != input.BaseUnitCode && await db.fnbMaterialBatchStock.AnyAsync(x => x.item_id == input.Id)) return Result(1, "已有库存的食材不能修改基本单位");
         row.code = input.Code.Trim(); row.name = input.Name.Trim(); row.category_id = input.CategoryId;
         row.item_type = input.ItemType; row.base_unit_code = input.BaseUnitCode;
-        row.default_input_unit_code = input.DefaultInputUnitCode; row.image_id = input.ImageId;
+        row.default_input_unit_code = input.DefaultInputUnitCode; row.warn_days = input.WarnDays.Value;
+        row.default_open_storage = input.DefaultOpenStorage; row.default_open_days = input.DefaultOpenDays;
+        row.image_id = input.ImageId;
         row.remark = input.Remark; row.valid = input.Valid; row.updated_at = DateTime.UtcNow;
         if (input.Id == 0) db.fnbMaterialItem.Add(row);
         await db.SaveChangesAsync();

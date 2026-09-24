@@ -33,15 +33,16 @@ public sealed class FnbReceiptService(ApplicationDBContext db)
         var baseUnit = await db.fnbUnit.AsNoTracking().FirstOrDefaultAsync(x => x.code == item.base_unit_code);
         if (inputUnit == null || baseUnit == null) throw new ArgumentException("计量单位不存在");
         var plan = FnbReceiptRules.Plan(input, item, inputUnit, baseUnit);
+        // expiry_source 的取值 "category" 沿用建表时的约束，2026-09-24 起含义为「按食材保质期规则计算」
         if (input.ExpirySource == "category")
         {
             var rule = await db.fnbShelfLifeRule.AsNoTracking().FirstOrDefaultAsync(x => x.id == input.ShelfLifeRuleId && x.valid
-                && x.category_id == item.category_id && x.storage_type == input.StorageType);
+                && x.item_id == item.id && x.storage_type == input.StorageType);
             if (rule == null || input.ProductionDate == null || rule.production_month != input.ProductionDate.Value.Month ||
                 input.ShelfLifeValue != rule.shelf_life_value || input.ShelfLifeUnit != rule.shelf_life_unit || plan.CalculatedExpiry != input.ExpireDate)
-                throw new ArgumentException("分类效期规则与批次数据不一致");
+                throw new ArgumentException("食材保质期规则与批次数据不一致");
         }
-        else if (input.ShelfLifeRuleId != null) throw new ArgumentException("手动效期不能绑定分类规则");
+        else if (input.ShelfLifeRuleId != null) throw new ArgumentException("手动效期不能绑定保质期规则");
         int photoCount = await db.UploadFile.CountAsync(x => input.ImageIds.Contains(x.id) && x.purpose == "食材批次");
         if (photoCount != input.ImageIds.Count) throw new ArgumentException("批次照片不存在或用途不符");
 
