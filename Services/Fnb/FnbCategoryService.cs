@@ -13,6 +13,11 @@ namespace SnowmeetApi.Services.Fnb;
 /// under the affected categories blocks the whole deletion.</summary>
 public sealed class FnbCategoryService(ApplicationDBContext db)
 {
+    /// <summary>Names are unique among valid siblings only (filtered index WHERE valid = 1): a deleted
+    /// category keeps its row and name for history, and the same name may be created again.</summary>
+    public Task<bool> NameTakenAsync(int id, int? parentId, string name) =>
+        db.fnbMaterialCategory.AnyAsync(x => x.id != id && x.valid && x.parent_id == parentId && x.name == name);
+
     public async Task<int[]> DeleteAsync(int id)
     {
         var row = await db.fnbMaterialCategory.AsTracking().FirstOrDefaultAsync(x => x.id == id && x.valid);

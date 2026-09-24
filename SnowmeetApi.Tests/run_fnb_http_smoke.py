@@ -189,6 +189,12 @@ def scenarios(ctx: dict) -> None:
     print("\n[分类、规则、食材]")
     l1 = post("FnbCatalog/SaveCategory", mgr, {"shopId": shop, "id": 0, "parentId": None, "level": 1, "name": "生鲜", "sort": 1, "valid": True})
     check("店长建一级分类", ok(l1), l1)
+    dup_l1 = post("FnbCatalog/SaveCategory", mgr, {"shopId": shop, "id": 0, "parentId": None, "level": 1, "name": "生鲜", "sort": 2, "valid": True})
+    check("一级分类重名返回 code 1 而不是 500", dup_l1[0] == 200 and dup_l1[1].get("code") == 1 and "生鲜" in dup_l1[1].get("message", ""), dup_l1)
+    temp = post("FnbCatalog/SaveCategory", mgr, {"shopId": shop, "id": 0, "parentId": None, "level": 1, "name": "冻品", "sort": 2, "valid": True})
+    removed = post("FnbCatalog/DeleteCategory", mgr, {"shopId": shop, "id": data(temp)["id"]}) if ok(temp) else temp
+    again = post("FnbCatalog/SaveCategory", mgr, {"shopId": shop, "id": 0, "parentId": None, "level": 1, "name": "冻品", "sort": 2, "valid": True})
+    check("删掉的一级分类可以再建同名", ok(removed) and ok(again) and data(again)["id"] != data(temp)["id"], [removed, again])
     l2 = post("FnbCatalog/SaveCategory", mgr, {"shopId": shop, "id": 0, "parentId": data(l1)["id"], "level": 2, "name": "蔬菜类",
                                                   "defaultStorage": "chilled", "sort": 1, "valid": True})
     check("店长建二级分类（只填名称和储存方式）", ok(l2), l2)

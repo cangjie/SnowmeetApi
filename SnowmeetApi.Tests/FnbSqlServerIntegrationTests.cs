@@ -320,6 +320,31 @@ public class FnbSqlServerIntegrationTests
     }
 
     [FnbSqlServerFact]
+    public async Task DeletedCategoryNameCanBeReusedButValidSiblingsStayUnique()
+    {
+        await using var db = OpenTestDatabase();
+        string name = "冻品" + Guid.NewGuid().ToString("N")[..6];
+        var service = new FnbCategoryService(db);
+        var first = new FnbMaterialCategory { level = 1, name = name, valid = true };
+        db.fnbMaterialCategory.Add(first);
+        await db.SaveChangesAsync();
+        Assert.True(await service.NameTakenAsync(0, null, name));
+        Assert.False(await service.NameTakenAsync(first.id, null, name));
+
+        // 未删除的一级分类之间，数据库同样拒绝重名（parent_id 为 NULL 也算同级）
+        db.fnbMaterialCategory.Add(new FnbMaterialCategory { level = 1, name = name, valid = true });
+        await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync());
+        db.ChangeTracker.Clear();
+
+        await service.DeleteAsync(first.id);
+        Assert.False(await service.NameTakenAsync(0, null, name));
+        var again = new FnbMaterialCategory { level = 1, name = name, valid = true };
+        db.fnbMaterialCategory.Add(again);
+        await db.SaveChangesAsync();
+        Assert.NotEqual(first.id, again.id);
+    }
+
+    [FnbSqlServerFact]
     public async Task DeleteCategoryRejectsWhileValidMaterialsRemainAndCascadesFromParent()
     {
         await using var db = OpenTestDatabase();

@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using SnowmeetApi.Data;
 using SnowmeetApi.Models;
@@ -92,11 +93,16 @@ public sealed class FnbCatalogController(ApplicationDBContext db) : ControllerBa
         if (row == null) return Result(1, "分类不存在");
         if (input.Id != 0 && row.level != input.Level) return Result(1, "分类层级不可修改");
         if (input.Id != 0 && row.valid && !input.Valid) return Result(1, "删除分类请使用删除操作");
-        row.parent_id = input.ParentId; row.level = input.Level; row.name = input.Name.Trim();
+        string name = input.Name.Trim();
+        string duplicate = $"同级已有「{name}」分类";
+        if (input.Valid && await new FnbCategoryService(db).NameTakenAsync(input.Id, input.ParentId, name)) return Result(1, duplicate);
+        row.parent_id = input.ParentId; row.level = input.Level; row.name = name;
         row.default_storage = input.DefaultStorage; row.sort = input.Sort; row.valid = input.Valid;
         row.updated_at = DateTime.UtcNow;
         if (input.Id == 0) db.fnbMaterialCategory.Add(row);
-        await db.SaveChangesAsync();
+        // 连点保存等并发请求越过上面的检查时，由唯一索引兜底
+        try { await db.SaveChangesAsync(); }
+        catch (DbUpdateException ex) when (ex.InnerException is SqlException { Number: 2601 or 2627 }) { return Result(1, duplicate); }
         return Result(0, "", row);
     }
 
