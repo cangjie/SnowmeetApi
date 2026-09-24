@@ -13,10 +13,25 @@ namespace SnowmeetApi.Services.Fnb;
 /// under the affected categories blocks the whole deletion.</summary>
 public sealed class FnbCategoryService(ApplicationDBContext db)
 {
-    /// <summary>Names are unique among valid siblings only (filtered index WHERE valid = 1): a deleted
-    /// category keeps its row and name for history, and the same name may be created again.</summary>
+    /// <summary>Only valid siblings compete for a name.</summary>
     public Task<bool> NameTakenAsync(int id, int? parentId, string name) =>
         db.fnbMaterialCategory.AnyAsync(x => x.id != id && x.valid && x.parent_id == parentId && x.name == name);
+
+    /// <summary>The unique index on (parent_id, name) also covers deleted rows, so a deleted sibling holding
+    /// the name gets a 「（已删除#id）」 suffix to free it; stock and reports still find it by id.</summary>
+    public async Task FreeNameAsync(int id, int? parentId, string name)
+    {
+        var holders = await db.fnbMaterialCategory.AsTracking()
+            .Where(x => x.id != id && !x.valid && x.parent_id == parentId && x.name == name).ToListAsync();
+        if (holders.Count == 0) return;
+        foreach (var x in holders)
+        {
+            string freed = $"{name}（已删除#{x.id}）";
+            x.name = FnbText.FitsChineseVarchar(freed, 100) ? freed : $"已删除#{x.id}";
+            x.updated_at = DateTime.UtcNow;
+        }
+        await db.SaveChangesAsync();
+    }
 
     public async Task<int[]> DeleteAsync(int id)
     {

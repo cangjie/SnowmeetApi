@@ -336,12 +336,17 @@ public class FnbSqlServerIntegrationTests
         await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync());
         db.ChangeTracker.Clear();
 
+        // 删掉后只剩已删除的同名分类：不算重名；让出名称后可直接再建（唯一索引本身不区分 valid）
         await service.DeleteAsync(first.id);
         Assert.False(await service.NameTakenAsync(0, null, name));
+        await service.FreeNameAsync(0, null, name);
         var again = new FnbMaterialCategory { level = 1, name = name, valid = true };
         db.fnbMaterialCategory.Add(again);
         await db.SaveChangesAsync();
         Assert.NotEqual(first.id, again.id);
+        var old = await db.fnbMaterialCategory.AsNoTracking().SingleAsync(x => x.id == first.id);
+        Assert.Equal($"{name}（已删除#{first.id}）", old.name);
+        Assert.False(old.valid);
     }
 
     [FnbSqlServerFact]

@@ -95,20 +95,20 @@ public sealed class FnbCatalogController(ApplicationDBContext db) : ControllerBa
         if (input.Id != 0 && row.valid && !input.Valid) return Result(1, "删除分类请使用删除操作");
         string name = input.Name.Trim();
         string duplicate = $"同级已有「{name}」分类";
+        // 只和未删除的同级分类查重；已删除的同名分类让出名称
         var categories = new FnbCategoryService(db);
-        if (input.Valid && await categories.NameTakenAsync(input.Id, input.ParentId, name)) return Result(1, duplicate);
+        if (input.Valid)
+        {
+            if (await categories.NameTakenAsync(input.Id, input.ParentId, name)) return Result(1, duplicate);
+            await categories.FreeNameAsync(input.Id, input.ParentId, name);
+        }
         row.parent_id = input.ParentId; row.level = input.Level; row.name = name;
         row.default_storage = input.DefaultStorage; row.sort = input.Sort; row.valid = input.Valid;
         row.updated_at = DateTime.UtcNow;
         if (input.Id == 0) db.fnbMaterialCategory.Add(row);
-        // 撞唯一索引有两种来源：连点保存等并发请求越过了上面的检查（确有未删除的同名分类）；
-        // 或库里还是不区分 valid 的旧索引、被已删除的同名分类占着（未执行 2026-09-24_fnb_category_name_unique_valid.sql）
+        // 连点保存等并发请求越过上面的检查时，由唯一索引兜底
         try { await db.SaveChangesAsync(); }
-        catch (DbUpdateException ex) when (ex.InnerException is SqlException { Number: 2601 or 2627 })
-        {
-            return Result(1, await categories.NameTakenAsync(input.Id, input.ParentId, name) ? duplicate
-                : $"「{name}」与已删除的同名分类冲突，需先更新数据库唯一索引");
-        }
+        catch (DbUpdateException ex) when (ex.InnerException is SqlException { Number: 2601 or 2627 }) { return Result(1, duplicate); }
         return Result(0, "", row);
     }
 
