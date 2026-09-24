@@ -31,6 +31,14 @@ public class FnbReceiptRulesTests
     }
 
     [Fact]
+    public void BatchPhotosAreOptionalButMustBeValidWhenGiven()
+    {
+        Assert.Equal(1000m, FnbReceiptRules.Plan(Sample() with { ImageIds = [] }, Flour, Kg, G).BaseQuantity);
+        Assert.Throws<ArgumentException>(() => FnbReceiptRules.Plan(Sample() with { ImageIds = [5, 5] }, Flour, Kg, G));
+        Assert.Throws<ArgumentException>(() => FnbReceiptRules.Plan(Sample() with { ImageIds = [0] }, Flour, Kg, G));
+    }
+
+    [Fact]
     public void ReceiptRejectsWrongDimensionAndExpiryBeforeProduction()
     {
         var input = Sample() with { ProductionDate = new DateOnly(2026, 10, 2), ExpireDate = new DateOnly(2026, 10, 1) };

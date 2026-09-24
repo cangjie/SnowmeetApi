@@ -43,8 +43,9 @@ public sealed class FnbReceiptService(ApplicationDBContext db)
                 throw new ArgumentException("食材保质期规则与批次数据不一致");
         }
         else if (input.ShelfLifeRuleId != null) throw new ArgumentException("手动效期不能绑定保质期规则");
-        int photoCount = await db.UploadFile.CountAsync(x => input.ImageIds.Contains(x.id) && x.purpose == "食材批次");
-        if (photoCount != input.ImageIds.Count) throw new ArgumentException("批次照片不存在或用途不符");
+        var imageIds = input.ImageIds ?? Array.Empty<int>();
+        int photoCount = imageIds.Count == 0 ? 0 : await db.UploadFile.CountAsync(x => imageIds.Contains(x.id) && x.purpose == "食材批次");
+        if (photoCount != imageIds.Count) throw new ArgumentException("批次照片不存在或用途不符");
 
         DateTime now = DateTime.UtcNow;
         DateTime businessDate = TimeZoneInfo.ConvertTimeFromUtc(now, TimeZoneInfo.FindSystemTimeZoneById("Asia/Shanghai")).Date;
@@ -55,7 +56,7 @@ public sealed class FnbReceiptService(ApplicationDBContext db)
             shelf_life_value = input.ShelfLifeValue,
             shelf_life_unit = input.ShelfLifeUnit == "day" ? "天" : input.ShelfLifeUnit == "month" ? "月" : null,
             expire_date = input.ExpireDate.ToDateTime(TimeOnly.MinValue), warn_days = input.WarnDays,
-            image_ids = string.Join(",", input.ImageIds), create_userid = actor.AuditUserId,
+            image_ids = imageIds.Count == 0 ? null : string.Join(",", imageIds), create_userid = actor.AuditUserId,
             staff_id = actor.Staff.id, create_date = DateTime.Now, valid = true
         };
         db.fnbMaterialBatch.Add(batch);

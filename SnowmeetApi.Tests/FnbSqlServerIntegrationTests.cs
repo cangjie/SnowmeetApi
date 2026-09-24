@@ -142,6 +142,15 @@ public class FnbSqlServerIntegrationTests
     }
 
     [FnbSqlServerFact]
+    public async Task ReceiptWithoutPhotosStoresNoImageIds()
+    {
+        await using var db = OpenTestDatabase();
+        var seed = await SeedAsync(db);
+        var posted = await new FnbReceiptService(db).PostAsync(Receipt(seed, 100m, 0.01m) with { ImageIds = [] }, seed.Actor);
+        Assert.Null((await db.fnbMaterialBatch.AsNoTracking().SingleAsync(x => x.id == posted.BatchId)).image_ids);
+    }
+
+    [FnbSqlServerFact]
     public async Task ReceiptByShelfLifeRuleAcceptsOnlyTheItemsOwnRule()
     {
         await using var db = OpenTestDatabase();

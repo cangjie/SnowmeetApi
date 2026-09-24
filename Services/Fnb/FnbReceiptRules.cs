@@ -48,9 +48,10 @@ public static class FnbReceiptRules
             if (input.ProductionDate == null) throw new ArgumentException("推算效期须有生产日期");
             calculatedExpiry = FnbInventoryRules.CalculateExpiry(input.ProductionDate.Value, input.ShelfLifeValue.Value, input.ShelfLifeUnit!);
         }
-        if (input.ImageIds == null || input.ImageIds.Count == 0 || input.ImageIds.Any(id => id <= 0) ||
-            input.ImageIds.Distinct().Count() != input.ImageIds.Count || string.Join(",", input.ImageIds).Length > 500)
-            throw new ArgumentException("至少上传一张有效且不重复的批次照片");
+        // 批次照片选填（2026-09-24 起）；传了就须有效且不重复
+        var imageIds = input.ImageIds ?? Array.Empty<int>();
+        if (imageIds.Any(id => id <= 0) || imageIds.Distinct().Count() != imageIds.Count || string.Join(",", imageIds).Length > 500)
+            throw new ArgumentException("批次照片无效或重复");
 
         decimal factor;
         if (input.StockForm == "sealed")
