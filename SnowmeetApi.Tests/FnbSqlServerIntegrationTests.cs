@@ -199,6 +199,18 @@ public class FnbSqlServerIntegrationTests
     }
 
     [FnbSqlServerFact]
+    public async Task OpeningWithKeepExpiryDaysKeepsSealedExpiryDate()
+    {
+        // 小程序「开封后保质期不变」记为 36500 天：开封到期取 min(原到期, 开封日 + 天数)，即原到期日
+        await using var db = OpenTestDatabase();
+        var seed = await SeedAsync(db);
+        var received = await new FnbReceiptService(db).PostAsync(Receipt(seed, 2m, 10m, "sealed", 500m, "袋", "frozen", 36500), seed.Actor);
+        var opened = await new FnbStockPostingService(db).PostOpenAsync(new OpenInput(seed.ShopId, Guid.NewGuid(), received.BatchId, 1, null), seed.Actor);
+        var sealedExpiry = (await db.fnbMaterialBatch.AsNoTracking().SingleAsync(x => x.id == received.BatchId)).expire_date;
+        Assert.Equal(sealedExpiry, (await db.fnbMaterialBatch.AsNoTracking().SingleAsync(x => x.id == opened.BatchId)).expire_date);
+    }
+
+    [FnbSqlServerFact]
     public async Task PreparationConsumesIngredientAndTransfersActualCost()
     {
         await using var db = OpenTestDatabase();
