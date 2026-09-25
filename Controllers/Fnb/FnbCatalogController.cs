@@ -73,9 +73,10 @@ public sealed class FnbCatalogController(ApplicationDBContext db) : ControllerBa
         return item == null ? Result(1, "食材不存在") : Result(0, "", item);
     }
 
-    // 二级分类只有名称和建议储存方式；计量、临期、开封默认和保质期规则在食材上维护
+    // 二级分类只有名称和建议储存方式；计量、临期、开封默认和保质期规则在食材上维护。
+    // IsPrepared：半成品分类（2026-09-25）；一级分类为半成品时，其下二级分类一律按半成品保存
     public sealed record CategoryInput(int ShopId, int Id, int? ParentId, byte Level, string Name,
-        string? DefaultStorage, int Sort, bool Valid);
+        string? DefaultStorage, int Sort, bool Valid, bool IsPrepared = false);
 
     [HttpPost]
     public async Task<ApiResult<object>> SaveCategory([FromQuery] string sessionKey, [FromBody] CategoryInput input)
@@ -95,8 +96,11 @@ public sealed class FnbCatalogController(ApplicationDBContext db) : ControllerBa
         if (input.Id != 0 && row.valid && !input.Valid) return Result(1, "删除分类请使用删除操作");
         string name = input.Name.Trim();
         string duplicate = $"同级已有「{name}」分类";
-        // 只和未删除的同级分类查重；已删除的同名分类让出名称
         var categories = new FnbCategoryService(db);
+        bool prepared = input.IsPrepared || input.Level == 2 && await categories.IsPreparedAsync(input.ParentId!.Value);
+        string? typeConflict = await categories.TypeChangeConflictAsync(row, prepared);
+        if (typeConflict != null) return Result(1, typeConflict);
+        // 只和未删除的同级分类查重；已删除的同名分类让出名称
         if (input.Valid)
         {
             if (await categories.NameTakenAsync(input.Id, input.ParentId, name)) return Result(1, duplicate);
@@ -104,7 +108,7 @@ public sealed class FnbCatalogController(ApplicationDBContext db) : ControllerBa
         }
         row.parent_id = input.ParentId; row.level = input.Level; row.name = name;
         row.default_storage = input.DefaultStorage; row.sort = input.Sort; row.valid = input.Valid;
-        row.updated_at = DateTime.UtcNow;
+        row.is_prepared = prepared; row.updated_at = DateTime.UtcNow;
         if (input.Id == 0) db.fnbMaterialCategory.Add(row);
         // 连点保存等并发请求越过上面的检查时，由唯一索引兜底
         try { await db.SaveChangesAsync(); }
@@ -145,7 +149,8 @@ public sealed class FnbCatalogController(ApplicationDBContext db) : ControllerBa
         return Result(0, "", row);
     }
 
-    public sealed record MaterialInput(int ShopId, int Id, string Code, string Name, int CategoryId, string ItemType,
+    // ItemType 已不采用（2026-09-25）：新食材的原料/半成品由所在分类决定，传了也忽略
+    public sealed record MaterialInput(int ShopId, int Id, string Code, string Name, int CategoryId, string? ItemType,
         string BaseUnitCode, string DefaultInputUnitCode, int? WarnDays, string? DefaultOpenStorage, int? DefaultOpenDays,
         int? ImageId, string? Remark, bool Valid);
 
@@ -155,7 +160,7 @@ public sealed class FnbCatalogController(ApplicationDBContext db) : ControllerBa
         int p = await Permission(sessionKey, input.ShopId, true);
         if (p != 0) return Result(p, p == 2 ? "会话失效" : "需要门店管理权限");
         if (string.IsNullOrWhiteSpace(input.Code) || !FnbText.FitsChineseVarchar(input.Code.Trim(), 64) || string.IsNullOrWhiteSpace(input.Name) || !FnbText.FitsChineseVarchar(input.Name.Trim(), 200) ||
-            !FnbText.FitsChineseVarchar(input.Remark, 1000) || input.ItemType is not ("raw" or "prepared") || input.BaseUnitCode is not ("g" or "ml" or "piece")) return Result(1, "食材资料无效");
+            !FnbText.FitsChineseVarchar(input.Remark, 1000) || input.BaseUnitCode is not ("g" or "ml" or "piece")) return Result(1, "食材资料无效");
         if (input.WarnDays is null or < 0) return Result(1, "临期提前提醒天数须为不小于 0 的整数");
         if (input.DefaultOpenStorage != null && !Storage(input.DefaultOpenStorage) || input.DefaultOpenDays < 0) return Result(1, "开封后默认值无效");
         if (!await db.fnbMaterialCategory.AnyAsync(x => x.id == input.CategoryId && x.level == 2 && x.valid)) return Result(1, "须选择有效二级分类");
@@ -168,8 +173,13 @@ public sealed class FnbCatalogController(ApplicationDBContext db) : ControllerBa
         if (row == null) return Result(1, "食材不存在");
         if (input.Id != 0 && row.code != input.Code.Trim()) return Result(1, "食材编码创建后不可修改");
         if (input.Id != 0 && row.base_unit_code != input.BaseUnitCode && await db.fnbMaterialBatchStock.AnyAsync(x => x.item_id == input.Id)) return Result(1, "已有库存的食材不能修改基本单位");
+        // 原料/半成品由分类决定：新食材跟分类；已有食材不跨类型换分类，同分类下保留原类型（兼容 09-25 前的历史数据）
+        string categoryType = await new FnbCategoryService(db).IsPreparedAsync(input.CategoryId) ? "prepared" : "raw";
+        if (input.Id != 0 && row.category_id != input.CategoryId && row.item_type != categoryType)
+            return Result(1, row.item_type == "prepared" ? "半成品食材不能移到原料分类" : "原料食材不能移到半成品分类");
         row.code = input.Code.Trim(); row.name = input.Name.Trim(); row.category_id = input.CategoryId;
-        row.item_type = input.ItemType; row.base_unit_code = input.BaseUnitCode;
+        if (input.Id == 0) row.item_type = categoryType;
+        row.base_unit_code = input.BaseUnitCode;
         row.default_input_unit_code = input.DefaultInputUnitCode; row.warn_days = input.WarnDays.Value;
         row.default_open_storage = input.DefaultOpenStorage; row.default_open_days = input.DefaultOpenDays;
         row.image_id = input.ImageId;

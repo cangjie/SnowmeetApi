@@ -726,4 +726,43 @@ public class FnbSqlServerIntegrationTests
         Assert.Equal(childId, (await db.fnbMaterialItem.AsNoTracking().SingleAsync(x => x.id == seed.RawItemId)).category_id);
         await Assert.ThrowsAsync<ArgumentException>(() => service.DeleteAsync(parentId));
     }
+
+    [FnbSqlServerFact]
+    public async Task PreparedCategoryIsInheritedFromParentAndTypeChangeNeedsMatchingMaterials()
+    {
+        await using var db = OpenTestDatabase();
+        var seed = await SeedAsync(db);
+        var service = new FnbCategoryService(db);
+        int childId = (await db.fnbMaterialItem.AsNoTracking().SingleAsync(x => x.id == seed.RawItemId)).category_id;
+        var child = await db.fnbMaterialCategory.AsTracking().SingleAsync(x => x.id == childId);
+        var parent = await db.fnbMaterialCategory.AsTracking().SingleAsync(x => x.id == child.parent_id);
+        Assert.False(await service.IsPreparedAsync(childId));
+        // 已有原料食材（面粉）的分类：二级、一级都不能改成半成品
+        Assert.Contains("1 种原料食材", await service.TypeChangeConflictAsync(child, true));
+        Assert.Contains("1 种原料食材", await service.TypeChangeConflictAsync(parent, true));
+        Assert.Null(await service.TypeChangeConflictAsync(child, false));
+
+        // 一级半成品分类下新建的二级分类算半成品
+        var top = new FnbMaterialCategory { level = 1, name = "半成品" + seed.ShopId, is_prepared = true, valid = true };
+        db.fnbMaterialCategory.Add(top);
+        await db.SaveChangesAsync();
+        var sauce = new FnbMaterialCategory { parent_id = top.id, level = 2, name = "酱料" + seed.ShopId, default_storage = "chilled", valid = true };
+        db.fnbMaterialCategory.Add(sauce);
+        await db.SaveChangesAsync();
+        Assert.True(await service.IsPreparedAsync(sauce.id));
+        Assert.Null(await service.TypeChangeConflictAsync(sauce, false));
+
+        // 其下已有半成品食材：一级不能改回原料；二级自己也标了半成品后，一级改回原料不影响它
+        db.fnbMaterialItem.Add(new FnbMaterialItem { code = "sauce" + seed.ShopId, name = "秘制酱", category_id = sauce.id,
+            item_type = "prepared", base_unit_code = "g", default_input_unit_code = "g", valid = true });
+        await db.SaveChangesAsync();
+        Assert.Contains("1 种半成品食材", await service.TypeChangeConflictAsync(top, false));
+        sauce.is_prepared = true;
+        await db.SaveChangesAsync();
+        Assert.Null(await service.TypeChangeConflictAsync(top, false));
+        top.is_prepared = false;
+        await db.SaveChangesAsync();
+        Assert.True(await service.IsPreparedAsync(sauce.id));
+        Assert.False(await service.IsPreparedAsync(top.id));
+    }
 }

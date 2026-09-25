@@ -21,6 +21,8 @@ public sealed class FnbMaterialCategory
     public string name { get; set; } = string.Empty;
     // 2026-09-24 起二级分类只保留建议储存方式；计量、临期、开封默认和保质期规则都在食材上
     public string? default_storage { get; set; }
+    // 2026-09-25：半成品分类；一级分类为半成品时其下二级分类都算半成品，食材类型由所在分类决定
+    public bool is_prepared { get; set; }
     public int sort { get; set; }
     public bool valid { get; set; }
     public DateTime created_at { get; set; }
