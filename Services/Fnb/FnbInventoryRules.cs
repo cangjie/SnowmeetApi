@@ -32,14 +32,18 @@ public static class FnbInventoryRules
         return originalExpiry <= openedExpiry ? originalExpiry : openedExpiry;
     }
 
+    /// <summary>出餐、制作能扣的库存：有效、未销毁、未过期的散装、已开封或自制半成品；整包未开封的不扣。</summary>
+    public static bool IsDeductible(AvailableBatch b, DateOnly businessDate) =>
+        b.IsValid && !b.IsDestroyed && b.Quantity > 0 && b.ExpireDate >= businessDate
+        && b.StockForm is "bulk" or "opened" or "prepared";
+
     public static StockAllocation AllocateFefo(IEnumerable<AvailableBatch> batches, decimal requestedQuantity, DateOnly businessDate)
     {
         if (requestedQuantity <= 0) throw new ArgumentOutOfRangeException(nameof(requestedQuantity));
         var lines = new List<AllocationLine>();
         decimal remaining = requestedQuantity;
         foreach (AvailableBatch batch in batches
-            .Where(b => b.IsValid && !b.IsDestroyed && b.Quantity > 0 && b.ExpireDate >= businessDate
-                && b.StockForm is "bulk" or "opened" or "prepared")
+            .Where(b => IsDeductible(b, businessDate))
             .OrderBy(b => b.ExpireDate).ThenBy(b => b.ReceivedAtUtc).ThenBy(b => b.BatchId))
         {
             if (remaining == 0) break;

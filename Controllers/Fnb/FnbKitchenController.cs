@@ -128,6 +128,50 @@ public sealed class FnbKitchenController(ApplicationDBContext db) : ControllerBa
         catch (DbUpdateConcurrencyException) { return Result(4, "库存已变化，请刷新后重试"); }
     }
 
+    // 建单前查配料库存（itemIds 逗号分隔）：能扣多少、有几包没开封、开封按钮用哪个批次
+    [HttpGet]
+    public async Task<ApiResult<object>> GetDeductStock(string sessionKey, int shopId, string itemIds)
+    {
+        int p = await Permission(sessionKey, shopId);
+        if (p != 0) return Result(p, "会话失效或无门店权限");
+        var ids = new List<int>();
+        foreach (string part in (itemIds ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (!int.TryParse(part, out int id) || id <= 0) return Result(1, "食材无效");
+            ids.Add(id);
+        }
+        if (ids.Count is 0 or > 100) return Result(1, "食材无效");
+        return Result(0, "", await new FnbServeService(db).DeductStockAsync(shopId, ids));
+    }
+
+    // 近几天还有欠料没补的厨房单（出餐后已盘点调整的不算），最多 100 单，新的在前
+    [HttpGet]
+    public async Task<ApiResult<object>> ListShortageOrders(string sessionKey, int shopId, int days = 7)
+    {
+        int p = await Permission(sessionKey, shopId);
+        if (p != 0) return Result(p, "会话失效或无门店权限");
+        if (days is < 1 or > 31) return Result(1, "天数无效");
+        var ids = await new FnbServeService(db).ShortageOrderIdsAsync(shopId, DateTime.UtcNow.AddDays(-days), 100);
+        var orders = await db.fnbOrder.AsNoTracking().Where(x => x.shop_id == shopId && ids.Contains(x.id)).ToListAsync();
+        return Result(0, "", ids.Select(id => orders.First(x => x.id == id)).ToList());
+    }
+
+    // 补扣欠料：补录入库或开封后，按现在的库存把这单欠的配料再扣一次；不受 10 分钟限制
+    [HttpPost]
+    public async Task<ApiResult<object>> FillShortage([FromQuery] string sessionKey, [FromBody] ReviewInput input)
+    {
+        var actor = await _access.ResolveActorAsync(sessionKey);
+        if (actor == null) return Result(2, "会话失效");
+        if (!FnbAccess.CanAccess(actor.Staff, input.ShopId, false)) return Result(3, "无门店权限");
+        try
+        {
+            var result = await new FnbServeService(db).FillShortageAsync(input.ShopId, input.OrderId, actor);
+            return Result(0, "", new { orderId = input.OrderId.ToString(), result.Needs, result.FilledItems, result.SettledByStocktake });
+        }
+        catch (ArgumentException ex) { return Result(1, ex.Message); }
+        catch (DbUpdateConcurrencyException) { return Result(4, "库存已变化，请刷新后重试"); }
+    }
+
     [HttpPost]
     public async Task<ApiResult<object>> CancelManualOrder([FromQuery] string sessionKey, [FromBody] ReviewInput input)
     {

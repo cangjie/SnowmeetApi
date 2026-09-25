@@ -10,8 +10,15 @@ using SnowmeetApi.Models.Fnb;
 
 namespace SnowmeetApi.Services.Fnb;
 
-public sealed record ServeNeed(int ItemId, string ItemName, decimal PlannedQuantity, decimal ActualQuantity, decimal ShortageQuantity);
+// SettledByStocktake：欠料的食材在出餐后已盘点，差异已由盘点调整，不能再补扣
+public sealed record ServeNeed(int ItemId, string ItemName, decimal PlannedQuantity, decimal ActualQuantity, decimal ShortageQuantity,
+    bool SettledByStocktake = false);
 public sealed record ServeResult(long DocumentId, bool Replayed, IReadOnlyList<ServeNeed> Needs);
+// 建单前查配料库存：Available 为出餐能扣的量（散装、已开封、自制，未过期），Sealed 为能开封的整包；
+// OpenBatch 为最早到期、可开封 1 件的未开封批次，给「开封」按钮用
+public sealed record DeductStock(int ItemId, decimal AvailableQuantity, decimal SealedQuantity, int SealedPacks,
+    int? OpenBatchId, string? OpenBatchNo, decimal? OpenPackSize, string? PackUnitName);
+public sealed record FillShortageResult(IReadOnlyList<ServeNeed> Needs, int FilledItems, IReadOnlyList<string> SettledByStocktake);
 
 // 建单即扣料：一张厨房单一道菜（将来由外部订单自动导入），按该菜已发布配方 × 份数扣料；
 // Ingredients 为单上微调的用量（基本单位），只能是配方里的食材，0 表示这单不扣这一项，没传的按配方
@@ -55,9 +62,13 @@ public sealed class FnbServeService(ApplicationDBContext db)
         return (order, lines, needs);
     }
 
+    private static DateTime BusinessDate(DateTime utc) =>
+        TimeZoneInfo.ConvertTimeFromUtc(utc, TimeZoneInfo.FindSystemTimeZoneById("Asia/Shanghai")).Date;
+
+    // excludedBatches：补扣时跳过这一行已扣过的批次（同一单据行同一批次只能有一条流水）
     private async Task<(List<FnbMaterialBatchStock> Stocks, Dictionary<int, FnbMaterialBatch> Batches,
         Dictionary<int, StockAllocation> Allocations, Dictionary<int, FnbMaterialItem> Items)> AllocateAsync(
-        int shopId, Dictionary<int, decimal> needs, DateOnly businessDate)
+        int shopId, Dictionary<int, decimal> needs, DateOnly businessDate, Dictionary<int, HashSet<int>>? excludedBatches = null)
     {
         int[] itemIds = needs.Keys.ToArray();
         var items = await db.fnbMaterialItem.AsNoTracking().Where(x => itemIds.Contains(x.id)).ToDictionaryAsync(x => x.id);
@@ -69,7 +80,8 @@ public sealed class FnbServeService(ApplicationDBContext db)
         var allocations = new Dictionary<int, StockAllocation>();
         foreach (var pair in needs)
         {
-            var candidates = stocks.Where(x => x.item_id == pair.Key).Select(x =>
+            var skip = excludedBatches?.GetValueOrDefault(pair.Key);
+            var candidates = stocks.Where(x => x.item_id == pair.Key && (skip == null || !skip.Contains(x.batch_id))).Select(x =>
             {
                 var batch = batches[x.batch_id];
                 return new AvailableBatch(x.batch_id, DateOnly.FromDateTime(batch.expire_date), x.stock_form,
@@ -182,19 +194,7 @@ public sealed class FnbServeService(ApplicationDBContext db)
     {
         int shopId = document.shop_id;
         var (stocks, batches, allocations, items) = await AllocateAsync(shopId, needs, DateOnly.FromDateTime(document.business_date));
-        var stockMap = stocks.ToDictionary(x => x.batch_id);
-        foreach (var allocation in allocations.Values.SelectMany(x => x.Lines))
-        {
-            var stock = stockMap[allocation.BatchId];
-            stock.quantity -= allocation.Quantity; stock.stock_amount -= allocation.Amount; stock.updated_at = now;
-            if (stock.quantity == 0)
-            {
-                var batch = batches[allocation.BatchId];
-                batch.dispose_status = "用完"; batch.dispose_userid = actor.AuditUserId;
-                batch.dispose_date = DateTime.Now; batch.update_date = DateTime.Now;
-            }
-        }
-        await db.SaveChangesAsync();
+        var stockMap = await TakeStockAsync(stocks, batches, allocations, actor, now);
         var documentLines = new List<FnbStockDocumentLine>();
         int lineNo = 1;
         foreach (var pair in needs.OrderBy(x => x.Key))
@@ -212,21 +212,144 @@ public sealed class FnbServeService(ApplicationDBContext db)
         }
         db.fnbStockDocumentLine.AddRange(documentLines);
         await db.SaveChangesAsync();
-        foreach (var line in documentLines)
+        await WriteMovementsAsync(documentLines, allocations, stockMap, now);
+        return needs.Select(x => new ServeNeed(x.Key, items[x.Key].name,
+            x.Value, allocations[x.Key].ActualQuantity, allocations[x.Key].ShortageQuantity)).ToList();
+    }
+
+    // 按分配结果扣批次库存，扣光的批次标「用完」
+    private async Task<Dictionary<int, FnbMaterialBatchStock>> TakeStockAsync(List<FnbMaterialBatchStock> stocks,
+        Dictionary<int, FnbMaterialBatch> batches, Dictionary<int, StockAllocation> allocations, FnbAccess.Actor actor, DateTime now)
+    {
+        var stockMap = stocks.ToDictionary(x => x.batch_id);
+        foreach (var allocation in allocations.Values.SelectMany(x => x.Lines))
+        {
+            var stock = stockMap[allocation.BatchId];
+            stock.quantity -= allocation.Quantity; stock.stock_amount -= allocation.Amount; stock.updated_at = now;
+            if (stock.quantity == 0)
+            {
+                var batch = batches[allocation.BatchId];
+                batch.dispose_status = "用完"; batch.dispose_userid = actor.AuditUserId;
+                batch.dispose_date = DateTime.Now; batch.update_date = DateTime.Now;
+            }
+        }
+        await db.SaveChangesAsync();
+        return stockMap;
+    }
+
+    private async Task WriteMovementsAsync(IEnumerable<FnbStockDocumentLine> lines, Dictionary<int, StockAllocation> allocations,
+        Dictionary<int, FnbMaterialBatchStock> stockMap, DateTime now)
+    {
+        foreach (var line in lines)
             foreach (var allocation in allocations[line.item_id].Lines)
             {
                 var stock = stockMap[allocation.BatchId];
                 db.fnbStockMovement.Add(new FnbStockMovement
                 {
-                    document_line_id = line.id, shop_id = shopId, item_id = line.item_id,
+                    document_line_id = line.id, shop_id = line.shop_id, item_id = line.item_id,
                     batch_id = allocation.BatchId, direction = -1, quantity = allocation.Quantity,
                     amount = allocation.Amount, balance_qty = stock.quantity, balance_amount = stock.stock_amount,
                     created_at = now
                 });
             }
         await db.SaveChangesAsync();
-        return needs.Select(x => new ServeNeed(x.Key, items[x.Key].name,
-            x.Value, allocations[x.Key].ActualQuantity, allocations[x.Key].ShortageQuantity)).ToList();
+    }
+
+    /// <summary>建单前查配料库存，口径与扣料一致；开封按钮取最早到期、还够 1 件的未开封批次。</summary>
+    public async Task<IReadOnlyList<DeductStock>> DeductStockAsync(int shopId, IReadOnlyList<int> itemIds)
+    {
+        int[] ids = itemIds.Distinct().ToArray();
+        DateTime today = BusinessDate(DateTime.UtcNow);
+        var stocks = await db.fnbMaterialBatchStock.AsNoTracking().Where(x => x.shop_id == shopId && ids.Contains(x.item_id)
+            && x.quantity > 0 && !x.is_destroyed).ToListAsync();
+        int[] batchIds = stocks.Select(x => x.batch_id).ToArray();
+        var batches = await db.fnbMaterialBatch.AsNoTracking().Where(x => batchIds.Contains(x.id)).ToDictionaryAsync(x => x.id);
+        return ids.Select(id =>
+        {
+            var own = stocks.Where(x => x.item_id == id).ToList();
+            decimal available = own.Where(x =>
+            {
+                var b = batches[x.batch_id];
+                return FnbInventoryRules.IsDeductible(new AvailableBatch(x.batch_id, DateOnly.FromDateTime(b.expire_date), x.stock_form,
+                    x.quantity, x.stock_amount, b.valid && b.dispose_status == null, x.is_destroyed, x.received_at), DateOnly.FromDateTime(today));
+            }).Sum(x => x.quantity);
+            var openable = own.Where(x => FnbStockPostingService.CanOpen(x, batches[x.batch_id], today)).ToList();
+            var first = openable.Where(x => x.quantity >= x.pack_size!.Value)
+                .OrderBy(x => batches[x.batch_id].expire_date).ThenBy(x => x.received_at).ThenBy(x => x.batch_id).FirstOrDefault();
+            return new DeductStock(id, available, openable.Sum(x => x.quantity),
+                openable.Sum(x => (int)Math.Floor(x.quantity / x.pack_size!.Value)),
+                first?.batch_id, first == null ? null : batches[first.batch_id].batch_no, first?.pack_size, first?.pack_unit_name);
+        }).ToList();
+    }
+
+    // 出餐后已盘点（盘点单过账时间晚于扣料）的食材：欠料差异已由盘点调整
+    private async Task<HashSet<int>> SettledByStocktakeAsync(int shopId, DateTime servedAt, IEnumerable<int> itemIds)
+    {
+        int[] ids = itemIds.Distinct().ToArray();
+        if (ids.Length == 0) return [];
+        var settled = await (from l in db.fnbStocktakeLine
+                             join d in db.fnbStockDocument on l.document_id equals d.id
+                             where l.shop_id == shopId && ids.Contains(l.item_id) && l.counted_qty != null &&
+                                 d.document_type == "stocktake" && d.status == "posted" && d.posted_at > servedAt
+                             select l.item_id).Distinct().ToListAsync();
+        return settled.ToHashSet();
+    }
+
+    /// <summary>扣料时间在 since 之后、还有未补欠料（且没被之后的盘点调整）的厨房单 ID，新的在前。</summary>
+    public async Task<List<long>> ShortageOrderIdsAsync(int shopId, DateTime since, int take)
+    {
+        var rows = await (from d in db.fnbStockDocument
+                          join l in db.fnbStockDocumentLine on d.id equals l.document_id
+                          where d.shop_id == shopId && d.document_type == "serve" && d.status == "posted" && d.order_id != null &&
+                              d.posted_at >= since && l.shortage_qty > 0 &&
+                              !(from tl in db.fnbStocktakeLine
+                                join td in db.fnbStockDocument on tl.document_id equals td.id
+                                where tl.shop_id == shopId && tl.item_id == l.item_id && tl.counted_qty != null &&
+                                    td.document_type == "stocktake" && td.status == "posted" && td.posted_at > d.posted_at
+                                select tl.id).Any()
+                          select new { OrderId = d.order_id!.Value, d.posted_at }).ToListAsync();
+        return rows.GroupBy(x => x.OrderId).OrderByDescending(g => g.Max(x => x.posted_at)).Take(take).Select(g => g.Key).ToList();
+    }
+
+    /// <summary>补扣欠料：补录入库或开封后，按现在的库存把这单欠的配料再扣一次（FEFO，仍不够的继续记欠料）。
+    /// 扣的量记在原单据行上、另写流水，不改计划用量；不受 10 分钟限制。出餐后已盘点的食材不补扣。</summary>
+    public async Task<FillShortageResult> FillShortageAsync(int shopId, long orderId, FnbAccess.Actor actor)
+    {
+        if (!FnbAccess.CanAccess(actor.Staff, shopId, false)) throw new UnauthorizedAccessException();
+        await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+        var document = await db.fnbStockDocument.AsNoTracking().FirstOrDefaultAsync(x => x.shop_id == shopId && x.order_id == orderId &&
+            x.document_type == "serve" && x.status == "posted");
+        if (document == null || document.posted_at == null) throw new ArgumentException("这张厨房单还没有扣料");
+        var shortLines = await db.fnbStockDocumentLine.AsTracking().Where(x => x.document_id == document.id && x.shortage_qty > 0).ToListAsync();
+        if (shortLines.Count == 0) throw new ArgumentException("这张厨房单没有欠料");
+        var settled = await SettledByStocktakeAsync(shopId, document.posted_at.Value, shortLines.Select(x => x.item_id));
+        var open = shortLines.Where(x => !settled.Contains(x.item_id)).ToList();
+        if (open.Count == 0) throw new ArgumentException("欠料的食材在出餐后已盘点过，差异已由盘点调整，不用再补扣");
+        long[] lineIds = open.Select(x => x.id).ToArray();
+        var used = await db.fnbStockMovement.AsNoTracking().Where(x => lineIds.Contains(x.document_line_id))
+            .Select(x => new { x.document_line_id, x.batch_id }).ToListAsync();
+        var excluded = open.ToDictionary(x => x.item_id, x => used.Where(u => u.document_line_id == x.id).Select(u => u.batch_id).ToHashSet());
+        DateTime now = DateTime.UtcNow;
+        var (stocks, batches, allocations, _) = await AllocateAsync(shopId, open.ToDictionary(x => x.item_id, x => x.shortage_qty),
+            DateOnly.FromDateTime(BusinessDate(now)), excluded);
+        var filled = open.Where(x => allocations[x.item_id].ActualQuantity > 0).ToList();
+        if (filled.Count == 0) throw new ArgumentException("库存还是不够，先入库或开封再补扣");
+        var stockMap = await TakeStockAsync(stocks, batches, allocations, actor, now);
+        string when = TimeZoneInfo.ConvertTimeFromUtc(now, TimeZoneInfo.FindSystemTimeZoneById("Asia/Shanghai")).ToString("MM-dd HH:mm");
+        foreach (var line in filled)
+        {
+            var allocation = allocations[line.item_id];
+            line.actual_qty += allocation.ActualQuantity;
+            line.actual_amount += allocation.Lines.Sum(x => x.Amount);
+            string note = $"{when} {actor.Staff.name} 补扣 {allocation.ActualQuantity:0.######}";
+            line.remark = string.IsNullOrEmpty(line.remark) ? note : line.remark + "；" + note;
+            if (line.remark.Length > 1000) line.remark = line.remark[^1000..];
+        }
+        await db.SaveChangesAsync();
+        await WriteMovementsAsync(filled, allocations, stockMap, now);
+        await tx.CommitAsync();
+        return new FillShortageResult(await ServedNeedsAsync(shopId, orderId), filled.Count,
+            settled.Select(id => shortLines.First(x => x.item_id == id).item_name).ToList());
     }
 
     /// <summary>已扣配料（出餐单据行），厨房单详情展示用；未出餐时为空。</summary>
@@ -235,8 +358,10 @@ public sealed class FnbServeService(ApplicationDBContext db)
         var document = await db.fnbStockDocument.AsNoTracking().FirstOrDefaultAsync(x => x.shop_id == shopId && x.order_id == orderId &&
             x.document_type == "serve" && x.status == "posted");
         if (document == null) return [];
-        return await db.fnbStockDocumentLine.AsNoTracking().Where(x => x.document_id == document.id).OrderBy(x => x.line_no)
-            .Select(x => new ServeNeed(x.item_id, x.item_name, x.planned_qty, x.actual_qty, x.shortage_qty)).ToListAsync();
+        var lines = await db.fnbStockDocumentLine.AsNoTracking().Where(x => x.document_id == document.id).OrderBy(x => x.line_no).ToListAsync();
+        var settled = await SettledByStocktakeAsync(shopId, document.posted_at!.Value, lines.Where(x => x.shortage_qty > 0).Select(x => x.item_id));
+        return lines.Select(x => new ServeNeed(x.item_id, x.item_name, x.planned_qty, x.actual_qty, x.shortage_qty,
+            x.shortage_qty > 0 && settled.Contains(x.item_id))).ToList();
     }
 
     private sealed record ServedRows(FnbOrder Order, FnbStockDocument Document, List<FnbStockDocumentLine> Lines,

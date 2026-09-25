@@ -472,6 +472,105 @@ public class FnbSqlServerIntegrationTests
     }
 
     [FnbSqlServerFact]
+    public async Task DeductStockCountsOnlyWhatServingCanTakeAndPointsToTheSealedPackToOpen()
+    {
+        await using var db = OpenTestDatabase();
+        var seed = await SeedAsync(db);
+        var receipts = new FnbReceiptService(db);
+        await receipts.PostAsync(Receipt(seed, 100m, 0.01m), seed.Actor);
+        var expired = await receipts.PostAsync(Receipt(seed, 40m, 0.01m), seed.Actor);
+        await db.fnbMaterialBatch.Where(x => x.id == expired.BatchId)
+            .ExecuteUpdateAsync(s => s.SetProperty(x => x.expire_date, DateTime.Today.AddDays(-1)));
+        var later = await receipts.PostAsync(Receipt(seed, 1m, 10m, "sealed", 500m, "袋", "ambient", 2), seed.Actor);
+        await db.fnbMaterialBatch.Where(x => x.id == later.BatchId)
+            .ExecuteUpdateAsync(s => s.SetProperty(x => x.expire_date, DateTime.Today.AddDays(60)));
+        var sooner = await receipts.PostAsync(Receipt(seed, 2m, 10m, "sealed", 500m, "袋", "ambient", 2), seed.Actor);
+        db.ChangeTracker.Clear();
+
+        var stock = Assert.Single(await new FnbServeService(db).DeductStockAsync(seed.ShopId, [seed.RawItemId]));
+        Assert.Equal((100m, 1500m, 3), (stock.AvailableQuantity, stock.SealedQuantity, stock.SealedPacks));
+        Assert.Equal((sooner.BatchId, 500m, "袋"), (stock.OpenBatchId!.Value, stock.OpenPackSize!.Value, stock.PackUnitName));
+    }
+
+    [FnbSqlServerFact]
+    public async Task FillShortageDeductsFromNewStockKeepsThePlanAndRollsBackWithTheOrder()
+    {
+        await using var db = OpenTestDatabase();
+        var seed = await SeedAsync(db);
+        var receipts = new FnbReceiptService(db);
+        var first = await receipts.PostAsync(Receipt(seed, 150m, 0.01m), seed.Actor);
+        var dish = await RestaurantDishAsync(db, seed, "蛋饼", 100m);
+        var service = new FnbServeService(db);
+        var order = await service.CreateAndServeAsync(OneDishOrder(seed, dish.id, 2), seed.Actor);
+        Assert.Equal(50m, Assert.Single(order.Needs).ShortageQuantity);
+        db.ChangeTracker.Clear();
+        Assert.Contains(order.OrderId, await service.ShortageOrderIdsAsync(seed.ShopId, DateTime.UtcNow.AddDays(-7), 100));
+        Assert.Contains("库存还是不够", (await Assert.ThrowsAsync<ArgumentException>(() =>
+            service.FillShortageAsync(seed.ShopId, order.OrderId, seed.Actor))).Message);
+
+        // 补录 30 g：补扣 30，还欠 20；计划用量不变
+        db.ChangeTracker.Clear();
+        var second = await receipts.PostAsync(Receipt(seed, 30m, 0.02m), seed.Actor);
+        db.ChangeTracker.Clear();
+        var partly = await service.FillShortageAsync(seed.ShopId, order.OrderId, seed.Actor);
+        var need = Assert.Single(partly.Needs);
+        Assert.Equal((200m, 180m, 20m, 1), (need.PlannedQuantity, need.ActualQuantity, need.ShortageQuantity, partly.FilledItems));
+        db.ChangeTracker.Clear();
+        Assert.Equal("用完", (await db.fnbMaterialBatch.SingleAsync(x => x.id == second.BatchId)).dispose_status);
+
+        var third = await receipts.PostAsync(Receipt(seed, 100m, 0.01m), seed.Actor);
+        db.ChangeTracker.Clear();
+        need = Assert.Single((await service.FillShortageAsync(seed.ShopId, order.OrderId, seed.Actor)).Needs);
+        Assert.Equal((200m, 0m), (need.ActualQuantity, need.ShortageQuantity));
+        db.ChangeTracker.Clear();
+        Assert.Equal(80m, (await db.fnbMaterialBatchStock.SingleAsync(x => x.batch_id == third.BatchId)).quantity);
+        var line = await db.fnbStockDocumentLine.SingleAsync(x => x.document_id == order.DocumentId);
+        Assert.Equal(1.5m + 0.6m + 0.2m, line.actual_amount);
+        Assert.Contains("补扣", line.remark);
+        Assert.Equal(3, await db.fnbStockMovement.CountAsync(x => x.document_line_id == line.id));
+        Assert.DoesNotContain(order.OrderId, await service.ShortageOrderIdsAsync(seed.ShopId, DateTime.UtcNow.AddDays(-7), 100));
+        Assert.Contains("没有欠料", (await Assert.ThrowsAsync<ArgumentException>(() =>
+            service.FillShortageAsync(seed.ShopId, order.OrderId, seed.Actor))).Message);
+
+        // 10 分钟内删除厨房单：连同补扣的配料一起退回
+        db.ChangeTracker.Clear();
+        await service.DeleteAsync(seed.ShopId, order.OrderId, seed.Actor);
+        db.ChangeTracker.Clear();
+        Assert.Equal(150m, (await db.fnbMaterialBatchStock.SingleAsync(x => x.batch_id == first.BatchId)).quantity);
+        Assert.Equal(30m, (await db.fnbMaterialBatchStock.SingleAsync(x => x.batch_id == second.BatchId)).quantity);
+        Assert.Equal(100m, (await db.fnbMaterialBatchStock.SingleAsync(x => x.batch_id == third.BatchId)).quantity);
+    }
+
+    [FnbSqlServerFact]
+    public async Task FillShortageSkipsItemsStocktakenAfterServing()
+    {
+        await using var db = OpenTestDatabase();
+        var seed = await SeedAsync(db);
+        var receipts = new FnbReceiptService(db);
+        await receipts.PostAsync(Receipt(seed, 150m, 0.01m), seed.Actor);
+        var dish = await RestaurantDishAsync(db, seed, "蛋饼", 100m);
+        var service = new FnbServeService(db);
+        var order = await service.CreateAndServeAsync(OneDishOrder(seed, dish.id, 2), seed.Actor);
+        db.ChangeTracker.Clear();
+        await receipts.PostAsync(Receipt(seed, 100m, 0.01m), seed.Actor);
+        db.ChangeTracker.Clear();
+
+        var stocktake = new FnbStocktakeService(db);
+        long documentId = await stocktake.CreateSnapshotAsync(seed.ShopId, Guid.NewGuid(), [seed.RawItemId], seed.Actor);
+        var row = await db.fnbStocktakeLine.SingleAsync(x => x.document_id == documentId);
+        await stocktake.SaveCountAsync(new CountInput(seed.ShopId, documentId, seed.RawItemId, 60m,
+            Convert.ToBase64String(row.row_version)), seed.Actor);
+        await stocktake.PostAsync(new PostStocktakeInput(seed.ShopId, documentId, []), seed.Actor);
+        db.ChangeTracker.Clear();
+
+        var need = Assert.Single(await service.ServedNeedsAsync(seed.ShopId, order.OrderId));
+        Assert.Equal((50m, true), (need.ShortageQuantity, need.SettledByStocktake));
+        Assert.DoesNotContain(order.OrderId, await service.ShortageOrderIdsAsync(seed.ShopId, DateTime.UtcNow.AddDays(-7), 100));
+        Assert.Contains("已盘点", (await Assert.ThrowsAsync<ArgumentException>(() =>
+            service.FillShortageAsync(seed.ShopId, order.OrderId, seed.Actor))).Message);
+    }
+
+    [FnbSqlServerFact]
     public async Task StocktakeChecksSnapshotAndPostsAdjustmentOnce()
     {
         await using var db = OpenTestDatabase();

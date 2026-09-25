@@ -25,6 +25,12 @@ public sealed class FnbStockPostingService(ApplicationDBContext db)
         created_by_staff_id = actor.Staff.id, posted_by_staff_id = actor.Staff.id
     };
 
+    /// <summary>未开封批次能否开封（件数够不够另判）：有效、未处置、未销毁、未过期，且有包装规格与开封后保质期。</summary>
+    internal static bool CanOpen(FnbMaterialBatchStock stock, FnbMaterialBatch batch, DateTime businessDate) =>
+        stock.stock_form == "sealed" && !stock.is_destroyed && batch.valid && batch.dispose_status == null &&
+        batch.expire_date.Date >= businessDate && stock.pack_size is > 0 && stock.open_shelf_life_days is >= 0 &&
+        stock.open_storage_type != null;
+
     public async Task<StockPostResult> PostOpenAsync(OpenInput input, FnbAccess.Actor actor)
     {
         if (!FnbAccess.CanAccess(actor.Staff, input.ShopId, false)) throw new UnauthorizedAccessException();
@@ -41,9 +47,7 @@ public sealed class FnbStockPostingService(ApplicationDBContext db)
         var parentBatch = await db.fnbMaterialBatch.AsTracking().FirstOrDefaultAsync(x => x.id == input.ParentBatchId);
         DateTime now = DateTime.UtcNow;
         DateOnly openDate = DateOnly.FromDateTime(BusinessDate(now));
-        if (parent == null || parentBatch == null || parent.stock_form != "sealed" || parent.is_destroyed || !parentBatch.valid ||
-            parentBatch.dispose_status != null || parentBatch.expire_date.Date < BusinessDate(now) ||
-            parent.pack_size is null or <= 0 || parent.open_shelf_life_days is null or < 0 || parent.open_storage_type == null)
+        if (parent == null || parentBatch == null || !CanOpen(parent, parentBatch, BusinessDate(now)))
             throw new ArgumentException("未开封批次不可开封");
         decimal quantity = input.PackCount * parent.pack_size.Value;
         if (quantity > parent.quantity) throw new InvalidOperationException("未开封库存不足");
