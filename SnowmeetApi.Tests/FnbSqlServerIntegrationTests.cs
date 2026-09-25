@@ -141,6 +141,128 @@ public class FnbSqlServerIntegrationTests
         Assert.Equal(200m, (await db.fnbMaterialBatchStock.SingleAsync(x => x.batch_id == first.BatchId)).quantity);
     }
 
+    private static async Task<Product> RestaurantDishAsync(ApplicationDBContext db, int shopId, string name)
+    {
+        var category = new Category { biz_type = "餐饮", name = "测试餐饮" + Guid.NewGuid().ToString("N")[..8], valid = 1 };
+        db.category.Add(category);
+        await db.SaveChangesAsync();
+        var product = new Product { category_id = category.id, shop_id = shopId, name = name, sale_price = 0, valid = 1 };
+        db.product.Add(product);
+        await db.SaveChangesAsync();
+        return product;
+    }
+
+    private static KitchenOrderServeInput QuickOrder(Seed seed, int productId, decimal quantity, Guid? requestId = null) =>
+        new(seed.ShopId, requestId ?? Guid.NewGuid(), "A1", null, [new ManualKitchenLineInput(productId, 1, null)],
+            [new KitchenIngredientInput(seed.RawItemId, quantity)]);
+
+    [FnbSqlServerFact]
+    public async Task CreateAndServeDeductsTheIngredientsOnTheOrderWithoutPublishedRecipe()
+    {
+        await using var db = OpenTestDatabase();
+        var seed = await SeedAsync(db);
+        await new FnbReceiptService(db).PostAsync(Receipt(seed, 1000m, 0.01m), seed.Actor);
+        var dish = await RestaurantDishAsync(db, seed.ShopId, "榛果饮");
+        var service = new FnbServeService(db);
+        var input = QuickOrder(seed, dish.id, 300m);
+        var first = await service.CreateAndServeAsync(input, seed.Actor);
+        db.ChangeTracker.Clear();
+        var replay = await service.CreateAndServeAsync(input, seed.Actor);
+        Assert.True(replay.Replayed);
+        Assert.Equal(first.OrderId, replay.OrderId);
+        Assert.Equal(300m, Assert.Single(first.Needs).ActualQuantity);
+        Assert.Equal(700m, (await db.fnbMaterialBatchStock.AsNoTracking().SingleAsync(x => x.item_id == seed.RawItemId)).quantity);
+        Assert.Equal("verified", (await db.fnbOrder.AsNoTracking().SingleAsync(x => x.id == first.OrderId)).review_status);
+        var shown = Assert.Single(await service.ServedNeedsAsync(seed.ShopId, first.OrderId));
+        Assert.Equal((300m, 300m), (shown.PlannedQuantity, shown.ActualQuantity));
+        await Assert.ThrowsAsync<ArgumentException>(() => service.CreateAndServeAsync(input with { RequestId = Guid.NewGuid(),
+            Ingredients = [new KitchenIngredientInput(seed.RawItemId, 1m), new KitchenIngredientInput(seed.RawItemId, 2m)] }, seed.Actor));
+    }
+
+    [FnbSqlServerFact]
+    public async Task EditingServedOrderWithinTenMinutesReplacesDishesAndReDeductsIngredients()
+    {
+        await using var db = OpenTestDatabase();
+        var seed = await SeedAsync(db);
+        var received = await new FnbReceiptService(db).PostAsync(Receipt(seed, 1000m, 0.01m), seed.Actor);
+        var latte = await RestaurantDishAsync(db, seed.ShopId, "拿铁");
+        var mocha = await RestaurantDishAsync(db, seed.ShopId, "摩卡");
+        var service = new FnbServeService(db);
+        var created = await service.CreateAndServeAsync(QuickOrder(seed, latte.id, 300m), seed.Actor);
+        db.ChangeTracker.Clear();
+        var postedAt = (await db.fnbStockDocument.AsNoTracking().SingleAsync(x => x.id == created.DocumentId)).posted_at;
+
+        var edited = await service.UpdateAsync(new KitchenOrderUpdateInput(seed.ShopId, created.OrderId, "B2", "少糖",
+            [new ManualKitchenLineInput(mocha.id, 2, null)], [new KitchenIngredientInput(seed.RawItemId, 450m)]), seed.Actor);
+        db.ChangeTracker.Clear();
+        Assert.Equal(created.DocumentId, edited.DocumentId);
+        Assert.Equal(550m, (await db.fnbMaterialBatchStock.SingleAsync(x => x.batch_id == received.BatchId)).quantity);
+        var line = Assert.Single(await db.fnbOrderLine.Where(x => x.order_id == created.OrderId).ToListAsync());
+        Assert.Equal(("摩卡", 2m), (line.item_name, line.quantity));
+        var order = await db.fnbOrder.SingleAsync(x => x.id == created.OrderId);
+        Assert.Equal(("B2", "少糖"), (order.table_no, order.remark));
+        Assert.Equal(postedAt, (await db.fnbStockDocument.SingleAsync(x => x.id == created.DocumentId)).posted_at);
+        Assert.Equal(450m, Assert.Single(await service.ServedNeedsAsync(seed.ShopId, created.OrderId)).PlannedQuantity);
+        Assert.Single(await db.fnbStockMovement.Where(x => x.batch_id == received.BatchId && x.direction == -1).ToListAsync());
+
+        // 编辑后仍可在原时限内删除，配料全部退回
+        await service.DeleteAsync(seed.ShopId, created.OrderId, seed.Actor);
+        db.ChangeTracker.Clear();
+        Assert.Equal(1000m, (await db.fnbMaterialBatchStock.SingleAsync(x => x.batch_id == received.BatchId)).quantity);
+
+        var late = await service.CreateAndServeAsync(QuickOrder(seed, latte.id, 100m), seed.Actor);
+        await db.fnbStockDocument.Where(x => x.id == late.DocumentId)
+            .ExecuteUpdateAsync(s => s.SetProperty(x => x.posted_at, DateTime.UtcNow.AddMinutes(-11)));
+        db.ChangeTracker.Clear();
+        Assert.Contains("超过 10 分钟", (await Assert.ThrowsAsync<ArgumentException>(() => service.UpdateAsync(new KitchenOrderUpdateInput(
+            seed.ShopId, late.OrderId, null, null, [new ManualKitchenLineInput(latte.id, 1, null)], [new KitchenIngredientInput(seed.RawItemId, 50m)]), seed.Actor))).Message);
+    }
+
+    [FnbSqlServerFact]
+    public async Task DeletingServedOrderWithinTenMinutesReturnsIngredientsAndFixesLaterBalances()
+    {
+        await using var db = OpenTestDatabase();
+        var seed = await SeedAsync(db);
+        var received = await new FnbReceiptService(db).PostAsync(Receipt(seed, 1000m, 0.01m), seed.Actor);
+        var dish = await RestaurantDishAsync(db, seed.ShopId, "榛果饮");
+        var service = new FnbServeService(db);
+        var first = await service.CreateAndServeAsync(QuickOrder(seed, dish.id, 300m), seed.Actor);
+        var second = await service.CreateAndServeAsync(QuickOrder(seed, dish.id, 200m), seed.Actor);
+        db.ChangeTracker.Clear();
+        Assert.InRange((await service.ChangeSecondsLeftAsync(seed.ShopId, first.OrderId, seed.Actor.Staff))!.Value, 590, 600);
+
+        var cook = new Staff { name = "厨师" + seed.ShopId, gender = "男", title_level = 100, valid = 1, base_shop_id = seed.ShopId };
+        db.staff.Add(cook);
+        await db.SaveChangesAsync();
+        Assert.Contains("自己的厨房单", (await Assert.ThrowsAsync<ArgumentException>(() =>
+            service.DeleteAsync(seed.ShopId, first.OrderId, new FnbAccess.Actor(cook, "mini", "mini#" + cook.id)))).Message);
+        db.ChangeTracker.Clear();
+
+        await service.DeleteAsync(seed.ShopId, first.OrderId, seed.Actor);
+        db.ChangeTracker.Clear();
+        Assert.Equal(800m, (await db.fnbMaterialBatchStock.SingleAsync(x => x.batch_id == received.BatchId)).quantity);
+        Assert.False(await db.fnbOrder.AnyAsync(x => x.id == first.OrderId));
+        Assert.False(await db.fnbStockDocument.AnyAsync(x => x.id == first.DocumentId));
+        Assert.False(await db.fnbOrderLine.AnyAsync(x => x.order_id == first.OrderId));
+        var later = await db.fnbStockMovement.SingleAsync(x => x.batch_id == received.BatchId && x.direction == -1);
+        Assert.Equal(800m, later.balance_qty);
+
+        // 扣光的批次（用完）退回后恢复可用
+        var all = await service.CreateAndServeAsync(QuickOrder(seed, dish.id, 800m), seed.Actor);
+        db.ChangeTracker.Clear();
+        Assert.Equal("用完", (await db.fnbMaterialBatch.SingleAsync(x => x.id == received.BatchId)).dispose_status);
+        await service.DeleteAsync(seed.ShopId, all.OrderId, seed.Actor);
+        db.ChangeTracker.Clear();
+        Assert.Null((await db.fnbMaterialBatch.SingleAsync(x => x.id == received.BatchId)).dispose_status);
+        Assert.Equal(800m, (await db.fnbMaterialBatchStock.SingleAsync(x => x.batch_id == received.BatchId)).quantity);
+
+        // 超过 10 分钟不能删
+        await db.fnbStockDocument.Where(x => x.id == second.DocumentId)
+            .ExecuteUpdateAsync(s => s.SetProperty(x => x.posted_at, DateTime.UtcNow.AddMinutes(-11)));
+        db.ChangeTracker.Clear();
+        Assert.Contains("超过 10 分钟", (await Assert.ThrowsAsync<ArgumentException>(() => service.DeleteAsync(seed.ShopId, second.OrderId, seed.Actor))).Message);
+    }
+
     [FnbSqlServerFact]
     public async Task ReceiptCanBeDeletedWithinTenMinutesBeforeAnyOtherOperation()
     {

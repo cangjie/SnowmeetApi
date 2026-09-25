@@ -50,7 +50,11 @@ public sealed class FnbKitchenController(ApplicationDBContext db) : ControllerBa
         if (order == null) return Result(1, "厨房订单不存在");
         var lines = await db.fnbOrderLine.AsNoTracking().Where(x => x.order_id == orderId && x.shop_id == shopId).OrderBy(x => x.id).ToListAsync();
         bool served = await db.fnbStockDocument.AnyAsync(x => x.order_id == orderId && x.status == "posted");
-        return Result(0, "", new { order, lines, served });
+        var service = new FnbServeService(db);
+        IReadOnlyList<ServeNeed> servedNeeds = served ? await service.ServedNeedsAsync(shopId, orderId) : Array.Empty<ServeNeed>();
+        // 扣料 10 分钟内、本人或店长时给出剩余秒数，小程序据此显示「编辑」「删除并退回配料」
+        int? changeSecondsLeft = served ? await service.ChangeSecondsLeftAsync(shopId, orderId, (await _access.ResolveAsync(sessionKey))!) : null;
+        return Result(0, "", new { order, lines, served, servedNeeds, changeSecondsLeft });
     }
 
     public sealed record ReviewInput(int ShopId, long OrderId);
@@ -71,6 +75,57 @@ public sealed class FnbKitchenController(ApplicationDBContext db) : ControllerBa
         catch (InvalidOperationException ex) { return Result(4, ex.Message); }
         catch (DbUpdateConcurrencyException) { return Result(4, "订单已变化，请刷新后重试"); }
         catch (DbUpdateException) { return Result(4, "订单提交冲突，请用原请求号重试"); }
+    }
+
+    // 建厨房单并按单上确认的配料立即扣料（同一事务）；配料不依赖已发布配方
+    [HttpPost]
+    public async Task<ApiResult<object>> CreateAndServe([FromQuery] string sessionKey, [FromBody] KitchenOrderServeInput input)
+    {
+        var actor = await _access.ResolveActorAsync(sessionKey);
+        if (actor == null) return Result(2, "会话失效");
+        if (!FnbAccess.CanAccess(actor.Staff, input.ShopId, false)) return Result(3, "无门店权限");
+        try
+        {
+            var result = await new FnbServeService(db).CreateAndServeAsync(input, actor);
+            return Result(0, "", new { orderId = result.OrderId.ToString(), result.DisplayNo, documentId = result.DocumentId.ToString(),
+                result.Replayed, result.Needs });
+        }
+        catch (ArgumentException ex) { return Result(1, ex.Message); }
+        catch (UnauthorizedAccessException) { return Result(3, "无门店权限"); }
+        catch (InvalidOperationException ex) { return Result(4, ex.Message); }
+        catch (DbUpdateConcurrencyException) { return Result(4, "库存已变化，请刷新后重试"); }
+    }
+
+    // 扣料 10 分钟内，本人或店长可编辑手动厨房单：退回原配料，换菜品、配料、桌号、备注后重新扣料
+    [HttpPost]
+    public async Task<ApiResult<object>> UpdateServedOrder([FromQuery] string sessionKey, [FromBody] KitchenOrderUpdateInput input)
+    {
+        var actor = await _access.ResolveActorAsync(sessionKey);
+        if (actor == null) return Result(2, "会话失效");
+        if (!FnbAccess.CanAccess(actor.Staff, input.ShopId, false)) return Result(3, "无门店权限");
+        try
+        {
+            var result = await new FnbServeService(db).UpdateAsync(input, actor);
+            return Result(0, "", new { orderId = result.OrderId.ToString(), result.DisplayNo, documentId = result.DocumentId.ToString(), result.Needs });
+        }
+        catch (ArgumentException ex) { return Result(1, ex.Message); }
+        catch (DbUpdateConcurrencyException) { return Result(4, "库存已变化，请刷新后重试"); }
+    }
+
+    // 扣料 10 分钟内，本人或店长可删除手动厨房单，扣掉的配料退回原批次
+    [HttpPost]
+    public async Task<ApiResult<object>> DeleteServedOrder([FromQuery] string sessionKey, [FromBody] ReviewInput input)
+    {
+        var actor = await _access.ResolveActorAsync(sessionKey);
+        if (actor == null) return Result(2, "会话失效");
+        if (!FnbAccess.CanAccess(actor.Staff, input.ShopId, false)) return Result(3, "无门店权限");
+        try
+        {
+            await new FnbServeService(db).DeleteAsync(input.ShopId, input.OrderId, actor);
+            return Result(0, "", new { orderId = input.OrderId.ToString() });
+        }
+        catch (ArgumentException ex) { return Result(1, ex.Message); }
+        catch (DbUpdateConcurrencyException) { return Result(4, "库存已变化，请刷新后重试"); }
     }
 
     [HttpPost]
