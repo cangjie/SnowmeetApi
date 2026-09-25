@@ -186,6 +186,13 @@ public class FnbSqlServerIntegrationTests
         var shown = Assert.Single(await service.ServedNeedsAsync(seed.ShopId, first.OrderId));
         Assert.Equal((300m, 300m), (shown.PlannedQuantity, shown.ActualQuantity));
 
+        // 单上微调用量：配方 2 份 300 g，这单只用 250 g
+        db.ChangeTracker.Clear();
+        var tuned = await service.CreateAndServeAsync(input with { RequestId = Guid.NewGuid(),
+            Ingredients = [new KitchenIngredientInput(seed.RawItemId, 250m)] }, seed.Actor);
+        Assert.Equal(250m, Assert.Single(tuned.Needs).PlannedQuantity);
+        Assert.Equal(450m, (await db.fnbMaterialBatchStock.AsNoTracking().SingleAsync(x => x.item_id == seed.RawItemId)).quantity);
+
         // 没有已发布配方：整单回滚，不留下厨房单
         var noRecipe = await RestaurantDishAsync(db, seed, "无配方菜", null);
         int orders = await db.fnbOrder.CountAsync(x => x.shop_id == seed.ShopId);

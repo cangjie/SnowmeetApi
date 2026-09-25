@@ -13,13 +13,15 @@ namespace SnowmeetApi.Services.Fnb;
 public sealed record ServeNeed(int ItemId, string ItemName, decimal PlannedQuantity, decimal ActualQuantity, decimal ShortageQuantity);
 public sealed record ServeResult(long DocumentId, bool Replayed, IReadOnlyList<ServeNeed> Needs);
 
-// 建单即扣料：一张厨房单一道菜（将来由外部订单自动导入），按该菜已发布配方 × 份数扣料
+// 建单即扣料：一张厨房单一道菜（将来由外部订单自动导入），按该菜已发布配方 × 份数扣料；
+// Ingredients 为单上微调的用量（基本单位），只能是配方里的食材，0 表示这单不扣这一项，没传的按配方
+public sealed record KitchenIngredientInput(int ItemId, decimal Quantity);
 public sealed record KitchenOrderServeInput(int ShopId, Guid RequestId, string? TableNo, string? Remark,
-    IReadOnlyList<ManualKitchenLineInput> Lines);
+    IReadOnlyList<ManualKitchenLineInput> Lines, IReadOnlyList<KitchenIngredientInput>? Ingredients = null);
 public sealed record KitchenOrderServeResult(long OrderId, string DisplayNo, long DocumentId, bool Replayed, IReadOnlyList<ServeNeed> Needs);
-// 扣料 10 分钟内编辑：换菜、份数、桌号、备注
+// 扣料 10 分钟内编辑：换菜、份数、微调用量、桌号、备注
 public sealed record KitchenOrderUpdateInput(int ShopId, long OrderId, string? TableNo, string? Remark,
-    IReadOnlyList<ManualKitchenLineInput> Lines);
+    IReadOnlyList<ManualKitchenLineInput> Lines, IReadOnlyList<KitchenIngredientInput>? Ingredients = null);
 
 public sealed class FnbServeService(ApplicationDBContext db)
 {
@@ -92,8 +94,26 @@ public sealed class FnbServeService(ApplicationDBContext db)
     public async Task<ServeResult> PostAsync(int shopId, long orderId, Guid requestId, FnbAccess.Actor actor)
     {
         await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable);
-        var result = await PostCoreAsync(shopId, orderId, requestId, actor);
+        var result = await PostCoreAsync(shopId, orderId, requestId, actor, null);
         await tx.CommitAsync();
+        return result;
+    }
+
+    /// <summary>配方 × 份数的用量按单上微调覆盖：只能改配方里的食材，0 表示不扣这一项，至少扣一种。</summary>
+    public static Dictionary<int, decimal> Adjust(Dictionary<int, decimal> recipeNeeds, IReadOnlyList<KitchenIngredientInput>? adjustments)
+    {
+        if (adjustments == null || adjustments.Count == 0) return recipeNeeds;
+        if (adjustments.Select(x => x.ItemId).Distinct().Count() != adjustments.Count ||
+            adjustments.Any(x => x.Quantity < 0 || x.Quantity >= 1_000_000_000_000m || x.Quantity != decimal.Round(x.Quantity, 6)))
+            throw new ArgumentException("配料用量无效");
+        var result = new Dictionary<int, decimal>(recipeNeeds);
+        foreach (var a in adjustments)
+        {
+            if (!result.ContainsKey(a.ItemId)) throw new ArgumentException("只能微调配方里的配料用量");
+            if (a.Quantity == 0) result.Remove(a.ItemId);
+            else result[a.ItemId] = a.Quantity;
+        }
+        if (result.Count == 0) throw new ArgumentException("至少要扣一种配料");
         return result;
     }
 
@@ -118,12 +138,13 @@ public sealed class FnbServeService(ApplicationDBContext db)
         var created = await new FnbManualOrderService(db).CreateCoreAsync(new ManualKitchenOrderInput(input.ShopId, input.RequestId,
             null, input.TableNo, input.Remark, input.Lines), actor, verified: false);
         await RequireRecipeAsync(created.OrderId, created.ReviewStatus);
-        var served = await PostCoreAsync(input.ShopId, created.OrderId, input.RequestId, actor);
+        var served = await PostCoreAsync(input.ShopId, created.OrderId, input.RequestId, actor, input.Ingredients);
         await tx.CommitAsync();
         return new KitchenOrderServeResult(created.OrderId, created.DisplayNo, served.DocumentId, created.Replayed, served.Needs);
     }
 
-    private async Task<ServeResult> PostCoreAsync(int shopId, long orderId, Guid requestId, FnbAccess.Actor actor)
+    private async Task<ServeResult> PostCoreAsync(int shopId, long orderId, Guid requestId, FnbAccess.Actor actor,
+        IReadOnlyList<KitchenIngredientInput>? adjustments)
     {
         if (!FnbAccess.CanAccess(actor.Staff, shopId, false)) throw new UnauthorizedAccessException();
         if (requestId == Guid.Empty) throw new ArgumentException("请求号必填");
@@ -137,7 +158,8 @@ public sealed class FnbServeService(ApplicationDBContext db)
         }
         if (await db.fnbStockDocument.AnyAsync(x => x.order_id == orderId && x.status == "posted"))
             throw new InvalidOperationException("订单已出餐，不可重复扣料");
-        var (_, _, needs) = await DemandAsync(shopId, orderId);
+        var (_, _, recipeNeeds) = await DemandAsync(shopId, orderId);
+        var needs = Adjust(recipeNeeds, adjustments);
         DateTime now = DateTime.UtcNow;
         DateTime businessDate = TimeZoneInfo.ConvertTimeFromUtc(now, TimeZoneInfo.FindSystemTimeZoneById("Asia/Shanghai")).Date;
         var document = new FnbStockDocument
@@ -260,7 +282,7 @@ public sealed class FnbServeService(ApplicationDBContext db)
         await tx.CommitAsync();
     }
 
-    /// <summary>扣料 10 分钟内，本人或店长可编辑手动厨房单：先退回原配料，再换菜品、份数、桌号、备注，按新菜品配方重新扣料。
+    /// <summary>扣料 10 分钟内，本人或店长可编辑手动厨房单：先退回原配料，再换菜品、份数、桌号、备注，按新菜品配方（及单上微调）重新扣料。
     /// 沿用原扣料单据，可编辑时限仍从第一次扣料算起。</summary>
     public async Task<KitchenOrderServeResult> UpdateAsync(KitchenOrderUpdateInput input, FnbAccess.Actor actor)
     {
@@ -280,8 +302,8 @@ public sealed class FnbServeService(ApplicationDBContext db)
         rows.Order.remark = input.Remark;
         rows.Order.updated_at = now;
         await db.SaveChangesAsync();
-        var (_, _, needs) = await DemandAsync(input.ShopId, input.OrderId);
-        var served = await DeductAsync(rows.Document, needs, actor, now);
+        var (_, _, recipeNeeds) = await DemandAsync(input.ShopId, input.OrderId);
+        var served = await DeductAsync(rows.Document, Adjust(recipeNeeds, input.Ingredients), actor, now);
         await tx.CommitAsync();
         return new KitchenOrderServeResult(rows.Order.id, rows.Order.display_no, rows.Document.id, false, served);
     }
