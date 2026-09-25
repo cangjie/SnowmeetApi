@@ -374,6 +374,27 @@ public class FnbSqlServerIntegrationTests
     }
 
     [FnbSqlServerFact]
+    public async Task SaveDishWithNameOnlyUsesZeroPriceAndDefaultCategoryAndKeepsThemOnRename()
+    {
+        await using var db = OpenTestDatabase();
+        var seed = await SeedAsync(db);
+        string key = Guid.NewGuid().ToString("N")[..8];
+        var service = new FnbDishService(db);
+        var saved = await service.SaveAsync(new DishInput(seed.ShopId, 0, "榛果饮" + key, null, null, null, true));
+        Assert.Equal(0m, saved.SalePrice);
+        Assert.Equal(FnbDishService.DefaultCategoryName, saved.CategoryName);
+        Assert.NotNull(saved.SpecId);
+        var second = await service.SaveAsync(new DishInput(seed.ShopId, 0, "香草拿铁" + key, null, null, null, true));
+        Assert.Equal(saved.CategoryId, second.CategoryId);
+
+        // 已有菜品只改名：售价和分类保持原值
+        var priced = await service.SaveAsync(new DishInput(seed.ShopId, 0, "酸菜锅" + key, 68m, null, "热菜" + key, true));
+        var renamed = await service.SaveAsync(new DishInput(seed.ShopId, priced.ProductId, "酸菜白肉锅" + key, null, null, null, true));
+        Assert.Equal((68m, priced.CategoryId), (renamed.SalePrice, renamed.CategoryId));
+        Assert.Equal("酸菜白肉锅" + key, (await db.product.AsNoTracking().SingleAsync(x => x.id == priced.ProductId)).name);
+    }
+
+    [FnbSqlServerFact]
     public async Task SaveDishRejectsNonRestaurantCategoryAndOtherShopDish()
     {
         await using var db = OpenTestDatabase();
@@ -385,7 +406,6 @@ public class FnbSqlServerIntegrationTests
         await db.SaveChangesAsync();
         var service = new FnbDishService(db);
         await Assert.ThrowsAsync<ArgumentException>(() => service.SaveAsync(new DishInput(seed.ShopId, 0, "菜" + key, 1m, retail.id, null, true)));
-        await Assert.ThrowsAsync<ArgumentException>(() => service.SaveAsync(new DishInput(seed.ShopId, 0, "菜" + key, 1m, null, null, true)));
         var foreign = await service.SaveAsync(new DishInput(other.ShopId, 0, "别店菜" + key, 1m, null, "热菜" + key, true));
         await Assert.ThrowsAsync<ArgumentException>(() => service.SaveAsync(new DishInput(seed.ShopId, foreign.ProductId, "改名" + key, 1m, foreign.CategoryId, null, true)));
     }

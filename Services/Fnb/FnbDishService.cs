@@ -10,7 +10,8 @@ using SnowmeetApi.Models.Fnb;
 
 namespace SnowmeetApi.Services.Fnb;
 
-public sealed record DishInput(int ShopId, int Id, string Name, decimal SalePrice, int? CategoryId,
+// 售价、分类都可不传（2026-09-25 起小程序只填名称和用料）：新建时售价 0、归入「未分类」；修改时不传则保持原值
+public sealed record DishInput(int ShopId, int Id, string Name, decimal? SalePrice, int? CategoryId,
     string? CategoryName, bool Valid);
 public sealed record DishRow(int ProductId, string Name, decimal SalePrice, int CategoryId, string CategoryName,
     int? SpecId, string? SpecName,
@@ -23,6 +24,8 @@ public sealed record DishList(IReadOnlyList<DishRow> Dishes, IReadOnlyList<DishC
 public sealed class FnbDishService(ApplicationDBContext db)
 {
     private const string BizType = "餐饮";
+    // 菜品挂在 product 上，product 须属于一个餐饮分类；不选分类的菜品统一放这里
+    public const string DefaultCategoryName = "未分类";
 
     public async Task<DishList> ListAsync(int shopId)
     {
@@ -56,25 +59,29 @@ public sealed class FnbDishService(ApplicationDBContext db)
     {
         string name = input.Name?.Trim() ?? "";
         if (input.ShopId <= 0 || name.Length == 0 || !FnbText.FitsChineseVarchar(name, 200) || input.SalePrice < 0 ||
-            input.SalePrice != decimal.Round(input.SalePrice, 2))
+            input.SalePrice != null && input.SalePrice != decimal.Round(input.SalePrice.Value, 2))
             throw new ArgumentException("菜品名称或售价无效");
-        var category = await ResolveCategoryAsync(input.CategoryId, input.CategoryName);
-        Product? product;
-        if (input.Id == 0)
+        Product? product = null;
+        if (input.Id != 0)
+        {
+            product = await db.product.AsTracking().FirstOrDefaultAsync(x => x.id == input.Id && x.shop_id == input.ShopId);
+            if (product == null || !await db.category.AnyAsync(x => x.id == product.category_id && x.biz_type == BizType))
+                throw new ArgumentException("菜品不存在或不属于本店");
+        }
+        // 先定分类（可能要新建分类并保存），再新建商品，避免把未填完的商品一并写库
+        bool pickCategory = input.CategoryId != null || !string.IsNullOrWhiteSpace(input.CategoryName);
+        var category = pickCategory ? await ResolveCategoryAsync(input.CategoryId, input.CategoryName)
+            : product == null ? await ResolveCategoryAsync(null, DefaultCategoryName)
+            : await db.category.AsNoTracking().FirstAsync(x => x.id == product.category_id);
+        if (product == null)
         {
             product = new Product { shop_id = input.ShopId, type = BizType, valid = 1, hidden = 0, on_shelves = 1,
                 create_date = DateTime.Now };
             db.product.Add(product);
         }
-        else
-        {
-            product = await db.product.AsTracking().FirstOrDefaultAsync(x => x.id == input.Id && x.shop_id == input.ShopId);
-            if (product == null || !await db.category.AnyAsync(x => x.id == product.category_id && x.biz_type == BizType))
-                throw new ArgumentException("菜品不存在或不属于本店");
-            product.update_date = DateTime.Now;
-        }
+        else product.update_date = DateTime.Now;
         product.name = name;
-        product.sale_price = (double)input.SalePrice;
+        if (input.SalePrice != null || input.Id == 0) product.sale_price = (double)(input.SalePrice ?? 0m);
         product.category_id = category.id;
         product.valid = input.Valid ? 1 : 0;
         await db.SaveChangesAsync();
@@ -88,7 +95,7 @@ public sealed class FnbDishService(ApplicationDBContext db)
             db.fnbDishSpec.Add(spec);
             await db.SaveChangesAsync();
         }
-        return new DishRow(product.id, product.name, input.SalePrice, category.id, category.name, spec?.id, spec?.name,
+        return new DishRow(product.id, product.name, (decimal)product.sale_price, category.id, category.name, spec?.id, spec?.name,
             null, null, null);
     }
 
