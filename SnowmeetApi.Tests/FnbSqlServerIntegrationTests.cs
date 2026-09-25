@@ -142,6 +142,56 @@ public class FnbSqlServerIntegrationTests
     }
 
     [FnbSqlServerFact]
+    public async Task ReceiptCanBeDeletedWithinTenMinutesBeforeAnyOtherOperation()
+    {
+        await using var db = OpenTestDatabase();
+        var seed = await SeedAsync(db);
+        var service = new FnbReceiptService(db);
+        var received = await service.PostAsync(Receipt(seed, 100m, 0.01m), seed.Actor);
+        int? left = await service.DeleteSecondsLeftAsync(seed.ShopId, received.BatchId, seed.Actor.Staff);
+        Assert.InRange(left!.Value, 590, 600);
+
+        // 同店其他普通员工不能删别人的入库
+        var cook = new Staff { name = "厨师" + seed.ShopId, gender = "男", title_level = 100, valid = 1, base_shop_id = seed.ShopId };
+        db.staff.Add(cook);
+        await db.SaveChangesAsync();
+        var other = await Assert.ThrowsAsync<ArgumentException>(() =>
+            service.DeleteAsync(seed.ShopId, received.BatchId, new FnbAccess.Actor(cook, "mini", "mini#" + cook.id)));
+        Assert.Contains("自己的入库", other.Message);
+
+        db.ChangeTracker.Clear();
+        await service.DeleteAsync(seed.ShopId, received.BatchId, seed.Actor);
+        Assert.False(await db.fnbMaterialBatch.AnyAsync(x => x.id == received.BatchId));
+        Assert.False(await db.fnbMaterialBatchStock.AnyAsync(x => x.batch_id == received.BatchId));
+        Assert.False(await db.fnbStockMovement.AnyAsync(x => x.batch_id == received.BatchId));
+        Assert.False(await db.fnbStockDocument.AnyAsync(x => x.id == received.DocumentId));
+        Assert.False(await db.fnbStockDocumentLine.AnyAsync(x => x.document_id == received.DocumentId));
+        Assert.True(await db.fnbMaterialItem.AnyAsync(x => x.id == seed.RawItemId), "食材档案保留");
+    }
+
+    [FnbSqlServerFact]
+    public async Task ReceiptCannotBeDeletedAfterTenMinutesOrAfterOpening()
+    {
+        await using var db = OpenTestDatabase();
+        var seed = await SeedAsync(db);
+        var service = new FnbReceiptService(db);
+        var old = await service.PostAsync(Receipt(seed, 100m, 0.01m), seed.Actor);
+        await db.fnbStockDocument.Where(x => x.id == old.DocumentId)
+            .ExecuteUpdateAsync(s => s.SetProperty(x => x.posted_at, DateTime.UtcNow.AddMinutes(-11)));
+        db.ChangeTracker.Clear();  // 批量更新绕过跟踪器；清掉入库时跟踪的旧单据，才能读到新的入库时间
+        Assert.Null(await service.DeleteSecondsLeftAsync(seed.ShopId, old.BatchId, seed.Actor.Staff));
+        Assert.Contains("超过 10 分钟", (await Assert.ThrowsAsync<ArgumentException>(() => service.DeleteAsync(seed.ShopId, old.BatchId, seed.Actor))).Message);
+
+        db.ChangeTracker.Clear();
+        var sealedBatch = await service.PostAsync(Receipt(seed, 2m, 10m, "sealed", 500m, "袋", "ambient", 2), seed.Actor);
+        await new FnbStockPostingService(db).PostOpenAsync(new OpenInput(seed.ShopId, Guid.NewGuid(), sealedBatch.BatchId, 1, null), seed.Actor);
+        db.ChangeTracker.Clear();
+        Assert.Null(await service.DeleteSecondsLeftAsync(seed.ShopId, sealedBatch.BatchId, seed.Actor.Staff));
+        Assert.Contains("后续操作", (await Assert.ThrowsAsync<ArgumentException>(() => service.DeleteAsync(seed.ShopId, sealedBatch.BatchId, seed.Actor))).Message);
+        Assert.True(await db.fnbMaterialBatchStock.AnyAsync(x => x.batch_id == sealedBatch.BatchId));
+    }
+
+    [FnbSqlServerFact]
     public async Task ReceiptWithoutPhotosStoresNoImageIds()
     {
         await using var db = OpenTestDatabase();

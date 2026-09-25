@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using SnowmeetApi.Data;
+using SnowmeetApi.Models;
 using SnowmeetApi.Models.Fnb;
 
 namespace SnowmeetApi.Services.Fnb;
@@ -105,5 +106,63 @@ public sealed class FnbReceiptService(ApplicationDBContext db)
         await db.SaveChangesAsync();
         await tx.CommitAsync();
         return new ReceiptResult(document.id, batch.id, plan.BaseQuantity, plan.Amount, false);
+    }
+
+    /// <summary>入库后可删除的时限：给误触、录错留的撤回窗口。</summary>
+    public static readonly TimeSpan DeleteWindow = TimeSpan.FromMinutes(10);
+
+    private sealed record ReceiptRows(FnbMaterialBatch Batch, FnbMaterialBatchStock Stock, FnbStockDocument Document,
+        FnbStockDocumentLine Line, FnbStockMovement Movement);
+
+    /// <summary>入库 10 分钟内、批次还没有开封、使用、报损、盘点等任何后续操作时，本人或店长可删除。
+    /// 删除是物理删除本次入库写入的批次、库存、单据和流水，就像没入过库；自动建档的食材保留。</summary>
+    public async Task DeleteAsync(int shopId, int batchId, FnbAccess.Actor actor)
+    {
+        await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+        var (rows, error) = await LoadDeletableAsync(shopId, batchId, actor.Staff, DateTime.UtcNow);
+        if (rows == null) throw new ArgumentException(error);
+        db.fnbStockMovement.Remove(rows.Movement);
+        await db.SaveChangesAsync();
+        db.fnbStockDocumentLine.Remove(rows.Line);
+        await db.SaveChangesAsync();
+        db.fnbStockDocument.Remove(rows.Document);
+        db.fnbMaterialBatchStock.Remove(rows.Stock);
+        await db.SaveChangesAsync();
+        db.fnbMaterialBatch.Remove(rows.Batch);
+        await db.SaveChangesAsync();
+        await tx.CommitAsync();
+    }
+
+    /// <summary>还能删除的秒数；不能删除（超时、已有后续操作、无权）时为 null。</summary>
+    public async Task<int?> DeleteSecondsLeftAsync(int shopId, int batchId, Staff staff)
+    {
+        DateTime now = DateTime.UtcNow;
+        var (rows, _) = await LoadDeletableAsync(shopId, batchId, staff, now);
+        return rows == null ? null : (int)(rows.Document.posted_at!.Value + DeleteWindow - now).TotalSeconds;
+    }
+
+    private async Task<(ReceiptRows? Rows, string? Error)> LoadDeletableAsync(int shopId, int batchId, Staff staff, DateTime now)
+    {
+        const string used = "该批次已有开封、使用等后续操作，不能删除";
+        var stock = await db.fnbMaterialBatchStock.AsTracking().FirstOrDefaultAsync(x => x.batch_id == batchId && x.shop_id == shopId);
+        if (stock == null) return (null, "批次不存在");
+        var line = await db.fnbStockDocumentLine.AsTracking().FirstOrDefaultAsync(x => x.specified_batch_id == batchId && x.shop_id == shopId
+            && x.direction == 1 && db.fnbStockDocument.Any(d => d.id == x.document_id && d.document_type == "receipt"));
+        if (line == null) return (null, "只能删除入库的批次");
+        var document = await db.fnbStockDocument.AsTracking().FirstAsync(x => x.id == line.document_id);
+        if (document.status != "posted" || document.posted_at == null || now - document.posted_at.Value > DeleteWindow)
+            return (null, "入库已超过 10 分钟，不能删除");
+        if (document.posted_by_staff_id != staff.id && staff.title_level < 200) return (null, "只能删除自己的入库，或请店长删除");
+        var movements = await db.fnbStockMovement.AsTracking().Where(x => x.batch_id == batchId).ToListAsync();
+        if (movements.Count != 1 || movements[0].document_line_id != line.id || stock.is_destroyed || stock.quantity != line.actual_qty)
+            return (null, used);
+        if (await db.fnbStockDocumentLine.CountAsync(x => x.document_id == document.id) != 1
+            || await db.fnbStockDocumentLine.AnyAsync(x => x.specified_batch_id == batchId && x.id != line.id)
+            || await db.fnbMaterialBatchStock.AnyAsync(x => x.parent_batch_id == batchId)
+            || await db.fnbStocktakeLine.AnyAsync(x => x.snapshot_last_movement_id == movements[0].id))
+            return (null, used);
+        var batch = await db.fnbMaterialBatch.AsTracking().FirstAsync(x => x.id == batchId);
+        if (!batch.valid || batch.dispose_status != null) return (null, used);
+        return (new ReceiptRows(batch, stock, document, line, movements[0]), null);
     }
 }

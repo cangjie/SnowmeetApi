@@ -56,6 +56,24 @@ public sealed class FnbInventoryController(ApplicationDBContext db) : Controller
         catch (DbUpdateConcurrencyException) { return Result(4, "库存已变化，请刷新后重试"); }
     }
 
+    public sealed record DeleteReceiptInput(int ShopId, int BatchId);
+
+    // 入库 10 分钟内、还没有开封使用等后续操作时，本人或店长可删除这次入库（误触、录错）
+    [HttpPost]
+    public async Task<ApiResult<object>> DeleteReceipt([FromQuery] string sessionKey, [FromBody] DeleteReceiptInput input)
+    {
+        var actor = await _access.ResolveActorAsync(sessionKey);
+        if (actor == null) return Result(2, "会话失效");
+        if (!FnbAccess.CanAccess(actor.Staff, input.ShopId, false)) return Result(3, "无门店权限");
+        try
+        {
+            await new FnbReceiptService(db).DeleteAsync(input.ShopId, input.BatchId, actor);
+            return Result(0, "", new { input.BatchId });
+        }
+        catch (ArgumentException ex) { return Result(1, ex.Message); }
+        catch (DbUpdateConcurrencyException) { return Result(4, "库存已变化，请刷新后重试"); }
+    }
+
     [HttpPost]
     public async Task<ApiResult<object>> PostOpen([FromQuery] string sessionKey, [FromBody] OpenInput input)
     {
@@ -136,8 +154,11 @@ public sealed class FnbInventoryController(ApplicationDBContext db) : Controller
         var stock = await db.fnbMaterialBatchStock.AsNoTracking().FirstOrDefaultAsync(x => x.batch_id == batchId && x.shop_id == shopId);
         if (stock == null) return Result(1, "批次不存在");
         var batch = await db.fnbMaterialBatch.AsNoTracking().FirstAsync(x => x.id == batchId);
-        bool canSeeCost = (await _access.ResolveAsync(sessionKey))!.title_level >= 200;
-        return Result(0, "", new { batch, stock = new { stock.batch_id, stock.shop_id, stock.item_id,
+        var staff = (await _access.ResolveAsync(sessionKey))!;
+        bool canSeeCost = staff.title_level >= 200;
+        // 入库 10 分钟内且还没有后续操作时给出剩余秒数，小程序据此显示「删除入库」
+        int? deleteSecondsLeft = await new FnbReceiptService(db).DeleteSecondsLeftAsync(shopId, batchId, staff);
+        return Result(0, "", new { batch, deleteSecondsLeft, stock = new { stock.batch_id, stock.shop_id, stock.item_id,
             stock.stock_form, stock.storage_type, stock.storage_location, stock.quantity,
             stock_amount = canSeeCost ? (decimal?)stock.stock_amount : null, stock.pack_size, stock.pack_unit_name,
             stock.sealed_pack_count, stock.parent_batch_id, stock.opened_date, stock.original_expire_date,
