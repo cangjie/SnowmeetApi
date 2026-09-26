@@ -62,6 +62,8 @@ internal static class FnbSchemaConfiguration
             e.Property(x => x.base_unit_code).HasColumnType("varchar(32)");
             e.Property(x => x.default_input_unit_code).HasColumnType("varchar(32)");
             e.Property(x => x.default_open_storage).HasColumnType("varchar(20)");
+            e.Property(x => x.low_stock_ratio).HasPrecision(5, 4);
+            e.Property(x => x.low_stock_qty).HasPrecision(18, 6);
             e.Property(x => x.remark).HasColumnType("varchar(1000)");
             e.Property(x => x.valid).HasDefaultValue(true);
             e.Property(x => x.created_at).HasDefaultValueSql("SYSUTCDATETIME()");

@@ -74,7 +74,7 @@ def bootstrap() -> None:
             )
 
         for script in ("2026-09-22_fnb_inventory_other_tables.sql", "2026-09-24_fnb_item_expiry_settings.sql",
-                       "2026-09-25_fnb_category_prepared.sql"):
+                       "2026-09-25_fnb_category_prepared.sql", "2026-09-26_fnb_item_low_stock.sql"):
             cursor.execute((ROOT / "snowmeet_ai_doc/sql" / script).read_text(encoding="utf-8"))
             while cursor.nextset():
                 pass

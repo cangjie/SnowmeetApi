@@ -189,5 +189,22 @@ public sealed class FnbCatalogController(ApplicationDBContext db) : ControllerBa
         return Result(0, "", row);
     }
 
+    // 用量预警设置（2026-09-26）：Ratio 为比例（0.2 = 20%），Quantity 为数量（基本单位），只能填一个；都不填 = 恢复默认 10%
+    public sealed record LowStockInput(int ShopId, int ItemId, decimal? Ratio, decimal? Quantity);
+
+    [HttpPost]
+    public async Task<ApiResult<object>> SaveLowStockAlert([FromQuery] string sessionKey, [FromBody] LowStockInput input)
+    {
+        int p = await Permission(sessionKey, input.ShopId, true);
+        if (p != 0) return Result(p, p == 2 ? "会话失效" : "需要门店管理权限");
+        string? invalid = FnbLowStockRules.Validate(input.Ratio, input.Quantity);
+        if (invalid != null) return Result(1, invalid);
+        var row = await db.fnbMaterialItem.AsTracking().FirstOrDefaultAsync(x => x.id == input.ItemId && x.valid);
+        if (row == null) return Result(1, "食材不存在");
+        row.low_stock_ratio = input.Ratio; row.low_stock_qty = input.Quantity; row.updated_at = DateTime.UtcNow;
+        await db.SaveChangesAsync();
+        return Result(0, "", new { row.id, row.low_stock_ratio, row.low_stock_qty });
+    }
+
     private static bool Storage(string? value) => value is "ambient" or "chilled" or "frozen";
 }

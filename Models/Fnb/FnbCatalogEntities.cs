@@ -56,6 +56,8 @@ public sealed class FnbMaterialItem
     public int warn_days { get; set; } = 1;              // 临期提前提醒天数，入库时复制到批次
     public string? default_open_storage { get; set; }    // 封装品开封后默认储存
     public int? default_open_days { get; set; }          // 封装品开封后默认天数；空=入库时再填
+    public decimal? low_stock_ratio { get; set; }        // 用量预警比例（× 最近一次入库或制作的数量）；两列都空 = 默认 10%
+    public decimal? low_stock_qty { get; set; }          // 用量预警数量（基本单位）；填了就不按比例
     public int? image_id { get; set; }
     public string? remark { get; set; }
     public bool valid { get; set; }

@@ -405,6 +405,46 @@ public class FnbSqlServerIntegrationTests
     }
 
     [FnbSqlServerFact]
+    public async Task LowStockAlertsAtTenPercentOfTheLastInboundBatchCountingSealedAndOpened()
+    {
+        await using var db = OpenTestDatabase();
+        var seed = await SeedAsync(db, withPrepared: true);
+        var service = new FnbLowStockService(db);
+        async Task<LowStockRow> Row() => (await service.ListAsync(seed.ShopId)).Single(r => r.ItemId == seed.RawItemId);
+        var received = await new FnbReceiptService(db).PostAsync(Receipt(seed, 2m, 10m, "sealed", 500m, "袋", "ambient", 2), seed.Actor);
+        var row = await Row();
+        Assert.Equal((1000m, (decimal?)1000m, (decimal?)100m, false), (row.AvailableQuantity, row.LastBatchQuantity, row.Threshold, row.Low));
+        Assert.DoesNotContain(await service.ListAsync(seed.ShopId), r => r.ItemId == seed.PreparedItemId);
+
+        // 开封不算入库；未开封 + 已开封一起算，报损掉的不算
+        var posting = new FnbStockPostingService(db);
+        var opened = await posting.PostOpenAsync(new OpenInput(seed.ShopId, Guid.NewGuid(), received.BatchId, 1, null), seed.Actor);
+        await posting.PostWasteAsync(new WasteInput(seed.ShopId, Guid.NewGuid(), opened.BatchId, 450m, "damage", "破损"), seed.Actor);
+        row = await Row();
+        Assert.Equal((550m, (decimal?)1000m, false), (row.AvailableQuantity, row.LastBatchQuantity, row.Low));
+        await posting.PostWasteAsync(new WasteInput(seed.ShopId, Guid.NewGuid(), received.BatchId, 500m, "damage", "破损"), seed.Actor);
+        row = await Row();
+        Assert.Equal((50m, true), (row.AvailableQuantity, row.Low));
+        Assert.Equal(seed.RawItemId, (await service.ListAsync(seed.ShopId)).First().ItemId);
+
+        // 可改比例或数量；再入库后按最近一次入库量算
+        var item = await db.fnbMaterialItem.AsTracking().SingleAsync(x => x.id == seed.RawItemId);
+        item.low_stock_qty = 40m;
+        await db.SaveChangesAsync();
+        row = await Row();
+        Assert.Equal(((decimal?)40m, false), (row.Threshold, row.Low));
+        item.low_stock_qty = null; item.low_stock_ratio = 0.5m;
+        await db.SaveChangesAsync();
+        await new FnbReceiptService(db).PostAsync(Receipt(seed, 200m, 1m), seed.Actor);
+        row = await Row();
+        Assert.Equal((250m, (decimal?)200m, (decimal?)100m, false), (row.AvailableQuantity, row.LastBatchQuantity, row.Threshold, row.Low));
+
+        // 比例和数量不能同时有值（库里 CHECK 约束兜底）
+        item.low_stock_qty = 5m;
+        await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync());
+    }
+
+    [FnbSqlServerFact]
     public async Task OpeningWithKeepExpiryDaysKeepsSealedExpiryDate()
     {
         // 小程序「开封后保质期不变」记为 36500 天：开封到期取 min(原到期, 开封日 + 天数)，即原到期日

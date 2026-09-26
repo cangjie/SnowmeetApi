@@ -203,6 +203,15 @@ public sealed class FnbInventoryController(ApplicationDBContext db) : Controller
         return Result(0, "", summary);
     }
 
+    // 用量预警：本店食材的可用量、预警线，预警的排在前面（规则见 FnbLowStockService）
+    [HttpGet]
+    public async Task<ApiResult<object>> ListLowStock(string sessionKey, int shopId)
+    {
+        int p = await Permission(sessionKey, shopId);
+        if (p != 0) return Result(p, "会话失效或无门店权限");
+        return Result(0, "", await new FnbLowStockService(db).ListAsync(shopId));
+    }
+
     [HttpGet]
     public async Task<ApiResult<object>> GetDocument(string sessionKey, int shopId, long documentId)
     {
