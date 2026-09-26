@@ -18,11 +18,13 @@ public sealed class FnbPreparationService(ApplicationDBContext db)
     public async Task<StockPostResult> PostAsync(PreparationInput input, FnbAccess.Actor actor)
     {
         if (!FnbAccess.CanAccess(actor.Staff, input.ShopId, false)) throw new UnauthorizedAccessException();
+        // 产出照片选填（2026-09-26 起，同入库）；传了就须有效且不重复
+        var imageIds = input.ImageIds ?? Array.Empty<int>();
         if (input.RequestId == Guid.Empty || input.OutputQuantity <= 0 || input.OutputQuantity != decimal.Round(input.OutputQuantity, 6) ||
             string.IsNullOrWhiteSpace(input.BatchNo) || !FnbText.FitsChineseVarchar(input.BatchNo, 50) ||
             input.StorageType is not ("ambient" or "chilled" or "frozen") || input.WarnDays < 0 ||
             !FnbText.FitsChineseVarchar(input.StorageLocation, 200) || !FnbText.FitsChineseVarchar(input.ExpiryNote, 1000) ||
-            input.ImageIds == null || input.ImageIds.Count == 0 || input.ImageIds.Any(x => x <= 0))
+            imageIds.Any(x => x <= 0) || imageIds.Distinct().Count() != imageIds.Count)
             throw new ArgumentException("半成品批次参数无效");
         await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable);
         var previous = await db.fnbStockDocument.AsNoTracking().FirstOrDefaultAsync(x => x.shop_id == input.ShopId && x.document_type == "prep" && x.request_id == input.RequestId);
@@ -41,7 +43,7 @@ public sealed class FnbPreparationService(ApplicationDBContext db)
         int[] itemIds = lines.Select(x => x.item_id).ToArray();
         var itemMap = await db.fnbMaterialItem.AsNoTracking().Where(x => itemIds.Contains(x.id)).ToDictionaryAsync(x => x.id);
         if (itemMap.Count != lines.Count || itemMap.Values.Any(x => !x.valid)) throw new ArgumentException("配方含无效原料");
-        if (await db.UploadFile.CountAsync(x => input.ImageIds.Contains(x.id) && x.purpose == "食材批次") != input.ImageIds.Distinct().Count())
+        if (imageIds.Count > 0 && await db.UploadFile.CountAsync(x => imageIds.Contains(x.id) && x.purpose == "食材批次") != imageIds.Count)
             throw new ArgumentException("批次照片不存在");
         DateTime now = DateTime.UtcNow;
         DateTime businessDate = TimeZoneInfo.ConvertTimeFromUtc(now, TimeZoneInfo.FindSystemTimeZoneById("Asia/Shanghai")).Date;
@@ -81,7 +83,7 @@ public sealed class FnbPreparationService(ApplicationDBContext db)
         {
             name = outputItem.name, batch_no = input.BatchNo.Trim(), produce_date = businessDate,
             expire_date = input.ExpireDate.ToDateTime(TimeOnly.MinValue), warn_days = input.WarnDays,
-            image_ids = string.Join(",", input.ImageIds), create_userid = actor.AuditUserId,
+            image_ids = imageIds.Count == 0 ? null : string.Join(",", imageIds), create_userid = actor.AuditUserId,
             staff_id = actor.Staff.id, valid = true, create_date = DateTime.Now
         };
         db.fnbMaterialBatch.Add(outputBatch);

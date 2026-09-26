@@ -434,6 +434,13 @@ public class FnbSqlServerIntegrationTests
         Assert.Equal(500m, made.Quantity);
         Assert.Equal(2.5m, made.Amount);
         Assert.Equal(750m, (await db.fnbMaterialBatchStock.SingleAsync(x => x.batch_id == received.BatchId)).quantity);
+
+        // 产出照片选填：不拍照也能制作，批次不记照片
+        var noPhoto = await new FnbPreparationService(db).PostAsync(new PreparationInput(seed.ShopId, Guid.NewGuid(), recipe.id,
+            100m, "DOUGH" + Guid.NewGuid().ToString("N")[..8], "ambient", null,
+            DateOnly.FromDateTime(DateTime.UtcNow.AddDays(20)), 3, [], null), seed.Actor);
+        Assert.Null((await db.fnbMaterialBatch.AsNoTracking().SingleAsync(x => x.id == noPhoto.BatchId)).image_ids);
+        Assert.Equal(700m, (await db.fnbMaterialBatchStock.SingleAsync(x => x.batch_id == received.BatchId)).quantity);
     }
 
     [FnbSqlServerFact]
