@@ -521,13 +521,20 @@ namespace SnowmeetApi.Controllers.Fnb
             return EXPIRE_HINTS.Any(h => up.Contains(h));
         }
 
+        // yyyy-MM-dd 字样（月、日都是两位）：不看前后缀，前面粘着数字、后面紧跟时间（2025-08-0512:30）都照样识别。
+        // 月日固定两位，所以不需要靠前后不是数字来划边界
+        private static readonly Regex YMD_PADDED = new Regex(@"(20\d{2})\s*[-－—–./／]\s*(\d{2})\s*[-－—–./／]\s*(\d{2})");
+
         // 从 OCR 文本行提取日期候选，归一化 yyyy-MM-dd 去重（最多 6 个）。
         // 覆盖：2026年7月16日 / 2026-07-16 / 2026/7/16 / 2026.07.16 / 20260716 / 260716（喷码）
         //      / 16-07-2026（DD/MM/YYYY，>12 侧判日）/ 16 JUL 2026 / JUL 16, 2026 / 16JUL26
+        // 带四位年份的明确日期（yyyy-MM-dd、yyyy年M月d日）排在最前面，喷码、日月年这类容易误判的猜测排在后面。
         // 返回 (all=全部日期, expire=其中带到期锚词行的日期)
         [NonAction]
         public static (List<string> all, List<string> expire) ExtractDates(IEnumerable<string> lines)
         {
+            var firstAll = new List<string>();
+            var firstExpire = new List<string>();
             var all = new List<string>();
             var expire = new List<string>();
             foreach (string raw in lines)
@@ -537,12 +544,25 @@ namespace SnowmeetApi.Controllers.Fnb
                     continue;
                 }
                 string s = raw.Trim();
-                var found = new List<string>();   // 本行提取结果
+                var first = new List<string>();   // 本行的明确日期
+                foreach (Match m in YMD_PADDED.Matches(s))
+                {
+                    _addDate(first, m.Groups[1].Value, m.Groups[2].Value, m.Groups[3].Value);
+                }
                 // 2026年7月16日（「日」可省）
                 foreach (Match m in Regex.Matches(s, @"(20\d{2})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日?"))
                 {
-                    _addDate(found, m.Groups[1].Value, m.Groups[2].Value, m.Groups[3].Value);
+                    _addDate(first, m.Groups[1].Value, m.Groups[2].Value, m.Groups[3].Value);
                 }
+                bool hint = _hasExpireHint(s);
+                firstAll.AddRange(first);
+                if (hint)
+                {
+                    firstExpire.AddRange(first);
+                }
+                // 已识别的 yyyy-MM-dd 先抹掉，免得前后粘着的数字再被下面的宽松格式拼出错误日期
+                s = YMD_PADDED.Replace(s, " ");
+                var found = new List<string>();   // 本行其余格式的提取结果
                 // 2026-07-16 / 2026/7/16 / 2026.07.16
                 foreach (Match m in Regex.Matches(s, @"(?<!\d)(20\d{2})\s*[./\-]\s*(\d{1,2})\s*[./\-]\s*(\d{1,2})(?!\d)"))
                 {
@@ -587,12 +607,13 @@ namespace SnowmeetApi.Controllers.Fnb
                     _addDate(found, _fixYear(m.Groups[3].Value), _monthNum(m.Groups[1].Value), m.Groups[2].Value);
                 }
                 all.AddRange(found);
-                if (found.Count > 0 && _hasExpireHint(s))
+                if (hint)
                 {
                     expire.AddRange(found);
                 }
             }
-            return (all.Distinct().Take(6).ToList(), expire.Distinct().Take(6).ToList());
+            return (firstAll.Concat(all).Distinct().Take(6).ToList(),
+                firstExpire.Concat(expire).Distinct().Take(6).ToList());
         }
 
         private static string _fixYear(string y)
@@ -644,6 +665,7 @@ namespace SnowmeetApi.Controllers.Fnb
                     continue;
                 }
                 string s = raw.Trim();
+                s = YMD_PADDED.Replace(s, " ");
                 s = Regex.Replace(s, @"(20\d{2})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日?", " ");
                 s = Regex.Replace(s, @"(?<!\d)(20\d{2})\s*[./\-]\s*\d{1,2}\s*[./\-]\s*\d{1,2}(?!\d)", " ");
                 s = Regex.Replace(s, @"(?<!\d)\d{1,2}\s*[./\-]\s*\d{1,2}\s*[./\-]\s*20\d{2}(?!\d)", " ");
