@@ -17,11 +17,8 @@ public class StaffAccountRulesTests
     }
 
     [Fact]
-    public void 只能管理职级不高于自己的账号_只能设四档职级()
+    public void 只能设四档职级()
     {
-        var admin = new Staff { title_level = 300 };
-        Assert.True(StaffAccountRules.CanManage(admin, new Staff { title_level = 300 }));
-        Assert.False(StaffAccountRules.CanManage(admin, new Staff { title_level = 1000 }));
         Assert.True(StaffAccountRules.IsTitleAllowed(50));
         Assert.False(StaffAccountRules.IsTitleAllowed(0));
         Assert.False(StaffAccountRules.IsTitleAllowed(1000));

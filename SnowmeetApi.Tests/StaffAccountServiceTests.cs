@@ -57,7 +57,7 @@ public sealed class StaffAccountServiceTests : IAsyncLifetime
     private static MemberSocialAccount Msa(int memberId, string openid) =>
         new() { member_id = memberId, type = MemberSocialAccount.TYPE_WECHAT_MINI_OPENID, num = openid, valid = 1, memo = "" };
 
-    private async Task<StaffDto> StaffOf(int id) => (await _service.GetStaffAsync(_admin, id)).staff;
+    private async Task<StaffDto> StaffOf(int id) => (await _service.GetStaffAsync(id)).staff;
     private async Task<PhoneDto> PhoneOf(int id) => (await _service.ListPhonesAsync()).Single(p => p.id == id);
     private async Task<int> ActiveLinks(int staffId) =>
         (await _db.staffSocialAccount.AsNoTracking().Where(l => l.staff_id == staffId).ToListAsync()).Count(l => StaffAccountRules.IsActiveLink(l, DateTime.Now));
@@ -67,15 +67,13 @@ public sealed class StaffAccountServiceTests : IAsyncLifetime
     [Fact]
     public async Task 列表_返回当前手机_微信_登录能否认出()
     {
-        var list = await _service.ListStaffAsync(_admin);
+        var list = await _service.ListStaffAsync();
         var liMing = list.Single(s => s.id == 2);
         Assert.Equal(11, liMing.binding!.account_id);
         Assert.False(liMing.binding.is_private);
         Assert.True(liMing.binding.has_wechat);
         Assert.True(liMing.binding.login_ok);
         Assert.Equal("万龙店", liMing.shop_name);
-        Assert.True(liMing.manageable);
-        Assert.False(list.Single(s => s.id == 4).manageable);
         Assert.Equal(new[] { "万龙店" }, (await _service.ListShopsAsync()).Select(s => s.name));
     }
 
@@ -158,7 +156,7 @@ public sealed class StaffAccountServiceTests : IAsyncLifetime
         Assert.Equal(21, back.binding!.account_id);
         Assert.Equal(1, await ActiveLinks(3));
         Assert.Null((await PhoneOf(12)).holder);
-        Assert.Equal(3, (await _service.GetStaffAsync(_admin, 3)).history.Count);
+        Assert.Equal(3, (await _service.GetStaffAsync(3)).history.Count);
     }
 
     [Fact]
@@ -205,7 +203,7 @@ public sealed class StaffAccountServiceTests : IAsyncLifetime
         Assert.Null((await PhoneOf(11)).holder);
         Assert.Equal(0, await ActiveLinks(2));
         Assert.Null(await LoginStaff("o-job-11"));
-        Assert.Single((await _service.GetStaffAsync(_admin, 2)).history);
+        Assert.Single((await _service.GetStaffAsync(2)).history);
     }
 
     [Fact]
@@ -219,12 +217,20 @@ public sealed class StaffAccountServiceTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task 不能给自己办离职_不能管理职级更高的账号()
+    public async Task 不能给自己办离职_不能改自己的职级()
     {
         await Assert.ThrowsAsync<StaffAccountException>(() => _service.OffboardAsync(_admin, 1, null));
-        await Assert.ThrowsAsync<StaffAccountException>(() => _service.OffboardAsync(_admin, 4, null));
-        await Assert.ThrowsAsync<StaffAccountException>(() => _service.UpdateStaffAsync(_admin, new UpdateStaffInput(4, "老板", "男", 300, null)));
         await Assert.ThrowsAsync<StaffAccountException>(() => _service.UpdateStaffAsync(_admin, new UpdateStaffInput(1, "管理员", "女", 200, null)));
+    }
+
+    [Fact]
+    public async Task 系统管理员可以管理超级管理员()
+    {
+        // 改姓名时职级 1000 不在可选档位里也照样保存（职级没变就不校验）
+        await _service.UpdateStaffAsync(_admin, new UpdateStaffInput(4, "老板甲", "男", 1000, null));
+        Assert.Equal(1000, (await StaffOf(4)).title_level);
+        await _service.OffboardAsync(_admin, 4, null);
+        Assert.False((await StaffOf(4)).valid);
     }
 
     [Fact]

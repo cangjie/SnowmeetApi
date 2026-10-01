@@ -19,7 +19,7 @@ public sealed class StaffAccountException(string message, int code = 1) : Except
 public sealed record BindingDto(int link_id, int account_id, string cell, bool is_private, bool has_wechat, string start_date, bool login_ok);
 public sealed record PendingBindDto(string token, string expire_at);
 public sealed record StaffDto(int id, string name, string gender, int title_level, bool valid, int? base_shop_id, string shop_name,
-    string create_date, BindingDto? binding, PendingBindDto? pending_bind, bool pending_reg, bool manageable);
+    string create_date, BindingDto? binding, PendingBindDto? pending_bind, bool pending_reg);
 public sealed record StaffHistoryDto(int id, string cell, bool is_private, string start_date, string? end_date, string season_memo);
 public sealed record StaffDetailDto(StaffDto staff, List<StaffHistoryDto> history);
 public sealed record PhoneHolderDto(int staff_id, string name, bool valid, int title_level);
@@ -95,7 +95,7 @@ public sealed class StaffAccountService(ApplicationDBContext db, Func<DateTime>?
         return latest?.id == account.id;
     }
 
-    private StaffDto ToDto(Snapshot snap, Staff s, Staff? op)
+    private StaffDto ToDto(Snapshot snap, Staff s)
     {
         DateTime now = Now;
         bool pendingReg = s.valid == 0 && snap.OpenCodes.Any(c => c.purpose == StaffBindCode.PURPOSE_SELFREG && c.staff_id == s.id);
@@ -113,16 +113,16 @@ public sealed class StaffAccountService(ApplicationDBContext db, Func<DateTime>?
         return new StaffDto(s.id, s.name, s.gender, s.title_level, s.valid == 1, s.base_shop_id,
             s.base_shop_id != null && snap.Shops.TryGetValue(s.base_shop_id.Value, out var shop) ? shop : "",
             Day(s.create_date), binding, code == null ? null : new PendingBindDto(code.token, Minute(code.expire_date)),
-            pendingReg, op != null && StaffAccountRules.CanManage(op, s));
+            pendingReg);
     }
 
-    public async Task<List<StaffDto>> ListStaffAsync(Staff op)
+    public async Task<List<StaffDto>> ListStaffAsync()
     {
         var snap = await LoadAsync();
-        return snap.Staff.OrderBy(s => s.id).Select(s => ToDto(snap, s, op)).ToList();
+        return snap.Staff.OrderBy(s => s.id).Select(s => ToDto(snap, s)).ToList();
     }
 
-    public async Task<StaffDetailDto> GetStaffAsync(Staff op, int id)
+    public async Task<StaffDetailDto> GetStaffAsync(int id)
     {
         var snap = await LoadAsync();
         Staff s = snap.Staff.FirstOrDefault(x => x.id == id) ?? throw new StaffAccountException("找不到这个账号");
@@ -133,7 +133,7 @@ public sealed class StaffAccountService(ApplicationDBContext db, Func<DateTime>?
                 var a = snap.Accounts.FirstOrDefault(x => x.id == l.social_account_id);
                 return new StaffHistoryDto(l.id, a?.cell ?? "", a?.is_private == 1, Day(l.start_date), Day(l.end_date), l.season_memo);
             }).ToList();
-        return new StaffDetailDto(ToDto(snap, s, op), history);
+        return new StaffDetailDto(ToDto(snap, s), history);
     }
 
     public async Task<List<PhoneDto>> ListPhonesAsync()
@@ -171,11 +171,9 @@ public sealed class StaffAccountService(ApplicationDBContext db, Func<DateTime>?
     private void Audit(string table, string field, int key, string action, int? staffId, int? memberId, string? prev, string? current) =>
         db.coreDataModLog.Add(CoreDataModLog.CreateManualLog(table, field, key, Scene + "-" + action, memberId, staffId, prev, current, null));
 
-    private async Task<Staff> TargetAsync(Staff op, int staffId)
+    private async Task<Staff> TargetAsync(int staffId)
     {
-        Staff target = await db.staff.FirstOrDefaultAsync(s => s.id == staffId) ?? throw new StaffAccountException("找不到这个账号");
-        if (!StaffAccountRules.CanManage(op, target)) throw new StaffAccountException("不能管理职级比自己高的账号");
-        return target;
+        return await db.staff.FirstOrDefaultAsync(s => s.id == staffId) ?? throw new StaffAccountException("找不到这个账号");
     }
 
     private async Task<StaffSocialAccount?> ActiveLinkOfStaffAsync(int staffId)
@@ -282,7 +280,7 @@ public sealed class StaffAccountService(ApplicationDBContext db, Func<DateTime>?
 
     public Task<int> UpdateStaffAsync(Staff op, UpdateStaffInput input) => InTransaction(async () =>
     {
-        Staff target = await TargetAsync(op, input.id);
+        Staff target = await TargetAsync(input.id);
         string name = CheckName(input.name);
         if (!StaffAccountRules.IsValidGender(input.gender)) throw new StaffAccountException("请选择性别");
         bool pending = target.valid == 0 && await OpenSelfRegAsync(target.id) != null;
@@ -308,7 +306,7 @@ public sealed class StaffAccountService(ApplicationDBContext db, Func<DateTime>?
     public Task<int> ChangePhoneAsync(Staff op, int staffId, int accountId) => InTransaction(async () =>
     {
         DateTime now = Now;
-        Staff target = await TargetAsync(op, staffId);
+        Staff target = await TargetAsync(staffId);
         if (target.valid != 1) throw new StaffAccountException("账号已停用");
         SocialAccountForJob phone = await AssignablePhoneAsync(accountId);
         var current = await ActiveLinkOfStaffAsync(target.id);
@@ -321,7 +319,7 @@ public sealed class StaffAccountService(ApplicationDBContext db, Func<DateTime>?
 
     public Task<TokenResult> RebindAsync(Staff op, int staffId) => InTransaction(async () =>
     {
-        Staff target = await TargetAsync(op, staffId);
+        Staff target = await TargetAsync(staffId);
         if (target.valid != 1) throw new StaffAccountException("账号已停用");
         await CancelCodesAsync(StaffBindCode.PURPOSE_PRIVATE, target.id, null);
         var code = NewCode(StaffBindCode.PURPOSE_PRIVATE, target.id, null, op.id, StaffAccountRules.CodeLifetime);
@@ -353,7 +351,7 @@ public sealed class StaffAccountService(ApplicationDBContext db, Func<DateTime>?
     public Task<int> OffboardAsync(Staff op, int staffId, DateTime? date) => InTransaction(async () =>
     {
         DateTime now = Now;
-        Staff target = await TargetAsync(op, staffId);
+        Staff target = await TargetAsync(staffId);
         if (target.id == op.id) throw new StaffAccountException("不能给自己办理离职");
         if (target.valid == 0 && await OpenSelfRegAsync(target.id) != null) throw new StaffAccountException("待开通的账号请用「拒绝」");
         var current = await ActiveLinkOfStaffAsync(target.id);
@@ -369,7 +367,7 @@ public sealed class StaffAccountService(ApplicationDBContext db, Func<DateTime>?
     public Task<int> ApproveAsync(Staff op, int staffId, int titleLevel, int? shopId) => InTransaction(async () =>
     {
         DateTime now = Now;
-        Staff target = await TargetAsync(op, staffId);
+        Staff target = await TargetAsync(staffId);
         var reg = await OpenSelfRegAsync(target.id);
         if (target.valid != 0 || reg == null) throw new StaffAccountException("这个账号不是待开通状态");
         await CheckTitleAndShopAsync(op, titleLevel, shopId);
@@ -393,7 +391,7 @@ public sealed class StaffAccountService(ApplicationDBContext db, Func<DateTime>?
     public Task<int> RejectAsync(Staff op, int staffId) => InTransaction(async () =>
     {
         DateTime now = Now;
-        Staff target = await TargetAsync(op, staffId);
+        Staff target = await TargetAsync(staffId);
         var reg = await OpenSelfRegAsync(target.id);
         if (target.valid != 0 || reg == null) throw new StaffAccountException("这个账号不是待开通状态");
         reg.cancel_date = now;

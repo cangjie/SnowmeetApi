@@ -7,7 +7,7 @@ namespace SnowmeetApi.Services.StaffAccounts;
 
 /// <summary>
 /// 员工账号管理的纯规则。一个员工账号同一时间只关联一套手机号 + 微信（social_account_for_job 一行），
-/// 工作手机 / 私人手机是那套手机的属性；只有系统管理员（职级 ≥ 300）能办理。
+/// 工作手机 / 私人手机是那套手机的属性；系统管理员（职级 ≥ 300）可以管理所有账号（含超级管理员），只是不能给自己办离职、不能改自己的职级。
 /// </summary>
 public static class StaffAccountRules
 {
@@ -18,9 +18,6 @@ public static class StaffAccountRules
     public static readonly TimeSpan SelfRegLifetime = TimeSpan.FromDays(365);
 
     public static bool IsAdmin(Staff? staff) => staff is { valid: 1 } && staff.title_level >= AdminLevel;
-
-    // 只能管理职级不高于自己的账号
-    public static bool CanManage(Staff op, Staff target) => target.title_level <= op.title_level;
 
     public static bool IsTitleAllowed(int level) => TitleLevels.Contains(level);
 

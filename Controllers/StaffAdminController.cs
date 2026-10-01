@@ -60,10 +60,10 @@ public sealed class StaffAdminController(ApplicationDBContext db) : ControllerBa
     }
 
     [HttpGet]
-    public Task<ApiResult<object>> ListStaff(string sessionKey) => AsAdmin(sessionKey, async op => await _service.ListStaffAsync(op));
+    public Task<ApiResult<object>> ListStaff(string sessionKey) => AsAdmin(sessionKey, async _ => await _service.ListStaffAsync());
 
     [HttpGet]
-    public Task<ApiResult<object>> GetStaff(string sessionKey, int id) => AsAdmin(sessionKey, async op => await _service.GetStaffAsync(op, id));
+    public Task<ApiResult<object>> GetStaff(string sessionKey, int id) => AsAdmin(sessionKey, async _ => await _service.GetStaffAsync(id));
 
     [HttpGet]
     public Task<ApiResult<object>> ListPhones(string sessionKey) => AsAdmin(sessionKey, async _ => await _service.ListPhonesAsync());
