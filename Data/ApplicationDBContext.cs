@@ -155,6 +155,7 @@ namespace SnowmeetApi.Data
         public DbSet<Staff> staff { get; set; }
         public DbSet<StaffSocialAccount> staffSocialAccount { get; set; }
         public DbSet<SocialAccountForJob> socialAccountForJob { get; set; }
+        public DbSet<StaffBindCode> staffBindCode { get; set; }
         public DbSet<Shop> shop { get; set; }
         public DbSet<Order> order { get; set; }
         public DbSet<MiniSession> miniSession { get; set; }
