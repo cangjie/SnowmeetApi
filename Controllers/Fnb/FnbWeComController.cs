@@ -247,6 +247,38 @@ namespace SnowmeetApi.Controllers.Fnb
             }
         }
 
+        // 下发纯文本消息（content ≤ 2048 字节）。美团采集程序的登录失效、停机提醒用它。
+        [NonAction]
+        public async Task<WeComSendResponse?> SendText(string content, string toUser, string purpose)
+        {
+            string batchId = DateTime.Now.ToString("yyyyMMddHHmmssfff");
+            string token = await GetToken(batchId, purpose);
+            if (token == null)
+            {
+                return null;
+            }
+            var payloadObj = new
+            {
+                touser = toUser,
+                msgtype = "text",
+                agentid = AGENT_ID,
+                text = new { content = content.Trim() },
+                enable_duplicate_check = 0
+            };
+            string payload = JsonConvert.SerializeObject(payloadObj);
+            WebApiLog log = await _mH.PerformRequest(
+                "https://qyapi.weixin.qq.com/cgi-bin/message/send?access_token=" + token,
+                "", payload, "POST", "企业微信", purpose, "下发文本消息", batchId);
+            try
+            {
+                return JsonConvert.DeserializeObject<WeComSendResponse>(log.response);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
         // 取餐饮应用 access_token（每次现取，与 WeComController.GetToken 同模式；调用量小无需缓存）
         [NonAction]
         public async Task<string?> GetToken(string batchId, string purpose)

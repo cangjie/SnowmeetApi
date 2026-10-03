@@ -13,6 +13,11 @@
     <Content Remove="SnowmeetApi.Tests\**" />
     <None Remove="SnowmeetApi.Tests\**" />
     <EmbeddedResource Remove="SnowmeetApi.Tests\**" />
+    <!-- Tools 下是独立的小工程（如美团管家采集程序 meituan_collector，Python），也不能被主工程当作源码或发布内容带进来。 -->
+    <Compile Remove="Tools\**" />
+    <Content Remove="Tools\**" />
+    <None Remove="Tools\**" />
+    <EmbeddedResource Remove="Tools\**" />
   </ItemGroup>
   <ItemGroup>
     <None Remove="Microsoft.EntityFrameworkCore" />

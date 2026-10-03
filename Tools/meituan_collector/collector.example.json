@@ -1,0 +1,34 @@
+// 复制为 collector.json 后按需修改；collector.json 不进 git。相对路径都相对于本文件所在目录。
+// 只支持整行 // 注释。
+{
+  "base_url": "https://pos.meituan.com/web",
+  // 只用于在登录页预填手机号；验证码必须由人在浏览器窗口里自己输入。
+  "phone": "",
+  "output_dir": "out",
+  "profile_dir": "profile",
+  // msedge 或 chrome（用电脑上已装的浏览器）
+  "browser_channel": "msedge",
+  // 电脑开着全局 VPN 时：让浏览器从本地宽带的网卡直接出网（Windows 如 Wi-Fi、以太网；macOS 如 en0）。不开 VPN 就留 null。
+  "direct_interface": null,
+  // 调试用代理，例如 socks5://127.0.0.1:1080（和 direct_interface 二选一）
+  "proxy": null,
+  "interval_minutes": 3,
+  "idle_interval_minutes": 60,
+  "active_hours": "06:00-24:00",
+  // 昨天的订单和退款每隔多久再查一次；前天及更早的不再检查
+  "previous_day_check_minutes": 60,
+  // 每隔多久不看指纹、把检查范围内所有订单的详情重抓一遍兜底
+  "full_refresh_minutes": 120,
+  // 从哪个营业日开始抓（YYYY-MM-DD）。null：从程序第一次运行那天开始。
+  // 改早，或者电脑停机几天后重新开机，没抓完整的日子都会逐天补上。
+  "start_date": null,
+  // 补抓时每轮最多打开多少张详情，避免补抓耽误当天的抓取
+  "backfill_details_per_round": 20,
+  "login_wait_minutes": 10,
+  "debug_port": 9222,
+  "trace_rounds": false,
+  // 心跳上报：登录失效、电脑停机时由服务器发企业微信提醒（企业微信有 IP 白名单，只能从服务器发）。
+  // server_token 找管理员要（与服务器上 config.meituanCollectorToken 一致）；留空则不上报、也不会有提醒。
+  "server_url": "https://mini.snowmeet.top",
+  "server_token": ""
+}

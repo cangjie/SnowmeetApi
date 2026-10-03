@@ -81,6 +81,10 @@ namespace SnowmeetApi
             services.AddScoped<IAdminAssistantQueryExecutor, SkiPassQueryExecutor>();
             services.AddScoped<IReqaiAdminAssistantClient, ReqaiAdminAssistantClient>();
             services.AddScoped<IAdminAssistantService, AdminAssistantService>();
+            // 美团管家采集程序的心跳看护：登录失效、采集电脑停机时由服务器发企业微信提醒
+            services.AddSingleton(sp => SnowmeetApi.Services.Fnb.MeituanCollectorMonitor.Create(
+                sp.GetRequiredService<IServiceScopeFactory>()));
+            services.AddHostedService<SnowmeetApi.Services.Fnb.MeituanCollectorWatchdog>();
             services.AddSingleton(FileStorageOptions.From(Configuration));
             services.AddSingleton<IFileStorage>(sp => FileStorageFactory.Create(sp.GetRequiredService<FileStorageOptions>()));
             services.AddControllers().AddJsonOptions(options =>{
