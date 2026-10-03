@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -25,6 +28,8 @@ namespace SnowmeetApi.Controllers.Fnb
         // 餐饮通知自建应用
         public const int AGENT_ID = 1000009;
         public const string AGENT_SECRET = "W4MBlCAmAfDrXLYVj2xDTd1qh21_Del8RE7jcE9tu0Q";
+        // 应用 1000009「网页授权及 JS-SDK」可信域名；只给这个域名下的页面签名
+        public const string JSSDK_HOST = "mini.snowmeet.top";
 
         private readonly ApplicationDBContext _db;
         private readonly IConfiguration _config;
@@ -67,7 +72,90 @@ namespace SnowmeetApi.Controllers.Fnb
             public string? access_token { get; set; } = null;
         }
 
+        public class WeComTicketResponse
+        {
+            public int errcode { get; set; }
+            public string errmsg { get; set; }
+            public string? ticket { get; set; } = null;
+            public int expires_in { get; set; }
+        }
+
+        // jsapi_ticket 有频率限制、有效期 2 小时：进程内缓存，提前 5 分钟过期
+        private class CachedTicket
+        {
+            public string ticket;
+            public DateTime expireAt;
+        }
+        private static CachedTicket? _corpTicket = null;
+        private static CachedTicket? _agentTicket = null;
+        private static readonly SemaphoreSlim _ticketLock = new SemaphoreSlim(1, 1);
+
         // ====== API ======
+
+        // 企业微信 JS-SDK 签名（ww.register 的 getConfigSignature / getAgentConfigSignature）。
+        // 不要求登录：签名只在可信域名下的页面里有效，这里也只给 JSSDK_HOST 的页面签。
+        // 企业签名（config）和应用签名（agentConfig）一次都给，页面按需使用。
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<object>>> GetJsSdkSignature(string url)
+        {
+            string? pageUrl = NormalizeJsSdkUrl(url);
+            if (pageUrl == null)
+            {
+                return Ok(new ApiResult<object>() { code = 1, message = "只能为 https://" + JSSDK_HOST + " 下的页面签名", data = null });
+            }
+            (string? corpTicket, string? agentTicket) = await GetJsApiTickets(DateTime.Now.ToString("yyyyMMddHHmmssfff"));
+            if (corpTicket == null || agentTicket == null)
+            {
+                return Ok(new ApiResult<object>() { code = 1, message = "获取企业微信 jsapi_ticket 失败", data = null });
+            }
+            long timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+            string nonceStr = Guid.NewGuid().ToString("N").Substring(0, 16);
+            return Ok(new ApiResult<object>()
+            {
+                code = 0,
+                message = "",
+                data = new
+                {
+                    corpId = CORP_ID,
+                    agentId = AGENT_ID,
+                    url = pageUrl,
+                    config = new { timestamp, nonceStr, signature = ComputeJsSdkSignature(corpTicket, nonceStr, timestamp, pageUrl) },
+                    agentConfig = new { timestamp, nonceStr, signature = ComputeJsSdkSignature(agentTicket, nonceStr, timestamp, pageUrl) }
+                }
+            });
+        }
+
+        // 去掉 # 之后的部分；不是 https://JSSDK_HOST（默认端口）的页面返回 null
+        [NonAction]
+        public static string? NormalizeJsSdkUrl(string? url)
+        {
+            if (string.IsNullOrWhiteSpace(url))
+            {
+                return null;
+            }
+            url = url.Trim();
+            int hash = url.IndexOf('#');
+            if (hash >= 0)
+            {
+                url = url.Substring(0, hash);
+            }
+            if (!Uri.TryCreate(url, UriKind.Absolute, out Uri? uri)
+                || uri.Scheme != Uri.UriSchemeHttps
+                || !uri.IsDefaultPort
+                || !uri.Host.Equals(JSSDK_HOST, StringComparison.OrdinalIgnoreCase))
+            {
+                return null;
+            }
+            return url;
+        }
+
+        // 与微信 JS-SDK 同一算法：sha1("jsapi_ticket=..&noncestr=..&timestamp=..&url=..")，小写十六进制
+        [NonAction]
+        public static string ComputeJsSdkSignature(string ticket, string nonceStr, long timestamp, string url)
+        {
+            string raw = "jsapi_ticket=" + ticket + "&noncestr=" + nonceStr + "&timestamp=" + timestamp + "&url=" + url;
+            return Convert.ToHexString(SHA1.HashData(Encoding.UTF8.GetBytes(raw))).ToLowerInvariant();
+        }
 
         // 下发图文消息（news）。店员级鉴权；后续食材过期定时任务走 [NonAction] SendNews 直调。
         [HttpPost]
@@ -169,6 +257,72 @@ namespace SnowmeetApi.Controllers.Fnb
             {
                 WeComSendResponse res = JsonConvert.DeserializeObject<WeComSendResponse>(tokenLog.response);
                 return res.errcode == 0 ? res.access_token : null;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        // 企业 jsapi_ticket（config 用）+ 应用 jsapi_ticket（agentConfig 用），带缓存；任一失败返回 null
+        [NonAction]
+        public async Task<(string?, string?)> GetJsApiTickets(string batchId)
+        {
+            if (IsFresh(_corpTicket) && IsFresh(_agentTicket))
+            {
+                return (_corpTicket!.ticket, _agentTicket!.ticket);
+            }
+            await _ticketLock.WaitAsync();
+            try
+            {
+                if (!IsFresh(_corpTicket) || !IsFresh(_agentTicket))
+                {
+                    string? token = await GetToken(batchId, "JS-SDK签名");
+                    if (token == null)
+                    {
+                        return (null, null);
+                    }
+                    if (!IsFresh(_corpTicket))
+                    {
+                        _corpTicket = await FetchTicket(
+                            "https://qyapi.weixin.qq.com/cgi-bin/get_jsapi_ticket?access_token=" + token,
+                            "获取企业jsapi_ticket", batchId);
+                    }
+                    if (!IsFresh(_agentTicket))
+                    {
+                        _agentTicket = await FetchTicket(
+                            "https://qyapi.weixin.qq.com/cgi-bin/ticket/get?access_token=" + token + "&type=agent_config",
+                            "获取应用jsapi_ticket", batchId);
+                    }
+                }
+                return (_corpTicket?.ticket, _agentTicket?.ticket);
+            }
+            finally
+            {
+                _ticketLock.Release();
+            }
+        }
+
+        private static bool IsFresh(CachedTicket? t)
+        {
+            return t != null && t.expireAt > DateTime.Now;
+        }
+
+        private async Task<CachedTicket?> FetchTicket(string url, string memo, string batchId)
+        {
+            WebApiLog log = await _mH.PerformRequest(url, "", "", "GET", "企业微信", "JS-SDK签名", memo, batchId);
+            try
+            {
+                WeComTicketResponse res = JsonConvert.DeserializeObject<WeComTicketResponse>(log.response);
+                if (res == null || res.errcode != 0 || string.IsNullOrEmpty(res.ticket))
+                {
+                    return null;
+                }
+                return new CachedTicket()
+                {
+                    ticket = res.ticket,
+                    expireAt = DateTime.Now.AddSeconds(Math.Max(res.expires_in - 300, 60))
+                };
             }
             catch
             {

@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>蓝牙打印测试</title>
+  <style>
+    :root {
+      --bg: #f4f6f8;
+      --card: #ffffff;
+      --text: #1f2933;
+      --muted: #6f7881;
+      --line: #e3e7eb;
+      --primary: #1f6feb;
+      --ok: #1a7f37;
+      --warn: #9a6700;
+      --error: #cf222e;
+      --code-bg: #f6f8fa;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #111418;
+        --card: #1b2026;
+        --text: #e6e9ec;
+        --muted: #9aa4ae;
+        --line: #2c333b;
+        --primary: #4c8dff;
+        --ok: #3fb950;
+        --warn: #d29922;
+        --error: #f85149;
+        --code-bg: #14181d;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 16px;
+      background: var(--bg);
+      color: var(--text);
+      font: 15px/1.6 -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+    h1 { font-size: 18px; margin: 4px 0 12px; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 14px 16px;
+      margin-bottom: 12px;
+    }
+    .sub { color: var(--muted); font-size: 13px; }
+    .row { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
+    .row label { flex: none; }
+    input[type=number], select {
+      font-size: 16px;
+      padding: 8px 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--card);
+      color: var(--text);
+      width: 100%;
+    }
+    button {
+      font-size: 16px;
+      border: 0;
+      border-radius: 8px;
+      padding: 12px 16px;
+      background: var(--primary);
+      color: #fff;
+      width: 100%;
+      margin-top: 14px;
+    }
+    button:disabled { opacity: .45; }
+    button.plain { background: transparent; color: var(--primary); border: 1px solid var(--line); padding: 8px 12px; font-size: 14px; }
+    #status { margin-top: 10px; min-height: 24px; font-size: 14px; }
+    #status.ok { color: var(--ok); }
+    #status.warn { color: var(--warn); }
+    #status.error { color: var(--error); }
+    #envHint { color: var(--warn); }
+    details { margin-bottom: 12px; }
+    summary { cursor: pointer; font-weight: 600; }
+    pre {
+      background: var(--code-bg);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px;
+      font: 12px/1.5 ui-monospace, Menlo, Consolas, monospace;
+      white-space: pre-wrap;
+      word-break: break-all;
+      max-height: 320px;
+      overflow: auto;
+      margin: 10px 0 0;
+    }
+  </style>
+</head>
+<body>
+  <h1>企业微信蓝牙打印测试</h1>
+
+  <div class="card">
+    <div>养护标签（存根）· WF-260715-002</div>
+    <div class="sub">万龙服务中心 · 单板 Burton 170 · 修刃 + 打蜡 · 75×50mm 标签纸</div>
+    <div id="envHint" class="sub" hidden>请在企业微信中打开本页面；当前只显示标签预览。</div>
+    <div class="row">
+      <label for="copies">张数</label>
+      <input id="copies" type="number" inputmode="numeric" min="1" max="10" value="1">
+    </div>
+    <button id="printBtn" disabled>打印</button>
+    <div id="status"></div>
+  </div>
+
+  <details class="card">
+    <summary>标签内容预览</summary>
+    <pre id="preview"></pre>
+  </details>
+
+  <details class="card">
+    <summary>高级</summary>
+    <div class="row">
+      <label for="chunkSize">每包字节</label>
+      <select id="chunkSize">
+        <option value="20">20（官方建议）</option>
+        <option value="64">64</option>
+        <option value="128">128（小程序用的）</option>
+        <option value="180">180</option>
+      </select>
+    </div>
+    <div class="row">
+      <label for="intervalMs">包间隔</label>
+      <select id="intervalMs">
+        <option value="0">0ms</option>
+        <option value="10">10ms</option>
+        <option value="20">20ms</option>
+        <option value="50">50ms</option>
+      </select>
+    </div>
+    <button id="resetBtn" class="plain">断开打印机，下次重新搜索</button>
+  </details>
+
+  <details class="card" open>
+    <summary>日志</summary>
+    <pre id="log"></pre>
+    <button id="clearLogBtn" class="plain">清空日志</button>
+  </details>
+
+  <!-- lib_loader：三个打印库文件与小程序 utils/ble_label_printer/ 逐字节相同，这里只补浏览器缺的环境。
+       ① 原生 TextEncoder 只会 UTF-8，先藏起来，encoding.js 才会挂上自己的 GB18030 版 -->
+  <script>
+    window.__nativeTextEncoder = window.TextEncoder;
+    window.__nativeTextDecoder = window.TextDecoder;
+    window.TextEncoder = undefined;
+    window.TextDecoder = undefined;
+  </script>
+  <script src="encoding-indexes.js"></script>
+  <script src="encoding.js"></script>
+  <!-- ② 收起 GB18030 版、还原原生的；tsc.js 是小程序模块，临时补上 getApp / require / module -->
+  <script>
+    window.GbEncoding = { TextEncoder: window.TextEncoder, TextDecoder: window.TextDecoder };
+    window.TextEncoder = window.__nativeTextEncoder;
+    window.TextDecoder = window.__nativeTextDecoder;
+    delete window.__nativeTextEncoder;
+    delete window.__nativeTextDecoder;
+    window.getApp = function () { return {}; };
+    window.require = function () { return window.GbEncoding; };
+    window.module = { exports: {} };
+  </script>
+  <script src="tsc.js"></script>
+  <!-- ③ 取出 tsc.js 的导出，删掉临时全局 -->
+  <script>
+    window.Tsc = window.module.exports;
+    delete window.getApp;
+    delete window.require;
+    delete window.module;
+  </script>
+
+  <script src="https://wwcdn.weixin.qq.com/node/wework/wwopen/js/wecom-jssdk-2.4.0.js"></script>
+  <script src="care_label.js"></script>
+  <script src="ble_print.js"></script>
+  <script>
+    (function () {
+      var SETTINGS_KEY = 'ble_print_test_settings';
+      var LABEL_TYPE = '【存根】';
+      function $(id) { return document.getElementById(id); }
+      function pad(n, w) { return String(n).padStart(w || 2, '0'); }
+
+      function log(msg) {
+        var t = new Date();
+        var line = pad(t.getHours()) + ':' + pad(t.getMinutes()) + ':' + pad(t.getSeconds()) + '.' + pad(t.getMilliseconds(), 3) + ' ' + msg;
+        $('log').textContent += line + '\n';
+        $('log').scrollTop = $('log').scrollHeight;
+        console.log(line);
+      }
+
+      function setStatus(text, kind) {
+        $('status').textContent = text;
+        $('status').className = kind || '';
+      }
+
+      function copies() {
+        var n = parseInt($('copies').value, 10);
+        return n >= 1 && n <= 10 ? n : 0;
+      }
+
+      // 高级设置存 localStorage：换参数重试不用重新部署
+      function loadSettings() {
+        var s = {};
+        try { s = JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {}; } catch (e) { }
+        $('chunkSize').value = String(s.chunkSize || 20);
+        $('intervalMs').value = String(s.intervalMs != null ? s.intervalMs : 20);
+      }
+      function settings() {
+        return { chunkSize: parseInt($('chunkSize').value, 10), intervalMs: parseInt($('intervalMs').value, 10) };
+      }
+      function saveSettings() {
+        try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings())); } catch (e) { }
+      }
+
+      function buildLabel(n, printerName) {
+        return CareLabel.build(CareLabel.SAMPLE_CARE, CareLabel.SAMPLE_ORDER, LABEL_TYPE, n, printerName);
+      }
+
+      function renderPreview() {
+        $('preview').textContent = CareLabel.preview(buildLabel(copies() || 1, 'Printer_'));
+      }
+
+      loadSettings();
+      $('chunkSize').onchange = saveSettings;
+      $('intervalMs').onchange = saveSettings;
+      $('copies').oninput = renderPreview;
+      $('clearLogBtn').onclick = function () { $('log').textContent = ''; };
+      $('resetBtn').onclick = function () {
+        BlePrint.disconnect().then(function () { setStatus('已断开，下次打印会重新搜索'); });
+      };
+      renderPreview();
+
+      if (!/wxwork/i.test(navigator.userAgent)) {
+        $('envHint').hidden = false;
+        log('不在企业微信里，只显示预览');
+        return;
+      }
+
+      setStatus('正在初始化企业微信 JS-SDK…');
+      BlePrint.register(log).then(function (ok) {
+        $('printBtn').disabled = false;
+        if (ok) {
+          setStatus('就绪，填好张数点「打印」');
+        } else {
+          setStatus('JS-SDK 签名没通过，仍可点「打印」看具体报错', 'warn');
+        }
+      });
+
+      $('printBtn').onclick = async function () {
+        var n = copies();
+        if (!n) {
+          setStatus('张数请填 1–10', 'error');
+          return;
+        }
+        $('printBtn').disabled = true;
+        try {
+          var dev = await BlePrint.print(function (printerName) { return buildLabel(n, printerName); }, settings(), setStatus);
+          setStatus('已发送到 ' + dev.name + '，共 ' + n + ' 张', 'ok');
+        } catch (e) {
+          var msg = (e && (e.message || e.errMsg)) || String(e);
+          setStatus(msg, 'error');
+          log('✗ ' + msg);
+        } finally {
+          $('printBtn').disabled = false;
+        }
+      };
+
+      window.addEventListener('pagehide', function () { BlePrint.release(); });
+    })();
+  </script>
+</body>
+</html>
