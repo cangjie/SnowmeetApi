@@ -23,6 +23,7 @@ using Newtonsoft.Json;
 using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using SnowmeetApi.Services.AdminAssistant;
+using SnowmeetApi.Services.Storage;
 
 namespace SnowmeetApi
 {
@@ -80,6 +81,8 @@ namespace SnowmeetApi
             services.AddScoped<IAdminAssistantQueryExecutor, SkiPassQueryExecutor>();
             services.AddScoped<IReqaiAdminAssistantClient, ReqaiAdminAssistantClient>();
             services.AddScoped<IAdminAssistantService, AdminAssistantService>();
+            services.AddSingleton(FileStorageOptions.From(Configuration));
+            services.AddSingleton<IFileStorage>(sp => FileStorageFactory.Create(sp.GetRequiredService<FileStorageOptions>()));
             services.AddControllers().AddJsonOptions(options =>{
                 options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
             });
@@ -90,6 +93,9 @@ namespace SnowmeetApi
             IConfiguration config = app.ApplicationServices.GetService<IConfiguration>();
             IHttpContextAccessor http = app.ApplicationServices.GetService<IHttpContextAccessor>();
             app.UseStaticFiles();
+            // 上传文件已改存 S3：本机磁盘没有的 /upload/... 一律 302 到图片域名。旧版小程序、库里写死
+            // mini.snowmeet.top/upload/ 的完整地址都靠这条继续能打开；磁盘上还在的老文件仍由上面的静态文件直接返回
+            app.UseUploadRedirect(app.ApplicationServices.GetRequiredService<FileStorageOptions>());
             app.UseDeveloperExceptionPage();
             app.UseSwagger();
             app.UseSwaggerUI(c => 

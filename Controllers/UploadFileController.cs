@@ -10,6 +10,7 @@ using SnowmeetApi.Models;
 using System.IO;
 using Microsoft.Extensions.Configuration;
 using SnowmeetApi.Models.Users;
+using SnowmeetApi.Services.Storage;
 
 namespace SnowmeetApi.Controllers
 {
@@ -19,10 +20,18 @@ namespace SnowmeetApi.Controllers
     {
         private readonly ApplicationDBContext _db;
         private IConfiguration _config;
-        public UploadFileController(ApplicationDBContext context, IConfiguration config)
+        private readonly IFileStorage _storage;
+        public UploadFileController(ApplicationDBContext context, IConfiguration config, IFileStorage storage)
         {
             _db = context;
             _config = config.GetSection("Settings");
+            _storage = storage;
+        }
+        // 三个上传接口共用：文件写 S3（见 Services/Storage），返回站内相对路径
+        private async Task<string> SaveUploadedFile(IFormFile file, bool isWeb)
+        {
+            using Stream s = file.OpenReadStream();
+            return await _storage.SaveAsync(s, file.FileName, isWeb);
         }
         [HttpGet("id")]
         public async Task<ActionResult<UploadFile>> GetFile(int id)
@@ -40,20 +49,7 @@ namespace SnowmeetApi.Controllers
             }           
             sessionKey = Util.UrlDecode(sessionKey);
             purpose = Util.UrlDecode(purpose);
-            string dateStr = DateTime.Now.Year.ToString() + DateTime.Now.Month.ToString().PadLeft(2, '0') + DateTime.Now.Day.ToString().PadLeft(2, '0');
-            string filePath = Util.workingPath + (isWeb? "/wwwroot/":"") + "/upload/" + dateStr;
-            if (!Directory.Exists(filePath))
-            {
-                Directory.CreateDirectory(filePath);
-            }
-            string[] fileNameArr = file.FileName.Split('.');
-            string ext = fileNameArr[fileNameArr.Length - 1].Trim();
-            string fileName = Util.GetLongTimeStamp(DateTime.Now).Trim() + "." + ext.Trim();
-            string returnFileName = "/upload/" + dateStr + "/" + fileName.Trim();
-            using (Stream s = System.IO.File.Create(filePath + "/" + fileName.Trim()))
-            {
-                await file.CopyToAsync(s);
-            }
+            string returnFileName = await SaveUploadedFile(file, isWeb);
             if (mainId == null)
             {
                 UploadFile fileSave = new UploadFile()
@@ -94,20 +90,7 @@ namespace SnowmeetApi.Controllers
             Staff staff = (Staff)result.data;
             sessionKey = Util.UrlDecode(sessionKey);
             purpose = Util.UrlDecode(purpose);
-            string dateStr = DateTime.Now.Year.ToString() + DateTime.Now.Month.ToString().PadLeft(2, '0') + DateTime.Now.Day.ToString().PadLeft(2, '0');
-            string filePath = Util.workingPath + (isWeb? "/wwwroot/":"") + "/upload/" + dateStr;
-            if (!Directory.Exists(filePath))
-            {
-                Directory.CreateDirectory(filePath);
-            }
-            string[] fileNameArr = file.FileName.Split('.');
-            string ext = fileNameArr[fileNameArr.Length - 1].Trim();
-            string fileName = Util.GetLongTimeStamp(DateTime.Now).Trim() + "." + ext.Trim();
-            string returnFileName = "/upload/" + dateStr + "/" + fileName.Trim();
-            using (Stream s = System.IO.File.Create(filePath + "/" + fileName.Trim()))
-            {
-                await file.CopyToAsync(s);
-            }
+            string returnFileName = await SaveUploadedFile(file, isWeb);
             UploadFile fileSave = new UploadFile()
             {
                 id = 0,
@@ -152,20 +135,7 @@ namespace SnowmeetApi.Controllers
                 return BadRequest();
             }
 
-            string dateStr = DateTime.Now.Year.ToString() + DateTime.Now.Month.ToString().PadLeft(2, '0') + DateTime.Now.Day.ToString().PadLeft(2, '0');
-            string filePath = Util.workingPath + "/wwwroot/upload/" + dateStr;
-            if (!Directory.Exists(filePath))
-            {
-                Directory.CreateDirectory(filePath);
-            }
-            string[] fileNameArr = file.FileName.Split('.');
-            string ext = fileNameArr[fileNameArr.Length - 1].Trim();
-            string fileName = Util.GetLongTimeStamp(DateTime.Now).Trim() + "." + ext.Trim();
-            string returnFileName = "/upload/" + dateStr + "/" + fileName.Trim();
-            using (Stream s = System.IO.File.Create(filePath + "/" + fileName.Trim()))
-            {
-                await file.CopyToAsync(s);
-            }
+            string returnFileName = await SaveUploadedFile(file, true);
 
             UploadFile fileSave = new UploadFile()
             {

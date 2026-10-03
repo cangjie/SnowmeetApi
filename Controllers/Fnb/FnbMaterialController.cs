@@ -372,14 +372,14 @@ namespace SnowmeetApi.Controllers.Fnb
             });
         }
 
-        // 现场照片薄上传：存盘 + UploadFile 落库逻辑照抄 UploadFileController.UploadFileWithThumb，
+        // 现场照片薄上传：存储 + UploadFile 落库逻辑照抄 UploadFileController.UploadFileWithThumb，
         // 但鉴权走 wecom 会话（原接口要求 staff，与本 H5 用户体系不兼容）。staff_id=null、owner=企微 UserId
-        // 2026-07-21：图片统一落这台服务器（部署为 snowmeet.wanlonghuaxue.com）磁盘；H5 页面托管在
-        // mini.snowmeet.top，跨域调用本接口需要 CORS（见 Startup.cs MatExpireUpload 策略）；小程序端
-        // wx.uploadFile 不受浏览器 CORS 约束，天然生效
+        // 2026-10-03：文件改存 S3（Services/Storage），显示走 img.snowmeet.top。CORS 策略留着，
+        // 万一 H5 又从别的域名跨域调用也不受影响
         [HttpPost]
         [EnableCors("MatExpireUpload")]
-        public async Task<ActionResult<ApiResult<object>>> UploadPhoto(IFormFile file, [FromQuery] string sessionKey)
+        public async Task<ActionResult<ApiResult<object>>> UploadPhoto(IFormFile file, [FromQuery] string sessionKey,
+            [FromServices] Services.Storage.IFileStorage storage)
         {
             var ctx = await _requireStaff(sessionKey);
             if (ctx == null)
@@ -391,19 +391,10 @@ namespace SnowmeetApi.Controllers.Fnb
             {
                 return Ok(new ApiResult<object>() { code = 1, message = "缺少文件", data = null });
             }
-            string dateStr = DateTime.Now.Year.ToString() + DateTime.Now.Month.ToString().PadLeft(2, '0') + DateTime.Now.Day.ToString().PadLeft(2, '0');
-            string filePath = Util.workingPath + "/wwwroot/upload/" + dateStr;
-            if (!Directory.Exists(filePath))
+            string returnFileName;
+            using (Stream s = file.OpenReadStream())
             {
-                Directory.CreateDirectory(filePath);
-            }
-            string[] fileNameArr = file.FileName.Split('.');
-            string ext = fileNameArr[fileNameArr.Length - 1].Trim();
-            string fileName = Util.GetLongTimeStamp(DateTime.Now).Trim() + "." + ext;
-            string returnFileName = "/upload/" + dateStr + "/" + fileName;
-            using (Stream s = System.IO.File.Create(filePath + "/" + fileName))
-            {
-                await file.CopyToAsync(s);
+                returnFileName = await storage.SaveAsync(s, file.FileName);
             }
             UploadFile fileSave = new UploadFile()
             {

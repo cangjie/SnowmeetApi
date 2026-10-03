@@ -29,6 +29,7 @@ namespace SnowmeetApi.Controllers
 
         [HttpGet]
         public async Task<IActionResult> Generate(int batchId, string sessionKey,
+            [FromServices] Services.Storage.IFileStorage storage,
             string sessionType = "wechat_mini_openid")
         {
             Staff staff = await Util.GetStaffBySessionKey(_db, Util.UrlDecode(sessionKey), sessionType);
@@ -59,8 +60,12 @@ namespace SnowmeetApi.Controllers
             string qrUrl = "https://mini.snowmeet.top/api/MediaHelper/ShowImageFromOfficialAccount?img="
                 + Uri.EscapeDataString("show_wechat_temp_qrcode.aspx?scene=" + batch.share_scene);
             using HttpClient client = new HttpClient();
-            string coverUrl = "https://mini.snowmeet.top" + cover.file_path_name.Trim();
-            byte[] coverBytes = await client.GetByteArrayAsync(coverUrl);
+            // 封面直接从存储读（S3，过渡期回退本机磁盘），不再绕公网回源自己
+            byte[]? coverBytes = await storage.ReadAsync(cover.file_path_name.Trim(), cover.is_web == 1);
+            if (coverBytes == null)
+            {
+                return BadRequest(new { code = 1, message = "模板海报文件不存在" });
+            }
             byte[] qrBytes = await client.GetByteArrayAsync(qrUrl);
             using Image poster = Image.Load(coverBytes);
             using Image qr = Image.Load(qrBytes);
@@ -81,17 +86,15 @@ namespace SnowmeetApi.Controllers
             poster.Mutate(x => x.DrawImage(qr,
                 new SixLabors.ImageSharp.Point(qrX, qrY), 1f));
 
-            string date = DateTime.Now.ToString("yyyyMMdd");
-            string directory = Path.Combine(Util.workingPath, "wwwroot", "upload", date);
-            Directory.CreateDirectory(directory);
-            string fileName = "ticket_poster_" + batch.id + "_" + DateTime.Now.Ticks + ".png";
-            string outputPath = Path.Combine(directory, fileName);
-            await poster.SaveAsPngAsync(outputPath, new PngEncoder());
+            using MemoryStream png = new MemoryStream();
+            await poster.SaveAsPngAsync(png, new PngEncoder());
+            png.Position = 0;
+            string relativePath = await storage.SaveAsync(png, "poster.png", true, "ticket_poster_" + batch.id + "_");
             return Ok(new ApiResult<object>()
             {
                 code = 0,
                 message = "",
-                data = new { url = "https://mini.snowmeet.top/upload/" + date + "/" + fileName }
+                data = new { url = storage.PublicUrl(relativePath) }
             });
         }
     }
