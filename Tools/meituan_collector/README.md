@@ -15,7 +15,7 @@
 
 ## 安装
 
-需要 Python 3.10 及以上，电脑上装有 Edge 或 Chrome。
+需要 **Python 3.11 及以上**（3.10 的 asyncio 超时异常和内置 `TimeoutError` 不是同一个，常驻会报错退出），电脑上装有 Edge 或 Chrome。
 
 Windows：
 
@@ -215,6 +215,24 @@ Register-ScheduledTask -TaskName MeituanCollector -Action $a -Trigger $t -Settin
 3. 重新启动。
 
 `collector.json`、`profile/`、`out/` 保留不动，就不用重新登录。
+
+## 换电脑
+
+**同一时间只能有一台电脑在跑**：两台同时跑会重复抓取，服务器收到的心跳也会混在一起。
+
+1. 旧电脑：停掉采集程序和它的自动启动。
+2. 新电脑：装 Python 3.11+ 和 Edge（或 Chrome），把整个 `meituan_collector` 文件夹拷过去，或者从 git 拉取 SnowmeetApi 的 `ai` 分支。
+3. 从旧电脑拷过来：
+   - `collector.json`：手机号、开始日期、`server_token` 都在里面。
+   - `out/`：已抓的订单和补抓进度（`coverage.json`）。拷过来就不用重新补抓；不拷也行，程序会从 `start_date` 起重新补抓，只是旧电脑上的数据要自己合并。
+4. 不要拷：
+   - `.venv/`：里面写死了旧电脑的路径，要在新电脑上重建。
+   - `profile/`：浏览器把登录信息按电脑和系统用户加密，拷过去也用不了，要在新电脑上重新登录一次。
+5. 改 `collector.json` 的 `direct_interface`：新电脑不开 VPN 就设为 `null`；开着 VPN 就填新电脑上本地宽带网卡的名字。名字填错的话，程序会启动失败。
+6. 按「安装」一节建 `.venv` 并安装依赖。先运行 `probe --no-browser`，确认出口是中国大陆 IP、「心跳服务器」一行显示通过。
+7. 运行 `serve`，在弹出的 Edge 里用验证码登录。最后按「开机自动启动」一节配置自动启动。
+
+新电脑开始上报心跳后，服务器会发一条「已恢复上报」的提醒；停机期间的订单会自动补抓。
 
 ## 测试
 
