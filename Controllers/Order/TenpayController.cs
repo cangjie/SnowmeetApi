@@ -24,6 +24,7 @@ using wechat_miniapp_base.Models;
 using SnowmeetApi.Controllers.User;
 using Microsoft.VisualStudio.Web.CodeGenerators.Mvc.Templates.Blazor;
 using AlipaySDKNet.OpenAPI.Model;
+using SnowmeetApi.Services.Payments;
 
 namespace SnowmeetApi.Controllers
 {
@@ -353,18 +354,7 @@ namespace SnowmeetApi.Controllers
 
             try
             {
-                string cerStr = "";
-                using (StreamReader sr = new StreamReader(path + serial.Trim() + ".pem", true))
-                {
-                    cerStr = sr.ReadToEnd();
-                    sr.Close();
-                }
-                CertificateEntry ce = new CertificateEntry("RSA", cerStr);
-
-                //CertificateEntry ce = new CertificateEntry()
-
-                var manager = new InMemoryCertificateManager();
-                manager.AddEntry(ce);
+                var manager = WepayPlatformCertificates.CreateManager(key, serial, path);
                 var options = new WechatTenpayClientOptions()
                 {
                     MerchantId = key.mch_id.Trim(),
@@ -554,14 +544,6 @@ namespace SnowmeetApi.Controllers
 
 
 
-            string cerStr = "";
-            using (StreamReader sr = new StreamReader(path + serial.Trim() + ".pem", true))
-            {
-                cerStr = sr.ReadToEnd();
-                sr.Close();
-            }
-
-
             string apiKey = "";
             WepayKey key = _db.wepayKeys.Find(mchid);
 
@@ -572,13 +554,7 @@ namespace SnowmeetApi.Controllers
 
             apiKey = key.api_key.Trim();
 
-            var certManager = new InMemoryCertificateManager();
-
-            CertificateEntry ce = new CertificateEntry("RSA", serial, cerStr, DateTimeOffset.MinValue, DateTimeOffset.MaxValue);
-
-
-            certManager.AddEntry(ce);
-            //certManager.SetCertificate(serial, cerStr);
+            var certManager = WepayPlatformCertificates.CreateManager(key, serial, path);
             var options = new WechatTenpayClientOptions()
             {
                 MerchantV3Secret = apiKey,
@@ -898,12 +874,7 @@ namespace SnowmeetApi.Controllers
         {
             WepayKey key = await _db.wepayKeys.Where(k => k.id == mchId)
                 .AsNoTracking().FirstOrDefaultAsync();
-            var certManager = new InMemoryCertificateManager();
-            if (key.cert != null)
-            {
-                CertificateEntry certEntry = new CertificateEntry("RSA", key.cert);
-                certManager.AddEntry(certEntry);
-            }
+            var certManager = WepayPlatformCertificates.CreateManager(key);
             var options = new WechatTenpayClientOptions()
             {
                 MerchantId = key.mch_id.Trim(),

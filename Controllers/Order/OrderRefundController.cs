@@ -299,14 +299,6 @@ namespace SnowmeetApi.Controllers.Order
 
             
 
-            string cerStr = "";
-            using (StreamReader sr = new StreamReader(path + serial.Trim() + ".pem", true))
-            {
-                cerStr = sr.ReadToEnd();
-                sr.Close();
-            }
-
-
             string apiKey = "";
             WepayKey key = _db.wepayKeys.Find(mchid);
 
@@ -317,13 +309,7 @@ namespace SnowmeetApi.Controllers.Order
 
             apiKey = key.api_key.Trim();
 
-            var certManager = new InMemoryCertificateManager();
-
-            CertificateEntry ce = new CertificateEntry("RSA", serial, cerStr, DateTimeOffset.MinValue, DateTimeOffset.MaxValue);
-
-
-            certManager.AddEntry(ce);
-            //certManager.SetCertificate(serial, cerStr);
+            var certManager = SnowmeetApi.Services.Payments.WepayPlatformCertificates.CreateManager(key, serial, path);
             var options = new WechatTenpayClientOptions()
             {
                 MerchantV3Secret = apiKey,

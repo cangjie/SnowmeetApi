@@ -17,6 +17,9 @@ namespace wechat_miniapp_base.Models
         public string api_key { get; set; }
         public int valid { get; set; }
         public string? cert {get; set;} = null;
+        // JSON array: [{"serial_no":"...","certificate":"-----BEGIN CERTIFICATE-----..."}].
+        // Keep overlapping platform certificates together during WeChat certificate rotation.
+        public string? platform_certificates { get; set; } = null;
         public string? doc_id {get; set;} = null;
     }
 }
