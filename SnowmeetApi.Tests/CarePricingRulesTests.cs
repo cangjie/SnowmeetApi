@@ -18,6 +18,15 @@ namespace SnowmeetApi.Tests
     /// </summary>
     public class CarePricingRulesTests
     {
+        [Theory]
+        [InlineData("万龙体验中心", "万龙服务中心")]
+        [InlineData(" 万龙体验中心 ", "万龙服务中心")]
+        [InlineData("南山", "南山")]
+        public void 养护门店沿用旧版接待归属(string input, string expected)
+        {
+            Assert.Equal(expected, CarePricingRules.ResolveCareShop(input));
+        }
+
         private static Care C(int edge = 0, int wax = 0, int freeWax = 0, int unwax = 0,
             int urgent = 0, string bizType = null, string summer = null)
         {

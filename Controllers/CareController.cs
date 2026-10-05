@@ -325,7 +325,7 @@ namespace SnowmeetApi.Controllers
         [HttpGet]
         public async Task<ActionResult<ApiResult<List<Models.Product>?>>> GetProducts(string shop)
         {
-            shop = (shop ?? "").Trim();
+            shop = CarePricingRules.ResolveCareShop(shop);
             int? shopId = await _db.shop.AsNoTracking()
                 .Where(s => s.name.Trim() == shop).Select(s => (int?)s.id).FirstOrDefaultAsync();
             // 店名在 shop_list 里查不到就没有商品可匹配。返回空列表与"该店没配养护商品"同义，
@@ -1672,6 +1672,7 @@ namespace SnowmeetApi.Controllers
                     data = null
                 });
             }
+            order.shop = CarePricingRules.ResolveCareShop(order.shop);
             order.needRender = false;
             // 防级联清理（同 SaveRentRecept）：JSON 往返回来的 member/staff 子图会让 _db.Update(order)
             // 在 TrackGraph 阶段抛 Value cannot be null (key)。本接口只管 order 标量 + cares 子图，

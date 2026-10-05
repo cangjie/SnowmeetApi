@@ -3148,6 +3148,7 @@ namespace SnowmeetApi.Controllers
                     data = null
                 });
             }
+            order.shop = CarePricingRules.ResolveCareShop(order.shop);
             // 非雪季养护生效时会给会员发 17/18 票券（EffectCareOrder 里 (int)member_id 强转），
             // 散客单必须先匹配会员，否则生效阶段直接抛异常
             for (int i = 0; i < order.cares.Count; i++)

@@ -24,6 +24,14 @@ namespace SnowmeetApi.Helpers
     /// </summary>
     public static class CarePricingRules
     {
+        // 旧版 ReceptController 的养护门店规则：体验中心只做租赁/零售，
+        // 万龙养护统一由服务中心接单。新版接待页也必须沿用同一归属。
+        public static string ResolveCareShop(string? shop)
+        {
+            string name = (shop ?? "").Trim();
+            return name == "万龙体验中心" ? "万龙服务中心" : name;
+        }
+
         public const string SummerBizType = "非雪季养护";
         public const string SummerProductName = "非雪季养护";
         /// <summary>直接寄存：这次做的就是"非雪季养护"整包，没有单项服务。</summary>
