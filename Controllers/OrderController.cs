@@ -1704,9 +1704,9 @@ namespace SnowmeetApi.Controllers
             string sessionKey, string sessionType = "wechat_mini_openid")
         {
             MemberController _memberHelper = new MemberController(_db, _config);
-            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
+            var (member, payerOpenId) = await _memberHelper.GetWechatPayerBySessionKey(sessionKey, sessionType);
             string message = "";
-            if (member == null || member.wechatMiniOpenId == null)
+            if (member == null || string.IsNullOrWhiteSpace(payerOpenId))
             {
                 message = "未找到用户";
             }
@@ -1759,7 +1759,7 @@ namespace SnowmeetApi.Controllers
             if (payment.member_id == null)
             {
                 payment.member_id = member.id;
-                payment.open_id = member.wechatMiniOpenId.Trim();
+                payment.open_id = payerOpenId;
                 payment.update_date = DateTime.Now;
                 payment.out_trade_no = outTradeNo.Trim();
                 _db.orderPayment.Entry(payment).State = EntityState.Modified;
@@ -1786,7 +1786,7 @@ namespace SnowmeetApi.Controllers
                 };
                 await _db.coreDataModLog.AddAsync(log);
                 payment.member_id = member.id;
-                payment.open_id = member.wechatMiniOpenId.Trim();
+                payment.open_id = payerOpenId;
                 payment.out_trade_no = outTradeNo.Trim();
                 payment.prepay_id = null;
                 payment.timestamp = null;
@@ -1801,11 +1801,10 @@ namespace SnowmeetApi.Controllers
             // 但 open_id 还是订单原会员的(或 null)；此处必须补写 open_id + out_trade_no 并清空 prepay 字段，
             // 否则 TenpayRequest 拿错的 openid 申请 prepay，wx.requestPayment 会因 openid 不匹配弹不出窗
             if (payment.member_id == member.id
-                && member.wechatMiniOpenId != null
                 && (payment.open_id == null
-                    || payment.open_id.Trim() != member.wechatMiniOpenId.Trim()))
+                    || payment.open_id.Trim() != payerOpenId))
             {
-                payment.open_id = member.wechatMiniOpenId.Trim();
+                payment.open_id = payerOpenId;
                 payment.out_trade_no = outTradeNo.Trim();
                 payment.prepay_id = null;
                 payment.timestamp = null;
@@ -2110,8 +2109,8 @@ namespace SnowmeetApi.Controllers
                 message = "订单已经支付过";
             }
             MemberController _memberHelper = new MemberController(_db, _config);
-            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
-            if (member == null || member.wechatMiniOpenId == null)
+            var (member, payerOpenId) = await _memberHelper.GetWechatPayerBySessionKey(sessionKey, sessionType);
+            if (member == null || string.IsNullOrWhiteSpace(payerOpenId))
             {
                 message = "未找到用户";
             }
@@ -2124,7 +2123,7 @@ namespace SnowmeetApi.Controllers
                     data = null
                 });
             }
-            OrderPayment payment = await GetReadyOrderPayment(order, amount, payMethod, member.id, member.wechatMiniOpenId, needShare);
+            OrderPayment payment = await GetReadyOrderPayment(order, amount, payMethod, member.id, payerOpenId, needShare);
             order.pay_flow_status = Models.Order.PayFlowStatus.支付中.ToString();
             //order.update_date = DateTime.Now;
             await UpdateOrder(order, member.id, null, "微信支付点击支付按钮");
@@ -3221,6 +3220,15 @@ namespace SnowmeetApi.Controllers
                     }
                 }
                 var (commonCharge, ticketDiscount) = await _careHelper.CalcCharge(order.shop, care, ticket, card);
+                if (commonCharge == 0 && !care.use_card && !care.warranty && !care.entertain
+                    && CarePricingRules.CountChargeableItems(care) > 0
+                    && await _careHelper.GetProduct(order.shop, care) == null)
+                {
+                    return Ok(new ApiResult<Models.Order>()
+                    {
+                        code = 1, message = "当前门店未配置养护价格，请核对门店", data = null
+                    });
+                }
                 care.common_charge = commonCharge;
                 if (ticketDiscount > 0 && care.discount < ticketDiscount)
                 {

@@ -82,6 +82,30 @@ namespace SnowmeetApi.Controllers
                 }
             }
         }
+        // 微信支付必须使用本次小程序登录得到的 openid。会员可能只通过 unionid 匹配到，
+        // 尚无 wechat_mini_openid 的 MSA；此时登录会话仍保存着可支付的 openid。
+        [NonAction]
+        public async Task<(Member? member, string? openId)> GetWechatPayerBySessionKey(string sessionKey,
+            string sessionType = "wechat_mini_openid")
+        {
+            if (string.IsNullOrWhiteSpace(sessionKey) || sessionType != "wechat_mini_openid")
+            {
+                return (null, null);
+            }
+            string key = Util.UrlDecode(sessionKey).Trim();
+            MiniSession? session = await _db.miniSession
+                .Where(s => s.session_key.Trim() == key && s.session_type == "wechat_mini_openid"
+                    && s.valid == 1 && s.expire_date >= DateTime.Now && s.member_id != null)
+                .AsNoTracking().FirstOrDefaultAsync();
+            if (session?.member_id == null)
+            {
+                return (null, null);
+            }
+            Member? member = await GetWholeMemberById(session.member_id.Value);
+            string? openId = !string.IsNullOrWhiteSpace(session.wechat_openid)
+                ? session.wechat_openid.Trim() : member?.wechatMiniOpenId;
+            return (member, openId);
+        }
         [NonAction]
         public async Task MergeMember(int sourceId, int targetId)
         {

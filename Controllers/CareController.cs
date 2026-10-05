@@ -642,6 +642,16 @@ namespace SnowmeetApi.Controllers
                 ApplyServiceLinkage(care, req.changedField.Trim());
             }
             var (commonCharge, ticketDiscount) = await CalcCharge(shop.Trim(), care, ticket, card);
+            // 有收费项目但找不到该店的商品时，不能把缺配置误当成免费养护。
+            if (commonCharge == 0 && !care.use_card && !care.warranty && !care.entertain
+                && CarePricingRules.CountChargeableItems(care) > 0
+                && await GetProduct(shop.Trim(), care) == null)
+            {
+                return Ok(new ApiResult<object>()
+                {
+                    code = 1, message = "当前门店未配置养护价格，请核对门店", data = null
+                });
+            }
             care.common_charge = commonCharge;
             if (ticketDiscount > 0 && care.discount < ticketDiscount)
             {
