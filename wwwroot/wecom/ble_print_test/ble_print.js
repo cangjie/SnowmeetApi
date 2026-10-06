@@ -10,7 +10,8 @@ var BlePrint = (function () {
     'startBluetoothDevicesDiscovery', 'stopBluetoothDevicesDiscovery', 'getBluetoothDevices', 'onBluetoothDeviceFound',
     'createBLEConnection', 'closeBLEConnection', 'onBLEConnectionStateChange',
     'getBLEDeviceServices', 'getBLEDeviceCharacteristics', 'readBLECharacteristicValue',
-    'writeBLECharacteristicValue', 'notifyBLECharacteristicValueChange', 'onBLECharacteristicValueChange'
+    'writeBLECharacteristicValue', 'notifyBLECharacteristicValueChange', 'onBLECharacteristicValueChange',
+    'scanQRCode'
   ];
   var SCAN_MS = 3000;
   // 数据库 printer 表没拉到时的兜底：现有打印机名都是这两种前缀
@@ -111,8 +112,9 @@ var BlePrint = (function () {
     });
     ww.onBLEConnectionStateChange(function (res) {
       if (connected && res.deviceId === connected.deviceId && !res.connected) {
-        log('打印机连接已断开：' + connected.name);
+        var disconnectedName = connected.name;
         connected = null;
+        log('打印机连接已断开：' + disconnectedName);
       }
     });
     return corpOk || agentOk;
@@ -290,5 +292,6 @@ var BlePrint = (function () {
     }
   }
 
-  return { register: register, print: print, disconnect: disconnect, release: release };
+  return { register: register, print: print, disconnect: disconnect, release: release,
+    connect: ensureConnected, getConnection: function () { return connected; } };
 })();

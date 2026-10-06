@@ -49,6 +49,9 @@ public class FnbV4HttpContractTests
         Assert.DoesNotContain(actions, a => a.ControllerName == "FnbMaterial" &&
             a.ActionName is "GetBatches" or "SaveBatch" or "DisposeBatch" or "DeleteBatch" or "GenBatchNo" or "PushExpireAlert");
         using var client = server.CreateClient();
+        var labelLink = await client.GetAsync("/fnb/b?id=9223372036854775806&source=label");
+        Assert.Equal(HttpStatusCode.Redirect, labelLink.StatusCode);
+        Assert.Equal("/fnb/v4/index.html?id=9223372036854775806&source=label", labelLink.Headers.Location?.OriginalString);
         var response = await client.GetAsync("/api/FnbAuth/GetMe?sessionKey=missing");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
