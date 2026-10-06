@@ -17,7 +17,7 @@ public sealed class FnbSqlServerFactAttribute : FactAttribute
     }
 }
 
-public class FnbSqlServerIntegrationTests
+public partial class FnbSqlServerIntegrationTests
 {
     private static int _sequence;
     private static ApplicationDBContext Open()
@@ -31,7 +31,7 @@ public class FnbSqlServerIntegrationTests
             .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking).Options);
     }
     private sealed record Seed(int ShopId, int ManagerId, int WorkerId, string Mini, string WeCom,
-        string WorkerMini, string WeComId, int ParentId, int CategoryId, int ItemId, int FinalFormId);
+        string WorkerMini, string WeComId, int ParentId, int CategoryId, int ItemId, int FinalFormId, int AreaId);
     private static async Task<T> Catalog<T>(Seed s, Func<FnbCatalogController, Task<ApiResult<object>>> call)
     {
         await using var db = Open(); var result = await call(new(db));
@@ -69,7 +69,11 @@ public class FnbSqlServerIntegrationTests
         var r = await new FnbRouteController(db).CreateItem(mini, new(shop.id, child.id, "牛肉", "牛肉片", "g"));
         Assert.Equal(0, r.code); var item = Assert.IsType<FnbItem>(r.data);
         var final = await db.fnbItemForm.SingleAsync(x => x.item_id == item.id);
-        return new(shop.id, manager.id, worker.id, mini, wecom, workerMini, "wecom" + key, parent.id, child.id, item.id, final.id);
+        var areaParent = new FnbArea { shop_id = shop.id, name = "仓库", area_type = "warehouse", valid = true, created_at = DateTime.UtcNow };
+        db.fnbArea.Add(areaParent); await db.SaveChangesAsync();
+        var area = new FnbArea { shop_id = shop.id, parent_id = areaParent.id, name = "冷库", area_type = "cold", valid = true, created_at = DateTime.UtcNow };
+        db.fnbArea.Add(area); await db.SaveChangesAsync();
+        return new(shop.id, manager.id, worker.id, mini, wecom, workerMini, "wecom" + key, parent.id, child.id, item.id, final.id, area.id);
     }
     private static IConfiguration Config => new ConfigurationBuilder().Build();
     private sealed class Gateway(string? id) : IFnbWeComLoginGateway

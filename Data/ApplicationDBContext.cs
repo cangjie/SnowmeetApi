@@ -218,6 +218,19 @@ namespace SnowmeetApi.Data
         public DbSet<Models.Fnb.FnbMaterialBatch> fnbMaterialBatch { get; set; }
         public DbSet<Models.Fnb.FnbMaterialAlertLog> fnbMaterialAlertLog { get; set; }
         public DbSet<FnbUnit> fnbUnit { get; set; }
+        public DbSet<FnbArea> fnbArea { get; set; }
+        public DbSet<FnbAreaImage> fnbAreaImage { get; set; }
+        public DbSet<FnbBatchDetail> fnbBatchDetail { get; set; }
+        public DbSet<FnbRequest> fnbRequest { get; set; }
+        public DbSet<FnbSupply> fnbSupply { get; set; }
+        public DbSet<FnbSupplyMovement> fnbSupplyMovement { get; set; }
+        public DbSet<FnbTool> fnbTool { get; set; }
+        public DbSet<FnbToolLog> fnbToolLog { get; set; }
+        public DbSet<FnbCheckItem> fnbCheckItem { get; set; }
+        public DbSet<FnbCheckSheet> fnbCheckSheet { get; set; }
+        public DbSet<FnbCheckLine> fnbCheckLine { get; set; }
+        public DbSet<FnbCheckHandling> fnbCheckHandling { get; set; }
+        public DbSet<FnbAlertDelivery> fnbAlertDelivery { get; set; }
         public DbSet<FnbCategory> fnbCategory { get; set; }
         public DbSet<FnbItem> fnbItem { get; set; }
         public DbSet<FnbItemForm> fnbItemForm { get; set; }

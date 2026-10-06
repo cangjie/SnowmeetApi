@@ -149,13 +149,14 @@ public sealed class FnbV4CatalogService(ApplicationDBContext db)
         var row = new FnbItemForm { item_id = input.ItemId, seq = 0,
             name = FnbV4Rules.RequiredText(input.Name, 100, "形态名称"), unit_name = FnbV4Rules.RequiredText(input.UnitName, 40, "形态单位"),
             per_base = FnbV4Rules.Quantity(input.PerBase), storage_type = input.StorageType,
-            form_code = FnbV4Rules.Code(input.FormCode, "形态编码"), shelf_after_op_days = input.ShelfAfterOpDays,
+            form_code = FnbV4Rules.Code(input.FormCode, "形态编码"),
             valid = true, created_at = DateTime.UtcNow };
         ValidateForm(row);
         if (forms.Any(x => x.form_code == row.form_code)) throw Invalid("该食材的形态编码已存在");
         // 先移至不重叠区间，再整体归位；避免唯一索引在逐行 UPDATE 时撞号。
         top.in_op_name = input.OpName.Trim(); top.in_op_ratio = FnbV4Rules.Ratio(row.per_base, top.per_base);
         top.in_op_yield = input.StandardYield; top.in_op_hours = input.DurationHours;
+        if (input.ShelfAfterOpDays != null) { FnbV4Rules.Days(input.ShelfAfterOpDays); top.shelf_after_op_days = input.ShelfAfterOpDays; }
         int offset = forms.Count + 1;
         foreach (var form in forms) { form.seq += offset; form.updated_at = DateTime.UtcNow; Modified(form); }
         await db.SaveChangesAsync();

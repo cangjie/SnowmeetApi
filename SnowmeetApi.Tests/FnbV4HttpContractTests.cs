@@ -45,6 +45,10 @@ public class FnbV4HttpContractTests
         var v4 = actions.Where(a => a.ControllerName is "FnbAuth" or "FnbCatalog" or "FnbRoute")
             .Select(a => a.ControllerName + "/" + a.ActionName).OrderBy(x => x).ToArray();
         Assert.Equal(expected.OrderBy(x => x), v4);
+        string[] complete = ["FnbArea/SaveArea", "FnbCheck/Submit", "FnbSupply/PostMovement", "FnbTool/ChangeStatus",
+            "FnbInbound/PostReceipt", "FnbStock/GetBatch", "FnbOperation/PostOperation", "FnbPrep/PostPreparation",
+            "FnbDish/SaveSpecLines", "FnbServe/PostServe", "FnbV4Stocktake/PostStocktake", "FnbV4Report/DownloadRecipeChain", "FnbLabel/GetLabelData", "FnbV4Alert/PushExpireAlert"];
+        foreach (var endpoint in complete) Assert.Contains(endpoint, actions.Select(x => x.ControllerName + "/" + x.ActionName));
         Assert.DoesNotContain(actions, a => a.ControllerName is "FnbInventory" or "FnbRecipe" or "FnbKitchen" or "FnbReport" or "FnbStocktake");
         Assert.DoesNotContain(actions, a => a.ControllerName == "FnbMaterial" &&
             a.ActionName is "GetBatches" or "SaveBatch" or "DisposeBatch" or "DeleteBatch" or "GenBatchNo" or "PushExpireAlert");
@@ -65,5 +69,9 @@ public class FnbV4HttpContractTests
         Assert.Equal(1, missingCodeJson.RootElement.GetProperty("code").GetInt32());
         Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsync("/api/FnbRoute/CreateItem?sessionKey=missing",
             new StringContent("{\"shopId\":\"invalid\"}", Encoding.UTF8, "application/json"))).StatusCode);
+        var longBody = await client.PostAsync("/api/FnbServe/PostServe?sessionKey=missing", new StringContent(
+            "{\"shopId\":1,\"requestId\":\"e0bbec70-3dd8-448d-a835-7e5f17bf0c01\",\"orderId\":\"9223372036854775806\"}", Encoding.UTF8, "application/json"));
+        Assert.Equal(HttpStatusCode.OK, longBody.StatusCode);
+        using var longJson = JsonDocument.Parse(await longBody.Content.ReadAsStringAsync()); Assert.Equal(2, longJson.RootElement.GetProperty("code").GetInt32());
     }
 }

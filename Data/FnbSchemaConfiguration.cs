@@ -173,6 +173,7 @@ internal static class FnbSchemaConfiguration
         operation.HasIndex(x => x.document_id).IsUnique();
         Check(operation, sqlServer, "value", "input_qty > 0 AND std_ratio > 0 AND std_yield > 0 AND std_yield <= 1 AND expected_qty >= 0 AND actual_qty >= 0 AND loss_base_qty >= 0 AND duration_hours >= 0 AND status IN ('running','done')");
 
+        ConfigureOperations(m, sqlServer);
         m.Entity<FnbStockView>(e => { e.HasNoKey(); e.ToView("vw_fnb_v4_stock"); });
         m.Entity<FnbLossView>(e => { e.HasNoKey(); e.ToView("vw_fnb_v4_loss"); e.Property(x => x.business_date).HasColumnType("date"); });
         foreach (var entity in m.Model.GetEntityTypes().Where(x => (x.GetTableName() ?? "").StartsWith("fnb_") || (x.GetViewName() ?? "").StartsWith("vw_fnb_")))
@@ -181,12 +182,64 @@ internal static class FnbSchemaConfiguration
             {
                 var b = m.Entity(entity.ClrType).Property(p.Name);
                 if ((p.ClrType == typeof(decimal) || p.ClrType == typeof(decimal?)) && p.GetPrecision() == null) b.HasPrecision(19, 6);
-                if (sqlServer && p.ClrType == typeof(string)) b.HasColumnType($"varchar({p.GetMaxLength() ?? 200})").UseCollation("Chinese_PRC_CI_AS");
+                if (sqlServer && p.ClrType == typeof(string)) b.HasColumnType(p.GetColumnType() == "varchar(max)" ? "varchar(max)" : $"varchar({p.GetMaxLength() ?? 200})").UseCollation("Chinese_PRC_CI_AS");
                 if (sqlServer && (p.ClrType == typeof(DateTime) || p.ClrType == typeof(DateTime?)) && p.GetColumnType() != "date") b.HasColumnType("datetime2(3)");
                 if (p.Name == "valid") b.HasDefaultValue(true).HasSentinel(true);
                 if (p.Name == "row_version") b.IsRowVersion();
             }
         }
+    }
+
+    private static void ConfigureOperations(ModelBuilder m, bool sql)
+    {
+        var area = Table<FnbArea>(m, "fnb_area"); area.HasKey(x => x.id);
+        Text(area, "name", 100); Text(area, "area_type", 20);
+        area.HasOne<Shop>().WithMany().HasForeignKey(x => x.shop_id).OnDelete(DeleteBehavior.NoAction);
+        area.HasOne<FnbArea>().WithMany().HasForeignKey(x => x.parent_id).OnDelete(DeleteBehavior.NoAction);
+        area.HasIndex(x => new { x.shop_id, x.parent_id, x.name }).IsUnique().HasFilter("[valid] = 1");
+        var image = Table<FnbAreaImage>(m, "fnb_area_image"); image.HasKey(x => new { x.area_id, x.upload_id });
+        image.HasOne<FnbArea>().WithMany().HasForeignKey(x => x.area_id).OnDelete(DeleteBehavior.NoAction);
+        image.HasOne<UploadFile>().WithMany().HasForeignKey(x => x.upload_id).OnDelete(DeleteBehavior.NoAction);
+        var detail = Table<FnbBatchDetail>(m, "fnb_batch_detail"); detail.HasKey(x => x.batch_id); detail.Property(x => x.batch_id).ValueGeneratedNever(); Text(detail, "open_storage", 20);
+        detail.HasOne<FnbBatch>().WithMany().HasForeignKey(x => x.batch_id).OnDelete(DeleteBehavior.NoAction);
+        detail.HasOne<FnbArea>().WithMany().HasForeignKey(x => x.area_id).OnDelete(DeleteBehavior.NoAction);
+        var request = Table<FnbRequest>(m, "fnb_request"); request.HasKey(x => new { x.shop_id, x.action, x.request_id });
+        Text(request, "action", 100); Text(request, "payload_hash", 64); request.Property(x => x.response_json).IsUnicode(false);
+        if (sql) request.Property(x => x.response_json).HasColumnType("varchar(max)");
+        var supply = Table<FnbSupply>(m, "fnb_supply"); supply.HasKey(x => x.id);
+        Text(supply, "name", 200); Text(supply, "supply_type", 16); Text(supply, "spec", 200); Text(supply, "pack_label", 40);
+        supply.HasOne<FnbArea>().WithMany().HasForeignKey(x => x.area_id).OnDelete(DeleteBehavior.NoAction);
+        supply.HasOne<Shop>().WithMany().HasForeignKey(x => x.shop_id).OnDelete(DeleteBehavior.NoAction);
+        supply.HasIndex(x => new { x.shop_id, x.name }).IsUnique().HasFilter("[valid] = 1");
+        Check(supply, sql, "value", "pack_size > 0 AND quantity >= 0 AND last_receipt_qty >= 0 AND supply_type IN ('disposable','reusable') AND (low_stock_ratio IS NULL OR low_stock_qty IS NULL)");
+        var sm = Table<FnbSupplyMovement>(m, "fnb_supply_movement"); sm.HasKey(x => x.id); Text(sm, "movement_type", 16); Text(sm, "reason", 600);
+        sm.HasOne<FnbSupply>().WithMany().HasForeignKey(x => x.supply_id).OnDelete(DeleteBehavior.NoAction);
+        sm.HasIndex(x => new { x.supply_id, x.request_id }).IsUnique(); Check(sm, sql, "value", "quantity > 0 AND balance_qty >= 0 AND movement_type IN ('in','out','waste')");
+        var tool = Table<FnbTool>(m, "fnb_tool"); tool.HasKey(x => x.id); Text(tool, "name", 200); Text(tool, "asset_no", 64); Text(tool, "spec", 200); Text(tool, "status", 16);
+        tool.HasOne<Shop>().WithMany().HasForeignKey(x => x.shop_id).OnDelete(DeleteBehavior.NoAction);
+        tool.HasOne<FnbArea>().WithMany().HasForeignKey(x => x.area_id).OnDelete(DeleteBehavior.NoAction);
+        tool.HasIndex(x => new { x.shop_id, x.asset_no }).IsUnique(); tool.Property(x => x.last_check_date).HasColumnType("date");
+        Check(tool, sql, "value", "quantity > 0 AND status IN ('normal','missing','damaged','repairing','disposed')");
+        var log = Table<FnbToolLog>(m, "fnb_tool_log"); log.HasKey(x => x.id); Text(log, "from_status", 16); Text(log, "to_status", 16); Text(log, "remark", 600);
+        log.HasOne<FnbTool>().WithMany().HasForeignKey(x => x.tool_id).OnDelete(DeleteBehavior.NoAction);
+        var ci = Table<FnbCheckItem>(m, "fnb_check_item"); ci.HasKey(x => x.id); Text(ci, "name", 200); Text(ci, "kind", 20); Text(ci, "method", 16); Text(ci, "unit", 40);
+        ci.HasOne<FnbArea>().WithMany().HasForeignKey(x => x.area_id).OnDelete(DeleteBehavior.NoAction);
+        ci.HasOne<FnbTool>().WithMany().HasForeignKey(x => x.tool_id).OnDelete(DeleteBehavior.NoAction);
+        ci.HasOne<FnbSupply>().WithMany().HasForeignKey(x => x.supply_id).OnDelete(DeleteBehavior.NoAction);
+        Check(ci, sql, "value", "method IN ('yes_no','number','photo') AND (minimum IS NULL OR maximum IS NULL OR minimum <= maximum)");
+        var sheet = Table<FnbCheckSheet>(m, "fnb_check_sheet"); sheet.HasKey(x => x.id); Text(sheet, "status", 16); Text(sheet, "fingerprint", 64);
+        sheet.Property(x => x.business_date).HasColumnType("date"); sheet.HasIndex(x => new { x.shop_id, x.business_date }).IsUnique();
+        sheet.HasOne<Shop>().WithMany().HasForeignKey(x => x.shop_id).OnDelete(DeleteBehavior.NoAction);
+        var cl = Table<FnbCheckLine>(m, "fnb_check_line"); cl.HasKey(x => x.id); Text(cl, "snapshot_json", 4000); Text(cl, "result", 16); Text(cl, "reason", 1000);
+        cl.HasOne<FnbCheckSheet>().WithMany().HasForeignKey(x => x.sheet_id).OnDelete(DeleteBehavior.NoAction);
+        cl.HasOne<FnbCheckItem>().WithMany().HasForeignKey(x => x.item_id).OnDelete(DeleteBehavior.NoAction);
+        cl.HasOne<UploadFile>().WithMany().HasForeignKey(x => x.upload_id).OnDelete(DeleteBehavior.NoAction);
+        cl.HasIndex(x => new { x.sheet_id, x.item_id }).IsUnique();
+        var handling = Table<FnbCheckHandling>(m, "fnb_check_handling"); handling.HasKey(x => x.id); Text(handling, "remark", 1000);
+        handling.HasOne<FnbCheckLine>().WithMany().HasForeignKey(x => x.line_id).OnDelete(DeleteBehavior.NoAction);
+        var alert = Table<FnbAlertDelivery>(m, "fnb_alert_delivery"); alert.HasKey(x => new { x.batch_id, x.business_date });
+        alert.Property(x => x.business_date).HasColumnType("date"); Text(alert, "status", 16); Text(alert, "receivers", 1000); Text(alert, "message_id", 200); Text(alert, "error", 1000);
+        alert.HasOne<FnbBatch>().WithMany().HasForeignKey(x => x.batch_id).OnDelete(DeleteBehavior.NoAction);
     }
 
     private static EntityTypeBuilder<T> Table<T>(ModelBuilder m, string name) where T : class
