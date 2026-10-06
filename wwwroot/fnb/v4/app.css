@@ -10,6 +10,11 @@
 .photo-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:12px 0}
 .area-children{margin-left:18px;border-left:3px solid #dbe4ff;padding-left:10px}
 .area-children .card{margin-bottom:14px}
+.area-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.area-heading h2{margin:0;overflow-wrap:anywhere;min-width:0}
+.area-toggle{border:0;border-radius:9px;background:#eff4ff;color:var(--blue);padding:8px 10px;min-height:40px;font-size:11px;font-weight:600;display:inline-flex;align-items:center;gap:8px;flex:none}
+.area-toggle:after{content:'';width:6px;height:6px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(45deg)}
+.area-toggle[aria-expanded=true]:after{transform:rotate(225deg)}
 .ingredient-row,.order-entry{padding:12px 0;border-bottom:1px solid #e8eaf0}
 .report td{overflow-wrap:anywhere;max-width:240px}
 .card .actions{flex-wrap:wrap}
