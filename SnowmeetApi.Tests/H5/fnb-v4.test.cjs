@@ -13,6 +13,37 @@ function fixture(responses, extra) {
   return { api, calls, store };
 }
 const identity = { code: 0, data: { staffId: 7, shopId: 12, shopName: '测试门店', name: '陈', isManager: true } };
+test('未确认的库存提交持久保存原 ID，刷新后同内容重试；改内容拒绝', async () => {
+  const f = fixture([identity, new Error('connection lost'), { code: 0, data: { documentId: '9007199254740993' } }]);
+  await f.api.authenticate({ search:'',pathname:'/',hash:'' }, { replaceState() {} });
+  const storage = { getItem:k=>f.store.get(k),setItem:(k,v)=>f.store.set(k,v) };
+  const body = { lines:[{itemId:1,quantity:2}],remark:'测试单' };
+  await assert.rejects(client.createWrites(f.api,storage).post('FnbInbound','PostReceipt',body));
+  const original = JSON.parse(f.calls[1].init.body).requestId;
+  const resumed = client.createWrites(f.api,storage);
+  await assert.rejects(resumed.post('FnbInbound','PostReceipt',{...body,remark:'改过的单'}),/先重试原单/);
+  const result = await resumed.retry('FnbInbound/PostReceipt');
+  assert.equal(JSON.parse(f.calls[2].init.body).requestId,original); assert.equal(result.documentId,'9007199254740993');
+  assert.equal(resumed.pending().length,0);
+});
+test('明确业务拒绝允许改表单生成新 ID，原内容重试仍沿用 ID', async () => {
+  const f = fixture([identity,{code:4,message:'库存冲突'},{code:1,message:'数量错误'},{code:0,data:{}}]);
+  await f.api.authenticate({search:'',pathname:'/',hash:''},{replaceState(){}});
+  const w = client.createWrites(f.api,{getItem:k=>f.store.get(k),setItem:(k,v)=>f.store.set(k,v)});
+  await assert.rejects(w.post('FnbStock','PostWaste',{batchId:1,quantity:2}));
+  const id = JSON.parse(f.calls[1].init.body).requestId;
+  await assert.rejects(w.post('FnbStock','PostWaste',{batchId:1,quantity:2}));
+  assert.equal(JSON.parse(f.calls[2].init.body).requestId,id);
+  await w.post('FnbStock','PostWaste',{batchId:1,quantity:1}); assert.notEqual(JSON.parse(f.calls[3].init.body).requestId,id);
+});
+test('报表下载共用会话和门店，JSON 业务失败不会伪装成 Excel', async () => {
+  const f = fixture([identity]); await f.api.authenticate({search:'',pathname:'/',hash:''},{replaceState(){}});
+  let url;
+  const download = client.create({ storage:{getItem:()=> 'qa-session',removeItem(){}}, fetch:async u=>{url=u;return {ok:true,status:200,headers:{get:()=> 'application/json'},json:async()=>({code:2,message:'会话失效'})};} });
+  // 验证通用 request 的 JSON 下载分支，身份接口无需门店。
+  await assert.rejects(download.request('FnbAuth','GetMe',{shop:false,download:true}),e=>e.code===2);
+  assert.match(url,/sessionKey=qa-session/);
+});
 const location = { origin: 'https://mini.snowmeet.top', pathname: '/fnb/v4/index.html', search: '', hash: '#routes?item=23' };
 test('百分比呈现与输入不引入二进制尾数或超过接口的小数精度', () => {
   assert.equal(client.percentInput(.961234), '96.1234');

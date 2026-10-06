@@ -16,7 +16,6 @@
   const empty = text => '<div class="empty">' + esc(text) + '</div>';
   const badge = (text, color) => '<span class="badge ' + (color || '') + '">' + esc(text) + '</span>';
   const note = text => '<p class="section-note">' + esc(text) + '</p>';
-  const pending = text => '<div class="notice"><strong>该功能暂未开通</strong><p>' + esc(text || '可以先维护分类、食材档案、形态链路和进货规格。') + '</p></div>';
   function field(name, label, value, type, extra) { return '<label class="field"><span>' + esc(label) + '</span><input name="' + name + '" type="' + (type || 'text') + '" value="' + esc(value) + '" ' + (extra || '') + '></label>'; }
   function select(name, label, entries, value, extra) { return '<label class="field"><span>' + esc(label) + '</span><select name="' + name + '" ' + (extra || '') + '>' + entries.map(e => '<option value="' + esc(e[0]) + '"' + (String(e[0]) === String(value) ? ' selected' : '') + '>' + esc(e[1]) + '</option>').join('') + '</select></label>'; }
   function check(name, text, value) { return '<label class="field check"><input type="checkbox" name="' + name + '"' + (value ? ' checked' : '') + '><span>' + esc(text) + '</span></label>'; }
@@ -48,12 +47,14 @@
     $('page').innerHTML = empty('正在加载…');
     try {
       await loadMaster(force);
+      const operationData = await operations.load(state.screen, state.params);
       let route = null;
       if (state.screen === 'routes' && state.items.length) {
         const id = state.params.get('item') || state.items[0].item.id;
         route = await api.request('FnbRoute', 'GetRoute', { params: { itemId: id } });
       }
       if (generation !== state.generation) return;
+      operations.setModel(operationData);
       state.route = route; $('page').innerHTML = views[state.screen](); $('page').scrollTop = 0;
       if (state.screen === 'inbound') await inboundSelection();
       if (state.screen === 'printer') updatePrinterState();
@@ -61,13 +62,6 @@
   }
   function back(screen) { return button('‹ 返回' + (titles[screen] ? titles[screen][0] : ''), 'navigate', screen, 'back'); }
   function quick(title, subtitle, screen, square) { return '<button type="button" class="card quick" data-action="navigate" data-id="' + screen + '"><span class="square">' + esc(square || '—') + '</span><span class="grow"><span class="strong">' + esc(title) + '</span><span class="hint" style="display:block">' + esc(subtitle) + '</span></span><span class="chevron">›</span></button>'; }
-  function stock() {
-    return '<div class="stack">' + quick('今日开门检查', '按区域记录营业状态', 'check', '检') + quick('用量预警', '查看出品态与物资余量', 'low')
-      + '<div class="stats">' + [['餐饮物资', 'supplies'], ['餐饮工具', 'tools'], ['存储区域', 'areas']].map(t => '<button class="menu" data-action="navigate" data-id="' + t[1] + '"><span class="strong small">' + t[0] + '</span></button>').join('') + '</div>'
-      + quick('临期与过期批次', '按有效到期查看批次', 'expiry') + '<div class="stats">' + ['在库品种', '批次', '已开封'].map(t => '<div class="stat"><div class="number">—</div><div class="hint">' + t + '</div></div>').join('') + '</div>'
-      + pending('库存查询和入库功能开通后，这里会显示真实批次与可出餐数量。') + '<input class="search" aria-label="搜索食材档案" placeholder="搜索食材档案" data-filter-items>'
-      + '<section class="card"><div class="row between"><h2>食材档案</h2>' + button('维护链路 ›', 'navigate', 'routes', 'link') + '</div><div id="item-list">' + itemList(state.items) + '</div></section></div>';
-  }
   function itemList(rows) { return rows.length ? rows.map(r => '<button type="button" class="menu list-row" data-action="item-route" data-id="' + esc(r.item.id) + '"><span class="thumb">' + esc(r.item.name.slice(0, 2)) + '</span><span class="grow"><span class="strong">' + esc(r.item.name) + '</span><span class="hint" style="display:block">' + esc(r.categoryName) + ' · ' + esc(unitNames[r.item.base_unit_code] || r.item.base_unit_code) + '</span></span>' + badge('已建档', 'blue') + '</button>').join('') : empty('还没有食材档案，先建分类，再创建食材'); }
   function more() { return '<div class="stack">' + menus.map(m => '<button type="button" class="menu" data-action="navigate" data-id="' + m[0] + '"><span class="grow"><span class="menu-title">' + m[1] + '</span><span class="hint" style="display:block">' + m[2] + '</span></span><span class="chevron">›</span></button>').join('') + '</div>'; }
   function cats() {
@@ -151,16 +145,6 @@
     const context = $('modal')._rules; if (!context) return;
     openModal('保质期规则', '<form data-form="rule" data-kind="' + context.kind + '" data-owner="' + context.id + '" data-id="' + (rule ? rule.id : 0) + '">' + select('storageType', '储存方式', storeOptions, rule ? rule.storage_type : 'chilled') + select('season', '生产月份分档', [['all', '全年'], ['warm', '暖季（6–9 月）'], ['cold', '冷季（其他月份）']], rule ? rule.season : 'all') + field('days', '保质天数', rule ? rule.days : '', 'number', 'required min="1" max="36500" step="1"') + check('valid', '启用规则', rule ? rule.valid : true) + beforeSave + saveButton() + '</form>');
   }
-  function inbound() {
-    return '<div class="stack">' + pending('入库提交暂未开通；可先选食材、规格、录入日期和照片，整理待提交清单。')
-      + '<form id="inbound-form" class="card" data-form="inbound-draft"><div class="step"><b>1</b>选择分类与食材</div>' + select('categoryId', '二级分类', [['', '全部分类']].concat(catOptions()), '') + select('itemId', '食材名称', [['', '请选择食材']].concat(itemOptions()), '', 'required')
-      + '<div class="step"><b>2</b>拍照建档</div><label class="field file-picker"><span>现场照片（选填）</span><span class="btn secondary">拍照 / 上传<input class="file-input" type="file" accept="image/*" capture="environment" data-inbound-photo aria-label="入库照片"></span></label><div id="inbound-photo" class="photo-picker"></div><input type="hidden" name="imageId">'
-      + '<div class="step"><b>3</b>批次号</div>' + field('batchNo', '由系统生成，也可手动填写', '', 'text', 'maxlength="100" placeholder="入库功能开通后生成"')
-      + '<div class="step"><b>4</b>储存方式与区域</div>' + select('storageType', '储存方式', storeOptions, 'chilled') + select('areaId', '存放区域', [['', '存储区域暂未开通']], '', 'disabled')
-      + '<div class="step"><b>5</b>日期</div><div class="inline-input">' + field('productionDate', '生产日期', '', 'date') + button('识别', 'ocr-date', 'productionDate', 'btn secondary compact') + '</div><div class="inline-input">' + field('shelfValue', '包装保质期（按包装标注）', '', 'number', 'min="1" step="1"') + select('shelfUnit', '单位', [['天', '天'], ['月', '月']], '天') + button('识别', 'ocr-shelf', 'shelfValue', 'btn secondary compact') + '</div><div class="inline-input">' + field('expireDate', '到期日期', '', 'date') + button('识别', 'ocr-expire', 'expireDate', 'btn secondary compact') + '</div>'
-      + '<p class="hint">有效到期由服务器预览，不在页面上推算。</p><div class="step"><b>6</b>进货规格</div><div id="inbound-specs">' + empty('先选择食材') + '</div><div class="inline-input">' + field('barcodeLookup', '扫描条码自动选规格', '', 'text', 'maxlength="100"') + button('扫一扫', 'lookup-scan', null, 'btn secondary compact') + button('查找', 'lookup-barcode', null, 'btn secondary compact') + '</div>'
-      + '<div class="step"><b>7</b>数量</div>' + field('quantity', '数量（按进货规格入口形态单位）', 1, 'number', 'required min="0.000001" step="0.000001"') + '<p id="inbound-unit" class="hint">请选择进货规格</p>' + beforeSave + saveButton('加入待提交清单') + '</form><section class="card"><h2>今日入库单</h2><div id="inbound-drafts">' + draftRows() + '</div>' + button('确认入库（暂未开通）', 'unavailable', null, 'btn full', true) + '</section></div>';
-  }
   function draftRows() { return state.drafts.length ? state.drafts.map((d, i) => '<div class="draft-row"><div class="row between"><strong>' + esc(d.itemName) + '</strong>' + button('移除', 'remove-draft', i, 'link') + '</div><p class="hint">' + esc(d.specName || d.packMode) + ' · ' + esc(d.quantity) + ' ' + esc(d.unitName) + ' · ' + esc(storageNames[d.storageType]) + '</p><p class="hint">' + esc(d.batchNo || '批次号待生成') + ' · ' + esc(d.expireDate || '到期待确认') + '</p></div>').join('') : empty('还没有待提交的入库条目'); }
   let inboundToken = 0, inboundRoute;
   async function inboundSelection() {
@@ -176,6 +160,7 @@
       $('inbound-specs').innerHTML = specs.length ? select('specId', '进货规格', specs.map(s => [s.id, s.name + (s.pack_desc ? ' · ' + s.pack_desc : '')]), specs[0].id, 'required')
         : r.forms.length > 1 ? '<p class="form-error">这个食材已配置链路，请先添加启用的进货规格。</p>' : select('packMode', '入库包装', [['bulk', '散装（入库即出品态）'], ['sealed', '封装（开封后使用）']], 'bulk') + field('packSize', '每件含量（封装时填写）', '', 'number', 'min="0.000001" step="0.000001"') + field('packLabel', '包装说明', '', 'text', 'maxlength="100"') + select('openedStorage', '开封后储存方式', storeOptions, r.defaults.storageType) + field('openedDays', '开封后保质（天空白跟随默认）', r.defaults.openDays, 'number', 'min="0" max="36500" step="1"');
       $('inbound-specs').innerHTML += button('维护进货规格与链路 ›', 'item-route', id, 'link'); updateInboundUnit();
+      await operations.selected();
     } catch (e) { if (token === inboundToken && $('inbound-specs')) $('inbound-specs').innerHTML = '<p class="form-error">' + esc(e.message) + '</p>'; }
   }
   function updateInboundUnit() {
@@ -185,24 +170,7 @@
     f.elements.quantity.step = sealed ? '1' : '0.000001'; f.elements.quantity.min = sealed ? '1' : '0.000001';
     $('inbound-unit').textContent = form ? '数量单位：' + (sealed ? '件（封装整件数量）' : form.unit_name) + '；换算与预计入库量等待服务器预览' : '请选择进货规格';
   }
-  function ops() { return '<div class="stack">' + note('采购态经拆箱、解冻、切片等作业变成出品态。每种食材走几步，由进货规格与链路决定。') + '<div class="stats">' + ['进行中', '建议作业', '今日完成'].map(t => '<div class="stat"><div class="number">—</div><p class="hint">' + t + '</p></div>').join('') + '</div>' + pending('作业功能开通后显示耗时作业、备料建议和可作业批次。') + ['进行中 · 耗时作业', '建议作业 · 出品态低于预警', '可作业批次', '今日作业记录'].map(t => '<section class="card"><h2>' + t + '</h2>' + empty('暂无可查询的数据') + '</section>').join('') + button('查看作业表单', 'navigate', 'job', 'btn secondary full') + button('维护进货规格与链路 ›', 'navigate', 'routes', 'link') + button('多原料作业 / 半成品制作 ›', 'navigate', 'prep', 'link') + '</div>'; }
-  function job() { return back('ops') + '<div class="stack">' + pending('需选择真实来源批次后，才能预览并执行作业。') + '<section class="card"><h2>投入</h2>' + select('sourceBatch', '来源批次', [['', '等待作业功能开通']], '', 'disabled') + field('inputQty', '投入数量（允许小数）', '', 'number', 'min="0.000001" step="0.000001"') + '<p class="hint">换算与预计产出：等待服务器预览</p></section><section class="card"><h2>产出 · 出品态</h2>' + field('actualQty', '实际产出（称重 / 点数）', '', 'number', 'min="0" step="0.000001"') + '<p class="hint">实际出成率、标准对比、损耗、新批次号和到期均由服务器返回。</p><hr class="divider">' + select('area', '存放区域', [['', '暂未开通']], '', 'disabled') + button('确认作业', 'unavailable', null, 'btn full', true) + '</section></div>'; }
-  function expiry() { return back('stock') + '<div class="stack">' + button('过期销毁清单 ›', 'navigate', 'destroy', 'btn secondary full') + pending('临期与过期批次查询暂未开通，阈值按分类 / 食材设置。') + ['已过期', '今日到期', '临期'].map(t => '<section class="card"><h2>' + t + '</h2>' + empty('批次查询暂未开通') + '</section>').join('') + '</div>'; }
-  function destroy() { return back('expiry') + '<div class="stack">' + pending('只有过期的真实批次才能确认已销毁。') + '<div class="chips"><button class="chip on" disabled>待销毁</button><button class="chip" disabled>已销毁</button></div><section class="card">' + empty('销毁清单暂未开通') + button('确认已销毁', 'unavailable', null, 'btn full', true) + '</section></div>'; }
-  function low() { return back('stock') + '<div class="stack">' + note('预警线可选最近入库量的比例，或固定数量，两者只能二选一。食材和餐饮物资共用规则，改规则需店长。') + pending('库存与预警查询暂未开通。') + '<section class="card">' + empty('暂无可查询的预警数据') + (manager() ? '<div class="form-grid">' + select('lowKind', '预警规则', [['ratio', '最近入库量 × 比例'], ['fixed', '固定数量']], 'ratio') + field('lowValue', '预警值', '', 'number', 'min="0" step="0.000001"') + '</div>' + button('保存预警规则', 'unavailable', null, 'btn full', true) : '') + '</section></div>'; }
-  function prep() { return '<div class="stack">' + note('半成品也是食材：制作一次即核销原料，产出按自己的保质期入库，可以直接用于菜品配方。') + pending('半成品配方与制作暂未开通。原料只选出品态。') + '<section class="card"><h2>新增半成品配方</h2>' + select('prepCategory', '二级分类', categories2().filter(c => c.is_prepared).map(c => [c.id, c.name]), '') + field('prepName', '半成品名称', '', 'text') + '<div class="form-grid">' + select('prepUnit', '单位', [['piece', '个'], ['g', 'g'], ['ml', 'ml']], 'piece') + field('prepOutput', '每批产出', '', 'number', 'min="0.000001" step="0.000001"') + '</div>' + button('创建半成品', 'unavailable', null, 'btn full', true) + '</section><section class="card"><h2>配方与制作</h2>' + empty('配方查询暂未开通') + field('prepBatches', '制作批数', 1, 'number', 'min="0.000001" step="0.000001"') + button('确认制作并核销原料', 'unavailable', null, 'btn full', true) + '</section><section class="card"><h2>制作记录</h2>' + empty('暂无可查询的记录') + '</section></div>'; }
-  function recipe() { return '<div class="stack">' + note('每道菜按规格分别设用料。出餐按订单规格扣减，标准份之外可增加大份、12 寸等规格。') + pending('菜品与配方维护暂未开通。') + '<section class="card"><h2>新增菜品</h2>' + field('dishName', '菜品名称（与订单系统一致）', '', 'text') + field('dishSpec', '默认规格', '标准份', 'text') + button('创建菜品', 'unavailable', null, 'btn full', true) + '</section><section class="card"><h2>菜品用料与规格</h2>' + empty('菜品配方查询暂未开通') + select('recipeItem', '用料食材（出品态）', itemOptions(), '') + field('recipeQty', '每份用量', '', 'number', 'min="0.000001" step="0.000001"') + button('+ 添加食材', 'unavailable', null, 'btn secondary full', true) + '</section></div>'; }
-  function serve() { return '<div class="stack">' + pending('厨房单、配方预览和出餐扣减暂未开通。') + '<section class="card"><h2>待出餐订单</h2>' + empty('订单查询暂未开通') + button('+ 手动创建厨房单', 'order-form', null, 'btn secondary full') + '</section><section class="card"><h2>出餐用料</h2><p class="hint">默认用量可按订单备注调整；服务器按最早到期批次扣减。</p>' + empty('先选择真实厨房单') + button('确认出餐并扣减', 'unavailable', null, 'btn full', true) + '</section><section class="card"><h2>扣减流水</h2>' + empty('暂无可查询的流水') + '</section></div>'; }
-  function count() { return '<div class="stack">' + note('只盘出品态余量；提交后以实盘数量为准，差异记入损耗台账。') + pending('盘点快照和过账暂未开通。') + '<section class="card"><div class="row between"><h2>今日盘点</h2>' + badge('差异 — 项', 'amber') + '</div>' + button('生成盘点快照', 'unavailable', null, 'btn secondary full', true) + empty('待生成真实库存快照') + field('countQty', '实盘数量', '', 'number', 'min="0" step="0.000001"') + button('提交盘点并登记差异', 'unavailable', null, 'btn full', true) + '</section></div>'; }
-  function dash() { return '<div class="stack">' + pending('看板与报表查询暂未开通。') + '<section class="card"><h2>导出报表</h2><p class="hint">出品与配方链路：每道菜 × 每种用料一行，含采购态和各转化阶段、作业、单位、储存、出成率。</p><div class="scroll-table"><table class="report"><thead><tr><th>菜品 / 规格</th><th>每份用料</th><th>采购与作业链路</th></tr></thead><tbody><tr><td colspan="3">暂未提供报表数据</td></tr></tbody></table></div><div class="actions">' + button('导出 Excel', 'unavailable', null, 'btn full', true) + '</div></section><div class="two-col"><section class="card"><h3>本周损耗率</h3><p class="number">—</p></section><section class="card"><h3>平均周转</h3><p class="number">—</p></section></div><section class="card"><h2>在库成本结构</h2>' + empty('暂无可查询的数据') + '</section><section class="card"><h2>损耗台账</h2>' + empty('暂无可查询的记录') + '</section></div>'; }
-  function areas() { return '<div class="stack">' + note('区域最多两级。食材批次、物资、工具和开门检查项挂在区域上。有绑定的区域只能停用，历史记录继续保留。') + pending('存储区域暂未开通，区域照片与检查项入口已保留。') + '<section class="card"><h2>新增一级区域</h2>' + field('areaName', '区域名称', '', 'text') + select('areaType', '区域类型', [['kitchen', '后厨'], ['front', '前台'], ['warehouse', '仓库'], ['cold', '冷藏冷冻']], 'warehouse') + button('创建', 'unavailable', null, 'btn full', true) + '</section><section class="card"><h2>区域与下级区域</h2>' + empty('区域查询暂未开通') + '<div class="actions">' + button('+ 下级区域', 'unavailable', null, 'btn secondary', true) + button('照片 / 检查项', 'check-item-form', null, 'btn secondary') + '</div></section></div>'; }
-  function checkPage() { return '<div class="stack">' + note('开门检查只记录运营状态，不修改库存。补货、报损与工具状态走对应单据。') + button('检查记录 ›', 'navigate', 'checkHist', 'link') + pending('每日检查单暂未开通。') + '<section class="card"><h2>今日检查</h2><div class="stats">' + ['已填写', '异常', '必填'].map(t => '<div class="stat"><div class="number">—</div><p class="hint">' + t + '</p></div>').join('') + '</div><p class="hint">一键通过只填未填的项目；温度等数值项仍需填实测值。</p><div class="actions">' + button('开始今日检查', 'unavailable', null, 'btn', true) + button('一键全部通过', 'unavailable', null, 'btn secondary', true) + '</div>' + empty('等待检查项与区域配置') + '<div class="actions">' + button('保存草稿', 'unavailable', null, 'btn neutral', true) + button('提交检查', 'unavailable', null, 'btn', true) + '</div></section></div>'; }
-  function checkHist() { return back('check') + '<div class="stack">' + pending('历史检查单查询暂未开通。') + '<section class="card">' + empty('暂无可查询的记录') + '</section></div>'; }
-  function supplies() { return '<div class="stack">' + note('餐饮物资按个记库存，包装入库由服务器换算；不进菜品配方、不随出餐扣减，按领用记录。') + pending('餐饮物资建档与流水暂未开通。') + '<div class="chips"><button class="chip on" disabled>一次性餐具</button><button class="chip" disabled>可重复使用餐具</button></div><section class="card"><h2>新增餐饮物资</h2>' + field('supplyName', '名称', '', 'text') + '<div class="form-grid">' + field('supplyPack', '包装（如条 / 箱）', '', 'text') + field('supplySize', '每包装个数', '', 'number', 'min="1" step="1"') + '</div>' + select('supplyArea', '存放区域', [['', '暂未开通']], '', 'disabled') + button('建档', 'unavailable', null, 'btn full', true) + '</section><section class="card"><h2>库存与领用记录</h2>' + empty('暂未提供物资数据') + '</section></div>'; }
-  function tools() { return '<div class="stack">' + note('工具按品种和数量管理，只记状态与位置；每次状态变化写日志。找回必须写说明，报废需店长。') + pending('餐饮工具档案与状态日志暂未开通。') + '<div class="chips">' + ['正常', '缺失', '损坏', '维修中', '已报废'].map((t, i) => '<button class="chip ' + (i ? '' : 'on') + '" disabled>' + t + '</button>').join('') + '</div><section class="card"><h2>工具建档</h2>' + field('toolName', '名称', '', 'text') + field('toolSpec', '规格', '', 'text') + field('toolQty', '数量', 1, 'number', 'min="1" step="1"') + select('toolArea', '所在区域', [['', '暂未开通']], '', 'disabled') + button('建档', 'unavailable', null, 'btn full', true) + '</section><section class="card"><h2>工具状态与日志</h2>' + empty('暂未提供工具数据') + '</section></div>'; }
-  function batch() { return back('stock') + '<div class="stack">' + pending('新批次详情查询暂未开通。标签打印只使用服务器提供的真实批次数据。') + '<section class="card"><h2>批次 ' + esc(state.params.get('id') || '—') + '</h2>' + empty('等待批次信息') + button('打印食材标签', 'unavailable', null, 'btn full', true) + '</section></div>'; }
   let printerLogs = [];
-  function printer() { return '<div class="stack"><section class="card"><h2>蓝牙打印机</h2><p id="printer-state" class="hint">尚未连接</p><div class="actions">' + button('搜索并连接', 'connect-printer', null, 'btn') + button('断开', 'disconnect-printer', null, 'btn neutral') + '</div><p class="hint">沿用原企业微信蓝牙连接与分包发送，打印完成后保持连接。</p></section><section class="card"><h2>食材标签 · 60 × 40 mm</h2><p class="hint">批次详情功能开通后，从真实批次进入标签预览与打印。</p>' + field('copies', '张数', 1, 'number', 'min="1" max="10" step="1"') + button('打印标签', 'unavailable', null, 'btn full', true) + '</section><details class="card"><summary>连接日志</summary><pre id="printer-log" class="printer-log">' + esc(printerLogs.join('\n')) + '</pre></details></div>'; }
   function updatePrinterState(message) { if ($('printer-state')) { const connection = window.BlePrint && BlePrint.getConnection(); $('printer-state').textContent = message || (connection ? '已连接 ' + connection.name : '尚未连接'); } if ($('printer-log')) $('printer-log').textContent = printerLogs.join('\n'); }
   function sdkReady() {
     if (!/wxwork/i.test(navigator.userAgent)) return Promise.reject(new Error('请在企业微信中使用扫一扫与蓝牙打印'));
@@ -231,6 +199,7 @@
   async function submit(form) {
     if (writing) return;
     if (form.dataset.uploading) throw new Error('照片正在上传，请稍候');
+    if (await operations.submit(form)) return;
     const kind = form.dataset.form, f = new FormData(form), id = Number(form.dataset.id || 0);
     if (kind !== 'inbound-draft' && !manager()) throw new Error('维护资料需店长权限');
     let controller = 'FnbRoute', action, body;
@@ -250,12 +219,12 @@
   async function handleAction(buttonElement) {
     const action = buttonElement.dataset.action, id = buttonElement.dataset.id;
     if (writing && action !== 'close-modal') { toast('正在保存，请稍候'); return; }
+    if (await operations.action(buttonElement)) return;
     if (action === 'close-modal') { if (!writing) closeModal(); return; }
     if (action === 'navigate') { navigate(id); return; }
     if (action === 'item-route') { navigate('routes', { item: id }); return; }
     if (action === 'refresh') { await renderPage(true); return; }
     if (action === 'login') { if (/wxwork/i.test(navigator.userAgent)) location.replace(api.oauthUrl(location)); else toast('请在企业微信中打开本页面'); return; }
-    if (action === 'unavailable') { toast('该功能暂未开通'); return; }
     if (action === 'new-category') categoryEditor();
     else if (action === 'new-subcategory') categoryEditor(null, Number(id));
     else if (action === 'edit-category') categoryEditor(state.categories.find(c => String(c.id) === id));
@@ -287,21 +256,24 @@
     else if (action === 'remove-draft') { state.drafts.splice(Number(id), 1); $('inbound-drafts').innerHTML = draftRows(); }
     else if (action === 'connect-printer') { buttonElement.disabled = true; try { await window.FnbPrinterReady; await sdkReady(); await BlePrint.connect(message => updatePrinterState(message)); updatePrinterState(); } finally { buttonElement.disabled = false; } }
     else if (action === 'disconnect-printer') { await BlePrint.disconnect(); updatePrinterState(); }
-    else if (action === 'order-form') openModal('手动厨房单', '<p class="notice">厨房单暂未开通，不能提交订单。</p>' + field('table', '桌号', '', 'text') + select('orderDish', '菜品 / 规格', [['', '等待菜品配方']], '', 'disabled') + field('servings', '份数', 1, 'number', 'min="1" step="1"') + '<label class="field"><span>订单备注</span><textarea name="note" placeholder="少芝麻菜等"></textarea></label>' + button('创建厨房单', 'unavailable', null, 'btn full', true));
-    else if (action === 'check-item-form') openModal('区域检查项', pending('检查项维护暂未开通。') + field('checkName', '检查项名称', '', 'text') + select('checkKind', '检查方式', [['boolean', '是否'], ['number', '数值'], ['photo', '拍照']], 'number') + '<div class="form-grid">' + field('minimum', '标准最小值', '', 'number', 'step="any"') + field('maximum', '标准最大值', '', 'number', 'step="any"') + '</div>' + check('required', '必填', true) + button('保存检查项', 'unavailable', null, 'btn full', true));
   }
   async function mutation(controller, action, body) { if (writing) return; writing = true; try { await api.request(controller, action, { body: body }); writing = false; await renderPage(true); toast('已保存'); } finally { writing = false; } }
-  const views = { stock: stock, more: more, cats: cats, routes: routes, inbound: inbound, ops: ops, job: job, expiry: expiry, destroy: destroy, low: low, prep: prep, recipe: recipe, serve: serve, count: count, dash: dash, areas: areas, check: checkPage, checkHist: checkHist, supplies: supplies, tools: tools, batch: batch, printer: printer };
+  const operations = FnbOperations.create({ api, state, esc, field, select, check, button, empty, note, badge, manager,
+    openModal, toast, navigate, catOptions, draftRows, photo, imageUrl, sdkReady, updatePrinterState,
+    inboundRoute: () => inboundRoute, isWriting: () => writing, setWriting: value => { writing = value; }, render: renderPage });
+  const views = Object.assign({ more, cats, routes }, operations.views);
   document.addEventListener('click', e => { const buttonElement = e.target.closest('[data-action]'); if (buttonElement && !buttonElement.disabled) handleAction(buttonElement).catch(e => toast(e.message)); });
   document.addEventListener('submit', e => { if (!e.target.dataset.form) return; e.preventDefault(); submit(e.target).catch(error => { const alert = e.target.querySelector('.form-error'); if (alert) { alert.textContent = error.message; alert.hidden = false; } else toast(error.message); }); });
-  document.addEventListener('input', e => { if (e.target.hasAttribute('data-filter-items')) { const query = e.target.value.trim(); $('item-list').innerHTML = itemList(state.items.filter(r => r.item.name.includes(query) || r.categoryName.includes(query))); } });
+  document.addEventListener('input', e => operations.input(e));
   document.addEventListener('change', e => {
-    if (e.target.hasAttribute('data-item-photo')) photo(e.target, 'item-photo').catch(e => toast(e.message));
+    if (e.target.hasAttribute('data-op-photo')) operations.photo(e.target).catch(e => toast(e.message));
+    else if (e.target.hasAttribute('data-item-photo')) photo(e.target, 'item-photo').catch(e => toast(e.message));
     else if (e.target.hasAttribute('data-inbound-photo')) photo(e.target, 'inbound-photo').catch(e => toast(e.message));
     else if (e.target.name === 'categoryId' && e.target.closest('[data-form=item]')) syncItemUnit();
     else if (e.target.closest('#inbound-form') && e.target.name === 'categoryId') { const rows = state.items.filter(r => !e.target.value || String(r.item.category_id) === e.target.value); $('inbound-form').elements.itemId.innerHTML = '<option value="">请选择食材</option>' + rows.map(r => '<option value="' + r.item.id + '">' + esc(r.item.name) + '</option>').join(''); inboundSelection().catch(e => toast(e.message)); }
     else if (e.target.closest('#inbound-form') && e.target.name === 'itemId') inboundSelection().catch(e => toast(e.message));
     else if (e.target.name === 'specId' || e.target.name === 'packMode') updateInboundUnit();
+    else if (e.target.closest('#inbound-form') && ['storageType', 'productionDate', 'expireDate'].includes(e.target.name)) operations.previewExpiry().catch(e => toast(e.message));
   });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && !writing) { FnbOcr.stop(); closeModal(); } if (e.key === 'Tab' && !$('modal').hidden) { const elements = [...$('modal').querySelectorAll('button:not(:disabled),input:not(:disabled):not([type=hidden]),select:not(:disabled),textarea:not(:disabled),a[href]')]; if (elements.length && e.shiftKey && document.activeElement === elements[0]) { e.preventDefault(); elements[elements.length - 1].focus(); } else if (elements.length && !e.shiftKey && document.activeElement === elements[elements.length - 1]) { e.preventDefault(); elements[0].focus(); } } });
   document.addEventListener('fnb-ocr-closed', () => { if (ocrReturnFocus && ocrReturnFocus.isConnected) ocrReturnFocus.focus(); });

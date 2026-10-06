@@ -24,6 +24,7 @@
       try { response = await fetcher('/api/' + controller + '/' + action + (query.size ? '?' + query : ''), init); }
       catch (e) { if (e.name === 'AbortError') throw e; throw new ApiError('网络连接失败，请重试', null, 0); }
       if (!response.ok) throw new ApiError(response.status === 404 ? '该功能暂未开通' : '请求失败，请重试（' + response.status + '）', null, response.status);
+      if (o.download && !/json/i.test(response.headers.get('Content-Type') || '')) return response.blob();
       let result;
       try { result = await response.json(); } catch (_) { throw new ApiError('服务器返回内容异常，请重试', null, response.status); }
       if (result.code !== 0) {
@@ -66,16 +67,38 @@
       } while (rows.length < total);
       return rows;
     }
-    return { request: request, authenticate: authenticate, oauthUrl: oauthUrl, session: session, clear: clear,
+    return { request: request, download: (controller, action, params) => request(controller, action, { params: params, download: true }), authenticate: authenticate, oauthUrl: oauthUrl, session: session, clear: clear,
       actor: () => actor, listItems: listItems, upload: file => { const form = new FormData(); form.append('file', file); return request('FnbMaterial', 'UploadPhoto', { formData: form, shop: false }); } };
   }
   function escape(value) { return String(value == null ? '' : value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]); }
   // 后续库存写接口使用；同一单据保存键值重试，UI 不自动重复 POST。
-  function requestId() { return root.crypto.randomUUID(); }
+  function requestId() {
+    if (root.crypto.randomUUID) return root.crypto.randomUUID();
+    const bytes = root.crypto.getRandomValues(new Uint8Array(16)); bytes[6] = (bytes[6] & 15) | 64; bytes[8] = (bytes[8] & 63) | 128;
+    const hex = [...bytes].map(b => b.toString(16).padStart(2, '0')).join('');
+    return [hex.slice(0,8),hex.slice(8,12),hex.slice(12,16),hex.slice(16,20),hex.slice(20)].join('-');
+  }
+  // 保留未确认的写请求；网络异常时更换内容可能重复过账，须先重试原单。
+  function createWrites(api, storage) {
+    const s = storage || root.localStorage;
+    const key = () => 'fnb_v4_pending_' + api.actor().shopId + '_' + api.actor().staffId;
+    const read = () => { const raw = s.getItem(key()); if (!raw) return {}; try { return JSON.parse(raw); } catch (_) { throw new Error('待确认请求记录异常，请联系管理员'); } };
+    function save(rows, storeKey) { s.setItem(storeKey || key(), JSON.stringify(rows)); }
+    async function post(controller, action, body, scope) {
+      const storeKey = key(), rows = read(), name = scope || controller + '/' + action, content = JSON.stringify(body);
+      let entry = rows[name];
+      if (entry && JSON.stringify(entry.body) !== content && entry.uncertain) throw new Error('上次提交结果尚未确认，请先重试原单');
+      if (!entry || JSON.stringify(entry.body) !== content) entry = { controller, action, body, requestId: requestId(), uncertain: false };
+      entry.uncertain = true; rows[name] = entry; save(rows, storeKey);
+      try { const result = await api.request(controller, action, { body: Object.assign({}, entry.body, { requestId: entry.requestId }) }); delete rows[name]; save(rows, storeKey); return result; }
+      catch (error) { if (error.code != null) entry.uncertain = false; rows[name] = entry; save(rows, storeKey); throw error; }
+    }
+    return { post, pending: () => Object.entries(read()).filter(x => x[1].uncertain), retry: name => { const e = read()[name]; if (!e) throw new Error('原请求不存在'); return post(e.controller, e.action, e.body, name); } };
+  }
   // 百分比表单的呈现单位转换，避免 96.1234 / 100 的二进制尾数违反服务端六位小数格式。
   function percentInput(value) { return new Intl.NumberFormat('en-US', { style: 'percent', useGrouping: false, maximumFractionDigits: 4 }).format(value).replace('%', ''); }
   function percentFraction(value) { return Number((Number(value) / 100).toFixed(6)); }
   root.FnbClient = { create: create, ApiError: ApiError, escape: escape, requestId: requestId, sessionKey: SESSION_KEY,
-    percentInput: percentInput, percentFraction: percentFraction };
+    percentInput: percentInput, percentFraction: percentFraction, createWrites: createWrites };
   if (typeof module !== 'undefined') module.exports = root.FnbClient;
 })(typeof window === 'undefined' ? globalThis : window);
