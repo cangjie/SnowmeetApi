@@ -146,11 +146,47 @@
     openModal('保质期规则', '<form data-form="rule" data-kind="' + context.kind + '" data-owner="' + context.id + '" data-id="' + (rule ? rule.id : 0) + '">' + select('storageType', '储存方式', storeOptions, rule ? rule.storage_type : 'chilled') + select('season', '生产月份分档', [['all', '全年'], ['warm', '暖季（6–9 月）'], ['cold', '冷季（其他月份）']], rule ? rule.season : 'all') + field('days', '保质天数', rule ? rule.days : '', 'number', 'required min="1" max="36500" step="1"') + check('valid', '启用规则', rule ? rule.valid : true) + beforeSave + saveButton() + '</form>');
   }
   function draftRows() { return state.drafts.length ? state.drafts.map((d, i) => '<div class="draft-row"><div class="row between"><strong>' + esc(d.itemName) + '</strong>' + button('移除', 'remove-draft', i, 'link') + '</div><p class="hint">' + esc(d.specName || d.packMode) + ' · ' + esc(d.quantity) + ' ' + esc(d.unitName) + ' · ' + esc(storageNames[d.storageType]) + '</p><p class="hint">' + esc(d.batchNo || '批次号待生成') + ' · ' + esc(d.expireDate || '到期待确认') + '</p></div>').join('') : empty('还没有待提交的入库条目'); }
+  const inboundParents = () => state.categories.filter(c => c.level === 1 && c.valid);
+  function inboundCategories(parentId = '') {
+    const parents = new Set(inboundParents().map(c => String(c.id)));
+    return categories2().filter(c => !c.is_prepared && parents.has(String(c.parent_id)) && (!parentId || String(c.parent_id) === String(parentId)));
+  }
+  function inboundItems(parentId = '', categoryId = '') {
+    const categories = new Set(inboundCategories(parentId).filter(c => !categoryId || String(c.id) === String(categoryId)).map(c => String(c.id)));
+    return state.items.filter(r => r.item.valid && r.item.item_type !== 'prepared' && categories.has(String(r.item.category_id)));
+  }
+  function inboundSelectors() {
+    return select('parentCategoryId', '一级分类', [['', '全部一级分类']].concat(inboundParents().map(c => [c.id, c.name])), '')
+      + select('categoryId', '二级分类', [['', '全部二级分类']].concat(inboundCategories().map(c => [c.id, c.name])), '')
+      + select('itemId', '食材名称', [['', '请选择食材']].concat(inboundItems().map(r => [r.item.id, r.item.name])), '', 'required');
+  }
+  function inboundOptions(control, entries, placeholder, value = '') {
+    control.innerHTML = '<option value="">' + esc(placeholder) + '</option>' + entries.map(x => '<option value="' + esc(x[0]) + '">' + esc(x[1]) + '</option>').join('');
+    control.value = String(value);
+  }
+  function filterInboundCategories(level) {
+    const f = $('inbound-form'); if (!f) return;
+    const parent = f.elements.parentCategoryId.value;
+    if (level === 'parentCategoryId') inboundOptions(f.elements.categoryId, inboundCategories(parent).map(c => [c.id, c.name]), '全部二级分类');
+    inboundOptions(f.elements.itemId, inboundItems(parent, f.elements.categoryId.value).map(r => [r.item.id, r.item.name]), '请选择食材');
+    return inboundSelection();
+  }
+  function selectInboundItem(id) {
+    const f = $('inbound-form'), r = inboundItems().find(x => String(x.item.id) === String(id));
+    if (!f || !r) throw new Error('该食材或所属分类已停用，不能入库');
+    const category = inboundCategories().find(c => c.id === r.item.category_id);
+    f.elements.parentCategoryId.value = category.parent_id;
+    inboundOptions(f.elements.categoryId, inboundCategories(category.parent_id).map(c => [c.id, c.name]), '全部二级分类', category.id);
+    inboundOptions(f.elements.itemId, inboundItems(category.parent_id, category.id).map(x => [x.item.id, x.item.name]), '请选择食材', id);
+  }
   let inboundToken = 0, inboundRoute;
   async function inboundSelection() {
     const form = $('inbound-form'); if (!form) return;
     const token = ++inboundToken, id = form.elements.itemId.value; inboundRoute = null;
+    operations.clearInboundPreview(); $('inbound-unit').textContent = '';
+    form.elements.quantity.step = '0.000001'; form.elements.quantity.min = '0.000001';
     if (!id) { $('inbound-specs').innerHTML = empty('先选择食材'); return; }
+    selectInboundItem(id);
     $('inbound-specs').innerHTML = empty('正在读取进货规格…');
     try {
       const r = await api.request('FnbRoute', 'GetRoute', { params: { itemId: id } });
@@ -183,8 +219,11 @@
     const value = scan ? await scanCode() : f.elements.barcodeLookup.value.trim(); if (!value) throw new Error('请扫描或输入条码');
     f.elements.barcodeLookup.value = value;
     const result = await api.request('FnbRoute', 'FindSpecByBarcode', { params: { barcode: value } });
-    f.elements.categoryId.value = ''; f.elements.itemId.innerHTML = '<option value="">请选择食材</option>' + itemOptions().map(x => '<option value="' + esc(x[0]) + '">' + esc(x[1]) + '</option>').join(''); f.elements.itemId.value = result.item.id;
-    await inboundSelection(); if (f.elements.specId) f.elements.specId.value = result.spec.id; updateInboundUnit(); toast('已选中 ' + result.spec.name);
+    if (!f.isConnected || $('inbound-form') !== f) return;
+    selectInboundItem(result.item.id);
+    await inboundSelection();
+    if (!f.isConnected || f.elements.itemId.value !== String(result.item.id)) return;
+    if (f.elements.specId) f.elements.specId.value = result.spec.id; updateInboundUnit(); toast('已选中 ' + result.spec.name);
   }
   async function photo(input, targetId) {
     const file = input.files && input.files[0]; if (!file) return;
@@ -259,7 +298,7 @@
   }
   async function mutation(controller, action, body) { if (writing) return; writing = true; try { await api.request(controller, action, { body: body }); writing = false; await renderPage(true); toast('已保存'); } finally { writing = false; } }
   const operations = FnbOperations.create({ api, state, esc, field, select, check, button, empty, note, badge, manager,
-    openModal, toast, navigate, catOptions, draftRows, photo, imageUrl, sdkReady, updatePrinterState,
+    openModal, toast, navigate, catOptions, draftRows, inboundSelectors, photo, imageUrl, sdkReady, updatePrinterState,
     inboundRoute: () => inboundRoute, isWriting: () => writing, setWriting: value => { writing = value; }, render: renderPage });
   const views = Object.assign({ more, cats, routes }, operations.views);
   document.addEventListener('click', e => { const buttonElement = e.target.closest('[data-action]'); if (buttonElement && !buttonElement.disabled) handleAction(buttonElement).catch(e => toast(e.message)); });
@@ -270,7 +309,7 @@
     else if (e.target.hasAttribute('data-item-photo')) photo(e.target, 'item-photo').catch(e => toast(e.message));
     else if (e.target.hasAttribute('data-inbound-photo')) photo(e.target, 'inbound-photo').catch(e => toast(e.message));
     else if (e.target.name === 'categoryId' && e.target.closest('[data-form=item]')) syncItemUnit();
-    else if (e.target.closest('#inbound-form') && e.target.name === 'categoryId') { const rows = state.items.filter(r => !e.target.value || String(r.item.category_id) === e.target.value); $('inbound-form').elements.itemId.innerHTML = '<option value="">请选择食材</option>' + rows.map(r => '<option value="' + r.item.id + '">' + esc(r.item.name) + '</option>').join(''); inboundSelection().catch(e => toast(e.message)); }
+    else if (e.target.closest('#inbound-form') && ['parentCategoryId', 'categoryId'].includes(e.target.name)) filterInboundCategories(e.target.name).catch(e => toast(e.message));
     else if (e.target.closest('#inbound-form') && e.target.name === 'itemId') inboundSelection().catch(e => toast(e.message));
     else if (e.target.name === 'specId' || e.target.name === 'packMode') updateInboundUnit();
     else if (e.target.closest('#inbound-form') && ['storageType', 'productionDate', 'expireDate'].includes(e.target.name)) operations.previewExpiry().catch(e => toast(e.message));
