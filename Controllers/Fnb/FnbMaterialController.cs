@@ -219,6 +219,7 @@ namespace SnowmeetApi.Controllers.Fnb
 
         // 全量有效批次 + 服务器今天（状态派生统一以服务器日期为准，防手机时区/改时间错乱）
         [HttpGet]
+        [NonAction] // 旧批次表已从 v4 EF 模型排除。
         public async Task<ActionResult<ApiResult<object>>> GetBatches(string sessionKey)
         {
             var ctx = await _requireStaff(sessionKey);
@@ -245,6 +246,7 @@ namespace SnowmeetApi.Controllers.Fnb
 
         // id=0 新增 / id>0 编辑（保留 create_* / dispose_*，全局 NoTracking 必须显式 Modified）
         [HttpPost]
+        [NonAction]
         public async Task<ActionResult<ApiResult<object>>> SaveBatch([FromBody] FnbMaterialBatch posted, [FromQuery] string sessionKey)
         {
             var ctx = await _requireStaff(sessionKey);
@@ -293,6 +295,7 @@ namespace SnowmeetApi.Controllers.Fnb
 
         // 处置：用完 / 报废（幂等：已处置直接返当前行）
         [HttpGet]
+        [NonAction]
         public async Task<ActionResult<ApiResult<object>>> DisposeBatch(int id, string action, string sessionKey)
         {
             var ctx = await _requireStaff(sessionKey);
@@ -329,6 +332,7 @@ namespace SnowmeetApi.Controllers.Fnb
 
         // 软删（valid=0，列表不显示，不做恢复入口）
         [HttpGet]
+        [NonAction]
         public async Task<ActionResult<ApiResult<object>>> DeleteBatch(int id, string sessionKey)
         {
             var ctx = await _requireStaff(sessionKey);
@@ -354,6 +358,7 @@ namespace SnowmeetApi.Controllers.Fnb
 
         // 批次号发号：B{yyMMdd}-{当日已发数+1，2位}。仅参考号，不保证并发唯一（手输允许重复）
         [HttpGet]
+        [NonAction]
         public async Task<ActionResult<ApiResult<object>>> GenBatchNo(string sessionKey)
         {
             var ctx = await _requireStaff(sessionKey);
@@ -787,6 +792,7 @@ namespace SnowmeetApi.Controllers.Fnb
         // 滥用风险由当天去重兜底（同批次一天最多推一次）。sessionKey 选传，仅用于日志记录触发人。
         // touser 仅联调覆盖用（传自己的 UserId 避免打扰全员），缺省走配置文件
         [HttpGet]
+        [NonAction] // 第三期按 fnb_batch 重写后再开放推送。
         public async Task<ActionResult<ApiResult<object>>> PushExpireAlert(string touser = null, string sessionKey = null)
         {
             string userId = await _getWecomUserId(sessionKey);  // 可为 null：定时任务/无 session 触发

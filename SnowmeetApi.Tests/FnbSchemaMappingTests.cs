@@ -1,47 +1,48 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
 using SnowmeetApi.Data;
 using SnowmeetApi.Models;
+using SnowmeetApi.Models.Fnb;
 
 namespace SnowmeetApi.Tests;
 
 public class FnbSchemaMappingTests
 {
     [Fact]
-    public void FoodInventoryBigIntIdsSerializeAsStringsForMiniProgramClients()
+    public void V4SchemaReplacesOldInventoryAndUsesNoCascades()
     {
-        var order = new SnowmeetApi.Models.Fnb.FnbOrder { id = 9_007_199_254_740_993L };
-        var json = System.Text.Json.JsonSerializer.Serialize(order);
-        Assert.Contains("\"id\":\"9007199254740993\"", json);
-        var document = new SnowmeetApi.Models.Fnb.FnbStockDocument { id = 5, order_id = order.id };
-        json = System.Text.Json.JsonSerializer.Serialize(document);
-        Assert.Contains("\"order_id\":\"9007199254740993\"", json);
+        using var db = new ApplicationDBContext(new DbContextOptionsBuilder<ApplicationDBContext>()
+            .UseSqlServer("Server=localhost;Database=metadata_only;Trusted_Connection=True").Options);
+        var entities = db.GetService<IDesignTimeModel>().Model.GetEntityTypes().ToArray();
+        string[] expected = ["fnb_unit", "fnb_category", "fnb_item", "fnb_item_form", "fnb_purchase_spec",
+            "fnb_shelf_life_rule", "fnb_batch", "fnb_batch_image", "fnb_stock_operation", "fnb_dish_spec",
+            "fnb_recipe", "fnb_recipe_line", "fnb_stock_document", "fnb_stock_document_line", "fnb_stock_movement",
+            "fnb_stocktake_line", "fnb_order", "fnb_order_line", "fnb_order_import"];
+        var tables = entities.Select(x => x.GetTableName()).ToArray();
+        foreach (var name in expected) Assert.Contains(name == "fnb_unit" ? name : name.Replace("fnb_", "fnb_v4_"), tables);
+        Assert.DoesNotContain("fnb_material_batch", tables);
+        Assert.DoesNotContain("fnb_material_batch_stock", tables);
+        Assert.DoesNotContain("fnb_material_category", tables);
+        Assert.Null(db.Model.FindEntityType(typeof(FnbMaterialBatchStock)));
+        var fnb = entities.Where(x => (x.GetTableName() ?? "").StartsWith("fnb_")).ToArray();
+        Assert.All(fnb.SelectMany(x => x.GetForeignKeys()), x => Assert.Equal(DeleteBehavior.NoAction, x.DeleteBehavior));
+        Assert.All(fnb.SelectMany(x => x.GetProperties()).Where(x => x.ClrType == typeof(string)),
+            x => Assert.Equal("Chinese_PRC_CI_AS", x.GetCollation()));
+        Assert.Equal("datetime2(3)", db.Model.FindEntityType(typeof(FnbItem))!.FindProperty("created_at")!.GetColumnType());
+        Assert.NotNull(db.Model.FindEntityType(typeof(FnbBatch))!.FindProperty("effective_expire")!.GetComputedColumnSql());
+        Assert.Null(db.Model.FindEntityType(typeof(FnbShelfLifeRule))!.FindProperty("production_month"));
+        Assert.Contains("vw_fnb_v4_stock", entities.Select(x => x.GetViewName()));
+        Assert.Contains("vw_fnb_v4_loss", entities.Select(x => x.GetViewName()));
+        Assert.NotNull(db.Model.FindEntityType(typeof(Order))!.FindProperty("order_source"));
+        Assert.NotNull(db.Model.FindEntityType(typeof(Order))!.FindProperty("source_order_no"));
     }
-
     [Fact]
-    public void InventoryTablesAndOrderSourceColumnsAreQueryableThroughEf()
+    public void FoodBigIntIdsSerializeAsStrings()
     {
-        var options = new DbContextOptionsBuilder<ApplicationDBContext>()
-            .UseSqlServer("Server=localhost;Database=snowmeet_fnb_metadata_only;Trusted_Connection=True;TrustServerCertificate=True").Options;
-        using var db = new ApplicationDBContext(options);
-        string[] expectedTables =
-        [
-            "fnb_unit", "fnb_material_category", "fnb_shelf_life_rule", "fnb_material_item",
-            "fnb_material_batch_stock", "fnb_dish_spec", "fnb_recipe", "fnb_recipe_line",
-            "fnb_order", "fnb_order_line", "fnb_order_import", "fnb_stock_document", "fnb_stock_document_line",
-            "fnb_stock_movement", "fnb_stocktake_line"
-        ];
-        var mapped = db.Model.GetEntityTypes().Select(e => e.GetTableName()).ToHashSet();
-        foreach (string table in expectedTables)
-            Assert.Contains(table, mapped);
-        Assert.Contains("vw_fnb_material_stock", db.Model.GetEntityTypes().Select(e => e.GetViewName()));
-        Assert.Contains("vw_fnb_material_loss", db.Model.GetEntityTypes().Select(e => e.GetViewName()));
-
-        var order = db.Model.FindEntityType(typeof(Order));
-        Assert.NotNull(order);
-        Assert.NotNull(order.FindProperty("order_source"));
-        Assert.NotNull(order.FindProperty("source_order_no"));
-        var stock = db.Model.FindEntityType(typeof(SnowmeetApi.Models.Fnb.FnbMaterialBatchStock));
-        Assert.NotNull(stock);
-        Assert.Equal(Microsoft.EntityFrameworkCore.Metadata.ValueGenerated.Never, stock.FindProperty("batch_id")!.ValueGenerated);
+        var order = new FnbOrder { id = 9_007_199_254_740_993L };
+        Assert.Contains("\"id\":\"9007199254740993\"", System.Text.Json.JsonSerializer.Serialize(order));
+        var operation = new FnbStockOperation { id = order.id, document_id = order.id };
+        Assert.Contains("\"document_id\":\"9007199254740993\"", System.Text.Json.JsonSerializer.Serialize(operation));
     }
 }

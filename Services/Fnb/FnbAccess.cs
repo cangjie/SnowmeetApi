@@ -24,7 +24,9 @@ public sealed class FnbAccess(ApplicationDBContext db)
         if (string.IsNullOrWhiteSpace(sessionKey)) return null;
         var key = Util.UrlDecode(sessionKey).Trim();
         var session = await db.miniSession.AsNoTracking()
-            .Where(s => s.session_key == key && s.valid == 1 && s.expire_date >= DateTime.Now)
+            .Where(s => s.session_key == key && s.valid == 1 && s.expire_date >= DateTime.Now &&
+                (s.session_type == "wecom_userid" || s.session_type == "wechat_mini_openid"))
+            .OrderByDescending(s => s.expire_date)
             .Select(s => new { s.session_type, s.wechat_openid })
             .FirstOrDefaultAsync();
         if (session == null) return null;

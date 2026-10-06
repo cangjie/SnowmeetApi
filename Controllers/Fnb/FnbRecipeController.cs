@@ -12,6 +12,7 @@ using SnowmeetApi.Services.Fnb;
 
 namespace SnowmeetApi.Controllers.Fnb;
 
+[NonController] // v3 配方接口停用，待第三期迁移后删除源码。
 [ApiController]
 [Route("api/[controller]/[action]")]
 public sealed class FnbRecipeController(ApplicationDBContext db) : ControllerBase

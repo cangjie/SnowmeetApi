@@ -1,4 +1,5 @@
 // Generated from the applied 2026-09-22 VARCHAR schema; edit with the SQL contract in view.
+#nullable enable
 using System;
 using System.Text.Json.Serialization;
 
@@ -79,6 +80,8 @@ public sealed class FnbStockDocumentLine
     public decimal? input_unit_price { get; set; }
     public decimal actual_amount { get; set; }
     public int? specified_batch_id { get; set; }
+    public int? spec_id { get; set; }
+    public int? form_id { get; set; }
     public string? remark { get; set; }
 }
 

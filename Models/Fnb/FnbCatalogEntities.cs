@@ -1,4 +1,5 @@
 // Generated from the applied 2026-09-22 VARCHAR schema; edit with the SQL contract in view.
+#nullable enable
 using System;
 
 namespace SnowmeetApi.Models.Fnb;
@@ -32,12 +33,19 @@ public sealed class FnbMaterialCategory
 public sealed class FnbShelfLifeRule
 {
     public int id { get; set; }
-    public int? item_id { get; set; }        // 新规则只挂食材
-    public int? category_id { get; set; }    // 仅 2026-09-24 前的历史分类规则（均已停用，旧批次仍引用）
+    public int? item_id { get; set; }        // 食材级或分类级二选一
+    public int? category_id { get; set; }    // 分类级只允许有效二级分类
     public string storage_type { get; set; } = string.Empty;
+    public string season { get; set; } = "all";
+    public int days { get; set; }
+    // 旧规则计算器的编译兼容字段，不映射到 v4 数据库；第三期迁移完删除。
+    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
     public byte production_month { get; set; }
+    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
     public int shelf_life_value { get; set; }
+    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
     public string shelf_life_unit { get; set; } = string.Empty;
+    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
     public string? remark { get; set; }
     public bool valid { get; set; }
     public DateTime created_at { get; set; }

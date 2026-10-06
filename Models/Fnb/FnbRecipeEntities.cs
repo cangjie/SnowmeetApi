@@ -1,4 +1,5 @@
 // Generated from the applied 2026-09-22 VARCHAR schema; edit with the SQL contract in view.
+#nullable enable
 using System;
 using System.Text.Json.Serialization;
 

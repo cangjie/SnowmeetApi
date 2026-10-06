@@ -19,7 +19,7 @@ namespace SnowmeetApi.Data
         }
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
-            FnbSchemaConfiguration.Configure(modelBuilder);
+            FnbSchemaConfiguration.Configure(modelBuilder, Database.IsSqlServer());
             modelBuilder.Entity<Order>().Property(x => x.order_source).HasColumnType("varchar(32)");
             modelBuilder.Entity<Order>().Property(x => x.source_order_no).HasColumnType("varchar(128)");
             modelBuilder.Entity<MaintainLive>().HasKey(c => c.id);
@@ -218,6 +218,16 @@ namespace SnowmeetApi.Data
         public DbSet<Models.Fnb.FnbMaterialBatch> fnbMaterialBatch { get; set; }
         public DbSet<Models.Fnb.FnbMaterialAlertLog> fnbMaterialAlertLog { get; set; }
         public DbSet<FnbUnit> fnbUnit { get; set; }
+        public DbSet<FnbCategory> fnbCategory { get; set; }
+        public DbSet<FnbItem> fnbItem { get; set; }
+        public DbSet<FnbItemForm> fnbItemForm { get; set; }
+        public DbSet<FnbPurchaseSpec> fnbPurchaseSpec { get; set; }
+        public DbSet<FnbBatch> fnbBatch { get; set; }
+        public DbSet<FnbBatchImage> fnbBatchImage { get; set; }
+        public DbSet<FnbStockOperation> fnbStockOperation { get; set; }
+        public DbSet<FnbStockView> fnbStockView { get; set; }
+        public DbSet<FnbLossView> fnbLossView { get; set; }
+        // 以下旧类型访问器仅保留供未迁移源码编译；Configure 明确 Ignore，不能查询或写入。
         public DbSet<FnbMaterialCategory> fnbMaterialCategory { get; set; }
         public DbSet<FnbShelfLifeRule> fnbShelfLifeRule { get; set; }
         public DbSet<FnbMaterialItem> fnbMaterialItem { get; set; }

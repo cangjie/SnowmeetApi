@@ -9,6 +9,7 @@ using SnowmeetApi.Services.Fnb;
 
 namespace SnowmeetApi.Controllers.Fnb;
 
+[NonController] // v3 报表接口停用，待第三期迁移后删除源码。
 [ApiController]
 [Route("api/[controller]/[action]")]
 public sealed class FnbReportController(ApplicationDBContext db) : ControllerBase
