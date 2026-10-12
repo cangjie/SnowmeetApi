@@ -28,6 +28,7 @@ public sealed class FnbOrder
     public DateTime? source_updated_at { get; set; }
     public DateTime created_at { get; set; }
     public DateTime? updated_at { get; set; }
+    public bool valid { get; set; } = true;
     public byte[] row_version { get; set; } = Array.Empty<byte>();
 }
 
@@ -53,4 +54,5 @@ public sealed class FnbOrderLine
     [JsonNumberHandling(JsonNumberHandling.WriteAsString)]
     public long? recipe_id { get; set; }
     public string? remark { get; set; }
+    public bool valid { get; set; } = true;
 }

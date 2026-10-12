@@ -18,4 +18,5 @@ public sealed class FnbOrderImport
     public int? reviewed_by_staff_id { get; set; }
     public DateTime captured_at { get; set; }
     public DateTime? processed_at { get; set; }
+    public bool valid { get; set; } = true;
 }

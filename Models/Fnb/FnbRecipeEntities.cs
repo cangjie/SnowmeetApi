@@ -35,6 +35,7 @@ public sealed class FnbRecipe
     public int? created_by_staff_id { get; set; }
     public DateTime created_at { get; set; }
     public DateTime? published_at { get; set; }
+    public bool valid { get; set; } = true;
     public byte[] row_version { get; set; } = Array.Empty<byte>();
 }
 
@@ -48,4 +49,5 @@ public sealed class FnbRecipeLine
     public decimal quantity { get; set; }
     public int sort { get; set; }
     public string? remark { get; set; }
+    public bool valid { get; set; } = true;
 }

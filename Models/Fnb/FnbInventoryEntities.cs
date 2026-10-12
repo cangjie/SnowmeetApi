@@ -57,6 +57,7 @@ public sealed class FnbStockDocument
     public int? posted_by_staff_id { get; set; }
     public DateTime created_at { get; set; }
     public DateTime? posted_at { get; set; }
+    public bool valid { get; set; } = true;
     public byte[] row_version { get; set; } = Array.Empty<byte>();
 }
 
@@ -83,6 +84,7 @@ public sealed class FnbStockDocumentLine
     public int? spec_id { get; set; }
     public int? form_id { get; set; }
     public string? remark { get; set; }
+    public bool valid { get; set; } = true;
 }
 
 public sealed class FnbStockMovement
@@ -102,6 +104,7 @@ public sealed class FnbStockMovement
     public decimal balance_qty { get; set; }
     public decimal balance_amount { get; set; }
     public DateTime created_at { get; set; }
+    public bool valid { get; set; } = true;
 }
 
 public sealed class FnbStocktakeLine
@@ -124,5 +127,6 @@ public sealed class FnbStocktakeLine
     public int? counted_by_staff_id { get; set; }
     public DateTime? counted_at { get; set; }
     public string? remark { get; set; }
+    public bool valid { get; set; } = true;
     public byte[] row_version { get; set; } = Array.Empty<byte>();
 }

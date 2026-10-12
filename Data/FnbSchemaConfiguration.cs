@@ -78,7 +78,7 @@ internal static class FnbSchemaConfiguration
             .HasPrincipalKey(x => new { x.id, x.item_id }).OnDelete(DeleteBehavior.NoAction);
         batch.HasOne<FnbBatch>().WithMany().HasForeignKey(x => new { x.parent_batch_id, x.shop_id, x.item_id })
             .HasPrincipalKey(x => new { x.id, x.shop_id, x.item_id }).OnDelete(DeleteBehavior.NoAction);
-        batch.HasIndex(x => new { x.shop_id, x.batch_no }).IsUnique();
+        batch.HasIndex(x => new { x.shop_id, x.batch_no }).IsUnique().HasFilter("[valid] = 1");
         batch.HasIndex(x => new { x.shop_id, x.item_id, x.form_id });
         foreach (var p in new[] { "production_date", "expire_date", "op_date", "op_expire_date", "effective_expire" }) batch.Property(p).HasColumnType("date");
         if (sqlServer) batch.Property(x => x.effective_expire).HasComputedColumnSql("CASE WHEN [op_expire_date] IS NOT NULL AND [op_expire_date] < [expire_date] THEN [op_expire_date] ELSE [expire_date] END", stored: true);
@@ -117,7 +117,7 @@ internal static class FnbSchemaConfiguration
         Text(order, "refund_status", 20); Text(order, "review_status", 20); Text(order, "remark", 2000);
         order.Property(x => x.business_date).HasColumnType("date");
         order.HasOne<Shop>().WithMany().HasForeignKey(x => x.shop_id).OnDelete(DeleteBehavior.NoAction);
-        order.HasIndex(x => new { x.shop_id, x.source_type, x.external_order_no }).IsUnique().HasFilter("[external_order_no] IS NOT NULL");
+        order.HasIndex(x => new { x.shop_id, x.source_type, x.external_order_no }).IsUnique().HasFilter("[valid] = 1 AND [external_order_no] IS NOT NULL");
         var orderLine = Table<FnbOrderLine>(m, "fnb_order_line"); orderLine.HasKey(x => x.id);
         Text(orderLine, "line_key", 256); Text(orderLine, "option_key", 256); Text(orderLine, "item_name", 300);
         Text(orderLine, "spec_name", 200); Text(orderLine, "options_text", 2000); Text(orderLine, "remark", 1000);
@@ -128,7 +128,7 @@ internal static class FnbSchemaConfiguration
         var import = Table<FnbOrderImport>(m, "fnb_order_import"); import.HasKey(x => x.id);
         Text(import, "source_method", 20); Text(import, "dedupe_key", 256); Text(import, "process_status", 24);
         import.HasOne<FnbOrder>().WithMany().HasForeignKey(x => x.order_id).OnDelete(DeleteBehavior.NoAction);
-        import.HasIndex(x => new { x.shop_id, x.source_method, x.dedupe_key }).IsUnique();
+        import.HasIndex(x => new { x.shop_id, x.source_method, x.dedupe_key }).IsUnique().HasFilter("[valid] = 1");
 
         var document = Table<FnbStockDocument>(m, "fnb_stock_document"); document.HasKey(x => x.id);
         Text(document, "document_no", 80); Text(document, "document_type", 32); Text(document, "status", 20);
@@ -174,6 +174,14 @@ internal static class FnbSchemaConfiguration
         Check(operation, sqlServer, "value", "input_qty > 0 AND std_ratio > 0 AND std_yield > 0 AND std_yield <= 1 AND expected_qty >= 0 AND actual_qty >= 0 AND loss_base_qty >= 0 AND duration_hours >= 0 AND status IN ('running','done')");
 
         ConfigureOperations(m, sqlServer);
+        // 2026-10-12 起每张 v4 表都有 valid。后补 valid 的表只用于逻辑删除，查询一律只看有效行；
+        // 原有主数据表（分类、食材、区域等）仍由各查询决定是否包含已停用记录。
+        // fnb_v4_request 是幂等记录，不过滤：同一 requestId 任何时候都不能再执行一次。
+        ActiveOnly<FnbBatch>(m); ActiveOnly<FnbBatchImage>(m); ActiveOnly<FnbBatchDetail>(m); ActiveOnly<FnbStockOperation>(m);
+        ActiveOnly<FnbStockDocument>(m); ActiveOnly<FnbStockDocumentLine>(m); ActiveOnly<FnbStockMovement>(m); ActiveOnly<FnbStocktakeLine>(m);
+        ActiveOnly<FnbRecipe>(m); ActiveOnly<FnbRecipeLine>(m); ActiveOnly<FnbOrder>(m); ActiveOnly<FnbOrderLine>(m); ActiveOnly<FnbOrderImport>(m);
+        ActiveOnly<FnbAreaImage>(m); ActiveOnly<FnbSupplyMovement>(m); ActiveOnly<FnbToolLog>(m); ActiveOnly<FnbAlertDelivery>(m);
+        ActiveOnly<FnbCheckSheet>(m); ActiveOnly<FnbCheckLine>(m); ActiveOnly<FnbCheckHandling>(m);
         m.Entity<FnbStockView>(e => { e.HasNoKey(); e.ToView("vw_fnb_v4_stock"); });
         m.Entity<FnbLossView>(e => { e.HasNoKey(); e.ToView("vw_fnb_v4_loss"); e.Property(x => x.business_date).HasColumnType("date"); });
         foreach (var entity in m.Model.GetEntityTypes().Where(x => (x.GetTableName() ?? "").StartsWith("fnb_") || (x.GetViewName() ?? "").StartsWith("vw_fnb_")))
@@ -218,7 +226,7 @@ internal static class FnbSchemaConfiguration
         var tool = Table<FnbTool>(m, "fnb_tool"); tool.HasKey(x => x.id); Text(tool, "name", 200); Text(tool, "asset_no", 64); Text(tool, "spec", 200); Text(tool, "status", 16);
         tool.HasOne<Shop>().WithMany().HasForeignKey(x => x.shop_id).OnDelete(DeleteBehavior.NoAction);
         tool.HasOne<FnbArea>().WithMany().HasForeignKey(x => x.area_id).OnDelete(DeleteBehavior.NoAction);
-        tool.HasIndex(x => new { x.shop_id, x.asset_no }).IsUnique(); tool.Property(x => x.last_check_date).HasColumnType("date");
+        tool.HasIndex(x => new { x.shop_id, x.asset_no }).IsUnique().HasFilter("[valid] = 1"); tool.Property(x => x.last_check_date).HasColumnType("date");
         Check(tool, sql, "value", "quantity > 0 AND status IN ('normal','missing','damaged','repairing','disposed')");
         var log = Table<FnbToolLog>(m, "fnb_tool_log"); log.HasKey(x => x.id); Text(log, "from_status", 16); Text(log, "to_status", 16); Text(log, "remark", 600);
         log.HasOne<FnbTool>().WithMany().HasForeignKey(x => x.tool_id).OnDelete(DeleteBehavior.NoAction);
@@ -228,7 +236,7 @@ internal static class FnbSchemaConfiguration
         ci.HasOne<FnbSupply>().WithMany().HasForeignKey(x => x.supply_id).OnDelete(DeleteBehavior.NoAction);
         Check(ci, sql, "value", "method IN ('yes_no','number','photo') AND (minimum IS NULL OR maximum IS NULL OR minimum <= maximum)");
         var sheet = Table<FnbCheckSheet>(m, "fnb_check_sheet"); sheet.HasKey(x => x.id); Text(sheet, "status", 16); Text(sheet, "fingerprint", 64);
-        sheet.Property(x => x.business_date).HasColumnType("date"); sheet.HasIndex(x => new { x.shop_id, x.business_date }).IsUnique();
+        sheet.Property(x => x.business_date).HasColumnType("date"); sheet.HasIndex(x => new { x.shop_id, x.business_date }).IsUnique().HasFilter("[valid] = 1");
         sheet.HasOne<Shop>().WithMany().HasForeignKey(x => x.shop_id).OnDelete(DeleteBehavior.NoAction);
         var cl = Table<FnbCheckLine>(m, "fnb_check_line"); cl.HasKey(x => x.id); Text(cl, "snapshot_json", 4000); Text(cl, "result", 16); Text(cl, "reason", 1000);
         cl.HasOne<FnbCheckSheet>().WithMany().HasForeignKey(x => x.sheet_id).OnDelete(DeleteBehavior.NoAction);
@@ -244,6 +252,7 @@ internal static class FnbSchemaConfiguration
 
     private static EntityTypeBuilder<T> Table<T>(ModelBuilder m, string name) where T : class
     { var e = m.Entity<T>(); e.ToTable(name == "fnb_unit" ? name : name.Replace("fnb_", "fnb_v4_")); return e; }
+    private static void ActiveOnly<T>(ModelBuilder m) where T : class => m.Entity<T>().HasQueryFilter(x => EF.Property<bool>(x, "valid"));
     private static void Text<T>(EntityTypeBuilder<T> e, string name, int size) where T : class => e.Property<string>(name).HasMaxLength(size).IsUnicode(false);
     private static void Check<T>(EntityTypeBuilder<T> e, bool sql, string name, string expression) where T : class
     { if (sql) e.ToTable(t => t.HasCheckConstraint("CK_" + e.Metadata.GetTableName() + "_" + name, expression)); }

@@ -22,6 +22,7 @@ public sealed class FnbAreaImage
     public int upload_id { get; set; }
     public int staff_id { get; set; }
     public DateTime created_at { get; set; }
+    public bool valid { get; set; } = true;
 }
 // Extension table keeps the already published batch schema intact.
 public sealed class FnbBatchDetail
@@ -30,6 +31,7 @@ public sealed class FnbBatchDetail
     public int? area_id { get; set; }
     public string? open_storage { get; set; }
     public int? open_days { get; set; }
+    public bool valid { get; set; } = true;
 }
 public sealed class FnbRequest
 {
@@ -40,6 +42,7 @@ public sealed class FnbRequest
     public string response_json { get; set; } = "";
     public int staff_id { get; set; }
     public DateTime created_at { get; set; }
+    public bool valid { get; set; } = true;
 }
 public sealed class FnbSupply
 {
@@ -72,6 +75,7 @@ public sealed class FnbSupplyMovement
     public bool cancelled { get; set; }
     public int staff_id { get; set; }
     public DateTime created_at { get; set; }
+    public bool valid { get; set; } = true;
 }
 public sealed class FnbTool
 {
@@ -101,6 +105,7 @@ public sealed class FnbToolLog
     public string? remark { get; set; }
     public int staff_id { get; set; }
     public DateTime created_at { get; set; }
+    public bool valid { get; set; } = true;
 }
 public sealed class FnbCheckItem
 {
@@ -133,6 +138,7 @@ public sealed class FnbCheckSheet
     public DateTime? submitted_at { get; set; }
     public int? confirmed_by { get; set; }
     public DateTime? confirmed_at { get; set; }
+    public bool valid { get; set; } = true;
     public byte[] row_version { get; set; } = Array.Empty<byte>();
 }
 public sealed class FnbCheckLine
@@ -149,6 +155,7 @@ public sealed class FnbCheckLine
     public bool bulk { get; set; }
     public int? staff_id { get; set; }
     public DateTime? updated_at { get; set; }
+    public bool valid { get; set; } = true;
 }
 public sealed class FnbCheckHandling
 {
@@ -157,6 +164,7 @@ public sealed class FnbCheckHandling
     public string remark { get; set; } = "";
     public int staff_id { get; set; }
     public DateTime created_at { get; set; }
+    public bool valid { get; set; } = true;
 }
 public sealed class FnbAlertDelivery
 {
@@ -167,5 +175,6 @@ public sealed class FnbAlertDelivery
     public string receivers { get; set; } = "";
     public string? message_id { get; set; }
     public string? error { get; set; }
+    public bool valid { get; set; } = true;
     public byte[] row_version { get; set; } = Array.Empty<byte>();
 }

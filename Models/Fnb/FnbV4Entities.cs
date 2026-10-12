@@ -98,6 +98,7 @@ public sealed class FnbBatch
     public int? spec_id { get; set; }
     public DateTime received_at { get; set; }
     public string? dispose_status { get; set; }
+    public bool valid { get; set; } = true;
     public byte[] row_version { get; set; } = Array.Empty<byte>();
 }
 
@@ -105,6 +106,7 @@ public sealed class FnbBatchImage
 {
     public int batch_id { get; set; }
     public int upload_id { get; set; }
+    public bool valid { get; set; } = true;
 }
 
 public sealed class FnbStockOperation
@@ -128,6 +130,7 @@ public sealed class FnbStockOperation
     public string status { get; set; } = "";
     public DateTime? completed_at { get; set; }
     public int staff_id { get; set; }
+    public bool valid { get; set; } = true;
 }
 
 public sealed class FnbStockView
