@@ -10,10 +10,18 @@ namespace SnowmeetApi.Services.Fnb;
 
 public sealed record FnbCategoryInput(int ShopId, int Id, int? ParentId, byte Level, string Name,
     string? BatchCode = null, string? MeasureType = null, string? DefaultStorage = null,
-    int? WarnDays = null, int? OpenDays = null, bool IsPrepared = false, int Sort = 0, bool Valid = true);
+    int? WarnDays = null, int? OpenDays = null, bool IsPrepared = false, int Sort = 0, bool Valid = true, bool? Enabled = null)
+{
+    // Compatibility alias: old Valid request values only control enabled, never restore deletion.
+    public bool IsEnabled => Enabled ?? Valid;
+}
 public sealed record FnbCategoryDeleteInput(int ShopId, int Id);
 public sealed record FnbShelfRuleInput(int ShopId, int Id, int? CategoryId, int? ItemId,
-    string StorageType, string Season, int Days, bool Valid = true);
+    string StorageType, string Season, int Days, bool Valid = true, bool? Enabled = null)
+{
+    // Compatibility alias: old Valid request values only control enabled, never restore deletion.
+    public bool IsEnabled => Enabled ?? Valid;
+}
 public sealed record FnbCreateItemInput(int ShopId, int CategoryId, string Name, string FinalFormName,
     string BaseUnitCode, string FinalFormCode = "F", string? StorageType = null,
     int? WarnDays = null, int? OpenDays = null, int? ImageId = null);
@@ -26,7 +34,11 @@ public sealed record FnbFormInput(int ShopId, int ItemId, int Id, string Name, s
     string? OpName = null, decimal StandardYield = 1, decimal DurationHours = 0);
 public sealed record FnbRemoveFormInput(int ShopId, int ItemId, int Id);
 public sealed record FnbSpecInput(int ShopId, int ItemId, int Id, int EntryFormId, string Name,
-    string? Brand = null, string? PackDesc = null, string? Barcode = null, int Sort = 0, bool Valid = true);
+    string? Brand = null, string? PackDesc = null, string? Barcode = null, int Sort = 0, bool Valid = true, bool? Enabled = null)
+{
+    // Compatibility alias: old Valid request values only control enabled, never restore deletion.
+    public bool IsEnabled => Enabled ?? Valid;
+}
 
 // 写方法由控制器的 Serializable 事务包住，结构变化和引用检查在同一事务内。
 public sealed class FnbV4CatalogService(ApplicationDBContext db)
@@ -48,29 +60,28 @@ public sealed class FnbV4CatalogService(ApplicationDBContext db)
             if (input.ParentId == null || !await db.fnbCategory.AnyAsync(x => x.id == input.ParentId && x.level == 1 && x.valid)) throw Invalid("父分类须为有效一级分类");
             if (!FnbV4Rules.Storage(input.DefaultStorage) || FnbV4Rules.Dimension(input.MeasureType) == 0) throw Invalid("计量类型或储存方式无效");
             batchCode = FnbV4Rules.Code(input.BatchCode, "批次编码");
-            if (input.Valid && await db.fnbCategory.AnyAsync(x => x.id != input.Id && x.valid && x.batch_code == batchCode)) throw Invalid("批次编码已使用");
+            if (await db.fnbCategory.AnyAsync(x => x.id != input.Id && x.valid && x.batch_code == batchCode)) throw Invalid("批次编码已使用");
         }
-        if (input.Valid && await db.fnbCategory.AnyAsync(x => x.id != input.Id && x.valid && x.parent_id == input.ParentId && x.name == name)) throw Invalid("同级分类名称已存在");
+        if (await db.fnbCategory.AnyAsync(x => x.id != input.Id && x.valid && x.parent_id == input.ParentId && x.name == name)) throw Invalid("同级分类名称已存在");
         var row = input.Id == 0 ? new FnbCategory { valid = true, created_at = DateTime.UtcNow } : await db.fnbCategory.AsNoTracking().SingleOrDefaultAsync(x => x.id == input.Id);
         if (row == null) throw Invalid("分类不存在");
         if (row.id != 0)
         {
             if (row.level != input.Level) throw Invalid("分类层级不可修改");
-            if (row.valid && !input.Valid) throw Invalid("停用分类请使用 DeleteCategory");
             if (row.measure_type != input.MeasureType || row.is_prepared != input.IsPrepared)
                 if (await db.fnbItem.AnyAsync(x => x.category_id == row.id)) throw Invalid("已有食材的分类不可更改计量类型或原料/半成品类型");
         }
         row.parent_id = input.ParentId; row.level = input.Level; row.name = name;
         row.batch_code = batchCode; row.measure_type = input.MeasureType; row.default_storage = input.DefaultStorage;
         row.warn_days = input.WarnDays; row.open_days = input.OpenDays; row.is_prepared = input.IsPrepared;
-        row.sort = input.Sort; row.valid = input.Valid; row.updated_at = DateTime.UtcNow;
+        row.sort = input.Sort; row.enabled = input.IsEnabled; row.updated_at = DateTime.UtcNow;
         if (row.id == 0) db.fnbCategory.Add(row); else Modified(row);
         await db.SaveChangesAsync(); return row;
     }
 
     public async Task<int[]> DeleteCategoryAsync(int id)
     {
-        var root = await db.fnbCategory.AsNoTracking().SingleOrDefaultAsync(x => x.id == id && x.valid) ?? throw Invalid("分类不存在或已停用");
+        var root = await db.fnbCategory.AsNoTracking().SingleOrDefaultAsync(x => x.id == id && x.valid) ?? throw Invalid("分类不存在或已删除");
         var rows = await db.fnbCategory.AsNoTracking().Where(x => x.id == id || x.parent_id == id).ToListAsync();
         var ids = rows.Select(x => x.id).ToArray();
         if (await db.fnbItem.AnyAsync(x => ids.Contains(x.category_id))) throw Invalid("分类下仍有食材，不能删除");
@@ -84,19 +95,19 @@ public sealed class FnbV4CatalogService(ApplicationDBContext db)
             !FnbV4Rules.Storage(input.StorageType) || input.Season is not ("all" or "warm" or "cold") || input.Days is <= 0 or > 36500)
             throw Invalid("保质期须归属食材或二级分类中的一个，且季节、天数、储存方式有效");
         if (input.CategoryId != null && !await db.fnbCategory.AnyAsync(x => x.id == input.CategoryId && x.level == 2 && x.valid) ||
-            input.ItemId != null && !await db.fnbItem.AnyAsync(x => x.id == input.ItemId && x.valid)) throw Invalid("规则归属不存在或已停用");
-        if (input.Valid && await db.fnbShelfLifeRule.AnyAsync(x => x.id != input.Id && x.valid && x.category_id == input.CategoryId && x.item_id == input.ItemId && x.storage_type == input.StorageType && x.season == input.Season)) throw Invalid("该归属已有同储存方式、同季节的规则");
+            input.ItemId != null && !await db.fnbItem.AnyAsync(x => x.id == input.ItemId && x.valid)) throw Invalid("规则归属不存在或已删除");
+        if (await db.fnbShelfLifeRule.AnyAsync(x => x.id != input.Id && x.valid && x.category_id == input.CategoryId && x.item_id == input.ItemId && x.storage_type == input.StorageType && x.season == input.Season)) throw Invalid("该归属已有同储存方式、同季节的规则");
         var row = input.Id == 0 ? new FnbShelfLifeRule { valid = true, created_at = DateTime.UtcNow } : await db.fnbShelfLifeRule.AsNoTracking().SingleOrDefaultAsync(x => x.id == input.Id);
         if (row == null) throw Invalid("规则不存在");
         if (row.id != 0 && (row.item_id != input.ItemId || row.category_id != input.CategoryId)) throw Invalid("规则归属不可修改");
         row.item_id = input.ItemId; row.category_id = input.CategoryId; row.storage_type = input.StorageType;
-        row.season = input.Season; row.days = input.Days; row.valid = input.Valid; row.updated_at = DateTime.UtcNow;
+        row.season = input.Season; row.days = input.Days; row.enabled = input.IsEnabled; row.updated_at = DateTime.UtcNow;
         if (row.id == 0) db.fnbShelfLifeRule.Add(row); else Modified(row);
         await db.SaveChangesAsync(); return row;
     }
 
-    private async Task<FnbItem> ItemAsync(int id) => await db.fnbItem.AsNoTracking().SingleOrDefaultAsync(x => x.id == id && x.valid) ?? throw Invalid("食材不存在或已停用");
-    private Task<List<FnbItemForm>> FormsAsync(int itemId) => db.fnbItemForm.AsNoTracking().Where(x => x.item_id == itemId && x.valid).OrderBy(x => x.seq).ToListAsync();
+    private async Task<FnbItem> ItemAsync(int id) => await db.fnbItem.AsNoTracking().SingleOrDefaultAsync(x => x.id == id && x.valid) ?? throw Invalid("食材不存在或已删除");
+    private Task<List<FnbItemForm>> FormsAsync(int itemId) => db.fnbItemForm.AsNoTracking().Where(x => x.item_id == itemId && x.valid && x.enabled).OrderBy(x => x.seq).ToListAsync();
 
     public async Task<object> GetRouteAsync(int itemId)
     {
@@ -112,7 +123,8 @@ public sealed class FnbV4CatalogService(ApplicationDBContext db)
 
     public async Task<FnbItem> CreateItemAsync(FnbCreateItemInput input)
     {
-        var category = await db.fnbCategory.AsNoTracking().SingleOrDefaultAsync(x => x.id == input.CategoryId && x.level == 2 && x.valid) ?? throw Invalid("须选择有效二级分类");
+        var category = await db.fnbCategory.AsNoTracking().SingleOrDefaultAsync(x => x.id == input.CategoryId && x.level == 2 && x.valid && x.enabled) ?? throw Invalid("须选择启用的二级分类");
+        if (!await db.fnbCategory.AnyAsync(x => x.id == category.parent_id && x.enabled)) throw Invalid("上级分类不存在或已停用");
         var name = FnbV4Rules.RequiredText(input.Name, 200, "食材名称");
         if (input.BaseUnitCode != FnbV4Rules.BaseUnit(category.measure_type) ||
             !await db.fnbUnit.AnyAsync(x => x.code == input.BaseUnitCode && x.valid && x.dimension == FnbV4Rules.Dimension(category.measure_type))) throw Invalid("基本单位须与分类计量类型一致，且为 g、ml 或 piece");
@@ -230,11 +242,11 @@ public sealed class FnbV4CatalogService(ApplicationDBContext db)
         var row = input.Id == 0 ? new FnbPurchaseSpec { item_id = input.ItemId, valid = true, created_at = DateTime.UtcNow } : await db.fnbPurchaseSpec.AsNoTracking().SingleOrDefaultAsync(x => x.id == input.Id && x.item_id == input.ItemId);
         if (row == null) throw Invalid("规格不属于该食材");
         bool referenced = row.id != 0 && (await db.fnbBatch.AnyAsync(x => x.spec_id == row.id) || await db.fnbStockDocumentLine.AnyAsync(x => x.spec_id == row.id));
-        if (referenced && (input.Valid || row.entry_form_id != input.EntryFormId || row.name != name || row.brand != brand || row.pack_desc != desc || row.barcode != barcode || row.sort != input.Sort))
-            throw Invalid("已被入库引用的规格只能原样停用");
-        if (input.Valid && barcode != null && await db.fnbPurchaseSpec.AnyAsync(x => x.id != input.Id && x.valid && x.barcode == barcode)) throw Invalid("启用中的进货规格条码须全局唯一");
+        if (referenced && (row.entry_form_id != input.EntryFormId || row.name != name || row.brand != brand || row.pack_desc != desc || row.barcode != barcode || row.sort != input.Sort))
+            throw Invalid("已被入库引用的规格只能切换启用状态，不可修改内容");
+        if (barcode != null && await db.fnbPurchaseSpec.AnyAsync(x => x.id != input.Id && x.valid && x.barcode == barcode)) throw Invalid("未删除的进货规格条码须全局唯一");
         row.entry_form_id = input.EntryFormId; row.name = name; row.brand = brand; row.pack_desc = desc; row.barcode = barcode;
-        row.sort = input.Sort; row.valid = input.Valid; row.updated_at = DateTime.UtcNow;
+        row.sort = input.Sort; row.enabled = input.IsEnabled; row.updated_at = DateTime.UtcNow;
         if (row.id == 0) db.fnbPurchaseSpec.Add(row); else Modified(row);
         await db.SaveChangesAsync(); return row;
     }

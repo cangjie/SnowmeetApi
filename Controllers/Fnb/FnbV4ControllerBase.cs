@@ -36,6 +36,7 @@ public abstract class FnbV4ControllerBase(ApplicationDBContext db) : ControllerB
             var prior = await db.fnbRequest.SingleOrDefaultAsync(x => x.shop_id == shopId && x.action == actionName && x.request_id == requestId);
             if (prior != null)
             {
+                if (!prior.valid) throw new FnbConflictException("原请求已删除，不能恢复或重复执行");
                 if (prior.payload_hash != hash) throw new FnbConflictException("同一 requestId 不能更换请求内容");
                 return JsonSerializer.Deserialize<JsonElement>(prior.response_json);
             }

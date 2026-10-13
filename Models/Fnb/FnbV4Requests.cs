@@ -26,17 +26,33 @@ public sealed record FnbServeRequest(int ShopId, Guid RequestId, [property: Json
 public sealed record FnbSnapshotRequest(int ShopId, Guid RequestId);
 public sealed record FnbCountLine(int ItemId, decimal Quantity, string? Remark = null);
 public sealed record FnbCountRequest(int ShopId, Guid RequestId, [property: JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)] long DocumentId, FnbCountLine[] Lines);
-public sealed record FnbAreaSaveRequest(int ShopId, int Id, int? ParentId, string Name, string AreaType = "other", bool Valid = true, int Sort = 0);
+public sealed record FnbAreaSaveRequest(int ShopId, int Id, int? ParentId, string Name, string AreaType = "other", bool Valid = true, int Sort = 0, bool? Enabled = null)
+{
+    // Compatibility alias: old Valid request values only control enabled, never restore deletion.
+    public bool IsEnabled => Enabled ?? Valid;
+}
 public sealed record FnbIdRequest(int ShopId, int Id);
 public sealed record FnbAreaImageRequest(int ShopId, int AreaId, int UploadId);
-public sealed record FnbSupplySaveRequest(int ShopId, int Id, string Name, string SupplyType, int PackSize, string PackLabel, int? AreaId = null, string? Spec = null, bool Valid = true);
+public sealed record FnbSupplySaveRequest(int ShopId, int Id, string Name, string SupplyType, int PackSize, string PackLabel, int? AreaId = null, string? Spec = null, bool Valid = true, bool? Enabled = null)
+{
+    // Compatibility alias: old Valid request values only control enabled, never restore deletion.
+    public bool IsEnabled => Enabled ?? Valid;
+}
 public sealed record FnbSupplyPostRequest(int ShopId, Guid RequestId, int SupplyId, string Type, decimal Quantity, string? Reason = null);
 public sealed record FnbSupplyUndoRequest(int ShopId, Guid RequestId, [property: JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)] long MovementId);
 public sealed record FnbSupplyLowRequest(int ShopId, int SupplyId, decimal? Ratio, decimal? Quantity);
-public sealed record FnbToolSaveRequest(int ShopId, int Id, string Name, int Quantity, string? Spec = null, int? AreaId = null, int? OwnerStaffId = null, bool DailyCheck = false, string? AssetNo = null, bool Valid = true);
+public sealed record FnbToolSaveRequest(int ShopId, int Id, string Name, int Quantity, string? Spec = null, int? AreaId = null, int? OwnerStaffId = null, bool DailyCheck = false, string? AssetNo = null, bool Valid = true, bool? Enabled = null)
+{
+    // Compatibility alias: old Valid request values only control enabled, never restore deletion.
+    public bool IsEnabled => Enabled ?? Valid;
+}
 public sealed record FnbToolChangeRequest(int ShopId, Guid RequestId, int ToolId, string? Status = null, int? AreaId = null, string? Remark = null);
 public sealed record FnbCheckItemRequest(int ShopId, int Id, int AreaId, string Name, string Method = "yes_no", string Kind = "environment", bool Required = true,
-    bool PhotoSuggested = false, string? Unit = null, decimal? Minimum = null, decimal? Maximum = null, int? ToolId = null, int? SupplyId = null, bool Valid = true);
+    bool PhotoSuggested = false, string? Unit = null, decimal? Minimum = null, decimal? Maximum = null, int? ToolId = null, int? SupplyId = null, bool Valid = true, bool? Enabled = null)
+{
+    // Compatibility alias: old Valid request values only control enabled, never restore deletion.
+    public bool IsEnabled => Enabled ?? Valid;
+}
 public sealed record FnbCheckWriteRequest(int ShopId, Guid RequestId, [property: JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)] long SheetId);
 public sealed record FnbCheckValue(int ItemId, string? Result, decimal? Value = null, string? Reason = null, int? UploadId = null);
 public sealed record FnbCheckDraftRequest(int ShopId, Guid RequestId, [property: JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)] long SheetId, FnbCheckValue[] Lines);

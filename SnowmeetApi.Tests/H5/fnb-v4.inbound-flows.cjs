@@ -3,13 +3,13 @@ const assert = require('node:assert/strict');
 module.exports = async ({ page, go, data }) => {
   const originalCategories = data.categories.slice(), originalItems = data.moreItems;
   data.categories.push(
-    { id: 101, level: 1, name: '粮油', valid: true },
-    { id: 102, level: 2, parent_id: 101, name: '进口面粉', valid: true },
-    { id: 103, level: 2, parent_id: 1, name: '奶粉', valid: true },
-    { id: 104, level: 2, parent_id: 1, name: '奶制半成品', valid: true, is_prepared: true },
-    { id: 105, level: 1, name: '停用大类', valid: false },
-    { id: 106, level: 2, parent_id: 105, name: '停用大类下的小类', valid: true },
-    { id: 107, level: 2, parent_id: 1, name: '停用小类', valid: false }
+    { id: 101, level: 1, name: '粮油', valid: true, enabled: true },
+    { id: 102, level: 2, parent_id: 101, name: '进口面粉', valid: true, enabled: true },
+    { id: 103, level: 2, parent_id: 1, name: '奶粉', valid: true, enabled: true },
+    { id: 104, level: 2, parent_id: 1, name: '奶制半成品', valid: true, enabled: true, is_prepared: true },
+    { id: 105, level: 1, name: '停用大类', valid: true, enabled: false },
+    { id: 106, level: 2, parent_id: 105, name: '停用大类下的小类', valid: true, enabled: true },
+    { id: 107, level: 2, parent_id: 1, name: '停用小类', valid: true, enabled: false }
   );
   data.moreItems = [
     { ...data.item, id: 111, category_id: 102, name: '面粉' },

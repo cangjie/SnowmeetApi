@@ -11,7 +11,9 @@ public sealed class FnbArea
     public int? parent_id { get; set; }
     public string name { get; set; } = "";
     public string area_type { get; set; } = "other";
-    public bool valid { get; set; }
+    // valid=false means deleted; enabled=false is a reversible suspension.
+    public bool valid { get; set; } = true;
+    public bool enabled { get; set; } = true;
     public int sort { get; set; }
     public DateTime created_at { get; set; }
     public DateTime? updated_at { get; set; }
@@ -58,7 +60,9 @@ public sealed class FnbSupply
     public decimal last_receipt_qty { get; set; }
     public decimal? low_stock_ratio { get; set; }
     public decimal? low_stock_qty { get; set; }
-    public bool valid { get; set; }
+    // valid=false means deleted; enabled=false is a reversible suspension.
+    public bool valid { get; set; } = true;
+    public bool enabled { get; set; } = true;
     public DateTime created_at { get; set; }
     public byte[] row_version { get; set; } = Array.Empty<byte>();
 }
@@ -90,7 +94,9 @@ public sealed class FnbTool
     public int? owner_staff_id { get; set; }
     public bool daily_check { get; set; }
     public DateTime? last_check_date { get; set; }
-    public bool valid { get; set; }
+    // valid=false means deleted; enabled=false is a reversible suspension.
+    public bool valid { get; set; } = true;
+    public bool enabled { get; set; } = true;
     public DateTime created_at { get; set; }
     public byte[] row_version { get; set; } = Array.Empty<byte>();
 }
@@ -121,7 +127,9 @@ public sealed class FnbCheckItem
     public decimal? maximum { get; set; }
     public int? tool_id { get; set; }
     public int? supply_id { get; set; }
-    public bool valid { get; set; }
+    // valid=false means deleted; enabled=false is a reversible suspension.
+    public bool valid { get; set; } = true;
+    public bool enabled { get; set; } = true;
     public DateTime updated_at { get; set; }
 }
 public sealed class FnbCheckSheet

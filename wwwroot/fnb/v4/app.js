@@ -22,7 +22,7 @@
   const num = (f, k, fallback) => { const v = f.get(k); return v === '' || v == null ? fallback : Number(v); };
   const text = (f, k) => String(f.get(k) || '').trim();
   const storeOptions = Object.entries(storageNames);
-  const categories2 = () => state.categories.filter(c => c.level === 2 && c.valid);
+  const categories2 = () => state.categories.filter(c => c.level === 2 && c.enabled && state.categories.some(p => p.id === c.parent_id && p.enabled));
   const catOptions = () => categories2().map(c => [c.id, c.name]);
   const itemOptions = () => state.items.map(r => [r.item.id, r.item.name]);
   const beforeSave = '<p class="form-error" role="alert" hidden></p>';
@@ -67,10 +67,10 @@
   function cats() {
     return '<div class="stack">' + note('二级分类决定建议储存方式、默认保质期与临期阈值。入库仍可选择三种储存方式。')
       + (manager() ? button('+ 新增一级分类', 'new-category', null, 'btn secondary full') : note('员工可以查看分类，维护需店长。'))
-      + state.categories.filter(c => c.level === 1).map(c => '<details class="card" open><summary>' + esc(c.name) + ' ' + (!c.valid ? badge('已停用') : '') + '</summary>'
-        + (manager() ? '<div class="row">' + button('编辑', 'edit-category', c.id, 'link') + button('停用分类', 'disable-category', c.id, 'link', !c.valid) + '</div>' : '')
-        + state.categories.filter(s => s.parent_id === c.id).map(s => '<div class="list-row"><div class="row between"><strong>' + esc(s.name) + '</strong>' + badge(s.valid ? s.is_prepared ? '半成品' : '启用' : '已停用', s.valid ? 'blue' : '') + '</div><p class="hint">' + esc(s.batch_code) + ' · ' + esc(measureNames[s.measure_type]) + ' · ' + esc(storageNames[s.default_storage]) + '</p><p class="hint">临期提醒 ' + esc(s.warn_days == null ? '跟随默认' : s.warn_days + ' 天') + ' · 开封/作业后保质 ' + esc(s.open_days == null ? '不改变到期' : s.open_days + ' 天') + '</p><div class="row wrap">' + button(manager() ? '分类属性' : '查看属性', 'edit-category', s.id, 'link') + button('保质期规则', 'category-rules', s.id, 'link') + (manager() ? button('停用', 'disable-category', s.id, 'link', !s.valid) : '') + '</div></div>').join('')
-        + (manager() && c.valid ? button('+ 新增二级分类', 'new-subcategory', c.id, 'link') : '') + '</details>').join('')
+      + state.categories.filter(c => c.level === 1).map(c => '<details class="card" open><summary>' + esc(c.name) + ' ' + (!c.enabled ? badge('已停用') : '') + '</summary>'
+        + (manager() ? '<div class="row">' + button('编辑', 'edit-category', c.id, 'link') + button(c.enabled ? '停用分类' : '启用分类', 'disable-category', c.id, 'link') + button('删除分类', 'delete-category', c.id, 'link') + '</div>' : '')
+        + state.categories.filter(s => s.parent_id === c.id).map(s => '<div class="list-row"><div class="row between"><strong>' + esc(s.name) + '</strong>' + badge(s.enabled ? s.is_prepared ? '半成品' : '启用' : '已停用', s.enabled ? 'blue' : '') + '</div><p class="hint">' + esc(s.batch_code) + ' · ' + esc(measureNames[s.measure_type]) + ' · ' + esc(storageNames[s.default_storage]) + '</p><p class="hint">临期提醒 ' + esc(s.warn_days == null ? '跟随默认' : s.warn_days + ' 天') + ' · 开封/作业后保质 ' + esc(s.open_days == null ? '不改变到期' : s.open_days + ' 天') + '</p><div class="row wrap">' + button(manager() ? '分类属性' : '查看属性', 'edit-category', s.id, 'link') + button('保质期规则', 'category-rules', s.id, 'link') + (manager() ? button(s.enabled ? '停用' : '启用', 'disable-category', s.id, 'link') + button('删除', 'delete-category', s.id, 'link') : '') + '</div></div>').join('')
+        + (manager() && c.enabled ? button('+ 新增二级分类', 'new-subcategory', c.id, 'link') : '') + '</details>').join('')
       + (!state.categories.length ? empty('先创建一级分类，再添加二级分类') : '') + '</div>';
   }
   function routes() {
@@ -84,18 +84,18 @@
           + '<div class="chain-form"><div class="row between"><strong>' + esc(f.name) + '</strong>' + badge(i === r.forms.length - 1 ? '出品态' : i === 0 ? '采购态' : '中间态', i === r.forms.length - 1 ? 'green' : 'blue') + '</div><p class="hint">' + esc(f.unit_name) + ' · ' + esc(storageNames[f.storage_type]) + ' · 编码 ' + esc(f.form_code) + '</p><p class="hint">每单位基本量 ' + esc(f.per_base) + ' ' + esc(unitNames[r.item.base_unit_code]) + '</p>' + (manager() ? '<div class="row">' + button('编辑', 'edit-form', f.id, 'link') + (i === 0 && r.forms.length > 1 ? button('移除上游形态', 'remove-form', f.id, 'link') : '') + '</div>' : '') + '</div>').join('')
         + (manager() ? '<div class="actions">' + button('+ 在上游加一个形态', 'new-form', r.item.id, 'btn secondary full') + '</div>' : '')
         + '</section><section class="card"><div class="row between"><h2>进货规格 ' + r.specs.length + '</h2>' + badge('编辑需店长') + '</div>'
-        + r.specs.map(s => '<div class="list-row"><div class="row between"><strong>' + esc(s.name) + '</strong>' + badge(s.valid ? '启用' : '已停用', s.valid ? 'blue' : '') + '</div><p class="hint">' + esc(s.pack_desc || '未填写包装说明') + '</p><p class="hint">入口：' + esc((r.forms.find(f => f.id === s.entry_form_id) || {}).name || '已停用形态') + '</p><p class="hint">条码 ' + esc(s.barcode || '未填写') + '</p>' + (manager() ? '<div class="row">' + button('编辑', 'edit-spec', s.id, 'link') + button(s.valid ? '停用' : '启用', 'toggle-spec', s.id, 'link') + '</div>' : '') + '</div>').join('')
+        + r.specs.map(s => '<div class="list-row"><div class="row between"><strong>' + esc(s.name) + '</strong>' + badge(s.enabled ? '启用' : '已停用', s.enabled ? 'blue' : '') + '</div><p class="hint">' + esc(s.pack_desc || '未填写包装说明') + '</p><p class="hint">入口：' + esc((r.forms.find(f => f.id === s.entry_form_id) || {}).name || '已停用形态') + '</p><p class="hint">条码 ' + esc(s.barcode || '未填写') + '</p>' + (manager() ? '<div class="row">' + button('编辑', 'edit-spec', s.id, 'link') + button(s.enabled ? '停用' : '启用', 'toggle-spec', s.id, 'link') + '</div>' : '') + '</div>').join('')
         + (!r.specs.length ? empty('还没有进货规格') : '') + (manager() ? button('+ 新增进货规格', 'new-spec', r.item.id, 'link') : '') + '<p class="hint">有库存的规格只能停用，修改限制由服务器校验。</p></section>') + '</div>';
   }
   const percent = value => value == null ? '—' : new Intl.NumberFormat('zh-CN', { style: 'percent', maximumFractionDigits: 4 }).format(value);
   function categoryEditor(c, parent) {
     const level = c ? c.level : parent ? 2 : 1, disabled = manager() ? '' : 'disabled';
-    const entry = c || { id: 0, parent_id: parent || null, level: level, name: '', batch_code: '', measure_type: 'weight', default_storage: 'chilled', warn_days: null, open_days: null, is_prepared: false, valid: true, sort: 0 };
+    const entry = c || { id: 0, parent_id: parent || null, level: level, name: '', batch_code: '', measure_type: 'weight', default_storage: 'chilled', warn_days: null, open_days: null, is_prepared: false, enabled: true, sort: 0 };
     openModal(level === 1 ? '一级分类' : '二级分类属性', '<form data-form="category" data-id="' + entry.id + '" data-parent="' + esc(entry.parent_id) + '" data-level="' + level + '">' + field('name', '分类名称', entry.name, 'text', 'required maxlength="100" ' + disabled)
       + (level === 2 ? field('batchCode', '批次号编码（大写字母 / 数字）', entry.batch_code, 'text', 'required pattern="[A-Za-z0-9]{1,16}" maxlength="16" ' + disabled)
         + select('measureType', '计量方式', Object.entries(measureNames), entry.measure_type, disabled) + select('defaultStorage', '建议储存方式', storeOptions, entry.default_storage, disabled)
         + '<div class="form-grid">' + field('warnDays', '临期提前提醒（天，空白跟默认）', entry.warn_days, 'number', 'min="0" max="36500" step="1" ' + disabled) + field('openDays', '开封 / 作业后保质（天空白不改变）', entry.open_days, 'number', 'min="0" max="36500" step="1" ' + disabled) + '</div>' + check('isPrepared', '半成品分类', entry.is_prepared) : '')
-      + field('sort', '排序', entry.sort, 'number', 'step="1" ' + disabled) + check('valid', '启用分类', entry.valid) + beforeSave + (manager() ? saveButton() : '') + '</form>');
+      + field('sort', '排序', entry.sort, 'number', 'step="1" ' + disabled) + check('enabled', '启用分类', entry.enabled) + beforeSave + (manager() ? saveButton() : '') + '</form>');
     if (!manager()) $('modal').querySelectorAll('input,select').forEach(e => { e.disabled = true; });
   }
   function itemEditor() {
@@ -131,29 +131,29 @@
     openModal(s ? '编辑进货规格' : '新增进货规格', '<form data-form="spec" data-id="' + (s ? s.id : 0) + '">' + field('name', '规格名称', s ? s.name : '', 'text', 'required maxlength="100"') + field('packDesc', '包装说明', s && s.pack_desc, 'text', 'maxlength="200"') + field('brand', '品牌（选填）', s && s.brand, 'text', 'maxlength="100"')
       + '<div class="inline-input">' + field('barcode', '商品条码（选填）', s && s.barcode, 'text', 'maxlength="100"') + button('扫一扫', 'scan-barcode', 'barcode', 'btn compact secondary') + '</div>'
       + select('entryFormId', '入口形态（从这一层入库）', r.forms.map(f => [f.id, f.name + ' · ' + f.unit_name]), s ? s.entry_form_id : r.forms[0].id)
-      + field('sort', '排序', s ? s.sort : 0, 'number', 'step="1"') + check('valid', '启用规格', s ? s.valid : true) + '<p class="hint">有库存或入库记录的规格只能停用。条码在启用规格中全局唯一。</p>' + beforeSave + saveButton('完成') + '</form>');
+      + field('sort', '排序', s ? s.sort : 0, 'number', 'step="1"') + check('enabled', '启用规格', s ? s.enabled : true) + '<p class="hint">有库存或入库记录的规格只能切换启用状态。条码在未删除的规格中全局唯一。</p>' + beforeSave + saveButton('完成') + '</form>');
   }
   async function rulesEditor(kind, id) {
     const params = { includeDisabled: true }; params[kind + 'Id'] = id;
     const rows = await api.request('FnbCatalog', 'ListShelfRules', { params: params });
     openModal(kind === 'category' ? '分类保质期规则' : '食材保质期规则', '<p class="hint">生产月份 6–9 月采用暖季，其余月份为冷季。回退顺序由服务器执行。</p>'
-      + rows.map(r => '<div class="list-row"><div class="row between"><span>' + esc(storageNames[r.storage_type]) + ' · ' + esc({ all: '全年', warm: '暖季 6–9 月', cold: '冷季' }[r.season]) + '</span>' + badge(r.valid ? r.days + ' 天' : '已停用', r.valid ? 'blue' : '') + '</div>' + (manager() ? button('编辑规则', 'edit-rule', r.id, 'link') : '') + '</div>').join('')
+      + rows.map(r => '<div class="list-row"><div class="row between"><span>' + esc(storageNames[r.storage_type]) + ' · ' + esc({ all: '全年', warm: '暖季 6–9 月', cold: '冷季' }[r.season]) + '</span>' + badge(r.enabled ? r.days + ' 天' : '已停用', r.enabled ? 'blue' : '') + '</div>' + (manager() ? button('编辑规则', 'edit-rule', r.id, 'link') : '') + '</div>').join('')
       + (!rows.length ? empty('暂未配置保质期规则') : '') + (manager() ? button('+ 新增规则', 'new-rule', null, 'btn secondary full') : ''));
     $('modal')._rules = { kind: kind, id: id, rows: rows };
   }
   function ruleForm(rule) {
     const context = $('modal')._rules; if (!context) return;
-    openModal('保质期规则', '<form data-form="rule" data-kind="' + context.kind + '" data-owner="' + context.id + '" data-id="' + (rule ? rule.id : 0) + '">' + select('storageType', '储存方式', storeOptions, rule ? rule.storage_type : 'chilled') + select('season', '生产月份分档', [['all', '全年'], ['warm', '暖季（6–9 月）'], ['cold', '冷季（其他月份）']], rule ? rule.season : 'all') + field('days', '保质天数', rule ? rule.days : '', 'number', 'required min="1" max="36500" step="1"') + check('valid', '启用规则', rule ? rule.valid : true) + beforeSave + saveButton() + '</form>');
+    openModal('保质期规则', '<form data-form="rule" data-kind="' + context.kind + '" data-owner="' + context.id + '" data-id="' + (rule ? rule.id : 0) + '">' + select('storageType', '储存方式', storeOptions, rule ? rule.storage_type : 'chilled') + select('season', '生产月份分档', [['all', '全年'], ['warm', '暖季（6–9 月）'], ['cold', '冷季（其他月份）']], rule ? rule.season : 'all') + field('days', '保质天数', rule ? rule.days : '', 'number', 'required min="1" max="36500" step="1"') + check('enabled', '启用规则', rule ? rule.enabled : true) + beforeSave + saveButton() + '</form>');
   }
   function draftRows() { return state.drafts.length ? state.drafts.map((d, i) => '<div class="draft-row"><div class="row between"><strong>' + esc(d.itemName) + '</strong>' + button('移除', 'remove-draft', i, 'link') + '</div><p class="hint">' + esc(d.specName || d.packMode) + ' · ' + esc(d.quantity) + ' ' + esc(d.unitName) + ' · ' + esc(storageNames[d.storageType]) + '</p><p class="hint">' + esc(d.batchNo || '批次号待生成') + ' · ' + esc(d.expireDate || '到期待确认') + '</p></div>').join('') : empty('还没有待提交的入库条目'); }
-  const inboundParents = () => state.categories.filter(c => c.level === 1 && c.valid);
+  const inboundParents = () => state.categories.filter(c => c.level === 1 && c.enabled);
   function inboundCategories(parentId = '') {
     const parents = new Set(inboundParents().map(c => String(c.id)));
     return categories2().filter(c => !c.is_prepared && parents.has(String(c.parent_id)) && (!parentId || String(c.parent_id) === String(parentId)));
   }
   function inboundItems(parentId = '', categoryId = '') {
     const categories = new Set(inboundCategories(parentId).filter(c => !categoryId || String(c.id) === String(categoryId)).map(c => String(c.id)));
-    return state.items.filter(r => r.item.valid && r.item.item_type !== 'prepared' && categories.has(String(r.item.category_id)));
+    return state.items.filter(r => r.item.enabled && r.item.item_type !== 'prepared' && categories.has(String(r.item.category_id)));
   }
   function inboundSelectors() {
     return select('parentCategoryId', '一级分类', [['', '全部一级分类']].concat(inboundParents().map(c => [c.id, c.name])), '')
@@ -192,7 +192,7 @@
       const r = await api.request('FnbRoute', 'GetRoute', { params: { itemId: id } });
       if (token !== inboundToken || !$('inbound-form') || $('inbound-form').elements.itemId.value !== String(id)) return;
       inboundRoute = r; form.elements.storageType.value = r.defaults.storageType;
-      const specs = r.specs.filter(s => s.valid);
+      const specs = r.specs.filter(s => s.enabled);
       $('inbound-specs').innerHTML = specs.length ? select('specId', '进货规格', specs.map(s => [s.id, s.name + (s.pack_desc ? ' · ' + s.pack_desc : '')]), specs[0].id, 'required')
         : r.forms.length > 1 ? '<p class="form-error">这个食材已配置链路，请先添加启用的进货规格。</p>' : select('packMode', '入库包装', [['bulk', '散装（入库即出品态）'], ['sealed', '封装（开封后使用）']], 'bulk') + field('packSize', '每件含量（封装时填写）', '', 'number', 'min="0.000001" step="0.000001"') + field('packLabel', '包装说明', '', 'text', 'maxlength="100"') + select('openedStorage', '开封后储存方式', storeOptions, r.defaults.storageType) + field('openedDays', '开封后保质（天空白跟随默认）', r.defaults.openDays, 'number', 'min="0" max="36500" step="1"');
       $('inbound-specs').innerHTML += button('维护进货规格与链路 ›', 'item-route', id, 'link'); updateInboundUnit();
@@ -242,12 +242,12 @@
     const kind = form.dataset.form, f = new FormData(form), id = Number(form.dataset.id || 0);
     if (kind !== 'inbound-draft' && !manager()) throw new Error('维护资料需店长权限');
     let controller = 'FnbRoute', action, body;
-    if (kind === 'category') { controller = 'FnbCatalog'; action = 'SaveCategory'; const level = Number(form.dataset.level); body = { id: id, parentId: level === 2 ? Number(form.dataset.parent) : null, level: level, name: text(f, 'name'), sort: num(f, 'sort', 0), valid: f.has('valid') }; if (level === 2) Object.assign(body, { batchCode: text(f, 'batchCode'), measureType: text(f, 'measureType'), defaultStorage: text(f, 'defaultStorage'), warnDays: num(f, 'warnDays', null), openDays: num(f, 'openDays', null), isPrepared: f.has('isPrepared') }); }
+    if (kind === 'category') { controller = 'FnbCatalog'; action = 'SaveCategory'; const level = Number(form.dataset.level); body = { id: id, parentId: level === 2 ? Number(form.dataset.parent) : null, level: level, name: text(f, 'name'), sort: num(f, 'sort', 0), enabled: f.has('enabled') }; if (level === 2) Object.assign(body, { batchCode: text(f, 'batchCode'), measureType: text(f, 'measureType'), defaultStorage: text(f, 'defaultStorage'), warnDays: num(f, 'warnDays', null), openDays: num(f, 'openDays', null), isPrepared: f.has('isPrepared') }); }
     else if (kind === 'item') { action = 'CreateItem'; body = { categoryId: num(f, 'categoryId'), name: text(f, 'name'), finalFormName: text(f, 'finalFormName'), finalFormCode: text(f, 'finalFormCode'), baseUnitCode: text(f, 'baseUnitCode'), storageType: text(f, 'storageType') || null, imageId: num(f, 'imageId', null) }; }
     else if (kind === 'defaults') { action = 'SaveItemDefaults'; body = { itemId: id, warnDays: num(f, 'warnDays', null), openDays: num(f, 'openDays', null) }; }
     else if (kind === 'form') { action = id ? 'UpdateForm' : 'AddUpstreamForm'; body = { itemId: state.route.item.id, name: text(f, 'name'), unitName: text(f, 'unitName'), perBase: num(f, 'perBase'), storageType: text(f, 'storageType'), formCode: text(f, 'formCode'), shelfAfterOpDays: num(f, 'shelfAfterOpDays', null), opName: text(f, 'opName') || null, standardYield: FnbClient.percentFraction(num(f, 'standardYield', 100)), durationHours: num(f, 'durationHours', 0) }; if (id) body.id = id; }
-    else if (kind === 'spec') { action = 'SaveSpec'; body = { id: id, itemId: state.route.item.id, entryFormId: num(f, 'entryFormId'), name: text(f, 'name'), brand: text(f, 'brand') || null, packDesc: text(f, 'packDesc') || null, barcode: text(f, 'barcode') || null, sort: num(f, 'sort', 0), valid: f.has('valid') }; }
-    else if (kind === 'rule') { controller = 'FnbCatalog'; action = 'SaveShelfRule'; body = { id: id, storageType: text(f, 'storageType'), season: text(f, 'season'), days: num(f, 'days'), valid: f.has('valid') }; body[form.dataset.kind + 'Id'] = Number(form.dataset.owner); }
+    else if (kind === 'spec') { action = 'SaveSpec'; body = { id: id, itemId: state.route.item.id, entryFormId: num(f, 'entryFormId'), name: text(f, 'name'), brand: text(f, 'brand') || null, packDesc: text(f, 'packDesc') || null, barcode: text(f, 'barcode') || null, sort: num(f, 'sort', 0), enabled: f.has('enabled') }; }
+    else if (kind === 'rule') { controller = 'FnbCatalog'; action = 'SaveShelfRule'; body = { id: id, storageType: text(f, 'storageType'), season: text(f, 'season'), days: num(f, 'days'), enabled: f.has('enabled') }; body[form.dataset.kind + 'Id'] = Number(form.dataset.owner); }
     else if (kind === 'inbound-draft') { if (!inboundRoute) throw new Error('请先选择食材'); const spec = inboundRoute.specs.find(s => String(s.id) === text(f, 'specId')); if (inboundRoute.forms.length > 1 && !spec) throw new Error('请先配置并选择启用进货规格'); if (text(f, 'packMode') === 'sealed' && !(num(f, 'packSize', 0) > 0)) throw new Error('请填写每件含量'); const entry = spec ? inboundRoute.forms.find(x => x.id === spec.entry_form_id) : inboundRoute.forms[inboundRoute.forms.length - 1]; state.drafts.push(Object.assign(Object.fromEntries(f), { itemName: inboundRoute.item.name, specName: spec && spec.name, unitName: !spec && text(f, 'packMode') === 'sealed' ? '件' : entry.unit_name })); $('inbound-drafts').innerHTML = draftRows(); toast('已加入待提交清单，尚未入库'); return; }
     else return;
     writing = true; const buttons = form.querySelectorAll('button'); buttons.forEach(b => { b.disabled = true; }); const error = form.querySelector('.form-error'); if (error) error.hidden = true;
@@ -278,15 +278,23 @@
     else if (action === 'new-spec') specEditor();
     else if (action === 'edit-spec') specEditor(state.route.specs.find(s => String(s.id) === id));
     else if (action === 'disable-category') {
-      if (!manager()) throw new Error('需店长权限'); if (!confirm('停用这个分类？一级分类会连同下级停用；有关联食材时服务器会拒绝。')) return;
+      if (!manager()) throw new Error('需店长权限');
+      const cat = state.categories.find(x => String(x.id) === id);
+      if (!confirm((cat.enabled ? '停用' : '启用') + '「' + cat.name + '」？停用后可以重新启用。')) return;
+      const body = { id: cat.id, parentId: cat.parent_id, level: cat.level, name: cat.name, sort: cat.sort, enabled: !cat.enabled };
+      if (cat.level === 2) Object.assign(body, { batchCode: cat.batch_code, measureType: cat.measure_type, defaultStorage: cat.default_storage, warnDays: cat.warn_days, openDays: cat.open_days, isPrepared: cat.is_prepared });
+      await mutation('FnbCatalog', 'SaveCategory', body);
+    } else if (action === 'delete-category') {
+      if (!manager()) throw new Error('需店长权限');
+      if (!confirm('删除这个分类？一级分类会连同下级删除；有食材时会拒绝。删除后界面无法恢复。')) return;
       await mutation('FnbCatalog', 'DeleteCategory', { id: Number(id) });
     } else if (action === 'remove-form') {
       if (!manager()) throw new Error('需店长权限'); if (!confirm('移除这个上游形态？已被规格、批次或流水引用时服务器会拒绝。')) return;
       await mutation('FnbRoute', 'RemoveForm', { itemId: state.route.item.id, id: Number(id) });
     } else if (action === 'toggle-spec') {
       if (!manager()) throw new Error('需店长权限'); const s = state.route.specs.find(x => String(x.id) === id);
-      if (!confirm((s.valid ? '停用' : '启用') + '「' + s.name + '」？')) return;
-      await mutation('FnbRoute', 'SaveSpec', { id: s.id, itemId: s.item_id, entryFormId: s.entry_form_id, name: s.name, brand: s.brand, packDesc: s.pack_desc, barcode: s.barcode, sort: s.sort, valid: !s.valid });
+      if (!confirm((s.enabled ? '停用' : '启用') + '「' + s.name + '」？')) return;
+      await mutation('FnbRoute', 'SaveSpec', { id: s.id, itemId: s.item_id, entryFormId: s.entry_form_id, name: s.name, brand: s.brand, packDesc: s.pack_desc, barcode: s.barcode, sort: s.sort, enabled: !s.enabled });
     } else if (action.startsWith('ocr-')) {
       const form = buttonElement.closest('form'); if (!form) return; const target = form.elements[id]; ocrReturnFocus = buttonElement;
       await FnbOcr.start({ api: api, mode: { 'ocr-name': 'name', 'ocr-date': 'date', 'ocr-expire': 'expire', 'ocr-shelf': 'shelf' }[action], onPick: value => { if (!form.isConnected) return; if (typeof value === 'object') { target.value = value.value; form.elements.shelfUnit.value = value.unit; } else target.value = value; target.dispatchEvent(new Event('change', { bubbles: true })); } });

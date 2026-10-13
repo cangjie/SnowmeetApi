@@ -174,9 +174,12 @@ internal static class FnbSchemaConfiguration
         Check(operation, sqlServer, "value", "input_qty > 0 AND std_ratio > 0 AND std_yield > 0 AND std_yield <= 1 AND expected_qty >= 0 AND actual_qty >= 0 AND loss_base_qty >= 0 AND duration_hours >= 0 AND status IN ('running','done')");
 
         ConfigureOperations(m, sqlServer);
-        // 2026-10-12 起每张 v4 表都有 valid。后补 valid 的表只用于逻辑删除，查询一律只看有效行；
-        // 原有主数据表（分类、食材、区域等）仍由各查询决定是否包含已停用记录。
+        // valid controls logical deletion on every v4 table. Master data uses enabled for suspension.
+        // includeDisabled only includes enabled=false; deleted rows are never editable or returned.
         // fnb_v4_request 是幂等记录，不过滤：同一 requestId 任何时候都不能再执行一次。
+        ActiveOnly<FnbCategory>(m); ActiveOnly<FnbItem>(m); ActiveOnly<FnbItemForm>(m); ActiveOnly<FnbPurchaseSpec>(m);
+        ActiveOnly<FnbShelfLifeRule>(m); ActiveOnly<FnbDishSpec>(m); ActiveOnly<FnbArea>(m);
+        ActiveOnly<FnbSupply>(m); ActiveOnly<FnbTool>(m); ActiveOnly<FnbCheckItem>(m);
         ActiveOnly<FnbBatch>(m); ActiveOnly<FnbBatchImage>(m); ActiveOnly<FnbBatchDetail>(m); ActiveOnly<FnbStockOperation>(m);
         ActiveOnly<FnbStockDocument>(m); ActiveOnly<FnbStockDocumentLine>(m); ActiveOnly<FnbStockMovement>(m); ActiveOnly<FnbStocktakeLine>(m);
         ActiveOnly<FnbRecipe>(m); ActiveOnly<FnbRecipeLine>(m); ActiveOnly<FnbOrder>(m); ActiveOnly<FnbOrderLine>(m); ActiveOnly<FnbOrderImport>(m);
@@ -192,7 +195,7 @@ internal static class FnbSchemaConfiguration
                 if ((p.ClrType == typeof(decimal) || p.ClrType == typeof(decimal?)) && p.GetPrecision() == null) b.HasPrecision(19, 6);
                 if (sqlServer && p.ClrType == typeof(string)) b.HasColumnType(p.GetColumnType() == "varchar(max)" ? "varchar(max)" : $"varchar({p.GetMaxLength() ?? 200})").UseCollation("Chinese_PRC_CI_AS");
                 if (sqlServer && (p.ClrType == typeof(DateTime) || p.ClrType == typeof(DateTime?)) && p.GetColumnType() != "date") b.HasColumnType("datetime2(3)");
-                if (p.Name == "valid") b.HasDefaultValue(true).HasSentinel(true);
+                if (p.Name is "valid" or "enabled") b.HasDefaultValue(true).HasSentinel(true);
                 if (p.Name == "row_version") b.IsRowVersion();
             }
         }

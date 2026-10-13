@@ -19,7 +19,7 @@ public sealed class FnbAreaController(ApplicationDBContext db) : FnbV4Controller
 [ApiController, Route("api/FnbSupply/[action]")]
 public sealed class FnbSupplyController(ApplicationDBContext db) : FnbV4ControllerBase(db)
 {
-    [HttpGet] public Task<ApiResult<object>> ListSupplies(string sessionKey, int shopId, string? type = null) => Execute(sessionKey, shopId, false, () => new FnbV4Service(Db, shopId).ListSupplies(type));
+    [HttpGet] public Task<ApiResult<object>> ListSupplies(string sessionKey, int shopId, string? type = null, bool includeDisabled = false) => Execute(sessionKey, shopId, false, () => new FnbV4Service(Db, shopId).ListSupplies(type, includeDisabled));
     [HttpGet] public Task<ApiResult<object>> ListLog(string sessionKey, int shopId, int supplyId) => Execute(sessionKey, shopId, false, () => new FnbV4Service(Db, shopId).SupplyLog(supplyId));
     [HttpPost] public Task<ApiResult<object>> SaveSupply([FromQuery] string sessionKey, [FromBody] FnbSupplySaveRequest r) => Run(sessionKey, r.ShopId, true, true, a => new FnbV4Service(Db, r.ShopId, a).SaveSupply(r));
     [HttpPost] public Task<ApiResult<object>> PostMovement([FromQuery] string sessionKey, [FromBody] FnbSupplyPostRequest r) => StockWrite(sessionKey, r.ShopId, false, r.RequestId, "supply.post", r, a => new FnbV4Service(Db, r.ShopId, a).PostSupply(r));
@@ -29,7 +29,7 @@ public sealed class FnbSupplyController(ApplicationDBContext db) : FnbV4Controll
 [ApiController, Route("api/FnbTool/[action]")]
 public sealed class FnbToolController(ApplicationDBContext db) : FnbV4ControllerBase(db)
 {
-    [HttpGet] public Task<ApiResult<object>> ListTools(string sessionKey, int shopId, string? status = null) => Execute(sessionKey, shopId, false, () => new FnbV4Service(Db, shopId).ListTools(status));
+    [HttpGet] public Task<ApiResult<object>> ListTools(string sessionKey, int shopId, string? status = null, bool includeDisabled = false) => Execute(sessionKey, shopId, false, () => new FnbV4Service(Db, shopId).ListTools(status, includeDisabled));
     [HttpGet] public Task<ApiResult<object>> ListLog(string sessionKey, int shopId, int toolId) => Execute(sessionKey, shopId, false, () => new FnbV4Service(Db, shopId).ToolLog(toolId));
     [HttpPost] public Task<ApiResult<object>> SaveTool([FromQuery] string sessionKey, [FromBody] FnbToolSaveRequest r) => Run(sessionKey, r.ShopId, true, true, a => new FnbV4Service(Db, r.ShopId, a).SaveTool(r));
     [HttpPost] public Task<ApiResult<object>> ChangeStatus([FromQuery] string sessionKey, [FromBody] FnbToolChangeRequest r) => StockWrite(sessionKey, r.ShopId, r.Status == "disposed", r.RequestId, "tool.change", r, a => new FnbV4Service(Db, r.ShopId, a).ChangeTool(r));

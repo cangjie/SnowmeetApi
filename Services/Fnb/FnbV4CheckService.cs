@@ -17,20 +17,20 @@ public sealed partial class FnbV4Service
         await Area(r.AreaId, false);
         if (r.Method is not ("yes_no" or "number" or "photo") || r.Kind is not ("environment" or "safety" or "tool" or "supply")) throw new ArgumentException("检查方式或类型无效");
         if (r.Minimum > r.Maximum || r.Method != "number" && (r.Minimum != null || r.Maximum != null)) throw new ArgumentException("检查数值标准无效");
-        if (r.ToolId != null) { var t = await Tool(r.ToolId.Value); if (t.area_id != r.AreaId || !t.valid || t.status == "disposed") throw new ArgumentException("工具不在此区域或不可用"); }
+        if (r.ToolId != null) { var t = await Tool(r.ToolId.Value); if (t.area_id != r.AreaId || !t.enabled || t.status == "disposed") throw new ArgumentException("工具不在此区域或不可用"); }
         if (r.SupplyId != null) { var s = await Supply(r.SupplyId.Value); if (s.area_id != r.AreaId) throw new ArgumentException("物资不在此区域"); }
         if (r.ToolId != null && r.SupplyId != null || r.Kind == "tool" && r.ToolId == null || r.Kind == "supply" && r.SupplyId == null) throw new ArgumentException("检查项关联对象无效");
         var c = r.Id == 0 ? new FnbCheckItem { valid = true } : await (from c0 in db.fnbCheckItem join a in db.fnbArea on c0.area_id equals a.id where c0.id == r.Id && a.shop_id == shopId select c0).SingleOrDefaultAsync() ?? throw new ArgumentException("本店检查项不存在");
         c.area_id = r.AreaId; c.name = Text(r.Name, 200, "检查项名称"); c.method = r.Method; c.kind = r.Kind; c.required = r.Required;
-        c.photo_suggested = r.PhotoSuggested; c.unit = Optional(r.Unit, 40, "单位"); c.minimum = r.Minimum; c.maximum = r.Maximum; c.tool_id = r.ToolId; c.supply_id = r.SupplyId; c.valid = r.Valid; c.updated_at = Now;
+        c.photo_suggested = r.PhotoSuggested; c.unit = Optional(r.Unit, 40, "单位"); c.minimum = r.Minimum; c.maximum = r.Maximum; c.tool_id = r.ToolId; c.supply_id = r.SupplyId; c.enabled = r.IsEnabled; c.updated_at = Now;
         if (r.Id == 0) db.fnbCheckItem.Add(c); else Modified(c); await db.SaveChangesAsync(); return c;
     }
     private async Task<(FnbCheckItem[] Items, string Fingerprint)> CheckConfiguration()
     {
         var areas = await db.fnbArea.Where(x => x.shop_id == shopId).OrderBy(x => x.id).ToArrayAsync();
-        var ids = areas.Where(x => x.valid && (x.parent_id == null || areas.Any(p => p.id == x.parent_id && p.valid))).Select(x => x.id).ToArray();
-        var items = await db.fnbCheckItem.Where(x => x.valid && ids.Contains(x.area_id)).OrderBy(x => x.id).ToArrayAsync();
-        string json = JsonSerializer.Serialize(new { areas = areas.Select(x => new { x.id, x.parent_id, x.name, x.valid, x.updated_at }), items });
+        var ids = areas.Where(x => x.enabled && (x.parent_id == null || areas.Any(p => p.id == x.parent_id && p.enabled))).Select(x => x.id).ToArray();
+        var items = await db.fnbCheckItem.Where(x => x.enabled && ids.Contains(x.area_id)).OrderBy(x => x.id).ToArrayAsync();
+        string json = JsonSerializer.Serialize(new { areas = areas.Select(x => new { x.id, x.parent_id, x.name, x.enabled, x.updated_at }), items });
         return (items, Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(json))));
     }
     private async Task<FnbCheckSheet> Sheet(long id) => await db.fnbCheckSheet.SingleOrDefaultAsync(x => x.id == id && x.shop_id == shopId) ?? throw new ArgumentException("本店检查单不存在");

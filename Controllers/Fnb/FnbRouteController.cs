@@ -44,9 +44,15 @@ public sealed class FnbRouteController(ApplicationDBContext db) : FnbV4Controlle
     public Task<SnowmeetApi.Models.ApiResult<object>> FindSpecByBarcode(string sessionKey, int shopId, string barcode) => Execute(sessionKey, shopId, false, async () =>
     {
         var code = FnbV4Rules.RequiredText(barcode, 100, "条码");
-        var spec = await Db.fnbPurchaseSpec.AsNoTracking().SingleOrDefaultAsync(x => x.valid && x.barcode == code);
+        var spec = await Db.fnbPurchaseSpec.AsNoTracking().SingleOrDefaultAsync(x => x.valid && x.enabled && x.barcode == code);
         if (spec == null) throw new System.ArgumentException("未找到启用中的进货规格");
-        return new { spec, item = await Db.fnbItem.AsNoTracking().SingleAsync(x => x.id == spec.item_id && x.valid),
-            entryForm = await Db.fnbItemForm.AsNoTracking().SingleAsync(x => x.id == spec.entry_form_id && x.valid) };
+        var item = await (from i in Db.fnbItem.AsNoTracking()
+            join c in Db.fnbCategory on i.category_id equals c.id
+            join p in Db.fnbCategory on c.parent_id equals p.id
+            where i.id == spec.item_id && i.enabled && c.enabled && p.enabled
+            select i).SingleOrDefaultAsync() ?? throw new System.ArgumentException("食材或所属分类不存在或已停用");
+        var entryForm = await Db.fnbItemForm.AsNoTracking().SingleOrDefaultAsync(x => x.id == spec.entry_form_id && x.enabled)
+            ?? throw new System.ArgumentException("入口形态不存在或已停用");
+        return new { spec, item, entryForm };
     });
 }

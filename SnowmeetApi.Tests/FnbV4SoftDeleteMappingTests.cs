@@ -6,7 +6,7 @@ using SnowmeetApi.Models.Fnb;
 
 namespace SnowmeetApi.Tests;
 
-// 2026-10-12：v4 每张表都有 valid；后补 valid 的表查询只看有效行。只用模型元数据，不连接数据库。
+// valid is deletion on every v4 table; enabled controls reversible suspension on masters.
 public class FnbV4SoftDeleteMappingTests
 {
     private static ApplicationDBContext Db() => new(new DbContextOptionsBuilder<ApplicationDBContext>()
@@ -33,22 +33,46 @@ public class FnbV4SoftDeleteMappingTests
     }
 
     [Fact]
-    public void LateValidTablesAreFilteredAndMasterDataAndRequestsAreNot()
+    public void AllDeletedV4RowsAreFilteredExceptIdempotencyReservations()
     {
         using var db = Db();
         var v4 = db.Model.GetEntityTypes().Where(x => (x.GetTableName() ?? "").StartsWith("fnb_v4_")).ToArray();
         var unfiltered = v4.Where(x => x.GetQueryFilter() == null).Select(x => x.ClrType).ToHashSet();
-        Assert.Equal(Master.Append(typeof(FnbRequest)).ToHashSet(), unfiltered);
-        Assert.Equal(20, v4.Length - unfiltered.Count);
+        Assert.Equal(new HashSet<Type> { typeof(FnbRequest) }, unfiltered);
+        Assert.Equal(30, v4.Length - unfiltered.Count);
 
         Assert.Contains("[valid] = CAST(1 AS bit)", db.fnbBatch.ToQueryString());
         Assert.Contains("[valid] = CAST(1 AS bit)", db.fnbStockMovement.ToQueryString());
         Assert.Contains("[valid] = CAST(1 AS bit)", db.fnbCheckSheet.Where(x => x.shop_id == 1).ToQueryString());
         Assert.DoesNotContain("WHERE", db.fnbRequest.ToQueryString());
-        Assert.DoesNotContain("WHERE", db.fnbItem.ToQueryString());
+        Assert.Contains("[valid] = CAST(1 AS bit)", db.fnbItem.ToQueryString());
+        Assert.All(Master, type =>
+        {
+            Assert.Contains("valid", db.Model.FindEntityType(type)!.GetQueryFilter()!.ToString());
+            Assert.DoesNotContain("enabled", db.Model.FindEntityType(type)!.GetQueryFilter()!.ToString());
+        });
         // 关联查询两边都只看有效行。
         string joined = (from m in db.fnbStockMovement join b in db.fnbBatch on m.batch_id equals b.id select new { m.id, b.batch_no }).ToQueryString();
         Assert.Equal(2, joined.Split("[valid] = CAST(1 AS bit)").Length - 1);
+    }
+
+    [Fact]
+    public void MasterActivationIsSeparateAndDefaultsToEnabled()
+    {
+        using var db = Db();
+        var model = db.GetService<IDesignTimeModel>().Model;
+        Assert.All(Master, type =>
+        {
+            var enabled = model.FindEntityType(type)!.FindProperty("enabled");
+            Assert.NotNull(enabled);
+            Assert.Equal(typeof(bool), enabled!.ClrType);
+            Assert.Equal(true, enabled.GetDefaultValue());
+        });
+        Assert.True(new FnbArea().valid && new FnbArea().enabled);
+        // A maintenance query may include suspended areas, but always excludes deleted areas.
+        string maintenance = db.fnbArea.Where(x => x.shop_id == 10).ToQueryString();
+        Assert.Contains("[valid] = CAST(1 AS bit)", maintenance);
+        Assert.DoesNotContain("[enabled] =", maintenance);
     }
 
     [Fact]

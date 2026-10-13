@@ -31,6 +31,13 @@ public partial class FnbSqlServerIntegrationTests
         long did = long.Parse(first.GetProperty("documentId").GetString()!);
         Data(await Workflow(s, db => new FnbInboundController(db).DeleteReceipt(s.WorkerMini, new(s.ShopId, Guid.NewGuid(), did))));
         await using (var db = Open()) { Assert.Equal(0, (await db.fnbBatch.SingleAsync(x => x.id == bid)).quantity); Assert.Equal("cancelled", (await db.fnbStockDocument.SingleAsync(x => x.id == did)).status); }
+        await using (var db = Open())
+        {
+            var reservation = await db.fnbRequest.SingleAsync(x => x.shop_id == s.ShopId && x.request_id == r.RequestId);
+            reservation.valid = false; db.Entry(reservation).State = EntityState.Modified; await db.SaveChangesAsync();
+        }
+        Assert.Equal(4, (await Workflow(s, db => new FnbInboundController(db).PostReceipt(s.Mini, r))).code);
+        await using (var db = Open()) Assert.Equal(1, await db.fnbBatch.CountAsync(x => x.shop_id == s.ShopId));
     }
     [FnbSqlServerFact]
     public async Task V4StockWritesRejectEmptyIdsAndConcurrentOverdraw()
@@ -136,7 +143,9 @@ public partial class FnbSqlServerIntegrationTests
         Data(await Workflow(s, db => new FnbToolController(db).ChangeStatus(s.Mini, new(s.ShopId, Guid.NewGuid(), tool, "disposed", Remark: "无法维修"))));
         Assert.Equal(1, (await Workflow(s, db => new FnbAreaController(db).DeleteArea(s.Mini, new(s.ShopId, s.AreaId)))).code);
         await using var db0 = Open(); Assert.Equal(80, (await db0.fnbSupply.SingleAsync(x => x.id == supply)).quantity);
-        Assert.Equal(5, await db0.fnbToolLog.CountAsync(x => x.tool_id == tool)); Assert.False((await db0.fnbCheckItem.SingleAsync(x => x.tool_id == tool)).valid);
+        Assert.Equal(5, await db0.fnbToolLog.CountAsync(x => x.tool_id == tool));
+        var check = await db0.fnbCheckItem.SingleAsync(x => x.tool_id == tool);
+        Assert.True(check.valid); Assert.False(check.enabled);
     }
     [FnbSqlServerFact]
     public async Task V4OpeningCheckSnapshotNumericRulesAndAppendOnlyHandling()

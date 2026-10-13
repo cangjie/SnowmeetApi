@@ -167,7 +167,7 @@ public partial class FnbSqlServerIntegrationTests
         await using var fresh = Open(); Assert.Equal((5, (int?)7), FnbV4Rules.Defaults(await fresh.fnbItem.SingleAsync(x => x.id == s.ItemId), category));
     }
     [FnbSqlServerFact]
-    public async Task CategoriesCannotDeleteOrChangeDimensionWithItemsAndCanReuseDisabledName()
+    public async Task CategoriesCannotDeleteOrChangeDimensionWithItemsAndCanReuseDeletedName()
     {
         var s = await SeedAsync(); await using var db = Open(); var c = new FnbCatalogController(db);
         Assert.Equal(1, (await c.DeleteCategory(s.Mini, new(s.ShopId, s.ParentId))).code);
@@ -176,7 +176,8 @@ public partial class FnbSqlServerIntegrationTests
         var created = await c.SaveCategory(s.Mini, new(s.ShopId, 0, null, 1, "可删除" + s.ItemId));
         Assert.Equal(0, created.code); var empty = Assert.IsType<FnbCategory>(created.data); db.ChangeTracker.Clear();
         Assert.Equal(0, (await c.DeleteCategory(s.Mini, new(s.ShopId, empty.id))).code); db.ChangeTracker.Clear();
-        Assert.False((await db.fnbCategory.SingleAsync(x => x.id == empty.id)).valid);
+        Assert.False((await db.fnbCategory.IgnoreQueryFilters().SingleAsync(x => x.id == empty.id)).valid);
+        Assert.Equal(1, (await c.SaveCategory(s.Mini, new(s.ShopId, empty.id, null, 1, empty.name, Enabled: true))).code);
         Assert.Equal(0, (await c.SaveCategory(s.Mini, new(s.ShopId, 0, null, 1, empty.name))).code);
     }
     [FnbSqlServerFact]
@@ -266,8 +267,13 @@ public partial class FnbSqlServerIntegrationTests
             amount = 1, expire_date = DateTime.Today.AddDays(10), received_at = DateTime.UtcNow }); await db.SaveChangesAsync();
         Assert.Equal(1, (await Route(s, r => r.SaveSpec(s.Mini, new(s.ShopId, s.ItemId, spec.id, s.FinalFormId, "改名", Barcode: barcode, Valid: false)))).code);
         Assert.Equal(0, (await Route(s, r => r.SaveSpec(s.WeCom, new(s.ShopId, s.ItemId, spec.id, s.FinalFormId, "牛肉", Barcode: barcode, Valid: false)))).code);
-        await using var fresh = Open(); Assert.False((await fresh.fnbPurchaseSpec.SingleAsync(x => x.id == spec.id)).valid);
+        await using var fresh = Open();
+        var suspended = await fresh.fnbPurchaseSpec.SingleAsync(x => x.id == spec.id);
+        Assert.True(suspended.valid); Assert.False(suspended.enabled);
         Assert.Equal(1, (await Route(s, r => r.FindSpecByBarcode(s.Mini, s.ShopId, barcode))).code);
+        Assert.Equal(1, (await Route(s, r => r.SaveSpec(s.Mini, new(s.ShopId, other.id, 0, otherFormId, "停用后重复条码", Barcode: barcode)))).code);
+        Assert.Equal(0, (await Route(s, r => r.SaveSpec(s.Mini, new(s.ShopId, s.ItemId, spec.id, s.FinalFormId, "牛肉", Barcode: barcode, Enabled: true)))).code);
+        Assert.Equal(0, (await Route(s, r => r.FindSpecByBarcode(s.Mini, s.ShopId, barcode))).code);
     }
     [FnbSqlServerFact]
     public async Task DatabaseEnforcesEffectiveExpiryAndRejectsNegativeStockAndCrossItemForm()

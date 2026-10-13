@@ -8,12 +8,12 @@ const root = path.resolve(__dirname, '../../wwwroot');
 const out = path.resolve(process.env.FNB_H5_SCREENSHOTS || path.join(__dirname, '../../../.local/fnb-v4-h5-qa'));
 const clone = data => JSON.parse(JSON.stringify(data));
 const base = {
-  categories: [{ id: 1, level: 1, parent_id: null, name: '乳制品', valid: true, sort: 0 }, { id: 2, level: 2, parent_id: 1, name: '鲜奶', batch_code: 'MLK', measure_type: 'volume', default_storage: 'chilled', warn_days: 2, open_days: 3, is_prepared: false, valid: true, sort: 0 }],
-  item: { id: 23, category_id: 2, name: '鲜牛奶', base_unit_code: 'ml', item_type: 'raw', warn_days: null, open_days: null, valid: true },
-  forms: [{ id: 7, item_id: 23, seq: 0, name: '整箱', unit_name: '箱', per_base: 12000, storage_type: 'chilled', form_code: 'BOX', valid: true }, { id: 8, item_id: 23, seq: 1, name: '独立桶', unit_name: '桶', per_base: 2000, storage_type: 'chilled', form_code: 'TUB', in_op_name: '拆箱', in_op_ratio: 6, in_op_yield: 1, in_op_hours: 0, valid: true }, { id: 9, item_id: 23, seq: 2, name: '液体鲜奶', unit_name: 'ml', per_base: 1, storage_type: 'chilled', form_code: 'F', in_op_name: '开盖', in_op_ratio: 2000, in_op_yield: .98, in_op_hours: 0, valid: true }],
-  specs: [{ id: 30, item_id: 23, name: '整箱', entry_form_id: 7, pack_desc: '6 桶 × 2 L', barcode: '6921234567890', valid: true, sort: 0 }, { id: 31, item_id: 23, name: '单桶', entry_form_id: 8, pack_desc: '2 L / 桶', barcode: '6921234567891', valid: true, sort: 1 }],
+  categories: [{ id: 1, level: 1, parent_id: null, name: '乳制品', valid: true, enabled: true, sort: 0 }, { id: 2, level: 2, parent_id: 1, name: '鲜奶', batch_code: 'MLK', measure_type: 'volume', default_storage: 'chilled', warn_days: 2, open_days: 3, is_prepared: false, valid: true, enabled: true, sort: 0 }],
+  item: { id: 23, category_id: 2, name: '鲜牛奶', base_unit_code: 'ml', item_type: 'raw', warn_days: null, open_days: null, valid: true, enabled: true },
+  forms: [{ id: 7, item_id: 23, seq: 0, name: '整箱', unit_name: '箱', per_base: 12000, storage_type: 'chilled', form_code: 'BOX', valid: true, enabled: true }, { id: 8, item_id: 23, seq: 1, name: '独立桶', unit_name: '桶', per_base: 2000, storage_type: 'chilled', form_code: 'TUB', in_op_name: '拆箱', in_op_ratio: 6, in_op_yield: 1, in_op_hours: 0, valid: true, enabled: true }, { id: 9, item_id: 23, seq: 2, name: '液体鲜奶', unit_name: 'ml', per_base: 1, storage_type: 'chilled', form_code: 'F', in_op_name: '开盖', in_op_ratio: 2000, in_op_yield: .98, in_op_hours: 0, valid: true, enabled: true }],
+  specs: [{ id: 30, item_id: 23, name: '整箱', entry_form_id: 7, pack_desc: '6 桶 × 2 L', barcode: '6921234567890', valid: true, enabled: true, sort: 0 }, { id: 31, item_id: 23, name: '单桶', entry_form_id: 8, pack_desc: '2 L / 桶', barcode: '6921234567891', valid: true, enabled: true, sort: 1 }],
   units: [{ code: 'g', name: '克', dimension: 1 }, { code: 'ml', name: '毫升', dimension: 2 }, { code: 'piece', name: '个', dimension: 3 }],
-  rules: [{ id: 42, category_id: 2, item_id: null, storage_type: 'chilled', season: 'all', days: 14, valid: true }]
+  rules: [{ id: 42, category_id: 2, item_id: null, storage_type: 'chilled', season: 'all', days: 14, valid: true, enabled: true }]
 };
 function staticServer() {
   return http.createServer((req, res) => {
@@ -41,16 +41,17 @@ async function main() {
       const action = u.pathname.split('/').pop(); calls.push({ path: u.pathname, params: Object.fromEntries(u.searchParams), body });
       let result;
       if (action === 'GetMe' || action === 'WeComLogin') result = deny ? { code: 3, message: '请管理员配置门店' } : { code: 0, data: { staffId: 7, name: '陈', shopId: 12, shopName: '测试门店', isManager: role, clientType: 'wecom', sessionKey: action === 'WeComLogin' ? 'new-session' : null } };
-      else if (action === 'ListCategories') result = { code: 0, data: data.categories };
+      else if (action === 'ListCategories') result = { code: 0, data: data.categories.filter(c => c.valid && (u.searchParams.get('includeDisabled') === 'true' || c.enabled)) };
       else if (action === 'ListUnits') result = { code: 0, data: data.units };
       else if (action === 'ListItems') result = { code: 0, data: { total: 1 + (data.moreItems || []).length, rows: [data.item].concat(data.moreItems || []).map(item => ({ item, categoryName: '鲜奶', effectiveWarnDays: item.warn_days ?? 2, effectiveOpenDays: item.open_days ?? 3, defaultStorage: 'chilled', measureType: 'volume' })) } };
       else if (action === 'GetRoute') result = { code: 0, data: { item: data.item, defaults: { warnDays: 2, openDays: 3, storageType: 'chilled', measureType: 'volume' }, forms: data.forms, specs: data.specs, shelfRules: data.rules } };
       else if (action === 'ListShelfRules') result = { code: 0, data: data.rules };
-      else if (action === 'SaveCategory') { assert.equal(body.shopId, 12); const row = data.categories.find(c => c.id === body.id); if (row) Object.assign(row, { name: body.name, warn_days: body.warnDays, open_days: body.openDays, batch_code: body.batchCode, measure_type: body.measureType, default_storage: body.defaultStorage, is_prepared: body.isPrepared, valid: body.valid }); else data.categories.push({ id: 55, name: body.name, level: body.level, parent_id: body.parentId, valid: body.valid }); result = { code: 0, data: row || data.categories.at(-1) }; }
+      else if (action === 'SaveCategory') { assert.equal(body.shopId, 12); const row = data.categories.find(c => c.id === body.id && c.valid); if (row) Object.assign(row, { name: body.name, warn_days: body.warnDays, open_days: body.openDays, batch_code: body.batchCode, measure_type: body.measureType, default_storage: body.defaultStorage, is_prepared: body.isPrepared, enabled: body.enabled }); else data.categories.push({ id: 55, name: body.name, level: body.level, parent_id: body.parentId, valid: true, enabled: body.enabled }); result = { code: 0, data: row || data.categories.at(-1) }; }
+      else if (action === 'DeleteCategory') { const ids = data.categories.filter(c => c.id === body.id || c.parent_id === body.id).map(c => c.id); data.categories.filter(c => ids.includes(c.id)).forEach(c => c.valid = false); result = { code: 0, data: ids }; }
       else if (action === 'SaveItemDefaults') { data.item.warn_days = body.warnDays; data.item.open_days = body.openDays; result = { code: 0, data: data.item }; }
       else if (action === 'CreateItem') result = { code: 0, data: { ...data.item, id: 24, name: body.name } };
       else if (action === 'SaveShelfRule') result = { code: 0, data: body };
-      else if (action === 'SaveSpec') { const row = data.specs.find(s => s.id === body.id); if (row) Object.assign(row, { name: body.name, barcode: body.barcode, pack_desc: body.packDesc, brand: body.brand, entry_form_id: body.entryFormId, valid: body.valid }); result = { code: 0, data: row || body }; }
+      else if (action === 'SaveSpec') { const row = data.specs.find(s => s.id === body.id); if (row) Object.assign(row, { name: body.name, barcode: body.barcode, pack_desc: body.packDesc, brand: body.brand, entry_form_id: body.entryFormId, enabled: body.enabled }); result = { code: 0, data: row || body }; }
       else if (action === 'AddUpstreamForm' || action === 'UpdateForm') result = { code: 0, data: body };
       else if (action === 'FindSpecByBarcode') result = { code: 0, data: { item: data.item, spec: data.specs[1], entryForm: data.forms[1] } };
       else if (action === 'OcrScanName') result = { code: 0, data: { candidates: [{ text: '牛奶' }, { text: '鲜' }], dates: ['2026-10-01'], expireDates: ['2026-10-15'], shelfLives: [{ value: 14, unit: '天' }] } };
@@ -94,6 +95,7 @@ async function main() {
     data.forms = [{ ...data.forms[2], seq: 0, in_op_name: null }]; data.specs = [];
     await go(page, 'inbound'); await page.locator('[name=itemId]').selectOption('23'); await page.locator('[name=packMode]').selectOption('sealed'); await page.locator('[name=packSize]').fill('1000'); await page.locator('[name=packLabel]').fill('件'); await page.locator('[name=areaId]').selectOption('2'); await page.locator('[name=quantity]').fill('2'); assert.equal(await page.locator('[name=quantity]').getAttribute('step'), '1'); await page.locator('[data-form=op-inbound-draft] [type=submit]').click(); await page.locator('#inbound-drafts').getByText(/2 件/).waitFor();
     await require('./fnb-v4.operations-flows.cjs')({page,go,calls,origin,data});
+    await require('./fnb-v4.state-flows.cjs')({page,go,calls,data});
     await page.setViewportSize({width:390,height:844});
     for(const screen of ['stock','areas','check','supplies','tools','dash']) {await go(page,screen);await page.screenshot({path:path.join(out,'operations-'+screen+'.png'),fullPage:true});}
     await context.close();

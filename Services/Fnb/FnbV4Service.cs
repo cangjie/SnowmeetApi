@@ -28,16 +28,20 @@ public sealed partial class FnbV4Service(ApplicationDBContext db, int shopId, Fn
     private static string? Optional(string? value, int size, string label) => FnbV4Rules.OptionalText(value, size, label);
     private void Manager()
     { if (actor?.Staff.title_level < 200) throw new ArgumentException("此操作需要店长权限"); }
-    private async Task<FnbItem> Item(int id) => await db.fnbItem.SingleOrDefaultAsync(x => x.id == id && x.valid) ?? throw new ArgumentException("食材不存在或已停用");
+    private async Task<FnbItem> Item(int id) => await (from item in db.fnbItem
+        join category in db.fnbCategory on item.category_id equals category.id
+        join parent in db.fnbCategory on category.parent_id equals parent.id
+        where item.id == id && item.enabled && category.enabled && parent.enabled
+        select item).SingleOrDefaultAsync() ?? throw new ArgumentException("食材或所属分类不存在或已停用");
     private async Task<FnbBatch> Batch(int id) => await db.fnbBatch.SingleOrDefaultAsync(x => x.id == id && x.shop_id == shopId) ?? throw new ArgumentException("本店批次不存在");
-    private async Task<FnbItemForm[]> Forms(int itemId) => await db.fnbItemForm.Where(x => x.item_id == itemId && x.valid).OrderBy(x => x.seq).ToArrayAsync();
+    private async Task<FnbItemForm[]> Forms(int itemId) => await db.fnbItemForm.Where(x => x.item_id == itemId && x.valid && x.enabled).OrderBy(x => x.seq).ToArrayAsync();
     private bool Available(FnbBatch b) => b.state == "final" && b.quantity > 0 && b.dispose_status == null && b.effective_expire >= Today && (b.ready_at == null || b.ready_at <= Now);
     private async Task Area(int? id, bool leaf = true, bool required = false)
     {
         if (id == null) { if (required) throw new ArgumentException("请选择存放区域"); return; }
-        var a = await db.fnbArea.SingleOrDefaultAsync(x => x.id == id && x.shop_id == shopId && x.valid) ?? throw new ArgumentException("本店存储区域不存在或已停用");
+        var a = await db.fnbArea.SingleOrDefaultAsync(x => x.id == id && x.shop_id == shopId && x.valid && x.enabled) ?? throw new ArgumentException("本店存储区域不存在或已停用");
         if (leaf && a.parent_id == null) throw new ArgumentException("请选择下级存储区域");
-        if (a.parent_id != null && !await db.fnbArea.AnyAsync(x => x.id == a.parent_id && x.shop_id == shopId && x.valid)) throw new ArgumentException("上级区域已停用");
+        if (a.parent_id != null && !await db.fnbArea.AnyAsync(x => x.id == a.parent_id && x.shop_id == shopId && x.valid && x.enabled)) throw new ArgumentException("上级区域已停用");
     }
     private async Task Photo(int? id)
     {
@@ -119,7 +123,7 @@ public sealed partial class FnbV4Service(ApplicationDBContext db, int shopId, Fn
             return (expiry.Value.Date, "manual", null);
         }
         if (production == null) throw new ArgumentException("需要到期日期，或生产日期及保质期规则");
-        var rules = await db.fnbShelfLifeRule.Where(x => x.valid && (x.item_id == itemId || x.category_id == item.category_id)).ToArrayAsync();
+        var rules = await db.fnbShelfLifeRule.Where(x => x.valid && x.enabled && (x.item_id == itemId || x.category_id == item.category_id)).ToArrayAsync();
         var rule = FnbV4Rules.ShelfRule(rules, itemId, item.category_id, storage, production.Value.Month) ?? throw new ArgumentException("没有适用的保质期规则，请填写到期日期");
         return (production.Value.Date.AddDays(rule.days), "rule", rule.id);
     }
@@ -130,7 +134,7 @@ public sealed partial class FnbV4Service(ApplicationDBContext db, int shopId, Fn
         foreach (var r in input.Lines)
         {
             var item = await Item(r.ItemId); var forms = await Forms(item.id); var final = forms.Last();
-            FnbPurchaseSpec? spec = r.SpecId == null ? null : await db.fnbPurchaseSpec.SingleOrDefaultAsync(x => x.id == r.SpecId && x.item_id == item.id && x.valid) ?? throw new ArgumentException("进货规格不存在或不属于此食材");
+            FnbPurchaseSpec? spec = r.SpecId == null ? null : await db.fnbPurchaseSpec.SingleOrDefaultAsync(x => x.id == r.SpecId && x.item_id == item.id && x.valid && x.enabled) ?? throw new ArgumentException("进货规格不存在或不属于此食材");
             if (item.item_type == "prepared") throw new ArgumentException("半成品请通过制作入库");
             if (forms.Length > 1 && spec == null) throw new ArgumentException("有链路的食材入库必须选择进货规格");
             var form = spec == null ? final : forms.Single(x => x.id == spec.entry_form_id);
@@ -196,7 +200,7 @@ public sealed partial class FnbV4Service(ApplicationDBContext db, int shopId, Fn
     }
     public async Task<object> LowStocks()
     {
-        var supplies = await db.fnbSupply.Where(x => x.shop_id == shopId && x.valid).ToArrayAsync();
+        var supplies = await db.fnbSupply.Where(x => x.shop_id == shopId && x.valid && x.enabled).ToArrayAsync();
         return new { food = (await Stock()).Where(x => x.LowStock).ToArray(), supplies = supplies.Select(x => new { supply = x, threshold = x.low_stock_qty ?? Round(x.last_receipt_qty * (x.low_stock_ratio ?? .1m)) }).Where(x => x.supply.quantity < x.threshold).ToArray() };
     }
     public async Task<object> Dispose(FnbBatchWriteRequest input, bool destroy)
@@ -214,14 +218,14 @@ public sealed partial class FnbV4Service(ApplicationDBContext db, int shopId, Fn
         decimal TotalQuantity, decimal Amount, decimal LowThreshold, bool LowStock, int BatchCount, decimal? Servings, object[] Layers);
     public async Task<StockRow[]> Stock(int? categoryId = null, string? storage = null, string? keyword = null)
     {
-        var items = await db.fnbItem.Where(x => x.valid && (keyword == null || x.name.Contains(keyword))).ToArrayAsync();
+        var items = await db.fnbItem.Where(x => x.valid && x.enabled && (keyword == null || x.name.Contains(keyword))).ToArrayAsync();
         if (categoryId != null)
         {
             var ids = await db.fnbCategory.Where(x => x.id == categoryId || x.parent_id == categoryId).Select(x => x.id).ToArrayAsync();
             items = items.Where(x => ids.Contains(x.category_id)).ToArray();
         }
         var batches = await db.fnbBatch.Where(x => x.shop_id == shopId && x.quantity > 0 && x.dispose_status == null && (storage == null || x.storage_type == storage)).ToArrayAsync();
-        var forms = await db.fnbItemForm.Where(x => x.valid).ToArrayAsync();
+        var forms = await db.fnbItemForm.Where(x => x.valid && x.enabled).ToArrayAsync();
         var receipts = await (from l in db.fnbStockDocumentLine join d in db.fnbStockDocument on l.document_id equals d.id
                               where d.shop_id == shopId && d.document_type == "receipt" && d.status == "posted" select new { l.item_id, l.actual_qty, d.created_at, l.id }).ToArrayAsync();
         var recipeLines = await (from l in db.fnbRecipeLine join r in db.fnbRecipe on l.recipe_id equals r.id

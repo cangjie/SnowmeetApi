@@ -15,7 +15,9 @@ public sealed class FnbDishSpec
     public decimal? sale_price { get; set; }
     public int? legacy_product_id { get; set; }
     public bool is_default { get; set; }
-    public bool valid { get; set; }
+    // valid=false means deleted; enabled=false is a reversible suspension.
+    public bool valid { get; set; } = true;
+    public bool enabled { get; set; } = true;
     public DateTime created_at { get; set; }
     public DateTime? updated_at { get; set; }
 }

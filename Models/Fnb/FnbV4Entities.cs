@@ -17,7 +17,9 @@ public sealed class FnbCategory
     public int? open_days { get; set; }
     public bool is_prepared { get; set; }
     public int sort { get; set; }
-    public bool valid { get; set; }
+    // valid=false means deleted; enabled=false is a reversible suspension.
+    public bool valid { get; set; } = true;
+    public bool enabled { get; set; } = true;
     public DateTime created_at { get; set; }
     public DateTime? updated_at { get; set; }
 }
@@ -34,7 +36,9 @@ public sealed class FnbItem
     public decimal? low_stock_ratio { get; set; }
     public decimal? low_stock_qty { get; set; }
     public int? image_id { get; set; }
-    public bool valid { get; set; }
+    // valid=false means deleted; enabled=false is a reversible suspension.
+    public bool valid { get; set; } = true;
+    public bool enabled { get; set; } = true;
     public DateTime created_at { get; set; }
     public DateTime? updated_at { get; set; }
 }
@@ -54,7 +58,9 @@ public sealed class FnbItemForm
     public decimal? in_op_ratio { get; set; }
     public decimal? in_op_yield { get; set; }
     public decimal? in_op_hours { get; set; }
-    public bool valid { get; set; }
+    // valid=false means deleted; enabled=false is a reversible suspension.
+    public bool valid { get; set; } = true;
+    public bool enabled { get; set; } = true;
     public DateTime created_at { get; set; }
     public DateTime? updated_at { get; set; }
 }
@@ -68,7 +74,9 @@ public sealed class FnbPurchaseSpec
     public string? brand { get; set; }
     public string? pack_desc { get; set; }
     public string? barcode { get; set; }
-    public bool valid { get; set; }
+    // valid=false means deleted; enabled=false is a reversible suspension.
+    public bool valid { get; set; } = true;
+    public bool enabled { get; set; } = true;
     public int sort { get; set; }
     public DateTime created_at { get; set; }
     public DateTime? updated_at { get; set; }

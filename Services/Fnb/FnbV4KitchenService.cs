@@ -16,10 +16,10 @@ public sealed partial class FnbV4Service
     private async Task<FnbRecipe> Recipe(int ownerId, bool prep) => await db.fnbRecipe.Where(x => x.shop_id == shopId && x.status == "published" &&
         (prep ? x.output_item_id == ownerId && x.recipe_type == "prep" : x.dish_spec_id == ownerId && x.recipe_type == "dish"))
         .OrderByDescending(x => x.version_no).FirstOrDefaultAsync() ?? throw new ArgumentException("尚未发布配方");
-    private async Task<FnbDishSpec> Spec(int id) => await db.fnbDishSpec.SingleOrDefaultAsync(x => x.id == id && x.shop_id == shopId && x.valid) ?? throw new ArgumentException("本店菜品规格不存在或已停用");
+    private async Task<FnbDishSpec> Spec(int id) => await db.fnbDishSpec.SingleOrDefaultAsync(x => x.id == id && x.shop_id == shopId && x.valid && x.enabled) ?? throw new ArgumentException("本店菜品规格不存在或已停用");
     public async Task<object> CreatePrep(FnbPrepCreateRequest input)
     {
-        var category = await db.fnbCategory.SingleOrDefaultAsync(x => x.id == input.CategoryId && x.valid && x.level == 2 && x.is_prepared) ?? throw new ArgumentException("请选择半成品二级分类");
+        var category = await db.fnbCategory.SingleOrDefaultAsync(x => x.id == input.CategoryId && x.valid && x.enabled && x.level == 2 && x.is_prepared) ?? throw new ArgumentException("请选择半成品二级分类");
         var item = await new FnbV4CatalogService(db).CreateItemAsync(new(shopId, category.id, input.Name, input.Name, input.BaseUnitCode));
         var form = (await Forms(item.id)).Single(); form.unit_name = Text(input.UnitName, 40, "单位"); Modified(form); await db.SaveChangesAsync();
         var recipe = await SaveRecipe(new(shopId, item.id, input.OutputQuantity, input.Lines ?? []), true, true);
@@ -56,7 +56,7 @@ public sealed partial class FnbV4Service
     }
     public async Task<object> ListPreps()
     {
-        var items = await db.fnbItem.Where(x => x.valid && x.item_type == "prepared").ToArrayAsync();
+        var items = await db.fnbItem.Where(x => x.valid && x.enabled && x.item_type == "prepared").ToArrayAsync();
         var recipes = await db.fnbRecipe.Where(x => x.shop_id == shopId && x.recipe_type == "prep" && x.status != "retired").ToArrayAsync();
         var ids = recipes.Select(x => x.id).ToArray(); var lines = await db.fnbRecipeLine.Where(x => ids.Contains(x.recipe_id)).ToArrayAsync();
         return items.Select(x => new { item = x, recipe = recipes.Where(r => r.output_item_id == x.id).OrderByDescending(r => r.version_no).FirstOrDefault(),
@@ -102,21 +102,21 @@ public sealed partial class FnbV4Service
         if (await db.fnbDishSpec.AnyAsync(x => x.product_id == input.ProductId && x.valid && x.name == name)) throw new ArgumentException("菜品已有同名规格");
         if (input.SalePrice != null) Qty(input.SalePrice.Value, true);
         var spec = new FnbDishSpec { shop_id = shopId, product_id = input.ProductId, name = name, spec_code = "S" + Guid.NewGuid().ToString("N"),
-            sale_price = input.SalePrice, is_default = !await db.fnbDishSpec.AnyAsync(x => x.product_id == input.ProductId && x.valid), valid = true, created_at = Now };
+            sale_price = input.SalePrice, is_default = !await db.fnbDishSpec.AnyAsync(x => x.product_id == input.ProductId && x.valid && x.enabled), valid = true, created_at = Now };
         db.fnbDishSpec.Add(spec); await db.SaveChangesAsync(); return spec;
     }
     public async Task<object> DeleteSpec(int specId)
     {
         var spec = await Spec(specId);
         if (await (from l in db.fnbOrderLine join o in db.fnbOrder on l.order_id equals o.id where l.dish_spec_id == specId && o.order_status == "pending" select l.id).AnyAsync()) throw new ArgumentException("规格仍被待出餐订单使用");
-        if (await db.fnbDishSpec.CountAsync(x => x.product_id == spec.product_id && x.valid) <= 1) throw new ArgumentException("菜品至少保留一个规格");
+        if (await db.fnbDishSpec.CountAsync(x => x.product_id == spec.product_id && x.valid && x.enabled) <= 1) throw new ArgumentException("菜品至少保留一个规格");
         spec.valid = false; spec.updated_at = Now; Modified(spec);
-        if (spec.is_default) { var next = await db.fnbDishSpec.Where(x => x.product_id == spec.product_id && x.valid && x.id != spec.id).OrderBy(x => x.id).FirstAsync(); next.is_default = true; Modified(next); }
+        if (spec.is_default) { var next = await db.fnbDishSpec.Where(x => x.product_id == spec.product_id && x.valid && x.enabled && x.id != spec.id).OrderBy(x => x.id).FirstAsync(); next.is_default = true; Modified(next); }
         await db.SaveChangesAsync(); return spec;
     }
     public async Task<object> ListDishes()
     {
-        var specs = await db.fnbDishSpec.Where(x => x.shop_id == shopId && x.valid).ToArrayAsync();
+        var specs = await db.fnbDishSpec.Where(x => x.shop_id == shopId && x.valid && x.enabled).ToArrayAsync();
         var ids = specs.Select(x => x.product_id).Distinct().ToArray(); var products = await db.product.Where(x => ids.Contains(x.id) && x.shop_id == shopId && x.type == "餐饮" && x.valid == 1).ToArrayAsync();
         var recipes = await db.fnbRecipe.Where(x => x.shop_id == shopId && x.recipe_type == "dish" && x.status == "published").ToArrayAsync();
         var rids = recipes.Select(x => x.id).ToArray(); var lines = await db.fnbRecipeLine.Where(x => rids.Contains(x.recipe_id)).ToArrayAsync();

@@ -53,7 +53,7 @@ public static class FnbV4Rules
     {
         if (productionMonth is < 1 or > 12 || !Storage(storage)) throw new ArgumentException("生产月份或储存方式无效");
         string season = productionMonth is >= 6 and <= 9 ? "warm" : "cold";
-        return rules.Where(x => x.valid && x.storage_type == storage && (x.season == season || x.season == "all") &&
+        return rules.Where(x => x.valid && x.enabled && x.storage_type == storage && (x.season == season || x.season == "all") &&
             (x.item_id == itemId || x.item_id == null && x.category_id == categoryId))
             .OrderBy(x => x.item_id == itemId ? 0 : 1).ThenBy(x => x.season == season ? 0 : 1).ThenBy(x => x.id).FirstOrDefault();
     }
