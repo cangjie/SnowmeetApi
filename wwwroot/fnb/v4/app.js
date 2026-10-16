@@ -98,13 +98,23 @@
       + field('sort', '排序', entry.sort, 'number', 'step="1" ' + disabled) + check('enabled', '启用分类', entry.enabled) + beforeSave + (manager() ? saveButton() : '') + '</form>');
     if (!manager()) $('modal').querySelectorAll('input,select').forEach(e => { e.disabled = true; });
   }
+  const itemParents = () => state.categories.filter(c => c.level === 1 && c.enabled && categories2().some(s => s.parent_id === c.id));
   function itemEditor() {
-    openModal('新建食材档案', '<form data-form="item">' + select('categoryId', '二级分类', catOptions(), catOptions()[0] && catOptions()[0][0], 'required')
+    const parents = itemParents();
+    openModal('新建食材档案', '<form data-form="item">' + select('parentCategoryId', '一级分类', [['', '请选择一级分类']].concat(parents.map(c => [c.id, c.name])), parents.length === 1 ? parents[0].id : '', 'required')
+      + select('categoryId', '二级分类', [], '', 'required')
       + '<div class="inline-input">' + field('name', '食材名称', '', 'text', 'required maxlength="100"') + button('识别', 'ocr-name', 'name', 'btn compact secondary') + '</div>'
       + field('finalFormName', '出品态名称（配方实际使用的形态）', '', 'text', 'required maxlength="100"')
       + '<div class="form-grid">' + select('baseUnitCode', '基本单位', [['g', 'g'], ['ml', 'ml'], ['piece', '个']], 'g') + field('finalFormCode', '出品态编码', 'F', 'text', 'required pattern="[A-Za-z0-9]{1,16}" maxlength="16"') + '</div>'
       + select('storageType', '储存方式', [['', '跟随分类建议']].concat(storeOptions), '') + '<label class="field file-picker"><span>食材照片（选填）</span><span class="btn secondary">拍照 / 上传<input class="file-input" type="file" accept="image/*" data-item-photo aria-label="食材照片"></span></label><input type="hidden" name="imageId"><div id="item-photo" class="photo-picker"></div>'
       + '<p class="hint">先建出品态，再逐层往上游添加采购态和作业。</p>' + beforeSave + saveButton('创建食材') + '</form>');
+    filterItemCategories();
+  }
+  function filterItemCategories() {
+    const form = $('modal').querySelector('[data-form=item]'); if (!form) return;
+    const parent = form.elements.parentCategoryId.value, subs = parent ? categories2().filter(c => String(c.parent_id) === parent) : [];
+    inboundOptions(form.elements.categoryId, subs.map(c => [c.id, c.name]), parent ? '请选择二级分类' : '请先选择一级分类', subs.length === 1 ? subs[0].id : '');
+    form.elements.categoryId.disabled = !parent;
     syncItemUnit();
   }
   function syncItemUnit() {
@@ -316,6 +326,7 @@
     if (e.target.hasAttribute('data-op-photo')) operations.photo(e.target).catch(e => toast(e.message));
     else if (e.target.hasAttribute('data-item-photo')) photo(e.target, 'item-photo').catch(e => toast(e.message));
     else if (e.target.hasAttribute('data-inbound-photo')) photo(e.target, 'inbound-photo').catch(e => toast(e.message));
+    else if (e.target.name === 'parentCategoryId' && e.target.closest('[data-form=item]')) filterItemCategories();
     else if (e.target.name === 'categoryId' && e.target.closest('[data-form=item]')) syncItemUnit();
     else if (e.target.closest('#inbound-form') && ['parentCategoryId', 'categoryId'].includes(e.target.name)) filterInboundCategories(e.target.name).catch(e => toast(e.message));
     else if (e.target.closest('#inbound-form') && e.target.name === 'itemId') inboundSelection().catch(e => toast(e.message));
