@@ -16,7 +16,14 @@
   const empty = text => '<div class="empty">' + esc(text) + '</div>';
   const badge = (text, color) => '<span class="badge ' + (color || '') + '">' + esc(text) + '</span>';
   const note = text => '<p class="section-note">' + esc(text) + '</p>';
-  function field(name, label, value, type, extra) { return '<label class="field"><span>' + esc(label) + '</span><input name="' + name + '" type="' + (type || 'text') + '" value="' + esc(value) + '" ' + (extra || '') + '></label>'; }
+  function field(name, label, value, type, extra = '') {
+    const numeric = type === 'number', step = (extra.match(/\bstep="([^"]+)"/) || [])[1] || '1', min = (extra.match(/\bmin="([^"]+)"/) || [])[1];
+    const mode = step === 'any' || !Number.isInteger(Number(step)) || (min != null && !Number.isInteger(Number(min))) ? 'decimal' : 'numeric';
+    const html = '<label class="field"><span>' + esc(label) + '</span><input name="' + name + '" type="' + (type || 'text') + '" value="' + esc(value) + '"' + (numeric ? ' inputmode="' + mode + '" enterkeyhint="done"' : '') + ' ' + extra + '></label>';
+    // iPhone 的数字键盘可能没有负号；温度、排序等允许负数的字段保留正负切换。
+    return numeric && (min == null || Number(min) < 0) && !/\b(readonly|disabled)\b/.test(extra)
+      ? '<div class="signed-number-field">' + html + '<button type="button" class="btn neutral" data-action="number-sign" aria-label="切换' + esc(label) + '的正负号">±</button></div>' : html;
+  }
   function select(name, label, entries, value, extra) { return '<label class="field"><span>' + esc(label) + '</span><select name="' + name + '" ' + (extra || '') + '>' + entries.map(e => '<option value="' + esc(e[0]) + '"' + (String(e[0]) === String(value) ? ' selected' : '') + '>' + esc(e[1]) + '</option>').join('') + '</select></label>'; }
   function check(name, text, value) { return '<label class="field check"><input type="checkbox" name="' + name + '"' + (value ? ' checked' : '') + '><span>' + esc(text) + '</span></label>'; }
   const num = (f, k, fallback) => { const v = f.get(k); return v === '' || v == null ? fallback : Number(v); };
@@ -194,7 +201,7 @@
     const form = $('inbound-form'); if (!form) return;
     const token = ++inboundToken, id = form.elements.itemId.value; inboundRoute = null;
     operations.clearInboundPreview(); $('inbound-unit').textContent = '';
-    form.elements.quantity.step = '0.000001'; form.elements.quantity.min = '0.000001';
+    form.elements.quantity.step = '0.000001'; form.elements.quantity.min = '0.000001'; form.elements.quantity.inputMode = 'decimal';
     if (!id) { $('inbound-specs').innerHTML = empty('先选择食材'); return; }
     selectInboundItem(id);
     $('inbound-specs').innerHTML = empty('正在读取进货规格…');
@@ -213,7 +220,7 @@
     const f = $('inbound-form'); if (!f || !inboundRoute) return;
     const s = inboundRoute.specs.find(s => String(s.id) === (f.elements.specId && f.elements.specId.value)), form = s ? inboundRoute.forms.find(x => x.id === s.entry_form_id) : inboundRoute.forms[inboundRoute.forms.length - 1];
     const sealed = !s && f.elements.packMode && f.elements.packMode.value === 'sealed';
-    f.elements.quantity.step = sealed ? '1' : '0.000001'; f.elements.quantity.min = sealed ? '1' : '0.000001';
+    f.elements.quantity.step = sealed ? '1' : '0.000001'; f.elements.quantity.min = sealed ? '1' : '0.000001'; f.elements.quantity.inputMode = sealed ? 'numeric' : 'decimal';
     $('inbound-unit').textContent = form ? '数量单位：' + (sealed ? '件（封装整件数量）' : form.unit_name) + '；换算与预计入库量等待服务器预览' : '请选择进货规格';
   }
   let printerLogs = [];
@@ -271,6 +278,12 @@
     if (await operations.action(buttonElement)) return;
     if (action === 'close-modal') { if (!writing) closeModal(); return; }
     if (action === 'navigate') { navigate(id); return; }
+    if (action === 'number-sign') {
+      const input = buttonElement.closest('.signed-number-field').querySelector('input');
+      if (input.value === '') { input.focus(); toast('请先输入数值'); return; }
+      input.value = input.value.startsWith('-') ? input.value.slice(1) : '-' + input.value;
+      input.dispatchEvent(new Event('input', { bubbles: true })); input.focus(); return;
+    }
     if (action === 'item-route') { navigate('routes', { item: id }); return; }
     if (action === 'refresh') { await renderPage(true); return; }
     if (action === 'login') { if (/wxwork/i.test(navigator.userAgent)) location.replace(api.oauthUrl(location)); else toast('请在企业微信中打开本页面'); return; }

@@ -20,3 +20,5 @@
 .card .actions{flex-wrap:wrap}
 .card .actions .btn{flex:1 1 120px}
 .area-children .actions .btn{flex-basis:100px}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+.signed-number-field{display:flex;align-items:flex-end;gap:8px}.signed-number-field>.field{flex:1;min-width:0}.signed-number-field>.btn{flex:none;margin-bottom:11px;min-width:42px;min-height:42px}

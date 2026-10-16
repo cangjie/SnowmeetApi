@@ -65,9 +65,20 @@ async function main() {
     });
     const page = await context.newPage(); page.on('pageerror', e => errors.push(e.message)); return { context, page };
   }
-  async function go(page, screen) { await page.goto(origin + '/fnb/v4/index.html?sessionKey=qa-session#' + screen); await page.locator('#page').getByText('正在加载…', { exact: true }).waitFor({ state: 'hidden' }); await page.waitForTimeout(80); }
+  async function go(page, screen) {
+    await page.goto(origin + '/fnb/v4/index.html?sessionKey=qa-session#' + screen);
+    await page.locator('#page').getByText('正在加载…', { exact: true }).waitFor({ state: 'hidden' }); await page.waitForTimeout(80);
+    const issues = await page.locator('input,select,textarea').evaluateAll(controls => controls.flatMap(el => {
+      const problems = [];
+      if (!['hidden', 'file', 'checkbox', 'radio'].includes(el.type) && parseFloat(getComputedStyle(el).fontSize) < 16) problems.push((el.name || el.tagName) + ' 字号不足 16px');
+      if (el.type === 'number' && !['numeric', 'decimal'].includes(el.inputMode)) problems.push(el.name + ' 缺少数字键盘设置');
+      return problems;
+    }));
+    assert.deepEqual(issues, [], screen + ' 输入控件配置');
+  }
   try {
     const { context, page } = await contextFor();
+    await require('./fnb-v4.mobile-input-flows.cjs')({ page, go });
     await require('./fnb-v4.serve-flows.cjs')({ page, go, calls });
     await go(page, 'stock'); assert.equal(new URL(page.url()).searchParams.has('sessionKey'), false); await page.getByRole('button', { name: '更多', exact: true }).click(); await page.getByRole('button', { name: /食材分类/ }).click(); await page.getByRole('button', { name: '分类属性', exact: true }).click();
     await page.locator('[name=warnDays]').fill('0'); await page.locator('[name=openDays]').fill(''); await page.locator('[data-form=category] [type=submit]').click(); await page.locator('#modal').waitFor({ state: 'hidden' });

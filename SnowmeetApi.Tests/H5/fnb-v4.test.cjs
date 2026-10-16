@@ -114,7 +114,7 @@ test('现有蓝牙模块保留连接、顺序分包和掉线重连，扩展给 v
   lost({ deviceId: 'p1', connected: false }); assert.equal(sandbox.BlePrint.getConnection(), null);
   await sandbox.BlePrint.connect(() => {}); assert.equal(sandbox.BlePrint.getConnection().deviceId, 'p1'); await sandbox.BlePrint.release();
 });
-test('输入控件字号不小于 16px，iOS 企业微信聚焦时不会自动放大页面', () => {
+test('输入控件基础样式字号不小于 16px', () => {
   const css = fs.readFileSync(path.join(__dirname, '../../wwwroot/fnb/v4/app.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
   const rules = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map(m => ({ parts: m[1].split(',').map(s => s.trim()), size: +(m[2].match(/font-size:\s*(\d+(?:\.\d+)?)px/) || [])[1] })).filter(r => r.size);
   // 选照片的文件框不弹键盘，不会触发放大
@@ -122,4 +122,38 @@ test('输入控件字号不小于 16px，iOS 企业微信聚焦时不会自动�
   const small = []; for (const r of rules) for (const s of r.parts) if (textEntry(s) && r.size < 16) small.push(s + ' ' + r.size + 'px');
   assert.deepEqual(small, []);
   for (const tag of ['input', 'select', 'textarea']) assert.ok(rules.some(r => r.parts.includes(tag) && r.size >= 16), tag + ' 缺少不小于 16px 的基础字号');
+});
+function mobileInputFixture(userAgent = 'iPhone wxwork') {
+  const normal = 'width=device-width, initial-scale=1, viewport-fit=cover';
+  let content = normal, next = 0, mutate;
+  const events = new Map(), lifecycle = new Map(), timers = new Map(), body = { tagName: 'BODY' };
+  const document = { documentElement: {}, activeElement: body, querySelector: () => ({ getAttribute: () => content, setAttribute: (name, value) => { content = value; } }), addEventListener: (name, fn) => events.set(name, fn) };
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../../wwwroot/fnb/v4/mobile-inputs.js'), 'utf8'), {
+    document, navigator: { userAgent, platform: '', maxTouchPoints: 0 }, window: { addEventListener: (name, fn) => lifecycle.set(name, fn) },
+    setTimeout: fn => { timers.set(++next, fn); return next; }, clearTimeout: id => timers.delete(id), MutationObserver: class { constructor(fn) { mutate = fn; } observe() {} }
+  });
+  const input = () => ({ tagName: 'INPUT', type: 'text', disabled: false, closest: function (selector) { return selector === 'input,textarea,select' ? this : null; } });
+  return { normal, document, body, events, lifecycle, input, mutate: () => mutate(), content: () => content, flush: () => { const pending = [...timers.values()]; timers.clear(); pending.forEach(fn => fn()); } };
+}
+test('iOS 仅输入期间限制焦点缩放，切换输入框不提前解锁，完成输入恢复原 viewport', () => {
+  const f = mobileInputFixture(), first = f.input(), second = f.input();
+  assert.equal(f.content(), f.normal);
+  f.document.activeElement = first; f.events.get('focusin')({ target: first });
+  assert.match(f.content(), /maximum-scale=1/);
+  f.events.get('focusout')({ target: first });
+  f.document.activeElement = second; f.events.get('focusin')({ target: second }); f.flush();
+  assert.match(f.content(), /maximum-scale=1/);
+  f.document.activeElement = f.body; f.events.get('focusout')({ target: second }); f.flush();
+  assert.equal(f.content(), f.normal);
+});
+test('iOS 触摸未聚焦和离开页面均恢复缩放；其他设备不修改 viewport', () => {
+  const f = mobileInputFixture(), input = f.input();
+  f.events.get('pointerdown')({ target: input }); assert.match(f.content(), /maximum-scale=1/); f.flush();
+  assert.equal(f.content(), f.normal);
+  f.document.activeElement = input; f.events.get('focusin')({ target: input });
+  f.document.activeElement = f.body; f.mutate(); f.flush(); assert.equal(f.content(), f.normal);
+  f.document.activeElement = input; f.events.get('focusin')({ target: input });
+  f.lifecycle.get('pagehide')(); assert.equal(f.content(), f.normal);
+  const android = mobileInputFixture('Android wxwork');
+  assert.equal(android.events.size, 0); assert.equal(android.content(), android.normal);
 });
