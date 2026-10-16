@@ -50,10 +50,10 @@ module.exports = function createFixture(getData) {
     if(action==='AddSpec'){const spec={id:next++,name:body.name};dishes.find(d=>d.productId===body.productId).specs.push({spec,recipe:null,lines:[],servings:0});return spec;}
     if(action==='DeleteSpec')return {};
     if(action==='SaveSpecLines'){const d=dishes.flatMap(d=>d.specs).find(r=>r.spec.id===body.ownerId);d.recipe={id:'99',status:'published'};d.lines=body.lines.map(l=>({item_id:l.itemId,quantity:l.quantity}));return d;}
-    if(action==='CreateOrder'){order={order:{id:'9007199254740997',order_no:'K-01',table_no:body.tableNo,remark:body.remark,status:'pending'},lines:body.lines.map(l=>({dish_name:'拿铁',spec_name:'标准份',quantity:l.quantity}))};return order;}
-    if(action==='ListPendingOrders')return order&&order.order.status==='pending'?[order]:[];
+    if(action==='CreateOrder'){order={order:{id:'9007199254740997',display_no:'K-01',table_no:body.tableNo,remark:body.remark,order_status:'pending'},lines:body.lines.map(l=>({item_name:'拿铁',spec_name:'标准份',quantity:l.quantity,cancelled_qty:0}))};return order;}
+    if(action==='ListPendingOrders')return order&&order.order.order_status==='pending'?[order]:[];
     if(action==='PreviewServe')return {order,ingredients:[{itemId:23,name:'鲜牛奶',quantity:400,baseUnit:'ml',availableQuantity:1000,shortageQuantity:0,suggestedAction:'ready'}]};
-    if(action==='PostServe'){assert.equal(typeof body.orderId,'string');order.order.status='served';return {documentId:'123',cost:8,order};}
+    if(action==='PostServe'){assert.equal(typeof body.orderId,'string');order.order.order_status='served';return {documentId:'123',cost:8,order};}
     if(action==='CreateSnapshot'){snapshot={document:{id:'9007199254740999',document_no:'C-01',status:'draft'},lines:[{item_id:23,system_qty:1000,counted_qty:null,difference_qty:null,remark:null}]};return snapshot;}
     if(action==='GetSnapshot')return snapshot;
     if(action==='SaveCount'){assert.equal(typeof body.documentId,'string');snapshot.lines[0].counted_qty=body.lines[0].quantity;return snapshot;}

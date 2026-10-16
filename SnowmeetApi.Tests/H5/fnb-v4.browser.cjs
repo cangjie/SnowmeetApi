@@ -68,6 +68,7 @@ async function main() {
   async function go(page, screen) { await page.goto(origin + '/fnb/v4/index.html?sessionKey=qa-session#' + screen); await page.locator('#page').getByText('正在加载…', { exact: true }).waitFor({ state: 'hidden' }); await page.waitForTimeout(80); }
   try {
     const { context, page } = await contextFor();
+    await require('./fnb-v4.serve-flows.cjs')({ page, go, calls });
     await go(page, 'stock'); assert.equal(new URL(page.url()).searchParams.has('sessionKey'), false); await page.getByRole('button', { name: '更多', exact: true }).click(); await page.getByRole('button', { name: /食材分类/ }).click(); await page.getByRole('button', { name: '分类属性', exact: true }).click();
     await page.locator('[name=warnDays]').fill('0'); await page.locator('[name=openDays]').fill(''); await page.locator('[data-form=category] [type=submit]').click(); await page.locator('#modal').waitFor({ state: 'hidden' });
     const savedCategory = calls.findLast(c => c.path.endsWith('/SaveCategory')); assert.equal(savedCategory.body.warnDays, 0); assert.equal(savedCategory.body.openDays, null);

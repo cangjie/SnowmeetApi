@@ -30,7 +30,7 @@
       if (state.screen === 'inbound' && state.lastReceiptData) return card('刚才入库的批次', rows(state.lastReceiptData.batches, d => batchRow(d.batch)));
       if (state.screen === 'job' && state.lastOperation) { const r = state.lastOperation; return card('刚才作业结果', badge(r.lowYield ? '低于标准出成率' : '已完成过账', r.lowYield ? 'amber' : 'green') + hint('实际出成率 ' + esc(FnbClient.percentInput(r.actualYield)) + '% · 损耗基本量 ' + esc(r.operation.loss_base_qty)) + batchRow(r.batch.batch)); }
       if (state.screen === 'prep' && state.lastPreparation) return card('刚才制作的批次', batchRow(state.lastPreparation.batch.batch));
-      if (state.screen === 'serve' && state.lastServe) return card('刚才出餐结果', hint('扣减成本 ¥' + esc(state.lastServe.cost)) + rows(state.lastServe.lines || [], l => hint(esc(itemName(l.item_id)) + ' · 实际 ' + esc(l.actual_qty) + ' · 短缺 ' + esc(l.shortage_qty)), ''));
+      if (state.screen === 'serve' && !state.params.has('order') && state.lastServe) return card('刚才出餐结果', hint('扣减成本 ¥' + esc(state.lastServe.cost)) + rows(state.lastServe.lines || [], l => hint(esc(itemName(l.item_id)) + ' · 实际 ' + esc(l.actual_qty) + ' · 短缺 ' + esc(l.shortage_qty)), ''));
       return '';
     }
     const stack = html => '<div class="stack">' + retryBanner() + recentResult() + html + '</div>';
@@ -46,7 +46,7 @@
       if (screen === 'low') return gather({ low: req('FnbStock', 'ListLowStock'), stock: req('FnbStock', 'ListStock'), supplies: req('FnbSupply', 'ListSupplies') });
       if (screen === 'prep') return gather({ preps: req('FnbPrep', 'ListPreps'), records: req('FnbPrep', 'ListPrepRecords'), areas: a() });
       if (screen === 'recipe') return gather({ dishes: req('FnbDish', 'ListDishes') });
-      if (screen === 'serve') return gather({ orders: req('FnbServe', 'ListPendingOrders'), dishes: req('FnbDish', 'ListDishes'), logs: req('FnbServe', 'ListServeLog'), serve: params.get('order') ? req('FnbServe', 'PreviewServe', { orderId: params.get('order') }) : null });
+      if (screen === 'serve') return params.get('order') ? gather({ serve: req('FnbServe', 'PreviewServe', { orderId: params.get('order') }) }) : gather({ orders: req('FnbServe', 'ListPendingOrders'), dishes: req('FnbDish', 'ListDishes'), logs: req('FnbServe', 'ListServeLog') });
       if (screen === 'count') return gather({ snapshot: params.get('document') ? req('FnbStocktake', 'GetSnapshot', { documentId: params.get('document') }) : null });
       if (screen === 'dash') return gather({ dashboard: req('FnbReport', 'GetDashboard', Object.fromEntries(params)), chain: req('FnbReport', 'GetRecipeChain') });
       if (screen === 'areas') return gather({ areas: a(), tools: req('FnbTool', 'ListTools'), supplies: req('FnbSupply', 'ListSupplies') });
@@ -73,7 +73,38 @@
     function prep() { return stack((manager() ? button('+ 新建半成品', 'op-new-prep', null, 'btn secondary full') : '') + card('配方与制作', rows(model.preps, p => list('<strong>' + esc(p.item.name) + '</strong>' + hint(p.recipe ? '每批产出 ' + esc(p.recipe.output_qty) + ' · 配方版本 ' + esc(p.recipe.version_no) : '尚无本店配方') + rows(p.lines.filter(l => p.recipe && String(l.recipe_id) === String(p.recipe.id)), l => hint(esc(itemName(l.item_id)) + ' · ' + esc(l.quantity))) + (manager() ? button('编辑配方', 'op-prep-bom', p.item.id, 'link') : '') + button('制作', 'op-prepare', p.item.id, 'btn secondary', !p.recipe || p.recipe.status !== 'published')))) + records('制作记录', model.records)); }
     function recipe() { return stack((manager() ? button('+ 新增菜品', 'op-new-dish', null, 'btn secondary full') : '') + rows(model.dishes, d => card(d.name, (manager() ? button('+ 新增规格', 'op-add-spec', d.productId, 'link') : '') + rows(d.specs, r => list('<div class="row between"><strong>' + esc(r.spec.name) + '</strong>' + badge(r.servings + ' 份可出餐', 'green') + '</div>' + rows(r.lines, l => hint(esc(itemName(l.item_id)) + ' · ' + esc(l.quantity))) + (manager() ? button('编辑用料', 'op-dish-bom', r.spec.id, 'link') + button('删除规格', 'op-delete-spec', r.spec.id, 'link') : '')))))); }
     function records(title, values) { return card(title, rows(values, r => '<details class="list-row"><summary>' + esc(r.document.document_no) + ' · ' + esc(date(r.document.business_date)) + '</summary>' + hint(esc(r.order && (r.order.remark || r.order.table_no) || r.document.remark)) + rows(r.lines, v => { const l = v.line; return list(esc(itemName(l.item_id)) + ' · 实际 ' + esc(l.actual_qty) + ' · 短缺 ' + esc(l.shortage_qty) + rows(v.movements, m => hint('批次 #' + esc(m.batch_id) + ' · 数量 ' + esc(m.quantity) + ' · 金额 ¥' + esc(m.amount)))); }) + '</details>')); }
-    function serve() { const p = model.serve; return stack(button('+ 手动创建厨房单', 'op-new-order', null, 'btn secondary full') + card('待出餐订单', rows(model.orders, r => list('<strong>' + esc(r.order.order_no) + '</strong>' + hint('桌号 ' + esc(r.order.table_no) + ' · ' + esc(r.order.remark)) + rows(r.lines, l => hint(esc(l.dish_name) + ' / ' + esc(l.spec_name) + ' × ' + esc(l.quantity))) + button('查看并出餐', 'op-order', r.order.id, 'btn secondary')))) + (p ? form('serve', '<h2>出餐用料</h2>' + hint(esc(p.order.order.remark)) + rows(p.ingredients, l => '<label class="field"><span>' + esc(l.name) + ' · 可用 ' + esc(l.availableQuantity) + ' ' + esc(unit(l.baseUnit)) + ' · 缺口 ' + esc(l.shortageQuantity) + '</span><input name="serveQty" data-item="' + l.itemId + '" type="number" min="0" step="0.000001" required value="' + l.quantity + '"></label>' + hint('建议 ' + esc({ ready: '可出餐', operate: '先作业', receive: '需入库' }[l.suggestedAction] || l.suggestedAction))), '确认出餐并扣减', 'data-id="' + esc(state.params.get('order')) + '"') : '') + records('出餐扣减流水', model.logs)); }
+    function kitchenOrderSummary(r) {
+      return '<strong>' + esc(r.order.display_no || '厨房单 #' + r.order.id) + '</strong>'
+        + hint('桌号 ' + esc(r.order.table_no || '未填写'))
+        + (r.order.remark ? hint('备注：' + esc(r.order.remark)) : '')
+        + rows(r.lines, l => list('<strong>' + esc(l.item_name) + (l.spec_name ? ' / ' + esc(l.spec_name) : '') + ' × ' + esc(Number(Math.max(0, l.quantity - (l.cancelled_qty || 0)).toFixed(6))) + '</strong>'
+          + (l.options_text ? hint(esc(l.options_text)) : '') + (l.remark ? hint('备注：' + esc(l.remark)) : '')), '');
+    }
+    function serveFeedback(l, value) {
+      const quantity = Number(value);
+      if (value === '' || !Number.isFinite(quantity) || quantity < 0) return '请输入不小于 0 的用量';
+      if (quantity === 0) return '本单不使用';
+      const shortage = Number(Math.max(0, quantity - l.availableQuantity).toFixed(6));
+      return shortage > 0 ? '缺口 ' + shortage + ' ' + unit(l.baseUnit) + ' · 建议' + (l.upstreamQuantity > 0 ? '先作业' : '需入库') : '库存充足 · 可出餐';
+    }
+    function updateServeFeedback(input) {
+      const ingredient = model.serve.ingredients.find(l => String(l.itemId) === input.dataset.item);
+      input.closest('[data-serve-ingredient]').querySelector('[data-serve-feedback]').textContent = serveFeedback(ingredient, input.value);
+    }
+    function serve() {
+      const p = model.serve;
+      if (p) return stack(button('‹ 返回待出餐订单', 'navigate', 'serve', 'back') + card('厨房单详情', kitchenOrderSummary(p.order))
+        + form('serve', '<div class="row between"><h2>本单实际用料</h2>' + button('恢复配方用量', 'op-reset-serve', null, 'link') + '</div>'
+          + note('以下为本单各菜品的合计用料。可逐项调整，填 0 表示不使用；仅影响本单，不修改菜品配方。')
+          + rows(p.ingredients, l => '<div class="list-row" data-serve-ingredient>'
+            + hint('配方 ' + esc(l.quantity) + ' ' + esc(unit(l.baseUnit)) + ' · 可用 ' + esc(l.availableQuantity) + ' ' + esc(unit(l.baseUnit)))
+            + field('serveQty', l.name + ' · 实际用量（' + unit(l.baseUnit) + '）', l.quantity, 'number', 'required min="0" step="0.000001" data-item="' + esc(l.itemId) + '"')
+            + '<p class="hint" data-serve-feedback>' + esc(serveFeedback(l, l.quantity)) + '</p></div>'),
+          '确认出餐并扣减', 'data-id="' + esc(p.order.order.id) + '"'));
+      return stack(button('+ 手动创建厨房单', 'op-new-order', null, 'btn secondary full')
+        + card('待出餐订单', rows(model.orders, r => list(kitchenOrderSummary(r) + button('查看并出餐', 'op-order', r.order.id, 'btn secondary'))))
+        + records('出餐扣减流水', model.logs));
+    }
     function count() { const s = model.snapshot; return stack(note('仅盘出品态可用量。提交需店长；期间库存变化时重新生成快照。') + button('生成盘点快照', 'op-snapshot', null, 'btn secondary full') + (s ? form('count', '<h2>盘点单 ' + esc(s.document.document_no) + '</h2>' + rows(s.lines, l => '<div class="list-row">' + hint(esc(itemName(l.item_id)) + ' · 系统量 ' + esc(l.system_qty) + ' · 差异 ' + esc(l.difference_qty)) + '<label class="field"><span>实盘基本量</span><input name="countQty" data-item="' + l.item_id + '" type="number" min="0" step="0.000001" required value="' + esc(l.counted_qty) + '" ' + (s.document.status === 'posted' ? 'disabled' : '') + '></label>' + field('countRemark', '说明', l.remark || '')) + (manager() && s.document.status !== 'posted' ? button('过账盘点', 'op-post-count', s.document.id, 'btn secondary full') : '') + hint('状态 ' + esc({ draft: '草稿', posted: '已过账', cancelled: '已撤销' }[s.document.status] || s.document.status)), '保存实盘', 'data-id="' + esc(s.document.id) + '"' + (s.document.status === 'posted' ? ' data-readonly="true"' : '')) : card('今日盘点', empty('先生成真实库存快照')))); }
     function dash() { const d = model.dashboard; return stack(form('report-filter', '<h2>报表时间范围</h2>' + field('from', '开始日期', date(d.from), 'date', 'required') + field('to', '结束日期', date(d.to), 'date', 'required'), '查询') + card('经营指标', hint('在库成本 ¥' + esc(d.inventoryCost) + ' · 损耗 ¥' + esc(d.lossAmount)) + hint('损耗率 ' + esc(FnbClient.percentInput(d.lossRate)) + '% · 平均周转 ' + esc(d.averageTurnoverDays == null ? '无出餐数据' : d.averageTurnoverDays + ' 天'))) + card('在库成本结构', rows(d.costStructure, x => hint(esc(x.categoryName) + ' · ¥' + esc(x.amount)))) + card('损耗台账', rows(d.lossLedger, x => list(esc(x.name) + ' · ' + esc({ waste: '报损', destroy: '销毁', stocktake: '盘点', op: '作业' }[x.sourceType] || x.sourceType) + hint(esc(date(x.date)) + ' · 数量 ' + esc(x.quantity) + ' · ¥' + esc(x.amount))))) + card('盘盈（单独记录）', rows(d.stocktakeGains, x => hint(esc(itemName(x.itemId)) + ' · ' + esc(x.quantity) + ' · ¥' + esc(x.amount)))) + card('出品与配方链路', '<div class="scroll-table"><table class="report"><thead><tr><th>菜品 / 规格</th><th>每份用料</th><th>采购与作业链路</th></tr></thead><tbody>' + rows(model.chain, x => '<tr><td>' + esc(x.dish) + ' / ' + esc(x.spec) + '</td><td>' + esc(x.ingredient) + ' ' + esc(x.recipeQuantity) + ' ' + esc(unit(x.baseUnit)) + '</td><td>采购 ' + esc(x.purchaseQuantity) + ' ' + esc(x.purchaseUnit) + '<br>' + esc((x.steps || []).map(s => s.operation + ' → ' + s.form + ' / ' + s.unit + ' / ' + storage[s.storage] + ' / ' + FnbClient.percentInput(s.standardYield) + '% / ' + s.hours + 'h').join('；')) + '</td></tr>') + '</tbody></table></div>' + button('导出 Excel', 'op-export', null, 'btn full'))); }
     function areaToggleText(expanded, count) { return (expanded ? '收起' : '展开') + '下级区域（' + count + '）'; }
@@ -145,6 +176,7 @@
       else if (act === 'op-batch') navigate('batch', { id });
       else if (act === 'op-job') navigate('job', { batch: id });
       else if (act === 'op-order') navigate('serve', { order: id });
+      else if (act === 'op-reset-serve') { for (const input of b.closest('form').querySelectorAll('[name=serveQty]')) { input.value = input.defaultValue; updateServeFeedback(input); } }
       else if (act === 'op-retry') await locked(async () => { const result = await writes.retry(id); remember(id.split('/')[0], id.split('/')[1], result); await c.render(true); toast('原请求已确认'); });
       else if (act === 'op-receipt') { if (!state.drafts.length) throw new Error('先加入入库条目'); await saved('FnbInbound', 'PostReceipt', { lines: state.drafts.map(d => d.body), remark: document.querySelector('[name=receiptRemark]').value }, true, r => { state.drafts = []; state.lastReceipt = r.documentId; }); }
       else if (act === 'op-cancel-receipt') { if (confirm('撤销刚才入库？服务器将检查 10 分钟时限及后续流水。')) await saved('FnbInbound', 'DeleteReceipt', { documentId: id }, true, () => { state.lastReceipt = null; }); }
@@ -238,7 +270,10 @@
     async function previewExpiry() { const f = $('inbound-form'); if (!f || !f.elements.itemId.value) return; const token = ++previewToken; try { const p = await req('FnbInbound', 'PreviewExpiry', { itemId: f.elements.itemId.value, storageType: f.elements.storageType.value, ...(f.elements.productionDate.value ? { productionDate: f.elements.productionDate.value } : {}), ...(f.elements.expireDate.value ? { expireDate: f.elements.expireDate.value } : {}) }); if (token === previewToken && f.isConnected) $('inbound-expiry').textContent = '有效到期 ' + date(p.expireDate) + ' · 来源 ' + p.expirySource + (p.expired ? ' · 已过期，不可入库' : ''); } catch (e) { if (token === previewToken && f.isConnected) $('inbound-expiry').textContent = e.message; } }
     function clearInboundPreview() { ++previewToken; const f = $('inbound-form'); if (!f) return; f.elements.batchNo.value = ''; $('inbound-expiry').textContent = ''; }
     async function selected() { const f = $('inbound-form'); if (!f || !f.elements.itemId.value) return; const id = f.elements.itemId.value, p = await req('FnbInbound', 'NextBatchNo', { itemId: id }); if (!f.isConnected || f.elements.itemId.value !== id) return; f.elements.batchNo.value = p.batchNo; await previewExpiry(); }
-    function input(e) { if (e.target.dataset.opFilter === 'stock') $('op-stock-rows').innerHTML = stockRows(model.stock.filter(s => s.name.includes(e.target.value.trim()))); }
+    function input(e) {
+      if (e.target.dataset.opFilter === 'stock') $('op-stock-rows').innerHTML = stockRows(model.stock.filter(s => s.name.includes(e.target.value.trim())));
+      if (e.target.name === 'serveQty') updateServeFeedback(e.target);
+    }
     return { load, setModel, action, submit, photo, selected, clearInboundPreview, previewExpiry, input, views: { stock, inbound, ops, job, expiry, destroy, low, prep, recipe, serve, count, dash, areas, check: checkPage, checkHist, supplies, tools, batch, printer } };
   }
   root.FnbOperations = { create };
