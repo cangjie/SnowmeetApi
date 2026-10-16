@@ -103,18 +103,19 @@
     // 入库 10 分钟内可撤销这一个批次；能否撤销和剩余秒数由服务器判断，页面只负责倒计时，到点收起按钮。
     let cancelTimer = 0;
     const cancelLeft = ms => { const s = Math.max(0, Math.ceil(ms / 1000)); return '还剩 ' + Math.floor(s / 60) + ' 分 ' + String(s % 60).padStart(2, '0') + ' 秒'; };
-    function receiptCancel(batchId, info) {
-      clearInterval(cancelTimer); if (!info) return '';
+    function batchActions(batchId, info, waste) {
+      const actions = cancel => cancel || waste ? '<div class="actions">' + cancel + waste + '</div>' : '';
+      clearInterval(cancelTimer); if (!info) return actions('');
       const deadline = Date.now() + info.secondsLeft * 1000;
       cancelTimer = setInterval(() => {
         const box = $('receipt-cancel'); if (!box) { clearInterval(cancelTimer); return; }
         const ms = deadline - Date.now();
-        if (ms <= 0) { clearInterval(cancelTimer); box.innerHTML = hint('入库已超过 10 分钟，不能撤销'); return; }
+        if (ms <= 0) { clearInterval(cancelTimer); box.innerHTML = hint('入库已超过 10 分钟，不能撤销') + actions(''); return; }
         box.querySelector('[data-cancel-left]').textContent = cancelLeft(ms);
       }, 1000);
-      return '<div id="receipt-cancel">' + hint('入库 10 分钟内可撤销 · <span data-cancel-left>' + cancelLeft(info.secondsLeft * 1000) + '</span>') + button('撤销入库', 'op-cancel-batch', batchId, 'btn danger') + '</div>';
+      return '<div id="receipt-cancel">' + hint('入库 10 分钟内可撤销 · <span data-cancel-left>' + cancelLeft(info.secondsLeft * 1000) + '</span>') + actions(button('撤销入库', 'op-cancel-batch', batchId, 'btn danger')) + '</div>';
     }
-    function batch() { const d = model.batch, b = d.batch; return stack(card('批次 ' + b.id, '<h3>' + esc(d.itemName) + ' · ' + esc(d.formName) + '</h3>' + hint(esc(b.batch_no)) + badge(d.available ? '可用' : '不可用', d.available ? 'green' : 'amber') + hint('剩余 ' + esc(d.displayQuantity) + ' ' + esc(d.unitName) + ' · 基本量 ' + esc(b.quantity) + ' ' + esc(unit(d.baseUnit))) + hint('原到期 ' + esc(date(b.expire_date)) + ' · 有效到期 ' + esc(date(b.effective_expire)) + ' · 剩余 ' + esc(d.remainingDays) + ' 天') + hint('就绪 ' + esc(stamp(b.ready_at)) + ' · 区域 #' + esc(d.areaId)) + rows(d.photos, p => '<img class="op-photo" src="' + esc(c.imageUrl(p.file_path_name)) + '" alt="食材照片">') + receiptCancel(b.id, d.cancelReceipt) + (manager() && b.quantity > 0 ? button('报损', 'op-waste', b.id, 'btn secondary') : '') + field('copies', '标签张数', 1, 'number', 'min="1" max="10" step="1"') + button('打印食材标签', 'op-print', null, 'btn full'))); }
+    function batch() { const d = model.batch, b = d.batch; return stack(card('批次 ' + b.id, '<h3>' + esc(d.itemName) + ' · ' + esc(d.formName) + '</h3>' + hint(esc(b.batch_no)) + badge(d.available ? '可用' : '不可用', d.available ? 'green' : 'amber') + hint('剩余 ' + esc(d.displayQuantity) + ' ' + esc(d.unitName) + ' · 基本量 ' + esc(b.quantity) + ' ' + esc(unit(d.baseUnit))) + hint('原到期 ' + esc(date(b.expire_date)) + ' · 有效到期 ' + esc(date(b.effective_expire)) + ' · 剩余 ' + esc(d.remainingDays) + ' 天') + hint('就绪 ' + esc(stamp(b.ready_at)) + ' · 区域 #' + esc(d.areaId)) + rows(d.photos, p => '<img class="op-photo" src="' + esc(c.imageUrl(p.file_path_name)) + '" alt="食材照片">') + batchActions(b.id, d.cancelReceipt, manager() && b.quantity > 0 ? button('报损', 'op-waste', b.id, 'btn secondary') : '') + field('copies', '标签张数', 1, 'number', 'min="1" max="10" step="1"') + button('打印食材标签', 'op-print', null, 'btn full'))); }
     function printer() { return stack(card('蓝牙打印机', '<p id="printer-state" class="hint">尚未连接</p><div class="actions">' + button('搜索并连接', 'connect-printer', null, 'btn') + button('断开', 'disconnect-printer', null, 'btn neutral') + '</div>') + card('食材标签 · 60 × 40 mm', label ? hint(esc(label.name) + ' · ' + esc(label.batchNo) + ' · ' + esc(label.expireDate)) : hint('先从库存打开真实批次，再打印标签。')) + field('copies', '张数', 1, 'number', 'min="1" max="10" step="1"') + button('打印标签', 'op-print', null, 'btn full', !label) + '<details class="card"><summary>连接日志</summary><pre id="printer-log" class="printer-log"></pre></details>'); }
     async function locked(fn) { if (busy || c.isWriting()) return; busy = true; c.setWriting(true); try { return await fn(); } finally { busy = false; c.setWriting(false); } }
     function remember(controller, action, result) {
