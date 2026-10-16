@@ -21,13 +21,14 @@ public sealed class FnbInboundController(ApplicationDBContext db) : FnbV4Control
     [HttpGet] public Task<ApiResult<object>> PreviewExpiry(string sessionKey, int shopId, int itemId, string storageType, DateTime? productionDate = null, DateTime? expireDate = null) => Execute(sessionKey, shopId, false, () => new FnbV4Service(Db, shopId).PreviewExpiry(itemId, storageType, productionDate, expireDate));
     [HttpPost] public Task<ApiResult<object>> PostReceipt([FromQuery] string sessionKey, [FromBody] FnbReceiptRequest r) => StockWrite(sessionKey, r.ShopId, false, r.RequestId, "receipt", r, a => new FnbV4Service(Db, r.ShopId, a).Receipt(r));
     [HttpPost] public Task<ApiResult<object>> DeleteReceipt([FromQuery] string sessionKey, [FromBody] FnbDocumentRequest r) => StockWrite(sessionKey, r.ShopId, false, r.RequestId, "receipt.cancel", r, a => new FnbV4Service(Db, r.ShopId, a).DeleteReceipt(r));
+    [HttpPost] public Task<ApiResult<object>> CancelReceiptBatch([FromQuery] string sessionKey, [FromBody] FnbBatchRequest r) => StockWrite(sessionKey, r.ShopId, false, r.RequestId, "receipt.cancel_batch", r, a => new FnbV4Service(Db, r.ShopId, a).CancelReceiptBatch(r));
 }
 [ApiController, Route("api/FnbStock/[action]")]
 public sealed class FnbStockController(ApplicationDBContext db) : FnbV4ControllerBase(db)
 {
     [HttpGet] public Task<ApiResult<object>> ListStock(string sessionKey, int shopId, int? categoryId = null, string? storageType = null, string? keyword = null) => Execute(sessionKey, shopId, false, async () => await new FnbV4Service(Db, shopId).Stock(categoryId, storageType, keyword));
     [HttpGet] public Task<ApiResult<object>> GetItemLayers(string sessionKey, int shopId, int itemId) => Execute(sessionKey, shopId, false, async () => (await new FnbV4Service(Db, shopId).Stock()).SingleOrDefault(x => x.ItemId == itemId) ?? throw new ArgumentException("食材不存在"));
-    [HttpGet] public Task<ApiResult<object>> GetBatch(string sessionKey, int shopId, int batchId) => Execute(sessionKey, shopId, false, () => new FnbV4Service(Db, shopId).GetBatch(batchId));
+    [HttpGet] public Task<ApiResult<object>> GetBatch(string sessionKey, int shopId, int batchId) => Run(sessionKey, shopId, false, false, a => new FnbV4Service(Db, shopId, a).GetBatch(batchId));
     [HttpGet] public Task<ApiResult<object>> ListExpiry(string sessionKey, int shopId, string? kind = null) => Execute(sessionKey, shopId, false, () => new FnbV4Service(Db, shopId).ListExpiry(kind));
     [HttpGet] public Task<ApiResult<object>> ListLowStock(string sessionKey, int shopId) => Execute(sessionKey, shopId, false, () => new FnbV4Service(Db, shopId).LowStocks());
     [HttpGet] public Task<ApiResult<object>> ListDestroy(string sessionKey, int shopId) => Execute(sessionKey, shopId, false, async () => new { pending = await new FnbV4Service(Db, shopId).ListExpiry("expired"),

@@ -40,6 +40,61 @@ public partial class FnbSqlServerIntegrationTests
         await using (var db = Open()) Assert.Equal(1, await db.fnbBatch.CountAsync(x => x.shop_id == s.ShopId));
     }
     [FnbSqlServerFact]
+    public async Task V4CancelReceiptBatchRemovesOnlyThatBatchWithinTenMinutes()
+    {
+        var s = await SeedAsync(); var r = Receive(s) with { Lines = [Receive(s).Lines[0], Receive(s, 500, 50).Lines[0]] };
+        var receipt = Data(await Workflow(s, db => new FnbInboundController(db).PostReceipt(s.WorkerMini, r)));
+        long did = long.Parse(receipt.GetProperty("documentId").GetString()!);
+        int keep = receipt.GetProperty("batches")[0].GetProperty("batch").GetProperty("id").GetInt32();
+        int drop = receipt.GetProperty("batches")[1].GetProperty("batch").GetProperty("id").GetInt32();
+        var detail = Data(await Workflow(s, db => new FnbStockController(db).GetBatch(s.WorkerMini, s.ShopId, drop)));
+        Assert.InRange(detail.GetProperty("cancelReceipt").GetProperty("secondsLeft").GetInt32(), 540, 600);
+        var cancel = new FnbBatchRequest(s.ShopId, Guid.NewGuid(), drop);
+        Data(await Workflow(s, db => new FnbInboundController(db).CancelReceiptBatch(s.WorkerMini, cancel)));
+        await using (var db = Open())
+        {
+            Assert.False(await db.fnbBatch.AnyAsync(x => x.id == drop));
+            var removed = await db.fnbBatch.IgnoreQueryFilters().SingleAsync(x => x.id == drop); Assert.False(removed.valid); Assert.Equal(0, removed.quantity);
+            Assert.False(await db.fnbStockMovement.AnyAsync(x => x.batch_id == drop)); Assert.False(await db.fnbBatchDetail.AnyAsync(x => x.batch_id == drop));
+            Assert.Equal(1000, (await db.fnbBatch.SingleAsync(x => x.id == keep)).quantity);
+            Assert.Equal("posted", (await db.fnbStockDocument.SingleAsync(x => x.id == did)).status);
+            Assert.Equal(1, await db.fnbStockDocumentLine.CountAsync(x => x.document_id == did));
+        }
+        Assert.Equal(1, (await Workflow(s, db => new FnbStockController(db).GetBatch(s.WorkerMini, s.ShopId, drop))).code);
+        Assert.Equal(1, (await Workflow(s, db => new FnbInboundController(db).CancelReceiptBatch(s.WorkerMini, cancel with { RequestId = Guid.NewGuid() }))).code);
+        // 店长可以撤销店员的入库；单上最后一个批次撤销后，整张入库单记为已撤销。
+        Data(await Workflow(s, db => new FnbInboundController(db).CancelReceiptBatch(s.Mini, new(s.ShopId, Guid.NewGuid(), keep))));
+        await using (var db = Open()) Assert.Equal("cancelled", (await db.fnbStockDocument.SingleAsync(x => x.id == did)).status);
+    }
+    [FnbSqlServerFact]
+    public async Task V4CancelReceiptBatchRequiresOwnerTimeWindowAndNoFollowUp()
+    {
+        var s = await SeedAsync();
+        static int First(JsonElement x) => x.GetProperty("batches")[0].GetProperty("batch").GetProperty("id").GetInt32();
+        async Task Rejected(int batchId)
+        {
+            Assert.Equal(JsonValueKind.Null, Data(await Workflow(s, db => new FnbStockController(db).GetBatch(s.WorkerMini, s.ShopId, batchId))).GetProperty("cancelReceipt").ValueKind);
+            Assert.Equal(1, (await Workflow(s, db => new FnbInboundController(db).CancelReceiptBatch(s.WorkerMini, new(s.ShopId, Guid.NewGuid(), batchId)))).code);
+        }
+        // 店员不能撤销别人的入库。
+        await Rejected(First(Data(await Workflow(s, db => new FnbInboundController(db).PostReceipt(s.Mini, Receive(s))))));
+        // 已有报损等后续流水。
+        int wasted = First(Data(await Workflow(s, db => new FnbInboundController(db).PostReceipt(s.WorkerMini, Receive(s)))));
+        Data(await Workflow(s, db => new FnbStockController(db).PostWaste(s.Mini, new(s.ShopId, Guid.NewGuid(), wasted, 10, "破损"))));
+        await Rejected(wasted);
+        // 入库后已做过盘点快照。
+        int counted = First(Data(await Workflow(s, db => new FnbInboundController(db).PostReceipt(s.WorkerMini, Receive(s)))));
+        Data(await Workflow(s, db => new FnbV4StocktakeController(db).CreateSnapshot(s.WorkerMini, new(s.ShopId, Guid.NewGuid()))));
+        await Rejected(counted);
+        // 超过 10 分钟。
+        var late = Receive(s); int old = First(Data(await Workflow(s, db => new FnbInboundController(db).PostReceipt(s.WorkerMini, late))));
+        await using (var db = Open())
+            await db.fnbStockDocument.Where(x => x.shop_id == s.ShopId && x.request_id == late.RequestId).ExecuteUpdateAsync(x => x
+                .SetProperty(d => d.created_at, DateTime.UtcNow.AddMinutes(-11)).SetProperty(d => d.posted_at, DateTime.UtcNow.AddMinutes(-11)));
+        await Rejected(old);
+        await using var check = Open(); Assert.Equal(4, await check.fnbBatch.CountAsync(x => x.shop_id == s.ShopId));
+    }
+    [FnbSqlServerFact]
     public async Task V4StockWritesRejectEmptyIdsAndConcurrentOverdraw()
     {
         var s = await SeedAsync(); Assert.Equal(1, (await Workflow(s, db => new FnbInboundController(db).PostReceipt(s.Mini, Receive(s) with { RequestId = Guid.Empty }))).code);

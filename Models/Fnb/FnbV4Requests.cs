@@ -9,6 +9,7 @@ public sealed record FnbReceiptLine(int ItemId, int? SpecId, decimal Quantity, d
     decimal? PackSize = null, string? PackLabel = null, string? OpenStorage = null, int? OpenDays = null, int[]? PhotoIds = null);
 public sealed record FnbReceiptRequest(int ShopId, Guid RequestId, FnbReceiptLine[] Lines, string? Remark = null);
 public sealed record FnbDocumentRequest(int ShopId, Guid RequestId, [property: JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)] long DocumentId);
+public sealed record FnbBatchRequest(int ShopId, Guid RequestId, int BatchId);
 public sealed record FnbBatchWriteRequest(int ShopId, Guid RequestId, int BatchId, decimal Quantity, string? Reason = null, bool ConfirmExpired = false);
 public sealed record FnbLowRuleRequest(int ShopId, int ItemId, decimal? Ratio, decimal? Quantity);
 public sealed record FnbOperationRequest(int ShopId, Guid RequestId, int BatchId, decimal InputQuantity, decimal ActualQuantity, int? AreaId = null);

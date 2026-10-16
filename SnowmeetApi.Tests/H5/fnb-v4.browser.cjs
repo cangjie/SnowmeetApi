@@ -97,6 +97,7 @@ async function main() {
     await go(page, 'inbound'); await page.locator('[name=itemId]').selectOption('23'); await page.locator('[name=packMode]').selectOption('sealed'); await page.locator('[name=packSize]').fill('1000'); await page.locator('[name=packLabel]').fill('件'); await page.locator('[name=areaId]').selectOption('2'); await page.locator('[name=quantity]').fill('2'); assert.equal(await page.locator('[name=quantity]').getAttribute('step'), '1'); await page.locator('[data-form=op-inbound-draft] [type=submit]').click(); await page.locator('#inbound-drafts').getByText(/2 件/).waitFor();
     await require('./fnb-v4.operations-flows.cjs')({page,go,calls,origin,data});
     await require('./fnb-v4.state-flows.cjs')({page,go,calls,data});
+    await require('./fnb-v4.cancel-batch-flows.cjs')({page,go,calls});
     await page.setViewportSize({width:390,height:844});
     for(const screen of ['stock','areas','check','supplies','tools','dash']) {await go(page,screen);await page.screenshot({path:path.join(out,'operations-'+screen+'.png'),fullPage:true});}
     await context.close();

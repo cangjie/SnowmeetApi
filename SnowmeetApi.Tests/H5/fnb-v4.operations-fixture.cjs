@@ -11,7 +11,7 @@ module.exports = function createFixture(getData) {
   const dish = {productId:77,name:'拿铁',specs:[{spec:{id:88,name:'标准份'},recipe:{id:'90',status:'published'},lines:[{item_id:23,quantity:200}],servings:5}]};
   const dishes = [dish],preps = [];
   function checkData() { return {sheet,stale:false,total:sheet?areas.flatMap(a=>a.checks).filter(x=>x.valid&&x.enabled).length:0,filled:0,abnormal:0,requiredRemaining:0,lines:sheet?areas.flatMap(a=>a.checks).filter(x=>x.valid&&x.enabled).map(x=>({item:x,line:{id:String(x.id),item_id:x.id,active:true,result:x.result||null,value:x.value,reason:x.reason,upload_id:x.upload_id},handlings:x.handlings||[]})):[]}; }
-  const journal = new Set(['PostReceipt','DeleteReceipt','PostWaste','PostDestroy','PostOperation','CompleteOperation','PostPreparation','CreateOrder','PostServe','CreateSnapshot','SaveCount','PostStocktake','PostMovement','UndoReceipt','ChangeStatus','StartToday','RefreshSnapshot','SaveDraft','PassAll','Submit','HandleAbnormal','Confirm']);
+  const journal = new Set(['PostReceipt','DeleteReceipt','CancelReceiptBatch','PostWaste','PostDestroy','PostOperation','CompleteOperation','PostPreparation','CreateOrder','PostServe','CreateSnapshot','SaveCount','PostStocktake','PostMovement','UndoReceipt','ChangeStatus','StartToday','RefreshSnapshot','SaveDraft','PassAll','Submit','HandleAbnormal','Confirm']);
   return function respond(pathname,body,params) {
     const action=pathname.split('/').pop(),controller=pathname.split('/')[2];
     if (body) { assert.equal(body.shopId,12); if(journal.has(action)) assert.match(body.requestId,/^[a-f0-9-]{36}$/); }
@@ -26,7 +26,9 @@ module.exports = function createFixture(getData) {
     if(action==='PreviewExpiry')return {expireDate:'2026-10-15T00:00:00',expirySource:'rule',expired:false};
     if(action==='PostReceipt'){assert.ok(body.lines.length);assert.ok(body.lines.every(l=>l.areaId&&typeof l.quantity==='number'&&typeof l.amount==='number'));return {documentId:'9007199254740993',batches:[bd()]};}
     if(action==='DeleteReceipt')return {documentId:body.documentId,status:'cancelled'};
-    if(action==='GetBatch')return {...bd(),batch:{...batch,id:params.get('batchId')}};
+    // 批次 43 刚入库、还能撤销 125 秒；批次 44 只剩 2 秒，用来看倒计时到点收起按钮。
+    if(action==='GetBatch')return {...bd(),batch:{...batch,id:params.get('batchId')},cancelReceipt:({'43':{secondsLeft:125},'44':{secondsLeft:2}})[params.get('batchId')]||null};
+    if(action==='CancelReceiptBatch'){assert.equal(typeof body.batchId,'number');return {batchId:body.batchId,documentId:'9007199254740993',documentStatus:'posted'};}
     if(action==='GetLabelData')return {...label,batchId:params.get('batchId')};
     if(action==='GetWorkbench')return {ongoing:[{id:'9007199254740995',op_name:'解冻',ready_at:'2026-10-07T09:00:00',output_batch_id:42}],recommended:[{stock:stock()[0],batches:[batch]}],canOperate:[batch],todayRecords:[]};
     if(action==='PreviewOperation')return {inputQuantity:1,inputUnit:'桶',expectedQuantity:1960,outputUnit:'ml',standardYield:.98,durationHours:0,effectiveExpire:'2026-10-12',batchNo:'261006-MLK-01-F'};

@@ -178,7 +178,40 @@ public sealed partial class FnbV4Service(ApplicationDBContext db, int shopId, Fn
         }
         d.status = "cancelled"; Modified(d); await db.SaveChangesAsync(); return new { documentId = d.id.ToString(), status = d.status };
     }
-    public async Task<object> BatchData(FnbBatch b)
+    private static readonly TimeSpan ReceiptCancelWindow = TimeSpan.FromMinutes(10);
+    /// <summary>单个批次撤销入库：入库 10 分钟内，批次只有这次入库的流水、没有派生批次、入库后没做过盘点快照，入库人本人或店长可撤销。</summary>
+    private async Task<(FnbStockDocument Document, FnbStockDocumentLine Line, int SecondsLeft)> ReceiptCancel(FnbBatch b)
+    {
+        var found = await (from l in db.fnbStockDocumentLine join d in db.fnbStockDocument on l.document_id equals d.id
+                           where l.specified_batch_id == b.id && l.direction == 1 && d.shop_id == shopId && d.document_type == "receipt" && d.status == "posted"
+                           select new { l, d }).SingleOrDefaultAsync() ?? throw new ArgumentException("只有入库生成的批次可以撤销入库");
+        var left = ReceiptCancelWindow - (Now - (found.d.posted_at ?? found.d.created_at));
+        if (left <= TimeSpan.Zero) throw new ArgumentException("入库已超过 10 分钟，不能撤销");
+        if (found.d.posted_by_staff_id != StaffId && actor!.Staff.title_level < 200) throw new ArgumentException("只能撤销自己的入库，或请店长撤销");
+        var movements = await db.fnbStockMovement.Where(x => x.batch_id == b.id).ToArrayAsync();
+        if (movements.Length != 1 || movements[0].document_line_id != found.l.id || b.dispose_status != null || await db.fnbBatch.AnyAsync(x => x.parent_batch_id == b.id)
+            || await db.fnbStocktakeLine.AnyAsync(x => x.shop_id == shopId && x.item_id == b.item_id && x.snapshot_last_movement_id >= movements[0].id))
+            throw new ArgumentException("该批次已有后续操作，不能撤销入库");
+        return (found.d, found.l, (int)Math.Ceiling(left.TotalSeconds));
+    }
+    private async Task<object?> ReceiptCancelInfo(FnbBatch b)
+    {
+        try { return new { secondsLeft = (await ReceiptCancel(b)).SecondsLeft }; } catch (ArgumentException) { return null; }
+    }
+    public async Task<object> CancelReceiptBatch(FnbBatchRequest input)
+    {
+        var b = await Batch(input.BatchId); var c = await ReceiptCancel(b);
+        await Move(c.Line, b, -1, b.quantity, b.amount);
+        // 撤销后这一批次就像没入过库：批次、明细、照片、单据行和流水都做逻辑删除；单上没有剩余行时整张单记为已撤销。
+        foreach (var m in await db.fnbStockMovement.Where(x => x.document_line_id == c.Line.id).ToArrayAsync()) { m.valid = false; Modified(m); }
+        foreach (var x in await db.fnbBatchDetail.Where(x => x.batch_id == b.id).ToArrayAsync()) { x.valid = false; Modified(x); }
+        foreach (var x in await db.fnbBatchImage.Where(x => x.batch_id == b.id).ToArrayAsync()) { x.valid = false; Modified(x); }
+        c.Line.valid = false; Modified(c.Line); b.valid = false; Modified(b);
+        await db.SaveChangesAsync();
+        if (!await db.fnbStockDocumentLine.AnyAsync(x => x.document_id == c.Document.id)) { c.Document.status = "cancelled"; Modified(c.Document); await db.SaveChangesAsync(); }
+        return new { batchId = b.id, documentId = c.Document.id.ToString(), documentStatus = c.Document.status };
+    }
+    public async Task<object> BatchData(FnbBatch b, bool withCancel = false)
     {
         var form = await db.fnbItemForm.SingleAsync(x => x.id == b.form_id);
         var item = await db.fnbItem.SingleAsync(x => x.id == b.item_id);
@@ -188,9 +221,10 @@ public sealed partial class FnbV4Service(ApplicationDBContext db, int shopId, Fn
             displayQuantity = b.state == "sealed" ? b.quantity / b.pack_size : b.quantity / form.per_base, baseUnit = item.base_unit_code,
             available = Available(b), remainingDays = (b.effective_expire - Today).Days, areaId = detail?.area_id, photos,
             label = new { batchId = b.id, batchNo = b.batch_no, name = item.name, formName = form.name, quantity = b.quantity,
-                baseUnit = item.base_unit_code, effectiveExpire = b.effective_expire, storageType = b.storage_type, qrUrl = "https://mini.snowmeet.top/fnb/b?id=" + b.id } };
+                baseUnit = item.base_unit_code, effectiveExpire = b.effective_expire, storageType = b.storage_type, qrUrl = "https://mini.snowmeet.top/fnb/b?id=" + b.id },
+            cancelReceipt = withCancel ? await ReceiptCancelInfo(b) : null };
     }
-    public async Task<object> GetBatch(int id) => await BatchData(await Batch(id));
+    public async Task<object> GetBatch(int id) => await BatchData(await Batch(id), actor != null);
     public async Task<object> GetLabel(int id)
     {
         var b = await Batch(id); var item = await db.fnbItem.SingleAsync(x => x.id == b.item_id); var form = await db.fnbItemForm.SingleAsync(x => x.id == b.form_id);
