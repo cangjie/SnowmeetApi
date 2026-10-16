@@ -1,9 +1,11 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using SnowmeetApi.Data;
 using SnowmeetApi.Models;
 using SnowmeetApi.Models.Fnb;
@@ -49,10 +51,21 @@ public sealed partial class FnbV4Service(ApplicationDBContext db, int shopId, Fn
         if (!await db.UploadFile.AnyAsync(x => x.id == id && (x.staff_id == StaffId || x.owner == actor!.AuditUserId) && (x.purpose == "fnb" || x.purpose == "food" || x.purpose == "食材批次")))
             throw new ArgumentException("照片必须是当前员工上传的食材管理文件");
     }
+    private async Task<string> NewDocumentNumber(string prefix, bool kitchenOrder = false)
+    {
+        // 读号和落单必须在同一个 Serializable 事务中，防止并发分配同一尾号。
+        if (db.Database.CurrentTransaction?.GetDbTransaction().IsolationLevel != IsolationLevel.Serializable)
+            throw new InvalidOperationException("分配单号需要可串行化事务");
+        // 删除不回收单号；历史长尾号保留，不参与新的四位流水计数。
+        var numbers = kitchenOrder
+            ? db.fnbOrder.IgnoreQueryFilters().Where(x => x.shop_id == shopId).Select(x => x.display_no)
+            : db.fnbStockDocument.IgnoreQueryFilters().Where(x => x.shop_id == shopId).Select(x => x.document_no);
+        return FnbV4Rules.NextDocumentNumber(prefix, await numbers.Where(x => x.StartsWith(prefix)).ToArrayAsync());
+    }
     private async Task<FnbStockDocument> Document(string type, Guid requestId, string? remark = null, string status = "posted")
     {
         if (requestId == Guid.Empty) throw new ArgumentException("requestId 不能为空");
-        var d = new FnbStockDocument { shop_id = shopId, document_type = type, document_no = type.ToUpperInvariant() + "-" + Now.ToString("yyyyMMdd") + "-" + requestId.ToString("N"),
+        var d = new FnbStockDocument { shop_id = shopId, document_type = type, document_no = await NewDocumentNumber(type.ToUpperInvariant() + "-" + Now.ToString("yyyyMMdd") + "-"),
             request_id = requestId, status = status, source_client = actor!.SourceClient, business_date = Today, occurred_at = Now, created_at = Now,
             posted_at = status == "posted" ? Now : null, created_by_staff_id = StaffId, posted_by_staff_id = status == "posted" ? StaffId : null,
             remark = Optional(remark, 2000, "备注") };

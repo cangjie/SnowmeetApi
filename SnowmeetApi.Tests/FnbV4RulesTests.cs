@@ -5,6 +5,32 @@ namespace SnowmeetApi.Tests;
 
 public class FnbV4RulesTests
 {
+    [Theory]
+    [InlineData("SO261016-")]
+    [InlineData("RECEIPT-20261016-")]
+    [InlineData("OP-20261016-")]
+    [InlineData("PREP-20261016-")]
+    [InlineData("SERVE-20261016-")]
+    [InlineData("WASTE-20261016-")]
+    [InlineData("DESTROY-20261016-")]
+    [InlineData("STOCKTAKE-20261016-")]
+    public void DocumentNumbersStartWithFourDigitDailySequence(string prefix) =>
+        Assert.Equal(prefix + "0001", FnbV4Rules.NextDocumentNumber(prefix, []));
+    [Fact]
+    public void DocumentSequenceIgnoresOldLongSuffixesAndOtherDaysOrTypes()
+    {
+        const string prefix = "STOCKTAKE-20261016-";
+        string[] existing = [prefix + "0001", prefix + "0003", prefix + "99999999", prefix + Guid.NewGuid().ToString("N"),
+            "STOCKTAKE-20261015-9999", "RECEIPT-20261016-9999", prefix + "ABCD"];
+        Assert.Equal(prefix + "0004", FnbV4Rules.NextDocumentNumber(prefix, existing));
+    }
+    [Fact]
+    public void DocumentSequenceNeverGrowsPastFourDigits()
+    {
+        const string prefix = "SO261016-";
+        Assert.Equal(prefix + "9999", FnbV4Rules.NextDocumentNumber(prefix, [prefix + "9998"]));
+        Assert.Throws<ArgumentException>(() => FnbV4Rules.NextDocumentNumber(prefix, [prefix + "9999"]));
+    }
     [Fact]
     public void ItemOverridesThenCategoryThenFallback()
     {

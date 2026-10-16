@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text.RegularExpressions;
 using SnowmeetApi.Models.Fnb;
@@ -8,6 +9,14 @@ namespace SnowmeetApi.Services.Fnb;
 
 public static class FnbV4Rules
 {
+    public static string NextDocumentNumber(string prefix, IEnumerable<string> existing)
+    {
+        int last = existing.Where(x => x.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) && x.Length == prefix.Length + 4)
+            .Select(x => x[prefix.Length..]).Where(x => x.All(c => c is >= '0' and <= '9'))
+            .Select(x => int.Parse(x, CultureInfo.InvariantCulture)).DefaultIfEmpty(0).Max();
+        if (last >= 9999) throw new ArgumentException("当日该类单号已用完（最多 9999 单），请联系管理员");
+        return prefix + (last + 1).ToString("D4", CultureInfo.InvariantCulture);
+    }
     public static bool Storage(string? value) => value is "ambient" or "chilled" or "frozen";
     public static byte Dimension(string? value) => value switch { "weight" => 1, "volume" => 2, "count" => 3, _ => 0 };
     public static string BaseUnit(string? measure) => measure switch { "weight" => "g", "volume" => "ml", "count" => "piece", _ => "" };

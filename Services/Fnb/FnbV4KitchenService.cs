@@ -128,7 +128,7 @@ public sealed partial class FnbV4Service
     public async Task<object> CreateOrder(FnbOrderCreateRequest input)
     {
         if (input.Lines == null || input.Lines.Length is < 1 or > 100 || input.Lines.Select(x => x.SpecId).Distinct().Count() != input.Lines.Length) throw new ArgumentException("订单须有不重复的规格行");
-        var order = new FnbOrder { shop_id = shopId, source_type = "manual", display_no = "SO" + Today.ToString("yyMMdd") + "-" + input.RequestId.ToString("N")[..8],
+        var order = new FnbOrder { shop_id = shopId, source_type = "manual", display_no = await NewDocumentNumber("SO" + Today.ToString("yyMMdd") + "-", kitchenOrder: true),
             business_date = Today, ordered_at = Now, order_status = "pending", review_status = "confirmed", refund_status = "none", created_at = Now,
             table_no = Optional(input.TableNo, 100, "桌号"), remark = Optional(input.Remark, 2000, "备注") };
         db.fnbOrder.Add(order); await db.SaveChangesAsync(); decimal total = 0; int seq = 0;
