@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light">
+  <meta name="referrer" content="same-origin">
+  <title>七色米 · 库存与业务查询</title>
+  <link rel="stylesheet" href="./app.css?v=20261020">
+  <script defer src="./api.js?v=20261020"></script>
+  <script defer src="./app.js?v=20261020"></script>
+</head>
+<body>
+<div id="qisemi-prototype">
+  <div class="qs-app">
+    <header class="qs-header">
+      <div class="qs-heading"><h1>七色米库存查询</h1><p class="qs-subtitle">Snowmeet · 库存与业务资料</p></div>
+      <span class="qs-identity">员工端</span>
+    </header>
+    <div id="source-area" hidden><label for="source-select">选择账套</label><select id="source-select"></select></div>
+    <nav class="qs-data-nav" aria-label="主要功能">
+      <button type="button" data-tab="inventory" aria-current="page">查库存</button>
+      <button type="button" data-tab="business">业务单据</button>
+      <button type="button" data-tab="archives">基础档案</button>
+      <button type="button" data-tab="more">更多数据</button>
+    </nav>
+    <div id="notice" role="alert" hidden></div>
+    <main class="qs-content" id="screen" aria-live="polite"><div class="qs-empty">正在读取最近发布的数据…</div></main>
+    <footer class="qs-footnote" id="snapshot-status"></footer>
+  </div>
+</div>
+<dialog id="file-preview" aria-label="图片预览"><button type="button" id="preview-close" aria-label="关闭预览">关闭</button><img id="preview-image" alt="商品或单据图片预览"><p id="preview-name"></p></dialog>
+<noscript>请启用 JavaScript 以使用库存与业务查询。</noscript>
+</body>
+</html>

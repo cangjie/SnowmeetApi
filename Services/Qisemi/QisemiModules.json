@@ -1,0 +1,613 @@
+[
+  {
+    "key": "purchases",
+    "label": "进货单",
+    "tab": "business",
+    "section": "采购",
+    "kind": "document",
+    "sources": [
+      "purchases"
+    ],
+    "native": [
+      "purchases_with_details.1",
+      "purchases_with_details.2"
+    ],
+    "documentType": "purchase"
+  },
+  {
+    "key": "purchase_returns",
+    "label": "进货退货",
+    "tab": "business",
+    "section": "采购",
+    "kind": "document",
+    "sources": [
+      "purchase_returns"
+    ],
+    "native": [
+      "purchase_returns_with_details.1",
+      "purchase_returns_with_details.2"
+    ],
+    "documentType": "purchase_return"
+  },
+  {
+    "key": "purchase_orders",
+    "label": "进货预订单",
+    "tab": "business",
+    "section": "采购",
+    "kind": "document",
+    "sources": [
+      "purchase_orders"
+    ],
+    "native": [
+      "purchase_orders_with_details.1",
+      "purchase_orders_with_details.2"
+    ],
+    "documentType": "purchase_order"
+  },
+  {
+    "key": "sales",
+    "label": "销售单",
+    "tab": "business",
+    "section": "销售",
+    "kind": "document",
+    "sources": [
+      "sales",
+      "sales_multi_account_details"
+    ],
+    "native": [
+      "sales_with_details.1",
+      "sales_with_details.2"
+    ],
+    "documentType": "sale"
+  },
+  {
+    "key": "sales_returns",
+    "label": "销售退货",
+    "tab": "business",
+    "section": "销售",
+    "kind": "document",
+    "sources": [
+      "sales_returns"
+    ],
+    "native": [
+      "sales_returns_with_details.1",
+      "sales_returns_with_details.2"
+    ],
+    "documentType": "sale_return"
+  },
+  {
+    "key": "sales_orders",
+    "label": "销售预订单",
+    "tab": "business",
+    "section": "销售",
+    "kind": "document",
+    "sources": [
+      "sales_orders",
+      "sales_order_details"
+    ],
+    "documentType": "sale_order"
+  },
+  {
+    "key": "sales_drafts",
+    "label": "销售草稿",
+    "tab": "business",
+    "section": "销售",
+    "kind": "document",
+    "sources": [
+      "sales_drafts",
+      "sales_draft_details"
+    ],
+    "documentType": "sale_draft"
+  },
+  {
+    "key": "transfers",
+    "label": "调拨单",
+    "tab": "business",
+    "section": "库存业务",
+    "kind": "document",
+    "sources": [
+      "transfers"
+    ],
+    "native": [
+      "transfers_with_details.1",
+      "transfers_with_details.2"
+    ],
+    "documentType": "transfer"
+  },
+  {
+    "key": "stocktaking",
+    "label": "盘点单",
+    "tab": "business",
+    "section": "库存业务",
+    "kind": "document",
+    "sources": [
+      "stocktaking",
+      "stocktaking_details",
+      "stocktaking_lines"
+    ],
+    "documentType": "stocktake"
+  },
+  {
+    "key": "loans_in",
+    "label": "借入与归还",
+    "tab": "business",
+    "section": "库存业务",
+    "kind": "document",
+    "sources": [
+      "loans_in",
+      "loans_in_return_details"
+    ],
+    "native": [
+      "loans_in_with_details.1",
+      "loans_in_with_details.2"
+    ],
+    "documentType": "loan_in"
+  },
+  {
+    "key": "loans_out",
+    "label": "借出与收回",
+    "tab": "business",
+    "section": "库存业务",
+    "kind": "document",
+    "sources": [
+      "loans_out",
+      "loans_out_return_details"
+    ],
+    "native": [
+      "loans_out_with_details.1",
+      "loans_out_with_details.2"
+    ],
+    "documentType": "loan_out"
+  },
+  {
+    "key": "inbound",
+    "label": "入库单",
+    "tab": "business",
+    "section": "库存业务",
+    "kind": "document",
+    "sources": [
+      "inbound"
+    ],
+    "documentType": "inbound"
+  },
+  {
+    "key": "outbound",
+    "label": "出库单",
+    "tab": "business",
+    "section": "库存业务",
+    "kind": "document",
+    "sources": [
+      "outbound",
+      "outbound_details"
+    ],
+    "documentType": "outbound"
+  },
+  {
+    "key": "other_inbound",
+    "label": "其他入库",
+    "tab": "business",
+    "section": "库存业务",
+    "kind": "document",
+    "sources": [
+      "other_inbound"
+    ],
+    "documentType": "other_inbound"
+  },
+  {
+    "key": "other_outbound",
+    "label": "其他出库",
+    "tab": "business",
+    "section": "库存业务",
+    "kind": "document",
+    "sources": [
+      "other_outbound"
+    ],
+    "documentType": "other_outbound"
+  },
+  {
+    "key": "assembly",
+    "label": "组装拆卸",
+    "tab": "business",
+    "section": "库存业务",
+    "kind": "document",
+    "sources": [
+      "assembly"
+    ],
+    "documentType": "assembly"
+  },
+  {
+    "key": "cost_adjustments",
+    "label": "成本调整",
+    "tab": "business",
+    "section": "库存业务",
+    "kind": "document",
+    "sources": [
+      "cost_adjustments"
+    ],
+    "documentType": "cost_adjustment"
+  },
+  {
+    "key": "receipts",
+    "label": "收款单",
+    "tab": "business",
+    "section": "收付款与往来",
+    "kind": "finance",
+    "sources": [
+      "receipts",
+      "receipts_details"
+    ],
+    "documentType": "receipt"
+  },
+  {
+    "key": "payments",
+    "label": "付款单",
+    "tab": "business",
+    "section": "收付款与往来",
+    "kind": "finance",
+    "sources": [
+      "payments",
+      "payments_details"
+    ],
+    "documentType": "payment"
+  },
+  {
+    "key": "daily_income_expenses",
+    "label": "日常收支",
+    "tab": "business",
+    "section": "收付款与往来",
+    "kind": "finance",
+    "sources": [
+      "daily_income_expenses"
+    ],
+    "documentType": "income_expense"
+  },
+  {
+    "key": "account_transfers",
+    "label": "账户转账",
+    "tab": "business",
+    "section": "收付款与往来",
+    "kind": "finance",
+    "sources": [
+      "account_transfers"
+    ],
+    "documentType": "account_transfer"
+  },
+  {
+    "key": "writeoffs",
+    "label": "核销单",
+    "tab": "business",
+    "section": "收付款与往来",
+    "kind": "finance",
+    "sources": [
+      "writeoffs"
+    ],
+    "documentType": "writeoff"
+  },
+  {
+    "key": "client_stored_orders",
+    "label": "客户储值单",
+    "tab": "business",
+    "section": "客户资产",
+    "kind": "finance",
+    "sources": [
+      "client_stored_orders"
+    ],
+    "documentType": "client_stored_order"
+  },
+  {
+    "key": "client_stored_movements",
+    "label": "客户储值流水",
+    "tab": "business",
+    "section": "客户资产",
+    "kind": "finance",
+    "sources": [
+      "client_stored_movements"
+    ],
+    "documentType": "client_stored_movement"
+  },
+  {
+    "key": "client_points",
+    "label": "客户积分流水",
+    "tab": "business",
+    "section": "客户资产",
+    "kind": "finance",
+    "sources": [
+      "client_points"
+    ],
+    "documentType": "client_points"
+  },
+  {
+    "key": "products_all",
+    "label": "商品档案",
+    "tab": "archives",
+    "section": "商品资料",
+    "kind": "product",
+    "sources": [
+      "products_all",
+      "products"
+    ],
+    "native": [
+      "products_all.1"
+    ],
+    "documentType": null
+  },
+  {
+    "key": "product_classes_tree",
+    "label": "商品分类",
+    "tab": "archives",
+    "section": "商品资料",
+    "kind": "category",
+    "sources": [
+      "product_classes_tree",
+      "product_classes"
+    ],
+    "documentType": null
+  },
+  {
+    "key": "accessories",
+    "label": "配件档案",
+    "tab": "archives",
+    "section": "商品资料",
+    "kind": "product",
+    "sources": [
+      "accessories"
+    ],
+    "documentType": null
+  },
+  {
+    "key": "units",
+    "label": "计量单位",
+    "tab": "archives",
+    "section": "商品资料",
+    "kind": "archive",
+    "sources": [
+      "units"
+    ],
+    "documentType": null
+  },
+  {
+    "key": "warehouses",
+    "label": "仓库档案",
+    "tab": "archives",
+    "section": "仓库与门店",
+    "kind": "warehouse",
+    "sources": [
+      "warehouses"
+    ],
+    "documentType": null
+  },
+  {
+    "key": "branches",
+    "label": "门店档案",
+    "tab": "archives",
+    "section": "仓库与门店",
+    "kind": "archive",
+    "sources": [
+      "branches"
+    ],
+    "documentType": null
+  },
+  {
+    "key": "warehouse_positions",
+    "label": "仓位档案",
+    "tab": "archives",
+    "section": "仓库与门店",
+    "kind": "archive",
+    "sources": [
+      "warehouse_positions"
+    ],
+    "documentType": null
+  },
+  {
+    "key": "clients",
+    "label": "客户档案",
+    "tab": "archives",
+    "section": "客户与供应商",
+    "kind": "client",
+    "sources": [
+      "clients"
+    ],
+    "native": [
+      "clients.1"
+    ],
+    "documentType": null
+  },
+  {
+    "key": "client_classes",
+    "label": "客户分类",
+    "tab": "archives",
+    "section": "客户与供应商",
+    "kind": "category",
+    "sources": [
+      "client_classes"
+    ],
+    "documentType": null
+  },
+  {
+    "key": "suppliers",
+    "label": "供应商档案",
+    "tab": "archives",
+    "section": "客户与供应商",
+    "kind": "supplier",
+    "sources": [
+      "suppliers"
+    ],
+    "native": [
+      "suppliers.1"
+    ],
+    "documentType": null
+  },
+  {
+    "key": "supplier_classes",
+    "label": "供应商分类",
+    "tab": "archives",
+    "section": "客户与供应商",
+    "kind": "category",
+    "sources": [
+      "supplier_classes"
+    ],
+    "documentType": null
+  },
+  {
+    "key": "accounts_all",
+    "label": "结算账户",
+    "tab": "archives",
+    "section": "结算与人员",
+    "kind": "archive",
+    "sources": [
+      "accounts_all",
+      "accounts"
+    ],
+    "documentType": null
+  },
+  {
+    "key": "projects",
+    "label": "收支项目",
+    "tab": "archives",
+    "section": "结算与人员",
+    "kind": "archive",
+    "sources": [
+      "projects"
+    ],
+    "documentType": null
+  },
+  {
+    "key": "employees_all",
+    "label": "员工档案",
+    "tab": "archives",
+    "section": "结算与人员",
+    "kind": "archive",
+    "sources": [
+      "employees_all",
+      "employees"
+    ],
+    "documentType": null
+  },
+  {
+    "key": "roles",
+    "label": "角色档案",
+    "tab": "archives",
+    "section": "结算与人员",
+    "kind": "archive",
+    "sources": [
+      "roles"
+    ],
+    "documentType": null
+  },
+  {
+    "key": "stock",
+    "label": "库存总表",
+    "tab": "more",
+    "section": "库存与商品追溯",
+    "kind": "stock",
+    "sources": [
+      "stock"
+    ],
+    "native": [
+      "stock.1"
+    ],
+    "documentType": null
+  },
+  {
+    "key": "stock_by_warehouse",
+    "label": "各仓库存明细",
+    "tab": "more",
+    "section": "库存与商品追溯",
+    "kind": "stock",
+    "sources": [
+      "stock_by_warehouse"
+    ],
+    "documentType": null
+  },
+  {
+    "key": "stock_movements",
+    "label": "库存流水",
+    "tab": "more",
+    "section": "库存与商品追溯",
+    "kind": "flow",
+    "sources": [
+      "stock_movements"
+    ],
+    "documentType": null
+  },
+  {
+    "key": "sales_line_items",
+    "label": "销售商品明细",
+    "tab": "more",
+    "section": "库存与商品追溯",
+    "kind": "line",
+    "sources": [
+      "sales_line_items"
+    ],
+    "documentType": null
+  },
+  {
+    "key": "sales_history_details",
+    "label": "历史销售版本",
+    "tab": "more",
+    "section": "历史记录",
+    "kind": "history",
+    "sources": [
+      "sales_history_details"
+    ],
+    "documentType": "sale"
+  },
+  {
+    "key": "purchases_history_details",
+    "label": "历史进货版本",
+    "tab": "more",
+    "section": "历史记录",
+    "kind": "history",
+    "sources": [
+      "purchases_history_details"
+    ],
+    "documentType": "purchase"
+  },
+  {
+    "key": "balances",
+    "label": "结存记录",
+    "tab": "more",
+    "section": "历史记录",
+    "kind": "archive",
+    "sources": [
+      "balances"
+    ],
+    "documentType": null
+  },
+  {
+    "key": "media",
+    "label": "图片与附件",
+    "tab": "more",
+    "section": "文件与数据快照",
+    "kind": "media",
+    "sources": [
+      "media/index.jsonl"
+    ],
+    "documentType": null
+  },
+  {
+    "key": "exports",
+    "label": "平台原表与导出文件",
+    "tab": "more",
+    "section": "文件与数据快照",
+    "kind": "files",
+    "sources": [],
+    "documentType": null
+  },
+  {
+    "key": "snapshot",
+    "label": "数据快照与核对",
+    "tab": "more",
+    "section": "文件与数据快照",
+    "kind": "snapshot",
+    "sources": [
+      "verification.json",
+      "manifest.json",
+      "status/*",
+      "native_status/*",
+      "media/manifest.json",
+      "media/documents.json"
+    ],
+    "documentType": null
+  }
+]
