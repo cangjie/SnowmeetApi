@@ -86,6 +86,10 @@ public class QisemiSnapshotTests
         var root = categories.EnumerateArray().Single(c => c.GetProperty("name").GetString() == "【硬件】双板鞋");
         var boots = await Read("inventory", new() { TopCategoryId = long.Parse(root.GetProperty("id").GetString()!), InStockOnly = true, WarehouseId = flagship, Keyword = "Fischer 110 26.5" });
         Assert.NotEmpty(boots.GetProperty("items").EnumerateArray());
+        var categoryPath = Assert.Single(boots.GetProperty("items")[0].GetProperty("categoryPaths").EnumerateArray());
+        Assert.Equal(new[] { "【硬件】双板鞋", "Fischer", "Fischer 24-25" }, categoryPath.GetProperty("levels").EnumerateArray().Select(level => level.GetProperty("name").GetString()));
+        var fuzzy = await Read("inventory", new() { Keyword = "双板鞋 fisch 24-25 110 26.5", InStockOnly = true, TopCategoryId = long.Parse(root.GetProperty("id").GetString()!) });
+        Assert.NotEmpty(fuzzy.GetProperty("items").EnumerateArray());
     }
     [QisemiSnapshotFact]
     public async Task MostRecentDocumentDetailRetainsItsRawRecordAssociation()

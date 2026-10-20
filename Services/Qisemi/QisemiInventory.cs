@@ -37,6 +37,27 @@ public sealed partial class QisemiReadService
             WHERE c.source_id={sql.Add(s.SourceId)} AND c.category_kind='product' AND {MasterVisible("c")}
             ORDER BY c.sort,c.name,c.id");
 
+    private sealed record CategoryLevel(string Id, string Name);
+    private sealed record CategoryPath(string CategoryId, CategoryLevel[] Levels, bool Complete);
+
+    private static Dictionary<string, CategoryPath> ProductCategoryPaths(List<Dictionary<string, object?>> categories)
+    {
+        var index = categories.ToDictionary(c => (string)c["id"]!);
+        var paths = new Dictionary<string, CategoryPath>();
+        foreach (string id in index.Keys)
+        {
+            var levels = new List<CategoryLevel>(); var visited = new HashSet<string>();
+            string? current = id; bool complete = false;
+            while (current != null && visited.Add(current) && index.TryGetValue(current, out var node))
+            {
+                levels.Add(new(current, (string)node["name"]!)); current = node["parentId"] as string;
+                if (current == null) complete = true;
+            }
+            levels.Reverse(); paths[id] = new(id, levels.ToArray(), complete);
+        }
+        return paths;
+    }
+
     private static async Task<object> Inventory(QisemiSql sql, QisemiScope s, QisemiQuery q)
     {
         bool covered = false;
@@ -58,6 +79,16 @@ public sealed partial class QisemiReadService
             join = $"LEFT JOIN dbo.qsm_stock_snapshot st ON st.sku_id=k.id AND st.source_id=k.source_id AND st.batch_id={sql.Add(s.BatchId)} AND st.warehouse_id={sql.Add(q.WarehouseId)}";
             qty = $"CASE WHEN {visibleStock} THEN st.quantity_main WHEN st.id IS NULL AND {sql.Add(covered ? 1 : 0)}=1 THEN CONVERT(decimal(19,6),0) END";
         }
+        var categories = await ProductCategoryRows(sql, s);
+        var categoryPaths = ProductCategoryPaths(categories);
+        string[] tokens = QisemiRules.Tokens(q.Keyword);
+        int requiredMask = (1 << tokens.Length) - 1;
+        var categoryMasks = categoryPaths.ToDictionary(x => x.Key, x => tokens.Select((token, n) =>
+            x.Value.Levels.Any(level => level.Name.Contains(token, StringComparison.OrdinalIgnoreCase)) ? 1 << n : 0).Aggregate(0, (a, b) => a | b));
+        // Keep literal LIKE semantics and SQL collation for product text. Match each
+        // token on the same SKU or its visible category path without extra SQL joins.
+        string keywordMask = tokens.Length == 0 ? "0" : string.Join("+", tokens.Select((token, n) =>
+            $"CASE WHEN CONCAT(p.search_text,N' ',k.search_text) LIKE {sql.Add(QisemiRules.Like(token))} ESCAPE N'~' THEN {1 << n} ELSE 0 END"));
         string where = $"p.valid=1 AND p.source_id={sql.Add(s.SourceId)}"
             + sql.Optional("p.id", q.StyleId) + sql.Optional("p.category_id", q.CategoryId);
         HashSet<string>? stockedStyleIds = null;
@@ -77,12 +108,10 @@ public sealed partial class QisemiReadService
             stockedStyleIds = stocked.Select(row => (string)row["styleId"]!).ToHashSet();
         }
         string skuWhere = "a.valid=1 AND a.style_id=p.id AND a.source_id=p.source_id"
-            + sql.Search("CONCAT(p.search_text,N' ',k.search_text)", q.Keyword)
             + sql.Optional("k.source_enabled", q.SourceEnabled) + sql.Optional("k.source_deleted", q.SourceDeleted) + sql.Optional("k.id", q.SkuId);
         HashSet<string>? categoryIds = null;
         if (q.TopCategoryId is { } topCategoryId)
         {
-            var categories = await ProductCategoryRows(sql, s);
             string rootId = QisemiRules.Id(topCategoryId);
             if (!categories.Any(c => (string)c["id"]! == rootId && c["parentId"] == null))
                 throw new QisemiReadException(404, "顶级商品分类不存在或已删除");
@@ -97,11 +126,23 @@ public sealed partial class QisemiReadService
         // The sparse raw-owner keys otherwise invite a quadratic nested-loop plan
         // after bulk import. Hash joins bound scans; cap their grant so a small
         // inventory query does not queue for an oversized reservation on busy hosts.
-        var matches=await sql.Rows($"SELECT DISTINCT p.id,k.category_id FROM {SkuLink()} JOIN dbo.qsm_product_style p ON p.id=a.style_id AND p.source_id=a.source_id {negativeJoin} WHERE {where} AND {skuWhere}{negativeWhere} OPTION(HASH JOIN,RECOMPILE,MAX_GRANT_PERCENT=1,MAXDOP 1)");
+        var matches=await sql.Rows($"SELECT DISTINCT p.id,k.id sku_id,k.category_id FROM {SkuLink()} JOIN dbo.qsm_product_style p ON p.id=a.style_id AND p.source_id=a.source_id {negativeJoin} WHERE {where} AND {skuWhere}{negativeWhere} OPTION(HASH JOIN,RECOMPILE,MAX_GRANT_PERCENT=1,MAXDOP 1)");
+        var skuMasks = new Dictionary<(string Style, string Sku), int>();
+        if (tokens.Length > 0)
+        {
+            // Evaluate text on the small catalog alone. Carrying long search text
+            // through provenance hash joins can require a large memory reservation.
+            var textMatches = await sql.Rows($@"SELECT p.id,k.id sku_id,({keywordMask}) keyword_mask
+                FROM dbo.qsm_style_sku a JOIN dbo.qsm_product_sku k ON k.id=a.sku_id AND k.source_id=a.source_id AND k.valid=1
+                JOIN dbo.qsm_product_style p ON p.id=a.style_id AND p.source_id=a.source_id AND p.valid=1
+                WHERE a.valid=1 AND a.source_id={sql.Add(s.SourceId)} OPTION(LOOP JOIN,RECOMPILE,MAXDOP 1)");
+            foreach (var row in textMatches) skuMasks[((string)row["id"]!, (string)row["skuId"]!)] = Convert.ToInt32(row["keywordMask"]);
+        }
         // Intersect the small SKU/style identity sets outside the join plan. Multiple
         // OPENJSON semi-joins can otherwise explode estimates for combined filters.
         var matched = matches.Where(row => (stockedStyleIds == null || stockedStyleIds.Contains((string)row["id"]!))
-            && (categoryIds == null || row["categoryId"] is string category && categoryIds.Contains(category)))
+            && (categoryIds == null || row["categoryId"] is string category && categoryIds.Contains(category))
+            && ((skuMasks.GetValueOrDefault(((string)row["id"]!, (string)row["skuId"]!)) | (row["categoryId"] is string leaf ? categoryMasks.GetValueOrDefault(leaf) : 0)) & requiredMask) == requiredMask)
             .Select(row => (string)row["id"]!).Distinct();
         string matchedIds=sql.Add(JsonSerializer.Serialize(matched));
         where=$"p.valid=1 AND p.source_id={sql.Add(s.SourceId)} AND p.id IN(SELECT CONVERT(bigint,[value]) FROM OPENJSON({matchedIds}))";
@@ -110,6 +151,16 @@ public sealed partial class QisemiReadService
         var page = await sql.Page("p.*", "dbo.qsm_product_style p", where, "p.display_name,p.id", q);
         var items = (List<Dictionary<string,object?>>)page["items"]!;
         if(items.Count==0)return page;
+        var categoryRows = matches;
+        if (q.SkuId != null || q.SourceEnabled != null || q.SourceDeleted != null || q.NegativeOnly)
+            categoryRows = await sql.Rows($@"SELECT DISTINCT a.style_id id,k.category_id FROM {SkuLink()}
+                WHERE a.valid=1 AND a.source_id={sql.Add(s.SourceId)} OPTION(HASH JOIN,RECOMPILE,MAX_GRANT_PERCENT=1,MAXDOP 1)");
+        var pageIds = items.Select(row => (string)row["id"]!).ToHashSet();
+        var pathsByStyle = categoryRows.Where(row => pageIds.Contains((string)row["id"]!)).GroupBy(row => (string)row["id"]!)
+            .ToDictionary(group => group.Key, group => group.Select(row => row["categoryId"] as string).OfType<string>().Distinct()
+                .Where(categoryPaths.ContainsKey).Select(id => categoryPaths[id])
+                .OrderBy(path => string.Join(" / ", path.Levels.Select(level => level.Name)), StringComparer.OrdinalIgnoreCase).ThenBy(path => path.CategoryId).ToArray());
+        foreach (var item in items) item["categoryPaths"] = pathsByStyle.GetValueOrDefault((string)item["id"]!) ?? [];
         string ids=sql.Add(JsonSerializer.Serialize(items.Select(row=>row["id"])));
         // Join the stock record's visibility once instead of a correlated EXISTS
         // inside each aggregate CASE; single-style pages otherwise get scan-heavy plans.

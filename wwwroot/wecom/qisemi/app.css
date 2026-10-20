@@ -39,6 +39,8 @@
 #qisemi-prototype .qs-brand{font-size:11px;font-weight:700;letter-spacing:.7px;color:var(--qs-muted);text-transform:uppercase}
 #qisemi-prototype .qs-name{font-size:15px;font-weight:700;line-height:1.55;margin:1px 0 5px;overflow-wrap:anywhere}
 #qisemi-prototype .qs-attributes{font-size:11px;color:var(--qs-muted);display:flex;gap:5px 8px;flex-wrap:wrap}
+#qisemi-prototype .qs-category-paths{font-size:11px;line-height:1.6;color:var(--qs-muted);overflow-wrap:anywhere;margin-top:7px}
+#qisemi-prototype .qs-category-paths p{margin:3px 0}
 #qisemi-prototype .qs-overview{display:flex;justify-content:space-between;align-items:center;margin-top:8px;gap:6px;font-size:12px;color:var(--qs-muted)}
 #qisemi-prototype .qs-overview b{font-size:16px;font-weight:700;color:var(--qs-ink)}
 #qisemi-prototype .qs-chevron{color:var(--qs-muted);font-size:18px;line-height:1;flex:none;margin-top:4px}
