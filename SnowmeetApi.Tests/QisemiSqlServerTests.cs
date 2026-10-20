@@ -187,6 +187,10 @@ public class QisemiSqlServerTests
         Assert.Equal("0", (await f.Read("inventory", new() { TopCategoryId = 4, InStockOnly = true })).GetProperty("result").GetProperty("total").GetString());
         Assert.Equal("1", (await f.Read("inventory", new() { TopCategoryId = 4 })).GetProperty("result").GetProperty("total").GetString());
         Assert.Equal("0", (await f.Read("inventory", new() { TopCategoryId = 5 })).GetProperty("result").GetProperty("total").GetString());
+        await f.Exec("UPDATE dbo.qsm_product_sku SET category_id=4 WHERE id=12");
+        Assert.Equal("0", (await f.Read("inventory", new() { TopCategoryId = 1, Keyword = "26.5", InStockOnly = true })).GetProperty("result").GetProperty("total").GetString());
+        Assert.Equal("1", (await f.Read("inventory", new() { TopCategoryId = 4, Keyword = "26.5", InStockOnly = true })).GetProperty("result").GetProperty("total").GetString());
+        await f.Exec("UPDATE dbo.qsm_product_sku SET category_id=3 WHERE id=12");
         Assert.Equal(404, (await Assert.ThrowsAsync<QisemiReadException>(() => f.Read("inventory", new() { TopCategoryId = 2 }))).Status);
         await f.Delete("category", 2, true);
         Assert.Equal("0", (await f.Read("inventory", new() { TopCategoryId = 1 })).GetProperty("result").GetProperty("total").GetString());
