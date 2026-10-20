@@ -42,15 +42,16 @@ public sealed partial class QisemiReadService
             covered = (bool)warehouse["coverageComplete"]!;
         }
         string qty, join;
+        const string visibleStock = "st.valid=1 AND qr.id IS NOT NULL AND qm.id IS NOT NULL AND qb.id IS NOT NULL";
         if (q.WarehouseId == null)
         {
             join = $"LEFT JOIN dbo.qsm_stock_total st ON st.sku_id=k.id AND st.source_id=k.source_id AND st.batch_id={sql.Add(s.BatchId)}";
-            qty = $"CASE WHEN st.valid=1 AND {RawVisible("st.raw_record_id", "st.source_id", "st.batch_id")} THEN st.quantity_main END";
+            qty = $"CASE WHEN {visibleStock} THEN st.quantity_main END";
         }
         else
         {
             join = $"LEFT JOIN dbo.qsm_stock_snapshot st ON st.sku_id=k.id AND st.source_id=k.source_id AND st.batch_id={sql.Add(s.BatchId)} AND st.warehouse_id={sql.Add(q.WarehouseId)}";
-            qty = $"CASE WHEN st.valid=1 AND {RawVisible("st.raw_record_id", "st.source_id", "st.batch_id")} THEN st.quantity_main WHEN st.id IS NULL AND {sql.Add(covered ? 1 : 0)}=1 THEN CONVERT(decimal(19,6),0) END";
+            qty = $"CASE WHEN {visibleStock} THEN st.quantity_main WHEN st.id IS NULL AND {sql.Add(covered ? 1 : 0)}=1 THEN CONVERT(decimal(19,6),0) END";
         }
         string where = $"p.valid=1 AND p.source_id={sql.Add(s.SourceId)}"
             + sql.Optional("p.id", q.StyleId) + sql.Optional("p.category_id", q.CategoryId);
@@ -70,11 +71,16 @@ public sealed partial class QisemiReadService
         var items = (List<Dictionary<string,object?>>)page["items"]!;
         if(items.Count==0)return page;
         string ids=sql.Add(JsonSerializer.Serialize(items.Select(row=>row["id"])));
+        // Join the stock record's visibility once instead of a correlated EXISTS
+        // inside each aggregate CASE; single-style pages otherwise get scan-heavy plans.
+        string stockVisibility = @"LEFT JOIN dbo.qsm_raw_record qr ON qr.id=st.raw_record_id AND qr.source_id=st.source_id AND qr.batch_id=st.batch_id AND qr.valid=1
+            LEFT JOIN dbo.qsm_import_module qm ON qm.id=qr.module_id AND qm.source_id=qr.source_id AND qm.batch_id=qr.batch_id AND qm.valid=1 AND qm.state IN ('complete','empty')
+            LEFT JOIN dbo.qsm_import_batch qb ON qb.id=qr.batch_id AND qb.source_id=qr.source_id AND qb.valid=1 AND qb.state='published' AND qb.verification_passed=1 AND qb.published_at IS NOT NULL";
         var totals=await sql.Rows($@"SELECT a.style_id,COUNT_BIG(*) size_count,
             CASE WHEN SUM(CASE WHEN z.qty IS NULL THEN 1 ELSE 0 END)=0 THEN SUM(z.qty) END quantity_main,
             SUM(CASE WHEN z.qty IS NULL THEN 1 ELSE 0 END) unknown_count,
             CONVERT(bit,CASE WHEN SUM(CASE WHEN z.qty<0 THEN 1 ELSE 0 END)>0 THEN 1 ELSE 0 END) has_negative
-            FROM {SkuLink()} {join} CROSS APPLY(SELECT {qty} qty) z
+            FROM {SkuLink()} {join} {stockVisibility} CROSS APPLY(SELECT {qty} qty) z
             WHERE a.valid=1 AND a.source_id={sql.Add(s.SourceId)} AND a.style_id IN(SELECT CONVERT(bigint,[value]) FROM OPENJSON({ids})) GROUP BY a.style_id");
         var lookup=totals.ToDictionary(row=>(string)row["styleId"]!);
         foreach(var item in items)
