@@ -43,7 +43,7 @@
   }
   function route() {
     const [tab, query = ''] = location.hash.slice(1).split('?');
-    return { ...Object.fromEntries(new URLSearchParams(query)), tab: tabs[tab] ? tab : 'inventory' };
+    return { sortBy:'name', sortDirection:'asc', ...Object.fromEntries(new URLSearchParams(query)), tab: tabs[tab] ? tab : 'inventory' };
   }
   function go(next) {
     const q = new URLSearchParams();
@@ -104,6 +104,7 @@
     const visibleIds=new Set(data.result.items.map(row=>row.id));
     for(const [key,d] of state.styles)if(!visibleIds.has(key)){if(d.photo)URL.revokeObjectURL(d.photo);state.styles.delete(key);}
     state.list = data.result; paintInventory();
+    void loadListThumbnails(seq);
   }
   function paintInventory() {
     const rows = state.list.items;
@@ -115,7 +116,7 @@
   }
   function inventorySorting() {
     const r = state.route;
-    return `<div class="qs-inventory-sort"><label for="inventory-sort-by">排序</label><select id="inventory-sort-by" aria-label="排序字段"><option value="name" ${r.sortBy !== 'topCategory' ? 'selected' : ''}>名称</option><option value="topCategory" ${r.sortBy === 'topCategory' ? 'selected' : ''}>顶级分类</option></select><label class="qs-sr-only" for="inventory-sort-direction">排序方向</label><select id="inventory-sort-direction" aria-label="排序方向"><option value="asc" ${r.sortDirection !== 'desc' ? 'selected' : ''}>正序 ↑</option><option value="desc" ${r.sortDirection === 'desc' ? 'selected' : ''}>倒序 ↓</option></select></div>`;
+    return `<div class="qs-inventory-sort"><label for="inventory-sort-by">排序</label><select id="inventory-sort-by" aria-label="排序字段"><option value="name" ${r.sortBy !== 'topCategory' ? 'selected' : ''}>名称</option><option value="topCategory" ${r.sortBy === 'topCategory' ? 'selected' : ''}>顶级分类</option></select><label class="qs-sr-only" for="inventory-sort-direction">排序方向</label><select id="inventory-sort-direction" aria-label="排序方向"><option value="asc" ${r.sortDirection !== 'desc' ? 'selected' : ''}>升序 ↑</option><option value="desc" ${r.sortDirection === 'desc' ? 'selected' : ''}>降序 ↓</option></select></div>`;
   }
   function inventoryFacets() {
     const selected = state.route.resultCategoryId || '';
@@ -131,9 +132,29 @@
     const paths = row.categoryPaths || [];
     return `<div class="qs-category-paths">${paths.length ? paths.map(path => `<p>分类：${(path.levels || []).map(level => esc(level.name)).join(' → ')}${path.complete === false ? '（上级分类缺失）' : ''}</p>`).join('') : '<p>分类：暂无分类资料</p>'}</div>`;
   }
+  function thumbnail(d) {
+    return d?.photo ? `<img src="${esc(d.photo)}" alt="商品图片" loading="lazy" decoding="async">` : `<span>${d?.photoLoading ? '加载中' : d?.noPhoto ? '暂无图片' : d?.photoFailed ? '图片暂不可用' : '商品'}</span>`;
+  }
+  function updateThumbnail(id, d) {
+    if (state.route.tab !== 'inventory' || state.styles.get(id) !== d) return;
+    const photo = screen.querySelector(`.qs-product[data-style="${id}"] .qs-photo`);
+    if (photo) photo.innerHTML = thumbnail(d);
+  }
+  async function loadListThumbnails(seq) {
+    const rows = state.list.items, signal = state.controller.signal;
+    let index = 0;
+    async function worker() {
+      while (seq === state.seq && !signal.aborted && index < rows.length) {
+        const id = rows[index++].id, d = state.styles.get(id) || {};
+        state.styles.set(id, d);
+        if (!d.photo && !d.noPhoto) await loadThumbnail(id, d, seq, signal);
+      }
+    }
+    await Promise.all([worker(), worker()]);
+  }
   function card(row) {
     const d = state.styles.get(row.id);
-    return `<article class="qs-product" data-style="${esc(row.id)}"><button type="button" class="qs-product-head" data-action="expand" data-id="${esc(row.id)}" aria-expanded="${!!d?.expanded}"><div class="qs-photo">${d?.photo ? `<img src="${esc(d.photo)}" alt="商品图片">` : '<span>商品</span>'}</div><div class="qs-product-main"><div class="qs-brand">${esc(row.brand || '')}</div><div class="qs-name">${esc(row.displayName)}</div><div class="qs-attributes">${[row.styleCode,row.season,row.color,row.gender].filter(Boolean).map(v => `<span>${esc(v)}</span>`).join('')}</div>${categoryPaths(row)}<div class="qs-overview"><span>${esc(row.sizeCount)} 个尺码</span><b>${quantity(row.quantityMain)}</b></div></div><span class="qs-chevron">${d?.expanded ? '⌃' : '⌄'}</span></button>${d?.expanded ? `<div class="qs-detail">${d.loading ? empty('正在读取尺码与各仓库存…') : d.error ? `${esc(d.error)} ${button('style-retry','重试',`data-id="${row.id}"`)}` : stylePanel(row.id, d)}</div>` : ''}</article>`;
+    return `<article class="qs-product" data-style="${esc(row.id)}"><button type="button" class="qs-product-head" data-action="expand" data-id="${esc(row.id)}" aria-expanded="${!!d?.expanded}"><div class="qs-photo">${thumbnail(d)}</div><div class="qs-product-main"><div class="qs-brand">${esc(row.brand || '')}</div><div class="qs-name">${esc(row.displayName)}</div><div class="qs-attributes">${[row.styleCode,row.season,row.color,row.gender].filter(Boolean).map(v => `<span>${esc(v)}</span>`).join('')}</div>${categoryPaths(row)}<div class="qs-overview"><span>${esc(row.sizeCount)} 个尺码</span><b>${quantity(row.quantityMain)}</b></div></div><span class="qs-chevron">${d?.expanded ? '⌃' : '⌄'}</span></button>${d?.expanded ? `<div class="qs-detail">${d.loading ? empty('正在读取尺码与各仓库存…') : d.error ? `${esc(d.error)} ${button('style-retry','重试',`data-id="${row.id}"`)}` : stylePanel(row.id, d)}</div>` : ''}</article>`;
   }
   function stylePanel(id, d) {
     if (!d.data) return '';
@@ -154,17 +175,19 @@
     try {
       const data = await api.request('Styles/' + id, { includeZero: true, warehouseId: state.route.resultWarehouseId || state.route.warehouseId }, state.controller.signal);
       if (seq !== state.seq) return; d.data = data.result;
-      loadThumbnail(id,d,seq);
     } catch (e) { if (seq !== state.seq || e.name === 'AbortError') return; if (e.status === 409) fail(e); d.error = e.message; }
     finally { if (seq === state.seq) { d.loading = false; paintInventory(); } }
   }
-  async function loadThumbnail(id,d,seq){
+  async function loadThumbnail(id,d,seq,signal){
+    d.photoLoading = true; d.photoFailed = false; updateThumbnail(id,d);
     try{
-      const images=await api.request('Files',{styleId:id,fileType:'image',pageSize:1},state.controller.signal);
-      const image=images.result.items[0];if(!image?.contentPath||seq!==state.seq)return;
-      const blob=await api.file(image.contentPath,state.controller.signal);if(seq!==state.seq)return;
-      if(d.photo)URL.revokeObjectURL(d.photo);d.photo=URL.createObjectURL(blob);paintInventory();
-    }catch(_){ /* A missing thumbnail must not hide inventory. */ }
+      const images=await api.request('Files',{styleId:id,fileType:'image',pageSize:1},signal);
+      if(seq!==state.seq || signal.aborted)return;
+      const image=images.result.items[0];if(!image?.contentPath){d.noPhoto=true;return;}
+      const blob=await api.file(image.contentPath,signal);if(seq!==state.seq || signal.aborted)return;
+      if(d.photo)URL.revokeObjectURL(d.photo);d.photo=URL.createObjectURL(blob);
+    }catch(error){if(error.name!=='AbortError' && seq===state.seq)d.photoFailed=true;}
+    finally{if(seq===state.seq){d.photoLoading=false;updateThumbnail(id,d);}}
   }
   function catalog() {
     const r = state.route, modules = state.modules.filter(m => m.tab === r.tab);
@@ -269,6 +292,12 @@
   document.getElementById('preview-close').onclick = closePreview;
   document.getElementById('file-preview').addEventListener('cancel', closePreview);
   document.getElementById('source-select').onchange = e => loadSource(e.target.value).catch(fail);
+  screen.addEventListener('error', e => {
+    if (!e.target.matches?.('.qs-photo img')) return;
+    const id = e.target.closest('.qs-product')?.dataset.style, d = state.styles.get(id);
+    if (!d?.photo || e.target.getAttribute('src') !== d.photo) return;
+    URL.revokeObjectURL(d.photo); delete d.photo; d.photoFailed = true; updateThumbnail(id,d);
+  }, true);
   document.addEventListener('click', e => {
     const tab = e.target.closest('[data-tab]'); if (tab) { go({tab:tab.dataset.tab}); return; }
     const target = e.target.closest('[data-action]'); if (!target || target.disabled) return;
@@ -277,7 +306,7 @@
     else if (action === 'retry') {if(state.modules.length)render();else boot().catch(fail);}
     else if (action === 'catalog') go({tab:r.tab});
     else if (action === 'module') go({tab:r.tab,module,view:'list'});
-    else if (action === 'clear-search') go({...r,keyword:'',skuId:'',resultCategoryId:'',resultWarehouseId:'',page:1});
+    else if (action === 'clear-search') go({...r,keyword:'',skuId:'',resultCategoryId:'',resultWarehouseId:'',sortBy:'name',sortDirection:'asc',page:1});
     else if (action === 'result-category') go({...r,resultCategoryId:id,page:1});
     else if (action === 'result-warehouse') go({...r,resultWarehouseId:id,page:1});
     else if (action === 'clear-sku') go({...r,skuId:'',page:1});
@@ -303,7 +332,7 @@
   });
   document.addEventListener('submit', e => {
     if (!['inventory-search','browser-search'].includes(e.target.id)) return; e.preventDefault();
-    if (e.target.id === 'inventory-search') go({tab:'inventory',keyword:document.getElementById('inventory-keyword').value.trim(),warehouseId:document.getElementById('inventory-warehouse').value,topCategoryId:document.getElementById('inventory-category').value,inStockOnly:document.getElementById('inventory-in-stock').checked,sortBy:state.route.sortBy,sortDirection:state.route.sortDirection});
+    if (e.target.id === 'inventory-search') go({tab:'inventory',keyword:document.getElementById('inventory-keyword').value.trim(),warehouseId:document.getElementById('inventory-warehouse').value,topCategoryId:document.getElementById('inventory-category').value,inStockOnly:document.getElementById('inventory-in-stock').checked,sortBy:'name',sortDirection:'asc'});
     else go({...state.route,keyword:document.getElementById('browser-keyword').value.trim(),dateFrom:document.getElementById('date-from')?.value,dateTo:document.getElementById('date-to')?.value,state:document.getElementById('browser-state')?.value,fileType:document.getElementById('file-type')?.value,page:1});
   });
   document.addEventListener('change', e => {
