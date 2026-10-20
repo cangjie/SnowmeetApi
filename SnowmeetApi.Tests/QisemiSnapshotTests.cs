@@ -98,6 +98,8 @@ public class QisemiSnapshotTests
         var selectedWarehouse = await Read("inventory", new() { Keyword = "双板鞋 fisch 24-25 110 26.5", InStockOnly = true, ResultWarehouseId = flagship });
         Assert.NotEmpty(selectedWarehouse.GetProperty("items").EnumerateArray());
         Assert.Equal(boots.GetProperty("items")[0].GetProperty("quantityMain").GetDecimal(), selectedWarehouse.GetProperty("items")[0].GetProperty("quantityMain").GetDecimal());
+        Assert.Equal(selectedWarehouse.GetProperty("items")[0].GetProperty("quantityMain").GetDecimal(),
+            selectedWarehouse.GetProperty("warehouseFacets").EnumerateArray().Single(w => w.GetProperty("id").GetString() == flagship.ToString()).GetProperty("quantityMain").GetDecimal());
     }
     [QisemiSnapshotFact]
     public async Task MostRecentDocumentDetailRetainsItsRawRecordAssociation()

@@ -39,6 +39,35 @@ public sealed partial class QisemiReadService
 
     private sealed record CategoryLevel(string Id, string Name);
     private sealed record CategoryPath(string CategoryId, CategoryLevel[] Levels, bool Complete);
+    private sealed record InventoryAmountTarget(string StyleId, string? WarehouseId, bool Covered);
+
+    private static async Task<List<Dictionary<string, object?>>> InventoryAmounts(QisemiSql sql, QisemiScope s,
+        IEnumerable<InventoryAmountTarget> targets, bool byWarehouse)
+    {
+        var rows = targets.Distinct().Select(t => new { style_id = t.StyleId, warehouse_id = t.WarehouseId, covered = t.Covered }).ToArray();
+        if (rows.Length == 0) return [];
+        string table = byWarehouse ? "qsm_stock_snapshot" : "qsm_stock_total";
+        string warehouse = byWarehouse ? " AND st.warehouse_id=x.warehouse_id" : "";
+        string zero = byWarehouse ? " WHEN st.id IS NULL AND x.covered=1 THEN CONVERT(decimal(19,6),0)" : "";
+        return await sql.Rows($@"SELECT x.style_id,x.warehouse_id,
+            CASE WHEN SUM(CASE WHEN z.qty IS NULL THEN 1 ELSE 0 END)=0 THEN SUM(z.qty) END quantity_main,
+            SUM(CONVERT(bigint,CASE WHEN z.qty IS NULL THEN 1 ELSE 0 END)) unknown_count
+            FROM {SkuLink()}
+            JOIN OPENJSON({sql.Add(JsonSerializer.Serialize(rows))}) WITH(style_id bigint,warehouse_id bigint,covered bit) x ON x.style_id=a.style_id
+            LEFT JOIN dbo.{table} st ON st.sku_id=k.id AND st.source_id=k.source_id AND st.batch_id={sql.Add(s.BatchId)}{warehouse}
+            LEFT JOIN dbo.qsm_raw_record qr ON qr.id=st.raw_record_id AND qr.source_id=st.source_id AND qr.batch_id=st.batch_id AND qr.valid=1
+            LEFT JOIN dbo.qsm_import_module qm ON qm.id=qr.module_id AND qm.source_id=qr.source_id AND qm.batch_id=qr.batch_id AND qm.valid=1 AND qm.state IN ('complete','empty')
+            LEFT JOIN dbo.qsm_import_batch qb ON qb.id=qr.batch_id AND qb.source_id=qr.source_id AND qb.valid=1 AND qb.state='published' AND qb.verification_passed=1 AND qb.published_at IS NOT NULL
+            CROSS APPLY(SELECT CASE WHEN st.valid=1 AND qr.id IS NOT NULL AND qm.id IS NOT NULL AND qb.id IS NOT NULL THEN st.quantity_main{zero} END qty) z
+            WHERE a.valid=1 AND a.source_id={sql.Add(s.SourceId)} GROUP BY x.style_id,x.warehouse_id
+            OPTION(HASH JOIN,RECOMPILE,MAX_GRANT_PERCENT=1,MAXDOP 1)");
+    }
+
+    private static decimal? InventoryQuantity(IEnumerable<Dictionary<string, object?>> amounts)
+    {
+        var rows = amounts.ToArray();
+        return rows.Any(row => row["quantityMain"] == null) ? null : rows.Sum(row => (decimal)row["quantityMain"]!);
+    }
 
     private static Dictionary<string, CategoryPath> ProductCategoryPaths(List<Dictionary<string, object?>> categories)
     {
@@ -184,6 +213,24 @@ public sealed partial class QisemiReadService
             ["id"] = w["id"], ["name"] = w["name"],
             ["count"] = QisemiRules.Id(stockByWarehouse[(string)w["id"]!].Count(categoryStyles.Contains))
         }).Where(w => (string)w["count"]! != "0").ToArray();
+        // Sum all sizes of the exact styles each warehouse chip would return.
+        // Negative quantities offset positives; incomplete quantities stay unknown.
+        var amountTargets = warehouseFacets.SelectMany(w => stockByWarehouse[(string)w["id"]!].Where(categoryStyles.Contains)
+            .Select(styleId => new InventoryAmountTarget(styleId, (string)w["id"]!, (bool)warehouseIndex[(string)w["id"]!]["coverageComplete"]!))).ToList();
+        if (q.WarehouseId is { } mainWarehouse)
+            amountTargets.AddRange(categoryStyles.Select(styleId => new InventoryAmountTarget(styleId, QisemiRules.Id(mainWarehouse),
+                (bool)warehouseIndex[QisemiRules.Id(mainWarehouse)]["coverageComplete"]!)));
+        var warehouseAmounts = await InventoryAmounts(sql, s, amountTargets, true);
+        foreach (var facet in warehouseFacets)
+        {
+            var eligible = stockByWarehouse[(string)facet["id"]!];
+            var amounts = warehouseAmounts.Where(a => (string?)a["warehouseId"] == (string)facet["id"]! && eligible.Contains((string)a["styleId"]!)).ToArray();
+            facet["quantityMain"] = InventoryQuantity(amounts);
+            facet["unknownCount"] = QisemiRules.Id(amounts.Sum(a => long.Parse((string)a["unknownCount"]!)));
+        }
+        var allAmounts = q.WarehouseId == null
+            ? await InventoryAmounts(sql, s, categoryStyles.Select(styleId => new InventoryAmountTarget(styleId, null, false)), false)
+            : warehouseAmounts.Where(a => (string?)a["warehouseId"] == QisemiRules.Id(q.WarehouseId.Value)).ToList();
         var warehouseMatched = q.ResultWarehouseId == null ? matched : matched.Where(row =>
             stockByWarehouse.TryGetValue(QisemiRules.Id(q.ResultWarehouseId.Value), out var set) && set.Contains((string)row["id"]!)).ToArray();
         // Each facet excludes its own selection and reflects the other selection,
@@ -215,6 +262,8 @@ public sealed partial class QisemiReadService
         page["unfilteredTotal"] = QisemiRules.Id(warehouseMatched.Select(row => (string)row["id"]!).Distinct().LongCount());
         page["warehouseFacets"] = warehouseFacets;
         page["warehouseUnfilteredTotal"] = QisemiRules.Id(categoryStyles.Count);
+        page["warehouseUnfilteredQuantityMain"] = InventoryQuantity(allAmounts);
+        page["warehouseUnfilteredUnknownCount"] = QisemiRules.Id(allAmounts.Sum(a => long.Parse((string)a["unknownCount"]!)));
         var items = (List<Dictionary<string,object?>>)page["items"]!;
         if(items.Count==0)return page;
         var categoryRows = matches;

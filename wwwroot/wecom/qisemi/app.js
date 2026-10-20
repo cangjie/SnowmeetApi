@@ -108,7 +108,7 @@
   }
   function paintInventory() {
     const rows = state.list.items;
-    show(inventoryForm() + inventorySorting() + inventoryFacets() + inventoryWarehouseFacets() + `<div class="qs-meta"><span role="status">共 <strong>${esc(state.list.total)}</strong> 款</span>${button('about', '数据说明')}</div><div id="inventory-info" class="qs-info" hidden>“有货仓库”括号内为当前结果中该仓至少一个尺码有正库存的款数；零、负数和未知不计入，可用上方仓库筛选查看。点击后按所选仓显示数量，点“全部仓库”恢复。分类括号内为当前搜索、顶级分类、仓库和库存条件下全部结果的款数，不是库存件数；点击分类可二次筛选，同款多个分类可分别计入。分类排序按分类名称，同款跨分类时取匹配分类中名称最前的一项，无分类排最后。“只看有库存”按所选仓库范围内至少一个尺码的账面数量大于零筛选。全部仓库按尺码总库存判断。取消勾选可查看零或负库存款式。零库存尺码保留；仓库未完整采集时数量显示“未知”。各模块采集时间可能不同，详见页面底部。</div><div class="qs-results">${rows.length ? rows.map(card).join('') : empty('没有匹配的商品，请更换关键词、调整分类或仓库，或取消“只看有库存”。')}</div>` + pager(state.list.total, state.route.page));
+    show(inventoryForm() + inventorySorting() + inventoryFacets() + inventoryWarehouseFacets() + `<div class="qs-meta"><span role="status">共 <strong>${esc(state.list.total)}</strong> 款</span>${button('about', '数据说明')}</div><div id="inventory-info" class="qs-info" hidden>仓库括号为当前搜索与分类下的账面库存件数，汇总同款全部尺码，负库存参与抵扣；数量不完整时显示未知。“全部仓库”包含其他仓的负库存，可能与有货仓标签之和不同。有货仓按至少一个尺码有正库存定位商品；零、负数或未知库存仓也可用上方仓库筛选查看。点击后按所选仓显示数量，点“全部仓库”恢复。分类括号内为当前搜索、顶级分类、仓库和库存条件下全部结果的款数，不是库存件数；点击分类可二次筛选，同款多个分类可分别计入。分类排序按分类名称，同款跨分类时取匹配分类中名称最前的一项，无分类排最后。“只看有库存”按所选仓库范围内至少一个尺码的账面数量大于零筛选。全部仓库按尺码总库存判断。取消勾选可查看零或负库存款式。零库存尺码保留；仓库未完整采集时数量显示“未知”。各模块采集时间可能不同，详见页面底部。</div><div class="qs-results">${rows.length ? rows.map(card).join('') : empty('没有匹配的商品，请更换关键词、调整分类或仓库，或取消“只看有库存”。')}</div>` + pager(state.list.total, state.route.page));
     for (const strip of document.querySelectorAll('.qs-category-facets')) {
       const selected = strip.querySelector('[aria-pressed="true"]');
       if (selected && selected.offsetLeft + selected.offsetWidth > strip.clientWidth) strip.scrollLeft = selected.offsetLeft + selected.offsetWidth - strip.clientWidth + 8;
@@ -121,12 +121,12 @@
   function inventoryFacets() {
     const selected = state.route.resultCategoryId || '';
     const choices = [{id:'',name:'全部',count:state.list.unfilteredTotal ?? state.list.total},...(state.list.categoryFacets || [])];
-    return `<div class="qs-result-facet-label">商品分类</div><nav class="qs-category-facets" aria-label="结果分类二次筛选" tabindex="0">${choices.map(c => `<button type="button" data-action="result-category" data-id="${esc(c.id)}" aria-pressed="${selected === c.id}">${esc(c.name)}<span>（${esc(c.count)}）</span></button>`).join('')}</nav>`;
+    return `<div class="qs-result-facet-label">商品分类</div><nav class="qs-category-facets" aria-label="结果分类二次筛选" tabindex="0">${choices.map(c => `<button type="button" data-action="result-category" data-id="${esc(c.id)}" aria-pressed="${selected === c.id}">${esc(c.name)}<span>（${esc(c.count)}款）</span></button>`).join('')}</nav>`;
   }
   function inventoryWarehouseFacets() {
     const selected = state.route.resultWarehouseId || '';
-    const choices = [{id:'',name:'全部仓库',count:state.list.warehouseUnfilteredTotal ?? state.list.total},...(state.list.warehouseFacets || [])];
-    return `<div class="qs-result-facet-label">有货仓库</div><nav class="qs-category-facets qs-warehouse-facets" aria-label="结果仓库二次筛选" tabindex="0">${choices.map(w => `<button type="button" data-action="result-warehouse" data-id="${esc(w.id)}" aria-pressed="${selected === w.id}">${esc(w.name)}<span>（${esc(w.count)}）</span></button>`).join('')}</nav>`;
+    const choices = [{id:'',name:'全部仓库',quantityMain:state.list.warehouseUnfilteredQuantityMain},...(state.list.warehouseFacets || [])];
+    return `<div class="qs-result-facet-label">有货仓库 · 账面件数</div><nav class="qs-category-facets qs-warehouse-facets" aria-label="结果仓库二次筛选" tabindex="0">${choices.map(w => `<button type="button" data-action="result-warehouse" data-id="${esc(w.id)}" aria-pressed="${selected === w.id}">${esc(w.name)}<span>（${w.quantityMain == null ? '数量未知' : esc(qty(w.quantityMain)) + '件'}）</span></button>`).join('')}</nav>`;
   }
   function categoryPaths(row) {
     const paths = row.categoryPaths || [];
