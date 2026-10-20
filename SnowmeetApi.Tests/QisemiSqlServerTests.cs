@@ -175,6 +175,47 @@ public class QisemiSqlServerTests
         Assert.Equal("0", (await Inventory(new() { InStockOnly = true, WarehouseId = 1 })).GetProperty("total").GetString());
     }
     [QisemiLocalDbFact]
+    public async Task InventorySortAndResultCategoryFacetsApplyBeforePaging()
+    {
+        await using var f = await Fixture.Create();
+        await f.Exec("INSERT dbo.qsm_category(source_id,source_key,last_seen_batch_id,last_raw_record_id,category_kind,parent_id,name) VALUES(1,N'boots',1,100,'product',NULL,N'Z 雪鞋'),(1,N'helmet',1,100,'product',NULL,N'A 头盔'); INSERT dbo.qsm_category(source_id,source_key,last_seen_batch_id,last_raw_record_id,category_kind,parent_id,name) VALUES(1,N'child',1,100,'product',1,N'子分类'); UPDATE dbo.qsm_product_sku SET category_id=CASE WHEN id=14 THEN 2 ELSE 3 END;");
+        async Task<JsonElement> Inventory(QisemiQuery q) => (await f.Read("inventory", q)).GetProperty("result");
+        string FirstId(JsonElement result) => result.GetProperty("items")[0].GetProperty("id").GetString()!;
+        var first = await Inventory(new() { Keyword = "Fischer", PageSize = 1 });
+        Assert.Equal("9007199254740993", FirstId(first));
+        Assert.Equal("2", first.GetProperty("total").GetString());
+        Assert.Equal(2, first.GetProperty("categoryFacets").GetArrayLength());
+        Assert.All(first.GetProperty("categoryFacets").EnumerateArray(), c => Assert.Equal("1", c.GetProperty("count").GetString()));
+        Assert.Equal("2", FirstId(await Inventory(new() { Keyword = "Fischer", PageSize = 1, SortDirection = "desc" })));
+        Assert.Equal("2", FirstId(await Inventory(new() { Keyword = "Fischer", PageSize = 1, SortBy = "topCategory" })));
+        Assert.Equal("9007199254740993", FirstId(await Inventory(new() { PageSize = 1, SortBy = "topCategory", SortDirection = "desc" })));
+        var secondPage = await Inventory(new() { PageSize = 1, Page = 2, SortBy = "topCategory" });
+        Assert.Equal("9007199254740993", FirstId(secondPage));
+        Assert.Equal(first.GetProperty("categoryFacets").GetRawText(), secondPage.GetProperty("categoryFacets").GetRawText());
+        var secondary = await Inventory(new() { ResultCategoryId = 2, PageSize = 1 });
+        Assert.Equal("2", FirstId(secondary));
+        Assert.Equal("1", secondary.GetProperty("total").GetString());
+        Assert.Equal("2", secondary.GetProperty("unfilteredTotal").GetString());
+        Assert.Equal(2, secondary.GetProperty("categoryFacets").GetArrayLength());
+        var primary = await Inventory(new() { TopCategoryId = 1, ResultCategoryId = 2 });
+        Assert.Equal("0", primary.GetProperty("total").GetString());
+        Assert.Equal("1", Assert.Single(primary.GetProperty("categoryFacets").EnumerateArray()).GetProperty("count").GetString());
+        var stocked = await Inventory(new() { WarehouseId = 1, InStockOnly = true });
+        Assert.Equal("1", Assert.Single(stocked.GetProperty("categoryFacets").EnumerateArray()).GetProperty("id").GetString());
+        await f.Exec("UPDATE dbo.qsm_product_sku SET category_id=2 WHERE id=12");
+        var mixed = await Inventory(new());
+        Assert.Equal("2", mixed.GetProperty("unfilteredTotal").GetString());
+        Assert.Equal("2", mixed.GetProperty("categoryFacets")[0].GetProperty("count").GetString());
+        var sameSku = await Inventory(new() { Keyword = "26.5", ResultCategoryId = 1 });
+        Assert.Equal("0", sameSku.GetProperty("total").GetString());
+        Assert.Equal("2", Assert.Single(sameSku.GetProperty("categoryFacets").EnumerateArray()).GetProperty("id").GetString());
+        await f.Exec("UPDATE dbo.qsm_product_sku SET category_id=NULL WHERE id=14");
+        var unknown = await Inventory(new() { ResultCategoryId = 0, SortBy = "topCategory", SortDirection = "desc" });
+        Assert.Equal("2", FirstId(unknown));
+        Assert.Equal("未分类", unknown.GetProperty("categoryFacets").EnumerateArray().Single(c => c.GetProperty("id").GetString() == "0").GetProperty("name").GetString());
+        Assert.Equal(404, (await Assert.ThrowsAsync<QisemiReadException>(() => Inventory(new() { ResultCategoryId = 3 }))).Status);
+    }
+    [QisemiLocalDbFact]
     public async Task TopCategoryIncludesDescendantsAndCombinesWithStockWarehouseAndKeyword()
     {
         await using var f = await Fixture.Create();

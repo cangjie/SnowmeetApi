@@ -99,7 +99,7 @@
   async function inventory(seq) {
     const r = state.route;
     show(inventoryForm()+empty('正在读取库存…'));
-    const data = await api.request('Inventory', { keyword: r.keyword, warehouseId: r.warehouseId, topCategoryId: r.topCategoryId, inStockOnly: r.inStockOnly !== 'false', skuId: r.skuId, page: r.page || 1 }, state.controller.signal);
+    const data = await api.request('Inventory', { keyword: r.keyword, warehouseId: r.warehouseId, topCategoryId: r.topCategoryId, resultCategoryId: r.resultCategoryId, sortBy:r.sortBy || 'name', sortDirection:r.sortDirection || 'asc', inStockOnly: r.inStockOnly !== 'false', skuId: r.skuId, page: r.page || 1 }, state.controller.signal);
     if (seq !== state.seq) return;
     const visibleIds=new Set(data.result.items.map(row=>row.id));
     for(const [key,d] of state.styles)if(!visibleIds.has(key)){if(d.photo)URL.revokeObjectURL(d.photo);state.styles.delete(key);}
@@ -107,7 +107,18 @@
   }
   function paintInventory() {
     const rows = state.list.items;
-    show(inventoryForm() + `<div class="qs-meta"><span role="status">共 <strong>${esc(state.list.total)}</strong> 款</span>${button('about', '数据说明')}</div><div id="inventory-info" class="qs-info" hidden>“只看有库存”按所选仓库范围内至少一个尺码的账面数量大于零筛选。全部仓库按尺码总库存判断。取消勾选可查看零或负库存款式。零库存尺码保留；仓库未完整采集时数量显示“未知”。各模块采集时间可能不同，详见页面底部。</div><div class="qs-results">${rows.length ? rows.map(card).join('') : empty('没有匹配的商品，请更换关键词、调整分类或仓库，或取消“只看有库存”。')}</div>` + pager(state.list.total, state.route.page));
+    show(inventoryForm() + inventorySorting() + inventoryFacets() + `<div class="qs-meta"><span role="status">共 <strong>${esc(state.list.total)}</strong> 款</span>${button('about', '数据说明')}</div><div id="inventory-info" class="qs-info" hidden>分类括号内为当前搜索、顶级分类、仓库和库存条件下全部结果的款数，不是库存件数；点击分类可二次筛选，同款多个分类可分别计入。分类排序按分类名称，同款跨分类时取匹配分类中名称最前的一项，无分类排最后。“只看有库存”按所选仓库范围内至少一个尺码的账面数量大于零筛选。全部仓库按尺码总库存判断。取消勾选可查看零或负库存款式。零库存尺码保留；仓库未完整采集时数量显示“未知”。各模块采集时间可能不同，详见页面底部。</div><div class="qs-results">${rows.length ? rows.map(card).join('') : empty('没有匹配的商品，请更换关键词、调整分类或仓库，或取消“只看有库存”。')}</div>` + pager(state.list.total, state.route.page));
+    const strip = document.querySelector('.qs-category-facets'), selected = strip?.querySelector('[aria-pressed="true"]');
+    if (selected && selected.offsetLeft + selected.offsetWidth > strip.clientWidth) strip.scrollLeft = selected.offsetLeft + selected.offsetWidth - strip.clientWidth + 8;
+  }
+  function inventorySorting() {
+    const r = state.route;
+    return `<div class="qs-inventory-sort"><label for="inventory-sort-by">排序</label><select id="inventory-sort-by" aria-label="排序字段"><option value="name" ${r.sortBy !== 'topCategory' ? 'selected' : ''}>名称</option><option value="topCategory" ${r.sortBy === 'topCategory' ? 'selected' : ''}>顶级分类</option></select><label class="qs-sr-only" for="inventory-sort-direction">排序方向</label><select id="inventory-sort-direction" aria-label="排序方向"><option value="asc" ${r.sortDirection !== 'desc' ? 'selected' : ''}>正序 ↑</option><option value="desc" ${r.sortDirection === 'desc' ? 'selected' : ''}>倒序 ↓</option></select></div>`;
+  }
+  function inventoryFacets() {
+    const selected = state.route.resultCategoryId || '';
+    const choices = [{id:'',name:'全部',count:state.list.unfilteredTotal ?? state.list.total},...(state.list.categoryFacets || [])];
+    return `<nav class="qs-category-facets" aria-label="结果分类二次筛选" tabindex="0">${choices.map(c => `<button type="button" data-action="result-category" data-id="${esc(c.id)}" aria-pressed="${selected === c.id}">${esc(c.name)}<span>（${esc(c.count)}）</span></button>`).join('')}</nav>`;
   }
   function categoryPaths(row) {
     const paths = row.categoryPaths || [];
@@ -258,7 +269,8 @@
     else if (action === 'retry') {if(state.modules.length)render();else boot().catch(fail);}
     else if (action === 'catalog') go({tab:r.tab});
     else if (action === 'module') go({tab:r.tab,module,view:'list'});
-    else if (action === 'clear-search') go({tab:'inventory',warehouseId:r.warehouseId,topCategoryId:r.topCategoryId,inStockOnly:r.inStockOnly});
+    else if (action === 'clear-search') go({...r,keyword:'',skuId:'',resultCategoryId:'',page:1});
+    else if (action === 'result-category') go({...r,resultCategoryId:id,page:1});
     else if (action === 'clear-sku') go({...r,skuId:'',page:1});
     else if (action === 'clear-links') go({...r,skuId:'',documentId:'',warehouseId:'',page:1});
     else if (action === 'about') document.getElementById('inventory-info').hidden = !document.getElementById('inventory-info').hidden;
@@ -282,13 +294,15 @@
   });
   document.addEventListener('submit', e => {
     if (!['inventory-search','browser-search'].includes(e.target.id)) return; e.preventDefault();
-    if (e.target.id === 'inventory-search') go({tab:'inventory',keyword:document.getElementById('inventory-keyword').value.trim(),warehouseId:document.getElementById('inventory-warehouse').value,topCategoryId:document.getElementById('inventory-category').value,inStockOnly:document.getElementById('inventory-in-stock').checked});
+    if (e.target.id === 'inventory-search') go({tab:'inventory',keyword:document.getElementById('inventory-keyword').value.trim(),warehouseId:document.getElementById('inventory-warehouse').value,topCategoryId:document.getElementById('inventory-category').value,inStockOnly:document.getElementById('inventory-in-stock').checked,sortBy:state.route.sortBy,sortDirection:state.route.sortDirection});
     else go({...state.route,keyword:document.getElementById('browser-keyword').value.trim(),dateFrom:document.getElementById('date-from')?.value,dateTo:document.getElementById('date-to')?.value,state:document.getElementById('browser-state')?.value,fileType:document.getElementById('file-type')?.value,page:1});
   });
   document.addEventListener('change', e => {
-    if (e.target.id === 'inventory-warehouse') { clearStyles();go({...state.route,warehouseId:e.target.value,page:1}); }
-    if (e.target.id === 'inventory-category') go({...state.route,topCategoryId:e.target.value,page:1});
-    if (e.target.id === 'inventory-in-stock') go({...state.route,inStockOnly:e.target.checked,page:1});
+    if (e.target.id === 'inventory-warehouse') { clearStyles();go({...state.route,warehouseId:e.target.value,resultCategoryId:'',page:1}); }
+    if (e.target.id === 'inventory-category') go({...state.route,topCategoryId:e.target.value,resultCategoryId:'',page:1});
+    if (e.target.id === 'inventory-in-stock') go({...state.route,inStockOnly:e.target.checked,resultCategoryId:'',page:1});
+    if (e.target.id === 'inventory-sort-by') go({...state.route,sortBy:e.target.value,page:1});
+    if (e.target.id === 'inventory-sort-direction') go({...state.route,sortDirection:e.target.value,page:1});
     if (e.target.dataset.zero) { state.styles.get(e.target.dataset.zero).zero=e.target.checked;paintInventory(); }
   });
   document.addEventListener('input', e => {

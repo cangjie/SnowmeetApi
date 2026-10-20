@@ -81,6 +81,11 @@ public sealed partial class QisemiReadService
         }
         var categories = await ProductCategoryRows(sql, s);
         var categoryPaths = ProductCategoryPaths(categories);
+        var roots = categories.Where(c => c["parentId"] == null).ToDictionary(c => (string)c["id"]!);
+        if (q.ResultCategoryId is > 0 && !roots.ContainsKey(QisemiRules.Id(q.ResultCategoryId.Value)))
+            throw new QisemiReadException(404, "结果分类不存在或不是顶级分类");
+        string RootOf(Dictionary<string, object?> row) => row["categoryId"] is string leaf
+            && categoryPaths.TryGetValue(leaf, out var path) && path.Complete ? path.Levels[0].Id : "0";
         string[] tokens = QisemiRules.Tokens(q.Keyword);
         int requiredMask = (1 << tokens.Length) - 1;
         var categoryMasks = categoryPaths.ToDictionary(x => x.Key, x => tokens.Select((token, n) =>
@@ -143,12 +148,34 @@ public sealed partial class QisemiReadService
         var matched = matches.Where(row => (stockedStyleIds == null || stockedStyleIds.Contains((string)row["id"]!))
             && (categoryIds == null || row["categoryId"] is string category && categoryIds.Contains(category))
             && ((skuMasks.GetValueOrDefault(((string)row["id"]!, (string)row["skuId"]!)) | (row["categoryId"] is string leaf ? categoryMasks.GetValueOrDefault(leaf) : 0)) & requiredMask) == requiredMask)
-            .Select(row => (string)row["id"]!).Distinct();
-        string matchedIds=sql.Add(JsonSerializer.Serialize(matched));
+            .ToArray();
+        // Facets describe the entire primary result, before secondary filtering or
+        // paging. A style counts once per matching root, even with multiple sizes.
+        var facets = matched.GroupBy(RootOf).Select(group => new Dictionary<string, object?> {
+            ["id"] = group.Key, ["name"] = group.Key == "0" ? "未分类" : roots[group.Key]["name"],
+            ["count"] = QisemiRules.Id(group.Select(row => (string)row["id"]!).Distinct().LongCount())
+        }).OrderBy(row => (string)row["id"]! == "0").ThenBy(row => (string)row["name"]!, StringComparer.OrdinalIgnoreCase).ToArray();
+        var filtered = matched.Where(row => q.ResultCategoryId == null || RootOf(row) == QisemiRules.Id(q.ResultCategoryId.Value)).ToArray();
+        string matchedIds=sql.Add(JsonSerializer.Serialize(filtered.Select(row => (string)row["id"]!).Distinct()));
         where=$"p.valid=1 AND p.source_id={sql.Add(s.SourceId)} AND p.id IN(SELECT CONVERT(bigint,[value]) FROM OPENJSON({matchedIds}))";
         // Page identities before calculating inventory. Calculating totals for the
         // entire catalog before OFFSET can time out on the first 30-row screen.
-        var page = await sql.Page("p.*", "dbo.qsm_product_style p", where, "p.display_name,p.id", q);
+        string direction = q.SortDirection == "desc" ? "DESC" : "ASC";
+        string from = "dbo.qsm_product_style p", order = $"p.display_name {direction},p.id {direction}";
+        if (q.SortBy == "topCategory")
+        {
+            // Only short identity/name pairs enter this small page query. Keep the
+            // category ordering under the database collation, just like name sort.
+            var sortNames = filtered.GroupBy(row => (string)row["id"]!).Select(group => new {
+                id = group.Key, name = group.Select(RootOf).Where(id => id != "0").Distinct()
+                    .Select(id => (string)roots[id]["name"]!).OrderBy(name => name, StringComparer.OrdinalIgnoreCase).FirstOrDefault()
+            });
+            from += $" LEFT JOIN OPENJSON({sql.Add(JsonSerializer.Serialize(sortNames))}) WITH(id bigint,name nvarchar(512)) sc ON sc.id=p.id";
+            order = $"CASE WHEN sc.name IS NULL THEN 1 ELSE 0 END,sc.name {direction},p.display_name {direction},p.id {direction}";
+        }
+        var page = await sql.Page("p.*", from, where, order, q);
+        page["categoryFacets"] = facets;
+        page["unfilteredTotal"] = QisemiRules.Id(matched.Select(row => (string)row["id"]!).Distinct().LongCount());
         var items = (List<Dictionary<string,object?>>)page["items"]!;
         if(items.Count==0)return page;
         var categoryRows = matches;

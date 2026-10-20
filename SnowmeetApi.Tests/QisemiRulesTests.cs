@@ -26,6 +26,9 @@ public class QisemiRulesTests
     {
         Assert.Throws<ArgumentException>(() => new QisemiQuery { DateFrom = new(2026, 10, 20), DateTo = new(2026, 10, 19) }.Validate());
         Assert.ThrowsAny<Exception>(() => new QisemiQuery { PageSize = 101 }.Validate());
+        Assert.ThrowsAny<Exception>(() => new QisemiQuery { SortBy = "name;DROP TABLE x" }.Validate());
+        Assert.ThrowsAny<Exception>(() => new QisemiQuery { SortDirection = "sideways" }.Validate());
+        Assert.ThrowsAny<Exception>(() => new QisemiQuery { ResultCategoryId = -1 }.Validate());
         Assert.Equal("库存.xlsx", QisemiRules.SafeName("../../库存.xlsx\r\n"));
     }
     [Fact]

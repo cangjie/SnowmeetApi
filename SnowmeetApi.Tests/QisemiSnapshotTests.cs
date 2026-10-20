@@ -67,6 +67,10 @@ public class QisemiSnapshotTests
         var data=JsonSerializer.SerializeToElement(await service.ReadAsync("inventory",new(){SourceId=1,PageSize=30},null,null,default),new JsonSerializerOptions(JsonSerializerDefaults.Web));
         var items=data.GetProperty("result").GetProperty("items");Assert.InRange(items.GetArrayLength(),1,30);
         Assert.All(items.EnumerateArray(),item=>Assert.True(item.TryGetProperty("quantityMain",out _)));
+        var result = data.GetProperty("result");
+        Assert.Equal(result.GetProperty("total").GetString(), result.GetProperty("unfilteredTotal").GetString());
+        Assert.True(result.GetProperty("categoryFacets").GetArrayLength() > 1);
+        Assert.True(result.GetProperty("categoryFacets").EnumerateArray().Sum(c => long.Parse(c.GetProperty("count").GetString()!)) >= long.Parse(result.GetProperty("total").GetString()!));
     }
     [QisemiSnapshotFact]
     public async Task InStockFirstPageAndWarehouseSelectionReadTheCompleteSnapshot()
