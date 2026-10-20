@@ -31,6 +31,7 @@ public sealed class QisemiQuery
     [Range(1, long.MaxValue)] public long? CategoryId { get; set; }
     [Range(1, long.MaxValue)] public long? TopCategoryId { get; set; }
     [Range(0, long.MaxValue)] public long? ResultCategoryId { get; set; }
+    [Range(1, long.MaxValue)] public long? ResultWarehouseId { get; set; }
     [RegularExpression("^(name|topCategory)$")] public string SortBy { get; set; } = "name";
     [RegularExpression("^(asc|desc)$")] public string SortDirection { get; set; } = "asc";
     [StringLength(160)] public string? WarehouseKeyword { get; set; }

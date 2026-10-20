@@ -175,6 +175,48 @@ public class QisemiSqlServerTests
         Assert.Equal("0", (await Inventory(new() { InStockOnly = true, WarehouseId = 1 })).GetProperty("total").GetString());
     }
     [QisemiLocalDbFact]
+    public async Task ResultWarehouseFacetsCountWholeStylesAndKeepCategoryPagingAndVisibility()
+    {
+        await using var f = await Fixture.Create();
+        async Task<JsonElement> Inventory(QisemiQuery q) => (await f.Read("inventory", q)).GetProperty("result");
+        var initial = await Inventory(new() { Keyword = "Fischer", PageSize = 1 });
+        var firstWarehouse = Assert.Single(initial.GetProperty("warehouseFacets").EnumerateArray());
+        Assert.Equal("1", firstWarehouse.GetProperty("id").GetString());
+        Assert.Equal("1", firstWarehouse.GetProperty("count").GetString());
+        Assert.Equal("2", initial.GetProperty("warehouseUnfilteredTotal").GetString());
+        var size = await Inventory(new() { Keyword = "26.5", ResultWarehouseId = 1 });
+        var style = Assert.Single(size.GetProperty("items").EnumerateArray());
+        Assert.Equal("3", style.GetProperty("sizeCount").GetString());
+        Assert.Equal(2m, style.GetProperty("quantityMain").GetDecimal());
+        Assert.Equal("0", (await Inventory(new() { ResultWarehouseId = 2 })).GetProperty("total").GetString());
+        await f.Exec("INSERT dbo.qsm_stock_snapshot(source_id,batch_id,raw_record_id,sku_id,warehouse_id,quantity_main) VALUES(1,1,132,12,2,1),(1,1,132,14,2,5); INSERT dbo.qsm_category(source_id,source_key,last_seen_batch_id,last_raw_record_id,category_kind,parent_id,name) VALUES(1,N'boots',1,100,'product',NULL,N'雪鞋'),(1,N'helmet',1,100,'product',NULL,N'头盔'); UPDATE dbo.qsm_product_sku SET category_id=CASE WHEN id=14 THEN 2 ELSE 1 END;");
+        var both = await Inventory(new() { PageSize = 1, ResultWarehouseId = 2, SortBy = "topCategory" });
+        Assert.Equal("2", both.GetProperty("total").GetString());
+        Assert.Equal(2, both.GetProperty("warehouseFacets").GetArrayLength());
+        Assert.Equal("2", both.GetProperty("warehouseFacets").EnumerateArray().Single(w => w.GetProperty("id").GetString() == "2").GetProperty("count").GetString());
+        Assert.Equal(2, both.GetProperty("categoryFacets").GetArrayLength());
+        var pageTwo = await Inventory(new() { PageSize = 1, Page = 2, ResultWarehouseId = 2, SortBy = "topCategory" });
+        Assert.Equal(both.GetProperty("warehouseFacets").GetRawText(), pageTwo.GetProperty("warehouseFacets").GetRawText());
+        var cancelingSizes = await Inventory(new() { ResultWarehouseId = 2, Keyword = "26.5" });
+        Assert.Equal(0m, Assert.Single(cancelingSizes.GetProperty("items").EnumerateArray()).GetProperty("quantityMain").GetDecimal());
+        var helmet = await Inventory(new() { ResultCategoryId = 2 });
+        var helmetWarehouse = Assert.Single(helmet.GetProperty("warehouseFacets").EnumerateArray());
+        Assert.Equal("2", helmetWarehouse.GetProperty("id").GetString());
+        Assert.Equal("1", helmetWarehouse.GetProperty("count").GetString());
+        Assert.Equal("1", helmet.GetProperty("warehouseUnfilteredTotal").GetString());
+        var noHelmet = await Inventory(new() { ResultCategoryId = 2, ResultWarehouseId = 1 });
+        Assert.Equal("0", noHelmet.GetProperty("total").GetString());
+        Assert.Equal("2", Assert.Single(noHelmet.GetProperty("warehouseFacets").EnumerateArray()).GetProperty("id").GetString());
+        var scoped = await Inventory(new() { WarehouseId = 1, InStockOnly = true });
+        Assert.Equal("1", Assert.Single(scoped.GetProperty("warehouseFacets").EnumerateArray()).GetProperty("id").GetString());
+        Assert.Equal(400, (await Assert.ThrowsAsync<QisemiReadException>(() => Inventory(new() { WarehouseId = 1, ResultWarehouseId = 2 }))).Status);
+        await f.Delete("warehouse", 1, true);
+        Assert.Equal(404, (await Assert.ThrowsAsync<QisemiReadException>(() => Inventory(new() { ResultWarehouseId = 1 }))).Status);
+        Assert.Equal("2", Assert.Single((await Inventory(new())).GetProperty("warehouseFacets").EnumerateArray()).GetProperty("id").GetString());
+        await f.Delete("raw_record", 132, true);
+        Assert.Empty((await Inventory(new())).GetProperty("warehouseFacets").EnumerateArray());
+    }
+    [QisemiLocalDbFact]
     public async Task InventorySortAndResultCategoryFacetsApplyBeforePaging()
     {
         await using var f = await Fixture.Create();

@@ -81,7 +81,7 @@
     const seq = ++state.seq; state.controller?.abort(); state.controller = new AbortController();
     for(const d of state.styles.values())if(d.loading){d.loading=false;if(!d.data)d.expanded=false;}
     const nextRoute = route();
-    if (nextRoute.warehouseId !== state.route.warehouseId) clearStyles();
+    if ((nextRoute.resultWarehouseId || nextRoute.warehouseId) !== (state.route.resultWarehouseId || state.route.warehouseId)) clearStyles();
     state.route = nextRoute; state.files.clear(); notice.hidden = true;
     document.querySelectorAll('[data-tab]').forEach(b => b.setAttribute('aria-current', b.dataset.tab === state.route.tab ? 'page' : 'false'));
     show(empty('正在读取…')); screen.setAttribute('aria-busy', 'true');
@@ -99,7 +99,7 @@
   async function inventory(seq) {
     const r = state.route;
     show(inventoryForm()+empty('正在读取库存…'));
-    const data = await api.request('Inventory', { keyword: r.keyword, warehouseId: r.warehouseId, topCategoryId: r.topCategoryId, resultCategoryId: r.resultCategoryId, sortBy:r.sortBy || 'name', sortDirection:r.sortDirection || 'asc', inStockOnly: r.inStockOnly !== 'false', skuId: r.skuId, page: r.page || 1 }, state.controller.signal);
+    const data = await api.request('Inventory', { keyword: r.keyword, warehouseId: r.warehouseId, resultWarehouseId:r.resultWarehouseId, topCategoryId: r.topCategoryId, resultCategoryId: r.resultCategoryId, sortBy:r.sortBy || 'name', sortDirection:r.sortDirection || 'asc', inStockOnly: r.inStockOnly !== 'false', skuId: r.skuId, page: r.page || 1 }, state.controller.signal);
     if (seq !== state.seq) return;
     const visibleIds=new Set(data.result.items.map(row=>row.id));
     for(const [key,d] of state.styles)if(!visibleIds.has(key)){if(d.photo)URL.revokeObjectURL(d.photo);state.styles.delete(key);}
@@ -107,9 +107,11 @@
   }
   function paintInventory() {
     const rows = state.list.items;
-    show(inventoryForm() + inventorySorting() + inventoryFacets() + `<div class="qs-meta"><span role="status">共 <strong>${esc(state.list.total)}</strong> 款</span>${button('about', '数据说明')}</div><div id="inventory-info" class="qs-info" hidden>分类括号内为当前搜索、顶级分类、仓库和库存条件下全部结果的款数，不是库存件数；点击分类可二次筛选，同款多个分类可分别计入。分类排序按分类名称，同款跨分类时取匹配分类中名称最前的一项，无分类排最后。“只看有库存”按所选仓库范围内至少一个尺码的账面数量大于零筛选。全部仓库按尺码总库存判断。取消勾选可查看零或负库存款式。零库存尺码保留；仓库未完整采集时数量显示“未知”。各模块采集时间可能不同，详见页面底部。</div><div class="qs-results">${rows.length ? rows.map(card).join('') : empty('没有匹配的商品，请更换关键词、调整分类或仓库，或取消“只看有库存”。')}</div>` + pager(state.list.total, state.route.page));
-    const strip = document.querySelector('.qs-category-facets'), selected = strip?.querySelector('[aria-pressed="true"]');
-    if (selected && selected.offsetLeft + selected.offsetWidth > strip.clientWidth) strip.scrollLeft = selected.offsetLeft + selected.offsetWidth - strip.clientWidth + 8;
+    show(inventoryForm() + inventorySorting() + inventoryFacets() + inventoryWarehouseFacets() + `<div class="qs-meta"><span role="status">共 <strong>${esc(state.list.total)}</strong> 款</span>${button('about', '数据说明')}</div><div id="inventory-info" class="qs-info" hidden>“有货仓库”括号内为当前结果中该仓至少一个尺码有正库存的款数；零、负数和未知不计入，可用上方仓库筛选查看。点击后按所选仓显示数量，点“全部仓库”恢复。分类括号内为当前搜索、顶级分类、仓库和库存条件下全部结果的款数，不是库存件数；点击分类可二次筛选，同款多个分类可分别计入。分类排序按分类名称，同款跨分类时取匹配分类中名称最前的一项，无分类排最后。“只看有库存”按所选仓库范围内至少一个尺码的账面数量大于零筛选。全部仓库按尺码总库存判断。取消勾选可查看零或负库存款式。零库存尺码保留；仓库未完整采集时数量显示“未知”。各模块采集时间可能不同，详见页面底部。</div><div class="qs-results">${rows.length ? rows.map(card).join('') : empty('没有匹配的商品，请更换关键词、调整分类或仓库，或取消“只看有库存”。')}</div>` + pager(state.list.total, state.route.page));
+    for (const strip of document.querySelectorAll('.qs-category-facets')) {
+      const selected = strip.querySelector('[aria-pressed="true"]');
+      if (selected && selected.offsetLeft + selected.offsetWidth > strip.clientWidth) strip.scrollLeft = selected.offsetLeft + selected.offsetWidth - strip.clientWidth + 8;
+    }
   }
   function inventorySorting() {
     const r = state.route;
@@ -118,7 +120,12 @@
   function inventoryFacets() {
     const selected = state.route.resultCategoryId || '';
     const choices = [{id:'',name:'全部',count:state.list.unfilteredTotal ?? state.list.total},...(state.list.categoryFacets || [])];
-    return `<nav class="qs-category-facets" aria-label="结果分类二次筛选" tabindex="0">${choices.map(c => `<button type="button" data-action="result-category" data-id="${esc(c.id)}" aria-pressed="${selected === c.id}">${esc(c.name)}<span>（${esc(c.count)}）</span></button>`).join('')}</nav>`;
+    return `<div class="qs-result-facet-label">商品分类</div><nav class="qs-category-facets" aria-label="结果分类二次筛选" tabindex="0">${choices.map(c => `<button type="button" data-action="result-category" data-id="${esc(c.id)}" aria-pressed="${selected === c.id}">${esc(c.name)}<span>（${esc(c.count)}）</span></button>`).join('')}</nav>`;
+  }
+  function inventoryWarehouseFacets() {
+    const selected = state.route.resultWarehouseId || '';
+    const choices = [{id:'',name:'全部仓库',count:state.list.warehouseUnfilteredTotal ?? state.list.total},...(state.list.warehouseFacets || [])];
+    return `<div class="qs-result-facet-label">有货仓库</div><nav class="qs-category-facets qs-warehouse-facets" aria-label="结果仓库二次筛选" tabindex="0">${choices.map(w => `<button type="button" data-action="result-warehouse" data-id="${esc(w.id)}" aria-pressed="${selected === w.id}">${esc(w.name)}<span>（${esc(w.count)}）</span></button>`).join('')}</nav>`;
   }
   function categoryPaths(row) {
     const paths = row.categoryPaths || [];
@@ -132,7 +139,8 @@
     if (!d.data) return '';
     const sizes = d.data.sizes, active = sizes.find(s => s.id === d.active) || sizes.find(s => s.id === state.route.skuId) || sizes.find(s => s.sizeLabel && (state.route.keyword || '').includes(s.sizeLabel)) || sizes[0];
     d.active = active.id;
-    const warehouses = d.data.warehouses.filter(w => (!state.route.warehouseId || w.id === state.route.warehouseId) && (!d.query || w.name.toLowerCase().includes(d.query.toLowerCase())));
+    const warehouseId = state.route.resultWarehouseId || state.route.warehouseId;
+    const warehouses = d.data.warehouses.filter(w => (!warehouseId || w.id === warehouseId) && (!d.query || w.name.toLowerCase().includes(d.query.toLowerCase())));
     const cell = (sku, w) => sku.warehouses.find(x => x.warehouseId === w.id) || { quantityMain: null, quantityState: 'unknown' };
     const sum = sku => warehouses.length && warehouses.every(w => cell(sku,w).quantityMain !== null) ? warehouses.reduce((n,w) => n + cell(sku,w).quantityMain, 0) : null;
     const visible = warehouses.filter(w => d.zero || (d.matrix ? sizes.some(s => cell(s,w).quantityMain !== 0) : cell(active,w).quantityMain !== 0));
@@ -144,7 +152,7 @@
     if (!d.expanded || (d.data && !retry)) return;
     const seq = state.seq; d.loading = true; d.error = ''; paintInventory();
     try {
-      const data = await api.request('Styles/' + id, { includeZero: true, warehouseId: state.route.warehouseId }, state.controller.signal);
+      const data = await api.request('Styles/' + id, { includeZero: true, warehouseId: state.route.resultWarehouseId || state.route.warehouseId }, state.controller.signal);
       if (seq !== state.seq) return; d.data = data.result;
       loadThumbnail(id,d,seq);
     } catch (e) { if (seq !== state.seq || e.name === 'AbortError') return; if (e.status === 409) fail(e); d.error = e.message; }
@@ -269,14 +277,15 @@
     else if (action === 'retry') {if(state.modules.length)render();else boot().catch(fail);}
     else if (action === 'catalog') go({tab:r.tab});
     else if (action === 'module') go({tab:r.tab,module,view:'list'});
-    else if (action === 'clear-search') go({...r,keyword:'',skuId:'',resultCategoryId:'',page:1});
+    else if (action === 'clear-search') go({...r,keyword:'',skuId:'',resultCategoryId:'',resultWarehouseId:'',page:1});
     else if (action === 'result-category') go({...r,resultCategoryId:id,page:1});
+    else if (action === 'result-warehouse') go({...r,resultWarehouseId:id,page:1});
     else if (action === 'clear-sku') go({...r,skuId:'',page:1});
     else if (action === 'clear-links') go({...r,skuId:'',documentId:'',warehouseId:'',page:1});
     else if (action === 'about') document.getElementById('inventory-info').hidden = !document.getElementById('inventory-info').hidden;
     else if (action === 'expand' || action === 'style-retry') expand(id,action === 'style-retry');
     else if (action === 'size' || action === 'style-view') { const d = state.styles.get(id); if (action === 'size') { d.active=sku;d.matrix=false; } else d.matrix=target.dataset.view==='matrix'; paintInventory(); }
-    else if (action === 'sku-flow') go({tab:'more',module:'stock_movements',skuId:sku,warehouseId:r.warehouseId});
+    else if (action === 'sku-flow') go({tab:'more',module:'stock_movements',skuId:sku,warehouseId:r.resultWarehouseId || r.warehouseId});
     else if (action === 'sku-files') go({tab:'more',module:'media',skuId:sku});
     else if (action === 'linked-stock') go({tab:'inventory',skuId:id});
     else if (action === 'warehouse-stock') go({tab:'inventory',warehouseId:id});
@@ -298,9 +307,9 @@
     else go({...state.route,keyword:document.getElementById('browser-keyword').value.trim(),dateFrom:document.getElementById('date-from')?.value,dateTo:document.getElementById('date-to')?.value,state:document.getElementById('browser-state')?.value,fileType:document.getElementById('file-type')?.value,page:1});
   });
   document.addEventListener('change', e => {
-    if (e.target.id === 'inventory-warehouse') { clearStyles();go({...state.route,warehouseId:e.target.value,resultCategoryId:'',page:1}); }
-    if (e.target.id === 'inventory-category') go({...state.route,topCategoryId:e.target.value,resultCategoryId:'',page:1});
-    if (e.target.id === 'inventory-in-stock') go({...state.route,inStockOnly:e.target.checked,resultCategoryId:'',page:1});
+    if (e.target.id === 'inventory-warehouse') { clearStyles();go({...state.route,warehouseId:e.target.value,resultCategoryId:'',resultWarehouseId:'',page:1}); }
+    if (e.target.id === 'inventory-category') go({...state.route,topCategoryId:e.target.value,resultCategoryId:'',resultWarehouseId:'',page:1});
+    if (e.target.id === 'inventory-in-stock') go({...state.route,inStockOnly:e.target.checked,resultCategoryId:'',resultWarehouseId:'',page:1});
     if (e.target.id === 'inventory-sort-by') go({...state.route,sortBy:e.target.value,page:1});
     if (e.target.id === 'inventory-sort-direction') go({...state.route,sortDirection:e.target.value,page:1});
     if (e.target.dataset.zero) { state.styles.get(e.target.dataset.zero).zero=e.target.checked;paintInventory(); }

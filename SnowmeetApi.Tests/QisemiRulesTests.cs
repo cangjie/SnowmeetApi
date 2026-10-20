@@ -29,6 +29,7 @@ public class QisemiRulesTests
         Assert.ThrowsAny<Exception>(() => new QisemiQuery { SortBy = "name;DROP TABLE x" }.Validate());
         Assert.ThrowsAny<Exception>(() => new QisemiQuery { SortDirection = "sideways" }.Validate());
         Assert.ThrowsAny<Exception>(() => new QisemiQuery { ResultCategoryId = -1 }.Validate());
+        Assert.ThrowsAny<Exception>(() => new QisemiQuery { ResultWarehouseId = 0 }.Validate());
         Assert.Equal("库存.xlsx", QisemiRules.SafeName("../../库存.xlsx\r\n"));
     }
     [Fact]

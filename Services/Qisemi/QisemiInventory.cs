@@ -60,23 +60,29 @@ public sealed partial class QisemiReadService
 
     private static async Task<object> Inventory(QisemiSql sql, QisemiScope s, QisemiQuery q)
     {
+        var warehouses = await WarehouseRows(sql, s);
+        var warehouseIndex = warehouses.ToDictionary(w => (string)w["id"]!);
+        foreach (long id in new[] { q.WarehouseId, q.ResultWarehouseId }.OfType<long>())
+            if (!warehouseIndex.ContainsKey(QisemiRules.Id(id))) throw new QisemiReadException(404, "仓库不存在或已删除");
+        if (q.WarehouseId != null && q.ResultWarehouseId != null && q.WarehouseId != q.ResultWarehouseId)
+            throw new QisemiReadException(400, "结果仓库超出当前仓库筛选范围");
+        long? displayWarehouseId = q.ResultWarehouseId ?? q.WarehouseId;
         bool covered = false;
-        if (q.WarehouseId != null)
+        if (displayWarehouseId != null)
         {
-            var warehouse = (await WarehouseRows(sql, s)).SingleOrDefault(w => (string)w["id"]! == QisemiRules.Id(q.WarehouseId.Value))
-                ?? throw new QisemiReadException(404, "仓库不存在或已删除");
+            var warehouse = warehouseIndex[QisemiRules.Id(displayWarehouseId.Value)];
             covered = (bool)warehouse["coverageComplete"]!;
         }
         string qty, join;
         const string visibleStock = "st.valid=1 AND qr.id IS NOT NULL AND qm.id IS NOT NULL AND qb.id IS NOT NULL";
-        if (q.WarehouseId == null)
+        if (displayWarehouseId == null)
         {
             join = $"LEFT JOIN dbo.qsm_stock_total st ON st.sku_id=k.id AND st.source_id=k.source_id AND st.batch_id={sql.Add(s.BatchId)}";
             qty = $"CASE WHEN {visibleStock} THEN st.quantity_main END";
         }
         else
         {
-            join = $"LEFT JOIN dbo.qsm_stock_snapshot st ON st.sku_id=k.id AND st.source_id=k.source_id AND st.batch_id={sql.Add(s.BatchId)} AND st.warehouse_id={sql.Add(q.WarehouseId)}";
+            join = $"LEFT JOIN dbo.qsm_stock_snapshot st ON st.sku_id=k.id AND st.source_id=k.source_id AND st.batch_id={sql.Add(s.BatchId)} AND st.warehouse_id={sql.Add(displayWarehouseId)}";
             qty = $"CASE WHEN {visibleStock} THEN st.quantity_main WHEN st.id IS NULL AND {sql.Add(covered ? 1 : 0)}=1 THEN CONVERT(decimal(19,6),0) END";
         }
         var categories = await ProductCategoryRows(sql, s);
@@ -126,7 +132,9 @@ public sealed partial class QisemiReadService
             while (pending.TryDequeue(out string? category))
                 if (categoryIds.Add(category)) foreach (var child in children[category]) pending.Enqueue((string)child["id"]!);
         }
-        string negativeJoin=q.NegativeOnly?join:"";
+        string negativeJoin = !q.NegativeOnly ? "" : q.WarehouseId == null
+            ? $"LEFT JOIN dbo.qsm_stock_total st ON st.sku_id=k.id AND st.source_id=k.source_id AND st.batch_id={sql.Add(s.BatchId)}"
+            : $"LEFT JOIN dbo.qsm_stock_snapshot st ON st.sku_id=k.id AND st.source_id=k.source_id AND st.batch_id={sql.Add(s.BatchId)} AND st.warehouse_id={sql.Add(q.WarehouseId)}";
         string negativeWhere=q.NegativeOnly?$" AND st.valid=1 AND st.quantity_main<0 AND {RawVisible("st.raw_record_id","st.source_id","st.batch_id")}":"";
         // The sparse raw-owner keys otherwise invite a quadratic nested-loop plan
         // after bulk import. Hash joins bound scans; cap their grant so a small
@@ -149,13 +157,42 @@ public sealed partial class QisemiReadService
             && (categoryIds == null || row["categoryId"] is string category && categoryIds.Contains(category))
             && ((skuMasks.GetValueOrDefault(((string)row["id"]!, (string)row["skuId"]!)) | (row["categoryId"] is string leaf ? categoryMasks.GetValueOrDefault(leaf) : 0)) & requiredMask) == requiredMask)
             .ToArray();
-        // Facets describe the entire primary result, before secondary filtering or
-        // paging. A style counts once per matching root, even with multiple sizes.
-        var facets = matched.GroupBy(RootOf).Select(group => new Dictionary<string, object?> {
+        // Warehouses with positive stock for any visible size of a matched style.
+        // Keep this independent of the size hit by the keyword and of pagination.
+        var primaryStyles = matched.Select(row => (string)row["id"]!).ToHashSet();
+        var stockByWarehouse = new Dictionary<string, HashSet<string>>();
+        if (primaryStyles.Count > 0)
+        {
+            var positive = await sql.Rows($@"SELECT DISTINCT a.style_id,st.warehouse_id FROM {SkuLink()}
+                JOIN dbo.qsm_stock_snapshot st ON st.sku_id=k.id AND st.source_id=k.source_id AND st.batch_id={sql.Add(s.BatchId)}
+                JOIN dbo.qsm_raw_record sr ON sr.id=st.raw_record_id AND sr.source_id=st.source_id AND sr.batch_id=st.batch_id AND sr.valid=1
+                JOIN dbo.qsm_import_module sm ON sm.id=sr.module_id AND sm.source_id=sr.source_id AND sm.batch_id=sr.batch_id AND sm.valid=1 AND sm.state IN ('complete','empty')
+                JOIN dbo.qsm_import_batch sb ON sb.id=sr.batch_id AND sb.source_id=sr.source_id AND sb.valid=1 AND sb.state='published' AND sb.verification_passed=1 AND sb.published_at IS NOT NULL
+                WHERE a.valid=1 AND a.source_id={sql.Add(s.SourceId)} AND st.valid=1 AND st.quantity_main>0{sql.Optional("st.warehouse_id", q.WarehouseId)}
+                OPTION(HASH JOIN,RECOMPILE,MAX_GRANT_PERCENT=1,MAXDOP 1)");
+            foreach (var row in positive)
+            {
+                string warehouseId = (string)row["warehouseId"]!, styleId = (string)row["styleId"]!;
+                if (!warehouseIndex.ContainsKey(warehouseId) || !primaryStyles.Contains(styleId)) continue;
+                if (!stockByWarehouse.TryGetValue(warehouseId, out var set)) stockByWarehouse[warehouseId] = set = new();
+                set.Add(styleId);
+            }
+        }
+        bool InCategory(Dictionary<string, object?> row) => q.ResultCategoryId == null || RootOf(row) == QisemiRules.Id(q.ResultCategoryId.Value);
+        var categoryStyles = matched.Where(InCategory).Select(row => (string)row["id"]!).ToHashSet();
+        var warehouseFacets = warehouses.Where(w => stockByWarehouse.ContainsKey((string)w["id"]!)).Select(w => new Dictionary<string, object?> {
+            ["id"] = w["id"], ["name"] = w["name"],
+            ["count"] = QisemiRules.Id(stockByWarehouse[(string)w["id"]!].Count(categoryStyles.Contains))
+        }).Where(w => (string)w["count"]! != "0").ToArray();
+        var warehouseMatched = q.ResultWarehouseId == null ? matched : matched.Where(row =>
+            stockByWarehouse.TryGetValue(QisemiRules.Id(q.ResultWarehouseId.Value), out var set) && set.Contains((string)row["id"]!)).ToArray();
+        // Each facet excludes its own selection and reflects the other selection,
+        // before paging. A style counts once per root, even with multiple sizes.
+        var facets = warehouseMatched.GroupBy(RootOf).Select(group => new Dictionary<string, object?> {
             ["id"] = group.Key, ["name"] = group.Key == "0" ? "未分类" : roots[group.Key]["name"],
             ["count"] = QisemiRules.Id(group.Select(row => (string)row["id"]!).Distinct().LongCount())
         }).OrderBy(row => (string)row["id"]! == "0").ThenBy(row => (string)row["name"]!, StringComparer.OrdinalIgnoreCase).ToArray();
-        var filtered = matched.Where(row => q.ResultCategoryId == null || RootOf(row) == QisemiRules.Id(q.ResultCategoryId.Value)).ToArray();
+        var filtered = warehouseMatched.Where(InCategory).ToArray();
         string matchedIds=sql.Add(JsonSerializer.Serialize(filtered.Select(row => (string)row["id"]!).Distinct()));
         where=$"p.valid=1 AND p.source_id={sql.Add(s.SourceId)} AND p.id IN(SELECT CONVERT(bigint,[value]) FROM OPENJSON({matchedIds}))";
         // Page identities before calculating inventory. Calculating totals for the
@@ -175,7 +212,9 @@ public sealed partial class QisemiReadService
         }
         var page = await sql.Page("p.*", from, where, order, q);
         page["categoryFacets"] = facets;
-        page["unfilteredTotal"] = QisemiRules.Id(matched.Select(row => (string)row["id"]!).Distinct().LongCount());
+        page["unfilteredTotal"] = QisemiRules.Id(warehouseMatched.Select(row => (string)row["id"]!).Distinct().LongCount());
+        page["warehouseFacets"] = warehouseFacets;
+        page["warehouseUnfilteredTotal"] = QisemiRules.Id(categoryStyles.Count);
         var items = (List<Dictionary<string,object?>>)page["items"]!;
         if(items.Count==0)return page;
         var categoryRows = matches;
