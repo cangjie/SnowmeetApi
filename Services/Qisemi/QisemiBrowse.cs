@@ -156,9 +156,16 @@ public sealed partial class QisemiReadService
         string where = $"r.valid=1 AND r.source_id={sql.Add(s.SourceId)} AND r.id={sql.Add(id)} AND {RawVisible("r.id", "r.source_id", "r.batch_id")}" + await RawOwnerWhere(sql, s);
         if (sameBatch) where += sql.Optional("r.batch_id", s.BatchId);
         var record = await sql.One($"SELECT r.id,r.module_id,r.batch_id,m.module_key,m.carrier,r.row_ordinal,r.source_entity_key,r.parent_source_key,r.payload_hash,r.duplicate_ordinal,r.sheet_id,r.payload_json FROM dbo.qsm_raw_record r JOIN dbo.qsm_import_module m ON m.id=r.module_id AND m.source_id=r.source_id AND m.batch_id=r.batch_id AND m.valid=1 WHERE {where}");
-        var documents = await sql.Rows($@"SELECT DISTINCT v.document_id,v.id version_id,v.version_kind,d.document_type FROM dbo.qsm_document_version v
-            JOIN dbo.qsm_document d ON d.id=v.document_id AND d.source_id=v.source_id AND d.valid=1 WHERE {ScopeWhere(sql, s, "v")} AND {DocumentVisible("v")}
-            AND (v.raw_record_id={sql.Add(id)} OR EXISTS(SELECT 1 FROM dbo.qsm_document_line l WHERE l.valid=1 AND l.document_version_id=v.id AND l.source_id=v.source_id AND l.raw_record_id={sql.Add(id)}))");
+        // Resolve candidate version IDs before the visibility joins. An OR with a
+        // correlated line lookup can rescan all document lines for every version.
+        string source = sql.Add(s.SourceId), rawId = sql.Add(id);
+        var documents = await sql.Rows($@"SET NOCOUNT ON; DECLARE @versions TABLE(id bigint NOT NULL PRIMARY KEY);
+            INSERT INTO @versions(id)
+                SELECT id FROM dbo.qsm_document_version WHERE source_id={source} AND raw_record_id={rawId}
+                UNION SELECT document_version_id FROM dbo.qsm_document_line WHERE source_id={source} AND valid=1 AND raw_record_id={rawId};
+            SELECT DISTINCT v.document_id,v.id version_id,v.version_kind,d.document_type FROM @versions candidates
+            JOIN dbo.qsm_document_version v ON v.id=candidates.id
+            JOIN dbo.qsm_document d ON d.id=v.document_id AND d.source_id=v.source_id AND d.valid=1 WHERE {ScopeWhere(sql, s, "v")} AND {DocumentVisible("v")}");
         return new { record, documents };
     }
 

@@ -69,6 +69,16 @@ public class QisemiSnapshotTests
         Assert.All(items.EnumerateArray(),item=>Assert.True(item.TryGetProperty("quantityMain",out _)));
     }
     [QisemiSnapshotFact]
+    public async Task MostRecentDocumentDetailRetainsItsRawRecordAssociation()
+    {
+        var docs = await Read("documents");
+        long id = long.Parse(docs.GetProperty("items")[0].GetProperty("id").GetString()!);
+        var detail = await Read("document", id: id);
+        Assert.Equal(QisemiRules.Id(id), detail.GetProperty("document").GetProperty("documentId").GetString());
+        Assert.Contains(detail.GetProperty("raw").GetProperty("documents").EnumerateArray(),
+            row => row.GetProperty("documentId").GetString() == QisemiRules.Id(id));
+    }
+    [QisemiSnapshotFact]
     public async Task RealBootStyleAndCurrentDocumentDetailsRetainTheirAssociations()
     {
         var boots = await Read("inventory", new() { Keyword = "Fischer RC4 110 MV BOA VAC 26.5" });
