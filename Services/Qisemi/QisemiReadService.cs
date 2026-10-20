@@ -22,7 +22,7 @@ public sealed partial class QisemiReadService(IQisemiConnectionFactory connectio
             var sources = await sql.Rows("SELECT s.id,s.display_name,s.source_timezone,s.current_full_batch_id,s.current_inventory_batch_id FROM dbo.qsm_source s WHERE s.valid=1 ORDER BY s.id");
             await tx.CommitAsync(ct); return new { items = sources, authentication = "reserved_headers_no_validation" };
         }
-        bool inventory = operation is "inventory" or "style" or "warehouses" or "stockTotals" or "warehouseStocks";
+        bool inventory = operation is "inventory" or "style" or "warehouses" or "topCategories" or "stockTotals" or "warehouseStocks";
         var scope = await Scope(sql, query, inventory);
         object data = operation switch
         {
@@ -31,6 +31,7 @@ public sealed partial class QisemiReadService(IQisemiConnectionFactory connectio
             "inventory" => await Inventory(sql, scope, query),
             "style" => await Style(sql, scope, query, id!.Value),
             "warehouses" => await Warehouses(sql, scope, query),
+            "topCategories" => (await ProductCategoryRows(sql, scope)).Where(c => c["parentId"] == null).ToArray(),
             "documents" => await Documents(sql, scope, query),
             "document" => await Document(sql, scope, id!.Value, query.VersionId),
             "version" => await Version(sql, scope, id!.Value),

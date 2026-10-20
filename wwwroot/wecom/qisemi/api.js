@@ -4,7 +4,7 @@
   else root.QisemiApi = api;
 })(typeof globalThis === 'object' ? globalThis : this, function () {
   'use strict';
-  const inventoryPaths = /^(Inventory|Styles\/|Warehouses$|StockTotals$|WarehouseStocks$)/;
+  const inventoryPaths = /^(Inventory|Styles\/|Warehouses$|TopCategories$|StockTotals$|WarehouseStocks$)/;
   class ApiError extends Error { constructor(message, status) { super(message); this.status = status; } }
   function create(options = {}) {
     const transport = options.fetch || globalThis.fetch.bind(globalThis);

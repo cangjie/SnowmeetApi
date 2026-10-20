@@ -69,6 +69,25 @@ public class QisemiSnapshotTests
         Assert.All(items.EnumerateArray(),item=>Assert.True(item.TryGetProperty("quantityMain",out _)));
     }
     [QisemiSnapshotFact]
+    public async Task InStockFirstPageAndWarehouseSelectionReadTheCompleteSnapshot()
+    {
+        var all = await Read("inventory");
+        var stocked = await Read("inventory", new() { InStockOnly = true });
+        Assert.InRange(long.Parse(stocked.GetProperty("total").GetString()!), 1, long.Parse(all.GetProperty("total").GetString()!) - 1);
+        var warehouses = await Read("warehouses");
+        long flagship = long.Parse(warehouses.EnumerateArray().Single(w => w.GetProperty("name").GetString() == "【旗舰】零售商品仓").GetProperty("id").GetString()!);
+        var scoped = await Read("inventory", new() { WarehouseId = flagship, InStockOnly = true });
+        Assert.NotEmpty(scoped.GetProperty("items").EnumerateArray());
+        long styleId = long.Parse(scoped.GetProperty("items")[0].GetProperty("id").GetString()!);
+        var detail = await Read("style", new() { WarehouseId = flagship, IncludeZero = true }, styleId);
+        Assert.Contains(detail.GetProperty("sizes").EnumerateArray(), size => size.GetProperty("warehouses").EnumerateArray().Any(cell => cell.GetProperty("quantityMain").ValueKind == JsonValueKind.Number && cell.GetProperty("quantityMain").GetDecimal() > 0));
+        Assert.All(detail.GetProperty("sizes").EnumerateArray(), size => Assert.Equal(QisemiRules.Id(flagship), Assert.Single(size.GetProperty("warehouses").EnumerateArray()).GetProperty("warehouseId").GetString()));
+        var categories = await Read("topCategories");
+        var root = categories.EnumerateArray().Single(c => c.GetProperty("name").GetString() == "【硬件】双板鞋");
+        var boots = await Read("inventory", new() { TopCategoryId = long.Parse(root.GetProperty("id").GetString()!), InStockOnly = true, WarehouseId = flagship, Keyword = "Fischer 110 26.5" });
+        Assert.NotEmpty(boots.GetProperty("items").EnumerateArray());
+    }
+    [QisemiSnapshotFact]
     public async Task MostRecentDocumentDetailRetainsItsRawRecordAssociation()
     {
         var docs = await Read("documents");

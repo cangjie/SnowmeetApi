@@ -32,6 +32,11 @@ public sealed partial class QisemiReadService
         JOIN dbo.qsm_import_module {sku}m ON {sku}m.id={sku}r.module_id AND {sku}m.source_id={sku}r.source_id AND {sku}m.batch_id={sku}r.batch_id AND {sku}m.valid=1 AND {sku}m.state IN ('complete','empty')
         JOIN dbo.qsm_import_batch {sku}b ON {sku}b.id={sku}r.batch_id AND {sku}b.source_id={sku}r.source_id AND {sku}b.valid=1 AND {sku}b.state='published' AND {sku}b.verification_passed=1 AND {sku}b.published_at IS NOT NULL";
 
+    private static Task<List<Dictionary<string, object?>>> ProductCategoryRows(QisemiSql sql, QisemiScope s)
+        => sql.Rows($@"SELECT c.id,c.name,c.parent_id,c.sort,c.source_enabled,c.source_deleted FROM dbo.qsm_category c
+            WHERE c.source_id={sql.Add(s.SourceId)} AND c.category_kind='product' AND {MasterVisible("c")}
+            ORDER BY c.sort,c.name,c.id");
+
     private static async Task<object> Inventory(QisemiSql sql, QisemiScope s, QisemiQuery q)
     {
         bool covered = false;
@@ -55,14 +60,45 @@ public sealed partial class QisemiReadService
         }
         string where = $"p.valid=1 AND p.source_id={sql.Add(s.SourceId)}"
             + sql.Optional("p.id", q.StyleId) + sql.Optional("p.category_id", q.CategoryId);
+        if (q.InStockOnly)
+        {
+            // Stock eligibility belongs to the whole style, independently of the
+            // SKU matched by a size keyword. Resolve it before counting/paging.
+            string stockTable = q.WarehouseId == null ? "qsm_stock_total" : "qsm_stock_snapshot";
+            string warehouse = q.WarehouseId == null ? "" : sql.Optional("st.warehouse_id", q.WarehouseId);
+            var stocked = await sql.Rows($@"SELECT DISTINCT a.style_id FROM {SkuLink()}
+                JOIN dbo.{stockTable} st ON st.sku_id=k.id AND st.source_id=k.source_id AND st.batch_id={sql.Add(s.BatchId)}
+                JOIN dbo.qsm_raw_record sr ON sr.id=st.raw_record_id AND sr.source_id=st.source_id AND sr.batch_id=st.batch_id AND sr.valid=1
+                JOIN dbo.qsm_import_module sm ON sm.id=sr.module_id AND sm.source_id=sr.source_id AND sm.batch_id=sr.batch_id AND sm.valid=1 AND sm.state IN ('complete','empty')
+                JOIN dbo.qsm_import_batch sb ON sb.id=sr.batch_id AND sb.source_id=sr.source_id AND sb.valid=1 AND sb.state='published' AND sb.verification_passed=1 AND sb.published_at IS NOT NULL
+                WHERE a.valid=1 AND a.source_id={sql.Add(s.SourceId)} AND st.valid=1 AND st.quantity_main>0{warehouse}
+                OPTION(HASH JOIN,RECOMPILE,MAX_GRANT_PERCENT=1,MAXDOP 1)");
+            string stockedIds = sql.Add(JsonSerializer.Serialize(stocked.Select(row => row["styleId"])));
+            where += $" AND p.id IN (SELECT CONVERT(bigint,[value]) FROM OPENJSON({stockedIds}))";
+        }
         string skuWhere = "a.valid=1 AND a.style_id=p.id AND a.source_id=p.source_id"
             + sql.Search("CONCAT(p.search_text,N' ',k.search_text)", q.Keyword)
             + sql.Optional("k.source_enabled", q.SourceEnabled) + sql.Optional("k.source_deleted", q.SourceDeleted) + sql.Optional("k.id", q.SkuId);
+        if (q.TopCategoryId is { } topCategoryId)
+        {
+            var categories = await ProductCategoryRows(sql, s);
+            string rootId = QisemiRules.Id(topCategoryId);
+            if (!categories.Any(c => (string)c["id"]! == rootId && c["parentId"] == null))
+                throw new QisemiReadException(404, "顶级商品分类不存在或已删除");
+            var children = categories.Where(c => c["parentId"] != null).ToLookup(c => (string)c["parentId"]!);
+            var descendants = new HashSet<string>();
+            var pending = new Queue<string>(); pending.Enqueue(rootId);
+            while (pending.TryDequeue(out string? category))
+                if (descendants.Add(category)) foreach (var child in children[category]) pending.Enqueue((string)child["id"]!);
+            string categoryIds = sql.Add(JsonSerializer.Serialize(descendants));
+            skuWhere += $" AND k.category_id IN (SELECT CONVERT(bigint,[value]) FROM OPENJSON({categoryIds}))";
+        }
         string negativeJoin=q.NegativeOnly?join:"";
         string negativeWhere=q.NegativeOnly?$" AND st.valid=1 AND st.quantity_main<0 AND {RawVisible("st.raw_record_id","st.source_id","st.batch_id")}":"";
         // The sparse raw-owner keys otherwise invite a quadratic nested-loop plan
-        // after bulk import. A hash join keeps the full-catalog first page bounded.
-        var matches=await sql.Rows($"SELECT DISTINCT p.id FROM {SkuLink()} JOIN dbo.qsm_product_style p ON p.id=a.style_id AND p.source_id=a.source_id {negativeJoin} WHERE {where} AND {skuWhere}{negativeWhere} OPTION(HASH JOIN,RECOMPILE)");
+        // after bulk import. Hash joins bound scans; cap their grant so a small
+        // inventory query does not queue for an oversized reservation on busy hosts.
+        var matches=await sql.Rows($"SELECT DISTINCT p.id FROM {SkuLink()} JOIN dbo.qsm_product_style p ON p.id=a.style_id AND p.source_id=a.source_id {negativeJoin} WHERE {where} AND {skuWhere}{negativeWhere} OPTION(HASH JOIN,RECOMPILE,MAX_GRANT_PERCENT=1,MAXDOP 1)");
         string matchedIds=sql.Add(JsonSerializer.Serialize(matches.Select(row=>row["id"])));
         where=$"p.valid=1 AND p.source_id={sql.Add(s.SourceId)} AND p.id IN(SELECT CONVERT(bigint,[value]) FROM OPENJSON({matchedIds}))";
         // Page identities before calculating inventory. Calculating totals for the

@@ -29,6 +29,7 @@ public sealed class QisemiQuery
     [Range(1, long.MaxValue)] public long? DocumentId { get; set; }
     [Range(1, long.MaxValue)] public long? VersionId { get; set; }
     [Range(1, long.MaxValue)] public long? CategoryId { get; set; }
+    [Range(1, long.MaxValue)] public long? TopCategoryId { get; set; }
     [StringLength(160)] public string? WarehouseKeyword { get; set; }
     [StringLength(64)] public string? Module { get; set; }
     [StringLength(40)] public string? DocumentType { get; set; }
@@ -39,6 +40,7 @@ public sealed class QisemiQuery
     public DateOnly? DateTo { get; set; }
     public bool IncludeZero { get; set; }
     public bool NegativeOnly { get; set; }
+    public bool InStockOnly { get; set; }
     public bool? WriteBack { get; set; }
     public bool? SourceEnabled { get; set; }
     public bool? SourceDeleted { get; set; }

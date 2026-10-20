@@ -5,7 +5,7 @@
   const api = QisemiApi.create({ session: () => {
     try { return { SessionKey: sessionStorage.getItem('SessionKey'), SessionType: sessionStorage.getItem('SessionType') }; } catch (_) { return {}; }
   } });
-  const state = { modules: [], warehouses: [], sources: [], seq: 0, styles: new Map(), list: null, controller: null, route: {}, files: new Map(), previewUrl: null };
+  const state = { modules: [], warehouses: [], categories: [], sources: [], seq: 0, styles: new Map(), list: null, controller: null, route: {}, files: new Map(), previewUrl: null };
   function clearStyles(){for(const d of state.styles.values())if(d.photo)URL.revokeObjectURL(d.photo);state.styles.clear();}
   const archiveKeys = new Set(['products_all','accessories','product_classes_tree','units','warehouses','branches','warehouse_positions','clients','client_classes','suppliers','supplier_classes','accounts_all','projects','employees_all','roles']);
   const tabs = { inventory: '查库存', business: '业务单据', archives: '基础档案', more: '更多数据' };
@@ -73,14 +73,16 @@
     api.selectSource(id); clearStyles(); state.list = null;
     show(empty('正在读取账套与仓库…')); notice.hidden = true;
     const signal = state.controller.signal;
-    const [modules, warehouses] = await Promise.all([api.request('Modules', {}, signal), api.request('Warehouses', {}, signal)]);
-    state.modules = modules.result; state.warehouses = warehouses.result;
+    const [modules, warehouses, categories] = await Promise.all([api.request('Modules', {}, signal), api.request('Warehouses', {}, signal), api.request('TopCategories', {}, signal)]);
+    state.modules = modules.result; state.warehouses = warehouses.result; state.categories = categories.result;
     snapshot(); await render();
   }
   async function render() {
     const seq = ++state.seq; state.controller?.abort(); state.controller = new AbortController();
     for(const d of state.styles.values())if(d.loading){d.loading=false;if(!d.data)d.expanded=false;}
-    state.route = route(); state.files.clear(); notice.hidden = true;
+    const nextRoute = route();
+    if (nextRoute.warehouseId !== state.route.warehouseId) clearStyles();
+    state.route = nextRoute; state.files.clear(); notice.hidden = true;
     document.querySelectorAll('[data-tab]').forEach(b => b.setAttribute('aria-current', b.dataset.tab === state.route.tab ? 'page' : 'false'));
     show(empty('正在读取…')); screen.setAttribute('aria-busy', 'true');
     try {
@@ -92,12 +94,12 @@
   }
   function inventoryForm() {
     const r = state.route;
-    return `<form id="inventory-search" class="qs-search-card" role="search"><div class="qs-search-row"><div class="qs-input-wrap"><label class="qs-sr-only" for="inventory-keyword">搜索商品名称、品牌、款号、条码或尺码</label><input id="inventory-keyword" class="qs-input" type="search" placeholder="商品名称 / 品牌 / 款号 / 条码" value="${esc(r.keyword || '')}" autocomplete="off" enterkeyhint="search" maxlength="160"><button type="button" class="qs-clear" data-action="clear-search" aria-label="清空搜索">×</button></div><button class="qs-button" type="submit">搜索</button></div><p class="qs-search-hint">多个关键词组合搜索，如 Fischer 110、26.5</p><div class="qs-filters"><label for="inventory-warehouse" class="qs-filter-label">查看库存</label><select id="inventory-warehouse" class="qs-warehouse"><option value="">全部仓库</option>${state.warehouses.map(w => `<option value="${esc(w.id)}" ${r.warehouseId === w.id ? 'selected' : ''}>${esc(w.name)}</option>`).join('')}</select></div>${r.skuId ? `<p class="qs-search-hint">已按指定 SKU 定位同款 ${button('clear-sku', '取消定位')}</p>` : ''}</form>`;
+    return `<form id="inventory-search" class="qs-search-card" role="search"><div class="qs-search-row"><div class="qs-input-wrap"><label class="qs-sr-only" for="inventory-keyword">搜索商品名称、品牌、款号、条码或尺码</label><input id="inventory-keyword" class="qs-input" type="search" placeholder="商品名称 / 品牌 / 款号 / 条码" value="${esc(r.keyword || '')}" autocomplete="off" enterkeyhint="search" maxlength="160"><button type="button" class="qs-clear" data-action="clear-search" aria-label="清空搜索">×</button></div><button class="qs-button" type="submit">搜索</button></div><p class="qs-search-hint">多个关键词组合搜索，如 Fischer 110、26.5</p><div class="qs-filters"><label for="inventory-category" class="qs-filter-label">顶级分类</label><select id="inventory-category" class="qs-warehouse" aria-label="按顶级分类筛选"><option value="">全部分类</option>${state.categories.map(c => `<option value="${esc(c.id)}" ${r.topCategoryId === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select></div><div class="qs-filters"><label for="inventory-warehouse" class="qs-filter-label">筛选仓库</label><select id="inventory-warehouse" class="qs-warehouse" aria-label="按仓库筛选"><option value="">全部仓库</option>${state.warehouses.map(w => `<option value="${esc(w.id)}" ${r.warehouseId === w.id ? 'selected' : ''}>${esc(w.name)}</option>`).join('')}</select></div><div class="qs-inventory-options"><label class="qs-check" for="inventory-in-stock"><input id="inventory-in-stock" type="checkbox" ${r.inStockOnly !== 'false' ? 'checked' : ''}>只看有库存</label></div>${r.skuId ? `<p class="qs-search-hint">已按指定 SKU 定位同款 ${button('clear-sku', '取消定位')}</p>` : ''}</form>`;
   }
   async function inventory(seq) {
     const r = state.route;
     show(inventoryForm()+empty('正在读取库存…'));
-    const data = await api.request('Inventory', { keyword: r.keyword, warehouseId: r.warehouseId, skuId: r.skuId, page: r.page || 1 }, state.controller.signal);
+    const data = await api.request('Inventory', { keyword: r.keyword, warehouseId: r.warehouseId, topCategoryId: r.topCategoryId, inStockOnly: r.inStockOnly !== 'false', skuId: r.skuId, page: r.page || 1 }, state.controller.signal);
     if (seq !== state.seq) return;
     const visibleIds=new Set(data.result.items.map(row=>row.id));
     for(const [key,d] of state.styles)if(!visibleIds.has(key)){if(d.photo)URL.revokeObjectURL(d.photo);state.styles.delete(key);}
@@ -105,7 +107,7 @@
   }
   function paintInventory() {
     const rows = state.list.items;
-    show(inventoryForm() + `<div class="qs-meta"><span role="status">共 <strong>${esc(state.list.total)}</strong> 款</span>${button('about', '数据说明')}</div><div id="inventory-info" class="qs-info" hidden>数量是账面库存，包含负数。零库存尺码保留；仓库未完整采集时数量显示“未知”。各模块采集时间可能不同，详见页面底部。</div><div class="qs-results">${rows.length ? rows.map(card).join('') : empty('没有匹配的商品，请更换关键词或清空搜索。')}</div>` + pager(state.list.total, state.route.page));
+    show(inventoryForm() + `<div class="qs-meta"><span role="status">共 <strong>${esc(state.list.total)}</strong> 款</span>${button('about', '数据说明')}</div><div id="inventory-info" class="qs-info" hidden>“只看有库存”按所选仓库范围内至少一个尺码的账面数量大于零筛选。全部仓库按尺码总库存判断。取消勾选可查看零或负库存款式。零库存尺码保留；仓库未完整采集时数量显示“未知”。各模块采集时间可能不同，详见页面底部。</div><div class="qs-results">${rows.length ? rows.map(card).join('') : empty('没有匹配的商品，请更换关键词、调整分类或仓库，或取消“只看有库存”。')}</div>` + pager(state.list.total, state.route.page));
   }
   function card(row) {
     const d = state.styles.get(row.id);
@@ -127,7 +129,7 @@
     if (!d.expanded || (d.data && !retry)) return;
     const seq = state.seq; d.loading = true; d.error = ''; paintInventory();
     try {
-      const data = await api.request('Styles/' + id, { includeZero: true }, state.controller.signal);
+      const data = await api.request('Styles/' + id, { includeZero: true, warehouseId: state.route.warehouseId }, state.controller.signal);
       if (seq !== state.seq) return; d.data = data.result;
       loadThumbnail(id,d,seq);
     } catch (e) { if (seq !== state.seq || e.name === 'AbortError') return; if (e.status === 409) fail(e); d.error = e.message; }
@@ -252,7 +254,7 @@
     else if (action === 'retry') {if(state.modules.length)render();else boot().catch(fail);}
     else if (action === 'catalog') go({tab:r.tab});
     else if (action === 'module') go({tab:r.tab,module,view:'list'});
-    else if (action === 'clear-search') go({tab:'inventory',warehouseId:r.warehouseId});
+    else if (action === 'clear-search') go({tab:'inventory',warehouseId:r.warehouseId,topCategoryId:r.topCategoryId,inStockOnly:r.inStockOnly});
     else if (action === 'clear-sku') go({...r,skuId:'',page:1});
     else if (action === 'clear-links') go({...r,skuId:'',documentId:'',warehouseId:'',page:1});
     else if (action === 'about') document.getElementById('inventory-info').hidden = !document.getElementById('inventory-info').hidden;
@@ -276,11 +278,13 @@
   });
   document.addEventListener('submit', e => {
     if (!['inventory-search','browser-search'].includes(e.target.id)) return; e.preventDefault();
-    if (e.target.id === 'inventory-search') go({tab:'inventory',keyword:document.getElementById('inventory-keyword').value.trim(),warehouseId:document.getElementById('inventory-warehouse').value});
+    if (e.target.id === 'inventory-search') go({tab:'inventory',keyword:document.getElementById('inventory-keyword').value.trim(),warehouseId:document.getElementById('inventory-warehouse').value,topCategoryId:document.getElementById('inventory-category').value,inStockOnly:document.getElementById('inventory-in-stock').checked});
     else go({...state.route,keyword:document.getElementById('browser-keyword').value.trim(),dateFrom:document.getElementById('date-from')?.value,dateTo:document.getElementById('date-to')?.value,state:document.getElementById('browser-state')?.value,fileType:document.getElementById('file-type')?.value,page:1});
   });
   document.addEventListener('change', e => {
     if (e.target.id === 'inventory-warehouse') { clearStyles();go({...state.route,warehouseId:e.target.value,page:1}); }
+    if (e.target.id === 'inventory-category') go({...state.route,topCategoryId:e.target.value,page:1});
+    if (e.target.id === 'inventory-in-stock') go({...state.route,inStockOnly:e.target.checked,page:1});
     if (e.target.dataset.zero) { state.styles.get(e.target.dataset.zero).zero=e.target.checked;paintInventory(); }
   });
   document.addEventListener('input', e => {

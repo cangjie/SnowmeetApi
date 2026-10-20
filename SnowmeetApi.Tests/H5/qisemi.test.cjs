@@ -5,12 +5,13 @@ const response = (data, status=200) => ({ok:status===200,status,json:async()=>st
 test('会话只放请求头，库存与业务分别固定批次，大整数身份保持字符串',async()=>{
   const calls=[];
   const api=apiModule.create({session:()=>({SessionKey:'reserved',SessionType:'wecom'}),fetch:async(url,init)=>{
-    calls.push({url,init});const inventory=/Inventory|Styles\//.test(url);
+    calls.push({url,init});const inventory=/Inventory|Styles\/|TopCategories/.test(url);
     return response({snapshot:{batchId:inventory?'9007199254740993':'2'},result:{items:[]}});
   }});
-  api.selectSource('9007199254740994');await api.request('Inventory');await api.request('Styles/1');await api.request('Documents');await api.request('Documents',{page:2});
+  api.selectSource('9007199254740994');await api.request('Inventory');await api.request('Styles/1');await api.request('TopCategories');await api.request('Documents');await api.request('Documents',{page:2});
   assert.equal(new URL(calls[1].url,'https://example.test').searchParams.get('batchId'),'9007199254740993');
-  assert.equal(new URL(calls[3].url,'https://example.test').searchParams.get('batchId'),'2');
+  assert.equal(new URL(calls[2].url,'https://example.test').searchParams.get('batchId'),'9007199254740993');
+  assert.equal(new URL(calls[4].url,'https://example.test').searchParams.get('batchId'),'2');
   assert.equal(calls[0].init.headers.SessionKey,'reserved');assert.equal(calls[0].init.headers.SessionType,'wecom');
   assert.ok(calls.every(c=>!c.url.includes('reserved')&&!c.url.includes('SessionKey')));
 });

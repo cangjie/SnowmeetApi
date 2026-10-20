@@ -15,8 +15,16 @@ function data(p,q){
   if(p==='Sources')return {items:[{id:'1',displayName:'测试账套',currentFullBatchId:'2',currentInventoryBatchId:'1'}]};
   if(p==='Modules')return catalog.map(m=>({...m,coverage:(m.sources||[]).filter(s=>!s.includes('*')).map(s=>({moduleKey:s,state:m.key==='other_inbound'?'empty':'complete',actualCount:m.key==='other_inbound'?'0':'1'}))}));
   if(p==='Warehouses')return warehouses;
-  if(p==='Inventory')return page(q.get('keyword')==='不存在的商品'?[]:[{...style,quantityMain:q.get('warehouseId')==='2'?-1:1}]);
-  if(p.startsWith('Styles/'))return {style,sizes,warehouses};
+  if(p==='TopCategories')return [{id:'10',name:'【硬件】双板鞋',parentId:null},{id:'20',name:'【附件】头盔',parentId:null}];
+  if(p==='Inventory'){
+    const warehouse=q.get('warehouseId'),stockOnly=q.get('inStockOnly')==='true';
+    const items=q.get('keyword')==='不存在的商品'||q.get('topCategoryId')==='20'||(stockOnly&&['2','3'].includes(warehouse))?[]:[{...style,quantityMain:warehouse==='2'?-1:warehouse==='3'?null:warehouse==='1'?2:1}];
+    return page(items);
+  }
+  if(p.startsWith('Styles/')){
+    const scope=warehouses.filter(w=>!q.get('warehouseId')||w.id===q.get('warehouseId'));
+    return {style,sizes:sizes.map(s=>({...s,warehouses:s.warehouses.filter(w=>scope.some(x=>x.id===w.warehouseId))})),warehouses:scope};
+  }
   if(p==='Documents')return page(q.get('module')==='other_inbound'?[]:[{...doc,id:'1',versionId:'4'}]);
   if(/^Documents\/\d+$/.test(p)||/^Versions\/\d+$/.test(p))return {document:{...doc,versionKind:p.startsWith('Versions')?'historical':'current'},raw:{record:{payloadJson:{中文自定义字段:'完整资料'}}},sections:['lines','settlements','writeoffs','relations','movements','versions','files','raw']};
   if(p.includes('/Sections/')){
@@ -55,11 +63,14 @@ async function main(){
     if(p==='FileReferences/9/Content'){await route.fulfill({status:200,contentType:'image/png',body:image});return;}
     if(p==='Inventory'&&u.searchParams.get('keyword')==='stale'&&!stale){stale=true;await route.fulfill({status:409,json:{code:4,message:'数据批次已变化，请刷新后重新查询'}});return;}
     if(p==='Inventory'&&u.searchParams.get('keyword')==='slow')await new Promise(r=>setTimeout(r,350));
-    const result=data(p,u.searchParams),inventory=/^(Inventory|Styles\/|Warehouses$|StockTotals$|WarehouseStocks$)/.test(p);
+    const result=data(p,u.searchParams),inventory=/^(Inventory|Styles\/|Warehouses$|TopCategories$|StockTotals$|WarehouseStocks$)/.test(p);
     await route.fulfill({status:200,json:{code:0,data:p==='Sources'?result:{snapshot:{batchId:inventory?'1':'2',batch:{captureFinishedAt:'2026-10-18T05:27:45Z'}},result}}});
   });
   try{
     await tab.goto(origin+'/wecom/qisemi/index.html');await tab.locator('[data-action="expand"]').first().waitFor();
+    assert.equal(await tab.locator('#inventory-in-stock').isChecked(),true);
+    assert.equal(await tab.locator('#inventory-category option').count(),3);
+    assert.ok(calls.some(c=>c.p==='Inventory'&&c.q.inStockOnly==='true'));
     await tab.locator('#inventory-keyword').fill('Fischer 110 26.5');await tab.locator('#inventory-search').evaluate(f=>f.requestSubmit());
     await tab.locator('[data-action="expand"]').first().click();await tab.locator('.qs-size').first().waitFor();assert.equal(await tab.locator('.qs-size').count(),3);
     assert.equal(await tab.locator('.qs-size[aria-pressed="true"] b').innerText(),'26.5');assert.match(await tab.locator('.qs-detail').innerText(),/负库存|未知/);
@@ -86,6 +97,33 @@ async function main(){
     await tab.locator('#inventory-keyword').fill('stale');await tab.locator('#inventory-search').evaluate(f=>f.requestSubmit());await tab.locator('[data-action="refresh"]').waitFor();await tab.locator('[data-action="refresh"]').click();await tab.locator('[data-action="expand"]').first().waitFor();
     await tab.locator('#inventory-keyword').fill('slow');await tab.locator('#inventory-search').evaluate(f=>f.requestSubmit());await tab.waitForFunction(()=>location.hash.includes('slow'));await tab.locator('[data-tab="business"]').click();await tab.locator('[data-action="module"]').first().waitFor();await tab.waitForTimeout(450);assert.equal(await tab.locator('[data-action="module"]').count(),catalog.filter(m=>m.tab==='business').length);
     await tab.locator('[data-tab="inventory"]').click();await tab.locator('[data-action="expand"]').first().waitFor();
+    async function inventoryChange(action,params){
+      await Promise.all([tab.waitForResponse(r=>{const u=new URL(r.url());return u.pathname.endsWith('/Inventory')&&Object.entries(params).every(([k,v])=>u.searchParams.get(k)===v);}),action()]);
+      await tab.waitForFunction(()=>!document.getElementById('screen').hasAttribute('aria-busy'));
+    }
+    await inventoryChange(()=>tab.locator('#inventory-category').selectOption('20'),{topCategoryId:'20',inStockOnly:'true'});
+    await tab.getByText('没有匹配的商品',{exact:false}).waitFor();
+    await inventoryChange(()=>tab.locator('#inventory-category').selectOption('10'),{topCategoryId:'10',inStockOnly:'true'});
+    await inventoryChange(()=>tab.locator('#inventory-warehouse').selectOption('2'),{topCategoryId:'10',warehouseId:'2',inStockOnly:'true'});
+    await tab.getByText('没有匹配的商品',{exact:false}).waitFor();assert.match(await tab.locator('.qs-meta').innerText(),/共 0 款/);
+    await inventoryChange(()=>tab.locator('#inventory-in-stock').uncheck(),{warehouseId:'2',inStockOnly:'false'});
+    await tab.locator('[data-action="expand"]').first().click();await tab.locator('.qs-size').first().waitFor();
+    await tab.locator('[data-sku="12"][data-action="size"]').click();
+    assert.equal(await tab.locator('.qs-size').count(),3);assert.match(await tab.locator('.qs-detail').innerText(),/测试负库存仓/);assert.doesNotMatch(await tab.locator('.qs-detail').innerText(),/旗舰|未完整采集仓/);
+    assert.ok(calls.some(c=>c.p==='Styles/'+big&&c.q.warehouseId==='2'));
+    await tab.locator('#inventory-keyword').fill('Fischer');
+    await inventoryChange(()=>tab.locator('#inventory-search').evaluate(f=>f.requestSubmit()),{keyword:'Fischer',warehouseId:'2',inStockOnly:'false'});
+    await inventoryChange(()=>tab.locator('[data-action="clear-search"]').click(),{warehouseId:'2',inStockOnly:'false'});
+    assert.equal(await tab.locator('#inventory-in-stock').isChecked(),false);
+    assert.equal(await tab.locator('#inventory-category').inputValue(),'10');
+    await inventoryChange(()=>tab.locator('#inventory-warehouse').selectOption('1'),{warehouseId:'1',inStockOnly:'false'});
+    await inventoryChange(()=>tab.locator('#inventory-in-stock').check(),{warehouseId:'1',inStockOnly:'true'});
+    await tab.locator('[data-action="expand"]').first().click();await tab.locator('.qs-size').first().waitFor();
+    await tab.locator('[data-sku="12"][data-action="size"]').click();
+    assert.equal(await tab.locator('.qs-size').count(),3);assert.match(await tab.locator('.qs-detail').innerText(),/旗舰/);assert.doesNotMatch(await tab.locator('.qs-detail').innerText(),/测试负库存仓/);
+    await tab.screenshot({path:path.join(out,'inventory-stock-warehouse-filter.png'),fullPage:true});
+    await inventoryChange(()=>tab.locator('#inventory-warehouse').selectOption(''),{inStockOnly:'true'});
+    await inventoryChange(()=>tab.locator('#inventory-category').selectOption(''),{inStockOnly:'true'});
     for(const width of [320,390,768,1280]){await tab.setViewportSize({width,height:844});assert.ok(await tab.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'horizontal overflow '+width);}
     await tab.setViewportSize({width:390,height:844});await tab.screenshot({path:path.join(out,'inventory-final.png'),fullPage:true});
     assert.ok(calls.some(c=>c.p==='Styles/'+big&&c.q.batchId==='1'));assert.ok(calls.some(c=>c.p==='Documents'&&c.q.batchId==='2'));

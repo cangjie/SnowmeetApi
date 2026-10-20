@@ -54,6 +54,7 @@ public sealed class QisemiController(IQisemiReadService service, ILogger<QisemiC
     [HttpGet("Snapshot")] public Task<IActionResult> Snapshot([FromQuery] QisemiQuery q) => Read("snapshot", q);
     [HttpGet("Modules")] public Task<IActionResult> Modules([FromQuery] QisemiQuery q) => Read("modules", q);
     [HttpGet("Warehouses")] public Task<IActionResult> Warehouses([FromQuery] QisemiQuery q) => Read("warehouses", q);
+    [HttpGet("TopCategories")] public Task<IActionResult> TopCategories([FromQuery] QisemiQuery q) => Read("topCategories", q);
     [HttpGet("Inventory")] public Task<IActionResult> Inventory([FromQuery] QisemiQuery q) => Read("inventory", q);
     [HttpGet("Styles/{id:long}")] public Task<IActionResult> Style(long id, [FromQuery] QisemiQuery q) => Read("style", q, id);
     [HttpGet("Skus/{id:long}")] public Task<IActionResult> Sku(long id, [FromQuery] QisemiQuery q) => Read("sku", q, id);

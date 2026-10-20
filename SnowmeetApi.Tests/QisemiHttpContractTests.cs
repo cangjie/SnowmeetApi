@@ -49,7 +49,7 @@ public class QisemiHttpContractTests
     public async Task InvalidQueriesAreRejectedAndFailuresDoNotExposeDatabaseDetails()
     {
         using var host = Host(s => s.AddScoped<IQisemiReadService, Probe>()); using var client = host.CreateClient();
-        foreach (string query in new[] { "pageSize=101", "sourceId=-1", "dateFrom=not-a-date", "warehouseId=xyz" })
+        foreach (string query in new[] { "pageSize=101", "sourceId=-1", "dateFrom=not-a-date", "warehouseId=xyz", "inStockOnly=xyz", "topCategoryId=0" })
             Assert.Equal(HttpStatusCode.BadRequest, (await client.GetAsync("/api/Qisemi/Inventory?" + query)).StatusCode);
         var response = await client.GetAsync("/api/Qisemi/Inventory?keyword=fail");
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
@@ -81,7 +81,7 @@ public class QisemiHttpContractTests
         using var host = Host(s => s.AddScoped<IQisemiReadService, Probe>());
         var swagger = host.Services.GetRequiredService<ISwaggerProvider>().GetSwagger("test");
         var operations = swagger.Paths.Where(x => x.Key.StartsWith("/api/Qisemi/")).SelectMany(x => x.Value.Operations.Values).ToArray();
-        Assert.Equal(27, operations.Length);
+        Assert.Equal(28, operations.Length);
         Assert.All(operations, op =>
         {
             Assert.Contains(op.Parameters, p => p.Name == "SessionKey" && !p.Required && p.In == Microsoft.OpenApi.Models.ParameterLocation.Header);
