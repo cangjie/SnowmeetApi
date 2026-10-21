@@ -166,7 +166,9 @@ public sealed partial class QisemiReadService
         var allAmounts = primaryStyles.Select(style => Amount(style, primaryWarehouse)).ToList();
         string matchedIds = sql.Add(JsonSerializer.Serialize(primaryStyles));
         where = $"p.valid=1 AND p.source_id={sql.Add(s.SourceId)} AND p.id IN(SELECT CONVERT(bigint,[value]) FROM OPENJSON({matchedIds}))";
-        var items = await sql.Rows($"SELECT p.* FROM dbo.qsm_product_style p WHERE {where} ORDER BY p.display_name,p.id OPTION(MAXDOP 1,MAX_GRANT_PERCENT=1)");
+        // OPENJSON has a small fixed row estimate. Force hash joins so a full
+        // catalogue does not repeatedly parse/scan its identity and category sets.
+        var items = await sql.Rows($"SELECT p.* FROM dbo.qsm_product_style p WHERE {where} ORDER BY p.display_name,p.id OPTION(HASH JOIN,RECOMPILE,MAXDOP 1,MAX_GRANT_PERCENT=1)");
         var categoryRows = visibleSkus;
         var pathsByStyle = categoryRows.Where(row => primaryStyles.Contains((string)row["id"]!)).GroupBy(row => (string)row["id"]!)
             .ToDictionary(group => group.Key, group => group.Select(row => row["categoryId"] as string).OfType<string>().Distinct()
@@ -183,7 +185,7 @@ public sealed partial class QisemiReadService
         var ranks = await sql.Rows($@"SELECT p.id,
             ROW_NUMBER() OVER(ORDER BY CASE WHEN sc.name IS NULL THEN 1 ELSE 0 END,sc.name,p.display_name,p.id) category_asc,
             ROW_NUMBER() OVER(ORDER BY CASE WHEN sc.name IS NULL THEN 1 ELSE 0 END,sc.name DESC,p.display_name DESC,p.id DESC) category_desc
-            FROM dbo.qsm_product_style p {sortJoin} WHERE {where} OPTION(MAXDOP 1,MAX_GRANT_PERCENT=1)");
+            FROM dbo.qsm_product_style p {sortJoin} WHERE {where} OPTION(HASH JOIN,RECOMPILE,MAXDOP 1,MAX_GRANT_PERCENT=1)");
         var identities = matched.Select(row => new InventoryMatch((string)row["id"]!, RootOf(row))).Distinct().ToArray();
         long estimatedBytes = 65536L + 4L * JsonSerializer.SerializeToUtf8Bytes(new {
             warehouses, identities, items, stockByWarehouse, warehouseAmounts, allAmounts, ranks

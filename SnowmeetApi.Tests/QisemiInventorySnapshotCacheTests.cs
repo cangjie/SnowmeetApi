@@ -77,7 +77,15 @@ public class QisemiInventorySnapshotCacheTests(ITestOutputHelper output)
         Assert.Equal(full.GetProperty("categoryFacets").GetRawText(), fullPage.GetProperty("categoryFacets").GetRawText());
         Assert.Equal(3, cache.BuildCount); Assert.Equal(3, cache.EntryCount);
         Assert.InRange(cache.EstimatedBytes, 1, 64L * 1024 * 1024);
+        // Include zero/negative/unknown stock: this is the largest catalogue and
+        // exposed an OPENJSON nested-loop plan timeout during production checks.
+        var all = await Read("catalog-all-cold", new() { PageSize = 1 });
+        Assert.True(long.Parse(all.GetProperty("total").GetString()!) > 5000);
+        var allPage = await Read("catalog-all-sort-page", new() { Page = 2, SortBy = "topCategory", SortDirection = "desc" });
+        Assert.Equal(all.GetProperty("total").GetString(), allPage.GetProperty("total").GetString());
+        Assert.Equal(30, allPage.GetProperty("items").GetArrayLength());
+        Assert.Equal(4, cache.BuildCount); Assert.Equal(6, cache.HitCount);
         await Read("brand-force-refresh", new() { Keyword = "Fischer", InStockOnly = true, RefreshCache = true });
-        Assert.Equal(4, cache.BuildCount);
+        Assert.Equal(5, cache.BuildCount);
     }
 }
