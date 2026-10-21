@@ -99,8 +99,9 @@
   async function inventory(seq) {
     const r = state.route;
     show(inventoryForm()+empty('正在读取库存…'));
-    const data = await api.request('Inventory', { keyword: r.keyword, warehouseId: r.warehouseId, resultWarehouseId:r.resultWarehouseId, topCategoryId: r.topCategoryId, resultCategoryId: r.resultCategoryId, sortBy:r.sortBy || 'name', sortDirection:r.sortDirection || 'asc', inStockOnly: r.inStockOnly !== 'false', skuId: r.skuId, page: r.page || 1 }, state.controller.signal);
+    const data = await api.request('Inventory', { keyword: r.keyword, warehouseId: r.warehouseId, resultWarehouseId:r.resultWarehouseId, topCategoryId: r.topCategoryId, resultCategoryId: r.resultCategoryId, sortBy:r.sortBy || 'name', sortDirection:r.sortDirection || 'asc', inStockOnly: r.inStockOnly !== 'false', skuId: r.skuId, page: r.page || 1, refreshCache: state.refreshInventory || undefined }, state.controller.signal);
     if (seq !== state.seq) return;
+    state.refreshInventory = false;
     const visibleIds=new Set(data.result.items.map(row=>row.id));
     for(const [key,d] of state.styles)if(!visibleIds.has(key)){if(d.photo)URL.revokeObjectURL(d.photo);state.styles.delete(key);}
     state.list = data.result; paintInventory();
@@ -302,7 +303,7 @@
     const tab = e.target.closest('[data-tab]'); if (tab) { go({tab:tab.dataset.tab}); return; }
     const target = e.target.closest('[data-action]'); if (!target || target.disabled) return;
     const { action, id, sku, module, kind, section } = target.dataset, r = state.route;
-    if (action === 'refresh') { api.reset(); clearStyles(); boot().catch(fail); }
+    if (action === 'refresh') { state.refreshInventory = true; api.reset(); clearStyles(); boot().catch(fail); }
     else if (action === 'retry') {if(state.modules.length)render();else boot().catch(fail);}
     else if (action === 'catalog') go({tab:r.tab});
     else if (action === 'module') go({tab:r.tab,module,view:'list'});

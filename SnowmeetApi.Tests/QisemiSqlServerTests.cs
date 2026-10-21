@@ -1,4 +1,6 @@
 using System.Data.Common;
+using System.Data;
+using System.Collections.Concurrent;
 using System.IO.Compression;
 using System.Net;
 using System.Text;
@@ -20,7 +22,17 @@ public sealed class QisemiLocalDbFactAttribute : FactAttribute
 [Collection("Qisemi SQL Server")]
 public class QisemiSqlServerTests
 {
-    private sealed class Factory(string connection) : IQisemiConnectionFactory { public DbConnection Create() => new SqlConnection(connection); }
+    private sealed class Factory(string connection) : IQisemiConnectionFactory
+    {
+        public ConcurrentQueue<long> RoundTrips { get; } = new();
+        public DbConnection Create()
+        {
+            var sql = new SqlConnection(connection) { StatisticsEnabled = true };
+            sql.StateChange += (_, e) => { if (e.CurrentState == ConnectionState.Closed)
+                RoundTrips.Enqueue(Convert.ToInt64(sql.RetrieveStatistics()["ServerRoundtrips"])); };
+            return sql;
+        }
+    }
     private sealed class FileProbe : IQisemiFileReader
     {
         public int OpenCount { get; private set; }
@@ -37,7 +49,10 @@ public class QisemiSqlServerTests
         private const string Master = @"Server=(localdb)\MSSQLLocalDB;Database=master;Integrated Security=true;Encrypt=false;TrustServerCertificate=true";
         public string Connection => new SqlConnectionStringBuilder(Master) { InitialCatalog = database }.ConnectionString;
         public FileProbe Files { get; } = new();
-        public IQisemiReadService Service => new QisemiReadService(new Factory(Connection), Files);
+        private Factory? factory;
+        public QisemiInventoryCache Cache { get; } = new();
+        public long LastRoundTrips => factory?.RoundTrips.LastOrDefault() ?? 0;
+        public IQisemiReadService Service => new QisemiReadService(factory ??= new Factory(Connection), Files, Cache);
         public static async Task<Fixture> Create()
         {
             var f = new Fixture();
@@ -79,6 +94,16 @@ public class QisemiSqlServerTests
             await cmd.ExecuteNonQueryAsync();
         }
         public Task Delete(string table, long id, bool deleted) => Exec($"UPDATE dbo.qsm_{table} SET valid=@v,deleted_at=CASE WHEN @v=0 THEN SYSUTCDATETIME() END,deleted_by=CASE WHEN @v=0 THEN N'test' END,delete_reason=CASE WHEN @v=0 THEN N'test' END WHERE id=@id", ("@v", !deleted), ("@id", id));
+        public async Task<string[]> ExpectedCacheOrder(bool category, bool descending)
+        {
+            await using var c = new SqlConnection(Connection); await c.OpenAsync();
+            string direction = descending ? "DESC" : "ASC";
+            string order = category ? $"CASE WHEN cat.name IS NULL THEN 1 ELSE 0 END,cat.name {direction},p.display_name {direction},p.id {direction}" : $"p.display_name {direction},p.id {direction}";
+            using var cmd = new SqlCommand($"SELECT p.id FROM dbo.qsm_product_style p JOIN dbo.qsm_style_sku a ON a.style_id=p.id JOIN dbo.qsm_product_sku k ON k.id=a.sku_id LEFT JOIN dbo.qsm_category cat ON cat.id=k.category_id WHERE p.search_text=N'cache' ORDER BY {order}", c);
+            await using var reader = await cmd.ExecuteReaderAsync(); var ids = new List<string>();
+            while (await reader.ReadAsync()) ids.Add(QisemiRules.Id(reader.GetInt64(0)));
+            return ids.ToArray();
+        }
         private async Task Raw(int id, int module, string payload = "{}", int ordinal = 1, int? sheet = null)
         {
             using var ms = new MemoryStream();
@@ -119,6 +144,80 @@ public class QisemiSqlServerTests
             await Exec("INSERT dbo.qsm_file(source_id,content_sha256,byte_length,mime_type,extension,storage_provider,object_key,first_seen_batch_id,availability_state) VALUES(1,HASHBYTES('SHA2_256','file'),3,N'image/png',N'.png','s3',N'private/qisemi/datasets/test/file.png',1,'ready'); INSERT dbo.qsm_file_ref(source_id,batch_id,raw_record_id,reference_key,file_id,sku_id,reference_kind,original_name,download_state) VALUES(1,1,230,N'image',1,11,'product_image',N'雪鞋.png','complete'); INSERT dbo.qsm_file_ref(source_id,batch_id,raw_record_id,reference_key,file_id,document_version_id,reference_kind,original_name,download_state) VALUES(1,1,231,N'document',1,1,'attachment',N'单据.png','complete'); INSERT dbo.qsm_export_sheet(source_id,batch_id,module_id,file_id,export_key,sheet_index,sheet_name,sheet_role,headers_json,row_count,binding_state) VALUES(1,1,12,1,N'sales_with_details',1,N'总表','header',N'[\"单号\",\"商品\"]',1,'unresolved');");
             await Raw(220, 12, "{\"单号\":\"TEST-0001\",\"商品\":\"Fischer\"}", sheet: 1);
         }
+    }
+
+    [QisemiLocalDbFact]
+    public async Task InventoryCacheReusesCompleteSearchAcrossFiltersSortAndPagesAndInvalidatesOnWrites()
+    {
+        await using var f = await Fixture.Create();
+        await f.Exec("INSERT dbo.qsm_category(source_id,source_key,last_seen_batch_id,last_raw_record_id,category_kind,name) VALUES(1,N'boots',1,100,'product',N'雪鞋'),(1,N'helmet',1,100,'product',N'头盔'); UPDATE dbo.qsm_product_sku SET category_id=CASE WHEN id=14 THEN 2 ELSE 1 END;");
+        async Task<JsonElement> Read(QisemiQuery q) { q.Keyword = "Fischer"; return (await f.Read("inventory", q)).GetProperty("result"); }
+        var first = await Read(new() { PageSize = 1 }); long coldTrips = f.LastRoundTrips;
+        Assert.Equal("2", first.GetProperty("total").GetString()); Assert.Equal(1, f.Cache.BuildCount);
+        var second = await Read(new() { Page = 2, PageSize = 1, SortDirection = "desc" });
+        Assert.Single(second.GetProperty("items").EnumerateArray()); Assert.True(f.LastRoundTrips < coldTrips);
+        var warehouse = await Read(new() { ResultWarehouseId = 1 });
+        Assert.Equal(2m, warehouse.GetProperty("items")[0].GetProperty("quantityMain").GetDecimal());
+        var category = await Read(new() { ResultCategoryId = 2, SortBy = "topCategory", SortDirection = "desc" });
+        Assert.Equal("2", category.GetProperty("items")[0].GetProperty("id").GetString());
+        var all = await Read(new()); Assert.Equal(1m, all.GetProperty("items")[0].GetProperty("quantityMain").GetDecimal());
+        Assert.Equal(1, f.Cache.BuildCount); Assert.Equal(4, f.Cache.HitCount);
+        Assert.Equal(2, all.GetProperty("categoryFacets").GetArrayLength());
+        await f.Exec("CREATE TABLE dbo.unrelated_cache_probe(id int PRIMARY KEY, value int, rv rowversion); INSERT dbo.unrelated_cache_probe(id,value) VALUES(1,1)");
+        await Read(new()); Assert.Equal(1, f.Cache.BuildCount);
+        await f.Exec("UPDATE dbo.unrelated_cache_probe SET value=2 WHERE id=1");
+        await Read(new()); Assert.Equal(1, f.Cache.BuildCount);
+        await Read(new() { RefreshCache = true }); Assert.Equal(2, f.Cache.BuildCount);
+        await f.Exec("UPDATE dbo.qsm_stock_total SET quantity_main=7 WHERE sku_id=11");
+        Assert.Equal(7m, (await Read(new())).GetProperty("items")[0].GetProperty("quantityMain").GetDecimal());
+        Assert.Equal(3, f.Cache.BuildCount);
+        await f.Delete("raw_record", 130, true);
+        Assert.Equal(JsonValueKind.Null, (await Read(new())).GetProperty("items")[0].GetProperty("quantityMain").ValueKind);
+        Assert.Equal(4, f.Cache.BuildCount);
+        await f.Delete("product_style", 9007199254740993, true);
+        Assert.Equal("1", (await Read(new())).GetProperty("total").GetString()); Assert.Equal(5, f.Cache.BuildCount);
+        await f.Exec("UPDATE dbo.qsm_source SET current_inventory_batch_id=NULL WHERE id=1");
+        Assert.Equal(409, (await Assert.ThrowsAsync<QisemiReadException>(() => Read(new() { BatchId = 1 }))).Status);
+    }
+
+    [QisemiLocalDbFact]
+    public async Task CachedFullSearchKeepsCrossPageFacetsAndDatabaseChineseSortOrder()
+    {
+        await using var f = await Fixture.Create();
+        await f.Exec(@"INSERT dbo.qsm_category(source_id,source_key,last_seen_batch_id,last_raw_record_id,category_kind,name)
+            VALUES(1,N'cache-boots',1,100,'product',N'雪鞋'),(1,N'cache-helmet',1,100,'product',N'头盔');
+            DECLARE @i int=1,@style bigint,@sku bigint;
+            WHILE @i<=35 BEGIN
+              INSERT dbo.qsm_product_style(source_id,style_key,display_name,group_method,search_text)
+                VALUES(1,NEWID(),CASE WHEN @i%2=0 THEN N'中山' ELSE N'安踏' END+CONVERT(nvarchar(10),@i),'singleton',N'cache');
+              SET @style=SCOPE_IDENTITY();
+              INSERT dbo.qsm_product_sku(source_id,source_key,last_seen_batch_id,last_raw_record_id,name,size_label,search_text,category_id)
+                VALUES(1,N'cache-'+CONVERT(nvarchar(10),@i),1,103,N'cache',N'M',N'cache',CASE WHEN @i%3=0 THEN NULL WHEN @i%2=0 THEN 1 ELSE 2 END);
+              SET @sku=SCOPE_IDENTITY();
+              INSERT dbo.qsm_style_sku(source_id,style_id,sku_id,assignment_method,evidence_json) VALUES(1,@style,@sku,'rule',N'{}');
+              INSERT dbo.qsm_stock_total(source_id,batch_id,raw_record_id,sku_id,quantity_main) VALUES(1,1,130,@sku,1);
+              INSERT dbo.qsm_stock_snapshot(source_id,batch_id,raw_record_id,sku_id,warehouse_id,quantity_main) VALUES(1,1,131,@sku,1,2);
+              SET @i+=1;
+            END");
+        JsonElement? originalFacets = null;
+        foreach (bool category in new[] { false, true }) foreach (bool descending in new[] { false, true })
+        {
+            var ids = new List<string>();
+            for (int page = 1; page <= 2; page++)
+            {
+                var result = (await f.Read("inventory", new() { Keyword = "cache", Page = page, SortBy = category ? "topCategory" : "name", SortDirection = descending ? "desc" : "asc" })).GetProperty("result");
+                Assert.Equal("35", result.GetProperty("total").GetString());
+                Assert.Equal(35m, result.GetProperty("warehouseUnfilteredQuantityMain").GetDecimal());
+                Assert.Equal(70m, Assert.Single(result.GetProperty("warehouseFacets").EnumerateArray()).GetProperty("quantityMain").GetDecimal());
+                originalFacets ??= result.GetProperty("categoryFacets");
+                Assert.Equal(originalFacets.Value.GetRawText(), result.GetProperty("categoryFacets").GetRawText());
+                ids.AddRange(result.GetProperty("items").EnumerateArray().Select(x => x.GetProperty("id").GetString()!));
+            }
+            Assert.Equal(await f.ExpectedCacheOrder(category, descending), ids);
+        }
+        var selected = (await f.Read("inventory", new() { Keyword = "cache", ResultCategoryId = 1, ResultWarehouseId = 1 })).GetProperty("result");
+        Assert.All(selected.GetProperty("items").EnumerateArray(), item => Assert.Equal(2m, item.GetProperty("quantityMain").GetDecimal()));
+        Assert.Equal(1, f.Cache.BuildCount); Assert.Equal(8, f.Cache.HitCount);
     }
 
     [QisemiLocalDbFact]
@@ -377,6 +476,7 @@ public class QisemiSqlServerTests
         {
             s.AddSingleton<IQisemiConnectionFactory>(new Factory(f.Connection)); s.AddSingleton<IQisemiFileReader>(f.Files);
             s.AddScoped<IQisemiReadService, QisemiReadService>();
+            s.AddSingleton(f.Cache);
         });
         using var client = server.CreateClient();
         foreach (string path in new[] { "Sources", "Snapshot", "Modules", "Warehouses", "Inventory", "StockTotals", "WarehouseStocks", "StockMovements", "SalesLines", "Documents", "Documents/1", "Versions", "Versions/2", "Skus/11", "Files", "ExportSheets", "ExportSheets/1/Rows", "Records/100", "Records", "Modules/products_all/Records", "DataIssues", "Batches", "Archives/products_all/11" })

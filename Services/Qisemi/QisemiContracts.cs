@@ -45,6 +45,7 @@ public sealed class QisemiQuery
     public bool IncludeZero { get; set; }
     public bool NegativeOnly { get; set; }
     public bool InStockOnly { get; set; }
+    public bool RefreshCache { get; set; }
     public bool? WriteBack { get; set; }
     public bool? SourceEnabled { get; set; }
     public bool? SourceDeleted { get; set; }

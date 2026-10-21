@@ -86,6 +86,7 @@ namespace SnowmeetApi
             services.AddScoped<SnowmeetApi.Controllers.QisemiSessionFilter>();
             services.AddScoped<SnowmeetApi.Services.Qisemi.IQisemiConnectionFactory, SnowmeetApi.Services.Qisemi.QisemiConnectionFactory>();
             services.AddScoped<SnowmeetApi.Services.Qisemi.IQisemiReadService, SnowmeetApi.Services.Qisemi.QisemiReadService>();
+            services.AddSingleton<SnowmeetApi.Services.Qisemi.QisemiInventoryCache>();
             services.AddSingleton<SnowmeetApi.Services.Qisemi.IQisemiFileReader, SnowmeetApi.Services.Qisemi.QisemiS3FileReader>();
             services.ConfigureSwaggerGen(options => options.OperationFilter<SnowmeetApi.Controllers.QisemiSessionSwagger>());
             // 美团管家采集程序的心跳看护：登录失效、采集电脑停机时由服务器发企业微信提醒

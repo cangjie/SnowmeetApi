@@ -5,11 +5,14 @@ using System.Data;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 
 namespace SnowmeetApi.Services.Qisemi;
 
-public sealed partial class QisemiReadService(IQisemiConnectionFactory connections, IQisemiFileReader files) : IQisemiReadService
+public sealed partial class QisemiReadService(IQisemiConnectionFactory connections, IQisemiFileReader files,
+    QisemiInventoryCache? inventoryCache = null, ILogger<QisemiReadService>? logger = null) : IQisemiReadService
 {
+    private readonly QisemiInventoryCache searchCache = inventoryCache ?? new();
     public async Task<object> ReadAsync(string operation, QisemiQuery query, long? id, string? key, CancellationToken ct)
     {
         query.Validate();
@@ -28,7 +31,7 @@ public sealed partial class QisemiReadService(IQisemiConnectionFactory connectio
         {
             "snapshot" => await Snapshot(sql, scope),
             "modules" => await Modules(sql, scope),
-            "inventory" => await Inventory(sql, scope, query),
+            "inventory" => await CachedInventory(sql, scope, query, connection.DataSource + "|" + connection.Database, ct),
             "style" => await Style(sql, scope, query, id!.Value),
             "warehouses" => await Warehouses(sql, scope, query),
             "topCategories" => (await ProductCategoryRows(sql, scope)).Where(c => c["parentId"] == null).ToArray(),
