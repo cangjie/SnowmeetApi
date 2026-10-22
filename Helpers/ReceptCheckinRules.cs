@@ -14,7 +14,7 @@ namespace SnowmeetApi.Helpers
         public const string QR_URL_PREFIX = "https://mini.snowmeet.top/mapp/recept_checkin?code=";
         public const int QR_EXPIRE_SECONDS = 120;
         public const int CUSTOMER_WAIT_MINUTES = 60;
-        const int TOKEN_LENGTH = 10;
+        public const int TOKEN_LENGTH = 10;
         const string TOKEN_CHARS = "abcdefghijkmnpqrstuvwxyz23456789";
 
         // 店员侧阶段

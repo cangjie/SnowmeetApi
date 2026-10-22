@@ -105,30 +105,7 @@ namespace SnowmeetApi.Controllers.Order
         [HttpGet]
         public async Task<ActionResult<ApiResult<object>>> VerifyWechatIdentity(int orderId, string sessionKey)
         {
-            var (sessOpenid, sessUnionid, sess) = await _loadSessionContext(sessionKey);
-            int? scannerMemberId = (sess != null) ? sess.member_id : null;
-            if (scannerMemberId == null && sess != null && !string.IsNullOrEmpty(sess.wechat_openid))
-            {
-                var scannerByOpenId = await _memberHelper.GetWholeMemberByNum(sess.wechat_openid, MemberSocialAccount.TYPE_WECHAT_MINI_OPENID);
-                if (scannerByOpenId != null)
-                {
-                    scannerMemberId = scannerByOpenId.id;
-                    sess.member_id = scannerMemberId;
-                    _db.miniSession.Entry(sess).State = EntityState.Modified;
-                    await _db.SaveChangesAsync();
-                }
-            }
-            if (scannerMemberId == null && sess != null && !string.IsNullOrEmpty(sess.cell))
-            {
-                var scannerByCell = await _memberHelper.GetWholeMemberByNum(sess.cell, MemberSocialAccount.TYPE_CELL);
-                if (scannerByCell != null)
-                {
-                    scannerMemberId = scannerByCell.id;
-                    sess.member_id = scannerMemberId;
-                    _db.miniSession.Entry(sess).State = EntityState.Modified;
-                    await _db.SaveChangesAsync();
-                }
-            }
+            int? scannerMemberId = await ResolveScannerMemberId(sessionKey);
             if (scannerMemberId == null)
             {
                 return Ok(new ApiResult<object> { code = 1, message = "未识别扫码人身份，请重新登录", data = new { matched = false } });
@@ -161,6 +138,38 @@ namespace SnowmeetApi.Controllers.Order
             var orderMember = await _memberHelper.GetWholeMemberById((int)order.member_id);
             if (orderMember != null) masked = _maskCell(orderMember.cell);
             return Ok(new ApiResult<object> { code = 0, message = "", data = new { matched = false, orderMemberMaskedCell = masked } });
+        }
+
+        // 扫码人的会员 id：mini_session.member_id → 小程序 openid → 会话里的手机号，找到后写回会话。
+        // 微信身份核验（储值付租金）与养护扫码取板（QrCodeController.VerifyCarePick）共用。
+        [NonAction]
+        public async Task<int?> ResolveScannerMemberId(string sessionKey)
+        {
+            var (_, _, sess) = await _loadSessionContext(sessionKey);
+            int? scannerMemberId = (sess != null) ? sess.member_id : null;
+            if (scannerMemberId == null && sess != null && !string.IsNullOrEmpty(sess.wechat_openid))
+            {
+                var scannerByOpenId = await _memberHelper.GetWholeMemberByNum(sess.wechat_openid, MemberSocialAccount.TYPE_WECHAT_MINI_OPENID);
+                if (scannerByOpenId != null)
+                {
+                    scannerMemberId = scannerByOpenId.id;
+                    sess.member_id = scannerMemberId;
+                    _db.miniSession.Entry(sess).State = EntityState.Modified;
+                    await _db.SaveChangesAsync();
+                }
+            }
+            if (scannerMemberId == null && sess != null && !string.IsNullOrEmpty(sess.cell))
+            {
+                var scannerByCell = await _memberHelper.GetWholeMemberByNum(sess.cell, MemberSocialAccount.TYPE_CELL);
+                if (scannerByCell != null)
+                {
+                    scannerMemberId = scannerByCell.id;
+                    sess.member_id = scannerMemberId;
+                    _db.miniSession.Entry(sess).State = EntityState.Modified;
+                    await _db.SaveChangesAsync();
+                }
+            }
+            return scannerMemberId;
         }
 
         // 店员端轮询：该订单是否已通过微信身份核验（wechat_unverified == true 即已核验本人）。

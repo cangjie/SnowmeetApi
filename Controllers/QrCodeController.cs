@@ -603,6 +603,180 @@ namespace SnowmeetApi.Controllers
             };
         }
 
+        // ====== 养护扫码取板：顾客扫店员手机上的码，直接进小程序验证本人（取代公众号 care_veri 码） ======
+        // 判定规则见 Helpers/CarePickRules.cs；店员页验证通过后照旧自己完成「发板」任务
+
+        public class CarePickView
+        {
+            public int id { get; set; }
+            public int careId { get; set; }
+            public string code { get; set; } = "";
+            public string qrText { get; set; } = "";
+            public string stage { get; set; } = "";
+            public DateTime? expireTime { get; set; }
+            // 扫码人不是下单会员时，告诉顾客应由哪个手机号的会员来扫
+            public string orderMemberMaskedCell { get; set; } = "";
+        }
+
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<CarePickView>>> CreateCarePickByStaff(int careId, string sessionKey,
+            string sessionType = "wechat_mini_openid")
+        {
+            StaffController _staffHelper = new StaffController(_db);
+            ApiResult<object?> r = await _staffHelper.CheckStaffLevel(100, sessionKey, sessionType);
+            if (r != null)
+            {
+                return Ok(r);
+            }
+            Staff staff = await _staffHelper.GetStaffBySessionKey(sessionKey, sessionType);
+            Care? care = await _db.care.Where(c => c.id == careId).AsNoTracking().FirstOrDefaultAsync();
+            if (care == null || care.order_id == null)
+            {
+                return Ok(_checkinError("养护单不存在"));
+            }
+            // scan_qrcode.id 不是自增列，沿用 CreateNewScanQrCodeByStaff 的 Max + 1
+            int lastId = 0;
+            try
+            {
+                lastId = await _db.scanQrCode.MaxAsync(s => s.id);
+            }
+            catch
+            {
+
+            }
+            lastId++;
+            ScanQrCode sq = new ScanQrCode()
+            {
+                id = lastId,
+                code = CarePickRules.BuildCode(ReceptCheckinRules.NewToken(), careId, lastId),
+                platform = "wechat_mini",
+                staff_id = staff.id,
+                scene = "养护取板",
+                purpose = "顾客扫码验证本人",
+                expire_time = DateTime.Now.AddSeconds(CarePickRules.QR_EXPIRE_SECONDS)
+            };
+            await _db.scanQrCode.AddAsync(sq);
+            await _db.SaveChangesAsync();
+            return Ok(new ApiResult<CarePickView>()
+            {
+                code = 0,
+                message = "",
+                data = new CarePickView()
+                {
+                    id = sq.id,
+                    careId = careId,
+                    code = sq.code,
+                    qrText = CarePickRules.BuildQrText(sq.code),
+                    stage = CarePickRules.WAITING_SCAN,
+                    expireTime = sq.expire_time
+                }
+            });
+        }
+
+        [HttpGet("{id}")]
+        public async Task<ActionResult<ApiResult<CarePickView>>> GetCarePickByStaff(int id,
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            StaffController _staffHelper = new StaffController(_db);
+            Staff staff = await _staffHelper.GetStaffBySessionKey(sessionKey, sessionType);
+            if (staff == null)
+            {
+                return Ok(_checkinError("没有权限"));
+            }
+            ScanQrCode? sq = await _db.scanQrCode.Where(s => s.id == id).AsNoTracking().FirstOrDefaultAsync();
+            if (sq == null || !CarePickRules.TryParseCareId(sq.code, out int careId))
+            {
+                return Ok(_checkinError("未找到"));
+            }
+            if (sq.staff_id != staff.id)
+            {
+                return Ok(_checkinError("无权限"));
+            }
+            int? orderMemberId = await _careOrderMemberId(careId);
+            return Ok(new ApiResult<CarePickView>()
+            {
+                code = 0,
+                message = "",
+                data = new CarePickView()
+                {
+                    id = sq.id,
+                    careId = careId,
+                    code = sq.code,
+                    stage = CarePickRules.StaffStage(sq, orderMemberId, DateTime.Now),
+                    expireTime = sq.expire_time
+                }
+            });
+        }
+
+        // 顾客扫码打开小程序后验证：扫码人就是下单会员即通过。新微信号没有会员身份时返回 need_member，
+        // 顾客页授权手机号绑定会员后再调一次（同一个人重复打开照常放行）
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<CarePickView>>> VerifyCarePick(string code, string sessionKey)
+        {
+            code = Util.UrlDecode(code ?? "").Trim();
+            if (!CarePickRules.TryParseCareId(code, out int careId))
+            {
+                return Ok(_checkinError("二维码无效，请让店员换一个码"));
+            }
+            var (openId, unionId, sess) = await _loadWechatSession(sessionKey);
+            if (sess == null)
+            {
+                return Ok(_checkinError("登录信息失效，请重新扫码"));
+            }
+            ScanQrCode? sq = await _db.scanQrCode.Where(s => s.code == code).FirstOrDefaultAsync();
+            if (sq == null)
+            {
+                return Ok(_checkinError("二维码无效，请让店员换一个码"));
+            }
+            DateTime now = DateTime.Now;
+            string? reject = ReceptCheckinRules.CheckScanAllowed(sq, openId, now);
+            if (reject != null)
+            {
+                return Ok(_checkinError(reject));
+            }
+            var identityHelper = new PaymentIdentityController(_db, _config);
+            int? scannerMemberId = await identityHelper.ResolveScannerMemberId(sessionKey);
+            if (sq.scaned == 0)
+            {
+                sq.scaned = 1;
+                sq.scan_time = now;
+                sq.scaner_openid = openId;
+                sq.scaner_unionid = unionId;
+            }
+            sq.scaner_member_id = scannerMemberId;
+            sq.update_date = now;
+            _db.scanQrCode.Entry(sq).State = EntityState.Modified;
+            await _db.SaveChangesAsync();
+
+            int? orderMemberId = await _careOrderMemberId(careId);
+            string stage = CarePickRules.ScannedStage(scannerMemberId, orderMemberId);
+            string masked = "";
+            if (stage == CarePickRules.MISMATCH && orderMemberId != null)
+            {
+                MemberController _memberHelper = new MemberController(_db, _config);
+                Member? orderMember = await _memberHelper.GetWholeMemberById((int)orderMemberId);
+                masked = ReceptCheckinRules.MaskCell(orderMember?.cell);
+            }
+            return Ok(new ApiResult<CarePickView>()
+            {
+                code = 0,
+                message = "",
+                data = new CarePickView()
+                {
+                    id = sq.id,
+                    careId = careId,
+                    code = sq.code,
+                    stage = stage,
+                    orderMemberMaskedCell = masked
+                }
+            });
+        }
+
+        private async Task<int?> _careOrderMemberId(int careId)
+        {
+            return await _db.care.Where(c => c.id == careId).Select(c => c.order.member_id).FirstOrDefaultAsync();
+        }
+
         private static ApiResult<object?> _checkinError(string message)
         {
             return new ApiResult<object?>()
