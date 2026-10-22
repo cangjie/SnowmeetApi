@@ -6,7 +6,9 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using SnowmeetApi.Controllers.Order;
 using SnowmeetApi.Data;
+using SnowmeetApi.Helpers;
 using SnowmeetApi.Models;
 namespace SnowmeetApi.Controllers
 {
@@ -310,6 +312,302 @@ namespace SnowmeetApi.Controllers
                 message = "",
                 data = code
             });
+        }
+
+        // ====== 店铺接待扫码：顾客扫店员手机上的码，直接进小程序报到（不经公众号） ======
+        // 判定规则见 Helpers/ReceptCheckinRules.cs；离开出码页作废码沿用 StopQeryScan。
+
+        public class ReceptCheckinView
+        {
+            public int id { get; set; }
+            public string code { get; set; } = "";
+            public string qrText { get; set; } = "";
+            public string stage { get; set; } = "";
+            public DateTime? expireTime { get; set; }
+            public int? memberId { get; set; }
+            public string name { get; set; } = "";
+            public string gender { get; set; } = "";
+            public string cell { get; set; } = "";
+            public string maskedCell { get; set; } = "";
+            public int? paymentId { get; set; }
+        }
+
+        public class ReceptCheckinPhoneBody
+        {
+            public string code { get; set; } = "";
+            public string encData { get; set; } = "";
+            public string iv { get; set; } = "";
+        }
+
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<ReceptCheckinView>>> CreateReceptCheckinByStaff(string sessionKey,
+            string sessionType = "wechat_mini_openid")
+        {
+            StaffController _staffHelper = new StaffController(_db);
+            ApiResult<object?> r = await _staffHelper.CheckStaffLevel(100, sessionKey, sessionType);
+            if (r != null)
+            {
+                return Ok(r);
+            }
+            Staff staff = await _staffHelper.GetStaffBySessionKey(sessionKey, sessionType);
+            // scan_qrcode.id 不是自增列，沿用 CreateNewScanQrCodeByStaff 的 Max + 1
+            int lastId = 0;
+            try
+            {
+                lastId = await _db.scanQrCode.MaxAsync(s => s.id);
+            }
+            catch
+            {
+
+            }
+            lastId++;
+            ScanQrCode sq = new ScanQrCode()
+            {
+                id = lastId,
+                code = ReceptCheckinRules.BuildCode(ReceptCheckinRules.NewToken(), lastId),
+                platform = "wechat_mini",
+                staff_id = staff.id,
+                scene = "店铺接待",
+                purpose = "顾客扫码进小程序",
+                expire_time = DateTime.Now.AddSeconds(ReceptCheckinRules.QR_EXPIRE_SECONDS)
+            };
+            await _db.scanQrCode.AddAsync(sq);
+            await _db.SaveChangesAsync();
+            return Ok(new ApiResult<ReceptCheckinView>()
+            {
+                code = 0,
+                message = "",
+                data = await _staffCheckinView(sq)
+            });
+        }
+
+        [HttpGet("{id}")]
+        public async Task<ActionResult<ApiResult<ReceptCheckinView>>> GetReceptCheckinByStaff(int id,
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            StaffController _staffHelper = new StaffController(_db);
+            Staff staff = await _staffHelper.GetStaffBySessionKey(sessionKey, sessionType);
+            if (staff == null)
+            {
+                return Ok(_checkinError("没有权限"));
+            }
+            ScanQrCode? sq = await _db.scanQrCode.Where(s => s.id == id).AsNoTracking().FirstOrDefaultAsync();
+            if (sq == null || !ReceptCheckinRules.IsCheckinCode(sq.code))
+            {
+                return Ok(_checkinError("未找到"));
+            }
+            if (sq.staff_id != staff.id)
+            {
+                return Ok(_checkinError("无权限"));
+            }
+            return Ok(new ApiResult<ReceptCheckinView>()
+            {
+                code = 0,
+                message = "",
+                data = await _staffCheckinView(sq)
+            });
+        }
+
+        // 顾客扫码打开小程序后报到：记下扫码人；会员已有手机号的直接算验证通过
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<ReceptCheckinView>>> ScanReceptCheckin(string code, string sessionKey)
+        {
+            code = Util.UrlDecode(code ?? "").Trim();
+            if (!ReceptCheckinRules.IsCheckinCode(code))
+            {
+                return Ok(_checkinError("二维码无效，请让店员换一个码"));
+            }
+            var (openId, unionId, sess) = await _loadWechatSession(sessionKey);
+            if (sess == null)
+            {
+                return Ok(_checkinError("登录信息失效，请重新扫码"));
+            }
+            ScanQrCode? sq = await _db.scanQrCode.Where(s => s.code == code).FirstOrDefaultAsync();
+            if (sq == null)
+            {
+                return Ok(_checkinError("二维码无效，请让店员换一个码"));
+            }
+            DateTime now = DateTime.Now;
+            string? reject = ReceptCheckinRules.CheckScanAllowed(sq, openId, now);
+            if (reject != null)
+            {
+                return Ok(_checkinError(reject));
+            }
+            if (sq.scaned == 0)
+            {
+                sq.scaned = 1;
+                sq.scan_time = now;
+                sq.scaner_openid = openId;
+                sq.scaner_unionid = unionId;
+            }
+            if (!ReceptCheckinRules.IsVerified(sq))
+            {
+                MemberController _memberHelper = new MemberController(_db, _config);
+                Member? member = await _memberHelper.GetWholeMemberByNum(openId, MemberSocialAccount.TYPE_WECHAT_MINI_OPENID);
+                if (member == null && sess.member_id != null)
+                {
+                    member = await _memberHelper.GetWholeMemberById((int)sess.member_id);
+                }
+                if (member != null)
+                {
+                    sq.scaner_member_id = member.id;
+                    if (!string.IsNullOrWhiteSpace(member.cell))
+                    {
+                        sq.cell = member.cell.Trim();
+                    }
+                }
+            }
+            sq.update_date = now;
+            _db.scanQrCode.Entry(sq).State = EntityState.Modified;
+            await _db.SaveChangesAsync();
+            return Ok(new ApiResult<ReceptCheckinView>()
+            {
+                code = 0,
+                message = "",
+                data = await _customerCheckinView(sq)
+            });
+        }
+
+        // 顾客用微信手机号一键授权验证身份：找到或建立会员（与支付前身份验证同一套规则）
+        [HttpPost]
+        public async Task<ActionResult<ApiResult<ReceptCheckinView>>> VerifyReceptCheckinPhone(
+            [FromBody] ReceptCheckinPhoneBody body, [FromQuery] string sessionKey)
+        {
+            string code = Util.UrlDecode(body?.code ?? "").Trim();
+            var (openId, unionId, sess) = await _loadWechatSession(sessionKey);
+            if (sess == null)
+            {
+                return Ok(_checkinError("登录信息失效，请重新扫码"));
+            }
+            ScanQrCode? sq = await _db.scanQrCode.Where(s => s.code == code).FirstOrDefaultAsync();
+            if (sq == null || sq.scaned == 0 || !ReceptCheckinRules.SameOpenId(sq.scaner_openid, openId))
+            {
+                return Ok(_checkinError("请重新扫描店员手机上的二维码"));
+            }
+            string phone;
+            try
+            {
+                phone = WechatPhoneHelper.Decrypt(body.encData, body.iv, sess.session_key);
+            }
+            catch (Exception ex)
+            {
+                return Ok(_checkinError("手机号解析失败: " + ex.Message));
+            }
+            if (string.IsNullOrEmpty(phone) || phone.Length != 11)
+            {
+                return Ok(_checkinError("手机号无效"));
+            }
+            var identityHelper = new PaymentIdentityController(_db, _config);
+            int? memberId = await identityHelper.ResolveMemberByVerifiedPhone(phone, openId, "wechat", unionId, "店铺接待扫码");
+            if (memberId == null)
+            {
+                return Ok(_checkinError("会员信息处理失败，请让店员按散客开单"));
+            }
+            if (sess.member_id != memberId)
+            {
+                sess.member_id = memberId;
+                _db.miniSession.Entry(sess).State = EntityState.Modified;
+            }
+            sq.scaner_member_id = memberId;
+            sq.cell = phone;
+            sq.update_date = DateTime.Now;
+            _db.scanQrCode.Entry(sq).State = EntityState.Modified;
+            await _db.SaveChangesAsync();
+            return Ok(new ApiResult<ReceptCheckinView>()
+            {
+                code = 0,
+                message = "",
+                data = await _customerCheckinView(sq)
+            });
+        }
+
+        // 顾客等待页轮询：店员选了微信支付就返回 paymentId，顾客手机直接跳去付款
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<ReceptCheckinView>>> GetReceptCheckinByCustomer(string code, string sessionKey)
+        {
+            code = Util.UrlDecode(code ?? "").Trim();
+            var (openId, _, sess) = await _loadWechatSession(sessionKey);
+            if (sess == null)
+            {
+                return Ok(_checkinError("登录信息失效，请重新扫码"));
+            }
+            ScanQrCode? sq = await _db.scanQrCode.Where(s => s.code == code).AsNoTracking().FirstOrDefaultAsync();
+            if (sq == null || !ReceptCheckinRules.SameOpenId(sq.scaner_openid, openId))
+            {
+                return Ok(_checkinError("请重新扫描店员手机上的二维码"));
+            }
+            return Ok(new ApiResult<ReceptCheckinView>()
+            {
+                code = 0,
+                message = "",
+                data = await _customerCheckinView(sq)
+            });
+        }
+
+        private async Task<(string? openId, string? unionId, MiniSession? session)> _loadWechatSession(string sessionKey)
+        {
+            var identityHelper = new PaymentIdentityController(_db, _config);
+            var (openId, unionId, sess) = await identityHelper.LoadSessionContext(sessionKey);
+            if (sess == null || (sess.session_type ?? "").Trim() != "wechat_mini_openid" || string.IsNullOrWhiteSpace(openId))
+            {
+                return (null, null, null);
+            }
+            return (openId.Trim(), unionId, sess);
+        }
+
+        private async Task<ReceptCheckinView> _staffCheckinView(ScanQrCode sq)
+        {
+            ReceptCheckinView view = new ReceptCheckinView()
+            {
+                id = sq.id,
+                code = sq.code,
+                qrText = ReceptCheckinRules.BuildQrText(sq.code),
+                stage = ReceptCheckinRules.StaffStage(sq, DateTime.Now),
+                expireTime = sq.expire_time
+            };
+            if (view.stage == ReceptCheckinRules.STAFF_VERIFIED)
+            {
+                MemberController _memberHelper = new MemberController(_db, _config);
+                Member? member = await _memberHelper.GetWholeMemberById((int)sq.scaner_member_id);
+                view.memberId = sq.scaner_member_id;
+                view.name = member == null ? "" : (member.real_name ?? "").Trim();
+                view.gender = member == null ? "" : (member.gender ?? "").Trim();
+                view.cell = (sq.cell ?? "").Trim();
+                view.maskedCell = ReceptCheckinRules.MaskCell(sq.cell);
+            }
+            return view;
+        }
+
+        private async Task<ReceptCheckinView> _customerCheckinView(ScanQrCode sq)
+        {
+            List<OrderPayment> payments = new List<OrderPayment>();
+            if (ReceptCheckinRules.IsVerified(sq) && sq.scan_time != null)
+            {
+                DateTime since = sq.scan_time.Value;
+                int? memberId = sq.scaner_member_id;
+                payments = await _db.orderPayment.Include(p => p.order)
+                    .Where(p => p.valid == 1 && p.status == "待支付" && p.create_date >= since
+                        && p.order.valid == 1 && p.order.member_id == memberId)
+                    .AsNoTracking().ToListAsync();
+            }
+            var (stage, paymentId) = ReceptCheckinRules.CustomerStage(sq, payments, DateTime.Now);
+            return new ReceptCheckinView()
+            {
+                code = sq.code,
+                stage = stage,
+                maskedCell = ReceptCheckinRules.MaskCell(sq.cell),
+                paymentId = paymentId
+            };
+        }
+
+        private static ApiResult<object?> _checkinError(string message)
+        {
+            return new ApiResult<object?>()
+            {
+                code = 1,
+                message = message,
+                data = null
+            };
         }
 
     }

@@ -423,14 +423,54 @@ namespace SnowmeetApi.Controllers.Order
                 }
             }
 
+            int? resolvedMemberId = await ResolveMemberByVerifiedPhone(phone, scannerId, payerType, sessUnionid, "支付前身份验证");
+            if (resolvedMemberId == null)
+            {
+                // 2026-06-03 用户原则: 支付宝路径不在 PaymentIdentity 里建新会员,
+                // 会员推迟到支付宝 notify(AliController.CallBack)收到支付成功后再兜底建。
+                // 手机号已在上游统一回写到 mini_session.cell；这里继续保持 OP.member_id 不动。
+                var refreshedAli = await _resolveStatus(body.paymentId, payerType, scannerId, sessionKey);
+                return Ok(new ApiResult<CheckPayerIdentityResult>
+                {
+                    code = refreshedAli.status == "error" ? 1 : 0,
+                    message = refreshedAli.errorMessage ?? "",
+                    data = refreshedAli
+                });
+            }
+            int finalMemberId = (int)resolvedMemberId;
+
+            // 把 mini_session 的 member_id 指向 finalMemberId,这样下次 MemberLogin 之前的 session 反查可以直接拿到
+            if (sess != null && sess.member_id != finalMemberId)
+            {
+                sess.member_id = finalMemberId;
+                _db.miniSession.Entry(sess).State = EntityState.Modified;
+                await _db.SaveChangesAsync();
+            }
+
+            // 完成绑定后重新评估 status；此时 scanner 应已有 cell
+            var refreshed = await _resolveStatus(body.paymentId, payerType, scannerId, sessionKey);
+            return Ok(new ApiResult<CheckPayerIdentityResult>
+            {
+                code = refreshed.status == "error" ? 1 : 0,
+                message = refreshed.errorMessage ?? "",
+                data = refreshed
+            });
+        }
+
+        // 顾客用已认证的手机号（微信 getPhoneNumber / 支付宝授权）表明身份后，找到或建立对应会员。
+        // 支付前身份验证与店铺接待扫码（QrCodeController）共用；scene 写入新会员来源与绑手机号场景。
+        // 返回 null 仅一种情况：支付宝全新顾客——会员推迟到支付成功 notify 再建（2026-06-03 用户原则）。
+        [NonAction]
+        public async Task<int?> ResolveMemberByVerifiedPhone(string phone, string scannerId, string payerType,
+            string? sessUnionid, string scene)
+        {
+            string msaType = _msaTypeForPayer(payerType);
             // 已绑同手机号的会员（不限当前 scanner）
             var phoneOwner = await _memberHelper.GetWholeMemberByNum(phone, MemberSocialAccount.TYPE_CELL);
             // 当前 scanner 已绑的会员（按 openid/payerid 找）
             var scannerMember = string.IsNullOrEmpty(scannerId)
                 ? null
                 : await _memberHelper.GetWholeMemberByNum(scannerId, msaType);
-
-            int finalMemberId;
 
             // helper local: 若 owner 没有当前 unionid MSA 则补一条(unionid 是微信跨小程序/跨设备的稳定标识,
             // 长期价值高,本次建会员/绑会员都顺手补全)
@@ -457,77 +497,31 @@ namespace SnowmeetApi.Controllers.Order
                     // (微信 getPhoneNumber 拿到的 cell 已被系统认证,user 能授权说明掌握该手机号)
                     await _addMsa(phoneOwner.id, scannerId, msaType);
                     await EnsureUnionIdMsa(phoneOwner.id, phoneOwner);
-                    finalMemberId = phoneOwner.id;
+                    return phoneOwner.id;
                 }
-                else if (payerType == "alipay")
+                if (payerType == "alipay")
                 {
-                    // 2026-06-03 用户原则: 支付宝路径不在 PaymentIdentity 里建新会员,
-                    // 会员推迟到支付宝 notify(AliController.CallBack)收到支付成功后再兜底建。
-                    // 手机号已在上游统一回写到 mini_session.cell；这里继续保持 OP.member_id 不动。
-                    var refreshedAli = await _resolveStatus(body.paymentId, payerType, scannerId, sessionKey);
-                    return Ok(new ApiResult<CheckPayerIdentityResult>
-                    {
-                        code = refreshedAli.status == "error" ? 1 : 0,
-                        message = refreshedAli.errorMessage ?? "",
-                        data = refreshedAli
-                    });
+                    return null;
                 }
-                else
-                {
-                    // wechat 全新顾客 → 注册新会员 + cell + openid + (unionid)MSA (维持原行为)
-                    finalMemberId = await _createNewMember(phone, scannerId, msaType, sessUnionid);
-                }
-            }
-            else
-            {
-                // 扫码方已绑会员(过渡期场景:历史脏数据 stub 仍存在,或 user 早期注册过的真实会员)
-                if (string.IsNullOrEmpty(scannerMember.cell))
-                {
-                    if (phoneOwner == null)
-                    {
-                        // 手机号未被绑过 → 绑给 scannerMember(补 cell)
-                        await _memberHelper.BindMemberMainCellNum(scannerMember.id, phone, "支付前身份验证", null);
-                        await EnsureUnionIdMsa(scannerMember.id, scannerMember);
-                        finalMemberId = scannerMember.id;
-                    }
-                    else if (phoneOwner.id == scannerMember.id)
-                    {
-                        // 手机号已绑同一会员(理论上 scannerMember.cell 应非空,这里兜底)
-                        finalMemberId = scannerMember.id;
-                    }
-                    else
-                    {
-                        // 手机号已绑别人 + scanner 当前 openid 已经关联了自己的 member →
-                        // 2026-05-29 修: 优先用 scanner 本身的 member, 不动 phoneOwner, 不失效 scanner 的 openid/unionid MSA
-                        //   (之前会把 scanner 的 openid/unionid MSA invalidate 然后迁移到 phoneOwner — 这个行为是错的:
-                        //    user 反馈"应该是第二次刷新后就可以拿到会员 ID 了, 用这个会员 ID 支付呀")
-                        // cell 仍归 phoneOwner, scanner 这次不绑 cell — 下次 user 进来用 scanner.id 直接支付即可
-                        finalMemberId = scannerMember.id;
-                    }
-                }
-                else
-                {
-                    // scannerMember 已有 cell → 走原 scanner(已是完整会员)
-                    finalMemberId = scannerMember.id;
-                }
+                // wechat 全新顾客 → 注册新会员 + cell + openid + (unionid)MSA (维持原行为)
+                return await _createNewMember(phone, scannerId, msaType, sessUnionid, scene);
             }
 
-            // 把 mini_session 的 member_id 指向 finalMemberId,这样下次 MemberLogin 之前的 session 反查可以直接拿到
-            if (sess != null && sess.member_id != finalMemberId)
+            // 扫码方已绑会员(过渡期场景:历史脏数据 stub 仍存在,或 user 早期注册过的真实会员)
+            if (string.IsNullOrEmpty(scannerMember.cell) && phoneOwner == null)
             {
-                sess.member_id = finalMemberId;
-                _db.miniSession.Entry(sess).State = EntityState.Modified;
-                await _db.SaveChangesAsync();
+                // 手机号未被绑过 → 绑给 scannerMember(补 cell)
+                await _memberHelper.BindMemberMainCellNum(scannerMember.id, phone, scene, null);
+                await EnsureUnionIdMsa(scannerMember.id, scannerMember);
             }
-
-            // 完成绑定后重新评估 status；此时 scanner 应已有 cell
-            var refreshed = await _resolveStatus(body.paymentId, payerType, scannerId, sessionKey);
-            return Ok(new ApiResult<CheckPayerIdentityResult>
-            {
-                code = refreshed.status == "error" ? 1 : 0,
-                message = refreshed.errorMessage ?? "",
-                data = refreshed
-            });
+            // 其余情况都用 scanner 本身的 member：
+            // - 手机号已绑同一会员（理论上 scannerMember.cell 应非空，这里兜底）；
+            // - 手机号已绑别人：2026-05-29 修，不动 phoneOwner、不失效 scanner 的 openid/unionid MSA
+            //   (之前会把 scanner 的 openid/unionid MSA invalidate 然后迁移到 phoneOwner — 这个行为是错的:
+            //    user 反馈"应该是第二次刷新后就可以拿到会员 ID 了, 用这个会员 ID 支付呀")，
+            //   cell 仍归 phoneOwner，scanner 这次不绑 cell；
+            // - scannerMember 已有 cell → 已是完整会员。
+            return scannerMember.id;
         }
 
         private async Task<ActionResult<ApiResult<CheckPayerIdentityResult>>> _applyChoice(
@@ -800,13 +794,14 @@ namespace SnowmeetApi.Controllers.Order
 
         // 2026-05-29: phone 可空(拒绝授权场景);unionId 可空(无微信 unionid 时)
         // MemberLogin 重构后此函数成为**唯一**建会员入口,scannerId+unionId 都从 mini_session 反查
-        private async Task<int> _createNewMember(string? phone, string scannerId, string msaType, string? unionId = null)
+        private async Task<int> _createNewMember(string? phone, string scannerId, string msaType, string? unionId = null,
+            string source = "支付前身份验证")
         {
             var member = new Member
             {
                 real_name = "",
                 gender = "",
-                source = "支付前身份验证",
+                source = source,
                 valid = 1   // 显式设值,不依赖 model 默认(某些 EF/DB schema 组合下默认值落库为 0)
             };
             await _db.member.AddAsync(member);
@@ -835,6 +830,12 @@ namespace SnowmeetApi.Controllers.Order
         //   - session_type='alipay_payerid' → alipay_payerid 列(为空时 fallback wechat_openid 兼容历史 session)
         //   - 否则 → wechat_openid 列
         // unionid 字段仅 wechat 路径有意义, alipay 路径恒返 null。
+        [NonAction]
+        public Task<(string? openid, string? unionid, MiniSession? session)> LoadSessionContext(string sessionKey)
+        {
+            return _loadSessionContext(sessionKey);
+        }
+
         private async Task<(string? openid, string? unionid, MiniSession? session)> _loadSessionContext(string sessionKey)
         {
             if (string.IsNullOrEmpty(sessionKey)) return (null, null, null);
