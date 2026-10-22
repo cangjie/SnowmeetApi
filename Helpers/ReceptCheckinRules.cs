@@ -23,6 +23,9 @@ namespace SnowmeetApi.Helpers
         public const string STAFF_VERIFIED = "verified";
         public const string STAFF_EXPIRED = "expired";
         public const string STAFF_STOPPED = "stopped";
+        // 店员输手机号进入（QrCode/QueryCell 写 cell）：普通店员要等店长授权，店长及以上直接通过
+        public const string STAFF_NEED_AUTH = "need_auth";
+        public const string STAFF_PHONE_AUTHED = "phone_authed";
 
         // 顾客侧阶段
         public const string CUSTOMER_NEED_PHONE = "need_phone";
@@ -69,6 +72,12 @@ namespace SnowmeetApi.Helpers
             return sq.scaned == 1 && sq.scaner_member_id != null && !string.IsNullOrWhiteSpace(sq.cell);
         }
 
+        // 店员在出码页输了手机号（没人扫码、cell 已写入）
+        public static bool IsPhoneEntry(ScanQrCode sq)
+        {
+            return sq.scaned == 0 && !string.IsNullOrWhiteSpace(sq.cell);
+        }
+
         public static string StaffStage(ScanQrCode sq, DateTime now)
         {
             if (sq.scaned == 1)
@@ -78,6 +87,11 @@ namespace SnowmeetApi.Helpers
             if (sq.stoped == 1)
             {
                 return STAFF_STOPPED;
+            }
+            // 等店长授权可能超过二维码的 2 分钟，不按过期处理
+            if (IsPhoneEntry(sq))
+            {
+                return sq.authed == 1 ? STAFF_PHONE_AUTHED : STAFF_NEED_AUTH;
             }
             if (sq.expire_time != null && now >= sq.expire_time.Value)
             {
@@ -98,7 +112,7 @@ namespace SnowmeetApi.Helpers
             {
                 return SameOpenId(sq.scaner_openid, openId) ? null : "这个二维码已被其他顾客使用，请让店员换一个码";
             }
-            if (sq.stoped == 1)
+            if (sq.stoped == 1 || IsPhoneEntry(sq))
             {
                 return "二维码已失效，请让店员换一个码";
             }

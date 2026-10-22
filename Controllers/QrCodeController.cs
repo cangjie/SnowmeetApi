@@ -203,8 +203,9 @@ namespace SnowmeetApi.Controllers
                     data = null
                 });
             }
+            // 只列店员输手机号提交、还在等的（scaned=0、未作废）；顾客自己扫码验证的记录也带 cell，但不需要授权
             List<ScanQrCode> scanQrCodeList = await _db.scanQrCode
-                .Where(s => s.cell != null && s.create_date >= DateTime.Now.Date)
+                .Where(s => s.cell != null && s.scaned == 0 && s.stoped == 0 && s.create_date >= DateTime.Now.Date)
                 .OrderByDescending(s => s.create_date).AsNoTracking().ToListAsync();
             List<ScanQrCode.AuthCell> cellList = new List<ScanQrCode.AuthCell>();
             foreach (ScanQrCode sq in scanQrCodeList)
@@ -565,7 +566,9 @@ namespace SnowmeetApi.Controllers
                 stage = ReceptCheckinRules.StaffStage(sq, DateTime.Now),
                 expireTime = sq.expire_time
             };
-            if (view.stage == ReceptCheckinRules.STAFF_VERIFIED)
+            // 扫码验证过的，或店员输手机号匹配到的会员（等授权时也带上，店员页显示是谁）
+            if (sq.scaner_member_id != null && (view.stage == ReceptCheckinRules.STAFF_VERIFIED
+                || view.stage == ReceptCheckinRules.STAFF_PHONE_AUTHED || view.stage == ReceptCheckinRules.STAFF_NEED_AUTH))
             {
                 MemberController _memberHelper = new MemberController(_db, _config);
                 Member? member = await _memberHelper.GetWholeMemberById((int)sq.scaner_member_id);

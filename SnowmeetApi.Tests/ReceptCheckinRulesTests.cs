@@ -70,6 +70,28 @@ namespace SnowmeetApi.Tests
         }
 
         [Fact]
+        public void 店员输手机号后等店长授权不按二维码过期处理()
+        {
+            ScanQrCode waiting = new ScanQrCode { cell = "13800138000", scaner_member_id = 7, authed = 0, expire_time = Now.AddMinutes(-10) };
+            ScanQrCode authed = new ScanQrCode { cell = "13800138000", scaner_member_id = 7, authed = 1, expire_time = Now.AddMinutes(-10) };
+            ScanQrCode stopped = new ScanQrCode { cell = "13800138000", authed = 0, stoped = 1, expire_time = Now.AddMinutes(1) };
+
+            Assert.True(ReceptCheckinRules.IsPhoneEntry(waiting));
+            Assert.False(ReceptCheckinRules.IsPhoneEntry(VerifiedScan()));
+            Assert.Equal(ReceptCheckinRules.STAFF_NEED_AUTH, ReceptCheckinRules.StaffStage(waiting, Now));
+            Assert.Equal(ReceptCheckinRules.STAFF_PHONE_AUTHED, ReceptCheckinRules.StaffStage(authed, Now));
+            Assert.Equal(ReceptCheckinRules.STAFF_STOPPED, ReceptCheckinRules.StaffStage(stopped, Now));
+        }
+
+        [Fact]
+        public void 店员已经输了手机号的码顾客不能再扫()
+        {
+            ScanQrCode phoneEntry = new ScanQrCode { cell = "13800138000", expire_time = Now.AddSeconds(60) };
+
+            Assert.NotNull(ReceptCheckinRules.CheckScanAllowed(phoneEntry, "oid-a", Now));
+        }
+
+        [Fact]
         public void 码过期作废或被别人扫过时拒绝报到()
         {
             ScanQrCode fresh = new ScanQrCode { expire_time = Now.AddSeconds(60) };
