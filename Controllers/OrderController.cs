@@ -785,10 +785,11 @@ namespace SnowmeetApi.Controllers
             return Ok(payment);
         }
         // checkinId：开单前顾客在接待页扫的报到码（scan_qrcode.id），用来定订单「已核验本人」（OrderVerifiedRules）
+        // isTest：店员在顾客信息页勾了「这是测试订单」，订单记为测试单（is_test=1）
         [HttpPost]
         public async Task<ActionResult<ApiResult<SnowmeetApi.Models.Order?>>> PlaceOrder([FromBody] SnowmeetApi.Models.Order order,
             [FromQuery] string sessionKey, [FromQuery] string sessionType = "wechat_mini_openid",
-            [FromQuery] int? checkinId = null)
+            [FromQuery] int? checkinId = null, [FromQuery] bool isTest = false)
         {
             StaffController _staffHelper = new StaffController(_db);
             Staff staff = await _staffHelper.GetStaffBySessionKey(sessionKey, sessionType);
@@ -938,7 +939,9 @@ namespace SnowmeetApi.Controllers
             }
 
  
-            if (order.staff_id == 28 || order.staff_id == 31 || order.staff_id == 34)
+            // 店员勾了「这是测试订单」也记为测试单；顾客自己下单不认这个参数
+            bool staffMarkedTest = isTest && staff != null && staff.title_level >= 100;
+            if (staffMarkedTest || order.staff_id == 28 || order.staff_id == 31 || order.staff_id == 34)
             {
                 order.is_test = 1;
             }

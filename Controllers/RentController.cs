@@ -4132,10 +4132,11 @@ namespace SnowmeetApi.Controllers
             });
         }
         // checkinId：开单前顾客在接待页扫的报到码（scan_qrcode.id），用来定订单「已核验本人」（OrderVerifiedRules）
+        // isTest：店员在顾客信息页勾了「这是测试订单」，订单记为测试单（is_test=1）
         [HttpPost]
         public async Task<ActionResult<ApiResult<Models.Order?>>> SaveRentRecept([FromBody] Models.Order order,
             [FromQuery] string sessionKey, [FromQuery] string sessionType = "wechat_mini_openid",
-            [FromQuery] int? checkinId = null)
+            [FromQuery] int? checkinId = null, [FromQuery] bool isTest = false)
         {
             sessionKey = Util.UrlDecode(sessionKey);
             Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
@@ -4187,7 +4188,7 @@ namespace SnowmeetApi.Controllers
             }
             if (order.id == 0)
             {
-                if (_httpContextAccessor.HttpContext.Request.Host.Value != null
+                if (!isTest && _httpContextAccessor.HttpContext.Request.Host.Value != null
                 && _httpContextAccessor.HttpContext.Request.Host.Value.Equals("mini.snowmeet.top"))
                 {
                     order.is_test = 0;
@@ -4225,6 +4226,10 @@ namespace SnowmeetApi.Controllers
                 {
                     await _db.coreDataModLog.AddAsync(
                         SnowmeetApi.Helpers.OrderVerifiedRules.ChangeLog(order.id, verified, staff.id, checkinId));
+                }
+                if (isTest)
+                {
+                    order.is_test = 1;
                 }
                 for (int i = 0; i < order.rentals.Count; i++)
                 {
