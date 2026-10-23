@@ -2188,6 +2188,16 @@ namespace SnowmeetApi.Controllers
                     data = null
                 });
             }
+            // 暂不允许个人微信转账：列表里已隐藏，这里挡住手工填写（规则见 PayMethodRules）
+            if (!payLater && PayMethodRules.IsPersonalWechatTransfer(payMethod))
+            {
+                return Ok(new ApiResult<object?>()
+                {
+                    code = 1,
+                    message = "暂不允许个人微信转账收款",
+                    data = null
+                });
+            }
             bool ok = await InvalidatePendingOrderPayments(order, staff.id, payLater ? "切换为挂账" : "切换为" + (payMethod ?? ""));
             if (!ok)
             {
@@ -2616,6 +2626,8 @@ namespace SnowmeetApi.Controllers
             var list = await _db.orderPayment.FromSqlRaw(" select distinct pay_method from order_payment where valid = 1 and status = '"
                 + OrderPayment.PaymentStatus.支付成功.ToString() + "' and pay_method not in ('微信支付','支付宝','京东收银','POS机刷卡', '现金') ")
                 .OrderBy(p => p.pay_method).AsNoTracking().Select(p => p.pay_method).ToListAsync();
+            // 暂不允许个人微信转账：以「微信转账」结尾的不给选（规则见 PayMethodRules）
+            list = list.Where(m => !PayMethodRules.IsPersonalWechatTransfer(m)).ToList();
             return Ok(new ApiResult<object>()
             {
                 code = 0,
