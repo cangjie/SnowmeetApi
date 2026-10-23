@@ -82,6 +82,39 @@ namespace SnowmeetApi.Tests
         }
 
         [Fact]
+        public void 后端查报到_挑能担保的最近一次()
+        {
+            ScanQrCode older = VerifiedCheckin();
+            older.id = 1;
+            older.scan_time = Now.AddMinutes(-30);
+            ScanQrCode newer = VerifiedCheckin();
+            newer.id = 2;
+            newer.scan_time = Now.AddMinutes(-3);
+            ScanQrCode notVerified = VerifiedCheckin();
+            notVerified.id = 3;
+            notVerified.scan_time = Now.AddMinutes(-1);
+            notVerified.cell = null;
+
+            ScanQrCode? picked = OrderVerifiedRules.PickVouchingCheckin(
+                new[] { older, notVerified, newer }, Staff, Member, Now);
+
+            Assert.NotNull(picked);
+            Assert.Equal(2, picked!.id);
+        }
+
+        [Fact]
+        public void 后端查报到_没有能担保的返回空()
+        {
+            ScanQrCode otherMember = VerifiedCheckin();
+            otherMember.scaner_member_id = 8;
+            ScanQrCode expired = VerifiedCheckin();
+            expired.scan_time = Now.AddMinutes(-61);
+
+            Assert.Null(OrderVerifiedRules.PickVouchingCheckin(new[] { otherMember, expired }, Staff, Member, Now));
+            Assert.Null(OrderVerifiedRules.PickVouchingCheckin(new ScanQrCode[0], Staff, Member, Now));
+        }
+
+        [Fact]
         public void 草稿保存_报到担保就是1()
         {
             Assert.True(OrderVerifiedRules.ResolveOnSave(true, false, null, Member));

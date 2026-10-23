@@ -546,25 +546,40 @@ namespace SnowmeetApi.Controllers
         }
 
         // 开单接口（租赁/养护草稿保存、零售下单）定 order.wechat_unverified 用，规则见 OrderVerifiedRules。
-        // checkinId 是开单前顾客扫的那张报到码（scan_qrcode.id），没有就传 null。返回 (库里原值, 新值)，新建订单原值按 0。
+        // 不用前端带报到码：自己找这位店员 60 分钟内出过、被本单会员本人扫码验证过的报到码。
+        // 返回 (库里原值, 新值, 担保的报到码 id)，新建订单原值按 0；没用到报到时 checkinId 为 null。
         [NonAction]
-        public async Task<(bool prev, bool next)> ResolveReceptOrderVerified(SnowmeetApi.Models.Order order,
-            int? checkinId, int staffId)
+        public async Task<(bool prev, bool next, int? checkinId)> ResolveReceptOrderVerified(
+            SnowmeetApi.Models.Order order, int staffId)
         {
-            bool vouched = false;
-            if (checkinId != null && checkinId > 0 && order.member_id != null)
+            bool prev = false;
+            int? savedMemberId = null;
+            if (order.id != 0)
             {
-                ScanQrCode? sq = await _db.scanQrCode.Where(s => s.id == checkinId).AsNoTracking().FirstOrDefaultAsync();
-                vouched = OrderVerifiedRules.CheckinVouches(sq, staffId, order.member_id, DateTime.Now);
+                var saved = await _db.order.Where(o => o.id == order.id)
+                    .Select(o => new { o.wechat_unverified, o.member_id }).AsNoTracking().FirstOrDefaultAsync();
+                prev = saved != null && saved.wechat_unverified;
+                savedMemberId = saved?.member_id;
+                // 已经是 1 且会员没换，不用再查报到（草稿每改一次就保存一次）
+                if (OrderVerifiedRules.ResolveOnSave(false, prev, savedMemberId, order.member_id))
+                {
+                    return (prev, true, null);
+                }
             }
-            if (order.id == 0)
+            ScanQrCode? checkin = null;
+            if (order.member_id != null)
             {
-                return (false, vouched);
+                DateTime now = DateTime.Now;
+                DateTime since = now.AddMinutes(-ReceptCheckinRules.CUSTOMER_WAIT_MINUTES);
+                int? memberId = order.member_id;
+                List<ScanQrCode> candidates = await _db.scanQrCode
+                    .Where(s => s.staff_id == staffId && s.scaner_member_id == memberId && s.scaned == 1
+                        && s.scan_time != null && s.scan_time > since)
+                    .AsNoTracking().ToListAsync();
+                checkin = OrderVerifiedRules.PickVouchingCheckin(candidates, staffId, memberId, now);
             }
-            var saved = await _db.order.Where(o => o.id == order.id)
-                .Select(o => new { o.wechat_unverified, o.member_id }).AsNoTracking().FirstOrDefaultAsync();
-            bool prev = saved != null && saved.wechat_unverified;
-            return (prev, OrderVerifiedRules.ResolveOnSave(vouched, prev, saved?.member_id, order.member_id));
+            bool next = OrderVerifiedRules.ResolveOnSave(checkin != null, prev, savedMemberId, order.member_id);
+            return (prev, next, checkin?.id);
         }
 
         private async Task<(string? openId, string? unionId, MiniSession? session)> _loadWechatSession(string sessionKey)

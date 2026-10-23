@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using SnowmeetApi.Models;
 
 namespace SnowmeetApi.Helpers
@@ -25,6 +27,17 @@ namespace SnowmeetApi.Helpers
                 && orderMemberId != null && sq.scaner_member_id == orderMemberId
                 && sq.scan_time != null
                 && now < sq.scan_time.Value.AddMinutes(ReceptCheckinRules.CUSTOMER_WAIT_MINUTES);
+        }
+
+        // 后端自己找报到：在这位店员最近出的码里，挑能担保这张单的最近一次报到；没有返回 null。
+        // 不需要前端带报到码，所以从手动录入页、找回中断单等入口开的单，顾客刚扫码报到过也算。
+        public static ScanQrCode? PickVouchingCheckin(IEnumerable<ScanQrCode> candidates, int staffId,
+            int? orderMemberId, DateTime now)
+        {
+            return candidates
+                .Where(sq => CheckinVouches(sq, staffId, orderMemberId, now))
+                .OrderByDescending(sq => sq.scan_time)
+                .FirstOrDefault();
         }
 
         // 开单草稿每次保存时的取值。不采信前端传来的值：草稿接口把整单原样写库，前端可能带着上一单的值。

@@ -1657,12 +1657,11 @@ namespace SnowmeetApi.Controllers
             });
         }
 
-        // checkinId：开单前顾客在接待页扫的报到码（scan_qrcode.id），用来定订单「已核验本人」（OrderVerifiedRules）
         // isTest：店员在顾客信息页勾了「这是测试订单」，订单记为测试单（is_test=1）
         [HttpPost]
         public async Task<ActionResult<ApiResult<Models.Order?>>> SaveCareRecept([FromBody] Models.Order order,
             [FromQuery] string sessionKey, [FromQuery] string sessionType = "wechat_mini_openid",
-            [FromQuery] int? checkinId = null, [FromQuery] bool isTest = false)
+            [FromQuery] bool isTest = false)
         {
             sessionKey = Util.UrlDecode(sessionKey);
             Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
@@ -1697,8 +1696,8 @@ namespace SnowmeetApi.Controllers
                 }
             }
             // 「已核验本人」由后端定，不采信前端带来的值：开单前扫码报到验证过本人的，订单一生成就是 1
-            var (prevVerified, verified) = await new QrCodeController(_db, _config, _http)
-                .ResolveReceptOrderVerified(order, checkinId, staff.id);
+            var (prevVerified, verified, checkinId) = await new QrCodeController(_db, _config, _http)
+                .ResolveReceptOrderVerified(order, staff.id);
             order.wechat_unverified = verified;
             if (order.id == 0)
             {
