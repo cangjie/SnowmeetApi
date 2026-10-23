@@ -4131,9 +4131,11 @@ namespace SnowmeetApi.Controllers
                 data = package
             });
         }
+        // checkinId：开单前顾客在接待页扫的报到码（scan_qrcode.id），用来定订单「已核验本人」（OrderVerifiedRules）
         [HttpPost]
         public async Task<ActionResult<ApiResult<Models.Order?>>> SaveRentRecept([FromBody] Models.Order order,
-            [FromQuery] string sessionKey, [FromQuery] string sessionType = "wechat_mini_openid")
+            [FromQuery] string sessionKey, [FromQuery] string sessionType = "wechat_mini_openid",
+            [FromQuery] int? checkinId = null)
         {
             sessionKey = Util.UrlDecode(sessionKey);
             Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
@@ -4161,6 +4163,10 @@ namespace SnowmeetApi.Controllers
                     order.rentals[i].rentItems[j].category = null;
                 }
             }
+            // 「已核验本人」由后端定，不采信前端带来的值：开单前扫码报到验证过本人的，订单一生成就是 1
+            var (prevVerified, verified) = await new QrCodeController(_db, _oriConfig, _httpContextAccessor)
+                .ResolveReceptOrderVerified(order, checkinId, staff.id);
+            order.wechat_unverified = verified;
             if (order.create_date == null)
             {
                 order.create_date = DateTime.Now;
@@ -4206,9 +4212,20 @@ namespace SnowmeetApi.Controllers
                 }
                 await _db.order.AddAsync(order);
                 await _db.SaveChangesAsync();
+                if (verified)
+                {
+                    await _db.coreDataModLog.AddAsync(
+                        SnowmeetApi.Helpers.OrderVerifiedRules.ChangeLog(order.id, true, staff.id, checkinId));
+                    await _db.SaveChangesAsync();
+                }
             }
             else
             {
+                if (verified != prevVerified)
+                {
+                    await _db.coreDataModLog.AddAsync(
+                        SnowmeetApi.Helpers.OrderVerifiedRules.ChangeLog(order.id, verified, staff.id, checkinId));
+                }
                 for (int i = 0; i < order.rentals.Count; i++)
                 {
                     int rentalId = order.rentals[i].id;

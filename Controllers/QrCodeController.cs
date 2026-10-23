@@ -545,6 +545,28 @@ namespace SnowmeetApi.Controllers
             });
         }
 
+        // 开单接口（租赁/养护草稿保存、零售下单）定 order.wechat_unverified 用，规则见 OrderVerifiedRules。
+        // checkinId 是开单前顾客扫的那张报到码（scan_qrcode.id），没有就传 null。返回 (库里原值, 新值)，新建订单原值按 0。
+        [NonAction]
+        public async Task<(bool prev, bool next)> ResolveReceptOrderVerified(SnowmeetApi.Models.Order order,
+            int? checkinId, int staffId)
+        {
+            bool vouched = false;
+            if (checkinId != null && checkinId > 0 && order.member_id != null)
+            {
+                ScanQrCode? sq = await _db.scanQrCode.Where(s => s.id == checkinId).AsNoTracking().FirstOrDefaultAsync();
+                vouched = OrderVerifiedRules.CheckinVouches(sq, staffId, order.member_id, DateTime.Now);
+            }
+            if (order.id == 0)
+            {
+                return (false, vouched);
+            }
+            var saved = await _db.order.Where(o => o.id == order.id)
+                .Select(o => new { o.wechat_unverified, o.member_id }).AsNoTracking().FirstOrDefaultAsync();
+            bool prev = saved != null && saved.wechat_unverified;
+            return (prev, OrderVerifiedRules.ResolveOnSave(vouched, prev, saved?.member_id, order.member_id));
+        }
+
         private async Task<(string? openId, string? unionId, MiniSession? session)> _loadWechatSession(string sessionKey)
         {
             var identityHelper = new PaymentIdentityController(_db, _config);

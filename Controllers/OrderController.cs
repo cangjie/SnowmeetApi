@@ -784,9 +784,11 @@ namespace SnowmeetApi.Controllers
             }
             return Ok(payment);
         }
+        // checkinId：开单前顾客在接待页扫的报到码（scan_qrcode.id），用来定订单「已核验本人」（OrderVerifiedRules）
         [HttpPost]
         public async Task<ActionResult<ApiResult<SnowmeetApi.Models.Order?>>> PlaceOrder([FromBody] SnowmeetApi.Models.Order order,
-            [FromQuery] string sessionKey, [FromQuery] string sessionType = "wechat_mini_openid")
+            [FromQuery] string sessionKey, [FromQuery] string sessionType = "wechat_mini_openid",
+            [FromQuery] int? checkinId = null)
         {
             StaffController _staffHelper = new StaffController(_db);
             Staff staff = await _staffHelper.GetStaffBySessionKey(sessionKey, sessionType);
@@ -800,6 +802,14 @@ namespace SnowmeetApi.Controllers
             {
                 order.member_id = member.id;
             }
+            // 「已核验本人」由后端定，不采信前端带来的值：开单前扫码报到验证过本人的，订单一生成就是 1
+            bool verified = false;
+            if (staff != null && staff.title_level >= 100)
+            {
+                verified = (await new QrCodeController(_db, _config, _http)
+                    .ResolveReceptOrderVerified(order, checkinId, staff.id)).next;
+            }
+            order.wechat_unverified = verified;
             order.recepting = 0;
             order.valid = 1;
             order.biz_date = DateTime.Now;
@@ -958,6 +968,11 @@ namespace SnowmeetApi.Controllers
             };
             await _db.coreDataModLog.AddAsync(log);
             await _db.SaveChangesAsync();
+            if (verified)
+            {
+                await _db.coreDataModLog.AddAsync(OrderVerifiedRules.ChangeLog(order.id, true, staff.id, checkinId));
+                await _db.SaveChangesAsync();
+            }
             for (int i = 0; order.cares != null && i < order.cares.Count; i++)
             {
                 if (order.cares[i].discount > 0)
@@ -2326,6 +2341,8 @@ namespace SnowmeetApi.Controllers
                     .AsNoTracking().FirstOrDefaultAsync();
                 if (paidOp != null)
                 {
+                    bool verifiedBefore = order.wechat_unverified;
+                    int? memberBefore = order.member_id;
                     // 「正常支付（订单转归我）」语义:无论订单原本有无 member_id,都同步为付款方
                     // 「替人代付（订单仍归原会员）」由 is_proxy_pay==true 拦截,不会误转
                     // scanner == order 原归属 时,paidOp.member_id == order.member_id,赋值无副作用
@@ -2334,15 +2351,11 @@ namespace SnowmeetApi.Controllers
                         order.member_id = paidOp.member_id;
                     }
                     // wechat_unverified 语义注意：本字段 1 = 「已通过微信核验为本人」，与字面相反（历史命名）。
-                    // 规则：仅当「微信支付 + 非代付 + 付款人 member_id == 订单 member_id」时置 true；
-                    // 其余（含本人支付宝、代付、会员不符）一律 false。上面非代付时已把 order.member_id
-                    // 同步为付款方，故此处相等即代表本人微信支付。每次成功都显式赋值，满足「否则都设 0」。
-                    order.wechat_unverified =
-                        paidOp.pay_method != null
-                        && paidOp.pay_method.Trim() == "微信支付"
-                        && paidOp.is_proxy_pay == false
-                        && paidOp.member_id != null
-                        && paidOp.member_id == order.member_id;
+                    // 规则见 OrderVerifiedRules.ResolveOnPaid：订单会员本人微信付款 → 1；此前已核验
+                    // （开单前扫码报到 / 扫过核验码）且这次付款没有改订单会员 → 保持 1；其余 0。
+                    // 2026-10-23 前是「非本人微信付款一律 0」，会把开单前已核验的单在支付宝付款后冲回 0。
+                    order.wechat_unverified = OrderVerifiedRules.ResolveOnPaid(verifiedBefore, memberBefore,
+                        order.member_id, paidOp.pay_method, paidOp.is_proxy_pay, paidOp.member_id);
                 }
             }
             await UpdateOrder(order, null, null, "支付成功");
