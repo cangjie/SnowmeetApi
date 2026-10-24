@@ -545,6 +545,8 @@ namespace SnowmeetApi.Controllers.Order
             sessionKey = Util.UrlDecode(sessionKey);
 
             OrderPayment payment = await _context.OrderPayment.Where(p => p.id == paymentId).AsNoTracking().FirstOrDefaultAsync();
+            if (payment != null && await SnowmeetApi.Services.CareCardSaleService.ContainsCardSaleAsync(_context, payment.order_id))
+                return BadRequest(new { code = 1, message = "含卡订单不允许退款，取消养护只返还次数" });
 
             /*
             Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);        

@@ -124,6 +124,8 @@ namespace SnowmeetApi.Models
         public Member member { get; set; } = null;
         public List<SkiPass> skipasses {get; set;} = new List<SkiPass>();
         public List<Retail> retails { get; set; } = new List<Retail>();
+        [NotMapped]
+        public CareCardSaleInfo? careCardSale { get; set; }
          
 
         public List<Care> cares { get; set; } = new List<Care>();

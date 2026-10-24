@@ -854,7 +854,8 @@ namespace SnowmeetApi.Controllers
                 c.equip_scale,
                 c.equip_serial,
                 // 限装备季卡：三个展示字段全非空即绑定（serial 暂不参与限制，未来启用序列号校验再加）
-                equipBound = !string.IsNullOrWhiteSpace(c.equip_type)
+                equipBound = SnowmeetApi.Helpers.CareCardRules.RequiresEquipmentBinding(c.total, c.card_name)
+                    && !string.IsNullOrWhiteSpace(c.equip_type)
                     && !string.IsNullOrWhiteSpace(c.equip_brand)
                     && !string.IsNullOrWhiteSpace(c.equip_scale),
                 lastUsedDate = lastUsed.Where(l => l.card_id == c.id)

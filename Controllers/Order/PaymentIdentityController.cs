@@ -10,6 +10,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using SnowmeetApi.Data;
 using SnowmeetApi.Models;
+using SnowmeetApi.Services;
 
 namespace SnowmeetApi.Controllers.Order
 {
@@ -268,6 +269,7 @@ namespace SnowmeetApi.Controllers.Order
             }
             result.orderId = order.id;
             result.orderMemberId = order.member_id;
+            var linkedCare = await CareCardSaleService.LinkedCareAsync(_db, order);
 
             if (order.member_id != null)
             {
@@ -330,19 +332,19 @@ namespace SnowmeetApi.Controllers.Order
             // 扫码支付，非本人拦截。已核验本人（开单前扫码报到 / 扫过核验码）或没用权益的单允许他人代付，
             // 订单仍归原会员（_applyChoice 按代付记录、DealSuccessPaidOrder 不改会员）。规则见 OrderVerifiedRules。
             // 散客养护单（无会员）不受此约束；仅养护 + 微信通道生效，不影响租赁/零售/雪票及支付宝。
-            if (order.type != null && order.type.Trim() == "养护"
+            if ((order.type?.Trim() == "养护" || linkedCare != null)
                 && payerType == "wechat"
                 && order.member_id != null
                 && result.scannerMemberId != order.member_id)
             {
-                int orderId = order.id;
+                int orderId = linkedCare?.id ?? order.id;
                 var careBenefits = await _db.care
                     .Where(c => c.order_id == orderId && c.valid == 1)
                     .Select(c => new { c.ticket_code, c.use_card })
                     .AsNoTracking().ToListAsync();
-                bool usesBenefit = SnowmeetApi.Helpers.OrderVerifiedRules.CareUsesBenefit(order.pay_with_deposit,
+                bool usesBenefit = linkedCare != null || SnowmeetApi.Helpers.OrderVerifiedRules.CareUsesBenefit(order.pay_with_deposit,
                     careBenefits.Select(c => (c.ticket_code, c.use_card)));
-                if (SnowmeetApi.Helpers.OrderVerifiedRules.CareRequiresMemberPayer(usesBenefit, order.wechat_unverified))
+                if (SnowmeetApi.Helpers.OrderVerifiedRules.CareRequiresMemberPayer(usesBenefit, linkedCare?.wechat_unverified ?? order.wechat_unverified))
                 {
                     result.status = "care_member_required";
                     return result;
@@ -612,7 +614,8 @@ namespace SnowmeetApi.Controllers.Order
             }
             // 养护单只允许替人代付：选了「正常支付（订单转归我）」也按代付记录，订单仍归原会员
             if (choice == "self" && !nowDirect
-                && SnowmeetApi.Helpers.OrderVerifiedRules.KeepOrderMemberOnPaid(order.type, order.member_id))
+                && (SnowmeetApi.Helpers.OrderVerifiedRules.KeepOrderMemberOnPaid(order.type, order.member_id)
+                    || await CareCardSaleService.IsLinkedRetailAsync(_db, order.id)))
             {
                 choice = "proxy";
             }

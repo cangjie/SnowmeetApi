@@ -5,6 +5,7 @@ using Microsoft.Extensions.Configuration;
 using SnowmeetApi.Data;
 using SnowmeetApi.Helpers;
 using SnowmeetApi.Models;
+using SnowmeetApi.Services;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -47,6 +48,9 @@ namespace SnowmeetApi.Controllers
             if (order.type == "零售")
             {
                 order.retails = await _db.order.Entry(order).Collection(o => o.retails).Query().Where(r => r.valid == 1).AsNoTracking().ToListAsync();
+                // 待付购卡安排是内部临时数据，普通订单详情仍只返回面向顾客的备注。
+                if (order.order_source == CareCardSaleService.OrderSource)
+                    foreach (var retail in order.retails) retail.memo = "";
                 order.retailImages = await _db.retailImage.Include(i => i.image).Where(i => i.order_id == orderId && i.valid).AsNoTracking().ToListAsync();
             }
             if (order.type == "养护")
@@ -127,6 +131,10 @@ namespace SnowmeetApi.Controllers
                 .Include(p => p.staff)
                 .Include(p => p.refunds).ThenInclude(r => r.member)
                 .AsSplitQuery().AsNoTracking().ToListAsync();
+            if (order.type == "零售" || order.type == "养护")
+            {
+                order.careCardSale = await CareCardSaleService.GetInfoAsync(_db, order);
+            }
             return order;
         }
         [NonAction]
@@ -479,6 +487,9 @@ namespace SnowmeetApi.Controllers
         [NonAction]
         public async Task CancelOrder(SnowmeetApi.Models.Order order, int? staffId, int? memberId, string scene)
         {
+            if (await CareCardSaleService.IsLinkedRetailAsync(_db, order.id)
+                || await CareCardSaleService.IsLinkedCareAsync(_db, order.id))
+                throw new InvalidOperationException("关联购卡订单不能单独删除，请保留购卡记录并按件取消养护");
             order.valid = 0;
             order.update_date = DateTime.Now;
             _db.order.Entry(order).State = EntityState.Modified;
@@ -615,6 +626,9 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<ApiResult<SnowmeetApi.Models.Order>>> UpdateOrderByStaff([FromBody] SnowmeetApi.Models.Order order,
             [FromQuery] string scene, [FromQuery] string sessionKey, [FromQuery] string sessionType = "wechat_mini_openid")
         {
+            if (await CareCardSaleService.IsLinkedRetailAsync(_db, order.id)
+                || await CareCardSaleService.IsLinkedCareAsync(_db, order.id))
+                return Ok(new ApiResult<Models.Order> { code = 1, message = "关联购卡订单已提交，不能直接覆盖金额或归属", data = null });
             StaffController _staffHelper = new StaffController(_db);
             Staff staff = await _staffHelper.GetStaffBySessionKey(sessionKey, sessionType);
             ApiResult<object?> r = await _staffHelper.CheckStaffLevel(100, sessionKey, sessionType);
@@ -1037,6 +1051,9 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<ApiResult<SnowmeetApi.Models.Order?>>> CancelOrder(int orderId,
             string scene, string sessionKey, string sessionType = "wechat_mini_openid")
         {
+            if (await CareCardSaleService.IsLinkedRetailAsync(_db, orderId)
+                || await CareCardSaleService.IsLinkedCareAsync(_db, orderId))
+                return Ok(new ApiResult<Models.Order?> { code = 1, message = "关联购卡订单不能单独删除，请按件取消养护", data = null });
             scene = Util.UrlDecode(scene);
             StaffController _staffHelper = new StaffController(_db);
             Staff staff = await _staffHelper.GetStaffBySessionKey(sessionKey, sessionType);
@@ -1487,6 +1504,8 @@ namespace SnowmeetApi.Controllers
         [NonAction]
         public async Task<OrderPayment> GetReadyOrderPayment(Models.Order order, double? amount, string payMethod, int? memberId, string? openId, bool needShare = false)
         {
+            var cardError = await CareCardSaleService.PaymentErrorAsync(_db, order, amount, payMethod);
+            if (cardError != null) throw new InvalidOperationException(cardError);
             if (order == null && order.closed == 1)
             {
                 return null;
@@ -1578,6 +1597,11 @@ namespace SnowmeetApi.Controllers
             string sessionKey, string sessionType = "wechat_mini_openid")
         {
             Models.Order order = await GetOrder(orderId);
+            if (order != null)
+            {
+                var cardError = await CareCardSaleService.PaymentErrorAsync(_db, order, amount, "微信支付");
+                if (cardError != null) return Ok(new ApiResult<OrderPayment?> { code = 1, message = cardError, data = null });
+            }
             string message = "";
             if (order == null)
             {
@@ -1651,6 +1675,11 @@ namespace SnowmeetApi.Controllers
             string sessionKey, string sessionType = "wechat_mini_openid")
         {
             Models.Order order = await GetOrder(orderId);
+            if (order != null)
+            {
+                var cardError = await CareCardSaleService.PaymentErrorAsync(_db, order, amount, "支付宝");
+                if (cardError != null) return Ok(new ApiResult<OrderPayment> { code = 1, message = cardError, data = null });
+            }
             string message = "";
             if (order == null)
             {
@@ -1749,6 +1778,8 @@ namespace SnowmeetApi.Controllers
             }
             Models.Order order = await GetOrder(payment.order_id);
             ///////正式上线时去掉注释
+            var careCardError = await CareCardSaleService.PaymentErrorAsync(_db, order, payment.amount, "微信支付", member.id, true);
+            if (careCardError != null) return Ok(new ApiResult<OrderPayment?> { code = 1, message = careCardError, data = null });
 
             if (order.shop == "万龙体验中心" && order.type == "租赁")
             {
@@ -1867,6 +1898,11 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<ApiResult<OrderPayment?>>> GetAlipayMiniPayment(int orderId, double? amount, string sessionKey, string sessionType = "wechat_mini_openid")
         {
             Models.Order order = await GetOrder(orderId);
+            if (order != null)
+            {
+                var cardError = await CareCardSaleService.PaymentErrorAsync(_db, order, amount, "支付宝");
+                if (cardError != null) return Ok(new ApiResult<OrderPayment?> { code = 1, message = cardError, data = null });
+            }
             string message = "";
             if (order == null) message = "无此订单";
             else if (order.closed == 1) message = "订单关闭";
@@ -1955,6 +1991,8 @@ namespace SnowmeetApi.Controllers
             Models.Order order = await GetOrder(payment.order_id);
 
             // 计算新 out_trade_no：用订单下所有 payment 的最大序号+1（与 wechat 版同算法）
+            var careCardError = await CareCardSaleService.PaymentErrorAsync(_db, order, payment.amount, "支付宝", sessionMemberId, true);
+            if (careCardError != null) return Ok(new ApiResult<OrderPayment?> { code = 1, message = careCardError, data = null });
             List<OrderPayment> allPayments = await _db.orderPayment.Where(p => p.order_id == order.id)
                 .OrderByDescending(p => p.out_trade_no).AsNoTracking().ToListAsync();
             string? outTradeNo = allPayments.Count > 0 ? allPayments[0].out_trade_no : null;
@@ -2158,7 +2196,7 @@ namespace SnowmeetApi.Controllers
         {
             StaffController _staffHelper = new StaffController(_db);
             Staff staff = await _staffHelper.GetStaffBySessionKey(sessionKey, sessionType);
-            if (staff == null && staff.title_level < 100)
+            if (staff == null || staff.title_level < 100)
             {
                 return Ok(new ApiResult<object?>()
                 {
@@ -2168,6 +2206,11 @@ namespace SnowmeetApi.Controllers
                 });
             }
             Models.Order order = await GetOrder(orderId);
+            if (order != null)
+            {
+                var cardError = await CareCardSaleService.PaymentErrorAsync(_db, order, order.paying_amount, payLater ? "挂账" : payMethod);
+                if (cardError != null) return Ok(new ApiResult<Models.Order?> { code = 1, message = cardError, data = null });
+            }
             /*
             if (order.paidAmount >= order.totalCharge)
             {
@@ -2341,8 +2384,26 @@ namespace SnowmeetApi.Controllers
         [HttpGet]
         public async Task DealSuccessPaidOrder(int orderId, int? paymentId = null)
         {
+            if (await new CareCardSaleService(_db, _config, _http).CompletePaidAsync(orderId, paymentId)) return;
             Models.Order order = await _db.order.Where(o => o.id == orderId)
                 .AsNoTracking().FirstOrDefaultAsync();
+            await using var careTransaction = order.type == "养护" && _db.Database.CurrentTransaction == null
+                ? await _db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable) : null;
+            try
+            {
+                if (order.type == "养护") await CareCardSaleService.LockAsync(_db, "care-card-order:" + order.id);
+                await DealSuccessPaidOrderCore(order, paymentId);
+                if (careTransaction != null) await careTransaction.CommitAsync();
+            }
+            catch
+            {
+                if (careTransaction != null) { await careTransaction.RollbackAsync(); _db.ChangeTracker.Clear(); }
+                throw;
+            }
+        }
+
+        private async Task DealSuccessPaidOrderCore(Models.Order order, int? paymentId)
+        {
             order.dealed = 1;
             order.pay_flow_status = Models.Order.PayFlowStatus.已支付.ToString();
             order.paying_amount = null;
@@ -2401,56 +2462,7 @@ namespace SnowmeetApi.Controllers
                     await _careHelper.EffectCareOrder(order.id);
                     break;
                 case "零售":
-                    // 顾客自助购买次卡：支付成功后自动发卡。punch_card_id==null 天然做幂等守卫，
-                    // 防止支付回调重复触发时重复发卡（order 本身是裸加载，未 Include retails，需现查）。
-                    List<Retail> retailsToGrant = await _db.retail
-                        .Where(r => r.order_id == order.id && r.valid == 1 && r.product_id != null && r.punch_card_id == null)
-                        .ToListAsync();
-                    for (int ri = 0; ri < retailsToGrant.Count; ri++)
-                    {
-                        Retail retail = retailsToGrant[ri];
-                        Product product = await _db.product.Where(p => p.id == retail.product_id).AsNoTracking().FirstOrDefaultAsync();
-                        if (product == null || order.member_id == null || string.IsNullOrEmpty(product.category_code))
-                        {
-                            continue;
-                        }
-                        // 「这是不是卡类商品」「是租赁卡还是养护卡」「是次卡还是季卡」全部由 product.category_code
-                        // 命中的那行 category 决定（次卡/季卡的权威识别方式，见 RentController.ResolveCardCategoryCode）。
-                        // 原来 biz_type 写死"租赁"——顾客买养护次卡会发成租赁卡；且要求 punch_total 非空——
-                        // 季卡不限次数、punch_total 恒空，永远发不出来。
-                        Category cardCategory = await _db.category
-                            .Where(c => c.code == product.category_code && c.valid == 1
-                                && (c.name == "次卡" || c.name == "季卡"))
-                            .AsNoTracking().FirstOrDefaultAsync();
-                        if (cardCategory == null)
-                        {
-                            continue;   // 普通零售商品，本来就不该发卡
-                        }
-                        bool isSeasonCard = cardCategory.name == "季卡";
-                        if (!isSeasonCard && product.punch_total == null)
-                        {
-                            continue;   // 次卡没配总次数，发不出卡
-                        }
-                        {
-                            PunchCard card = new PunchCard()
-                            {
-                                biz_type = cardCategory.biz_type,
-                                card_name = product.name,
-                                member_id = (int)order.member_id,
-                                total = isSeasonCard ? null : product.punch_total,   // 季卡 total=null 即"不限次数"
-                                punches = 0,
-                                // 养护次卡的单项/双项跟着卡走（与店员发卡 GrantPunchCard 同口径）
-                                care_project_count = product.care_project_count,
-                                source_retail_id = retail.id,
-                                create_date = DateTime.Now
-                            };
-                            await _db.punchCard.AddAsync(card);
-                            await _db.SaveChangesAsync();   // 先落 card.id，供下面回填
-                            retail.punch_card_id = card.id;
-                            _db.retail.Entry(retail).State = EntityState.Modified;
-                        }
-                    }
-                    await _db.SaveChangesAsync();
+                    await RetailCardService.GrantAsync(_db, order);
                     break;
                 case "雪票":
                     CoreDataModLog orderSkiPassLog = CoreDataModLog.CreateManualLog("Order", "", order.id, "雪票支付回调", null, null, null,
@@ -2459,7 +2471,7 @@ namespace SnowmeetApi.Controllers
                     await _db.SaveChangesAsync();
                     SkiPassController _skiPassHelper = new SkiPassController(_db, _config, _http);
                     await _skiPassHelper.CreateSkiPass(order.id);
-                    List<OrderShare> shares = await _db.orderShare.Where(s => s.valid && s.order_id == orderId).AsNoTracking().ToListAsync();
+                    List<OrderShare> shares = await _db.orderShare.Where(s => s.valid && s.order_id == order.id).AsNoTracking().ToListAsync();
                     for (int i = 0; i < shares.Count; i++)
                     {
                         await _shareHelper.CreatePaymentShare(shares[i]);
@@ -2925,6 +2937,8 @@ namespace SnowmeetApi.Controllers
         [NonAction]
         public async Task<ApiResult<Models.Order?>> RefundCore(Models.Order order, Staff? staff, List<OrderPaymentRefund> refunds)
         {
+            if (await CareCardSaleService.ContainsCardSaleAsync(_db, order.id))
+                return new ApiResult<Models.Order?> { code = 1, message = "含卡订单不允许退款，取消养护只返还次数", data = null };
             int orderId = order.id;
             string message = "";
             for (int i = 0; i < refunds.Count; i++)
@@ -3157,6 +3171,8 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<ApiResult<Models.Order>>> PlaceCareOrder(int tempOrderId,
             string sessionKey, string sessionType = "wechat_mini_openid", bool useDeposit = false)
         {
+            if (await CareCardSaleService.HasDraftAsync(_db, tempOrderId))
+                return Ok(new ApiResult<Models.Order> { code = 1, message = "本单已选择购卡，请通过购卡结算入口提交", data = null });
             Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
             if (staff == null || staff.title_level < 100)
             {
@@ -3195,6 +3211,11 @@ namespace SnowmeetApi.Controllers
                 }
             }
             CareController _careHelper = new CareController(_db, _config, _http);
+            try { await _careHelper.ValidateCardBalances(order.cares, order.member_id); }
+            catch (InvalidOperationException e)
+            {
+                return Ok(new ApiResult<Models.Order> { code = 1, message = e.Message, data = null });
+            }
             double total = 0;
             // 本单已用掉的季卡：季卡每天限一次，同一张卡在本单多件装备上重复选也要拦
             // （下单这一刻它们都还没落 punch_card_used，只查库看不出来）
@@ -3425,6 +3446,11 @@ namespace SnowmeetApi.Controllers
             bool canNotFindOrder = false;
             OrderController _orderHelper = new OrderController(_db, _config, _http);
             Models.Order order = await _orderHelper.GetOrder(orderId);
+            if (order != null)
+            {
+                var cardError = await CareCardSaleService.PaymentErrorAsync(_db, order, order.paying_amount, "储值支付");
+                if (cardError != null) return Ok(new ApiResult<Models.Order?> { code = 1, message = cardError, data = null });
+            }
 
             if ((order == null || order.paying_amount == null) && order.type != "租赁")
             {
@@ -3537,82 +3563,97 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<ApiResult<Models.Order?>>> WriteoffCareOrder(int orderId,
             string sessionKey, string sessionType = "wechat_mini_openid")
         {
+            if (await CareCardSaleService.IsLinkedCareAsync(_db, orderId))
+                return Ok(new ApiResult<Models.Order?> { code = 1, message = "请支付关联购卡订单，养护将自动核销", data = null });
             Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
             if (staff == null || staff.title_level < 100)
             {
                 return Ok(new ApiResult<Models.Order?>() { code = 1, message = "没有权限", data = null });
             }
-            Models.Order order = await _db.order.Include(o => o.cares)
-                .Where(o => o.id == orderId && o.valid == 1 && o.type == "养护")
-                .AsNoTracking().FirstOrDefaultAsync();
-            if (order == null || order.cares == null || order.cares.Count == 0)
+            await using var writeoffTransaction = _db.Database.CurrentTransaction == null
+                ? await _db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable) : null;
+            try
             {
-                return Ok(new ApiResult<Models.Order?>() { code = 1, message = "未找到养护订单", data = null });
-            }
-            // 幂等：已生效（EffectCareOrder 生成过 task_flow_code）直接返回，避免重复扣款/重复建任务
-            if (order.cares.Any(c => c.task_flow_code != null))
-            {
-                return Ok(new ApiResult<Models.Order?>() { code = 0, message = "", data = await GetOrder(orderId) });
-            }
-            if (!order.wechat_unverified)
-            {
-                return Ok(new ApiResult<Models.Order?>() { code = 1, message = "请先完成微信身份核验", data = null });
-            }
-            // 储值实扣（勾选了储值支付时）—— 镜像 PayWithDeposit 的储值消费段，自控 dealed 便于失败回退
-            if (order.pay_with_deposit)
-            {
-                if (order.member_id == null)
+                await CareCardSaleService.LockAsync(_db, "care-card-order:" + orderId);
+                Models.Order order = await _db.order.Include(o => o.cares)
+                    .Where(o => o.id == orderId && o.valid == 1 && o.type == "养护")
+                    .AsNoTracking().FirstOrDefaultAsync();
+                if (order == null || order.cares == null || order.cares.Count == 0)
                 {
-                    return Ok(new ApiResult<Models.Order?>() { code = 1, message = "未找到会员，无法用储值支付", data = null });
+                    return Ok(new ApiResult<Models.Order?>() { code = 1, message = "未找到养护订单", data = null });
                 }
-                MemberController _memberHelper = new MemberController(_db, _config);
-                Member member = await _memberHelper.GetWholeMemberById((int)order.member_id);
-                if (member == null)
+                // 幂等：已生效（EffectCareOrder 生成过 task_flow_code）直接返回，避免重复扣款/重复建任务
+                if (order.cares.Any(c => c.task_flow_code != null))
                 {
-                    return Ok(new ApiResult<Models.Order?>() { code = 1, message = "未找到会员信息", data = null });
+                    return Ok(new ApiResult<Models.Order?>() { code = 0, message = "", data = await GetOrder(orderId) });
                 }
-                double payingAmount = Math.Round((double)(order.paying_amount ?? 0), 2);
-                if (payingAmount > Math.Round(member.availableDeposit, 2))
+                if (!order.wechat_unverified)
                 {
-                    return Ok(new ApiResult<Models.Order?>() { code = 1, message = "储值余额不足", data = null });
+                    return Ok(new ApiResult<Models.Order?>() { code = 1, message = "请先完成微信身份核验", data = null });
                 }
-                if (payingAmount > 0)
+                var careHelper = new CareController(_db, _config, _http);
+                await careHelper.ValidateCardBalances(order.cares, lockCards: true);
+                // 储值实扣（勾选了储值支付时）—— 镜像 PayWithDeposit 的储值消费段，自控 dealed 便于失败回退
+                if (order.pay_with_deposit)
                 {
-                    DepositController _depositHelper = new DepositController(_db, _config);
-                    OrderPayment payment = new OrderPayment()
+                    if (order.member_id == null)
                     {
-                        id = 0,
-                        order_id = order.id,
-                        pay_method = "储值支付",
-                        staff_id = staff.id,
-                        member_id = order.member_id,
-                        amount = payingAmount,
-                        status = OrderPayment.PaymentStatus.待支付.ToString(),
-                        deposit_type = "服务储值",
-                        create_date = DateTime.Now
-                    };
-                    await _db.orderPayment.AddAsync(payment);
-                    await _db.SaveChangesAsync();
-                    List<DepositBalance> balances = await _depositHelper.ConsumeDeposit(payment);
-                    if (balances == null)
+                        return Ok(new ApiResult<Models.Order?>() { code = 1, message = "未找到会员，无法用储值支付", data = null });
+                    }
+                    MemberController _memberHelper = new MemberController(_db, _config);
+                    Member member = await _memberHelper.GetWholeMemberById((int)order.member_id);
+                    if (member == null)
                     {
-                        return Ok(new ApiResult<Models.Order?>() { code = 1, message = "储值消费失败", data = null });
+                        return Ok(new ApiResult<Models.Order?>() { code = 1, message = "未找到会员信息", data = null });
+                    }
+                    double payingAmount = Math.Round((double)(order.paying_amount ?? 0), 2);
+                    if (payingAmount > Math.Round(member.availableDeposit, 2))
+                    {
+                        return Ok(new ApiResult<Models.Order?>() { code = 1, message = "储值余额不足", data = null });
+                    }
+                    if (payingAmount > 0)
+                    {
+                        DepositController _depositHelper = new DepositController(_db, _config);
+                        OrderPayment payment = new OrderPayment()
+                        {
+                            id = 0,
+                            order_id = order.id,
+                            pay_method = "储值支付",
+                            staff_id = staff.id,
+                            member_id = order.member_id,
+                            amount = payingAmount,
+                            status = OrderPayment.PaymentStatus.待支付.ToString(),
+                            deposit_type = "服务储值",
+                            create_date = DateTime.Now
+                        };
+                        await _db.orderPayment.AddAsync(payment);
+                        await _db.SaveChangesAsync();
+                        List<DepositBalance> balances = await _depositHelper.ConsumeDeposit(payment);
+                        if (balances == null)
+                        {
+                            throw new InvalidOperationException("储值消费失败");
+                        }
                     }
                 }
+                // 核销、任务和订单完成状态一起提交，失败不会留下“已支付但没有任务”的订单。
+                await careHelper.EffectCareOrder(orderId);
+                Models.Order dealOrder = await _db.order.AsTracking().FirstAsync(o => o.id == orderId);
+                dealOrder.dealed = 1;
+                dealOrder.pay_flow_status = Models.Order.PayFlowStatus.已支付.ToString();
+                dealOrder.paying_amount = null;
+                await _db.SaveChangesAsync();
+                await SupplementMemberProfileFromOrder(dealOrder);
+                var result = await GetOrder(orderId);
+                if (writeoffTransaction != null) await writeoffTransaction.CommitAsync();
+                return Ok(new ApiResult<Models.Order?>() { code = 0, message = "", data = result });
             }
-            // 消费成功后标记已了结（与支付成功路径一致）+ 生效（券/卡核销在 EffectCareOrder 内完成）
-            Models.Order dealOrder = await _db.order.Where(o => o.id == orderId).AsNoTracking().FirstOrDefaultAsync();
-            dealOrder.dealed = 1;
-            dealOrder.pay_flow_status = Models.Order.PayFlowStatus.已支付.ToString();
-            dealOrder.paying_amount = null;
-            _db.order.Entry(dealOrder).State = EntityState.Modified;
-            await _db.SaveChangesAsync();
-            _db.order.Entry(dealOrder).State = EntityState.Detached;
-            // 核销生效同样不经过支付回调，会员空姓名/性别在这里补（见 SupplementMemberProfileFromOrder）
-            await SupplementMemberProfileFromOrder(dealOrder);
-            CareController _careHelper = new CareController(_db, _config, _http);
-            await _careHelper.EffectCareOrder(orderId);
-            return Ok(new ApiResult<Models.Order?>() { code = 0, message = "", data = await GetOrder(orderId) });
+            catch (Exception e)
+            {
+                if (writeoffTransaction != null) { await writeoffTransaction.RollbackAsync(); _db.ChangeTracker.Clear(); }
+                if (e is InvalidOperationException)
+                    return Ok(new ApiResult<Models.Order?> { code = 1, message = e.Message, data = null });
+                throw;
+            }
         }
 
         [NonAction]

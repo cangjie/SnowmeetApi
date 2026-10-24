@@ -460,6 +460,13 @@ namespace SnowmeetApi.Controllers
         {
             OrderPaymentRefund refund = await _db.orderPaymentRefund.FindAsync(refundId);
             OrderPayment payment = await _db.OrderPayment.FindAsync(refund.payment_id);
+            if (await SnowmeetApi.Services.CareCardSaleService.ContainsCardSaleAsync(_db, payment.order_id))
+            {
+                refund.memo = "含卡订单不允许退款，取消养护只返还次数";
+                refund.state = 0;
+                await _db.SaveChangesAsync();
+                return refund;
+            }
             var refunds = await _db.orderPaymentRefund
                 .Where(r => r.payment_id == payment.id)
                 .AsNoTracking().ToListAsync();

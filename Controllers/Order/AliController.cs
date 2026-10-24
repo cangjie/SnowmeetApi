@@ -849,7 +849,7 @@ namespace SnowmeetApi.Controllers
                 .AsNoTracking().ToListAsync();
             try
             {
-                AlipayTradeRefundResponse res = Refund(payment.out_trade_no.Trim(), refund.out_refund_no.Trim(), refund.amount, refund.reason.Trim());
+                AlipayTradeRefundResponse res = await Refund(payment.out_trade_no.Trim(), refund.out_refund_no.Trim(), refund.amount, refund.reason.Trim());
                 if (res.FundChange != null && res.FundChange.ToUpper() == "Y")
                 {
                     refund.state = 1;
@@ -869,8 +869,11 @@ namespace SnowmeetApi.Controllers
 
 
         [HttpGet]
-        public AlipayTradeRefundResponse Refund(string outTradeNo, string outRefundNo, double amount, string reason = "")
+        public async Task<AlipayTradeRefundResponse> Refund(string outTradeNo, string outRefundNo, double amount, string reason = "")
         {
+            var payment = await _db.OrderPayment.AsNoTracking().FirstOrDefaultAsync(p => p.out_trade_no == outTradeNo);
+            if (payment != null && await SnowmeetApi.Services.CareCardSaleService.ContainsCardSaleAsync(_db, payment.order_id))
+                return new AlipayTradeRefundResponse { Code = "40004", Msg = "含卡订单不允许退款，取消养护只返还次数" };
 
             AlipayTradeRefundRequest req = new AlipayTradeRefundRequest();
             AlipayTradeRefundModel model = new AlipayTradeRefundModel();

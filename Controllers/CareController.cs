@@ -10,6 +10,7 @@ using Microsoft.Extensions.Configuration;
 using SnowmeetApi.Data;
 using SnowmeetApi.Helpers;
 using SnowmeetApi.Models;
+using SnowmeetApi.Services;
 namespace SnowmeetApi.Controllers
 {
     [Route("api/[controller]/[action]")]
@@ -65,7 +66,8 @@ namespace SnowmeetApi.Controllers
         [HttpGet]
         public async Task<Care> GetCare(int id)
         {
-            Care c = await _db.care.FindAsync(id);
+            // 详情组装会挂入只读订单图，不能改写同一请求中刚用于核销/取消的跟踪实体。
+            Care c = await _db.care.AsNoTracking().FirstOrDefaultAsync(c => c.id == id);
             if (c == null)
             {
                 return null;
@@ -82,7 +84,7 @@ namespace SnowmeetApi.Controllers
             c.tasks = await _db.careTask
                 .Include(t => t.staff)
                 .Include(t => t.terminateStaff)
-                .Where(t => t.care_id == c.id).OrderBy(t => t.id).ToListAsync();
+                .Where(t => t.care_id == c.id).OrderBy(t => t.id).AsNoTracking().ToListAsync();
             if (c.order.member != null)
             {
                 await _db.member.Entry(c.order.member).Collection(m => m.memberSocialAccounts).LoadAsync();
@@ -235,6 +237,10 @@ namespace SnowmeetApi.Controllers
                 });
             }
             scene = Util.UrlDecode(scene);
+            var careOrderId = await _db.care.AsNoTracking().Where(c => c.id == care.id).Select(c => c.order_id).FirstOrDefaultAsync();
+            var pendingSale = careOrderId == null ? null : await CareCardSaleService.GetLinkedRetailAsync(_db, careOrderId.Value);
+            if (pendingSale != null && pendingSale.dealed != 1)
+                return Ok(new ApiResult<Care?> { code = 1, message = "购卡尚未结算完成，请先完成购卡再修改装备", data = null });
             care = await UpdateCare(care, null, staff.id, scene);
             Brand brand = await UpdateBrand(care.equipment, care.brand, staff.id);
             if (brand != null && care.series != null)
@@ -667,19 +673,76 @@ namespace SnowmeetApi.Controllers
                 data = new { commonCharge, ticketDiscount, care }
             });
         }
+        [NonAction]
+        public async Task ValidateCardBalances(IReadOnlyCollection<Care> cares, int? memberId = null, bool lockCards = false)
+        {
+            foreach (var group in cares.Where(c => !c.is_cancel && c.task_flow_code == null && c.use_card && c.card_id != null)
+                .GroupBy(c => c.card_id.Value).OrderBy(g => g.Key))
+            {
+                if (lockCards) await CareCardSaleService.LockAsync(_db, "punch-card:" + group.Key);
+                var card = lockCards
+                    ? await _db.punchCard.AsTracking().FirstOrDefaultAsync(c => c.id == group.Key)
+                    : await _db.punchCard.AsNoTracking().FirstOrDefaultAsync(c => c.id == group.Key);
+                if (lockCards && card != null) await _db.Entry(card).ReloadAsync();
+                if (card == null || card.is_refund || (memberId != null && card.member_id != memberId))
+                {
+                    if (lockCards) throw new InvalidOperationException("所选会员卡已不可用，请重新选择");
+                    continue; // 下单时原有定价逻辑会清除无效/不属于顾客的卡。
+                }
+                var careIds = group.Select(c => c.id).ToList();
+                var used = await _db.punchCardUsed.AsNoTracking().Where(u => u.card_id == card.id && u.biz_type == "养护"
+                    && u.valid && careIds.Contains(u.biz_id)).Select(u => u.biz_id).ToListAsync();
+                int required = careIds.Count(id => !used.Contains(id));
+                if (card.total != null && card.remaining < required)
+                    throw new InvalidOperationException("「" + card.card_name + "」剩余次数不足，本单需要" + required + "次");
+            }
+        }
+
         [HttpGet]
         public async Task EffectCareOrder(int orderId)
         {
+            await using var transaction = _db.Database.CurrentTransaction == null
+                ? await _db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable) : null;
+            try
+            {
+                await CareCardSaleService.LockAsync(_db, "care-card-order:" + orderId);
+                await EffectCareOrderCore(orderId);
+                if (transaction != null) await transaction.CommitAsync();
+            }
+            catch
+            {
+                if (transaction != null)
+                {
+                    await transaction.RollbackAsync();
+                    // 上层回调还会保存错误日志，回滚不能留下待写入的业务实体。
+                    _db.ChangeTracker.Clear();
+                }
+                throw;
+            }
+        }
+
+        private async Task EffectCareOrderCore(int orderId)
+        {
+            var retail = await CareCardSaleService.GetLinkedRetailAsync(_db, orderId);
+            if (retail != null)
+            {
+                double paid = await _db.orderPayment.Where(p => p.order_id == retail.id && p.valid == 1 && p.status == "支付成功" && p.is_debt == 0).SumAsync(p => p.amount);
+                if (Math.Round(paid, 2) < Math.Round(retail.total_amount, 2)) throw new InvalidOperationException("请先付清关联购卡订单");
+                if (await _db.care.AnyAsync(c => c.order_id == orderId && c.use_card && c.card_id == null && !c.is_cancel))
+                    throw new InvalidOperationException("购卡处理中，请等待自动发卡核销");
+            }
             Models.Order order = await _db.order.Where(o => o.id == orderId)
-                .Include(o => o.cares).AsNoTracking().FirstOrDefaultAsync();
+                .Include(o => o.cares).AsTracking().FirstOrDefaultAsync();
             if (order == null)
             {
                 return;
             }
+            await ValidateCardBalances(order.cares ?? new List<Care>(), lockCards: true);
             List<Care>? todayCareList = null;
             for (int i = 0; order.cares != null && i < order.cares.Count; i++)
             {
                 Care care = order.cares[i];
+                if (care.is_cancel || care.task_flow_code != null) continue;
                 string? taskFlowCode = null;
                 if (todayCareList == null)
                 {
@@ -981,11 +1044,12 @@ namespace SnowmeetApi.Controllers
                 // 防支付回调 / 重复调用 EffectCareOrder 重复扣。镜像 RentController.UseRentalPunchCard。
                 if (care.use_card && care.card_id != null)
                 {
+                    await CareCardSaleService.LockAsync(_db, "punch-card:" + care.card_id);
                     bool alreadyUsed = await _db.punchCardUsed.AnyAsync(u => u.card_id == care.card_id
                         && u.order_id == order.id && u.biz_id == care.id && u.biz_type == "养护" && u.valid);
                     if (!alreadyUsed)
                     {
-                        PunchCard punchCard = await _db.punchCard.Where(c => c.id == care.card_id).FirstOrDefaultAsync();
+                        PunchCard punchCard = await _db.punchCard.AsTracking().Where(c => c.id == care.card_id).FirstOrDefaultAsync();
                         // 不再比对 punchCard.member_id == order.member_id：卡归属在 PlaceCareOrder 定价时
                         // 已按下单会员校验（不符会清 care.card_id），而 order.member_id 会在支付成功时被
                         // DealSuccessPaidOrder 改写为付款方（同人跨通道两个会员号即触发，实录 71884：
@@ -995,6 +1059,8 @@ namespace SnowmeetApi.Controllers
                         // 卡引用，这里是防御（万一是先下单、后退卡的时序）
                         if (punchCard != null && !punchCard.is_refund)
                         {
+                            if (punchCard.total != null && punchCard.remaining <= 0)
+                                throw new InvalidOperationException("会员卡剩余次数不足");
                             PunchCardUsed cardUsed = new PunchCardUsed()
                             {
                                 card_id = punchCard.id,
@@ -1018,7 +1084,8 @@ namespace SnowmeetApi.Controllers
                             // 就把这次养护的装备写进卡——此后这张季卡只能给这块板用。
                             // 只在三项**都为空**时写（已开卡的不覆盖），且本次装备信息要够全，
                             // 免得写进去一张残缺的绑定把卡废掉。
-                            if (IsSeasonCardUnbound(punchCard) && HasFullEquipInfo(care))
+                            if (CareCardRules.RequiresEquipmentBinding(punchCard.total, punchCard.card_name)
+                                && IsSeasonCardUnbound(punchCard) && HasFullEquipInfo(care))
                             {
                                 punchCard.equip_type = (care.equipment ?? "").Trim();
                                 punchCard.equip_brand = (care.brand ?? "").Trim();
@@ -1037,7 +1104,6 @@ namespace SnowmeetApi.Controllers
                     }
                 }
             }
-            _db.order.Entry(order).State = EntityState.Detached;
             await _db.SaveChangesAsync();
         }
         [HttpGet("{careId}")]
@@ -1076,7 +1142,7 @@ namespace SnowmeetApi.Controllers
         {
             scene = Util.UrlDecode(scene);
             Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
-            if (staff.title_level < 100)
+            if (staff == null || staff.title_level < 100)
             {
                 return Ok(new ApiResult<Care?>()
                 {
@@ -1085,7 +1151,13 @@ namespace SnowmeetApi.Controllers
                     data = null
                 });
             }
-            CareTask careTask = await _db.careTask.Where(t => t.id == taskId && t.valid == 1).AsNoTracking().FirstOrDefaultAsync();
+            var taskOrderId = await (from t in _db.careTask join c in _db.care on t.care_id equals c.id
+                where t.id == taskId && t.valid == 1 select c.order_id).FirstOrDefaultAsync();
+            await using var cancelTransaction = isCancel && _db.Database.CurrentTransaction == null
+                ? await _db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable) : null;
+            if (isCancel) await CareCardSaleService.LockAsync(_db, "care-card-order:" + taskOrderId);
+            CareTask careTask = await _db.careTask.Where(t => t.id == taskId && t.valid == 1).AsTracking().FirstOrDefaultAsync();
+            if (careTask == null) return Ok(new ApiResult<Care?> { code = 1, message = "未找到养护任务", data = null });
 
             CoreDataModLog log = Util.CreateCoreDataModLog("care_task", "status", taskId, careTask.status, status, null, staff.id, scene);
             careTask.status = status;
@@ -1103,9 +1175,11 @@ namespace SnowmeetApi.Controllers
                         if (isCancel)
                         {
                             // 取消：装备未真正完成养护，跳过"养护完成赠送"券，改记 Care.is_cancel/cancel_reason
-                            Care careCancel = await _db.care.Where(c => c.id == careTask.care_id).AsNoTracking().FirstOrDefaultAsync();
+                            Care careCancel = await _db.care.Where(c => c.id == careTask.care_id).AsTracking().FirstOrDefaultAsync();
                             if (careCancel != null)
                             {
+                                await CareCardSaleService.ReverseCareUseAsync(_db, careCancel, staff.id,
+                                    cancelReason == null ? "" : Util.UrlDecode(cancelReason));
                                 careCancel.is_cancel = true;
                                 careCancel.cancel_reason = cancelReason != null ? Util.UrlDecode(cancelReason) : null;
                                 careCancel.update_date = DateTime.Now;
@@ -1149,6 +1223,7 @@ namespace SnowmeetApi.Controllers
             _db.careTask.Entry(careTask).State = EntityState.Modified;
             await _db.SaveChangesAsync();
 
+            if (cancelTransaction != null) await cancelTransaction.CommitAsync();
             Care care = await GetCare(careTask.care_id);
             //非雪季养护打蜡完成，下一步应该是快递和寄存步骤的开始
             if (care.biz_type == "非雪季养护" && careTask.task_name == "热蜡" && careTask.status == "已完成")
@@ -1675,6 +1750,8 @@ namespace SnowmeetApi.Controllers
                 });
             }
             order.shop = CarePricingRules.ResolveCareShop(order.shop);
+            if (order.id != 0 && await CareCardSaleService.IsLinkedCareAsync(_db, order.id))
+                return Ok(new ApiResult<Models.Order?> { code = 1, message = "购卡订单已提交，不能覆盖原养护草稿", data = null });
             order.needRender = false;
             // 防级联清理（同 SaveRentRecept）：JSON 往返回来的 member/staff 子图会让 _db.Update(order)
             // 在 TrackGraph 阶段抛 Value cannot be null (key)。本接口只管 order 标量 + cares 子图，

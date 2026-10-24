@@ -6938,6 +6938,12 @@ namespace SnowmeetApi.Controllers
         private async Task<PunchCardRefundEval> EvaluatePunchCardRefund(PunchCard card, int memberId)
         {
             PunchCardRefundEval eval = new PunchCardRefundEval();
+            // 含卡订单一律禁退，即使未使用或取消养护后次数已全部返还。
+            if (!card.is_refund)
+            {
+                eval.blockReason = "含卡订单不允许退款，取消养护只返还次数";
+                return eval;
+            }
             if (card.is_refund)
             {
                 eval.blockReason = "这张卡已退款";
