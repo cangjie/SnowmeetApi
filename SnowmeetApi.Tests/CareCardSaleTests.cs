@@ -371,6 +371,79 @@ public class CareCardSaleTests
         Assert.Equal("双板", (await f.Db.care.AsNoTracking().SingleAsync()).equipment);
     }
 
+    [Fact]
+    public async Task CardSelectionStaysDraft_DefaultsAllEquipment_AndNewEquipmentUsesDefaults()
+    {
+        await using var f = await Fixture.Create(2);
+        foreach (var care in await f.Db.care.ToListAsync()) { care.need_edge = 1; care.need_wax = 0; }
+        await f.Db.SaveChangesAsync();
+        var trial = await f.Service.PreviewAsync(f.Request());
+        Assert.All(trial.projects, p => { Assert.Equal(1, p.need_edge); Assert.Equal(1, p.need_wax); });
+        Assert.All(await f.Db.care.ToListAsync(), c => Assert.Equal(0, c.need_wax)); // 试算不改项目。
+        await f.Service.SaveDraftAsync(f.Request());
+        Assert.All(await f.Db.care.ToListAsync(), c => { Assert.Equal(1, c.need_edge); Assert.Equal(1, c.need_wax); });
+        Assert.All(await f.Db.order.ToListAsync(), o => { Assert.Equal(0, o.valid); Assert.Equal(1, o.recepting); });
+        Assert.Empty(await f.Db.careTask.ToListAsync()); Assert.Empty(await f.Db.punchCard.ToListAsync());
+        // 同一张双项卡允许店员后续只做其中一项，新增装备仍默认双项。
+        (await f.Db.care.OrderBy(c => c.id).FirstAsync()).need_wax = 0;
+        f.Db.care.Add(new Care { order_id = f.OrderId, equipment = "双板", brand = "新增", scale = "160", need_edge = 1 });
+        await f.Db.SaveChangesAsync();
+        var saved = await f.Service.SaveDraftAsync(f.Request());
+        Assert.Equal(0, saved.projects.First().need_wax);
+        Assert.Equal(1, saved.projects.Last().need_wax);
+        Assert.Equal(3, saved.items.Single().punches);
+    }
+
+    [Fact]
+    public async Task SingleCardCanBeSelectedBeforeProjects_ButAllEquipmentMustChooseOneBeforeSubmit()
+    {
+        await using var f = await Fixture.Create(2, "单项养护10次卡");
+        (await f.Db.product.SingleAsync()).care_project_count = 1; await f.Db.SaveChangesAsync();
+        var draft = await f.Service.SaveDraftAsync(f.Request());
+        Assert.False(draft.canCheckout); Assert.Equal(2, draft.errors.Count);
+        Assert.All(await f.Db.care.ToListAsync(), c => { Assert.Equal(0, c.need_edge); Assert.Equal(0, c.need_wax); });
+        await Assert.ThrowsAsync<InvalidOperationException>(() => f.Service.SubmitAsync(f.OrderId, 28));
+        var cares = await f.Db.care.OrderBy(c => c.id).ToListAsync();
+        cares[0].need_edge = 1; await f.Db.SaveChangesAsync();
+        Assert.False((await f.Service.SaveDraftAsync(f.Request())).canCheckout);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => f.Service.SubmitAsync(f.OrderId, 28));
+        cares[1].need_wax = 1; await f.Db.SaveChangesAsync();
+        Assert.True((await f.Service.SaveDraftAsync(f.Request())).canCheckout);
+        int retailId = await f.Service.SubmitAsync(f.OrderId, 28);
+        await f.Pay(retailId); await f.Service.CompletePaidAsync(retailId, f.PaymentId);
+        Assert.Equal(2, (await f.Db.punchCard.SingleAsync()).punches);
+        Assert.Equal(1, cares[0].need_edge); Assert.Equal(0, cares[0].need_wax);
+        Assert.Equal(0, cares[1].need_edge); Assert.Equal(1, cares[1].need_wax);
+    }
+
+    [Fact]
+    public async Task MachineSeasonRequiresExactlyOneEquipment_AndOverridesPreviousProjects()
+    {
+        await using var f = await Fixture.Create(2, "机打蜡季卡", true);
+        var request = f.Request(); request.selections[0].quantity = 2;
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => f.Service.SaveDraftAsync(request));
+        Assert.Contains("一套装备", error.Message); Assert.Single(await f.Db.order.ToListAsync());
+        f.Db.care.Remove((await f.Db.care.OrderBy(c => c.id).ToListAsync()).Last());
+        var care = await f.Db.care.FirstAsync(); care.need_edge = care.need_wax = 1; care.free_wax = 0;
+        await f.Db.SaveChangesAsync();
+        var preview = await f.Service.SaveDraftAsync(f.Request());
+        Assert.Equal("machine", preview.serviceMode);
+        Assert.Equal(0, care.need_edge); Assert.Equal(0, care.need_wax); Assert.Equal(1, care.free_wax);
+    }
+
+    [Fact]
+    public async Task EachOrderMayBuyOnlyOneProductType_ButCanBuyMultipleCardsOfThatType()
+    {
+        await using var f = await Fixture.Create(2);
+        var request = f.Request(); request.selections.Add(new CareCardSelection { productId = 102 });
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => f.Service.SaveDraftAsync(request));
+        Assert.Contains("一种卡", error.Message);
+        request.selections.RemoveAt(1); request.selections[0].quantity = 2;
+        var result = await f.Service.SaveDraftAsync(request);
+        Assert.Equal(1200m, result.amount); Assert.Equal(2, result.items.Count);
+        Assert.Equal(2, result.items.Sum(i => i.punches));
+    }
+
     private static async Task PrepareLegacyCard(Fixture f, bool placed, int punches)
     {
         var order = (await f.Db.order.FindAsync(f.OrderId))!;

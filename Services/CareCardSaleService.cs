@@ -41,11 +41,25 @@ public class CareCardPreviewItem
     public int? remaining => total == null ? null : total - punches;
 }
 
+public class CareCardProject
+{
+    public int careId { get; set; }
+    public int need_edge { get; set; }
+    public int need_wax { get; set; }
+    public int need_unwax { get; set; }
+    public int free_wax { get; set; }
+    public string? edge_degree { get; set; }
+}
+
 public class CareCardPreview
 {
     public int careOrderId { get; set; }
     public decimal amount { get; set; }
     public List<CareCardPreviewItem> items { get; set; } = new();
+    public List<CareCardProject> projects { get; set; } = new();
+    public List<string> errors { get; set; } = new();
+    public bool canCheckout => items.Count > 0 && errors.Count == 0;
+    public string serviceMode => items.Count == 0 ? "" : CareCardRules.ServiceMode(items[0]);
 }
 
 // 与原支付流水保持单订单关系，仅处理从养护开单发起的售卡订单。
@@ -116,6 +130,8 @@ IF @result < 0 THROW 51010, N'操作繁忙，请稍后重试', 1;");
         if (request.selections == null || request.selections.Count > 20
             || request.selections.Any(s => s.quantity <= 0 || s.quantity > 20)
             || request.selections.Sum(s => s.quantity) > 20) throw new InvalidOperationException("购卡数量不合法（最多20张）");
+        if (request.selections.Select(s => s.productId).Distinct().Count() != 1)
+            throw new InvalidOperationException("每单只能选择一种卡");
         var result = new CareCardPreview { careOrderId = order.id };
         foreach (var selection in request.selections.OrderBy(s => s.productId))
         {
@@ -136,56 +152,49 @@ IF @result < 0 THROW 51010, N'操作繁忙，请稍后重试', 1;");
             });
         }
         if (result.items.Count == 0) return result; // 清空已选卡，不改变普通养护。
-        // 优先分配覆盖范围更窄的卡，结果明确回显到每张卡，提交使用同一确定性算法。
-        foreach (var care in cares.Where(c => !c.use_card && string.IsNullOrWhiteSpace(c.ticket_code)))
+        var first = result.items[0];
+        if (CareCardRules.ServiceMode(first) == "machine" && cares.Count != 1)
+            throw new InvalidOperationException("机打蜡季卡仅限一套装备的订单选择");
+        var priorRetail = await GetLinkedRetailAsync(db, order.id, true);
+        var previous = priorRetail == null ? new List<CareCardPreviewItem>()
+            : (await ReadPreviewAsync(priorRetail, order.id)).items;
+        foreach (var care in cares)
         {
-            var item = result.items.Where(i => (i.total == null ? i.punches < 1 : i.punches < i.total)
-                && CareCardRules.Covers(i, CareCardRules.PreviewCare(i, care)))
-                .OrderBy(i => i.projectCount ?? (i.name.Contains("双项") ? 2 : 1)).ThenBy(i => i.lineNo).FirstOrDefault();
-            if (item == null) throw new InvalidOperationException("所选卡不能覆盖全部装备项目或次数不足，请调整卡类或养护项目");
-            if (item.requiresBinding && !CareController.HasFullEquipInfo(care)) throw new InvalidOperationException("打蜡季卡需要完整的装备类型、品牌和长度");
+            bool reset = !previous.Any(i => i.productId == first.productId && i.careIds.Contains(care.id));
+            var plan = CareCardRules.PreviewCare(first, care, reset);
+            bool needsSingleProject = result.serviceMode == "single" && plan.need_edge == 0 && plan.need_wax == 0;
+            // 缺单项项目可保存选卡草稿；额外收费、维修等仍须单独开单。
+            var validation = CareCardRules.PreviewCare(first, care, reset);
+            if (needsSingleProject) validation.need_edge = 1;
+            if (!CareCardRules.Covers(first, validation))
+                throw new InvalidOperationException("所选卡不能覆盖全部装备项目，请调整养护项目");
+            var item = result.items.FirstOrDefault(i => i.total == null ? i.punches < 1 : i.punches < i.total);
+            if (item == null) throw new InvalidOperationException("所选卡次数不足，请调整购卡数量");
+            if (item.requiresBinding && !CareController.HasFullEquipInfo(care))
+                throw new InvalidOperationException("打蜡季卡需要完整的装备类型、品牌和长度");
             item.careIds.Add(care.id);
+            result.projects.Add(new CareCardProject { careId = care.id, need_edge = plan.need_edge,
+                need_wax = plan.need_wax, need_unwax = plan.need_unwax, free_wax = plan.free_wax,
+                edge_degree = plan.edge_degree });
+            if (needsSingleProject) result.errors.Add("第" + (cares.IndexOf(care) + 1) + "件装备请选择修刃或热蜡（单项）");
         }
         foreach (var item in result.items)
-            item.serviceLabel = string.Join("；", cares.Where(c => item.careIds.Contains(c.id)).Select(c =>
-            {
-                var plan = CareCardRules.PreviewCare(item, c);
-                return plan.free_wax == 1 ? "机打蜡" : (plan.need_edge == 1 && plan.need_wax == 1 ? "修刃＋热蜡" : plan.need_edge == 1 ? "修刃" : "热蜡");
-            }).Distinct());
-        await ValidateExistingBenefitsAsync(order, cares.Where(c => c.use_card || !string.IsNullOrWhiteSpace(c.ticket_code)).ToList());
+            item.serviceLabel = string.Join("；", result.projects.Where(p => item.careIds.Contains(p.careId)).Select(p =>
+                p.free_wax == 1 ? "机打蜡" : p.need_edge == 1 && p.need_wax == 1 ? "修刃＋热蜡"
+                : p.need_edge == 1 ? "修刃" : p.need_wax == 1 ? "热蜡" : "待选择单项").Distinct());
         result.amount = result.items.Sum(i => i.price);
         return result;
     }
 
-    private async Task ValidateExistingBenefitsAsync(Models.Order order, List<Care> cares)
+    private static void ApplyProjects(CareCardPreview preview, IEnumerable<Care> cares)
     {
-        var helper = new CareController(db, config, http);
-        var seasonIds = new HashSet<int>();
         foreach (var care in cares)
         {
-            PunchCard card = null;
-            Ticket ticket = null;
-            if (care.use_card)
-            {
-                card = await db.punchCard.AsNoTracking().FirstOrDefaultAsync(c => c.id == care.card_id && c.member_id == order.member_id && !c.is_refund);
-                if (card == null || (card.total != null && card.remaining <= 0)) throw new InvalidOperationException("已有卡不可用");
-                var priorCount = cares.Count(c => c.use_card && c.card_id == card.id);
-                if (card.total != null && card.remaining < priorCount) throw new InvalidOperationException("已有卡剩余次数不足");
-                if (card.total == null && (!seasonIds.Add(card.id) || await db.punchCardUsed.AnyAsync(u => u.card_id == card.id && u.valid && u.create_date >= DateTime.Today)))
-                    throw new InvalidOperationException("该季卡今天已使用");
-                if (CareCardRules.RequiresEquipmentBinding(card.total, card.card_name) && !CareController.IsSeasonCardUnbound(card)
-                    && (card.equip_type != care.equipment || card.equip_brand != care.brand || card.equip_scale != care.scale))
-                    throw new InvalidOperationException("打蜡季卡绑定装备不匹配");
-            }
-            if (!string.IsNullOrWhiteSpace(care.ticket_code))
-            {
-                ticket = await db.ticket.Include(t => t.template).ThenInclude(t => t.productTicketTemplates).ThenInclude(t => t.product)
-                    .FirstOrDefaultAsync(t => t.code == care.ticket_code && t.valid == 1 && t.used == 0 && t.member_id == order.member_id);
-                if (ticket == null || cares.Count(c => c.ticket_code == care.ticket_code) != 1) throw new InvalidOperationException("优惠券不可用或重复选择");
-            }
-            var (charge, discount) = await helper.CalcCharge(order.shop, care, ticket, card);
-            if (Math.Round(charge + care.repair_charge - Math.Max(care.discount, discount) - care.ticket_discount, 2) != 0)
-                throw new InvalidOperationException("本次购卡关联养护须由权益全额覆盖，额外收费请使用普通养护开单");
+            var project = preview.projects.Single(p => p.careId == care.id);
+            care.need_edge = project.need_edge; care.need_wax = project.need_wax;
+            care.need_unwax = project.need_unwax; care.free_wax = project.free_wax; care.edge_degree = project.edge_degree;
+            care.use_card = false; care.card_id = null; care.card_name = null; care.ticket_code = null;
+            care.common_charge = care.discount = care.ticket_discount = 0;
         }
     }
 
@@ -267,6 +276,8 @@ IF @result < 0 THROW 51010, N'操作繁忙，请稍后重试', 1;");
             db.retail.Add(new Retail { order_id = retailOrder.id, product_id = item.productId, sale_price = (double)item.price,
                 deal_price = (double)item.price, order_type = "卡类销售", retail_type = "养护卡",
                 memo = JsonConvert.SerializeObject(new PendingCard { item = item }), valid = 1 });
+        if (preview.items.Count > 0)
+            ApplyProjects(preview, await db.care.AsTracking().Where(c => c.order_id == request.orderId).ToListAsync());
         await db.SaveChangesAsync(); await tx.CommitAsync();
         return preview;
     }
@@ -275,6 +286,9 @@ IF @result < 0 THROW 51010, N'操作繁忙，请稍后重试', 1;");
     {
         var retail = await GetLinkedRetailAsync(db, orderId, true);
         var preview = retail == null ? new CareCardPreview { careOrderId = orderId } : await ReadPreviewAsync(retail, orderId);
+        if (retail?.recepting == 1 && preview.items.Count > 0)
+            preview = await PreviewAsync(new CareCardSaleRequest { orderId = orderId,
+                selections = preview.items.GroupBy(i => i.productId).Select(g => new CareCardSelection { productId = g.Key, quantity = g.Count() }).ToList() });
         return new { careOrderId = orderId, retailOrderId = retail?.recepting == 0 ? (int?)retail.id : null,
             state = retail == null || retail.recepting == 1 ? "draft" : retail.dealed == 1 ? "completed" : "pending",
             preview, selections = preview.items.GroupBy(i => i.productId).Select(g => new CareCardSelection { productId = g.Key, quantity = g.Count() }).ToList() };
@@ -292,6 +306,7 @@ IF @result < 0 THROW 51010, N'操作繁忙，请稍后重试', 1;");
         var request = new CareCardSaleRequest { orderId = orderId,
             selections = saved.items.GroupBy(i => i.productId).Select(g => new CareCardSelection { productId = g.Key, quantity = g.Count() }).ToList() };
         var preview = await PreviewAsync(request);
+        if (!preview.canCheckout) throw new InvalidOperationException(string.Join("；", preview.errors));
         if (preview.items.Count != saved.items.Count || preview.items.Where((p, n) => !SamePlan(p, saved.items[n])).Any())
             throw new InvalidOperationException("商品价格、权益或装备项目已变化，请重新试算并确认");
         var careOrder = await db.order.AsTracking().FirstAsync(o => o.id == orderId);
@@ -304,6 +319,7 @@ IF @result < 0 THROW 51010, N'操作繁忙，请稍后重试', 1;");
         var helper = new OrderController(db, config, http);
         await helper.GenerateOrderCode(retailOrder); await helper.GenerateOrderCode(careOrder);
         var cares = await db.care.AsTracking().Where(c => c.order_id == orderId).ToListAsync();
+        ApplyProjects(preview, cares);
         foreach (var care in cares)
         {
             care.valid = 1;
