@@ -326,15 +326,27 @@ namespace SnowmeetApi.Controllers.Order
                 result.scannerHasCell = false;
             }
 
-            // 养护微信支付：必须订单会员本人（当前会员绑定的微信）扫码支付，非本人拦截。
+            // 养护微信支付：用了会员权益（券/卡/储值）且还没核验本人的单，必须订单会员本人（当前会员绑定的微信）
+            // 扫码支付，非本人拦截。已核验本人（开单前扫码报到 / 扫过核验码）或没用权益的单允许他人代付，
+            // 订单仍归原会员（_applyChoice 按代付记录、DealSuccessPaidOrder 不改会员）。规则见 OrderVerifiedRules。
             // 散客养护单（无会员）不受此约束；仅养护 + 微信通道生效，不影响租赁/零售/雪票及支付宝。
             if (order.type != null && order.type.Trim() == "养护"
                 && payerType == "wechat"
                 && order.member_id != null
                 && result.scannerMemberId != order.member_id)
             {
-                result.status = "care_member_required";
-                return result;
+                int orderId = order.id;
+                var careBenefits = await _db.care
+                    .Where(c => c.order_id == orderId && c.valid == 1)
+                    .Select(c => new { c.ticket_code, c.use_card })
+                    .AsNoTracking().ToListAsync();
+                bool usesBenefit = SnowmeetApi.Helpers.OrderVerifiedRules.CareUsesBenefit(order.pay_with_deposit,
+                    careBenefits.Select(c => (c.ticket_code, c.use_card)));
+                if (SnowmeetApi.Helpers.OrderVerifiedRules.CareRequiresMemberPayer(usesBenefit, order.wechat_unverified))
+                {
+                    result.status = "care_member_required";
+                    return result;
+                }
             }
 
             // 4) Status
@@ -597,6 +609,12 @@ namespace SnowmeetApi.Controllers.Order
             if (order == null || op == null)
             {
                 return Ok(_err("order_not_found", "订单或支付记录消失"));
+            }
+            // 养护单只允许替人代付：选了「正常支付（订单转归我）」也按代付记录，订单仍归原会员
+            if (choice == "self" && !nowDirect
+                && SnowmeetApi.Helpers.OrderVerifiedRules.KeepOrderMemberOnPaid(order.type, order.member_id))
+            {
+                choice = "proxy";
             }
 
             // 决策时机迁回 notify：此处只在 OrderPayment 上写付款方意图,

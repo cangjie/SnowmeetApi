@@ -2359,7 +2359,10 @@ namespace SnowmeetApi.Controllers
                     // 「正常支付（订单转归我）」语义:无论订单原本有无 member_id,都同步为付款方
                     // 「替人代付（订单仍归原会员）」由 is_proxy_pay==true 拦截,不会误转
                     // scanner == order 原归属 时,paidOp.member_id == order.member_id,赋值无副作用
-                    if (paidOp.is_proxy_pay == false && paidOp.member_id != null)
+                    // 已挂会员的养护单一律不转给付款人（别人代付时券、卡、季卡开卡、养护完成赠券都归原会员），
+                    // 不论走的是哪条付款路径（OrderVerifiedRules.KeepOrderMemberOnPaid）
+                    if (paidOp.is_proxy_pay == false && paidOp.member_id != null
+                        && !OrderVerifiedRules.KeepOrderMemberOnPaid(order.type, order.member_id))
                     {
                         order.member_id = paidOp.member_id;
                     }

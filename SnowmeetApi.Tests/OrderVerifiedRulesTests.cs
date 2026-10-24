@@ -135,6 +135,40 @@ namespace SnowmeetApi.Tests
         }
 
         [Fact]
+        public void 养护权益_券卡储值算_手动减免不算()
+        {
+            Assert.True(OrderVerifiedRules.CareUsesBenefit(false, new (string?, bool)[] { ("123456789", false) }));
+            Assert.True(OrderVerifiedRules.CareUsesBenefit(false, new (string?, bool)[] { (null, true) }));
+            Assert.True(OrderVerifiedRules.CareUsesBenefit(true, new (string?, bool)[] { (null, false) }));
+            // 只有店员手动减免：ticket_code 为空、没用卡、没勾储值
+            Assert.False(OrderVerifiedRules.CareUsesBenefit(false, new (string?, bool)[] { (null, false), ("  ", false) }));
+        }
+
+        [Fact]
+        public void 养护非本人付款_只拦用了权益又没核验的单()
+        {
+            Assert.True(OrderVerifiedRules.CareRequiresMemberPayer(true, false));
+            // 已核验本人：用了权益也允许别人代付
+            Assert.False(OrderVerifiedRules.CareRequiresMemberPayer(true, true));
+            // 没用权益：没核验也允许别人代付
+            Assert.False(OrderVerifiedRules.CareRequiresMemberPayer(false, false));
+            Assert.False(OrderVerifiedRules.CareRequiresMemberPayer(false, true));
+        }
+
+        [Fact]
+        public void 付款后不改会员_只限已挂会员的养护单()
+        {
+            Assert.True(OrderVerifiedRules.KeepOrderMemberOnPaid("养护", Member));
+            Assert.True(OrderVerifiedRules.KeepOrderMemberOnPaid(" 养护 ", Member));
+            // 散客养护单：付款后按付款人补会员
+            Assert.False(OrderVerifiedRules.KeepOrderMemberOnPaid("养护", null));
+            // 租赁、零售保留原来的「订单转归我」
+            Assert.False(OrderVerifiedRules.KeepOrderMemberOnPaid("租赁", Member));
+            Assert.False(OrderVerifiedRules.KeepOrderMemberOnPaid("零售", Member));
+            Assert.False(OrderVerifiedRules.KeepOrderMemberOnPaid(null, Member));
+        }
+
+        [Fact]
         public void 支付成功_本人微信付款是1()
         {
             Assert.True(OrderVerifiedRules.ResolveOnPaid(false, Member, Member, "微信支付", false, Member));

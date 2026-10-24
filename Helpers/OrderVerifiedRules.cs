@@ -65,6 +65,27 @@ namespace SnowmeetApi.Helpers
             return verifiedBefore && memberBefore != null && memberBefore == memberAfter;
         }
 
+        // 养护单是否用了会员权益：券、会员卡（次卡 / 季卡）、储值支付。店员手动减免不算
+        public static bool CareUsesBenefit(bool payWithDeposit, IEnumerable<(string? ticketCode, bool useCard)> cares)
+        {
+            return payWithDeposit
+                || cares.Any(c => c.useCard || !string.IsNullOrWhiteSpace(c.ticketCode));
+        }
+
+        // 2026-10-24 用户确认：养护单只有「用了会员权益、且还没核验本人」时，才必须由会员本人微信付款。
+        // 已核验本人（开单前扫码报到 / 扫过核验码）或没用权益的单，允许他人代付，订单仍归原会员。
+        public static bool CareRequiresMemberPayer(bool usesBenefit, bool verified)
+        {
+            return usesBenefit && !verified;
+        }
+
+        // 养护单付款后不改订单会员：代付时会员的券、卡、季卡开卡和养护完成赠券都还归原会员。
+        // 只有原来没挂会员的养护单，才按付款人补上会员。
+        public static bool KeepOrderMemberOnPaid(string? orderType, int? orderMemberId)
+        {
+            return orderType != null && orderType.Trim() == "养护" && orderMemberId != null;
+        }
+
         // 开单时取值变化的日志
         public static CoreDataModLog ChangeLog(int orderId, bool verified, int staffId, int? checkinId)
         {
