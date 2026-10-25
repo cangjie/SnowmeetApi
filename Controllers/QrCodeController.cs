@@ -546,7 +546,7 @@ namespace SnowmeetApi.Controllers
         }
 
         // 开单接口（租赁/养护草稿保存、零售下单）定 order.wechat_unverified 用，规则见 OrderVerifiedRules。
-        // 不用前端带报到码：自己找这位店员 60 分钟内出过、被本单会员本人扫码验证过的报到码。
+        // 不采信前端验证标记：匹配同一店员与会员的近期扫码，或当天已授权的手机号接待记录。
         // 返回 (库里原值, 新值, 担保的报到码 id)，新建订单原值按 0；没用到报到时 checkinId 为 null。
         [NonAction]
         public async Task<(bool prev, bool next, int? checkinId)> ResolveReceptOrderVerified(
@@ -571,10 +571,12 @@ namespace SnowmeetApi.Controllers
             {
                 DateTime now = DateTime.Now;
                 DateTime since = now.AddMinutes(-ReceptCheckinRules.CUSTOMER_WAIT_MINUTES);
+                DateTime today = now.Date;
                 int? memberId = order.member_id;
                 List<ScanQrCode> candidates = await _db.scanQrCode
-                    .Where(s => s.staff_id == staffId && s.scaner_member_id == memberId && s.scaned == 1
-                        && s.scan_time != null && s.scan_time > since)
+                    .Where(s => s.staff_id == staffId && s.scaner_member_id == memberId
+                        && ((s.scaned == 1 && s.scan_time != null && s.scan_time > since)
+                            || (s.scaned == 0 && s.authed == 1 && s.stoped == 0 && s.cell != null && s.create_date >= today)))
                     .AsNoTracking().ToListAsync();
                 checkin = OrderVerifiedRules.PickVouchingCheckin(candidates, staffId, memberId, now);
             }

@@ -9,6 +9,7 @@ using SnowmeetApi.Data;
 using SnowmeetApi.Helpers;
 using SnowmeetApi.Models;
 using SnowmeetApi.Services;
+using PayIdentity = SnowmeetApi.Controllers.Order.PaymentIdentityController;
 
 namespace SnowmeetApi.Tests;
 
@@ -835,6 +836,138 @@ public class CareCardSaleTests
         Assert.Equal(60.02m, (await f.Service.SaveDraftAsync(f.Request())).amount);
         care.discount = 10; await f.Db.SaveChangesAsync();
         Assert.Equal(50.02m, (await f.Service.SaveDraftAsync(f.Request())).amount);
+    }
+
+    [Theory]
+    [InlineData("coupon")]
+    [InlineData("card")]
+    public async Task AuthorizedPhoneReceptionVerifiesCareOrder_AndProxyPaymentUsesOriginalMembersBenefits(string benefit)
+    {
+        await using var f = await Fixture.Create(1);
+        await AddCarePrices(f);
+        if (benefit == "card") await PrepareLegacyCard(f, false, 0);
+        else
+        {
+            f.Db.ticketTemplate.Add(new TicketTemplate { id = 16, biz_type = "养护", type = "养护券",
+                name = "老顾客优惠券", memo = "", miniapp_recept_path = "" });
+            f.Db.ticket.Add(new Ticket { code = "OWNER-COUPON", name = "老顾客优惠券", template_id = 16,
+                member_id = 10, open_id = "owner-openid", valid = 1, is_active = 1 });
+            (await f.Db.care.SingleAsync()).ticket_code = "OWNER-COUPON";
+        }
+        var care = await f.Db.care.SingleAsync(); care.need_repair = 1; care.repair_charge = 0.01;
+        f.Db.member.Add(new Member { id = 20, real_name = "代付人", gender = "男" });
+        f.Db.miniSession.Add(new MiniSession { session_key = "payer-session", session_type = "wechat_mini_openid",
+            member_id = 20, wechat_openid = "payer-openid", valid = 1, expire_date = DateTime.Now.AddHours(1) });
+        await PreparePhoneReception(f, true);
+        await using var db = f.NewContext();
+        var posted = await db.order.Include(o => o.cares).FirstAsync(o => o.id == f.OrderId);
+        posted.wechat_unverified = false;
+        var saved = await new CareController(db, f.Config, f.Http).SaveCareRecept(posted, "staff-session");
+        var savedEnvelope = Assert.IsType<ApiResult<SnowmeetApi.Models.Order?>>(Assert.IsType<OkObjectResult>(saved.Result).Value);
+        Assert.Equal(0, savedEnvelope.code); Assert.True(savedEnvelope.data!.wechat_unverified);
+        db.ChangeTracker.Clear(); // 每个接口调用对应独立 HTTP 请求的跟踪范围。
+        var orders = new OrderController(db, f.Config, f.Http);
+        var placed = await orders.PlaceCareOrder(f.OrderId, "staff-session");
+        var placedEnvelope = Assert.IsType<ApiResult<SnowmeetApi.Models.Order>>(Assert.IsType<OkObjectResult>(placed.Result).Value);
+        Assert.Equal(0, placedEnvelope.code); Assert.True(placedEnvelope.data!.wechat_unverified);
+        Assert.Equal(0.01, placedEnvelope.data.total_amount, 2);
+        db.ChangeTracker.Clear();
+        var payment = new OrderPayment { order_id = f.OrderId, amount = 0.01, pay_method = "微信支付",
+            status = "待支付", valid = 1 };
+        db.orderPayment.Add(payment); await db.SaveChangesAsync();
+        db.ChangeTracker.Clear();
+        var identity = new PayIdentity(db, f.Config);
+        var checkedPayment = await identity.CheckPayerIdentity(payment.id, "wechat", "", "payer-session");
+        var checkedEnvelope = Assert.IsType<ApiResult<PayIdentity.CheckPayerIdentityResult>>(Assert.IsType<OkObjectResult>(checkedPayment.Result).Value);
+        Assert.Equal("choose_identity", checkedEnvelope.data.status);
+        var confirmed = await identity.ConfirmPayIdentity(new() { paymentId = payment.id, payerType = "wechat",
+            action = "choose", choice = "self", scannerId = "" }, "payer-session");
+        var confirmedEnvelope = Assert.IsType<ApiResult<PayIdentity.CheckPayerIdentityResult>>(Assert.IsType<OkObjectResult>(confirmed.Result).Value);
+        Assert.Equal(0, confirmedEnvelope.code); Assert.Equal("direct", confirmedEnvelope.data.status);
+        db.ChangeTracker.Clear();
+        payment = await db.orderPayment.AsTracking().FirstAsync(p => p.id == payment.id);
+        Assert.True(payment.is_proxy_pay); Assert.Equal(20, payment.member_id);
+        payment.status = "支付成功"; await db.SaveChangesAsync();
+        db.ChangeTracker.Clear();
+        await orders.DealSuccessPaidOrder(f.OrderId, payment.id);
+        var completed = await db.order.AsNoTracking().FirstAsync(o => o.id == f.OrderId);
+        Assert.Equal(10, completed.member_id); Assert.True(completed.wechat_unverified); Assert.Equal(1, completed.dealed);
+        if (benefit == "coupon")
+        {
+            var used = await db.ticket.SingleAsync(); Assert.Equal(1, used.used); Assert.Equal(10, used.member_id);
+        }
+        else
+        {
+            var used = await db.punchCard.SingleAsync(); Assert.Equal(1, used.punches); Assert.Equal(10, used.member_id);
+        }
+    }
+
+    [Fact]
+    public async Task AuthorizedPhoneReceptionAllowsDepositWriteoffFromOriginalMemberWithoutWechatReverification()
+    {
+        await using var f = await Fixture.Create(1); await AddCarePrices(f);
+        f.Db.depositAccount.Add(new DepositAccount { id = 1, member_id = 10, type = "服务储值", sub_type = "",
+            deposit_no = "OWNER-DEPOSIT", income_amount = 10, consume_amount = 0, create_date = DateTime.Now });
+        await PreparePhoneReception(f, true);
+        await using var db = f.NewContext();
+        var posted = await db.order.Include(o => o.cares).FirstAsync(o => o.id == f.OrderId);
+        await new CareController(db, f.Config, f.Http).SaveCareRecept(posted, "staff-session");
+        db.ChangeTracker.Clear();
+        var orders = new OrderController(db, f.Config, f.Http);
+        var placed = await orders.PlaceCareOrder(f.OrderId, "staff-session", useDeposit: true);
+        var placedEnvelope = Assert.IsType<ApiResult<SnowmeetApi.Models.Order>>(Assert.IsType<OkObjectResult>(placed.Result).Value);
+        Assert.Equal(0, placedEnvelope.code); Assert.True(placedEnvelope.data!.wechat_unverified);
+        db.ChangeTracker.Clear();
+        var writeoff = await orders.WriteoffCareOrder(f.OrderId, "staff-session");
+        var envelope = Assert.IsType<ApiResult<SnowmeetApi.Models.Order?>>(Assert.IsType<OkObjectResult>(writeoff.Result).Value);
+        Assert.Equal(0, envelope.code); Assert.Equal(1, envelope.data!.dealed); Assert.Equal(10, envelope.data.member_id);
+        Assert.Equal(0.05, (await db.depositAccount.AsNoTracking().SingleAsync()).consume_amount, 2);
+        Assert.All(await db.depositBalance.ToListAsync(), b => Assert.Equal(10, b.member_id));
+    }
+
+    [Fact]
+    public async Task PhoneReceptionCannotTrustPostedFlagBeforeApproval_AndChangingMemberClearsSavedVerification()
+    {
+        await using var f = await Fixture.Create(1); await PreparePhoneReception(f, false);
+        await using (var db = f.NewContext())
+        {
+            var posted = await db.order.Include(o => o.cares).FirstAsync(o => o.id == f.OrderId);
+            posted.wechat_unverified = true;
+            await new CareController(db, f.Config, f.Http).SaveCareRecept(posted, "staff-session");
+            Assert.False((await db.order.AsNoTracking().FirstAsync(o => o.id == f.OrderId)).wechat_unverified);
+            var checkin = await db.scanQrCode.AsTracking().SingleAsync(); checkin.authed = 1; await db.SaveChangesAsync();
+        }
+        await using (var db = f.NewContext())
+        {
+            var posted = await db.order.Include(o => o.cares).FirstAsync(o => o.id == f.OrderId);
+            await new CareController(db, f.Config, f.Http).SaveCareRecept(posted, "staff-session");
+            Assert.True((await db.order.AsNoTracking().FirstAsync(o => o.id == f.OrderId)).wechat_unverified);
+            var checkin = await db.scanQrCode.AsTracking().SingleAsync(); checkin.authed = 0; await db.SaveChangesAsync();
+        }
+        await using (var db = f.NewContext())
+        {
+            var posted = await db.order.Include(o => o.cares).FirstAsync(o => o.id == f.OrderId);
+            await new CareController(db, f.Config, f.Http).SaveCareRecept(posted, "staff-session");
+            Assert.True((await db.order.AsNoTracking().FirstAsync(o => o.id == f.OrderId)).wechat_unverified);
+        }
+        await using (var db = f.NewContext())
+        {
+            var posted = await db.order.Include(o => o.cares).FirstAsync(o => o.id == f.OrderId);
+            posted.member_id = 20;
+            await new CareController(db, f.Config, f.Http).SaveCareRecept(posted, "staff-session");
+            Assert.False((await db.order.AsNoTracking().FirstAsync(o => o.id == f.OrderId)).wechat_unverified);
+        }
+    }
+
+    private static async Task PreparePhoneReception(Fixture f, bool authorized)
+    {
+        var order = (await f.Db.order.FindAsync(f.OrderId))!; order.wechat_unverified = false;
+        (await f.Db.staff.FirstAsync(s => s.id == 28)).title_level = 100;
+        f.Db.scanQrCode.Add(new ScanQrCode { id = 700, code = ReceptCheckinRules.BuildCode("abcdefghij", 700),
+            platform = "wechat_mini", scene = "店铺接待", purpose = "顾客扫码进小程序", staff_id = 28,
+            scaner_member_id = 10, scaned = 0, cell = "13800138000", authed = authorized ? 1 : 0,
+            create_date = DateTime.Now, update_date = DateTime.Now });
+        await f.Db.SaveChangesAsync();
     }
 
     private static async Task AddCarePrices(Fixture f)

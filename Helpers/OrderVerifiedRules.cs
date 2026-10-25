@@ -7,26 +7,26 @@ namespace SnowmeetApi.Helpers
 {
     // 订单「已核验本人」标识位 order.wechat_unverified 的判定（1 = 已核验为订单会员本人，命名与字面相反，历史遗留）。
     // 为 1 时，养护 0 元核销、储值支付、支付宝付款、租赁储值付租金和次卡都不再要求顾客扫「微信身份核验码」。
-    // 置 1 的来源有三个：
+    // 置 1 的来源：
     //   1. 开单前顾客在接待页扫码报到并验证了身份——订单一生成就是 1（CheckinVouches / ResolveOnSave）；
     //   2. 顾客扫「微信身份核验码」（PaymentIdentity/VerifyWechatIdentity）；
-    //   3. 订单会员本人用微信付款成功（ResolveOnPaid）。
+    //   3. 订单会员本人用微信付款成功（ResolveOnPaid）；
+    //   4. 店员从接待页输入手机号，完成店长授权（含当天授权复用）后进入接待。
     // 这里只放不碰数据库的判定，便于单测。
     public static class OrderVerifiedRules
     {
         public const string LOG_SCENE = "开单";
 
-        // 扫码报到能否给这张单担保：顾客本人扫码、手机号已验证（店员输手机号进入、散客都不算），
-        // 是这位店员出的码，报到会员就是订单会员，且在报到后 60 分钟内（与顾客等待页同一时限）。
+        // 同一店员、同一订单会员：本人扫码沿用 60 分钟；手机号进入须为当天已授权、未作废的接待记录。
         public static bool CheckinVouches(ScanQrCode? sq, int staffId, int? orderMemberId, DateTime now)
         {
-            return sq != null
-                && ReceptCheckinRules.IsCheckinCode(sq.code)
-                && ReceptCheckinRules.IsVerified(sq)
-                && sq.staff_id == staffId
-                && orderMemberId != null && sq.scaner_member_id == orderMemberId
-                && sq.scan_time != null
-                && now < sq.scan_time.Value.AddMinutes(ReceptCheckinRules.CUSTOMER_WAIT_MINUTES);
+            if (sq == null || !ReceptCheckinRules.IsCheckinCode(sq.code) || sq.staff_id != staffId
+                || orderMemberId == null || sq.scaner_member_id != orderMemberId) return false;
+            if (ReceptCheckinRules.IsVerified(sq))
+                return sq.scan_time != null
+                    && now < sq.scan_time.Value.AddMinutes(ReceptCheckinRules.CUSTOMER_WAIT_MINUTES);
+            return ReceptCheckinRules.IsPhoneEntry(sq) && sq.authed == 1 && sq.stoped == 0
+                && sq.create_date.Date == now.Date && sq.create_date <= now;
         }
 
         // 后端自己找报到：在这位店员最近出的码里，挑能担保这张单的最近一次报到；没有返回 null。
@@ -36,7 +36,7 @@ namespace SnowmeetApi.Helpers
         {
             return candidates
                 .Where(sq => CheckinVouches(sq, staffId, orderMemberId, now))
-                .OrderByDescending(sq => sq.scan_time)
+                .OrderByDescending(sq => ReceptCheckinRules.IsPhoneEntry(sq) ? sq.update_date ?? sq.create_date : sq.scan_time)
                 .FirstOrDefault();
         }
 
@@ -73,7 +73,7 @@ namespace SnowmeetApi.Helpers
         }
 
         // 2026-10-24 用户确认：养护单只有「用了会员权益、且还没核验本人」时，才必须由会员本人微信付款。
-        // 已核验本人（开单前扫码报到 / 扫过核验码）或没用权益的单，允许他人代付，订单仍归原会员。
+        // 已核验本人（扫码报到 / 手机号授权 / 扫过核验码）或没用权益的单，允许他人代付，订单仍归原会员。
         public static bool CareRequiresMemberPayer(bool usesBenefit, bool verified)
         {
             return usesBenefit && !verified;
@@ -90,7 +90,7 @@ namespace SnowmeetApi.Helpers
         public static CoreDataModLog ChangeLog(int orderId, bool verified, int staffId, int? checkinId)
         {
             string memo = verified
-                ? "开单前扫码报到已验证本人（扫码记录 " + checkinId + "）"
+                ? "开单前接待已验证本人（接待记录 " + checkinId + "，顾客扫码或手机号授权）"
                 : "订单会员已更换，取消已核验本人";
             return CoreDataModLog.CreateManualLog("Order", "wechat_unverified", orderId, LOG_SCENE,
                 null, staffId, verified ? "0" : "1", verified ? "1" : "0", memo);

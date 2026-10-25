@@ -41,19 +41,44 @@ namespace SnowmeetApi.Tests
         }
 
         [Fact]
-        public void 店员输手机号进入和没验证手机号的报到不担保()
+        public void 未授权的手机号进入和没验证手机号的报到不担保()
         {
-            // 店员输手机号、店长已授权：没人扫码
+            // 店员仅输入手机号，还没有店长授权。
             ScanQrCode phoneEntry = VerifiedCheckin();
             phoneEntry.scaned = 0;
             phoneEntry.scan_time = null;
-            phoneEntry.authed = 1;
+            phoneEntry.authed = 0;
             Assert.False(OrderVerifiedRules.CheckinVouches(phoneEntry, Staff, Member, Now));
 
             // 扫了码但还没验证手机号
             ScanQrCode noPhone = VerifiedCheckin();
             noPhone.cell = null;
             Assert.False(OrderVerifiedRules.CheckinVouches(noPhone, Staff, Member, Now));
+        }
+
+        [Fact]
+        public void 当天已授权手机号接待能担保同一店员同一会员的订单()
+        {
+            var sq = VerifiedCheckin(); sq.scaned = 0; sq.scan_time = null; sq.authed = 1;
+            sq.create_date = Now.Date.AddMinutes(1); sq.update_date = Now.AddMinutes(-1);
+            Assert.True(OrderVerifiedRules.CheckinVouches(sq, Staff, Member, Now));
+            Assert.False(OrderVerifiedRules.CheckinVouches(sq, Staff + 1, Member, Now));
+            Assert.False(OrderVerifiedRules.CheckinVouches(sq, Staff, Member + 1, Now));
+            sq.stoped = 1;
+            Assert.False(OrderVerifiedRules.CheckinVouches(sq, Staff, Member, Now));
+            sq.stoped = 0; sq.create_date = Now.AddDays(-1);
+            Assert.False(OrderVerifiedRules.CheckinVouches(sq, Staff, Member, Now));
+            sq.create_date = Now.AddMinutes(1);
+            Assert.False(OrderVerifiedRules.CheckinVouches(sq, Staff, Member, Now));
+        }
+
+        [Fact]
+        public void 当天手机号授权和扫码记录按最近时间选择担保记录()
+        {
+            var scan = VerifiedCheckin();
+            var phone = VerifiedCheckin(); phone.id = 2; phone.scaned = 0; phone.scan_time = null;
+            phone.authed = 1; phone.create_date = Now.AddHours(-2); phone.update_date = Now.AddMinutes(-1);
+            Assert.Equal(2, OrderVerifiedRules.PickVouchingCheckin(new[] { scan, phone }, Staff, Member, Now)!.id);
         }
 
         [Fact]
