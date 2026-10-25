@@ -563,6 +563,43 @@ public class CareCardSaleTests
         Assert.Equal("测试品牌", (await f.Db.punchCard.SingleAsync()).equip_brand);
     }
 
+    [Theory]
+    [InlineData(0, 1)]
+    [InlineData(1, 0)]
+    public async Task SubmitSetsPickupDateUsingActualOrderDayAndUrgency(int urgent, int days)
+    {
+        await using var f = await Fixture.Create(1);
+        var order = (await f.Db.order.FindAsync(f.OrderId))!;
+        order.biz_date = DateTime.Today.AddDays(-2);
+        var care = await f.Db.care.SingleAsync(); care.urgent = urgent;
+        if (urgent == 1) await AddCarePrices(f); // 加急补差使用现有门店价格。
+        await f.Db.SaveChangesAsync();
+        await f.Service.SaveDraftAsync(f.Request());
+        int retailId = await f.Service.SubmitAsync(f.OrderId, 28);
+        Assert.Equal(DateTime.Today, order.biz_date.Date);
+        Assert.Equal(order.biz_date.Date.AddDays(days), care.member_pick_date);
+        await f.Pay(retailId, (await f.Db.order.FindAsync(retailId))!.total_amount);
+        await f.Service.CompletePaidAsync(retailId, f.PaymentId);
+        Assert.Equal(order.biz_date.Date.AddDays(days), care.member_pick_date);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ExistingPendingOrderFillsMissingPickupDate_AndKeepsAnExplicitPickupDate(bool explicitDate)
+    {
+        await using var f = await Fixture.Create(1);
+        await f.Service.SaveDraftAsync(f.Request());
+        int retailId = await f.Service.SubmitAsync(f.OrderId, 28);
+        var order = (await f.Db.order.FindAsync(f.OrderId))!; order.biz_date = DateTime.Today.AddDays(-1);
+        var care = await f.Db.care.SingleAsync();
+        care.member_pick_date = explicitDate ? DateTime.Today.AddDays(5) : null;
+        await f.Db.SaveChangesAsync();
+        await f.Pay(retailId); await f.Service.CompletePaidAsync(retailId, f.PaymentId);
+        Assert.Equal(explicitDate ? DateTime.Today.AddDays(5) : DateTime.Today, care.member_pick_date);
+        Assert.Single(await f.Db.punchCardUsed.ToListAsync());
+    }
+
     private static async Task AddCarePrices(Fixture f)
     {
         f.Db.shop.Add(new Shop { id = 1, name = "测试店", code = "TEST", beacon_mac = "", beacon_uuid = "" });

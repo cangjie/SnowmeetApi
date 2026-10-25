@@ -1,7 +1,6 @@
 // 养护标签（存根）：逐行移植小程序 components/care/print_care_label.js 的 getCommand。
 // 纸 75×50mm、间隙 4mm、坐标与二维码地址都与小程序一致；指令由原样拷贝的 tsc.js 生成。
-// 与小程序的差别：① 取板日期在 member_pick_date 为空时按次日算（小程序那里引用了未定义的 pickData）；
-// ② 文本里的 " 去掉（TEXT 指令用 " 包内容）；③ 张数用 PRINT n,1 交给打印机重复打。
+// 与小程序的差别：① 文本里的 " 去掉（TEXT 指令用 " 包内容）；② 张数用 PRINT n,1 交给打印机重复打。
 var CareLabel = (function () {
   // 测试单：care 25693 / order 71887（万龙服务中心）。按存根格式只留姓、手机号中间打码。
   var SAMPLE_ORDER = {
@@ -68,7 +67,7 @@ var CareLabel = (function () {
     var more = care.repair_more ? care.repair_more : '';
     var memo = care.repair_memo ? care.repair_memo : '';
     var pole = care.with_pole == true ? '含杖' : '';
-    var orderDate = new Date(care.create_date);
+    var orderDate = new Date(order.biz_date || care.create_date);
     var orderDateStr = (orderDate.getMonth() + 1).toString() + '-' + orderDate.getDate().toString();
     var urgent = care.urgent == 1;
     var pickDate = new Date(orderDate);
@@ -80,13 +79,9 @@ var CareLabel = (function () {
     }
     var pickDateStr = (pickDate.getMonth() + 1).toString() + '-' + pickDate.getDate().toString();
     var scale = care.scale ? care.scale : '未填';
-    var pickDateTitle = '次日';
-    if (pickDate.getDate() == orderDate.getDate()) {
-      pickDateTitle = '当日';
-    }
-    else if (pickDate.getDate() - orderDate.getDate() != 1) {
-      pickDateTitle = '多日';
-    }
+    var pickDays = (Date.UTC(pickDate.getFullYear(), pickDate.getMonth(), pickDate.getDate())
+      - Date.UTC(orderDate.getFullYear(), orderDate.getMonth(), orderDate.getDate())) / 86400000;
+    var pickDateTitle = pickDays == 0 ? '当日' : (pickDays == 1 ? '次日' : '多日');
     var command = Tsc.jpPrinter.createNew();
     command.setCls();
     command.setSize(75, 50);

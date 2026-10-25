@@ -409,6 +409,7 @@ IF @result < 0 THROW 51010, N'操作繁忙，请稍后重试', 1;");
         retailOrder.wechat_unverified = careOrder.wechat_unverified;
         careOrder.valid = 1; careOrder.recepting = 0; careOrder.total_amount = 0; careOrder.paying_amount = 0;
         careOrder.dealed = 0; careOrder.pay_with_deposit = false; careOrder.staff_id = staffId;
+        careOrder.biz_date = retailOrder.biz_date = DateTime.Now;
         var helper = new OrderController(db, config, http);
         await helper.GenerateOrderCode(retailOrder); await helper.GenerateOrderCode(careOrder);
         var cares = await db.care.AsTracking().Where(c => c.order_id == orderId).ToListAsync();
@@ -416,6 +417,7 @@ IF @result < 0 THROW 51010, N'操作繁忙，请稍后重试', 1;");
         foreach (var care in cares)
         {
             care.valid = 1;
+            care.member_pick_date = care.urgent == 1 ? careOrder.biz_date.Date : careOrder.biz_date.Date.AddDays(1);
             var plan = preview.items.SingleOrDefault(i => i.careIds.Contains(care.id));
             if (plan == null) continue;
             care.use_card = true; care.card_id = null;
@@ -464,6 +466,11 @@ IF @result < 0 THROW 51010, N'操作繁忙，请稍后重试', 1;");
                     care.card_id = row.punch_card_id; care.use_card = true; care.card_name = plans[row.id].name;
                 }
             }
+            await db.SaveChangesAsync();
+            // 兼容本次修复前已提交、尚未付款的购卡单，沿用原下单日计算取板日期。
+            var careRows = await db.care.AsTracking().Where(c => c.order_id == careOrder.id).ToListAsync();
+            foreach (var care in careRows.Where(c => c.member_pick_date == null))
+                care.member_pick_date = care.urgent == 1 ? careOrder.biz_date.Date : careOrder.biz_date.Date.AddDays(1);
             await db.SaveChangesAsync();
             await new CareController(db, config, http).EffectCareOrder(careOrder.id);
             order.dealed = careOrder.dealed = 1;
