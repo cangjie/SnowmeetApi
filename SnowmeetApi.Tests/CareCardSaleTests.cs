@@ -733,6 +733,35 @@ public class CareCardSaleTests
         Assert.Single(await f.Db.punchCard.ToListAsync()); Assert.Single(await f.Db.punchCardUsed.ToListAsync());
     }
 
+    [Theory]
+    [InlineData(0.05, 0, 0.02)]
+    [InlineData(0.06, 0.06, 0.01)]
+    public async Task SwitchingFromOldCustomerTicketToCardRemovesCouponDiscountButKeepsLargerManualDiscount(
+        double previousDiscount, double expectedDiscount, double amount)
+    {
+        await using var f = await Fixture.Create(1);
+        await AddCarePrices(f);
+        f.Db.ticketTemplate.Add(new TicketTemplate { id = 16, biz_type = "养护", type = "养护券",
+            name = "老顾客优惠券", memo = "", miniapp_recept_path = "" });
+        f.Db.ticket.Add(new Ticket { code = "OLD-CUSTOMER", name = "老顾客优惠券", template_id = 16,
+            member_id = 10, open_id = "customer-openid", valid = 1, is_active = 1 });
+        var product = await f.Db.product.FirstAsync(p => p.id == 101); product.sale_price = 0.01;
+        var care = await f.Db.care.SingleAsync(); care.ticket_code = "OLD-CUSTOMER";
+        care.discount = previousDiscount; care.repair_charge = 0.01;
+        await f.Db.SaveChangesAsync();
+        var preview = await f.Service.PreviewAsync(f.Request());
+        Assert.Equal(previousDiscount, care.discount); Assert.Equal("OLD-CUSTOMER", care.ticket_code);
+        Assert.Equal((decimal)amount, preview.amount);
+        Assert.Equal(expectedDiscount, preview.projects.Single().discount);
+        await f.Service.SaveDraftAsync(f.Request());
+        Assert.Null(care.ticket_code); Assert.Equal(expectedDiscount, care.discount);
+        Assert.Equal((decimal)amount, (await f.Service.SaveDraftAsync(f.Request())).amount);
+        int id = await f.Service.SubmitAsync(f.OrderId, 28);
+        await f.Pay(id, amount); await f.Service.CompletePaidAsync(id, f.PaymentId);
+        Assert.Single(await f.Db.order.ToListAsync()); Assert.Single(await f.Db.punchCardUsed.ToListAsync());
+        Assert.Equal(0, (await f.Db.ticket.SingleAsync()).used);
+    }
+
     private static async Task AddCarePrices(Fixture f)
     {
         f.Db.shop.Add(new Shop { id = 1, name = "测试店", code = "TEST", beacon_mac = "", beacon_uuid = "" });

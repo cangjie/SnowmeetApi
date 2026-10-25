@@ -198,12 +198,26 @@ IF @result < 0 THROW 51010, N'操作繁忙，请稍后重试', 1;");
                 && plan.need_repair != 1 && string.IsNullOrWhiteSpace(plan.repair_memo) && plan.repair_charge == 0 && plan.summer == null)
                 result.errors.Add("第" + (cares.IndexOf(care) + 1) + "件装备请选择养护项目");
             double commonCharge = await ExtraServiceChargeAsync(helper, order.shop, first, plan, usesCard);
+            double discount = care.discount;
+            if (!string.IsNullOrWhiteSpace(care.ticket_code))
+            {
+                var oldCustomerTicket = await db.ticket.AsNoTracking()
+                    .Where(t => t.code == care.ticket_code && t.template_id == CarePricingRules.LegacyDiscountTemplateId)
+                    .Include(t => t.template).ThenInclude(t => t.productTicketTemplates).ThenInclude(r => r.product)
+                    .FirstOrDefaultAsync();
+                if (oldCustomerTicket != null)
+                {
+                    var (_, ticketDiscount) = await helper.CalcCharge(order.shop, care, oldCustomerTicket);
+                    // 购卡与旧券互斥：清掉券自动带出的减免，较大的店员手动减免保留。
+                    if (ticketDiscount > 0 && Money(discount) <= Money(ticketDiscount)) discount = 0;
+                }
+            }
             decimal amount = care.warranty || care.entertain ? 0
-                : Math.Max(0, Money(commonCharge) + Money(care.repair_charge) - Money(care.discount));
+                : Math.Max(0, Money(commonCharge) + Money(care.repair_charge) - Money(discount));
             result.projects.Add(new CareCardProject { careId = care.id, need_edge = plan.need_edge,
                 need_wax = plan.need_wax, need_unwax = plan.need_unwax, free_wax = plan.free_wax,
                 edge_degree = plan.edge_degree, common_charge = commonCharge, repair_charge = care.repair_charge,
-                discount = care.discount, amount = amount });
+                discount = discount, amount = amount });
         }
         foreach (var item in result.items)
             item.serviceLabel = string.Join("；", cares.Where(c => item.careIds.Contains(c.id)).Select(c =>
