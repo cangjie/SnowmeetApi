@@ -110,7 +110,7 @@ public class CareCardSaleTests
     }
 
     [Fact]
-    public async Task ProductChangesRequireNewPreview_AndUnmatchedProjectsAreRejected()
+    public async Task ProductChangesRequireNewPreview_AndRepairChargesAreAdded()
     {
         await using var f = await Fixture.Create(1);
         await f.Service.SaveDraftAsync(f.Request());
@@ -119,16 +119,22 @@ public class CareCardSaleTests
         Assert.Contains("重新试算", e.Message);
         Assert.Empty(await f.Db.punchCard.ToListAsync());
         var care = await f.Db.care.SingleAsync(); care.repair_charge = 50; await f.Db.SaveChangesAsync();
-        await Assert.ThrowsAsync<InvalidOperationException>(() => f.Service.PreviewAsync(f.Request()));
+        var revised = await f.Service.PreviewAsync(f.Request());
+        Assert.Equal(50m, revised.careAmount); Assert.Equal(750m, revised.amount);
     }
 
-    [Fact]
-    public async Task FailedBusinessTransactionDoesNotLeakAssetsWhenCallbackSavesLogs_AndCanRetry()
+    [Theory]
+    [InlineData(0)]
+    [InlineData(0.01)]
+    public async Task FailedBusinessTransactionDoesNotLeakAssetsWhenCallbackSavesLogs_AndCanRetry(double repairFee)
     {
         await using var f = await Fixture.Create(1);
+        var care = await f.Db.care.SingleAsync(); care.repair_charge = repairFee;
+        if (repairFee > 0) { care.need_repair = 1; care.repair_memo = "维修附加项目"; }
+        await f.Db.SaveChangesAsync();
         await f.Service.SaveDraftAsync(f.Request());
         int retailId = await f.Service.SubmitAsync(f.OrderId, 28);
-        await f.Pay(retailId);
+        await f.Pay(retailId, 600 + repairFee);
         await f.Db.Database.ExecuteSqlRawAsync("CREATE TRIGGER fail_care_tasks BEFORE INSERT ON care_task BEGIN SELECT RAISE(ABORT, 'injected task failure'); END;");
         await Assert.ThrowsAsync<DbUpdateException>(() => f.Service.CompletePaidAsync(retailId, f.PaymentId));
         f.Db.coreDataModLog.Add(CoreDataModLog.CreateManualLog("order", "test", retailId, "回调记录失败", null, null, null, "injected", ""));
@@ -395,10 +401,12 @@ public class CareCardSaleTests
     }
 
     [Fact]
-    public async Task SingleCardCanBeSelectedBeforeProjects_ButAllEquipmentMustChooseOneBeforeSubmit()
+    public async Task SingleCardCanBeSelectedBeforeProjects_ButAllEquipmentMustChooseServicesBeforeSubmit()
     {
         await using var f = await Fixture.Create(2, "单项养护10次卡");
-        (await f.Db.product.SingleAsync()).care_project_count = 1; await f.Db.SaveChangesAsync();
+        (await f.Db.product.SingleAsync()).care_project_count = 1;
+        foreach (var care in await f.Db.care.ToListAsync()) care.need_edge = care.need_wax = 0;
+        await f.Db.SaveChangesAsync();
         var draft = await f.Service.SaveDraftAsync(f.Request());
         Assert.False(draft.canCheckout); Assert.Equal(2, draft.errors.Count);
         Assert.All(await f.Db.care.ToListAsync(), c => { Assert.Equal(0, c.need_edge); Assert.Equal(0, c.need_wax); });
@@ -442,6 +450,128 @@ public class CareCardSaleTests
         var result = await f.Service.SaveDraftAsync(request);
         Assert.Equal(1200m, result.amount); Assert.Equal(2, result.items.Count);
         Assert.Equal(2, result.items.Sum(i => i.punches));
+    }
+
+    [Fact]
+    public async Task OneCentCardAndOneCentRepairCollectTwoCents_OnlyOneCardIsGrantedAndUsed()
+    {
+        await using var f = await Fixture.Create(1, "测试单项次卡");
+        var product = await f.Db.product.SingleAsync(); product.sale_price = 0.01; product.care_project_count = 1;
+        var care = await f.Db.care.SingleAsync(); care.need_wax = 0;
+        care.need_repair = 1; care.repair_memo = "修磨刃"; care.repair_charge = 0.01;
+        await f.Db.SaveChangesAsync();
+        var trial = await f.Service.SaveDraftAsync(f.Request());
+        Assert.True(trial.canCheckout); Assert.Equal(0.01m, trial.cardAmount);
+        Assert.Equal(0.01m, trial.careAmount); Assert.Equal(0.02m, trial.amount);
+        Assert.Equal(1, trial.items.Single().punches);
+        Assert.Equal(0, trial.projects.Single().common_charge);
+        Assert.Equal(0.01, care.repair_charge);
+        var rows = await f.Db.retail.ToListAsync(); Assert.Equal(2, rows.Count);
+        Assert.Null(rows.Single(r => r.retail_type == CareCardSaleService.CareChargeRetailType).product_id);
+        int retailId = await f.Service.SubmitAsync(f.OrderId, 28);
+        var retail = (await f.Db.order.FindAsync(retailId))!;
+        Assert.Equal(0.02, retail.total_amount); Assert.Equal(0.02, retail.paying_amount);
+        Assert.Equal(0, (await f.Db.order.FindAsync(f.OrderId))!.total_amount); // 只在零售单收一次合计款。
+        Assert.Contains("一次付清", (await CareCardSaleService.PaymentErrorAsync(f.Db, retail, 0.01, "微信支付"))!);
+        await f.Pay(retailId, 0.01);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => f.Service.CompletePaidAsync(retailId, f.PaymentId));
+        Assert.Empty(await f.Db.punchCard.ToListAsync()); Assert.Empty(await f.Db.careTask.ToListAsync());
+        (await f.Db.orderPayment.FindAsync(f.PaymentId))!.amount = 0.02; await f.Db.SaveChangesAsync();
+        await f.Service.CompletePaidAsync(retailId, f.PaymentId);
+        await f.Service.CompletePaidAsync(retailId, f.PaymentId);
+        Assert.Single(await f.Db.orderPayment.ToListAsync());
+        Assert.Equal(1, (await f.Db.punchCard.SingleAsync()).punches);
+        Assert.Single(await f.Db.punchCardUsed.ToListAsync());
+        Assert.Single(await f.Db.careTask.Where(t => t.task_name == "维修").ToListAsync());
+        Assert.Null((await f.Db.retail.SingleAsync(r => r.retail_type == CareCardSaleService.CareChargeRetailType)).punch_card_id);
+        var history = JObject.FromObject(await f.Service.GetDraftAsync(f.OrderId));
+        Assert.Equal(0.02m, (decimal?)history["preview"]?["amount"]);
+        Assert.Equal(0.01m, (decimal?)history["preview"]?["careAmount"]);
+        Assert.Single((JArray)history["preview"]!["items"]!);
+        var info = await CareCardSaleService.GetInfoAsync(f.Db, retail);
+        Assert.Equal(0.01m, info!.careAmount); Assert.Equal(0.01m, info.cardAmount);
+        int finish = await f.Db.careTask.Where(t => t.care_id == care.id && t.task_name == "发板").Select(t => t.id).SingleAsync();
+        await new CareController(f.Db, f.Config, f.Http).SetTaskStatus(finish, "已完成", "测试取消", "staff-session", isCancel: true, cancelReason: "取消本件");
+        Assert.Equal(0, (await f.Db.punchCard.SingleAsync()).punches);
+        Assert.Equal(0.01, (await f.Db.retail.SingleAsync(r => r.retail_type == CareCardSaleService.CareChargeRetailType)).deal_price);
+    }
+
+    [Theory]
+    [InlineData(0, 0.02, 0.03)]
+    [InlineData(1, 0.05, 0.06)]
+    public async Task SingleCardAllowsBothProjects_CollectsPackageDifferenceAndUrgentCharge(int urgent, double extra, double total)
+    {
+        await using var f = await Fixture.Create(1, "单项养护次卡");
+        var card = await f.Db.product.SingleAsync(); card.sale_price = 0.01; card.care_project_count = 1;
+        var care = await f.Db.care.SingleAsync(); care.urgent = urgent;
+        await AddCarePrices(f);
+        var preview = await f.Service.SaveDraftAsync(f.Request());
+        Assert.True(preview.canCheckout);
+        Assert.Equal(1, care.need_edge); Assert.Equal(1, care.need_wax);
+        Assert.Equal(extra, care.common_charge); Assert.Equal((decimal)extra, preview.careAmount);
+        Assert.Equal((decimal)total, preview.amount);
+        Assert.Equal(1, preview.items.Single().punches);
+        int retailId = await f.Service.SubmitAsync(f.OrderId, 28);
+        await f.Pay(retailId, total); await f.Service.CompletePaidAsync(retailId, f.PaymentId);
+        Assert.Equal(1, (await f.Db.punchCard.SingleAsync()).punches);
+        Assert.Single(await f.Db.careTask.Where(t => t.task_name == "修刃").ToListAsync());
+        Assert.Single(await f.Db.careTask.Where(t => t.task_name == "热蜡").ToListAsync());
+    }
+
+    [Fact]
+    public async Task RepairPriceChangedAfterTrialRequiresReconfirmation_AndDiscountIsPreserved()
+    {
+        await using var f = await Fixture.Create(1);
+        var care = await f.Db.care.SingleAsync(); care.need_repair = 1; care.repair_charge = 10; care.discount = 2;
+        await f.Db.SaveChangesAsync();
+        var trial = await f.Service.SaveDraftAsync(f.Request());
+        Assert.Equal(8m, trial.careAmount); Assert.Equal(2, care.discount);
+        care.repair_charge = 12; await f.Db.SaveChangesAsync();
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => f.Service.SubmitAsync(f.OrderId, 28));
+        Assert.Contains("重新试算", error.Message);
+        var revised = await f.Service.SaveDraftAsync(f.Request());
+        Assert.Equal(10m, revised.careAmount);
+        int retailId = await f.Service.SubmitAsync(f.OrderId, 28);
+        await f.Pay(retailId, 610); await f.Service.CompletePaidAsync(retailId, f.PaymentId);
+        Assert.Equal(2, care.discount); Assert.Equal(12, care.repair_charge);
+    }
+
+    [Fact]
+    public async Task MissingUpgradePriceDoesNotTurnAdditionalProjectIntoFreeService()
+    {
+        await using var f = await Fixture.Create(1, "单项养护次卡");
+        (await f.Db.product.SingleAsync()).care_project_count = 1; await f.Db.SaveChangesAsync();
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => f.Service.PreviewAsync(f.Request()));
+        Assert.Contains("未配置养护价格", error.Message);
+        Assert.Empty(await f.Db.retail.ToListAsync());
+    }
+
+    [Fact]
+    public async Task MachineSeasonAllowsAdditionalProjectAndCollectsExistingUpgradePrice()
+    {
+        await using var f = await Fixture.Create(1, "机打蜡季卡", true);
+        (await f.Db.product.SingleAsync()).sale_price = 0.01;
+        await AddCarePrices(f);
+        await f.Service.SaveDraftAsync(f.Request());
+        var care = await f.Db.care.SingleAsync(); care.need_edge = 1; await f.Db.SaveChangesAsync();
+        var preview = await f.Service.SaveDraftAsync(f.Request());
+        Assert.Equal(1, care.free_wax); Assert.Equal(1, care.need_edge);
+        Assert.Equal(0.03m, preview.careAmount); Assert.Equal(0.04m, preview.amount);
+        int retailId = await f.Service.SubmitAsync(f.OrderId, 28);
+        await f.Pay(retailId, 0.04); await f.Service.CompletePaidAsync(retailId, f.PaymentId);
+        Assert.Single(await f.Db.punchCardUsed.ToListAsync());
+        Assert.Equal("测试品牌", (await f.Db.punchCard.SingleAsync()).equip_brand);
+    }
+
+    private static async Task AddCarePrices(Fixture f)
+    {
+        f.Db.shop.Add(new Shop { id = 1, name = "测试店", code = "TEST", beacon_mac = "", beacon_uuid = "" });
+        f.Db.category.Add(new Category { id = 11, code = CareProductRules.CareCategoryCode, name = "养护服务", biz_type = "养护", valid = 1 });
+        f.Db.product.AddRange(
+            new Product { id = 201, name = "单项", shop_id = 1, category_code = CareProductRules.CareCategoryCode, sale_price = 0.03, valid = 1 },
+            new Product { id = 202, name = "双项", shop_id = 1, category_code = CareProductRules.CareCategoryCode, sale_price = 0.05, valid = 1 },
+            new Product { id = 203, name = "双项加急", shop_id = 1, category_code = CareProductRules.CareCategoryCode, sale_price = 0.08, valid = 1 });
+        await f.Db.SaveChangesAsync();
     }
 
     private static async Task PrepareLegacyCard(Fixture f, bool placed, int punches)
@@ -497,9 +627,9 @@ public class CareCardSaleTests
             await db.SaveChangesAsync(); return f;
         }
 
-        public async Task Pay(int retailId)
+        public async Task Pay(int retailId, double amount = 600)
         {
-            var payment = new OrderPayment { order_id = retailId, amount = 600, pay_method = "微信支付", status = "支付成功", member_id = 999, is_proxy_pay = false };
+            var payment = new OrderPayment { order_id = retailId, amount = amount, pay_method = "微信支付", status = "支付成功", member_id = 999, is_proxy_pay = false };
             Db.orderPayment.Add(payment); await Db.SaveChangesAsync(); PaymentId = payment.id;
         }
         public async ValueTask DisposeAsync() { await Db.DisposeAsync(); await connection.DisposeAsync(); }

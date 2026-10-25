@@ -49,12 +49,18 @@ public class CareCardProject
     public int need_unwax { get; set; }
     public int free_wax { get; set; }
     public string? edge_degree { get; set; }
+    public double common_charge { get; set; }
+    public double repair_charge { get; set; }
+    public double discount { get; set; }
+    public decimal amount { get; set; }
 }
 
 public class CareCardPreview
 {
     public int careOrderId { get; set; }
     public decimal amount { get; set; }
+    public decimal cardAmount => items.Sum(i => i.price);
+    public decimal careAmount { get; set; }
     public List<CareCardPreviewItem> items { get; set; } = new();
     public List<CareCardProject> projects { get; set; } = new();
     public List<string> errors { get; set; } = new();
@@ -73,6 +79,7 @@ public class CareCardSaleService
 
     // 复用订单来源字段定位由养护草稿创建的零售单，不增加表或列。
     public const string OrderSource = "care_card_reception";
+    public const string CareChargeRetailType = "养护附加费用";
 
     public static Task<Models.Order?> GetLinkedRetailAsync(ApplicationDBContext db, int careOrderId, bool includeDraft = false) =>
         db.order.AsNoTracking().Where(o => o.type == "零售" && o.order_source == OrderSource
@@ -107,7 +114,10 @@ public class CareCardSaleService
         var retail = order.type == "养护" ? await GetLinkedRetailAsync(db, order.id)
             : order.type == "零售" && order.order_source == OrderSource && order.valid == 1 && order.recepting == 0 ? order : null;
         if (retail == null || !int.TryParse(retail.source_order_no, out int careId)) return null;
-        return new CareCardSaleInfo { careOrderId = careId, retailOrderId = retail.id, completed = retail.dealed == 1 };
+        var charges = await db.retail.AsNoTracking().Where(r => r.order_id == retail.id && r.valid == 1).ToListAsync();
+        return new CareCardSaleInfo { careOrderId = careId, retailOrderId = retail.id, completed = retail.dealed == 1,
+            cardAmount = charges.Where(r => r.retail_type != CareChargeRetailType).Sum(r => Money(r.deal_price)),
+            careAmount = charges.Where(r => r.retail_type == CareChargeRetailType).Sum(r => Money(r.deal_price)) };
     }
 
     // SQL Server跨进程锁；SQLite隔离测试由写事务串行化。不能只用进程内锁保护支付回调。
@@ -156,34 +166,77 @@ IF @result < 0 THROW 51010, N'操作繁忙，请稍后重试', 1;");
         if (CareCardRules.ServiceMode(first) == "machine" && cares.Count != 1)
             throw new InvalidOperationException("机打蜡季卡仅限一套装备的订单选择");
         var priorRetail = await GetLinkedRetailAsync(db, order.id, true);
-        var previous = priorRetail == null ? new List<CareCardPreviewItem>()
-            : (await ReadPreviewAsync(priorRetail, order.id)).items;
+        var previous = priorRetail == null ? new CareCardPreview() : await ReadPreviewAsync(priorRetail, order.id);
+        var helper = new CareController(db, config, http);
         foreach (var care in cares)
         {
-            bool reset = !previous.Any(i => i.productId == first.productId && i.careIds.Contains(care.id));
+            bool reset = !previous.items.Any(i => i.productId == first.productId)
+                || !previous.projects.Any(p => p.careId == care.id) && !previous.items.Any(i => i.careIds.Contains(care.id));
             var plan = CareCardRules.PreviewCare(first, care, reset);
-            bool needsSingleProject = result.serviceMode == "single" && plan.need_edge == 0 && plan.need_wax == 0;
-            // 缺单项项目可保存选卡草稿；额外收费、维修等仍须单独开单。
-            var validation = CareCardRules.PreviewCare(first, care, reset);
-            if (needsSingleProject) validation.need_edge = 1;
-            if (!CareCardRules.Covers(first, validation))
-                throw new InvalidOperationException("所选卡不能覆盖全部装备项目，请调整养护项目");
-            var item = result.items.FirstOrDefault(i => i.total == null ? i.punches < 1 : i.punches < i.total);
-            if (item == null) throw new InvalidOperationException("所选卡次数不足，请调整购卡数量");
-            if (item.requiresBinding && !CareController.HasFullEquipInfo(care))
-                throw new InvalidOperationException("打蜡季卡需要完整的装备类型、品牌和长度");
-            item.careIds.Add(care.id);
+            if (care.is_cancel) throw new InvalidOperationException("已取消的装备不能重新下单");
+            if (!double.IsFinite(care.repair_charge) || !double.IsFinite(care.discount) || care.repair_charge < 0 || care.discount < 0)
+                throw new InvalidOperationException("附加费和减免金额必须为非负数");
+            bool usesCard = CareCardRules.HasCoveredService(first, plan);
+            if (usesCard)
+            {
+                var item = result.items.FirstOrDefault(i => i.total == null ? i.punches < 1 : i.punches < i.total);
+                if (item == null) throw new InvalidOperationException("所选卡次数不足，请调整购卡数量");
+                if (item.requiresBinding && !CareController.HasFullEquipInfo(care))
+                    throw new InvalidOperationException("打蜡季卡需要完整的装备类型、品牌和长度");
+                item.careIds.Add(care.id);
+            }
+            if (plan.need_edge != 1 && plan.need_wax != 1 && plan.free_wax != 1 && plan.need_unwax != 1
+                && plan.need_repair != 1 && string.IsNullOrWhiteSpace(plan.repair_memo) && plan.repair_charge == 0 && plan.summer == null)
+                result.errors.Add("第" + (cares.IndexOf(care) + 1) + "件装备请选择养护项目");
+            double commonCharge = await ExtraServiceChargeAsync(helper, order.shop, first, plan, usesCard);
+            decimal amount = care.warranty || care.entertain ? 0
+                : Math.Max(0, Money(commonCharge) + Money(care.repair_charge) - Money(care.discount));
             result.projects.Add(new CareCardProject { careId = care.id, need_edge = plan.need_edge,
                 need_wax = plan.need_wax, need_unwax = plan.need_unwax, free_wax = plan.free_wax,
-                edge_degree = plan.edge_degree });
-            if (needsSingleProject) result.errors.Add("第" + (cares.IndexOf(care) + 1) + "件装备请选择修刃或热蜡（单项）");
+                edge_degree = plan.edge_degree, common_charge = commonCharge, repair_charge = care.repair_charge,
+                discount = care.discount, amount = amount });
         }
         foreach (var item in result.items)
-            item.serviceLabel = string.Join("；", result.projects.Where(p => item.careIds.Contains(p.careId)).Select(p =>
-                p.free_wax == 1 ? "机打蜡" : p.need_edge == 1 && p.need_wax == 1 ? "修刃＋热蜡"
-                : p.need_edge == 1 ? "修刃" : p.need_wax == 1 ? "热蜡" : "待选择单项").Distinct());
-        result.amount = result.items.Sum(i => i.price);
+            item.serviceLabel = string.Join("；", cares.Where(c => item.careIds.Contains(c.id)).Select(c =>
+            {
+                var project = result.projects.Single(p => p.careId == c.id);
+                var selected = new Care { need_edge = project.need_edge, need_wax = project.need_wax,
+                    need_unwax = project.need_unwax, free_wax = project.free_wax, need_repair = c.need_repair,
+                    repair_memo = c.repair_memo, urgent = c.urgent, summer = c.summer };
+                return CoveredServiceLabel(item, selected);
+            }).Distinct());
+        result.careAmount = result.projects.Sum(p => p.amount);
+        result.amount = result.cardAmount + result.careAmount;
         return result;
+    }
+
+    private static decimal Money(double value) => Math.Round((decimal)value, 2, MidpointRounding.AwayFromZero);
+
+    private static async Task<double> ExtraServiceChargeAsync(CareController helper, string shop,
+        CareCardPreviewItem card, Care selected, bool usesCard)
+    {
+        if (selected.warranty || selected.entertain) return 0;
+        if (usesCard && CareCardRules.ServiceMode(card) == "machine")
+        {
+            selected.use_card = true;
+            var (charge, _) = await helper.CalcCharge(shop, selected, null,
+                new PunchCard { card_name = card.name, total = null });
+            selected.use_card = false;
+            if (CarePricingRules.CountChargeableItems(selected) > 0 && await helper.GetProduct(shop, selected) == null)
+                throw new InvalidOperationException("当前门店未配置养护价格，请核对门店");
+            return (double)Money(charge);
+        }
+        var covered = CareCardRules.CoveredServices(card, selected);
+        int selectedCount = CarePricingRules.CountChargeableItems(selected);
+        int coveredCount = usesCard ? CarePricingRules.CountChargeableItems(covered) : 0;
+        if (selected.summer == null && selectedCount == coveredCount && (selected.urgent == 0 || selectedCount == 0)) return 0;
+        var fullPrice = await helper.GetProduct(shop, selected);
+        if (fullPrice == null && CarePricingRules.ResolveProductName(selected) != "")
+            throw new InvalidOperationException("当前门店未配置养护价格，请核对门店");
+        var coveredPrice = coveredCount == 0 ? null : await helper.GetProduct(shop, covered);
+        if (coveredCount > 0 && coveredPrice == null)
+            throw new InvalidOperationException("当前门店未配置卡抵扣项目的价格，请核对门店");
+        return (double)Math.Max(0, Money(fullPrice?.sale_price ?? 0) - Money(coveredPrice?.sale_price ?? 0));
     }
 
     private static void ApplyProjects(CareCardPreview preview, IEnumerable<Care> cares)
@@ -194,7 +247,9 @@ IF @result < 0 THROW 51010, N'操作繁忙，请稍后重试', 1;");
             care.need_edge = project.need_edge; care.need_wax = project.need_wax;
             care.need_unwax = project.need_unwax; care.free_wax = project.free_wax; care.edge_degree = project.edge_degree;
             care.use_card = false; care.card_id = null; care.card_name = null; care.ticket_code = null;
-            care.common_charge = care.discount = care.ticket_discount = 0;
+            care.common_charge = project.common_charge; care.discount = project.discount; care.ticket_discount = 0;
+            if (care.summer != null) care.biz_type = "非雪季养护";
+            else if (care.biz_type == "非雪季养护") care.biz_type = null;
         }
     }
 
@@ -204,6 +259,7 @@ IF @result < 0 THROW 51010, N'操作繁忙，请稍后重试', 1;");
     {
         public int version { get; set; } = 1;
         public CareCardPreviewItem item { get; set; } = new();
+        public List<CareCardProject>? projects { get; set; }
     }
 
     private static CareCardPreviewItem ReadPlan(Retail retail)
@@ -224,30 +280,61 @@ IF @result < 0 THROW 51010, N'操作繁忙，请稍后重试', 1;");
     {
         var rows = await db.retail.AsNoTracking().Where(r => r.order_id == retailOrder.id && r.valid == 1).OrderBy(r => r.id).ToListAsync();
         var result = new CareCardPreview { careOrderId = careOrderId, amount = rows.Sum(r => Math.Round((decimal)r.deal_price, 2)) };
-        foreach (var row in rows)
+        result.careAmount = rows.Where(r => r.retail_type == CareChargeRetailType).Sum(r => Money(r.deal_price));
+        foreach (var row in rows.Where(r => r.retail_type != CareChargeRetailType))
         {
-            if (retailOrder.dealed != 1) { result.items.Add(ReadPlan(row)); continue; }
+            if (retailOrder.dealed != 1)
+            {
+                result.items.Add(ReadPlan(row));
+                var savedProjects = JsonConvert.DeserializeObject<PendingCard>(row.memo)?.projects;
+                if (savedProjects != null) result.projects = savedProjects;
+                continue;
+            }
             var card = await db.punchCard.AsNoTracking().FirstOrDefaultAsync(c => c.id == row.punch_card_id && c.source_retail_id == row.id);
             if (card == null) throw new InvalidOperationException("未找到已发出的会员卡，请联系管理员核对");
             var uses = await db.punchCardUsed.AsNoTracking().Where(u => u.card_id == card.id && u.order_id == careOrderId
                 && u.biz_type == "养护" && u.valid).ToListAsync();
             var careIds = uses.Select(u => u.biz_id).ToList();
             var cares = await db.care.AsNoTracking().Where(c => careIds.Contains(c.id)).ToListAsync();
-            result.items.Add(new CareCardPreviewItem { lineNo = result.items.Count + 1, productId = row.product_id.Value,
+            var item = new CareCardPreviewItem { lineNo = result.items.Count + 1, productId = row.product_id.Value,
                 name = card.card_name, price = Math.Round((decimal)row.deal_price, 2), total = card.total,
                 projectCount = card.care_project_count, requiresBinding = CareCardRules.RequiresEquipmentBinding(card.total, card.card_name),
-                careIds = careIds, serviceLabel = string.Join("；", cares.Select(ServiceLabel).Distinct()) });
+                careIds = careIds };
+            item.serviceLabel = string.Join("；", cares.Select(c => CoveredServiceLabel(item, c)).Distinct());
+            result.items.Add(item);
         }
         return result;
     }
 
-    private static string ServiceLabel(Care care) => care.free_wax == 1 ? "机打蜡"
-        : care.need_edge == 1 && care.need_wax == 1 ? "修刃＋热蜡" : care.need_edge == 1 ? "修刃" : "热蜡";
+    private static string CoveredServiceLabel(CareCardPreviewItem item, Care selected) =>
+        CareCardRules.ServiceMode(item) == "machine" ? "机打蜡" : ServiceLabel(CareCardRules.CoveredServices(item, selected));
+
+    private static string ServiceLabel(Care care)
+    {
+        var labels = new List<string>();
+        if (care.need_edge == 1) labels.Add("修刃");
+        if (care.need_wax == 1) labels.Add("热蜡");
+        if (care.free_wax == 1) labels.Add("机打蜡");
+        if (care.need_unwax == 1 && care.need_wax != 1) labels.Add("刮蜡");
+        if (care.need_repair == 1 || !string.IsNullOrWhiteSpace(care.repair_memo)) labels.Add("维修");
+        if (care.summer != null) labels.Add("寄存");
+        if (care.urgent == 1) labels.Add("立等");
+        return string.Join("＋", labels);
+    }
 
     private static bool SamePlan(CareCardPreviewItem a, CareCardPreviewItem b) =>
         a.productId == b.productId && a.price == b.price && a.name == b.name && a.total == b.total
         && a.projectCount == b.projectCount && a.requiresBinding == b.requiresBinding && a.serviceLabel == b.serviceLabel
         && a.careIds.OrderBy(x => x).SequenceEqual(b.careIds.OrderBy(x => x));
+
+    private static bool SameProjects(List<CareCardProject> a, List<CareCardProject> b) =>
+        a.Count == b.Count && a.OrderBy(p => p.careId).Zip(b.OrderBy(p => p.careId)).All(pair =>
+            pair.First.careId == pair.Second.careId && pair.First.need_edge == pair.Second.need_edge
+            && pair.First.need_wax == pair.Second.need_wax && pair.First.need_unwax == pair.Second.need_unwax
+            && pair.First.free_wax == pair.Second.free_wax && pair.First.edge_degree == pair.Second.edge_degree
+            && Money(pair.First.common_charge) == Money(pair.Second.common_charge)
+            && Money(pair.First.repair_charge) == Money(pair.Second.repair_charge)
+            && Money(pair.First.discount) == Money(pair.Second.discount) && pair.First.amount == pair.Second.amount);
 
     public async Task<CareCardPreview> SaveDraftAsync(CareCardSaleRequest request)
     {
@@ -275,7 +362,11 @@ IF @result < 0 THROW 51010, N'操作繁忙，请稍后重试', 1;");
         foreach (var item in preview.items)
             db.retail.Add(new Retail { order_id = retailOrder.id, product_id = item.productId, sale_price = (double)item.price,
                 deal_price = (double)item.price, order_type = "卡类销售", retail_type = "养护卡",
-                memo = JsonConvert.SerializeObject(new PendingCard { item = item }), valid = 1 });
+                memo = JsonConvert.SerializeObject(new PendingCard { item = item, projects = item.lineNo == 1 ? preview.projects : null }), valid = 1 });
+        if (preview.careAmount > 0)
+            db.retail.Add(new Retail { order_id = retailOrder.id, sale_price = (double)preview.careAmount,
+                deal_price = (double)preview.careAmount, order_type = "养护补费", retail_type = CareChargeRetailType,
+                memo = "关联养护订单 " + request.orderId + " 的卡外项目及附加费用，与卡款合并收取", valid = 1 });
         if (preview.items.Count > 0)
             ApplyProjects(preview, await db.care.AsTracking().Where(c => c.order_id == request.orderId).ToListAsync());
         await db.SaveChangesAsync(); await tx.CommitAsync();
@@ -307,7 +398,9 @@ IF @result < 0 THROW 51010, N'操作繁忙，请稍后重试', 1;");
             selections = saved.items.GroupBy(i => i.productId).Select(g => new CareCardSelection { productId = g.Key, quantity = g.Count() }).ToList() };
         var preview = await PreviewAsync(request);
         if (!preview.canCheckout) throw new InvalidOperationException(string.Join("；", preview.errors));
-        if (preview.items.Count != saved.items.Count || preview.items.Where((p, n) => !SamePlan(p, saved.items[n])).Any())
+        if (preview.amount != saved.amount || preview.careAmount != saved.careAmount
+            || saved.projects.Count > 0 && !SameProjects(preview.projects, saved.projects)
+            || preview.items.Count != saved.items.Count || preview.items.Where((p, n) => !SamePlan(p, saved.items[n])).Any())
             throw new InvalidOperationException("商品价格、权益或装备项目已变化，请重新试算并确认");
         var careOrder = await db.order.AsTracking().FirstAsync(o => o.id == orderId);
         var retailOrder = await db.order.AsTracking().FirstAsync(o => o.id == existing.id);
@@ -325,8 +418,7 @@ IF @result < 0 THROW 51010, N'操作繁忙，请稍后重试', 1;");
             care.valid = 1;
             var plan = preview.items.SingleOrDefault(i => i.careIds.Contains(care.id));
             if (plan == null) continue;
-            CareCardRules.ApplyDefaultServices(plan, care);
-            care.use_card = true; care.card_id = null; care.common_charge = 0; care.discount = 0; care.ticket_discount = 0;
+            care.use_card = true; care.card_id = null;
         }
         await db.SaveChangesAsync(); await tx.CommitAsync();
         return retailOrder.id;
@@ -347,7 +439,7 @@ IF @result < 0 THROW 51010, N'操作繁忙，请稍后重试', 1;");
             var paid = await db.orderPayment.AsNoTracking().Where(p => p.order_id == retailOrderId && p.valid == 1
                 && p.status == "支付成功" && p.is_debt == 0).ToListAsync();
             if (paid.Count == 0 || paid.Sum(p => Math.Round((decimal)p.amount, 2)) < Math.Round((decimal)order.total_amount, 2))
-                throw new InvalidOperationException("购卡款尚未收齐");
+                throw new InvalidOperationException("购卡及养护费用尚未收齐");
             var careOrder = await db.order.AsTracking().FirstAsync(o => o.id == linkedCare.id);
             var memberId = order.member_id ?? throw new InvalidOperationException("购卡订单未匹配会员");
             careOrder.member_id = memberId;
@@ -355,7 +447,10 @@ IF @result < 0 THROW 51010, N'操作繁忙，请稍后重试', 1;");
             bool verified = OrderVerifiedRules.ResolveOnPaid(careOrder.wechat_unverified || order.wechat_unverified,
                 memberId, memberId, payment.pay_method, payment.is_proxy_pay, payment.member_id);
             order.wechat_unverified = careOrder.wechat_unverified = verified;
-            var rows = await db.retail.AsTracking().Where(r => r.order_id == order.id && r.valid == 1).ToListAsync();
+            var allRows = await db.retail.AsTracking().Where(r => r.order_id == order.id && r.valid == 1).ToListAsync();
+            if (allRows.Sum(r => Money(r.deal_price)) != Money(order.total_amount))
+                throw new InvalidOperationException("购卡及养护收费明细与订单合计不一致，请联系管理员核对");
+            var rows = allRows.Where(r => r.retail_type != CareChargeRetailType).ToList();
             var plans = rows.ToDictionary(r => r.id, ReadPlan);
             if (rows.Count == 0) throw new InvalidOperationException("购卡销售明细为空");
             await RetailCardService.GrantAsync(db, order, plans);
@@ -402,7 +497,7 @@ IF @result < 0 THROW 51010, N'操作繁忙，请稍后重试', 1;");
         if (order.closed != 0 || order.dealed != 0) return "购卡订单已支付或已关闭";
         double alreadyPaid = await db.orderPayment.Where(p => p.order_id == order.id && p.valid == 1 && p.status == "支付成功" && p.is_debt == 0).SumAsync(p => p.amount);
         if (Math.Round(alreadyPaid, 2) >= Math.Round(order.total_amount, 2)) return "购卡款已收到，正在处理发卡核销，请勿重复收款";
-        if (amount != null && Math.Round(amount.Value, 2) != Math.Round(order.total_amount, 2)) return "购卡须一次付清全部卡款";
+        if (amount != null && Math.Round(amount.Value, 2) != Math.Round(order.total_amount, 2)) return "购卡及养护费用须一次付清";
         if (method == "储值支付" || method == "挂账") return "购卡暂不支持储值或挂账";
         if (!care.wechat_unverified && (method != "微信支付" || (checkPayer && payerId != care.member_id)))
             return "请先核验顾客本人，或由订单会员本人微信支付";

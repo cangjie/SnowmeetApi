@@ -6,4 +6,6 @@ public class CareCardSaleInfo
     public int careOrderId { get; set; }
     public int? retailOrderId { get; set; }
     public bool completed { get; set; }
+    public decimal cardAmount { get; set; }
+    public decimal careAmount { get; set; }
 }

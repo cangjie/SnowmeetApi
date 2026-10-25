@@ -14,16 +14,12 @@ public static class CareCardRules
     public static void ApplyDefaultServices(CareCardPreviewItem card, Care care, bool reset = false)
     {
         string mode = ServiceMode(card);
-        bool empty = care.need_edge != 1 && care.need_wax != 1 && care.free_wax != 1;
-        if (mode == "machine") { care.free_wax = 1; care.need_edge = care.need_wax = care.need_unwax = 0; }
-        else if (mode == "wax") { care.need_wax = care.need_unwax = 1; care.need_edge = care.free_wax = 0; }
-        else if (mode == "dual" && (reset || empty))
-        { care.need_edge = care.need_wax = care.need_unwax = 1; care.free_wax = 0; }
-        else if (mode == "single")
+        // 只在选卡/新增装备时给默认项目，后续选择完整保留，卡外项目另行计费。
+        if (reset && care.summer == null && !care.warranty && !care.entertain)
         {
-            // 双项不能沿用到单项卡；保留已明确选择的修刃或热蜡。
-            if (care.need_edge == care.need_wax || care.free_wax == 1) care.need_edge = care.need_wax = 0;
-            care.free_wax = 0; care.need_unwax = care.need_wax;
+            if (mode == "machine") { care.free_wax = 1; care.need_edge = care.need_wax = care.need_unwax = 0; }
+            else if (mode == "wax") { care.need_wax = care.need_unwax = 1; care.need_edge = care.free_wax = 0; }
+            else if (mode == "dual") { care.need_edge = care.need_wax = care.need_unwax = 1; care.free_wax = 0; }
         }
         if (care.need_edge != 1) care.edge_degree = null;
         else if (string.IsNullOrWhiteSpace(care.edge_degree)) care.edge_degree = "89";
@@ -35,7 +31,9 @@ public static class CareCardRules
             need_repair = original.need_repair, repair_charge = original.repair_charge,
             warranty = original.warranty, entertain = original.entertain,
             need_edge = original.need_edge, edge_degree = original.edge_degree,
-            need_wax = original.need_wax, free_wax = original.free_wax, need_unwax = original.need_unwax };
+            need_wax = original.need_wax, free_wax = original.free_wax, need_unwax = original.need_unwax,
+            urgent = original.urgent, discount = original.discount, repair_memo = original.repair_memo,
+            biz_type = original.biz_type };
         ApplyDefaultServices(card, care, reset);
         return care;
     }
@@ -45,17 +43,25 @@ public static class CareCardRules
         total == null && ((name ?? "").Contains("打蜡", StringComparison.Ordinal)
             || (name ?? "").Contains("热蜡", StringComparison.Ordinal));
 
-    public static bool Covers(CareCardPreviewItem card, Care care)
+    public static Care CoveredServices(CareCardPreviewItem card, Care selected)
     {
-        if (care.is_cancel || care.summer != null || care.need_repair == 1 || care.repair_charge != 0
-            || care.warranty || care.entertain) return false;
-        if (card.total == null && card.name.Contains("机打蜡", StringComparison.Ordinal))
-            return care.free_wax == 1 && care.need_edge == 0 && care.need_wax == 0;
-        if (card.requiresBinding)
-            return care.need_wax == 1 && care.need_edge == 0;
-        int projects = (care.need_edge == 1 ? 1 : 0) + (care.need_wax == 1 ? 1 : 0);
-        int allowed = card.projectCount ?? (card.name.Contains("双项") ? 2 : 1);
-        return projects > 0 && projects <= allowed && care.free_wax == 0;
+        var covered = new Care();
+        if (selected.is_cancel || selected.summer != null || selected.warranty || selected.entertain) return covered;
+        string mode = ServiceMode(card);
+        if (mode == "machine") { covered.free_wax = selected.free_wax; return covered; }
+        int allowed = mode == "dual" ? 2 : 1;
+        if (mode != "wax" && selected.need_edge == 1) { covered.need_edge = 1; allowed--; }
+        if (allowed > 0 && selected.need_wax == 1) covered.need_wax = covered.need_unwax = 1;
+        return covered;
+    }
+
+    public static bool HasCoveredService(CareCardPreviewItem card, Care selected)
+    {
+        if (selected.is_cancel || selected.summer != null || selected.warranty || selected.entertain) return false;
+        var covered = CoveredServices(card, selected);
+        // 机打蜡季卡升级项目沿用已有季卡加价规则，仍核销本次季卡权益。
+        return covered.need_edge == 1 || covered.need_wax == 1 || covered.free_wax == 1
+            || ServiceMode(card) == "machine" && (selected.need_edge == 1 || selected.need_wax == 1);
     }
 
     public static int RestoredPunches(int used, int restore)
