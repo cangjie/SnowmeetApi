@@ -663,7 +663,8 @@ public class CareCardSaleTests
         var care = await f.Db.care.SingleAsync(); care.repair_charge = careFee;
         await f.Db.SaveChangesAsync(); await f.Service.SaveDraftAsync(f.Request());
         var original = (await f.Db.order.FindAsync(f.OrderId))!;
-        original.order_source = null; original.sub_type = ""; original.total_amount = 0; original.paying_amount = 0;
+        original.order_source = null; original.source_order_no = null; original.sub_type = "";
+        original.total_amount = 0; original.paying_amount = 0;
         var legacy = new SnowmeetApi.Models.Order { type = "零售", sub_type = "养护购卡", shop = "测试店",
             member_id = 10, staff_id = 28, valid = 0, recepting = 1, wechat_unverified = true,
             order_source = CareCardSaleService.OrderSource, source_order_no = f.OrderId.ToString(),
@@ -762,6 +763,56 @@ public class CareCardSaleTests
         Assert.Equal(0, (await f.Db.ticket.SingleAsync()).used);
     }
 
+    [Fact]
+    public async Task SingleOrderSetsAndClearsBothSourceFieldsUnderProductionPairConstraint()
+    {
+        await using var f = await Fixture.Create(1);
+        await Assert.ThrowsAsync<SqliteException>(() => f.Db.Database.ExecuteSqlInterpolatedAsync(
+            $"UPDATE \"order\" SET order_source={CareCardSaleService.SingleOrderSource} WHERE id={f.OrderId}"));
+        await f.Service.SaveDraftAsync(f.Request());
+        await f.Service.SaveDraftAsync(f.Request());
+        var order = await f.Db.order.SingleAsync();
+        Assert.Equal(CareCardSaleService.SingleOrderSource, order.order_source);
+        Assert.Equal(f.OrderId.ToString(), order.source_order_no);
+        Assert.Single(await f.Db.retail.ToListAsync());
+        await f.Service.SaveDraftAsync(new() { orderId = f.OrderId });
+        Assert.Null(order.order_source); Assert.Null(order.source_order_no);
+        Assert.Empty(await f.Db.retail.ToListAsync());
+        await f.Service.SaveDraftAsync(f.Request());
+        Assert.Equal(f.OrderId, await f.Service.SubmitAsync(f.OrderId, 28));
+        Assert.Single(await f.Db.order.ToListAsync());
+    }
+
+    [Fact]
+    public async Task SavingNewCardClearsEveryOldTicketAndMemberCard_OnlyNewCardIsUsedAfterPayment()
+    {
+        await using var f = await Fixture.Create(2);
+        f.Db.ticketTemplate.Add(new TicketTemplate { id = 12, biz_type = "养护", type = "养护券",
+            name = "老券", memo = "", miniapp_recept_path = "" });
+        f.Db.ticket.Add(new Ticket { code = "PREVIOUS", name = "老券", template_id = 12,
+            member_id = 10, open_id = "customer-openid", valid = 1, is_active = 1 });
+        f.Db.punchCard.Add(new PunchCard { id = 501, member_id = 10, biz_type = "养护", card_name = "旧会员卡",
+            total = 10, punches = 0, care_project_count = 2 });
+        var cares = await f.Db.care.OrderBy(c => c.id).ToListAsync();
+        cares[0].ticket_code = "PREVIOUS"; cares[0].ticket_discount = 30;
+        cares[1].use_card = true; cares[1].card_id = 501; cares[1].card_name = "旧会员卡";
+        await f.Db.SaveChangesAsync();
+        await f.Service.SaveDraftAsync(f.Request());
+        Assert.All(await f.Db.care.ToListAsync(), c =>
+        {
+            Assert.Null(c.ticket_code); Assert.Equal(0, c.ticket_discount);
+            Assert.False(c.use_card); Assert.Null(c.card_id); Assert.Null(c.card_name);
+        });
+        int id = await f.Service.SubmitAsync(f.OrderId, 28);
+        await f.Pay(id); await f.Service.CompletePaidAsync(id, f.PaymentId);
+        Assert.Single(await f.Db.order.ToListAsync()); Assert.Single(await f.Db.retail.ToListAsync());
+        Assert.Equal(0, (await f.Db.punchCard.FirstAsync(c => c.id == 501)).punches);
+        Assert.Equal(0, (await f.Db.ticket.SingleAsync()).used);
+        Assert.All(await f.Db.punchCardUsed.ToListAsync(), u => Assert.NotEqual(501, u.card_id));
+        var newCardId = (await f.Db.retail.SingleAsync()).punch_card_id;
+        Assert.All(await f.Db.care.ToListAsync(), c => Assert.Equal(newCardId, c.card_id));
+    }
+
     private static async Task AddCarePrices(Fixture f)
     {
         f.Db.shop.Add(new Shop { id = 1, name = "测试店", code = "TEST", beacon_mac = "", beacon_uuid = "" });
@@ -805,6 +856,15 @@ public class CareCardSaleTests
             await connection.OpenAsync();
             var db = new ApplicationDBContext(new DbContextOptionsBuilder<ApplicationDBContext>().UseSqlite(connection).Options);
             await db.Database.EnsureCreatedAsync();
+            // SQLite EnsureCreated 不带生产现有 CHECK，显式复现其成对字段要求。
+            await db.Database.ExecuteSqlRawAsync("""
+                CREATE TRIGGER CK_order_source_pair_insert BEFORE INSERT ON "order"
+                WHEN (NEW.order_source IS NULL) <> (NEW.source_order_no IS NULL)
+                BEGIN SELECT RAISE(ABORT, 'CK_order_source_pair'); END;
+                CREATE TRIGGER CK_order_source_pair_update BEFORE UPDATE ON "order"
+                WHEN (NEW.order_source IS NULL) <> (NEW.source_order_no IS NULL)
+                BEGIN SELECT RAISE(ABORT, 'CK_order_source_pair'); END;
+                """);
             var f = new Fixture(connection, db);
             db.member.Add(new Member { id = 10, real_name = "顾客", gender = "男" });
             db.Set<Staff>().Add(new Staff { id = 28, title_level = 300, valid = 1 });

@@ -380,6 +380,8 @@ IF @result < 0 THROW 51010, N'操作繁忙，请稍后重试', 1;");
             retailOrder.order_source = SingleOrderSource;
             retailOrder.sub_type = "养护购卡";
         }
+        // 生产 CK_order_source_pair 要求来源两列成对；单订单用自己的 ID 作来源标识。
+        if (IsSingleOrder(retailOrder)) retailOrder.source_order_no = careOrder.id.ToString();
         retailOrder.shop = careOrder.shop; retailOrder.member_id = careOrder.member_id;
         retailOrder.staff_id = careOrder.staff_id; retailOrder.is_test = careOrder.is_test;
         retailOrder.name = careOrder.name; retailOrder.gender = careOrder.gender; retailOrder.cell = careOrder.cell;
@@ -403,6 +405,7 @@ IF @result < 0 THROW 51010, N'操作繁忙，请稍后重试', 1;");
         else if (IsSingleOrder(retailOrder))
         {
             retailOrder.order_source = null;
+            retailOrder.source_order_no = null;
             retailOrder.sub_type = "";
         }
         await db.SaveChangesAsync(); await tx.CommitAsync();
