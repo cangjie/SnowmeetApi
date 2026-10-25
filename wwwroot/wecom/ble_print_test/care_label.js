@@ -130,7 +130,7 @@ var CareLabel = (function () {
     command.setText(20, 20 + 40 + 40 + 55 + 55 + 55 + 50, font, 0, 1, 1, priceStr);
     command.setText(20, 350, font, 0, 1, 1, '取板 ' + pickDateTitle + ' ' + pickDateStr);
     command.setText(300, 350, font, 0, 1, 1, '订单日期：' + orderDateStr);
-    var qrCodeText = 'https://mini.snowmeet.top/mapp/admin/care/care_order_detail/care_order_detail?orderId=' + order.id.toString() + '&careId=' + care.id.toString();
+    var qrCodeText = 'https://mini.snowmeet.top/mapp/admin/care/care_order_detail?orderId=' + order.id.toString() + '&careId=' + care.id.toString();
     command.setQrcode(360, 20 + 40 + 65 + 25, 'L', 4, 'M', qrCodeText);
     command.setPrint(copies);
     return command.getData();
