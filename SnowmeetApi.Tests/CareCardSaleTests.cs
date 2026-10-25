@@ -959,6 +959,265 @@ public class CareCardSaleTests
         }
     }
 
+    [Fact]
+    public async Task CancelNowReturns17Only() => await AssertSummerCancellation("now", 17, 18);
+
+    [Fact]
+    public async Task CancelLaterReturns18Only() => await AssertSummerCancellation("later", 18, 17);
+
+    private static async Task AssertSummerCancellation(string mode, int consumed, int other)
+    {
+        await using var f = await Fixture.Create(1);
+        var (careId, taskId) = await PrepareCouponCancellation(f, mode);
+        AddCancellationTicket(f, "CONSUMED", consumed, careId);
+        AddCancellationTicket(f, "OTHER", other, careId, used: 0);
+        await f.Db.SaveChangesAsync();
+        await CancelInNewContext(f, taskId);
+        await using var read = f.NewContext();
+        await AssertReturnedCoupon(read, "CONSUMED", careId, f.OrderId);
+        Assert.Equal(0, (await read.ticket.SingleAsync(t => t.code == "OTHER")).used);
+        Assert.Single(await read.coreDataModLog.Where(l => l.table_name == "ticket").ToListAsync());
+        Assert.Empty(await read.ticketLog.ToListAsync());
+    }
+
+    [Fact]
+    public async Task CancelReturnsSelectedOrdinaryTicket()
+    {
+        await using var f = await Fixture.Create(1);
+        var (careId, taskId) = await PrepareCouponCancellation(f, selected: "SELECTED");
+        AddCancellationTicket(f, "SELECTED", 12, careId, sourceOrder: 991);
+        f.Db.discount.Add(new Discount { order_id = f.OrderId, biz_type = "养护", biz_id = careId,
+            ticket_code = "SELECTED", amount = 30, valid = 1 });
+        await f.Db.SaveChangesAsync();
+        await CancelInNewContext(f, taskId);
+        await using var read = f.NewContext();
+        await AssertReturnedCoupon(read, "SELECTED", careId, f.OrderId);
+        var order = await read.order.SingleAsync();
+        Assert.Equal(330, order.total_amount); Assert.Equal(1, order.dealed);
+        Assert.Equal(330, (await read.orderPayment.SingleAsync()).amount);
+        Assert.Equal("支付成功", (await read.orderPayment.SingleAsync()).status);
+        Assert.Equal(30, (await read.discount.SingleAsync()).amount);
+        Assert.Equal(991, (await read.ticket.SingleAsync()).order_id);
+    }
+
+    [Theory]
+    [InlineData("now", 17)]
+    [InlineData("later", 18)]
+    public async Task CancelReturnsSelectedExistingSummerTicket(string mode, int template)
+    {
+        await using var f = await Fixture.Create(1);
+        var (careId, taskId) = await PrepareCouponCancellation(f, mode, "SELECTED");
+        AddCancellationTicket(f, "SELECTED", template, careId, sourceOrder: 991);
+        await f.Db.SaveChangesAsync(); await CancelInNewContext(f, taskId);
+        await using var read = f.NewContext();
+        await AssertReturnedCoupon(read, "SELECTED", careId, f.OrderId);
+    }
+
+    [Fact]
+    public async Task CancelDoesNotReturnOtherEquipmentTicket()
+    {
+        await using var f = await Fixture.Create(2);
+        var (careId, taskId) = await PrepareCouponCancellation(f, "now", "REUSED");
+        int otherCare = await f.Db.care.Where(c => c.id != careId).Select(c => c.id).SingleAsync();
+        AddCancellationTicket(f, "OWN", 17, careId);
+        AddCancellationTicket(f, "REUSED", 17, otherCare);
+        AddCancellationTicket(f, "OTHER-EQUIPMENT", 18, otherCare);
+        await f.Db.SaveChangesAsync(); await CancelInNewContext(f, taskId);
+        await using var read = f.NewContext();
+        await AssertReturnedCoupon(read, "OWN", careId, f.OrderId);
+        Assert.All(await read.ticket.Where(t => t.code != "OWN").ToListAsync(), t => Assert.Equal(1, t.used));
+    }
+
+    [Fact]
+    public async Task CancelDoesNotReturnCompletionGift()
+    {
+        await using var f = await Fixture.Create(1);
+        var (careId, taskId) = await PrepareCouponCancellation(f, "now");
+        AddCancellationTicket(f, "OWN", 17, careId);
+        AddCancellationTicket(f, "COMPLETION-GIFT", 16, careId);
+        await f.Db.SaveChangesAsync(); await CancelInNewContext(f, taskId);
+        await using var read = f.NewContext();
+        await AssertReturnedCoupon(read, "OWN", careId, f.OrderId);
+        Assert.Equal(1, (await read.ticket.SingleAsync(t => t.code == "COMPLETION-GIFT")).used);
+    }
+
+    [Fact]
+    public async Task RepeatedCancelDoesNotWriteAgain()
+    {
+        await using var f = await Fixture.Create(1);
+        var (careId, taskId) = await PrepareCouponCancellation(f, selected: "OWN", withCard: true);
+        AddCancellationTicket(f, "OWN", 12, careId);
+        await f.Db.SaveChangesAsync(); await CancelInNewContext(f, taskId);
+        await using var read = f.NewContext();
+        var before = await CancellationSnapshot(read, careId, taskId);
+        await CancelInNewContext(f, taskId, "另一个取消原因");
+        Assert.Equal(before, await CancellationSnapshot(read, careId, taskId));
+    }
+
+    [Fact]
+    public async Task RepeatedCancelAfterLegacyUseKeepsNewUse()
+    {
+        await using var f = await Fixture.Create(1);
+        var (careId, taskId) = await PrepareCouponCancellation(f, selected: "OWN");
+        AddCancellationTicket(f, "OWN", 12, careId);
+        await f.Db.SaveChangesAsync(); await CancelInNewContext(f, taskId);
+        await using (var use = f.NewContext())
+        {
+            var ticket = await use.ticket.AsTracking().SingleAsync();
+            Assert.Equal(0, ticket.used); // 先证明首次取消已退券。
+            ticket.used = 1; ticket.used_time = new DateTime(2026, 10, 25, 18, 0, 0);
+            await use.SaveChangesAsync(); // 模拟旧接口：不改 biz_id。
+        }
+        await using var read = f.NewContext();
+        var before = await CancellationSnapshot(read, careId, taskId);
+        await CancelInNewContext(f, taskId, "旧取消请求重试");
+        Assert.Equal(before, await CancellationSnapshot(read, careId, taskId));
+        Assert.Equal(1, (await read.ticket.SingleAsync()).used);
+    }
+
+    [Theory]
+    [InlineData("now", 17, 18)]
+    [InlineData("later", 18, 17)]
+    public async Task CancelDoesNotReturnOppositeSummerTicketUsedElsewhere(string mode, int consumed, int other)
+    {
+        await using var f = await Fixture.Create(1);
+        var (careId, taskId) = await PrepareCouponCancellation(f, mode);
+        AddCancellationTicket(f, "OWN", consumed, careId);
+        AddCancellationTicket(f, "OTHER-USED", other, careId);
+        await f.Db.SaveChangesAsync(); await CancelInNewContext(f, taskId);
+        await using var read = f.NewContext();
+        await AssertReturnedCoupon(read, "OWN", careId, f.OrderId);
+        var otherTicket = await read.ticket.SingleAsync(t => t.code == "OTHER-USED");
+        Assert.Equal(1, otherTicket.used); Assert.Equal(CancellationUseTime, otherTicket.used_time);
+    }
+
+    [Fact]
+    public async Task NormalFinishDoesNotReturnTickets()
+    {
+        await using var f = await Fixture.Create(1);
+        var (careId, taskId) = await PrepareCouponCancellation(f, selected: "OWN", withCard: true);
+        AddCancellationTicket(f, "OWN", 12, careId);
+        await f.Db.SaveChangesAsync();
+        await using (var db = f.NewContext())
+            await new CareController(db, f.Config, f.Http).SetTaskStatus(taskId, "已完成", "正常发板", "staff-session");
+        await using var read = f.NewContext();
+        Assert.Equal(1, (await read.ticket.SingleAsync(t => t.code == "OWN")).used);
+        Assert.Equal(1, (await read.punchCard.SingleAsync()).punches);
+        Assert.True((await read.punchCardUsed.SingleAsync()).valid);
+        Assert.False((await read.care.SingleAsync()).is_cancel);
+        Assert.Empty(await read.coreDataModLog.Where(l => l.table_name == "ticket").ToListAsync());
+    }
+
+    [Fact]
+    public async Task CancelPersistsWithNoTrackingContext()
+    {
+        await using var f = await Fixture.Create(1);
+        var (careId, taskId) = await PrepareCouponCancellation(f, selected: "OWN", withCard: true);
+        AddCancellationTicket(f, "OWN", 12, careId);
+        await f.Db.SaveChangesAsync(); await CancelInNewContext(f, taskId);
+        await using var read = f.NewContext();
+        await AssertReturnedCoupon(read, "OWN", careId, f.OrderId);
+        Assert.True((await read.care.SingleAsync()).is_cancel);
+        Assert.Equal("测试取消原因", (await read.care.SingleAsync()).cancel_reason);
+        Assert.Equal("已完成", (await read.careTask.SingleAsync()).status);
+        Assert.Equal(0, (await read.punchCard.SingleAsync()).punches);
+        Assert.False((await read.punchCardUsed.SingleAsync()).valid);
+        Assert.Single(await read.coreDataModLog.Where(l => l.scene == "取消养护返次").ToListAsync());
+    }
+
+    [Fact]
+    public async Task CancelSaveFailureRollsBackAllChanges()
+    {
+        await using var f = await Fixture.Create(1);
+        var (careId, taskId) = await PrepareCouponCancellation(f, selected: "OWN", withCard: true);
+        AddCancellationTicket(f, "OWN", 12, careId); await f.Db.SaveChangesAsync();
+        await using var db = f.NewContext();
+        await db.Database.ExecuteSqlRawAsync("CREATE TRIGGER fail_cancel_audit BEFORE INSERT ON core_data_mod_log WHEN NEW.table_name = 'care' AND NEW.field_name = 'is_cancel' BEGIN SELECT RAISE(ABORT, 'injected cancellation audit failure'); END;");
+        await Assert.ThrowsAsync<DbUpdateException>(() => new CareController(db, f.Config, f.Http)
+            .SetTaskStatus(taskId, "已完成", "取消养护", "staff-session", isCancel: true, cancelReason: "测试取消原因"));
+        await using var read = f.NewContext();
+        var original = await CancellationSnapshot(read, careId, taskId);
+        Assert.False((await read.care.SingleAsync()).is_cancel);
+        Assert.Equal(1, (await read.ticket.SingleAsync()).used);
+        Assert.Equal(1, (await read.punchCard.SingleAsync()).punches);
+        Assert.True((await read.punchCardUsed.SingleAsync()).valid);
+        Assert.Equal("未开始", (await read.careTask.SingleAsync()).status);
+        Assert.Empty(await read.coreDataModLog.ToListAsync());
+        await db.Database.ExecuteSqlRawAsync("DROP TRIGGER fail_cancel_audit;");
+        db.coreDataModLog.Add(CoreDataModLog.CreateManualLog("order", "error", f.OrderId, "错误日志", null, null, null, null, "取消失败"));
+        await db.SaveChangesAsync();
+        Assert.Equal(original, await CancellationSnapshot(read, careId, taskId));
+        await CancelInNewContext(f, taskId);
+        await AssertReturnedCoupon(read, "OWN", careId, f.OrderId);
+        Assert.Equal(0, (await read.punchCard.SingleAsync()).punches);
+        Assert.Single(await read.coreDataModLog.Where(l => l.table_name == "ticket").ToListAsync());
+    }
+
+    private static readonly DateTime CancellationUseTime = new(2026, 10, 25, 12, 0, 0);
+
+    private static async Task<(int CareId, int TaskId)> PrepareCouponCancellation(Fixture f,
+        string? mode = null, string? selected = null, bool withCard = false)
+    {
+        var order = (await f.Db.order.FindAsync(f.OrderId))!;
+        order.valid = 1; order.dealed = 1; order.recepting = 0; order.total_amount = 330;
+        order.code = "TEST_YH_261025_00001";
+        var care = await f.Db.care.OrderBy(c => c.id).FirstAsync();
+        care.valid = 1; care.task_flow_code = "TEST-261025-001";
+        care.biz_type = mode == null ? "雪季养护" : "非雪季养护";
+        care.summer = mode; care.ticket_code = selected;
+        var task = new CareTask { care_id = care.id, task_name = "发板", sort = 60 };
+        f.Db.careTask.Add(task);
+        f.Db.orderPayment.Add(new OrderPayment { order_id = order.id, amount = 330, pay_method = "微信支付", status = "支付成功", member_id = 10, valid = 1 });
+        if (withCard)
+        {
+            f.Db.punchCard.Add(new PunchCard { id = 501, member_id = 10, biz_type = "养护", card_name = "测试次卡", total = 10, punches = 1 });
+            f.Db.punchCardUsed.Add(new PunchCardUsed { card_id = 501, order_id = order.id, biz_type = "养护", biz_id = care.id, punch_count = 1 });
+        }
+        await f.Db.SaveChangesAsync();
+        return (care.id, task.id);
+    }
+
+    private static void AddCancellationTicket(Fixture f, string code, int template, int careId, int used = 1, int? sourceOrder = null)
+        => f.Db.ticket.Add(new Ticket { code = code, name = "测试券", open_id = "customer-openid", member_id = 10,
+            template_id = template, valid = 1, is_active = 1, used = used, used_time = used == 1 ? CancellationUseTime : null,
+            biz_type = "养护", biz_id = careId, order_id = sourceOrder ?? f.OrderId,
+            start_date = new DateTime(2026, 10, 1), expire_date = new DateTime(2027, 1, 1) });
+
+    private static async Task CancelInNewContext(Fixture f, int taskId, string reason = "测试取消原因")
+    {
+        await using var db = f.NewContext();
+        var response = await new CareController(db, f.Config, f.Http)
+            .SetTaskStatus(taskId, "已完成", "取消养护", "staff-session", isCancel: true, cancelReason: reason);
+        var result = Assert.IsType<ApiResult<Care>>(Assert.IsType<OkObjectResult>(response.Result).Value);
+        Assert.Equal(0, result.code); Assert.True(result.data!.is_cancel);
+    }
+
+    private static async Task AssertReturnedCoupon(ApplicationDBContext db, string code, int careId, int orderId)
+    {
+        var ticket = await db.ticket.SingleAsync(t => t.code == code);
+        Assert.Equal(0, ticket.used); Assert.Null(ticket.used_time);
+        Assert.Equal(new DateTime(2027, 1, 1), ticket.expire_date); Assert.Equal(1, ticket.valid); Assert.Equal(1, ticket.is_active);
+        Assert.Equal(10, ticket.member_id); Assert.Equal(careId, ticket.biz_id);
+        var log = Assert.Single(await db.coreDataModLog.Where(l => l.table_name == "ticket" && l.manual_memo!.Contains(code)).ToListAsync());
+        Assert.Equal("used", log.field_name); Assert.Equal(0, log.key_value);
+        Assert.Equal("1", log.prev_value); Assert.Equal("0", log.current_value);
+        Assert.Equal(10, log.member_id); Assert.Equal(28, log.staff_id);
+        Assert.Contains("care=" + careId, log.manual_memo); Assert.Contains("order=" + orderId, log.manual_memo);
+        Assert.Contains("2026-10-25 12:00:00", log.manual_memo); Assert.Contains("测试取消原因", log.manual_memo);
+    }
+
+    private static async Task<string> CancellationSnapshot(ApplicationDBContext db, int careId, int taskId)
+        => System.Text.Json.JsonSerializer.Serialize(new
+        {
+            care = await db.care.Where(c => c.id == careId).Select(c => new { c.is_cancel, c.cancel_reason, c.update_date }).SingleAsync(),
+            task = await db.careTask.Where(t => t.id == taskId).Select(t => new { t.status, t.memo, t.update_date, t.end_time, t.staff_id }).SingleAsync(),
+            tickets = await db.ticket.OrderBy(t => t.code).Select(t => new { t.code, t.used, t.used_time }).ToListAsync(),
+            cards = await db.punchCard.OrderBy(c => c.id).Select(c => new { c.id, c.punches, c.update_date }).ToListAsync(),
+            usages = await db.punchCardUsed.OrderBy(u => u.id).Select(u => new { u.id, u.valid, u.update_date }).ToListAsync(),
+            logs = await db.coreDataModLog.Where(l => l.field_name != "error").OrderBy(l => l.id)
+                .Select(l => new { l.id, l.table_name, l.field_name, l.prev_value, l.current_value, l.manual_memo }).ToListAsync()
+        });
+
     private static async Task PreparePhoneReception(Fixture f, bool authorized)
     {
         var order = (await f.Db.order.FindAsync(f.OrderId))!; order.wechat_unverified = false;

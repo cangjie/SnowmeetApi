@@ -1155,75 +1155,99 @@ namespace SnowmeetApi.Controllers
                 where t.id == taskId && t.valid == 1 select c.order_id).FirstOrDefaultAsync();
             await using var cancelTransaction = isCancel && _db.Database.CurrentTransaction == null
                 ? await _db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable) : null;
-            if (isCancel) await CareCardSaleService.LockAsync(_db, "care-card-order:" + taskOrderId);
-            CareTask careTask = await _db.careTask.Where(t => t.id == taskId && t.valid == 1).AsTracking().FirstOrDefaultAsync();
-            if (careTask == null) return Ok(new ApiResult<Care?> { code = 1, message = "未找到养护任务", data = null });
-
-            CoreDataModLog log = Util.CreateCoreDataModLog("care_task", "status", taskId, careTask.status, status, null, staff.id, scene);
-            careTask.status = status;
-            switch (status)
+            CareTask? careTask = null;
+            try
             {
-                case "已开始":
-                    careTask.start_time = DateTime.Now;
-                    careTask.staff_id = staff.id;
-                    break;
-                case "已完成":
-                    careTask.end_time = DateTime.Now;
-                    careTask.staff_id = staff.id;
-                    if (careTask.task_name == "发板")
-                    {
-                        if (isCancel)
-                        {
-                            // 取消：装备未真正完成养护，跳过"养护完成赠送"券，改记 Care.is_cancel/cancel_reason
-                            Care careCancel = await _db.care.Where(c => c.id == careTask.care_id).AsTracking().FirstOrDefaultAsync();
-                            if (careCancel != null)
-                            {
-                                await CareCardSaleService.ReverseCareUseAsync(_db, careCancel, staff.id,
-                                    cancelReason == null ? "" : Util.UrlDecode(cancelReason));
-                                careCancel.is_cancel = true;
-                                careCancel.cancel_reason = cancelReason != null ? Util.UrlDecode(cancelReason) : null;
-                                careCancel.update_date = DateTime.Now;
-                                _db.care.Entry(careCancel).State = EntityState.Modified;
-                                CoreDataModLog cancelLog = CoreDataModLog.CreateManualLog("care", "is_cancel", careCancel.id,
-                                    scene, null, staff.id, "0", "1",
-                                    "取消发板" + (string.IsNullOrEmpty(careCancel.cancel_reason) ? "" : "，原因：" + careCancel.cancel_reason));
-                                await _db.coreDataModLog.AddAsync(cancelLog);
-                            }
-                        }
-                        else
-                        {
-                            try
-                            {
-                                TicketController _tHelper = new TicketController(_db, _config);
-                                Care careFinish = await _db.care.Where(c => c.id == careTask.care_id).AsNoTracking().FirstOrDefaultAsync();
-                                Models.Order order = await _db.order.Where(o => o.id == careFinish.order_id).AsNoTracking().FirstOrDefaultAsync();
-                                await _tHelper.CreateTicket(16, order.member_id, staff.id, "养护完成赠送", "养护", careFinish.id, true, DateTime.Now, null);
-                            }
-                            catch
-                            {
+                if (isCancel) await CareCardSaleService.LockAsync(_db, "care-card-order:" + taskOrderId);
+                careTask = await _db.careTask.Where(t => t.id == taskId && t.valid == 1).AsTracking().FirstOrDefaultAsync();
+                if (careTask == null) return Ok(new ApiResult<Care?> { code = 1, message = "未找到养护任务", data = null });
 
+                Care? careCancel = null;
+                if (isCancel && status == "已完成" && careTask.task_name == "发板")
+                {
+                    careCancel = await _db.care.Where(c => c.id == careTask.care_id).AsTracking().FirstOrDefaultAsync();
+                    // 券可能已退回后再次核销；必须先看养护取消标记，不能只依赖券当前的 used 值。
+                    if (careCancel?.is_cancel == true)
+                        return Ok(new ApiResult<Care> { code = 0, message = "", data = await GetCare(careTask.care_id) });
+                }
+
+                CoreDataModLog log = Util.CreateCoreDataModLog("care_task", "status", taskId, careTask.status, status, null, staff.id, scene);
+                careTask.status = status;
+                switch (status)
+                {
+                    case "已开始":
+                        careTask.start_time = DateTime.Now;
+                        careTask.staff_id = staff.id;
+                        break;
+                    case "已完成":
+                        careTask.end_time = DateTime.Now;
+                        careTask.staff_id = staff.id;
+                        if (careTask.task_name == "发板")
+                        {
+                            if (isCancel)
+                            {
+                                // 取消：装备未真正完成养护，跳过"养护完成赠送"券，改记 Care.is_cancel/cancel_reason
+                                if (careCancel != null)
+                                {
+                                    await CareCardSaleService.ReverseCareUseAsync(_db, careCancel, staff.id,
+                                        cancelReason == null ? "" : Util.UrlDecode(cancelReason));
+                                    await ReverseCareTicketsAsync(careCancel, staff.id, scene,
+                                        cancelReason == null ? "" : Util.UrlDecode(cancelReason));
+                                    careCancel.is_cancel = true;
+                                    careCancel.cancel_reason = cancelReason != null ? Util.UrlDecode(cancelReason) : null;
+                                    careCancel.update_date = DateTime.Now;
+                                    _db.care.Entry(careCancel).State = EntityState.Modified;
+                                    CoreDataModLog cancelLog = CoreDataModLog.CreateManualLog("care", "is_cancel", careCancel.id,
+                                        scene, null, staff.id, "0", "1",
+                                        "取消发板" + (string.IsNullOrEmpty(careCancel.cancel_reason) ? "" : "，原因：" + careCancel.cancel_reason));
+                                    await _db.coreDataModLog.AddAsync(cancelLog);
+                                }
+                            }
+                            else
+                            {
+                                try
+                                {
+                                    TicketController _tHelper = new TicketController(_db, _config);
+                                    Care careFinish = await _db.care.Where(c => c.id == careTask.care_id).AsNoTracking().FirstOrDefaultAsync();
+                                    Models.Order order = await _db.order.Where(o => o.id == careFinish.order_id).AsNoTracking().FirstOrDefaultAsync();
+                                    await _tHelper.CreateTicket(16, order.member_id, staff.id, "养护完成赠送", "养护", careFinish.id, true, DateTime.Now, null);
+                                }
+                                catch
+                                {
+
+                                }
                             }
                         }
-                    }
-                    break;
-                case "强行中止":
-                    careTask.end_time = DateTime.Now;
-                    careTask.terminate_staff_id = staff.id;
-                    break;
-                default:
-                    break;
+                        break;
+                    case "强行中止":
+                        careTask.end_time = DateTime.Now;
+                        careTask.terminate_staff_id = staff.id;
+                        break;
+                    default:
+                        break;
+                }
+                // taskMemo 显式传入（哪怕空串）时代表调用方要写真实备注，覆盖默认的 "memo=场景字符串" 行为；
+                // 不传（null）时保持旧语义不变——memo 记录本次状态变更的场景，供审计追溯
+                careTask.memo = taskMemo != null ? Util.UrlDecode(taskMemo) : scene;
+                careTask.update_date = DateTime.Now;
+                careTask.deal_method = dealMethod != null? Util.UrlDecode(dealMethod):null;
+                careTask.store_memo = storeMemo != null ? Util.UrlDecode(storeMemo): null;
+                await _db.coreDataModLog.AddAsync(log);
+                _db.careTask.Entry(careTask).State = EntityState.Modified;
+                await _db.SaveChangesAsync();
+
+                if (cancelTransaction != null) await cancelTransaction.CommitAsync();
             }
-            // taskMemo 显式传入（哪怕空串）时代表调用方要写真实备注，覆盖默认的 "memo=场景字符串" 行为；
-            // 不传（null）时保持旧语义不变——memo 记录本次状态变更的场景，供审计追溯
-            careTask.memo = taskMemo != null ? Util.UrlDecode(taskMemo) : scene;
-            careTask.update_date = DateTime.Now;
-            careTask.deal_method = dealMethod != null? Util.UrlDecode(dealMethod):null;
-            careTask.store_memo = storeMemo != null ? Util.UrlDecode(storeMemo): null;
-            await _db.coreDataModLog.AddAsync(log);
-            _db.careTask.Entry(careTask).State = EntityState.Modified;
-            await _db.SaveChangesAsync();
-
-            if (cancelTransaction != null) await cancelTransaction.CommitAsync();
+            catch
+            {
+                if (cancelTransaction != null)
+                {
+                    await cancelTransaction.RollbackAsync();
+                    // 调用方可能继续保存错误日志，不能把已回滚的退券、返次和取消状态重新写入。
+                    _db.ChangeTracker.Clear();
+                }
+                throw;
+            }
             Care care = await GetCare(careTask.care_id);
             //非雪季养护打蜡完成，下一步应该是快递和寄存步骤的开始
             if (care.biz_type == "非雪季养护" && careTask.task_name == "热蜡" && careTask.status == "已完成")
@@ -1246,6 +1270,26 @@ namespace SnowmeetApi.Controllers
                 data = care
             });
         }
+        private async Task ReverseCareTicketsAsync(Care care, int staffId, string scene, string reason)
+        {
+            int? generatedTemplate = care.biz_type == "非雪季养护" && care.order_id != null
+                ? care.summer switch { "now" => 17, "later" => 18, _ => (int?)null }
+                : null;
+            string? selectedCode = string.IsNullOrWhiteSpace(care.ticket_code) ? null : care.ticket_code;
+            var tickets = await _db.ticket.AsTracking().Where(t => t.used == 1 && t.biz_type == "养护" && t.biz_id == care.id
+                && ((selectedCode != null && t.code == selectedCode)
+                    || (generatedTemplate != null && t.template_id == generatedTemplate && t.order_id == care.order_id)))
+                .ToListAsync();
+            foreach (var ticket in tickets)
+            {
+                string previousUse = ticket.used_time?.ToString("yyyy-MM-dd HH:mm:ss") ?? "未记录";
+                ticket.used = 0;
+                ticket.used_time = null;
+                _db.coreDataModLog.Add(CoreDataModLog.CreateManualLog("ticket", "used", 0, scene, ticket.member_id, staffId,
+                    "1", "0", $"取消养护退券；code={ticket.code}；order={care.order_id}；care={care.id}；原使用时间={previousUse}；原因={reason}"));
+            }
+        }
+
         [HttpGet("{careId}")]
         public async Task<ActionResult<ApiResult<Care?>>> CreateVerifyCode(int careId,
             string sessionKey, string sessionType = "wechat_mini_openid")
