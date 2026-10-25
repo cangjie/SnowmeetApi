@@ -813,6 +813,30 @@ public class CareCardSaleTests
         Assert.All(await f.Db.care.ToListAsync(), c => Assert.Equal(newCardId, c.card_id));
     }
 
+    [Fact]
+    public async Task OneCentSingleCardAndWanlongDoubleServiceShowSixtyYuanPackageDifference_AndRecalculateAfterProjectChanges()
+    {
+        await using var f = await Fixture.Create(1, "测试");
+        await AddCarePrices(f);
+        var card = await f.Db.product.FirstAsync(p => p.id == 101); card.sale_price = 0.01; card.care_project_count = 1;
+        (await f.Db.product.FirstAsync(p => p.id == 201)).sale_price = 170;
+        (await f.Db.product.FirstAsync(p => p.id == 202)).sale_price = 230;
+        await f.Db.SaveChangesAsync();
+        var doubleService = await f.Service.SaveDraftAsync(f.Request());
+        Assert.Equal(60.01m, doubleService.amount);
+        Assert.Equal(230m, doubleService.projects.Single().serviceAmount);
+        Assert.Equal(170m, doubleService.projects.Single().cardCoveredAmount);
+        Assert.Equal(60, doubleService.projects.Single().common_charge);
+        var care = await f.Db.care.SingleAsync(); care.need_wax = 0; care.need_unwax = 0;
+        await f.Db.SaveChangesAsync();
+        Assert.Equal(0.01m, (await f.Service.SaveDraftAsync(f.Request())).amount);
+        care.need_wax = 1; care.need_unwax = 1; care.repair_charge = 0.01;
+        await f.Db.SaveChangesAsync();
+        Assert.Equal(60.02m, (await f.Service.SaveDraftAsync(f.Request())).amount);
+        care.discount = 10; await f.Db.SaveChangesAsync();
+        Assert.Equal(50.02m, (await f.Service.SaveDraftAsync(f.Request())).amount);
+    }
+
     private static async Task AddCarePrices(Fixture f)
     {
         f.Db.shop.Add(new Shop { id = 1, name = "测试店", code = "TEST", beacon_mac = "", beacon_uuid = "" });

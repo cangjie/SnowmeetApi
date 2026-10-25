@@ -53,6 +53,8 @@ public class CareCardProject
     public double repair_charge { get; set; }
     public double discount { get; set; }
     public decimal amount { get; set; }
+    public decimal serviceAmount { get; set; }
+    public decimal cardCoveredAmount { get; set; }
 }
 
 public class CareCardPreview
@@ -197,7 +199,8 @@ IF @result < 0 THROW 51010, N'操作繁忙，请稍后重试', 1;");
             if (plan.need_edge != 1 && plan.need_wax != 1 && plan.free_wax != 1 && plan.need_unwax != 1
                 && plan.need_repair != 1 && string.IsNullOrWhiteSpace(plan.repair_memo) && plan.repair_charge == 0 && plan.summer == null)
                 result.errors.Add("第" + (cares.IndexOf(care) + 1) + "件装备请选择养护项目");
-            double commonCharge = await ExtraServiceChargeAsync(helper, order.shop, first, plan, usesCard);
+            var pricing = await ExtraServiceChargeAsync(helper, order.shop, first, plan, usesCard);
+            double commonCharge = pricing.charge;
             double discount = care.discount;
             if (!string.IsNullOrWhiteSpace(care.ticket_code))
             {
@@ -217,7 +220,8 @@ IF @result < 0 THROW 51010, N'操作繁忙，请稍后重试', 1;");
             result.projects.Add(new CareCardProject { careId = care.id, need_edge = plan.need_edge,
                 need_wax = plan.need_wax, need_unwax = plan.need_unwax, free_wax = plan.free_wax,
                 edge_degree = plan.edge_degree, common_charge = commonCharge, repair_charge = care.repair_charge,
-                discount = discount, amount = amount });
+                discount = discount, amount = amount, serviceAmount = pricing.serviceAmount,
+                cardCoveredAmount = pricing.coveredAmount });
         }
         foreach (var item in result.items)
             item.serviceLabel = string.Join("；", cares.Where(c => item.careIds.Contains(c.id)).Select(c =>
@@ -235,31 +239,35 @@ IF @result < 0 THROW 51010, N'操作繁忙，请稍后重试', 1;");
 
     private static decimal Money(double value) => Math.Round((decimal)value, 2, MidpointRounding.AwayFromZero);
 
-    private static async Task<double> ExtraServiceChargeAsync(CareController helper, string shop,
+    private static async Task<(double charge, decimal serviceAmount, decimal coveredAmount)> ExtraServiceChargeAsync(CareController helper, string shop,
         CareCardPreviewItem card, Care selected, bool usesCard)
     {
-        if (selected.warranty || selected.entertain) return 0;
+        if (selected.warranty || selected.entertain) return (0, 0m, 0m);
         if (usesCard && CareCardRules.ServiceMode(card) == "machine")
         {
             selected.use_card = true;
             var (charge, _) = await helper.CalcCharge(shop, selected, null,
                 new PunchCard { card_name = card.name, total = null });
             selected.use_card = false;
-            if (CarePricingRules.CountChargeableItems(selected) > 0 && await helper.GetProduct(shop, selected) == null)
+            var serviceProduct = await helper.GetProduct(shop, selected);
+            if (CarePricingRules.CountChargeableItems(selected) > 0 && serviceProduct == null)
                 throw new InvalidOperationException("当前门店未配置养护价格，请核对门店");
-            return (double)Money(charge);
+            var serviceAmount = Money(serviceProduct?.sale_price ?? 0);
+            return ((double)Money(charge), serviceAmount, Math.Max(0, serviceAmount - Money(charge)));
         }
         var covered = CareCardRules.CoveredServices(card, selected);
         int selectedCount = CarePricingRules.CountChargeableItems(selected);
         int coveredCount = usesCard ? CarePricingRules.CountChargeableItems(covered) : 0;
-        if (selected.summer == null && selectedCount == coveredCount && (selected.urgent == 0 || selectedCount == 0)) return 0;
+        if (selected.summer == null && selectedCount == coveredCount && (selected.urgent == 0 || selectedCount == 0)) return (0, 0m, 0m);
         var fullPrice = await helper.GetProduct(shop, selected);
         if (fullPrice == null && CarePricingRules.ResolveProductName(selected) != "")
             throw new InvalidOperationException("当前门店未配置养护价格，请核对门店");
         var coveredPrice = coveredCount == 0 ? null : await helper.GetProduct(shop, covered);
         if (coveredCount > 0 && coveredPrice == null)
             throw new InvalidOperationException("当前门店未配置卡抵扣项目的价格，请核对门店");
-        return (double)Math.Max(0, Money(fullPrice?.sale_price ?? 0) - Money(coveredPrice?.sale_price ?? 0));
+        var fullAmount = Money(fullPrice?.sale_price ?? 0);
+        var coveredAmount = Money(coveredPrice?.sale_price ?? 0);
+        return ((double)Math.Max(0, fullAmount - coveredAmount), fullAmount, coveredAmount);
     }
 
     private static void ApplyProjects(CareCardPreview preview, IEnumerable<Care> cares)
