@@ -1750,8 +1750,23 @@ namespace SnowmeetApi.Controllers
                 });
             }
             order.shop = CarePricingRules.ResolveCareShop(order.shop);
+            // 与选卡、提交、付款共用订单锁，避免迟到的草稿保存覆盖已经提交的主订单。
+            await using var draftTransaction = order.id != 0 && _db.Database.CurrentTransaction == null
+                ? await _db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable) : null;
+            if (order.id != 0) await CareCardSaleService.LockAsync(_db, "care-card-order:" + order.id);
             if (order.id != 0 && await CareCardSaleService.IsLinkedCareAsync(_db, order.id))
                 return Ok(new ApiResult<Models.Order?> { code = 1, message = "购卡订单已提交，不能覆盖原养护草稿", data = null });
+            // 选卡快照由 CareCardSale 管理，养护草稿的旧客户端负载不能清空或覆盖零售明细。
+            order.retails = null;
+            var originalDraft = order.id == 0 ? null : await _db.order.AsNoTracking().FirstOrDefaultAsync(o => o.id == order.id);
+            if (originalDraft != null && CareCardSaleService.IsSingleOrder(originalDraft))
+            {
+                order.order_source = originalDraft.order_source;
+                order.source_order_no = originalDraft.source_order_no;
+                order.sub_type = originalDraft.sub_type;
+                order.total_amount = originalDraft.total_amount;
+                order.paying_amount = originalDraft.paying_amount;
+            }
             order.needRender = false;
             // 防级联清理（同 SaveRentRecept）：JSON 往返回来的 member/staff 子图会让 _db.Update(order)
             // 在 TrackGraph 阶段抛 Value cannot be null (key)。本接口只管 order 标量 + cares 子图，
@@ -1881,6 +1896,7 @@ namespace SnowmeetApi.Controllers
                     Console.WriteLine(ex.Message);
                 }
             }
+            if (draftTransaction != null) await draftTransaction.CommitAsync();
             return Ok(new ApiResult<Models.Order?>()
             {
                 code = 0,

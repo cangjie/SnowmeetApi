@@ -45,11 +45,12 @@ namespace SnowmeetApi.Controllers
                 return null;
             }
 
-            if (order.type == "零售")
+            if (order.type == "零售" || CareCardSaleService.IsSingleOrder(order))
             {
-                order.retails = await _db.order.Entry(order).Collection(o => o.retails).Query().Where(r => r.valid == 1).AsNoTracking().ToListAsync();
+                order.retails = await _db.order.Entry(order).Collection(o => o.retails).Query().Where(r => r.valid == 1)
+                    .Include(r => r.product).Include(r => r.punchCard).AsNoTracking().ToListAsync();
                 // 待付购卡安排是内部临时数据，普通订单详情仍只返回面向顾客的备注。
-                if (order.order_source == CareCardSaleService.OrderSource)
+                if (order.order_source == CareCardSaleService.OrderSource || CareCardSaleService.IsSingleOrder(order))
                     foreach (var retail in order.retails) retail.memo = "";
                 order.retailImages = await _db.retailImage.Include(i => i.image).Where(i => i.order_id == orderId && i.valid).AsNoTracking().ToListAsync();
             }
@@ -150,7 +151,8 @@ namespace SnowmeetApi.Controllers
                 .Include(o => o.discounts)
                 .Include(o => o.staff)
                 .Include(o => o.member).ThenInclude(m => m.memberSocialAccounts)
-                .Where(o => o.valid == 1 && o.type == "零售"
+                .Where(o => o.valid == 1 && (o.type == "零售"
+                    || (o.type == "养护" && o.order_source == CareCardSaleService.SingleOrderSource))
                     && o.biz_date.Date >= ((DateTime)startDate).Date && o.biz_date.Date <= ((DateTime)endDate).Date
                     && (shop == null || o.shop.Equals(shop.Trim()))
                     //&& (status == null || o.paymentStatus.Equals(status.Trim()))
@@ -220,7 +222,8 @@ namespace SnowmeetApi.Controllers
                     orderList = await _db.order.Where(o => (o.biz_date.Date >= ((DateTime)startDate).Date && o.biz_date.Date <= ((DateTime)endDate).Date)
                         && (memberId == null || o.member_id == memberId) && (staffId == null || o.staff_id == staffId)
                         && (payOption == null || o.pay_option.Trim().Equals(payOption.Trim()))
-                        && (shop == null || o.shop.Trim().Equals(shop.Trim())) && (type == null || o.type.Trim().Equals(type.Trim()))
+                        && (shop == null || o.shop.Trim().Equals(shop.Trim()))
+                        && (o.type == "零售" || (o.type == "养护" && o.order_source == CareCardSaleService.SingleOrderSource))
                         && o.valid == 1 && (orderId == null || o.id == orderId)
                         
                         )
@@ -804,6 +807,8 @@ namespace SnowmeetApi.Controllers
             [FromQuery] string sessionKey, [FromQuery] string sessionType = "wechat_mini_openid",
             [FromQuery] bool isTest = false)
         {
+            if (order.id != 0 && await CareCardSaleService.HasDraftAsync(_db, order.id))
+                return Ok(new ApiResult<Models.Order?> { code = 1, message = "本单包含养护购卡，请通过购卡结算入口提交", data = null });
             StaffController _staffHelper = new StaffController(_db);
             Staff staff = await _staffHelper.GetStaffBySessionKey(sessionKey, sessionType);
             MemberController _memberHelper = new MemberController(_db, _config);

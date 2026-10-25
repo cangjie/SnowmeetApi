@@ -77,17 +77,21 @@ public class CareCardSaleService
     public CareCardSaleService(ApplicationDBContext db, IConfiguration config, IHttpContextAccessor http)
     { this.db = db; this.config = config; this.http = http; }
 
-    // 复用订单来源字段定位由养护草稿创建的零售单，不增加表或列。
+    // 原两单结构继续兼容；新单直接在养护主订单下保存零售明细。
     public const string OrderSource = "care_card_reception";
+    public const string SingleOrderSource = "care_card_single";
     public const string CareChargeRetailType = "养护附加费用";
+    public static bool IsSingleOrder(Models.Order order) => order.type == "养护" && order.order_source == SingleOrderSource;
 
     public static Task<Models.Order?> GetLinkedRetailAsync(ApplicationDBContext db, int careOrderId, bool includeDraft = false) =>
-        db.order.AsNoTracking().Where(o => o.type == "零售" && o.order_source == OrderSource
-            && o.source_order_no == careOrderId.ToString() && o.closed == 0
+        db.order.AsNoTracking().Where(o => ((o.type == "零售" && o.order_source == OrderSource
+            && o.source_order_no == careOrderId.ToString())
+            || (o.id == careOrderId && o.type == "养护" && o.order_source == SingleOrderSource)) && o.closed == 0
             && (includeDraft || (o.valid == 1 && o.recepting == 0))).OrderByDescending(o => o.id).FirstOrDefaultAsync();
 
     public static Task<bool> IsLinkedRetailAsync(ApplicationDBContext db, int orderId) =>
-        db.order.AnyAsync(o => o.id == orderId && o.type == "零售" && o.order_source == OrderSource
+        db.order.AnyAsync(o => o.id == orderId && ((o.type == "零售" && o.order_source == OrderSource)
+            || (o.type == "养护" && o.order_source == SingleOrderSource))
             && o.valid == 1 && o.recepting == 0);
 
     public static async Task<bool> IsLinkedCareAsync(ApplicationDBContext db, int orderId) =>
@@ -101,6 +105,7 @@ public class CareCardSaleService
 
     public static async Task<Models.Order?> LinkedCareAsync(ApplicationDBContext db, Models.Order retail)
     {
+        if (IsSingleOrder(retail) && retail.valid == 1 && retail.recepting == 0) return retail;
         if (retail.type != "零售" || retail.order_source != OrderSource || retail.valid != 1 || retail.recepting != 0) return null;
         if (!int.TryParse(retail.source_order_no, out int careId)) throw new InvalidOperationException("购卡订单来源不完整");
         var care = await db.order.AsNoTracking().FirstOrDefaultAsync(o => o.id == careId && o.type == "养护");
@@ -113,11 +118,15 @@ public class CareCardSaleService
     {
         var retail = order.type == "养护" ? await GetLinkedRetailAsync(db, order.id)
             : order.type == "零售" && order.order_source == OrderSource && order.valid == 1 && order.recepting == 0 ? order : null;
-        if (retail == null || !int.TryParse(retail.source_order_no, out int careId)) return null;
+        if (retail == null) return null;
+        int careId;
+        if (IsSingleOrder(retail)) careId = retail.id;
+        else if (!int.TryParse(retail.source_order_no, out careId)) return null;
         var charges = await db.retail.AsNoTracking().Where(r => r.order_id == retail.id && r.valid == 1).ToListAsync();
+        var cardAmount = charges.Where(r => r.retail_type != CareChargeRetailType).Sum(r => Money(r.deal_price));
         return new CareCardSaleInfo { careOrderId = careId, retailOrderId = retail.id, completed = retail.dealed == 1,
-            cardAmount = charges.Where(r => r.retail_type != CareChargeRetailType).Sum(r => Money(r.deal_price)),
-            careAmount = charges.Where(r => r.retail_type == CareChargeRetailType).Sum(r => Money(r.deal_price)) };
+            cardAmount = cardAmount, careAmount = IsSingleOrder(retail) ? Money(retail.total_amount) - cardAmount
+                : charges.Where(r => r.retail_type == CareChargeRetailType).Sum(r => Money(r.deal_price)) };
     }
 
     // SQL Server跨进程锁；SQLite隔离测试由写事务串行化。不能只用进程内锁保护支付回调。
@@ -303,6 +312,12 @@ IF @result < 0 THROW 51010, N'操作繁忙，请稍后重试', 1;");
             item.serviceLabel = string.Join("；", cares.Select(c => CoveredServiceLabel(item, c)).Distinct());
             result.items.Add(item);
         }
+        if (IsSingleOrder(retailOrder))
+        {
+            result.careAmount = retailOrder.dealed == 1 ? Money(retailOrder.total_amount) - result.cardAmount
+                : result.projects.Sum(p => p.amount);
+            result.amount = result.cardAmount + result.careAmount;
+        }
         return result;
     }
 
@@ -344,10 +359,13 @@ IF @result < 0 THROW 51010, N'操作繁忙，请稍后重试', 1;");
         var existing = await GetLinkedRetailAsync(db, request.orderId, true);
         if (existing != null && existing.recepting != 1) throw new InvalidOperationException("订单已提交，请到原结算页继续支付");
         if (existing == null && preview.items.Count == 0) { await tx.CommitAsync(); return preview; }
-        var careOrder = await db.order.AsNoTracking().FirstAsync(o => o.id == request.orderId);
-        var retailOrder = existing == null ? new Models.Order { type = "零售", sub_type = "养护购卡", valid = 0, recepting = 1,
-            order_source = OrderSource, source_order_no = request.orderId.ToString() }
-            : await db.order.AsTracking().FirstAsync(o => o.id == existing.id);
+        var careOrder = await db.order.AsTracking().FirstAsync(o => o.id == request.orderId);
+        var retailOrder = existing == null ? careOrder : await db.order.AsTracking().FirstAsync(o => o.id == existing.id);
+        if (existing == null && preview.items.Count > 0)
+        {
+            retailOrder.order_source = SingleOrderSource;
+            retailOrder.sub_type = "养护购卡";
+        }
         retailOrder.shop = careOrder.shop; retailOrder.member_id = careOrder.member_id;
         retailOrder.staff_id = careOrder.staff_id; retailOrder.is_test = careOrder.is_test;
         retailOrder.name = careOrder.name; retailOrder.gender = careOrder.gender; retailOrder.cell = careOrder.cell;
@@ -355,7 +373,6 @@ IF @result < 0 THROW 51010, N'操作繁忙，请稍后重试', 1;");
         retailOrder.contact_gender = careOrder.contact_gender; retailOrder.wechat_unverified = careOrder.wechat_unverified;
         retailOrder.total_amount = (double)preview.amount; retailOrder.paying_amount = (double)preview.amount;
         retailOrder.update_date = DateTime.Now;
-        if (existing == null) { db.order.Add(retailOrder); await db.SaveChangesAsync(); }
         var old = await db.retail.AsTracking().Where(r => r.order_id == retailOrder.id).ToListAsync();
         if (old.Any(r => r.punch_card_id != null)) throw new InvalidOperationException("本单已发卡，不能覆盖购卡安排");
         db.retail.RemoveRange(old); await db.SaveChangesAsync();
@@ -363,12 +380,17 @@ IF @result < 0 THROW 51010, N'操作繁忙，请稍后重试', 1;");
             db.retail.Add(new Retail { order_id = retailOrder.id, product_id = item.productId, sale_price = (double)item.price,
                 deal_price = (double)item.price, order_type = "卡类销售", retail_type = "养护卡",
                 memo = JsonConvert.SerializeObject(new PendingCard { item = item, projects = item.lineNo == 1 ? preview.projects : null }), valid = 1 });
-        if (preview.careAmount > 0)
+        if (!IsSingleOrder(retailOrder) && preview.careAmount > 0)
             db.retail.Add(new Retail { order_id = retailOrder.id, sale_price = (double)preview.careAmount,
                 deal_price = (double)preview.careAmount, order_type = "养护补费", retail_type = CareChargeRetailType,
                 memo = "关联养护订单 " + request.orderId + " 的卡外项目及附加费用，与卡款合并收取", valid = 1 });
         if (preview.items.Count > 0)
             ApplyProjects(preview, await db.care.AsTracking().Where(c => c.order_id == request.orderId).ToListAsync());
+        else if (IsSingleOrder(retailOrder))
+        {
+            retailOrder.order_source = null;
+            retailOrder.sub_type = "";
+        }
         await db.SaveChangesAsync(); await tx.CommitAsync();
         return preview;
     }
@@ -407,11 +429,14 @@ IF @result < 0 THROW 51010, N'操作繁忙，请稍后重试', 1;");
         if (careOrder.member_id != retailOrder.member_id) throw new InvalidOperationException("顾客已改变，请重新选择卡类");
         retailOrder.valid = 1; retailOrder.recepting = 0; retailOrder.staff_id = staffId;
         retailOrder.wechat_unverified = careOrder.wechat_unverified;
-        careOrder.valid = 1; careOrder.recepting = 0; careOrder.total_amount = 0; careOrder.paying_amount = 0;
+        careOrder.valid = 1; careOrder.recepting = 0;
+        careOrder.total_amount = IsSingleOrder(retailOrder) ? (double)preview.amount : 0;
+        careOrder.paying_amount = careOrder.total_amount;
         careOrder.dealed = 0; careOrder.pay_with_deposit = false; careOrder.staff_id = staffId;
         careOrder.biz_date = retailOrder.biz_date = DateTime.Now;
         var helper = new OrderController(db, config, http);
-        await helper.GenerateOrderCode(retailOrder); await helper.GenerateOrderCode(careOrder);
+        if (retailOrder.id != careOrder.id) await helper.GenerateOrderCode(retailOrder);
+        await helper.GenerateOrderCode(careOrder);
         var cares = await db.care.AsTracking().Where(c => c.order_id == orderId).ToListAsync();
         ApplyProjects(preview, cares);
         foreach (var care in cares)
@@ -450,10 +475,21 @@ IF @result < 0 THROW 51010, N'操作繁忙，请稍后重试', 1;");
                 memberId, memberId, payment.pay_method, payment.is_proxy_pay, payment.member_id);
             order.wechat_unverified = careOrder.wechat_unverified = verified;
             var allRows = await db.retail.AsTracking().Where(r => r.order_id == order.id && r.valid == 1).ToListAsync();
-            if (allRows.Sum(r => Money(r.deal_price)) != Money(order.total_amount))
-                throw new InvalidOperationException("购卡及养护收费明细与订单合计不一致，请联系管理员核对");
             var rows = allRows.Where(r => r.retail_type != CareChargeRetailType).ToList();
             var plans = rows.ToDictionary(r => r.id, ReadPlan);
+            var expectedTotal = allRows.Sum(r => Money(r.deal_price));
+            if (IsSingleOrder(order))
+            {
+                var snapshot = await ReadPreviewAsync(order, careOrder.id);
+                var currentCares = await db.care.AsNoTracking().Where(c => c.order_id == careOrder.id).ToListAsync();
+                if (snapshot.projects.Count != currentCares.Count || snapshot.projects.Any(p => !currentCares.Any(c =>
+                    c.id == p.careId && Money(c.common_charge) == Money(p.common_charge)
+                    && Money(c.repair_charge) == Money(p.repair_charge) && Money(c.discount) == Money(p.discount))))
+                    throw new InvalidOperationException("待付养护费用已变化，请联系管理员核对");
+                expectedTotal += snapshot.careAmount;
+            }
+            if (expectedTotal != Money(order.total_amount))
+                throw new InvalidOperationException("购卡及养护收费明细与订单合计不一致，请联系管理员核对");
             if (rows.Count == 0) throw new InvalidOperationException("购卡销售明细为空");
             await RetailCardService.GrantAsync(db, order, plans);
             foreach (var row in rows)
@@ -498,7 +534,9 @@ IF @result < 0 THROW 51010, N'操作繁忙，请稍后重试', 1;");
     public static async Task<string?> PaymentErrorAsync(ApplicationDBContext db, Models.Order order,
         double? amount, string method, int? payerId = null, bool checkPayer = false)
     {
-        if (order.type == "养护" && await IsLinkedCareAsync(db, order.id)) return "该养护单由关联购卡订单支付后自动核销，请勿重复收款";
+        if (IsSingleOrder(order) && (order.valid != 1 || order.recepting != 0)) return "请先提交养护购卡订单再付款";
+        if (order.type == "养护" && !IsSingleOrder(order) && await IsLinkedCareAsync(db, order.id))
+            return "该养护单由关联购卡订单支付后自动核销，请勿重复收款";
         var care = await LinkedCareAsync(db, order);
         if (care == null) return null;
         if (order.closed != 0 || order.dealed != 0) return "购卡订单已支付或已关闭";
