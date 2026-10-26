@@ -1218,6 +1218,133 @@ public class CareCardSaleTests
                 .Select(l => new { l.id, l.table_name, l.field_name, l.prev_value, l.current_value, l.manual_memo }).ToListAsync()
         });
 
+    [Theory]
+    [InlineData(1, "测试", 1, 0, 0, 0)]
+    [InlineData(1, "测试", 0, 1, 0, 0)]
+    [InlineData(1, "测试", 1, 1, 0, 60)]
+    [InlineData(1, "测试", 1, 0, 1, 50)]
+    [InlineData(1, "测试", 1, 1, 1, 110)]
+    [InlineData(2, "测试", 1, 1, 0, 0)]
+    [InlineData(2, "测试", 1, 1, 1, 50)]
+    [InlineData(null, "历史双项次卡", 1, 1, 0, 0)]
+    [InlineData(null, "历史单项次卡", 1, 1, 0, 60)]
+    [InlineData(1, "名称含双项但实际单项", 1, 1, 0, 60)]
+    public async Task ExistingCardPreviewChargesOnlyServicesOutsideItsCoverage(int? projectCount, string name,
+        int edge, int wax, int urgent, double expected)
+    {
+        await using var f = await Fixture.Create(1);
+        await PrepareExistingCareCard(f, projectCount, name);
+        var care = await f.Db.care.AsNoTracking().SingleAsync();
+        care.need_edge = edge; care.need_wax = care.need_unwax = wax; care.urgent = urgent;
+        var response = await new CareController(f.Db, f.Config, f.Http).CalcCareCharge(new()
+            { shop = "测试店", memberId = 10, care = care }, "staff-session");
+        var result = Assert.IsType<ApiResult<object>>(Assert.IsType<OkObjectResult>(response.Result).Value);
+        Assert.Equal(0, result.code);
+        var data = JObject.FromObject(result.data);
+        Assert.Equal(expected, data.Value<double>("commonCharge"));
+        Assert.Equal(expected, data["care"]!.Value<double>("common_charge"));
+        Assert.Equal(0, data.Value<double>("ticketDiscount"));
+        Assert.Equal(0, (await f.Db.punchCard.SingleAsync()).punches);
+        Assert.Empty(await f.Db.punchCardUsed.ToListAsync());
+    }
+
+    [Fact]
+    public async Task ExistingSingleCardCheckoutRecalculatesUpgradeThenPaymentUsesOnePunchExactlyOnce()
+    {
+        await using var f = await Fixture.Create(1);
+        await PrepareExistingCareCard(f);
+        // 客户端保存的 0 元费用不能绕过正式下单重新计价。
+        var care = await f.Db.care.SingleAsync(); care.common_charge = 0; await f.Db.SaveChangesAsync();
+        await using var db = f.NewContext();
+        var orders = new OrderController(db, f.Config, f.Http);
+        var placed = await orders.PlaceCareOrder(f.OrderId, "staff-session");
+        var result = Assert.IsType<ApiResult<SnowmeetApi.Models.Order>>(Assert.IsType<OkObjectResult>(placed.Result).Value);
+        Assert.Equal(0, result.code); Assert.Equal(60, result.data!.total_amount); Assert.Equal(60, result.data.paying_amount);
+        Assert.Equal(60, (await db.care.AsNoTracking().SingleAsync()).common_charge);
+        Assert.Empty(await db.punchCardUsed.ToListAsync()); Assert.Empty(await db.careTask.ToListAsync());
+        await f.Pay(f.OrderId, 60);
+        (await f.Db.orderPayment.FindAsync(f.PaymentId))!.member_id = 10; await f.Db.SaveChangesAsync();
+        db.ChangeTracker.Clear();
+        await orders.DealSuccessPaidOrder(f.OrderId, f.PaymentId);
+        db.ChangeTracker.Clear();
+        await orders.DealSuccessPaidOrder(f.OrderId, f.PaymentId);
+        Assert.Equal(1, (await db.punchCard.AsNoTracking().SingleAsync()).punches);
+        Assert.Equal(1, (await db.punchCardUsed.AsNoTracking().SingleAsync(u => u.valid)).punch_count);
+        Assert.Equal(1, (await db.order.AsNoTracking().SingleAsync()).dealed);
+        Assert.NotEmpty(await db.careTask.ToListAsync());
+    }
+
+    [Fact]
+    public async Task ExistingCardWithUnpaidUpgradeCannotUseZeroAmountWriteoff()
+    {
+        await using var f = await Fixture.Create(1);
+        await PrepareExistingCareCard(f);
+        var order = (await f.Db.order.FindAsync(f.OrderId))!;
+        order.valid = 1; order.recepting = 0; order.code = "TEST_YH_261026_00001";
+        order.total_amount = 60; order.paying_amount = 60;
+        (await f.Db.care.SingleAsync()).valid = 1; await f.Db.SaveChangesAsync();
+        await using var db = f.NewContext();
+        var response = await new OrderController(db, f.Config, f.Http).WriteoffCareOrder(f.OrderId, "staff-session");
+        var result = Assert.IsType<ApiResult<SnowmeetApi.Models.Order?>>(Assert.IsType<OkObjectResult>(response.Result).Value);
+        Assert.Equal(1, result.code); Assert.Contains("支付", result.message);
+        Assert.Equal(0, (await db.punchCard.AsNoTracking().SingleAsync()).punches);
+        Assert.Equal(0, (await db.order.AsNoTracking().SingleAsync()).dealed);
+        Assert.Empty(await db.punchCardUsed.ToListAsync()); Assert.Empty(await db.careTask.ToListAsync());
+    }
+
+    [Theory]
+    [InlineData(201)]
+    [InlineData(202)]
+    public async Task ExistingSingleCardMissingUpgradePricesRejectsPreviewAndPlacement(int missingProductId)
+    {
+        await using var f = await Fixture.Create(1);
+        await PrepareExistingCareCard(f);
+        f.Db.product.Remove(await f.Db.product.FindAsync(missingProductId) ?? throw new InvalidOperationException());
+        await f.Db.SaveChangesAsync();
+        await using var db = f.NewContext();
+        var care = await db.care.SingleAsync();
+        var preview = await new CareController(db, f.Config, f.Http).CalcCareCharge(new()
+            { shop = "测试店", memberId = 10, care = care }, "staff-session");
+        var previewResult = Assert.IsType<ApiResult<object>>(Assert.IsType<OkObjectResult>(preview.Result).Value);
+        Assert.Equal(1, previewResult.code); Assert.Contains("价格", previewResult.message);
+        db.ChangeTracker.Clear();
+        var placed = await new OrderController(db, f.Config, f.Http).PlaceCareOrder(f.OrderId, "staff-session");
+        var placedResult = Assert.IsType<ApiResult<SnowmeetApi.Models.Order>>(Assert.IsType<OkObjectResult>(placed.Result).Value);
+        Assert.Equal(1, placedResult.code); Assert.Contains("价格", placedResult.message);
+        Assert.Equal(0, (await db.order.AsNoTracking().SingleAsync()).valid);
+        Assert.Empty(await db.punchCardUsed.ToListAsync()); Assert.Empty(await db.careTask.ToListAsync());
+    }
+
+    [Fact]
+    public async Task ExistingMachineSeasonKeepsItsConfiguredUpgradePrice()
+    {
+        await using var f = await Fixture.Create(1, "机打蜡季卡", true);
+        await PrepareExistingCareCard(f, 1, "机打蜡季卡");
+        (await f.Db.punchCard.SingleAsync()).total = null;
+        f.Db.ticketTemplate.Add(new TicketTemplate { id = 12, biz_type = "养护", type = "养护券",
+            name = "免费打蜡", memo = "", miniapp_recept_path = "" });
+        f.Db.productTicketTemplate.Add(new ProductTicketTemplate { ticket_template_id = 12, product_id = 201, fixed_price = 50, valid = true });
+        await f.Db.SaveChangesAsync();
+        var helper = new CareController(f.Db, f.Config, f.Http);
+        var card = await f.Db.punchCard.SingleAsync();
+        var care = await f.Db.care.SingleAsync();
+        Assert.Equal(0, (await helper.CalcCharge("测试店", care, null, card)).commonCharge);
+        care.free_wax = 0; care.need_wax = care.need_unwax = 1;
+        Assert.Equal(50, (await helper.CalcCharge("测试店", care, null, card)).commonCharge);
+    }
+
+    private static async Task PrepareExistingCareCard(Fixture f, int? projectCount = 1, string name = "测试")
+    {
+        await AddCarePrices(f); await PrepareLegacyCard(f, false, 0);
+        var card = await f.Db.punchCard.SingleAsync(); card.care_project_count = projectCount; card.card_name = name;
+        (await f.Db.product.FindAsync(201))!.sale_price = 170;
+        (await f.Db.product.FindAsync(202))!.sale_price = 230;
+        (await f.Db.product.FindAsync(203))!.sale_price = 280;
+        f.Db.product.Add(new Product { id = 204, name = "单项加急", shop_id = 1,
+            category_code = CareProductRules.CareCategoryCode, sale_price = 220, valid = 1 });
+        await f.Db.SaveChangesAsync();
+    }
+
     private static async Task PreparePhoneReception(Fixture f, bool authorized)
     {
         var order = (await f.Db.order.FindAsync(f.OrderId))!; order.wechat_unverified = false;

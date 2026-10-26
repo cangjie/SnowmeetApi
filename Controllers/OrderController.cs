@@ -3277,7 +3277,12 @@ namespace SnowmeetApi.Controllers
                         seasonCardUsedInThisOrder.Add(card.id);
                     }
                 }
-                var (commonCharge, ticketDiscount) = await _careHelper.CalcCharge(order.shop, care, ticket, card);
+                double commonCharge, ticketDiscount;
+                try { (commonCharge, ticketDiscount) = await _careHelper.CalcCharge(order.shop, care, ticket, card); }
+                catch (InvalidOperationException e)
+                {
+                    return Ok(new ApiResult<Models.Order> { code = 1, message = e.Message, data = null });
+                }
                 if (commonCharge == 0 && !care.use_card && !care.warranty && !care.entertain
                     && CarePricingRules.CountChargeableItems(care) > 0
                     && await _careHelper.GetProduct(order.shop, care) == null)
@@ -3595,6 +3600,10 @@ namespace SnowmeetApi.Controllers
                 if (!order.wechat_unverified)
                 {
                     return Ok(new ApiResult<Models.Order?>() { code = 1, message = "请先完成微信身份核验", data = null });
+                }
+                if (!order.pay_with_deposit && Math.Round(order.paying_amount ?? order.total_amount, 2) > 0)
+                {
+                    return Ok(new ApiResult<Models.Order?> { code = 1, message = "订单仍有应付金额，请先完成支付", data = null });
                 }
                 var careHelper = new CareController(_db, _config, _http);
                 await careHelper.ValidateCardBalances(order.cares, lockCards: true);

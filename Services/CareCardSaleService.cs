@@ -239,7 +239,8 @@ IF @result < 0 THROW 51010, N'操作繁忙，请稍后重试', 1;");
 
     private static decimal Money(double value) => Math.Round((decimal)value, 2, MidpointRounding.AwayFromZero);
 
-    private static async Task<(double charge, decimal serviceAmount, decimal coveredAmount)> ExtraServiceChargeAsync(CareController helper, string shop,
+    // 新购卡和已有卡核销共用同一套覆盖范围及门店补差口径。
+    internal static async Task<(double charge, decimal serviceAmount, decimal coveredAmount)> ExtraServiceChargeAsync(CareController helper, string shop,
         CareCardPreviewItem card, Care selected, bool usesCard)
     {
         if (selected.warranty || selected.entertain) return (0, 0m, 0m);

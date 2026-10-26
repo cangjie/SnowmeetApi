@@ -383,7 +383,7 @@ namespace SnowmeetApi.Controllers
         }
 
         // 养护服务费定价（真理之源，CalcCareCharge 开单实时计费与 PlaceCareOrder 下单落库共用）：
-        // 选会员卡按 0（2026-07-09 用户拍板，核销链路另做）/ 质保招待 0 / summer 330（GetProduct 内置）
+        // 会员卡按覆盖项目抵扣、卡外项目及加急按门店价补差 / 质保招待 0 / summer 330（GetProduct 内置）
         // / 其余 GetProduct 按 shop_id + 服务项匹配商品取 sale_price，再按券的商品优惠规则调整。
         // 例外：机打蜡季卡（卡名含「机打蜡」）升级热蜡/加修刃的加价规则与免费打蜡券（券12模板）一致
         //
@@ -391,7 +391,7 @@ namespace SnowmeetApi.Controllers
         // 一口价 > 折扣率 > 立减金额。此前只读 fixed_price，券16 的立减 双项30/单项20 是这里
         // 按 template_id == 16 硬编码的（且不看门店）；现在改为读 product_ticket_template.discount_amount。
         // 表里没配到规则时回退到那套老写死规则（CarePricingRules.LegacyTicketDiscount），
-        // 所以漏配门店的商品也不会让顾客的券白拿。季卡（use_card）分支维持原状，不受这次改动影响。
+        // 所以漏配门店的商品也不会让顾客的券白拿。
         [NonAction]
         public async Task<(double commonCharge, double ticketDiscount)> CalcCharge(string shop, Care care, Ticket? ticket, PunchCard? card = null)
         {
@@ -421,6 +421,17 @@ namespace SnowmeetApi.Controllers
                         upCharge = cardCharge - cardDiscount;
                     }
                     return (upCharge, 0);
+                }
+                if (care.use_card && !care.warranty && !care.entertain && card != null)
+                {
+                    var benefit = new CareCardPreviewItem
+                    {
+                        name = card.card_name ?? "", total = card.total, projectCount = card.care_project_count,
+                        requiresBinding = CareCardRules.RequiresEquipmentBinding(card.total, card.card_name)
+                    };
+                    var pricing = await CareCardSaleService.ExtraServiceChargeAsync(this, shop, benefit, care,
+                        CareCardRules.HasCoveredService(benefit, care));
+                    return (pricing.charge, 0);
                 }
                 return (0, 0);
             }
@@ -647,7 +658,12 @@ namespace SnowmeetApi.Controllers
                 // 普通界面操作：按本次改动字段应用服务联动
                 ApplyServiceLinkage(care, req.changedField.Trim());
             }
-            var (commonCharge, ticketDiscount) = await CalcCharge(shop.Trim(), care, ticket, card);
+            double commonCharge, ticketDiscount;
+            try { (commonCharge, ticketDiscount) = await CalcCharge(shop.Trim(), care, ticket, card); }
+            catch (InvalidOperationException e)
+            {
+                return Ok(new ApiResult<object> { code = 1, message = e.Message, data = null });
+            }
             // 有收费项目但找不到该店的商品时，不能把缺配置误当成免费养护。
             if (commonCharge == 0 && !care.use_card && !care.warranty && !care.entertain
                 && CarePricingRules.CountChargeableItems(care) > 0
