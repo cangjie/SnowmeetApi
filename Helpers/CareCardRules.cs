@@ -6,8 +6,14 @@ namespace SnowmeetApi.Helpers;
 
 public static class CareCardRules
 {
+    // 普通打蜡季卡（含测试商品）提供机打蜡；明确标注热蜡的季卡保留热蜡权益。
+    public static bool IsMachineWaxSeasonCard(int? total, string? name) =>
+        total == null && (name ?? "").Contains("打蜡", StringComparison.Ordinal)
+        && !(name ?? "").Contains("热蜡", StringComparison.Ordinal)
+        && !(name ?? "").Contains("热打蜡", StringComparison.Ordinal);
+
     public static string ServiceMode(CareCardPreviewItem card) =>
-        card.total == null && card.name.Contains("机打蜡", StringComparison.Ordinal) ? "machine"
+        IsMachineWaxSeasonCard(card.total, card.name) ? "machine"
         : card.requiresBinding ? "wax"
         : card.projectCount == 2 || (card.projectCount == null && card.name.Contains("双项")) ? "dual" : "single";
 

@@ -385,7 +385,7 @@ namespace SnowmeetApi.Controllers
         // 养护服务费定价（真理之源，CalcCareCharge 开单实时计费与 PlaceCareOrder 下单落库共用）：
         // 会员卡按覆盖项目抵扣、卡外项目及加急按门店价补差 / 质保招待 0 / summer 330（GetProduct 内置）
         // / 其余 GetProduct 按 shop_id + 服务项匹配商品取 sale_price，再按券的商品优惠规则调整。
-        // 例外：机打蜡季卡（卡名含「机打蜡」）升级热蜡/加修刃的加价规则与免费打蜡券（券12模板）一致
+        // 例外：机打蜡季卡（含未标热蜡的普通打蜡季卡）升级热蜡/加修刃与券12模板同价。
         //
         // 2026-08-18：券的优惠口径统一收到 TicketTemplateRules.ResolveProductDiscount，
         // 一口价 > 折扣率 > 立减金额。此前只读 fixed_price，券16 的立减 双项30/单项20 是这里
@@ -400,7 +400,8 @@ namespace SnowmeetApi.Controllers
                 // 机打蜡季卡：默认机打蜡免费（无匹配产品 → 0）；升级热蜡/加修刃按当前服务匹配产品，
                 // 再套券12模板的商品优惠规则——与使用免费打蜡券完全同一套加价规则
                 if (care.use_card && !care.warranty && !care.entertain
-                    && card != null && (card.card_name ?? "").IndexOf("机打蜡") >= 0)
+                    && card != null && (CareCardRules.IsMachineWaxSeasonCard(card.total, card.card_name)
+                        || (card.card_name ?? "").IndexOf("机打蜡") >= 0))
                 {
                     Models.Product upProduct = await GetProduct(shop, care);
                     if (upProduct == null)
@@ -486,7 +487,7 @@ namespace SnowmeetApi.Controllers
 
         // 按所选券/卡推导默认服务项（换券/换卡时刻调用）：先清空服务项再套默认，
         // 与前端「更改券/卡先清空已选服务」同一口径。规则：双项卡 → 修刃+热蜡+刮蜡；
-        // 卡名含「机打蜡」（如机打蜡季卡）→ 机打蜡；券12 → 机打蜡；券17/18 → 非雪季 now/later；其余不默认。
+        // 机打蜡季卡及未标热蜡的普通打蜡季卡 → 机打蜡；券12 → 机打蜡；券17/18 → 非雪季 now/later。
         // 「是不是双项卡」优先看 punch_card.care_project_count（商品维护页定义、发卡时复制过来），
         // 该字段为空的历史卡才回退到「卡名含双项」的老口径。
         [NonAction]
@@ -508,16 +509,16 @@ namespace SnowmeetApi.Controllers
                 bool isDoubleProject = card.care_project_count != null
                     ? card.care_project_count == 2
                     : name.IndexOf("双项") >= 0;   // 历史卡没有该字段，回退老口径
-                if (isDoubleProject)
+                if (CareCardRules.IsMachineWaxSeasonCard(card.total, name) || name.IndexOf("机打蜡") >= 0)
+                {
+                    care.free_wax = 1;
+                }
+                else if (isDoubleProject)
                 {
                     care.need_edge = 1;
                     care.edge_degree = "89";
                     care.need_wax = 1;
                     care.need_unwax = 1;
-                }
-                else if (name.IndexOf("机打蜡") >= 0)
-                {
-                    care.free_wax = 1;
                 }
             }
             else if (ticket != null)

@@ -198,6 +198,32 @@ public class CareCardSaleTests
         Assert.Equal(1, (await f.Db.punchCardUsed.SingleAsync()).punch_count);
     }
 
+    [Theory]
+    [InlineData("测试打蜡季卡", "machine", 1, 0)]
+    [InlineData("26-27雪季机打蜡季卡", "machine", 1, 0)]
+    [InlineData("热打蜡季卡", "wax", 0, 1)]
+    [InlineData("热蜡季卡", "wax", 0, 1)]
+    public async Task WaxSeasonProductNameControlsDefaultsAndPaidCardUsage(string name, string mode, int machine, int hot)
+    {
+        await using var f = await Fixture.Create(1, name, true);
+        var product = await f.Db.product.SingleAsync(); product.care_project_count = null; product.sale_price = 0.01;
+        var care = await f.Db.care.SingleAsync(); care.need_edge = 0; care.free_wax = 0;
+        care.need_wax = care.need_unwax = 1; await f.Db.SaveChangesAsync();
+        var preview = await f.Service.PreviewAsync(f.Request());
+        Assert.Equal(mode, preview.serviceMode);
+        Assert.Equal(machine, preview.projects.Single().free_wax);
+        Assert.Equal(hot, preview.projects.Single().need_wax);
+        Assert.Equal(0, care.free_wax); // 试算不改写原草稿。
+        await f.Service.SaveDraftAsync(f.Request());
+        Assert.Equal(machine, care.free_wax); Assert.Equal(hot, care.need_wax);
+        Assert.Equal(hot, care.need_unwax); Assert.Equal(0, care.need_edge);
+        Assert.Equal(0.01m, (await f.Service.PreviewAsync(f.Request())).amount);
+        int retailId = await f.Service.SubmitAsync(f.OrderId, 28);
+        await f.Pay(retailId, 0.01); await f.Service.CompletePaidAsync(retailId, f.PaymentId);
+        Assert.Equal(1, (await f.Db.punchCardUsed.SingleAsync()).punch_count);
+        Assert.Equal("测试品牌", (await f.Db.punchCard.SingleAsync()).equip_brand);
+    }
+
     [Fact]
     public async Task NoNewConfigurationDoesNotEnableNewEntry()
     {
@@ -1315,11 +1341,13 @@ public class CareCardSaleTests
         Assert.Empty(await db.punchCardUsed.ToListAsync()); Assert.Empty(await db.careTask.ToListAsync());
     }
 
-    [Fact]
-    public async Task ExistingMachineSeasonKeepsItsConfiguredUpgradePrice()
+    [Theory]
+    [InlineData("机打蜡季卡")]
+    [InlineData("测试打蜡季卡")]
+    public async Task ExistingMachineSeasonKeepsItsConfiguredUpgradePrice(string name)
     {
-        await using var f = await Fixture.Create(1, "机打蜡季卡", true);
-        await PrepareExistingCareCard(f, 1, "机打蜡季卡");
+        await using var f = await Fixture.Create(1, name, true);
+        await PrepareExistingCareCard(f, 1, name);
         (await f.Db.punchCard.SingleAsync()).total = null;
         f.Db.ticketTemplate.Add(new TicketTemplate { id = 12, biz_type = "养护", type = "养护券",
             name = "免费打蜡", memo = "", miniapp_recept_path = "" });
@@ -1328,6 +1356,8 @@ public class CareCardSaleTests
         var helper = new CareController(f.Db, f.Config, f.Http);
         var card = await f.Db.punchCard.SingleAsync();
         var care = await f.Db.care.SingleAsync();
+        helper.ApplyDefaultServices(care, card, null!);
+        Assert.Equal(1, care.free_wax); Assert.Equal(0, care.need_wax);
         Assert.Equal(0, (await helper.CalcCharge("测试店", care, null, card)).commonCharge);
         care.free_wax = 0; care.need_wax = care.need_unwax = 1;
         Assert.Equal(50, (await helper.CalcCharge("测试店", care, null, card)).commonCharge);
