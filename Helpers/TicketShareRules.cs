@@ -1,4 +1,5 @@
 using SnowmeetApi.Models;
+using SnowmeetApi.Services.Tickets;
 
 namespace SnowmeetApi.Helpers
 {
@@ -35,7 +36,7 @@ namespace SnowmeetApi.Helpers
         /// </summary>
         public static string DescribeShareType(string shareType)
         {
-            string t = (shareType ?? "").Trim();
+            string t = MiniTicketRules.DisplayType((shareType ?? "").Trim());
             return (t == TicketShareBatch.ShareGroup || t == TicketShareBatch.ShareQrCode)
                 ? "海报" : "小程序卡片";
         }

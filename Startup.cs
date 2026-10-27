@@ -93,6 +93,8 @@ namespace SnowmeetApi
             services.AddSingleton(sp => SnowmeetApi.Services.Fnb.MeituanCollectorMonitor.Create(
                 sp.GetRequiredService<IServiceScopeFactory>()));
             services.AddHostedService<SnowmeetApi.Services.Fnb.MeituanCollectorWatchdog>();
+            services.AddScoped<SnowmeetApi.Services.Tickets.IMiniTicketTokenProvider, SnowmeetApi.Services.Tickets.MiniTicketTokenProvider>();
+            services.AddHttpClient<SnowmeetApi.Services.Tickets.IMiniTicketQrService, SnowmeetApi.Services.Tickets.MiniTicketQrService>(client => client.Timeout = TimeSpan.FromSeconds(30));
             services.AddSingleton(FileStorageOptions.From(Configuration));
             services.AddSingleton<IFileStorage>(sp => FileStorageFactory.Create(sp.GetRequiredService<FileStorageOptions>()));
             services.AddControllers().AddJsonOptions(options =>{

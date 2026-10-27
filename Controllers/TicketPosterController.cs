@@ -16,7 +16,7 @@ namespace SnowmeetApi.Controllers
 {
     [Route("api/[controller]/[action]")]
     [ApiController]
-    public class TicketPosterController : ControllerBase
+    public partial class TicketPosterController : ControllerBase
     {
         private readonly ApplicationDBContext _db;
         private readonly IConfiguration _config;

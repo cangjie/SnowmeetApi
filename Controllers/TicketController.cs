@@ -11,11 +11,12 @@ using SnowmeetApi.Models.Users;
 using SnowmeetApi.Controllers.User;
 using SnowmeetApi.Models;
 using SnowmeetApi.Helpers;
+using SnowmeetApi.Services.Tickets;
 namespace SnowmeetApi.Controllers
 {
     [Route("api/[controller]/[action]")]
     [ApiController]
-    public class TicketController : ControllerBase
+    public partial class TicketController : ControllerBase
     {
         private readonly ApplicationDBContext _context;
         private IConfiguration _config;
@@ -322,6 +323,15 @@ namespace SnowmeetApi.Controllers
                 return Ok(new ApiResult<Ticket>() { code = 1, message = "该优惠券当前不可转赠", data = null });
             }
 
+            // 只追加本次新分享的失效记录，保留原审计内容和时间。
+            if (await MiniTicketRules.HasCurrentMarker(_context, ticket))
+            {
+                _context.ticketLog.Add(new TicketLog {
+                    code = ticket.code, sender_open_id = (member.wechatMiniOpenId ?? ticket.open_id ?? "").Trim(),
+                    accepter_open_id = "", memo = MiniTicketRules.ShareReplacedMarker,
+                    transact_time = ticket.shared_time.Value
+                });
+            }
             ticket.shared = 1;
             ticket.shared_time = DateTime.Now;
 
@@ -374,6 +384,10 @@ namespace SnowmeetApi.Controllers
             if (ticket == null || ticket.shared != 1)
             {
                 return new ApiResult<Ticket>() { code = 1, message = "该优惠券当前不可接受，链接可能已失效", data = null };
+            }
+            if (await MiniTicketRules.HasCurrentMarker(_context, ticket))
+            {
+                return new ApiResult<Ticket>() { code = 1, message = "请通过小程序新分享页面领取", data = null };
             }
             if (ticket.member_id == accepter.id)
             {

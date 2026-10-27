@@ -7,6 +7,7 @@ using Microsoft.Extensions.Configuration;
 using SnowmeetApi.Data;
 using SnowmeetApi.Helpers;
 using SnowmeetApi.Models;
+using SnowmeetApi.Services.Tickets;
 
 namespace SnowmeetApi.Controllers
 {
@@ -20,7 +21,7 @@ namespace SnowmeetApi.Controllers
     // 小程序端轮询这个接口，服务端查 oa_receive 里有没有本批次 scene 的命中记录。
     [Route("api/[controller]/[action]")]
     [ApiController]
-    public class TicketShareController : ControllerBase
+    public partial class TicketShareController : ControllerBase
     {
         private readonly ApplicationDBContext _db;
         private readonly IConfiguration _config;
@@ -69,7 +70,7 @@ namespace SnowmeetApi.Controllers
             Member member = await _memberHelper.GetMemberBySessionKey(Util.UrlDecode(sessionKey), sessionType);
             TicketShareBatch batch = await _db.ticketShareBatch.AsNoTracking()
                 .FirstOrDefaultAsync(b => b.id == batchId);
-            if (batch == null || batch.valid != 1)
+            if (batch == null || batch.valid != 1 || MiniTicketRules.IsMini(batch.share_type))
             {
                 return Ok(new ApiResult<object>() { code = 1, message = "分享链接已失效", data = null });
             }
@@ -125,7 +126,7 @@ namespace SnowmeetApi.Controllers
             }
             TicketShareBatch batch = await _db.ticketShareBatch
                 .FirstOrDefaultAsync(b => b.id == batchId);
-            if (batch == null || batch.valid != 1)
+            if (batch == null || batch.valid != 1 || MiniTicketRules.IsMini(batch.share_type))
             {
                 return Ok(new ApiResult<object>() { code = 1, message = "分享链接已失效", data = null });
             }
@@ -251,7 +252,7 @@ namespace SnowmeetApi.Controllers
 
             TicketShareBatch batch = await _db.ticketShareBatch
                 .FirstOrDefaultAsync(b => b.id == batchId);
-            if (batch == null || batch.valid != 1)
+            if (batch == null || batch.valid != 1 || MiniTicketRules.IsMini(batch.share_type))
             {
                 return Ok(new ApiResult<object>() { code = 1, message = "分享链接已失效", data = null });
             }
@@ -370,7 +371,7 @@ namespace SnowmeetApi.Controllers
             TicketShareBatch batch = await _db.ticketShareBatch
                 .FirstOrDefaultAsync(b => b.id == batchId
                     && b.share_type == TicketShareBatch.ShareQrCode);
-            if (batch == null || batch.valid != 1)
+            if (batch == null || batch.valid != 1 || MiniTicketRules.IsMini(batch.share_type))
             {
                 return Ok(new ApiResult<object>() { code = 1, message = "该二维码已停用", data = null });
             }

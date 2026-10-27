@@ -8,6 +8,7 @@ using Microsoft.Extensions.Configuration;
 using SnowmeetApi.Data;
 using SnowmeetApi.Helpers;
 using SnowmeetApi.Models;
+using SnowmeetApi.Services.Tickets;
 
 namespace SnowmeetApi.Controllers
 {
@@ -21,7 +22,7 @@ namespace SnowmeetApi.Controllers
     // 要么查出来后显式 Entry(x).State = Modified，要么用 Add。
     [Route("api/[controller]/[action]")]
     [ApiController]
-    public class TicketTemplateAdminController : ControllerBase
+    public partial class TicketTemplateAdminController : ControllerBase
     {
         private readonly ApplicationDBContext _db;
         private readonly IConfiguration _config;
@@ -699,6 +700,8 @@ namespace SnowmeetApi.Controllers
                     templateId = b.template_id,
                     templateName = tpl != null ? (tpl.name ?? "").Trim() : "",
                     shareTypeText = TicketShareRules.DescribeShareType(b.share_type),
+                    shareType = MiniTicketRules.DisplayType(b.share_type),
+                    rawShareType = b.share_type,
                     progressText = TicketShareRules.DescribeProgress(b),
                     claimCount = b.claim_count,
                     staffId = b.staff_id,
