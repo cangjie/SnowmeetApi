@@ -137,8 +137,9 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<ProductQueryResult>> GetProductList(string keyword)
+        public async Task<ActionResult<ProductQueryResult>> GetProductList(string keyword, string? source = null)
         {
+            UseSource(source);
             int pageSize = 20;
             //string custId = dhhsCustId;
             //string apiKey = dhhsApiKey;
@@ -180,8 +181,7 @@ namespace SnowmeetApi.Controllers
         public async Task<ProductQueryResult> GetProductListByPage(string keyword, int pageNum)
         {
             int pageSize = 20;
-            string custId = dhhsCustId;
-            string apiKey = dhhsApiKey;
+            // 第 2 页起也用当前账号（原来这里固定用大好河山账号，万龙自我游账号的翻页会拿到别的目录）
             string postJson = "{\"apikey\": \"" + apiKey + "\",\t\"catIds\": \"\",\t\"cityId\": \"\",\t\"cityName\": \"\",\t\"custId\": " + custId + " ,\t\"isConfirm\": \"0\",\t\"isExpress\": \"0\",\t\"isMulti\": \"\",\t\"isPackage\": \"\",\t\"isPay\": \"\",\t\"keyWord\": \"" + keyword.Trim() + "\",\t\"orderBy\": \"\",\t\"page\": " + pageNum.ToString() + ",\t\"productNos\": \"\",\t\"resultNum\": " + pageSize.ToString() + ",\t\"tagIds\": \"\",\t\"treeId\": \"\",\t\"viewId\": \"\"}";
             MiniAppHelperController _miniHelper = new MiniAppHelperController(_context, _oriConfig);
             WebApiLog reqLog = await _miniHelper.PerformRequest("https://task-api.zowoyoo.com/api/thirdPaty/prod/list"
@@ -276,8 +276,9 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<ZiwoyouProductDailyPrice>> GetProductPrice(int productId, DateTime date)
+        public async Task<ActionResult<ZiwoyouProductDailyPrice>> GetProductPrice(int productId, DateTime date, string? source = null)
         {
+            UseSource(source);
             MiniAppHelperController _miniHelper = new MiniAppHelperController(_context, _oriConfig);
             string postData = "{\"apikey\": \"" + apiKey + "\",\"custId\": " + custId.Trim() + ",\"productNo\": "
                 + productId.ToString() + ", \"travelDate\": \"" + date.ToString("yyyy-MM-dd") + "\" }";
@@ -289,18 +290,60 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<ZiwoyouOrder>> GetOrder(int orderId)
+        public async Task<ActionResult<ZiwoyouOrder>> GetOrder(int orderId, string? source = null)
         {
-            MiniAppHelperController _miniHelper = new MiniAppHelperController(_context, _oriConfig);
-            string postData = "{\"apikey\": \"" + apiKey + "\",\"custId\": " + custId.Trim()
-                + ",\"orderId\": " + orderId.ToString() + "}";
-            WebApiLog log = await _miniHelper.PerformRequest("https://task-api.zowoyoo.com/api/thirdPaty/order/detail",
-                 "", postData, "POST", "易龙雪聚小程序", "预订雪票", "万龙自我游订单查询");
-            ZiwoyouQueryResult r = JsonConvert.DeserializeObject<ZiwoyouQueryResult>(log.response.Trim());
-            ZiwoyouOrder order = JsonConvert.DeserializeObject<ZiwoyouOrder>(r.data.ToString());
-
+            UseSource(source);
+            ZiwoyouOrder? order = await TryGetOrder(orderId);
+            if (order == null)
+            {
+                // 自我游的订单号是全局唯一的，当前账号查不到就换另一个账号查一次：
+                // 万龙试营业的票是用大好河山账号下的单，而出票、核销、退款的回环调用默认用万龙自我游账号。
+                // 查完把账号换回来，后面同一个实例上的取消订单等调用仍用原账号。
+                bool isDhhs = apiKey == dhhsApiKey;
+                SetParam(isDhhs ? SkipassSaleRules.SOURCE_WANLONG : SkipassSaleRules.SOURCE_DHHS);
+                order = await TryGetOrder(orderId);
+                SetParam(isDhhs ? SkipassSaleRules.SOURCE_DHHS : SkipassSaleRules.SOURCE_WANLONG);
+            }
+            if (order == null)
+            {
+                return NotFound();
+            }
             return Ok(order);
+        }
 
+        // 用当前账号查订单；订单不存在或接口报错返回 null
+        [NonAction]
+        private async Task<ZiwoyouOrder?> TryGetOrder(int orderId)
+        {
+            try
+            {
+                MiniAppHelperController _miniHelper = new MiniAppHelperController(_context, _oriConfig);
+                string postData = "{\"apikey\": \"" + apiKey + "\",\"custId\": " + custId.Trim()
+                    + ",\"orderId\": " + orderId.ToString() + "}";
+                WebApiLog log = await _miniHelper.PerformRequest("https://task-api.zowoyoo.com/api/thirdPaty/order/detail",
+                     "", postData, "POST", "易龙雪聚小程序", "预订雪票", "万龙自我游订单查询");
+                ZiwoyouQueryResult? r = JsonConvert.DeserializeObject<ZiwoyouQueryResult>(log.response.Trim());
+                if (r == null || r.state != 1 || r.data == null)
+                {
+                    return null;
+                }
+                return JsonConvert.DeserializeObject<ZiwoyouOrder>(r.data.ToString());
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        // 带了 source 就切到对应的自我游账号（不带沿用构造时的账号）
+        [NonAction]
+        private void UseSource(string? source)
+        {
+            if (!string.IsNullOrWhiteSpace(source))
+            {
+                this.source = source.Trim();
+                SetParam(this.source);
+            }
         }
 
         [NonAction]
@@ -333,112 +376,144 @@ namespace SnowmeetApi.Controllers
 
         }
 
+        // 自我游查价格一次只返回到当月月底（从 travelDate 算起），所以从起始日起按月往后查，
+        // 连续两个月没有价格就停；商品已下架（接口报错）整个商品跳过。
+        // source 不传同步所有来源的商品，传了只同步该账号的商品；每个商品用它自己的账号取价。
+        const int MONTHS_TO_SYNC = 8;
+
         [HttpGet]
-        public async Task UpdateSkipassProductPrice(DateTime? date = null)
+        public async Task UpdateSkipassProductPrice(DateTime? date = null, string? source = null)
         {
             DateTime currentDate = date == null? DateTime.Now: (DateTime)date;
 
-            var l = await _context.skiPassProduct.Where(s => s.third_party_no != null).AsNoTracking().ToListAsync();
-            //var l = await _context.skiPassProduct.Where(s => s.third_party_no.Equals("37696044")).AsNoTracking().ToListAsync();
+            var query = _context.skiPassProduct.Where(s => s.third_party_no != null);
+            if (!string.IsNullOrWhiteSpace(source))
+            {
+                string src = source.Trim();
+                query = query.Where(s => s.source == src);
+            }
+            var l = await query.AsNoTracking().ToListAsync();
             foreach (var item in l)
             {
-                try
+                int emptyMonths = 0;
+                foreach (DateTime monthFrom in SkipassSaleRules.MonthStarts(currentDate, MONTHS_TO_SYNC))
                 {
-                    string priceStr = Util.GetWebContent("https://mini.snowmeet.top/core/WanlongZiwoyouHelper/GetProductPrice?productId=" + item.third_party_no.Trim() + "&date=" + currentDate.ToString("yyyy-MM-dd"));//+ DateTime.Now.ToString("yyyy-MM-dd"));
-                    //string priceStr = Util.GetWebContent("https://mini.snowmeet.top/core/WanlongZiwoyouHelper/GetProductPrice?productId=" + item.third_party_no.Trim() + "&date=2025-02-01"); //+ DateTime..ToString("yyyy-MM-dd") );//+ DateTime.Now.ToString("yyyy-MM-dd"));
-                    ZiwoyouProductDailyPrice price = JsonConvert.DeserializeObject<ZiwoyouProductDailyPrice>(priceStr);
-                    ZiwoyouDailyPrice[] priceArr = price.ticketPrices;
-                    if (priceArr.Length == 0)
+                    int rows;
+                    try
                     {
-                        continue;
+                        rows = await SyncProductMonthPrice(item, monthFrom);
                     }
-                    DateTime startDate = priceArr[0].date.Date;
-                    var oriPriceList = await _context.skipassDailyPrice
-                        .Where(s => s.third_party_id.Trim().Equals(price.infoId.ToString()) && s.valid == 1 && s.reserve_date.Date >= startDate).ToListAsync();
-                    for (int i = 0; i < priceArr.Length; i++)
+                    catch (Exception ex)
                     {
-                        var priceObj = priceArr[i];
-                        bool changed = false;
-                        bool exists = false;
-                        double revenu = 0;
-                        string dayType = "";
-                        for (int j = 0; j < oriPriceList.Count; j++)
-                        {
-                            var oriPrice = oriPriceList[j];
-                            if (oriPrice.reserve_date.Date == priceObj.date.Date)
-                            {
-                                exists = true;
-                                // 结算价、建议售价、门市价任一变了都要换新行：成交价取门市价，只比结算价会漏掉门市价调整
-                                if (SkipassSaleRules.PriceChanged(oriPrice, priceObj.settlementPrice, priceObj.salePrice, priceObj.marketPrice))
-                                {
-                                    changed = true;
-                                    oriPrice.valid = 0;
-                                    revenu = oriPrice.deal_price - oriPrice.settlementPrice;
-                                    dayType = oriPrice.day_type.Trim();
-                                    _context.skipassDailyPrice.Entry(oriPrice).State = EntityState.Modified;
-
-                                }
-                                break;
-                            }
-                        }
-                        if (changed || !exists)
-                        {
-                            if (dayType.Trim().Equals(""))
-                            {
-                                dayType = ((priceObj.date.Date.DayOfWeek == DayOfWeek.Sunday || priceObj.date.Date.DayOfWeek == DayOfWeek.Saturday) ? "周末" : "平日");
-                            }
-                            // 成交价取自我游门市价；只有门市价缺失时才需要「结算价 + 加价」，这时才去查上一次的加价
-                            if (revenu == 0 && !(priceObj.marketPrice > 0))
-                            {
-                                try
-                                {
-                                    SkipassDailyPrice lastPrice = await _context.skipassDailyPrice
-                                        .Where(s => (s.product_id == item.product_id && s.day_type.Trim().Equals(dayType.Trim())
-                                        && s.valid == 1)).OrderByDescending(s => s.reserve_date).FirstAsync();
-                                    if (lastPrice != null)
-                                    {
-                                        revenu = lastPrice.deal_price - lastPrice.settlementPrice;
-                                    }
-                                    else
-                                    {
-
-                                    }
-                                }
-                                catch
-                                {
-                                    revenu = 20;
-                                }
-                            }
-                            SkipassDailyPrice newPrice = new SkipassDailyPrice()
-                            {
-                                product_id = item.product_id,
-                                third_party_id = item.third_party_no,
-                                salePrice = priceObj.salePrice,
-                                settlementPrice = priceObj.settlementPrice,
-                                marketPrice = priceObj.marketPrice,
-                                valid = 1,
-                                deal_price = SkipassSaleRules.ResolveDealPrice(priceObj.marketPrice, priceObj.settlementPrice, revenu),
-                                reserve_date = priceObj.date.Date,
-                                day_type = ((priceObj.date.Date.DayOfWeek == DayOfWeek.Sunday || priceObj.date.Date.DayOfWeek == DayOfWeek.Saturday) ? "周末" : "平日")
-                            };
-                            await _context.skipassDailyPrice.AddAsync(newPrice);
-                            await _context.SaveChangesAsync();
-                        }
-
+                        Console.WriteLine(ex.ToString());
+                        break;
                     }
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine(ex.ToString());
+                    emptyMonths = rows == 0 ? emptyMonths + 1 : 0;
+                    if (emptyMonths >= 2)
+                    {
+                        break;
+                    }
                 }
             }
+        }
+
+        // 取一个商品从 from 起到当月月底的每日价格并写库；返回这次接口给了多少天
+        [NonAction]
+        private async Task<int> SyncProductMonthPrice(Models.SkiPassProduct item, DateTime from)
+        {
+            string priceStr = Util.GetWebContent("https://mini.snowmeet.top/core/WanlongZiwoyouHelper/GetProductPrice?productId=" + item.third_party_no.Trim()
+                + "&date=" + from.ToString("yyyy-MM-dd") + "&source=" + Uri.EscapeDataString((item.source ?? "").Trim()));
+            ZiwoyouProductDailyPrice price = JsonConvert.DeserializeObject<ZiwoyouProductDailyPrice>(priceStr);
+            ZiwoyouDailyPrice[] priceArr = price.ticketPrices;
+            if (priceArr.Length == 0)
+            {
+                return 0;
+            }
+            DateTime startDate = priceArr[0].date.Date;
+            var oriPriceList = await _context.skipassDailyPrice
+                .Where(s => s.third_party_id.Trim().Equals(price.infoId.ToString()) && s.valid == 1 && s.reserve_date.Date >= startDate).ToListAsync();
+            for (int i = 0; i < priceArr.Length; i++)
+            {
+                var priceObj = priceArr[i];
+                bool changed = false;
+                bool exists = false;
+                double revenu = 0;
+                string dayType = "";
+                for (int j = 0; j < oriPriceList.Count; j++)
+                {
+                    var oriPrice = oriPriceList[j];
+                    if (oriPrice.reserve_date.Date == priceObj.date.Date)
+                    {
+                        exists = true;
+                        // 结算价、建议售价、门市价任一变了都要换新行：成交价取门市价，只比结算价会漏掉门市价调整
+                        if (SkipassSaleRules.PriceChanged(oriPrice, priceObj.settlementPrice, priceObj.salePrice, priceObj.marketPrice))
+                        {
+                            changed = true;
+                            oriPrice.valid = 0;
+                            revenu = oriPrice.deal_price - oriPrice.settlementPrice;
+                            dayType = oriPrice.day_type.Trim();
+                            _context.skipassDailyPrice.Entry(oriPrice).State = EntityState.Modified;
+
+                        }
+                        break;
+                    }
+                }
+                if (changed || !exists)
+                {
+                    if (dayType.Trim().Equals(""))
+                    {
+                        dayType = ((priceObj.date.Date.DayOfWeek == DayOfWeek.Sunday || priceObj.date.Date.DayOfWeek == DayOfWeek.Saturday) ? "周末" : "平日");
+                    }
+                    // 成交价取自我游门市价；只有门市价缺失时才需要「结算价 + 加价」，这时才去查上一次的加价
+                    if (revenu == 0 && !(priceObj.marketPrice > 0))
+                    {
+                        try
+                        {
+                            SkipassDailyPrice lastPrice = await _context.skipassDailyPrice
+                                .Where(s => (s.product_id == item.product_id && s.day_type.Trim().Equals(dayType.Trim())
+                                && s.valid == 1)).OrderByDescending(s => s.reserve_date).FirstAsync();
+                            if (lastPrice != null)
+                            {
+                                revenu = lastPrice.deal_price - lastPrice.settlementPrice;
+                            }
+                            else
+                            {
+
+                            }
+                        }
+                        catch
+                        {
+                            revenu = 20;
+                        }
+                    }
+                    SkipassDailyPrice newPrice = new SkipassDailyPrice()
+                    {
+                        product_id = item.product_id,
+                        third_party_id = item.third_party_no,
+                        salePrice = priceObj.salePrice,
+                        settlementPrice = priceObj.settlementPrice,
+                        marketPrice = priceObj.marketPrice,
+                        valid = 1,
+                        deal_price = SkipassSaleRules.ResolveDealPrice(priceObj.marketPrice, priceObj.settlementPrice, revenu),
+                        reserve_date = priceObj.date.Date,
+                        day_type = ((priceObj.date.Date.DayOfWeek == DayOfWeek.Sunday || priceObj.date.Date.DayOfWeek == DayOfWeek.Saturday) ? "周末" : "平日")
+                    };
+                    await _context.skipassDailyPrice.AddAsync(newPrice);
+                    await _context.SaveChangesAsync();
+                }
+
+            }
+            return priceArr.Length;
         }
 
 
 
         [HttpGet]
-        public async Task UpdateSkipassProduct(string keyword)
+        public async Task UpdateSkipassProduct(string keyword, string? source = null, int unhide = 0)
         {
+            // source 选自我游账号（不传沿用万龙自我游）；同步到的商品来源会记成这个账号，之后查价、下单都用它。
+            // unhide=1 把这次同步到的商品置为可见（商品原来被隐藏、现在要卖时用；默认不动隐藏状态）。
+            UseSource(source);
             ProductQueryResult originProductInfo = (ProductQueryResult)((OkObjectResult)(await GetProductList(keyword)).Result).Value;
             // 万龙自我游同步过来的都是「崇礼旗舰店卖的万龙雪场票」：
             // 门店 = 崇礼旗舰店（shop_id 关联 shop_list），雪场 = 万龙（category「万龙雪票」）。
@@ -457,6 +532,12 @@ namespace SnowmeetApi.Controllers
                     continue;
                 }
                 */
+                // 大好河山账号的目录里搜「万龙」还会返回「万龙&常规」这类酒店套餐，只收万龙滑雪场的雪票和次卡
+                if (this.source == SkipassSaleRules.SOURCE_DHHS
+                    && !SkipassSaleRules.IsWanlongLiftProduct(skipassProduct.productName, skipassProduct.viewName))
+                {
+                    continue;
+                }
                 Models.SkiPassProduct skipass = await GetSkipassProductByCode(skipassProduct.productNo);
                 // 对外价格 = 自我游门市价（不再加价）；列表接口没给门市价时退回建议售价
                 double retailPrice = SkipassSaleRules.ResolveDealPrice(skipassProduct.marketPrice, skipassProduct.salePrice, 0);
@@ -468,6 +549,17 @@ namespace SnowmeetApi.Controllers
                     skipass.product.sale_price = retailPrice;
                     skipass.product.market_price = retailPrice;
                     skipass.product.cost = skipassProduct.settlementPrice;
+                    if (unhide == 1)
+                    {
+                        skipass.product.hidden = 0;
+                    }
+                    // 去年的商品，有效期还停在去年的雪季：按商品名里的雪季（没写就按今天所在雪季）刷新
+                    if (skipass.product.end_date == null || skipass.product.end_date < DateTime.Today)
+                    {
+                        var renewed = SkipassSaleRules.ResolveSeasonDates(skipassProduct.productName, DateTime.Now);
+                        skipass.product.start_date = renewed.Start;
+                        skipass.product.end_date = renewed.End;
+                    }
                     skipass.source = this.source.Trim();
                     skipass.update_date = DateTime.Now;
                     _context.Entry<Models.Product>(skipass.product).State = EntityState.Modified;
@@ -633,20 +725,21 @@ namespace SnowmeetApi.Controllers
         // 自我游预存款余额只给店员看；顾客、没带会话的请求一律 401
         [HttpGet]
         public async Task<ActionResult<double>> GetBalance(string? sessionKey = null,
-            string sessionType = "wechat_mini_openid")
+            string sessionType = "wechat_mini_openid", string? source = null)
         {
             if (!await CanSeeCostAsync(sessionKey, sessionType))
             {
                 return Unauthorized();
             }
-            return Ok(await QueryBalance());
+            return Ok(await QueryBalance(source));
         }
 
         // 服务端内部（出票前查余额）直接调用，不经过 HTTP
         [NonAction]
-        public async Task<double> QueryBalance()
+        public async Task<double> QueryBalance(string? account = null)
         {
-            SetParam(source);
+            // account 不传就用构造时的账号（出票前查余额走这条，账号由商品的来源决定）
+            SetParam(string.IsNullOrWhiteSpace(account) ? source : account.Trim());
             string postData = "{\"apikey\": \"" + apiKey + "\", \"custId\": " + custId + "}";
             MiniAppHelperController _miniHelper = new MiniAppHelperController(_context, _oriConfig);
             WebApiLog reqLog = await _miniHelper.PerformRequest("https://task-api.zowoyoo.com/api/thirdPaty/order/balance",

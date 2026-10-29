@@ -77,7 +77,7 @@ namespace SnowmeetApi.Tests
             var result = await f.Controller(db).GetProductsByResort("万龙", 0, "customer-session");
             var list = Assert.IsType<List<SnowmeetApi.Controllers.SkiPassController.SkipassWithPrice>>(
                 Assert.IsType<OkObjectResult>(result.Result).Value);
-            var item = Assert.Single(list);
+            var item = list.Single(x => x.product_id == 901);
             Assert.Null(item.cost);
             Assert.NotEmpty(item.dailyPrice);
             Assert.All(item.dailyPrice, d => { Assert.Equal(0, d.settlementPrice); Assert.Equal(0, d.salePrice); });
@@ -91,8 +91,7 @@ namespace SnowmeetApi.Tests
             await using var f = await Fixture.Create();
             await using var db = f.NewContext();
             var result = await f.Controller(db).GetProductsByResort("万龙", 0);
-            var item = Assert.Single(Assert.IsType<List<SnowmeetApi.Controllers.SkiPassController.SkipassWithPrice>>(
-                Assert.IsType<OkObjectResult>(result.Result).Value));
+            var item = ListOf(result).Single(x => x.product_id == 901);
             Assert.Null(item.cost);
             Assert.All(item.dailyPrice, d => Assert.Equal(0, d.settlementPrice));
         }
@@ -103,10 +102,47 @@ namespace SnowmeetApi.Tests
             await using var f = await Fixture.Create();
             await using var db = f.NewContext();
             var result = await f.Controller(db).GetProductsByResort("万龙", 0, "staff-session");
-            var item = Assert.Single(Assert.IsType<List<SnowmeetApi.Controllers.SkiPassController.SkipassWithPrice>>(
-                Assert.IsType<OkObjectResult>(result.Result).Value));
+            var item = ListOf(result).Single(x => x.product_id == 901);
             Assert.Equal(299, item.cost);
             Assert.All(item.dailyPrice, d => Assert.Equal(299, d.settlementPrice));
+        }
+
+        static List<SnowmeetApi.Controllers.SkiPassController.SkipassWithPrice> ListOf(
+            ActionResult<List<SnowmeetApi.Controllers.SkiPassController.SkipassWithPrice>> result)
+        {
+            return Assert.IsType<List<SnowmeetApi.Controllers.SkiPassController.SkipassWithPrice>>(
+                Assert.IsType<OkObjectResult>(result.Result).Value);
+        }
+
+        [Fact]
+        public async Task 商品列表同时包含万龙自我游和大好河山来源_其他来源和隐藏的不出现()
+        {
+            await using var f = await Fixture.Create();
+            await using var db = f.NewContext();
+            var list = ListOf(await f.Controller(db).GetProductsByResort("万龙", 0));
+            Assert.Equal(new[] { 901, 902 }, list.Select(x => x.product_id).OrderBy(x => x).ToArray());
+            Assert.Equal("大好河山", list.Single(x => x.product_id == 902).source);
+            Assert.Equal("万龙自我游", list.Single(x => x.product_id == 901).source);
+        }
+
+        [Fact]
+        public async Task 显示隐藏商品时_隐藏的万龙自我游商品也在_其他来源仍不出现()
+        {
+            await using var f = await Fixture.Create();
+            await using var db = f.NewContext();
+            var list = ListOf(await f.Controller(db).GetProductsByResort("万龙", 1, "staff-session"));
+            Assert.Equal(new[] { 901, 902, 904 }, list.Select(x => x.product_id).OrderBy(x => x).ToArray());
+        }
+
+        [Fact]
+        public async Task 大好河山来源的商品_顾客同样看不到进货价()
+        {
+            await using var f = await Fixture.Create();
+            await using var db = f.NewContext();
+            var item = ListOf(await f.Controller(db).GetProductsByResort("万龙", 0, "customer-session")).Single(x => x.product_id == 902);
+            Assert.Null(item.cost);
+            Assert.NotEmpty(item.dailyPrice);
+            Assert.All(item.dailyPrice, d => { Assert.Equal(0, d.settlementPrice); Assert.Equal(399, d.deal_price); });
         }
 
         [Fact]
@@ -200,6 +236,23 @@ namespace SnowmeetApi.Tests
                     db.skipassDailyPrice.Add(new SkipassDailyPrice { product_id = 901, third_party_id = "37696034",
                         reserve_date = DateTime.Today.AddDays(i), settlementPrice = 299, salePrice = 299, marketPrice = 579,
                         deal_price = 579, day_type = "平日", valid = 1 });
+                }
+                // 万龙试营业的票：大好河山来源；另有别的来源的商品（不该出现）和被隐藏的万龙自我游商品
+                db.product.Add(new Product { id = 902, name = "【万龙】全雪区日场1天雪票-11.6", type = "雪票", sale_price = 399,
+                    market_price = 399, cost = 371.07, hidden = 0, start_date = new DateTime(2026, 10, 1), end_date = new DateTime(2027, 6, 1) });
+                db.skiPassProduct.Add(new SnowmeetApi.Models.SkiPassProduct { product_id = 902, resort = "万龙", source = "大好河山",
+                    third_party_no = "37704649", rules = "试营业", tags = "", available_days = "", unavailable_days = "" });
+                db.product.Add(new Product { id = 903, name = "别的渠道的雪票", type = "雪票", sale_price = 100, hidden = 0 });
+                db.skiPassProduct.Add(new SnowmeetApi.Models.SkiPassProduct { product_id = 903, resort = "万龙", source = "别的渠道",
+                    third_party_no = "99999999", rules = "", tags = "", available_days = "", unavailable_days = "" });
+                db.product.Add(new Product { id = 904, name = "【25-26雪季】被隐藏的票", type = "雪票", sale_price = 100, hidden = 1 });
+                db.skiPassProduct.Add(new SnowmeetApi.Models.SkiPassProduct { product_id = 904, resort = "万龙", source = "万龙自我游",
+                    third_party_no = "88888888", rules = "", tags = "", available_days = "", unavailable_days = "" });
+                for (int i = 0; i < 7; i++)
+                {
+                    db.skipassDailyPrice.Add(new SkipassDailyPrice { product_id = 902, third_party_id = "37704649",
+                        reserve_date = DateTime.Today.AddDays(i), settlementPrice = 371.07, salePrice = 399, marketPrice = 399,
+                        deal_price = 399, day_type = "平日", valid = 1 });
                 }
                 await db.SaveChangesAsync();
                 return f;

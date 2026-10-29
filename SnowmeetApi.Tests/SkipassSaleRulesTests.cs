@@ -118,6 +118,73 @@ namespace SnowmeetApi.Tests
             SkipassSaleRules.RedactDailyPrices(new List<SkipassDailyPrice>());
         }
 
+        // ---------- 大好河山账号里哪些是万龙的雪票/次卡 ----------
+
+        [Theory]
+        [InlineData("【万龙】全雪区日场1天雪票-11.6")]
+        [InlineData("【万龙】全雪区日场4小时雪票(含全套装备)-11.6")]
+        [InlineData("【万龙】全雪区下午场+夜场滑雪票-11.6")]
+        [InlineData("【万龙预售2026-27】夜场3次卡(不含雪具)限平日使用")]
+        [InlineData("【万龙预售2026-27】11月日场3次卡(不含雪具)周末使用")]
+        public void 万龙滑雪场的雪票和次卡_收(string name)
+        {
+            Assert.True(SkipassSaleRules.IsWanlongLiftProduct(name, "【崇礼】万龙滑雪场"));
+        }
+
+        [Theory]
+        [InlineData("【万龙&常规】盛龙公寓-1住1滑-简约景观标1晚+1张日场雪票（自带板）", "张家口万龙滑雪场盛龙公寓")]
+        [InlineData("【万龙&常规】国际公寓-双人1住1滑-豪华标间（含双早+2张日场雪票+温泉）（自带板）", "张家口万龙滑雪场国际酒店公寓")]
+        [InlineData("【万龙&常规】龙宫酒店-双人1住1滑-低层大床房（含双早+2张日场雪票+温泉）（自带板）", "张家口万龙滑雪场龙宫酒店")]
+        [InlineData("【万龙&常规】双龙酒店-双人1住1滑-雪景标间（含双早+2张日场雪票+温泉）（自带板）", "张家口万龙滑雪场双龙酒店")]
+        public void 万龙的酒店套餐_不收(string name, string viewName)
+        {
+            Assert.False(SkipassSaleRules.IsWanlongLiftProduct(name, viewName));
+        }
+
+        [Theory]
+        [InlineData("全季卡（日场26-27）", "【崇礼】翠云山森林风景区")]
+        [InlineData("【常规&云顶】云顶大酒店-双人1住1滑-园景大床房（自带板）12.4—2.27", "张家口云顶大酒店")]
+        [InlineData("【万龙】全雪区日场1天雪票-11.6", null)]
+        public void 别的雪场或没有景区信息_不收(string name, string? viewName)
+        {
+            Assert.False(SkipassSaleRules.IsWanlongLiftProduct(name, viewName));
+        }
+
+        [Fact]
+        public void 景区是万龙但名字带住或和号_也不收()
+        {
+            Assert.False(SkipassSaleRules.IsWanlongLiftProduct("【万龙】1住1滑套餐", "【崇礼】万龙滑雪场"));
+            Assert.False(SkipassSaleRules.IsWanlongLiftProduct("【万龙&常规】雪票", "【崇礼】万龙滑雪场"));
+            Assert.False(SkipassSaleRules.IsWanlongLiftProduct("【万龙＆常规】雪票", "【崇礼】万龙滑雪场"));
+        }
+
+        [Fact]
+        public void 可卖的来源是万龙自我游和大好河山()
+        {
+            Assert.Equal(new[] { "万龙自我游", "大好河山" }, SkipassSaleRules.SellableSources);
+        }
+
+        // ---------- 按月查价格 ----------
+
+        [Fact]
+        public void 月初序列_第一个是起始日本身_之后每月1号()
+        {
+            var months = SkipassSaleRules.MonthStarts(new DateTime(2026, 10, 29, 15, 30, 0), 4);
+            Assert.Equal(new[]
+            {
+                new DateTime(2026, 10, 29), new DateTime(2026, 11, 1), new DateTime(2026, 12, 1), new DateTime(2027, 1, 1)
+            }, months);
+        }
+
+        [Fact]
+        public void 月初序列_跨年和1号起始()
+        {
+            var months = SkipassSaleRules.MonthStarts(new DateTime(2026, 12, 1), 3);
+            Assert.Equal(new[] { new DateTime(2026, 12, 1), new DateTime(2027, 1, 1), new DateTime(2027, 2, 1) }, months);
+            Assert.Single(SkipassSaleRules.MonthStarts(new DateTime(2026, 12, 5), 1));
+            Assert.Empty(SkipassSaleRules.MonthStarts(new DateTime(2026, 12, 5), 0));
+        }
+
         // ---------- 新商品的雪季起止日 ----------
 
         [Theory]

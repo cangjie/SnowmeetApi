@@ -14,6 +14,12 @@ namespace SnowmeetApi.Helpers
     {
         public const string STAFF_ONLY_MESSAGE = "仅限店员订票";
 
+        // 自我游的两个账号：万龙自我游是万龙自己的账号，大好河山是另一个渠道账号。
+        // 万龙试营业期间的票只在大好河山账号里有售卖权限（2026-10-29 核实），所以两个来源的商品都能卖。
+        public const string SOURCE_WANLONG = "万龙自我游";
+        public const string SOURCE_DHHS = "大好河山";
+        public static readonly string[] SellableSources = { SOURCE_WANLONG, SOURCE_DHHS };
+
         // 门市价缺失时沿用的加价（与旧同步逻辑的默认值一致）
         public const double DEFAULT_MARGIN = 20;
 
@@ -60,6 +66,33 @@ namespace SnowmeetApi.Helpers
                 p.settlementPrice = 0;
                 p.salePrice = 0;
             }
+        }
+
+        // 大好河山账号的商品目录里，搜「万龙」会同时返回雪票、次卡和「万龙&常规」这类酒店套餐。
+        // 只有景区是万龙滑雪场、不是酒店/公寓、名字里没有「&」「住」的才是能单独卖的雪票或次卡。
+        public static bool IsWanlongLiftProduct(string? name, string? viewName)
+        {
+            string n = name ?? "";
+            string v = viewName ?? "";
+            if (!v.Contains("万龙滑雪场")) return false;
+            if (v.Contains("酒店") || v.Contains("公寓")) return false;
+            if (n.Contains('&') || n.Contains('＆') || n.Contains('住')) return false;
+            return true;
+        }
+
+        // 自我游查价格是按自然月返回的：从 travelDate 一直返回到当月月底。
+        // 要拿到整季价格，就得先查起始日，再按每月 1 号往后查。
+        public static List<DateTime> MonthStarts(DateTime from, int months)
+        {
+            var result = new List<DateTime>();
+            if (months <= 0) return result;
+            result.Add(from.Date);
+            var firstOfMonth = new DateTime(from.Year, from.Month, 1);
+            for (int i = 1; i < months; i++)
+            {
+                result.Add(firstOfMonth.AddMonths(i));
+            }
+            return result;
         }
 
         static readonly Regex SeasonRegex = new Regex(@"(?<!\d)(?:20)?(\d{2})\s*[-—~至]\s*(?:20)?(\d{2})(?!\d)");

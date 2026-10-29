@@ -707,8 +707,17 @@ namespace SnowmeetApi.Controllers
                     continue;
                 }
                 string url = "https://mini.snowmeet.top/core/WanlongZiwoyouHelper/GetOrder?orderId=" + skipass.reserve_no.ToString();
-                string ret = Util.GetWebContent(url);
-                WanlongZiwoyouHelper.ZiwoyouOrder order = JsonConvert.DeserializeObject<WanlongZiwoyouHelper.ZiwoyouOrder>(ret);
+                WanlongZiwoyouHelper.ZiwoyouOrder? order = null;
+                try
+                {
+                    string ret = Util.GetWebContent(url);
+                    order = JsonConvert.DeserializeObject<WanlongZiwoyouHelper.ZiwoyouOrder>(ret);
+                }
+                catch
+                {
+                    // 订单两个账号都查不到或接口报错：跳过这一条，不能中断后面所有订单的核销检查
+                    continue;
+                }
                 if (order != null && order.orderState == 4)
                 {
                     skipass.is_used = 1;
@@ -1126,6 +1135,8 @@ namespace SnowmeetApi.Controllers
             string? sessionKey = null, string sessionType = "wechat_mini_openid")
         {
             resort = Util.UrlDecode(resort);
+            // 万龙自我游、大好河山两个账号的商品都能卖（试营业的票只有大好河山账号有售卖权限）
+            string[] sellableSources = SkipassSaleRules.SellableSources;
             var l = await _context.skiPassProduct//.Include(s => s.dailyPrice)
                 .Join(_context.product, s=>s.product_id, p=>p.id,
                 (s, p)=> new {s.product_id, s.resort, s.rules, s.source, s.third_party_no, p.name, p.shop_id,
@@ -1134,7 +1145,7 @@ namespace SnowmeetApi.Controllers
                 //s.avaliablePriceList,
                 p.sale_price, p.market_price, p.cost, p.type, p.hidden })
                 .Where(p => p.type.Trim().Equals("雪票") && p.resort.Trim().Equals(resort)
-                && p.third_party_no != null && p.source == "万龙自我游" 
+                && p.third_party_no != null && sellableSources.Contains(p.source)
                 && ((p.hidden == 0 && showHidden == 0) || (showHidden == 1))
                 ).OrderBy(p => p.market_price).AsNoTracking().ToListAsync();
             
