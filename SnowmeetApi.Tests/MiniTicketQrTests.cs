@@ -35,12 +35,12 @@ public sealed class MiniTicketQrTests
     }
     internal sealed class Handler : HttpMessageHandler
     {
-        public int Calls; public List<string> Requests=new();public string? Error;public bool ExpireOnce;
+        public int Calls; public List<string> Requests=new();public string? Error;public bool ExpireOnce; public byte[]? ImageBytes;
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,CancellationToken ct)
         {
             Calls++;Requests.Add(await request.Content!.ReadAsStringAsync(ct));
             if(ExpireOnce && Calls==1)return new(HttpStatusCode.OK){Content=new StringContent("{\"errcode\":40001,\"errmsg\":\"invalid token\"}")};
-            return new(HttpStatusCode.OK){Content=Error==null?new ByteArrayContent(Png):new StringContent(Error)};
+            return new(HttpStatusCode.OK){Content=Error==null?new ByteArrayContent(ImageBytes ?? Png):new StringContent(Error)};
         }
     }
     [Fact] public async Task CacheReusesPersistedBytesAcrossInstancesAndEnvironmentsAreIsolated()
@@ -55,6 +55,26 @@ public sealed class MiniTicketQrTests
         Assert.Equal(MiniTicketRules.ClaimPage,release.GetProperty("page").GetString());Assert.Equal("batch=1",release.GetProperty("scene").GetString());
         Assert.True(release.GetProperty("check_path").GetBoolean());Assert.Equal("release",release.GetProperty("env_version").GetString());
         Assert.False(trial.GetProperty("check_path").GetBoolean());Assert.Equal("trial",trial.GetProperty("env_version").GetString());
+    }
+    [Fact] public async Task WechatJpegIsConvertedToPngAndCached()
+    {
+        await using var f=await TicketMigrationTests.Fixture.Create("mini_q");
+        using var source=new Image<Rgba32>(40,40,new Rgba32(255,255,255,255));
+        using var jpegStream=new MemoryStream(); source.SaveAsJpeg(jpegStream);
+        var handler=new Handler{ImageBytes=jpegStream.ToArray()};var storage=new Storage();
+        var service=new MiniTicketQrService(f.Db,f.Config,storage,new Tokens(),new HttpClient(handler));
+        var result=await service.GetAsync(1,"develop");
+        Assert.Equal(new byte[]{137,80,78,71,13,10,26,10},result.Take(8).ToArray());
+        using var decoded=Image.Load(result);Assert.Equal(40,decoded.Width);Assert.Equal(40,decoded.Height);
+        Assert.Equal(result,await service.GetAsync(1,"develop"));Assert.Equal(1,handler.Calls);Assert.Equal(1,storage.Saves);
+    }
+    [Fact] public async Task InvalidWechatImageIsRejectedWithoutCaching()
+    {
+        await using var f=await TicketMigrationTests.Fixture.Create("mini_q");
+        var storage=new Storage();var handler=new Handler{ImageBytes=new byte[]{255,216,1,2,3}};
+        var qr=new MiniTicketQrService(f.Db,f.Config,storage,new Tokens(),new HttpClient(handler));
+        await Assert.ThrowsAsync<InvalidOperationException>(()=>qr.GetAsync(1));
+        Assert.Equal(0,storage.Saves);Assert.Equal(0,await f.Db.UploadFile.CountAsync());
     }
     [Fact] public async Task ConcurrentRequestsGenerateOnce()
     {

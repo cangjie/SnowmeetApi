@@ -89,10 +89,27 @@ public sealed class MiniTicketQrService(ApplicationDBContext db, IConfiguration 
                 if (attempt == 0 && (code == 40001 || code == 40014 || code == 42001)) continue;
                 throw new InvalidOperationException("微信小程序码生成失败（" + code + "）：" + message);
             }
-            ValidatePng(bytes);
-            return bytes;
+            return NormalizeToPng(bytes);
         }
         throw new InvalidOperationException("获取小程序码失败");
+    }
+
+    private static byte[] NormalizeToPng(byte[] bytes)
+    {
+        // WeChat returns JPEG for some mini-program codes. Cache and endpoints promise PNG.
+        if (bytes.Length >= 3 && bytes[0] == 0xff && bytes[1] == 0xd8 && bytes[2] == 0xff)
+        {
+            try
+            {
+                using Image image = Image.Load(bytes);
+                using var output = new MemoryStream();
+                image.SaveAsPng(output);
+                return output.ToArray();
+            }
+            catch (Exception e) { throw new InvalidOperationException("小程序码 JPEG 图片损坏", e); }
+        }
+        ValidatePng(bytes);
+        return bytes;
     }
 
     private static void ValidatePng(byte[] bytes)
