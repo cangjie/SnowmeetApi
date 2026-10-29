@@ -17,6 +17,7 @@ using Microsoft.EntityFrameworkCore.Internal;
 using System.IO;
 //using LuqinMiniAppBase.Controllers;
 using SnowmeetApi.Models;
+using SnowmeetApi.Helpers;
 using NPOI.XSSF.UserModel;
 using NPOI.SS.UserModel;
 using TencentCloud.Ocr.V20181119.Models;
@@ -367,7 +368,8 @@ namespace SnowmeetApi.Controllers
                             if (oriPrice.reserve_date.Date == priceObj.date.Date)
                             {
                                 exists = true;
-                                if (oriPrice.settlementPrice != priceObj.settlementPrice)
+                                // 结算价、建议售价、门市价任一变了都要换新行：成交价取门市价，只比结算价会漏掉门市价调整
+                                if (SkipassSaleRules.PriceChanged(oriPrice, priceObj.settlementPrice, priceObj.salePrice, priceObj.marketPrice))
                                 {
                                     changed = true;
                                     oriPrice.valid = 0;
@@ -385,7 +387,8 @@ namespace SnowmeetApi.Controllers
                             {
                                 dayType = ((priceObj.date.Date.DayOfWeek == DayOfWeek.Sunday || priceObj.date.Date.DayOfWeek == DayOfWeek.Saturday) ? "周末" : "平日");
                             }
-                            if (revenu == 0)
+                            // 成交价取自我游门市价；只有门市价缺失时才需要「结算价 + 加价」，这时才去查上一次的加价
+                            if (revenu == 0 && !(priceObj.marketPrice > 0))
                             {
                                 try
                                 {
@@ -414,7 +417,7 @@ namespace SnowmeetApi.Controllers
                                 settlementPrice = priceObj.settlementPrice,
                                 marketPrice = priceObj.marketPrice,
                                 valid = 1,
-                                deal_price = priceObj.settlementPrice + revenu,
+                                deal_price = SkipassSaleRules.ResolveDealPrice(priceObj.marketPrice, priceObj.settlementPrice, revenu),
                                 reserve_date = priceObj.date.Date,
                                 day_type = ((priceObj.date.Date.DayOfWeek == DayOfWeek.Sunday || priceObj.date.Date.DayOfWeek == DayOfWeek.Saturday) ? "周末" : "平日")
                             };
@@ -455,12 +458,15 @@ namespace SnowmeetApi.Controllers
                 }
                 */
                 Models.SkiPassProduct skipass = await GetSkipassProductByCode(skipassProduct.productNo);
+                // 对外价格 = 自我游门市价（不再加价）；列表接口没给门市价时退回建议售价
+                double retailPrice = SkipassSaleRules.ResolveDealPrice(skipassProduct.marketPrice, skipassProduct.salePrice, 0);
                 if (skipass != null)
                 {
                     skipass.product.name = skipassProduct.productName;
                     skipass.product.update_date = DateTime.Now;
 
-                    skipass.product.market_price = skipassProduct.salePrice;
+                    skipass.product.sale_price = retailPrice;
+                    skipass.product.market_price = retailPrice;
                     skipass.product.cost = skipassProduct.settlementPrice;
                     skipass.source = this.source.Trim();
                     skipass.update_date = DateTime.Now;
@@ -470,19 +476,21 @@ namespace SnowmeetApi.Controllers
                 }
                 else
                 {
+                    // 雪季起止日按商品名里的「26-27」推算，没写就按今天所在雪季
+                    var season = SkipassSaleRules.ResolveSeasonDates(skipassProduct.productName, DateTime.Now);
                     Models.Product p = new Models.Product()
                     {
                         id = 0,
                         name = skipassProduct.productName.Trim(),
-                        sale_price = skipassProduct.settlementPrice + 15,
-                        market_price = skipassProduct.salePrice,
+                        sale_price = retailPrice,
+                        market_price = retailPrice,
                         cost = skipassProduct.settlementPrice,
                         type = "雪票",
                         shop_id = syncShopId,
                         category_id = syncCategoryId,
                         hidden = 0,
-                        start_date = DateTime.Parse("2024-10-1"),
-                        end_date = DateTime.Parse("2025-6-1"),
+                        start_date = season.Start,
+                        end_date = season.End,
                         intro = skipassProduct.orderDesc.Trim(),
                         principal = ""
 
@@ -506,8 +514,21 @@ namespace SnowmeetApi.Controllers
         }
 
 
+        // 会话是在职店员才算「能看进货价」；没传会话、会话无效、不是店员都按顾客处理
+        [NonAction]
+        private async Task<bool> CanSeeCostAsync(string? sessionKey, string sessionType)
+        {
+            if (string.IsNullOrWhiteSpace(sessionKey))
+            {
+                return false;
+            }
+            Staff? staff = await Util.GetStaffBySessionKey(_context, sessionKey, sessionType);
+            return SkipassSaleRules.CanSeeCost(staff);
+        }
+
         [HttpGet("{id}")]
-        public async Task<ActionResult<object>> GetProductById(int id)
+        public async Task<ActionResult<object>> GetProductById(int id, string? sessionKey = null,
+            string sessionType = "wechat_mini_openid")
         {
             var l = await _context.skiPassProduct.Include(s => s.dailyPrice)
                 .Join(_context.product, s => s.product_id, p => p.id,
@@ -528,8 +549,15 @@ namespace SnowmeetApi.Controllers
                     .FirstOrDefaultAsync(x => x.id == row.shop_id);
                 shopName = sh == null ? "" : (sh.name ?? "").Trim();
             }
+            // 顾客能看价格，但看不到进货价：商品 cost、每日结算价和建议售价只给店员
+            bool canSeeCost = await CanSeeCostAsync(sessionKey, sessionType);
+            if (!canSeeCost)
+            {
+                SkipassSaleRules.RedactDailyPrices(row.dailyPrice);
+            }
             return Ok(new { row.product_id, row.resort, row.rules, row.source, row.third_party_no,
-                row.name, shop = shopName, row.sale_price, row.market_price, row.cost, row.type, row.dailyPrice });
+                row.name, shop = shopName, row.sale_price, row.market_price,
+                cost = canSeeCost ? row.cost : null, row.type, row.dailyPrice });
         }
 
 
@@ -602,8 +630,21 @@ namespace SnowmeetApi.Controllers
                 }
             }
         }
+        // 自我游预存款余额只给店员看；顾客、没带会话的请求一律 401
         [HttpGet]
-        public async Task<ActionResult<double>> GetBalance()
+        public async Task<ActionResult<double>> GetBalance(string? sessionKey = null,
+            string sessionType = "wechat_mini_openid")
+        {
+            if (!await CanSeeCostAsync(sessionKey, sessionType))
+            {
+                return Unauthorized();
+            }
+            return Ok(await QueryBalance());
+        }
+
+        // 服务端内部（出票前查余额）直接调用，不经过 HTTP
+        [NonAction]
+        public async Task<double> QueryBalance()
         {
             SetParam(source);
             string postData = "{\"apikey\": \"" + apiKey + "\", \"custId\": " + custId + "}";
@@ -614,11 +655,11 @@ namespace SnowmeetApi.Controllers
             {
                 ZiwoyouQueryResult r = JsonConvert.DeserializeObject<ZiwoyouQueryResult>(reqLog.response.Trim());
                 ZiwoyouAccountBalance b = JsonConvert.DeserializeObject<ZiwoyouAccountBalance>(r.data.ToString());
-                return Ok(b.accountBalance);
+                return b.accountBalance;
             }
             catch
             {
-                return Ok(double.Parse("0"));
+                return 0;
             }
         }
 

@@ -16,6 +16,7 @@ using SnowmeetApi.Controllers.User;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using SixLabors.ImageSharp;
 using SnowmeetApi.Controllers.Order;
+using SnowmeetApi.Helpers;
 using Org.BouncyCastle.Asn1.Crmf;
 using System.Runtime.CompilerServices;
 using Microsoft.CodeAnalysis.CSharp;
@@ -539,7 +540,9 @@ namespace SnowmeetApi.Controllers
             } 
         }
 
-        [HttpGet]
+        // 向自我游真实下单、扣预存款。只能由 CreateSkiPass 等服务端流程调用：
+        // 它原来是公开的 [HttpGet] 且参数是整个 SkiPass 对象，外部可以自己拼一个对象绕过 ReserveSkiPass 的店员限制。
+        [NonAction]
         public async Task AutoReserve(Models.SkiPass skipass)
         {
             if (!skipass.status.Equals("已付款"))
@@ -567,7 +570,7 @@ namespace SnowmeetApi.Controllers
             {
                 outTradeNo = skipass.id.ToString() + Util.GetLongTimeStamp(DateTime.Now);
             }
-            double balance = (double)((OkObjectResult)(await _zwHelper.GetBalance()).Result).Value;
+            double balance = await _zwHelper.QueryBalance();
             //balance = 10000;
             if (balance <= skipass.deal_price)
             {
@@ -852,10 +855,29 @@ namespace SnowmeetApi.Controllers
             return _context.SkiPass.Any(e => e.product_id == id);
         }
         */
+        /// <summary>
+        /// 会话对应的在职店员；没带会话、会话无效、不是店员都返回 null。
+        /// </summary>
+        [NonAction]
+        private async Task<Staff?> GetStaffOrNull(string? sessionKey, string sessionType)
+        {
+            if (string.IsNullOrWhiteSpace(sessionKey))
+            {
+                return null;
+            }
+            return await Util.GetStaffBySessionKey(_context, sessionKey, sessionType);
+        }
+
         [HttpGet("{productId}")]
-        public async Task<ActionResult<object>> ReserveSkiPass(int productId, DateTime date, 
+        public async Task<ActionResult<object>> ReserveSkiPass(int productId, DateTime date,
             int count, string cell, string name, string sessionKey, string sessionType = "wechat_mini_openid", string idNo = "", int refereeMemberId = 0, int? staffId = null)
         {
+            // 只有在职店员能订票，顾客只能看价格。微信、支付宝小程序共用这个入口，在这里一处拦住；
+            // 页面上隐藏支付栏只是体验，不能当作限制。
+            if (!SkipassSaleRules.CanReserve(await GetStaffOrNull(sessionKey, sessionType)))
+            {
+                return BadRequest(SkipassSaleRules.STAFF_ONLY_MESSAGE);
+            }
             Models.Product product = await _context.product.FindAsync(productId);
             Models.SkiPassProduct skipassProduct = await _context.skiPassProduct.FindAsync(productId);
             SkipassDailyPrice dailyPrice = await _context.skipassDailyPrice
@@ -1100,7 +1122,8 @@ namespace SnowmeetApi.Controllers
             }
         }
         [HttpGet]
-        public async Task<ActionResult<List<SkipassWithPrice>>> GetProductsByResort(string resort, int showHidden = 0)
+        public async Task<ActionResult<List<SkipassWithPrice>>> GetProductsByResort(string resort, int showHidden = 0,
+            string? sessionKey = null, string sessionType = "wechat_mini_openid")
         {
             resort = Util.UrlDecode(resort);
             var l = await _context.skiPassProduct//.Include(s => s.dailyPrice)
@@ -1155,7 +1178,15 @@ namespace SnowmeetApi.Controllers
                 ret.Add(sp);
             }
 
-
+            // 顾客能看价格，但看不到进货价：商品 cost、每日结算价和建议售价只给店员（后台页要带 sessionKey）
+            if (!SkipassSaleRules.CanSeeCost(await GetStaffOrNull(sessionKey, sessionType)))
+            {
+                foreach (SkipassWithPrice sp in ret)
+                {
+                    sp.cost = null;
+                    SkipassSaleRules.RedactDailyPrices(sp.dailyPrice);
+                }
+            }
             return Ok(ret);
         }
 
@@ -1180,7 +1211,8 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet("{productId}")]
-        public async Task<ActionResult<SkipassWithPrice>> GetProduct(int productId)
+        public async Task<ActionResult<SkipassWithPrice>> GetProduct(int productId, string? sessionKey = null,
+            string sessionType = "wechat_mini_openid")
         {
             Product p = await _context.product.FindAsync(productId);
             Models.SkiPassProduct skipass = await _context.skiPassProduct.FindAsync(productId);
@@ -1206,6 +1238,11 @@ namespace SnowmeetApi.Controllers
                 type = p.type,
                 hidden = p.hidden
             };
+            if (!SkipassSaleRules.CanSeeCost(await GetStaffOrNull(sessionKey, sessionType)))
+            {
+                ret.cost = null;
+                SkipassSaleRules.RedactDailyPrices(ret.dailyPrice);
+            }
             return Ok(ret);
         }
 
