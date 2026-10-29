@@ -122,7 +122,7 @@ public sealed class TicketMigrationTests
         Assert.Equal(0,(await MiniTicket(f.Transfer(),"SetTicketToMiniShare","111111111","session-1")).code);
         Assert.Equal(0,(await MiniTicket(f.Transfer(),"AcceptMiniTicket","111111111","","session-2")).code);
         Assert.Single(await f.Db.ticketLog.Where(SnowmeetApi.Helpers.TicketTransferRules.TransferLogFilter()).ToListAsync());Assert.Equal(2,(await f.Db.ticket.FirstAsync(t=>t.code=="111111111")).member_id);
-        Assert.Single(await f.Db.ticket.Where(t=>t.create_memo=="转赠被领取回赠").ToListAsync());
+        Assert.Empty(await f.Db.ticket.Where(t=>t.create_memo=="转赠被领取回赠").ToListAsync());
     }
     [Theory][InlineData("expired")][InlineData("used")][InlineData("revoked")][InlineData("unshareable")]
     public async Task TransferRejectsInvalidCouponEvenIfFollowing(string state)
@@ -215,7 +215,9 @@ public sealed class TicketMigrationTests
     }
     [Fact] public async Task ConcurrentTransferHasOneCompletedLogAndOneReward()
     {
-        await using var f=await Fixture.Create();f.Db.ticket.Add(f.Ticket());await f.Db.SaveChangesAsync();
+        await using var f=await Fixture.Create();
+        f.Db.ticketTemplate.Add(new TicketTemplate {id=16,name="老顾客优惠券",memo="说明",sharable=1,valid=1});
+        var ticket=f.Ticket();ticket.template_id=16;f.Db.ticket.Add(ticket);await f.Db.SaveChangesAsync();
         Assert.Equal(0,(await MiniTicket(f.Transfer(),"SetTicketToMiniShare","111111111","session-1")).code);
         async Task<ApiResult<Ticket>> Accept(int member) { await using var db=f.NewContext(); return Result(await new TestTicketController(db,f.Config).AcceptMiniTicket("111111111","直接领取","session-"+member)); }
         var results=await Task.WhenAll(Accept(2),Accept(3));Assert.Single(results.Where(r=>r.code==0));

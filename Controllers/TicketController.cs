@@ -469,7 +469,7 @@ namespace SnowmeetApi.Controllers
         {
             try
             {
-                if (sender == null)
+                if (acceptedTicket == null || acceptedTicket.template_id == 12 || sender == null)
                 {
                     return;
                 }

@@ -75,7 +75,7 @@ public partial class TicketController
             ticket.shared = 0; ticket.shared_time = null;
             _context.Entry(ticket).State = EntityState.Modified;
             // Transfer, completed-transfer audit and reward commit together. Notification follows the commit.
-            if (sender != null && !string.IsNullOrWhiteSpace(sender.wechatMiniOpenId)) {
+            if (ticket.template_id != 12 && sender != null && !string.IsNullOrWhiteSpace(sender.wechatMiniOpenId)) {
                 TicketTemplate tpl = await _context.ticketTemplate.AsNoTracking().FirstOrDefaultAsync(t => t.id == ticket.template_id);
                 if (tpl != null) {
                     reward = new Ticket { code = await GetNewTicketCode(), template_id = tpl.id, name = (tpl.name ?? "").Trim(), memo = (tpl.memo ?? "").Trim(),
