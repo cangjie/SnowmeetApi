@@ -7552,7 +7552,7 @@ namespace SnowmeetApi.Controllers
             // 旧条件 i.status != "已归还" 会把「未发放」「已更换」也算成在租 → 从没发出去的装备也天天计租金（虚账根因）。
             // status 由 RentItemLog 派生（无领还事件=「未发放」），外层 ContinueRentOrder 已 Include rentItems.logs。
             if (rental.settled == 1 || rental.valid == 0
-            || rental.rentItems.Where(i => i.status == "已发放" || i.status == "暂存").Count() == 0
+            || rental.rentItems.Where(i => i.status == "已发放" || i.status == "暂存" || i.status == "已暂存").Count() == 0
             || rental.details.Where(d => ((DateTime)d.rental_date).Date == rentDate.Date).Count() > 0)
             {
                 return;

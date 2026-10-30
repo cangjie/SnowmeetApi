@@ -1147,7 +1147,8 @@ namespace SnowmeetApi.Models
                                     continue;
                                 }
                                 string itemStatus = item.status;
-                                if (itemStatus != "已发放" && itemStatus != "暂存")
+                                // 暂存接口写入的日志状态是「已暂存」，枚举名是「暂存」，两者都算已领出
+                                if (itemStatus != "已发放" && itemStatus != "暂存" && itemStatus != "已暂存")
                                 {
                                     allItemsIssuedOrNoNeed = false;
                                     break;
