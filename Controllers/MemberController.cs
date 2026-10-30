@@ -106,9 +106,67 @@ namespace SnowmeetApi.Controllers
                 ? session.wechat_openid.Trim() : member?.wechatMiniOpenId;
             return (member, openId);
         }
+        /// <summary>
+        /// 合并前检查：两个会员都是教练时不能合并（教练记录、学员卡和价格不能混在一起，需先停用其中一位并人工处理）。
+        /// 返回 null = 可以合并。
+        /// </summary>
+        [NonAction]
+        public async Task<string?> MergeBlockReasonAsync(int sourceId, int targetId)
+        {
+            bool sourceCoach = await _db.coach.AsNoTracking().AnyAsync(c => c.member_id == sourceId);
+            bool targetCoach = await _db.coach.AsNoTracking().AnyAsync(c => c.member_id == targetId);
+            return sourceCoach && targetCoach ? "两个会员都是教练，不能直接合并，请先在教练列表里处理其中一位" : null;
+        }
+
+        // 教练身份、学员卡及其使用记录随会员合并迁到目标会员（2026-10-30）。
+        // 目标会员本雪季已领过同一位教练的卡时，来源这张不迁移而是作废（status=merged），否则唯一索引会让整个 SaveChanges 失败。
+        private async Task MergeCoachDataAsync(int sourceId, int targetId, int traceId)
+        {
+            List<Coach> coaches = await _db.coach.Where(c => c.member_id == sourceId).ToListAsync();
+            foreach (Coach coach in coaches)
+            {
+                coach.member_id = targetId;
+                coach.update_date = DateTime.Now;
+                _db.coach.Entry(coach).State = EntityState.Modified;
+                await _db.coreDataModLog.AddAsync(CoreDataModLog.CreateManualLog("coach", "member_id", coach.id, "用户批量合并",
+                    null, null, sourceId.ToString(), targetId.ToString(), "教练身份迁移"));
+            }
+            List<CoachCard> cards = await _db.coachCard.Where(c => c.member_id == sourceId && c.status != CoachCard.StatusMerged).ToListAsync();
+            foreach (CoachCard card in cards)
+            {
+                bool duplicate = card.status == CoachCard.StatusClaimed && await _db.coachCard.AsNoTracking().AnyAsync(c =>
+                    c.coach_id == card.coach_id && c.member_id == targetId && c.status == CoachCard.StatusClaimed
+                    && c.season_end_year == card.season_end_year);
+                if (duplicate)
+                {
+                    card.status = CoachCard.StatusMerged;
+                    card.update_date = DateTime.Now;
+                    _db.coachCard.Entry(card).State = EntityState.Modified;
+                    await _db.coreDataModLog.AddAsync(CoreDataModLog.CreateManualLog("coach_card", "status", card.id, "用户批量合并",
+                        null, null, "claimed", "merged", "目标会员本雪季已有该教练的学员卡，来源这张作废"));
+                    continue;
+                }
+                card.member_id = targetId;
+                card.update_date = DateTime.Now;
+                _db.coachCard.Entry(card).State = EntityState.Modified;
+                await _db.coreDataModLog.AddAsync(CoreDataModLog.CreateManualLog("coach_card", "member_id", card.id, "用户批量合并",
+                    null, null, sourceId.ToString(), targetId.ToString(), "学员卡迁移"));
+            }
+            List<CoachCardUse> uses = await _db.coachCardUse.Where(u => u.member_id == sourceId).ToListAsync();
+            foreach (CoachCardUse use in uses)
+            {
+                use.member_id = targetId;
+                _db.coachCardUse.Entry(use).State = EntityState.Modified;
+            }
+        }
         [NonAction]
         public async Task MergeMember(int sourceId, int targetId)
         {
+            string? blocked = await MergeBlockReasonAsync(sourceId, targetId);
+            if (blocked != null)
+            {
+                throw new InvalidOperationException(blocked);
+            }
             int traceId = (DateTime.Now - DateTime.Parse("1970-01-01")).Milliseconds;
             Member sourceMember = await _db.member.FindAsync(sourceId);
             Member targetMember = await _db.member.FindAsync(targetId);
@@ -260,6 +318,7 @@ namespace SnowmeetApi.Controllers
                 };
                 await _db.coreDataModLog.AddAsync(logTicket);
             }
+            await MergeCoachDataAsync(sourceId, targetId, traceId);
             await _db.SaveChangesAsync();
             // 源会员的微信/支付宝等社交账号不迁移（上面已全部 valid=0）；
             // 仅把源会员手机号以 type=contact（联系手机号）挂到目标会员，不作为登录/身份主手机号（type=cell）

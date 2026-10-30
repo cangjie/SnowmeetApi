@@ -20,6 +20,20 @@ public partial class TicketController
     private Task<bool> IsMiniTransferTemplateEnabled(int templateId) => _context.ticketTemplate.AsNoTracking()
         .AnyAsync(t => t.id == templateId && t.valid == 1 && t.sharable == 1);
 
+    // 教练券（管理员批量发给教练的，coach_coupon_grant 里有记录）：不受「仅模板 12、16 可转赠」和「模板 sharable=1」限制，
+    // 只要券本身可用、模板有效就能转发给学员。普通顾客之间的转赠规则不变。
+    private static bool CanMiniTransferIgnoringTemplate(Ticket ticket, DateTime now) => ticket != null && ticket.valid == 1
+        && ticket.used != 1 && ticket.is_active == 1 && TicketTransferRules.IsNotExpired(ticket, now);
+
+    private async Task<bool> CanMiniTransferNowAsync(Ticket ticket, DateTime now)
+    {
+        if (ticket == null) return false;
+        if (await _context.coachCouponGrant.AsNoTracking().AnyAsync(g => g.ticket_code == ticket.code))
+            return CanMiniTransferIgnoringTemplate(ticket, now)
+                && await _context.ticketTemplate.AsNoTracking().AnyAsync(t => t.id == ticket.template_id && t.valid == 1);
+        return CanMiniTransfer(ticket, now) && await IsMiniTransferTemplateEnabled(ticket.template_id);
+    }
+
     [HttpGet("{code}")]
     public async Task<ActionResult<ApiResult<Ticket>>> SetTicketToMiniShare(string code, string sessionKey,
         string sessionType = "wechat_mini_openid")
@@ -29,7 +43,7 @@ public partial class TicketController
         var result = await MiniTicketTransaction.Run(_context, async () => {
             Ticket ticket = await _context.ticket.AsNoTracking().FirstOrDefaultAsync(t => t.code == code);
             if (ticket == null || ticket.member_id != member.id) return MiniTransferError("优惠券不存在");
-            if (!CanMiniTransfer(ticket, DateTime.Now) || !await IsMiniTransferTemplateEnabled(ticket.template_id))
+            if (!await CanMiniTransferNowAsync(ticket, DateTime.Now))
                 return MiniTransferError("该优惠券当前不可转赠");
             DateTime sharedTime = MiniTicketRules.ShareTime();
             // If a user starts two shares within the SQL datetime precision, the new share still needs a new marker.
@@ -56,7 +70,7 @@ public partial class TicketController
         Ticket reward = null; Member sender = null;
         ApiResult<Ticket> result = await MiniTicketTransaction.Run(_context, async () => {
             Ticket ticket = await _context.ticket.AsNoTracking().FirstOrDefaultAsync(t => t.code == code);
-            if (!CanMiniTransfer(ticket, DateTime.Now) || !await IsMiniTransferTemplateEnabled(ticket.template_id)
+            if (!await CanMiniTransferNowAsync(ticket, DateTime.Now)
                 || !await MiniTicketRules.HasCurrentMarker(_context, ticket))
                 return MiniTransferError("该优惠券当前不可接受，链接可能已失效");
             if (ticket.member_id == accepter.id) return MiniTransferError("不能转赠给自己");
@@ -75,7 +89,9 @@ public partial class TicketController
             ticket.shared = 0; ticket.shared_time = null;
             _context.Entry(ticket).State = EntityState.Modified;
             // Transfer, completed-transfer audit and reward commit together. Notification follows the commit.
-            if (ticket.template_id != 12 && sender != null && !string.IsNullOrWhiteSpace(sender.wechatMiniOpenId)) {
+            // 教练转发不回赠（2026-10-30）：回赠会让教练每转出一张被接受的券就再得一张，等于无限刷券
+            bool senderIsCoach = sender != null && await _context.coach.AsNoTracking().AnyAsync(c => c.member_id == sender.id);
+            if (ticket.template_id != 12 && !senderIsCoach && sender != null && !string.IsNullOrWhiteSpace(sender.wechatMiniOpenId)) {
                 TicketTemplate tpl = await _context.ticketTemplate.AsNoTracking().FirstOrDefaultAsync(t => t.id == ticket.template_id);
                 if (tpl != null) {
                     reward = new Ticket { code = await GetNewTicketCode(), template_id = tpl.id, name = (tpl.name ?? "").Trim(), memo = (tpl.memo ?? "").Trim(),

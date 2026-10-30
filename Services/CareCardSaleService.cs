@@ -278,7 +278,7 @@ IF @result < 0 THROW 51010, N'操作繁忙，请稍后重试', 1;");
             var project = preview.projects.Single(p => p.careId == care.id);
             care.need_edge = project.need_edge; care.need_wax = project.need_wax;
             care.need_unwax = project.need_unwax; care.free_wax = project.free_wax; care.edge_degree = project.edge_degree;
-            care.use_card = false; care.card_id = null; care.card_name = null; care.ticket_code = null;
+            care.use_card = false; care.card_id = null; care.card_name = null; care.ticket_code = null; care.coach_card_id = null;
             care.common_charge = project.common_charge; care.discount = project.discount; care.ticket_discount = 0;
             if (care.summer != null) care.biz_type = "非雪季养护";
             else if (care.biz_type == "非雪季养护") care.biz_type = null;

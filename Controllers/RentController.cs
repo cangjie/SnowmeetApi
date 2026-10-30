@@ -7,6 +7,8 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using SnowmeetApi.Data;
+using SnowmeetApi.Helpers;
+using SnowmeetApi.Services.CoachPlatform;
 using SnowmeetApi.Models;
 using SnowmeetApi.Models.Rent;
 using SnowmeetApi.Models.Users;
@@ -4149,6 +4151,20 @@ namespace SnowmeetApi.Controllers
                 });
             }
             order.needRender = false;
+            // 学员卡校验（2026-10-30）：所选的卡必须属于该订单会员、已领取、在有效期内，否则清掉，不让无效卡留在草稿里
+            for (int i = 0; i < order.rentals.Count; i++)
+            {
+                if (order.rentals[i].coach_card_id == null)
+                {
+                    continue;
+                }
+                CoachCard? pickedCard = order.member_id == null ? null
+                    : await _db.coachCard.Where(c => c.id == order.rentals[i].coach_card_id).AsNoTracking().FirstOrDefaultAsync();
+                if (order.member_id == null || !CoachCardRules.IsEffective(pickedCard, order.member_id.Value, DateTime.Now))
+                {
+                    order.rentals[i].coach_card_id = null;
+                }
+            }
             // 找回中断单时前端会原样带回 GetReceptingOrder 包含的 member / memberSocialAccounts 导航对象。
             // 下面 else 分支的 _db.Update(order) 会把整图标脏级联更新（含 member 子图），SaveChanges 抛错被
             // try/catch 静默吞掉 → 租金修改、新增套餐全都不落库。SaveRentRecept 只管 order 标量 + rentals 子图，
@@ -4611,6 +4627,30 @@ namespace SnowmeetApi.Controllers
             });
 
         }
+        // 学员卡（某某教练的学员卡，2026-10-30）：租赁开单页「优惠券/卡」选的那张，落 rental.coach_card_id。
+        // 租赁只有一个折扣率（各店各项目通用）：某一天的日租金优惠 = 日租金 × (1 − 卡内租赁折扣率)。
+        // 价格由客户端预设、服务端原先不校验，所以学员卡优惠必须在这里（生效 / 每日续租的唯一落库口）服务端强制，
+        // 客户端选卡后的预填只是提示。店员手改过价格（preset.manual）的不叠加学员卡，以店员为准。
+        [NonAction]
+        private async Task<(CoachCard? card, double discount)> CoachRentalDiscountAsync(Models.Rental rental, DateTime date, double amount)
+        {
+            if (rental == null || rental.coach_card_id == null || amount <= 0)
+            {
+                return (null, 0);
+            }
+            int? memberId = await _db.order.Where(o => o.id == rental.order_id).AsNoTracking().Select(o => o.member_id).FirstOrDefaultAsync();
+            if (memberId == null)
+            {
+                return (null, 0);
+            }
+            CoachCard? card = await _db.coachCard.Where(c => c.id == rental.coach_card_id).AsNoTracking().FirstOrDefaultAsync();
+            if (!CoachCardRules.IsEffectiveOnDate(card, memberId.Value, date))
+            {
+                return (null, 0);
+            }
+            double coachDiscount = CoachPricingService.QuoteRentalDiscount(card!, amount);
+            return coachDiscount > 0 ? (card, coachDiscount) : (null, 0);
+        }
         [NonAction]
         public async Task<Models.RentalDetail?> SetRentalDetail(int rentalId, DateTime date, int? staffId)
         {
@@ -4696,6 +4736,21 @@ namespace SnowmeetApi.Controllers
             {
                 price = rentPrice.price;
             }
+            // 学员卡：与预设减免取大（不叠加）；店员手改价（manual）的不套
+            CoachCard? coachCard = null;
+            double coachDiscount = 0;
+            if (!(preset != null && preset.manual))
+            {
+                (coachCard, coachDiscount) = await CoachRentalDiscountAsync(rental, date, (double)price);
+                if (coachCard != null && coachDiscount > discount)
+                {
+                    discount = coachDiscount;
+                }
+                else
+                {
+                    coachCard = null;
+                }
+            }
             Models.RentalDetail detail = new Models.RentalDetail()
             {
                 id = 0,
@@ -4734,6 +4789,12 @@ namespace SnowmeetApi.Controllers
                 await _db.coreDataModLog.AddAsync(logD);
                 await _db.discount.AddAsync(discountObj);
                 await _db.SaveChangesAsync();
+            }
+            if (coachCard != null)
+            {
+                // 每个租赁日一条使用记录（biz_id = rental.id，sub_biz_id = 当天 rental_detail.id），重复生效只记一次
+                await new CoachPricingService(_db).RecordUseAsync(coachCard, rental.order_id, "租赁", rental.id, detail.id,
+                    CoachCardRules.ModeRate, coachCard.rental_rate_snapshot ?? 0, (double)price, coachDiscount, DateTime.Now);
             }
 
             return detail;
@@ -7543,6 +7604,21 @@ namespace SnowmeetApi.Controllers
                     newPrice = manualPreset.price;
                 }
             }
+            // 学员卡：沿用租赁开单时选的卡（rental.coach_card_id），按当天日租金折扣；店员手改过价的租赁不套
+            CoachCard? coachCard = null;
+            double coachDiscount = 0;
+            if (!rental.pricePresets.Any(p => p.manual))
+            {
+                (coachCard, coachDiscount) = await CoachRentalDiscountAsync(rental, rentDate, newPrice);
+                if (coachCard != null && coachDiscount > (discountAmount ?? 0))
+                {
+                    discountAmount = coachDiscount;
+                }
+                else
+                {
+                    coachCard = null;
+                }
+            }
             Models.RentalDetail detail = new Models.RentalDetail()
             {
                 id = 0,
@@ -7579,6 +7655,11 @@ namespace SnowmeetApi.Controllers
 
                 await _db.discount.AddAsync(discountObj);
                 await _db.SaveChangesAsync();
+            }
+            if (coachCard != null)
+            {
+                await new CoachPricingService(_db).RecordUseAsync(coachCard, rental.order_id, "租赁", rental.id, detail.id,
+                    CoachCardRules.ModeRate, coachCard.rental_rate_snapshot ?? 0, newPrice, coachDiscount, DateTime.Now);
             }
         }
         [HttpGet]

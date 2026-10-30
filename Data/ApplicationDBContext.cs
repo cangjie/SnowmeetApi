@@ -20,6 +20,7 @@ namespace SnowmeetApi.Data
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             FnbSchemaConfiguration.Configure(modelBuilder, Database.IsSqlServer());
+            CoachSchemaConfiguration.Configure(modelBuilder);
             modelBuilder.Entity<Order>().Property(x => x.order_source).HasColumnType("varchar(32)");
             modelBuilder.Entity<Order>().Property(x => x.source_order_no).HasColumnType("varchar(128)");
             modelBuilder.Entity<MaintainLive>().HasKey(c => c.id);
@@ -189,6 +190,11 @@ namespace SnowmeetApi.Data
         public DbSet<TicketTemplate> ticketTemplate { get; set; }
         public DbSet<TicketShareBatch> ticketShareBatch { get; set; }
         public DbSet<TicketShareClaim> ticketShareClaim { get; set; }
+        public DbSet<Coach> coach { get; set; }
+        public DbSet<CoachCarePrice> coachCarePrice { get; set; }
+        public DbSet<CoachCard> coachCard { get; set; }
+        public DbSet<CoachCardUse> coachCardUse { get; set; }
+        public DbSet<CoachCouponGrant> coachCouponGrant { get; set; }
         public DbSet<Card> card { get; set; }
         public DbSet<Printer> printer { get; set; }
         public DbSet<PrintTask> printTask { get; set; }

@@ -763,6 +763,9 @@ namespace SnowmeetApi.Controllers
                 return Ok(new ApiResult<object>() { code = 1, message = "目标会员已被合并，不能作为合并目标", data = null });
 
             MemberController memberHelper = new MemberController(_db, _config);
+            string? coachBlock = await memberHelper.MergeBlockReasonAsync(sourceMemberId, targetMemberId);
+            if (coachBlock != null)
+                return Ok(new ApiResult<object>() { code = 1, message = coachBlock, data = null });
             await memberHelper.MergeMember(sourceMemberId, targetMemberId);
             return Ok(new ApiResult<object>() { code = 0, message = "", data = new { sourceMemberId, targetMemberId } });
         }

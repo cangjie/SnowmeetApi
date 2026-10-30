@@ -36,6 +36,12 @@ namespace SnowmeetApi.Models
         public int valid { get; set; } = 0;
         //public int? staff_id {get; set;}
 
+        /// <summary>
+        /// 是否管理员批量发给教练的券（coach_coupon_grant 里有记录）。教练券不受「仅模板 12、16 可转赠」限制，
+        /// 客户端据此决定是否显示转发按钮。只在 FillCardFields 里填，不入库。
+        /// </summary>
+        [NotMapped]
+        public bool coachGranted { get; set; } = false;
         [NotMapped]
         public string status
         {

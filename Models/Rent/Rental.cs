@@ -36,6 +36,9 @@ namespace SnowmeetApi.Models
         public DateTime? append_commit_time {get; set;} = null;
         public string? pick_type {get; set;} = null;
         public bool use_card {get; set;} = false;
+        // 学员卡（2026-10-30 加 DB 列）：租赁开单页「优惠券/卡」选的那张，日租金按卡内租赁折扣率优惠；
+        // SetRentalDetail / ContinueRental 核销时服务端强制并校验
+        public int? coach_card_id { get; set; } = null;
         public DateTime? update_date { get; set; } = null;
         public DateTime create_date { get; set; } = DateTime.Now;
         public List<RentItem> rentItems { get; set; } = new List<RentItem>();

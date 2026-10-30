@@ -340,10 +340,10 @@ namespace SnowmeetApi.Controllers.Order
                 int orderId = linkedCare?.id ?? order.id;
                 var careBenefits = await _db.care
                     .Where(c => c.order_id == orderId && c.valid == 1)
-                    .Select(c => new { c.ticket_code, c.use_card })
+                    .Select(c => new { c.ticket_code, c.use_card, c.coach_card_id })
                     .AsNoTracking().ToListAsync();
                 bool usesBenefit = linkedCare != null || SnowmeetApi.Helpers.OrderVerifiedRules.CareUsesBenefit(order.pay_with_deposit,
-                    careBenefits.Select(c => (c.ticket_code, c.use_card)));
+                    careBenefits.Select(c => (c.ticket_code ?? (c.coach_card_id != null ? "coach-card" : null), c.use_card)));
                 if (SnowmeetApi.Helpers.OrderVerifiedRules.CareRequiresMemberPayer(usesBenefit, linkedCare?.wechat_unverified ?? order.wechat_unverified))
                 {
                     result.status = "care_member_required";

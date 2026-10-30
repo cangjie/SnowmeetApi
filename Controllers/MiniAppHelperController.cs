@@ -266,6 +266,7 @@ namespace SnowmeetApi.Controllers
             sessionObj.member = member;
             StaffController _staffHelper = new StaffController(_db);
             sessionObj.staff = await _staffHelper.GetStaffBySocialNum(openId, "wechat_mini_openid", DateTime.Now);
+            if (member != null) sessionObj.coach = await SnowmeetApi.Services.CoachPlatform.CoachBrief.ForMemberAsync(_db, member.id);
             sessionObj.openid = "";
             sessionObj.unionid = "";
             result.code = 0;
@@ -851,6 +852,8 @@ namespace SnowmeetApi.Controllers
             public Member member { get; set; } = null;
             [NotMapped]
             public Staff staff { get; set; } = null;
+            /// <summary>该会员若是教练：id 和显示名（教练首页入口、「我是教练」用）。不是教练为空。</summary>
+            public SnowmeetApi.Services.CoachPlatform.CoachBrief? coach { get; set; } = null;
         }
 
         protected class AccessToken

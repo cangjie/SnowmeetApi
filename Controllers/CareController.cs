@@ -11,6 +11,7 @@ using SnowmeetApi.Data;
 using SnowmeetApi.Helpers;
 using SnowmeetApi.Models;
 using SnowmeetApi.Services;
+using SnowmeetApi.Services.CoachPlatform;
 namespace SnowmeetApi.Controllers
 {
     [Route("api/[controller]/[action]")]
@@ -458,6 +459,64 @@ namespace SnowmeetApi.Controllers
             }
             return (commonCharge, ticketDiscount);
         }
+        // 学员卡（某某教练的学员卡，2026-10-30）：店员在开单页「优惠券/卡」弹层里选的那张，落 care.coach_card_id。
+        // 与券、会员卡互斥（同一件装备只能选一个）；不做自动比价，选哪个用哪个。
+        // 学员卡只作用于养护服务费里单项/双项的基础价：维修费不打折，加急加价不打折；
+        // 质保/招待/非雪季养护/没有计费项的单不享受（卡不报错，只是没有优惠）。
+        // 价格按卡内领取时的快照取（门店 × 单项/双项那一格），折扣率或一口价。
+        [NonAction]
+        public async Task<(double commonCharge, double ticketDiscount, CoachCareQuote? coach)> CalcChargeWithCoach(
+            string shop, Care care, Ticket? ticket, PunchCard? card, int? memberId)
+        {
+            if (care.coach_card_id == null)
+            {
+                var (c0, t0) = await CalcCharge(shop, care, ticket, card);
+                return (c0, t0, null);
+            }
+            if (ticket != null || card != null || care.use_card || !string.IsNullOrWhiteSpace(care.ticket_code))
+            {
+                throw new InvalidOperationException("学员卡不能与优惠券、会员卡同时使用，请只选一个");
+            }
+            if (memberId == null)
+            {
+                throw new InvalidOperationException("散客不能使用学员卡，请先登记会员");
+            }
+            CoachPricingService coachPricing = new CoachPricingService(_db);
+            CoachCard? coachCard = await coachPricing.GetEffectiveCardAsync(care.coach_card_id.Value, memberId.Value, DateTime.Now);
+            if (coachCard == null)
+            {
+                throw new InvalidOperationException("所选学员卡已不可用（不属于该会员、已撤销或已过期），请重新选择");
+            }
+            var (commonCharge, _) = await CalcCharge(shop, care, null, null);
+            return (commonCharge, 0, await BuildCoachQuoteAsync(shop, care, coachCard, commonCharge));
+        }
+
+        // 学员卡报价：不校验卡的有效性（调用方负责）。质保/招待/非雪季养护/没有服务费的单不享受，返回 null。
+        // 加急单：教练价只作用于不含加急加价的单/双项基础价；没有加急商品的店按非加急价收，加价为 0。
+        [NonAction]
+        public async Task<CoachCareQuote?> BuildCoachQuoteAsync(string shop, Care care, CoachCard coachCard, double commonCharge)
+        {
+            if (care.warranty || care.entertain || !string.IsNullOrWhiteSpace(care.summer) || commonCharge <= 0)
+            {
+                return null;
+            }
+            double basePrice = commonCharge;
+            if (care.urgent == 1)
+            {
+                Care nonUrgent = new Care
+                {
+                    equipment = care.equipment, need_edge = care.need_edge, need_wax = care.need_wax, free_wax = care.free_wax,
+                    need_unwax = care.need_unwax, summer = care.summer, biz_type = care.biz_type, urgent = 0
+                };
+                Models.Product? baseProduct = await GetProduct(shop, nonUrgent);
+                if (baseProduct != null)
+                {
+                    basePrice = Math.Min(baseProduct.sale_price, commonCharge);
+                }
+            }
+            return await new CoachPricingService(_db).QuoteCareAsync(coachCard, shop, care, commonCharge, basePrice);
+        }
+
         // 季卡是否「还没开卡」：三项装备信息都为空 = 尚未绑定到具体装备，第一次用它养护时才绑。
         // 判定口径必须与前端 care_recept_form 的「即将开卡」提示一致，否则会出现
         // 「界面提示要开卡、生效时却没写」或反过来的情况。
@@ -660,7 +719,8 @@ namespace SnowmeetApi.Controllers
                 ApplyServiceLinkage(care, req.changedField.Trim());
             }
             double commonCharge, ticketDiscount;
-            try { (commonCharge, ticketDiscount) = await CalcCharge(shop.Trim(), care, ticket, card); }
+            CoachCareQuote? coach;
+            try { (commonCharge, ticketDiscount, coach) = await CalcChargeWithCoach(shop.Trim(), care, ticket, card, memberId); }
             catch (InvalidOperationException e)
             {
                 return Ok(new ApiResult<object> { code = 1, message = e.Message, data = null });
@@ -682,12 +742,17 @@ namespace SnowmeetApi.Controllers
                 // 店员之后手动加大的减免（如老板临时再让利）保留，不被重算碾回券面值；低于券面才补齐
                 care.discount = ticketDiscount;
             }
+            if (coach != null && coach.discount > 0 && care.discount < coach.discount)
+            {
+                // 学员卡优惠同样取「保底」：店员手动加大的减免保留，低于卡面才补齐
+                care.discount = coach.discount;
+            }
             // 返回整个 care：联动/推导后的服务项 + 计费结果都在其中，前端以此为真理之源回填
             return Ok(new ApiResult<object>()
             {
                 code = 0,
                 message = "",
-                data = new { commonCharge, ticketDiscount, care }
+                data = new { commonCharge, ticketDiscount, care, coach }
             });
         }
         [NonAction]
@@ -1056,6 +1121,26 @@ namespace SnowmeetApi.Controllers
                         _db.ticket.Entry(ticket).State = EntityState.Modified;
                     }
                 }
+                // 学员卡核销（2026-10-30）：本单该 care 选了某某教练的学员卡 → 记一笔使用，归属到这位教练。
+                // 幂等：coach_card_use 按 (养护, care.id, 0) 唯一，支付回调 / 重复调用 EffectCareOrder 只记一次。
+                // 不再校验卡当前是否仍有效——定价（PlaceCareOrder）时已校验，付款后才被撤销的卡，这一单照常归属。
+                if (care.coach_card_id != null)
+                {
+                    CoachCard? coachCard = await _db.coachCard.AsNoTracking().FirstOrDefaultAsync(c => c.id == care.coach_card_id && c.member_id != null);
+                    if (coachCard != null)
+                    {
+                        CoachCareQuote? coachQuote = await BuildCoachQuoteAsync(order.shop, care, coachCard, care.common_charge);
+                        if (coachQuote != null && coachQuote.discount > 0)
+                        {
+                            CoachCardUse? coachUse = await new CoachPricingService(_db).NewUseAsync(coachCard, order.id, "养护", care.id, 0,
+                                coachQuote.mode, coachQuote.value, coachQuote.baseAmount, Math.Min(coachQuote.discount, care.discount), DateTime.Now);
+                            if (coachUse != null)
+                            {
+                                await _db.coachCardUse.AddAsync(coachUse);
+                            }
+                        }
+                    }
+                }
                 // 次卡核销：本单该 care 用了会员卡 → 抵 1 次 + 写 punch_card_used。
                 // 季卡（total==null）不扣次数、仍记录使用（供「上次使用时间」）。幂等：已有本 care 记录则跳过，
                 // 防支付回调 / 重复调用 EffectCareOrder 重复扣。镜像 RentController.UseRentalPunchCard。
@@ -1210,6 +1295,9 @@ namespace SnowmeetApi.Controllers
                                         cancelReason == null ? "" : Util.UrlDecode(cancelReason));
                                     await ReverseCareTicketsAsync(careCancel, staff.id, scene,
                                         cancelReason == null ? "" : Util.UrlDecode(cancelReason));
+                                    // 学员卡：卡可重复使用，取消只是把这一件的使用记录置为已反向，不影响卡本身
+                                    await new CoachPricingService(_db).ReverseUseAsync("养护", careCancel.id, 0,
+                                        "取消养护：" + (cancelReason == null ? "" : Util.UrlDecode(cancelReason)), DateTime.Now);
                                     careCancel.is_cancel = true;
                                     careCancel.cancel_reason = cancelReason != null ? Util.UrlDecode(cancelReason) : null;
                                     careCancel.update_date = DateTime.Now;

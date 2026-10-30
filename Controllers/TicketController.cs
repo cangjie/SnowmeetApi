@@ -149,6 +149,14 @@ namespace SnowmeetApi.Controllers
             {
                 return;
             }
+            // 教练券标记：客户端据此给教练券显示转发按钮（普通券仍只认模板 12、16）
+            List<string> allCodes = tickets.Select(t => t.code).Distinct().ToList();
+            HashSet<string> coachCodes = (await _context.coachCouponGrant.AsNoTracking()
+                .Where(g => allCodes.Contains(g.ticket_code)).Select(g => g.ticket_code).ToListAsync()).ToHashSet();
+            foreach (Ticket coachTicket in tickets)
+            {
+                coachTicket.coachGranted = coachCodes.Contains(coachTicket.code);
+            }
             Dictionary<string, DateTime> transferTimes = new Dictionary<string, DateTime>();
             // 未使用列表要区分"转赠领来的"和"自己获得的"，已分享-已接受要拿最后一次转赠时间；
             // 已使用 / 已分享-未接受 用不到转赠记录，省掉这次查询。

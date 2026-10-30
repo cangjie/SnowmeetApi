@@ -3278,7 +3278,8 @@ namespace SnowmeetApi.Controllers
                     }
                 }
                 double commonCharge, ticketDiscount;
-                try { (commonCharge, ticketDiscount) = await _careHelper.CalcCharge(order.shop, care, ticket, card); }
+                SnowmeetApi.Services.CoachPlatform.CoachCareQuote coachQuote;
+                try { (commonCharge, ticketDiscount, coachQuote) = await _careHelper.CalcChargeWithCoach(order.shop, care, ticket, card, order.member_id); }
                 catch (InvalidOperationException e)
                 {
                     return Ok(new ApiResult<Models.Order> { code = 1, message = e.Message, data = null });
@@ -3299,6 +3300,11 @@ namespace SnowmeetApi.Controllers
                     // 低于券面才补齐。曾把店员录入 229.99 无条件碾回 30 → 界面 0.01 下单后变 200（2026-07-15）
                     care.discount = ticketDiscount;
                 }
+                if (coachQuote != null && coachQuote.discount > 0 && care.discount < coachQuote.discount)
+                {
+                    // 学员卡优惠同样取「保底」（与 CalcCareCharge 同口径）：店员手动加大的减免保留，低于卡面才补齐
+                    care.discount = coachQuote.discount;
+                }
                 care.member_pick_date = care.urgent == 1 ? DateTime.Now.Date : DateTime.Now.Date.AddDays(1);
                 care.valid = 1;
                 care.update_date = DateTime.Now;
@@ -3318,7 +3324,8 @@ namespace SnowmeetApi.Controllers
             // 纯质保/招待 0 元单（无权益消耗）照旧立即生效。
             bool usedBenefit = useDeposit
                 || order.cares.Any(c => c.use_card)
-                || order.cares.Any(c => !string.IsNullOrWhiteSpace(c.ticket_code));
+                || order.cares.Any(c => !string.IsNullOrWhiteSpace(c.ticket_code))
+                || order.cares.Any(c => c.coach_card_id != null);   // 学员卡也是会员权益：0 元单要核验本人后再生效
             if (total == 0 && !usedBenefit)
             {
                 order.dealed = 1;
