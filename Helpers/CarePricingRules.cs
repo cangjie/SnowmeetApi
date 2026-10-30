@@ -67,6 +67,46 @@ namespace SnowmeetApi.Helpers
         /// <summary>老顾客优惠券。唯一一个曾经写死在代码里的券优惠。</summary>
         public const int LegacyDiscountTemplateId = 16;
 
+        /// <summary>
+        /// 万龙服务中心「只选了刮蜡」的一口价（用户 2026-10-30 提出）：
+        /// 会员之前有过消费记录（老会员，口径见 MemberConsumption）80 元，否则 100 元。
+        /// 刮蜡和别的项目一起选、以及其他门店，都不走这条，保持上面的原有计费。
+        /// </summary>
+        public const string ScrapeOnlyShop = "万龙服务中心";
+        public const double ScrapeOnlyOldMemberPrice = 80;
+        public const double ScrapeOnlyNewMemberPrice = 100;
+
+        /// <summary>
+        /// care 上只勾了刮蜡：没有修刃、热蜡、机打蜡，也不是非雪季、会员卡、质保、招待。
+        /// 立等、维修等不影响「只刮蜡」的判定。
+        /// </summary>
+        public static bool IsScrapeOnly(Care care)
+        {
+            if (care == null)
+            {
+                return false;
+            }
+            bool summer = !string.IsNullOrWhiteSpace(care.summer)
+                || (care.biz_type != null && care.biz_type.Trim() == SummerBizType);
+            return care.need_unwax == 1 && care.need_edge != 1 && care.need_wax != 1 && care.free_wax != 1
+                && !summer && !care.use_card && !care.warranty && !care.entertain;
+        }
+
+        /// <summary>
+        /// 这件 care 在这家店是否按「单刮蜡一口价」收费。
+        /// 门店先走 ResolveCareShop 归并（万龙体验中心 → 万龙服务中心）：PlaceCareOrder 下单前会先改写 order.shop，
+        /// 开单页预览传的是原店名，不归并预览和下单就会各算各的。
+        /// </summary>
+        public static bool AppliesScrapeOnlyPrice(string? shop, Care care)
+        {
+            return ResolveCareShop(shop) == ScrapeOnlyShop && IsScrapeOnly(care);
+        }
+
+        public static double ScrapeOnlyPrice(bool isOldMember)
+        {
+            return isOldMember ? ScrapeOnlyOldMemberPrice : ScrapeOnlyNewMemberPrice;
+        }
+
         /// <summary>计费项数：修刃 + 热打蜡，各算一项；机打蜡和刮蜡不计。</summary>
         public static int CountChargeableItems(Care care)
         {

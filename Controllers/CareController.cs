@@ -393,8 +393,11 @@ namespace SnowmeetApi.Controllers
         // 按 template_id == 16 硬编码的（且不看门店）；现在改为读 product_ticket_template.discount_amount。
         // 表里没配到规则时回退到那套老写死规则（CarePricingRules.LegacyTicketDiscount），
         // 所以漏配门店的商品也不会让顾客的券白拿。
+        //
+        // 2026-10-30：万龙服务中心「只选了刮蜡」按一口价收（老会员 80 / 其他 100，见 CarePricingRules.ScrapeOnly*），
+        // 券不参与（没有商品可匹配，本来也没有优惠）；memberId 只用来判定老会员，不传 = 没有会员 = 100。
         [NonAction]
-        public async Task<(double commonCharge, double ticketDiscount)> CalcCharge(string shop, Care care, Ticket? ticket, PunchCard? card = null)
+        public async Task<(double commonCharge, double ticketDiscount)> CalcCharge(string shop, Care care, Ticket? ticket, PunchCard? card = null, int? memberId = null)
         {
             if (care.use_card || care.warranty || care.entertain)
             {
@@ -437,6 +440,10 @@ namespace SnowmeetApi.Controllers
                 }
                 return (0, 0);
             }
+            if (CarePricingRules.AppliesScrapeOnlyPrice(shop, care))
+            {
+                return (CarePricingRules.ScrapeOnlyPrice(await MemberConsumption.HasPaidOrderAsync(_db, memberId)), 0);
+            }
             Models.Product product = await GetProduct(shop, care);
             double commonCharge = product == null ? 0 : product.sale_price;
             double ticketDiscount = 0;
@@ -470,7 +477,7 @@ namespace SnowmeetApi.Controllers
         {
             if (care.coach_card_id == null)
             {
-                var (c0, t0) = await CalcCharge(shop, care, ticket, card);
+                var (c0, t0) = await CalcCharge(shop, care, ticket, card, memberId);
                 return (c0, t0, null);
             }
             if (ticket != null || card != null || care.use_card || !string.IsNullOrWhiteSpace(care.ticket_code))
@@ -487,7 +494,7 @@ namespace SnowmeetApi.Controllers
             {
                 throw new InvalidOperationException("所选学员卡已不可用（不属于该会员、已撤销或已过期），请重新选择");
             }
-            var (commonCharge, _) = await CalcCharge(shop, care, null, null);
+            var (commonCharge, _) = await CalcCharge(shop, care, null, null, memberId);
             return (commonCharge, 0, await BuildCoachQuoteAsync(shop, care, coachCard, commonCharge));
         }
 

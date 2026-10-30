@@ -3240,6 +3240,16 @@ namespace SnowmeetApi.Controllers
                         .Include(t => t.template).ThenInclude(p => p.productTicketTemplates).ThenInclude(p => p.product)
                         .AsNoTracking().FirstOrDefaultAsync();
                 }
+                // 万龙服务中心单刮蜡是一口价，券没有任何优惠可给。开单页会给老顾客自动带上券 16，
+                // 不在这里摘掉的话，生效时这张券会被核销却一分钱没减。
+                if (ticket != null || !string.IsNullOrWhiteSpace(care.ticket_code))
+                {
+                    if (CarePricingRules.AppliesScrapeOnlyPrice(order.shop, care))
+                    {
+                        ticket = null;
+                        care.ticket_code = null;
+                    }
+                }
                 // 所选会员卡随 care.card_id 持久化，下单重算时同样参与定价（机打蜡季卡加价规则等）
                 PunchCard card = null;
                 if (care.use_card && care.card_id != null)
