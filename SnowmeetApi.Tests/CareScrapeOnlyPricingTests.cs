@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 using SnowmeetApi.Controllers;
 using SnowmeetApi.Helpers;
 using SnowmeetApi.Models;
@@ -211,6 +212,82 @@ public class CareScrapeOnlyPricingTests
         Assert.Equal((120d, 120d), await Preview(f, C(wax: 1, unwax: 1), CoachFixture.StudentA));
     }
 
+    // ---------- 只选刮蜡：不选任何券、卡、学员卡 ----------
+
+    private static async Task<System.Text.Json.JsonElement> PreviewJson(CoachFixture f, Care care, int? memberId, string shop = Wanlong)
+    {
+        var res = await Care(f).CalcCareCharge(new CareController.CalcCareChargeRequest { shop = shop, memberId = memberId, care = care }, "session-7");
+        var env = Assert.IsType<ApiResult<object>>(Assert.IsType<OkObjectResult>(res.Result).Value);
+        Assert.Equal(0, env.code);
+        return System.Text.Json.JsonSerializer.SerializeToElement(env.data);
+    }
+
+    private static async Task<int> AddPunchCard(CoachFixture f, int memberId, int total = 10, int punches = 0)
+    {
+        var db = f.NewContext();
+        var card = new PunchCard { biz_type = "养护", card_name = "测试次卡", member_id = memberId, total = total, punches = punches };
+        db.punchCard.Add(card); await db.SaveChangesAsync();
+        return card.id;
+    }
+
+    [Fact]
+    public async Task Preview_ScrapeOnly_ClearsTicketCardAndDiscountAndReportsIt()
+    {
+        await using var f = await CoachFixture.Create();
+        await AddOrder(f, CoachFixture.StudentA);
+        int cardId = await AddPunchCard(f, CoachFixture.StudentA);
+        var care = C(); care.ticket_code = "OLDCUST16"; care.use_card = true; care.card_id = cardId; care.card_name = "测试次卡"; care.discount = 20;
+        var json = await PreviewJson(f, care, CoachFixture.StudentA);
+        Assert.Equal(80, json.GetProperty("commonCharge").GetDouble());
+        Assert.True(json.GetProperty("benefitsCleared").GetBoolean());
+        var returned = json.GetProperty("care");
+        Assert.Equal(JsonValueKind.Null, returned.GetProperty("ticket_code").ValueKind);
+        Assert.False(returned.GetProperty("use_card").GetBoolean());
+        Assert.Equal(JsonValueKind.Null, returned.GetProperty("card_id").ValueKind);
+        Assert.Equal(0, returned.GetProperty("discount").GetDouble());
+        Assert.Equal(80, returned.GetProperty("common_charge").GetDouble());
+    }
+
+    [Fact]
+    public async Task Preview_ScrapeOnly_ClearsACoachCardToo_NoQuote()
+    {
+        await using var f = await CoachFixture.Create();
+        CoachCard card = await f.IssueAndClaim(CoachFixture.StudentA);
+        var care = C(); care.coach_card_id = card.id;
+        var json = await PreviewJson(f, care, CoachFixture.StudentA);
+        Assert.Equal(100, json.GetProperty("commonCharge").GetDouble());
+        Assert.True(json.GetProperty("benefitsCleared").GetBoolean());
+        Assert.Equal(JsonValueKind.Null, json.GetProperty("care").GetProperty("coach_card_id").ValueKind);
+        Assert.Equal(JsonValueKind.Null, json.GetProperty("coach").ValueKind);
+    }
+
+    [Fact]
+    public async Task Preview_ScrapeOnly_WithNothingSelected_ReportsNothingCleared_AndKeepsAManualDiscount()
+    {
+        await using var f = await CoachFixture.Create();
+        var care = C(); care.discount = 10;
+        var json = await PreviewJson(f, care, CoachFixture.StudentA);
+        Assert.False(json.GetProperty("benefitsCleared").GetBoolean());
+        Assert.Equal(10, json.GetProperty("care").GetProperty("discount").GetDouble());
+    }
+
+    [Fact]
+    public async Task Preview_MixedServicesAndOtherShops_KeepTheirTicketsAndCards()
+    {
+        await using var f = await CoachFixture.Create();
+        await AddOrder(f, CoachFixture.StudentA);
+        int cardId = await AddPunchCard(f, CoachFixture.StudentA);
+        var mixed = C(edge: 1, wax: 1); mixed.ticket_code = "OLDCUST16"; mixed.discount = 20;
+        var json = await PreviewJson(f, mixed, CoachFixture.StudentA);
+        Assert.False(json.GetProperty("benefitsCleared").GetBoolean());
+        Assert.Equal("OLDCUST16", json.GetProperty("care").GetProperty("ticket_code").GetString());
+        Assert.Equal(20, json.GetProperty("care").GetProperty("discount").GetDouble());
+        var otherShop = C(); otherShop.use_card = true; otherShop.card_id = cardId; otherShop.card_name = "测试次卡";
+        var other = await PreviewJson(f, otherShop, CoachFixture.StudentA, "南山");
+        Assert.False(other.GetProperty("benefitsCleared").GetBoolean());
+        Assert.True(other.GetProperty("care").GetProperty("use_card").GetBoolean());
+    }
+
     // ---------- 下单：服务端落库金额与预览一致 ----------
 
     private static async Task<(int orderId, int careId)> Draft(CoachFixture f, int? memberId, Care care, string shop = Wanlong)
@@ -287,6 +364,50 @@ public class CareScrapeOnlyPricingTests
         Assert.Null((await f.Db.care.AsNoTracking().SingleAsync(c => c.id == c1)).ticket_code);
         Assert.Equal("OLDCUST17", (await f.Db.care.AsNoTracking().SingleAsync(c => c.id == c2)).ticket_code);   // 其它单照旧
     }
+
+    [Fact]
+    public async Task PlaceOrder_ScrapeOnly_DropsTheCardEvenIfItWouldFailTheBalanceCheck_AndTheDiscountThatCameWithTheTicket()
+    {
+        await using var f = await CoachFixture.Create();
+        int usedUpCard = await AddPunchCard(f, CoachFixture.StudentA, total: 1, punches: 1);   // 剩余 0 次：带着卡本来过不了余额校验
+        var care = C(); care.use_card = true; care.card_id = usedUpCard; care.card_name = "测试次卡";
+        care.ticket_code = "OLDCUST16"; care.discount = 20;
+        var (orderId, careId) = await Draft(f, CoachFixture.StudentA, care);
+        var r = await Place(f, orderId);
+        Assert.Equal(0, r.code);
+        var saved = await f.Db.care.AsNoTracking().SingleAsync(c => c.id == careId);
+        Assert.False(saved.use_card); Assert.Null(saved.card_id); Assert.Null(saved.card_name); Assert.Null(saved.ticket_code);
+        Assert.Equal(0, saved.discount);
+        Assert.Equal(100, saved.common_charge);
+        Assert.Equal(100, (await f.Db.order.AsNoTracking().SingleAsync(o => o.id == orderId)).total_amount);   // 没有 20 的残留减免
+    }
+
+    [Fact]
+    public async Task PlaceOrder_ScrapeOnly_DropsACoachCard()
+    {
+        await using var f = await CoachFixture.Create();
+        await AddOrder(f, CoachFixture.StudentA);
+        CoachCard card = await f.IssueAndClaim(CoachFixture.StudentA);
+        var care = C(); care.coach_card_id = card.id;
+        var (orderId, careId) = await Draft(f, CoachFixture.StudentA, care);
+        Assert.Equal(0, (await Place(f, orderId)).code);
+        var saved = await f.Db.care.AsNoTracking().SingleAsync(c => c.id == careId);
+        Assert.Null(saved.coach_card_id);
+        Assert.Equal(80, saved.common_charge);
+        Assert.Equal(0, saved.discount);
+    }
+
+    [Fact]
+    public async Task PlaceOrder_MixedServicesAtWanlong_KeepTheTicketAndDiscount()
+    {
+        await using var f = await CoachFixture.Create();
+        var mixed = C(edge: 1, wax: 1); mixed.ticket_code = "OLDCUST16"; mixed.discount = 20;
+        var (orderId, careId) = await Draft(f, CoachFixture.StudentA, mixed);
+        Assert.Equal(0, (await Place(f, orderId)).code);
+        var saved = await f.Db.care.AsNoTracking().SingleAsync(c => c.id == careId);
+        Assert.Equal("OLDCUST16", saved.ticket_code);
+        Assert.Equal(20, saved.discount);
+    }
 }
 
 /// <summary>「只选了刮蜡」一口价的纯规则：什么算单刮蜡、哪些店适用、两个价各多少。</summary>
@@ -315,13 +436,91 @@ public class CareScrapeOnlyRulesTests
         var summerNow = C(); summerNow.summer = "now";
         var summerLater = C(); summerLater.summer = "later";
         var summerBiz = C(); summerBiz.biz_type = "非雪季养护";
-        var card = C(); card.use_card = true;
         var warranty = C(); warranty.warranty = true;
         var entertain = C(); entertain.entertain = true;
-        foreach (Care care in new[] { summerNow, summerLater, summerBiz, card, warranty, entertain })
+        foreach (Care care in new[] { summerNow, summerLater, summerBiz, warranty, entertain })
             Assert.False(CarePricingRules.IsScrapeOnly(care));
         var urgent = C(); urgent.urgent = 1;       // 立等不改变「只刮蜡」
         Assert.True(CarePricingRules.IsScrapeOnly(urgent));
+    }
+
+    [Fact]
+    public void IsScrapeOnly_IgnoresWhichTicketOrCardIsSelected_TheyGetCleared()
+    {
+        var withTicket = C(); withTicket.ticket_code = "T";
+        var withCard = C(); withCard.use_card = true; withCard.card_id = 5;
+        var withCoach = C(); withCoach.coach_card_id = 9;
+        foreach (Care care in new[] { withTicket, withCard, withCoach })
+            Assert.True(CarePricingRules.IsScrapeOnly(care));
+    }
+
+    private static Care Loaded(int edge = 0, int wax = 0, int freeWax = 0, int unwax = 1)
+    {
+        Care care = C(edge, wax, freeWax, unwax);
+        care.ticket_code = "T16"; care.use_card = true; care.card_id = 5; care.card_name = "次卡";
+        care.coach_card_id = 9; care.discount = 20; care.ticket_discount = 5;
+        return care;
+    }
+
+    [Fact]
+    public void ClearBenefitsForScrapeOnly_ClearsTicketCardCoachCardAndTheirDiscount()
+    {
+        Care care = Loaded();
+        Assert.True(CarePricingRules.ClearBenefitsForScrapeOnly("万龙服务中心", care));
+        Assert.Null(care.ticket_code);
+        Assert.False(care.use_card); Assert.Null(care.card_id); Assert.Null(care.card_name);
+        Assert.Null(care.coach_card_id);
+        Assert.Equal(0, care.discount); Assert.Equal(0, care.ticket_discount);
+    }
+
+    [Theory]
+    [InlineData("ticket")]
+    [InlineData("card")]
+    [InlineData("coach")]
+    public void ClearBenefitsForScrapeOnly_AnyOneOfThemIsEnough(string which)
+    {
+        Care care = C(); care.discount = 20;
+        if (which == "ticket") care.ticket_code = "T";
+        if (which == "card") { care.use_card = true; care.card_id = 5; }
+        if (which == "coach") care.coach_card_id = 9;
+        Assert.True(CarePricingRules.ClearBenefitsForScrapeOnly("万龙服务中心", care));
+        Assert.Equal(0, care.discount);
+    }
+
+    [Fact]
+    public void ClearBenefitsForScrapeOnly_NothingSelected_ReturnsFalseAndKeepsAManualDiscount()
+    {
+        Care care = C(); care.discount = 10;
+        Assert.False(CarePricingRules.ClearBenefitsForScrapeOnly("万龙服务中心", care));
+        Assert.Equal(10, care.discount);
+    }
+
+    [Theory]
+    [InlineData("南山", 0, 0, 0, 1)]               // 别的店不动
+    [InlineData("崇礼旗舰店", 0, 0, 0, 1)]
+    [InlineData("万龙服务中心", 1, 0, 0, 1)]       // 刮蜡 + 修刃
+    [InlineData("万龙服务中心", 0, 1, 0, 1)]       // 刮蜡 + 热蜡
+    [InlineData("万龙服务中心", 0, 0, 1, 1)]       // 刮蜡 + 机打蜡
+    [InlineData("万龙服务中心", 0, 0, 0, 0)]       // 没选刮蜡
+    public void ClearBenefitsForScrapeOnly_LeavesEverythingElseAlone(string shop, int edge, int wax, int freeWax, int unwax)
+    {
+        Care care = Loaded(edge, wax, freeWax, unwax);
+        Assert.False(CarePricingRules.ClearBenefitsForScrapeOnly(shop, care));
+        Assert.Equal("T16", care.ticket_code); Assert.True(care.use_card); Assert.Equal(5, care.card_id);
+        Assert.Equal(9, care.coach_card_id); Assert.Equal(20, care.discount);
+    }
+
+    [Fact]
+    public void ClearBenefitsForScrapeOnly_WarrantyEntertainAndSummerAreNotTouched()
+    {
+        Care warranty = Loaded(); warranty.warranty = true;
+        Care entertain = Loaded(); entertain.entertain = true;
+        Care summer = Loaded(); summer.summer = "later";
+        foreach (Care care in new[] { warranty, entertain, summer })
+        {
+            Assert.False(CarePricingRules.ClearBenefitsForScrapeOnly("万龙服务中心", care));
+            Assert.Equal("T16", care.ticket_code);
+        }
     }
 
     [Theory]

@@ -3201,6 +3201,13 @@ namespace SnowmeetApi.Controllers
                 });
             }
             order.shop = CarePricingRules.ResolveCareShop(order.shop);
+            // 万龙服务中心只选了刮蜡是一口价，不该带任何券 / 会员卡 / 学员卡：开单页会给老顾客自动带上券 16，
+            // 不摘掉的话生效时这张券会被核销（或卡被扣次）却一分钱没减。要在余额校验之前摘，
+            // 免得一张已用完的卡把本来不需要卡的单子拦下。
+            foreach (Care scrapeCare in order.cares)
+            {
+                CarePricingRules.ClearBenefitsForScrapeOnly(order.shop, scrapeCare);
+            }
             // 非雪季养护生效时会给会员发 17/18 票券（EffectCareOrder 里 (int)member_id 强转），
             // 散客单必须先匹配会员，否则生效阶段直接抛异常
             for (int i = 0; i < order.cares.Count; i++)
@@ -3239,16 +3246,6 @@ namespace SnowmeetApi.Controllers
                     ticket = await _db.ticket.Where(t => t.code == care.ticket_code && t.valid == 1 && t.used == 0)
                         .Include(t => t.template).ThenInclude(p => p.productTicketTemplates).ThenInclude(p => p.product)
                         .AsNoTracking().FirstOrDefaultAsync();
-                }
-                // 万龙服务中心单刮蜡是一口价，券没有任何优惠可给。开单页会给老顾客自动带上券 16，
-                // 不在这里摘掉的话，生效时这张券会被核销却一分钱没减。
-                if (ticket != null || !string.IsNullOrWhiteSpace(care.ticket_code))
-                {
-                    if (CarePricingRules.AppliesScrapeOnlyPrice(order.shop, care))
-                    {
-                        ticket = null;
-                        care.ticket_code = null;
-                    }
                 }
                 // 所选会员卡随 care.card_id 持久化，下单重算时同样参与定价（机打蜡季卡加价规则等）
                 PunchCard card = null;

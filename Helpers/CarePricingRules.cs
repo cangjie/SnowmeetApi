@@ -77,8 +77,8 @@ namespace SnowmeetApi.Helpers
         public const double ScrapeOnlyNewMemberPrice = 100;
 
         /// <summary>
-        /// care 上只勾了刮蜡：没有修刃、热蜡、机打蜡，也不是非雪季、会员卡、质保、招待。
-        /// 立等、维修等不影响「只刮蜡」的判定。
+        /// care 上的服务只勾了刮蜡：没有修刃、热蜡、机打蜡，也不是非雪季、质保、招待。
+        /// 立等、维修等不影响「只刮蜡」的判定；已选的券 / 卡也不看——它们会被 ClearBenefitsForScrapeOnly 摘掉。
         /// </summary>
         public static bool IsScrapeOnly(Care care)
         {
@@ -89,7 +89,7 @@ namespace SnowmeetApi.Helpers
             bool summer = !string.IsNullOrWhiteSpace(care.summer)
                 || (care.biz_type != null && care.biz_type.Trim() == SummerBizType);
             return care.need_unwax == 1 && care.need_edge != 1 && care.need_wax != 1 && care.free_wax != 1
-                && !summer && !care.use_card && !care.warranty && !care.entertain;
+                && !summer && !care.warranty && !care.entertain;
         }
 
         /// <summary>
@@ -100,6 +100,35 @@ namespace SnowmeetApi.Helpers
         public static bool AppliesScrapeOnlyPrice(string? shop, Care care)
         {
             return ResolveCareShop(shop) == ScrapeOnlyShop && IsScrapeOnly(care);
+        }
+
+        /// <summary>
+        /// 只选了刮蜡就不该选中任何券、会员卡、学员卡（用户 2026-10-30）：一口价不叠加任何优惠，
+        /// 留着只会在订单生效时白白核销一张券 / 扣一次卡。把已选的都摘掉，并把随它们带来的减免一并清零
+        /// （减免可能来自折扣券 16，区分不了来源——与开单页换券时清减免同一口径）。
+        /// 返回 true = 确实摘掉了东西（给开单页提示用）；没选任何券卡时不动，店员手填的减免保留。
+        /// 开单页预览（CalcCareCharge）和下单（PlaceCareOrder）都要在定价前先调这个。
+        /// </summary>
+        public static bool ClearBenefitsForScrapeOnly(string? shop, Care care)
+        {
+            if (!AppliesScrapeOnlyPrice(shop, care))
+            {
+                return false;
+            }
+            bool hasBenefit = !string.IsNullOrWhiteSpace(care.ticket_code) || care.use_card
+                || care.card_id != null || care.coach_card_id != null;
+            if (!hasBenefit)
+            {
+                return false;
+            }
+            care.ticket_code = null;
+            care.use_card = false;
+            care.card_id = null;
+            care.card_name = null;
+            care.coach_card_id = null;
+            care.discount = 0;
+            care.ticket_discount = 0;
+            return true;
         }
 
         public static double ScrapeOnlyPrice(bool isOldMember)

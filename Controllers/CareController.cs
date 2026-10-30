@@ -725,6 +725,13 @@ namespace SnowmeetApi.Controllers
                 // 普通界面操作：按本次改动字段应用服务联动
                 ApplyServiceLinkage(care, req.changedField.Trim());
             }
+            // 只选了刮蜡：一口价不叠加任何优惠，已选的券 / 会员卡 / 学员卡先摘掉（前端据 benefitsCleared 同步清除并提示）
+            bool benefitsCleared = CarePricingRules.ClearBenefitsForScrapeOnly(shop, care);
+            if (benefitsCleared)
+            {
+                ticket = null;
+                card = null;
+            }
             double commonCharge, ticketDiscount;
             CoachCareQuote? coach;
             try { (commonCharge, ticketDiscount, coach) = await CalcChargeWithCoach(shop.Trim(), care, ticket, card, memberId); }
@@ -759,7 +766,7 @@ namespace SnowmeetApi.Controllers
             {
                 code = 0,
                 message = "",
-                data = new { commonCharge, ticketDiscount, care, coach }
+                data = new { commonCharge, ticketDiscount, care, coach, benefitsCleared }
             });
         }
         [NonAction]
