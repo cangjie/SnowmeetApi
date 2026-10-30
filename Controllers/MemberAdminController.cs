@@ -13,7 +13,8 @@ using SnowmeetApi.Models.Users;
 
 namespace SnowmeetApi.Controllers
 {
-    // 会员管理（店员/店长侧）。鉴权统一 staff.title_level >= 200。
+    // 会员管理（店员/店长侧）。鉴权：会员管理与会员明细相关接口 staff.title_level >= 100（所有店员，2026-10-30 起）；
+    // 会员合并 >= 300；储值账户查询 >= 200。
     // 储值：生产只有「服务储值」一种（= C 类），depositType 入参留 A/B/C 接口、v1 仅 C 落地。
     // 系统标签 = 参与业务（派生，不入库）；自定义标签 = member_tag 表。
     [Route("api/[controller]/[action]")]
@@ -33,7 +34,11 @@ namespace SnowmeetApi.Controllers
 
         // 业务标签集合（系统标签 = 会员参与过的业务类型）
         static readonly string[] BIZ_TAGS = { "租赁", "养护", "零售", "雪票", "二手回收", "水吧餐厅" };
-        const int MIN_LEVEL = 200; // 店长/管理员
+        // 2026-10-30 用户要求：会员管理、会员明细页面对所有店员开放，不再限制权限（原先 200 = 店长及以上）。
+        // 店员（100）及以上可用：搜索、会员明细、改资料、标签、手机号注册会员、储值充值、发次卡、发券。
+        // 万龙对账（50）仍不可用。会员合并仍是系统管理员（ADMIN_LEVEL），储值账户查询两个页面仍是 MIN_LEVEL。
+        const int STAFF_LEVEL = 100; // 所有店员
+        const int MIN_LEVEL = 200; // 店长/管理员（储值账户查询页面）
         const int ADMIN_LEVEL = 300; // 系统管理员（会员合并等高危操作）
 
         private async Task<Staff?> GetStaff(string sessionKey, string sessionType)
@@ -48,7 +53,7 @@ namespace SnowmeetApi.Controllers
             string? tags = null, int pageIndex = 1, int pageSize = 20, string sessionType = "wechat_mini_openid")
         {
             Staff staff = await GetStaff(sessionKey, sessionType);
-            if (staff == null || staff.title_level < MIN_LEVEL)
+            if (staff == null || staff.title_level < STAFF_LEVEL)
                 return Ok(new ApiResult<object>() { code = 1, message = "没有权限", data = null });
 
             if (pageIndex < 1) pageIndex = 1;
@@ -136,7 +141,7 @@ namespace SnowmeetApi.Controllers
             string sessionKey, string sessionType = "wechat_mini_openid")
         {
             Staff staff = await GetStaff(sessionKey, sessionType);
-            if (staff == null || staff.title_level < MIN_LEVEL)
+            if (staff == null || staff.title_level < STAFF_LEVEL)
                 return Ok(new ApiResult<object>() { code = 1, message = "没有权限", data = null });
 
             Member m = await _db.member.Where(x => x.id == memberId).AsNoTracking().FirstOrDefaultAsync();
@@ -222,7 +227,7 @@ namespace SnowmeetApi.Controllers
             string sessionKey, string sessionType = "wechat_mini_openid")
         {
             Staff staff = await GetStaff(sessionKey, sessionType);
-            if (staff == null || staff.title_level < MIN_LEVEL)
+            if (staff == null || staff.title_level < STAFF_LEVEL)
                 return Ok(new ApiResult<object>() { code = 1, message = "没有权限", data = null });
             if (req == null)
                 return Ok(new ApiResult<object>() { code = 1, message = "参数为空", data = null });
@@ -268,7 +273,7 @@ namespace SnowmeetApi.Controllers
             string sessionKey, string sessionType = "wechat_mini_openid")
         {
             Staff staff = await GetStaff(sessionKey, sessionType);
-            if (staff == null || staff.title_level < MIN_LEVEL)
+            if (staff == null || staff.title_level < STAFF_LEVEL)
                 return Ok(new ApiResult<object>() { code = 1, message = "没有权限", data = null });
             tag = (tag ?? "").Trim();
             if (tag == "")
@@ -298,7 +303,7 @@ namespace SnowmeetApi.Controllers
             string sessionKey, string sessionType = "wechat_mini_openid")
         {
             Staff staff = await GetStaff(sessionKey, sessionType);
-            if (staff == null || staff.title_level < MIN_LEVEL)
+            if (staff == null || staff.title_level < STAFF_LEVEL)
                 return Ok(new ApiResult<object>() { code = 1, message = "没有权限", data = null });
             tag = (tag ?? "").Trim();
             List<MemberTag> rows = await _db.memberTag
@@ -320,7 +325,7 @@ namespace SnowmeetApi.Controllers
             string sessionType = "wechat_mini_openid")
         {
             Staff staff = await GetStaff(sessionKey, sessionType);
-            if (staff == null || staff.title_level < MIN_LEVEL)
+            if (staff == null || staff.title_level < STAFF_LEVEL)
                 return Ok(new ApiResult<object>() { code = 1, message = "没有权限", data = null });
             var tags = await _db.memberTagPreset
                 .Where(t => t.valid)
@@ -336,7 +341,7 @@ namespace SnowmeetApi.Controllers
             string sessionType = "wechat_mini_openid")
         {
             Staff staff = await GetStaff(sessionKey, sessionType);
-            if (staff == null || staff.title_level < MIN_LEVEL)
+            if (staff == null || staff.title_level < STAFF_LEVEL)
                 return Ok(new ApiResult<object>() { code = 1, message = "没有权限", data = null });
             var presets = await _db.memberTagPreset.Where(t => t.valid)
                 .OrderBy(t => t.sort).ThenBy(t => t.id)
@@ -361,7 +366,7 @@ namespace SnowmeetApi.Controllers
             string sessionKey, string sessionType = "wechat_mini_openid")
         {
             Staff staff = await GetStaff(sessionKey, sessionType);
-            if (staff == null || staff.title_level < MIN_LEVEL)
+            if (staff == null || staff.title_level < STAFF_LEVEL)
                 return Ok(new ApiResult<object>() { code = 1, message = "没有权限", data = null });
             from = (from ?? "").Trim();
             to = (to ?? "").Trim();
@@ -410,7 +415,7 @@ namespace SnowmeetApi.Controllers
             string sessionKey, string sessionType = "wechat_mini_openid")
         {
             Staff staff = await GetStaff(sessionKey, sessionType);
-            if (staff == null || staff.title_level < MIN_LEVEL)
+            if (staff == null || staff.title_level < STAFF_LEVEL)
                 return Ok(new ApiResult<object>() { code = 1, message = "没有权限", data = null });
             tag = (tag ?? "").Trim();
             if (tag == "")
@@ -434,7 +439,7 @@ namespace SnowmeetApi.Controllers
             string? groupName = null, string sessionType = "wechat_mini_openid")
         {
             Staff staff = await GetStaff(sessionKey, sessionType);
-            if (staff == null || staff.title_level < MIN_LEVEL)
+            if (staff == null || staff.title_level < STAFF_LEVEL)
                 return Ok(new ApiResult<object>() { code = 1, message = "没有权限", data = null });
             tag = (tag ?? "").Trim();
             if (tag == "")
@@ -465,7 +470,7 @@ namespace SnowmeetApi.Controllers
             string sessionKey, string sessionType = "wechat_mini_openid")
         {
             Staff staff = await GetStaff(sessionKey, sessionType);
-            if (staff == null || staff.title_level < MIN_LEVEL)
+            if (staff == null || staff.title_level < STAFF_LEVEL)
                 return Ok(new ApiResult<object>() { code = 1, message = "没有权限", data = null });
             string cell = (req?.cell ?? "").Trim();
             if (cell.Length < 6)
@@ -523,7 +528,7 @@ namespace SnowmeetApi.Controllers
             string sessionKey, string sessionType = "wechat_mini_openid")
         {
             Staff staff = await GetStaff(sessionKey, sessionType);
-            if (staff == null || staff.title_level < MIN_LEVEL)
+            if (staff == null || staff.title_level < STAFF_LEVEL)
                 return Ok(new ApiResult<object>() { code = 1, message = "没有权限", data = null });
             if (req == null || req.amount <= 0)
                 return Ok(new ApiResult<object>() { code = 1, message = "金额无效", data = null });
@@ -573,7 +578,7 @@ namespace SnowmeetApi.Controllers
             string sessionType = "wechat_mini_openid")
         {
             Staff staff = await GetStaff(sessionKey, sessionType);
-            if (staff == null || staff.title_level < MIN_LEVEL)
+            if (staff == null || staff.title_level < STAFF_LEVEL)
                 return Ok(new ApiResult<object>() { code = 1, message = "没有权限", data = null });
             // 卡种来自「次卡/季卡商品维护」那批商品，不再从 punch_card 表 DISTINCT 已发出去的卡——
             // 那样会把历史遗留叫法一并列出来（同一种卡既有"单项10次卡"又有"养护单项10次卡"），
@@ -616,7 +621,7 @@ namespace SnowmeetApi.Controllers
             string sessionKey, string sessionType = "wechat_mini_openid")
         {
             Staff staff = await GetStaff(sessionKey, sessionType);
-            if (staff == null || staff.title_level < MIN_LEVEL)
+            if (staff == null || staff.title_level < STAFF_LEVEL)
                 return Ok(new ApiResult<object>() { code = 1, message = "没有权限", data = null });
             if (req == null || req.productId <= 0)
                 return Ok(new ApiResult<object>() { code = 1, message = "参数无效", data = null });
@@ -664,7 +669,7 @@ namespace SnowmeetApi.Controllers
             string sessionType = "wechat_mini_openid")
         {
             Staff staff = await GetStaff(sessionKey, sessionType);
-            if (staff == null || staff.title_level < MIN_LEVEL)
+            if (staff == null || staff.title_level < STAFF_LEVEL)
                 return Ok(new ApiResult<object>() { code = 1, message = "没有权限", data = null });
             // TicketTemplate 模型只映射了 id/type/name/memo/hide/expire_date 子集（biz_type/currency_value 在 DB 有列、模型未映射，v1 不取）
             var templates = await _db.ticketTemplate
@@ -679,7 +684,7 @@ namespace SnowmeetApi.Controllers
             string sessionKey, string sessionType = "wechat_mini_openid")
         {
             Staff staff = await GetStaff(sessionKey, sessionType);
-            if (staff == null || staff.title_level < MIN_LEVEL)
+            if (staff == null || staff.title_level < STAFF_LEVEL)
                 return Ok(new ApiResult<object>() { code = 1, message = "没有权限", data = null });
             if (req == null || req.count <= 0 || req.count > 50)
                 return Ok(new ApiResult<object>() { code = 1, message = "数量无效", data = null });
