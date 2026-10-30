@@ -137,11 +137,16 @@ public class CoachPricingIntegrationTests
         Assert.Equal(54, rental[0].estimatedDiscount);
         Assert.Empty(await f.Pricing().ListUsableAsync(CoachFixture.StudentB, "养护", "万龙服务中心", null, 0, 0, 0, DateTime.Now));
         // 控制器：店员 ≥ 100 才能查
-        var ctl = new SnowmeetApi.Controllers.CoachPlatform.CoachCardController(f.NewContext(), f.Config);
+        var ctl = new SnowmeetApi.Controllers.CoachPlatform.CoachCardController(f.NewContext(), f.Config, new Http());
         Assert.Equal(3, (await ctl.ListUsableCards("session-3", CoachFixture.StudentA)).code);
         var ok = await ctl.ListUsableCards("session-7", CoachFixture.StudentA, "养护", "万龙服务中心", "双项", 168, 168);
         Assert.Equal(0, ok.code);
         Assert.Equal(33.6, System.Text.Json.JsonSerializer.SerializeToElement(ok.data).GetProperty("cards")[0].GetProperty("estimatedDiscount").GetDouble());
+        // 客户端不传 basePrice：非加急取服务费本身，加急由服务端查非加急价（168），加急加价 60 不打折
+        double Est(ApiResult<object> r) => System.Text.Json.JsonSerializer.SerializeToElement(r.data).GetProperty("cards")[0].GetProperty("estimatedDiscount").GetDouble();
+        Assert.Equal(33.6, Est(await ctl.ListUsableCards("session-7", CoachFixture.StudentA, "养护", "万龙服务中心", "双项", 168, 0, 0, 0)));
+        Assert.Equal(33.6, Est(await ctl.ListUsableCards("session-7", CoachFixture.StudentA, "养护", "万龙服务中心", "双项", 228, 0, 0, 1)));
+        Assert.Equal(60, Est(await ctl.ListUsableCards("session-7", CoachFixture.StudentA, "养护", "崇礼旗舰店", "双项", 188, 0, 0, 1)));   // 崇礼没有加急商品
     }
 
     // ---------- 使用记录：每笔只记一次，取消后反向 ----------

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -15,7 +16,7 @@ namespace SnowmeetApi.Controllers.CoachPlatform;
 // 学员领取学员卡（小程序 pages/coach/claim），以及开单页选卡弹层用的「该会员可用的学员卡」。
 [ApiController]
 [Route("api/[controller]/[action]")]
-public sealed class CoachCardController(ApplicationDBContext db, IConfiguration config) : CoachApiBase(db)
+public sealed class CoachCardController(ApplicationDBContext db, IConfiguration config, IHttpContextAccessor http) : CoachApiBase(db)
 {
     private readonly CoachCardService _cards = new(db, config);
     private readonly CoachPricingService _pricing = new(db);
@@ -89,10 +90,12 @@ public sealed class CoachCardController(ApplicationDBContext db, IConfiguration 
     /// 开单页「优惠券/卡」选择弹层用：该会员可用的学员卡，附本单预计优惠（店员 ≥ 100）。
     /// 养护：传 shop、tier（单项/双项）、commonCharge（该件当前服务费，含加急）、basePrice（单/双项基础价，不含加急加价）；
     /// 租赁：bizType=租赁，传 rentalAmount（用来预估优惠）。
+    /// 客户端不知道不含加急加价的单/双项基础价：basePrice 不传（0）时，urgent=1 由服务端按门店价格表查非加急价，
+    /// urgent=0 就取 commonCharge。
     /// </summary>
     [HttpGet]
     public async Task<ApiResult<object>> ListUsableCards(string sessionKey, int memberId, string bizType = "养护",
-        string? shop = null, string? tier = null, double commonCharge = 0, double basePrice = 0, double rentalAmount = 0)
+        string? shop = null, string? tier = null, double commonCharge = 0, double basePrice = 0, double rentalAmount = 0, int urgent = 0)
     {
         if (await SessionAsync(sessionKey) == null) return Result(2, "登录已失效，请重新进入小程序");
         Staff? staff = await Util.GetStaffBySessionKey(Db, Util.UrlDecode(sessionKey), "wechat_mini_openid");
@@ -105,6 +108,17 @@ public sealed class CoachCardController(ApplicationDBContext db, IConfiguration 
             Care? care = null;
             if (biz == CoachCardRules.BizCare && CoachCardRules.IsValidTier(tier))
                 care = new Care { equipment = "", need_edge = 1, need_wax = tier == CoachCardRules.TierTwo ? 1 : 0 };
+            if (care != null && basePrice <= 0 && commonCharge > 0)
+            {
+                basePrice = commonCharge;
+                if (urgent == 1)
+                {
+                    // 加急单：教练价只作用于基础价，加急加价不打折。基础价 = 同门店同档位的非加急商品价；没有加急商品的店 = commonCharge
+                    Care nonUrgent = new Care { equipment = "", need_edge = 1, need_wax = tier == CoachCardRules.TierTwo ? 1 : 0, urgent = 0 };
+                    Product? baseProduct = await new CareController(Db, config, http).GetProduct((shop ?? "").Trim(), nonUrgent);
+                    if (baseProduct != null) basePrice = Math.Min(baseProduct.sale_price, commonCharge);
+                }
+            }
             List<UsableCoachCard> cards = await _pricing.ListUsableAsync(memberId, biz, shop, care, commonCharge, basePrice, rentalAmount, DateTime.Now);
             return new { cards };
         });

@@ -177,7 +177,7 @@ public class CoachCardClaimTests
     {
         await using var f = await CoachFixture.Create();
         CoachCard card = await f.Cards().CreateCardAsync(f.CoachId, DateTime.Now);
-        var ctl = () => new CoachCardController(f.NewContext(), f.Config);
+        var ctl = () => new CoachCardController(f.NewContext(), f.Config, new Microsoft.AspNetCore.Http.HttpContextAccessor());
         Assert.Equal(2, (await ctl().ClaimShareCard(card.token, "bad-session")).code);
         var noMember = await ctl().ClaimShareCard(card.token, "session-new");
         Assert.Equal(5, noMember.code);
