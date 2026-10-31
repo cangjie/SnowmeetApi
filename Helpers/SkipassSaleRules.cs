@@ -97,6 +97,30 @@ namespace SnowmeetApi.Helpers
             return IssuingAction.GiveUp;
         }
 
+        // 超过 30 分钟没出成、准备确认出票失败之前，先按我方单号去供应商那里核对这张票有没有订单：
+        //   没有订单 / 订单已取消 → 可以确认失败并退款；
+        //   有订单、有取票码 → 其实出成了（我们没记上），补记订单号，不退款；
+        //   有订单、没有取票码 → 先取消，等供应商确认已取消再退款；
+        //   查不到结果（接口异常）→ 不动，下一分钟再核对。
+        public enum SupplierOrderKind { NoOrder, Cancelled, LiveWithCode, LiveWithoutCode, Unknown }
+        public enum GiveUpAction { ConfirmFailedAndRefund, RecordIssued, CancelThenConfirm, Wait }
+
+        public static GiveUpAction DecideGiveUp(SupplierOrderKind kind)
+        {
+            switch (kind)
+            {
+                case SupplierOrderKind.NoOrder:
+                case SupplierOrderKind.Cancelled:
+                    return GiveUpAction.ConfirmFailedAndRefund;
+                case SupplierOrderKind.LiveWithCode:
+                    return GiveUpAction.RecordIssued;
+                case SupplierOrderKind.LiveWithoutCode:
+                    return GiveUpAction.CancelThenConfirm;
+                default:
+                    return GiveUpAction.Wait;
+            }
+        }
+
         // 出票中的票（付款了、还没有供应商订单号、没有失败）不允许退票、退款：只有等出票成功，或确认出票失败。
         public static bool CanRefundBeforeIssued(string? reserveNo, int isCancel)
         {

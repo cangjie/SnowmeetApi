@@ -642,6 +642,102 @@ namespace SnowmeetApi.Controllers
         // 同一张票同一时间只允许一处在出票（付款回调、后台重试可能同时碰到）
         static readonly HashSet<int> IssuingNow = new HashSet<int>();
 
+        // 供应商那边这张票对应订单的核对结果（超过 30 分钟没出成、准备确认失败之前用）
+        public sealed record SupplierOrderCheck(SkipassSaleRules.SupplierOrderKind Kind, string? OrderId);
+
+        // 按我方单号去供应商核对这张票有没有订单；测试里替换成假的
+        public Func<Models.SkiPass, string, Task<SupplierOrderCheck>>? SupplierOrderChecker { get; set; }
+        // 取消供应商订单并确认它已变成「已取消」才返回 true；测试里替换成假的
+        public Func<string, string, Task<bool>>? SupplierOrderCanceller { get; set; }
+
+        // 这张票向供应商下单用的我方单号（出票和事后核对必须一致）
+        [NonAction]
+        private async Task<string> SupplierSourceIdOf(Models.SkiPass skipass)
+        {
+            OrderPayment? payment = await _context.OrderPayment
+                .Where(p => p.order_id == skipass.order_id && p.status.Trim().Equals("支付成功") && p.out_trade_no != null && p.out_trade_no.Trim() != "")
+                .OrderBy(p => p.id).AsNoTracking().FirstOrDefaultAsync();
+            string outTradeNo = payment != null ? payment.out_trade_no.Trim() : skipass.id.ToString() + Util.GetLongTimeStamp(DateTime.Now);
+            int passesInOrder = await _context.skiPass.CountAsync(s => s.order_id == skipass.order_id && s.valid == 1);
+            return SkipassSaleRules.SupplierSourceId(outTradeNo, passesInOrder, skipass.id);
+        }
+
+        [NonAction]
+        private async Task<SupplierOrderCheck> CheckSupplierOrder(Models.SkiPass skipass, string source)
+        {
+            if (SupplierOrderChecker != null)
+            {
+                return await SupplierOrderChecker(skipass, source);
+            }
+            try
+            {
+                string sourceId = await SupplierSourceIdOf(skipass);
+                var helper = new WanlongZiwoyouHelper(_context, _config, source);
+                DateTime start = skipass.create_date.Date.AddDays(-1);
+                DateTime end = DateTime.Now.Date.AddDays(1);
+                for (int page = 0; page < 50; page++)
+                {
+                    var listResult = await helper.GetOrderListByPage(start, end, page);
+                    if (listResult.Result is not OkObjectResult ok || ok.Value is not WanlongZiwoyouHelper.ZiwoyouQueryList list)
+                    {
+                        return new SupplierOrderCheck(SkipassSaleRules.SupplierOrderKind.Unknown, null);
+                    }
+                    var hit = list.results?.FirstOrDefault(o => o.orderSourceId == sourceId);
+                    if (hit != null)
+                    {
+                        if (!int.TryParse(hit.orderId, out int orderNo))
+                        {
+                            return new SupplierOrderCheck(SkipassSaleRules.SupplierOrderKind.Unknown, null);
+                        }
+                        var detail = await helper.GetOrder(orderNo);
+                        if (detail.Result is not OkObjectResult dok || dok.Value is not WanlongZiwoyouHelper.ZiwoyouOrder order)
+                        {
+                            return new SupplierOrderCheck(SkipassSaleRules.SupplierOrderKind.Unknown, hit.orderId);
+                        }
+                        if (order.orderState == 3)
+                        {
+                            return new SupplierOrderCheck(SkipassSaleRules.SupplierOrderKind.Cancelled, hit.orderId);
+                        }
+                        bool hasCode = order.vouchers != null && order.vouchers.Any(v => !string.IsNullOrWhiteSpace(v.code));
+                        return new SupplierOrderCheck(hasCode ? SkipassSaleRules.SupplierOrderKind.LiveWithCode
+                            : SkipassSaleRules.SupplierOrderKind.LiveWithoutCode, hit.orderId);
+                    }
+                    if (page + 1 >= list.pageCount)
+                    {
+                        return new SupplierOrderCheck(SkipassSaleRules.SupplierOrderKind.NoOrder, null);
+                    }
+                }
+                return new SupplierOrderCheck(SkipassSaleRules.SupplierOrderKind.Unknown, null); // 页数太多没翻完，不能当成没有
+            }
+            catch (Exception err)
+            {
+                Console.WriteLine("[出票核对] 查供应商订单失败 skipass=" + skipass.id + " " + err.Message);
+                return new SupplierOrderCheck(SkipassSaleRules.SupplierOrderKind.Unknown, null);
+            }
+        }
+
+        [NonAction]
+        private async Task<bool> CancelSupplierOrderConfirmed(string orderId, string source)
+        {
+            if (SupplierOrderCanceller != null)
+            {
+                return await SupplierOrderCanceller(orderId, source);
+            }
+            try
+            {
+                if (!int.TryParse(orderId, out int orderNo)) return false;
+                var helper = new WanlongZiwoyouHelper(_context, _config, source);
+                await helper.CancelOrder(orderNo);
+                var detail = await helper.GetOrder(orderNo);
+                return detail.Result is OkObjectResult ok && ok.Value is WanlongZiwoyouHelper.ZiwoyouOrder order && order.orderState == 3;
+            }
+            catch (Exception err)
+            {
+                Console.WriteLine("[出票核对] 取消供应商订单失败 order=" + orderId + " " + err.Message);
+                return false;
+            }
+        }
+
         // 出票。结果只有三种：
         //   成功——拿到供应商订单号 reserve_no；
         //   确认失败（供应商拒绝、预存款不够、支付被拒、返回别的票的订单号）——停止出票、必要时取消供应商订单、自动退这一张的款；
@@ -715,26 +811,9 @@ namespace SnowmeetApi.Controllers
             }
             Models.SkiPassProduct skipassProduct = await _context.skiPassProduct.FindAsync(skipass.product_id);
             WanlongZiwoyouHelper _zwHelper = new WanlongZiwoyouHelper(_context, _config, skipassProduct.source);
-            List<OrderPayment> pList = await _context.OrderPayment
-                .Where(p => (p.order_id == skipass.order_id && p.status.Trim().Equals("支付成功")))
-                .AsNoTracking().ToListAsync();
-            string outTradeNo = "";
-            foreach (OrderPayment payment in pList)
-            {
-                if (!payment.out_trade_no.Trim().Equals(""))
-                {
-                    outTradeNo = payment.out_trade_no.Trim();
-                    break;
-                }
-            }
-            if (outTradeNo.Trim().Equals(""))
-            {
-                outTradeNo = skipass.id.ToString() + Util.GetLongTimeStamp(DateTime.Now);
-            }
             // 一单多张票（购物车）时每张票单独一个我方单号，否则自我游把第 2、3… 张当成重复下单，
             // 返回第一张的订单号，这几张票就一直没有出成。单号固定，所以重试同一张票不会重复出票
-            int passesInOrder = await _context.skiPass.CountAsync(s => s.order_id == skipass.order_id && s.valid == 1);
-            outTradeNo = SkipassSaleRules.SupplierSourceId(outTradeNo, passesInOrder, skipass.id);
+            string outTradeNo = await SupplierSourceIdOf(skipass);
             double balance = await _zwHelper.QueryBalance();
             //balance = 10000;
             if (balance <= skipass.deal_price)
@@ -763,7 +842,18 @@ namespace SnowmeetApi.Controllers
             // 「已经支付成功」是同一个单号重试时的正常回答（上一次已经付过），也算成功
             if (payResult.state != 1 || !(payResult.msg ?? "").Contains("支付成功"))
             {
-                await MarkBookingFailed(skipass, "供应商支付没有成功：" + (payResult.msg ?? "").Trim(), orderId, skipassProduct.source);
+                // 供应商那边已经建了订单但没付成：先取消它，确认变成「已取消」才退款；没确认就先不退，
+                // 留在出票中，后台一分钟后再试，30 分钟内还没有结果会按核对流程处理
+                if (await CancelSupplierOrderConfirmed(orderId, skipassProduct.source))
+                {
+                    await MarkBookingFailed(skipass, "供应商支付没有成功：" + (payResult.msg ?? "").Trim(), null, null);
+                }
+                else
+                {
+                    skipass.memo += " 供应商支付没有成功（" + (payResult.msg ?? "").Trim() + "），订单 " + orderId + " 还没确认取消，稍后再核对";
+                    _context.skiPass.Entry(skipass).State = EntityState.Modified;
+                    await _context.SaveChangesAsync();
+                }
                 return;
             }
             skipass.reserve_no = payResult.data.orderId.ToString();
@@ -776,6 +866,39 @@ namespace SnowmeetApi.Controllers
                 await _context.SaveChangesAsync();
             // 取票码由后台轮询（SkipassCancelPoller 每分钟调 RefreshAutoReserve）补上。
             // 这里原来睡 25 秒再查，买 N 张票就要睡 N 个 25 秒，把付款回调拖得很长。
+        }
+
+        // 超过 30 分钟还没出成：先去供应商核对这张票到底有没有订单，再决定（见 SkipassSaleRules.DecideGiveUp）。
+        // 核对不了就什么都不做，下一分钟再来，不会在没把握的时候退款。
+        [NonAction]
+        private async Task ConfirmIssuingOutcome(Models.SkiPass skipass)
+        {
+            Models.SkiPassProduct? product = await _context.skiPassProduct.FindAsync(skipass.product_id);
+            string source = product?.source ?? "万龙自我游";
+            SupplierOrderCheck check = await CheckSupplierOrder(skipass, source);
+            switch (SkipassSaleRules.DecideGiveUp(check.Kind))
+            {
+                case SkipassSaleRules.GiveUpAction.ConfirmFailedAndRefund:
+                    await MarkBookingFailed(skipass, "超过 30 分钟仍没有出票成功，供应商那边没有这张票的有效订单", null, null);
+                    break;
+                case SkipassSaleRules.GiveUpAction.RecordIssued:
+                    // 其实出成了，只是我们没记上：补记订单号，取票码由 RefreshAutoReserve 补，不退款
+                    skipass.reserve_no = check.OrderId;
+                    skipass.memo += " 超时后核对供应商订单，补记订单号 " + check.OrderId;
+                    skipass.update_date = DateTime.Now;
+                    _context.skiPass.Entry(skipass).State = EntityState.Modified;
+                    await _context.SaveChangesAsync();
+                    break;
+                case SkipassSaleRules.GiveUpAction.CancelThenConfirm:
+                    if (!string.IsNullOrWhiteSpace(check.OrderId) && await CancelSupplierOrderConfirmed(check.OrderId, source))
+                    {
+                        await MarkBookingFailed(skipass, "超过 30 分钟仍没有出票成功，已取消供应商订单 " + check.OrderId, null, null);
+                    }
+                    break;
+                default:
+                    Console.WriteLine("[出票核对] 暂时核对不了供应商订单，不退款 skipass=" + skipass.id);
+                    break;
+            }
         }
 
         // 后台每分钟调一次：付款了还没出成的票，30 分钟内重试，超过 30 分钟确认出票失败并自动退款。
@@ -798,8 +921,7 @@ namespace SnowmeetApi.Controllers
                             await AutoReserve(skipass);
                             break;
                         case SkipassSaleRules.IssuingAction.GiveUp:
-                            Models.SkiPassProduct? product = await _context.skiPassProduct.FindAsync(skipass.product_id);
-                            await MarkBookingFailed(skipass, "超过 30 分钟仍没有出票成功", null, product?.source);
+                            await ConfirmIssuingOutcome(skipass);
                             break;
                         default:
                             break;

@@ -541,6 +541,127 @@ namespace SnowmeetApi.Tests
             Assert.Equal(502, failed.StatusCode);
         }
 
+        // ---------------- 确认失败前先核对供应商 ----------------
+
+        [Theory]
+        [InlineData(SkipassSaleRules.SupplierOrderKind.NoOrder, SkipassSaleRules.GiveUpAction.ConfirmFailedAndRefund)]
+        [InlineData(SkipassSaleRules.SupplierOrderKind.Cancelled, SkipassSaleRules.GiveUpAction.ConfirmFailedAndRefund)]
+        [InlineData(SkipassSaleRules.SupplierOrderKind.LiveWithCode, SkipassSaleRules.GiveUpAction.RecordIssued)]
+        [InlineData(SkipassSaleRules.SupplierOrderKind.LiveWithoutCode, SkipassSaleRules.GiveUpAction.CancelThenConfirm)]
+        [InlineData(SkipassSaleRules.SupplierOrderKind.Unknown, SkipassSaleRules.GiveUpAction.Wait)]
+        public void 超时后按供应商那边的订单情况决定(SkipassSaleRules.SupplierOrderKind kind, SkipassSaleRules.GiveUpAction expect)
+        {
+            Assert.Equal(expect, SkipassSaleRules.DecideGiveUp(kind));
+        }
+
+        // 把 501 设成「出票中超过 31 分钟」，然后跑一轮 RefreshIssuing
+        static async Task<(Fixture f, SkiPassController ctl)> StuckLongAgo(Func<SkiPassController, Task>? tweak = null)
+        {
+            var f = await Fixture.Create();
+            await SeedPaidCartOrder(f, payMethod: "线下");
+            await using (var seed = f.NewContext())
+            {
+                var p = await seed.skiPass.FirstAsync(x => x.id == 501);
+                p.booking_now = true;
+                p.update_date = DateTime.Now.AddMinutes(-31);
+                seed.skiPass.Update(p);
+                await seed.SaveChangesAsync();
+            }
+            return (f, null!);
+        }
+
+        [Fact]
+        public async Task 超时_供应商那边有订单且有取票码_补记订单号_不判失败不退款()
+        {
+            var (f, _) = await StuckLongAgo();
+            await using var _f = f;
+            await using (var db = f.NewContext())
+            {
+                var ctl = f.Controller(db);
+                ctl.SupplierOrderChecker = (pass, src) => Task.FromResult(new SkiPassController.SupplierOrderCheck(SkipassSaleRules.SupplierOrderKind.LiveWithCode, "1222999999"));
+                await ctl.RefreshIssuing();
+            }
+            await using var check = f.NewContext();
+            var pass = await check.skiPass.FirstAsync(p => p.id == 501);
+            Assert.Equal("1222999999", pass.reserve_no);
+            Assert.Equal(0, pass.is_cancel);
+            Assert.Empty(await check.orderPaymentRefund.ToListAsync());
+        }
+
+        [Fact]
+        public async Task 超时_供应商那边有订单没有取票码_先取消并确认已取消才退款_没确认就不退()
+        {
+            // 取消没确认：不退款，票还在出票中
+            var (f, _) = await StuckLongAgo();
+            await using (var db = f.NewContext())
+            {
+                var ctl = f.Controller(db);
+                ctl.SupplierOrderChecker = (pass, src) => Task.FromResult(new SkiPassController.SupplierOrderCheck(SkipassSaleRules.SupplierOrderKind.LiveWithoutCode, "1222888888"));
+                string? cancelled = null;
+                ctl.SupplierOrderCanceller = (orderId, src) => { cancelled = orderId; return Task.FromResult(false); };
+                await ctl.RefreshIssuing();
+                Assert.Equal("1222888888", cancelled);
+            }
+            await using (var check = f.NewContext())
+            {
+                Assert.Equal(0, (await check.skiPass.FirstAsync(p => p.id == 501)).is_cancel);
+                Assert.Empty(await check.orderPaymentRefund.ToListAsync());
+            }
+            // 取消已确认：判定出票失败并退这一张的款
+            await using (var db = f.NewContext())
+            {
+                var ctl = f.Controller(db);
+                ctl.SupplierOrderChecker = (pass, src) => Task.FromResult(new SkiPassController.SupplierOrderCheck(SkipassSaleRules.SupplierOrderKind.LiveWithoutCode, "1222888888"));
+                ctl.SupplierOrderCanceller = (orderId, src) => Task.FromResult(true);
+                await ctl.RefreshIssuing();
+            }
+            await using var after = f.NewContext();
+            Assert.Equal(-2, (await after.skiPass.FirstAsync(p => p.id == 501)).is_cancel);
+            var refunds = await after.orderPaymentRefund.ToListAsync();
+            Assert.Single(refunds);
+            Assert.Equal(579, refunds[0].amount);
+            await f.DisposeAsync();
+        }
+
+        [Fact]
+        public async Task 超时_核对不了供应商订单_什么都不做_不退款()
+        {
+            var (f, _) = await StuckLongAgo();
+            await using var _f = f;
+            await using (var db = f.NewContext())
+            {
+                var ctl = f.Controller(db);
+                ctl.SupplierOrderChecker = (pass, src) => Task.FromResult(new SkiPassController.SupplierOrderCheck(SkipassSaleRules.SupplierOrderKind.Unknown, null));
+                await ctl.RefreshIssuing();
+                await ctl.RefreshIssuing();
+            }
+            await using var check = f.NewContext();
+            var pass = await check.skiPass.FirstAsync(p => p.id == 501);
+            Assert.Equal(0, pass.is_cancel);
+            Assert.Null(pass.reserve_no);
+            Assert.Empty(await check.orderPaymentRefund.ToListAsync());
+        }
+
+        [Theory]
+        [InlineData(SkipassSaleRules.SupplierOrderKind.NoOrder)]
+        [InlineData(SkipassSaleRules.SupplierOrderKind.Cancelled)]
+        public async Task 超时_供应商那边没有订单或已取消_确认失败并退这一张的款(SkipassSaleRules.SupplierOrderKind kind)
+        {
+            var (f, _) = await StuckLongAgo();
+            await using var _f = f;
+            await using (var db = f.NewContext())
+            {
+                var ctl = f.Controller(db);
+                ctl.SupplierOrderChecker = (pass, src) => Task.FromResult(new SkiPassController.SupplierOrderCheck(kind, null));
+                await ctl.RefreshIssuing();
+            }
+            await using var check = f.NewContext();
+            Assert.Equal(-2, (await check.skiPass.FirstAsync(p => p.id == 501)).is_cancel);
+            var refunds = await check.orderPaymentRefund.ToListAsync();
+            Assert.Single(refunds);
+            Assert.Equal(501, refunds[0].skipass_id);
+        }
+
         // ---------------- 夹具 ----------------
 
         static SkipassCartItem Item(int productId, string cell, string name = "张三", DateTime? date = null, int count = 1)
@@ -578,8 +699,14 @@ namespace SnowmeetApi.Tests
             public ApplicationDBContext NewContext() => new(new DbContextOptionsBuilder<ApplicationDBContext>()
                 .UseSqlite(connection).UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking).Options);
 
+            // 供应商订单核对默认「没有订单」、取消默认「已确认取消」：测试里不发真实请求，需要别的结果时在测试里改
             public SkiPassController Controller(ApplicationDBContext db) =>
-                new(db, Config, Http) { BalanceProvider = source => Task.FromResult(Balances.TryGetValue(source, out var b) ? b : 0) };
+                new(db, Config, Http)
+                {
+                    BalanceProvider = source => Task.FromResult(Balances.TryGetValue(source, out var b) ? b : 0),
+                    SupplierOrderChecker = (pass, source) => Task.FromResult(new SkiPassController.SupplierOrderCheck(SkipassSaleRules.SupplierOrderKind.NoOrder, null)),
+                    SupplierOrderCanceller = (orderId, source) => Task.FromResult(true)
+                };
 
             public static async Task<Fixture> Create()
             {
