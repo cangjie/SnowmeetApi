@@ -9,6 +9,7 @@ using Microsoft.Extensions.Configuration;
 using SKIT.FlurlHttpClient.Wechat.TenpayV3;
 using SKIT.FlurlHttpClient.Wechat.TenpayV3.Models;
 using SnowmeetApi.Data;
+using SnowmeetApi.Helpers;
 using SnowmeetApi.Models;
 namespace SnowmeetApi.Controllers
 {
@@ -64,11 +65,7 @@ namespace SnowmeetApi.Controllers
                 double rentalAmount = 0;
                 for (int i = 0; i < order.rentals.Count; i++)
                 {
-                    Rental rental = order.rentals[i];
-                    if (rental.entertain == false)
-                    {
-                        rentalAmount += (rental.totalRentalAmount - rental.totalDiscountAmount);
-                    }
+                    rentalAmount += WanlongShareRules.RentAfterDiscounts(order.rentals[i]);
                 }
                 OrderShare share = new OrderShare()
                 {
