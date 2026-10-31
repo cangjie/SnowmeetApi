@@ -240,5 +240,43 @@ namespace SnowmeetApi.Tests
         {
             Assert.Equal(expect, SkipassSaleRules.NeedsAutoRefund(isCancel, valid, resort, haveRefund, refundAmount));
         }
+
+        static readonly DateTime Requested = new DateTime(2026, 10, 31, 16, 28, 0);
+
+        [Theory]
+        [InlineData(0, 28, true)]     // 刚申请
+        [InlineData(10, 38, true)]    // 30 分钟内每分钟都查，不看分钟数
+        [InlineData(30, 58, true)]    // 恰好 30 分钟
+        [InlineData(31, 59, false)]   // 之后只在整十分钟查
+        [InlineData(32, 0, true)]     // 17:00
+        [InlineData(122, 30, true)]   // 18:30
+        [InlineData(123, 31, false)]
+        public void 取消中的雪票_30分钟内每分钟查_之后每10分钟查(int minutesAfter, int minuteOfHour, bool expect)
+        {
+            DateTime now = Requested.AddMinutes(minutesAfter);
+            Assert.Equal(minuteOfHour, now.Minute);
+            Assert.Equal(expect, SkipassSaleRules.ShouldPollCancel(Requested, now));
+        }
+
+        [Fact]
+        public void 没有取消申请时间_每轮都查()
+        {
+            Assert.True(SkipassSaleRules.ShouldPollCancel(null, new DateTime(2026, 10, 31, 17, 7, 0)));
+        }
+
+        [Theory]
+        [InlineData(23 * 60 + 59, false)]
+        [InlineData(24 * 60, false)]       // 恰好 24 小时还不算超时
+        [InlineData(24 * 60 + 1, true)]
+        public void 取消超过24小时没确认_算超时(int minutesAfter, bool expect)
+        {
+            Assert.Equal(expect, SkipassSaleRules.CancelTimedOut(Requested, Requested.AddMinutes(minutesAfter)));
+        }
+
+        [Fact]
+        public void 没有取消申请时间_不算超时()
+        {
+            Assert.False(SkipassSaleRules.CancelTimedOut(null, Requested.AddDays(30)));
+        }
     }
 }

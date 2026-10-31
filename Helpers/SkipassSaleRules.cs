@@ -67,6 +67,25 @@ namespace SnowmeetApi.Helpers
             return haveRefund == null && refundAmount == null;
         }
 
+        // 「取消中」的雪票多久查一次自我游：取消申请后 30 分钟内每分钟查（通常几分钟就确认），
+        // 之后每 10 分钟查一次，超过 24 小时还没确认就不再等（见 CancelTimedOut）。
+        // 后台轮询每分钟调一次，这里按当前分钟数决定这一轮查不查。
+        public static readonly TimeSpan CancelFastPollWindow = TimeSpan.FromMinutes(30);
+        public static readonly TimeSpan CancelGiveUpAfter = TimeSpan.FromHours(24);
+
+        public static bool ShouldPollCancel(DateTime? requestedAt, DateTime now)
+        {
+            if (requestedAt == null) return true;
+            TimeSpan age = now - requestedAt.Value;
+            if (age <= CancelFastPollWindow) return true;
+            return now.Minute % 10 == 0;
+        }
+
+        public static bool CancelTimedOut(DateTime? requestedAt, DateTime now)
+        {
+            return requestedAt != null && now - requestedAt.Value > CancelGiveUpAfter;
+        }
+
         // 顾客看到的价格行不带进货价和建议售价；deal_price、marketPrice 保留
         public static void RedactDailyPrices(IEnumerable<SkipassDailyPrice>? prices)
         {

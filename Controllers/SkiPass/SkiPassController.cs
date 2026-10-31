@@ -664,8 +664,26 @@ namespace SnowmeetApi.Controllers
 
         // 自我游确认取消后自动退款，不需要店员会话。已发起过退款（payment_refund 有任何一行）的不再自动退。
         // 退款成功后由微信回调的 RefundCallBack 补退款金额。返回是否发起了退款。
+        // 进程内同一时间只允许一个自动退款在跑：取消接口、定时轮询、手动触发 RefreshCancel 可能同时处理同一张票，
+        // 没有这把锁两边都先查到「没有退款行」再各发一笔
+        static readonly SemaphoreSlim AutoRefundLock = new SemaphoreSlim(1, 1);
+
         [NonAction]
         public async Task<bool> AutoRefundCancelled(Models.SkiPass skipass, string reason, int? staffId)
+        {
+            await AutoRefundLock.WaitAsync();
+            try
+            {
+                return await AutoRefundCancelledLocked(skipass, reason, staffId);
+            }
+            finally
+            {
+                AutoRefundLock.Release();
+            }
+        }
+
+        [NonAction]
+        private async Task<bool> AutoRefundCancelledLocked(Models.SkiPass skipass, string reason, int? staffId)
         {
             if (!SkipassSaleRules.NeedsAutoRefund(skipass.is_cancel, skipass.valid ?? 0, skipass.resort, skipass.have_refund, skipass.refund_amount))
             {
@@ -695,8 +713,10 @@ namespace SnowmeetApi.Controllers
             return true;
         }
 
+        // poll=1 是后台轮询（SkipassCancelPoller，每分钟一次）：按取消申请后的时间决定这一轮查不查；
+        // 不带 poll 是手动或外部调用，全部都查。
         [HttpGet]
-        public async Task RefreshCancel()
+        public async Task RefreshCancel(int poll = 0)
         {
             // 取消中（自我游需要审核）的，查到已取消就改成已取消并自动退款；
             // 已取消但没退款的（以前这里只改状态不退款）近两天内的也补退，退款行存在的不会重复退
@@ -707,6 +727,13 @@ namespace SnowmeetApi.Controllers
             for(int i = 0; i < skipassList.Count; i++)
             {
                 Models.SkiPass skipass = skipassList[i];
+                DateTime now = DateTime.Now;
+                // 取消申请时间：Cancel 里记在 card_member_return_time，没有就退回到下单时间
+                DateTime requestedAt = skipass.card_member_return_time ?? skipass.create_date;
+                if (poll == 1 && skipass.is_cancel == 2 && !SkipassSaleRules.ShouldPollCancel(requestedAt, now))
+                {
+                    continue;
+                }
                 Models.SkiPassProduct skipassProduct = await _context.skiPassProduct.FindAsync(skipass.product_id);
                 if (skipassProduct == null)
                 {
@@ -723,11 +750,21 @@ namespace SnowmeetApi.Controllers
                         await _context.SaveChangesAsync();
                         await AutoRefundCancelled(skipass, "退票确认退款", null);
                     }
+                    else if (skipass.is_cancel == 2 && SkipassSaleRules.CancelTimedOut(requestedAt, now))
+                    {
+                        // 等了 24 小时自我游还没确认：标成取消失败，交给店员人工处理，不自动退款
+                        skipass.is_cancel = -1;
+                        skipass.memo = (skipass.memo ?? "") + " 自我游超过24小时未确认取消，需人工处理";
+                        skipass.update_date = now;
+                        _context.skiPass.Entry(skipass).State = EntityState.Modified;
+                        await _context.SaveChangesAsync();
+                        Console.WriteLine("[雪票取消] 超时未确认 skipass=" + skipass.id + " reserve_no=" + skipass.reserve_no);
+                    }
                     
                 }
-                catch
+                catch (Exception err)
                 {
-
+                    Console.WriteLine("[雪票取消] 处理失败 skipass=" + skipass.id + " " + err.Message);
                 }
             }
         }
