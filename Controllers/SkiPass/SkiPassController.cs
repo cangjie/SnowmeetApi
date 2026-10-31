@@ -1184,8 +1184,26 @@ namespace SnowmeetApi.Controllers
         }
         // recentDays > 0（后台轮询用）：只查游玩日期是今天、或最近 recentDays 天内的票——游玩日期还没到的票不可能取票，
         // 没必要每次都去供应商一张张查；不带参数是原来的行为，查全部没使用的票。
+        // 服务器 crontab 里也有一条每 10 分钟（8:00–20:50）调这个接口的任务，和后台轮询可能同时到：
+        // 进程内一次只跑一个，后到的等前一个跑完再重新查未使用的票，不会对同一张票重复执行后续（激活券、分账、记推荐店员）
+        static readonly SemaphoreSlim UsedCheckLock = new SemaphoreSlim(1, 1);
+
         [HttpGet]
         public async Task RefreshUsedAll(int recentDays = 0)
+        {
+            await UsedCheckLock.WaitAsync();
+            try
+            {
+                await RefreshUsedAllCore(recentDays);
+            }
+            finally
+            {
+                UsedCheckLock.Release();
+            }
+        }
+
+        [NonAction]
+        private async Task RefreshUsedAllCore(int recentDays)
         {
             TicketController _tHelper = new TicketController(_context, _config);
             OrderShareController _shareHelper = new OrderShareController(_context, _config, _http);
