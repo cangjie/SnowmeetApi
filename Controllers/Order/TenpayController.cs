@@ -510,6 +510,82 @@ namespace SnowmeetApi.Controllers
                 return refund;
             }
         }
+        // 退款成功后的落库：回调和主动查询共用。sideEffects 控制是否执行订单类型相关的后续（雪票会记退款金额、取消赠券），
+        // 补很久以前的历史状态时不要重放这些后续。
+        [NonAction]
+        public async Task ApplyRefundSuccess(OrderPaymentRefund refund, OrderPayment payment, string? transactionId, bool sideEffects)
+        {
+            refund.state = 1;
+            refund.memo = transactionId ?? "";
+            refund.TransactionId = (transactionId ?? "").Trim();
+            refund.update_date = DateTime.Now;
+            _db.Entry(refund).State = EntityState.Modified;
+            await _db.SaveChangesAsync();
+            if (sideEffects)
+            {
+                await _orderPaymentHelper.SetPaymentRefundSuccess(payment.id);
+            }
+        }
+
+        static readonly SemaphoreSlim RefundSyncLock = new SemaphoreSlim(1, 1);
+
+        // 主动向微信查退款结果，把还是「处理中」(state=0) 的退款落成成功。
+        // 微信的退款成功回调从 2026-07 中旬起没有更新过库里的状态（原因要看服务器回调日志），不能只靠回调。
+        // days：只查最近这么多天创建的退款；sideEffects=0 只改状态、不重放雪票退款后续（补历史数据用）。
+        // 查到的状态以微信为准，幂等：已经是成功的不会再查，重复调用不会重复执行后续。
+        [HttpGet]
+        public async Task<ActionResult<object>> SyncPendingRefunds(int days = 3, int sideEffects = 1)
+        {
+            await RefundSyncLock.WaitAsync();
+            try
+            {
+                DateTime from = DateTime.Now.AddDays(-Math.Max(days, 1));
+                List<OrderPaymentRefund> pending = await _db.orderPaymentRefund
+                    .Where(r => r.state == 0 && r.refund_id != null && r.refund_id != "" && r.create_date > from)
+                    .OrderBy(r => r.id).ToListAsync();
+                int succeeded = 0, other = 0, failed = 0;
+                foreach (OrderPaymentRefund refund in pending)
+                {
+                    try
+                    {
+                        OrderPayment payment = await _db.OrderPayment.AsNoTracking().FirstOrDefaultAsync(p => p.id == refund.payment_id);
+                        if (payment == null || payment.mch_id == null || !payment.pay_method.Trim().Equals("微信支付"))
+                        {
+                            continue;
+                        }
+                        var client = await GetClient((int)payment.mch_id);
+                        var response = await client.ExecuteGetRefundDomesticRefundByOutRefundNumberAsync(
+                            new GetRefundDomesticRefundByOutRefundNumberRequest() { OutRefundNumber = refund.out_refund_no.Trim() });
+                        if (!response.IsSuccessful())
+                        {
+                            failed++;
+                            Console.WriteLine("[微信退款查询] 失败 refund=" + refund.id + " " + response.ErrorMessage);
+                            continue;
+                        }
+                        if ("SUCCESS".Equals(response.Status))
+                        {
+                            await ApplyRefundSuccess(refund, payment, response.TransactionId, sideEffects == 1);
+                            succeeded++;
+                        }
+                        else
+                        {
+                            other++;
+                        }
+                    }
+                    catch (Exception err)
+                    {
+                        failed++;
+                        Console.WriteLine("[微信退款查询] 出错 refund=" + refund.id + " " + err.Message);
+                    }
+                }
+                return Ok(new { total = pending.Count, succeeded, notYet = other, failed });
+            }
+            finally
+            {
+                RefundSyncLock.Release();
+            }
+        }
+
         [HttpPost("{mchid}")]
         public async Task<ActionResult<string>> RefundCallback(int mchid, [FromBody] object postData)
         {
@@ -590,25 +666,19 @@ namespace SnowmeetApi.Controllers
                         OrderPaymentRefund refund = await _db.orderPaymentRefund
                             .Where(r => (r.refund_id.Trim().Equals(callbackResource.RefundId.Trim()))).FirstAsync();
 
-                        refund.state = 1;
-                        refund.memo = callbackResource.TransactionId;
-                        refund.TransactionId = callbackResource.TransactionId.Trim();
-                        refund.update_date = DateTime.Now;
-                        _db.Entry(refund).State = EntityState.Modified;
-                        await _db.SaveChangesAsync();
-
-                        await _orderPaymentHelper.SetPaymentRefundSuccess(payment.id);
+                        await ApplyRefundSuccess(refund, payment, callbackResource.TransactionId, true);
                     }
-                    catch
+                    catch (Exception err)
                     {
-
+                        // 以前这里什么都不记，回调处理失败了没人知道；SyncPendingRefunds 会兜底，但要留下线索
+                        Console.WriteLine("[微信退款回调] 处理失败 mch=" + mchid + " " + err.Message);
                     }
-
-
-
-
                 }
 
+            }
+            else
+            {
+                Console.WriteLine("[微信退款回调] 验签失败 mch=" + mchid + " serial=" + serial);
             }
             return "{ \r\n \"code\": \"SUCCESS\", \r\n \"message\": \"成功\" \r\n}";
         }

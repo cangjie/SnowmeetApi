@@ -95,6 +95,8 @@ namespace SnowmeetApi
             services.AddHostedService<SnowmeetApi.Services.Fnb.MeituanCollectorWatchdog>();
             // 雪票取消后自动退款的轮询：自我游确认取消可能要几分钟，每分钟查一次（30 分钟后放缓），24 小时没确认标成取消失败
             services.AddHostedService<SnowmeetApi.Services.SkipassJobs.SkipassCancelPoller>();
+            // 微信退款成功回调没有更新退款状态，每 5 分钟主动向微信查一次处理中的退款
+            services.AddHostedService<SnowmeetApi.Services.SkipassJobs.RefundStateSyncPoller>();
             services.AddScoped<SnowmeetApi.Services.Tickets.IMiniTicketTokenProvider, SnowmeetApi.Services.Tickets.MiniTicketTokenProvider>();
             services.AddHttpClient<SnowmeetApi.Services.Tickets.IMiniTicketQrService, SnowmeetApi.Services.Tickets.MiniTicketQrService>(client => client.Timeout = TimeSpan.FromSeconds(30));
             services.AddSingleton(FileStorageOptions.From(Configuration));
