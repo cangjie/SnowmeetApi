@@ -1182,14 +1182,20 @@ namespace SnowmeetApi.Controllers
                 }
             }
         }
+        // recentDays > 0（后台轮询用）：只查游玩日期是今天、或最近 recentDays 天内的票——游玩日期还没到的票不可能取票，
+        // 没必要每次都去供应商一张张查；不带参数是原来的行为，查全部没使用的票。
         [HttpGet]
-        public async Task RefreshUsedAll()
+        public async Task RefreshUsedAll(int recentDays = 0)
         {
             TicketController _tHelper = new TicketController(_context, _config);
             OrderShareController _shareHelper = new OrderShareController(_context, _config, _http);
+            DateTime today = DateTime.Now.Date;
+            DateTime from = recentDays > 0 ? today.AddDays(-recentDays) : DateTime.MinValue;
+            DateTime toExclusive = recentDays > 0 ? today.AddDays(1) : DateTime.MaxValue; // 不能对 MaxValue 再 AddDays，会溢出
             List<Models.SkiPass> skipassList = await _context.skiPass
                 .Where(s => (s.valid == 1 && s.is_cancel == 0 
-                && s.is_used == 0 && !s.resort.Trim().Equals("南山")))
+                && s.is_used == 0 && !s.resort.Trim().Equals("南山")
+                && (recentDays <= 0 || (s.reserve_date != null && s.reserve_date >= from && s.reserve_date < toExclusive))))
                 .OrderByDescending(s => s.id).ToListAsync();
             for(int i = 0; i < skipassList.Count; i++)
             {

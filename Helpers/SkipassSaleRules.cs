@@ -97,6 +97,25 @@ namespace SnowmeetApi.Helpers
             return IssuingAction.GiveUp;
         }
 
+        // 「已取票检查」（RefreshUsedAll：向供应商查订单是否已使用，标成已使用并执行后续）的后台轮询节奏：
+        // 每 5 分钟一次，只在早 7:00（含）到晚 21:00（不含）之间；其余时间雪场不营业，不查。
+        public static readonly TimeSpan PickupCheckInterval = TimeSpan.FromMinutes(5);
+        static readonly TimeSpan PickupCheckTolerance = TimeSpan.FromSeconds(30); // 后台每分钟醒一次，时间会有几秒漂移
+        public static readonly TimeSpan PickupWindowStart = TimeSpan.FromHours(7);
+        public static readonly TimeSpan PickupWindowEnd = TimeSpan.FromHours(21);
+
+        public static bool InPickupWindow(DateTime now)
+        {
+            TimeSpan t = now.TimeOfDay;
+            return t >= PickupWindowStart && t < PickupWindowEnd;
+        }
+
+        public static bool ShouldCheckPickup(DateTime now, DateTime? lastRun)
+        {
+            if (!InPickupWindow(now)) return false;
+            return lastRun == null || now - lastRun.Value >= PickupCheckInterval - PickupCheckTolerance;
+        }
+
         // 超过 30 分钟没出成、准备确认出票失败之前，先按我方单号去供应商那里核对这张票有没有订单：
         //   没有订单 / 订单已取消 → 可以确认失败并退款；
         //   有订单、有取票码 → 其实出成了（我们没记上），补记订单号，不退款；

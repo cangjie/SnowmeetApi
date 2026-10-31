@@ -662,6 +662,55 @@ namespace SnowmeetApi.Tests
             Assert.Equal(501, refunds[0].skipass_id);
         }
 
+        // ---------------- 已取票检查的轮询节奏 ----------------
+
+        [Theory]
+        [InlineData(6, 59, 59, false)]
+        [InlineData(7, 0, 0, true)]
+        [InlineData(12, 30, 0, true)]
+        [InlineData(20, 59, 59, true)]
+        [InlineData(21, 0, 0, false)]
+        [InlineData(23, 30, 0, false)]
+        [InlineData(3, 0, 0, false)]
+        public void 已取票检查只在早7点到晚9点之间(int h, int m, int sec, bool expect)
+        {
+            Assert.Equal(expect, SkipassSaleRules.InPickupWindow(new DateTime(2026, 11, 1, h, m, sec)));
+        }
+
+        [Fact]
+        public void 已取票检查每5分钟一次_后台每分钟醒一次的时间漂移不影响()
+        {
+            var t0 = new DateTime(2026, 11, 1, 10, 0, 0);
+            Assert.True(SkipassSaleRules.ShouldCheckPickup(t0, null));                           // 第一次
+            Assert.False(SkipassSaleRules.ShouldCheckPickup(t0.AddMinutes(1), t0));
+            Assert.False(SkipassSaleRules.ShouldCheckPickup(t0.AddMinutes(4), t0));
+            Assert.True(SkipassSaleRules.ShouldCheckPickup(t0.AddMinutes(4).AddSeconds(45), t0)); // 每分钟 +几秒漂移，第 5 次醒来时差几秒不到 5 分钟，也要查
+            Assert.True(SkipassSaleRules.ShouldCheckPickup(t0.AddMinutes(5), t0));
+            Assert.True(SkipassSaleRules.ShouldCheckPickup(t0.AddMinutes(30), t0));
+        }
+
+        [Fact]
+        public void 已取票检查窗口外一律不查_哪怕很久没查过()
+        {
+            var last = new DateTime(2026, 11, 1, 20, 50, 0);
+            Assert.False(SkipassSaleRules.ShouldCheckPickup(new DateTime(2026, 11, 1, 21, 5, 0), last));
+            Assert.False(SkipassSaleRules.ShouldCheckPickup(new DateTime(2026, 11, 2, 6, 30, 0), last));
+            Assert.True(SkipassSaleRules.ShouldCheckPickup(new DateTime(2026, 11, 2, 7, 0, 0), last)); // 次日 7 点第一轮
+        }
+
+        [Theory]
+        [InlineData(0)]
+        [InlineData(14)]
+        public async Task 已取票检查_按游玩日期过滤的查询能正常执行_没有供应商订单号的票直接跳过(int recentDays)
+        {
+            await using var f = await Fixture.Create();
+            await SeedPaidCartOrder(f, payMethod: "线下"); // 三张票都没有 reserve_no，不会发出网络请求
+            await using var db = f.NewContext();
+            await f.Controller(db).RefreshUsedAll(recentDays);
+            await using var check = f.NewContext();
+            Assert.All(await check.skiPass.ToListAsync(), p => Assert.Equal(0, p.is_used));
+        }
+
         // ---------------- 退票留痕：谁、什么时候、提交了什么、供应商反馈了什么 ----------------
 
         static async Task SeedIssuedPass(Fixture f)
