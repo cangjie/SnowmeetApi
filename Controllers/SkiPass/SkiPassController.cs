@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
@@ -568,6 +569,76 @@ namespace SnowmeetApi.Controllers
 
         // 向自我游真实下单、扣预存款。只能由 CreateSkiPass 等服务端流程调用：
         // 它原来是公开的 [HttpGet] 且参数是整个 SkiPass 对象，外部可以自己拼一个对象绕过 ReserveSkiPass 的店员限制。
+        // 取票二维码图片：由我们的服务器去供应商那里取，再转给小程序（小程序真机不能直接加载供应商域名的图片）。
+        // 只给这张票的购买者本人或在职店员；只取供应商域名下的 https 图片。图片内容不会变，按地址缓存在内存里。
+        public Func<string, Task<(byte[] Bytes, string ContentType)>>? QrFetcher { get; set; }
+        static readonly System.Collections.Concurrent.ConcurrentDictionary<string, (byte[] Bytes, string ContentType)> QrCache = new();
+        const int QR_CACHE_MAX = 300;
+
+        [HttpGet]
+        public async Task<IActionResult> QrImage(int skipassId, string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            Member? member = string.IsNullOrWhiteSpace(sessionKey) ? null : await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
+            if (member == null)
+            {
+                return BadRequest();
+            }
+            Models.SkiPass? skipass = await _context.skiPass.Where(s => s.id == skipassId && s.valid == 1).AsNoTracking().FirstOrDefaultAsync();
+            if (skipass == null)
+            {
+                return NotFound();
+            }
+            if (skipass.member_id != member.id && !SkipassSaleRules.CanReserve(await GetStaffOrNull(sessionKey, sessionType)))
+            {
+                return BadRequest();
+            }
+            string url = (skipass.qr_code_url ?? "").Trim();
+            if (url == "")
+            {
+                return NotFound();
+            }
+            if (!SkipassSaleRules.IsAllowedQrImageUrl(url))
+            {
+                return BadRequest();
+            }
+            if (!QrCache.TryGetValue(url, out var image))
+            {
+                try
+                {
+                    image = QrFetcher != null ? await QrFetcher(url) : await FetchQrImage(url);
+                }
+                catch (Exception err)
+                {
+                    Console.WriteLine("[取票二维码] 取图失败 skipass=" + skipassId + " " + err.Message);
+                    return StatusCode(502);
+                }
+                if (QrCache.Count >= QR_CACHE_MAX)
+                {
+                    QrCache.Clear();
+                }
+                QrCache[url] = image;
+            }
+            if (HttpContext != null)
+            {
+                Response.Headers["Cache-Control"] = "private, max-age=600";
+            }
+            return File(image.Bytes, image.ContentType);
+        }
+
+        [NonAction]
+        private static async Task<(byte[] Bytes, string ContentType)> FetchQrImage(string url)
+        {
+            using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
+            using var response = await client.GetAsync(url);
+            response.EnsureSuccessStatusCode();
+            string contentType = response.Content.Headers.ContentType?.MediaType ?? "image/png";
+            if (!contentType.StartsWith("image/"))
+            {
+                throw new InvalidOperationException("不是图片：" + contentType);
+            }
+            return (await response.Content.ReadAsByteArrayAsync(), contentType);
+        }
+
         // 同一张票同一时间只允许一处在出票（付款回调、后台重试可能同时碰到）
         static readonly HashSet<int> IssuingNow = new HashSet<int>();
 

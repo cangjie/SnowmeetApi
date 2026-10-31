@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text.RegularExpressions;
 using SnowmeetApi.Models;
 
@@ -65,6 +66,20 @@ namespace SnowmeetApi.Helpers
             if (isCancel != 1 || valid != 1) return false;
             if ((resort ?? "").Trim().Equals("南山")) return false;
             return haveRefund == null && refundAmount == null;
+        }
+
+        // 取票二维码图片是供应商（自我游、携程图片库）的域名，小程序真机不允许加载非合法域名的图片，
+        // 所以由我们的服务器去取再转给小程序。服务器只替小程序取这几个供应商域名下的 https 图片，不能被当成任意地址的代理。
+        static readonly string[] QrImageHostSuffixes = { ".zowoyoo.com", ".c-ctrip.com", ".ctrip.com" };
+
+        public static bool IsAllowedQrImageUrl(string? url)
+        {
+            if (string.IsNullOrWhiteSpace(url)) return false;
+            if (!Uri.TryCreate(url.Trim(), UriKind.Absolute, out Uri? uri)) return false;
+            if (uri.Scheme != Uri.UriSchemeHttps) return false;
+            string host = uri.Host.ToLowerInvariant();
+            if (host == "zowoyoo.com" || host == "c-ctrip.com" || host == "ctrip.com") return true;
+            return QrImageHostSuffixes.Any(suffix => host.EndsWith(suffix));
         }
 
         // 付款后「出票中」的票怎么处理：刚开始的 90 秒留给第一次出票；之后 30 分钟内每分钟重试

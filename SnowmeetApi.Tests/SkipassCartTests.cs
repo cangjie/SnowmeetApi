@@ -443,6 +443,104 @@ namespace SnowmeetApi.Tests
             Assert.Equal(399, refunds[1].amount);
         }
 
+        // ---------------- 取票二维码转发 ----------------
+
+        [Theory]
+        [InlineData("https://dimg04.c-ctrip.com/images/0450l12000ub6ustm1A2C.png", true)]
+        [InlineData("https://www.zowoyoo.com/qr/abc.png", true)]
+        [InlineData("https://zowoyoo.com/a.png", true)]
+        [InlineData("http://www.zowoyoo.com/qr/abc.png", false)]          // 只取 https
+        [InlineData("https://evil.com/zowoyoo.com/a.png", false)]
+        [InlineData("https://zowoyoo.com.evil.com/a.png", false)]          // 后缀骗不了
+        [InlineData("https://evilzowoyoo.com/a.png", false)]
+        [InlineData("file:///etc/passwd", false)]
+        [InlineData("", false)]
+        [InlineData(null, false)]
+        public void 二维码图片只取供应商域名下的https图片(string? url, bool expect)
+        {
+            Assert.Equal(expect, SkipassSaleRules.IsAllowedQrImageUrl(url));
+        }
+
+        static readonly byte[] PngBytes = new byte[] { 0x89, 0x50, 0x4E, 0x47, 1, 2, 3 };
+
+        static async Task SeedQrPass(Fixture f, string? qrUrl, int memberId = 10)
+        {
+            await using var db = f.NewContext();
+            db.skiPass.Add(new SnowmeetApi.Models.SkiPass { id = 601, order_id = 900, member_id = memberId, product_id = 901, resort = "万龙",
+                product_name = "p", count = 1, deal_price = 579, valid = 1, qr_code_url = qrUrl, reserve_date = D0 });
+            await db.SaveChangesAsync();
+        }
+
+        [Fact]
+        public async Task 二维码转发_购买者本人拿到图片_按地址缓存只取一次()
+        {
+            await using var f = await Fixture.Create();
+            await SeedQrPass(f, "https://dimg04.c-ctrip.com/images/cache-test-1.png");
+            int fetches = 0;
+            await using var db = f.NewContext();
+            var ctl = f.Controller(db);
+            ctl.QrFetcher = url => { fetches++; return Task.FromResult((PngBytes, "image/png")); };
+            var first = Assert.IsType<FileContentResult>(await ctl.QrImage(601, "staff-session"));
+            Assert.Equal("image/png", first.ContentType);
+            Assert.Equal(PngBytes, first.FileContents);
+            Assert.IsType<FileContentResult>(await ctl.QrImage(601, "staff-session"));
+            Assert.Equal(1, fetches);
+        }
+
+        [Fact]
+        public async Task 二维码转发_别人的票_顾客拿不到_在职店员可以()
+        {
+            await using var f = await Fixture.Create();
+            await SeedQrPass(f, "https://dimg04.c-ctrip.com/images/cache-test-2.png", memberId: 11);
+            await using var db = f.NewContext();
+            var ctl = f.Controller(db);
+            ctl.QrFetcher = url => Task.FromResult((PngBytes, "image/png"));
+            // 票是顾客 11 的：店员 10 能看，另一个普通会话（这里用无效会话）不行
+            Assert.IsType<FileContentResult>(await ctl.QrImage(601, "staff-session"));
+            Assert.IsType<BadRequestResult>(await ctl.QrImage(601, "no-such-session"));
+            Assert.IsType<BadRequestResult>(await ctl.QrImage(601, ""));
+        }
+
+        [Fact]
+        public async Task 二维码转发_没有会话的顾客看别人的票被拒绝()
+        {
+            await using var f = await Fixture.Create();
+            await SeedQrPass(f, "https://dimg04.c-ctrip.com/images/cache-test-3.png", memberId: 10); // 店员自己的票
+            await using var db = f.NewContext();
+            var ctl = f.Controller(db);
+            ctl.QrFetcher = url => Task.FromResult((PngBytes, "image/png"));
+            Assert.IsType<BadRequestResult>(await ctl.QrImage(601, "customer-session")); // 顾客 11 看店员 10 的票
+        }
+
+        [Fact]
+        public async Task 二维码转发_没有二维码_不存在的票_非供应商域名_取图失败()
+        {
+            await using var f = await Fixture.Create();
+            await SeedQrPass(f, null);
+            await using var db = f.NewContext();
+            var ctl = f.Controller(db);
+            ctl.QrFetcher = url => Task.FromResult((PngBytes, "image/png"));
+            Assert.IsType<NotFoundResult>(await ctl.QrImage(601, "staff-session"));
+            Assert.IsType<NotFoundResult>(await ctl.QrImage(999, "staff-session"));
+
+            await using var f2 = await Fixture.Create();
+            await SeedQrPass(f2, "https://evil.example.com/a.png");
+            await using var db2 = f2.NewContext();
+            var ctl2 = f2.Controller(db2);
+            int fetches = 0;
+            ctl2.QrFetcher = url => { fetches++; return Task.FromResult((PngBytes, "image/png")); };
+            Assert.IsType<BadRequestResult>(await ctl2.QrImage(601, "staff-session"));
+            Assert.Equal(0, fetches);
+
+            await using var f3 = await Fixture.Create();
+            await SeedQrPass(f3, "https://dimg04.c-ctrip.com/images/cache-test-fail.png");
+            await using var db3 = f3.NewContext();
+            var ctl3 = f3.Controller(db3);
+            ctl3.QrFetcher = url => throw new InvalidOperationException("boom");
+            var failed = Assert.IsType<StatusCodeResult>(await ctl3.QrImage(601, "staff-session"));
+            Assert.Equal(502, failed.StatusCode);
+        }
+
         // ---------------- 夹具 ----------------
 
         static SkipassCartItem Item(int productId, string cell, string name = "张三", DateTime? date = null, int count = 1)
