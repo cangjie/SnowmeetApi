@@ -95,6 +95,10 @@ namespace SnowmeetApi.Controllers
             double sharedAmount = 0;
             orderShare.amount = Math.Round(orderShare.amount, 2);
             bool overFlow = orderShare.amount >= (paidAmount * 0.3);
+            // 2026-10-31 用户要求：用了优惠券的租赁单照常生成分账记录，但不自动分账（夜间 ExecuteWLShare 跳过 can_not_share），需要时手动分。
+            bool usedTicket = await _db.discount.AnyAsync(d => d.valid == 1 && d.biz_type == "租赁"
+                && d.ticket_code != null && d.ticket_code.Trim() != ""
+                && _db.rental.Any(r => r.id == d.biz_id && r.order_id == orderShare.order_id && r.valid == 1));
             for (int i = 0; i < payments.Count && sharedAmount < orderShare.amount; i++)
             {
                 double currentAmount = Math.Min(orderShare.amount - sharedAmount, payments[i].amount * 0.29);
@@ -113,7 +117,8 @@ namespace SnowmeetApi.Controllers
                     amount = currentAmount,
                     valid = true,
                     out_trade_no = payments[i].out_trade_no.Trim() + "_FZ_" + (i + 1).ToString().PadLeft(2, '0'),
-                    can_not_share = overFlow,
+                    can_not_share = overFlow || usedTicket,
+                    memo = usedTicket ? "租赁用了优惠券，不自动分账" : null,
                     create_date = DateTime.Now
                 };
                 await _db.paymentShare.AddAsync(pShare);
