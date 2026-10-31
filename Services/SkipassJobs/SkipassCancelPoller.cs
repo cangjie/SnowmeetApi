@@ -10,14 +10,15 @@ namespace SnowmeetApi.Services.SkipassJobs
     /// <summary>
     /// 每分钟调两个本机接口：
     ///   SkiPass/RefreshCancel?poll=1 —— 自我游确认取消后自动退款，等太久的标成取消失败；
-    ///   SkiPass/RefreshAutoReserve?hours=48 —— 补上刚下单的票的取票码（以前付款回调里睡 25 秒等，现在改为后台补）。
+    ///   SkiPass/RefreshAutoReserve?hours=48 —— 补上刚下单的票的取票码（以前付款回调里睡 25 秒等，现在改为后台补）；
+    ///   SkiPass/RefreshIssuing —— 付款后还没出成的票：30 分钟内重试，超过就确认出票失败并自动退款。
     /// 退款链路里的控制器构造函数要读 HttpContext，后台服务里没有，所以不在这里直接 new 控制器，
     /// 而是请求本机自己的接口；基础地址可用配置 SkipassPollBaseUrl 覆盖。
     /// </summary>
     public sealed class SkipassCancelPoller : BackgroundService
     {
         const string DEFAULT_BASE = "http://127.0.0.1:5000/core/SkiPass/";
-        static readonly string[] Calls = { "RefreshCancel?poll=1", "RefreshAutoReserve?hours=48" };
+        static readonly string[] Calls = { "RefreshCancel?poll=1", "RefreshAutoReserve?hours=48", "RefreshIssuing" };
         readonly string _base;
         static readonly HttpClient Client = new HttpClient { Timeout = TimeSpan.FromMinutes(2) };
 

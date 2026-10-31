@@ -333,6 +333,116 @@ namespace SnowmeetApi.Tests
             Assert.Equal("订单取消", (await check.ticket.FirstAsync(t => t.code == "T1")).use_memo);
         }
 
+        // ---------------- 出票中 / 出票失败 ----------------
+
+        [Fact]
+        public void 出票中怎么处理_90秒内等_30分钟内重试_之后确认失败()
+        {
+            var start = new DateTime(2026, 10, 31, 19, 0, 0);
+            Assert.Equal(SkipassSaleRules.IssuingAction.Wait, SkipassSaleRules.DecideIssuing(start, start.AddSeconds(90)));
+            Assert.Equal(SkipassSaleRules.IssuingAction.Retry, SkipassSaleRules.DecideIssuing(start, start.AddSeconds(91)));
+            Assert.Equal(SkipassSaleRules.IssuingAction.Retry, SkipassSaleRules.DecideIssuing(start, start.AddMinutes(30)));
+            Assert.Equal(SkipassSaleRules.IssuingAction.GiveUp, SkipassSaleRules.DecideIssuing(start, start.AddMinutes(30).AddSeconds(1)));
+        }
+
+        [Theory]
+        [InlineData(null, 0, false)]     // 出票中（没有供应商订单号）：不能退
+        [InlineData("", 0, false)]
+        [InlineData("123", 0, true)]     // 已出票：可以走退票
+        [InlineData(null, -2, true)]     // 确认出票失败：可以退款
+        [InlineData(null, 1, false)]
+        public void 出票中不允许退票退款(string? reserveNo, int isCancel, bool expect)
+        {
+            Assert.Equal(expect, SkipassSaleRules.CanRefundBeforeIssued(reserveNo, isCancel));
+        }
+
+        [Fact]
+        public async Task 出票中的票_退票接口被拒绝_状态不变()
+        {
+            await using var f = await Fixture.Create();
+            await SeedPaidCartOrder(f, payMethod: "线下");
+            await using var db = f.NewContext();
+            var result = await f.Controller(db).Cancel(501, "staff-session");
+            var bad = Assert.IsType<BadRequestObjectResult>(result.Result);
+            Assert.Contains("出票中", (string)bad.Value!);
+            await using var check = f.NewContext();
+            var pass = await check.skiPass.FirstAsync(p => p.id == 501);
+            Assert.Equal(0, pass.is_cancel);
+            Assert.Empty(await check.orderPaymentRefund.ToListAsync());
+        }
+
+        [Fact]
+        public async Task 出票中的票_手工退款接口被拒绝()
+        {
+            await using var f = await Fixture.Create();
+            await SeedPaidCartOrder(f, payMethod: "线下");
+            await using var db = f.NewContext();
+            var result = await f.Controller(db).Refund(501, "手工退款", "staff-session");
+            Assert.IsType<BadRequestObjectResult>(result.Result);
+            await using var check = f.NewContext();
+            Assert.Empty(await check.orderPaymentRefund.ToListAsync());
+        }
+
+        [Fact]
+        public async Task 后台出票检查_超过30分钟没出成_确认出票失败并自动退这一张的款_90秒内的不动()
+        {
+            await using var f = await Fixture.Create();
+            await SeedPaidCartOrder(f, payMethod: "线下");
+            await using (var seed = f.NewContext())
+            {
+                var old = await seed.skiPass.FirstAsync(p => p.id == 501);
+                old.booking_now = true;
+                old.update_date = DateTime.Now.AddMinutes(-31);
+                seed.skiPass.Update(old);
+                var fresh = await seed.skiPass.FirstAsync(p => p.id == 502);
+                fresh.booking_now = true;
+                fresh.update_date = DateTime.Now.AddSeconds(-20);
+                seed.skiPass.Update(fresh);
+                await seed.SaveChangesAsync();
+            }
+            await using (var db = f.NewContext())
+            {
+                await f.Controller(db).RefreshIssuing();
+            }
+            await using var check = f.NewContext();
+            var timedOut = await check.skiPass.FirstAsync(p => p.id == 501);
+            Assert.Equal(-2, timedOut.is_cancel);
+            Assert.Contains("出票失败", timedOut.memo);
+            Assert.Equal(0, (await check.skiPass.FirstAsync(p => p.id == 502)).is_cancel);
+            var refunds = await check.orderPaymentRefund.Where(r => r.order_id == 900).ToListAsync();
+            Assert.Single(refunds);
+            Assert.Equal(579, refunds[0].amount);       // 这一张的成交价，不是整笔 1557
+            Assert.Equal(501, refunds[0].skipass_id);
+        }
+
+        [Fact]
+        public async Task 后台出票检查_已经是出票失败还没退款的补退_退过的不重复()
+        {
+            await using var f = await Fixture.Create();
+            await SeedPaidCartOrder(f, payMethod: "线下");
+            await using (var seed = f.NewContext())
+            {
+                foreach (int id in new[] { 502, 503 })
+                {
+                    var p = await seed.skiPass.FirstAsync(x => x.id == id);
+                    p.is_cancel = -2;
+                    seed.skiPass.Update(p);
+                }
+                seed.orderPaymentRefund.Add(new OrderPaymentRefund { order_id = 900, payment_id = 800, amount = 579, skipass_id = 503,
+                    refund_id = "R1", state = 1, out_refund_no = "x_TK_01" });
+                await seed.SaveChangesAsync();
+            }
+            await using (var db = f.NewContext())
+            {
+                await f.Controller(db).RefreshIssuing();
+                await f.Controller(db).RefreshIssuing();
+            }
+            await using var check = f.NewContext();
+            var refunds = await check.orderPaymentRefund.Where(r => r.order_id == 900).OrderBy(r => r.id).ToListAsync();
+            Assert.Equal(new int?[] { 503, 502 }, refunds.Select(r => r.skipass_id).ToArray());
+            Assert.Equal(399, refunds[1].amount);
+        }
+
         // ---------------- 夹具 ----------------
 
         static SkipassCartItem Item(int productId, string cell, string name = "张三", DateTime? date = null, int count = 1)

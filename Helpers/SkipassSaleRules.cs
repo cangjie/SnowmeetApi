@@ -67,6 +67,27 @@ namespace SnowmeetApi.Helpers
             return haveRefund == null && refundAmount == null;
         }
 
+        // 付款后「出票中」的票怎么处理：刚开始的 90 秒留给第一次出票；之后 30 分钟内每分钟重试
+        // （向自我游下单用固定的我方单号，重试不会重复出票）；超过 30 分钟还没出成就确认出票失败、停止出票、自动退款。
+        public static readonly TimeSpan IssuingGrace = TimeSpan.FromSeconds(90);
+        public static readonly TimeSpan IssuingGiveUpAfter = TimeSpan.FromMinutes(30);
+
+        public enum IssuingAction { Wait, Retry, GiveUp }
+
+        public static IssuingAction DecideIssuing(DateTime startedAt, DateTime now)
+        {
+            TimeSpan age = now - startedAt;
+            if (age <= IssuingGrace) return IssuingAction.Wait;
+            if (age <= IssuingGiveUpAfter) return IssuingAction.Retry;
+            return IssuingAction.GiveUp;
+        }
+
+        // 出票中的票（付款了、还没有供应商订单号、没有失败）不允许退票、退款：只有等出票成功，或确认出票失败。
+        public static bool CanRefundBeforeIssued(string? reserveNo, int isCancel)
+        {
+            return !string.IsNullOrWhiteSpace(reserveNo) || isCancel == -2;
+        }
+
         // 向自我游下单时的 orderSourceId（我方单号）。自我游按它去重：同一个单号再下单，返回「订单已经下单成功」
         // 和第一次的订单号，不会新建订单。购物车订单一单有多张票、共用一个付款单号，所以多张票的订单每张票要带上
         // 票号，各用各的单号；一单一张的沿用原来的付款单号。

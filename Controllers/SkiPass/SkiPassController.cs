@@ -229,6 +229,10 @@ namespace SnowmeetApi.Controllers
             {
                 return BadRequest();
             }
+            if (!SkipassSaleRules.CanRefundBeforeIssued(skipass.reserve_no, skipass.is_cancel))
+            {
+                return BadRequest("出票中，暂时不能退票，请等出票结果");
+            }
             if (skipass.status.Trim().Equals("出票失败"))
             {
                 return await Refund(skipassId, "出票失败退款", sessionKey, sessionType);
@@ -280,6 +284,10 @@ namespace SnowmeetApi.Controllers
             if (skipass.refund_amount != null || skipass.have_refund != null)
             {
                 return NotFound();
+            }
+            if (!SkipassSaleRules.CanRefundBeforeIssued(skipass.reserve_no, skipass.is_cancel))
+            {
+                return BadRequest("出票中，暂时不能退款，请等出票结果");
             }
             if (skipass.reserve_no != null && !skipass.reserve_no.Trim().Equals(""))
             {
@@ -560,8 +568,72 @@ namespace SnowmeetApi.Controllers
 
         // 向自我游真实下单、扣预存款。只能由 CreateSkiPass 等服务端流程调用：
         // 它原来是公开的 [HttpGet] 且参数是整个 SkiPass 对象，外部可以自己拼一个对象绕过 ReserveSkiPass 的店员限制。
+        // 同一张票同一时间只允许一处在出票（付款回调、后台重试可能同时碰到）
+        static readonly HashSet<int> IssuingNow = new HashSet<int>();
+
+        // 出票。结果只有三种：
+        //   成功——拿到供应商订单号 reserve_no；
+        //   确认失败（供应商拒绝、预存款不够、支付被拒、返回别的票的订单号）——停止出票、必要时取消供应商订单、自动退这一张的款；
+        //   不确定（网络异常等）——留在「出票中」，后台每分钟重试，30 分钟还不行就算确认失败（RefreshIssuing）。
+        // 出票中的票不允许退票、退款。
         [NonAction]
         public async Task AutoReserve(Models.SkiPass skipass)
+        {
+            lock (IssuingNow)
+            {
+                if (!IssuingNow.Add(skipass.id)) return;
+            }
+            try
+            {
+                await AutoReserveOnce(skipass);
+            }
+            catch (Exception err)
+            {
+                skipass.memo += " 出票异常，稍后重试：" + err.Message;
+                try
+                {
+                    _context.skiPass.Entry(skipass).State = EntityState.Modified;
+                    await _context.SaveChangesAsync();
+                }
+                catch (Exception saveErr)
+                {
+                    Console.WriteLine("[出票] 记录异常失败 skipass=" + skipass.id + " " + saveErr.Message);
+                }
+            }
+            finally
+            {
+                lock (IssuingNow)
+                {
+                    IssuingNow.Remove(skipass.id);
+                }
+            }
+        }
+
+        // 确认这张票不可能出了：停止出票（供应商那边已有订单号的取消掉）、标成出票失败、自动退这一张的款
+        [NonAction]
+        private async Task MarkBookingFailed(Models.SkiPass skipass, string reason, string? supplierOrderId, string? source)
+        {
+            skipass.memo += " 出票失败：" + reason;
+            skipass.is_cancel = -2;
+            skipass.update_date = DateTime.Now;
+            _context.skiPass.Entry(skipass).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
+            if (!string.IsNullOrWhiteSpace(supplierOrderId) && int.TryParse(supplierOrderId, out int orderNo))
+            {
+                try
+                {
+                    await new WanlongZiwoyouHelper(_context, _config, source ?? "万龙自我游").CancelOrder(orderNo);
+                }
+                catch (Exception err)
+                {
+                    Console.WriteLine("[出票失败] 取消供应商订单失败 skipass=" + skipass.id + " order=" + supplierOrderId + " " + err.Message);
+                }
+            }
+            await AutoRefundFailedBooking(skipass, "出票失败退款");
+        }
+
+        [NonAction]
+        private async Task AutoReserveOnce(Models.SkiPass skipass)
         {
             if (!skipass.status.Equals("已付款"))
             {
@@ -589,69 +661,38 @@ namespace SnowmeetApi.Controllers
                 outTradeNo = skipass.id.ToString() + Util.GetLongTimeStamp(DateTime.Now);
             }
             // 一单多张票（购物车）时每张票单独一个我方单号，否则自我游把第 2、3… 张当成重复下单，
-            // 返回第一张的订单号，这几张票就一直没有出成
+            // 返回第一张的订单号，这几张票就一直没有出成。单号固定，所以重试同一张票不会重复出票
             int passesInOrder = await _context.skiPass.CountAsync(s => s.order_id == skipass.order_id && s.valid == 1);
             outTradeNo = SkipassSaleRules.SupplierSourceId(outTradeNo, passesInOrder, skipass.id);
             double balance = await _zwHelper.QueryBalance();
             //balance = 10000;
             if (balance <= skipass.deal_price)
             {
-                // 没向供应商下单，顾客的钱要退回：标成出票失败并自动退这一张的款
-                skipass.memo += " 账户余额不足";
-                skipass.is_cancel = -2;
-                _context.skiPass.Entry(skipass).State = EntityState.Modified;
-                await _context.SaveChangesAsync();
-                await AutoRefundFailedBooking(skipass, "出票失败退款");
+                // 没向供应商下单，顾客的钱要退回
+                await MarkBookingFailed(skipass, "账户余额不足", null, null);
                 return;
             }
-            string orderId = "";
-            try
+            Models.WanLong.ZiwoyouPlaceOrderResult orderResult =
+                await _zwHelper.PlaceOrder(skipassProduct.third_party_no, skipass.contact_name, skipass.contact_cell,
+                skipass.contact_id_type, skipass.contact_id_no, skipass.count, (DateTime)skipass.reserve_date,
+                "", outTradeNo);
+            if (orderResult.state != 1)
             {
-                Models.WanLong.ZiwoyouPlaceOrderResult orderResult = 
-                    await _zwHelper.PlaceOrder(skipassProduct.third_party_no, skipass.contact_name, skipass.contact_cell,
-                    skipass.contact_id_type, skipass.contact_id_no, skipass.count, (DateTime)skipass.reserve_date, 
-                    "", outTradeNo);
-                if (orderResult.state == 1)
-                {
-                    orderId = orderResult.data.orderId;
-                    // 自我游返回的订单号已经属于另一张票：说明它把这次下单当成了重复，没有新建订单。
-                    // 这张票没出成，不能一直卡在「出票中」，标成出票失败并退这一张的款
-                    if (await _context.skiPass.AnyAsync(s => s.reserve_no == orderId && s.id != skipass.id))
-                    {
-                        skipass.memo += " 自我游返回了已存在的订单号 " + orderId + "，没有新建订单";
-                        skipass.is_cancel = -2;
-                        _context.skiPass.Entry(skipass).State = EntityState.Modified;
-                        await _context.SaveChangesAsync();
-                        await AutoRefundFailedBooking(skipass, "出票失败退款");
-                        return;
-                    }
-                }
-                else
-                {
-                    skipass.memo += (" " + orderResult.msg.Trim()) ;
-                    skipass.is_cancel = -2;
-                    _context.skiPass.Entry(skipass).State = EntityState.Modified;
-                    await _context.SaveChangesAsync();
-                    await AutoRefundFailedBooking(skipass, "出票失败退款");
-                    return;
-                }
-                
-            }
-            catch(Exception err)
-            {
-                skipass.memo += (" 预定失败 " + err.ToString()) ;
-                _context.skiPass.Entry(skipass).State = EntityState.Modified;
-                await _context.SaveChangesAsync();
+                await MarkBookingFailed(skipass, (orderResult.msg ?? "供应商拒绝下单").Trim(), null, null);
                 return;
-
+            }
+            string orderId = orderResult.data.orderId;
+            // 自我游返回的订单号已经属于另一张票：说明它把这次下单当成了重复，没有新建订单
+            if (await _context.skiPass.AnyAsync(s => s.reserve_no == orderId && s.id != skipass.id))
+            {
+                await MarkBookingFailed(skipass, "自我游返回了已存在的订单号 " + orderId + "，没有新建订单", null, null);
+                return;
             }
             Models.WanLong.PayResult payResult = await _zwHelper.Pay(int.Parse(orderId));
-            if (payResult.state != 1 || !payResult.msg.Trim().Equals("支付成功"))
+            // 「已经支付成功」是同一个单号重试时的正常回答（上一次已经付过），也算成功
+            if (payResult.state != 1 || !(payResult.msg ?? "").Contains("支付成功"))
             {
-                skipass.memo += (" " + payResult.msg);
-                _context.skiPass.Entry(skipass).State = EntityState.Modified;
-                await _context.SaveChangesAsync();
-                
+                await MarkBookingFailed(skipass, "供应商支付没有成功：" + (payResult.msg ?? "").Trim(), orderId, skipassProduct.source);
                 return;
             }
             skipass.reserve_no = payResult.data.orderId.ToString();
@@ -664,6 +705,55 @@ namespace SnowmeetApi.Controllers
                 await _context.SaveChangesAsync();
             // 取票码由后台轮询（SkipassCancelPoller 每分钟调 RefreshAutoReserve）补上。
             // 这里原来睡 25 秒再查，买 N 张票就要睡 N 个 25 秒，把付款回调拖得很长。
+        }
+
+        // 后台每分钟调一次：付款了还没出成的票，30 分钟内重试，超过 30 分钟确认出票失败并自动退款。
+        // 另外给已经是出票失败、还没退款的票补退（近两天内）。
+        [HttpGet]
+        public async Task RefreshIssuing()
+        {
+            DateTime now = DateTime.Now;
+            List<Models.SkiPass> stuck = await _context.skiPass
+                .Where(s => s.valid == 1 && s.booking_now && s.is_cancel == 0 && s.reserve_no == null
+                    && !s.resort.Trim().Equals("南山") && s.create_date > now.AddDays(-2)).ToListAsync();
+            foreach (Models.SkiPass skipass in stuck)
+            {
+                try
+                {
+                    DateTime startedAt = skipass.update_date ?? skipass.create_date;
+                    switch (SkipassSaleRules.DecideIssuing(startedAt, now))
+                    {
+                        case SkipassSaleRules.IssuingAction.Retry:
+                            await AutoReserve(skipass);
+                            break;
+                        case SkipassSaleRules.IssuingAction.GiveUp:
+                            Models.SkiPassProduct? product = await _context.skiPassProduct.FindAsync(skipass.product_id);
+                            await MarkBookingFailed(skipass, "超过 30 分钟仍没有出票成功", null, product?.source);
+                            break;
+                        default:
+                            break;
+                    }
+                }
+                catch (Exception err)
+                {
+                    Console.WriteLine("[出票重试] 处理失败 skipass=" + skipass.id + " " + err.Message);
+                }
+            }
+            List<Models.SkiPass> failed = await _context.skiPass
+                .Where(s => s.valid == 1 && s.is_cancel == -2 && (s.reserve_no == null || s.reserve_no == "")
+                    && s.have_refund == null && s.refund_amount == null && !s.resort.Trim().Equals("南山")
+                    && s.create_date > now.AddDays(-2)).ToListAsync();
+            foreach (Models.SkiPass skipass in failed)
+            {
+                try
+                {
+                    await AutoRefundFailedBooking(skipass, "出票失败退款");
+                }
+                catch (Exception err)
+                {
+                    Console.WriteLine("[出票失败退款] 处理失败 skipass=" + skipass.id + " " + err.Message);
+                }
+            }
         }
 
         // 退款成功后的雪票后续。refundId 是刚成功的那笔退款：购物车订单一单多张票，要写到这笔退款对应的那张票上
