@@ -67,6 +67,14 @@ namespace SnowmeetApi.Helpers
             return haveRefund == null && refundAmount == null;
         }
 
+        // 向自我游下单时的 orderSourceId（我方单号）。自我游按它去重：同一个单号再下单，返回「订单已经下单成功」
+        // 和第一次的订单号，不会新建订单。购物车订单一单有多张票、共用一个付款单号，所以多张票的订单每张票要带上
+        // 票号，各用各的单号；一单一张的沿用原来的付款单号。
+        public static string SupplierSourceId(string outTradeNo, int validPassesInOrder, int skipassId)
+        {
+            return validPassesInOrder > 1 ? outTradeNo + "_P" + skipassId : outTradeNo;
+        }
+
         // 一张票退多少：购物车订单一单多张票，只退这一张的成交价；
         // 一单只有一张票的老订单沿用整笔支付金额（行为不变，成交价和支付额本来就相等）。
         public static double RefundAmountFor(int validPassesInOrder, double dealPrice, double paymentAmount)

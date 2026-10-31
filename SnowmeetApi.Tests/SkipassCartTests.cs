@@ -46,6 +46,22 @@ namespace SnowmeetApi.Tests
         }
 
         [Theory]
+        [InlineData("QJ_XP_261031_00002_ZF_02", 1, 8354, "QJ_XP_261031_00002_ZF_02")]       // 一单一张：沿用付款单号
+        [InlineData("QJ_XP_261031_00002_ZF_02", 4, 8354, "QJ_XP_261031_00002_ZF_02_P8354")] // 购物车：每张票各用各的单号
+        [InlineData("QJ_XP_261031_00002_ZF_02", 4, 8355, "QJ_XP_261031_00002_ZF_02_P8355")]
+        public void 向供应商下单的我方单号_多张票的订单每张票各用各的(string outTradeNo, int passes, int skipassId, string expect)
+        {
+            Assert.Equal(expect, SkipassSaleRules.SupplierSourceId(outTradeNo, passes, skipassId));
+        }
+
+        [Fact]
+        public void 同一个订单的几张票我方单号互不相同()
+        {
+            var ids = new[] { 8354, 8355, 8356, 8357 }.Select(i => SkipassSaleRules.SupplierSourceId("PAY_01", 4, i)).ToList();
+            Assert.Equal(4, ids.Distinct().Count());
+        }
+
+        [Theory]
         [InlineData(3, 309, 927, 309)]   // 一单三张：只退这一张的成交价
         [InlineData(2, 389.5, 779, 389.5)]
         [InlineData(1, 309, 309, 309)]   // 一单一张：沿用整笔支付额

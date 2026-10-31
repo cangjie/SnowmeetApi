@@ -588,6 +588,10 @@ namespace SnowmeetApi.Controllers
             {
                 outTradeNo = skipass.id.ToString() + Util.GetLongTimeStamp(DateTime.Now);
             }
+            // 一单多张票（购物车）时每张票单独一个我方单号，否则自我游把第 2、3… 张当成重复下单，
+            // 返回第一张的订单号，这几张票就一直没有出成
+            int passesInOrder = await _context.skiPass.CountAsync(s => s.order_id == skipass.order_id && s.valid == 1);
+            outTradeNo = SkipassSaleRules.SupplierSourceId(outTradeNo, passesInOrder, skipass.id);
             double balance = await _zwHelper.QueryBalance();
             //balance = 10000;
             if (balance <= skipass.deal_price)
@@ -610,7 +614,17 @@ namespace SnowmeetApi.Controllers
                 if (orderResult.state == 1)
                 {
                     orderId = orderResult.data.orderId;
-                    
+                    // 自我游返回的订单号已经属于另一张票：说明它把这次下单当成了重复，没有新建订单。
+                    // 这张票没出成，不能一直卡在「出票中」，标成出票失败并退这一张的款
+                    if (await _context.skiPass.AnyAsync(s => s.reserve_no == orderId && s.id != skipass.id))
+                    {
+                        skipass.memo += " 自我游返回了已存在的订单号 " + orderId + "，没有新建订单";
+                        skipass.is_cancel = -2;
+                        _context.skiPass.Entry(skipass).State = EntityState.Modified;
+                        await _context.SaveChangesAsync();
+                        await AutoRefundFailedBooking(skipass, "出票失败退款");
+                        return;
+                    }
                 }
                 else
                 {
