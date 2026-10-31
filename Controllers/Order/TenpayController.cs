@@ -537,7 +537,7 @@ namespace SnowmeetApi.Controllers
                 await _db.SaveChangesAsync();
                 if (sideEffects)
                 {
-                    await _orderPaymentHelper.SetPaymentRefundSuccess(payment.id);
+                    await _orderPaymentHelper.SetPaymentRefundSuccess(payment.id, refund.id);
                 }
             }
             finally

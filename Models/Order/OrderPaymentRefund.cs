@@ -24,6 +24,8 @@ namespace SnowmeetApi.Models
         public string reason {get; set;} = "";
 
         public string out_refund_no {get; set;} = "";
+        // 雪票购物车订单一单多张票：这笔退款退的是哪一张票（ski_pass.id）；其他业务和旧数据为空
+        public int? skipass_id {get; set;} = null;
         public DateTime? update_date {get; set;} = null;
         [ForeignKey("payment_id")]
         public OrderPayment? payment { get; set; } = null;

@@ -67,6 +67,22 @@ namespace SnowmeetApi.Helpers
             return haveRefund == null && refundAmount == null;
         }
 
+        // 一张票退多少：购物车订单一单多张票，只退这一张的成交价；
+        // 一单只有一张票的老订单沿用整笔支付金额（行为不变，成交价和支付额本来就相等）。
+        public static double RefundAmountFor(int validPassesInOrder, double dealPrice, double paymentAmount)
+        {
+            return validPassesInOrder > 1 ? Math.Round(dealPrice, 2) : paymentAmount;
+        }
+
+        // 预订失败（供应商没接单、也没有供应商订单号）的票：顾客已经付了款，要自动退这一张的钱
+        public static bool NeedsAutoRefundForFailedBooking(int isCancel, int valid, string? resort, string? reserveNo, int? haveRefund, double? refundAmount)
+        {
+            if (isCancel != -2 || valid != 1) return false;
+            if ((resort ?? "").Trim().Equals("南山")) return false;
+            if (!string.IsNullOrWhiteSpace(reserveNo)) return false;
+            return haveRefund == null && refundAmount == null;
+        }
+
         // 「取消中」的雪票多久查一次自我游：取消申请后 30 分钟内每分钟查（通常几分钟就确认），
         // 之后每 10 分钟查一次，超过 24 小时还没确认就不再等（见 CancelTimedOut）。
         // 后台轮询每分钟调一次，这里按当前分钟数决定这一轮查不查。

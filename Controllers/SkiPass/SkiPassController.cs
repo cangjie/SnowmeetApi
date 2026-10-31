@@ -296,8 +296,21 @@ namespace SnowmeetApi.Controllers
                 return NotFound();
             }
             int paymentId = pL[0].id;
-            double amount = pL[0].amount;
-            OrderPaymentRefund refund = (OrderPaymentRefund)((OkObjectResult)(await _refundHelper.Refund(paymentId, amount, reason, sessionKey, sessionType)).Result).Value;
+            // 只退这一张票的钱（一单多张的购物车订单）；已经为这张票发起过退款的不再退
+            int validPasses = await _context.skiPass.CountAsync(s => s.order_id == skipass.order_id && s.valid == 1);
+            double amount = SkipassSaleRules.RefundAmountFor(validPasses, skipass.deal_price ?? 0, pL[0].amount);
+            bool refundExists = validPasses > 1
+                ? await _context.orderPaymentRefund.AnyAsync(r => r.skipass_id == skipassId)
+                : await _context.orderPaymentRefund.AnyAsync(r => r.payment_id == paymentId);
+            if (refundExists)
+            {
+                return BadRequest("这张票已经发起过退款");
+            }
+            var refundResult = await _refundHelper.Refund(paymentId, amount, reason, sessionKey, sessionType, skipassId);
+            if (refundResult.Result is not OkObjectResult refundOk || refundOk.Value is not OrderPaymentRefund refund)
+            {
+                return BadRequest("退款被拒绝");
+            }
             if (!refund.refund_id.Equals(""))
             {
                 skipass.have_refund = 1;
@@ -579,9 +592,12 @@ namespace SnowmeetApi.Controllers
             //balance = 10000;
             if (balance <= skipass.deal_price)
             {
+                // 没向供应商下单，顾客的钱要退回：标成出票失败并自动退这一张的款
                 skipass.memo += " 账户余额不足";
+                skipass.is_cancel = -2;
                 _context.skiPass.Entry(skipass).State = EntityState.Modified;
                 await _context.SaveChangesAsync();
+                await AutoRefundFailedBooking(skipass, "出票失败退款");
                 return;
             }
             string orderId = "";
@@ -602,6 +618,7 @@ namespace SnowmeetApi.Controllers
                     skipass.is_cancel = -2;
                     _context.skiPass.Entry(skipass).State = EntityState.Modified;
                     await _context.SaveChangesAsync();
+                    await AutoRefundFailedBooking(skipass, "出票失败退款");
                     return;
                 }
                 
@@ -631,28 +648,43 @@ namespace SnowmeetApi.Controllers
             CoreDataModLog logTicket = CoreDataModLog.CreateManualLog("ski_pass", "", skipass.id, "万龙雪票预定成功", null, null, null, null, "");
                 await _context.coreDataModLog.AddAsync(logTicket);
                 await _context.SaveChangesAsync();
-            for(int i = 0; i < 5; i++)
-            {
-                System.Threading.Thread.Sleep(5000);
-                //_zwHelper.
-                await RefreshAutoReserve();
-            }
+            // 取票码由后台轮询（SkipassCancelPoller 每分钟调 RefreshAutoReserve）补上。
+            // 这里原来睡 25 秒再查，买 N 张票就要睡 N 个 25 秒，把付款回调拖得很长。
         }
 
+        // 退款成功后的雪票后续。refundId 是刚成功的那笔退款：购物车订单一单多张票，要写到这笔退款对应的那张票上
+        // （退款行的 skipass_id），不能取「订单里最新一张」；没有 skipass_id 的老退款沿用原来的取法。
+        // 订单挂的赠券只在这单的票都已处理完（没有还在正常持有的票）时才取消，取消一张票不能让另几张票的赠券作废。
         [NonAction]
-        public async Task RefundCallBack(int paymentId)
+        public async Task RefundCallBack(int paymentId, int? refundId = null)
         {
             OrderPayment payment = await _context.OrderPayment.FindAsync(paymentId);
 
-            TicketController _ticketHelper = new TicketController(_context, _config);
-            await _ticketHelper.Cancel(payment.order_id);
+            OrderPaymentRefund? refund = null;
+            if (refundId != null)
+            {
+                refund = await _context.orderPaymentRefund.Where(r => r.id == refundId).AsNoTracking().FirstOrDefaultAsync();
+            }
+            if (refund == null)
+            {
+                refund = await _context.orderPaymentRefund
+                    .Where(p => p.order_id == payment.order_id && p.state == 1)
+                    .AsNoTracking().FirstAsync();
+            }
+            Models.SkiPass skipass = refund.skipass_id != null
+                ? await _context.skiPass.FindAsync(refund.skipass_id)
+                : await _context.skiPass
+                    .Where(s => (s.valid == 1 && s.order_id == payment.order_id))
+                    .OrderByDescending(s => s.id).FirstAsync();
 
-            Models.SkiPass skipass = await _context.skiPass
-                .Where(s => (s.valid == 1 && s.order_id == payment.order_id))
-                .OrderByDescending(s => s.id).FirstAsync();
-            OrderPaymentRefund refund = await _context.orderPaymentRefund
-                .Where(p => p.order_id == payment.order_id && p.state == 1)
-                .AsNoTracking().FirstAsync();
+            int stillHeld = await _context.skiPass.CountAsync(s => s.order_id == payment.order_id && s.valid == 1
+                && s.is_cancel == 0 && s.id != skipass.id);
+            if (stillHeld == 0)
+            {
+                TicketController _ticketHelper = new TicketController(_context, _config);
+                await _ticketHelper.Cancel(payment.order_id);
+            }
+
             if (!skipass.resort.Trim().Equals("南山"))
             {
                 skipass.refund_amount = refund.amount;
@@ -682,10 +714,37 @@ namespace SnowmeetApi.Controllers
             }
         }
 
+        // 预订失败（供应商没接单）的票：顾客已经付款，自动退这一张的钱
+        [NonAction]
+        public async Task<bool> AutoRefundFailedBooking(Models.SkiPass skipass, string reason)
+        {
+            await AutoRefundLock.WaitAsync();
+            try
+            {
+                bool allowed = SkipassSaleRules.NeedsAutoRefundForFailedBooking(skipass.is_cancel, skipass.valid ?? 0,
+                    skipass.resort, skipass.reserve_no, skipass.have_refund, skipass.refund_amount);
+                return await RefundSkipassRow(skipass, reason, null, allowed);
+            }
+            finally
+            {
+                AutoRefundLock.Release();
+            }
+        }
+
         [NonAction]
         private async Task<bool> AutoRefundCancelledLocked(Models.SkiPass skipass, string reason, int? staffId)
         {
-            if (!SkipassSaleRules.NeedsAutoRefund(skipass.is_cancel, skipass.valid ?? 0, skipass.resort, skipass.have_refund, skipass.refund_amount))
+            bool allowed = SkipassSaleRules.NeedsAutoRefund(skipass.is_cancel, skipass.valid ?? 0, skipass.resort, skipass.have_refund, skipass.refund_amount);
+            return await RefundSkipassRow(skipass, reason, staffId, allowed);
+        }
+
+        // 退一张票的款。金额只退这一张的成交价（一单多张票的购物车订单），老的一单一张沿用整笔支付额；
+        // 退款行记下 skipass_id，防重复按票判断：一单多张看这张票有没有退款行，一单一张看这笔支付有没有退款行。
+        // 调用方负责持有 AutoRefundLock。累计退款不超过支付额由 RefundCore 校验。
+        [NonAction]
+        private async Task<bool> RefundSkipassRow(Models.SkiPass skipass, string reason, int? staffId, bool allowed)
+        {
+            if (!allowed)
             {
                 return false;
             }
@@ -696,12 +755,20 @@ namespace SnowmeetApi.Controllers
             {
                 return false;
             }
-            bool refundExists = await _context.orderPaymentRefund.AnyAsync(r => r.payment_id == payment.id);
+            int validPasses = await _context.skiPass.CountAsync(s => s.order_id == skipass.order_id && s.valid == 1);
+            double amount = SkipassSaleRules.RefundAmountFor(validPasses, skipass.deal_price ?? 0, payment.amount);
+            if (amount <= 0)
+            {
+                return false;
+            }
+            bool refundExists = validPasses > 1
+                ? await _context.orderPaymentRefund.AnyAsync(r => r.skipass_id == skipass.id)
+                : await _context.orderPaymentRefund.AnyAsync(r => r.payment_id == payment.id);
             if (refundExists)
             {
                 return false;
             }
-            OrderPaymentRefund? refund = await _refundHelper.RefundCore(payment, payment.amount, reason, staffId, "系统自动退款");
+            OrderPaymentRefund? refund = await _refundHelper.RefundCore(payment, amount, reason, staffId, "系统自动退款", skipass.id);
             if (refund == null || string.IsNullOrEmpty(refund.refund_id))
             {
                 return false;
@@ -826,15 +893,17 @@ namespace SnowmeetApi.Controllers
             }
             
         }
+        // hours > 0 只处理最近这么多小时下的单：后台轮询每分钟调一次，不能每分钟都把历史上一直没有取票码的老票再查一遍
         [HttpGet]
-        public async Task RefreshAutoReserve()
+        public async Task RefreshAutoReserve(int hours = 0)
         {
+            DateTime since = hours > 0 ? DateTime.Now.AddHours(-hours) : DateTime.MinValue;
             List<Models.SkiPass> skipassList = await _context.skiPass
                 .Include(s => s.order)
                     .ThenInclude(o => o.payments.Where(p => p.status.Equals("支付成功")))
                 .Where(s => (s.valid == 1 && s.reserve_no != null && !s.resort.Trim().Equals("南山")
                 && s.card_no == null && s.qr_code_url == null && s.send_content == null && s.is_cancel == 0
-                //&& s.create_date > DateTime.Now.AddHours(-480)
+                && s.create_date > since
                 //&& s.id == 2008
                 )).ToListAsync();
             for(int i = 0; i < skipassList.Count; i++)
@@ -955,6 +1024,19 @@ namespace SnowmeetApi.Controllers
             return await Util.GetStaffBySessionKey(_context, sessionKey, sessionType);
         }
 
+        // 向自我游查某个账号的预存款；测试里替换成假的，不发真实请求
+        public Func<string, Task<double>>? BalanceProvider { get; set; }
+
+        [NonAction]
+        private async Task<double> QuerySourceBalance(string source)
+        {
+            if (BalanceProvider != null)
+            {
+                return await BalanceProvider(source);
+            }
+            return await new WanlongZiwoyouHelper(_context, _config, source).QueryBalance();
+        }
+
         [HttpGet("{productId}")]
         public async Task<ActionResult<object>> ReserveSkiPass(int productId, DateTime date,
             int count, string cell, string name, string sessionKey, string sessionType = "wechat_mini_openid", string idNo = "", int refereeMemberId = 0, int? staffId = null)
@@ -965,50 +1047,127 @@ namespace SnowmeetApi.Controllers
             {
                 return BadRequest(SkipassSaleRules.STAFF_ONLY_MESSAGE);
             }
-            Models.Product product = await _context.product.FindAsync(productId);
-            Models.SkiPassProduct skipassProduct = await _context.skiPassProduct.FindAsync(productId);
-            SkipassDailyPrice dailyPrice = await _context.skipassDailyPrice
-                .Where(s => s.product_id == productId && s.valid == 1 && s.reserve_date.Date == date.Date)
-                .OrderBy(s => s.reserve_date).AsNoTracking().FirstAsync();
-            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
-            if (member.real_name == null || member.real_name.Trim() == "" )
+            // 供应商一单只能 1 张：多张按张数展开成多条记录（原来是一条记录写 count 张，会被供应商拒绝，价格还会乘两次）
+            var items = new List<SkipassCartItem>
             {
-                member.real_name = name;
+                new SkipassCartItem { productId = productId, date = date, cell = cell ?? "", name = name ?? "", count = count, idNo = idNo }
+            };
+            return await ReserveTickets(items, staffId, sessionKey, sessionType);
+        }
+
+        // 购物车结算：一个订单、一笔付款，每张票一条 ski_pass 记录（张数都是 1）。
+        // 总价、可订日期、预存款都在服务端核对，不信客户端传来的金额。
+        [HttpPost]
+        public async Task<ActionResult<object>> ReserveSkiPassCart([FromBody] SkipassCartRequest request, string sessionKey,
+            string sessionType = "wechat_mini_openid")
+        {
+            if (!SkipassSaleRules.CanReserve(await GetStaffOrNull(sessionKey, sessionType)))
+            {
+                return BadRequest(SkipassSaleRules.STAFF_ONLY_MESSAGE);
+            }
+            if (request == null)
+            {
+                return BadRequest("购物车是空的");
+            }
+            return await ReserveTickets(request.items, request.staffId, sessionKey, sessionType);
+        }
+
+        [NonAction]
+        private async Task<ActionResult<object>> ReserveTickets(List<SkipassCartItem> cartItems, int? staffId, string sessionKey, string sessionType)
+        {
+            string? invalid = SkipassCartRules.Validate(cartItems);
+            if (invalid != null)
+            {
+                return BadRequest(invalid);
+            }
+            List<SkipassCartItem> tickets = SkipassCartRules.Expand(cartItems);
+            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
+            if (member == null)
+            {
+                return BadRequest("会话无效");
+            }
+
+            // 逐张核对商品和当天价格行
+            var rows = new List<(SkipassCartItem item, Models.Product product, Models.SkiPassProduct skipassProduct, SkipassDailyPrice price)>();
+            foreach (SkipassCartItem item in tickets)
+            {
+                Models.Product? product = await _context.product.FindAsync(item.productId);
+                Models.SkiPassProduct? skipassProduct = await _context.skiPassProduct.FindAsync(item.productId);
+                if (product == null || skipassProduct == null)
+                {
+                    return BadRequest("票种不存在");
+                }
+                SkipassDailyPrice? price = await _context.skipassDailyPrice
+                    .Where(p => p.product_id == item.productId && p.valid == 1 && p.reserve_date.Date == item.date.Date)
+                    .OrderBy(p => p.reserve_date).AsNoTracking().FirstOrDefaultAsync();
+                if (price == null || price.deal_price <= 0)
+                {
+                    return BadRequest(product.name + " " + item.date.ToString("MM-dd") + " 没有可订的价格");
+                }
+                rows.Add((item, product, skipassProduct, price));
+            }
+
+            // 每个自我游账号各自的预存款要够付它名下这些票的合计，不够整单不让付（付了款出不了票）
+            foreach (var group in rows.GroupBy(r => (r.skipassProduct.source ?? "").Trim()))
+            {
+                double need = group.Sum(r => r.price.deal_price);
+                double balance;
+                try
+                {
+                    balance = await QuerySourceBalance(group.Key);
+                }
+                catch
+                {
+                    return BadRequest("查询" + group.Key + "预存款失败，请稍后再试");
+                }
+                if (!(need < balance))
+                {
+                    return BadRequest(group.Key + "预存款不足，暂时不能订票");
+                }
+            }
+
+            if (member.real_name == null || member.real_name.Trim() == "")
+            {
+                member.real_name = tickets[0].name;
                 _context.member.Entry(member).State = EntityState.Modified;
                 await _context.SaveChangesAsync();
-                _context.member.Entry(member).State =EntityState.Detached;
+                _context.member.Entry(member).State = EntityState.Detached;
                 await _context.SaveChangesAsync();
             }
-            //double totalPrice = 0;
-            Models.SkiPass skipass = new Models.SkiPass()
+
+            var passes = new List<Models.SkiPass>();
+            foreach (var r in rows)
             {
-                member_id = member.id,
-                wechat_mini_openid = member.wechatMiniOpenId,
-                product_id = productId,
-                resort = skipassProduct.resort.Trim(),
-                product_name = product.name,
-                count = count,
-                //order_id = orderId,
-                deal_price = dailyPrice.deal_price * count,
-                ticket_price = dailyPrice.settlementPrice,
-                deposit = product.deposit,
-                valid = 0,
-                contact_cell = cell,
-                contact_name = name,
-                contact_id_no = idNo.Trim(),
-                contact_id_type = "身份证",
-                reserve_date = date.Date,
-                booking_now = false,
-                reserve_success = false
-            };
+                passes.Add(new Models.SkiPass()
+                {
+                    member_id = member.id,
+                    wechat_mini_openid = member.wechatMiniOpenId,
+                    product_id = r.item.productId,
+                    resort = r.skipassProduct.resort.Trim(),
+                    product_name = r.product.name,
+                    count = 1,
+                    deal_price = r.price.deal_price,
+                    ticket_price = r.price.settlementPrice,
+                    deposit = r.product.deposit,
+                    valid = 0,
+                    contact_cell = r.item.cell,
+                    contact_name = r.item.name,
+                    contact_id_no = (r.item.idNo ?? "").Trim(),
+                    contact_id_type = "身份证",
+                    reserve_date = r.item.date.Date,
+                    booking_now = false,
+                    reserve_success = false
+                });
+            }
+            double totalAmount = Math.Round(passes.Sum(p => (double)p.deal_price), 2);
             Models.Order order = new Models.Order()
             {
                 id = 0,
                 member_id = member.id,
                 type = "雪票",
-                shop = await ResolveProductShopName(product),
-                total_amount = (double)skipass.deal_price * count,
-                paying_amount = (double)skipass.deal_price * count,
+                shop = await ResolveProductShopName(rows[0].product),
+                total_amount = totalAmount,
+                paying_amount = totalAmount,
                 create_date = DateTime.Now,
                 valid = 1
             };
@@ -1081,7 +1240,7 @@ namespace SnowmeetApi.Controllers
                 create_date = DateTime.Now
             };
             order.payments = new List<OrderPayment>() { payment };
-            order.skipasses = new List<Models.SkiPass>() { skipass };
+            order.skipasses = passes;
             await _context.order.AddAsync(order);
             await _context.SaveChangesAsync();
             return Ok(order);

@@ -8,20 +8,23 @@ using Microsoft.Extensions.Hosting;
 namespace SnowmeetApi.Services.SkipassJobs
 {
     /// <summary>
-    /// 每分钟调一次 SkiPass/RefreshCancel?poll=1：自我游确认取消后自动退款，等太久的标成取消失败。
+    /// 每分钟调两个本机接口：
+    ///   SkiPass/RefreshCancel?poll=1 —— 自我游确认取消后自动退款，等太久的标成取消失败；
+    ///   SkiPass/RefreshAutoReserve?hours=48 —— 补上刚下单的票的取票码（以前付款回调里睡 25 秒等，现在改为后台补）。
     /// 退款链路里的控制器构造函数要读 HttpContext，后台服务里没有，所以不在这里直接 new 控制器，
-    /// 而是请求本机自己的接口；地址可用配置 SkipassCancelPollUrl 覆盖。
+    /// 而是请求本机自己的接口；基础地址可用配置 SkipassPollBaseUrl 覆盖。
     /// </summary>
     public sealed class SkipassCancelPoller : BackgroundService
     {
-        const string DEFAULT_URL = "http://127.0.0.1:5000/core/SkiPass/RefreshCancel?poll=1";
-        readonly string _url;
+        const string DEFAULT_BASE = "http://127.0.0.1:5000/core/SkiPass/";
+        static readonly string[] Calls = { "RefreshCancel?poll=1", "RefreshAutoReserve?hours=48" };
+        readonly string _base;
         static readonly HttpClient Client = new HttpClient { Timeout = TimeSpan.FromMinutes(2) };
 
         public SkipassCancelPoller(IConfiguration config)
         {
-            string? configured = config["SkipassCancelPollUrl"];
-            _url = string.IsNullOrWhiteSpace(configured) ? DEFAULT_URL : configured.Trim();
+            string? configured = config["SkipassPollBaseUrl"];
+            _base = string.IsNullOrWhiteSpace(configured) ? DEFAULT_BASE : configured.Trim().TrimEnd('/') + "/";
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -32,21 +35,24 @@ namespace SnowmeetApi.Services.SkipassJobs
                 await Task.Delay(TimeSpan.FromMinutes(1), stoppingToken);
                 while (!stoppingToken.IsCancellationRequested)
                 {
-                    try
+                    foreach (string call in Calls)
                     {
-                        using var response = await Client.GetAsync(_url, stoppingToken);
-                        if (!response.IsSuccessStatusCode)
+                        try
                         {
-                            Console.WriteLine("[雪票取消轮询] 返回 " + (int)response.StatusCode);
+                            using var response = await Client.GetAsync(_base + call, stoppingToken);
+                            if (!response.IsSuccessStatusCode)
+                            {
+                                Console.WriteLine("[雪票轮询] " + call + " 返回 " + (int)response.StatusCode);
+                            }
                         }
-                    }
-                    catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
-                    {
-                        throw;
-                    }
-                    catch (Exception e)
-                    {
-                        Console.WriteLine("[雪票取消轮询] 出错：" + e.Message);
+                        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                        {
+                            throw;
+                        }
+                        catch (Exception e)
+                        {
+                            Console.WriteLine("[雪票轮询] " + call + " 出错：" + e.Message);
+                        }
                     }
                     await Task.Delay(TimeSpan.FromMinutes(1), stoppingToken);
                 }

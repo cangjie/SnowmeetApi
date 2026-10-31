@@ -207,7 +207,11 @@ namespace SnowmeetApi.Tests
             public ApplicationDBContext NewContext() => new(new DbContextOptionsBuilder<ApplicationDBContext>()
                 .UseSqlite(connection).UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking).Options);
 
-            public SkiPassController Controller(ApplicationDBContext db) => new(db, Config, Http);
+            public double Balance { get; set; } = 100000;
+
+            // 预存款查询换成假的：订票前会核对各自我游账号的预存款，测试里不发真实请求
+            public SkiPassController Controller(ApplicationDBContext db) =>
+                new(db, Config, Http) { BalanceProvider = _ => Task.FromResult(Balance) };
 
             public static async Task<Fixture> Create(int staffValid = 1)
             {

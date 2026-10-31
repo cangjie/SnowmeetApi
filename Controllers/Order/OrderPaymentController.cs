@@ -539,7 +539,7 @@ namespace SnowmeetApi.Controllers.Order
 
         [HttpGet("{paymentId}")]
         public async Task<ActionResult<OrderPaymentRefund>> Refund(int paymentId, double amount, 
-            string reason, string sessionKey, string sessionType = "wechat_mini_openid")
+            string reason, string sessionKey, string sessionType = "wechat_mini_openid", int? skipassId = null)
         {
             reason = Util.UrlDecode(reason);
             sessionKey = Util.UrlDecode(sessionKey);
@@ -562,7 +562,7 @@ namespace SnowmeetApi.Controllers.Order
             {
                 return BadRequest();
             }
-            OrderPaymentRefund? refund = await RefundCore(payment, amount, reason, staff.id, "");
+            OrderPaymentRefund? refund = await RefundCore(payment, amount, reason, staff.id, "", skipassId);
             if (refund == null)
             {
                 return BadRequest();
@@ -574,7 +574,7 @@ namespace SnowmeetApi.Controllers.Order
         // 系统自动退款（雪票取消确认后）没有店员会话，直接调这里，staffId 留空、oper 写明来源。
         // 不能退（未支付成功、超过可退金额）返回 null。
         [NonAction]
-        public async Task<OrderPaymentRefund?> RefundCore(OrderPayment payment, double amount, string reason, int? staffId, string oper)
+        public async Task<OrderPaymentRefund?> RefundCore(OrderPayment payment, double amount, string reason, int? staffId, string oper, int? skipassId = null)
         {
             int paymentId = payment.id;
             if (!payment.status.Equals("支付成功"))
@@ -607,6 +607,7 @@ namespace SnowmeetApi.Controllers.Order
                 RefundFee = 0,
                 oper = oper,
                 staff_id = staffId,
+                skipass_id = skipassId,
                 memo = "",
                 notify_url = "",
                 out_refund_no = outRefundNo.Trim()
@@ -639,7 +640,7 @@ namespace SnowmeetApi.Controllers.Order
 
 
         [HttpGet]
-        public async Task SetPaymentRefundSuccess(int paymentId)
+        public async Task SetPaymentRefundSuccess(int paymentId, int? refundId = null)
         {
             OrderPayment payment = await _context.OrderPayment.FindAsync(paymentId);
             if (payment == null)
@@ -664,7 +665,7 @@ namespace SnowmeetApi.Controllers.Order
             if (orderType.Trim().Equals("雪票"))
             {
                 SkiPassController _skipassHelper = new SkiPassController(_context, _originConfig, _httpContextAccessor);
-                await _skipassHelper.RefundCallBack(paymentId);
+                await _skipassHelper.RefundCallBack(paymentId, refundId);
             }
             
         }
