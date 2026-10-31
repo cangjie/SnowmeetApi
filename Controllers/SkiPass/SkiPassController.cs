@@ -216,6 +216,43 @@ namespace SnowmeetApi.Controllers
 
         
 
+        // 每张票的退票、退款、出票失败等关键步骤都留一条记录（core_data_mod_log，table_name=ski_pass，key_value=票号）：
+        // 谁、什么时候、向供应商提交了什么、供应商反馈了什么、我们据此做了什么。供应商每次接口调用的原始请求和返回
+        // 另外在 web_api_log 里（按供应商订单号能对上）。写记录失败不能影响业务本身。
+        [NonAction]
+        private async Task LogSkipassEvent(Models.SkiPass skipass, string scene, int? memberId, int? staffId, string detail)
+        {
+            try
+            {
+                CoreDataModLog log = CoreDataModLog.CreateManualLog("ski_pass", "", skipass.id, scene, memberId, staffId, null, null, detail);
+                await _context.coreDataModLog.AddAsync(log);
+                await _context.SaveChangesAsync();
+            }
+            catch (Exception err)
+            {
+                Console.WriteLine("[雪票记录] 写入失败 skipass=" + skipass.id + " " + scene + " " + err.Message);
+            }
+        }
+
+        // 供应商对「取消订单」的反馈
+        public sealed record SupplierCancelFeedback(int CancelState, string Msg, string? CancelId, double? CancelMoney);
+
+        // 向供应商提交取消；测试里替换成假的
+        public Func<Models.SkiPass, string, Task<SupplierCancelFeedback>>? SupplierCancelSubmitter { get; set; }
+
+        [NonAction]
+        private async Task<SupplierCancelFeedback> SubmitSupplierCancel(Models.SkiPass skipass, string source)
+        {
+            if (SupplierCancelSubmitter != null)
+            {
+                return await SupplierCancelSubmitter(skipass, source);
+            }
+            WanlongZiwoyouHelper helper = new WanlongZiwoyouHelper(_context, _config, source);
+            WanlongZiwoyouHelper.ZiwoyouQueryResult r = await helper.CancelOrder(int.Parse(skipass.reserve_no));
+            WanlongZiwoyouHelper.ZiwoyouCancel cancel = (WanlongZiwoyouHelper.ZiwoyouCancel)r.data;
+            return new SupplierCancelFeedback(cancel.cancelState, (r.msg ?? "").Trim(), cancel.cancelId, cancel.cancelMoney);
+        }
+
         [HttpGet("{skipassId}")]
         public async Task<ActionResult<Models.SkiPass>> Cancel(int skipassId, string sessionKey, string sessionType = "wechat_mini_openid")
         {
@@ -243,18 +280,21 @@ namespace SnowmeetApi.Controllers
             skipass.is_cancel = 3;
             _context.skiPass.Entry(skipass).State = EntityState.Modified;
             await _context.SaveChangesAsync();
+            await LogSkipassEvent(skipass, "退票申请提交", member.id, staff?.id,
+                "向供应商提交取消，供应商订单号 " + skipass.reserve_no);
 
             try
             {
                 Models.SkiPassProduct product = await _context.skiPassProduct.FindAsync(skipass.product_id);
-                WanlongZiwoyouHelper _wlHelper = new WanlongZiwoyouHelper(_context, _config, product.source.Trim());
-                WanlongZiwoyouHelper.ZiwoyouQueryResult r = await _wlHelper.CancelOrder(int.Parse(skipass.reserve_no));
-                WanlongZiwoyouHelper.ZiwoyouCancel cancel = (WanlongZiwoyouHelper.ZiwoyouCancel)r.data;
-                skipass.is_cancel = cancel.cancelState;
-                skipass.memo += " " + r.msg.Trim();
-                if (cancel.cancelState == 1)
+                SupplierCancelFeedback feedback = await SubmitSupplierCancel(skipass, product.source.Trim());
+                skipass.is_cancel = feedback.CancelState;
+                skipass.memo += " " + feedback.Msg;
+                await LogSkipassEvent(skipass, "供应商退票反馈", member.id, staff?.id,
+                    "cancelState=" + feedback.CancelState + "（1 即时确认，2 提交待审核），msg=" + feedback.Msg
+                    + "，cancelId=" + feedback.CancelId + "，cancelMoney=" + feedback.CancelMoney);
+                if (feedback.CancelState == 1)
                 {
-                    // 自我游已即时确认取消，直接退款；不再回头查一次订单状态——刚确认时查到的可能还是旧状态，
+                    // 供应商同意取消就算退票成功：直接退这一张的票款。不再回头查一次订单状态——刚确认时查到的可能还是旧状态，
                     // 那样退款会被误拦，而且之后没有人补退
                     _context.skiPass.Entry(skipass).State = EntityState.Modified;
                     await _context.SaveChangesAsync();
@@ -267,6 +307,7 @@ namespace SnowmeetApi.Controllers
             {
                 skipass.is_cancel = -1;
                 skipass.memo = "取消出错 " + err.ToString();
+                await LogSkipassEvent(skipass, "供应商退票出错", member.id, staff?.id, err.Message);
             }
             _context.skiPass.Entry(skipass).State = EntityState.Modified;
             await _context.SaveChangesAsync();
@@ -785,6 +826,7 @@ namespace SnowmeetApi.Controllers
             skipass.update_date = DateTime.Now;
             _context.skiPass.Entry(skipass).State = EntityState.Modified;
             await _context.SaveChangesAsync();
+            await LogSkipassEvent(skipass, "确认出票失败", null, null, reason);
             if (!string.IsNullOrWhiteSpace(supplierOrderId) && int.TryParse(supplierOrderId, out int orderNo))
             {
                 try
@@ -888,6 +930,7 @@ namespace SnowmeetApi.Controllers
                     skipass.update_date = DateTime.Now;
                     _context.skiPass.Entry(skipass).State = EntityState.Modified;
                     await _context.SaveChangesAsync();
+                    await LogSkipassEvent(skipass, "补记供应商订单号", null, null, "出票超过 30 分钟，核对发现供应商已有订单 " + check.OrderId + " 且有取票码，补记，不退款");
                     break;
                 case SkipassSaleRules.GiveUpAction.CancelThenConfirm:
                     if (!string.IsNullOrWhiteSpace(check.OrderId) && await CancelSupplierOrderConfirmed(check.OrderId, source))
@@ -988,6 +1031,7 @@ namespace SnowmeetApi.Controllers
                 skipass.update_date = DateTime.Now;
                 _context.skiPass.Entry(skipass).State = EntityState.Modified;
                 await _context.SaveChangesAsync();
+                await LogSkipassEvent(skipass, "退款成功", null, null, "微信确认退款到账，退 " + refund.amount + " 元，退款单 " + refund.out_refund_no);
             }
         }
 
@@ -1068,8 +1112,12 @@ namespace SnowmeetApi.Controllers
             OrderPaymentRefund? refund = await _refundHelper.RefundCore(payment, amount, reason, staffId, "系统自动退款", skipass.id);
             if (refund == null || string.IsNullOrEmpty(refund.refund_id))
             {
+                await LogSkipassEvent(skipass, "退款未发出", null, staffId,
+                    "原因：" + reason + "，应退 " + amount + " 元，" + (refund == null ? "被拒绝（支付状态不对或超过可退金额）" : "没有拿到微信退款号，退款单 " + refund.out_refund_no));
                 return false;
             }
+            await LogSkipassEvent(skipass, "发起退款", null, staffId,
+                "原因：" + reason + "，退 " + amount + " 元，退款单 " + refund.out_refund_no + "，微信退款号 " + refund.refund_id);
             skipass.have_refund = 1;
             skipass.update_date = DateTime.Now;
             _context.skiPass.Entry(skipass).State = EntityState.Modified;
@@ -1112,6 +1160,8 @@ namespace SnowmeetApi.Controllers
                         skipass.is_cancel = 1;
                         _context.skiPass.Entry(skipass).State = EntityState.Modified;
                         await _context.SaveChangesAsync();
+                        await LogSkipassEvent(skipass, "供应商确认已取消", null, null,
+                            "后台核对供应商订单 " + skipass.reserve_no + " 状态为 3（已取消）");
                         await AutoRefundCancelled(skipass, "退票确认退款", null);
                     }
                     else if (skipass.is_cancel == 2 && SkipassSaleRules.CancelTimedOut(requestedAt, now))

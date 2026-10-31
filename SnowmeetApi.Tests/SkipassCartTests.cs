@@ -662,6 +662,109 @@ namespace SnowmeetApi.Tests
             Assert.Equal(501, refunds[0].skipass_id);
         }
 
+        // ---------------- 退票留痕：谁、什么时候、提交了什么、供应商反馈了什么 ----------------
+
+        static async Task SeedIssuedPass(Fixture f)
+        {
+            await SeedPaidCartOrder(f, payMethod: "线下");
+            await using var seed = f.NewContext();
+            var p = await seed.skiPass.FirstAsync(x => x.id == 501);
+            p.reserve_no = "1222500001";
+            seed.skiPass.Update(p);
+            await seed.SaveChangesAsync();
+        }
+
+        static async Task<List<CoreDataModLog>> LogsOf(Fixture f, int skipassId)
+        {
+            await using var db = f.NewContext();
+            return await db.coreDataModLog.Where(l => l.table_name == "ski_pass" && l.key_value == skipassId).OrderBy(l => l.id).ToListAsync();
+        }
+
+        [Fact]
+        public async Task 退票_供应商即时确认_按这一张退款_每一步都留痕()
+        {
+            await using var f = await Fixture.Create();
+            await SeedIssuedPass(f);
+            await using (var db = f.NewContext())
+            {
+                var ctl = f.Controller(db);
+                ctl.SupplierCancelSubmitter = (pass, src) => Task.FromResult(new SkiPassController.SupplierCancelFeedback(1, "取消成功", "7069756", 579));
+                var result = await ctl.Cancel(501, "staff-session");
+                Assert.IsType<OkObjectResult>(result.Result);
+            }
+            await using var check = f.NewContext();
+            Assert.Equal(1, (await check.skiPass.FirstAsync(p => p.id == 501)).is_cancel);
+            var refunds = await check.orderPaymentRefund.Where(r => r.order_id == 900).ToListAsync();
+            Assert.Single(refunds);
+            Assert.Equal(579, refunds[0].amount);
+            Assert.Equal(501, refunds[0].skipass_id);
+
+            var logs = await LogsOf(f, 501);
+            Assert.Equal(new[] { "退票申请提交", "供应商退票反馈", "退款未发出" }, logs.Select(l => l.scene).ToArray());
+            Assert.Equal(10, logs[0].member_id);           // 谁点的
+            Assert.Equal(28, logs[0].staff_id);
+            Assert.Contains("1222500001", logs[0].manual_memo);
+            Assert.Contains("cancelState=1", logs[1].manual_memo); // 供应商反馈了什么
+            Assert.Contains("取消成功", logs[1].manual_memo);
+            Assert.Contains("cancelId=7069756", logs[1].manual_memo);
+            Assert.All(logs, l => Assert.True(DateTime.Now - l.create_date < TimeSpan.FromMinutes(1))); // 什么时候
+        }
+
+        [Fact]
+        public async Task 退票_供应商提交待审核_不退款_记下提交和反馈()
+        {
+            await using var f = await Fixture.Create();
+            await SeedIssuedPass(f);
+            await using (var db = f.NewContext())
+            {
+                var ctl = f.Controller(db);
+                ctl.SupplierCancelSubmitter = (pass, src) => Task.FromResult(new SkiPassController.SupplierCancelFeedback(2, "取消申请已提交", "7069757", 0));
+                await ctl.Cancel(501, "staff-session");
+            }
+            await using var check = f.NewContext();
+            var pass = await check.skiPass.FirstAsync(p => p.id == 501);
+            Assert.Equal(2, pass.is_cancel);
+            Assert.Contains("取消申请已提交", pass.memo);
+            Assert.Empty(await check.orderPaymentRefund.ToListAsync());
+            var logs = await LogsOf(f, 501);
+            Assert.Equal(new[] { "退票申请提交", "供应商退票反馈" }, logs.Select(l => l.scene).ToArray());
+            Assert.Contains("cancelState=2", logs[1].manual_memo);
+        }
+
+        [Fact]
+        public async Task 退票_向供应商提交出错_标成取消失败_不退款_记下错误()
+        {
+            await using var f = await Fixture.Create();
+            await SeedIssuedPass(f);
+            await using (var db = f.NewContext())
+            {
+                var ctl = f.Controller(db);
+                ctl.SupplierCancelSubmitter = (pass, src) => throw new InvalidOperationException("供应商接口超时");
+                await ctl.Cancel(501, "staff-session");
+            }
+            await using var check = f.NewContext();
+            Assert.Equal(-1, (await check.skiPass.FirstAsync(p => p.id == 501)).is_cancel);
+            Assert.Empty(await check.orderPaymentRefund.ToListAsync());
+            var logs = await LogsOf(f, 501);
+            Assert.Equal(new[] { "退票申请提交", "供应商退票出错" }, logs.Select(l => l.scene).ToArray());
+            Assert.Contains("供应商接口超时", logs[1].manual_memo);
+        }
+
+        [Fact]
+        public async Task 确认出票失败_留痕写明原因()
+        {
+            var (f, _) = await StuckLongAgo();
+            await using var _f = f;
+            await using (var db = f.NewContext())
+            {
+                await f.Controller(db).RefreshIssuing();
+            }
+            var logs = await LogsOf(f, 501);
+            Assert.Contains("确认出票失败", logs.Select(l => l.scene));
+            Assert.Contains("供应商那边没有这张票的有效订单", logs.First(l => l.scene == "确认出票失败").manual_memo);
+            Assert.Contains("退款未发出", logs.Select(l => l.scene)); // 夹具里是线下付款，不会真发微信退款
+        }
+
         // ---------------- 夹具 ----------------
 
         static SkipassCartItem Item(int productId, string cell, string name = "张三", DateTime? date = null, int count = 1)

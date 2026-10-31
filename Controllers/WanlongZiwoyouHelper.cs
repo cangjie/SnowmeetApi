@@ -104,6 +104,8 @@ namespace SnowmeetApi.Controllers
         {
             public int orderId { get; set; }
             public int cancelState { get; set; }
+            public double? cancelMoney { get; set; }
+            public string? cancelId { get; set; }
         }
         public class ZiwoyouDailyPrice
         {
