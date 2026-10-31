@@ -75,6 +75,11 @@ namespace SnowmeetApi.Controllers
                 // 带上 product/punchCard 导航属性，前端展示"次卡销售"时才能读到商品名/卡信息。
                 order.retails = await _db.order.Entry(order).Collection(o => o.retails).Query().Where(r => r.valid == 1)
                     .Include(r => r.product).Include(r => r.punchCard).AsNoTracking().ToListAsync();
+                // 订单退款余额依赖订单级押金及其付款状态；租赁明细中的押金不会自动填充该集合。
+                order.guarantys = await _db.order.Entry(order).Collection(o => o.guarantys).Query()
+                    .Where(g => g.valid == 1)
+                    .Include(g => g.guarantyPayments).ThenInclude(gp => gp.payment)
+                    .AsSplitQuery().AsNoTracking().ToListAsync();
                 order.rentals = await _db.order.Entry(order).Collection(o => o.rentals).Query().AsNoTracking()
                     .Include(r => r.discounts.Where(d => d.valid == 1 && d.biz_type.Trim().Equals("租赁"))).AsNoTracking()
                     .Include(r => r.details.Where(d => d.valid == 1)).AsNoTracking()
