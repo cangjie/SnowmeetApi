@@ -471,7 +471,9 @@ namespace SnowmeetApi.Controllers
                 .Where(r => r.payment_id == payment.id)
                 .AsNoTracking().ToListAsync();
             string notifyUrl = payment.notify.Trim().Replace("https://", "").Split('/')[0].Trim();
-            notifyUrl = "https://" + notifyUrl + "/core/Tenpay/RefundCallback/" + payment.mch_id.ToString();
+            // 本控制器的路由是 api/[controller]/[action]，线上 /core/Tenpay/RefundCallback/* 返回 404（/api/... 才是 POST 路由），
+            // 通知地址写成 /core 微信永远回调不到；支付回调（TenpayPaymentCallBack）用的就是 /api
+            notifyUrl = "https://" + notifyUrl + "/api/Tenpay/RefundCallback/" + payment.mch_id.ToString();
             refund.notify_url = notifyUrl.Trim();
             _db.orderPaymentRefund.Entry(refund).State = EntityState.Modified;
             await _db.SaveChangesAsync();
@@ -512,18 +514,35 @@ namespace SnowmeetApi.Controllers
         }
         // 退款成功后的落库：回调和主动查询共用。sideEffects 控制是否执行订单类型相关的后续（雪票会记退款金额、取消赠券），
         // 补很久以前的历史状态时不要重放这些后续。
+        // 回调和主动查询可能同时到，已经落成成功的不再重复执行后续（雪票退款后续会取消赠券、记退款金额）
+        static readonly SemaphoreSlim RefundApplyLock = new SemaphoreSlim(1, 1);
+
         [NonAction]
         public async Task ApplyRefundSuccess(OrderPaymentRefund refund, OrderPayment payment, string? transactionId, bool sideEffects)
         {
-            refund.state = 1;
-            refund.memo = transactionId ?? "";
-            refund.TransactionId = (transactionId ?? "").Trim();
-            refund.update_date = DateTime.Now;
-            _db.Entry(refund).State = EntityState.Modified;
-            await _db.SaveChangesAsync();
-            if (sideEffects)
+            await RefundApplyLock.WaitAsync();
+            try
             {
-                await _orderPaymentHelper.SetPaymentRefundSuccess(payment.id);
+                int currentState = await _db.orderPaymentRefund.AsNoTracking()
+                    .Where(r => r.id == refund.id).Select(r => r.state).FirstOrDefaultAsync();
+                if (currentState == 1)
+                {
+                    return;
+                }
+                refund.state = 1;
+                refund.memo = transactionId ?? "";
+                refund.TransactionId = (transactionId ?? "").Trim();
+                refund.update_date = DateTime.Now;
+                _db.Entry(refund).State = EntityState.Modified;
+                await _db.SaveChangesAsync();
+                if (sideEffects)
+                {
+                    await _orderPaymentHelper.SetPaymentRefundSuccess(payment.id);
+                }
+            }
+            finally
+            {
+                RefundApplyLock.Release();
             }
         }
 

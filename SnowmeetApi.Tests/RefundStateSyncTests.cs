@@ -58,6 +58,51 @@ namespace SnowmeetApi.Tests
         }
 
         [Fact]
+        public async Task 退款已经是成功_再次落库不改动_不重复执行后续()
+        {
+            await using var c = await CreateDb();
+            var firstTime = new DateTime(2026, 10, 31, 17, 0, 0);
+            await using (var seed = Open(c))
+            {
+                seed.OrderPayment.Add(new OrderPayment { id = 1, order_id = 500, pay_method = "微信支付", status = "支付成功", amount = 309, mch_id = 11 });
+                seed.orderPaymentRefund.Add(new OrderPaymentRefund { id = 1, order_id = 500, payment_id = 1, amount = 309, refund_id = "5030",
+                    out_refund_no = "A_TK_01", state = 1, TransactionId = "first", update_date = firstTime });
+                await seed.SaveChangesAsync();
+            }
+            await using var db = Open(c);
+            var tenpay = new TenpayController(db, Config, new TestHttp());
+            var refund = await db.orderPaymentRefund.FirstAsync(r => r.id == 1);
+            var payment = await db.OrderPayment.FirstAsync(p => p.id == 1);
+            await tenpay.ApplyRefundSuccess(refund, payment, "second", true);
+
+            await using var check = Open(c);
+            var saved = await check.orderPaymentRefund.FirstAsync(r => r.id == 1);
+            Assert.Equal("first", saved.TransactionId);
+            Assert.Equal(firstTime, saved.update_date);
+        }
+
+        [Fact]
+        public async Task 雪票退款成功后续_按新订单表判断订单类型_记退款金额()
+        {
+            await using var c = await CreateDb();
+            await using (var seed = Open(c))
+            {
+                seed.order.Add(new SnowmeetApi.Models.Order { id = 900, type = "雪票", member_id = 1, total_amount = 309, create_date = DateTime.Now, valid = 1 });
+                seed.OrderPayment.Add(new OrderPayment { id = 1, order_id = 900, pay_method = "微信支付", status = "支付成功", amount = 309, mch_id = 11 });
+                seed.orderPaymentRefund.Add(new OrderPaymentRefund { id = 1, order_id = 900, payment_id = 1, amount = 309, refund_id = "5030", out_refund_no = "A_TK_01", state = 1 });
+                seed.skiPass.Add(new SnowmeetApi.Models.SkiPass { id = 70, order_id = 900, resort = "万龙", valid = 1, product_name = "p", deal_price = 309, is_cancel = 1, have_refund = 1 });
+                await seed.SaveChangesAsync();
+            }
+            await using var db = Open(c);
+            var payments = new OrderPaymentController(db, Config, new TestHttp());
+            await payments.SetPaymentRefundSuccess(1);
+
+            await using var check = Open(c);
+            var pass = await check.skiPass.FirstAsync(s => s.id == 70);
+            Assert.Equal(309, pass.refund_amount);
+        }
+
+        [Fact]
         public async Task 同步入口_只处理处理中且已有微信退款号的近期退款_查询失败不抛异常不改状态()
         {
             await using var c = await CreateDb();

@@ -646,14 +646,22 @@ namespace SnowmeetApi.Controllers.Order
             {
                 return;
             } 
-            OrderOnline order = await _context.OrderOnlines.FindAsync(payment.order_id);
-            if (order == null)
+            // 订单类型先看新订单表 order（order_payment 里的 order_id 指向它），找不到再退回旧的 order_online：
+            // 以前只查旧表，新订单的支付永远查不到订单，退款成功后雪票的后续（记退款金额、取消赠券）从没执行过
+            string? orderType = await _context.order.AsNoTracking().Where(o => o.id == payment.order_id)
+                .Select(o => o.type).FirstOrDefaultAsync();
+            if (orderType == null)
+            {
+                OrderOnline legacyOrder = await _context.OrderOnlines.FindAsync(payment.order_id);
+                orderType = legacyOrder?.type;
+            }
+            if (orderType == null)
             {
                 return;
             }
             
             
-            if (order.type.Trim().Equals("雪票"))
+            if (orderType.Trim().Equals("雪票"))
             {
                 SkiPassController _skipassHelper = new SkiPassController(_context, _originConfig, _httpContextAccessor);
                 await _skipassHelper.RefundCallBack(paymentId);
