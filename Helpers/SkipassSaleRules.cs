@@ -57,6 +57,16 @@ namespace SnowmeetApi.Helpers
             return Math.Abs(a - b) > PRICE_EPSILON;
         }
 
+        // 取消已确认（is_cancel=1）、有效、还没发起过退款的万龙雪票，需要自动退款。
+        // 取消先提交给自我游，即时确认的当场退，需要审核的等 RefreshCancel 查到已取消再退；
+        // 退款行（payment_refund）一旦存在就不再自动退，避免失败重试变成重复退款（由调用方查）。
+        public static bool NeedsAutoRefund(int isCancel, int valid, string? resort, int? haveRefund, double? refundAmount)
+        {
+            if (isCancel != 1 || valid != 1) return false;
+            if ((resort ?? "").Trim().Equals("南山")) return false;
+            return haveRefund == null && refundAmount == null;
+        }
+
         // 顾客看到的价格行不带进货价和建议售价；deal_price、marketPrice 保留
         public static void RedactDailyPrices(IEnumerable<SkipassDailyPrice>? prices)
         {

@@ -562,9 +562,24 @@ namespace SnowmeetApi.Controllers.Order
             {
                 return BadRequest();
             }
-            if (!payment.status.Equals("支付成功"))
+            OrderPaymentRefund? refund = await RefundCore(payment, amount, reason, staff.id, "");
+            if (refund == null)
             {
                 return BadRequest();
+            }
+            return Ok(refund);
+        }
+
+        // 退款的公共部分：校验金额、建退款行、按支付方式发起退款。HTTP 入口 Refund 先验店员会话再调这里；
+        // 系统自动退款（雪票取消确认后）没有店员会话，直接调这里，staffId 留空、oper 写明来源。
+        // 不能退（未支付成功、超过可退金额）返回 null。
+        [NonAction]
+        public async Task<OrderPaymentRefund?> RefundCore(OrderPayment payment, double amount, string reason, int? staffId, string oper)
+        {
+            int paymentId = payment.id;
+            if (!payment.status.Equals("支付成功"))
+            {
+                return null;
             }
             var refunds = await _context.orderPaymentRefund
                 .Where(r => r.payment_id == paymentId && ((!r.refund_id.Trim().Equals("") && r.refund_id != null ) || r.state == 1))
@@ -576,7 +591,7 @@ namespace SnowmeetApi.Controllers.Order
             }
             if (Math.Round(amount, 2) > Math.Round(payment.amount - totalRefundAmount, 2))
             {
-                return BadRequest();
+                return null;
             }
             string outRefundNo = payment.out_trade_no + "_TK_" + (refunds.Count + 1).ToString().PadLeft(2, '0');
                 //+ "_" + DateTime.Now.ToString("yyyyMMdd");
@@ -590,8 +605,8 @@ namespace SnowmeetApi.Controllers.Order
                 amount = amount,
                 TransactionId = "",
                 RefundFee = 0,
-                oper = "",
-                staff_id = staff.id,
+                oper = oper,
+                staff_id = staffId,
                 memo = "",
                 notify_url = "",
                 out_refund_no = outRefundNo.Trim()
@@ -618,7 +633,7 @@ namespace SnowmeetApi.Controllers.Order
                     break;
             }
             //refund.oper = "";
-            return Ok(refund);
+            return refund;
 
         }
 

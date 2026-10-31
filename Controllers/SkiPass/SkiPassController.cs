@@ -249,7 +249,12 @@ namespace SnowmeetApi.Controllers
                 skipass.memo += " " + r.msg.Trim();
                 if (cancel.cancelState == 1)
                 {
-                    return await Refund(skipassId, "退票即时确认退款", sessionKey, sessionType);
+                    // 自我游已即时确认取消，直接退款；不再回头查一次订单状态——刚确认时查到的可能还是旧状态，
+                    // 那样退款会被误拦，而且之后没有人补退
+                    _context.skiPass.Entry(skipass).State = EntityState.Modified;
+                    await _context.SaveChangesAsync();
+                    await AutoRefundCancelled(skipass, "退票即时确认退款", staff?.id);
+                    return Ok(skipass);
                 }
                 
             }
@@ -657,12 +662,48 @@ namespace SnowmeetApi.Controllers
             }
         }
 
+        // 自我游确认取消后自动退款，不需要店员会话。已发起过退款（payment_refund 有任何一行）的不再自动退。
+        // 退款成功后由微信回调的 RefundCallBack 补退款金额。返回是否发起了退款。
+        [NonAction]
+        public async Task<bool> AutoRefundCancelled(Models.SkiPass skipass, string reason, int? staffId)
+        {
+            if (!SkipassSaleRules.NeedsAutoRefund(skipass.is_cancel, skipass.valid ?? 0, skipass.resort, skipass.have_refund, skipass.refund_amount))
+            {
+                return false;
+            }
+            OrderPayment? payment = await _context.OrderPayment
+                .Where(p => p.order_id == skipass.order_id && p.status.Trim().Equals("支付成功"))
+                .OrderBy(p => p.id).AsNoTracking().FirstOrDefaultAsync();
+            if (payment == null)
+            {
+                return false;
+            }
+            bool refundExists = await _context.orderPaymentRefund.AnyAsync(r => r.payment_id == payment.id);
+            if (refundExists)
+            {
+                return false;
+            }
+            OrderPaymentRefund? refund = await _refundHelper.RefundCore(payment, payment.amount, reason, staffId, "系统自动退款");
+            if (refund == null || string.IsNullOrEmpty(refund.refund_id))
+            {
+                return false;
+            }
+            skipass.have_refund = 1;
+            skipass.update_date = DateTime.Now;
+            _context.skiPass.Entry(skipass).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
+            return true;
+        }
+
         [HttpGet]
         public async Task RefreshCancel()
         {
+            // 取消中（自我游需要审核）的，查到已取消就改成已取消并自动退款；
+            // 已取消但没退款的（以前这里只改状态不退款）近两天内的也补退，退款行存在的不会重复退
             List<Models.SkiPass> skipassList = await _context.skiPass
                 .Where(s => (s.valid == 1 && s.reserve_no != null && !s.resort.Trim().Equals("南山")
-                && s.is_cancel == 2)).ToListAsync();
+                && (s.is_cancel == 2 || (s.is_cancel == 1 && s.have_refund == null && s.refund_amount == null
+                    && s.create_date > DateTime.Now.AddDays(-2))))).ToListAsync();
             for(int i = 0; i < skipassList.Count; i++)
             {
                 Models.SkiPass skipass = skipassList[i];
@@ -680,7 +721,7 @@ namespace SnowmeetApi.Controllers
                         skipass.is_cancel = 1;
                         _context.skiPass.Entry(skipass).State = EntityState.Modified;
                         await _context.SaveChangesAsync();
-                        
+                        await AutoRefundCancelled(skipass, "退票确认退款", null);
                     }
                     
                 }

@@ -225,5 +225,20 @@ namespace SnowmeetApi.Tests
             var (start, _) = SkipassSaleRules.ResolveSeasonDates(null, new DateTime(2026, 10, 29));
             Assert.Equal(new DateTime(2026, 10, 1), start);
         }
+
+        [Theory]
+        [InlineData(1, 1, "万龙", null, null, true)]      // 取消已确认、有效、没退过款：要自动退
+        [InlineData(2, 1, "万龙", null, null, false)]     // 取消中：等自我游确认
+        [InlineData(0, 1, "万龙", null, null, false)]     // 没取消
+        [InlineData(3, 1, "万龙", null, null, false)]     // 申请取消
+        [InlineData(1, 0, "万龙", null, null, false)]     // 无效记录
+        [InlineData(1, 1, "南山", null, null, false)]     // 南山不走这条
+        [InlineData(1, 1, " 南山 ", null, null, false)]
+        [InlineData(1, 1, "万龙", 1, null, false)]        // 已经发起过退款
+        [InlineData(1, 1, "万龙", null, 309.0, false)]    // 已经退款成功
+        public void 取消确认后是否需要自动退款(int isCancel, int valid, string resort, int? haveRefund, double? refundAmount, bool expect)
+        {
+            Assert.Equal(expect, SkipassSaleRules.NeedsAutoRefund(isCancel, valid, resort, haveRefund, refundAmount));
+        }
     }
 }
