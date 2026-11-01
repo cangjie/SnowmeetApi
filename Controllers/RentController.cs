@@ -8418,6 +8418,16 @@ namespace SnowmeetApi.Controllers
             await _db.SaveChangesAsync();
             OrderController _orderH = new OrderController(_db, _oriConfig, _httpContextAccessor);
             Models.Order order = await _orderH.GetOrder((int)rental.order_id);
+            // 主单还没生效时，待支付金额是主单自己的押金，不能被追加项重算覆盖
+            if (!RentAppendRules.MainOrderEffective(order))
+            {
+                return Ok(new ApiResult<Models.Order>()
+                {
+                    code = 0,
+                    message = "",
+                    data = order
+                });
+            }
             // 重算订单待支付金额 = 剩余待支付追加项的未支付 Guaranty 合计（删光则置 0）
             double remainPay = 0;
             for (int ri = 0; order.appendingRentals != null && ri < order.appendingRentals.Count; ri++)
@@ -8456,6 +8466,16 @@ namespace SnowmeetApi.Controllers
                     data = null
                 });
             }
+            OrderController _orderH = new OrderController(_db, _oriConfig, _httpContextAccessor);
+            if (commit && !RentAppendRules.MainOrderEffective(await _orderH.GetOrder(orderId)))
+            {
+                return Ok(new ApiResult<Models.Order>()
+                {
+                    code = 1,
+                    message = "主单还没有付款，不能确认追加，请先完成付款",
+                    data = null
+                });
+            }
             for (int i = 0; i < appendings.Count; i++)
             {
                 if (orderId == appendings[i].order_id)
@@ -8463,7 +8483,6 @@ namespace SnowmeetApi.Controllers
                     await SaveAppendingRental(appendings[i], commit);
                 }
             }
-            OrderController _orderH = new OrderController(_db, _oriConfig, _httpContextAccessor);
             Models.Order order = await _orderH.GetOrder(orderId);
             // commit=false：实时保存草稿（只持久化字段，保持 appending=true，不提交/不生效/不算应付）
             if (commit)
