@@ -4651,6 +4651,32 @@ namespace SnowmeetApi.Controllers
             double coachDiscount = CoachPricingService.QuoteRentalDiscount(card!, amount);
             return coachDiscount > 0 ? (card, coachDiscount) : (null, 0);
         }
+        // 按本单门店、有效的价目表给租赁取某一天某一场次的价：套餐租赁先找套餐价，找不到再找分类价；单品只找分类价。
+        private async Task<RentPrice?> FindCatalogPriceAsync(Models.Rental rental, string dayType, string rentType, string scene)
+        {
+            int shopId = 10;
+            Models.Order? order = await _db.order.Where(o => o.id == rental.order_id).AsNoTracking().FirstOrDefaultAsync();
+            if (order != null)
+            {
+                Shop? shop = await _db.shop.Where(s => s.name == order.shop).AsNoTracking().FirstOrDefaultAsync();
+                if (shop != null)
+                {
+                    shopId = shop.id;
+                }
+            }
+            IQueryable<RentPrice> candidates = _db.rentPrice.Where(p => p.day_type == dayType && p.rent_type == rentType
+                && p.scene == scene && p.valid == 1 && p.shop_id == shopId);
+            RentPrice? price = null;
+            if (rental.package_id != null)
+            {
+                price = await candidates.Where(p => p.package_id == rental.package_id).AsNoTracking().FirstOrDefaultAsync();
+            }
+            if (price == null && rental.category_id != null)
+            {
+                price = await candidates.Where(p => p.category_id == rental.category_id).AsNoTracking().FirstOrDefaultAsync();
+            }
+            return price;
+        }
         [NonAction]
         public async Task<Models.RentalDetail?> SetRentalDetail(int rentalId, DateTime date, int? staffId)
         {
@@ -4714,16 +4740,10 @@ namespace SnowmeetApi.Controllers
                 }
                 scene = "门市";
             }
-            List<RentPrice> priceList = new List<RentPrice>();
-            if (rental.package_id != null)
-            {
-                priceList = await _db.rentPrice.Where(r => r.category_id == rental.category_id).AsNoTracking().ToListAsync();
-            }
-            else
-            {
-                priceList = await _db.rentPrice.Where(r => r.package_id == rental.package_id).AsNoTracking().ToListAsync();
-            }
-            RentPrice rentPrice = priceList.Where(p => p.day_type == dayType && p.rent_type == rentType && p.scene == scene).FirstOrDefault();
+            // 起租日没有价格预设时按价目表取价：套餐租赁取套餐价（package_id），没有再取分类价；单品取分类价。
+            // 只取本店、有效的价目（和 ContinueRental 一致）。以前这里套餐和分类的条件写反了，
+            // 套餐租赁在没有预设的日期（比如「延时租赁」起租日是明天）会取成分类价，甚至取不到价、不记第一天租金。
+            RentPrice? rentPrice = await FindCatalogPriceAsync(rental, dayType, rentType, scene);
             if (rentPrice == null && price == null)
             {
                 CoreDataModLog log = CoreDataModLog.CreateManualLog("Rental", "", rentalId, "租赁开单",
