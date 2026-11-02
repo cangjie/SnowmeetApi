@@ -7799,16 +7799,27 @@ namespace SnowmeetApi.Controllers
                     newList.Add(order);
                     try
                     {
-                        if (order.type == "租赁" && order.shop == "万龙体验中心")
+                        // 2026-11-02 用户定：万龙租赁的应分记录在关单时生成（不在退押金时生成），按最终的租金明细算；
+                        // 没有退款的单也要有。已经有分账记录的（可能手工调过金额）不动，免得重复生成。
+                        if (order.type == "租赁" && order.shop == "万龙体验中心" && order.hide == false
+                            && order.paidAmount > 0)
                         {
-                            OrderShare share = await _db.orderShare.Where(s => s.valid && s.order_id == order.id)
-                                .AsNoTracking().FirstOrDefaultAsync();
-                            await _shareHelper.CreatePaymentShare(share);
+                            bool hasPaymentShare = await _db.paymentShare.AnyAsync(p => p.valid
+                                && _db.orderShare.Any(s => s.id == p.share_id && s.valid && s.order_id == order.id));
+                            if (!hasPaymentShare)
+                            {
+                                List<OrderShare> orderShares = await _shareHelper.CreateOrderShares(order);
+                                for (int si = 0; si < orderShares.Count; si++)
+                                {
+                                    await _shareHelper.CreatePaymentShare(orderShares[si]);
+                                }
+                            }
                         }
                     }
-                    catch
+                    catch (Exception ex)
                     {
-
+                        // 以前这里是空 catch，失败了没人知道：订单关了却没有应分记录
+                        Console.WriteLine($"CloseOrder 生成万龙分账失败 order={order.id} {order.code}: {ex}");
                     }
                 }
             }

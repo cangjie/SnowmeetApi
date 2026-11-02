@@ -3030,19 +3030,7 @@ namespace SnowmeetApi.Controllers
                 }
             }
 
-            try
-            {
-                if (order.type == "租赁" && order.shop == "万龙体验中心" && order.hide == false && order.valid == 1 && order.paidAmount > 0
-                && order.refundAmount > 0 && Math.Round((double)order.totalRentUnRefund, 2) == 0)
-                {
-                    OrderShareController _shareHelper = new OrderShareController(_db, _config, _http);
-                    List<OrderShare> orderShares = await _shareHelper.CreateOrderShares(order);
-                }
-            }
-            catch
-            {
-
-            }
+            // 2026-11-02 用户定：万龙租赁的应分记录改在关单时生成（RentController.CloseOrder），不再在退押金时生成。
 
             return new ApiResult<Models.Order?>() { code = 0, message = "", data = order };
         }
