@@ -30,6 +30,7 @@ public sealed class TicketMigrationTests
             {
                 f.Db.member.Add(new Member {id=id, following_wechat=0});
                 f.Db.memberSocialAccount.Add(new MemberSocialAccount {member_id=id,type="wechat_mini_openid",num="mini-"+id,valid=1});
+                f.Db.memberSocialAccount.Add(new MemberSocialAccount {member_id=id,type="cell",num="1380000000"+id,valid=1});
                 f.Db.miniSession.Add(new MiniSession {session_key="session-"+id,session_type="wechat_mini_openid",member_id=id,wechat_openid="mini-"+id, valid=1,expire_date=DateTime.Now.AddHours(1)});
             }
             f.Db.ticketTemplate.Add(new TicketTemplate {id=12,name="测试券",memo="说明",type="养护券",miniapp_recept_path="",sharable=1,valid=1});
@@ -67,6 +68,25 @@ public sealed class TicketMigrationTests
         var r=await Mini(f.Share(),"ClaimMiniSharedTicket",1,"session-2");
         Assert.Equal(0,r.code); Assert.Single(await f.Db.ticket.ToListAsync());
         Assert.Single(await f.Db.ticketShareClaim.ToListAsync()); Assert.Equal(1,(await f.Db.ticketShareBatch.FirstAsync()).claim_count);
+    }
+    [Fact] public async Task BatchClaimRequiresBoundPhone()
+    {
+        await using var f=await Fixture.Create();
+        await f.Db.memberSocialAccount.Where(a=>a.member_id==2 && a.type=="cell").ExecuteDeleteAsync();
+        var result=await Mini(f.Share(),"ClaimMiniSharedTicket",1,"session-2");
+        Assert.Equal(1,result.code);
+        Assert.Contains("手机号",result.message);
+        Assert.Empty(await f.Db.ticket.ToListAsync());
+    }
+    [Fact] public async Task TransferAcceptanceRequiresBoundPhone()
+    {
+        await using var f=await Fixture.Create();f.Db.ticket.Add(f.Ticket());await f.Db.SaveChangesAsync();
+        Assert.Equal(0,(await MiniTicket(f.Transfer(),"SetTicketToMiniShare","111111111","session-1")).code);
+        await f.Db.memberSocialAccount.Where(a=>a.member_id==2 && a.type=="cell").ExecuteDeleteAsync();
+        var result=await MiniTicket(f.Transfer(),"AcceptMiniTicket","111111111","","session-2");
+        Assert.Equal(1,result.code);
+        Assert.Contains("手机号",result.message);
+        Assert.Equal(1,(await f.Db.ticket.SingleAsync()).member_id);
     }
     [Fact] public async Task BatchRequiresLogin()
     {

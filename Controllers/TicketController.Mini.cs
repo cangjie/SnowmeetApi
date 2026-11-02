@@ -67,6 +67,7 @@ public partial class TicketController
     {
         Member accepter = await new MemberController(_context, _oriConfig).GetMemberBySessionKey(Util.UrlDecode(sessionKey ?? ""), sessionType);
         if (accepter == null) return Ok(MiniTransferError("用户未登录"));
+        if (string.IsNullOrWhiteSpace(accepter.cell)) return Ok(MiniTransferError("请先验证手机号"));
         Ticket reward = null; Member sender = null;
         ApiResult<Ticket> result = await MiniTicketTransaction.Run(_context, async () => {
             Ticket ticket = await _context.ticket.AsNoTracking().FirstOrDefaultAsync(t => t.code == code);

@@ -50,6 +50,7 @@ public partial class TicketShareController
     {
         Member member = await new MemberController(_db, _config).GetMemberBySessionKey(Util.UrlDecode(sessionKey ?? ""), sessionType);
         if (member == null) return Ok(MiniError("请先登录"));
+        if (string.IsNullOrWhiteSpace(member.cell)) return Ok(MiniError("请先验证手机号"));
         ApiResult<object> result = await MiniTicketTransaction.Run(_db, async () => {
             TicketShareBatch batch = await _db.ticketShareBatch.AsNoTracking().FirstOrDefaultAsync(b => b.id == batchId);
             if (batch == null || batch.valid != 1 || (qr ? batch.share_type != MiniTicketRules.QrCode
