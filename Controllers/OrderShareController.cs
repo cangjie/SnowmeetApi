@@ -85,11 +85,14 @@ namespace SnowmeetApi.Controllers
         [NonAction]
         public async Task<List<PaymentShare>> CreatePaymentShare(OrderShare orderShare)
         {
-            List<OrderPayment> payments = await _db.orderPayment
+            // 2026-11-02 用户定：微信、支付宝的分账上限都是实收的 30%，且按「实收 − 已退款」的净额算
+            // （微信会拒绝超过净额 30% 的分账，11-01 有 8 笔因此被拒）。超过 30% 时照常生成分账记录，
+            // 但标成 can_not_share，夜间不自动分，需要时手动分。所以这里要带出退款，按净额排序、取数。
+            List<OrderPayment> payments = (await _db.orderPayment
                 .Where(p => p.order_id == orderShare.order_id && p.valid == 1 && p.status == "支付成功"
-                && (p.pay_method == "微信支付" || p.pay_method == "支付宝")).OrderByDescending(p => p.amount)
-                .AsNoTracking().ToListAsync();
-            double paidAmount = payments.Sum(p => p.amount);
+                && (p.pay_method == "微信支付" || p.pay_method == "支付宝")).Include(p => p.refunds)
+                .AsNoTracking().ToListAsync()).OrderByDescending(p => p.unRefundedAmount).ToList();
+            double paidAmount = payments.Sum(p => p.unRefundedAmount);
 
             List<PaymentShare> shares = new List<PaymentShare>();
             double sharedAmount = 0;
@@ -101,7 +104,12 @@ namespace SnowmeetApi.Controllers
                 && _db.rental.Any(r => r.id == d.biz_id && r.order_id == orderShare.order_id && r.valid == 1));
             for (int i = 0; i < payments.Count && sharedAmount < orderShare.amount; i++)
             {
-                double currentAmount = Math.Min(orderShare.amount - sharedAmount, payments[i].amount * 0.29);
+                // 退光了的那笔付款没有可分的钱，不生成 0 元记录；超限时记录挂在净额最大的那笔上
+                if (!overFlow && payments[i].unRefundedAmount <= 0)
+                {
+                    continue;
+                }
+                double currentAmount = Math.Min(orderShare.amount - sharedAmount, payments[i].unRefundedAmount * 0.29);
                 if (overFlow)
                 {
                     currentAmount = orderShare.amount;
@@ -118,7 +126,8 @@ namespace SnowmeetApi.Controllers
                     valid = true,
                     out_trade_no = payments[i].out_trade_no.Trim() + "_FZ_" + (i + 1).ToString().PadLeft(2, '0'),
                     can_not_share = overFlow || usedTicket,
-                    memo = usedTicket ? "租赁用了优惠券，不自动分账" : null,
+                    memo = usedTicket ? "租赁用了优惠券，不自动分账"
+                        : (overFlow ? "分账金额超过实收（扣除退款）的30%，不自动分账" : null),
                     create_date = DateTime.Now
                 };
                 await _db.paymentShare.AddAsync(pShare);

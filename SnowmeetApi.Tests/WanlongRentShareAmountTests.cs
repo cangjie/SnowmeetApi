@@ -106,6 +106,40 @@ public class WanlongRentShareAmountTests
         }
     }
 
+    // 2026-11-02 用户定：微信、支付宝分账上限都是 30%，按「实收 − 已退款」的净额算（微信会拒绝超过净额 30% 的分账，
+    // 11-01 有 8 笔就是这样被拒的）。超过时照常生成分账记录，但标成不自动分账。
+    // 付 5000，应分 200（租金 400 ÷ 2）。
+    [Theory]
+    [InlineData(4640, "WX_REFUND_1", 1, true)]    // 退 4640，净额 360，30% = 108 < 200 → 记录照生成，不自动分
+    [InlineData(1000, "WX_REFUND_2", 1, false)]   // 退 1000，净额 4000，30% = 1200 ≥ 200 → 正常自动分
+    [InlineData(4640, "", 0, false)]              // 退款还没成功（没有退款号、状态 0）不算退
+    public async Task CreatePaymentShare_over_30_percent_of_net_after_refund_is_recorded_but_not_auto_shared(
+        double refundAmount, string refundId, int refundState, bool expectedManualOnly)
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:;Foreign Keys=False");
+        await connection.OpenAsync();
+        await using var db = await CreateDbAsync(connection);
+        SeedTwoDayRental(db, secondDayValid: true, withDayDiscount: false);
+        db.orderPaymentRefund.Add(new OrderPaymentRefund { id = 1, order_id = 1, payment_id = 4, amount = refundAmount,
+            refund_id = refundId, state = refundState });
+        await db.SaveChangesAsync();
+        db.ChangeTracker.Clear();
+
+        var shareHelper = new OrderShareController(db, Config, Http);
+        await shareHelper.CreateOrderShares(await new OrderController(db, Config, Http).GetOrder(1));
+        db.ChangeTracker.Clear();
+        var orderShare = await db.orderShare.AsNoTracking().SingleAsync(s => s.order_id == 1 && s.valid);
+        await shareHelper.CreatePaymentShare(orderShare);
+
+        var paymentShare = await db.paymentShare.AsNoTracking().SingleAsync(s => s.share_id == orderShare.id);
+        Assert.Equal(200, paymentShare.amount, 2);                  // 金额不因超限而少分，记录照常生成
+        Assert.Equal(expectedManualOnly, paymentShare.can_not_share);
+        if (expectedManualOnly)
+        {
+            Assert.Contains("30%", paymentShare.memo);
+        }
+    }
+
     [Fact]
     public async Task CreatePaymentShare_ignores_coupons_used_on_other_orders()
     {
