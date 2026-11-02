@@ -150,6 +150,14 @@ public sealed class TicketMigrationTests
         Assert.NotNull(typeof(TicketTemplateAdminController).GetMethod("CreateMiniQrCodeBatchByStaff"));
         await Task.CompletedTask;
     }
+    [Theory][InlineData("personal")][InlineData("group")]
+    public async Task StaffCanCreateShareBatchWithoutPoster(string mode)
+    {
+        await using var f=await Fixture.Create(); await f.AddStaff();
+        var result=Result(await new TicketTemplateAdminController(f.Db,f.Config).ShareMiniTicketTemplateByStaff(12,mode,"session-1"));
+        Assert.Equal(0,result.code);
+        Assert.Contains("ticket_claim_mini",Data(result).GetProperty("sharePath").GetString());
+    }
     [Theory][InlineData("personal")][InlineData("group")][InlineData("qrcode")]
     public async Task NewEndpointsRejectOldBatchTypesAndLegacyKeepsOaGate(string type)
     {

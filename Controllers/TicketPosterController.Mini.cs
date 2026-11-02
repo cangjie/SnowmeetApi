@@ -46,22 +46,38 @@ namespace SnowmeetApi.Controllers
             }
             TicketTemplate template = await _db.ticketTemplate.AsNoTracking()
                 .FirstOrDefaultAsync(x => x.id == batch.template_id);
-            if (template == null || template.valid != 1 || template.cover_upload_id == null)
+            if (template == null || template.valid != 1)
             {
                 return BadRequest(new { code = 1, message = "模板海报不存在" });
             }
-            UploadFile cover = await _db.UploadFile.AsNoTracking()
-                .FirstOrDefaultAsync(x => x.id == template.cover_upload_id);
-            if (cover == null || string.IsNullOrWhiteSpace(cover.file_path_name))
+            bool defaultCover = template.cover_upload_id == null;
+            byte[]? coverBytes;
+            if (defaultCover)
             {
-                return BadRequest(new { code = 1, message = "模板海报文件不存在" });
+                using Stream stream = typeof(TicketPosterController).Assembly.GetManifestResourceStream("SnowmeetApi.Tickets.DefaultShare.jpg")
+                    ?? throw new InvalidOperationException("默认分享图片不存在");
+                using MemoryStream buffer = new MemoryStream();
+                await stream.CopyToAsync(buffer);
+                coverBytes = buffer.ToArray();
             }
-
-            // 封面直接从存储读（S3，过渡期回退本机磁盘），不再绕公网回源自己
-            byte[]? coverBytes = await storage.ReadAsync(cover.file_path_name.Trim(), cover.is_web == 1);
+            else
+            {
+                UploadFile cover = await _db.UploadFile.AsNoTracking()
+                    .FirstOrDefaultAsync(x => x.id == template.cover_upload_id);
+                if (cover == null || string.IsNullOrWhiteSpace(cover.file_path_name))
+                    return BadRequest(new { code = 1, message = "模板海报文件不存在" });
+                coverBytes = await storage.ReadAsync(cover.file_path_name.Trim(), cover.is_web == 1);
+            }
             if (coverBytes == null)
             {
                 return BadRequest(new { code = 1, message = "模板海报文件不存在" });
+            }
+            // 好友卡片通过 path 领取，无需二维码；保留用户提供的默认图片原样。
+            if (defaultCover && batch.share_type == MiniTicketRules.Personal)
+            {
+                using MemoryStream image = new MemoryStream(coverBytes);
+                string path = await storage.SaveAsync(image, "share.jpg", true, "ticket_poster_" + batch.id + "_");
+                return Ok(new ApiResult<object> { code = 0, message = "", data = new { url = storage.PublicUrl(path) } });
             }
             byte[] qrBytes;
             try { qrBytes = await qrService.GetAsync(batchId, envVersion); }
@@ -78,6 +94,12 @@ namespace SnowmeetApi.Controllers
             int qrHeight = Math.Max(1, (int)Math.Round(template.qr_height * qrScale));
             int qrX = (int)Math.Round(template.qr_x * poster.Width / (double)referenceWidth);
             int qrY = (int)Math.Round(template.qr_y * poster.Height / (double)referenceHeight);
+            if (defaultCover)
+            {
+                qrWidth = qrHeight = Math.Max(1, poster.Width / 5);
+                qrX = poster.Width - qrWidth;
+                qrY = poster.Height - qrHeight;
+            }
             if (qrX < 0 || qrY < 0 || qrX + qrWidth > poster.Width || qrY + qrHeight > poster.Height)
             {
                 return BadRequest(new { code = 1, message = "二维码布局超出海报范围" });

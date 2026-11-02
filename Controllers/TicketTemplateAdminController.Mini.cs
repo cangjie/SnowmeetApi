@@ -32,8 +32,6 @@ public partial class TicketTemplateAdminController
             TicketTemplate tpl = await _db.ticketTemplate.AsNoTracking().FirstOrDefaultAsync(t => t.id == templateId);
             if (tpl == null || tpl.valid != 1 || tpl.sharable != 1)
                 return new ApiResult<object> { code = 1, message = "该模板未开放分享或已停用", data = null };
-            if (mode != "qrcode" && tpl.cover_upload_id == null)
-                return new ApiResult<object> { code = 1, message = "请先上传分享海报", data = null };
             TicketShareBatch batch = mode != "qrcode" ? null : await _db.ticketShareBatch.AsNoTracking().FirstOrDefaultAsync(
                 b => b.staff_id == staff.id && b.template_id == templateId && b.share_type == MiniTicketRules.QrCode && b.channel == ch);
             if (batch == null) {

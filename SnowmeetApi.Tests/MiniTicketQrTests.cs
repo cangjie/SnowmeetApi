@@ -132,4 +132,23 @@ public sealed class MiniTicketQrTests
         Assert.Equal(0,Assert.IsType<ApiResult<object>>(response.Value).code);using var image=Image.Load<Rgba32>(storage.Files["/upload/1.png"]);
         Assert.Equal(108,image.Width);Assert.Equal(144,image.Height);Assert.Equal(new Rgba32(0,0,0,255),image[10,20]);Assert.Equal(new Rgba32(0,0,0,255),image[33,43]);Assert.Equal(new Rgba32(255,255,255,255),image[34,44]);
     }
+    [Fact] public async Task PersonalShareWithoutCoverReturnsDefaultImageWithoutQr()
+    {
+        await using var f=await TicketMigrationTests.Fixture.Create("mini_p"); await f.AddStaff();
+        var storage=new Storage(); var qr=new Qr();
+        var response=Assert.IsType<OkObjectResult>(await new TicketPosterController(f.Db,f.Config).GenerateMini(1,"session-1",storage,qr));
+        Assert.Equal(0,Assert.IsType<ApiResult<object>>(response.Value).code);
+        Assert.Equal(0,qr.Calls);
+        using var image=Image.Load(storage.Files["/upload/1.png"]);
+        Assert.Equal(992,image.Width); Assert.Equal(990,image.Height);
+    }
+    [Fact] public async Task GroupShareWithoutCoverIncludesQrOnDefaultImage()
+    {
+        await using var f=await TicketMigrationTests.Fixture.Create("mini_g"); await f.AddStaff();
+        var storage=new Storage(); var qr=new Qr();
+        var response=Assert.IsType<OkObjectResult>(await new TicketPosterController(f.Db,f.Config).GenerateMini(1,"session-1",storage,qr));
+        Assert.Equal(0,Assert.IsType<ApiResult<object>>(response.Value).code); Assert.Equal(1,qr.Calls);
+        using var image=Image.Load<Rgba32>(storage.Files["/upload/1.png"]);
+        Assert.Equal(992,image.Width); Assert.Equal(new Rgba32(0,0,0,255),image[991,989]);
+    }
 }
