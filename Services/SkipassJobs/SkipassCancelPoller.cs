@@ -18,7 +18,8 @@ namespace SnowmeetApi.Services.SkipassJobs
     /// </summary>
     public sealed class SkipassCancelPoller : BackgroundService
     {
-        const string DEFAULT_BASE = "http://127.0.0.1:5000/core/SkiPass/";
+        /// <summary>默认请求的本机基础地址。PollerRouteTests 会把它和 SkiPassController 的真实路由对上。</summary>
+        public const string DefaultBase = "http://127.0.0.1:5000/core/SkiPass/";
         static readonly string[] Calls = { "RefreshCancel?poll=1", "RefreshAutoReserve?hours=48", "RefreshIssuing" };
         readonly string _base;
         const string PICKUP_CALL = "RefreshUsedAll?recentDays=14";
@@ -28,7 +29,7 @@ namespace SnowmeetApi.Services.SkipassJobs
         public SkipassCancelPoller(IConfiguration config)
         {
             string? configured = config["SkipassPollBaseUrl"];
-            _base = string.IsNullOrWhiteSpace(configured) ? DEFAULT_BASE : configured.Trim().TrimEnd('/') + "/";
+            _base = string.IsNullOrWhiteSpace(configured) ? DefaultBase : configured.Trim().TrimEnd('/') + "/";
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
