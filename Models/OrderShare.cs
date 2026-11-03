@@ -19,6 +19,8 @@ namespace SnowmeetApi.Models
         public DateTime create_date {get; set;}
         /// <summary>预计分账日期（介绍人分账用，只存日期）；null = 按默认规则，关单次日起的第一个夜间任务。见 Helpers/ShareDateRules。</summary>
         public DateTime? plan_date {get; set;}
+        /// <summary>是否自动分账（介绍人分账用）：false = 店长设成手动，只记账，夜间任务不提交，自己去转账。默认 true。</summary>
+        public bool auto_share {get; set;} = true;
         [ForeignKey("relation_id")]
         public OrderShareRelation relation {get; set;}
         public List<PaymentShare> paymentShares {get; set;}

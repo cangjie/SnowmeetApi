@@ -80,10 +80,13 @@ namespace SnowmeetApi.Helpers
     public static class ShareMemoRules
     {
         public const string TicketMemo = "租赁用了优惠券，不自动分账";
+        /// <summary>店长在分账请求里把「自动分账」关掉时写的原因。</summary>
+        public const string ManualChosenMemo = "已设为手动分账，不自动分账";
 
         public static readonly string[] KnownAutoMemos =
         {
             TicketMemo,
+            ManualChosenMemo,
             "分账金额超过实收（扣除退款）的30%，不自动分账",
             "分账金额超过付款总额的30%，不自动分账",
             "介绍人没有微信收款账号",

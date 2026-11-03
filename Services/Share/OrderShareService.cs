@@ -55,8 +55,9 @@ public sealed class OrderShareService(ApplicationDBContext db, IConfiguration co
     }
 
     /// <param name="planDate">预计分账日期；null = 不指定，按默认规则（关单次日起的第一个夜间任务）。不能早于今天，已经存着的旧日期原样再存不算。</param>
+    /// <param name="autoShare">false = 店长把这条设成手动分账（只记账，不自动提交）；true = 能自动就自动，系统判断必须手动的（用券、没账号、超门槛）仍是手动。</param>
     public async Task<OrderShareView> SetIntroducerShareAsync(Staff op, int orderId, int introducerId, double amount, string? memo,
-        DateTime? planDate = null)
+        DateTime? planDate = null, bool autoShare = true)
     {
         if (!StaffAccountRules.IsManager(op)) throw new ShareException("只有店长以上可以设置介绍人分账", 3);
         Models.Order order = await new OrderController(db, config, http).GetOrder(orderId);
@@ -95,7 +96,7 @@ public sealed class OrderShareService(ApplicationDBContext db, IConfiguration co
         if (existing == null)
         {
             share = new OrderShare { order_id = orderId, relation_id = introducer.relation_id, amount = amount, valid = true, create_date = DateTime.Now,
-                plan_date = planDate };
+                plan_date = planDate, auto_share = autoShare };
             db.orderShare.Add(share);
         }
         else
@@ -103,6 +104,7 @@ public sealed class OrderShareService(ApplicationDBContext db, IConfiguration co
             share = existing;
             share.amount = amount;
             share.plan_date = planDate;
+            share.auto_share = autoShare;
             share.dealed = false;
             db.orderShare.Update(share);
         }
@@ -126,7 +128,8 @@ public sealed class OrderShareService(ApplicationDBContext db, IConfiguration co
         db.coreDataModLog.Add(CoreDataModLog.CreateManualLog("order_share", "amount", share.id, "设置介绍人分账", null, op.id,
             existing == null ? null : existing.amount.ToString("0.##"), amount.ToString("0.##"),
             "订单 " + orderId + "，介绍人 " + introducer.name + "（" + introducer.id + "）"
-            + (planDate == null ? "" : "，预计分账日期 " + planDate.Value.ToString("yyyy-MM-dd"))));
+            + (planDate == null ? "" : "，预计分账日期 " + planDate.Value.ToString("yyyy-MM-dd"))
+            + (autoShare ? "" : "，手动分账")));
         await db.SaveChangesAsync();
         db.ChangeTracker.Clear();
         return (await ListAsync(orderId)).First(v => v.orderShareId == share.id);
@@ -198,8 +201,9 @@ public sealed class OrderShareService(ApplicationDBContext db, IConfiguration co
             OrderShare share = shares.First(s => s.id == row.share_id);
             string? problem = relations.TryGetValue(share.relation_id, out OrderShareRelation? relation)
                 ? ShareReceiverRules.Problem(relation, relation.binds ?? new List<ShareRelationBind>(), payment.pay_method) : null;
-            string? autoMemo = usedTicket ? ShareMemoRules.TicketMemo : (problem ?? (over ? ShareCapRules.OverCapMemo(payment) : null));
-            bool flag = usedTicket || over || problem != null;
+            string? autoMemo = usedTicket ? ShareMemoRules.TicketMemo
+                : (problem ?? (over ? ShareCapRules.OverCapMemo(payment) : (share.auto_share ? null : ShareMemoRules.ManualChosenMemo)));
+            bool flag = usedTicket || over || problem != null || !share.auto_share;
             string? memo = ShareMemoRules.WithAuto(row.memo, autoMemo);
             if (row.can_not_share == flag && row.memo == memo) continue;
             row.can_not_share = flag;

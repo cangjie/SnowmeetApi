@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using SnowmeetApi.Data;
@@ -24,6 +25,69 @@ public sealed class IntroducerService(ApplicationDBContext db, IAlipayRoyaltyBin
         string wechat, string alipay, string alipayMessage);
 
     private static string Clean(string? s) => (s ?? "").Trim();
+
+    // 进程内只有一个同步在跑：同一位教练不会被两个同时打开的页面各建一次（库里还有 member_id 的唯一索引兜底）
+    private static readonly SemaphoreSlim CoachSyncLock = new(1, 1);
+
+    /// <summary>
+    /// 教练也是介绍人：每位有效的教练如果还没有介绍人记录，就自动建一条（类型教练，名称取教练的显示名，
+    /// 微信收款账号取这位会员的小程序 openid，支付宝账号和真实姓名留空，管理员以后补）。
+    /// 已经有介绍人记录的（不管有效还是被管理员停用）不再建，所以停用的不会被自动启用；停用的教练也不建。返回新建了几位。
+    /// </summary>
+    public async Task<int> SyncCoachesAsync()
+    {
+        await CoachSyncLock.WaitAsync();
+        try
+        {
+            List<Coach> coaches = await db.coach.AsNoTracking().Where(c => c.valid == 1).OrderBy(c => c.id).ToListAsync();
+            if (coaches.Count == 0) return 0;
+            List<int> knownMembers = await db.introducer.AsNoTracking().Select(i => i.member_id).ToListAsync();
+            List<int> knownCoaches = await db.introducer.AsNoTracking().Where(i => i.coach_id != null).Select(i => i.coach_id!.Value).ToListAsync();
+            int created = 0;
+            foreach (Coach coach in coaches.Where(c => !knownMembers.Contains(c.member_id) && !knownCoaches.Contains(c.id)))
+            {
+                Member? member = await db.member.AsNoTracking().FirstOrDefaultAsync(m => m.id == coach.member_id);
+                string name = !string.IsNullOrWhiteSpace(coach.display_name) ? Clean(coach.display_name)
+                    : !string.IsNullOrWhiteSpace(member?.real_name) ? Clean(member!.real_name) : "教练" + coach.id;
+                string? openid = await db.memberSocialAccount.AsNoTracking()
+                    .Where(a => a.member_id == coach.member_id && a.valid == 1 && a.type == MemberSocialAccount.TYPE_WECHAT_MINI_OPENID)
+                    .OrderByDescending(a => a.id).Select(a => a.num).FirstOrDefaultAsync();
+                try
+                {
+                    await using var tx = await db.Database.BeginTransactionAsync();
+                    var relation = new OrderShareRelation
+                    {
+                        type = IntroducerRules.RelationType(IntroducerRules.TypeCoach), name = name, valid = true,
+                        wepay_account_type = string.IsNullOrWhiteSpace(openid) ? null : "PERSONAL_OPENID",
+                        wepay_account_num = string.IsNullOrWhiteSpace(openid) ? null : openid,
+                    };
+                    db.orderShareRelation.Add(relation);
+                    await db.SaveChangesAsync();
+                    db.introducer.Add(new Introducer
+                    {
+                        member_id = coach.member_id, type = IntroducerRules.TypeCoach, name = name,
+                        relation_id = relation.id, coach_id = coach.id,
+                    });
+                    await db.SaveChangesAsync();
+                    await tx.CommitAsync();
+                    created++;
+                }
+                catch (DbUpdateException)
+                {
+                    // 别的进程（比如两台服务）同时建了同一位：唯一索引挡住了第二条，事务已回滚，这位算别人建好了
+                }
+                finally
+                {
+                    db.ChangeTracker.Clear();
+                }
+            }
+            return created;
+        }
+        finally
+        {
+            CoachSyncLock.Release();
+        }
+    }
 
     public async Task<IntroducerView> AddAsync(Staff op, int memberId, string type, string name, string? realName, AccountInput account)
     {

@@ -29,7 +29,11 @@ public sealed class IntroducerController(ApplicationDBContext db, IConfiguration
 
     [HttpGet]
     public Task<ApiResult<object>> ListIntroducers(string sessionKey)
-        => AsStaff(sessionKey, StaffAccountRules.IsAdmin, AdminOnly, async _ => new { introducers = await Service.ListAsync(false) });
+        => AsStaff(sessionKey, StaffAccountRules.IsAdmin, AdminOnly, async _ =>
+        {
+            await Service.SyncCoachesAsync();   // 教练也是介绍人，先把还没建的教练补上
+            return new { introducers = await Service.ListAsync(false) };
+        });
 
     [HttpGet]
     public Task<ApiResult<object>> LookupMember(string sessionKey, string cell)
@@ -51,8 +55,9 @@ public sealed class IntroducerController(ApplicationDBContext db, IConfiguration
 
     [HttpGet]
     public Task<ApiResult<object>> ListChoices(string sessionKey)
-        => AsStaff(sessionKey, StaffAccountRules.IsManager, "只有店长以上可以设置介绍人分账", async _ => new
+        => AsStaff(sessionKey, StaffAccountRules.IsManager, "只有店长以上可以设置介绍人分账", async _ =>
         {
-            choices = (await Service.ListAsync(true)).Select(v => new { v.id, v.name, v.type }).ToList(),
+            await Service.SyncCoachesAsync();   // 订单上选收款人时，教练直接在候选里
+            return new { choices = (await Service.ListAsync(true)).Select(v => new { v.id, v.name, v.type }).ToList() };
         });
 }
