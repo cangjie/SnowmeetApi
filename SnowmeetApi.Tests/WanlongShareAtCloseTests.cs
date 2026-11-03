@@ -29,6 +29,21 @@ public class WanlongShareAtCloseTests
         Assert.True(paymentShare.can_not_share);
     }
 
+    // 支付宝的 30% 上限按付款总额算，退款不会让额度变小（实测：付 6000 退 5140 后可分额度仍是 1800；
+    // 上季 297 笔、11-01 的 00013 都是净额的 50% 且成功）。同样付 500、退 430、应分 35，支付宝照常自动分。
+    [Fact]
+    public async Task CloseOrder_alipay_cap_is_30_percent_of_the_gross_payment_not_the_net()
+    {
+        await using var db = await SeedAsync(shop: "万龙体验中心", payMethod: "支付宝", paid: 500, refunded: 430, rent: 70);
+
+        await new RentController(db, Config, Http).CloseOrder();
+
+        var orderShare = await db.orderShare.AsNoTracking().SingleAsync(s => s.order_id == 1 && s.valid);
+        var paymentShare = await db.paymentShare.AsNoTracking().SingleAsync(s => s.share_id == orderShare.id);
+        Assert.Equal(35, paymentShare.amount, 2);
+        Assert.False(paymentShare.can_not_share);
+    }
+
     // 没有任何退款（押金刚好等于租金）的单以前永远没有应分记录
     [Fact]
     public async Task CloseOrder_creates_shares_for_a_wanlong_rental_without_any_refund()

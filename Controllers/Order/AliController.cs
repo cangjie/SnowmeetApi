@@ -187,6 +187,34 @@ namespace SnowmeetApi.Controllers
                 return "false";
             }
         }
+        /// <summary>
+        /// 向支付宝绑定一个分账收款方。登录号（loginName）要同时传真实姓名；用户号（userId）只传号。
+        /// 写法照 BindRoyaltiRelationTest，但不依赖 kol 表。没有自动化测试（要调真实支付宝），上线后用一个小额真实账号验证。
+        /// </summary>
+        [NonAction]
+        public (bool ok, string message) BindRoyaltyReceiver(string accountType, string account, string? realName)
+        {
+            AlipayTradeRoyaltyRelationBindRequest req = new AlipayTradeRoyaltyRelationBindRequest();
+            AlipayTradeRoyaltyRelationBindModel model = new AlipayTradeRoyaltyRelationBindModel();
+            model.OutRequestNo = Util.GetLongTimeStamp(DateTime.Now);
+            RoyaltyEntity receiver = new RoyaltyEntity();
+            receiver.Type = accountType;
+            receiver.Account = account;
+            if (accountType == "loginName")
+            {
+                receiver.BindLoginName = account;
+                receiver.Name = realName;
+            }
+            model.ReceiverList = new List<RoyaltyEntity> { receiver };
+            req.SetBizModel(model);
+            AlipayTradeRoyaltyRelationBindResponse response = client.CertificateExecute(req);
+            if (!response.IsError)
+            {
+                return (true, "");
+            }
+            return (false, string.IsNullOrWhiteSpace(response.SubMsg) ? (response.Msg ?? "支付宝绑定失败") : response.SubMsg);
+        }
+
         [HttpGet]
         public ActionResult<double> GetUnSettledAmount(string tradeNo)
         {

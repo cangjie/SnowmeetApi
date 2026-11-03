@@ -19,6 +19,11 @@ public static class StaffAccountRules
 
     public static bool IsAdmin(Staff? staff) => staff is { valid: 1 } && staff.title_level >= AdminLevel;
 
+    public const int ManagerLevel = 200;
+
+    /// <summary>店长及以上（含系统管理员）。</summary>
+    public static bool IsManager(Staff? staff) => staff is { valid: 1 } && staff.title_level >= ManagerLevel;
+
     public static bool IsTitleAllowed(int level) => TitleLevels.Contains(level);
 
     public static bool IsValidCell(string? cell) => cell != null && Regex.IsMatch(cell.Trim(), @"^1\d{10}$");
