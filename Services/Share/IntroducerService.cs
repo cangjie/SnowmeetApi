@@ -15,7 +15,7 @@ namespace SnowmeetApi.Services.Share;
 /// </summary>
 public sealed class IntroducerService(ApplicationDBContext db, IAlipayRoyaltyBinder binder)
 {
-    public sealed record AccountInput(string? wepayAccountNum, string? wepayAccountName, string? aliAccountType, string? aliAccountNum);
+    public sealed record AccountInput(string? wepayAccountNum, string? wepayAccountName, string? aliAccountNum);
 
     /// <param name="wechat">已填写 / 未填写</param>
     /// <param name="alipay">未填写 / 已绑定 / 未绑定</param>
@@ -54,13 +54,13 @@ public sealed class IntroducerService(ApplicationDBContext db, IAlipayRoyaltyBin
             wepayType = string.IsNullOrWhiteSpace(wepayNum) ? null : "PERSONAL_OPENID";
             wepayName = null;
         }
-        (string? aliType, string? aliNum) = ValidateAli(account, real);
+        string? aliNum = ValidateAli(account, real);
 
         var relation = new OrderShareRelation
         {
             type = IntroducerRules.RelationType(type), name = name, valid = true,
             wepay_account_type = wepayType, wepay_account_num = wepayNum, wepay_account_name = wepayName,
-            ali_account_type = aliType, ali_account_num = aliNum,
+            ali_account_type = aliNum == null ? null : IntroducerRules.AlipayLoginType, ali_account_num = aliNum,
         };
         db.orderShareRelation.Add(relation);
         await db.SaveChangesAsync();
@@ -103,10 +103,10 @@ public sealed class IntroducerService(ApplicationDBContext db, IAlipayRoyaltyBin
                 r.wepay_account_num = Clean(account.wepayAccountNum);
                 r.wepay_account_name = Clean(account.wepayAccountName);
             }
-            (string? aliType, string? aliNum) = ValidateAli(account, i.real_name ?? "");
-            if (aliNum != null && (aliType != r.ali_account_type || aliNum != r.ali_account_num))
+            string? aliNum = ValidateAli(account, i.real_name ?? "");
+            if (aliNum != null && (r.ali_account_type != IntroducerRules.AlipayLoginType || aliNum != r.ali_account_num))
             {
-                r.ali_account_type = aliType;
+                r.ali_account_type = IntroducerRules.AlipayLoginType;
                 r.ali_account_num = aliNum;
                 aliChanged = true;
             }
@@ -180,13 +180,13 @@ public sealed class IntroducerService(ApplicationDBContext db, IAlipayRoyaltyBin
         return new IntroducerView(i.id, i.member_id, i.type, i.name, i.real_name, i.valid == 1, i.coach_id, wechat, alipay, alipayMessage);
     }
 
-    private static (string? type, string? num) ValidateAli(AccountInput a, string realName)
+    /// <summary>支付宝登录号：空就是没填；填了要是手机号或邮箱，并且要有真实姓名（支付宝按登录号绑定时核对）。</summary>
+    private static string? ValidateAli(AccountInput a, string realName)
     {
         string num = Clean(a.aliAccountNum);
-        string type = Clean(a.aliAccountType);
-        if (num == "") return (null, null);
-        if (type != "loginName" && type != "userId") throw new ShareException("支付宝账号类型只能是登录号或用户号");
-        if (type == "loginName" && Clean(realName) == "") throw new ShareException("登录号要同时填真实姓名");
-        return (type, num);
+        if (num == "") return null;
+        if (!IntroducerRules.IsValidAlipayLoginName(num)) throw new ShareException("支付宝登录号要填手机号或邮箱");
+        if (Clean(realName) == "") throw new ShareException("登录号要同时填真实姓名");
+        return num;
     }
 }

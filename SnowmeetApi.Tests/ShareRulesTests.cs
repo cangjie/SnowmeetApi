@@ -28,6 +28,15 @@ public class ShareRulesTests
     }
 
     [Fact]
+    public void Alipay_login_name_is_a_phone_number_or_an_email()
+    {
+        foreach (var ok in new[] { "13691457006", "zhang.san@example.com", "a_b-c+d@mail.example.cn" })
+            Assert.True(IntroducerRules.IsValidAlipayLoginName(ok), ok);
+        foreach (var bad in new[] { "2088000000000001", "1369145700", "136914570061", "abc", "a@b", "@example.com", "a b@example.com", "", null })
+            Assert.False(IntroducerRules.IsValidAlipayLoginName(bad), bad ?? "null");
+    }
+
+    [Fact]
     public void Cap_uses_net_for_wechat_and_gross_for_alipay()
     {
         var wechat = Pay("微信支付", 300, 250);               // 基数 50，门槛 15

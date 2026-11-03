@@ -20,7 +20,7 @@ public class IntroducerServiceTests
         }
     }
 
-    private static readonly IntroducerService.AccountInput NoAccount = new(null, null, null, null);
+    private static readonly IntroducerService.AccountInput NoAccount = new(null, null, null);
 
     private static async Task SeedMemberAsync(ApplicationDBContext db, int memberId, string? openid)
     {
@@ -64,10 +64,10 @@ public class IntroducerServiceTests
         var svc = new IntroducerService(db, new FakeBinder());
 
         var ex = await Assert.ThrowsAsync<ShareException>(() =>
-            svc.AddAsync(ShareFixture.Manager(300), 100, "机构", "某俱乐部", null, new("1600000001", null, null, null)));
+            svc.AddAsync(ShareFixture.Manager(300), 100, "机构", "某俱乐部", null, new("1600000001", null, null)));
         Assert.Equal(1, ex.Code);
 
-        var view = await svc.AddAsync(ShareFixture.Manager(300), 100, "机构", "某俱乐部", null, new("1600000001", "某某滑雪俱乐部有限公司", null, null));
+        var view = await svc.AddAsync(ShareFixture.Manager(300), 100, "机构", "某俱乐部", null, new("1600000001", "某某滑雪俱乐部有限公司", null));
         var relation = await db.orderShareRelation.AsNoTracking().SingleAsync(r => r.id ==
             db.introducer.Single(i => i.id == view.id).relation_id);
         Assert.Equal("公司", relation.type);
@@ -102,10 +102,10 @@ public class IntroducerServiceTests
         var svc = new IntroducerService(db, binder);
 
         await Assert.ThrowsAsync<ShareException>(() =>
-            svc.AddAsync(ShareFixture.Manager(300), 100, "教练", "张三", null, new(null, null, "loginName", "13691457006")));
+            svc.AddAsync(ShareFixture.Manager(300), 100, "教练", "张三", null, new(null, null, "13691457006")));
         Assert.Empty(binder.Calls);
 
-        var view = await svc.AddAsync(ShareFixture.Manager(300), 100, "教练", "张三", "张三", new(null, null, "loginName", "13691457006"));
+        var view = await svc.AddAsync(ShareFixture.Manager(300), 100, "教练", "张三", "张三", new(null, null, "13691457006"));
 
         Assert.Equal(("loginName", "13691457006", "张三"), Assert.Single(binder.Calls));
         Assert.Equal("已绑定", view.alipay);
@@ -116,6 +116,29 @@ public class IntroducerServiceTests
     }
 
     [Fact]
+    public async Task Alipay_login_name_must_be_a_phone_number_or_an_email()
+    {
+        await using var db = await ShareFixture.NewDbAsync();
+        await SeedMemberAsync(db, 100, "oABC");
+        var binder = new FakeBinder();
+        var svc = new IntroducerService(db, binder);
+
+        foreach (var bad in new[] { "2088000000000001", "1369145700", "abc", "a@b", "13691457006x" })
+        {
+            var ex = await Assert.ThrowsAsync<ShareException>(() =>
+                svc.AddAsync(ShareFixture.Manager(300), 100, "教练", "张三", "张三", new(null, null, bad)));
+            Assert.Equal("支付宝登录号要填手机号或邮箱", ex.Message);
+        }
+        Assert.Empty(binder.Calls);
+
+        var view = await svc.AddAsync(ShareFixture.Manager(300), 100, "教练", "张三", "张三", new(null, null, " zhang.san@example.com "));
+        Assert.Equal(("loginName", "zhang.san@example.com", "张三"), Assert.Single(binder.Calls));
+        Assert.Equal("已绑定", view.alipay);
+        var relation = await db.orderShareRelation.AsNoTracking().SingleAsync(r => r.ali_account_num == "zhang.san@example.com");
+        Assert.Equal("loginName", relation.ali_account_type);
+    }
+
+    [Fact]
     public async Task A_failed_bind_keeps_the_introducer_and_can_be_retried()
     {
         await using var db = await ShareFixture.NewDbAsync();
@@ -123,7 +146,7 @@ public class IntroducerServiceTests
         var binder = new FakeBinder { Ok = false };
         var svc = new IntroducerService(db, binder);
 
-        var view = await svc.AddAsync(ShareFixture.Manager(300), 100, "教练", "张三", "张三", new(null, null, "loginName", "13691457006"));
+        var view = await svc.AddAsync(ShareFixture.Manager(300), 100, "教练", "张三", "张三", new(null, null, "13691457006"));
 
         Assert.Equal("未绑定", view.alipay);
         Assert.Equal("账号与姓名不一致", view.alipayMessage);

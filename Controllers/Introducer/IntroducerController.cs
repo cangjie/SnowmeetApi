@@ -18,9 +18,9 @@ namespace SnowmeetApi.Controllers.IntroducerShare;
 public sealed class IntroducerController(ApplicationDBContext db, IConfiguration config, IHttpContextAccessor http) : ShareApiBase(db)
 {
     public sealed record AddIntroducerInput(int memberId, string? type, string? name, string? realName,
-        string? wepayAccountNum, string? wepayAccountName, string? aliAccountType, string? aliAccountNum);
+        string? wepayAccountNum, string? wepayAccountName, string? aliAccountNum);
     public sealed record UpdateIntroducerInput(int introducerId, string? name, string? realName, bool? valid,
-        string? wepayAccountNum, string? wepayAccountName, string? aliAccountType, string? aliAccountNum);
+        string? wepayAccountNum, string? wepayAccountName, string? aliAccountNum);
     public sealed record IntroducerIdInput(int introducerId);
 
     private const string AdminOnly = "只有系统管理员可以管理介绍人";
@@ -38,12 +38,12 @@ public sealed class IntroducerController(ApplicationDBContext db, IConfiguration
     [HttpPost]
     public Task<ApiResult<object>> AddIntroducer(string sessionKey, [FromBody] AddIntroducerInput input)
         => AsStaff(sessionKey, StaffAccountRules.IsAdmin, AdminOnly, async op => await Service.AddAsync(op, input.memberId,
-            input.type ?? "", input.name ?? "", input.realName, new(input.wepayAccountNum, input.wepayAccountName, input.aliAccountType, input.aliAccountNum)));
+            input.type ?? "", input.name ?? "", input.realName, new(input.wepayAccountNum, input.wepayAccountName, input.aliAccountNum)));
 
     [HttpPost]
     public Task<ApiResult<object>> UpdateIntroducer(string sessionKey, [FromBody] UpdateIntroducerInput input)
         => AsStaff(sessionKey, StaffAccountRules.IsAdmin, AdminOnly, async _ => await Service.UpdateAsync(input.introducerId, input.name,
-            input.realName, input.valid, new(input.wepayAccountNum, input.wepayAccountName, input.aliAccountType, input.aliAccountNum)));
+            input.realName, input.valid, new(input.wepayAccountNum, input.wepayAccountName, input.aliAccountNum)));
 
     [HttpPost]
     public Task<ApiResult<object>> BindAlipay(string sessionKey, [FromBody] IntroducerIdInput input)

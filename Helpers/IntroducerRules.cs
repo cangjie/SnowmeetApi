@@ -22,6 +22,17 @@ namespace SnowmeetApi.Helpers
         public static string RelationType(string type) => type == TypeOrg ? "公司" : "个人";
 
         public static double SuggestedRentShare(double rentAfterDiscounts) => Math.Round(rentAfterDiscounts * RentShareRate, 2);
+
+        /// <summary>支付宝收款账号只用登录号，类型固定是 loginName（用户 2026-11-03 定）。</summary>
+        public const string AlipayLoginType = "loginName";
+
+        private static readonly System.Text.RegularExpressions.Regex AlipayEmail =
+            new(@"^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$", System.Text.RegularExpressions.RegexOptions.Compiled);
+
+        /// <summary>支付宝登录号要是手机号（11 位，1 开头）或邮箱地址。</summary>
+        public static bool IsValidAlipayLoginName(string? loginName)
+            => !string.IsNullOrWhiteSpace(loginName)
+               && (SnowmeetApi.Services.StaffAccounts.StaffAccountRules.IsValidCell(loginName) || AlipayEmail.IsMatch(loginName.Trim()));
     }
 
     // 自动分账的 30% 门槛。基数两个平台不同，见 WanlongShareRules.ShareBase。

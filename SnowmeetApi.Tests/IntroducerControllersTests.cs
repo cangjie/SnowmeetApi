@@ -27,12 +27,12 @@ public class IntroducerControllersTests
         Assert.Equal(3, (await ctl().ListIntroducers("clerk-s")).code);
         Assert.Equal(0, (await ctl().ListIntroducers("admin-s")).code);
 
-        var denied = await ctl().AddIntroducer("manager-s", new(400, "KOL", "小王", null, null, null, null, null));
+        var denied = await ctl().AddIntroducer("manager-s", new(400, "KOL", "小王", null, null, null, null));
         Assert.Equal(3, denied.code);
-        var added = await ctl().AddIntroducer("admin-s", new(400, "KOL", "小王", null, null, null, null, null));
+        var added = await ctl().AddIntroducer("admin-s", new(400, "KOL", "小王", null, null, null, null));
         Assert.Equal(0, added.code);
         Assert.Equal("已填写", D(added).GetProperty("wechat").GetString());
-        var dup = await ctl().AddIntroducer("admin-s", new(400, "KOL", "小王", null, null, null, null, null));
+        var dup = await ctl().AddIntroducer("admin-s", new(400, "KOL", "小王", null, null, null, null));
         Assert.Equal(1, dup.code);
         Assert.Equal("这位会员已经是介绍人", dup.message);
     }
