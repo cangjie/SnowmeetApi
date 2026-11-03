@@ -22,6 +22,7 @@ namespace SnowmeetApi.Data
             FnbSchemaConfiguration.Configure(modelBuilder, Database.IsSqlServer());
             CoachSchemaConfiguration.Configure(modelBuilder);
             IntroducerSchemaConfiguration.Configure(modelBuilder);
+            ShareBatchSchemaConfiguration.Configure(modelBuilder, Database.IsSqlite());
             modelBuilder.Entity<Order>().Property(x => x.order_source).HasColumnType("varchar(32)");
             modelBuilder.Entity<Order>().Property(x => x.source_order_no).HasColumnType("varchar(128)");
             modelBuilder.Entity<MaintainLive>().HasKey(c => c.id);
@@ -197,6 +198,7 @@ namespace SnowmeetApi.Data
         public DbSet<CoachCardUse> coachCardUse { get; set; }
         public DbSet<CoachCouponGrant> coachCouponGrant { get; set; }
         public DbSet<Introducer> introducer { get; set; }
+        public DbSet<ShareBatch> shareBatch { get; set; }
         public DbSet<Card> card { get; set; }
         public DbSet<Printer> printer { get; set; }
         public DbSet<PrintTask> printTask { get; set; }
