@@ -54,10 +54,12 @@ public sealed class IntroducerController(ApplicationDBContext db, IConfiguration
         => AsStaff(sessionKey, StaffAccountRules.IsAdmin, AdminOnly, async _ => await Service.BindAlipayAsync(input.introducerId));
 
     [HttpGet]
-    public Task<ApiResult<object>> ListChoices(string sessionKey)
+    /// <param name="type">教练 / KOL / 机构，不传 = 全部（旧版小程序不传）</param>
+    /// <param name="keyword">名称、真实姓名或手机号里包含的文字，不传 = 不搜</param>
+    public Task<ApiResult<object>> ListChoices(string sessionKey, string? type = null, string? keyword = null)
         => AsStaff(sessionKey, StaffAccountRules.IsManager, "只有店长以上可以设置介绍人分账", async _ =>
         {
             await Service.SyncCoachesAsync();   // 订单上选收款人时，教练直接在候选里
-            return new { choices = (await Service.ListAsync(true)).Select(v => new { v.id, v.name, v.type }).ToList() };
+            return new { choices = (await Service.ChoicesAsync(type, keyword)).Select(v => new { v.id, v.name, v.type, v.cellTail }).ToList() };
         });
 }

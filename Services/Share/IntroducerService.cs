@@ -26,6 +26,40 @@ public sealed class IntroducerService(ApplicationDBContext db, IAlipayRoyaltyBin
 
     private static string Clean(string? s) => (s ?? "").Trim();
 
+    /// <param name="cellTail">手机号后 4 位，用来区分同名；没有手机号为空</param>
+    public sealed record ChoiceView(int id, string name, string type, string cellTail);
+
+    /// <summary>
+    /// 订单上选收款人的候选：只列有效的介绍人。type（教练 / KOL / 机构，空 = 全部）筛类型；
+    /// keyword 在介绍人名称、真实姓名（介绍人上填的和会员资料里的）、会员的手机号里找，包含即算。
+    /// </summary>
+    public async Task<List<ChoiceView>> ChoicesAsync(string? type, string? keyword)
+    {
+        string kind = Clean(type);
+        if (kind != "" && !IntroducerRules.IsValidType(kind)) throw new ShareException("介绍人类型只能是教练、KOL、机构");
+        string key = Clean(keyword);
+
+        List<Introducer> introducers = await db.introducer.AsNoTracking()
+            .Where(i => i.valid == 1 && (kind == "" || i.type == kind)).OrderBy(i => i.id).ToListAsync();
+        List<int> memberIds = introducers.Select(i => i.member_id).Distinct().ToList();
+        Dictionary<int, List<string>> cells = (await db.memberSocialAccount.AsNoTracking()
+            .Where(a => memberIds.Contains(a.member_id) && a.valid == 1 && a.type == MemberSocialAccount.TYPE_CELL).OrderBy(a => a.id).ToListAsync())
+            .GroupBy(a => a.member_id).ToDictionary(g => g.Key, g => g.Select(a => a.num ?? "").Where(n => n != "").ToList());
+        Dictionary<int, string> memberNames = (await db.member.AsNoTracking().Where(m => memberIds.Contains(m.id)).ToListAsync())
+            .ToDictionary(m => m.id, m => m.real_name ?? "");
+
+        bool Has(string? text) => !string.IsNullOrEmpty(text) && text.Contains(key, StringComparison.OrdinalIgnoreCase);
+        return introducers
+            .Where(i => key == "" || Has(i.name) || Has(i.real_name) || Has(memberNames.GetValueOrDefault(i.member_id))
+                || (cells.TryGetValue(i.member_id, out List<string>? mine) && mine.Any(n => n.Contains(key))))
+            .Select(i =>
+            {
+                string last = cells.TryGetValue(i.member_id, out List<string>? mine) && mine.Count > 0 ? mine[^1] : "";
+                return new ChoiceView(i.id, i.name, i.type, last.Length > 4 ? last[^4..] : last);
+            })
+            .ToList();
+    }
+
     // 进程内只有一个同步在跑：同一位教练不会被两个同时打开的页面各建一次（库里还有 member_id 的唯一索引兜底）
     private static readonly SemaphoreSlim CoachSyncLock = new(1, 1);
 
