@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
@@ -17,7 +18,8 @@ namespace SnowmeetApi.Controllers.IntroducerShare;
 [Route("api/[controller]/[action]")]
 public sealed class OrderIntroducerShareController(ApplicationDBContext db, IConfiguration config, IHttpContextAccessor http) : ShareApiBase(db)
 {
-    public sealed record SetShareInput(int orderId, int introducerId, double amount, string? memo);
+    /// <param name="planDate">预计分账日期 yyyy-MM-dd；旧版小程序不传，按默认规则</param>
+    public sealed record SetShareInput(int orderId, int introducerId, double amount, string? memo, string? planDate = null);
     public sealed record RemoveShareInput(int orderShareId);
 
     private const string ManagerOnly = "只有店长以上可以设置介绍人分账";
@@ -36,6 +38,8 @@ public sealed class OrderIntroducerShareController(ApplicationDBContext db, ICon
                 canEdit = reason == null,
                 reason,
                 suggested = reason == null ? await Service.SuggestedAmountAsync(orderId) : 0,
+                // 小程序据此知道后端支持预计分账日期（旧后端没有这个字段，就不显示日期）
+                suggestedPlanDate = reason == null ? ShareDateRules.EarliestPlanDate(order.close_date!.Value, DateTime.Now).ToString("yyyy-MM-dd") : null,
                 shares = await Service.ListAsync(orderId),
             };
         });
@@ -44,7 +48,13 @@ public sealed class OrderIntroducerShareController(ApplicationDBContext db, ICon
     public Task<ApiResult<object>> SetShare(string sessionKey, [FromBody] SetShareInput input)
         => AsStaff(sessionKey, StaffAccountRules.IsManager, ManagerOnly, async op =>
         {
-            await Service.SetIntroducerShareAsync(op, input.orderId, input.introducerId, input.amount, input.memo);
+            DateTime? planDate = null;
+            if (!string.IsNullOrWhiteSpace(input.planDate))
+            {
+                if (!ShareDateRules.TryParse(input.planDate, out DateTime parsed)) throw new ShareException("预计分账日期格式不对");
+                planDate = parsed;
+            }
+            await Service.SetIntroducerShareAsync(op, input.orderId, input.introducerId, input.amount, input.memo, planDate);
             return new { shares = await Service.ListAsync(input.orderId) };
         });
 

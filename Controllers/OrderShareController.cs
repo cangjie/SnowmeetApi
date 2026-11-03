@@ -293,11 +293,13 @@ namespace SnowmeetApi.Controllers
         [NonAction]
         public async Task<List<PaymentShare>> GetDueWanlongShares(DateTime shareDate)
         {
+            DateTime planLimit = ShareDateRules.DueLimit(shareDate);   // 介绍人分账的预计分账日期没到的，这次不提交（ShareDateRules.IsDue）
             List<PaymentShare> shares = await _db.paymentShare.Include(p => p.payment)
                 .Include(s => s.orderShare).ThenInclude(o => o.order).ThenInclude(o => o.payments)
                 .ThenInclude(p => p.refunds).Include(s => s.orderShare).ThenInclude(s => s.relation)
                 .Where(s => s.valid && s.orderShare.valid && s.submit_time == null
                 && ((DateTime)s.orderShare.order.close_date).Date <= shareDate.Date //&& s.orderShare.order.hide == false
+                && (s.orderShare.plan_date == null || s.orderShare.plan_date <= planLimit)
                 && s.orderShare.order.type == "租赁" && s.orderShare.order.shop == "万龙体验中心" && s.can_not_share == false)
                 .AsNoTracking().ToListAsync();
             return shares.OrderBy(s => s.orderShare.relation_id == WanlongShareRules.WanlongRelationId ? 0 : 1).ThenBy(s => s.id).ToList();

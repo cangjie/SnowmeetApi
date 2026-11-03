@@ -17,6 +17,8 @@ namespace SnowmeetApi.Models
         public bool valid {get; set; } = true;
         public bool dealed {get; set;} = false;
         public DateTime create_date {get; set;}
+        /// <summary>预计分账日期（介绍人分账用，只存日期）；null = 按默认规则，关单次日起的第一个夜间任务。见 Helpers/ShareDateRules。</summary>
+        public DateTime? plan_date {get; set;}
         [ForeignKey("relation_id")]
         public OrderShareRelation relation {get; set;}
         public List<PaymentShare> paymentShares {get; set;}

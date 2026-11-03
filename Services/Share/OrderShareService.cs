@@ -20,7 +20,9 @@ namespace SnowmeetApi.Services.Share;
 public sealed class OrderShareService(ApplicationDBContext db, IConfiguration config, IHttpContextAccessor http)
 {
     /// <param name="state">待自动分账 / 手动处理 / 已分账 / 被拒绝</param>
-    public sealed record OrderShareView(int orderShareId, int introducerId, string name, string type, double amount, string state, string? memo);
+    /// <param name="planDate">预计分账日期 yyyy-MM-dd，没指定为 null</param>
+    public sealed record OrderShareView(int orderShareId, int introducerId, string name, string type, double amount, string state, string? memo,
+        string? planDate);
 
     /// <summary>租赁单预填的金额：租金（扣减免后，同万龙那份的基数）的 10%；其他订单没有默认值。</summary>
     public async Task<double> SuggestedAmountAsync(int orderId)
@@ -46,12 +48,15 @@ public sealed class OrderShareService(ApplicationDBContext db, IConfiguration co
             string state = mine.Any(r => r.success == true) ? "已分账"
                 : mine.Any(r => r.submit_time != null) ? "被拒绝"
                 : mine.Count == 0 || mine.Any(r => r.can_not_share) ? "手动处理" : "待自动分账";
-            views.Add(new OrderShareView(share.id, introducer.id, introducer.name, introducer.type, share.amount, state, mine.FirstOrDefault()?.memo));
+            views.Add(new OrderShareView(share.id, introducer.id, introducer.name, introducer.type, share.amount, state, mine.FirstOrDefault()?.memo,
+                share.plan_date?.ToString("yyyy-MM-dd")));
         }
         return views;
     }
 
-    public async Task<OrderShareView> SetIntroducerShareAsync(Staff op, int orderId, int introducerId, double amount, string? memo)
+    /// <param name="planDate">预计分账日期；null = 不指定，按默认规则（关单次日起的第一个夜间任务）。不能早于今天，已经存着的旧日期原样再存不算。</param>
+    public async Task<OrderShareView> SetIntroducerShareAsync(Staff op, int orderId, int introducerId, double amount, string? memo,
+        DateTime? planDate = null)
     {
         if (!StaffAccountRules.IsManager(op)) throw new ShareException("只有店长以上可以设置介绍人分账", 3);
         Models.Order order = await new OrderController(db, config, http).GetOrder(orderId);
@@ -69,6 +74,11 @@ public sealed class OrderShareService(ApplicationDBContext db, IConfiguration co
         List<PaymentShare> existingRecords = existing == null ? new()
             : await db.paymentShare.AsNoTracking().Where(r => r.share_id == existingId && r.valid).ToListAsync();
         if (existingRecords.Any(r => r.submit_time != null)) throw new ShareException("已提交，不能修改");
+        planDate = planDate?.Date;
+        if (planDate != null && planDate < DateTime.Today && planDate != existing?.plan_date?.Date)
+        {
+            throw new ShareException("预计分账日期不能早于今天");
+        }
 
         double others = await db.orderShare.AsNoTracking().Where(s => s.valid && s.order_id == orderId && s.id != existingId).SumAsync(s => s.amount);
         double net = (await db.orderPayment.AsNoTracking().Include(p => p.refunds)
@@ -84,13 +94,15 @@ public sealed class OrderShareService(ApplicationDBContext db, IConfiguration co
         OrderShare share;
         if (existing == null)
         {
-            share = new OrderShare { order_id = orderId, relation_id = introducer.relation_id, amount = amount, valid = true, create_date = DateTime.Now };
+            share = new OrderShare { order_id = orderId, relation_id = introducer.relation_id, amount = amount, valid = true, create_date = DateTime.Now,
+                plan_date = planDate };
             db.orderShare.Add(share);
         }
         else
         {
             share = existing;
             share.amount = amount;
+            share.plan_date = planDate;
             share.dealed = false;
             db.orderShare.Update(share);
         }
@@ -113,7 +125,8 @@ public sealed class OrderShareService(ApplicationDBContext db, IConfiguration co
 
         db.coreDataModLog.Add(CoreDataModLog.CreateManualLog("order_share", "amount", share.id, "设置介绍人分账", null, op.id,
             existing == null ? null : existing.amount.ToString("0.##"), amount.ToString("0.##"),
-            "订单 " + orderId + "，介绍人 " + introducer.name + "（" + introducer.id + "）"));
+            "订单 " + orderId + "，介绍人 " + introducer.name + "（" + introducer.id + "）"
+            + (planDate == null ? "" : "，预计分账日期 " + planDate.Value.ToString("yyyy-MM-dd"))));
         await db.SaveChangesAsync();
         db.ChangeTracker.Clear();
         return (await ListAsync(orderId)).First(v => v.orderShareId == share.id);
