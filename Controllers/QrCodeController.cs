@@ -147,7 +147,6 @@ namespace SnowmeetApi.Controllers
             }
             StaffController _staffHelper = new StaffController(_db);
             Staff staff = await _staffHelper.GetStaffBySessionKey(sessionKey, sessionType);
-            bool authed = false;
             ScanQrCode sq = await _db.scanQrCode.FindAsync(id);
             if (staff.title_level < 100)
             {
@@ -158,22 +157,7 @@ namespace SnowmeetApi.Controllers
                     data = null
                 });
             }
-            else if (staff.title_level < 200)
-            {
-
-                List<ScanQrCode> cL = await _db.scanQrCode
-                    .Where(c => c.cell.Trim().Equals(cell.Trim()) && c.authed == 1 && c.create_date >= DateTime.Now.Date
-                        && c.platform.Trim().Equals(sq.platform.Trim()) && c.scene.Trim().Equals(sq.scene.Trim()) && c.purpose.Trim().Equals(sq.purpose.Trim()))
-                    .AsNoTracking().ToListAsync();
-                if (cL.Count > 0)
-                {
-                    authed = true;
-                }
-            }
-            else
-            {
-                authed = true;
-            }
+            bool authed = await _cellAuthed(staff, cell, sq.platform, sq.scene, sq.purpose);
             sq.cell = cell.Trim();
             sq.authed = authed ? 1 : 0;
             sq.update_date = DateTime.Now;
@@ -351,7 +335,56 @@ namespace SnowmeetApi.Controllers
                 return Ok(r);
             }
             Staff staff = await _staffHelper.GetStaffBySessionKey(sessionKey, sessionType);
-            // scan_qrcode.id 不是自增列，沿用 CreateNewScanQrCodeByStaff 的 Max + 1
+            ScanQrCode sq = await _newReceptRecord(staff.id);
+            await _db.scanQrCode.AddAsync(sq);
+            await _db.SaveChangesAsync();
+            return Ok(new ApiResult<ReceptCheckinView>()
+            {
+                code = 0,
+                message = "",
+                data = await _staffCheckinView(sq)
+            });
+        }
+
+        // 店员在出码页输手机号进入：一次建好接待记录、写手机号、判授权，不用等出码页那张二维码生成好。
+        // 授权规则同 QueryCell；记录建好后，店员页照旧用 GetReceptCheckinByStaff 轮询，店长在授权列表里授权。
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<ReceptCheckinView>>> EnterReceptByPhone(string cell, string sessionKey,
+            string sessionType = "wechat_mini_openid")
+        {
+            StaffController _staffHelper = new StaffController(_db);
+            ApiResult<object?> r = await _staffHelper.CheckStaffLevel(100, sessionKey, sessionType);
+            if (r != null)
+            {
+                return Ok(r);
+            }
+            Staff staff = await _staffHelper.GetStaffBySessionKey(sessionKey, sessionType);
+            cell = (cell ?? "").Trim();
+            List<MemberSocialAccount> msaList = await _db.memberSocialAccount
+                .Where(m => m.valid == 1 && m.type.Trim().Equals("cell") && m.num.Trim().Equals(cell))
+                .AsNoTracking().ToListAsync();
+            if (msaList.Count <= 0)
+            {
+                return Ok(_checkinError("用户不存在"));
+            }
+            ScanQrCode sq = await _newReceptRecord(staff.id);
+            sq.cell = cell;
+            sq.scaner_member_id = msaList[0].member_id;
+            sq.authed = await _cellAuthed(staff, cell, sq.platform, sq.scene, sq.purpose) ? 1 : 0;
+            sq.update_date = DateTime.Now;
+            await _db.scanQrCode.AddAsync(sq);
+            await _db.SaveChangesAsync();
+            return Ok(new ApiResult<ReceptCheckinView>()
+            {
+                code = 0,
+                message = "",
+                data = await _staffCheckinView(sq)
+            });
+        }
+
+        // 新的店铺接待记录（还没保存）。scan_qrcode.id 不是自增列，沿用 CreateNewScanQrCodeByStaff 的 Max + 1
+        private async Task<ScanQrCode> _newReceptRecord(int staffId)
+        {
             int lastId = 0;
             try
             {
@@ -362,24 +395,30 @@ namespace SnowmeetApi.Controllers
 
             }
             lastId++;
-            ScanQrCode sq = new ScanQrCode()
+            return new ScanQrCode()
             {
                 id = lastId,
                 code = ReceptCheckinRules.BuildCode(ReceptCheckinRules.NewToken(), lastId),
                 platform = "wechat_mini",
-                staff_id = staff.id,
+                staff_id = staffId,
                 scene = "店铺接待",
                 purpose = "顾客扫码进小程序",
                 expire_time = DateTime.Now.AddSeconds(ReceptCheckinRules.QR_EXPIRE_SECONDS)
             };
-            await _db.scanQrCode.AddAsync(sq);
-            await _db.SaveChangesAsync();
-            return Ok(new ApiResult<ReceptCheckinView>()
+        }
+
+        // 手机号进入是否直接放行：店长及以上直接放行；普通店员要等店长授权，
+        // 当天同一手机号（同平台、场景、用途）已经授权过的就直接放行
+        private async Task<bool> _cellAuthed(Staff staff, string cell, string platform, string scene, string purpose)
+        {
+            if (staff.title_level >= 200)
             {
-                code = 0,
-                message = "",
-                data = await _staffCheckinView(sq)
-            });
+                return true;
+            }
+            return await _db.scanQrCode
+                .Where(c => c.cell.Trim().Equals(cell.Trim()) && c.authed == 1 && c.create_date >= DateTime.Now.Date
+                    && c.platform.Trim().Equals(platform.Trim()) && c.scene.Trim().Equals(scene.Trim()) && c.purpose.Trim().Equals(purpose.Trim()))
+                .AnyAsync();
         }
 
         [HttpGet("{id}")]
