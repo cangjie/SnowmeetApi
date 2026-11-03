@@ -103,7 +103,7 @@ namespace SnowmeetApi.Controllers
             bool usedTicket = await ShareQueries.UsedTicketAsync(_db, orderShare.order_id);
             // 介绍人的收款方要看在这个渠道上有没有账号、绑没绑定；万龙那条不检查（它在支付宝的绑定不记在 share_relation_bind 里）
             OrderShareRelation? introducerRelation = null;
-            if (await _db.introducer.AnyAsync(i => i.relation_id == orderShare.relation_id))
+            if (await ShareQueries.IsIntroducerRelationAsync(_db, orderShare.relation_id))
             {
                 introducerRelation = await _db.orderShareRelation.Include(r => r.binds)
                     .AsNoTracking().FirstOrDefaultAsync(r => r.id == orderShare.relation_id);

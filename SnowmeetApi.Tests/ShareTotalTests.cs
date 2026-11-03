@@ -113,6 +113,20 @@ public class ShareTotalTests
         Assert.Equal("介绍人没有支付宝收款账号", record.memo);
     }
 
+    // 新版后端先于建表上线时，introducer 表还不存在：雪票付款回调和夜间关单都要调 CreatePaymentShare，不能因此报错
+    [Fact]
+    public async Task A_missing_introducer_table_does_not_break_sharing()
+    {
+        await using var db = await ShareFixture.ClosedWanlongOrderAsync("支付宝", 500, 430, 70);
+        var wanlong = await AddShareAsync(db, 4, 35);
+        await db.Database.ExecuteSqlRawAsync("DROP TABLE introducer");
+
+        var record = Assert.Single(await Helper(db).CreatePaymentShare(wanlong));
+
+        Assert.Equal(35, record.amount, 2);
+        Assert.False(record.can_not_share);
+    }
+
     [Fact]
     public async Task Wanlong_relation_is_not_flagged_for_a_missing_alipay_bind()
     {
