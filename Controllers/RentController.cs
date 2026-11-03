@@ -7536,7 +7536,9 @@ namespace SnowmeetApi.Controllers
                 .Include(o => o.rentals).ThenInclude(r => r.rentItems).ThenInclude(i => i.logs)
                 .Include(o => o.rentals).ThenInclude(r => r.details).ThenInclude(d => d.rentPrice)
                 .Include(o => o.rentals).ThenInclude(r => r.pricePresets)
-                .Where(o => o.valid == 1 && o.type == "租赁"
+                // 订单了结关闭（closed = 1）就不再续租（2026-11-03 用户定）：以前只看租赁有没有归还，
+                // 关单了装备却一直没还的旧单每晚还会继续加明细行
+                .Where(o => o.valid == 1 && o.closed == 0 && o.type == "租赁"
                     && o.rentals.Any(r => r.valid == 1 && r.settled == 0
                     && r.rentItems != null && r.rentItems.Count > 0
                     //&& o.id == 67390
