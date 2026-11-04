@@ -1599,7 +1599,7 @@ namespace SnowmeetApi.Controllers
                 .AsNoTracking().ToListAsync();
             List<object> list = new List<object>();
             HashSet<string> seen = new HashSet<string>();
-            Dictionary<string, string> photoByEquipment = new();
+            Dictionary<string, (string Thumbnail, string Original)> photoByEquipment = new();
             foreach (Care historyCare in cares)
             {
                 string historyKey = (historyCare.brand ?? "").Trim() + "|" + (historyCare.scale ?? "").Trim();
@@ -1607,14 +1607,16 @@ namespace SnowmeetApi.Controllers
                 {
                     continue;
                 }
-                string? photoUrl = historyCare.careImages
-                    .Where(i => i.valid && i.image != null && !string.IsNullOrWhiteSpace(i.image.thumbUrl))
+                var photo = historyCare.careImages
+                    .Where(i => i.valid && i.image != null
+                        && !string.IsNullOrWhiteSpace(i.image.thumbUrl)
+                        && !string.IsNullOrWhiteSpace(i.image.file_path_name))
                     .OrderBy(i => i.id)
-                    .Select(i => i.image.thumbUrl)
+                    .Select(i => new { Thumbnail = i.image.thumbUrl, Original = i.image.file_path_name })
                     .FirstOrDefault();
-                if (!string.IsNullOrWhiteSpace(photoUrl))
+                if (photo != null)
                 {
-                    photoByEquipment[historyKey] = photoUrl;
+                    photoByEquipment[historyKey] = (photo.Thumbnail, photo.Original);
                 }
             }
             foreach (Care c in cares)
@@ -1625,6 +1627,7 @@ namespace SnowmeetApi.Controllers
                     continue;
                 }
                 seen.Add(key);
+                photoByEquipment.TryGetValue(key, out var photo);
                 list.Add(new
                 {
                     brand = c.brand,
@@ -1634,7 +1637,8 @@ namespace SnowmeetApi.Controllers
                     year = c.year,
                     with_pole = c.with_pole,
                     last_care_date = c.create_date,
-                    photoUrl = photoByEquipment.TryGetValue(key, out string? photoUrl) ? photoUrl : null
+                    photoUrl = photo.Thumbnail,
+                    photoFullUrl = photo.Original
                 });
             }
             return Ok(new ApiResult<object>() { code = 0, message = "", data = list });

@@ -54,6 +54,7 @@ public class CareCardSaleTests
 
         Assert.Single(rows);
         Assert.Equal("/upload/latest-thumb.jpg", (string?)rows[0]["photoUrl"]);
+        Assert.Equal("/upload/latest.jpg", (string?)rows[0]["photoFullUrl"]);
         Assert.Equal(latestWithoutPhoto.create_date, (DateTime)rows[0]["last_care_date"]!);
     }
 
