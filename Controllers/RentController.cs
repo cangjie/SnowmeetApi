@@ -7795,6 +7795,16 @@ namespace SnowmeetApi.Controllers
                     {
                         closeDate = order.availableRefunds[order.availableRefunds.Count - 1].create_date;
                     }
+                    // 结算日期按本单有效租赁物的最后一次实际归还计算；缺少归还记录时保留原规则。
+                    List<int> rentItemIds = order.rentals.SelectMany(r => r.rentItems)
+                        .Select(item => item.id).ToList();
+                    DateTime? lastReturn = await _db.rentItemLog
+                        .Where(log => rentItemIds.Contains(log.rent_item_id) && log.valid == 1 && log.status == "已归还")
+                        .MaxAsync(log => (DateTime?)log.create_date);
+                    if (lastReturn.HasValue)
+                    {
+                        closeDate = lastReturn.Value;
+                    }
                     order.close_date = closeDate;
                     order.update_date = DateTime.Now;
                     _db.order.Entry(order).State = EntityState.Modified;
