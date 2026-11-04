@@ -16,6 +16,41 @@ namespace SnowmeetApi.Tests;
 public class CareCardSaleTests
 {
     [Fact]
+    public async Task GetMemberCaredEquipmentsReturnsLatestValidPhotoThumbnail()
+    {
+        await using var f = await Fixture.Create(1);
+        Care previous = await f.Db.care.SingleAsync();
+        previous.valid = 1;
+        previous.create_date = DateTime.Now.AddDays(-1);
+
+        Care latest = new()
+        {
+            order_id = f.OrderId, equipment = "双板", brand = previous.brand, scale = previous.scale,
+            biz_type = "雪季养护", valid = 1, create_date = DateTime.Now
+        };
+        f.Db.care.Add(latest);
+        UploadFile previousPhoto = new() { file_path_name = "/upload/previous.jpg", thumb = "/upload/previous-thumb.jpg" };
+        UploadFile latestPhoto = new() { file_path_name = "/upload/latest.jpg", thumb = "/upload/latest-thumb.jpg" };
+        UploadFile invalidPhoto = new() { file_path_name = "/upload/invalid.jpg", thumb = "/upload/invalid-thumb.jpg" };
+        f.Db.Set<UploadFile>().AddRange(previousPhoto, latestPhoto, invalidPhoto);
+        await f.Db.SaveChangesAsync();
+        f.Db.Set<CareImage>().AddRange(
+            new CareImage { care_id = previous.id, image_id = previousPhoto.id, title = "previous", valid = true },
+            new CareImage { care_id = latest.id, image_id = latestPhoto.id, title = "latest", valid = true },
+            new CareImage { care_id = latest.id, image_id = invalidPhoto.id, title = "invalid", valid = false });
+        await f.Db.SaveChangesAsync();
+
+        var response = await new CareController(f.Db, f.Config, f.Http)
+            .GetMemberCaredEquipments(10, "双板", "staff-session");
+        var envelope = Assert.IsType<ApiResult<object>>(
+            Assert.IsType<OkObjectResult>(response.Result).Value);
+        JArray rows = JArray.Parse(Newtonsoft.Json.JsonConvert.SerializeObject(envelope.data));
+
+        Assert.Single(rows);
+        Assert.Equal("/upload/latest-thumb.jpg", (string?)rows[0]["photoUrl"]);
+    }
+
+    [Fact]
     public async Task PreviewDoesNotGrant_ThenPaidRetailGrantsAndUsesExactlyOnce()
     {
         await using var f = await Fixture.Create(2);

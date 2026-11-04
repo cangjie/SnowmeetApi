@@ -1595,6 +1595,7 @@ namespace SnowmeetApi.Controllers
                     && c.order.member_id == memberId
                     && c.brand != null && c.brand.Trim() != "")
                 .OrderByDescending(c => c.create_date)
+                .Include(c => c.careImages).ThenInclude(i => i.image)
                 .AsNoTracking().ToListAsync();
             List<object> list = new List<object>();
             HashSet<string> seen = new HashSet<string>();
@@ -1614,7 +1615,12 @@ namespace SnowmeetApi.Controllers
                     serials = c.serials,
                     year = c.year,
                     with_pole = c.with_pole,
-                    last_care_date = c.create_date
+                    last_care_date = c.create_date,
+                    photoUrl = c.careImages
+                        .Where(i => i.valid && i.image != null && !string.IsNullOrWhiteSpace(i.image.thumbUrl))
+                        .OrderBy(i => i.id)
+                        .Select(i => i.image.thumbUrl)
+                        .FirstOrDefault()
                 });
             }
             return Ok(new ApiResult<object>() { code = 0, message = "", data = list });
