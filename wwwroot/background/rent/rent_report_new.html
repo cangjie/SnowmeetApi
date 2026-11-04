@@ -45,6 +45,7 @@
         &nbsp;<button id="btn" onclick="getData()"> 查 询 </button>&nbsp;<button onclick="download()"> 下 载 </button>
     </div>
     <div id="total" ></div>
+    <div id="dailyTotals" style="white-space: pre-line;"></div>
     <div style="text-align:center;display:flex;justify-content:left;margin-top:50px">
         <table style="border:solid;border-width:1px;width:100%">
             <thead>
@@ -88,6 +89,9 @@
     var tHead = tHeadTemplate;
     var tData = [];
     var totalAmount = 0;
+    var dailyAmounts = {};
+    var resultStartDate = '';
+    var resultEndDate = '';
     render();
 
     function getData() {
@@ -95,11 +99,14 @@
         //tHead = tHeadTemplate;
         totalAmount = 0;
         tData = [];
+        dailyAmounts = {};
+        var queryStartDate = formatDate(startDate);
+        var queryEndDate = formatDate(endDate);
         var btnCtrl = document.getElementById('btn');
         btnCtrl.disabled = true;
         btnCtrl.innerText = "查询中……";
         var getUrl = '../../api/Rent/GetConfirmedRentOrder?sessionKey=' + encodeURIComponent(sessionKey)
-            + '&startDate=' + formatDate(startDate) + '&endDate=' + formatDate(endDate);
+            + '&startDate=' + queryStartDate + '&endDate=' + queryEndDate;
         $.ajax({
             url: getUrl,
             type: 'GET',
@@ -112,6 +119,8 @@
                 if (status != 'success') {
                     return
                 }
+                resultStartDate = queryStartDate;
+                resultEndDate = queryEndDate;
                 var orders = msg.data
                 console.log('get orders', orders);
                 var index = 1;
@@ -165,6 +174,7 @@
                             if (rental.totalRentalAmount - rental.totalDiscountAmount >= 1) {
                                 tData.push(lineData);
                                 totalAmount +=  (rental.totalRentalAmount - rental.totalDiscountAmount);
+                                addDailyAmount(order.close_date, rental.totalRentalAmount - rental.totalDiscountAmount);
                                 index++;
                             }
                         }
@@ -217,6 +227,7 @@
                         if (order.paidAmount - order.refundAmount >= 1) {
                             tData.push(lineData);
                             totalAmount += (order.paidAmount - order.refundAmount);
+                            addDailyAmount(order.close_date, order.paidAmount - order.refundAmount);
                             index++;
                         }
 
@@ -231,6 +242,11 @@
             }
         })
     }
+    function addDailyAmount(closeDate, amount) {
+        var date = formatDate(closeDate);
+        dailyAmounts[date] = (dailyAmounts[date] || 0) + amount;
+    }
+
     function render() {
         var tHeadCtl = document.getElementById('tHead');
         tHeadCtl.innerHTML = '';
@@ -262,6 +278,19 @@
         }
         var totalCell = document.getElementById('total');
         totalCell.innerText = "总计：" + totalAmount.toFixed(2);
+        var dailyCell = document.getElementById('dailyTotals');
+        dailyCell.innerText = '';
+        if (resultStartDate && resultStartDate < resultEndDate) {
+            var parts = resultStartDate.split('-');
+            var day = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+            var lines = ['每日汇总（结算日期）：'];
+            while (formatDate(day) <= resultEndDate) {
+                var date = formatDate(day);
+                lines.push(date + '：' + (dailyAmounts[date] || 0).toFixed(2));
+                day.setDate(day.getDate() + 1);
+            }
+            dailyCell.innerText = lines.join('\n');
+        }
     }
 </script>
 <script type="text/javascript" src="../../js/date_selector.js"></script>
