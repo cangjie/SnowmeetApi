@@ -1156,6 +1156,18 @@ namespace SnowmeetApi.Controllers
         {
             public List<SnowmeetApi.Models.Order> items { get; set; } = new();
             public int total { get; set; } = 0;
+            public double? totalEarnAmount { get; set; }
+
+            public static PagedOrderResult Create(List<SnowmeetApi.Models.Order> filtered, int pageIndex, int pageSize, bool includeEarnTotal)
+            {
+                return new PagedOrderResult
+                {
+                    total = filtered.Count,
+                    totalEarnAmount = includeEarnTotal ? filtered.Sum(o => o.totalEarnAmount) : null,
+                    items = filtered.OrderByDescending(o => o.biz_date)
+                        .Skip((pageIndex - 1) * pageSize).Take(pageSize).ToList()
+                };
+            }
         }
 
         [HttpGet]
@@ -1227,12 +1239,8 @@ namespace SnowmeetApi.Controllers
                 isTest, isEntertain, isPackage, isOnCredit, haveDiscount, status, null, null, haveWarranty, retailType, keyword, isSummerCare,
                 rentCategoryId, rentItemName, useCard, cell, rentStatus, hasRetailFilter);
             List<SnowmeetApi.Models.Order> filtered = OrderQueryRules.FilterByCustomerCellSuffix(orders, cell);
-            int total = filtered.Count;
-            List<SnowmeetApi.Models.Order> paged = filtered
-                .OrderByDescending(o => o.biz_date)
-                .Skip((pageIndex - 1) * pageSize)
-                .Take(pageSize)
-                .ToList();
+            PagedOrderResult result = PagedOrderResult.Create(filtered, pageIndex, pageSize, type == "养护");
+            List<SnowmeetApi.Models.Order> paged = result.items;
             // 标记本页订单是否用过次卡（punch_card_used 有有效记录）→ 列表「卡」标签
             List<int> pagedIds = paged.Select(o => o.id).ToList();
             List<int> punchOrderIds = await _db.punchCardUsed
@@ -1247,7 +1255,7 @@ namespace SnowmeetApi.Controllers
             {
                 code = 0,
                 message = "",
-                data = new PagedOrderResult { items = paged, total = total }
+                data = result
             });
         }
 
