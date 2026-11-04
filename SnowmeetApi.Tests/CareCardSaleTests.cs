@@ -28,7 +28,13 @@ public class CareCardSaleTests
             order_id = f.OrderId, equipment = "双板", brand = previous.brand, scale = previous.scale,
             biz_type = "雪季养护", valid = 1, create_date = DateTime.Now
         };
+        Care latestWithoutPhoto = new()
+        {
+            order_id = f.OrderId, equipment = "双板", brand = previous.brand, scale = previous.scale,
+            biz_type = "雪季养护", valid = 1, create_date = DateTime.Now.AddMinutes(1)
+        };
         f.Db.care.Add(latest);
+        f.Db.care.Add(latestWithoutPhoto);
         UploadFile previousPhoto = new() { file_path_name = "/upload/previous.jpg", thumb = "/upload/previous-thumb.jpg" };
         UploadFile latestPhoto = new() { file_path_name = "/upload/latest.jpg", thumb = "/upload/latest-thumb.jpg" };
         UploadFile invalidPhoto = new() { file_path_name = "/upload/invalid.jpg", thumb = "/upload/invalid-thumb.jpg" };
@@ -37,7 +43,7 @@ public class CareCardSaleTests
         f.Db.Set<CareImage>().AddRange(
             new CareImage { care_id = previous.id, image_id = previousPhoto.id, title = "previous", valid = true },
             new CareImage { care_id = latest.id, image_id = latestPhoto.id, title = "latest", valid = true },
-            new CareImage { care_id = latest.id, image_id = invalidPhoto.id, title = "invalid", valid = false });
+            new CareImage { care_id = latestWithoutPhoto.id, image_id = invalidPhoto.id, title = "invalid", valid = false });
         await f.Db.SaveChangesAsync();
 
         var response = await new CareController(f.Db, f.Config, f.Http)
@@ -48,6 +54,7 @@ public class CareCardSaleTests
 
         Assert.Single(rows);
         Assert.Equal("/upload/latest-thumb.jpg", (string?)rows[0]["photoUrl"]);
+        Assert.Equal(latestWithoutPhoto.create_date, (DateTime)rows[0]["last_care_date"]!);
     }
 
     [Fact]

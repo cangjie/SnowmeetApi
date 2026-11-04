@@ -1599,6 +1599,24 @@ namespace SnowmeetApi.Controllers
                 .AsNoTracking().ToListAsync();
             List<object> list = new List<object>();
             HashSet<string> seen = new HashSet<string>();
+            Dictionary<string, string> photoByEquipment = new();
+            foreach (Care historyCare in cares)
+            {
+                string historyKey = (historyCare.brand ?? "").Trim() + "|" + (historyCare.scale ?? "").Trim();
+                if (photoByEquipment.ContainsKey(historyKey))
+                {
+                    continue;
+                }
+                string? photoUrl = historyCare.careImages
+                    .Where(i => i.valid && i.image != null && !string.IsNullOrWhiteSpace(i.image.thumbUrl))
+                    .OrderBy(i => i.id)
+                    .Select(i => i.image.thumbUrl)
+                    .FirstOrDefault();
+                if (!string.IsNullOrWhiteSpace(photoUrl))
+                {
+                    photoByEquipment[historyKey] = photoUrl;
+                }
+            }
             foreach (Care c in cares)
             {
                 string key = (c.brand ?? "").Trim() + "|" + (c.scale ?? "").Trim();
@@ -1616,11 +1634,7 @@ namespace SnowmeetApi.Controllers
                     year = c.year,
                     with_pole = c.with_pole,
                     last_care_date = c.create_date,
-                    photoUrl = c.careImages
-                        .Where(i => i.valid && i.image != null && !string.IsNullOrWhiteSpace(i.image.thumbUrl))
-                        .OrderBy(i => i.id)
-                        .Select(i => i.image.thumbUrl)
-                        .FirstOrDefault()
+                    photoUrl = photoByEquipment.TryGetValue(key, out string? photoUrl) ? photoUrl : null
                 });
             }
             return Ok(new ApiResult<object>() { code = 0, message = "", data = list });
