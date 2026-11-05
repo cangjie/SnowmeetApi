@@ -68,11 +68,8 @@ public sealed class CoachAdminService(ApplicationDBContext db, IConfiguration co
         if (existing != null)
         {
             if (existing.valid == 1) throw new CoachException("这个会员已经是教练了");
-            // 曾经停用过：恢复原记录，价格和历史学员卡保留
-            existing.valid = 1; existing.display_name = name; existing.update_date = now;
-            db.Entry(existing).State = EntityState.Modified;
-            await db.SaveChangesAsync();
-            return existing;
+            // 恢复原记录并走统一更新路径，保留价格与历史卡，同时同步已关联分销商。
+            return await UpdateCoachAsync(existing.id, name, true);
         }
         Models.Coach coach = new() { member_id = member.id, display_name = name, valid = 1, created_by_staff_id = op.id, create_date = now };
         db.coach.Add(coach);
@@ -83,6 +80,12 @@ public sealed class CoachAdminService(ApplicationDBContext db, IConfiguration co
     public async Task<Models.Coach> UpdateCoachAsync(int coachId, string? displayName, bool? valid)
     {
         Models.Coach coach = await db.coach.AsNoTracking().FirstOrDefaultAsync(c => c.id == coachId) ?? throw new CoachException("没有找到这位教练");
+        List<Introducer> linked = await db.introducer.AsNoTracking()
+            .Where(i => i.member_id == coach.member_id && (i.coach_id == coachId || (i.coach_id == null && i.valid == 1))).ToListAsync();
+        if (linked.Count(i => i.valid == 1) == 1) linked = linked.Where(i => i.valid == 1).ToList();
+        if (linked.Count > 1) throw new CoachException("该身份关联多条分销商记录，请先处理冲突");
+        if (linked.Count == 1 && linked[0].valid != coach.valid)
+            throw new CoachException("分销商与教练身份状态不一致，请先处理冲突");
         if (displayName != null)
         {
             string n = displayName.Trim();
@@ -90,6 +93,19 @@ public sealed class CoachAdminService(ApplicationDBContext db, IConfiguration co
             coach.display_name = n;
         }
         if (valid != null) coach.valid = valid.Value ? 1 : 0;
+        if (linked.Count == 1)
+        {
+            Introducer intro = linked[0];
+            intro.coach_id = coachId;
+            if (valid == true && intro.valid == 0 && await db.introducer.AsNoTracking().AnyAsync(i => i.member_id == intro.member_id && i.valid == 1 && i.id != intro.id))
+                throw new CoachException("该会员已有启用的分销商，请先处理身份冲突");
+            OrderShareRelation relation = await db.orderShareRelation.AsNoTracking().FirstAsync(r => r.id == intro.relation_id);
+            if (displayName != null) { intro.name = coach.display_name; relation.name = coach.display_name; }
+            if (valid != null) intro.valid = coach.valid;
+            intro.update_date = DateTime.Now;
+            db.introducer.Update(intro);
+            db.orderShareRelation.Update(relation);
+        }
         coach.update_date = DateTime.Now;
         db.Entry(coach).State = EntityState.Modified;
         await db.SaveChangesAsync();
@@ -172,6 +188,10 @@ public sealed class CoachAdminService(ApplicationDBContext db, IConfiguration co
         DateTime expire = TicketTemplateRules.ResolveTicketExpireDate(tpl, now);
         return await MiniTicketTransaction.Run(db, async () =>
         {
+            coaches = await db.coach.AsNoTracking().Where(c => ids.Contains(c.id) && c.valid == 1).ToListAsync();
+            if (coaches.Count != ids.Count) throw new CoachException("所选分销商里有已停用或不存在的，请刷新后重试");
+            foreach (Models.Coach coach in coaches)
+                if (!await DistributorAccess.CanIssueAsync(db, coach)) throw new CoachException("所选分销商身份已停用或存在冲突，请刷新后处理");
             GrantResult result = new();
             HashSet<string> doneKeys = (await db.coachCouponGrant.AsNoTracking()
                 .Where(g => g.grant_key.StartsWith(req + "-")).Select(g => g.grant_key).ToListAsync()).ToHashSet();

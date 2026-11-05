@@ -1,9 +1,11 @@
 using System;
 using System.Data.Common;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using SnowmeetApi.Data;
+using SnowmeetApi.Models;
 
 namespace SnowmeetApi.Services.Share;
 
@@ -22,13 +24,33 @@ internal static class ShareQueries
     {
         try
         {
-            return await db.introducer.AnyAsync(i => i.relation_id == relationId);
+            return await db.introducer.AnyAsync(i => i.relation_id == relationId)
+                || await db.introducerRelationHistory.AnyAsync(h => h.relation_id == relationId);
         }
         catch (DbException e)
         {
             Console.WriteLine("introducer 表查不到，按「不是介绍人」处理：" + e.Message);
             return false;
         }
+    }
+
+    internal static async Task<Dictionary<int, Introducer>> IntroducersByRelationAsync(ApplicationDBContext db, IReadOnlyCollection<int> relationIds)
+    {
+        var current = await db.introducer.AsNoTracking().Where(i => relationIds.Contains(i.relation_id)).ToListAsync();
+        var result = current.GroupBy(i => i.relation_id).ToDictionary(g => g.Key, g => g.OrderBy(i => i.id).First());
+        var history = await (from h in db.introducerRelationHistory.AsNoTracking()
+            join i in db.introducer.AsNoTracking() on h.introducer_id equals i.id
+            where relationIds.Contains(h.relation_id)
+            select new { h.relation_id, introducer = i }).ToListAsync();
+        foreach (var item in history) result.TryAdd(item.relation_id, item.introducer);
+        return result;
+    }
+
+    internal static async Task<List<int>> AllIntroducerRelationsAsync(ApplicationDBContext db)
+    {
+        var current = await db.introducer.AsNoTracking().Select(i => i.relation_id).ToListAsync();
+        var previous = await db.introducerRelationHistory.AsNoTracking().Select(h => h.relation_id).ToListAsync();
+        return current.Concat(previous).Distinct().ToList();
     }
 
     internal static Task<bool> UsedTicketAsync(ApplicationDBContext db, int orderId)

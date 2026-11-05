@@ -12,6 +12,66 @@ public class CoachAdminTests
     private static JsonElement D(ApiResult<object> r) => JsonSerializer.SerializeToElement(r.data);
 
     [Fact]
+    public async Task Legacy_coach_edit_updates_linked_distributor_and_payee()
+    {
+        await using var f = await CoachFixture.Create();
+        var rel = new OrderShareRelation { name = "旧名称", type = "个人", valid = true };
+        f.Db.orderShareRelation.Add(rel);
+        await f.Db.SaveChangesAsync();
+        f.Db.introducer.Add(new Introducer { member_id = CoachFixture.CoachMember, coach_id = f.CoachId, type = "KOL", name = "旧名称", relation_id = rel.id, valid = 1 });
+        await f.Db.SaveChangesAsync();
+        f.Db.ChangeTracker.Clear();
+        await f.Admin_().UpdateCoachAsync(f.CoachId, "新名称", false);
+        var intro = await f.Db.introducer.AsNoTracking().SingleAsync(i => i.coach_id == f.CoachId);
+        Assert.Equal("新名称", intro.name);
+        Assert.Equal(0, intro.valid);
+        Assert.Equal("新名称", (await f.Db.orderShareRelation.AsNoTracking().SingleAsync(r => r.id == rel.id)).name);
+        Staff op = await f.Db.staff.AsNoTracking().FirstAsync(s => s.id == 9);
+        await f.Admin_().AddCoachAsync(op, CoachFixture.CoachMember, null, "恢复名称");
+        intro = await f.Db.introducer.AsNoTracking().SingleAsync(i => i.coach_id == f.CoachId);
+        Assert.Equal(1, intro.valid);
+        Assert.Equal("恢复名称", intro.name);
+    }
+
+    [Fact]
+    public async Task Legacy_coach_edit_links_matching_unlinked_distributor_before_disabling()
+    {
+        await using var f = await CoachFixture.Create();
+        f.Db.orderShareRelation.Add(new OrderShareRelation { id = 91, name = "旧名称", type = "个人", valid = true });
+        f.Db.introducer.Add(new Introducer { member_id = CoachFixture.CoachMember, coach_id = null, type = "KOL", name = "旧名称", relation_id = 91, valid = 1 });
+        await f.Db.SaveChangesAsync();
+        await f.Admin_().UpdateCoachAsync(f.CoachId, null, false);
+        var intro = await f.Db.introducer.AsNoTracking().SingleAsync(i => i.relation_id == 91);
+        Assert.Equal(0, intro.valid);
+        Assert.Equal(f.CoachId, intro.coach_id);
+    }
+
+    [Fact]
+    public async Task Coach_edit_updates_the_active_distributor_when_an_old_stopped_record_exists()
+    {
+        await using var f = await CoachFixture.Create();
+        f.Db.orderShareRelation.AddRange(new OrderShareRelation { id = 91, name = "旧", type = "个人", valid = true }, new OrderShareRelation { id = 92, name = "新", type = "个人", valid = true });
+        f.Db.introducer.AddRange(new Introducer { member_id = CoachFixture.CoachMember, coach_id = f.CoachId, type = "KOL", name = "旧", relation_id = 91, valid = 0 },
+            new Introducer { member_id = CoachFixture.CoachMember, coach_id = f.CoachId, type = "KOL", name = "新", relation_id = 92, valid = 1 });
+        await f.Db.SaveChangesAsync();
+        await f.Admin_().UpdateCoachAsync(f.CoachId, "新名字", null);
+        Assert.Equal("新名字", (await f.Db.introducer.AsNoTracking().SingleAsync(i => i.relation_id == 92)).name);
+        Assert.Equal("旧", (await f.Db.introducer.AsNoTracking().SingleAsync(i => i.relation_id == 91)).name);
+    }
+
+    [Fact]
+    public async Task Coupons_cannot_be_granted_to_a_stopped_distributor_with_an_active_legacy_coach()
+    {
+        await using var f = await CoachFixture.Create();
+        f.Db.orderShareRelation.Add(new OrderShareRelation { id = 93, name = "旧", type = "个人", valid = true });
+        f.Db.introducer.Add(new Introducer { member_id = CoachFixture.CoachMember, type = "KOL", name = "旧", relation_id = 93, valid = 0 });
+        await f.Db.SaveChangesAsync();
+        var op = await f.Db.staff.AsNoTracking().FirstAsync(s => s.id == 9);
+        await Assert.ThrowsAsync<CoachException>(() => f.Admin_().GrantCouponsAsync(op, new() { f.CoachId }, 16, 1, "stopped-dist"));
+        Assert.Empty(await f.Db.coachCouponGrant.AsNoTracking().ToListAsync());
+    }
+
+    [Fact]
     public async Task Controller_OnlySystemAdminsAndValidSessions()
     {
         await using var f = await CoachFixture.Create();

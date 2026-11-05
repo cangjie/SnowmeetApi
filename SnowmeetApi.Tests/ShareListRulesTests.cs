@@ -14,6 +14,16 @@ public class ShareListRulesTests
     private static ShareFacts F(bool auto, int? batch, params RecordFacts[] records) => new(auto, batch, records);
 
     [Fact]
+    public void Submitted_without_response_is_pending_and_cannot_be_manually_marked_as_rejected()
+    {
+        var inFlight = F(true, null, new RecordFacts(null, T, null, false));
+        Assert.Equal("未分", ShareListRules.Status(inFlight));
+        Assert.Equal("自动", ShareListRules.Mode(inFlight));
+        Assert.False(ShareListRules.Selectable(inFlight));
+        Assert.Null(ShareListRules.ManualReason(inFlight));
+    }
+
+    [Fact]
     public void Status_is_done_only_with_a_batch_or_when_every_record_succeeded()
     {
         Assert.Equal("已分", ShareListRules.Status(F(true, 7)));                       // 手动批次，没有记录也算

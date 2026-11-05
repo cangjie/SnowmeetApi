@@ -29,6 +29,38 @@ public class OrderShareServiceTests
         => db.paymentShare.AsNoTracking().Where(r => r.share_id == shareId && r.valid).ToListAsync();
 
     [Fact]
+    public async Task Failed_application_log_rolls_back_the_entire_share_application()
+    {
+        await using var db = await ShareFixture.ClosedWanlongOrderAsync("支付宝", 1000, 0, 400);
+        var introducer = await ShareFixture.AddIntroducerAsync(db);
+        await db.Database.ExecuteSqlRawAsync("CREATE TRIGGER fail_share_log BEFORE INSERT ON core_data_mod_log WHEN NEW.scene = '设置介绍人分账' BEGIN SELECT RAISE(ABORT, 'injected failure'); END;");
+        await Assert.ThrowsAnyAsync<Exception>(() => Svc(db).SetIntroducerShareAsync(ShareFixture.Manager(), 1, introducer.id, 40, null));
+        db.ChangeTracker.Clear();
+        Assert.Empty(await db.orderShare.AsNoTracking().Where(s => s.relation_id == introducer.relation_id).ToListAsync());
+        Assert.Empty(await db.paymentShare.AsNoTracking().ToListAsync());
+    }
+
+    [Fact]
+    public async Task Order_view_does_not_report_partial_or_unanswered_share_as_success()
+    {
+        await using var db = await ShareFixture.ClosedWanlongOrderAsync("支付宝", 1000, 0, 400);
+        var intro = await ShareFixture.AddIntroducerAsync(db);
+        db.orderShare.Add(new OrderShare { id = 90, order_id = 1, relation_id = intro.relation_id, amount = 40, valid = true, create_date = DateTime.Now });
+        db.paymentShare.AddRange(
+            new PaymentShare { id = 901, share_id = 90, payment_id = 4, out_trade_no = "A", amount = 20, valid = true, success = true, submit_time = DateTime.Now, response_time = DateTime.Now },
+            new PaymentShare { id = 902, share_id = 90, payment_id = 4, out_trade_no = "B", amount = 20, valid = true, success = null, submit_time = DateTime.Now });
+        await db.SaveChangesAsync();
+        db.ChangeTracker.Clear();
+        Assert.Equal("处理中", Assert.Single(await Svc(db).ListAsync(1)).state);
+        var failed = await db.paymentShare.AsNoTracking().SingleAsync(p => p.id == 902);
+        failed.response_time = DateTime.Now;
+        db.paymentShare.Update(failed);
+        await db.SaveChangesAsync();
+        db.ChangeTracker.Clear();
+        Assert.Equal("被拒绝", Assert.Single(await Svc(db).ListAsync(1)).state);
+    }
+
+    [Fact]
     public async Task Set_creates_an_automatic_share()
     {
         await using var db = await ShareFixture.ClosedWanlongOrderAsync("支付宝", 500, 430, 70);   // 万龙 35

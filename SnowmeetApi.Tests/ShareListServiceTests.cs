@@ -39,7 +39,7 @@ public class ShareListServiceTests
         db.paymentShare.Add(P(101, 10));
         db.paymentShare.Add(P(102, 11, cannot: true));
         db.paymentShare.Add(P(103, 12, true, new DateTime(2026, 10, 31, 23, 0, 3), new DateTime(2026, 10, 31, 23, 0, 5)));
-        db.paymentShare.Add(P(104, 13, null, new DateTime(2026, 10, 31, 23, 0, 3)));
+        db.paymentShare.Add(P(104, 13, null, new DateTime(2026, 10, 31, 23, 0, 3), new DateTime(2026, 10, 31, 23, 0, 5)));
         db.paymentShare.Add(P(105, 15, true, new DateTime(2026, 11, 3, 18, 30, 0), new DateTime(2026, 11, 3, 18, 30, 0)));
         db.coreDataModLog.Add(CoreDataModLog.CreateManualLog("order_share", "amount", 11, "设置介绍人分账", null, 28, null, "40", "订单 1"));
         await db.SaveChangesAsync();
@@ -51,6 +51,31 @@ public class ShareListServiceTests
         DateTime? start = null, DateTime? end = null, int page = 1, int size = 50) => new(status, type, mode, keyword, start, end, page, size);
 
     private static ShareListItem Item(ShareListPage page, int id) => page.items.Single(i => i.orderShareId == id);
+
+    [Fact]
+    public async Task Distributor_share_exposes_application_date_and_configured_automatic_flag()
+    {
+        await using var db = await SeedAsync();
+        var page = await new ShareListService(db).ListAsync(Q());
+        using var json = System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(Item(page, 11)));
+        Assert.True(json.RootElement.TryGetProperty("applicationDate", out var date));
+        Assert.Equal("2026-11-03 10:00", date.GetString());
+        Assert.True(json.RootElement.TryGetProperty("autoShare", out var automatic));
+        Assert.False(automatic.GetBoolean());
+    }
+
+    [Fact]
+    public async Task Distributor_filter_excludes_other_payees_before_pagination_and_totals()
+    {
+        await using var db = await SeedAsync();
+        var query = Q(size: 1) with { DistributorOnly = true };
+        var page = await new ShareListService(db).ListAsync(query);
+        Assert.Equal(1, page.total);
+        Assert.Equal(40, page.totalAmount);
+        Assert.Equal(11, Assert.Single(page.items).orderShareId);
+        Assert.Empty((await new ShareListService(db).ListAsync(query with { DistributorType = "KOL" })).items);
+        Assert.Single((await new ShareListService(db).ListAsync(query with { DistributorType = "教练" })).items);
+    }
 
     [Fact]
     public async Task Each_column_comes_from_the_right_place()

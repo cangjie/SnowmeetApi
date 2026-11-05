@@ -15,7 +15,11 @@ namespace SnowmeetApi.Services.Share;
 /// <param name="Keyword">订单号或收款人里包含的文字</param>
 /// <param name="StartDate">日期范围按 COALESCE(plan_date, create_date) 的日期，含首尾两天</param>
 public sealed record ShareListQuery(string? Status, string? Type, string? Mode, string? Keyword, DateTime? StartDate, DateTime? EndDate,
-    int PageIndex = 1, int PageSize = 20);
+    int PageIndex = 1, int PageSize = 20)
+{
+    public bool DistributorOnly { get; init; }
+    public string? DistributorType { get; init; }
+}
 
 /// <param name="planDate">yyyy-MM-dd；没有计划日期时：租赁取关单次日，其他为空</param>
 /// <param name="sharedTime">yyyy-MM-dd HH:mm，已分才有</param>
@@ -23,7 +27,7 @@ public sealed record ShareListQuery(string? Status, string? Type, string? Mode, 
 /// <param name="listDate">COALESCE(plan_date, create_date) 的日期 yyyy-MM-dd，小程序用它判断「30 天前」</param>
 public sealed record ShareListItem(int orderShareId, int orderId, string orderCode, string shop, string orderType, string payee, double amount,
     string applicant, string mode, string? manualReason, string status, string? planDate, string? sharedTime, string? batch, bool selectable,
-    int? skipassId, string listDate);
+    int? skipassId, string listDate, string applicationDate, bool autoShare, string? distributorType);
 
 /// <param name="totalAmount">筛选后全部条目的金额合计（两位小数），不是当前页</param>
 /// <param name="selectableCount">筛选后全部条目里可勾选的条数</param>
@@ -84,8 +88,7 @@ public sealed class ShareListService(ApplicationDBContext db)
         List<int> relationIds = rows.Select(r => r.Share.relation_id).Distinct().ToList();
         Dictionary<int, string> relationNames = (await db.orderShareRelation.AsNoTracking().Where(r => relationIds.Contains(r.id)).ToListAsync())
             .ToDictionary(r => r.id, r => r.name ?? "");
-        Dictionary<int, string> introducerNames = (await db.introducer.AsNoTracking().Where(i => relationIds.Contains(i.relation_id)).ToListAsync())
-            .GroupBy(i => i.relation_id).ToDictionary(g => g.Key, g => g.OrderBy(i => i.id).First().name);
+        Dictionary<int, Introducer> introducers = await ShareQueries.IntroducersByRelationAsync(db, relationIds);
 
         // 申请人：介绍人分账是店员在订单上设的，操作日志里有人；万龙、雪票是系统生成的
         Dictionary<int, int> applicantIds = (await db.coreDataModLog.AsNoTracking()
@@ -104,15 +107,19 @@ public sealed class ShareListService(ApplicationDBContext db)
             OrderShare s = r.Share;
             string status = ShareListRules.Status(r.Facts);
             string? done = status == "已分" ? SharedAt(r) : null;
-            string payee = introducerNames.GetValueOrDefault(s.relation_id) ?? relationNames.GetValueOrDefault(s.relation_id) ?? "";
+            Introducer? distributor = introducers.GetValueOrDefault(s.relation_id);
+            string payee = distributor?.name ?? relationNames.GetValueOrDefault(s.relation_id) ?? "";
             string? plan = s.plan_date?.ToString(DateFormat)
                 ?? (r.Order.type == "租赁" && r.Order.close_date != null ? r.Order.close_date.Value.Date.AddDays(1).ToString(DateFormat) : null);
             string applicant = applicantIds.TryGetValue(s.id, out int sid) ? staffNames.GetValueOrDefault(sid, "未知") : "系统";
             return new ShareListItem(s.id, s.order_id, r.Order.code ?? r.Order.id.ToString(), r.Order.shop ?? "", r.Order.type ?? "", payee, s.amount, applicant,
                 ShareListRules.Mode(r.Facts), ShareListRules.ManualReason(r.Facts), status, plan, done, BatchColumn(r, status),
-                ShareListRules.Selectable(r.Facts), skipassIds.TryGetValue(r.Order.id, out int k) ? k : null, (s.plan_date ?? s.create_date).ToString(DateFormat));
+                ShareListRules.Selectable(r.Facts), skipassIds.TryGetValue(r.Order.id, out int k) ? k : null, (s.plan_date ?? s.create_date).ToString(DateFormat),
+                s.create_date.ToString(TimeFormat), s.auto_share, distributor?.type);
         }).ToList();
 
+        if (q.DistributorOnly) items = items.Where(i => i.distributorType != null).ToList();
+        if (!string.IsNullOrWhiteSpace(q.DistributorType)) items = items.Where(i => i.distributorType == q.DistributorType.Trim()).ToList();
         if (!string.IsNullOrWhiteSpace(q.Status)) items = items.Where(i => i.status == q.Status).ToList();
         if (!string.IsNullOrWhiteSpace(q.Mode)) items = items.Where(i => i.mode == q.Mode).ToList();
         string key = (q.Keyword ?? "").Trim();

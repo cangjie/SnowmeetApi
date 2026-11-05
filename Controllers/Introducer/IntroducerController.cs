@@ -32,7 +32,9 @@ public sealed class IntroducerController(ApplicationDBContext db, IConfiguration
         => AsStaff(sessionKey, StaffAccountRules.IsAdmin, AdminOnly, async _ =>
         {
             await Service.SyncCoachesAsync();   // 教练也是介绍人，先把还没建的教练补上
-            return new { introducers = await Service.ListAsync(false) };
+            var stoppedConflicts = await Service.SyncStoppedCoachesAsync();
+            var sync = await Service.SyncDistributorsAsync();
+            return new { introducers = await Service.ListAsync(false), syncConflicts = stoppedConflicts.Concat(sync.conflicts).ToList() };
         });
 
     [HttpGet]
@@ -46,8 +48,8 @@ public sealed class IntroducerController(ApplicationDBContext db, IConfiguration
 
     [HttpPost]
     public Task<ApiResult<object>> UpdateIntroducer(string sessionKey, [FromBody] UpdateIntroducerInput input)
-        => AsStaff(sessionKey, StaffAccountRules.IsAdmin, AdminOnly, async _ => await Service.UpdateAsync(input.introducerId, input.name,
-            input.realName, input.valid, new(input.wepayAccountNum, input.wepayAccountName, input.aliAccountNum)));
+        => AsStaff(sessionKey, StaffAccountRules.IsAdmin, AdminOnly, async op => await Service.UpdateAsync(input.introducerId, input.name,
+            input.realName, input.valid, new(input.wepayAccountNum, input.wepayAccountName, input.aliAccountNum), op.id));
 
     [HttpPost]
     public Task<ApiResult<object>> BindAlipay(string sessionKey, [FromBody] IntroducerIdInput input)

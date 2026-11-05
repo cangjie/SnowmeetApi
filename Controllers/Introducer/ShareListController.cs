@@ -30,11 +30,12 @@ public sealed class ShareListController(ApplicationDBContext db, IConfiguration 
     /// <param name="startDate">yyyy-MM-dd，按「计划分账日期，没有就取创建日」筛，含首尾两天</param>
     [HttpGet]
     public Task<ApiResult<object>> List(string sessionKey, string? status = null, string? type = null, string? mode = null, string? keyword = null,
-        string? startDate = null, string? endDate = null, int pageIndex = 1, int pageSize = 20)
+        string? startDate = null, string? endDate = null, int pageIndex = 1, int pageSize = 20, bool distributorOnly = false, string? distributorType = null)
         => AsStaff(sessionKey, StaffAccountRules.IsManager, ManagerOnly, async _ =>
         {
             DateTime? start = ParseDate(startDate), end = ParseDate(endDate);
-            var page = await Service.ListAsync(new ShareListQuery(status, type, mode, keyword, start, end, Math.Max(1, pageIndex), Math.Clamp(pageSize, 1, MaxPageSize)));
+            var page = await Service.ListAsync(new ShareListQuery(status, type, mode, keyword, start, end, Math.Max(1, pageIndex), Math.Clamp(pageSize, 1, MaxPageSize))
+                { DistributorOnly = distributorOnly, DistributorType = distributorType });
             return new { items = page.items, total = page.total, totalAmount = page.totalAmount, selectableCount = page.selectableCount };
         });
 

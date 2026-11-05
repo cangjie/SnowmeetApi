@@ -30,7 +30,7 @@ namespace SnowmeetApi.Helpers
             if (f.Records.Count > 0 && f.Records.All(r => r.Success == true)) return null;
             if (!f.AutoShare) return "设为手动";
             if (f.Records.Any(r => r.SubmitTime == null && r.CannotShare)) return "系统标手动";
-            if (f.Records.Any(r => r.SubmitTime != null && r.Success != true)) return "自动被拒绝";
+            if (f.Records.Any(r => r.SubmitTime != null && r.ResponseTime != null && r.Success != true)) return "自动被拒绝";
             if (f.Records.Count == 0) return "没有分账记录";
             return null;
         }

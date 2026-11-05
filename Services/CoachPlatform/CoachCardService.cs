@@ -50,8 +50,10 @@ public sealed class CoachCardService(ApplicationDBContext db, IConfiguration? co
     /// <summary>教练名下待领取的卡：先在服务器建一行，再由前端用 open-type=share 分享出去。</summary>
     public async Task<CoachCard> CreateCardAsync(int coachId, DateTime now)
     {
+        await using var tx = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
         Coach? coach = await db.coach.AsNoTracking().FirstOrDefaultAsync(c => c.id == coachId);
-        if (coach == null || coach.valid != 1) throw new CoachException("你的教练身份已停用，不能再发学员卡");
+        if (coach == null || coach.valid != 1 || !await DistributorAccess.CanIssueAsync(db, coach))
+            throw new CoachException("你的分销商身份已停用或存在冲突，不能再发学员卡");
         if (!await HasAnyBenefitAsync(coach)) throw new CoachException("管理员还没有给你设置学员卡的价格，请先联系管理员");
         int pending = await db.coachCard.AsNoTracking().CountAsync(c => c.coach_id == coachId && c.status == CoachCard.StatusIssued
             && (c.claim_deadline == null || c.claim_deadline >= now));
@@ -60,6 +62,7 @@ public sealed class CoachCardService(ApplicationDBContext db, IConfiguration? co
         CoachCard card = new() { coach_id = coachId, token = CoachCardRules.NewToken(), status = CoachCard.StatusIssued, create_date = now };
         db.coachCard.Add(card);
         await db.SaveChangesAsync();
+        await tx.CommitAsync();
         return card;
     }
 
@@ -89,7 +92,7 @@ public sealed class CoachCardService(ApplicationDBContext db, IConfiguration? co
             view.message = mine ? "你已领取这张学员卡" : "这张学员卡已被领取";
             await FillBenefitAsync(view, card, coach, now); return view;
         }
-        if (card.status != CoachCard.StatusIssued || !CoachCardRules.IsClaimable(card, now) || coach.valid != 1)
+        if (card.status != CoachCard.StatusIssued || !CoachCardRules.IsClaimable(card, now) || coach.valid != 1 || !await DistributorAccess.CanIssueAsync(db, coach))
         {
             view.state = ShareCardState.Invalid; view.message = "这张学员卡已失效，请联系教练重新发送"; return view;
         }
@@ -147,7 +150,7 @@ public sealed class CoachCardService(ApplicationDBContext db, IConfiguration? co
                     ? new ClaimResult { state = ShareCardState.ClaimedByMe, message = "你已领取这张学员卡", card = card }
                     : Fail(ShareCardState.Taken, "这张学员卡已被领取");
             }
-            if (card.status != CoachCard.StatusIssued || !CoachCardRules.IsClaimable(card, now) || coach.valid != 1)
+            if (card.status != CoachCard.StatusIssued || !CoachCardRules.IsClaimable(card, now) || coach.valid != 1 || !await DistributorAccess.CanIssueAsync(db, coach))
                 return Fail(ShareCardState.Invalid, "这张学员卡已失效，请联系教练重新发送");
 
             DateTime end = CoachCardRules.SeasonEnd(now, config);

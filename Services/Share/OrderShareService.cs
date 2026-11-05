@@ -36,18 +36,21 @@ public sealed class OrderShareService(ApplicationDBContext db, IConfiguration co
     {
         List<OrderShare> shares = await db.orderShare.AsNoTracking().Where(s => s.valid && s.order_id == orderId).ToListAsync();
         List<int> relationIds = shares.Select(s => s.relation_id).ToList();
-        List<Introducer> introducers = await db.introducer.AsNoTracking().Where(i => relationIds.Contains(i.relation_id)).ToListAsync();
+        Dictionary<int, Introducer> introducers = await ShareQueries.IntroducersByRelationAsync(db, relationIds);
         List<int> shareIds = shares.Select(s => s.id).ToList();
         List<PaymentShare> rows = await db.paymentShare.AsNoTracking().Where(r => shareIds.Contains(r.share_id) && r.valid).ToListAsync();
         List<OrderShareView> views = new();
         foreach (OrderShare share in shares.OrderBy(s => s.id))
         {
-            Introducer? introducer = introducers.FirstOrDefault(i => i.relation_id == share.relation_id);
+            Introducer? introducer = introducers.GetValueOrDefault(share.relation_id);
             if (introducer == null) continue;   // 万龙那条和别的应分不在这里显示
             List<PaymentShare> mine = rows.Where(r => r.share_id == share.id).ToList();
-            string state = mine.Any(r => r.success == true) ? "已分账"
-                : mine.Any(r => r.submit_time != null) ? "被拒绝"
-                : mine.Count == 0 || mine.Any(r => r.can_not_share) ? "手动处理" : "待自动分账";
+            var facts = new ShareFacts(share.auto_share, share.batch_id,
+                mine.Select(r => new RecordFacts(r.success, r.submit_time, r.response_time, r.can_not_share)).ToList());
+            string state = ShareListRules.Status(facts) == "已分" ? "已分账"
+                : mine.Any(r => r.submit_time != null && r.response_time == null && r.success != true) ? "处理中"
+                : mine.Any(r => r.submit_time != null && r.response_time != null && r.success != true) ? "被拒绝"
+                : ShareListRules.Mode(facts) == "手动" ? "手动处理" : "待自动分账";
             views.Add(new OrderShareView(share.id, introducer.id, introducer.name, introducer.type, share.amount, state, mine.FirstOrDefault()?.memo,
                 share.plan_date?.ToString("yyyy-MM-dd")));
         }
@@ -66,8 +69,15 @@ public sealed class OrderShareService(ApplicationDBContext db, IConfiguration co
         if (reason != null) throw new ShareException(reason);
         amount = Math.Round(amount, 2);
         if (!(amount > 0)) throw new ShareException("请填写大于 0 的金额");
+        // 锁住申请使用的收款关系，并让应分、付款分账和操作日志共同提交或回滚。
+        await using var tx = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
         Introducer introducer = await db.introducer.AsNoTracking().FirstOrDefaultAsync(i => i.id == introducerId && i.valid == 1)
             ?? throw new ShareException("介绍人不存在或已停用");
+
+        List<int> priorRelations = await db.introducerRelationHistory.AsNoTracking().Where(h => h.introducer_id == introducerId)
+            .Select(h => h.relation_id).ToListAsync();
+        if (await db.orderShare.AsNoTracking().AnyAsync(s => s.valid && s.order_id == orderId && priorRelations.Contains(s.relation_id)))
+            throw new ShareException("该分销商在此订单已有历史收款账号的分账，请先处理原申请");
 
         OrderShare? existing = await db.orderShare.AsNoTracking()
             .FirstOrDefaultAsync(s => s.valid && s.order_id == orderId && s.relation_id == introducer.relation_id);
@@ -132,7 +142,9 @@ public sealed class OrderShareService(ApplicationDBContext db, IConfiguration co
             + (autoShare ? "" : "，手动分账")));
         await db.SaveChangesAsync();
         db.ChangeTracker.Clear();
-        return (await ListAsync(orderId)).First(v => v.orderShareId == share.id);
+        OrderShareView result = (await ListAsync(orderId)).First(v => v.orderShareId == share.id);
+        await tx.CommitAsync();
+        return result;
     }
 
     public async Task RemoveIntroducerShareAsync(Staff op, int orderShareId)
@@ -140,7 +152,7 @@ public sealed class OrderShareService(ApplicationDBContext db, IConfiguration co
         if (!StaffAccountRules.IsManager(op)) throw new ShareException("只有店长以上可以删除介绍人分账", 3);
         OrderShare share = await db.orderShare.AsNoTracking().FirstOrDefaultAsync(s => s.id == orderShareId && s.valid)
             ?? throw new ShareException("没有找到这条分账");
-        if (!await db.introducer.AsNoTracking().AnyAsync(i => i.relation_id == share.relation_id))
+        if (!await ShareQueries.IsIntroducerRelationAsync(db, share.relation_id))
         {
             throw new ShareException("这不是介绍人分账，不能在这里删除");
         }
@@ -157,7 +169,7 @@ public sealed class OrderShareService(ApplicationDBContext db, IConfiguration co
     /// <summary>订单被全额退款后：还没提交的介绍人分账作废，已经提交的不动。</summary>
     public async Task VoidUnsubmittedIntroducerSharesAsync(int orderId)
     {
-        List<int> introducerRelationIds = await db.introducer.AsNoTracking().Select(i => i.relation_id).ToListAsync();
+        List<int> introducerRelationIds = await ShareQueries.AllIntroducerRelationsAsync(db);
         List<OrderShare> shares = await db.orderShare.AsNoTracking()
             .Where(s => s.valid && s.order_id == orderId && introducerRelationIds.Contains(s.relation_id)).ToListAsync();
         foreach (OrderShare share in shares)
@@ -187,7 +199,7 @@ public sealed class OrderShareService(ApplicationDBContext db, IConfiguration co
         bool usedTicket = await ShareQueries.UsedTicketAsync(db, orderId);
 
         List<int> relationIds = shares.Select(s => s.relation_id).Distinct().ToList();
-        List<int> introducerRelationIds = await db.introducer.AsNoTracking().Where(i => relationIds.Contains(i.relation_id)).Select(i => i.relation_id).ToListAsync();
+        List<int> introducerRelationIds = (await ShareQueries.IntroducersByRelationAsync(db, relationIds)).Keys.ToList();
         Dictionary<int, OrderShareRelation> relations = (await db.orderShareRelation.AsNoTracking().Include(r => r.binds)
             .Where(r => introducerRelationIds.Contains(r.id)).ToListAsync()).ToDictionary(r => r.id);
         List<int> shareIds = shares.Select(s => s.id).ToList();

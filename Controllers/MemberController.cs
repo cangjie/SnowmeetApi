@@ -115,13 +115,26 @@ namespace SnowmeetApi.Controllers
         {
             bool sourceCoach = await _db.coach.AsNoTracking().AnyAsync(c => c.member_id == sourceId);
             bool targetCoach = await _db.coach.AsNoTracking().AnyAsync(c => c.member_id == targetId);
-            return sourceCoach && targetCoach ? "两个会员都是教练，不能直接合并，请先在教练列表里处理其中一位" : null;
+            if (sourceCoach && targetCoach) return "两个会员都是教练，不能直接合并，请先在教练列表里处理其中一位";
+            bool sourceDistributor = await _db.introducer.AsNoTracking().AnyAsync(i => i.member_id == sourceId);
+            bool targetDistributor = await _db.introducer.AsNoTracking().AnyAsync(i => i.member_id == targetId);
+            return (sourceCoach || sourceDistributor) && (targetCoach || targetDistributor)
+                ? "两个会员都有分销商相关身份，不能直接合并，请先处理身份冲突" : null;
         }
 
         // 教练身份、学员卡及其使用记录随会员合并迁到目标会员（2026-10-30）。
         // 目标会员本雪季已领过同一位教练的卡时，来源这张不迁移而是作废（status=merged），否则唯一索引会让整个 SaveChanges 失败。
         private async Task MergeCoachDataAsync(int sourceId, int targetId, int traceId)
         {
+            List<Introducer> distributors = await _db.introducer.Where(i => i.member_id == sourceId).ToListAsync();
+            foreach (Introducer distributor in distributors)
+            {
+                distributor.member_id = targetId;
+                distributor.update_date = DateTime.Now;
+                _db.introducer.Entry(distributor).State = EntityState.Modified;
+                await _db.coreDataModLog.AddAsync(CoreDataModLog.CreateManualLog("introducer", "member_id", distributor.id, "用户批量合并",
+                    null, null, sourceId.ToString(), targetId.ToString(), "分销商身份迁移"));
+            }
             List<Coach> coaches = await _db.coach.Where(c => c.member_id == sourceId).ToListAsync();
             foreach (Coach coach in coaches)
             {

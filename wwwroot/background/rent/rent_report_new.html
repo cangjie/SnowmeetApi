@@ -96,6 +96,8 @@
     var tData = [];
     var totalAmount = 0;
     var dailyAmounts = {};
+    var dailyPaymentAmounts = Object.create(null);
+    var resultPaymentMethods = [];
     var resultStartDate = '';
     var resultEndDate = '';
     render();
@@ -106,6 +108,7 @@
         totalAmount = 0;
         tData = [];
         dailyAmounts = {};
+        dailyPaymentAmounts = Object.create(null);
         var queryStartDate = formatDate(startDate);
         var queryEndDate = formatDate(endDate);
         var btnCtrl = document.getElementById('btn');
@@ -244,6 +247,7 @@
                     }
                     if (tData.length > firstRowIndex) {
                         var payments = summarizePayments(order.availablePayments || []);
+                        addDailyPayments(order.close_date, payments);
                         Object.keys(payments).forEach(function (method) {
                             if (method !== '微信支付' && method !== '支付宝') otherPaymentMethods.add(method);
                         });
@@ -251,6 +255,7 @@
                     }
                 }
                 var paymentMethods = ['微信支付', '支付宝'].concat(Array.from(otherPaymentMethods).sort());
+                resultPaymentMethods = paymentMethods;
                 paymentMethods.forEach(function (method) {
                     tHead.push(method + '收款', method + '退款', method + '结余');
                 });
@@ -292,6 +297,15 @@
         dailyAmounts[date] = (dailyAmounts[date] || 0) + amount;
     }
 
+    function addDailyPayments(closeDate, payments) {
+        var date = formatDate(closeDate);
+        if (!dailyPaymentAmounts[date]) dailyPaymentAmounts[date] = Object.create(null);
+        Object.keys(payments).forEach(function (method) {
+            var current = dailyPaymentAmounts[date][method] || 0;
+            dailyPaymentAmounts[date][method] = current + payments[method].received - payments[method].refunded;
+        });
+    }
+
     function render() {
         var tHeadCtl = document.getElementById('tHead');
         tHeadCtl.innerHTML = '';
@@ -322,7 +336,15 @@
             tBodyCtl.appendChild(tr);
         }
         var totalCell = document.getElementById('total');
-        totalCell.innerText = "总计：" + totalAmount.toFixed(2);
+        var totalText = "总计：" + totalAmount.toFixed(2);
+        resultPaymentMethods.forEach(function (method) {
+            var cents = 0;
+            Object.keys(dailyPaymentAmounts).forEach(function (date) {
+                cents += dailyPaymentAmounts[date][method] || 0;
+            });
+            totalText += '  |  ' + method + '结余：' + (cents / 100).toFixed(2);
+        });
+        totalCell.innerText = totalText;
         var dailyCell = document.getElementById('dailyTotals');
         dailyCell.innerText = '';
         if (resultStartDate && resultStartDate < resultEndDate) {
@@ -331,7 +353,12 @@
             var lines = ['每日汇总（结算日期）：'];
             while (formatDate(day) <= resultEndDate) {
                 var date = formatDate(day);
-                lines.push(date + '：' + (dailyAmounts[date] || 0).toFixed(2));
+                var line = date + '：租金 ' + (dailyAmounts[date] || 0).toFixed(2);
+                resultPaymentMethods.forEach(function (method) {
+                    var cents = dailyPaymentAmounts[date] && dailyPaymentAmounts[date][method] || 0;
+                    line += '  |  ' + method + '结余：' + (cents / 100).toFixed(2);
+                });
+                lines.push(line);
                 day.setDate(day.getDate() + 1);
             }
             dailyCell.innerText = lines.join('\n');

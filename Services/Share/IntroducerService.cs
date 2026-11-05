@@ -22,7 +22,7 @@ public sealed class IntroducerService(ApplicationDBContext db, IAlipayRoyaltyBin
     /// <param name="alipay">未填写 / 已绑定 / 未绑定</param>
     /// <param name="alipayMessage">这次绑定失败的原因，没有则为空</param>
     public sealed record IntroducerView(int id, int memberId, string type, string name, string? realName, bool valid, int? coachId,
-        string wechat, string alipay, string alipayMessage);
+        string wechat, string alipay, string alipayMessage, string phoneTail);
 
     private static string Clean(string? s) => (s ?? "").Trim();
 
@@ -123,6 +123,125 @@ public sealed class IntroducerService(ApplicationDBContext db, IAlipayRoyaltyBin
         }
     }
 
+    public sealed record DistributorSyncResult(int linked, int created, List<string> conflicts);
+
+    // 旧版停用的教练也要能从统一管理页找到；只建立停用映射，不恢复身份或改历史卡。
+    public async Task<List<string>> SyncStoppedCoachesAsync()
+    {
+        await CoachSyncLock.WaitAsync();
+        var conflicts = new List<string>();
+        try
+        {
+            List<Coach> stopped = await db.coach.AsNoTracking().Where(c => c.valid == 0).ToListAsync();
+            foreach (Coach coach in stopped)
+            {
+                if (await db.introducer.AsNoTracking().AnyAsync(i => i.member_id == coach.member_id || i.coach_id == coach.id)) continue;
+                if (await db.coach.AsNoTracking().CountAsync(c => c.member_id == coach.member_id) != 1)
+                { conflicts.Add(coach.display_name + "：历史身份记录不唯一"); continue; }
+                if (!await db.member.AsNoTracking().AnyAsync(m => m.id == coach.member_id && m.valid == 1 && m.is_merge != 1))
+                { conflicts.Add(coach.display_name + "：关联会员无效或已合并"); continue; }
+                try
+                {
+                    await using var tx = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
+                    if (await db.introducer.AsNoTracking().AnyAsync(i => i.member_id == coach.member_id || i.coach_id == coach.id)) continue;
+                    string? openid = await db.memberSocialAccount.AsNoTracking()
+                        .Where(a => a.member_id == coach.member_id && a.valid == 1 && a.type == MemberSocialAccount.TYPE_WECHAT_MINI_OPENID)
+                        .OrderByDescending(a => a.id).Select(a => a.num).FirstOrDefaultAsync();
+                    string name = Clean(coach.display_name);
+                    if (name == "") name = "教练" + coach.id;
+                    var relation = new OrderShareRelation { type = IntroducerRules.RelationType(IntroducerRules.TypeCoach), name = name, valid = true,
+                        wepay_account_type = string.IsNullOrWhiteSpace(openid) ? null : "PERSONAL_OPENID", wepay_account_num = openid };
+                    db.orderShareRelation.Add(relation);
+                    await db.SaveChangesAsync();
+                    db.introducer.Add(new Introducer { member_id = coach.member_id, type = IntroducerRules.TypeCoach, name = name,
+                        relation_id = relation.id, coach_id = coach.id, valid = 0, created_by_staff_id = coach.created_by_staff_id });
+                    await db.SaveChangesAsync();
+                    await tx.CommitAsync();
+                }
+                catch (DbUpdateException) { conflicts.Add(coach.display_name + "：历史身份关联失败，请刷新后处理"); }
+                finally { db.ChangeTracker.Clear(); }
+            }
+            return conflicts;
+        }
+        finally { CoachSyncLock.Release(); }
+    }
+
+    // 只补可确定的一对一关系。停用或多条历史记录不自动恢复或合并。
+    public async Task<DistributorSyncResult> SyncDistributorsAsync()
+    {
+        await CoachSyncLock.WaitAsync();
+        var conflicts = new List<string>();
+        int linked = 0, created = 0;
+        try
+        {
+            List<Introducer> rows = await db.introducer.AsNoTracking().Where(i => i.coach_id == null).OrderBy(i => i.id).ToListAsync();
+            foreach (Introducer intro in rows)
+            {
+                if (intro.valid == 0 && await db.introducer.AsNoTracking().AnyAsync(i => i.id != intro.id && i.member_id == intro.member_id && i.valid == 1)) continue;
+                List<Coach> coaches = await db.coach.AsNoTracking().Where(c => c.member_id == intro.member_id).ToListAsync();
+                if (intro.valid == 0 && coaches.Count == 0) continue;
+                if (intro.valid == 0 && await db.introducer.AsNoTracking().CountAsync(i => i.member_id == intro.member_id && i.valid == 0) > 1)
+                { conflicts.Add(intro.name + "：历史分销商记录不唯一"); continue; }
+                if (coaches.Count > 1 || (coaches.Count == 1 && coaches[0].valid != intro.valid))
+                {
+                    conflicts.Add(intro.name + "：历史身份状态冲突");
+                    continue;
+                }
+                if (coaches.Count == 1 && await db.introducer.AsNoTracking().AnyAsync(i => i.id != intro.id && i.coach_id == coaches[0].id && i.valid == 1))
+                {
+                    conflicts.Add(intro.name + "：身份已关联其他分销商");
+                    continue;
+                }
+                try
+                {
+                    await using var tx = await db.Database.BeginTransactionAsync();
+                    Coach coach;
+                    if (coaches.Count == 0)
+                    {
+                        coach = new Coach { member_id = intro.member_id, display_name = intro.name, valid = intro.valid, created_by_staff_id = intro.created_by_staff_id, create_date = DateTime.Now };
+                        db.coach.Add(coach);
+                        await db.SaveChangesAsync();
+                    }
+                    else
+                    {
+                        coach = coaches[0];
+                        coach.display_name = intro.name;
+                        coach.update_date = DateTime.Now;
+                        db.coach.Update(coach);
+                    }
+                    intro.coach_id = coach.id;
+                    intro.update_date = DateTime.Now;
+                    db.introducer.Update(intro);
+                    await db.SaveChangesAsync();
+                    await tx.CommitAsync();
+                    if (coaches.Count == 0) created++; else linked++;
+                }
+                catch (DbUpdateException)
+                {
+                    conflicts.Add(intro.name + "：关联时发生冲突，请刷新后处理");
+                }
+                finally { db.ChangeTracker.Clear(); }
+            }
+            var allIntroducers = await db.introducer.AsNoTracking().ToListAsync();
+            var allCoaches = await db.coach.AsNoTracking().ToListAsync();
+            foreach (Introducer intro in allIntroducers.Where(i => i.valid == 1 && i.coach_id != null))
+            {
+                Coach? coach = allCoaches.FirstOrDefault(c => c.id == intro.coach_id);
+                if (coach == null || coach.member_id != intro.member_id || coach.valid != intro.valid)
+                    conflicts.Add(intro.name + "：关联身份状态不一致");
+            }
+            foreach (Introducer intro in allIntroducers.Where(i => i.valid == 0))
+            {
+                if (allIntroducers.Any(other => other.id != intro.id && other.member_id == intro.member_id && other.valid == 1)) continue;
+                if (intro.coach_id == null) continue; // 未关联的冲突已在上面的同步检查里报告
+                if (allCoaches.Any(c => c.member_id == intro.member_id && c.valid == 1 && c.id == intro.coach_id))
+                    conflicts.Add(intro.name + "：分销商已停用但教练身份仍启用");
+            }
+            return new DistributorSyncResult(linked, created, conflicts);
+        }
+        finally { CoachSyncLock.Release(); }
+    }
+
     public async Task<IntroducerView> AddAsync(Staff op, int memberId, string type, string name, string? realName, AccountInput account)
     {
         type = Clean(type);
@@ -154,6 +273,26 @@ public sealed class IntroducerService(ApplicationDBContext db, IAlipayRoyaltyBin
         }
         string? aliNum = ValidateAli(account, real);
 
+        // 保留旧教练 id 和卡券历史；状态冲突由管理员处理，不能悄悄恢复被单独停用的教练。
+        List<Coach> priorCoaches = await db.coach.AsNoTracking().Where(c => c.member_id == memberId).ToListAsync();
+        if (priorCoaches.Count > 1) throw new ShareException("该会员有多条历史教练记录，请先处理身份冲突");
+        Coach? coach = priorCoaches.SingleOrDefault();
+        if (coach != null && coach.valid == 0 && !await db.introducer.AsNoTracking().AnyAsync(i => i.coach_id == coach.id && i.member_id == memberId))
+            throw new ShareException("该会员的教练身份已停用，请先处理身份状态");
+
+        await using var tx = await db.Database.BeginTransactionAsync();
+        if (coach == null)
+        {
+            coach = new Coach { member_id = memberId, display_name = name, valid = 1, created_by_staff_id = op?.id, create_date = DateTime.Now };
+            db.coach.Add(coach);
+        }
+        else
+        {
+            coach.valid = 1;
+            coach.display_name = name;
+            coach.update_date = DateTime.Now;
+            db.coach.Update(coach);
+        }
         var relation = new OrderShareRelation
         {
             type = IntroducerRules.RelationType(type), name = name, valid = true,
@@ -165,65 +304,99 @@ public sealed class IntroducerService(ApplicationDBContext db, IAlipayRoyaltyBin
         var introducer = new Introducer
         {
             member_id = memberId, type = type, name = name, real_name = real == "" ? null : real,
-            relation_id = relation.id, created_by_staff_id = op?.id,
+            relation_id = relation.id, coach_id = coach.id, created_by_staff_id = op?.id,
         };
         db.introducer.Add(introducer);
         await db.SaveChangesAsync();
+        await tx.CommitAsync();
+        await tx.DisposeAsync();
         db.ChangeTracker.Clear();
         return aliNum != null ? await BindAlipayAsync(introducer.id) : await ViewAsync(introducer.id);
     }
 
-    public async Task<IntroducerView> UpdateAsync(int introducerId, string? name, string? realName, bool? valid, AccountInput? account)
+    public async Task<IntroducerView> UpdateAsync(int introducerId, string? name, string? realName, bool? valid, AccountInput? account, int? staffId = null)
     {
+        await using var tx = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
         Introducer i = await db.introducer.AsNoTracking().FirstOrDefaultAsync(x => x.id == introducerId)
             ?? throw new ShareException("介绍人不存在");
         OrderShareRelation r = await db.orderShareRelation.AsNoTracking().FirstAsync(x => x.id == i.relation_id);
+        int originalRelationId = r.id;
+        string oldRealName = Clean(i.real_name);
         if (valid == true && i.valid == 0
             && await db.introducer.AsNoTracking().AnyAsync(x => x.member_id == i.member_id && x.valid == 1 && x.id != i.id))
         {
             throw new ShareException("这位会员已经是介绍人");
         }
-        if (name != null)
+        string newName = name == null ? i.name : Clean(name);
+        if (newName == "") throw new ShareException("请填写显示名称");
+        string newRealName = realName == null ? oldRealName : Clean(realName);
+        string? aliNum = account == null ? null : ValidateAli(account, newRealName);
+        string wepayNum = Clean(account?.wepayAccountNum), wepayName = Clean(account?.wepayAccountName);
+        if (i.type == IntroducerRules.TypeOrg && ((wepayNum == "") != (wepayName == "")))
+            throw new ShareException("机构商户号和商户全称需要一起填写");
+        bool wepayChanged = i.type == IntroducerRules.TypeOrg && wepayNum != ""
+            && (wepayNum != r.wepay_account_num || wepayName != r.wepay_account_name);
+        bool aliChanged = (aliNum != null && (r.ali_account_type != IntroducerRules.AlipayLoginType || aliNum != r.ali_account_num))
+            || (realName != null && oldRealName != newRealName && !string.IsNullOrWhiteSpace(r.ali_account_num));
+        if (aliChanged && newRealName == "") throw new ShareException("支付宝登录号要同时填真实姓名");
+        // 每次改收款资料都新建关系，即使此刻尚无订单；避免并发申请刚读取旧关系时被改号。
+        bool snapshot = wepayChanged || aliChanged;
+        Coach? linkedCoach = null;
+        if (i.coach_id != null)
         {
-            string n = Clean(name);
-            if (n == "") throw new ShareException("请填写显示名称");
-            i.name = n;
-            r.name = n;
+            linkedCoach = await db.coach.AsNoTracking().FirstOrDefaultAsync(c => c.id == i.coach_id && c.member_id == i.member_id);
+            if (linkedCoach == null) throw new ShareException("分销商关联的教练身份不一致，请先处理身份冲突");
         }
-        if (realName != null) i.real_name = Clean(realName) == "" ? null : Clean(realName);
-        if (valid != null) i.valid = valid.Value ? 1 : 0;
+        else
+        {
+            List<Coach> candidates = await db.coach.AsNoTracking().Where(c => c.member_id == i.member_id).ToListAsync();
+            if (candidates.Count > 1 || (candidates.Count == 1 && candidates[0].valid != i.valid))
+                throw new ShareException("分销商与教练身份状态不一致，请先处理冲突");
+            linkedCoach = candidates.SingleOrDefault();
+            if (linkedCoach != null) i.coach_id = linkedCoach.id;
+        }
+        if (linkedCoach != null && linkedCoach.valid != i.valid)
+            throw new ShareException("分销商与教练身份状态不一致，请先处理冲突");
 
-        bool aliChanged = false;
-        if (account != null)
+        if (snapshot)
         {
-            if (i.type == IntroducerRules.TypeOrg && Clean(account.wepayAccountNum) != "" && Clean(account.wepayAccountName) != "")
+            int oldRelationId = r.id;
+            List<ShareRelationBind> oldBinds = await db.shareRelationBind.AsNoTracking().Where(b => b.share_relation_id == oldRelationId && b.valid).ToListAsync();
+            r = new OrderShareRelation { type = r.type, staff_id = r.staff_id, name = r.name, valid = r.valid,
+                wepay_account_type = r.wepay_account_type, wepay_account_num = r.wepay_account_num, wepay_account_name = r.wepay_account_name,
+                ali_account_type = r.ali_account_type, ali_account_num = r.ali_account_num, create_date = DateTime.Now };
+            db.orderShareRelation.Add(r);
+            await db.SaveChangesAsync();
+            db.introducerRelationHistory.Add(new IntroducerRelationHistory { introducer_id = i.id, relation_id = oldRelationId,
+                real_name = oldRealName == "" ? null : oldRealName });
+            i.relation_id = r.id;
+            foreach (var old in oldBinds.Where(b => !(aliChanged && b.pay_method == "支付宝") && !(wepayChanged && b.pay_method == "微信支付")))
             {
-                r.wepay_account_num = Clean(account.wepayAccountNum);
-                r.wepay_account_name = Clean(account.wepayAccountName);
-            }
-            string? aliNum = ValidateAli(account, i.real_name ?? "");
-            if (aliNum != null && (r.ali_account_type != IntroducerRules.AlipayLoginType || aliNum != r.ali_account_num))
-            {
-                r.ali_account_type = IntroducerRules.AlipayLoginType;
-                r.ali_account_num = aliNum;
-                aliChanged = true;
+                db.shareRelationBind.Add(new ShareRelationBind { share_relation_id = r.id, pay_method = old.pay_method,
+                    wepay_key_id = old.wepay_key_id, ali_account_id = old.ali_account_id, valid = true, create_date = DateTime.Now });
             }
         }
+        i.name = newName;
+        i.real_name = newRealName == "" ? null : newRealName;
+        if (valid != null) i.valid = valid.Value ? 1 : 0;
         i.update_date = DateTime.Now;
+        r.name = newName;
+        if (wepayChanged) { r.wepay_account_num = wepayNum; r.wepay_account_name = wepayName; }
+        if (aliNum != null) { r.ali_account_type = IntroducerRules.AlipayLoginType; r.ali_account_num = aliNum; }
         db.introducer.Update(i);
-        db.orderShareRelation.Update(r);
-        if (aliChanged)
+        if (!snapshot) db.orderShareRelation.Update(r);
+        if (linkedCoach != null)
         {
-            // 账号换了，旧的绑定作废，下面重新绑
-            foreach (ShareRelationBind old in await db.shareRelationBind.AsNoTracking()
-                .Where(b => b.share_relation_id == r.id && b.pay_method == "支付宝" && b.valid).ToListAsync())
-            {
-                old.valid = false;
-                old.update_date = DateTime.Now;
-                db.shareRelationBind.Update(old);
-            }
+            if (name != null) linkedCoach.display_name = i.name;
+            if (valid != null) linkedCoach.valid = i.valid;
+            linkedCoach.update_date = DateTime.Now;
+            db.coach.Update(linkedCoach);
         }
+        if (snapshot) db.coreDataModLog.Add(CoreDataModLog.CreateManualLog("introducer", "relation_id", i.id, "修改分销商收款资料",
+            null, staffId, originalRelationId.ToString(), r.id.ToString(), "保留历史收款方，创建新收款方"));
         await db.SaveChangesAsync();
+        await tx.CommitAsync();
+        await tx.DisposeAsync();
         db.ChangeTracker.Clear();
         return aliChanged ? await BindAlipayAsync(i.id) : await ViewAsync(i.id);
     }
@@ -275,7 +448,9 @@ public sealed class IntroducerService(ApplicationDBContext db, IAlipayRoyaltyBin
         bool bound = await db.shareRelationBind.AsNoTracking().AnyAsync(b => b.share_relation_id == r.id && b.pay_method == "支付宝" && b.valid);
         string wechat = string.IsNullOrWhiteSpace(r.wepay_account_num) ? "未填写" : "已填写";
         string alipay = string.IsNullOrWhiteSpace(r.ali_account_num) ? "未填写" : (bound ? "已绑定" : "未绑定");
-        return new IntroducerView(i.id, i.member_id, i.type, i.name, i.real_name, i.valid == 1, i.coach_id, wechat, alipay, alipayMessage);
+        string? cell = await db.memberSocialAccount.AsNoTracking().Where(a => a.member_id == i.member_id && a.valid == 1 && a.type == MemberSocialAccount.TYPE_CELL)
+            .OrderByDescending(a => a.id).Select(a => a.num).FirstOrDefaultAsync();
+        return new IntroducerView(i.id, i.member_id, i.type, i.name, i.real_name, i.valid == 1, i.coach_id, wechat, alipay, alipayMessage, CoachCardRules.PhoneTail(cell));
     }
 
     /// <summary>支付宝登录号：空就是没填；填了要是手机号或邮箱，并且要有真实姓名（支付宝按登录号绑定时核对）。</summary>

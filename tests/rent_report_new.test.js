@@ -43,7 +43,7 @@ test('跨天查询按关单日期汇总可见行，包括空白日期与临时�
     const ignored = normal('2026-10-30', [100]);
     ignored.rentals[0].entertain = 1;
     p.query([normal('2026-10-28', [70, 20]), temporary, ignored]);
-    assert.equal(p.elements.total.innerText, '总计：120.00');
+    assert.match(p.elements.total.innerText, /^总计：120\.00/);
     assert.match(p.elements.dailyTotals.innerText, /2026-10-28[^\n]*90\.00/);
     assert.match(p.elements.dailyTotals.innerText, /2026-10-29[^\n]*0\.00/);
     assert.match(p.elements.dailyTotals.innerText, /2026-10-30[^\n]*30\.00/);
@@ -56,7 +56,7 @@ test('单日查询隐藏每日汇总，重新查询清除旧汇总', () => {
     p.context.startDate = '2026-11-01';
     p.context.endDate = '2026-11-01';
     p.query([normal('2026-11-01', [12])]);
-    assert.equal(p.elements.total.innerText, '总计：12.00');
+    assert.match(p.elements.total.innerText, /^总计：12\.00/);
     assert.equal(p.elements.dailyTotals.innerText, '');
 });
 
@@ -65,9 +65,12 @@ test('空结果跨月查询显示每天的零金额', () => {
     p.context.startDate = '2026-10-31';
     p.context.endDate = '2026-11-02';
     p.query([]);
-    assert.equal(p.elements.total.innerText, '总计：0.00');
+    assert.match(p.elements.total.innerText, /^总计：0\.00/);
     assert.equal(p.elements.dailyTotals.innerText,
-        '每日汇总（结算日期）：\n2026-10-31：0.00\n2026-11-01：0.00\n2026-11-02：0.00');
+        '每日汇总（结算日期）：\n' +
+        '2026-10-31：租金 0.00  |  微信支付结余：0.00  |  支付宝结余：0.00\n' +
+        '2026-11-01：租金 0.00  |  微信支付结余：0.00  |  支付宝结余：0.00\n' +
+        '2026-11-02：租金 0.00  |  微信支付结余：0.00  |  支付宝结余：0.00');
 });
 
 test('同一订单的收款、退款与结余只出现在第一条可见明细，支持多次支付及其他方式', () => {
@@ -120,4 +123,59 @@ test('下载的 CSV 包含支付列，且带逗号和引号的字段不拆列', 
     assert.match(csv, /现金收款,现金退款,现金结余/);
     assert.match(csv, /"头盔, ""高级"""/);
     assert.match(csv, /100\.00,30\.00,70\.00/);
+});
+
+test('每日按订单结算日期汇总各支付方式结余，不重复计算多条明细', () => {
+    const p = page();
+    const first = normal('2026-10-28', [70, 20], { availablePayments: [
+        { pay_method: '微信支付', amount: 100, refundedAmount: 40 },
+        { pay_method: '支付宝', amount: 50, refundedAmount: 20 },
+        { pay_method: '现金', amount: 20, refundedAmount: 8 }
+    ] });
+    const second = normal('2026-10-28', [50], { availablePayments: [
+        { pay_method: '微信支付', amount: 80, refundedAmount: 70 }
+    ] });
+    const third = normal('2026-10-30', [30], { availablePayments: [
+        { pay_method: '支付宝', amount: 90, refundedAmount: 60 }
+    ] });
+    const excluded = normal('2026-10-29', [90], { availablePayments: [
+        { pay_method: '现金', amount: 999, refundedAmount: 0 }
+    ] });
+    excluded.rentals[0].entertain = 1;
+    p.query([first, second, third, excluded]);
+    const lines = p.elements.dailyTotals.innerText.split('\n');
+    assert.match(lines[1], /2026-10-28.*140\.00.*微信支付结余[：:]\s*70\.00.*支付宝结余[：:]\s*30\.00.*现金结余[：:]\s*12\.00/);
+    assert.match(lines[2], /2026-10-29.*0\.00.*微信支付结余[：:]\s*0\.00.*支付宝结余[：:]\s*0\.00.*现金结余[：:]\s*0\.00/);
+    assert.match(lines[3], /2026-10-30.*30\.00.*微信支付结余[：:]\s*0\.00.*支付宝结余[：:]\s*30\.00.*现金结余[：:]\s*0\.00/);
+});
+
+test('重新查询时每日支付汇总不会保留前次数据或其他支付方式', () => {
+    const p = page();
+    p.query([normal('2026-10-28', [10], { availablePayments: [{ pay_method: '现金', amount: 10, refundedAmount: 0 }] })]);
+    assert.match(p.elements.dailyTotals.innerText, /现金结余[：:]\s*10\.00/);
+    p.query([normal('2026-10-28', [20], { availablePayments: [{ pay_method: '支付宝', amount: 20, refundedAmount: 5 }] })]);
+    assert.match(p.elements.dailyTotals.innerText, /支付宝结余[：:]\s*15\.00/);
+    assert.doesNotMatch(p.elements.dailyTotals.innerText, /现金结余/);
+});
+
+test('总计显示各支付方式跨日结余，同订单多条明细只计一次', () => {
+    const p = page();
+    p.query([
+        normal('2026-10-28', [70, 20], { availablePayments: [
+            { pay_method: '微信支付', amount: 100, refundedAmount: 40 },
+            { pay_method: '现金', amount: 30, refundedAmount: 10 }
+        ] }),
+        normal('2026-10-30', [50], { availablePayments: [
+            { pay_method: '微信支付', amount: 10, refundedAmount: 2 },
+            { pay_method: '支付宝', amount: 90, refundedAmount: 60 }
+        ] })
+    ]);
+    assert.match(p.elements.total.innerText, /总计：140\.00.*微信支付结余[：:]\s*68\.00.*支付宝结余[：:]\s*30\.00.*现金结余[：:]\s*20\.00/);
+    p.context.startDate = '2026-10-30';
+    p.context.endDate = '2026-10-30';
+    p.query([normal('2026-10-30', [50], { availablePayments: [
+        { pay_method: '支付宝', amount: 90, refundedAmount: 60 }
+    ] })]);
+    assert.match(p.elements.total.innerText, /总计：50\.00.*微信支付结余[：:]\s*0\.00.*支付宝结余[：:]\s*30\.00/);
+    assert.doesNotMatch(p.elements.total.innerText, /现金结余/);
 });

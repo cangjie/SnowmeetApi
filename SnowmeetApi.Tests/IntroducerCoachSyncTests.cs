@@ -4,12 +4,112 @@ using SnowmeetApi.Controllers.IntroducerShare;
 using SnowmeetApi.Data;
 using SnowmeetApi.Models;
 using SnowmeetApi.Services.Share;
+using SnowmeetApi.Services.CoachPlatform;
 
 namespace SnowmeetApi.Tests;
 
 // 教练也是介绍人：有效的教练自动出现在介绍人名单和订单上的候选里，不用再一个个添加。
 public class IntroducerCoachSyncTests
 {
+    [Fact]
+    public async Task Existing_distributor_can_link_an_existing_active_coach_without_replacing_history()
+    {
+        await using var db = await ShareFixture.NewDbAsync();
+        await AddCoachAsync(db, 7, 201, "旧教练");
+        db.orderShareRelation.Add(new OrderShareRelation { id = 18, name = "分销商", type = "个人", valid = true });
+        db.introducer.Add(new Introducer { id = 8, member_id = 201, type = "KOL", name = "分销商", relation_id = 18, valid = 1 });
+        await db.SaveChangesAsync();
+        db.ChangeTracker.Clear();
+        var svc = new IntroducerService(db, new NoBinder());
+        await svc.SyncDistributorsAsync();
+        var intro = await db.introducer.AsNoTracking().SingleAsync(i => i.id == 8);
+        Assert.Equal(7, intro.coach_id);
+        Assert.Equal(18, intro.relation_id);
+        Assert.Equal("分销商", (await db.coach.AsNoTracking().SingleAsync()).display_name);
+    }
+
+    [Fact]
+    public async Task Legacy_distributor_without_coach_is_provisioned_but_a_stopped_coach_is_not_reactivated()
+    {
+        await using var db = await ShareFixture.NewDbAsync();
+        await ShareFixture.AddIntroducerAsync(db, 201, "KOL");
+        var conflict = await ShareFixture.AddIntroducerAsync(db, 202, "机构");
+        db.coach.Add(new Coach { id = 9, member_id = 202, display_name = "已停用", valid = 0 });
+        await db.SaveChangesAsync();
+        db.ChangeTracker.Clear();
+        var result = await new IntroducerService(db, new NoBinder()).SyncDistributorsAsync();
+        Assert.Equal(1, result.created);
+        Assert.Single(result.conflicts);
+        Assert.Equal(1, (await db.coach.AsNoTracking().SingleAsync(c => c.member_id == 201)).valid);
+        Assert.Equal(0, (await db.coach.AsNoTracking().SingleAsync(c => c.id == 9)).valid);
+        Assert.Null((await db.introducer.AsNoTracking().SingleAsync(i => i.id == conflict.id)).coach_id);
+    }
+
+    [Fact]
+    public async Task Stopped_distributor_with_active_coach_is_reported_without_changing_status()
+    {
+        await using var db = await ShareFixture.NewDbAsync();
+        var intro = await ShareFixture.AddIntroducerAsync(db, 201, "KOL");
+        var stopped = await db.introducer.AsNoTracking().SingleAsync(i => i.id == intro.id);
+        stopped.valid = 0;
+        db.introducer.Update(stopped);
+        db.coach.Add(new Coach { member_id = 201, display_name = "仍启用", valid = 1 });
+        await db.SaveChangesAsync();
+        db.ChangeTracker.Clear();
+        var result = await new IntroducerService(db, new NoBinder()).SyncDistributorsAsync();
+        Assert.Single(result.conflicts);
+        Assert.Equal(0, (await db.introducer.AsNoTracking().SingleAsync()).valid);
+        Assert.Equal(1, (await db.coach.AsNoTracking().SingleAsync()).valid);
+    }
+
+    [Fact]
+    public async Task Conflicting_stopped_distributor_cannot_issue_or_claim_new_cards()
+    {
+        await using var db = await ShareFixture.NewDbAsync();
+        var intro = await ShareFixture.AddIntroducerAsync(db, 201, "KOL");
+        var stopped = await db.introducer.AsNoTracking().SingleAsync(i => i.id == intro.id);
+        stopped.valid = 0;
+        db.introducer.Update(stopped);
+        db.coach.Add(new Coach { id = 9, member_id = 201, display_name = "旧教练", valid = 1, rental_rate = 0.9 });
+        db.coachCard.Add(new CoachCard { id = 21, coach_id = 9, token = "aaaaaaaaaaaaaaaaaaaaaaaa", status = CoachCard.StatusIssued });
+        await db.SaveChangesAsync();
+        db.ChangeTracker.Clear();
+        var cards = new CoachCardService(db, ShareFixture.Config);
+        await Assert.ThrowsAsync<CoachException>(() => cards.CreateCardAsync(9, DateTime.Now));
+        Assert.Equal(ShareCardState.Invalid, (await cards.GetShareCardAsync("aaaaaaaaaaaaaaaaaaaaaaaa", 202, DateTime.Now)).state);
+        Assert.Equal(ShareCardState.Invalid, (await cards.ClaimAsync("aaaaaaaaaaaaaaaaaaaaaaaa", 202, DateTime.Now)).state);
+    }
+
+    [Fact]
+    public async Task Admin_list_preserves_preexisting_stopped_coach_as_a_stopped_distributor()
+    {
+        await using var db = await ShareFixture.NewDbAsync();
+        await ShareFixture.AddStaffSessionAsync(db, 301, 300, "admin-s");
+        await AddCoachAsync(db, 9, 201, "旧教练", valid: 0);
+        var ctl = new IntroducerController(db, ShareFixture.Config, ShareFixture.Http);
+        var listed = D(await ctl.ListIntroducers("admin-s")).GetProperty("introducers");
+        Assert.Equal(1, listed.GetArrayLength());
+        Assert.False(listed[0].GetProperty("valid").GetBoolean());
+        Assert.Equal(9, listed[0].GetProperty("coachId").GetInt32());
+        Assert.Equal(0, (await db.coach.AsNoTracking().SingleAsync(c => c.id == 9)).valid);
+    }
+
+    [Fact]
+    public async Task Stopped_unlinked_distributor_is_linked_to_the_same_stopped_coach()
+    {
+        await using var db = await ShareFixture.NewDbAsync();
+        var intro = await ShareFixture.AddIntroducerAsync(db, 201, "KOL");
+        var stopped = await db.introducer.AsNoTracking().SingleAsync(i => i.id == intro.id);
+        stopped.valid = 0;
+        db.introducer.Update(stopped);
+        db.coach.Add(new Coach { id = 9, member_id = 201, display_name = "旧名称", valid = 0 });
+        await db.SaveChangesAsync();
+        db.ChangeTracker.Clear();
+        await new IntroducerService(db, new NoBinder()).SyncDistributorsAsync();
+        Assert.Equal(9, (await db.introducer.AsNoTracking().SingleAsync(i => i.id == intro.id)).coach_id);
+        Assert.Equal(0, (await db.coach.AsNoTracking().SingleAsync(c => c.id == 9)).valid);
+    }
+
     private sealed class NoBinder : IAlipayRoyaltyBinder
     {
         public Task<(bool ok, string message)> BindAsync(string accountType, string account, string? realName) => Task.FromResult((true, ""));

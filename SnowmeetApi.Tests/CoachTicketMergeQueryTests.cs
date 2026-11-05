@@ -11,6 +11,37 @@ namespace SnowmeetApi.Tests;
 
 public class CoachTicketMergeQueryTests
 {
+    [Fact]
+    public async Task Member_merge_moves_distributor_with_its_existing_platform_identity()
+    {
+        await using var f = await CoachFixture.Create();
+        var relation = new OrderShareRelation { name = "教练", type = "个人", valid = true };
+        f.Db.orderShareRelation.Add(relation);
+        await f.Db.SaveChangesAsync();
+        f.Db.introducer.Add(new Introducer { member_id = CoachFixture.CoachMember, coach_id = f.CoachId, type = "KOL", name = "教练", relation_id = relation.id, valid = 1 });
+        await f.Db.SaveChangesAsync();
+        await new MemberController(f.NewContext(), f.Config).MergeMember(CoachFixture.CoachMember, CoachFixture.StudentC);
+        var intro = await f.Db.introducer.AsNoTracking().SingleAsync(i => i.relation_id == relation.id);
+        Assert.Equal(CoachFixture.StudentC, intro.member_id);
+        Assert.Equal(f.CoachId, intro.coach_id);
+        Assert.Equal(CoachFixture.StudentC, (await f.Db.coach.AsNoTracking().SingleAsync(c => c.id == f.CoachId)).member_id);
+    }
+
+    [Fact]
+    public async Task Member_merge_blocks_two_distributor_identities_without_changing_them()
+    {
+        await using var f = await CoachFixture.Create();
+        f.Db.orderShareRelation.AddRange(new OrderShareRelation { id = 71, name = "甲", type = "个人", valid = true }, new OrderShareRelation { id = 72, name = "乙", type = "个人", valid = true });
+        f.Db.introducer.AddRange(
+            new Introducer { member_id = CoachFixture.StudentA, type = "KOL", name = "甲", relation_id = 71, valid = 1 },
+            new Introducer { member_id = CoachFixture.StudentB, type = "机构", name = "乙", relation_id = 72, valid = 1 });
+        await f.Db.SaveChangesAsync();
+        var helper = new MemberController(f.NewContext(), f.Config);
+        Assert.Contains("分销商", (await helper.MergeBlockReasonAsync(CoachFixture.StudentA, CoachFixture.StudentB))!);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => helper.MergeMember(CoachFixture.StudentA, CoachFixture.StudentB));
+        Assert.Equal(2, await f.Db.introducer.AsNoTracking().CountAsync());
+    }
+
     private static TicketMigrationTests.TestTicketController Tickets(CoachFixture f) => new(f.NewContext(), f.Config);
     private static ApiResult<Ticket> R(ActionResult<ApiResult<Ticket>> a) => TicketMigrationTests.Result(a);
 
