@@ -20,6 +20,7 @@
     <style>
         td {
             text-align: center;
+            white-space: nowrap;
             padding-left: 5px;
             padding-right: 5px;
             border: solid;
@@ -46,8 +47,9 @@
     </div>
     <div id="total" ></div>
     <div id="dailyTotals" style="white-space: pre-line;"></div>
-    <div style="text-align:center;display:flex;justify-content:left;margin-top:50px">
-        <table style="border:solid;border-width:1px;width:100%">
+    <div style="color:#555;font-size:14px">退款按系统记录统计：状态为成功或已有渠道退款单号；结余＝收款－退款。</div>
+    <div style="text-align:center;display:flex;justify-content:left;margin-top:50px;overflow-x:auto;width:100%">
+        <table style="border:solid;border-width:1px;width:100%;min-width:max-content">
             <thead>
                 <tr id="tHead">
                 </tr>
@@ -67,13 +69,13 @@
         var csvContent = '';
         var lineContent = '';
         for (var i = 0; i < tHead.length; i++) {
-            lineContent += (i > 0 ? ',' : '') + tHead[i];
+            lineContent += (i > 0 ? ',' : '') + csvCell(tHead[i]);
         }
         csvContent += lineContent + '\r\n';
         for (var i = 0; i < tData.length; i++) {
             lineContent = '';
             for (var j = 0; j < tHead.length; j++) {
-                lineContent += (j > 0 ? ',' : '') + tData[i][j];
+                lineContent += (j > 0 ? ',' : '') + csvCell(tData[i][j]);
             }
             csvContent += lineContent + '\r\n';
         }
@@ -85,8 +87,12 @@
         link.click();
         document.body.removeChild(link);
     }
+    function csvCell(value) {
+        var text = value == null ? '' : String(value);
+        return /[",\r\n]/.test(text) ? '"' + text.replace(/"/g, '""') + '"' : text;
+    }
     var tHeadTemplate = ['序号', '订单号', '订单类型', '商品名称','订单日期','订单时间', '起租日期', '退租日期', '结算日期', '租金'];
-    var tHead = tHeadTemplate;
+    var tHead = tHeadTemplate.slice();
     var tData = [];
     var totalAmount = 0;
     var dailyAmounts = {};
@@ -106,7 +112,7 @@
         btnCtrl.disabled = true;
         btnCtrl.innerText = "查询中……";
         var getUrl = '../../api/Rent/GetConfirmedRentOrder?sessionKey=' + encodeURIComponent(sessionKey)
-            + '&startDate=' + queryStartDate + '&endDate=' + queryEndDate;
+            + '&startDate=' + queryStartDate + '&endDate=' + queryEndDate + '&includeOtherPaymentMethods=true';
         $.ajax({
             url: getUrl,
             type: 'GET',
@@ -121,11 +127,15 @@
                 }
                 resultStartDate = queryStartDate;
                 resultEndDate = queryEndDate;
+                tHead = tHeadTemplate.slice();
                 var orders = msg.data
                 console.log('get orders', orders);
                 var index = 1;
+                var paymentRows = [];
+                var otherPaymentMethods = new Set();
                 for (var i = 0; i < orders.length; i++) {
                     var order = orders[i];
+                    var firstRowIndex = tData.length;
                     if (order.rentals != null && order.rentals.length > 0) {
                         for (var j = 0; j < order.rentals.length; j++) {
                             var rental = order.rentals[j]
@@ -232,7 +242,31 @@
                         }
 
                     }
+                    if (tData.length > firstRowIndex) {
+                        var payments = summarizePayments(order.availablePayments || []);
+                        Object.keys(payments).forEach(function (method) {
+                            if (method !== '微信支付' && method !== '支付宝') otherPaymentMethods.add(method);
+                        });
+                        paymentRows.push({ row: tData[firstRowIndex], payments: payments });
+                    }
                 }
+                var paymentMethods = ['微信支付', '支付宝'].concat(Array.from(otherPaymentMethods).sort());
+                paymentMethods.forEach(function (method) {
+                    tHead.push(method + '收款', method + '退款', method + '结余');
+                });
+                tData.forEach(function (row) {
+                    while (row.length < tHead.length) row.push('');
+                });
+                paymentRows.forEach(function (entry) {
+                    paymentMethods.forEach(function (method, index) {
+                        var amounts = entry.payments[method];
+                        if (!amounts) return;
+                        var col = tHeadTemplate.length + index * 3;
+                        entry.row[col] = (amounts.received / 100).toFixed(2);
+                        entry.row[col + 1] = (amounts.refunded / 100).toFixed(2);
+                        entry.row[col + 2] = ((amounts.received - amounts.refunded) / 100).toFixed(2);
+                    });
+                });
                 console.log('get head', tHead);
                 render();
             },
@@ -242,6 +276,17 @@
             }
         })
     }
+    function summarizePayments(payments) {
+        var totals = Object.create(null);
+        payments.forEach(function (payment) {
+            var method = (payment.pay_method || '').trim() || '未标明支付方式';
+            if (!totals[method]) totals[method] = { received: 0, refunded: 0 };
+            totals[method].received += Math.round(Number(payment.amount) * 100);
+            totals[method].refunded += Math.round(Number(payment.refundedAmount || 0) * 100);
+        });
+        return totals;
+    }
+
     function addDailyAmount(closeDate, amount) {
         var date = formatDate(closeDate);
         dailyAmounts[date] = (dailyAmounts[date] || 0) + amount;

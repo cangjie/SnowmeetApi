@@ -7686,7 +7686,8 @@ namespace SnowmeetApi.Controllers
         }
         [HttpGet]
         public async Task<ActionResult<ApiResult<List<Models.Order>?>>> GetConfirmedRentOrder(string shop,
-            DateTime startDate, DateTime endDate, string sessionKey, string sessionType = "wechat_mini_openid")
+            DateTime startDate, DateTime endDate, string sessionKey, string sessionType = "wechat_mini_openid",
+            bool includeOtherPaymentMethods = false)
         {
             Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
             if (staff.title_level == 50)
@@ -7724,7 +7725,7 @@ namespace SnowmeetApi.Controllers
                     if ((staff.title_level == 50 && ((DateTime)order.close_date).Date < DateTime.Now.AddDays(-1).Date)
                         || staff.title_level > 50)
                     {
-                        if (order.availablePayments.Where(p => p.pay_method != "微信支付" && p.pay_method != "支付宝").ToList().Count <= 0)
+                        if (includeOtherPaymentMethods || order.availablePayments.All(p => p.pay_method == "微信支付" || p.pay_method == "支付宝"))
                         {
                             confirmedOrders.Add(order);
                         }
