@@ -41,9 +41,10 @@ public sealed class CoachController(ApplicationDBContext db, IConfiguration conf
     private async Task<object> CoachInfoAsync(Models.Coach coach)
     {
         List<CoachCarePrice> prices = await Db.coachCarePrice.AsNoTracking().Where(p => p.coach_id == coach.id).OrderBy(p => p.shop).ThenBy(p => p.tier).ToListAsync();
+        bool canIssue = coach.valid == 1 && await DistributorAccess.CanIssueAsync(Db, coach);
         return new
         {
-            id = coach.id, name = coach.display_name, valid = coach.valid == 1, rentalRate = coach.rental_rate,
+            id = coach.id, name = coach.display_name, valid = canIssue, rentalRate = coach.rental_rate,
             carePrices = prices.Select(p => new { p.shop, p.tier, p.mode, p.value }),
             validUntil = CoachCardRules.SeasonEnd(DateTime.Now, config),
         };

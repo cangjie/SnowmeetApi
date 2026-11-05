@@ -72,9 +72,13 @@ public class IntroducerCoachSyncTests
         db.introducer.Update(stopped);
         db.coach.Add(new Coach { id = 9, member_id = 201, display_name = "旧教练", valid = 1, rental_rate = 0.9 });
         db.coachCard.Add(new CoachCard { id = 21, coach_id = 9, token = "aaaaaaaaaaaaaaaaaaaaaaaa", status = CoachCard.StatusIssued });
+        db.miniSession.Add(new MiniSession { session_key = "dist-stopped", session_type = "wechat_mini_openid", member_id = 201,
+            wechat_openid = "mini-201", valid = 1, expire_date = DateTime.Now.AddHours(1) });
         await db.SaveChangesAsync();
         db.ChangeTracker.Clear();
         var cards = new CoachCardService(db, ShareFixture.Config);
+        var self = await new SnowmeetApi.Controllers.CoachPlatform.CoachController(db, ShareFixture.Config).GetMyCoach("dist-stopped");
+        Assert.False(D(self).GetProperty("coach").GetProperty("valid").GetBoolean());
         await Assert.ThrowsAsync<CoachException>(() => cards.CreateCardAsync(9, DateTime.Now));
         Assert.Equal(ShareCardState.Invalid, (await cards.GetShareCardAsync("aaaaaaaaaaaaaaaaaaaaaaaa", 202, DateTime.Now)).state);
         Assert.Equal(ShareCardState.Invalid, (await cards.ClaimAsync("aaaaaaaaaaaaaaaaaaaaaaaa", 202, DateTime.Now)).state);
