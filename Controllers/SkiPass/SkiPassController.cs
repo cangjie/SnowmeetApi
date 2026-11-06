@@ -629,7 +629,7 @@ namespace SnowmeetApi.Controllers
             {
                 return NotFound();
             }
-            if (skipass.member_id != member.id && !SkipassSaleRules.CanReserve(await GetStaffOrNull(sessionKey, sessionType)))
+            if (skipass.member_id != member.id && !SkipassSaleRules.IsActiveStaff(await GetStaffOrNull(sessionKey, sessionType)))
             {
                 return BadRequest();
             }
@@ -1412,12 +1412,7 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<object>> ReserveSkiPass(int productId, DateTime date,
             int count, string cell, string name, string sessionKey, string sessionType = "wechat_mini_openid", string idNo = "", int refereeMemberId = 0, int? staffId = null)
         {
-            // 只有在职店员能订票，顾客只能看价格。微信、支付宝小程序共用这个入口，在这里一处拦住；
-            // 页面上隐藏支付栏只是体验，不能当作限制。
-            if (!SkipassSaleRules.CanReserve(await GetStaffOrNull(sessionKey, sessionType)))
-            {
-                return BadRequest(SkipassSaleRules.STAFF_ONLY_MESSAGE);
-            }
+            // 2026-11-06 起订票对所有登录用户开放（2026-10-29 起曾只限店员）。会话是否有效在 ReserveTickets 里核对。
             // 供应商一单只能 1 张：多张按张数展开成多条记录（原来是一条记录写 count 张，会被供应商拒绝，价格还会乘两次）
             var items = new List<SkipassCartItem>
             {
@@ -1432,10 +1427,6 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<object>> ReserveSkiPassCart([FromBody] SkipassCartRequest request, string sessionKey,
             string sessionType = "wechat_mini_openid")
         {
-            if (!SkipassSaleRules.CanReserve(await GetStaffOrNull(sessionKey, sessionType)))
-            {
-                return BadRequest(SkipassSaleRules.STAFF_ONLY_MESSAGE);
-            }
             if (request == null)
             {
                 return BadRequest("购物车是空的");
@@ -1479,6 +1470,7 @@ namespace SnowmeetApi.Controllers
             }
 
             // 每个自我游账号各自的预存款要够付它名下这些票的合计，不够整单不让付（付了款出不了票）
+            bool isStaff = SkipassSaleRules.IsActiveStaff(await GetStaffOrNull(sessionKey, sessionType));
             foreach (var group in rows.GroupBy(r => (r.skipassProduct.source ?? "").Trim()))
             {
                 double need = group.Sum(r => r.price.deal_price);
@@ -1489,11 +1481,12 @@ namespace SnowmeetApi.Controllers
                 }
                 catch
                 {
-                    return BadRequest("查询" + group.Key + "预存款失败，请稍后再试");
+                    return BadRequest(isStaff ? "查询" + group.Key + "预存款失败，请稍后再试" : SkipassSaleRules.CUSTOMER_UNAVAILABLE_MESSAGE);
                 }
                 if (!(need < balance))
                 {
-                    return BadRequest(group.Key + "预存款不足，暂时不能订票");
+                    // 预存款和账号名是内部信息，只告诉店员；顾客只看到通用提示
+                    return BadRequest(isStaff ? group.Key + "预存款不足，暂时不能订票" : SkipassSaleRules.CUSTOMER_UNAVAILABLE_MESSAGE);
                 }
             }
 

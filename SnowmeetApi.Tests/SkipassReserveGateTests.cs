@@ -13,24 +13,28 @@ using Xunit;
 namespace SnowmeetApi.Tests
 {
     /// <summary>
-    /// 万龙雪票下单入口 ReserveSkiPass 的店员闸门（2026-10-29 用户拍板：顾客能看价格，不能订票）。
-    /// 页面隐藏支付栏不算数，这里验证的是后端：顾客、无会话一律 400 且不建订单；店员正常下单，成交价取库里的 deal_price。
-    /// 以及顾客看不到进货价（GetProductsByResort / GetProduct / GetBalance）。
+    /// 万龙雪票下单入口 ReserveSkiPass：2026-10-29 起只有店员能订，2026-11-06 起开放给所有登录用户（用户拍板）。
+    /// 现在验证的是：任何有效会话都能订（订单和票属于下单的人），没有会话/会话无效仍 400 且不建订单；成交价取库里的 deal_price。
+    /// 进货价仍只给店员看：顾客看不到（GetProductsByResort / GetProduct / GetBalance）。
     /// </summary>
     public class SkipassReserveGateTests
     {
         static readonly DateTime TravelDate = DateTime.Today.AddDays(3);
 
         [Fact]
-        public async Task 顾客会话下单_被拒绝_不建订单()
+        public async Task 顾客会话下单_可以订_订单和票都属于顾客()
         {
             await using var f = await Fixture.Create();
             await using var db = f.NewContext();
             var result = await f.Controller(db).ReserveSkiPass(901, TravelDate, 1, "13800138000", "张三", "customer-session");
-            var bad = Assert.IsType<BadRequestObjectResult>(result.Result);
-            Assert.Equal(SkipassSaleRules.STAFF_ONLY_MESSAGE, bad.Value);
-            Assert.Empty(await db.order.ToListAsync());
-            Assert.Empty(await db.skiPass.ToListAsync());
+            var ok = Assert.IsType<OkObjectResult>(result.Result);
+            var order = Assert.IsType<SnowmeetApi.Models.Order>(ok.Value);
+            Assert.Equal(11, order.member_id);
+            Assert.Equal(579, order.total_amount);
+            var skipass = await db.skiPass.SingleAsync();
+            Assert.Equal(11, skipass.member_id);
+            Assert.Equal(579, skipass.deal_price);
+            Assert.Equal("张三", skipass.contact_name);
         }
 
         [Theory]
@@ -46,13 +50,14 @@ namespace SnowmeetApi.Tests
         }
 
         [Fact]
-        public async Task 已停用店员的会话_被拒绝()
+        public async Task 已停用店员的会话_按顾客处理_也能订_但看不到进货价()
         {
             await using var f = await Fixture.Create(staffValid: 0);
             await using var db = f.NewContext();
             var result = await f.Controller(db).ReserveSkiPass(901, TravelDate, 1, "13800138000", "张三", "staff-session");
-            Assert.IsType<BadRequestObjectResult>(result.Result);
-            Assert.Empty(await db.order.ToListAsync());
+            Assert.IsType<OkObjectResult>(result.Result);
+            var list = ListOf(await f.Controller(db).GetProductsByResort("万龙", 0, "staff-session"));
+            Assert.Null(list.Single(x => x.product_id == 901).cost);
         }
 
         [Fact]

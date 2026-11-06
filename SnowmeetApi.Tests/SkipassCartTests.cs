@@ -160,16 +160,53 @@ namespace SnowmeetApi.Tests
         }
 
         [Fact]
-        public async Task 购物车下单_顾客会话被拒绝()
+        public async Task 购物车下单_顾客会话也能订_订单属于顾客()
         {
             await using var f = await Fixture.Create();
             await using var db = f.NewContext();
             var result = await f.Controller(db).ReserveSkiPassCart(
                 new SkipassCartRequest { items = new List<SkipassCartItem> { Item(901, "13501177897", date: D0) } }, "customer-session");
-            var bad = Assert.IsType<BadRequestObjectResult>(result.Result);
-            Assert.Equal(SkipassSaleRules.STAFF_ONLY_MESSAGE, bad.Value);
+            var ok = Assert.IsType<OkObjectResult>(result.Result);
+            var order = Assert.IsType<SnowmeetApi.Models.Order>(ok.Value);
+            Assert.Equal(11, order.member_id);
+            await using var check = f.NewContext();
+            var pass = await check.skiPass.SingleAsync();
+            Assert.Equal(11, pass.member_id);
+        }
+
+        [Fact]
+        public async Task 购物车下单_预存款不够_顾客看到的提示不带账号名和预存款字样_店员看原提示()
+        {
+            await using var f = await Fixture.Create();
+            f.Balances["万龙自我游"] = 100;
+            await using var db = f.NewContext();
+            var request = new SkipassCartRequest { items = new List<SkipassCartItem> { Item(901, "13501177897", date: D0) } };
+
+            var customer = Assert.IsType<BadRequestObjectResult>((await f.Controller(db).ReserveSkiPassCart(request, "customer-session")).Result);
+            string msg = (string)customer.Value!;
+            Assert.DoesNotContain("预存款", msg);
+            Assert.DoesNotContain("万龙自我游", msg);
+            Assert.Contains("暂时不能订票", msg);
+
+            var staff = Assert.IsType<BadRequestObjectResult>((await f.Controller(db).ReserveSkiPassCart(request, "staff-session")).Result);
+            Assert.Contains("万龙自我游预存款不足", (string)staff.Value!);
             await using var check = f.NewContext();
             Assert.Empty(await check.order.ToListAsync());
+        }
+
+        [Fact]
+        public async Task 购物车下单_查预存款失败_顾客看到的提示不带账号名和预存款字样()
+        {
+            await using var f = await Fixture.Create();
+            f.BalanceFails = true;
+            await using var db = f.NewContext();
+            var request = new SkipassCartRequest { items = new List<SkipassCartItem> { Item(901, "13501177897", date: D0) } };
+            var customer = Assert.IsType<BadRequestObjectResult>((await f.Controller(db).ReserveSkiPassCart(request, "customer-session")).Result);
+            string msg = (string)customer.Value!;
+            Assert.DoesNotContain("预存款", msg);
+            Assert.DoesNotContain("万龙自我游", msg);
+            var staff = Assert.IsType<BadRequestObjectResult>((await f.Controller(db).ReserveSkiPassCart(request, "staff-session")).Result);
+            Assert.Contains("预存款失败", (string)staff.Value!);
         }
 
         [Fact]
@@ -845,6 +882,7 @@ namespace SnowmeetApi.Tests
                 new Dictionary<string, string?> { ["Settings:AppId"] = "local-test-app" }).Build();
             public IHttpContextAccessor Http { get; } = new TestHttp();
             public Dictionary<string, double> Balances { get; } = new() { ["万龙自我游"] = 100000, ["大好河山"] = 100000 };
+            public bool BalanceFails { get; set; }
 
             Fixture(SqliteConnection c) { connection = c; }
 
@@ -855,7 +893,9 @@ namespace SnowmeetApi.Tests
             public SkiPassController Controller(ApplicationDBContext db) =>
                 new(db, Config, Http)
                 {
-                    BalanceProvider = source => Task.FromResult(Balances.TryGetValue(source, out var b) ? b : 0),
+                    BalanceProvider = source => BalanceFails
+                        ? Task.FromException<double>(new InvalidOperationException("供应商接口不可用"))
+                        : Task.FromResult(Balances.TryGetValue(source, out var b) ? b : 0),
                     SupplierOrderChecker = (pass, source) => Task.FromResult(new SkiPassController.SupplierOrderCheck(SkipassSaleRules.SupplierOrderKind.NoOrder, null)),
                     SupplierOrderCanceller = (orderId, source) => Task.FromResult(true)
                 };

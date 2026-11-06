@@ -7,13 +7,15 @@ using SnowmeetApi.Models;
 namespace SnowmeetApi.Helpers
 {
     // 万龙雪票（自我游）的售卖规则。只放不碰数据库的判定，便于单测。
-    //   1. 只有在职店员能订票，顾客只能看价格（ReserveSkiPass 入口强制，页面隐藏支付栏只是体验）；
+    //   1. 订票对所有登录用户开放（2026-11-06 用户拍板；2026-10-29 起曾只限店员）；订单和票属于下单的人；
     //   2. 成交价 = 自我游门市价 marketPrice，不再加价；门市价缺失（<=0）时回退到「结算价 + 加价」；
     //   3. 价格行变化判定看结算价、建议售价、门市价任一个，不能只看结算价；
-    //   4. 非店员看不到进货价（商品 cost、每日结算价、建议售价），也查不了自我游预存款。
+    //   4. 非店员看不到进货价（商品 cost、每日结算价、建议售价），也查不了自我游预存款；
+    //      订票被预存款卡住时，顾客只看到通用提示，不带账号名和「预存款」字样。
     public static class SkipassSaleRules
     {
-        public const string STAFF_ONLY_MESSAGE = "仅限店员订票";
+        // 顾客订票被供应商账号预存款卡住（不足、查询失败）时的提示：不透露账号名和预存款
+        public const string CUSTOMER_UNAVAILABLE_MESSAGE = "暂时不能订票，请联系店员";
 
         // 自我游的两个账号：万龙自我游是万龙自己的账号，大好河山是另一个渠道账号。
         // 万龙试营业期间的票只在大好河山账号里有售卖权限（2026-10-29 核实），所以两个来源的商品都能卖。
@@ -27,14 +29,14 @@ namespace SnowmeetApi.Helpers
         const double PRICE_EPSILON = 0.005;
 
         // staff 来自 Util.GetStaffBySessionKey：会话无效、不是店员或已离职都是 null
-        public static bool CanReserve(Staff? staff)
+        public static bool IsActiveStaff(Staff? staff)
         {
             return staff != null && staff.valid == 1;
         }
 
         public static bool CanSeeCost(Staff? staff)
         {
-            return CanReserve(staff);
+            return IsActiveStaff(staff);
         }
 
         public static double ResolveDealPrice(double? marketPrice, double settlementPrice, double margin)

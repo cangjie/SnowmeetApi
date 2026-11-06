@@ -8,28 +8,28 @@ namespace SnowmeetApi.Tests
 {
     /// <summary>
     /// 万龙雪票售卖规则（2026-10-29 用户拍板）：
-    /// 价格同万龙自我游门市价、不再加价；只有店员能订票，顾客只能看价格，且看不到进货价。
+    /// 价格同万龙自我游门市价、不再加价；订票 2026-11-06 起对所有登录用户开放，但进货价、预存款仍只给店员看。
     /// </summary>
     public class SkipassSaleRulesTests
     {
-        // ---------- 谁能订票 ----------
+        // ---------- 谁算在职店员（看进货价、代别人操作票用；订票本身不再限制） ----------
 
         [Fact]
-        public void 会话没有对应店员_不能订票()
+        public void 会话没有对应店员_不是在职店员()
         {
-            Assert.False(SkipassSaleRules.CanReserve(null));
+            Assert.False(SkipassSaleRules.IsActiveStaff(null));
         }
 
         [Fact]
-        public void 在职店员_能订票()
+        public void 在职店员_是在职店员()
         {
-            Assert.True(SkipassSaleRules.CanReserve(new Staff { id = 28, valid = 1 }));
+            Assert.True(SkipassSaleRules.IsActiveStaff(new Staff { id = 28, valid = 1 }));
         }
 
         [Fact]
-        public void 已停用店员_不能订票()
+        public void 已停用店员_不是在职店员()
         {
-            Assert.False(SkipassSaleRules.CanReserve(new Staff { id = 28, valid = 0 }));
+            Assert.False(SkipassSaleRules.IsActiveStaff(new Staff { id = 28, valid = 0 }));
         }
 
         [Fact]
