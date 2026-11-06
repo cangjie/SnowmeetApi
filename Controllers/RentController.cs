@@ -7810,30 +7810,7 @@ namespace SnowmeetApi.Controllers
                     order.update_date = DateTime.Now;
                     _db.order.Entry(order).State = EntityState.Modified;
                     newList.Add(order);
-                    try
-                    {
-                        // 2026-11-02 用户定：万龙租赁的应分记录在关单时生成（不在退押金时生成），按最终的租金明细算；
-                        // 没有退款的单也要有。已经有分账记录的（可能手工调过金额）不动，免得重复生成。
-                        if (order.type == "租赁" && order.shop == "万龙体验中心" && order.hide == false
-                            && order.paidAmount > 0)
-                        {
-                            bool hasPaymentShare = await _db.paymentShare.AnyAsync(p => p.valid
-                                && _db.orderShare.Any(s => s.id == p.share_id && s.valid && s.order_id == order.id));
-                            if (!hasPaymentShare)
-                            {
-                                List<OrderShare> orderShares = await _shareHelper.CreateOrderShares(order);
-                                for (int si = 0; si < orderShares.Count; si++)
-                                {
-                                    await _shareHelper.CreatePaymentShare(orderShares[si]);
-                                }
-                            }
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        // 以前这里是空 catch，失败了没人知道：订单关了却没有应分记录
-                        Console.WriteLine($"CloseOrder 生成万龙分账失败 order={order.id} {order.code}: {ex}");
-                    }
+                    await CreateWanlongSharesAtClose(order, _shareHelper);
                 }
             }
             await _db.SaveChangesAsync();
@@ -7842,6 +7819,114 @@ namespace SnowmeetApi.Controllers
                 code = 0,
                 message = "",
                 data = newList
+            });
+        }
+        public class ManualCloseResult
+        {
+            public int orderId { get; set; }
+            public DateTime closeDate { get; set; }
+            public int staffId { get; set; }
+        }
+        // 2026-11-02 用户定：万龙租赁的应分记录在关单时生成（不在退押金时生成），按最终的租金明细算；
+        // 没有退款的单也要有。已经有分账记录的（可能手工调过金额）不动，免得重复生成。
+        // 夜间关单和手动关单（CloseOrderByStaff）共用；失败只记日志，不影响订单已经关闭。
+        [NonAction]
+        private async Task CreateWanlongSharesAtClose(Models.Order order, OrderShareController _shareHelper)
+        {
+            try
+            {
+                if (order.type == "租赁" && order.shop == "万龙体验中心" && order.hide == false
+                    && order.paidAmount > 0)
+                {
+                    bool hasPaymentShare = await _db.paymentShare.AnyAsync(p => p.valid
+                        && _db.orderShare.Any(s => s.id == p.share_id && s.valid && s.order_id == order.id));
+                    if (!hasPaymentShare)
+                    {
+                        List<OrderShare> orderShares = await _shareHelper.CreateOrderShares(order);
+                        for (int si = 0; si < orderShares.Count; si++)
+                        {
+                            await _shareHelper.CreatePaymentShare(orderShares[si]);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // 以前这里是空 catch，失败了没人知道：订单关了却没有应分记录
+                Console.WriteLine($"CloseOrder 生成万龙分账失败 order={order.id} {order.code}: {ex}");
+            }
+        }
+        // 租赁订单详情页「订单关闭」按钮：满足 RentOrderCloseRules.CanManualClose 才能关，不可逆。
+        // 订单变成了结关闭（closed = 1），close_date 记关闭时间；操作的员工记在审计日志（core_data_mod_log.staff_id，
+        // 场景「订单关闭」），不动订单上的 staff_id（那是开单员工）。关单和写日志在同一个事务里。
+        // 万龙体验中心的订单和夜间关单一样，随后生成应分记录。
+        [HttpPost("{orderId}")]
+        public async Task<ActionResult<ApiResult<ManualCloseResult?>>> CloseOrderByStaff(int orderId,
+            [FromQuery] string sessionKey, [FromQuery] string sessionType = "wechat_mini_openid")
+        {
+            ActionResult<ApiResult<ManualCloseResult?>> Fail(string message) => Ok(new ApiResult<ManualCloseResult?>()
+            {
+                code = 1,
+                message = message,
+                data = null
+            });
+            Staff? staff = string.IsNullOrWhiteSpace(sessionKey) ? null
+                : await new StaffController(_db).GetStaffBySessionKey(sessionKey, sessionType);
+            if (staff == null || staff.title_level < RentOrderCloseRules.MIN_STAFF_LEVEL)
+            {
+                return Fail("没有权限");
+            }
+            OrderController _orderHelper = new OrderController(_db, _oriConfig, _httpContextAccessor);
+            Models.Order order = await _orderHelper.GetOrder(orderId);
+            if (order == null)
+            {
+                return Fail("没有找到订单");
+            }
+            if (order.closed == 1)
+            {
+                return Fail("订单已经关闭");
+            }
+            if (!RentOrderCloseRules.CanManualClose(order))
+            {
+                return Fail("订单还不满足关闭条件：需要全部退完押金，或无需退押金且全部租赁物都已归还");
+            }
+            DateTime now = DateTime.Now;
+            await using (var tx = await _db.Database.BeginTransactionAsync())
+            {
+                // 只改还没关闭的这一行：并发点两次，只有一次能改成
+                int updated = await _db.order.Where(o => o.id == orderId && o.closed == 0)
+                    .ExecuteUpdateAsync(s => s.SetProperty(o => o.closed, 1)
+                        .SetProperty(o => o.close_date, (DateTime?)now)
+                        .SetProperty(o => o.update_date, (DateTime?)now));
+                if (updated == 0)
+                {
+                    await tx.RollbackAsync();
+                    return Fail("订单已经关闭");
+                }
+                await _db.coreDataModLog.AddAsync(new CoreDataModLog()
+                {
+                    table_name = "Order",
+                    field_name = "closed",
+                    key_value = order.id,
+                    prev_value = "0",
+                    current_value = "1",
+                    staff_id = staff.id,
+                    is_manual = 1,
+                    manual_memo = "租赁订单详情页手动关闭订单",
+                    scene = "订单关闭",
+                    create_date = now
+                });
+                await _db.SaveChangesAsync();
+                await tx.CommitAsync();
+            }
+            order.closed = 1;
+            order.close_date = now;
+            await CreateWanlongSharesAtClose(order, new OrderShareController(_db, _oriConfig, _httpContextAccessor));
+            return Ok(new ApiResult<ManualCloseResult?>()
+            {
+                code = 0,
+                message = "",
+                data = new ManualCloseResult() { orderId = order.id, closeDate = now, staffId = staff.id }
             });
         }
         [NonAction]

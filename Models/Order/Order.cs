@@ -1240,6 +1240,22 @@ namespace SnowmeetApi.Models
                 }
             }
         }
+        // 租赁订单详情页「订单关闭」按钮是否显示（也是关单接口的校验口径）：规则见 RentOrderCloseRules
+        [NotMapped]
+        public bool canManualClose
+        {
+            get
+            {
+                try
+                {
+                    return SnowmeetApi.Helpers.RentOrderCloseRules.CanManualClose(this);
+                }
+                catch
+                {
+                    return false;
+                }
+            }
+        }
         [NotMapped]
         public CarePropertySet? careProperties
         {
