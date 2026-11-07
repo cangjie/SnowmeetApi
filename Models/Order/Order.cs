@@ -1145,11 +1145,15 @@ namespace SnowmeetApi.Models
                             for (int j = 0; j < rental.rentItems.Count; j++)
                             {
                                 var item = rental.rentItems[j];
-                                if (item.noNeed)
+                                if (item.valid != 1 || item.noNeed)
                                 {
                                     continue;
                                 }
                                 string itemStatus = item.status;
+                                if (itemStatus == "已更换")
+                                {
+                                    continue;
+                                }
                                 // 暂存接口写入的日志状态是「已暂存」，枚举名是「暂存」，两者都算已领出
                                 if (itemStatus != "已发放" && itemStatus != "暂存" && itemStatus != "已暂存")
                                 {
