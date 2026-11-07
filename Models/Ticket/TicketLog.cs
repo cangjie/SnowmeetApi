@@ -13,7 +13,7 @@ namespace SnowmeetApi.Models
 		public string sender_open_id { get; set; }
 		public string accepter_open_id { get; set; }
 		public string memo { get; set; }
+		[Column(TypeName = "datetime")]
 		public DateTime transact_time { get; set; }
 	}
 }
-
