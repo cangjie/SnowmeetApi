@@ -117,6 +117,9 @@ namespace SnowmeetApi.Models
         // 该订单是否使用过次卡（punch_card_used 有有效记录）—— 列表「卡」标签用，由查询接口填充
         [NotMapped]
         public bool usePunchCard { get; set; } = false;
+        [NotMapped]
+        public bool hasCrossShopRent => rentals != null && rentals.Any(r => r.valid == 1 && r.rentItems != null
+            && r.rentItems.Any(i => i.valid == 1 && !i.noNeed && !string.IsNullOrWhiteSpace(i.pickup_shop)));
         public DateTime create_date { get; set; } = DateTime.Now;
         [ForeignKey("staff_id")]
         public Staff staff { get; set; } = null;

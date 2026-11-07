@@ -55,18 +55,21 @@ namespace SnowmeetApi.Models
                 {
                     return availabelRentDetails[0].rental_date.Date;
                 }
-                // 回退：无有效计费明细（如当日租金被免除/清零）时，按租赁物实际发放事件取最早起租，
+                // 回退：无有效计费明细时，取全部应领租赁物中最后发放的时间，
                 // 避免归还后仍因明细缺失被误判为「未开始」。
-                DateTime? earliestPick = null;
-                for (int i = 0; rentItems != null && i < rentItems.Count; i++)
+                var required = (rentItems ?? new List<RentItem>())
+                    .Where(i => i.valid == 1 && !i.noNeed && i.status != "已更换").ToList();
+                if (required.Count == 0 || required.Any(i => i.pickDate == null)) return null;
+                DateTime? latestPick = null;
+                for (int i = 0; i < required.Count; i++)
                 {
-                    DateTime? pd = rentItems[i].pickDate;
-                    if (pd != null && (earliestPick == null || pd < earliestPick))
+                    DateTime? pd = required[i].pickDate;
+                    if (pd != null && (latestPick == null || pd > latestPick))
                     {
-                        earliestPick = pd;
+                        latestPick = pd;
                     }
                 }
-                return earliestPick;
+                return latestPick;
             }
         }
         [NotMapped]
@@ -410,6 +413,8 @@ namespace SnowmeetApi.Models
         public bool atOnce { get; set; } = false;
         public bool is_associate {get; set;} = false;
         public string? pick_type {get; set;} = null;
+        // 异店装备预定的领取及归还门店；普通租赁为空。
+        public string? pickup_shop { get; set; } = null;
         [NotMapped]
         public Staff? pickStaff
         {

@@ -8,7 +8,7 @@ namespace SnowmeetApi.Tests;
 /// <summary>
 /// 租赁模式和发放：
 ///   延时租赁（atOnce=true、start_date=明天）：装备当晚发放，明天才开始计费，今天不产生租金记录；
-///   先租后取（atOnce=false、start_date=今天）：从今天起先计租金，装备不发放，稍后由店员发放。
+///   先租后取（atOnce=false）：装备稍后发放，全部领取后计租。
 /// 2026-11-01 起小程序开单页按这个口径发 atOnce（tests/rent_mode_at_once.test.js 钉住前端那一半），和旧版一致。
 /// </summary>
 public class RentalModeIssueTests
@@ -95,9 +95,9 @@ public class RentalModeIssueTests
     }
 
     [Fact]
-    public async Task LaterPickupRental_ChargesFromToday_ButGearIsNotIssued()
+    public async Task LaterPickupRental_DoesNotChargeBeforeGearIsIssued()
     {
-        // 先租后取：先开始计租金，装备稍后取走。开单生效时第一天租金就记上，装备保持「未发放」，等店员发放。
+        // 2026-11-06 起所有商品均在全部租赁物领取后计租，先租后取不再提前生成租金。
         await using var f = await CoachFixture.Create(withPricing: false);
         await SeedPrices(f);
         var (rentalId, itemId) = await NewRental(f, atOnce: false, start: DateTime.Now, pickType: "先租后取");
@@ -105,9 +105,7 @@ public class RentalModeIssueTests
         await Rent(f).EffectRental(rentalId, 9);
 
         Assert.DoesNotContain(await f.Db.rentItemLog.AsNoTracking().Where(l => l.rent_item_id == itemId).ToListAsync(), l => l.status == "已发放");
-        var detail = await f.Db.rentalDetail.AsNoTracking().SingleAsync(d => d.rental_id == rentalId && d.valid == 1);
-        Assert.Equal(DateTime.Now.Date, detail.rental_date.Date);                 // 从今天起计租金
-        Assert.Equal(150, detail.amount);                                          // 开单页给今天建的价格预设
+        Assert.Empty(await f.Db.rentalDetail.AsNoTracking().Where(d => d.rental_id == rentalId && d.valid == 1).ToListAsync());
     }
 
     [Fact]

@@ -175,7 +175,7 @@ namespace SnowmeetApi.Controllers
             bool? haveDiscount = null, string? status = null, DateTime? closeStartDate = null, DateTime? closeEndDate = null,
             bool? haveWarranty = null, string? retailType = null, string? keyword = null, bool? isSummerCare = null,
             int? rentCategoryId = null, string? rentItemName = null, bool? useCard = null, string? cell = null, string? rentStatus = null,
-            bool? hasRetail = null)
+            bool? hasRetail = null, bool crossShopOnly = false)
         {
             startDate = startDate == null ? DateTime.MinValue : startDate;
             endDate = endDate == null ? DateTime.MaxValue : endDate;
@@ -191,7 +191,13 @@ namespace SnowmeetApi.Controllers
                     orderList = await _db.order.Where(o => (o.biz_date.Date >= ((DateTime)startDate).Date && o.biz_date.Date <= ((DateTime)endDate).Date)
                         && (memberId == null || o.member_id == memberId) && (staffId == null || o.staff_id == staffId)
                         && (payOption == null || o.pay_option.Trim().Equals(payOption.Trim()))
-                        && (shop == null || o.shop.Trim().Equals(shop.Trim())) && (type == null || o.type.Trim().Equals(type.Trim()))
+                        && ((!crossShopOnly && (shop == null || o.shop.Trim().Equals(shop.Trim())))
+                            || (crossShopOnly && o.rentals.Any(r => r.valid == 1
+                                && (r.appending == null || (r.appending == false && r.append_commit_time != null))
+                                && r.rentItems.Any(i => i.valid == 1 && !i.noNeed
+                                && i.pickup_shop != null && i.pickup_shop != ""
+                                && (shop == null || o.shop.Trim() == shop.Trim() || i.pickup_shop.Trim() == shop.Trim())))))
+                        && (type == null || o.type.Trim().Equals(type.Trim()))
                         && o.valid == 1 && (orderId == null || o.id == orderId)
                         && (closeStartDate == null || (o.close_date != null && ((DateTime)o.close_date).Date >= ((DateTime)closeStartDate).Date))
                         && (closeEndDate == null || (o.close_date != null && ((DateTime)o.close_date).Date <= ((DateTime)closeEndDate).Date))
@@ -1177,9 +1183,10 @@ namespace SnowmeetApi.Controllers
             bool? isPackage = null, bool? isOnCredit = null, bool? haveDiscount = null, string? status = null, string? cell = null,
             bool? haveWarranty = null, string? retailType = null, string? keyword = null, bool? isSummerCare = null,
             int? rentCategoryId = null, string? rentItemName = null, bool? useCard = null, string? rentStatus = null,
-            string? hasRetail = null, int pageIndex = 1, int pageSize = 10)
+            string? hasRetail = null, int pageIndex = 1, int pageSize = 10, bool crossShopOnly = false)
         {
             shop = shop == null ? null : Util.UrlDecode(shop);
+            if (crossShopOnly && string.IsNullOrWhiteSpace(shop)) shop = null;
             type = type == null ? null : Util.UrlDecode(type);
             subType = subType == null ? null : Util.UrlDecode(subType);
             sessionKey = Util.UrlDecode(sessionKey);
@@ -1237,7 +1244,7 @@ namespace SnowmeetApi.Controllers
             }
             List<SnowmeetApi.Models.Order> orders = await GetCommonOrders(orderId, shop, null, null, type, startDate, endDate, payOption,
                 isTest, isEntertain, isPackage, isOnCredit, haveDiscount, status, null, null, haveWarranty, retailType, keyword, isSummerCare,
-                rentCategoryId, rentItemName, useCard, cell, rentStatus, hasRetailFilter);
+                rentCategoryId, rentItemName, useCard, cell, rentStatus, hasRetailFilter, crossShopOnly);
             List<SnowmeetApi.Models.Order> filtered = OrderQueryRules.FilterByCustomerCellSuffix(orders, cell);
             PagedOrderResult result = PagedOrderResult.Create(filtered, pageIndex, pageSize, type == "养护");
             List<SnowmeetApi.Models.Order> paged = result.items;

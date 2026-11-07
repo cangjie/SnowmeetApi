@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Threading;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -30,6 +31,7 @@ namespace SnowmeetApi.Controllers
     [ApiController]
     public class RentController : ControllerBase
     {
+        private static readonly SemaphoreSlim RentalChargeLock = new SemaphoreSlim(1, 1);
         private readonly ApplicationDBContext _db;
         private IConfiguration _config;
         public string _appId = "";
@@ -164,7 +166,7 @@ namespace SnowmeetApi.Controllers
             });
         }
         [HttpGet("{shopId}")]
-        public async Task<ActionResult<ApiResult<List<RentPrice>>>> GetRentPriceList(int shopId, string type, int id, string scene)
+        public async Task<ActionResult<ApiResult<List<RentPrice>>>> GetRentPriceList(int shopId, string type, int id, string scene, bool fallbackExperience = false)
         {
             scene = Util.UrlDecode(scene);
             type = Util.UrlDecode(type);
@@ -173,6 +175,18 @@ namespace SnowmeetApi.Controllers
                 && ((type.Trim().Equals("分类") && p.category_id == id)
                 || (type.Trim().Equals("套餐") && p.package_id == id))
                 && p.scene.Trim().Equals(scene)).AsNoTracking().ToListAsync();
+            if (fallbackExperience && await _db.shop.AnyAsync(s => s.id == shopId && s.name.Trim() == "万龙服务中心"))
+            {
+                int? fallbackId = await _db.shop.Where(s => s.name.Trim() == "万龙体验中心").Select(s => (int?)s.id).FirstOrDefaultAsync();
+                if (fallbackId != null)
+                {
+                    var fallback = await _db.rentPrice.Where(p => p.valid == 1 && p.shop_id == fallbackId && p.type.Trim() == type.Trim()
+                        && ((type == "分类" && p.category_id == id) || (type == "套餐" && p.package_id == id))
+                        && p.scene.Trim() == scene.Trim()).AsNoTracking().ToListAsync();
+                    rentPrice.AddRange(fallback.Where(p => !rentPrice.Any(local =>
+                        local.day_type.Trim() == p.day_type.Trim() && local.rent_type.Trim() == p.rent_type.Trim())));
+                }
+            }
             return Ok(new ApiResult<List<RentPrice>>()
             {
                 code = 0,
@@ -3971,12 +3985,20 @@ namespace SnowmeetApi.Controllers
             });
         }
         [HttpGet]
-        public async Task<ActionResult<ApiResult<List<RentPackage>>>> GetRentPackageList(string? shop = null)
+        public async Task<ActionResult<ApiResult<List<RentPackage>>>> GetRentPackageList(string? shop = null, bool fallbackExperience = false)
         {
             List<RentPackage> list = await _db.rentPackage.Include(c => c.rentPackageCategoryList)
                 .ThenInclude(rpc => rpc.rentCategory)
                 .Where(r => r.valid == 1 && (r.shop == null || shop == null || r.shop == shop))
                 .OrderByDescending(r => r.id).ToListAsync();
+            if (fallbackExperience && shop?.Trim() == "万龙服务中心"
+                && !list.Any(p => p.shop != null && p.shop.Trim() == "万龙服务中心"))
+            {
+                var fallback = await _db.rentPackage.Include(c => c.rentPackageCategoryList).ThenInclude(rpc => rpc.rentCategory)
+                    .Where(r => r.valid == 1 && r.shop != null && r.shop.Trim() == "万龙体验中心")
+                    .OrderByDescending(r => r.id).AsNoTracking().ToListAsync();
+                list.AddRange(fallback);
+            }
             return Ok(new ApiResult<List<RentPackage>>()
             {
                 code = 0,
@@ -4134,6 +4156,25 @@ namespace SnowmeetApi.Controllers
             });
         }
         // isTest：店员在顾客信息页勾了「这是测试订单」，订单记为测试单（is_test=1）
+        private static bool ValidCrossShopRentals(string shop, IEnumerable<Rental> rentals)
+        {
+            shop = (shop ?? "").Trim();
+            foreach (var rental in rentals ?? Enumerable.Empty<Rental>())
+            foreach (var item in rental.rentItems ?? new List<Models.RentItem>())
+            {
+                if (item.noNeed) continue;
+                if (item.pick_type != "异店租赁" && string.IsNullOrWhiteSpace(item.pickup_shop)) continue;
+                var allowed = shop == "崇礼旗舰店"
+                    ? new[] { "万龙服务中心", "万龙体验中心" }
+                    : shop == "万龙体验中心" ? new[] { "万龙服务中心" }
+                    : shop == "万龙服务中心" ? new[] { "万龙体验中心" }
+                    : Array.Empty<string>();
+                if (item.pick_type != "异店租赁" || !allowed.Contains(item.pickup_shop)) return false;
+                item.atOnce = false;
+            }
+            return true;
+        }
+
         [HttpPost]
         public async Task<ActionResult<ApiResult<Models.Order?>>> SaveRentRecept([FromBody] Models.Order order,
             [FromQuery] string sessionKey, [FromQuery] string sessionType = "wechat_mini_openid",
@@ -4150,6 +4191,8 @@ namespace SnowmeetApi.Controllers
                     data = null
                 });
             }
+            if (!ValidCrossShopRentals(order.shop, order.rentals))
+                return Ok(new ApiResult<Models.Order?> { code = 1, message = "异店领取门店不符合开单门店规则", data = null });
             order.needRender = false;
             // 学员卡校验（2026-10-30）：所选的卡必须属于该订单会员、已领取、在有效期内，否则清掉，不让无效卡留在草稿里
             for (int i = 0; i < order.rentals.Count; i++)
@@ -4671,17 +4714,42 @@ namespace SnowmeetApi.Controllers
             {
                 price = await candidates.Where(p => p.package_id == rental.package_id).AsNoTracking().FirstOrDefaultAsync();
             }
-            if (price == null && rental.category_id != null)
+            if (price == null && order?.shop?.Trim() == "万龙服务中心")
             {
+                int? fallbackId = await _db.shop.Where(s => s.name.Trim() == "万龙体验中心").Select(s => (int?)s.id).FirstOrDefaultAsync();
+                if (fallbackId != null)
+                {
+                    var fallback = _db.rentPrice.Where(p => p.day_type == dayType && p.rent_type == rentType
+                        && p.scene == scene && p.valid == 1 && p.shop_id == fallbackId);
+                    if (rental.package_id != null)
+                        price = await fallback.Where(p => p.package_id == rental.package_id).AsNoTracking().FirstOrDefaultAsync();
+                }
+            }
+            if (price == null && rental.category_id != null)
                 price = await candidates.Where(p => p.category_id == rental.category_id).AsNoTracking().FirstOrDefaultAsync();
+            if (price == null && rental.category_id != null && order?.shop?.Trim() == "万龙服务中心")
+            {
+                int? fallbackId = await _db.shop.Where(s => s.name.Trim() == "万龙体验中心").Select(s => (int?)s.id).FirstOrDefaultAsync();
+                if (fallbackId != null)
+                    price = await _db.rentPrice.Where(p => p.day_type == dayType && p.rent_type == rentType
+                        && p.scene == scene && p.valid == 1 && p.shop_id == fallbackId && p.category_id == rental.category_id)
+                        .AsNoTracking().FirstOrDefaultAsync();
             }
             return price;
         }
         [NonAction]
         public async Task<Models.RentalDetail?> SetRentalDetail(int rentalId, DateTime date, int? staffId)
         {
+            await RentalChargeLock.WaitAsync();
+            try { return await SetRentalDetailCore(rentalId, date, staffId); }
+            finally { RentalChargeLock.Release(); }
+        }
+
+        private async Task<Models.RentalDetail?> SetRentalDetailCore(int rentalId, DateTime date, int? staffId)
+        {
             List<Models.RentalDetail> detailList = await _db.rentalDetail
-                .Where(r => r.rental_id == rentalId && r.rental_date.Date == date.Date)
+                .Where(r => r.rental_id == rentalId && r.rental_date.Date == date.Date
+                    && r.valid == 1 && r.charge_type == "租金")
                 .AsNoTracking().ToListAsync();
             if (detailList.Count > 0)
             {
@@ -4700,6 +4768,7 @@ namespace SnowmeetApi.Controllers
             RentalPricePreset? preset = await _db.rentalPricePreset
                 .Where(p => p.rental_id == rentalId && p.rent_date.Date == date.Date)
                 .AsNoTracking().FirstOrDefaultAsync();
+            bool manualPrice = preset?.manual == true;
             if (preset != null)
             {
                 rentType = preset.rent_type.Trim();
@@ -4739,6 +4808,13 @@ namespace SnowmeetApi.Controllers
                     return null;
                 }
                 scene = "门市";
+                RentalPricePreset? manualPreset = await _db.rentalPricePreset
+                    .Where(p => p.rental_id == rentalId && p.manual).AsNoTracking().FirstOrDefaultAsync();
+                if (manualPreset != null)
+                {
+                    price = manualPreset.price;
+                    manualPrice = true;
+                }
             }
             // 起租日没有价格预设时按价目表取价：套餐租赁取套餐价（package_id），没有再取分类价；单品取分类价。
             // 只取本店、有效的价目（和 ContinueRental 一致）。以前这里套餐和分类的条件写反了，
@@ -4759,7 +4835,7 @@ namespace SnowmeetApi.Controllers
             // 学员卡：与预设减免取大（不叠加）；店员手改价（manual）的不套
             CoachCard? coachCard = null;
             double coachDiscount = 0;
-            if (!(preset != null && preset.manual))
+            if (!manualPrice)
             {
                 (coachCard, coachDiscount) = await CoachRentalDiscountAsync(rental, date, (double)price);
                 if (coachCard != null && coachDiscount > discount)
@@ -4874,15 +4950,27 @@ namespace SnowmeetApi.Controllers
                 null, null, null, null, "开始设置租金");
             await _db.coreDataModLog.AddAsync(logR);
             await _db.SaveChangesAsync();
-            if (rental.start_date == null)
+            Rental issued = await GetRental(rentalId);
+            if (AllRequiredItemsIssued(issued))
             {
-                await SetRentalDetail(rentalId, DateTime.Now.Date, staffId);
-            }
-            else
-            {
-                await SetRentalDetail(rentalId, ((DateTime)rental.start_date).Date, staffId);
+                DateTime start = rental.start_date != null && rental.start_date.Value > DateTime.Now
+                    ? rental.start_date.Value : DateTime.Now;
+                if (rental.start_date == null || rental.start_date.Value < start)
+                {
+                    rental.start_date = start;
+                    _db.Entry(rental).Property(r => r.start_date).IsModified = true;
+                    await _db.SaveChangesAsync();
+                }
+                await SetRentalDetail(rentalId, start.Date, staffId);
             }
             return await GetRental(rentalId);
+        }
+
+        private static bool AllRequiredItemsIssued(Rental rental)
+        {
+            var required = (rental.rentItems ?? new List<Models.RentItem>())
+                .Where(i => i.valid == 1 && !i.noNeed && i.status != "已更换").ToList();
+            return required.Count > 0 && required.All(i => i.availableLog.Any(l => l.status == "已发放"));
         }
         [NonAction]
         public async Task<Models.Order> EffectAppendingRentals(int orderId, int paymentId)
@@ -5133,6 +5221,66 @@ namespace SnowmeetApi.Controllers
                 data = rental
             });
         }
+        public class AssignCrossShopItemRequest
+        {
+            public int? productId { get; set; }
+            public string? name { get; set; }
+        }
+
+        private async Task<bool> IsCompatibleRentCategory(int? selectedCategoryId, int productCategoryId)
+        {
+            if (selectedCategoryId == productCategoryId) return true;
+            if (selectedCategoryId == null) return false;
+            var categories = await _db.rentCategory.AsNoTracking()
+                .Where(c => c.id == selectedCategoryId || c.id == productCategoryId).ToListAsync();
+            var parentCode = categories.FirstOrDefault(c => c.id == selectedCategoryId)?.code?.Trim();
+            var childCode = categories.FirstOrDefault(c => c.id == productCategoryId)?.code?.Trim();
+            return !string.IsNullOrEmpty(parentCode) && childCode != null && childCode.StartsWith(parentCode, StringComparison.Ordinal);
+        }
+
+        [HttpPost("{rentItemId}")]
+        public async Task<ActionResult<ApiResult<Models.Rental?>>> AssignCrossShopItem(int rentItemId,
+            [FromBody] AssignCrossShopItemRequest request, string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            if (staff == null || staff.title_level < 100)
+                return Ok(new ApiResult<Models.Rental?> { code = 1, message = "没有权限" });
+            var item = await _db.rentItem.Include(i => i.logs).AsNoTracking().FirstOrDefaultAsync(i => i.id == rentItemId);
+            if (request == null || item == null || item.valid != 1 || item.noNeed || string.IsNullOrWhiteSpace(item.pickup_shop) || item.status != "未发放")
+                return Ok(new ApiResult<Models.Rental?> { code = 1, message = "只能录入未发放的异店租赁物" });
+            string? previousValue = item.noCode ? item.name : item.code;
+            if (item.noCode)
+            {
+                if (string.IsNullOrWhiteSpace(request.name))
+                    return Ok(new ApiResult<Models.Rental?> { code = 1, message = "请输入租赁物名称" });
+                item.name = request.name.Trim();
+            }
+            else
+            {
+                var product = await _db.rentProduct.AsNoTracking().FirstOrDefaultAsync(p => p.id == request.productId && p.valid == 1);
+                if (product == null || string.IsNullOrWhiteSpace(product.barcode)
+                    || (!string.IsNullOrWhiteSpace(product.status) && product.status.Trim() != "正常"))
+                    return Ok(new ApiResult<Models.Rental?> { code = 1, message = "租赁物不存在、分类不符或不可用" });
+                if (!await IsCompatibleRentCategory(item.category_id, product.category_id))
+                    return Ok(new ApiResult<Models.Rental?> { code = 1, message = "租赁物不存在、分类不符或不可用" });
+                if (item.category_id != product.category_id)
+                {
+                    item.category_id = product.category_id;
+                    item.class_name = (await _db.rentCategory.AsNoTracking().FirstOrDefaultAsync(c => c.id == product.category_id))?.name ?? item.class_name;
+                }
+                item.rent_product_id = product.id;
+                item.code = product.barcode;
+                item.name = product.name;
+            }
+            item.update_date = DateTime.Now;
+            item.logs = null;
+            _db.rentItem.Update(item);
+            await _db.coreDataModLog.AddAsync(CoreDataModLog.CreateManualLog("rent_item", item.noCode ? "name" : "code", item.id,
+                "录入异店租赁物", null, staff.id, previousValue, item.noCode ? item.name : item.code, item.pickup_shop));
+            await _db.SaveChangesAsync();
+            return Ok(new ApiResult<Models.Rental?> { code = 0, data = await GetRental(item.rental_id.Value) });
+        }
+
         [HttpGet("{rentItemId}")]
         public async Task<ActionResult<ApiResult<Models.Rental?>>> SetRentItemRepairAmount(int rentItemId,
             double amount, string sessionKey, string sessionType = "wechat_mini_openid")
@@ -5288,7 +5436,7 @@ namespace SnowmeetApi.Controllers
                     data = null
                 });
             }
-            Models.RentItem? rentItem = await _db.rentItem.Where(r => r.id == rentItemId)
+            Models.RentItem? rentItem = await _db.rentItem.Include(r => r.logs).Where(r => r.id == rentItemId)
                 .AsNoTracking().FirstOrDefaultAsync();
             if (rentItem == null)
             {
@@ -5298,6 +5446,32 @@ namespace SnowmeetApi.Controllers
                     message = "无此租赁物",
                     data = null
                 });
+            }
+            if (status == "已发放" && !string.IsNullOrWhiteSpace(rentItem.pickup_shop)
+                && (rentItem.noCode ? string.IsNullOrWhiteSpace(rentItem.name) : string.IsNullOrWhiteSpace(rentItem.code)))
+                return Ok(new ApiResult<Models.Rental?> { code = 1, message = "请先录入异店租赁物信息" });
+            if (status == "已发放" && !string.IsNullOrWhiteSpace(rentItem.pickup_shop) && !rentItem.noCode)
+            {
+                var product = await _db.rentProduct.AsNoTracking().FirstOrDefaultAsync(p => rentItem.rent_product_id != null
+                    ? p.id == rentItem.rent_product_id : p.barcode == rentItem.code);
+                bool resumeFromStorage = (rentItem.status == "暂存" || rentItem.status == "已暂存")
+                    && product?.status?.Trim() == "租赁中";
+                if (product == null || product.valid != 1
+                    || (!string.IsNullOrWhiteSpace(product.status) && product.status.Trim() != "正常" && !resumeFromStorage))
+                    return Ok(new ApiResult<Models.Rental?> { code = 1, message = "租赁物已不可用，请重新录入" });
+                if (!await IsCompatibleRentCategory(rentItem.category_id, product.category_id))
+                    return Ok(new ApiResult<Models.Rental?> { code = 1, message = "租赁物分类不符，请重新录入" });
+                if (rentItem.category_id != product.category_id)
+                {
+                    rentItem.category_id = product.category_id;
+                    rentItem.class_name = (await _db.rentCategory.AsNoTracking().FirstOrDefaultAsync(c => c.id == product.category_id))?.name ?? rentItem.class_name;
+                    _db.rentItem.Entry(rentItem).State = EntityState.Modified;
+                }
+                if (rentItem.rent_product_id == null)
+                {
+                    rentItem.rent_product_id = product.id;
+                    _db.rentItem.Entry(rentItem).State = EntityState.Modified;
+                }
             }
             RentItemLog log = new RentItemLog()
             {
@@ -5338,7 +5512,7 @@ namespace SnowmeetApi.Controllers
             bool allReturned = true;
             for (int i = 0; rental.rentItems != null && i < rental.rentItems.Count; i++)
             {
-                if (rental.rentItems[i].status != "已归还" && rental.rentItems[i].status != "未发放"
+                if (rental.rentItems[i].valid == 1 && rental.rentItems[i].status != "已归还"
                 && rental.rentItems[i].status != "已更换" && rental.rentItems[i].noNeed == false)
                 {
                     allReturned = false;
@@ -5375,6 +5549,21 @@ namespace SnowmeetApi.Controllers
                 }
                 _db.rental.Entry(rental).State = EntityState.Modified;
                 await _db.SaveChangesAsync();
+                bool hasRent = await _db.rentalDetail.AsNoTracking()
+                    .AnyAsync(d => d.rental_id == rental.id && d.valid == 1 && d.charge_type == "租金");
+                if (!hasRent && rental.valid == 1 && AllRequiredItemsIssued(rental))
+                {
+                    DateTime start = rental.start_date != null && rental.start_date.Value > DateTime.Now
+                        ? rental.start_date.Value : DateTime.Now;
+                    if (rental.start_date == null || rental.start_date.Value < start)
+                    {
+                        rental.start_date = start;
+                        _db.Entry(rental).Property(r => r.start_date).IsModified = true;
+                        await _db.SaveChangesAsync();
+                    }
+                    await SetRentalDetail(rental.id, start.Date, staff.id);
+                    rental = await GetRental(rental.id);
+                }
             }
             return Ok(new ApiResult<Models.Rental>()
             {
@@ -7562,9 +7751,38 @@ namespace SnowmeetApi.Controllers
         [NonAction]
         public async Task ContinueRental(Models.Rental rental, DateTime rentDate)
         {
+            await RentalChargeLock.WaitAsync();
+            try { await ContinueRentalCore(rental, rentDate); }
+            finally { RentalChargeLock.Release(); }
+        }
+
+        private async Task ContinueRentalCore(Models.Rental rental, DateTime rentDate)
+        {
+            if (rental.settled == 1 || rental.valid == 0
+                || (rental.start_date != null && rentDate.Date < rental.start_date.Value.Date)
+                || !AllRequiredItemsIssued(rental))
+            {
+                return;
+            }
+
+            // 生效或最后发放时若因价目缺失没能建首日租金，续租前先补首日。
+            // 已作废的历史租金也算曾经计租，避免把人工免除的旧明细重新建出来。
+            bool everCharged = await _db.rentalDetail.AsNoTracking()
+                .AnyAsync(d => d.rental_id == rental.id && d.charge_type == "租金");
+            if (!everCharged)
+            {
+                DateTime completedAt = rental.rentItems.Where(i => i.valid == 1 && !i.noNeed && i.status != "已更换")
+                    .Max(i => i.pickDate!.Value);
+                DateTime firstDate = rental.start_date != null && rental.start_date.Value > completedAt
+                    ? rental.start_date.Value.Date : completedAt.Date;
+                if (firstDate > rentDate.Date) return;
+                await SetRentalDetailCore(rental.id, firstDate, rental.staff_id);
+                if (!await _db.rentalDetail.AsNoTracking().AnyAsync(d => d.rental_id == rental.id
+                    && d.valid == 1 && d.charge_type == "租金")) return;
+            }
 
             List<Models.RentalDetail> details = await _db.rentalDetail
-                .Where(d => d.valid == 1 && d.rental_date.Date == rentDate.Date && d.rental_id == rental.id)
+                .Where(d => d.valid == 1 && d.charge_type == "租金" && d.rental_date.Date == rentDate.Date && d.rental_id == rental.id)
                 .AsNoTracking().ToListAsync();
             if (details.Count > 0)
             {
@@ -7575,7 +7793,7 @@ namespace SnowmeetApi.Controllers
             // status 由 RentItemLog 派生（无领还事件=「未发放」），外层 ContinueRentOrder 已 Include rentItems.logs。
             if (rental.settled == 1 || rental.valid == 0
             || rental.rentItems.Where(i => i.status == "已发放" || i.status == "暂存" || i.status == "已暂存").Count() == 0
-            || rental.details.Where(d => ((DateTime)d.rental_date).Date == rentDate.Date).Count() > 0)
+            || rental.details.Where(d => d.valid == 1 && d.charge_type == "租金" && d.rental_date.Date == rentDate.Date).Count() > 0)
             {
                 return;
             }
@@ -7596,22 +7814,7 @@ namespace SnowmeetApi.Controllers
             {
                 rentType = "多日";
             }
-            int shopId = 10;
-            Models.Order order = await _db.order.Where(o => o.id == rental.order_id).AsNoTracking().FirstOrDefaultAsync();
-            if (order != null)
-            {
-                Shop shop = await _db.shop.Where(s => s.name == order.shop).AsNoTracking().FirstOrDefaultAsync();
-                if (shop != null)
-                {
-                    shopId = shop.id;
-                }
-
-            }
-            RentPrice price = await _db.rentPrice.Where(p => p.day_type == dayType
-                && p.rent_type == rentType && p.scene == scene && p.valid == 1 && p.shop_id == shopId
-                && ((rental.package_id != null && p.package_id == rental.package_id)
-                || (rental.category_id != null && p.category_id == rental.category_id)))
-                .AsNoTracking().FirstOrDefaultAsync();
+            RentPrice? price = await FindCatalogPriceAsync(rental, dayType, rentType, scene);
             double newPrice = (double)(price == null ? 0 : price.price);
             if (preset != null)
             {
@@ -8125,6 +8328,8 @@ namespace SnowmeetApi.Controllers
         public async Task<Models.RentItem> ChangeRentItem(Models.RentItem oriItem,
             Models.RentItem newItem, int? staffId, string? scene = null)
         {
+            newItem.pickup_shop = oriItem.pickup_shop;
+            newItem.pick_type = oriItem.pick_type;
             newItem.valid = 0;
             newItem.category = null;
             newItem.rental = null;
@@ -8348,9 +8553,7 @@ namespace SnowmeetApi.Controllers
                 default:
                     break;
             }
-            RentPrice price = await _db.rentPrice
-                .Where(p => p.category_id == categoryId && p.shop_id == shop.id && p.scene == scene && p.rent_type == "日场" && p.day_type == dayType)
-                    .AsNoTracking().FirstOrDefaultAsync();
+            RentPrice price = await FindCatalogPriceAsync(new Rental { order_id = order.id, category_id = categoryId }, dayType, "日场", scene);
             RentCategory category = await _db.rentCategory.Where(c => c.id == categoryId).AsNoTracking().FirstOrDefaultAsync();
             // 搜索单品选中具体租赁物时，取其 barcode/name 填主项编码（同开单 onAddSingleProduct）
             RentProduct rentProduct = null;
@@ -8433,9 +8636,7 @@ namespace SnowmeetApi.Controllers
                 default:
                     break;
             }
-            RentPrice price = await _db.rentPrice
-                .Where(p => p.package_id == packageId && p.shop_id == shop.id && p.scene == scene && p.rent_type == "日场" && p.day_type == dayType)
-                    .AsNoTracking().FirstOrDefaultAsync();
+            RentPrice price = await FindCatalogPriceAsync(new Rental { order_id = order.id, package_id = packageId }, dayType, "日场", scene);
 
             Models.Rental rental = new Rental()
             {
@@ -8576,7 +8777,10 @@ namespace SnowmeetApi.Controllers
                 });
             }
             OrderController _orderH = new OrderController(_db, _oriConfig, _httpContextAccessor);
-            if (commit && !RentAppendRules.MainOrderEffective(await _orderH.GetOrder(orderId)))
+            var mainOrder = await _orderH.GetOrder(orderId);
+            if (mainOrder == null || !ValidCrossShopRentals(mainOrder.shop, appendings))
+                return Ok(new ApiResult<Models.Order> { code = 1, message = "异店领取门店不符合开单门店规则", data = null });
+            if (commit && !RentAppendRules.MainOrderEffective(mainOrder))
             {
                 return Ok(new ApiResult<Models.Order>()
                 {

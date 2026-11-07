@@ -657,8 +657,20 @@ namespace SnowmeetApi.Controllers
 
 
         [HttpPost]
-        public ActionResult CallBack()
+        public async Task<ActionResult> CallBack()
         {
+            // 供应商的订单回调：把收到的原文和时间记进 web_api_log（见 ZiwoyouCallbackLog）。
+            // 返回给供应商的永远是 200 空正文，记录失败也不能改变它，否则供应商会当成失败反复重发。
+            try
+            {
+                string body = await ZiwoyouCallbackLog.ReadBodyAsync(Request);
+                await _context.webApiLog.AddAsync(ZiwoyouCallbackLog.Build(Request, body, DateTime.Now));
+                await _context.SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("自我游回调记录失败：" + ex.Message);
+            }
             return Ok();
         }
         [HttpGet]
