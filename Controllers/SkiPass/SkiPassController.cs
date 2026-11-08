@@ -1575,17 +1575,22 @@ namespace SnowmeetApi.Controllers
                 OrderShareRelation shareRelation = await _context.orderShareRelation.Where(r => r.staff_id == staffId).AsNoTracking().FirstOrDefaultAsync();
                 if (shareRelation != null)
                 {
-                    OrderShare share = new OrderShare()
+                    // 2026-11-08 用户定：系统分账每张票 1 元（以前整单只 1 元）。
+                    // 每张票一条 1 元的 order_share：「系统 1 元分账」的识别口径（amount == 1）不变，合计 = 张数。
+                    for (int i = 0; i < passes.Count; i++)
                     {
-                        id = 0,
-                        order_id = order.id,
-                        relation_id = shareRelation.id,
-                        amount = 1,
-                        valid = true,
-                        dealed = false,
-                        create_date = DateTime.Now
-                    };
-                    order.orderShares.Add(share);
+                        OrderShare share = new OrderShare()
+                        {
+                            id = 0,
+                            order_id = order.id,
+                            relation_id = shareRelation.id,
+                            amount = 1,
+                            valid = true,
+                            dealed = false,
+                            create_date = DateTime.Now
+                        };
+                        order.orderShares.Add(share);
+                    }
                 }
                 
             }

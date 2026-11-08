@@ -21,6 +21,8 @@ namespace SnowmeetApi.Models
         public DateTime? plan_date {get; set;}
         /// <summary>是否自动分账（介绍人分账用）：false = 店长设成手动，只记账，夜间任务不提交，自己去转账。默认 true。</summary>
         public bool auto_share {get; set;} = true;
+        /// <summary>分销商分账方式：auto、manual、bank；null 为旧记录或系统分账。</summary>
+        [MaxLength(10)] public string? share_method {get; set;}
         /// <summary>手动分账批次（share_batch.id）：空 = 没走过手动批次。</summary>
         public int? batch_id {get; set;}
         [ForeignKey("relation_id")]

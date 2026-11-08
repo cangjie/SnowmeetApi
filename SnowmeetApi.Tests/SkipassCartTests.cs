@@ -4,10 +4,12 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using SnowmeetApi.Controllers;
+using SnowmeetApi.Controllers.IntroducerShare;
 using SnowmeetApi.Data;
 using SnowmeetApi.Helpers;
 using SnowmeetApi.Models;
 using SnowmeetApi.Models.Users;
+using SnowmeetApi.Services.Share;
 using Xunit;
 
 namespace SnowmeetApi.Tests
@@ -86,6 +88,222 @@ namespace SnowmeetApi.Tests
         }
 
         // ---------------- 下单 ----------------
+
+        [Fact]
+        public async Task 员工系统分账_每张票1元_3张票生成3条1元分账_合计3元()
+        {
+            await using var f = await Fixture.Create();
+            await using var db = f.NewContext();
+            db.orderShareRelation.Add(new OrderShareRelation { id = 202, staff_id = 29, type = "个人", name = "员工B", valid = true });
+            await db.SaveChangesAsync();
+            var request = new SkipassCartRequest
+            {
+                staffId = 29,
+                items = new List<SkipassCartItem>
+                {
+                    Item(901, "13501177897", date: D0, count: 2),
+                    Item(902, "13900139000", date: D1, count: 1)
+                }
+            };
+            var order = Assert.IsType<Order>(Assert.IsType<OkObjectResult>((await f.Controller(db).ReserveSkiPassCart(request, "staff-session")).Result).Value);
+            await using var check = f.NewContext();
+            Assert.Equal(3, await check.skiPass.CountAsync(s => s.order_id == order.id));
+            var shares = await check.orderShare.Where(s => s.order_id == order.id && s.valid).ToListAsync();
+            Assert.Equal(3, shares.Count);
+            Assert.All(shares, s => { Assert.Equal(1, s.amount); Assert.Equal(202, s.relation_id); Assert.False(s.dealed); Assert.Null(s.share_method); });
+            Assert.Equal(3, shares.Sum(s => s.amount));
+            Assert.Equal(1, (await check.orderPayment.SingleAsync(p => p.order_id == order.id)).need_share);
+        }
+
+        [Fact]
+        public async Task 员工系统分账_旧接口买2张也是2元()
+        {
+            await using var f = await Fixture.Create();
+            await using var db = f.NewContext();
+            db.orderShareRelation.Add(new OrderShareRelation { id = 202, staff_id = 29, type = "个人", name = "员工B", valid = true });
+            await db.SaveChangesAsync();
+            var request = new SkipassCartRequest { staffId = 29, items = new List<SkipassCartItem> { Item(901, "13501177897", date: D0, count: 2) } };
+            var order = Assert.IsType<Order>(Assert.IsType<OkObjectResult>((await f.Controller(db).ReserveSkiPassCart(request, "customer-session")).Result).Value);
+            await using var check = f.NewContext();
+            Assert.Equal(2, await check.orderShare.CountAsync(s => s.order_id == order.id && s.valid && s.amount == 1));
+        }
+
+        [Fact]
+        public async Task 员工系统分账_付款成功后每张票一条1元分账记录()
+        {
+            await using var f = await Fixture.Create();
+            await using var db = f.NewContext();
+            db.orderShareRelation.Add(new OrderShareRelation { id = 202, staff_id = 29, type = "个人", name = "员工B", valid = true });
+            await db.SaveChangesAsync();
+            var request = new SkipassCartRequest
+            {
+                staffId = 29,
+                items = new List<SkipassCartItem> { Item(901, "13501177897", date: D0, count: 2), Item(902, "13900139000", date: D1) }
+            };
+            var order = Assert.IsType<Order>(Assert.IsType<OkObjectResult>((await f.Controller(db).ReserveSkiPassCart(request, "staff-session")).Result).Value);
+            await db.orderPayment.Where(p => p.order_id == order.id).ExecuteUpdateAsync(x => x.SetProperty(p => p.status, "支付成功"));
+
+            await using var pay = f.NewContext();
+            var helper = new OrderShareController(pay, f.Config, f.Http);
+            foreach (var share in await pay.orderShare.AsNoTracking().Where(s => s.valid && s.order_id == order.id).ToListAsync())
+                await helper.CreatePaymentShare(share);
+
+            await using var check = f.NewContext();
+            var paymentShares = await check.paymentShare.AsNoTracking().Where(p => p.valid && p.orderShare.order_id == order.id).ToListAsync();
+            Assert.Equal(3, paymentShares.Count);
+            Assert.All(paymentShares, p => Assert.Equal(1, p.amount));
+        }
+
+        // ---------------- 雪票分账记录（后台「大好河山雪票」页的卡片）：分给谁、成没成、计划何时、何时成功 ----------------
+
+        async Task<Order> 下单并付款_员工29有分账关系(Fixture f, int tickets, string? staffName = "张小飞")
+        {
+            await using var db = f.NewContext();
+            db.orderShareRelation.Add(new OrderShareRelation { id = 202, staff_id = 29, type = "个人", name = "员工B", valid = true });
+            await db.SaveChangesAsync();
+            if (staffName != null) await db.Set<Staff>().Where(s => s.id == 29).ExecuteUpdateAsync(x => x.SetProperty(s => s.name, staffName));
+            var request = new SkipassCartRequest { staffId = 29, items = new List<SkipassCartItem> { Item(901, "13501177897", date: D0, count: tickets) } };
+            var order = Assert.IsType<Order>(Assert.IsType<OkObjectResult>((await f.Controller(db).ReserveSkiPassCart(request, "customer-session")).Result).Value);
+            await db.orderPayment.Where(p => p.order_id == order.id).ExecuteUpdateAsync(x => x.SetProperty(p => p.status, "支付成功"));
+            await using var pay = f.NewContext();
+            var helper = new OrderShareController(pay, f.Config, f.Http);
+            foreach (var share in await pay.orderShare.AsNoTracking().Where(s => s.valid && s.order_id == order.id).ToListAsync())
+                await helper.CreatePaymentShare(share);
+            return order;
+        }
+
+        static SkipassShareRecordResult 取记录(ApiResult<object> r) => Assert.IsType<SkipassShareRecordResult>(r.data);
+
+        [Fact]
+        public async Task 雪票分账记录_已分账_待分账_被拒绝_各显示收款人和时间()
+        {
+            await using var f = await Fixture.Create();
+            var order = await 下单并付款_员工29有分账关系(f, 3);
+            await using var db = f.NewContext();
+            var ps = await db.paymentShare.AsNoTracking().Where(p => p.orderShare.order_id == order.id).OrderBy(p => p.id).ToListAsync();
+            Assert.Equal(3, ps.Count);
+            var t1 = new DateTime(2026, 11, 7, 17, 41, 55); var t2 = new DateTime(2026, 11, 7, 17, 41, 56);
+            await db.paymentShare.Where(p => p.id == ps[0].id).ExecuteUpdateAsync(x => x.SetProperty(p => p.success, (bool?)true)
+                .SetProperty(p => p.submit_time, (DateTime?)t1).SetProperty(p => p.response_time, (DateTime?)t2).SetProperty(p => p.response_content, "30002003422026110728241824903"));
+            await db.paymentShare.Where(p => p.id == ps[1].id).ExecuteUpdateAsync(x => x.SetProperty(p => p.success, (bool?)null)
+                .SetProperty(p => p.submit_time, (DateTime?)t1).SetProperty(p => p.response_time, (DateTime?)t2).SetProperty(p => p.response_content, "INVALID_REQUEST:分账金额超出最大分账比例"));
+            await db.skiPass.Where(s => s.order_id == order.id).OrderBy(s => s.id).Take(2).ExecuteUpdateAsync(x => x.SetProperty(s => s.is_used, 1));
+
+            var result = 取记录(await new SkipassShareRecordController(db).GetByOrder("staff-session", order.id));
+            Assert.Equal(3, result.ticketCount);
+            Assert.Equal(2, result.pickedUpCount);
+            Assert.Equal(3, result.records.Count);
+            Assert.All(result.records, r => { Assert.Equal("张小飞", r.receiver); Assert.Equal(1, r.amount); });
+            var ok = result.records[0];
+            Assert.Equal("已分账", ok.state); Assert.Equal("2026-11-07 17:41:56", ok.successTime); Assert.Equal("2026-11-07 17:41:55", ok.submitTime);
+            var rejected = result.records[1];
+            Assert.Equal("被拒绝", rejected.state); Assert.Null(rejected.successTime); Assert.Contains("超出最大分账比例", rejected.memo);
+            var waiting = result.records[2];
+            Assert.Equal("待分账", waiting.state); Assert.Null(waiting.successTime); Assert.Null(waiting.submitTime);
+            Assert.Contains("取票后自动分账", waiting.plan);
+        }
+
+        [Fact]
+        public async Task 雪票分账记录_提交了还没回执_显示处理中()
+        {
+            await using var f = await Fixture.Create();
+            var order = await 下单并付款_员工29有分账关系(f, 1);
+            await using var db = f.NewContext();
+            await db.paymentShare.Where(p => p.orderShare.order_id == order.id).ExecuteUpdateAsync(x => x.SetProperty(p => p.submit_time, (DateTime?)DateTime.Now));
+            var result = 取记录(await new SkipassShareRecordController(db).GetByOrder("staff-session", order.id));
+            Assert.Equal("处理中", Assert.Single(result.records).state);
+        }
+
+        [Fact]
+        public async Task 雪票分账记录_员工姓名为空时用收款方名称()
+        {
+            await using var f = await Fixture.Create();
+            var order = await 下单并付款_员工29有分账关系(f, 1, staffName: null);
+            await using var db = f.NewContext();
+            var result = 取记录(await new SkipassShareRecordController(db).GetByOrder("staff-session", order.id));
+            Assert.Equal("员工B", Assert.Single(result.records).receiver);
+        }
+
+        [Fact]
+        public async Task 雪票分账记录_介绍人分账不混进来()
+        {
+            await using var f = await Fixture.Create();
+            var order = await 下单并付款_员工29有分账关系(f, 1);
+            await using var db = f.NewContext();
+            db.orderShare.Add(new OrderShare { order_id = order.id, relation_id = 202, amount = 20, valid = true, share_method = "manual", create_date = DateTime.Now });
+            // 金额恰好是 1 的介绍人手动分账：只能靠「没有 share_method」把它和系统分账分开
+            db.orderShare.Add(new OrderShare { order_id = order.id, relation_id = 202, amount = 1, valid = true, share_method = "manual", create_date = DateTime.Now });
+            db.orderShare.Add(new OrderShare { order_id = order.id, relation_id = 202, amount = 1, valid = false, create_date = DateTime.Now });
+            await db.SaveChangesAsync();
+            var result = 取记录(await new SkipassShareRecordController(db).GetByOrder("staff-session", order.id));
+            Assert.Equal(1, Assert.Single(result.records).amount);
+        }
+
+        [Fact]
+        public async Task 雪票分账记录_没有记录推荐员工_说明原因()
+        {
+            await using var f = await Fixture.Create();
+            await using var db = f.NewContext();
+            var request = new SkipassCartRequest { items = new List<SkipassCartItem> { Item(901, "13501177897", date: D0) } };
+            var order = Assert.IsType<Order>(Assert.IsType<OkObjectResult>((await f.Controller(db).ReserveSkiPassCart(request, "customer-session")).Result).Value);
+            var result = 取记录(await new SkipassShareRecordController(db).GetByOrder("staff-session", order.id));
+            Assert.Empty(result.records);
+            Assert.Contains("没有记录推荐员工", result.emptyReason);
+        }
+
+        [Fact]
+        public async Task 雪票分账记录_推荐员工已离职_说明不产生分账()
+        {
+            await using var f = await Fixture.Create();
+            await using var db = f.NewContext();
+            db.orderShareRelation.Add(new OrderShareRelation { id = 202, staff_id = 29, type = "个人", name = "员工B", valid = true });
+            await db.Set<Staff>().Where(s => s.id == 29).ExecuteUpdateAsync(x => x.SetProperty(s => s.valid, 0).SetProperty(s => s.name, "张小飞"));
+            var request = new SkipassCartRequest { staffId = 29, items = new List<SkipassCartItem> { Item(901, "13501177897", date: D0) } };
+            var order = Assert.IsType<Order>(Assert.IsType<OkObjectResult>((await f.Controller(db).ReserveSkiPassCart(request, "customer-session")).Result).Value);
+            var result = 取记录(await new SkipassShareRecordController(db).GetByOrder("staff-session", order.id));
+            Assert.Empty(result.records);
+            Assert.Contains("张小飞", result.emptyReason);
+            Assert.Contains("已离职", result.emptyReason);
+        }
+
+        [Fact]
+        public async Task 雪票分账记录_推荐员工没有分账关系_说明不产生分账()
+        {
+            await using var f = await Fixture.Create();
+            await using var db = f.NewContext();
+            var request = new SkipassCartRequest { staffId = 29, items = new List<SkipassCartItem> { Item(901, "13501177897", date: D0) } };
+            var order = Assert.IsType<Order>(Assert.IsType<OkObjectResult>((await f.Controller(db).ReserveSkiPassCart(request, "customer-session")).Result).Value);
+            var result = 取记录(await new SkipassShareRecordController(db).GetByOrder("staff-session", order.id));
+            Assert.Empty(result.records);
+            Assert.Contains("没有分账收款账号", result.emptyReason);
+        }
+
+        [Fact]
+        public async Task 雪票分账记录_只有店长以上能看_非雪票订单拒绝()
+        {
+            await using var f = await Fixture.Create();
+            var order = await 下单并付款_员工29有分账关系(f, 1);
+            await using var db = f.NewContext();
+            db.order.Add(new Order { id = 99001, code = "ZL-1", type = "租赁", valid = 1 });
+            await db.SaveChangesAsync();
+            var ctl = new SkipassShareRecordController(db);
+            Assert.Equal(2, (await ctl.GetByOrder("no-such-session", order.id)).code);
+            Assert.Equal(3, (await ctl.GetByOrder("customer-session", order.id)).code);
+            Assert.Equal(1, (await ctl.GetByOrder("staff-session", 99001)).code);
+            Assert.Equal(1, (await ctl.GetByOrder("staff-session", 123456)).code);
+        }
+
+        [Fact]
+        public async Task 员工系统分账_没有分账关系的员工不生成分账()
+        {
+            await using var f = await Fixture.Create();
+            await using var db = f.NewContext();
+            var request = new SkipassCartRequest { staffId = 29, items = new List<SkipassCartItem> { Item(901, "13501177897", date: D0, count: 2) } };
+            var order = Assert.IsType<Order>(Assert.IsType<OkObjectResult>((await f.Controller(db).ReserveSkiPassCart(request, "customer-session")).Result).Value);
+            await using var check = f.NewContext();
+            Assert.False(await check.orderShare.AnyAsync(s => s.order_id == order.id));
+            Assert.Equal(0, (await check.orderPayment.SingleAsync(p => p.order_id == order.id)).need_share);
+        }
 
         [Fact]
         public async Task 购物车下单_一个订单一笔付款_每张票一条记录_总额是各张价格之和()
@@ -910,6 +1128,7 @@ namespace SnowmeetApi.Tests
                 db.member.Add(new Member { id = 10, real_name = "店员", gender = "男" });
                 db.member.Add(new Member { id = 11, real_name = "顾客", gender = "男" });
                 db.Set<Staff>().Add(new Staff { id = 28, title_level = 300, valid = 1 });
+                db.Set<Staff>().Add(new Staff { id = 29, title_level = 100, valid = 1 });
                 db.Set<SocialAccountForJob>().Add(new SocialAccountForJob { id = 1, member_id = 10, wechat_mini_openid = "staff-openid" });
                 db.Set<StaffSocialAccount>().Add(new StaffSocialAccount { staff_id = 28, social_account_id = 1, valid = 1 });
                 db.miniSession.Add(new MiniSession { session_key = "staff-session", session_type = "wechat_mini_openid", member_id = 10,
