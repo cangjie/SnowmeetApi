@@ -1587,7 +1587,9 @@ namespace SnowmeetApi.Controllers
                             amount = 1,
                             valid = true,
                             dealed = false,
-                            create_date = DateTime.Now
+                            create_date = DateTime.Now,
+                            // 2026-11-08 用户定：分账对应的是雪票而不是订单，一张票最多一笔。
+                            skipass = passes[i]
                         };
                         order.orderShares.Add(share);
                     }

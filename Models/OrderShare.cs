@@ -25,6 +25,10 @@ namespace SnowmeetApi.Models
         [MaxLength(10)] public string? share_method {get; set;}
         /// <summary>手动分账批次（share_batch.id）：空 = 没走过手动批次。</summary>
         public int? batch_id {get; set;}
+        /// <summary>系统分账（雪票每张票 1 元）对应的那张雪票 ski_pass.id：一张票最多一条有效分账。介绍人分账等其它分账为空。</summary>
+        public int? skipass_id {get; set;}
+        [ForeignKey("skipass_id")]
+        public SkiPass? skipass {get; set;}
         [ForeignKey("relation_id")]
         public OrderShareRelation relation {get; set;}
         public List<PaymentShare> paymentShares {get; set;}
