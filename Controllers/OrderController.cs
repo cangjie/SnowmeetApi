@@ -175,7 +175,7 @@ namespace SnowmeetApi.Controllers
             bool? haveDiscount = null, string? status = null, DateTime? closeStartDate = null, DateTime? closeEndDate = null,
             bool? haveWarranty = null, string? retailType = null, string? keyword = null, bool? isSummerCare = null,
             int? rentCategoryId = null, string? rentItemName = null, bool? useCard = null, string? cell = null, string? rentStatus = null,
-            bool? hasRetail = null, bool crossShopOnly = false)
+            bool? hasRetail = null, bool crossShopOnly = false, bool includeCareTaskStaff = false)
         {
             startDate = startDate == null ? DateTime.MinValue : startDate;
             endDate = endDate == null ? DateTime.MaxValue : endDate;
@@ -251,7 +251,7 @@ namespace SnowmeetApi.Controllers
                     //orderList = orderList.Where(o =>  ((o.retails.Any(r => r.retail_type == retailType) || retailType == null) )).ToList();
                     break;
                 case "养护":
-                    orderList = await _db.order.Where(o => (o.biz_date.Date >= ((DateTime)startDate).Date && o.biz_date.Date <= ((DateTime)endDate).Date)
+                    IQueryable<SnowmeetApi.Models.Order> careOrders = _db.order.Where(o => (o.biz_date.Date >= ((DateTime)startDate).Date && o.biz_date.Date <= ((DateTime)endDate).Date)
                             && (memberId == null || o.member_id == memberId) && (staffId == null || o.staff_id == staffId)
                             && (payOption == null || o.pay_option.Trim().Equals(payOption.Trim()))
                             && (shop == null || o.shop.Trim().Equals(shop.Trim())) && (type == null || o.type.Trim().Equals(type.Trim()))
@@ -268,8 +268,12 @@ namespace SnowmeetApi.Controllers
                         .Include(o => o.refunds)
                         .Include(o => o.discounts.Where(d => d.valid == 1))
                         .Include(o => o.staff)
-                        .Include(o => o.member).ThenInclude(m => m.memberSocialAccounts)
-                        .OrderByDescending(o => o.id).AsSplitQuery().AsNoTracking().ToListAsync();
+                        .Include(o => o.member).ThenInclude(m => m.memberSocialAccounts);
+                    if (includeCareTaskStaff)
+                        careOrders = careOrders.Include(o => o.cares.Where(c => c.valid == 1))
+                            .ThenInclude(c => c.tasks.Where(t => t.valid == 1).OrderBy(t => t.sort))
+                            .ThenInclude(t => t.staff);
+                    orderList = await careOrders.OrderByDescending(o => o.id).AsSplitQuery().AsNoTracking().ToListAsync();
                     break;
                 default:
                     orderList = await _db.order.Where(o => (o.biz_date.Date >= ((DateTime)startDate).Date && o.biz_date.Date <= ((DateTime)endDate).Date)
@@ -1109,7 +1113,8 @@ namespace SnowmeetApi.Controllers
             string? payOption, string sessionType = "wechat_mini_openid", bool? isTest = null, bool? isEntertain = null,
             bool? isPackage = null, bool? isOnCredit = null, bool? haveDiscount = null, string? status = null, string? cell = null,
             bool? haveWarranty = null, string? retailType = null, string? keyword = null, bool? isSummerCare = null,
-            int? rentCategoryId = null, string? rentItemName = null, bool? useCard = null, string? rentStatus = null)
+            int? rentCategoryId = null, string? rentItemName = null, bool? useCard = null, string? rentStatus = null,
+            bool includeCareTaskStaff = false)
         {
             shop = shop == null ? null : Util.UrlDecode(shop);
             type = type == null ? null : Util.UrlDecode(type);
@@ -1147,7 +1152,7 @@ namespace SnowmeetApi.Controllers
             }
             List<SnowmeetApi.Models.Order> orders = await GetCommonOrders(orderId, shop, null, null, type, startDate, endDate, payOption,
             isTest, isEntertain, isPackage, isOnCredit, haveDiscount, status, null, null, haveWarranty, retailType, keyword, isSummerCare,
-            rentCategoryId, rentItemName, useCard, cell, rentStatus);
+            rentCategoryId, rentItemName, useCard, cell, rentStatus, includeCareTaskStaff: includeCareTaskStaff);
             List<SnowmeetApi.Models.Order> newOrders = OrderQueryRules.FilterByCustomerCellSuffix(orders, cell);
 
             SnowmeetApi.Models.Order.RendOrderList(newOrders);

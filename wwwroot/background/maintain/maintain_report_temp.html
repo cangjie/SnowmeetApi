@@ -16,7 +16,9 @@
     <script type="text/javascript">//alert(sessionKey);</script>
     <style>
         td {
-            text-align: center
+            text-align: center;
+            white-space: nowrap;
+            padding: 0 5px;
         }
     </style>
 </head>
@@ -43,9 +45,10 @@
     <div style="height:20px"></div>
     <h1></h1>
     <div style="height:20px" id="total"></div>
-    <table style="width:100%">
+    <div style="width:100%; overflow-x:auto">
+    <table style="width:100%; min-width:max-content">
         <thead>
-            <tr>
+            <tr id="report_head">
                 <td class="table_head">序号</td>
                 <td class="table_head">订单号</td>
                 <td class="table_head">门店</td>
@@ -57,23 +60,62 @@
                 <td class="table_head">订单金额</td>
                 <td class="table_head">日期</td>
                 <td class="table_head">时间</td>
-                <td class="table_head">销售</td>
                 <td class="table_head">备注</td>
+                <td class="table_head">开单</td>
 
             </tr>
         </thead>
         <tbody id="report_rows">
         </tbody>
     </table>
+    </div>
 </body>
 
 </html>
 <script type="text/javascript">var currentColor = '#DDDDDD';
     var totalPaid = 0;
-    var tHead = ['序号', '订单号', '门店', '姓名', '电话', '收款方式', '支付', '退款', '订单金额', '日期', '时间', '销售', '备注']
+    var baseHead = ['序号', '订单号', '门店', '姓名', '电话', '收款方式', '支付', '退款', '订单金额', '日期', '时间', '备注', '开单'];
+    var tHead = baseHead.slice();
+    var stepNames = [];
+
+    function orderSteps(order) {
+        var tasks = [];
+        (order.cares || []).forEach(function (care) {
+            if (care.valid != 1) return;
+            (care.tasks || []).forEach(function (task) {
+                if (task.valid == 1 && task.task_name && task.task_name.trim()) tasks.push(task);
+            });
+        });
+        return tasks;
+    }
+
+    function buildStepNames(orders) {
+        var names = new Set();
+        orders.forEach(function (order) {
+            orderSteps(order).forEach(function (task) { names.add(task.task_name.trim()); });
+        });
+        var rank = { '安全检查': 0, '修刃': 1, '打蜡': 2, '热蜡': 2, '机打蜡': 2, '刮蜡': 3, '发板': 5 };
+        return Array.from(names).sort(function (a, b) {
+            var aRank = Object.prototype.hasOwnProperty.call(rank, a) ? rank[a] : 4;
+            var bRank = Object.prototype.hasOwnProperty.call(rank, b) ? rank[b] : 4;
+            return aRank - bRank || a.localeCompare(b, 'zh-CN');
+        });
+    }
+
+    function updateHead(orders) {
+        stepNames = buildStepNames(orders);
+        tHead = baseHead.concat(stepNames);
+        var head = document.getElementById('report_head');
+        head.innerHTML = '';
+        tHead.forEach(function (title) {
+            var td = document.createElement('td');
+            td.className = 'table_head';
+            td.innerText = title;
+            head.appendChild(td);
+        });
+    }
+
     function FillItem(item) {
-        var totalColNum = 11;
-        var orderIdIndex = 4;
         var rows = document.getElementById('report_rows');
         var newRow = document.createElement('tr');
         var td_id = document.createElement('td');
@@ -160,17 +202,31 @@
 
 
 
-        var td_staff = document.createElement('td');
-        td_staff.innerText = item.staff.name;
-        lineData.push(item.staff);
-        newRow.appendChild(td_staff);
-
         var td_memo = document.createElement('td');
         td_memo.innerText = item.memo;
         lineData.push(item.memo);
-        tData.push(lineData);
         newRow.appendChild(td_memo);
 
+        var td_staff = document.createElement('td');
+        var staffName = item.staff && item.staff.name ? item.staff.name.trim() : '';
+        td_staff.innerText = staffName;
+        lineData.push(staffName);
+        newRow.appendChild(td_staff);
+
+        var tasks = orderSteps(item);
+        stepNames.forEach(function (step) {
+            var names = [];
+            tasks.forEach(function (task) {
+                var name = task.staff && task.staff.name ? task.staff.name.trim() : '';
+                if (task.task_name.trim() == step && name && names.indexOf(name) < 0) names.push(name);
+            });
+            var value = names.join('、');
+            var td = document.createElement('td');
+            td.innerText = value;
+            lineData.push(value);
+            newRow.appendChild(td);
+        });
+        tData.push(lineData);
 
         rows.appendChild(newRow);
     }
@@ -178,34 +234,41 @@
         totalPaid = 0;
         var rows = document.getElementById('report_rows');
         rows.innerHTML = '';
+        tData = [];
+        updateHead([]);
+        document.getElementById('total').innerText = '';
         var btnCtrl = document.getElementById('btn');
         btnCtrl.disabled = true;
         var shop = document.getElementById('shop')
         var getUrl = '../../api/Order/GetOrdersByStaff?type=' + encodeURIComponent('养护') + '&startDate=' + formatDate(startDate) + '&endDate='
-            + formatDate(endDate) + (shop.value == '' ? '' : '&shop=' + encodeURIComponent(shop.value)) + '&isTest=false&sessionKey=' + encodeURIComponent(sessionKey)
+            + formatDate(endDate) + (shop.value == '' ? '' : '&shop=' + encodeURIComponent(shop.value)) + '&isTest=false&includeCareTaskStaff=true&sessionKey=' + encodeURIComponent(sessionKey)
         $.ajax({
             url: getUrl,
             type: 'GET',
             success: function (msg, status) {
                 console.log('get data msg', msg)
                 console.log('get data status', status)
-                tData = []
-                if (status != 'success') {
+                if (status != 'success' || !msg || msg.code !== 0 || !Array.isArray(msg.data)) {
+                    alert((msg && msg.message) || '查询养护报表失败');
                     return
                 }
+                var visibleOrders = msg.data.filter(function (order) {
+                    return !(order.paidAmount <= 0 && order.entertain == 0);
+                });
+                updateHead(visibleOrders);
                 var seq = 1;
-                for (var i = 0; i < msg.data.length; i++) {
-                    if (msg.data[i].paidAmount <= 0 && msg.data[i].entertain == 0){
-                        continue;
-                    }
-                    msg.data[i].id = seq;
+                for (var i = 0; i < visibleOrders.length; i++) {
+                    visibleOrders[i].id = seq;
                     seq++;
-                    FillItem(msg.data[i]);
-                    totalPaid += (msg.data[i].paidAmount - msg.data[i].refundAmount)
+                    FillItem(visibleOrders[i]);
+                    totalPaid += (visibleOrders[i].paidAmount - visibleOrders[i].refundAmount)
                     
                 }
                 var divTotal = document.getElementById('total');
                 divTotal.innerText = '总计：' + formatAmount(totalPaid);
+            },
+            error: function () {
+                alert('查询养护报表失败，请稍后重试');
             },
             complete: function (msg, status) {
                 btnCtrl.disabled = false;
@@ -251,25 +314,13 @@
         if (tHead.length <= 0 || tData.length <= 0) {
             return;
         }
-        var csvContent = '';
-        var lineContent = '';
-        for (var i = 0; i < tHead.length; i++) {
-            lineContent += (i > 0 ? ',' : '') + tHead[i];
+        function csvCell(value) {
+            var text = value == null ? '' : String(value);
+            return /[",\r\n]/.test(text) ? '"' + text.replace(/"/g, '""') + '"' : text;
         }
-        csvContent += lineContent + '\r\n';
-        for (var i = 0; i < tData.length; i++) {
-            lineContent = '';
-            for (var j = 0; j < tHead.length; j++) {
-                if (j != 11){
-                    lineContent += (j > 0 ? ',' : '') + tData[i][j];
-                }
-                else{
-                    lineContent += (j > 0 ? ',' : '') + tData[i][j].name;
-                }
-            }
-            csvContent += lineContent + '\r\n';
-        }
-        csvContent = csvContent.trim();
+        var csvContent = [tHead].concat(tData).map(function (row) {
+            return row.map(csvCell).join(',');
+        }).join('\r\n');
         var link = document.createElement('a');
         link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvContent);
         link.download = encodeURIComponent('yanghu_' + formatDate(startDate) + '_' + formatDate(endDate) + '.csv');
