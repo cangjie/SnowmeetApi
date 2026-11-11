@@ -125,6 +125,14 @@ namespace SnowmeetApi.Models
         public double? displayCharge { get; set; } = null;
         [NotMapped]
         public double? displayDiscount { get; set; } = null;
+        // 列表展示用的次卡信息（不入库，由 GetOrdersByStaffPaged 填充，口径见 Helpers/CareCardInfoRules）：
+        // 用了次卡的装备显示「用的哪张卡、还剩几次」；季卡不限次（cardUnlimited），没绑上卡 / 读卡失败时没有剩余次数
+        [NotMapped]
+        public string? cardDisplayName { get; set; } = null;
+        [NotMapped]
+        public int? cardRemaining { get; set; } = null;
+        [NotMapped]
+        public bool cardUnlimited { get; set; } = false;
         // 浅拷贝（只用于按「去掉招待 / 质保标记」的副本重新计价，不会存库）
         public Care ShallowCopy()
         {

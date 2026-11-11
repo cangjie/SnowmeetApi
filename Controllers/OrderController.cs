@@ -1279,6 +1279,8 @@ namespace SnowmeetApi.Controllers
                 await MarkNewCareCustomersAsync(paged);
                 // 每件装备的「金额」「减免」（招待 / 质保的装备也要显示：按所做项目算标准价，减免到 0 元）
                 await FillCareDisplayAmountsAsync(paged);
+                // 用次卡的装备：用的是哪张卡、还剩几次
+                await FillCareCardInfoAsync(paged);
             }
             SnowmeetApi.Models.Order.RendOrderList(paged);
             return Ok(new ApiResult<PagedOrderResult>()
@@ -1287,6 +1289,37 @@ namespace SnowmeetApi.Controllers
                 message = "",
                 data = result
             });
+        }
+
+        // 给本页养护订单里用次卡的装备填展示用的卡名 / 剩余次数（Care.cardDisplayName / cardRemaining / cardUnlimited，规则见 CareCardInfoRules）。
+        // 本页用到的卡一次查出来；读卡失败只是这页的装备没有这些展示信息，不能把整个列表弄坏。
+        private async Task FillCareCardInfoAsync(List<SnowmeetApi.Models.Order> pageOrders)
+        {
+            try
+            {
+                List<int> cardIds = pageOrders.Where(o => o.cares != null)
+                    .SelectMany(o => o.cares).Where(c => c.use_card && c.card_id != null)
+                    .Select(c => c.card_id!.Value).Distinct().ToList();
+                Dictionary<int, PunchCard> cards = cardIds.Count == 0
+                    ? new Dictionary<int, PunchCard>()
+                    : await _db.punchCard.AsNoTracking().Where(c => cardIds.Contains(c.id)).ToDictionaryAsync(c => c.id);
+                foreach (SnowmeetApi.Models.Order order in pageOrders)
+                {
+                    if (order.cares == null)
+                    {
+                        continue;
+                    }
+                    foreach (Care care in order.cares)
+                    {
+                        PunchCard? card = care.card_id != null && cards.TryGetValue(care.card_id.Value, out PunchCard? found) ? found : null;
+                        (care.cardDisplayName, care.cardRemaining, care.cardUnlimited) = CareCardInfoRules.Build(care, card);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("养护订单列表次卡信息读取失败：" + ex.Message);
+            }
         }
 
         // 给本页养护订单的每件装备填展示用的金额 / 减免（Care.displayCharge / displayDiscount，规则见 CareAmountRules）。
