@@ -1281,6 +1281,8 @@ namespace SnowmeetApi.Controllers
                 await FillCareDisplayAmountsAsync(paged);
                 // 用次卡的装备：用的是哪张卡、还剩几次
                 await FillCareCardInfoAsync(paged);
+                // 用了券 / 学员卡的装备：券名、学员卡名（和次卡一起显示在装备块里）
+                await FillCareTicketAndCoachCardNamesAsync(paged);
             }
             SnowmeetApi.Models.Order.RendOrderList(paged);
             return Ok(new ApiResult<PagedOrderResult>()
@@ -1326,6 +1328,61 @@ namespace SnowmeetApi.Controllers
             catch (Exception ex)
             {
                 Console.WriteLine("养护订单列表次卡信息读取失败：" + ex.Message);
+            }
+        }
+
+        // 给本页养护订单里用了券 / 学员卡的装备填展示用的券名、学员卡名（Care.ticketDisplayName / coachCardDisplayName，规则见 CareCardInfoRules）。
+        // 券、学员卡各自一次查出本页用到的；读不出来只是这件装备没有名字（客户端退回「优惠券」「学员卡」），不能把整个列表弄坏。
+        private async Task FillCareTicketAndCoachCardNamesAsync(List<SnowmeetApi.Models.Order> pageOrders)
+        {
+            List<Care> cares = pageOrders.Where(o => o.cares != null).SelectMany(o => o.cares).ToList();
+            try
+            {
+                List<string> codes = cares.Where(c => !string.IsNullOrWhiteSpace(c.ticket_code))
+                    .Select(c => c.ticket_code!.Trim()).Distinct().ToList();
+                if (codes.Count > 0)
+                {
+                    Dictionary<string, string?> names = (await _db.ticket.AsNoTracking().Where(t => codes.Contains(t.code)).Select(t => new { t.code, t.name }).ToListAsync())
+                        .GroupBy(t => t.code).ToDictionary(g => g.Key, g => (string?)g.First().name);
+                    foreach (Care care in cares)
+                    {
+                        string? name = null;
+                        if (!string.IsNullOrWhiteSpace(care.ticket_code))
+                        {
+                            names.TryGetValue(care.ticket_code.Trim(), out name);
+                        }
+                        care.ticketDisplayName = CareCardInfoRules.TicketName(care, name);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("养护订单列表券名读取失败：" + ex.Message);
+            }
+            try
+            {
+                List<int> cardIds = cares.Where(c => c.coach_card_id != null).Select(c => c.coach_card_id!.Value).Distinct().ToList();
+                if (cardIds.Count > 0)
+                {
+                    Dictionary<int, int> coachOfCard = (await _db.coachCard.AsNoTracking().Where(c => cardIds.Contains(c.id)).Select(c => new { c.id, c.coach_id }).ToListAsync())
+                        .ToDictionary(c => c.id, c => c.coach_id);
+                    List<int> coachIds = coachOfCard.Values.Distinct().ToList();
+                    Dictionary<int, string> coachNames = (await _db.coach.AsNoTracking().Where(c => coachIds.Contains(c.id)).Select(c => new { c.id, c.display_name }).ToListAsync())
+                        .ToDictionary(c => c.id, c => c.display_name);
+                    foreach (Care care in cares.Where(c => c.coach_card_id != null))
+                    {
+                        string? coachName = null;
+                        if (coachOfCard.TryGetValue(care.coach_card_id!.Value, out int coachId))
+                        {
+                            coachNames.TryGetValue(coachId, out coachName);
+                        }
+                        care.coachCardDisplayName = CareCardInfoRules.CoachCardName(care, coachName);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("养护订单列表学员卡名读取失败：" + ex.Message);
             }
         }
 

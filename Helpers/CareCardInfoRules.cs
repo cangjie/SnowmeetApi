@@ -16,6 +16,26 @@ namespace SnowmeetApi.Helpers
     //   · 装备没用次卡不显示；还没绑上卡（购卡处理中 card_id 为空）或卡找不到时只有卡名、没有剩余次数。
     public static class CareCardInfoRules
     {
+        // 装备选的券的名字（ticket_code 为空 = 没用券 → null；券找不到或没名字 → null，由客户端显示「优惠券」）
+        public static string? TicketName(Care care, string? ticketName)
+        {
+            if (string.IsNullOrWhiteSpace(care.ticket_code) || string.IsNullOrWhiteSpace(ticketName))
+            {
+                return null;
+            }
+            return ticketName.Trim();
+        }
+
+        // 装备选的学员卡的名字：「某某教练的学员卡」（与开单页同一叫法）；没选学员卡、教练找不到或没名字 → null
+        public static string? CoachCardName(Care care, string? coachDisplayName)
+        {
+            if (care.coach_card_id == null || string.IsNullOrWhiteSpace(coachDisplayName))
+            {
+                return null;
+            }
+            return coachDisplayName.Trim() + "的学员卡";
+        }
+
         // 这张卡上，这件装备自己的核销之后又用掉了几次；装备自己没有有效核销记录时返回 null。
         // cardUses = 这张卡的有效核销明细（punch_card_used）。
         public static int? UsedAfter(IEnumerable<PunchCardUsed> cardUses, int careId)

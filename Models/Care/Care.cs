@@ -133,6 +133,12 @@ namespace SnowmeetApi.Models
         public int? cardRemaining { get; set; } = null;
         [NotMapped]
         public bool cardUnlimited { get; set; } = false;
+        // 列表展示用的券名 / 学员卡名（不入库，由 GetOrdersByStaffPaged 填充，口径见 Helpers/CareCardInfoRules）：
+        // 装备选了券（ticket_code）→ 券的名字，如「老顾客优惠券」；选了学员卡（coach_card_id）→「某某教练的学员卡」。读不到时为 null，客户端退回通用称呼
+        [NotMapped]
+        public string? ticketDisplayName { get; set; } = null;
+        [NotMapped]
+        public string? coachCardDisplayName { get; set; } = null;
         // 浅拷贝（只用于按「去掉招待 / 质保标记」的副本重新计价，不会存库）
         public Care ShallowCopy()
         {
