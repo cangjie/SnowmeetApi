@@ -1303,6 +1303,11 @@ namespace SnowmeetApi.Controllers
                 Dictionary<int, PunchCard> cards = cardIds.Count == 0
                     ? new Dictionary<int, PunchCard>()
                     : await _db.punchCard.AsNoTracking().Where(c => cardIds.Contains(c.id)).ToDictionaryAsync(c => c.id);
+                // 每次核销的明细：同一张卡上先后用的装备要显示「各自用完之后」的剩余次数
+                Dictionary<int, List<PunchCardUsed>> usesByCard = cardIds.Count == 0
+                    ? new Dictionary<int, List<PunchCardUsed>>()
+                    : (await _db.punchCardUsed.AsNoTracking().Where(u => u.valid && cardIds.Contains(u.card_id)).ToListAsync())
+                        .GroupBy(u => u.card_id).ToDictionary(g => g.Key, g => g.ToList());
                 foreach (SnowmeetApi.Models.Order order in pageOrders)
                 {
                     if (order.cares == null)
@@ -1312,7 +1317,9 @@ namespace SnowmeetApi.Controllers
                     foreach (Care care in order.cares)
                     {
                         PunchCard? card = care.card_id != null && cards.TryGetValue(care.card_id.Value, out PunchCard? found) ? found : null;
-                        (care.cardDisplayName, care.cardRemaining, care.cardUnlimited) = CareCardInfoRules.Build(care, card);
+                        int? usedAfter = care.card_id != null && usesByCard.TryGetValue(care.card_id.Value, out List<PunchCardUsed>? uses)
+                            ? CareCardInfoRules.UsedAfter(uses, care.id) : null;
+                        (care.cardDisplayName, care.cardRemaining, care.cardUnlimited) = CareCardInfoRules.Build(care, card, usedAfter);
                     }
                 }
             }
