@@ -18,6 +18,9 @@ namespace SnowmeetApi.Models
         public int? merge_id { get; set; }
         public string source { get; set; } = "";
         public int in_staff_list { get; set; } = 0;
+        // VIP 会员（2026-11-09）：会员详情页「设为VIP」设置；是会员自己的字段而不是标签，
+        // 会员列表按 VIP 筛选要快，走索引 ix_member_is_vip(is_vip, id)。合并会员时 VIP 随之转给目标会员。
+        public bool is_vip { get; set; } = false;
         public int? following_wechat { get; set; } = null;
         public int valid { get; set; } = 1;
         public DateTime? update_date { get; set; } = null;

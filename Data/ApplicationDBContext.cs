@@ -23,6 +23,10 @@ namespace SnowmeetApi.Data
             CoachSchemaConfiguration.Configure(modelBuilder);
             IntroducerSchemaConfiguration.Configure(modelBuilder);
             ShareBatchSchemaConfiguration.Configure(modelBuilder, Database.IsSqlite());
+            // 会员列表「只看 VIP」走这个索引：WHERE is_vip = 1 ORDER BY id DESC（线上由 sql/2026-11-09_member_is_vip.sql 建）
+            modelBuilder.Entity<Member>().HasIndex(m => new { m.is_vip, m.id }).HasDatabaseName("ix_member_is_vip");
+            // 养护首单：member 表上两个可空列，用与 Member 共用 member 表的另一个实体读写（见 MemberCareFirstOrder）
+            modelBuilder.Entity<MemberCareFirstOrder>().HasOne<Member>().WithOne().HasForeignKey<MemberCareFirstOrder>(x => x.member_id);
             modelBuilder.Entity<Order>().Property(x => x.order_source).HasColumnType("varchar(32)");
             modelBuilder.Entity<Order>().Property(x => x.source_order_no).HasColumnType("varchar(128)");
             modelBuilder.Entity<MaintainLive>().HasKey(c => c.id);
@@ -200,6 +204,7 @@ namespace SnowmeetApi.Data
         public DbSet<Introducer> introducer { get; set; }
         public DbSet<IntroducerRelationHistory> introducerRelationHistory { get; set; }
         public DbSet<ShareBatch> shareBatch { get; set; }
+        public DbSet<MemberCareFirstOrder> memberCareFirstOrder { get; set; }
         public DbSet<Card> card { get; set; }
         public DbSet<Printer> printer { get; set; }
         public DbSet<PrintTask> printTask { get; set; }

@@ -1915,6 +1915,8 @@ namespace SnowmeetApi.Controllers
                 switch (order.type.Trim())
                 {
                     case "养护":
+                        // 万龙体验中心开的养护单也在这里：订单店名是体验中心（单号 WT_YH_…），但收款进服务中心的养护商户，
+                        // 不会落到体验中心自己的租赁(5) / 零售(12)商户。
                         mchId = 3;
                         break;
                     case "租赁":

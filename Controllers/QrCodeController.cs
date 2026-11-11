@@ -382,6 +382,58 @@ namespace SnowmeetApi.Controllers
             });
         }
 
+        // 接待页「VIP开单」：店员在 VIP 列表里点一位 VIP 会员，不用顾客扫码、不用店长授权，直接进入开单，
+        // 并视同身份已验证（2026-11-09 用户要求），其余开单流程照旧。
+        // 做法：建一条已授权（authed = 1）的「手机号进入」接待记录，用途记成「VIP开单」。
+        //   - 店员页拿到 stage = phone_authed，照旧进顾客信息页；
+        //   - 开单保存时 ResolveReceptOrderVerified 认「同一店员、同一会员、当天已授权、未作废的手机号接待记录」，订单一生成 wechat_unverified 就是 1；
+        //   - 用途单独记成「VIP开单」：_cellAuthed 的「当天同手机号已授权就放行」按用途匹配，
+        //     所以这条记录不会让别的店员之后用普通手机号进入时免掉店长授权。
+        // 只认有效、没被合并、当前是 VIP 的会员；会员没有登记手机号时拒绝（接待记录靠手机号标识身份，没有手机号就没法算已验证）。
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<ReceptCheckinView>>> EnterReceptByVip(int memberId, string sessionKey,
+            string sessionType = "wechat_mini_openid")
+        {
+            StaffController _staffHelper = new StaffController(_db);
+            ApiResult<object?> r = await _staffHelper.CheckStaffLevel(100, sessionKey, sessionType);
+            if (r != null)
+            {
+                return Ok(r);
+            }
+            Staff staff = await _staffHelper.GetStaffBySessionKey(sessionKey, sessionType);
+            Member? member = await _db.member.Where(m => m.id == memberId).AsNoTracking().FirstOrDefaultAsync();
+            if (member == null || member.valid != 1 || member.merge_id != null)
+            {
+                return Ok(_checkinError("会员不存在"));
+            }
+            if (!member.is_vip)
+            {
+                return Ok(_checkinError("该会员不是VIP"));
+            }
+            List<string> cells = await _db.memberSocialAccount
+                .Where(m => m.member_id == memberId && m.valid == 1 && m.type.Trim().Equals("cell"))
+                .OrderBy(m => m.id).Select(m => m.num).AsNoTracking().ToListAsync();
+            string? cell = cells.Select(c => (c ?? "").Trim()).FirstOrDefault(c => c != "");
+            if (cell == null)
+            {
+                return Ok(_checkinError("该VIP会员没有登记手机号，请先在会员管理里补上手机号"));
+            }
+            ScanQrCode sq = await _newReceptRecord(staff.id);
+            sq.purpose = "VIP开单";
+            sq.cell = cell;
+            sq.scaner_member_id = memberId;
+            sq.authed = 1;
+            sq.update_date = DateTime.Now;
+            await _db.scanQrCode.AddAsync(sq);
+            await _db.SaveChangesAsync();
+            return Ok(new ApiResult<ReceptCheckinView>()
+            {
+                code = 0,
+                message = "",
+                data = await _staffCheckinView(sq)
+            });
+        }
+
         // 新的店铺接待记录（还没保存）。scan_qrcode.id 不是自增列，沿用 CreateNewScanQrCodeByStaff 的 Max + 1
         private async Task<ScanQrCode> _newReceptRecord(int staffId)
         {

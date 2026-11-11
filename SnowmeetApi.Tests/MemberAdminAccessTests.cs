@@ -15,7 +15,7 @@ public class MemberAdminAccessTests
     // 会员管理 / 会员明细页面用到的全部接口（原先 200，现在 100）
     private static readonly string[] OpenToStaff =
     {
-        "SearchMembersByStaff", "GetMemberDetailByStaff", "UpdateMemberProfile", "AddMemberTag", "RemoveMemberTag",
+        "SearchMembersByStaff", "GetMemberDetailByStaff", "UpdateMemberProfile", "AddMemberTag", "RemoveMemberTag", "SetMemberVip",
         "GetTagLibrary", "GetTagLibraryWithStats", "MergeTagPreset", "DeleteTagPreset", "AddTagPreset",
         "RegisterMemberByPhone", "ChargeMemberDeposit", "GetPunchCardPresets", "GrantPunchCard", "GetCouponTemplates", "GrantCoupon",
     };

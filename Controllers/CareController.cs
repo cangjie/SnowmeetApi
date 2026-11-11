@@ -442,7 +442,13 @@ namespace SnowmeetApi.Controllers
             }
             if (CarePricingRules.AppliesScrapeOnlyPrice(shop, care))
             {
-                return (CarePricingRules.ScrapeOnlyPrice(await MemberConsumption.HasPaidOrderAsync(_db, memberId)), 0);
+                double scrapePrice = CarePricingRules.ScrapeOnlyPrice(await MemberConsumption.HasPaidOrderAsync(_db, memberId));
+                // 开板刮蜡券（封板取板后发的）整笔抵掉这口价：服务费照常显示，券减免等额，这件装备 0 元。
+                // 券能不能用（会员、有效期、是否单刮蜡）已由 CarePricingRules.ApplyScrapeOnlyBenefitRules 在定价前把过关，
+                // 走到这里还挂着的 20 号券就是可用的；其余券在到这之前就被摘掉了
+                double scrapeDiscount = ticket != null && ticket.template_id == CarePricingRules.BoardScrapeTicketTemplateId
+                    ? scrapePrice : 0;
+                return (scrapePrice, scrapeDiscount);
             }
             Models.Product product = await GetProduct(shop, care);
             double commonCharge = product == null ? 0 : product.sale_price;
@@ -465,6 +471,15 @@ namespace SnowmeetApi.Controllers
                 }
             }
             return (commonCharge, ticketDiscount);
+        }
+        // 有收费项目但找不到该店的商品时的提示（开单页预览和下单共用）：养板的价目只配在万龙服务中心，
+        // 别的门店选养板要明说「没有养板价目」，而不是笼统的「未配置养护价格」让店员以为是系统坏了
+        [NonAction]
+        public static string MissingPriceMessage(Care care)
+        {
+            return care != null && care.maintain_board == 1
+                ? "当前门店没有养板价目，请核对门店（养板目前只在万龙服务中心 / 体验中心开单）"
+                : "当前门店未配置养护价格，请核对门店";
         }
         // 学员卡（某某教练的学员卡，2026-10-30）：店员在开单页「优惠券/卡」弹层里选的那张，落 care.coach_card_id。
         // 与券、会员卡互斥（同一件装备只能选一个）；不做自动比价，选哪个用哪个。
@@ -563,6 +578,8 @@ namespace SnowmeetApi.Controllers
             care.edge_degree = null;
             care.need_wax = 0;
             care.need_unwax = 0;
+            care.seal_board = 0;
+            care.maintain_board = 0;
             care.free_wax = 0;
             care.summer = null;
             if (care.biz_type == "非雪季养护")
@@ -594,6 +611,10 @@ namespace SnowmeetApi.Controllers
                     case 12:
                         care.free_wax = 1;
                         break;
+                    case CarePricingRules.BoardScrapeTicketTemplateId:
+                        // 开板刮蜡券：选了就是只刮蜡（封板的板子来开板），其余项目店员需要再加
+                        care.need_unwax = 1;
+                        break;
                     case 17:
                         care.summer = "now";
                         care.biz_type = "非雪季养护";
@@ -623,25 +644,78 @@ namespace SnowmeetApi.Controllers
             public Care care { get; set; }
         }
         // 服务项联动规则（真理之源，前端不再本地联动；未来新增联动只改这里）：
-        // 开/关热蜡 → 刮蜡跟随；开热蜡与机打蜡互斥；开机打蜡清热蜡/刮蜡；
-        // 开修刃默认角度 89；非雪季 later→修刃+热蜡+刮蜡 / now→清三项，非雪季下取消立等
+        // 开/关热蜡 → 刮蜡跟随（封板清掉，默认刮蜡）；开热蜡与机打蜡、养板互斥；开机打蜡清热蜡/养板/刮蜡/封板；
+        // 开/关养板 → 与热蜡同一套：开 = 换掉热蜡 / 机打蜡、默认带刮蜡，关 = 刮蜡 / 封板一并清掉；非雪季没有养板；
+        // 有热蜡或养板时刮蜡与封板二选一（CareSealRules）；
+        // 开修刃默认角度 89；非雪季 later→修刃+热蜡+刮蜡 / now→清三项，非雪季下取消立等，且不能封板、没有养板
         [NonAction]
         public void ApplyServiceLinkage(Care care, string changedField)
         {
             switch (changedField)
             {
                 case "need_wax":
-                    care.need_unwax = care.need_wax;
                     if (care.need_wax == 1)
                     {
+                        care.maintain_board = 0;
                         care.free_wax = 0;
+                    }
+                    else if (care.maintain_board == 1)
+                    {
+                        // 热蜡本来就关着、养板开着：养板的刮蜡 / 封板不能被这次事件带掉
+                        break;
+                    }
+                    care.need_unwax = care.need_wax;
+                    care.seal_board = 0;
+                    break;
+                case "maintain_board":
+                    if (care.maintain_board == 1)
+                    {
+                        if (!string.IsNullOrWhiteSpace(care.summer))
+                        {
+                            // 非雪季没有养板
+                            care.maintain_board = 0;
+                            care.seal_board = 0;
+                            break;
+                        }
+                        care.need_wax = 0;
+                        care.free_wax = 0;
+                        care.need_unwax = 1;
+                        care.seal_board = 0;
+                    }
+                    else
+                    {
+                        care.need_unwax = 0;
+                        care.seal_board = 0;
+                    }
+                    break;
+                case "need_unwax":
+                    // 有热蜡 / 养板：刮蜡关掉 = 改成封板，刮蜡打开 = 取消封板；没有它们不能封板
+                    care.seal_board = CareSealRules.HasWaxService(care) && care.need_unwax != 1 ? 1 : 0;
+                    break;
+                case "seal_board":
+                    if (care.seal_board == 1)
+                    {
+                        if (CareSealRules.CanSeal(care))
+                        {
+                            care.need_unwax = 0;
+                        }
+                        else
+                        {
+                            care.seal_board = 0;
+                        }
+                    }
+                    else if (CareSealRules.HasWaxService(care))
+                    {
+                        care.need_unwax = 1;
                     }
                     break;
                 case "free_wax":
                     if (care.free_wax == 1)
                     {
                         care.need_wax = 0;
+                        care.maintain_board = 0;
                         care.need_unwax = 0;
+                        care.seal_board = 0;
                     }
                     break;
                 case "need_edge":
@@ -651,6 +725,8 @@ namespace SnowmeetApi.Controllers
                     }
                     break;
                 case "summer":
+                    care.seal_board = 0;
+                    care.maintain_board = 0;
                     if (care.summer == "later")
                     {
                         care.need_edge = 1;
@@ -725,12 +801,28 @@ namespace SnowmeetApi.Controllers
                 // 普通界面操作：按本次改动字段应用服务联动
                 ApplyServiceLinkage(care, req.changedField.Trim());
             }
-            // 只选了刮蜡：一口价不叠加任何优惠，已选的券 / 会员卡 / 学员卡先摘掉（前端据 benefitsCleared 同步清除并提示）
-            bool benefitsCleared = CarePricingRules.ClearBenefitsForScrapeOnly(shop, care);
+            // 刮蜡 / 封板 收敛到合法组合（有热蜡时二选一、默认刮蜡；不能封板的清零），响应里的 care 以此为准
+            CareSealRules.Normalize(care);
+            // 只选了刮蜡：一口价不叠加任何优惠，已选的券 / 会员卡 / 学员卡先摘掉（前端据 benefitsCleared 同步清除并提示）。
+            // 唯一例外是可用的开板刮蜡券：它专抵这口价，留下；抵不了的开板刮蜡券（别的门店 / 不是单刮蜡 / 已用 / 非本人）
+            // 也在这里摘掉不核销，响应 boardTicketRemoved = true
+            Ticket? selectedTicket = string.IsNullOrWhiteSpace(care.ticket_code) ? null
+                : await _db.ticket.Where(t => t.code == care.ticket_code).AsNoTracking().FirstOrDefaultAsync();
+            var benefitRules = CarePricingRules.ApplyScrapeOnlyBenefitRules(shop, care, selectedTicket, memberId, DateTime.Now);
+            bool benefitsCleared = benefitRules.BenefitsCleared;
+            bool boardTicketRemoved = benefitRules.BoardTicketRemoved;
+            // 养板只认老顾客券：其余券 / 会员卡 / 学员卡先摘掉（同样靠 benefitsCleared 让前端同步清除并提示）
+            if (CarePricingRules.ClearBenefitsForMaintainBoard(care, selectedTicket))
+            {
+                benefitsCleared = true;
+            }
             if (benefitsCleared)
             {
-                ticket = null;
                 card = null;
+            }
+            if (string.IsNullOrWhiteSpace(care.ticket_code))
+            {
+                ticket = null;
             }
             double commonCharge, ticketDiscount;
             CoachCareQuote? coach;
@@ -746,7 +838,7 @@ namespace SnowmeetApi.Controllers
             {
                 return Ok(new ApiResult<object>()
                 {
-                    code = 1, message = "当前门店未配置养护价格，请核对门店", data = null
+                    code = 1, message = MissingPriceMessage(care), data = null
                 });
             }
             care.common_charge = commonCharge;
@@ -766,7 +858,7 @@ namespace SnowmeetApi.Controllers
             {
                 code = 0,
                 message = "",
-                data = new { commonCharge, ticketDiscount, care, coach, benefitsCleared }
+                data = new { commonCharge, ticketDiscount, care, coach, benefitsCleared, boardTicketRemoved }
             });
         }
         [NonAction]
@@ -793,6 +885,9 @@ namespace SnowmeetApi.Controllers
                     throw new InvalidOperationException("「" + card.card_name + "」剩余次数不足，本单需要" + required + "次");
             }
         }
+
+        // 养板的工序（用户 2026-11-10）：养板打蜡1 → 养板刮蜡1 → 养板打蜡2 → 养板刮蜡2 → 养板打蜡3
+        public static readonly string[] CareMaintainBoardSteps = { "养板打蜡1", "养板刮蜡1", "养板打蜡2", "养板刮蜡2", "养板打蜡3" };
 
         [HttpGet]
         public async Task EffectCareOrder(int orderId)
@@ -1100,6 +1195,24 @@ namespace SnowmeetApi.Controllers
                         };
                         await _db.careTask.AddAsync(taskWax);
                     }
+                    if (care.maintain_board == 1)
+                    {
+                        // 养板（与热蜡互斥，占热蜡的位置）：打蜡 → 刮蜡 交替做三轮蜡两轮刮，sort 40~44 依次排在刮蜡（50）之前。
+                        // 末尾的「刮蜡」（need_unwax）是整个养板做完后的那一道，封板时没有
+                        string[] steps = CareMaintainBoardSteps;
+                        for (int s = 0; s < steps.Length; s++)
+                        {
+                            await _db.careTask.AddAsync(new CareTask()
+                            {
+                                id = 0,
+                                care_id = care.id,
+                                task_name = steps[s],
+                                memo = "",
+                                sort = 40 + s,
+                                create_date = DateTime.Now
+                            });
+                        }
+                    }
                     if (care.need_unwax == 1)
                     {
                         CareTask taskUnWax = new CareTask()
@@ -1335,6 +1448,8 @@ namespace SnowmeetApi.Controllers
                                 {
 
                                 }
+                                // 封板的装备：取板后再给顾客发一张开板刮蜡券（与上面的完成赠券互不影响，各发各的）
+                                await GrantSealBoardTicketAsync(careTask.care_id, staff.id);
                             }
                         }
                         break;
@@ -1388,6 +1503,38 @@ namespace SnowmeetApi.Controllers
                 message = "",
                 data = care
             });
+        }
+        // 封板的装备取板（发板完成）后，给顾客发一张开板刮蜡券（模板 CareSealRules.SealTicketTemplateId）。
+        // 同一件装备只发一次：发板重复提交（重试、验证码重放）不会多发；发券失败只记日志，不能拖垮取板本身。
+        private async Task GrantSealBoardTicketAsync(int careId, int staffId)
+        {
+            try
+            {
+                Care care = await _db.care.Where(c => c.id == careId).AsNoTracking().FirstOrDefaultAsync();
+                if (!CareSealRules.ShouldGrantTicket(care) || care.order_id == null)
+                {
+                    return;
+                }
+                int? memberId = await _db.order.Where(o => o.id == care.order_id).Select(o => o.member_id).FirstOrDefaultAsync();
+                if (memberId == null)
+                {
+                    return;
+                }
+                string memo = CareSealRules.GrantMemo(careId);
+                bool granted = await _db.ticket.AnyAsync(t => t.template_id == CareSealRules.SealTicketTemplateId
+                    && t.create_memo == memo);
+                if (granted)
+                {
+                    return;
+                }
+                TicketController ticketHelper = new TicketController(_db, _config);
+                await ticketHelper.CreateTicket(CareSealRules.SealTicketTemplateId, memberId, staffId, memo,
+                    "养护", careId, true, DateTime.Now, null);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("封板取板发开板刮蜡券失败 care=" + careId + "：" + ex);
+            }
         }
         private async Task ReverseCareTicketsAsync(Care care, int staffId, string scene, string reason)
         {
@@ -1523,7 +1670,7 @@ namespace SnowmeetApi.Controllers
             {
                 Care care = cares[i];
                 CareTask taskEdge = care.tasks.Where(t => t.task_name == "修刃" && t.valid == 1).FirstOrDefault();
-                CareTask taskWax = care.tasks.Where(t => (t.task_name == "打蜡" || t.task_name == "热蜡") && t.valid == 1).FirstOrDefault();
+                CareTask taskWax = care.tasks.Where(t => (t.task_name == "打蜡" || t.task_name == "热蜡" || t.task_name == CareMaintainBoardSteps[0]) && t.valid == 1).FirstOrDefault();
                 CareTask taskUnWax = care.tasks.Where(t => t.task_name == "刮蜡" && t.valid == 1).FirstOrDefault();
                 CareTask taskRepair = care.tasks.Where(t => t.task_name == "维修" && t.valid == 1).FirstOrDefault();
                 CareTask taskSafe = care.tasks.Where(t => t.task_name == "安全检查" && t.valid == 1).FirstOrDefault();
@@ -1936,7 +2083,7 @@ namespace SnowmeetApi.Controllers
                     data = null
                 });
             }
-            order.shop = CarePricingRules.ResolveCareShop(order.shop);
+            // 草稿店名保持开单门店，不再把体验中心改记成服务中心（见 OrderController.PlaceCareOrder 的同款说明）。
             // 与选卡、提交、付款共用订单锁，避免迟到的草稿保存覆盖已经提交的主订单。
             await using var draftTransaction = order.id != 0 && _db.Database.CurrentTransaction == null
                 ? await _db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable) : null;

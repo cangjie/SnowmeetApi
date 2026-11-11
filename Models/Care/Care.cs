@@ -40,6 +40,18 @@ namespace SnowmeetApi.Models
         public int need_wax { get; set; } = 0;
         public int free_wax {get; set;} = 0;
         public int need_unwax { get; set; } = 0;
+        // 封板（2026-11-09 加 DB 列）：热蜡后不刮蜡，把蜡留在板面上封存过季。它不是养护工序——不生成任务、
+        // 不计费——只是个标志：取板（发板完成）后给顾客发一张「开板刮蜡券」（ticket_template 20），开板时凭券刮蜡。
+        // 与 need_unwax 二选一：有热蜡时「刮蜡」和「封板」必选其一（默认刮蜡）；没有热蜡、非雪季养护、机打蜡不能封板。
+        // 规则集中在 Helpers/CareSealRules.cs。
+        public int seal_board { get; set; } = 0;
+        // 养板（2026-11-10 加 DB 列）：和热蜡同一类业务、与热蜡互斥、可互相替换。工序为
+        // 养板打蜡1 → 养板刮蜡1 → 养板打蜡2 → 养板刮蜡2 → 养板打蜡3（EffectCareOrder 生效时生成）。
+        // 和热蜡一样：选了就默认带刮蜡，刮蜡与封板必选其一（CareSealRules）。
+        // 计费独立于单项/双项：单选养板 220、修刃+养板 280（商品「养板」「修刃养板」），老顾客券（模板 16）减 20 / 30；
+        // 只认老顾客券，其余券卡、会员卡、学员卡不能用于养板（CarePricingRules.ClearBenefitsForMaintainBoard）。
+        // 与机打蜡互斥，非雪季养护没有养板。
+        public int maintain_board { get; set; } = 0;
         public int need_repair { get; set; } = 0;
         public string? repair_memo { get; set; }
         public double repair_charge { get; set; }
@@ -80,7 +92,11 @@ namespace SnowmeetApi.Models
             get
             {
                 string desc = "";
-                if (edge_degree != null && need_wax == 1)
+                if (maintain_board == 1)
+                {
+                    desc += edge_degree != null ? "修刃养板" : "养板";
+                }
+                else if (edge_degree != null && need_wax == 1)
                 {
                     desc += "双项";
                 }
@@ -103,6 +119,17 @@ namespace SnowmeetApi.Models
             }
         }
 
+        // 列表展示用的金额 / 减免（不入库，由 GetOrdersByStaffPaged 填充，口径见 Helpers/CareAmountRules）：
+        // 普通装备 = 库里的值；招待 / 质保装备 = 按所做项目算的标准价，减免到 0 元。没填（价目读取失败）时为 null，客户端退回显示库里的值
+        [NotMapped]
+        public double? displayCharge { get; set; } = null;
+        [NotMapped]
+        public double? displayDiscount { get; set; } = null;
+        // 浅拷贝（只用于按「去掉招待 / 质保标记」的副本重新计价，不会存库）
+        public Care ShallowCopy()
+        {
+            return (Care)MemberwiseClone();
+        }
         public List<CareTask> tasks { get; set; } = new List<CareTask>();
         [NotMapped]
         public string? currentStep

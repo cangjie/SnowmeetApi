@@ -117,9 +117,14 @@ namespace SnowmeetApi.Models
         // 该订单是否使用过次卡（punch_card_used 有有效记录）—— 列表「卡」标签用，由查询接口填充
         [NotMapped]
         public bool usePunchCard { get; set; } = false;
+        // 这是不是该顾客第一次下的有效养护订单 —— 养护订单列表「新」标识用，由 GetOrdersByStaffPaged 填充（规则见 CareNewCustomerRules）
         [NotMapped]
-        public bool hasCrossShopRent => rentals != null && rentals.Any(r => r.valid == 1 && r.rentItems != null
-            && r.rentItems.Any(i => i.valid == 1 && !i.noNeed && !string.IsNullOrWhiteSpace(i.pickup_shop)));
+        public bool isNewCareCustomer { get; set; } = false;
+        [NotMapped]
+        // 元素判空：页面把 GetRental 取回的租赁（rental.order.rentals 因循环引用被序列化成 [null]）原样 POST 回来时，
+        // 模型验证会读这个属性，不判空会 NullReferenceException → 500（租赁订单详情页改商品备注「保存失败」）
+        public bool hasCrossShopRent => rentals != null && rentals.Any(r => r != null && r.valid == 1 && r.rentItems != null
+            && r.rentItems.Any(i => i != null && i.valid == 1 && !i.noNeed && !string.IsNullOrWhiteSpace(i.pickup_shop)));
         public DateTime create_date { get; set; } = DateTime.Now;
         [ForeignKey("staff_id")]
         public Staff staff { get; set; } = null;
@@ -132,7 +137,16 @@ namespace SnowmeetApi.Models
          
 
         public List<Care> cares { get; set; } = new List<Care>();
-        public List<Rental> rentals { get; set; } = new List<Rental>();
+        // 不变量：rentals 里不会有 null 元素。接口（Startup 里 ReferenceHandler.IgnoreCycles）输出 rental.order 时，
+        // order.rentals 里指回自己的那条租赁会被写成 null；页面再把整个 rental 原样 POST 回来，反序列化出 [null]，
+        // 之后模型验证读本类各计算属性（rentalStatus/hasCrossShopRent/…）时会逐个 NullReferenceException → 500。
+        // 在 setter 这一处把 null 丢掉，比给十几个读 rentals[i] 的计算属性逐个补判空稳；EF 按约定直接用 _rentals 字段装配，不受影响。
+        private List<Rental> _rentals = new List<Rental>();
+        public List<Rental> rentals
+        {
+            get => _rentals;
+            set => _rentals = value == null ? null : value.Where(r => r != null).ToList();
+        }
         [NotMapped]
         public List<Rental> appendingRentals { get; set; } = new List<Rental>();
         public List<FdOrder> fdOrders { get; set; } = new List<FdOrder>();
@@ -1304,11 +1318,25 @@ namespace SnowmeetApi.Models
                                 property.services += " 打蜡";
                             }
                         }
+                        if (care.maintain_board == 1)
+                        {
+                            if (property.services.IndexOf("养板") < 0)
+                            {
+                                property.services += " 养板";
+                            }
+                        }
                         if (care.need_unwax == 1)
                         {
                             if (property.services.IndexOf("刮蜡") < 0)
                             {
                                 property.services += " 刮蜡";
+                            }
+                        }
+                        if (care.seal_board == 1)
+                        {
+                            if (property.services.IndexOf("封板") < 0)
+                            {
+                                property.services += " 封板";
                             }
                         }
                         if (care.need_repair == 1)

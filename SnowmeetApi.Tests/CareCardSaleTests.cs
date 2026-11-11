@@ -94,6 +94,17 @@ public class CareCardSaleTests
     }
 
     [Fact]
+    public async Task SubmittingACareCardOrder_RecordsTheMembersFirstCareOrder()
+    {
+        await using var f = await Fixture.Create(1);
+        await f.Service.SaveDraftAsync(f.Request());
+        Assert.Empty(await f.Db.memberCareFirstOrder.Where(r => r.order_id != null).ToListAsync());
+        await f.Service.SubmitAsync(f.OrderId, 28);
+        var record = await f.Db.memberCareFirstOrder.SingleAsync(r => r.order_id != null);
+        Assert.Equal((10, (int?)f.OrderId), (record.member_id, record.order_id));   // 订单生效就记下，不等有人打开养护订单列表
+    }
+
+    [Fact]
     public async Task CancellingOneEquipmentReturnsOnlyItsUse_AndCannotReapplyOrRefund()
     {
         await using var f = await Fixture.Create(2);

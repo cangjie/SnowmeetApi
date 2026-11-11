@@ -1154,6 +1154,12 @@ namespace SnowmeetApi.Controllers
             isTest, isEntertain, isPackage, isOnCredit, haveDiscount, status, null, null, haveWarranty, retailType, keyword, isSummerCare,
             rentCategoryId, rentItemName, useCard, cell, rentStatus, includeCareTaskStaff: includeCareTaskStaff);
             List<SnowmeetApi.Models.Order> newOrders = OrderQueryRules.FilterByCustomerCellSuffix(orders, cell);
+            // 零售订单列表不显示「顾客自助买卡、还没付款」的单（腾讯安全检测天天下的待支付单）；已付款的照常显示。
+            // 只加在员工列表接口上：GetCommonOrders 不动（会员自己查订单也走它）。
+            if (type == "零售")
+            {
+                newOrders = OrderQueryRules.ExcludeUnpaidSelfServiceCardOrders(newOrders);
+            }
 
             SnowmeetApi.Models.Order.RendOrderList(newOrders);
             return Ok(new ApiResult<List<SnowmeetApi.Models.Order>>()
@@ -1251,6 +1257,11 @@ namespace SnowmeetApi.Controllers
                 isTest, isEntertain, isPackage, isOnCredit, haveDiscount, status, null, null, haveWarranty, retailType, keyword, isSummerCare,
                 rentCategoryId, rentItemName, useCard, cell, rentStatus, hasRetailFilter, crossShopOnly);
             List<SnowmeetApi.Models.Order> filtered = OrderQueryRules.FilterByCustomerCellSuffix(orders, cell);
+            // 同 GetOrdersByStaff：零售列表不显示「顾客自助买卡、还没付款」的单
+            if (type == "零售")
+            {
+                filtered = OrderQueryRules.ExcludeUnpaidSelfServiceCardOrders(filtered);
+            }
             PagedOrderResult result = PagedOrderResult.Create(filtered, pageIndex, pageSize, type == "养护");
             List<SnowmeetApi.Models.Order> paged = result.items;
             // 标记本页订单是否用过次卡（punch_card_used 有有效记录）→ 列表「卡」标签
@@ -1262,6 +1273,13 @@ namespace SnowmeetApi.Controllers
             {
                 paged[i].usePunchCard = punchOrderIds.Contains(paged[i].id);
             }
+            // 养护订单列表「新」标识：该顾客第一次下有效养护订单的那一单
+            if (type == "养护")
+            {
+                await MarkNewCareCustomersAsync(paged);
+                // 每件装备的「金额」「减免」（招待 / 质保的装备也要显示：按所做项目算标准价，减免到 0 元）
+                await FillCareDisplayAmountsAsync(paged);
+            }
             SnowmeetApi.Models.Order.RendOrderList(paged);
             return Ok(new ApiResult<PagedOrderResult>()
             {
@@ -1269,6 +1287,69 @@ namespace SnowmeetApi.Controllers
                 message = "",
                 data = result
             });
+        }
+
+        // 给本页养护订单的每件装备填展示用的金额 / 减免（Care.displayCharge / displayDiscount，规则见 CareAmountRules）。
+        // 招待 / 质保的装备库里是 0 / 0，这里把「去掉招待 / 质保标记」的副本交给开单时同一个定价（CareController.CalcCharge）算标准价，
+        // 所以特价、一口价（如万龙只刮蜡）、加急、非雪季等规则只有一份。不改库。
+        // 价目读不出来只是这件装备没有展示金额（客户端退回显示库里的值），不能把整个列表弄坏。
+        private async Task FillCareDisplayAmountsAsync(List<SnowmeetApi.Models.Order> pageOrders)
+        {
+            CareController careHelper = new CareController(_db, _config, _http);
+            foreach (SnowmeetApi.Models.Order order in pageOrders)
+            {
+                if (order.cares == null)
+                {
+                    continue;
+                }
+                foreach (Care care in order.cares)
+                {
+                    try
+                    {
+                        if (!CareAmountRules.IsFreeCare(care))
+                        {
+                            (care.displayCharge, care.displayDiscount) = CareAmountRules.FromStored(care);
+                            continue;
+                        }
+                        Care priced = care.ShallowCopy();
+                        priced.warranty = false;
+                        priced.entertain = false;
+                        priced.use_card = false;
+                        priced.coach_card_id = null;
+                        priced.ticket_code = null;
+                        var (standardCharge, _) = await careHelper.CalcCharge(order.shop, priced, null, null, order.member_id);
+                        (care.displayCharge, care.displayDiscount) = CareAmountRules.ForFreeCare(care, standardCharge);
+                    }
+                    catch (Exception ex)
+                    {
+                        care.displayCharge = null;
+                        care.displayDiscount = null;
+                        Console.WriteLine("养护订单列表装备金额计算失败 care=" + care.id + "：" + ex.Message);
+                    }
+                }
+            }
+        }
+
+        // 给本页的养护订单打「新」标：每个会员的养护首单读 member 表上记着的 care_first_order_id（不限日期、不限店铺；
+        // 没有记录的会员在这里当场补上），本页里正好是那一张的订单 isNewCareCustomer = true。
+        // 规则见 CareNewCustomerRules，首单记录的读取与维护见 CareFirstOrderService（报表也读同一份）。
+        private async Task MarkNewCareCustomersAsync(List<SnowmeetApi.Models.Order> pageOrders)
+        {
+            List<int> memberIds = pageOrders.Where(o => o.member_id != null && CareNewCustomerRules.IsValidCareOrder(o))
+                .Select(o => (int)o.member_id!).Distinct().ToList();
+            if (memberIds.Count == 0)
+            {
+                return;
+            }
+            try
+            {
+                CareNewCustomerRules.Mark(pageOrders, await CareFirstOrderService.GetFirstOrderIdsAsync(_db, memberIds));
+            }
+            catch (Exception ex)
+            {
+                // 「新」只是列表上的一个标记，读首单记录出错（比如加列脚本还没执行）时不能把整个列表弄坏：记日志，本页不显示「新」
+                Console.WriteLine("养护订单列表「新」标识读取失败：" + ex.Message);
+            }
         }
 
         [HttpGet("{orderId}")]
@@ -3213,13 +3294,27 @@ namespace SnowmeetApi.Controllers
                     data = null
                 });
             }
-            order.shop = CarePricingRules.ResolveCareShop(order.shop);
+            // 订单店名保持开单门店（万龙体验中心开的养护单就记体验中心，单号 WT_YH_…）：价目 / 一口价 / 开板刮蜡券 /
+            // 教练卡这些规则入口都会自己按 ResolveCareShop 把体验中心当服务中心算，收款商户见 TenpayController.GetMchId
+            // （万龙的养护一律进服务中心的 3 号商户）。这里不要再改写 order.shop。
             // 万龙服务中心只选了刮蜡是一口价，不该带任何券 / 会员卡 / 学员卡：开单页会给老顾客自动带上券 16，
             // 不摘掉的话生效时这张券会被核销（或卡被扣次）却一分钱没减。要在余额校验之前摘，
             // 免得一张已用完的卡把本来不需要卡的单子拦下。
+            // 例外：可用的开板刮蜡券（封板取板后发的）专抵这口价，留下；抵不了的开板刮蜡券（别的门店 / 不是单刮蜡 /
+            // 已用 / 过期 / 非本人）摘掉不核销。券不信前端，这里按券码重新查库判定。
+            HashSet<string> boardTicketsInThisOrder = new HashSet<string>();
             foreach (Care scrapeCare in order.cares)
             {
-                CarePricingRules.ClearBenefitsForScrapeOnly(order.shop, scrapeCare);
+                Ticket? scrapeTicket = string.IsNullOrWhiteSpace(scrapeCare.ticket_code) ? null
+                    : await _db.ticket.Where(t => t.code == scrapeCare.ticket_code).AsNoTracking().FirstOrDefaultAsync();
+                var scrapeRules = CarePricingRules.ApplyScrapeOnlyBenefitRules(order.shop, scrapeCare, scrapeTicket, order.member_id, DateTime.Now);
+                // 一张券只能抵一件装备：同一张开板刮蜡券挂在本单两件装备上，后一件摘掉，免得一张券抵两笔
+                if (scrapeRules.BoardTicketKept && !boardTicketsInThisOrder.Add(scrapeCare.ticket_code!))
+                {
+                    scrapeCare.ticket_code = null;
+                }
+                // 养板只认老顾客券（模板 16）：其余券 / 会员卡 / 学员卡同样要在余额校验和定价之前摘掉
+                CarePricingRules.ClearBenefitsForMaintainBoard(scrapeCare, scrapeTicket);
             }
             // 非雪季养护生效时会给会员发 17/18 票券（EffectCareOrder 里 (int)member_id 强转），
             // 散客单必须先匹配会员，否则生效阶段直接抛异常
@@ -3252,6 +3347,9 @@ namespace SnowmeetApi.Controllers
                 {
                     care.biz_type = "非雪季养护";
                 }
+                // 刮蜡 / 封板收敛到合法组合（与开单页 CalcCareCharge 同口径）：有热蜡二选一、默认刮蜡，不能封板的清零。
+                // 封板的装备取板后才发开板刮蜡券，所以落库的 seal_board 必须是服务端认的值
+                CareSealRules.Normalize(care);
                 // 定价以服务端为准：与开单页 Care/CalcCareCharge 共用 CareController.CalcCharge
                 Ticket ticket = null;
                 if (care.ticket_code != null && care.ticket_code.Trim() != "")
@@ -3310,7 +3408,7 @@ namespace SnowmeetApi.Controllers
                 {
                     return Ok(new ApiResult<Models.Order>()
                     {
-                        code = 1, message = "当前门店未配置养护价格，请核对门店", data = null
+                        code = 1, message = CareController.MissingPriceMessage(care), data = null
                     });
                 }
                 care.common_charge = commonCharge;
@@ -3359,6 +3457,8 @@ namespace SnowmeetApi.Controllers
             {
                 _db.care.Entry(order.cares[i]).State = EntityState.Detached;
             }
+            // 订单生效这一刻就记下该会员的养护首单（读取时也会补；这里让记录不依赖有人打开列表）。出错只记日志，不影响下单
+            await CareFirstOrderService.TryReconcileAsync(_db, order.member_id);
             for (int i = 0; i < order.cares.Count; i++)
             {
                 Care care = order.cares[i];

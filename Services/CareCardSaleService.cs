@@ -474,6 +474,8 @@ IF @result < 0 THROW 51010, N'操作繁忙，请稍后重试', 1;");
             care.use_card = true; care.card_id = null;
         }
         await db.SaveChangesAsync(); await tx.CommitAsync();
+        // 订单生效这一刻就记下该会员的养护首单（读取时也会补；这里让记录不依赖有人打开列表）。出错只记日志，不影响下单
+        await CareFirstOrderService.TryReconcileAsync(db, careOrder.member_id);
         return retailOrder.id;
     }
 

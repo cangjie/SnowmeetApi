@@ -24,8 +24,10 @@ namespace SnowmeetApi.Helpers
     /// </summary>
     public static class CarePricingRules
     {
-        // 旧版 ReceptController 的养护门店规则：体验中心只做租赁/零售，
-        // 万龙养护统一由服务中心接单。新版接待页也必须沿用同一归属。
+        // 万龙的养护统一由服务中心做：体验中心可以接单（2026-11-09 起 shop_list.care=1，接待页按这个标志放行），
+        // 订单店名保持开单门店（体验中心的单记体验中心、单号 WT_YH_…），但价目 / 单刮蜡一口价 / 开板刮蜡券 / 教练卡
+        // 都按服务中心算（本方法），收款进服务中心的养护商户（TenpayController.GetMchId 的 3 号）。
+        // 只有旧版 ReceptController（旧客户端）还会在下单时把店名也改成服务中心。
         public static string ResolveCareShop(string? shop)
         {
             string name = (shop ?? "").Trim();
@@ -88,14 +90,69 @@ namespace SnowmeetApi.Helpers
             }
             bool summer = !string.IsNullOrWhiteSpace(care.summer)
                 || (care.biz_type != null && care.biz_type.Trim() == SummerBizType);
+            // 养板自带刮蜡（默认带出），它不是「只刮蜡」：养板按自己的价目收，不能落到 80 / 100 的一口价
             return care.need_unwax == 1 && care.need_edge != 1 && care.need_wax != 1 && care.free_wax != 1
-                && !summer && !care.warranty && !care.entertain;
+                && care.maintain_board != 1 && !summer && !care.warranty && !care.entertain;
+        }
+
+        /// <summary>
+        /// 养板价目的商品名（用户 2026-11-10）：单选养板「养板」220，修刃+养板「修刃养板」280；
+        /// 老顾客券（模板 16）分别减 20 / 30 → 200 / 250。价目只配在万龙服务中心（体验中心同价），
+        /// 别的门店没有这两个商品，选养板会报「没有养板价目」而不是静默免费。
+        /// </summary>
+        public const string MaintainBoardName = "养板";
+        public const string EdgeMaintainBoardName = "修刃养板";
+
+        /// <summary>这件 care 是否按养板收费：选了养板，且不是非雪季、质保、招待（它们各有各的算法）。</summary>
+        public static bool AppliesMaintainBoardPrice(Care care)
+        {
+            if (care == null || care.maintain_board != 1)
+            {
+                return false;
+            }
+            bool summer = !string.IsNullOrWhiteSpace(care.summer)
+                || (care.biz_type != null && care.biz_type.Trim() == SummerBizType);
+            return !summer && !care.warranty && !care.entertain;
+        }
+
+        /// <summary>
+        /// 养板只认老顾客券（模板 16，上面的 200 / 250 就是凭它的价）：其余券 / 会员卡 / 学员卡一律摘掉，
+        /// 并把随它们带来的减免一并清零（减免可能来自别的券，区分不了来源）——留着只会在订单生效时白白核销一张券 / 扣一次卡。
+        /// ticket 传这件 care 当前所选券码对应的券（没选 / 查不到传 null；查不到的券码也摘掉）。
+        /// 返回 true = 确实摘掉了东西（给开单页提示用）；没选任何券卡时不动，店员手填的减免保留。
+        /// 老顾客券的减免随后由定价按「保底」补齐，不受这里清零影响。
+        /// 开单页预览（CalcCareCharge）和下单（PlaceCareOrder）都要在定价前先调这个。
+        /// </summary>
+        public static bool ClearBenefitsForMaintainBoard(Care care, Ticket? ticket)
+        {
+            if (!AppliesMaintainBoardPrice(care))
+            {
+                return false;
+            }
+            bool hasTicket = !string.IsNullOrWhiteSpace(care.ticket_code);
+            bool dropTicket = hasTicket && (ticket == null || ticket.template_id != LegacyDiscountTemplateId);
+            bool dropOthers = care.use_card || care.card_id != null || care.coach_card_id != null;
+            if (!dropTicket && !dropOthers)
+            {
+                return false;
+            }
+            if (dropTicket)
+            {
+                care.ticket_code = null;
+            }
+            care.use_card = false;
+            care.card_id = null;
+            care.card_name = null;
+            care.coach_card_id = null;
+            care.discount = 0;
+            care.ticket_discount = 0;
+            return true;
         }
 
         /// <summary>
         /// 这件 care 在这家店是否按「单刮蜡一口价」收费。
-        /// 门店先走 ResolveCareShop 归并（万龙体验中心 → 万龙服务中心）：PlaceCareOrder 下单前会先改写 order.shop，
-        /// 开单页预览传的是原店名，不归并预览和下单就会各算各的。
+        /// 门店先走 ResolveCareShop 归并（万龙体验中心 → 万龙服务中心）：订单店名保持开单门店（体验中心的单就是体验中心），
+        /// 开单页预览和下单传进来的都可能是体验中心，不归并就会把体验中心的单刮蜡算成免费。
         /// </summary>
         public static bool AppliesScrapeOnlyPrice(string? shop, Care care)
         {
@@ -109,19 +166,25 @@ namespace SnowmeetApi.Helpers
         /// 返回 true = 确实摘掉了东西（给开单页提示用）；没选任何券卡时不动，店员手填的减免保留。
         /// 开单页预览（CalcCareCharge）和下单（PlaceCareOrder）都要在定价前先调这个。
         /// </summary>
-        public static bool ClearBenefitsForScrapeOnly(string? shop, Care care)
+        public static bool ClearBenefitsForScrapeOnly(string? shop, Care care, bool keepBoardTicket = false)
         {
             if (!AppliesScrapeOnlyPrice(shop, care))
             {
                 return false;
             }
-            bool hasBenefit = !string.IsNullOrWhiteSpace(care.ticket_code) || care.use_card
+            // keepBoardTicket：这件 care 选的是一张可用的「开板刮蜡券」（封板后发的，专抵这笔一口价），券留着，
+            // 其余（会员卡 / 学员卡 / 减免）照旧摘掉
+            bool keepTicket = keepBoardTicket && !string.IsNullOrWhiteSpace(care.ticket_code);
+            bool hasBenefit = (!keepTicket && !string.IsNullOrWhiteSpace(care.ticket_code)) || care.use_card
                 || care.card_id != null || care.coach_card_id != null;
             if (!hasBenefit)
             {
                 return false;
             }
-            care.ticket_code = null;
+            if (!keepTicket)
+            {
+                care.ticket_code = null;
+            }
             care.use_card = false;
             care.card_id = null;
             care.card_name = null;
@@ -136,14 +199,61 @@ namespace SnowmeetApi.Helpers
             return isOldMember ? ScrapeOnlyOldMemberPrice : ScrapeOnlyNewMemberPrice;
         }
 
-        /// <summary>计费项数：修刃 + 热打蜡，各算一项；机打蜡和刮蜡不计。</summary>
+        /// <summary>
+        /// 开板刮蜡券（模板 20，封板取板后发给顾客，见 CareSealRules）。
+        /// 它只有一个用处：抵掉万龙服务中心「只选刮蜡」的一口价（老会员 80 / 其他 100），抵完这件装备 0 元。
+        /// 其余场合都没有东西可抵——别的门店刮蜡本来就不收费，刮蜡跟修刃 / 热蜡一起选时刮蜡也不单独计费——
+        /// 所以那些场合不允许选，免得白白核销一张券。
+        /// </summary>
+        public const int BoardScrapeTicketTemplateId = CareSealRules.SealTicketTemplateId;
+
+        /// <summary>
+        /// 这张券此刻能不能抵这件 care：模板 20、这件 care 正是万龙服务中心的单刮蜡、券有效未用、
+        /// 在有效期内，并且属于下单的会员（散客不能用——券是发给会员的）。
+        /// 服务端不信前端选的券码：开单页预览和下单两边都要走这个判断。
+        /// </summary>
+        public static bool CanRedeemBoardTicket(string? shop, Care care, Ticket? ticket, int? memberId, DateTime now)
+        {
+            return ticket != null && ticket.template_id == BoardScrapeTicketTemplateId
+                && AppliesScrapeOnlyPrice(shop, care)
+                && ticket.valid == 1 && ticket.used == 0 && ticket.is_active == 1
+                && memberId != null && ticket.member_id == memberId
+                && (ticket.start_date == null || ticket.start_date.Value.Date <= now.Date)
+                && (ticket.expire_date == null || ticket.expire_date.Value.Date >= now.Date);
+        }
+
+        /// <summary>
+        /// 单刮蜡一口价下的券卡取舍，开单页预览（CalcCareCharge）和下单（PlaceCareOrder）共用，要在定价前调：
+        /// ① 选的是可用的开板刮蜡券 → 留下，摘掉其余券卡；
+        /// ② 选的是开板刮蜡券但此刻抵不了（别的门店 / 不是单刮蜡 / 券已用、过期、不属于该会员）→ 把这张券摘掉，不核销；
+        /// ③ 其余情况 → 与 ClearBenefitsForScrapeOnly 原来的口径完全一致（单刮蜡一口价时摘掉所有券卡）。
+        /// ticket 传这件 care 当前所选券码对应的券（没选 / 查不到就传 null）。
+        /// </summary>
+        public static ScrapeOnlyBenefitResult ApplyScrapeOnlyBenefitRules(string? shop, Care care, Ticket? ticket,
+            int? memberId, DateTime now)
+        {
+            bool keep = CanRedeemBoardTicket(shop, care, ticket, memberId, now);
+            bool boardTicketRemoved = false;
+            if (ticket != null && ticket.template_id == BoardScrapeTicketTemplateId && !keep
+                && !string.IsNullOrWhiteSpace(care.ticket_code))
+            {
+                care.ticket_code = null;
+                boardTicketRemoved = true;
+            }
+            bool cleared = ClearBenefitsForScrapeOnly(shop, care, keep);
+            return new ScrapeOnlyBenefitResult(cleared, boardTicketRemoved, keep);
+        }
+
+        public readonly record struct ScrapeOnlyBenefitResult(bool BenefitsCleared, bool BoardTicketRemoved, bool BoardTicketKept);
+
+        /// <summary>计费项数：修刃 + 热打蜡（或养板——二者互斥，养板就是「蜡」那一项），各算一项；机打蜡和刮蜡不计。</summary>
         public static int CountChargeableItems(Care care)
         {
             if (care == null)
             {
                 return 0;
             }
-            return (care.need_edge == 1 ? 1 : 0) + (care.need_wax == 1 ? 1 : 0);
+            return (care.need_edge == 1 ? 1 : 0) + (care.need_wax == 1 || care.maintain_board == 1 ? 1 : 0);
         }
 
         /// <summary>
@@ -177,7 +287,10 @@ namespace SnowmeetApi.Helpers
                 // 只做机打蜡或只刮蜡：有服务但不计费，没有对应商品
                 return "";
             }
-            string baseName = items >= 2 ? TwoItems : OneItem;
+            // 养板有自己的价目，不走单项 / 双项
+            string baseName = care.maintain_board == 1
+                ? (care.need_edge == 1 ? EdgeMaintainBoardName : MaintainBoardName)
+                : (items >= 2 ? TwoItems : OneItem);
             return care.urgent == 1 ? baseName + UrgentSuffix : baseName;
         }
 

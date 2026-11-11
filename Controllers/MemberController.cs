@@ -9,6 +9,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using SnowmeetApi.Data;
 using SnowmeetApi.Models;
+using SnowmeetApi.Services;
 namespace SnowmeetApi.Controllers
 {
     [Route("api/[controller]/[action]")]
@@ -209,6 +210,24 @@ namespace SnowmeetApi.Controllers
 
             targetMember.is_merge = 0;
             targetMember.merge_id = null;
+            // VIP 是会员本身的属性：源会员是 VIP，合并后目标会员也要是 VIP（源会员此后不再出现在会员列表里）
+            if (sourceMember.is_vip && !targetMember.is_vip)
+            {
+                targetMember.is_vip = true;
+                await _db.coreDataModLog.AddAsync(new CoreDataModLog()
+                {
+                    id = 0,
+                    trace_id = traceId,
+                    table_name = "member",
+                    key_value = targetId,
+                    scene = "用户批量合并",
+                    field_name = "is_vip",
+                    prev_value = "0",
+                    current_value = "1",
+                    is_manual = 1,
+                    manual_memo = "源会员是VIP，VIP随合并转给目标会员"
+                });
+            }
             _db.member.Entry(sourceMember).State = EntityState.Modified;
             _db.member.Entry(targetMember).State = EntityState.Modified;
             CoreDataModLog logMember = new CoreDataModLog()
@@ -333,6 +352,8 @@ namespace SnowmeetApi.Controllers
             }
             await MergeCoachDataAsync(sourceId, targetId, traceId);
             await _db.SaveChangesAsync();
+            // 订单已改挂到目标会员：养护首单跟着走（目标取两边更早的，来源清空）；出错只记日志，不影响合并
+            await CareFirstOrderService.TryMergeAsync(_db, sourceId, targetId);
             // 源会员的微信/支付宝等社交账号不迁移（上面已全部 valid=0）；
             // 仅把源会员手机号以 type=contact（联系手机号）挂到目标会员，不作为登录/身份主手机号（type=cell）
             if (cell != null && targetMember.memberSocialAccounts.Where(m => (m.type.Trim().Equals("cell") || m.type.Trim().Equals("contact"))

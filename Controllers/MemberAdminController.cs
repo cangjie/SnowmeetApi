@@ -50,7 +50,7 @@ namespace SnowmeetApi.Controllers
         [HttpGet]
         public async Task<ActionResult<ApiResult<object>>> SearchMembersByStaff(string sessionKey,
             string? name = null, string? cell = null, string? gender = null, string? bizTypes = null,
-            string? tags = null, int pageIndex = 1, int pageSize = 20, string sessionType = "wechat_mini_openid")
+            string? tags = null, int pageIndex = 1, int pageSize = 20, string sessionType = "wechat_mini_openid", bool? vip = null)
         {
             Staff staff = await GetStaff(sessionKey, sessionType);
             if (staff == null || staff.title_level < STAFF_LEVEL)
@@ -61,6 +61,11 @@ namespace SnowmeetApi.Controllers
 
             // merge_id 非空 = 已被合并进其他会员的源会员，不出现在会员列表
             var q = _db.member.Where(m => m.valid == 1 && m.merge_id == null);
+            // 只看 VIP：直接用 member.is_vip（索引 ix_member_is_vip），不关联标签表；vip 为空/false 不筛
+            if (vip == true)
+            {
+                q = q.Where(m => m.is_vip);
+            }
             if (!string.IsNullOrWhiteSpace(name))
             {
                 string nm = name.Trim();
@@ -125,6 +130,7 @@ namespace SnowmeetApi.Controllers
                 id = m.id,
                 name = m.real_name,
                 gender = m.gender,
+                isVip = m.is_vip,
                 phone = cells.Where(c => c.member_id == m.id).Select(c => c.num).FirstOrDefault() ?? "",
                 deposit = Math.Round(deposits.Where(d => d.member_id == m.id).Sum(d => d.income_amount - d.consume_amount), 2),
                 points = pts.Where(p => p.member_id == m.id).Sum(p => p.points),
@@ -198,6 +204,7 @@ namespace SnowmeetApi.Controllers
                 id = m.id,
                 name = m.real_name,
                 gender = m.gender,
+                isVip = m.is_vip,
                 phone = cell,
                 source = m.source,
                 following_wechat = m.following_wechat,
@@ -265,6 +272,32 @@ namespace SnowmeetApi.Controllers
             await memberHelper.UpdateMemberInfo(m, staff, "会员详情修改资料");
 
             return Ok(new ApiResult<object>() { code = 0, message = "", data = new { id = req.memberId } });
+        }
+
+        // ───────────────────────── 2b. 设置 / 取消 VIP ─────────────────────────
+        // VIP 是 member.is_vip 字段（带索引），不是标签——会员列表「只看 VIP」要快。所有店员（≥100）可设，和标签维护一致。
+        // 状态没变就什么都不写（不记日志）；改了就记一条 core_data_mod_log（谁、什么时候、0→1 / 1→0）。
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<object>>> SetMemberVip(int memberId, bool vip,
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await GetStaff(sessionKey, sessionType);
+            if (staff == null || staff.title_level < STAFF_LEVEL)
+                return Ok(new ApiResult<object>() { code = 1, message = "没有权限", data = null });
+            Member? m = await _db.member.AsTracking().FirstOrDefaultAsync(x => x.id == memberId);
+            if (m == null || m.valid != 1)
+                return Ok(new ApiResult<object>() { code = 1, message = "会员不存在", data = null });
+            if (m.merge_id != null)
+                return Ok(new ApiResult<object>() { code = 1, message = "该会员已被合并，请到合并后的会员上设置", data = null });
+            if (m.is_vip != vip)
+            {
+                m.is_vip = vip;
+                m.update_date = DateTime.Now;
+                await _db.coreDataModLog.AddAsync(CoreDataModLog.CreateManualLog("member", "is_vip", memberId, "会员详情页设置VIP",
+                    null, staff.id, vip ? "0" : "1", vip ? "1" : "0", vip ? "设为VIP" : "取消VIP"));
+                await _db.SaveChangesAsync();
+            }
+            return Ok(new ApiResult<object>() { code = 0, message = "", data = new { isVip = m.is_vip } });
         }
 
         // ───────────────────────── 3. 标签维护 ─────────────────────────

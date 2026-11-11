@@ -7829,6 +7829,20 @@ namespace SnowmeetApi.Controllers
                     newPrice = manualPreset.price;
                 }
             }
+            // 连租按预约价封顶（2026-11-09 用户定）：连租时每天的租金超过预约价都按预约价算——
+            // 下一日大于预约价就记预约价，上一日已记的租金大于预约价的也改成预约价（和下一日租金同一次 SaveChanges 落库）。
+            // 预约价 = 价目表里同门店、同品类（或套餐）、同场次、同日类型、scene = 预约 的那档价；查不到就不封顶。
+            // 店员手改过价（preset.manual）的租赁以店员为准，不封顶。
+            if (!rental.pricePresets.Any(p => p.manual) && !string.IsNullOrWhiteSpace(dayType) && !string.IsNullOrWhiteSpace(rentType))
+            {
+                RentPrice? reservePrice = await FindCatalogPriceAsync(rental, dayType.Trim(), rentType.Trim(), "预约");
+                if (reservePrice?.price != null && newPrice > reservePrice.price.Value)
+                {
+                    newPrice = reservePrice.price.Value;
+                    price = reservePrice;
+                }
+                await CapPreviousDayRentAtReservePriceAsync(rental, rentDate);
+            }
             // 学员卡：沿用租赁开单时选的卡（rental.coach_card_id），按当天日租金折扣；店员手改过价的租赁不套
             CoachCard? coachCard = null;
             double coachDiscount = 0;
@@ -7886,6 +7900,50 @@ namespace SnowmeetApi.Controllers
                 await new CoachPricingService(_db).RecordUseAsync(coachCard, rental.order_id, "租赁", rental.id, detail.id,
                     CoachCardRules.ModeRate, coachCard.rental_rate_snapshot ?? 0, newPrice, coachDiscount, DateTime.Now);
             }
+        }
+        // 连租按预约价封顶的「上一日」部分：上一日有效的租金明细若大于它那一天场次/日类型对应的预约价，就改成预约价。
+        // 只改 amount 和指向的价目（rent_price_id）；已有的减免行不动。改动由调用方随次日租金一起 SaveChanges。
+        private async Task CapPreviousDayRentAtReservePriceAsync(Models.Rental rental, DateTime rentDate)
+        {
+            DateTime prevDate = rentDate.Date.AddDays(-1);
+            Models.RentalDetail? prev = await _db.rentalDetail.AsTracking()
+                .Where(d => d.rental_id == rental.id && d.valid == 1 && d.charge_type == "租金" && d.rental_date.Date == prevDate)
+                .OrderByDescending(d => d.id).FirstOrDefaultAsync();
+            if (prev == null)
+            {
+                return;
+            }
+            string? prevRentType = null;
+            string? prevDayType = null;
+            if (prev.rent_price_id != null)
+            {
+                RentPrice? used = await _db.rentPrice.AsNoTracking().FirstOrDefaultAsync(p => p.id == prev.rent_price_id);
+                prevRentType = used?.rent_type;
+                prevDayType = used?.day_type;
+            }
+            if (string.IsNullOrWhiteSpace(prevRentType) || string.IsNullOrWhiteSpace(prevDayType))
+            {
+                RentalPricePreset? prevPreset = rental.pricePresets.FirstOrDefault(p => p.rent_date.Date == prevDate);
+                prevRentType = prevPreset?.rent_type;
+                prevDayType = prevPreset?.day_type;
+            }
+            if (string.IsNullOrWhiteSpace(prevRentType) || string.IsNullOrWhiteSpace(prevDayType))
+            {
+                return;
+            }
+            RentPrice? reserve = await FindCatalogPriceAsync(rental, prevDayType.Trim(), prevRentType.Trim(), "预约");
+            if (reserve?.price == null || prev.amount <= reserve.price.Value)
+            {
+                return;
+            }
+            double oldAmount = prev.amount;
+            prev.amount = reserve.price.Value;
+            prev.rent_price_id = reserve.id;
+            prev.update_date = DateTime.Now;
+            await _db.coreDataModLog.AddAsync(CoreDataModLog.CreateManualLog("RentDetail", "amount", prev.id, "系统续租",
+                null, null, oldAmount.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                prev.amount.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                "连租按预约价封顶：" + prevDate.ToString("MM-dd") + " 的租金改为预约价"));
         }
         [HttpGet]
         public async Task<ActionResult<ApiResult<List<Models.Order>?>>> GetConfirmedRentOrder(string shop,
