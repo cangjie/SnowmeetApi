@@ -873,7 +873,8 @@ namespace SnowmeetApi.Controllers
             var cards = await q
                 .OrderByDescending(c => c.id)
                 .Select(c => new { c.id, c.biz_type, c.card_name, c.total, c.punches,
-                    c.equip_type, c.equip_brand, c.equip_scale, c.equip_serial })
+                    c.equip_type, c.equip_brand, c.equip_scale, c.equip_serial,
+                    c.care_project_count })   // 1=单项 / 2=双项，历史卡为 NULL；开单页自动选卡据此先选双项
                 .AsNoTracking().ToListAsync();
             List<int> cardIds = cards.Select(c => c.id).ToList();
             var lastUsed = await _db.punchCardUsed
