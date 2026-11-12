@@ -14,6 +14,7 @@ public class ShareListControllerTests
         var db = await ShareListServiceTests.SeedAsync();
         await ShareFixture.AddStaffSessionAsync(db, 302, 200, "manager-s");
         await ShareFixture.AddStaffSessionAsync(db, 303, 100, "clerk-s");
+        await ShareFixture.AddStaffSessionAsync(db, 304, 300, "admin-s");
         return (db, () => new ShareListController(db, ShareFixture.Config, ShareFixture.Http));
     }
 
@@ -33,7 +34,9 @@ public class ShareListControllerTests
         Assert.Equal(3, (await ctl().NextBatchNo("clerk-s")).code);
         Assert.Equal(3, (await ctl().CompleteManual("clerk-s", body)).code);
         Assert.Equal(0, (await ctl().List("manager-s")).code);
-        Assert.Equal(0, (await ctl().NextBatchNo("manager-s")).code);
+        Assert.Equal(3, (await ctl().NextBatchNo("manager-s")).code);
+        Assert.Equal(3, (await ctl().CompleteManual("manager-s", body)).code);
+        Assert.Equal(0, (await ctl().NextBatchNo("admin-s")).code);
     }
 
     [Fact]
@@ -48,7 +51,7 @@ public class ShareListControllerTests
 
         var snow = D(await ctl().List("manager-s", status: "未分", type: "雪票"));
         Assert.Equal(new[] { 13, 14 }, Ids(snow.GetProperty("items")));
-        Assert.Equal(2, snow.GetProperty("selectableCount").GetInt32());
+        Assert.Equal(0, snow.GetProperty("selectableCount").GetInt32());
 
         var byKeyword = D(await ctl().List("manager-s", keyword: "李教练"));
         Assert.Equal(new[] { 11 }, Ids(byKeyword.GetProperty("items")));
@@ -70,18 +73,18 @@ public class ShareListControllerTests
         var (db, ctl) = await SetupAsync();
         await using var _ = db;
 
-        var next = D(await ctl().NextBatchNo("manager-s")).GetProperty("batchNo").GetString()!;
+        var next = D(await ctl().NextBatchNo("admin-s")).GetProperty("batchNo").GetString()!;
         Assert.StartsWith("MS-", next);
 
-        var done = await ctl().CompleteManual("manager-s", new ShareListController.CompleteManualInput(new List<int> { 11, 13, 14 }, next));
+        var done = await ctl().CompleteManual("admin-s", new ShareListController.CompleteManualInput(new List<int> { 11 }, next));
         Assert.Equal(0, done.code);
         var result = D(done);
-        Assert.Equal((next, 3, 42d), (result.GetProperty("batchNo").GetString(), result.GetProperty("count").GetInt32(), result.GetProperty("total").GetDouble()));
+        Assert.Equal((next, 1, 40d), (result.GetProperty("batchNo").GetString(), result.GetProperty("count").GetInt32(), result.GetProperty("total").GetDouble()));
 
         var listed = D(await ctl().List("manager-s", status: "已分"));
-        Assert.Equal(new[] { 11, 12, 13, 14, 15 }, Ids(listed.GetProperty("items")));
+        Assert.Equal(new[] { 11, 12, 15 }, Ids(listed.GetProperty("items")));
 
-        var again = await ctl().CompleteManual("manager-s", new ShareListController.CompleteManualInput(new List<int> { 10 }, next));
+        var again = await ctl().CompleteManual("admin-s", new ShareListController.CompleteManualInput(new List<int> { 10 }, next));
         Assert.Equal(1, again.code);
         Assert.Equal("批次号已存在", again.message);
     }

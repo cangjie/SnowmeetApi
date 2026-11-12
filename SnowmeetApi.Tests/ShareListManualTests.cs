@@ -31,36 +31,38 @@ public class ShareListManualTests
         var rejected = await db.paymentShare.AsNoTracking().SingleAsync(p => p.id == 104);
         rejected.response_content = "INVALID_REQUEST:分账金额超出最大分账比例";
         db.paymentShare.Update(rejected);
+        db.orderShare.Add(new OrderShare { id = 17, order_id = 1, relation_id = 6, amount = 2, auto_share = false,
+            share_method = "bank", valid = true, create_date = DateTime.Now });
         await db.SaveChangesAsync();
         db.ChangeTracker.Clear();
         var svc = new ShareListService(db);
 
-        var result = await svc.CompleteManualAsync(Op, new[] { 11, 13, 14 }, "MS-TEST-01");
+        var result = await svc.CompleteManualAsync(Op, new[] { 11, 17 }, "MS-TEST-01");
 
-        Assert.Equal(("MS-TEST-01", 3, 42d), (result.batchNo, result.count, result.total));
+        Assert.Equal(("MS-TEST-01", 2, 42d), (result.batchNo, result.count, result.total));
         var batch = await db.shareBatch.AsNoTracking().SingleAsync(b => b.batch_no == "MS-TEST-01");
-        Assert.Equal((3, 42d, 28), (batch.share_count, batch.total_amount, batch.created_by_staff_id));
-        foreach (int id in new[] { 11, 13, 14 })
+        Assert.Equal((2, 42d, 28), (batch.share_count, batch.total_amount, batch.created_by_staff_id));
+        foreach (int id in new[] { 11, 17 })
         {
             var share = await db.orderShare.AsNoTracking().SingleAsync(s => s.id == id);
             Assert.Equal(batch.id, share.batch_id);
             Assert.False(share.dealed);                       // dealed 的意思是「已生成分账记录」，记账不动它
         }
         var introRecord = await db.paymentShare.AsNoTracking().SingleAsync(p => p.id == 102);
-        Assert.True(introRecord.success);
-        Assert.NotNull(introRecord.submit_time);
-        Assert.NotNull(introRecord.response_time);
-        Assert.Contains("手动分账 批次 MS-TEST-01", introRecord.memo);
+        Assert.Null(introRecord.success);
+        Assert.Null(introRecord.submit_time);
+        Assert.Null(introRecord.response_time);
+        Assert.Null(introRecord.memo);
         var rejectedAfter = await db.paymentShare.AsNoTracking().SingleAsync(p => p.id == 104);
-        Assert.True(rejectedAfter.success);
+        Assert.Null(rejectedAfter.success);
         Assert.Equal("INVALID_REQUEST:分账金额超出最大分账比例", rejectedAfter.response_content);   // 原来的拒绝回执保留
         Assert.Equal(new DateTime(2026, 10, 31, 23, 0, 3), rejectedAfter.submit_time);              // 原来的提交时间也保留
 
         var page = await svc.ListAsync(ShareListServiceTests.Q());
-        foreach (int id in new[] { 11, 13, 14 })
+        foreach (int id in new[] { 11, 17 })
         {
             var item = page.items.Single(i => i.orderShareId == id);
-            Assert.Equal(("已分", "手动", "MS-TEST-01", false), (item.status, item.mode, item.batch, item.selectable));
+            Assert.Equal(("已分", "银行转账", "MS-TEST-01", false), (item.status, item.mode, item.batch, item.selectable));
         }
         Assert.Equal(0, page.selectableCount);
     }

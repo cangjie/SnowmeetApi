@@ -90,6 +90,104 @@ namespace SnowmeetApi.Tests
         // ---------------- 下单 ----------------
 
         [Fact]
+        public async Task 取票状态与首次推荐绑定共同提交_写推荐失败时可下次重试()
+        {
+            await using var f = await Fixture.Create();
+            await using var db = f.NewContext();
+            db.order.Add(new Order { id = 921, member_id = 11, staff_id = 28, type = "雪票", valid = 1 });
+            db.skiPass.Add(new SkiPass { id = 922, order_id = 921, member_id = 11, resort = "万龙", valid = 1, is_used = 0 });
+            await db.SaveChangesAsync(); db.ChangeTracker.Clear();
+            var method = typeof(SkiPassController).GetMethod("CommitPickupAndReferralAsync");
+            Assert.NotNull(method);
+            await db.Database.ExecuteSqlRawAsync("CREATE TRIGGER fail_referral BEFORE INSERT ON biz_referee BEGIN SELECT RAISE(ABORT, 'test-failure'); END");
+            var pass = await db.skiPass.AsNoTracking().SingleAsync(s => s.id == 922);
+            await Assert.ThrowsAnyAsync<Exception>(() => (Task)method!.Invoke(f.Controller(db), new object[] { pass })!);
+            db.ChangeTracker.Clear();
+            Assert.Equal(0, (await db.skiPass.AsNoTracking().SingleAsync(s => s.id == 922)).is_used);
+            await db.Database.ExecuteSqlRawAsync("DROP TRIGGER fail_referral");
+            await (Task)method!.Invoke(f.Controller(db), new object[] { pass })!;
+            db.ChangeTracker.Clear();
+            Assert.Equal(1, (await db.skiPass.AsNoTracking().SingleAsync(s => s.id == 922)).is_used);
+            Assert.Equal(28, (await db.bizReferee.AsNoTracking().SingleAsync(r => r.member_id == 11 && r.valid)).staff_id);
+        }
+
+        [Theory]
+        [InlineData(null)]
+        [InlineData(28)]
+        public async Task 离职员工推荐关系保留_新雪票订单不创建分账(int? requestedStaff)
+        {
+            await using var f = await Fixture.Create();
+            await using var db = f.NewContext();
+            await db.staff.Where(s => s.id == 28).ExecuteUpdateAsync(x => x.SetProperty(s => s.valid, 0));
+            db.bizReferee.Add(new BizReferee { member_id = 11, biz_type = "雪票", staff_id = 28, valid = true });
+            db.orderShareRelation.Add(new OrderShareRelation { id = 201, staff_id = 28, type = "个人", name = "离职员工", valid = true });
+            await db.SaveChangesAsync();
+            var request = new SkipassCartRequest { staffId = requestedStaff, items = new List<SkipassCartItem> { Item(901, "13501177897", date: D0) } };
+            var order = Assert.IsType<Order>(Assert.IsType<OkObjectResult>((await f.Controller(db).ReserveSkiPassCart(request, "customer-session")).Result).Value);
+            await using var check = f.NewContext();
+            Assert.Equal(28, (await check.order.SingleAsync(o => o.id == order.id)).staff_id);
+            Assert.False(await check.orderShare.AnyAsync(s => s.order_id == order.id && s.valid));
+            Assert.Equal(0, (await check.orderPayment.SingleAsync(p => p.order_id == order.id)).need_share);
+            Assert.Equal(28, (await check.bizReferee.SingleAsync(r => r.member_id == 11 && r.valid)).staff_id);
+        }
+
+        [Fact]
+        public async Task 原推荐员工离职_本单在职员工仍可获得分账()
+        {
+            await using var f = await Fixture.Create();
+            await using var db = f.NewContext();
+            await db.staff.Where(s => s.id == 28).ExecuteUpdateAsync(x => x.SetProperty(s => s.valid, 0));
+            db.bizReferee.Add(new BizReferee { member_id = 11, biz_type = "雪票", staff_id = 28, valid = true });
+            db.orderShareRelation.Add(new OrderShareRelation { id = 202, staff_id = 29, type = "个人", name = "在职员工", valid = true });
+            await db.SaveChangesAsync();
+            var request = new SkipassCartRequest { staffId = 29, items = new List<SkipassCartItem> { Item(901, "13501177897", date: D0) } };
+            var order = Assert.IsType<Order>(Assert.IsType<OkObjectResult>((await f.Controller(db).ReserveSkiPassCart(request, "customer-session")).Result).Value);
+            await using var check = f.NewContext();
+            Assert.Equal(29, (await check.order.SingleAsync(o => o.id == order.id)).staff_id);
+            Assert.Equal(202, (await check.orderShare.SingleAsync(s => s.order_id == order.id && s.valid)).relation_id);
+            Assert.Equal(28, (await check.bizReferee.SingleAsync(r => r.member_id == 11 && r.valid)).staff_id);
+        }
+
+        [Theory]
+        [InlineData(29, 29, 202)]
+        [InlineData(null, 28, 201)]
+        public async Task 订票员工优先_缺省时使用已有推荐员工(int? requestedStaff, int expectedStaff, int expectedRelation)
+        {
+            await using var f = await Fixture.Create();
+            await using var db = f.NewContext();
+            db.bizReferee.Add(new BizReferee { member_id = 11, biz_type = "雪票", staff_id = 28, valid = true });
+            db.orderShareRelation.AddRange(
+                new OrderShareRelation { id = 201, staff_id = 28, type = "个人", name = "员工A", valid = true },
+                new OrderShareRelation { id = 202, staff_id = 29, type = "个人", name = "员工B", valid = true });
+            await db.SaveChangesAsync();
+            var request = new SkipassCartRequest { staffId = requestedStaff, items = new List<SkipassCartItem> { Item(901, "13501177897", date: D0) } };
+            var order = Assert.IsType<Order>(Assert.IsType<OkObjectResult>((await f.Controller(db).ReserveSkiPassCart(request, "customer-session")).Result).Value);
+            await using var check = f.NewContext();
+            Assert.Equal(expectedStaff, (await check.order.SingleAsync(o => o.id == order.id)).staff_id);
+            var share = await check.orderShare.SingleAsync(s => s.order_id == order.id && s.valid);
+            Assert.Equal(expectedRelation, share.relation_id); Assert.Equal(1, share.amount);
+            await new OrderController(check, f.Config, f.Http).SetReferee(order.id, null);
+            Assert.Equal(28, (await check.bizReferee.SingleAsync(r => r.member_id == 11 && r.valid)).staff_id);
+        }
+
+        [Fact]
+        public async Task 首次扫码下单仅记录员工_取票后才建立推荐关系()
+        {
+            await using var f = await Fixture.Create();
+            await using var db = f.NewContext();
+            db.orderShareRelation.Add(new OrderShareRelation { id = 202, staff_id = 29, type = "个人", name = "员工B", valid = true });
+            await db.SaveChangesAsync();
+            var request = new SkipassCartRequest { staffId = 29, items = new List<SkipassCartItem> { Item(901, "13501177897", date: D0) } };
+            var order = Assert.IsType<Order>(Assert.IsType<OkObjectResult>((await f.Controller(db).ReserveSkiPassCart(request, "customer-session")).Result).Value);
+            await using var check = f.NewContext();
+            Assert.False(await check.bizReferee.AnyAsync(r => r.member_id == 11 && r.valid));
+            await new OrderController(check, f.Config, f.Http).SetReferee(order.id, 123);
+            Assert.Equal(29, (await check.bizReferee.SingleAsync(r => r.member_id == 11 && r.valid)).staff_id);
+        }
+
+        // 2026-11-08 用户定：员工系统分账是「每张票 1 元」，不是每单 1 元。
+        // 做法：每张票一条 1 元的 order_share（和原来「系统 1 元分账」的识别口径 amount==1 一致），合计 = 张数。
+        [Fact]
         public async Task 员工系统分账_每张票1元_3张票生成3条1元分账_合计3元()
         {
             await using var f = await Fixture.Create();
@@ -149,7 +247,7 @@ namespace SnowmeetApi.Tests
         }
 
         [Fact]
-        public async Task 员工系统分账_付款成功后每张票一条1元分账记录()
+        public async Task 员工系统分账_付款成功后每张票一条1元分账记录_取票提交时整单全部选中()
         {
             await using var f = await Fixture.Create();
             await using var db = f.NewContext();
@@ -172,6 +270,9 @@ namespace SnowmeetApi.Tests
             var paymentShares = await check.paymentShare.AsNoTracking().Where(p => p.valid && p.orderShare.order_id == order.id).ToListAsync();
             Assert.Equal(3, paymentShares.Count);
             Assert.All(paymentShares, p => Assert.Equal(1, p.amount));
+            var selected = await new OrderShareController(check, f.Config, f.Http).GetSystemTicketSharesAsync(order.id);
+            Assert.Equal(3, selected.Count);
+            Assert.Equal(3, selected.Sum(p => p.amount));
         }
 
         // ---------------- 雪票分账记录（后台「大好河山雪票」页的卡片）：分给谁、成没成、计划何时、何时成功 ----------------
@@ -360,6 +461,33 @@ namespace SnowmeetApi.Tests
             Assert.Equal(3, (await ctl.GetBySkipass("customer-session", tickets[0])).code);
             Assert.Equal(1, (await ctl.GetBySkipass("staff-session", 88001)).code);
             Assert.Equal(1, (await ctl.GetBySkipass("staff-session", 123456)).code);
+        }
+
+        [Fact]
+        public async Task 取票后分账_只选这张票自己的那1元_旧的没挂票的分账仍随任何一张票分_不传票号时整单都选()
+        {
+            await using var f = await Fixture.Create();
+            var order = await 下单并付款_员工29有分账关系(f, 3);
+            var tickets = await 票号(f, order.id);
+            await using var db = f.NewContext();
+            var helper = new OrderShareController(db, f.Config, f.Http);
+            async Task<List<int>> 选中的票(int? ticketId)
+            {
+                var rows = ticketId == null ? await helper.GetSystemTicketSharesAsync(order.id) : await helper.GetSystemTicketSharesOfTicketAsync(order.id, ticketId.Value);
+                var ids = rows.Select(r => r.share_id).ToList();
+                return await db.orderShare.AsNoTracking().Where(s => ids.Contains(s.id)).Select(s => s.skipass_id ?? 0).OrderBy(i => i).ToListAsync();
+            }
+            Assert.Equal(new[] { tickets[1] }, await 选中的票(tickets[1]));
+            Assert.Equal(tickets, await 选中的票(null));
+
+            // 这张票的分账已提交过：不再选中；别的票不受影响
+            await db.paymentShare.Where(p => p.orderShare.skipass_id == tickets[1]).ExecuteUpdateAsync(x => x.SetProperty(p => p.submit_time, (DateTime?)DateTime.Now));
+            Assert.Empty(await 选中的票(tickets[1]));
+            Assert.Equal(new[] { tickets[0], tickets[2] }, await 选中的票(null));
+
+            // 旧订单没挂票的分账：随任何一张票的取票一起分
+            await db.orderShare.Where(s => s.skipass_id == tickets[0]).ExecuteUpdateAsync(x => x.SetProperty(s => s.skipass_id, (int?)null));
+            Assert.Equal(new[] { 0, tickets[2] }, await 选中的票(tickets[2]));
         }
 
         [Fact]

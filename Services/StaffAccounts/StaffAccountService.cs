@@ -161,11 +161,21 @@ public sealed class StaffAccountService(ApplicationDBContext db, Func<DateTime>?
 
     private async Task<T> InTransaction<T>(Func<Task<T>> body)
     {
-        await using var tx = await db.Database.BeginTransactionAsync();
-        T result = await body();
-        await db.SaveChangesAsync();
-        await tx.CommitAsync();
-        return result;
+        // 线上上下文默认 NoTracking；员工账号写操作需要跟踪查出的员工、绑定和一次性码。
+        var previous = db.ChangeTracker.QueryTrackingBehavior;
+        db.ChangeTracker.QueryTrackingBehavior = QueryTrackingBehavior.TrackAll;
+        try
+        {
+            await using var tx = await db.Database.BeginTransactionAsync();
+            T result = await body();
+            await db.SaveChangesAsync();
+            await tx.CommitAsync();
+            return result;
+        }
+        finally
+        {
+            db.ChangeTracker.QueryTrackingBehavior = previous;
+        }
     }
 
     private void Audit(string table, string field, int key, string action, int? staffId, int? memberId, string? prev, string? current) =>

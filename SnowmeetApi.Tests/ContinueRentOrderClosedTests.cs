@@ -32,6 +32,8 @@ public class ContinueRentOrderClosedTests
         var item = new RentItem { rental_id = rental.id, name = "雪板", class_name = "双板", noCode = true, valid = 1, category_id = CategoryId };
         db.rentItem.Add(item); await db.SaveChangesAsync();
         db.rentItemLog.Add(new RentItemLog { rent_item_id = item.id, status = "已发放", valid = 1 });
+        // 这两个测试模拟已经开始计租的订单；首日租金已存在，目标日期才是续租日。
+        db.rentalDetail.Add(new RentalDetail { rental_id = rental.id, rental_date = target.AddDays(-1), charge_type = "租金", amount = 100, valid = 1 });
         db.rentalPricePreset.Add(new RentalPricePreset { rental_id = rental.id, rent_date = target, rent_type = "多日", day_type = "平日", scene = "门市", price = 100 });
         await db.SaveChangesAsync();
         return rental.id;

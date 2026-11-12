@@ -24,7 +24,7 @@ public sealed class StaffAccountServiceTests : IAsyncLifetime
         // 工作手机刚登记时 member_id = 0，生产库没有外键；这里关掉外键检查
         _connection = new SqliteConnection("Data Source=:memory:;Foreign Keys=False");
         await _connection.OpenAsync();
-        _db = new ApplicationDBContext(new DbContextOptionsBuilder<ApplicationDBContext>().UseSqlite(_connection).Options);
+        _db = new ApplicationDBContext(new DbContextOptionsBuilder<ApplicationDBContext>().UseSqlite(_connection).UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking).Options);
         await _db.Database.EnsureCreatedAsync();
         _db.shop.AddRange(new Shop { id = 4, name = "万龙店", sort = 1 }, new Shop { id = 10, name = "南山店", sort = 2 });
         _admin = new Staff { id = 1, name = "管理员", gender = "女", title_level = 300, valid = 1 };
@@ -41,6 +41,8 @@ public sealed class StaffAccountServiceTests : IAsyncLifetime
         _db.memberSocialAccount.AddRange(Msa(111, "o-job-11"), Msa(112, "o-job-12"), Msa(121, "o-pri-21"),
             Msa(500, "o-new-member"), Msa(600, "o-other-member"));
         await _db.SaveChangesAsync();
+        // 与线上每次请求的新上下文一致，不能依赖测试数据初始化时留下的已跟踪对象。
+        _db.ChangeTracker.Clear();
         _service = new StaffAccountService(_db);
     }
 
@@ -172,7 +174,7 @@ public sealed class StaffAccountServiceTests : IAsyncLifetime
     public async Task 过期的码不能用()
     {
         var t = await _service.RebindAsync(_admin, 3);
-        var code = await _db.staffBindCode.SingleAsync(c => c.token == t.token);
+        var code = await _db.staffBindCode.AsTracking().SingleAsync(c => c.token == t.token);
         code.expire_date = DateTime.Now.AddMinutes(-1);
         await _db.SaveChangesAsync();
         Assert.Equal("expired", (await _service.GetCodeAsync(t.token)).status);
@@ -204,6 +206,16 @@ public sealed class StaffAccountServiceTests : IAsyncLifetime
         Assert.Equal(0, await ActiveLinks(2));
         Assert.Null(await LoginStaff("o-job-11"));
         Assert.Single((await _service.GetStaffAsync(2)).history);
+    }
+
+    [Fact]
+    public async Task 写操作成功或失败后恢复默认不跟踪配置()
+    {
+        Assert.Equal(QueryTrackingBehavior.NoTracking, _db.ChangeTracker.QueryTrackingBehavior);
+        await _service.OffboardAsync(_admin, 2, null);
+        Assert.Equal(QueryTrackingBehavior.NoTracking, _db.ChangeTracker.QueryTrackingBehavior);
+        await Assert.ThrowsAsync<StaffAccountException>(() => _service.OffboardAsync(_admin, 1, null));
+        Assert.Equal(QueryTrackingBehavior.NoTracking, _db.ChangeTracker.QueryTrackingBehavior);
     }
 
     [Fact]
@@ -247,7 +259,7 @@ public sealed class StaffAccountServiceTests : IAsyncLifetime
     [Fact]
     public async Task 收回离职员工占用的手机()
     {
-        var li = await _db.staff.SingleAsync(s => s.id == 2);
+        var li = await _db.staff.AsTracking().SingleAsync(s => s.id == 2);
         li.valid = 0;
         await _db.SaveChangesAsync();
         Assert.False((await PhoneOf(11)).holder!.valid);

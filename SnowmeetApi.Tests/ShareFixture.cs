@@ -45,7 +45,8 @@ internal static class ShareFixture
         double refunded = 0)
     {
         db.orderPayment.Add(new OrderPayment { id = id, order_id = 1, amount = amount, pay_method = payMethod, status = "支付成功",
-            valid = 1, out_trade_no = "WT_ZL_261031_00001_ZF_" + (id - 3).ToString().PadLeft(2, '0') });
+            valid = 1, out_trade_no = "WT_ZL_261031_00001_ZF_" + (id - 3).ToString().PadLeft(2, '0'),
+            need_share = payMethod == "微信支付" ? 1 : 0, mch_id = 1, wepay_trans_id = "TEST-WECHAT", ali_trade_no = "TEST-ALIPAY" });
         if (refunded > 0)
         {
             db.Set<OrderPaymentRefund>().Add(new OrderPaymentRefund { id = id + 100, order_id = 1, payment_id = id,

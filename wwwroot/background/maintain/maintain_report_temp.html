@@ -50,6 +50,8 @@
         <thead>
             <tr id="report_head">
                 <td class="table_head">序号</td>
+                <td class="table_head">日期</td>
+                <td class="table_head">时间</td>
                 <td class="table_head">订单号</td>
                 <td class="table_head">门店</td>
                 <td class="table_head">姓名</td>
@@ -58,8 +60,6 @@
                 <td class="table_head">支付</td>
                 <td class="table_head">退款</td>
                 <td class="table_head">订单金额</td>
-                <td class="table_head">日期</td>
-                <td class="table_head">时间</td>
                 <td class="table_head">备注</td>
                 <td class="table_head">开单</td>
 
@@ -74,7 +74,7 @@
 </html>
 <script type="text/javascript">var currentColor = '#DDDDDD';
     var totalPaid = 0;
-    var baseHead = ['序号', '订单号', '门店', '姓名', '电话', '收款方式', '支付', '退款', '订单金额', '日期', '时间', '备注', '开单'];
+    var baseHead = ['序号', '日期', '时间', '订单号', '门店', '姓名', '电话', '收款方式', '支付', '退款', '订单金额', '备注', '开单'];
     var tHead = baseHead.slice();
     var stepNames = [];
 
@@ -123,6 +123,16 @@
         td_id.innerText = item.id.toString();
         lineData.push(item.id);
         newRow.appendChild(td_id);
+
+        var td_date = document.createElement('td');
+        td_date.innerText = formatDate(item.biz_date);
+        lineData.push(formatDate(item.biz_date));
+        newRow.appendChild(td_date);
+
+        var td_time = document.createElement('td');
+        td_time.innerText = formatTime(item.biz_date);
+        lineData.push(formatTime(item.biz_date));
+        newRow.appendChild(td_time);
 
         var td_order_id = document.createElement('td');
         td_order_id.innerText = item.code;
@@ -189,18 +199,6 @@
             lineData.push(item.paidAmount);
         }
         newRow.appendChild(td_rev);
-
-        var td_date = document.createElement('td');
-        td_date.innerText = formatDate(item.biz_date);
-        lineData.push(formatDate(item.biz_date));
-        newRow.appendChild(td_date);
-
-        var td_time = document.createElement('td');
-        td_time.innerText = formatTime(item.biz_date);
-        lineData.push(formatTime(item.biz_date));
-        newRow.appendChild(td_time);
-
-
 
         var td_memo = document.createElement('td');
         td_memo.innerText = item.memo;

@@ -52,7 +52,7 @@ test('动态步骤列覆盖所有可见订单和装备，按指定顺序排列�
     const hidden = order('C', [task('不显示', '某')], { paidAmount: 0 });
     p.query([first, second, hidden]);
     const head = Array.from(p.context.tHead);
-    assert.deepEqual(head.slice(11), ['备注', '开单', '安全检查', '修刃', '机打蜡', '热蜡', '刮蜡', '寄存或快递', '维修', '发板']);
+    assert.deepEqual(head.slice(13), ['安全检查', '修刃', '机打蜡', '热蜡', '刮蜡', '寄存或快递', '维修', '发板']);
     const rows = Array.from(p.context.tData, row => Array.from(row));
     const at = (row, title) => row[head.indexOf(title)];
     assert.equal(rows.length, 2);
@@ -64,6 +64,20 @@ test('动态步骤列覆盖所有可见订单和装备，按指定顺序排列�
     assert.equal(at(rows[1], '修刃'), '壬');
     assert.deepEqual(p.elements.report_head.children.map(td => td.innerText), head);
     assert.ok(p.url().includes('includeCareTaskStaff=true'));
+});
+
+test('日期和时间位于订单号之前，页面数据和 CSV 列顺序一致', () => {
+    const p = page();
+    p.query([order('A', [task('修刃', '甲')])]);
+    const head = Array.from(p.context.tHead);
+    assert.deepEqual(head.slice(0, 4), ['序号', '日期', '时间', '订单号']);
+    assert.deepEqual(Array.from(p.context.tData[0]).slice(0, 4), [1, '2026-11-08', '12:00:00', 'A']);
+    assert.deepEqual(p.elements.report_rows.children[0].children.slice(0, 4).map(cell => cell.innerText),
+        ['1', '2026-11-08', '12:00:00', 'A']);
+    p.context.download();
+    const csv = decodeURIComponent(p.body.lastChild.href.split(',').slice(1).join(','));
+    assert.match(csv, /^序号,日期,时间,订单号,/);
+    assert.match(csv, /\r\n1,2026-11-08,12:00:00,A,/);
 });
 
 test('重新查询清除旧步骤列，空结果及查询错误不会保留旧数据', () => {

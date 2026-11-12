@@ -70,7 +70,7 @@ public class OrderShareServiceTests
         var view = await Svc(db).SetIntroducerShareAsync(ShareFixture.Manager(), 1, introducer.id, 7, "备注");
 
         Assert.Equal(7, view.amount, 2);
-        Assert.Equal("待自动分账", view.state);
+        Assert.Equal("待审核", view.state);
         var share = await db.orderShare.AsNoTracking().SingleAsync(s => s.relation_id == introducer.relation_id && s.valid);
         Assert.Equal(7, share.amount, 2);
         var record = Assert.Single(await RecordsAsync(db, share.id));
@@ -89,13 +89,13 @@ public class OrderShareServiceTests
 
         var view = await Svc(db).SetIntroducerShareAsync(ShareFixture.Manager(), 1, introducer.id, 60, null);
 
-        Assert.Equal("手动处理", view.state);
+        Assert.Equal("待审核", view.state);
         var wanlongRecord = Assert.Single(await RecordsAsync(db, wanlong.id));
         Assert.True(wanlongRecord.can_not_share);
         Assert.Equal(WechatOverMemo, wanlongRecord.memo);
         var introRecord = Assert.Single(await db.paymentShare.AsNoTracking().Where(r => r.share_id != wanlong.id).ToListAsync());
-        Assert.True(introRecord.can_not_share);
-        Assert.Equal(WechatOverMemo, introRecord.memo);
+        Assert.False(introRecord.can_not_share);
+        Assert.Null(introRecord.memo);
     }
 
     [Fact]
@@ -117,7 +117,7 @@ public class OrderShareServiceTests
         Assert.False(after.can_not_share);
         Assert.True(after.success);
         var intro = await db.paymentShare.AsNoTracking().SingleAsync(r => r.share_id != wanlong.id);
-        Assert.True(intro.can_not_share);
+        Assert.False(intro.can_not_share);
     }
 
     [Fact]
@@ -146,8 +146,8 @@ public class OrderShareServiceTests
         db.order.Update(order);
         await db.SaveChangesAsync();
         db.ChangeTracker.Clear();
-        var open = await Assert.ThrowsAsync<ShareException>(() => svc.SetIntroducerShareAsync(ShareFixture.Manager(), 1, introducer.id, 7, null));
-        Assert.Equal("该订单还没有关单", open.Message);
+        var open = await svc.SetIntroducerShareAsync(ShareFixture.Manager(), 1, introducer.id, 7, null);
+        Assert.Equal("待审核", open.state);
     }
 
     [Fact]
@@ -172,7 +172,7 @@ public class OrderShareServiceTests
         await db.SaveChangesAsync();
         db.ChangeTracker.Clear();
         var ex = await Assert.ThrowsAsync<ShareException>(() => svc.SetIntroducerShareAsync(ShareFixture.Manager(), 1, introducer.id, 50, null));
-        Assert.Equal("已提交，不能修改", ex.Message);
+        Assert.Equal("已提交或已记账，不能修改", ex.Message);
     }
 
     [Fact]
@@ -201,7 +201,7 @@ public class OrderShareServiceTests
         await db.SaveChangesAsync();
         db.ChangeTracker.Clear();
         var ex = await Assert.ThrowsAsync<ShareException>(() => svc.RemoveIntroducerShareAsync(ShareFixture.Manager(), again.id));
-        Assert.Equal("已提交，不能删除", ex.Message);
+        Assert.Equal("已提交或已记账，不能删除", ex.Message);
     }
 
     [Fact]
@@ -266,8 +266,10 @@ public class OrderShareServiceTests
         var order = await new OrderController(db, ShareFixture.Config, ShareFixture.Http).GetOrder(1);
         Assert.Null(ShareTriggerRules.ReasonCannotSet(order));
         order.closed = 0;
-        Assert.Equal("该订单还没有关单", ShareTriggerRules.ReasonCannotSet(order));
+        Assert.Null(ShareTriggerRules.ReasonCannotSet(order));
         order.type = "养护";
-        Assert.Equal("该类订单暂不支持设置介绍人分账", ShareTriggerRules.ReasonCannotSet(order));
+        Assert.Null(ShareTriggerRules.ReasonCannotSet(order));
+        order.hide = true;
+        Assert.Equal("该订单已失效或隐藏，不能设置分销商分账", ShareTriggerRules.ReasonCannotSet(order));
     }
 }

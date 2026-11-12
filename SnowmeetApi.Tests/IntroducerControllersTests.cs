@@ -82,7 +82,7 @@ public class IntroducerControllersTests
         var shares = D(set).GetProperty("shares");
         Assert.Equal(1, shares.GetArrayLength());
         Assert.Equal(40, shares[0].GetProperty("amount").GetDouble(), 2);
-        Assert.Equal("待自动分账", shares[0].GetProperty("state").GetString());
+        Assert.Equal("待审核", shares[0].GetProperty("state").GetString());
 
         var tooMuch = await ctl().SetShare("manager-s", new(1, introducer.id, 9999, null));
         Assert.Equal(1, tooMuch.code);
@@ -94,7 +94,7 @@ public class IntroducerControllersTests
     }
 
     [Fact]
-    public async Task Order_share_api_explains_an_order_that_is_not_closed()
+    public async Task Order_share_api_allows_an_open_order_with_a_shareable_payment()
     {
         await using var db = await ShareFixture.ClosedWanlongOrderAsync();
         await ShareFixture.AddStaffSessionAsync(db, 302, 200, "manager-s");
@@ -108,7 +108,8 @@ public class IntroducerControllersTests
         var view = await new OrderIntroducerShareController(db, ShareFixture.Config, ShareFixture.Http).GetOrderShares("manager-s", 1);
 
         Assert.Equal(0, view.code);
-        Assert.False(D(view).GetProperty("canEdit").GetBoolean());
-        Assert.Equal("该订单还没有关单", D(view).GetProperty("reason").GetString());
+        Assert.True(D(view).GetProperty("canEdit").GetBoolean());
+        Assert.True(D(view).GetProperty("channelShareAvailable").GetBoolean());
+        Assert.Equal(JsonValueKind.Null, D(view).GetProperty("reason").ValueKind);
     }
 }

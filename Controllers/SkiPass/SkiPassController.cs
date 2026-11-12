@@ -1236,34 +1236,40 @@ namespace SnowmeetApi.Controllers
                 }
                 if (order != null && order.orderState == 4)
                 {
-                    skipass.is_used = 1;
-                    _context.skiPass.Entry(skipass).State = EntityState.Modified;
-                    await _context.SaveChangesAsync();
-                    //await _tHelper.ActiveTicket((int)skipass.order_id);
+                    // 先把取票和首次推荐关系一起提交：绑定失败时不标已取，下一轮还能重试。
+                    await CommitPickupAndReferralAsync(skipass);
                     if (skipass.order_id != null)
                     {
-                        try
-                        {
-                            await _tHelper.ActiveSkipassTicket(skipass);
-                            if (skipass.order_id != null)
-                            {
-                                await _shareHelper.ExecuteShare((int)skipass.order_id);    
-                            }
-                            OrderController _oH = new OrderController(_context, _config, _http);
-                            if (skipass.order_id != null)
-                            {
-                                await _oH.SetReferee((int)skipass.order_id, skipass.id);
-                            }
-                        }
-                        catch
-                        {
-                            
-                        }
+                        try { await _tHelper.ActiveSkipassTicket(skipass); }
+                        catch { /* 赠券失败不应阻断该订单的分账。 */ }
+                        try { await _shareHelper.ExecuteShareOfTicket((int)skipass.order_id, skipass.id); }
+                        catch { /* 渠道结果待核对，不自动重复付款。 */ }
                     }
                 }
             }
             
         }
+        [NonAction]
+        public async Task CommitPickupAndReferralAsync(Models.SkiPass skipass)
+        {
+            await using var tx = await _context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
+            try
+            {
+                skipass.is_used = 1;
+                _context.skiPass.Entry(skipass).State = EntityState.Modified;
+                await _context.SaveChangesAsync();
+                if (skipass.order_id != null)
+                    await new OrderController(_context, _config, _http).SetReferee((int)skipass.order_id, skipass.id);
+                await tx.CommitAsync();
+            }
+            catch
+            {
+                await tx.RollbackAsync();
+                _context.ChangeTracker.Clear();
+                throw;
+            }
+        }
+
         // hours > 0 只处理最近这么多小时下的单：后台轮询每分钟调一次，不能每分钟都把历史上一直没有取票码的老票再查一遍
         [HttpGet]
         public async Task RefreshAutoReserve(int hours = 0)
@@ -1572,7 +1578,11 @@ namespace SnowmeetApi.Controllers
             if (staffId != null)
             {
                 order.staff_id = staffId;
-                OrderShareRelation shareRelation = await _context.orderShareRelation.Where(r => r.staff_id == staffId).AsNoTracking().FirstOrDefaultAsync();
+                // 推荐关系和订单归属保留；仅在员工仍在职时生成系统 1 元分账。
+                bool canShare = await _context.staff.AsNoTracking().AnyAsync(s => s.id == staffId && s.valid == 1);
+                OrderShareRelation shareRelation = canShare
+                    ? await _context.orderShareRelation.Where(r => r.staff_id == staffId).AsNoTracking().FirstOrDefaultAsync()
+                    : null;
                 if (shareRelation != null)
                 {
                     // 2026-11-08 用户定：系统分账每张票 1 元（以前整单只 1 元）。

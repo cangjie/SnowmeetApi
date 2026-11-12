@@ -19,11 +19,14 @@ namespace SnowmeetApi.Models
         public DateTime create_date {get; set;}
         /// <summary>预计分账日期（介绍人分账用，只存日期）；null = 按默认规则，关单次日起的第一个夜间任务。见 Helpers/ShareDateRules。</summary>
         public DateTime? plan_date {get; set;}
-        /// <summary>是否自动分账（介绍人分账用）：false = 店长设成手动，只记账，夜间任务不提交，自己去转账。默认 true。</summary>
+        /// <summary>兼容旧客户端的自动分账标志；新申请以 share_method 表示三种方式。</summary>
         public bool auto_share {get; set;} = true;
         /// <summary>分销商分账方式：auto、manual、bank；null 为旧记录或系统分账。</summary>
         [MaxLength(10)] public string? share_method {get; set;}
-        /// <summary>手动分账批次（share_batch.id）：空 = 没走过手动批次。</summary>
+        public int? approved_by_staff_id {get; set;}
+        public DateTime? approved_at {get; set;}
+        [MaxLength(400)] public string? application_memo {get; set;}
+        /// <summary>银行转账记账批次（share_batch.id）；历史手动记账批次也保留在这里。</summary>
         public int? batch_id {get; set;}
         /// <summary>系统分账（雪票每张票 1 元）对应的那张雪票 ski_pass.id：一张票最多一条有效分账。介绍人分账等其它分账为空。</summary>
         public int? skipass_id {get; set;}
@@ -37,6 +40,7 @@ namespace SnowmeetApi.Models
         {
             get
             {
+                if (batch_id != null) return amount;
                 try
                 {
                     return paymentShares.Where(s => s.valid && (s.success == true)).Sum(s=>s.amount);

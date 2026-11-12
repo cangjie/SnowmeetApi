@@ -36,6 +36,56 @@ function normal(date, amounts, extra = {}) {
             totalRentalAmount: amount, totalDiscountAmount: 0 })), ...extra };
 }
 
+test('结算日期位于订单号之前，正常订单、临时订单和下载内容保持对齐', () => {
+    const p = page();
+    p.query([normal('2026-10-28', [70]), {
+        code: 'TEMP', biz_date: '2026-10-27T09:00:00', close_date: '2026-10-30',
+        rentals: [], paidAmount: 40, refundAmount: 10,
+        availableRefunds: [{ create_date: '2026-10-29T12:00:00' }]
+    }]);
+    assert.deepEqual([...p.context.tHead].slice(0, 3), ['序号', '结算日期', '订单号']);
+    assert.deepEqual([...p.context.tData[0]].slice(0, 3), ['1', '2026-10-28', 'WT']);
+    assert.deepEqual([...p.context.tData[1]].slice(0, 3), ['2', '2026-10-29', 'TEMP']);
+    assert.deepEqual(p.elements.tHead.children.slice(0, 3).map(td => td.innerText), ['序号', '结算日期', '订单号']);
+    assert.deepEqual(p.elements.tBody.children[0].children.slice(0, 3).map(td => td.innerText), ['1', '2026-10-28', 'WT']);
+    p.context.download();
+    const csv = decodeURIComponent(p.body.lastChild.href.split(',').slice(1).join(','));
+    assert.match(csv, /^序号,结算日期,订单号,/);
+    assert.match(csv, /\r\n1,2026-10-28,WT,/);
+    assert.match(csv, /\r\n2,2026-10-29,TEMP,/);
+});
+
+test('顶部导航不再显示租赁业务临时报表，其他报表链接保留', () => {
+    const menu = fs.readFileSync(path.join(__dirname, '../wwwroot/background/js/menu.js'), 'utf8');
+    assert.doesNotMatch(menu, /租赁业务临时报表|rent_report_temp\.html/);
+    assert.match(menu, /sale_report_temp\.html/);
+    assert.match(menu, /maintain_report_temp\.html/);
+    assert.match(menu, /rent_report_new\.html/);
+});
+
+test('开单人始终在最后一列，覆盖多装备、临时订单、缺失人员及下载', () => {
+    const p = page();
+    p.query([normal('2026-10-28', [70, 20], {
+        staff: { name: ' 张三 ' }, availablePayments: [{ pay_method: '现金', amount: 100, refundedAmount: 10 }]
+    }), {
+        code: 'TEMP', biz_date: '2026-10-27T09:00:00', close_date: '2026-10-30',
+        rentals: [], paidAmount: 40, refundAmount: 10, staff: { name: '李四' },
+        availableRefunds: [{ create_date: '2026-10-29T12:00:00' }]
+    }, normal('2026-10-30', [20])]);
+    const head = [...p.context.tHead];
+    assert.equal(head[head.length - 1], '开单人');
+    assert.ok(head.indexOf('现金结余') < head.indexOf('开单人'));
+    assert.deepEqual(Array.from(p.context.tData, row => row[row.length - 1]), ['张三', '张三', '李四', '']);
+    assert.deepEqual(p.elements.tBody.children.map(row => row.children[head.length - 1].innerText), ['张三', '张三', '李四', '']);
+    p.context.download();
+    const csv = decodeURIComponent(p.body.lastChild.href.split(',').slice(1).join(',')).split('\r\n');
+    assert.ok(csv[0].endsWith(',开单人'));
+    assert.ok(csv[1].endsWith(',张三'));
+    assert.ok(csv[2].endsWith(',张三'));
+    assert.ok(csv[3].endsWith(',李四'));
+    assert.ok(csv[4].endsWith(','));
+});
+
 test('跨天查询按关单日期汇总可见行，包括空白日期与临时订单', () => {
     const p = page();
     const temporary = { code: 'TEMP', biz_date: '2026-10-27', close_date: '2026-10-30', rentals: [],

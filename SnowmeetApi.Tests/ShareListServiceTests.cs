@@ -9,9 +9,9 @@ namespace SnowmeetApi.Tests;
 public class ShareListServiceTests
 {
     // 订单 1：租赁（万龙体验中心，11-01 关单）；订单 2：雪票（崇礼旗舰店，雪票 id 21）。
-    //   10 万龙·自动待分            11 李教练(介绍人)·设成手动、预计 11-05、店员 28 设的
+    //   10 其他收款方·自动待分      11 李教练(介绍人)·设成手动、预计 11-05、店员 28 设的
     //   12 雪票·自动已分            13 雪票·被拒绝            14 雪票·没有分账记录
-    //   15 万龙·已记手动批次 MS-20261103-01   16 作废（不应出现）
+    //   15 其他收款方·已记手动批次 MS-20261103-01   16 作废（不应出现）
     internal static async Task<ApplicationDBContext> SeedAsync()
     {
         var db = await ShareFixture.ClosedWanlongOrderAsync("支付宝", 5000, 0, 400);
@@ -19,6 +19,7 @@ public class ShareListServiceTests
         db.skiPass.Add(new SkiPass { id = 21, order_id = 2, valid = 1, resort = "万龙", product_name = "雪票" });
         db.staff.Add(new Staff { id = 28, name = "苍杰", valid = 1, title_level = 300 });
         db.orderShareRelation.Add(new OrderShareRelation { id = 4, type = "公司", name = "万龙租赁分账", valid = true });
+        db.orderShareRelation.Add(new OrderShareRelation { id = 6, type = "公司", name = "其他租赁收款方", valid = true });
         db.orderShareRelation.Add(new OrderShareRelation { id = 5, type = "个人", name = "肖志强", valid = true });
         db.orderShareRelation.Add(new OrderShareRelation { id = 9, type = "个人", name = "示例·李教练关系", valid = true });
         db.introducer.Add(new Introducer { id = 1, member_id = 100, type = "教练", name = "李教练", relation_id = 9 });
@@ -26,12 +27,12 @@ public class ShareListServiceTests
 
         OrderShare S(int id, int order, int relation, double amount, DateTime created, DateTime? plan = null, bool auto = true, int? batch = null, bool valid = true)
             => new() { id = id, order_id = order, relation_id = relation, amount = amount, create_date = created, plan_date = plan, auto_share = auto, batch_id = batch, valid = valid };
-        db.orderShare.Add(S(10, 1, 4, 200, new DateTime(2026, 11, 1, 16, 0, 0)));
+        db.orderShare.Add(S(10, 1, 6, 200, new DateTime(2026, 11, 1, 16, 0, 0)));
         db.orderShare.Add(S(11, 1, 9, 40, new DateTime(2026, 11, 3, 10, 0, 0), plan: new DateTime(2026, 11, 5), auto: false));
         db.orderShare.Add(S(12, 2, 5, 1, new DateTime(2026, 10, 30, 12, 0, 0)));
         db.orderShare.Add(S(13, 2, 5, 1, new DateTime(2026, 10, 30, 12, 5, 0)));
         db.orderShare.Add(S(14, 2, 5, 1, new DateTime(2026, 10, 30, 12, 10, 0)));
-        db.orderShare.Add(S(15, 1, 4, 150, new DateTime(2026, 11, 3, 9, 0, 0), batch: 1));
+        db.orderShare.Add(S(15, 1, 6, 150, new DateTime(2026, 11, 3, 9, 0, 0), batch: 1));
         db.orderShare.Add(S(16, 1, 4, 99, new DateTime(2026, 11, 3, 9, 0, 0), valid: false));
 
         PaymentShare P(int id, int share, bool? success = null, DateTime? submit = null, DateTime? response = null, bool cannot = false)
@@ -51,6 +52,27 @@ public class ShareListServiceTests
         DateTime? start = null, DateTime? end = null, int page = 1, int size = 50) => new(status, type, mode, keyword, start, end, page, size);
 
     private static ShareListItem Item(ShareListPage page, int id) => page.items.Single(i => i.orderShareId == id);
+
+    [Fact]
+    public async Task Wanlong_rental_payee_is_excluded_before_paging_and_totals()
+    {
+        await using var db = await SeedAsync();
+        db.orderShare.Add(new OrderShare { id = 17, order_id = 1, relation_id = 4, amount = 80, create_date = new DateTime(2026, 11, 6), valid = true });
+        db.orderShare.Add(new OrderShare { id = 18, order_id = 1, relation_id = 4, amount = 55, create_date = new DateTime(2026, 11, 6), batch_id = 1, valid = true });
+        await db.SaveChangesAsync();
+        db.ChangeTracker.Clear();
+        var service = new ShareListService(db);
+        var first = await service.ListAsync(Q(size: 2));
+        var second = await service.ListAsync(Q(size: 2, page: 2));
+
+        Assert.Equal(new[] { 11, 10 }, first.items.Select(i => i.orderShareId));
+        Assert.Equal(new[] { 14, 13 }, second.items.Select(i => i.orderShareId));
+        Assert.Equal(6, first.total);
+        Assert.Equal(393, first.totalAmount);
+        Assert.Equal(1, first.selectableCount);
+        Assert.Empty((await service.ListAsync(Q(keyword: "万龙租赁分账"))).items);
+        Assert.Equal(2, await db.orderShare.CountAsync(s => s.relation_id == 4 && s.valid));
+    }
 
     [Fact]
     public async Task Distributor_share_exposes_application_date_and_configured_automatic_flag()
@@ -85,13 +107,13 @@ public class ShareListServiceTests
         var page = await new ShareListService(db).ListAsync(Q());
 
         var wanlong = Item(page, 10);
-        Assert.Equal(("WT_ZL_261031_00001", "万龙体验中心", "租赁", "万龙租赁分账", 200d), (wanlong.orderCode, wanlong.shop, wanlong.orderType, wanlong.payee, wanlong.amount));
+        Assert.Equal(("WT_ZL_261031_00001", "万龙体验中心", "租赁", "其他租赁收款方", 200d), (wanlong.orderCode, wanlong.shop, wanlong.orderType, wanlong.payee, wanlong.amount));
         Assert.Equal(("系统", "2026-11-02", "2026-11-01", "未分", "自动"), (wanlong.applicant, wanlong.planDate, wanlong.listDate, wanlong.status, wanlong.mode));
         Assert.Equal(1, wanlong.orderId);
 
         var intro = Item(page, 11);
         Assert.Equal(("李教练", "苍杰", "2026-11-05", "2026-11-05"), (intro.payee, intro.applicant, intro.planDate, intro.listDate));
-        Assert.Equal(("手动", "设为手动", "未分"), (intro.mode, intro.manualReason, intro.status));
+        Assert.Equal(("银行转账", "设为手动", "未分"), (intro.mode, intro.manualReason, intro.status));
         Assert.Null(wanlong.batch);
         Assert.Null(wanlong.sharedTime);
     }
@@ -104,9 +126,9 @@ public class ShareListServiceTests
         var page = await new ShareListService(db).ListAsync(Q());
 
         var auto = Item(page, 12);
-        Assert.Equal(("已分", "自动", "2026-10-31 23:00", "20261031"), (auto.status, auto.mode, auto.sharedTime, auto.batch));
+        Assert.Equal(("已分", "自动", "2026-10-31 23:00", (string?)null), (auto.status, auto.mode, auto.sharedTime, auto.batch));
         var manual = Item(page, 15);
-        Assert.Equal(("已分", "手动", "2026-11-03 18:30", "MS-20261103-01"), (manual.status, manual.mode, manual.sharedTime, manual.batch));
+        Assert.Equal(("已分", "银行转账", "2026-11-03 18:30", "MS-20261103-01"), (manual.status, manual.mode, manual.sharedTime, manual.batch));
         Assert.Equal("已记手动批次", manual.manualReason);
     }
 
@@ -117,10 +139,10 @@ public class ShareListServiceTests
 
         var page = await new ShareListService(db).ListAsync(Q());
 
-        Assert.Equal(new[] { 11, 13, 14 }, page.items.Where(i => i.selectable).Select(i => i.orderShareId).OrderBy(x => x).ToArray());
-        Assert.Equal(3, page.selectableCount);
-        Assert.Equal("自动被拒绝", Item(page, 13).manualReason);
-        Assert.Equal("没有分账记录", Item(page, 14).manualReason);
+        Assert.Equal(new[] { 11 }, page.items.Where(i => i.selectable).Select(i => i.orderShareId).OrderBy(x => x).ToArray());
+        Assert.Equal(1, page.selectableCount);
+        Assert.Equal(("自动", "渠道失败"), (Item(page, 13).mode, Item(page, 13).channelState));
+        Assert.Equal(("自动", "待自动提交"), (Item(page, 14).mode, Item(page, 14).channelState));
         Assert.False(Item(page, 10).selectable);   // 自动待分
         Assert.False(Item(page, 12).selectable);   // 自动已分
         Assert.False(Item(page, 15).selectable);   // 已记批次
@@ -137,8 +159,9 @@ public class ShareListServiceTests
         Assert.Equal(new[] { 10, 11, 13, 14 }, Ids(await svc.ListAsync(Q(status: "未分"))));
         Assert.Equal(new[] { 12, 15 }, Ids(await svc.ListAsync(Q(status: "已分"))));
         Assert.Equal(new[] { 12, 13, 14 }, Ids(await svc.ListAsync(Q(type: "雪票"))));
-        Assert.Equal(new[] { 11, 13, 14, 15 }, Ids(await svc.ListAsync(Q(mode: "手动"))));
-        Assert.Equal(new[] { 10, 12 }, Ids(await svc.ListAsync(Q(mode: "自动"))));
+        Assert.Empty(Ids(await svc.ListAsync(Q(mode: "手动"))));
+        Assert.Equal(new[] { 11, 15 }, Ids(await svc.ListAsync(Q(mode: "银行转账"))));
+        Assert.Equal(new[] { 10, 12, 13, 14 }, Ids(await svc.ListAsync(Q(mode: "自动"))));
         Assert.Equal(new[] { 11 }, Ids(await svc.ListAsync(Q(keyword: "李教练"))));            // 收款人
         Assert.Equal(new[] { 10, 11, 15 }, Ids(await svc.ListAsync(Q(keyword: "WT_ZL_261031_00001"))));   // 订单号
         // 日期按 listDate（有计划日期取计划日期，否则取创建日）：11-03 ~ 11-05 只有 11（11-05）和 15（11-03）
@@ -147,7 +170,7 @@ public class ShareListServiceTests
         var unfinishedSnow = await svc.ListAsync(Q(status: "未分", type: "雪票"));
         Assert.Equal(2, unfinishedSnow.total);
         Assert.Equal(2, unfinishedSnow.totalAmount);
-        Assert.Equal(2, unfinishedSnow.selectableCount);
+        Assert.Equal(0, unfinishedSnow.selectableCount);
     }
 
     [Fact]
@@ -168,7 +191,7 @@ public class ShareListServiceTests
         {
             Assert.Equal(6, p.total);
             Assert.Equal(393, p.totalAmount);   // 200 + 40 + 1 + 1 + 1 + 150
-            Assert.Equal(3, p.selectableCount);
+            Assert.Equal(1, p.selectableCount);
         }
         Assert.Empty((await svc.ListAsync(Q(size: 2, page: 4))).items);
     }
@@ -188,10 +211,10 @@ public class ShareListServiceTests
     public async Task Total_amount_is_rounded_to_cents()
     {
         await using var db = await ShareFixture.ClosedWanlongOrderAsync("支付宝", 5000, 0, 400);
-        db.orderShareRelation.Add(new OrderShareRelation { id = 4, type = "公司", name = "万龙租赁分账", valid = true });
+        db.orderShareRelation.Add(new OrderShareRelation { id = 6, type = "公司", name = "其他租赁收款方", valid = true });
         foreach (var (id, amount) in new[] { (1, 0.1), (2, 0.2), (3, 0.0) })
         {
-            db.orderShare.Add(new OrderShare { id = id, order_id = 1, relation_id = 4, amount = amount, create_date = new DateTime(2026, 11, 1), valid = true });
+            db.orderShare.Add(new OrderShare { id = id, order_id = 1, relation_id = 6, amount = amount, create_date = new DateTime(2026, 11, 1), valid = true });
         }
         await db.SaveChangesAsync();
         db.ChangeTracker.Clear();

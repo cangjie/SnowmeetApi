@@ -9,6 +9,87 @@ namespace SnowmeetApi.Tests;
 
 public class IntroducerServiceTests
 {
+    [Fact]
+    public void Update_request_accepts_distributor_type()
+    {
+        var input = System.Text.Json.JsonSerializer.Deserialize<SnowmeetApi.Controllers.IntroducerShare.IntroducerController.UpdateIntroducerInput>(
+            "{\"introducerId\":1,\"type\":\"机构\"}");
+        using var json = System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(input));
+        Assert.True(json.RootElement.TryGetProperty("type", out var type));
+        Assert.Equal("机构", type.GetString());
+    }
+
+    [Theory]
+    [InlineData("教练", "KOL")]
+    [InlineData("KOL", "教练")]
+    [InlineData("教练", "机构")]
+    [InlineData("KOL", "机构")]
+    [InlineData("机构", "教练")]
+    [InlineData("机构", "KOL")]
+    public async Task Role_change_preserves_identity_and_existing_share_account(string from, string to)
+    {
+        await using var db = await ShareFixture.ClosedWanlongOrderAsync("支付宝", 1000, 0, 400);
+        await SeedMemberAsync(db, 100, "member-openid");
+        var svc = new IntroducerService(db, new FakeBinder());
+        var account = from == "机构" ? new IntroducerService.AccountInput("1600000001", "旧商户", "13800001234") : new(null, null, "13800001234");
+        var added = await svc.AddAsync(ShareFixture.Manager(300), 100, from, "甲", "真实姓名", account);
+        var old = await db.introducer.AsNoTracking().SingleAsync(i => i.id == added.id);
+        var oldRelation = await db.orderShareRelation.AsNoTracking().SingleAsync(r => r.id == old.relation_id);
+        var share = await new OrderShareService(db, ShareFixture.Config, ShareFixture.Http)
+            .SetIntroducerShareAsync(ShareFixture.Manager(), 1, added.id, 40, null);
+        var nextAccount = to == "机构" ? new IntroducerService.AccountInput("1600000002", "新商户", null) : NoAccount;
+
+        var updated = await svc.UpdateAsync(added.id, null, null, null, nextAccount, type: to);
+
+        var current = await db.introducer.AsNoTracking().SingleAsync(i => i.id == added.id);
+        var receiver = await db.orderShareRelation.AsNoTracking().SingleAsync(r => r.id == current.relation_id);
+        Assert.Equal(to, updated.type);
+        Assert.Equal(old.member_id, current.member_id);
+        Assert.Equal(old.coach_id, current.coach_id);
+        Assert.Equal(to == "机构" ? "公司" : "个人", receiver.type);
+        Assert.Equal(to == "机构" ? "MERCHANT_ID" : "PERSONAL_OPENID", receiver.wepay_account_type);
+        Assert.Equal(to == "机构" ? "1600000002" : "member-openid", receiver.wepay_account_num);
+        Assert.Equal(old.relation_id, (await db.orderShare.AsNoTracking().SingleAsync(s => s.id == share.orderShareId)).relation_id);
+        Assert.True(await db.shareRelationBind.AsNoTracking().AnyAsync(b => b.share_relation_id == current.relation_id && b.pay_method == "支付宝" && b.valid));
+        if ((from == "机构") != (to == "机构"))
+        {
+            Assert.NotEqual(old.relation_id, current.relation_id);
+            var historical = await db.orderShareRelation.AsNoTracking().SingleAsync(r => r.id == old.relation_id);
+            Assert.Equal(oldRelation.wepay_account_num, historical.wepay_account_num);
+            Assert.Equal(oldRelation.type, historical.type);
+            Assert.True(await db.introducerRelationHistory.AsNoTracking().AnyAsync(h => h.introducer_id == added.id && h.relation_id == old.relation_id));
+        }
+        else Assert.Equal(old.relation_id, current.relation_id);
+    }
+
+    [Fact]
+    public async Task Role_change_rejects_unknown_type_and_organization_without_merchant_details()
+    {
+        await using var db = await ShareFixture.NewDbAsync();
+        await SeedMemberAsync(db, 100, "member-openid");
+        var svc = new IntroducerService(db, new FakeBinder());
+        var added = await svc.AddAsync(ShareFixture.Manager(300), 100, "KOL", "甲", null, NoAccount);
+        await Assert.ThrowsAsync<ShareException>(() => svc.UpdateAsync(added.id, null, null, null, NoAccount, type: "其他"));
+        await Assert.ThrowsAsync<ShareException>(() => svc.UpdateAsync(added.id, null, null, null, NoAccount, type: "机构"));
+        Assert.Equal("KOL", (await db.introducer.AsNoTracking().SingleAsync(i => i.id == added.id)).type);
+        Assert.Empty(await db.introducerRelationHistory.ToListAsync());
+    }
+
+    [Fact]
+    public async Task Organization_to_person_without_wechat_uses_no_merchant_account()
+    {
+        await using var db = await ShareFixture.NewDbAsync();
+        await SeedMemberAsync(db, 100, null);
+        var svc = new IntroducerService(db, new FakeBinder());
+        var added = await svc.AddAsync(ShareFixture.Manager(300), 100, "机构", "甲", null, new("1600000001", "商户", null));
+        var view = await svc.UpdateAsync(added.id, null, null, null, NoAccount, type: "KOL");
+        var current = await db.introducer.AsNoTracking().SingleAsync(i => i.id == added.id);
+        var receiver = await db.orderShareRelation.AsNoTracking().SingleAsync(r => r.id == current.relation_id);
+        Assert.Equal("未填写", view.wechat);
+        Assert.Null(receiver.wepay_account_type);
+        Assert.Null(receiver.wepay_account_num);
+    }
+
     private sealed class FakeBinder : IAlipayRoyaltyBinder
     {
         public readonly List<(string type, string account, string? name)> Calls = new();

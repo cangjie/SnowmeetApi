@@ -8,12 +8,9 @@ using SnowmeetApi.Services.Share;
 
 namespace SnowmeetApi.Tests;
 
-// 分账请求里的「是否自动分账」：店长可以把某条设成手动（只记账，夜间任务不提交，自己去转账）；
-// 默认自动，但系统判断必须手动的（用券、没收款账号、合计超门槛）仍然是手动，原因写在备注里。
+// 旧版客户端的自动开关兼容：关闭映射为银行转账，开启映射为待管理员审核的自动分账。
 public class ShareAutoChoiceTests
 {
-    private const string ChosenMemo = "已设为手动分账，不自动分账";
-
     private static OrderShareService Svc(ApplicationDBContext db) => new(db, ShareFixture.Config, ShareFixture.Http);
     private static JsonElement D(ApiResult<object> r) => JsonSerializer.SerializeToElement(r.data);
 
@@ -28,11 +25,12 @@ public class ShareAutoChoiceTests
 
         var view = await Svc(db).SetIntroducerShareAsync(ShareFixture.Manager(), 1, introducer.id, 40, null, null, autoShare: false);
 
-        Assert.Equal("手动处理", view.state);
-        Assert.Equal(ChosenMemo, view.memo);
-        var record = Assert.Single(await RecordsAsync(db, introducer.relation_id));
-        Assert.True(record.can_not_share);
-        Assert.False((await db.orderShare.AsNoTracking().SingleAsync(s => s.relation_id == introducer.relation_id && s.valid)).auto_share);
+        Assert.Equal("待银行转账", view.state);
+        Assert.Null(view.memo);
+        Assert.Empty(await RecordsAsync(db, introducer.relation_id));
+        var share = await db.orderShare.AsNoTracking().SingleAsync(s => s.relation_id == introducer.relation_id && s.valid);
+        Assert.False(share.auto_share);
+        Assert.Equal("bank", share.share_method);
     }
 
     [Fact]
@@ -43,7 +41,7 @@ public class ShareAutoChoiceTests
 
         var view = await Svc(db).SetIntroducerShareAsync(ShareFixture.Manager(), 1, introducer.id, 40, "月底统一转", null, autoShare: false);
 
-        Assert.Equal("月底统一转；" + ChosenMemo, view.memo);
+        Assert.Equal("月底统一转", view.memo);
     }
 
     [Fact]
@@ -55,7 +53,7 @@ public class ShareAutoChoiceTests
 
         var view = await Svc(db).SetIntroducerShareAsync(ShareFixture.Manager(), 1, introducer.id, 40, null, null, autoShare: true);
 
-        Assert.Equal("待自动分账", view.state);
+        Assert.Equal("待审核", view.state);
         Assert.Null(view.memo);
         Assert.False(Assert.Single(await RecordsAsync(db, introducer.relation_id)).can_not_share);
     }
@@ -71,8 +69,8 @@ public class ShareAutoChoiceTests
         await Svc(db).SetIntroducerShareAsync(ShareFixture.Manager(), 1, auto.id, 30, null);   // 触发整单重算
 
         var shares = await Svc(db).ListAsync(1);
-        Assert.Equal("手动处理", shares.Single(s => s.introducerId == manual.id).state);
-        Assert.Equal("待自动分账", shares.Single(s => s.introducerId == auto.id).state);
+        Assert.Equal("待银行转账", shares.Single(s => s.introducerId == manual.id).state);
+        Assert.Equal("待审核", shares.Single(s => s.introducerId == auto.id).state);
     }
 
     [Fact]
@@ -83,8 +81,9 @@ public class ShareAutoChoiceTests
 
         var view = await Svc(db).SetIntroducerShareAsync(ShareFixture.Manager(), 1, noAlipay.id, 40, null, null, autoShare: true);
 
-        Assert.Equal("手动处理", view.state);
+        Assert.Equal("待审核", view.state);
         Assert.Equal("介绍人没有支付宝收款账号", view.memo);
+        Assert.True(Assert.Single(await RecordsAsync(db, noAlipay.relation_id)).can_not_share);
     }
 
     [Fact]
@@ -98,8 +97,8 @@ public class ShareAutoChoiceTests
         Assert.True(D(await ctl().GetOrderShares("manager-s", 1)).GetProperty("autoShareSupported").GetBoolean());
 
         var manual = await ctl().SetShare("manager-s", new(1, introducer.id, 40, null, null, false));
-        Assert.Equal("手动处理", D(manual).GetProperty("shares")[0].GetProperty("state").GetString());
+        Assert.Equal("待银行转账", D(manual).GetProperty("shares")[0].GetProperty("state").GetString());
         var auto = await ctl().SetShare("manager-s", new(1, introducer.id, 40, null));   // 老版本小程序不传：按自动
-        Assert.Equal("待自动分账", D(auto).GetProperty("shares")[0].GetProperty("state").GetString());
+        Assert.Equal("待审核", D(auto).GetProperty("shares")[0].GetProperty("state").GetString());
     }
 }

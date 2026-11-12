@@ -47,6 +47,8 @@
         <thead>
             <tr>
                 <td class="table_head">序号</td>
+                <td class="table_head">日期</td>
+                <td class="table_head">时间</td>
                 <td class="table_head">订单号</td>
                 <td class="table_head">门店</td>
                 <td class="table_head">姓名</td>
@@ -55,8 +57,6 @@
                 <td class="table_head">支付</td>
                 <td class="table_head">退款</td>
                 <td class="table_head">订单金额</td>
-                <td class="table_head">日期</td>
-                <td class="table_head">时间</td>
                 <td class="table_head">销售</td>
                 <td class="table_head">备注</td>
 
@@ -70,7 +70,7 @@
 </html>
 <script type="text/javascript">var currentColor = '#DDDDDD';
     var totalPaid = 0;
-    var tHead = ['序号', '订单号', '门店', '姓名', '电话', '收款方式', '支付', '退款', '订单金额', '日期', '时间', '销售', '备注']
+    var tHead = ['序号', '日期', '时间', '订单号', '门店', '姓名', '电话', '收款方式', '支付', '退款', '订单金额', '销售', '备注']
     function FillItem(item) {
         var totalColNum = 11;
         var orderIdIndex = 4;
@@ -81,6 +81,16 @@
         td_id.innerText = item.id.toString();
         lineData.push(item.id);
         newRow.appendChild(td_id);
+
+        var td_date = document.createElement('td');
+        td_date.innerText = formatDate(item.biz_date);
+        lineData.push(formatDate(item.biz_date));
+        newRow.appendChild(td_date);
+
+        var td_time = document.createElement('td');
+        td_time.innerText = formatTime(item.biz_date);
+        lineData.push(formatTime(item.biz_date));
+        newRow.appendChild(td_time);
 
         var td_order_id = document.createElement('td');
         td_order_id.innerText = item.code;
@@ -148,21 +158,9 @@
         }
         newRow.appendChild(td_rev);
 
-        var td_date = document.createElement('td');
-        td_date.innerText = formatDate(item.biz_date);
-        lineData.push(formatDate(item.biz_date));
-        newRow.appendChild(td_date);
-
-        var td_time = document.createElement('td');
-        td_time.innerText = formatTime(item.biz_date);
-        lineData.push(formatTime(item.biz_date));
-        newRow.appendChild(td_time);
-
-
-
         var td_staff = document.createElement('td');
         td_staff.innerText = item.staff.name;
-        lineData.push(item.staff);
+        lineData.push(item.staff.name);
         newRow.appendChild(td_staff);
 
         var td_memo = document.createElement('td');
@@ -178,6 +176,7 @@
         totalPaid = 0;
         var rows = document.getElementById('report_rows');
         rows.innerHTML = '';
+        tData = [];
         var btnCtrl = document.getElementById('btn');
         btnCtrl.disabled = true;
         var shop = document.getElementById('shop')
@@ -198,7 +197,6 @@
                     }
                     msg.data[i].id = i + 1;
                     FillItem(msg.data[i]);
-                    tData.push(msg.data[i]);
                     if (msg.data[i].refundAmount > 0) {
                         totalPaid += (msg.data[i].paidAmount - msg.data[i].refundAmount)
                     }
@@ -250,20 +248,13 @@
         if (tHead.length <= 0 || tData.length <= 0) {
             return;
         }
-        var csvContent = '';
-        var lineContent = '';
-        for (var i = 0; i < tHead.length; i++) {
-            lineContent += (i > 0 ? ',' : '') + tHead[i];
+        function csvCell(value) {
+            var text = value == null ? '' : String(value);
+            return /[",\r\n]/.test(text) ? '"' + text.replace(/"/g, '""') + '"' : text;
         }
-        csvContent += lineContent + '\r\n';
-        for (var i = 0; i < tData.length; i++) {
-            lineContent = '';
-            for (var j = 0; j < tHead.length; j++) {
-                lineContent += (j > 0 ? ',' : '') + tData[i][j];
-            }
-            csvContent += lineContent + '\r\n';
-        }
-        csvContent = csvContent.trim();
+        var csvContent = [tHead].concat(tData).map(function (row) {
+            return row.map(csvCell).join(',');
+        }).join('\r\n');
         var link = document.createElement('a');
         link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvContent);
         link.download = encodeURIComponent('LingShou_' + formatDate(startDate) + '_' + formatDate(endDate) + '.csv');

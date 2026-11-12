@@ -255,7 +255,7 @@ public class IntroducerCoachSyncTests
         var view = await new OrderShareService(db, ShareFixture.Config, ShareFixture.Http)
             .SetIntroducerShareAsync(ShareFixture.Manager(), 1, introducer.id, 40, null);
 
-        Assert.Equal("待自动分账", view.state);
+        Assert.Equal("待审核", view.state);
     }
 
     [Fact]
@@ -270,7 +270,7 @@ public class IntroducerCoachSyncTests
         var view = await new OrderShareService(db, ShareFixture.Config, ShareFixture.Http)
             .SetIntroducerShareAsync(ShareFixture.Manager(), 1, introducer.id, 40, null);
 
-        Assert.Equal("手动处理", view.state);
+        Assert.Equal("待审核", view.state);
         Assert.Equal("介绍人没有支付宝收款账号", view.memo);
     }
 }

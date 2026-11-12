@@ -314,7 +314,7 @@ public sealed class IntroducerService(ApplicationDBContext db, IAlipayRoyaltyBin
         return aliNum != null ? await BindAlipayAsync(introducer.id) : await ViewAsync(introducer.id);
     }
 
-    public async Task<IntroducerView> UpdateAsync(int introducerId, string? name, string? realName, bool? valid, AccountInput? account, int? staffId = null)
+    public async Task<IntroducerView> UpdateAsync(int introducerId, string? name, string? realName, bool? valid, AccountInput? account, int? staffId = null, string? type = null)
     {
         await using var tx = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
         Introducer i = await db.introducer.AsNoTracking().FirstOrDefaultAsync(x => x.id == introducerId)
@@ -329,13 +329,32 @@ public sealed class IntroducerService(ApplicationDBContext db, IAlipayRoyaltyBin
         }
         string newName = name == null ? i.name : Clean(name);
         if (newName == "") throw new ShareException("请填写显示名称");
+        string newType = type == null ? i.type : Clean(type);
+        if (!IntroducerRules.IsValidType(newType)) throw new ShareException("介绍人类型只能是教练、KOL、机构");
         string newRealName = realName == null ? oldRealName : Clean(realName);
         string? aliNum = account == null ? null : ValidateAli(account, newRealName);
         string wepayNum = Clean(account?.wepayAccountNum), wepayName = Clean(account?.wepayAccountName);
-        if (i.type == IntroducerRules.TypeOrg && ((wepayNum == "") != (wepayName == "")))
+        bool wasOrg = i.type == IntroducerRules.TypeOrg, isOrg = newType == IntroducerRules.TypeOrg;
+        bool changeReceiverType = wasOrg != isOrg;
+        if (isOrg && !wasOrg && (wepayNum == "" || wepayName == ""))
+            throw new ShareException("机构要填商户号和商户全称");
+        if (isOrg && ((wepayNum == "") != (wepayName == "")))
             throw new ShareException("机构商户号和商户全称需要一起填写");
-        bool wepayChanged = i.type == IntroducerRules.TypeOrg && wepayNum != ""
-            && (wepayNum != r.wepay_account_num || wepayName != r.wepay_account_name);
+        string? nextWepayType = r.wepay_account_type, nextWepayNum = r.wepay_account_num, nextWepayName = r.wepay_account_name;
+        if (isOrg && wepayNum != "")
+        {
+            nextWepayType = "MERCHANT_ID"; nextWepayNum = wepayNum; nextWepayName = wepayName;
+        }
+        else if (changeReceiverType)
+        {
+            nextWepayNum = await db.memberSocialAccount.AsNoTracking()
+                .Where(a => a.member_id == i.member_id && a.valid == 1 && a.type == MemberSocialAccount.TYPE_WECHAT_MINI_OPENID)
+                .OrderByDescending(a => a.id).Select(a => a.num).FirstOrDefaultAsync();
+            nextWepayType = string.IsNullOrWhiteSpace(nextWepayNum) ? null : "PERSONAL_OPENID";
+            nextWepayName = null;
+        }
+        bool wepayChanged = changeReceiverType || (isOrg && wepayNum != ""
+            && (wepayNum != r.wepay_account_num || wepayName != r.wepay_account_name));
         bool aliChanged = (aliNum != null && (r.ali_account_type != IntroducerRules.AlipayLoginType || aliNum != r.ali_account_num))
             || (realName != null && oldRealName != newRealName && !string.IsNullOrWhiteSpace(r.ali_account_num));
         if (aliChanged && newRealName == "") throw new ShareException("支付宝登录号要同时填真实姓名");
@@ -376,12 +395,14 @@ public sealed class IntroducerService(ApplicationDBContext db, IAlipayRoyaltyBin
                     wepay_key_id = old.wepay_key_id, ali_account_id = old.ali_account_id, valid = true, create_date = DateTime.Now });
             }
         }
+        i.type = newType;
         i.name = newName;
         i.real_name = newRealName == "" ? null : newRealName;
         if (valid != null) i.valid = valid.Value ? 1 : 0;
         i.update_date = DateTime.Now;
+        r.type = IntroducerRules.RelationType(newType);
         r.name = newName;
-        if (wepayChanged) { r.wepay_account_num = wepayNum; r.wepay_account_name = wepayName; }
+        if (wepayChanged) { r.wepay_account_type = nextWepayType; r.wepay_account_num = nextWepayNum; r.wepay_account_name = nextWepayName; }
         if (aliNum != null) { r.ali_account_type = IntroducerRules.AlipayLoginType; r.ali_account_num = aliNum; }
         db.introducer.Update(i);
         if (!snapshot) db.orderShareRelation.Update(r);

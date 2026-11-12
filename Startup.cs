@@ -99,6 +99,7 @@ namespace SnowmeetApi
             services.AddHostedService<SnowmeetApi.Services.SkipassJobs.RefundStateSyncPoller>();
             services.AddScoped<SnowmeetApi.Services.Tickets.IMiniTicketTokenProvider, SnowmeetApi.Services.Tickets.MiniTicketTokenProvider>();
             services.AddHttpClient<SnowmeetApi.Services.Tickets.IMiniTicketQrService, SnowmeetApi.Services.Tickets.MiniTicketQrService>(client => client.Timeout = TimeSpan.FromSeconds(30));
+            services.AddHttpClient<SnowmeetApi.Services.Tickets.MiniStaffBookingQrService>(client => client.Timeout = TimeSpan.FromSeconds(30));
             services.AddSingleton(FileStorageOptions.From(Configuration));
             services.AddSingleton<IFileStorage>(sp => FileStorageFactory.Create(sp.GetRequiredService<FileStorageOptions>()));
             services.AddControllers().AddJsonOptions(options =>{

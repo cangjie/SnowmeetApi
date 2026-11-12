@@ -43,6 +43,39 @@ public sealed class MiniTicketQrTests
             return new(HttpStatusCode.OK){Content=Error==null?new ByteArrayContent(ImageBytes ?? Png):new StringContent(Error)};
         }
     }
+    [Fact] public async Task StaffBookingQrTargetsTicketPageAndEncodesEmployee()
+    {
+        var type=typeof(MiniTicketQrService).Assembly.GetType("SnowmeetApi.Services.Tickets.MiniStaffBookingQrService");
+        Assert.NotNull(type);
+        var handler=new Handler{ExpireOnce=true}; var tokens=new Tokens();
+        object service=Activator.CreateInstance(type!,tokens,new HttpClient(handler))!;
+        var result=await (Task<byte[]>)type!.GetMethod("GetAsync")!.Invoke(service,new object[]{42,"release"})!;
+        Assert.Equal(Png,result); Assert.Equal(2,handler.Calls); Assert.Equal(2,tokens.Calls);
+        var body=JsonDocument.Parse(handler.Requests[0]).RootElement;
+        Assert.Equal("pages/ski_pass/ski_pass_selector",body.GetProperty("page").GetString());
+        Assert.Equal("s=42",body.GetProperty("scene").GetString());
+        Assert.True(body.GetProperty("check_path").GetBoolean());
+    }
+    [Fact] public async Task StaffBookingQrReportsWechatErrors()
+    {
+        var type=typeof(MiniTicketQrService).Assembly.GetType("SnowmeetApi.Services.Tickets.MiniStaffBookingQrService");
+        Assert.NotNull(type);
+        object service=Activator.CreateInstance(type!,new Tokens(),new HttpClient(new Handler{Error="{\"errcode\":41030,\"errmsg\":\"invalid page\"}"}))!;
+        var error=await Assert.ThrowsAsync<InvalidOperationException>(()=>(Task<byte[]>)type!.GetMethod("GetAsync")!.Invoke(service,new object[]{42,"release"})!);
+        Assert.Contains("41030",error.Message);
+    }
+    [Fact] public async Task BookingQrEndpointUsesAuthenticatedStaffRatherThanCallerSuppliedId()
+    {
+        await using var f=await TicketMigrationTests.Fixture.Create("mini_q");
+        var handler=new Handler(); var qr=new MiniStaffBookingQrService(new Tokens(),new HttpClient(handler));
+        var ctl=new SkiPassStaffQrController(f.Db);
+        Assert.IsType<BadRequestObjectResult>(await ctl.GetQrCode("session-2",qr));
+        Assert.Equal(0,handler.Calls);
+        await f.AddStaff();
+        var response=Assert.IsType<FileContentResult>(await ctl.GetQrCode("session-1",qr));
+        Assert.Equal("image/png",response.ContentType);
+        Assert.Equal("s=9",JsonDocument.Parse(handler.Requests.Single()).RootElement.GetProperty("scene").GetString());
+    }
     [Fact] public async Task CacheReusesPersistedBytesAcrossInstancesAndEnvironmentsAreIsolated()
     {
         await using var f=await TicketMigrationTests.Fixture.Create("mini_q");var storage=new Storage();var token=new Tokens();var handler=new Handler();var http=new HttpClient(handler);

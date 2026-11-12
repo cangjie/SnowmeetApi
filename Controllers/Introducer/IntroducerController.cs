@@ -20,7 +20,7 @@ public sealed class IntroducerController(ApplicationDBContext db, IConfiguration
     public sealed record AddIntroducerInput(int memberId, string? type, string? name, string? realName,
         string? wepayAccountNum, string? wepayAccountName, string? aliAccountNum);
     public sealed record UpdateIntroducerInput(int introducerId, string? name, string? realName, bool? valid,
-        string? wepayAccountNum, string? wepayAccountName, string? aliAccountNum);
+        string? wepayAccountNum, string? wepayAccountName, string? aliAccountNum, string? type = null);
     public sealed record IntroducerIdInput(int introducerId);
 
     private const string AdminOnly = "只有系统管理员可以管理介绍人";
@@ -49,7 +49,7 @@ public sealed class IntroducerController(ApplicationDBContext db, IConfiguration
     [HttpPost]
     public Task<ApiResult<object>> UpdateIntroducer(string sessionKey, [FromBody] UpdateIntroducerInput input)
         => AsStaff(sessionKey, StaffAccountRules.IsAdmin, AdminOnly, async op => await Service.UpdateAsync(input.introducerId, input.name,
-            input.realName, input.valid, new(input.wepayAccountNum, input.wepayAccountName, input.aliAccountNum), op.id));
+            input.realName, input.valid, new(input.wepayAccountNum, input.wepayAccountName, input.aliAccountNum), op.id, input.type));
 
     [HttpPost]
     public Task<ApiResult<object>> BindAlipay(string sessionKey, [FromBody] IntroducerIdInput input)
