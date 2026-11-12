@@ -4217,6 +4217,11 @@ namespace SnowmeetApi.Controllers
             for (int i = 0; i < order.rentals.Count; i++)
             {
                 order.rentals[i].details = null;
+                // 保证金记录只由 PlaceRentOrder 生成，草稿保存不接收、也不改写它。「去结算」后小程序把订单脱钩成
+                // id=0 的新单，却会带着刚生成的 guaranties：新单分支 AddAsync 会把它们按已有 id 插入
+                // （SQL 544 / 同 id 重复跟踪，页面只看到 500，2026-11-12 生产实录）；更新分支 Update 则会把前端值写回。
+                // 用空列表而不是 null：Rental.totalGuarantyAmount 直接 foreach(guaranties)。
+                order.rentals[i].guaranties = new List<Guaranty>();
                 for (int j = 0; j < order.rentals[i].rentItems.Count; j++)
                 {
                     order.rentals[i].rentItems[j].category = null;
