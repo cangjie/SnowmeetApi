@@ -8,8 +8,8 @@ using SnowmeetApi.Services;
 namespace SnowmeetApi.Tests;
 
 /// <summary>
-/// 日养护工作列表的每日快照：22:00 之后存、不重复存、读快照而不受后来改动影响、表读不出来退回现算、
-/// 定时任务启动时补缺的日子、建表脚本和 EF 模型一致。
+/// 日养护工作列表的每日快照：每晚 22:00 存当天的、不重复存、过去的日子读快照而不受后来改动影响、今天永远现算、
+/// 表读不出来退回现算、定时任务只存当天不往回补、建表脚本和 EF 模型一致。
 /// </summary>
 public class CareWorkloadSnapshotTests
 {
@@ -95,13 +95,18 @@ public class CareWorkloadSnapshotTests
     }
 
     [Fact]
-    public async Task Read_TodayBeforeTwentyTwoIsAlwaysLive_AndAShopWithoutARowOnASnapshotDayIsZero()
+    public async Task Read_TodayIsAlwaysLive_AndAShopWithoutARowOnASnapshotDayIsZero()
     {
         await using var f = await CoachFixture.Create();
         await Seed(f);
         await new CareWorkloadService(f.NewContext()).SaveSnapshotAsync(Day, At(10, 22, 15));
         var service = new CareWorkloadService(f.NewContext());
         Assert.Equal("live", (await service.GetAsync(Day, At(10, 18), "万龙服务中心")).source);       // 当天 22:00 前：不读快照
+        var tonight = await service.GetAsync(Day, At(10, 23), "万龙服务中心");                          // 当天 22:00 之后快照已经存了，但今天仍然现算
+        Assert.Equal("live", tonight.source);
+        var stored = await service.GetSnapshotAsync(Day, "万龙服务中心");
+        Assert.Equal((stored!.initialPending, stored.added, stored.completed, stored.pending),        // 冻结在 22:00，和存下的快照数字一致
+            (tonight.initialPending, tonight.added, tonight.completed, tonight.pending));
         var south = await service.GetAsync(Day, At(11, 8), "南山");                                     // 那天存过，但南山没有养护装备
         Assert.Equal(("snapshot", 0, 0), (south.source, south.added, south.pending));
         Assert.Equal("南山", south.shop);
@@ -129,31 +134,32 @@ public class CareWorkloadSnapshotTests
         Assert.Empty(await f.NewContext().careDailyWorkload.ToListAsync());
     }
 
-    // ───────────── 补缺的日子 / 定时任务 ─────────────
+    // ───────────── 定时任务：每晚 22:00 存当天的 ─────────────
 
     [Fact]
-    public async Task Ensure_FillsMissingDaysUpToToday_TodayOnlyAfterTwentyTwoTen_AndNotTwice()
+    public async Task Ensure_StoresOnlyTodayAtTwentyTwo_NotBeforeNotTwiceAndNeverBackfills()
     {
         await using var f = await CoachFixture.Create();
-        AddBoard(f, "万龙服务中心", At(7, 9), At(8, 12));     // 11-07 进来，11-08 发板
-        AddBoard(f, "万龙服务中心", At(9, 9));                // 11-09 进来，一直压着
+        AddBoard(f, "万龙服务中心", At(7, 9), At(8, 12));     // 前几天的数据：不往回补
+        AddBoard(f, "万龙服务中心", At(9, 9));
+        AddBoard(f, "万龙服务中心", At(10, 9));
         await f.Db.SaveChangesAsync();
         var done = new HashSet<DateTime>();
         var service = new CareWorkloadService(f.NewContext());
 
-        // 11-10 22:05：今天还没到 22:10，只补前几天（11-06 之前没有数据）
-        int first = await service.EnsureSnapshotsAsync(At(10, 22, 5), 4, done);
-        var days = (await f.NewContext().careDailyWorkload.ToListAsync()).Select(r => r.stat_date.Day).OrderBy(x => x).ToArray();
-        Assert.Equal(new[] { 7, 8, 9 }, days.Distinct().ToArray());      // 11-07、08、09 各一行；11-10 还没存
-        Assert.Equal(3, first);
-        Assert.DoesNotContain(Day, done);
-
-        int second = await service.EnsureSnapshotsAsync(At(10, 22, 12), 4, done);   // 22:12：今天的也存了
-        Assert.Equal(1, second);
+        Assert.Equal(0, await service.EnsureSnapshotsAsync(At(10, 21, 59), done));      // 22:00 之前：不存
+        Assert.Empty(done);
+        Assert.Equal(1, await service.EnsureSnapshotsAsync(At(10, 22), done));          // 22:00 整：存今天（一家店一行）
         Assert.Contains(Day, done);
-        Assert.Equal(0, await service.EnsureSnapshotsAsync(At(10, 23), 4, done));    // 再跑不会重复
-        var sources = (await f.NewContext().careDailyWorkload.ToListAsync()).OrderBy(r => r.stat_date).Select(r => r.source).ToArray();
-        Assert.Equal(new[] { "catchup", "catchup", "catchup", "auto" }, sources);
+        Assert.Equal(0, await service.EnsureSnapshotsAsync(At(10, 22, 1), done));       // 同一进程里再跑：不碰库
+        Assert.Equal(0, await new CareWorkloadService(f.NewContext()).EnsureSnapshotsAsync(At(10, 23), new HashSet<DateTime>()));   // 换个进程（重启）：库里已有就不重复存
+        var rows = await f.NewContext().careDailyWorkload.ToListAsync();
+        var row = Assert.Single(rows);
+        Assert.Equal((Day, "auto", At(10, 22)), (row.stat_date, row.source, row.as_of));   // 只有 11-10 这一天，11-07 ~ 11-09 没有补
+
+        // 服务 22:00 以后才启动：当天的快照也会补存（只补当天）
+        Assert.Equal(1, await new CareWorkloadService(f.NewContext()).EnsureSnapshotsAsync(At(11, 23, 5), new HashSet<DateTime>()));
+        Assert.Equal(new[] { 10, 11 }, (await f.NewContext().careDailyWorkload.ToListAsync()).Select(r => r.stat_date.Day).OrderBy(x => x).ToArray());
     }
 
     [Fact]
@@ -162,10 +168,10 @@ public class CareWorkloadSnapshotTests
         await using var f = await CoachFixture.Create();
         await Seed(f);
         var job = new CareWorkloadSnapshotJob(new ScopeFactory(f));
-        // 第一轮：11-10 两家店各一行，外加补上 11-09（只有万龙那块压着的板）一行
-        Assert.Equal(3, await job.RunOnceAsync(At(10, 22, 30)));
-        Assert.Equal(0, await job.RunOnceAsync(At(10, 22, 40)));
-        Assert.Equal(3, (await f.NewContext().careDailyWorkload.ToListAsync()).Count);
+        Assert.Equal(0, await job.RunOnceAsync(At(10, 21, 30)));
+        Assert.Equal(2, await job.RunOnceAsync(At(10, 22, 0)));      // 两家店各一行，只有当天
+        Assert.Equal(0, await job.RunOnceAsync(At(10, 22, 1)));
+        Assert.Equal(2, (await f.NewContext().careDailyWorkload.ToListAsync()).Count);
     }
 
     private sealed class ScopeFactory : IServiceScopeFactory

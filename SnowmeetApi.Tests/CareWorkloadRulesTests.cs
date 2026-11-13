@@ -259,6 +259,53 @@ public class CareWorkloadRulesTests
         Assert.Null(Kind("寄存或快递"));
     }
 
+    // ───────────── 老装备不统计 ─────────────
+
+    private static Care OldBoard(DateTime orderDate, string? bizType = null, DateTime? entered = null, params CareTask[] more)
+    {
+        var care = Board(900, entered ?? At(9, 10), null, false, more);
+        care.order = new Order { biz_date = orderDate, shop = "万龙服务中心" };
+        care.biz_type = bizType;
+        return care;
+    }
+
+    [Fact]
+    public void Legacy_BoardsOrderedBeforeApril30AreIgnored_ExceptOffSeasonCare()
+    {
+        Assert.Equal(new DateTime(2026, 4, 30), CareWorkloadRules.LegacyCutoff);
+        Assert.False(CareWorkloadRules.IsConsidered(new DateTime(2026, 4, 29, 23, 59, 59), null));
+        Assert.True(CareWorkloadRules.IsConsidered(new DateTime(2026, 4, 30), null));          // 4 月 30 日当天起算
+        Assert.True(CareWorkloadRules.IsConsidered(new DateTime(2026, 11, 1), ""));
+        Assert.True(CareWorkloadRules.IsConsidered(new DateTime(2025, 5, 3), "非雪季养护"));      // 非雪季养护不受分界限制
+        Assert.True(CareWorkloadRules.IsConsidered(new DateTime(2025, 5, 3), " 非雪季养护 "));
+        Assert.False(CareWorkloadRules.IsConsidered(new DateTime(2025, 5, 3), "雪季养护"));
+
+        var cares = new[]
+        {
+            OldBoard(new DateTime(2025, 5, 3)),                              // 去年批量导入的：不算
+            OldBoard(new DateTime(2026, 4, 29)),                             // 4 月 29 日开的单：不算
+            OldBoard(new DateTime(2026, 4, 30)),                             // 4 月 30 日：算（压着）
+            OldBoard(new DateTime(2025, 5, 3), "非雪季养护"),                  // 老的非雪季养护：算（压着）
+            OldBoard(new DateTime(2026, 11, 8)),                             // 这个雪季的：算（压着）
+        };
+        var s = CareWorkloadRules.Compute(cares, Day, Asof);
+        Assert.Equal((3, 0, 0, 3), (s.initialPending, s.added, s.completed, s.pending));
+        Assert.Equal(3, s.idlePending);
+    }
+
+    [Fact]
+    public void Legacy_IgnoredBoardsAreOutOfEveryNumber_IncludingWorkDoneOnThemToday()
+    {
+        var edge = Task("修刃", At(9, 9), "已完成", At(10, 9), At(10, 10), 1);
+        var oldDone = OldBoard(new DateTime(2026, 3, 1), null, At(9, 9), edge);       // 老装备今天被动过：整块不统计
+        var s = CareWorkloadRules.Compute(new[] { oldDone }, Day, Asof);
+        Assert.Equal((0, 0, 0, 0, 0, 0), (s.initialPending, s.added, s.completed, s.pending, s.worked, s.idlePending));
+        Assert.Equal(0, s.process[CareWorkloadRules.Edge]);
+        Assert.Empty(s.staff);
+        var keep = OldBoard(new DateTime(2026, 11, 3), null, At(9, 9), edge);
+        Assert.Equal(1, CareWorkloadRules.Compute(new[] { keep }, Day, Asof).process[CareWorkloadRules.Edge]);
+    }
+
     // ───────────── 门店相加 ─────────────
 
     [Fact]

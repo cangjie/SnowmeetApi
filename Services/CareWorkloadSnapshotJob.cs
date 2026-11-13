@@ -9,19 +9,18 @@ using SnowmeetApi.Data;
 namespace SnowmeetApi.Services
 {
     /// <summary>
-    /// 日养护工作列表的每日快照：每 10 分钟看一眼，今天过了 22:10 就把当天（asOf = 22:00）的统计存下来；
-    /// 服务重启后的第一轮会把最近 14 天缺的日子补上（服务停了几天也不会漏）。
+    /// 日养护工作列表的每日快照：每天晚上 22:00 把当天（asOf = 22:00）的统计存下来，一天一次，只存当天。
+    /// 今天的数据不存、直接现算；过去的日子没有快照（服务那天没在 22:00 跑）时也会按当天 22:00 现算，所以不往回补。
+    /// 每分钟看一眼时间，到了 22:00 且今天还没存过就存（22:00 以后才启动服务，启动后一分钟左右也会补存今天的）。
     /// 直接在应用里用数据库，不走 crontab 和公网域名——对外网络断了 crontab 任务会一起失效、而且没有告警。
     /// 表还没建 / 查询失败只记一条日志，下一轮再试，不影响别的功能。
     /// </summary>
     public sealed class CareWorkloadSnapshotJob : BackgroundService
     {
-        /// <summary>启动时往回补几天。</summary>
-        public const int BackDays = 14;
-        static readonly TimeSpan Interval = TimeSpan.FromMinutes(10);
+        static readonly TimeSpan Interval = TimeSpan.FromMinutes(1);
 
         private readonly IServiceScopeFactory _scopeFactory;
-        // 这个进程已经处理过的日子（存过或那天本来就没有数据），免得每 10 分钟把 15 天重查一遍
+        // 这个进程已经处理过的日子（存过或那天本来就没有数据），免得 22:00 以后每分钟都查库
         private readonly HashSet<DateTime> _done = new();
 
         public CareWorkloadSnapshotJob(IServiceScopeFactory scopeFactory)
@@ -67,7 +66,7 @@ namespace SnowmeetApi.Services
         {
             using IServiceScope scope = _scopeFactory.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDBContext>();
-            return await new CareWorkloadService(db).EnsureSnapshotsAsync(now, BackDays, _done);
+            return await new CareWorkloadService(db).EnsureSnapshotsAsync(now, _done);
         }
     }
 }

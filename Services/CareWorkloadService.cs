@@ -12,9 +12,10 @@ namespace SnowmeetApi.Services
 {
     /// <summary>
     /// 日养护工作列表：从库里取出统计要用的装备，交给 CareWorkloadRules 算。
-    /// 范围：已生效的养护装备（care.valid = 1、task_flow_code 有值）、订单有效、是养护订单、不是测试单。
-    /// 只取「窗口开始前没完成」且「截止前已经进来」的装备（= 当时的待完成工作集 + 当天新增），
-    /// 昨天以前就发板的不用读，所以每次只读几百条。
+    /// 范围：已生效的养护装备（care.valid = 1、task_flow_code 有值）、订单有效、是养护订单、不是测试单；
+    /// 开单日期早于 2026-04-30 的老装备不统计（非雪季养护除外，见 CareWorkloadRules.IsConsidered）。
+    /// 只算「窗口开始前没完成」且「截止前已经进来」的装备（= 当时的待完成工作集 + 当天新增）。
+    /// 取数方式见 ComputeByShopAsync：三条窄查询 + 内存里筛，库里那几千块一直没发板的老装备不会拖慢它。
     /// </summary>
     public class CareWorkloadService
     {
@@ -31,21 +32,68 @@ namespace SnowmeetApi.Services
             DateTime start = day.Date;
             DateTime asOf = CareWorkloadRules.AsOf(day, now);
             string? shopName = string.IsNullOrWhiteSpace(shop) ? null : shop.Trim();
-            var query = _db.care.Where(c => c.valid == 1 && c.task_flow_code != null
+
+            // 不能一次把「装备 + 全部任务」读出来、再在 SQL 里用 EXISTS / NOT EXISTS 去筛：生产库里有七千多块
+            // 「早就进来、一直没发板」的老装备，那样的相关子查询要扫任务表几千遍，一条查询占满一个核好几分钟。
+            // 所以拆成三条窄查询，筛选放在内存里做：
+            //   ① 装备基本信息（不碰任务表）  ② 每件装备的进入 / 完成时刻（任务表扫一遍）  ③ 统计窗口内有过开始 / 结束的任务（很少）
+            var careQuery = _db.care.Where(c => c.valid == 1 && c.task_flow_code != null
                 && c.order != null && c.order.valid == 1 && c.order.type == "养护" && c.order.is_test == 0);
-            if (shopName != null) query = query.Where(c => c.order!.shop.Trim() == shopName);
-            List<Care> cares = await query
-                // 截止前已经进来
-                .Where(c => c.tasks.Any(t => t.valid == 1 && t.create_date < asOf))
-                // 窗口开始前就已经完成的不用读
-                .Where(c => !c.tasks.Any(t => t.valid == 1 && (t.task_name == "发板" || t.task_name == "强行索回")
-                    && (t.status == "已完成" || t.status == "强行中止") && t.end_time != null && t.end_time < start))
-                .Include(c => c.order)
-                .Include(c => c.tasks.Where(t => t.valid == 1)).ThenInclude(t => t.staff)
-                .AsSplitQuery().AsNoTracking()
-                .ToListAsync();
+            if (shopName != null) careQuery = careQuery.Where(c => c.order!.shop.Trim() == shopName);
+            // 老装备不统计：开单日期早于 2026-04-30 的不读（非雪季养护除外），库里四千多块没发板的老装备就不用进内存了
+            DateTime legacyCutoff = CareWorkloadRules.LegacyCutoff;
+            careQuery = careQuery.Where(c => c.order!.biz_date >= legacyCutoff || c.biz_type == CareWorkloadRules.SummerCareType);
+            var cares = await careQuery
+                .Select(c => new { c.id, shop = c.order!.shop, orderDate = c.order!.biz_date, c.biz_type, c.is_cancel, c.repair_memo })
+                .AsNoTracking().ToListAsync();
+
+            var taskRows = await _db.careTask.Where(t => t.valid == 1)
+                .Select(t => new { t.care_id, t.task_name, t.status, t.create_date, t.end_time, t.update_date })
+                .AsNoTracking().ToListAsync();
+            var times = new Dictionary<int, (DateTime entered, DateTime? finished)>();
+            foreach (var t in taskRows)
+            {
+                times.TryGetValue(t.care_id, out var cur);
+                DateTime entered = cur.entered == default || t.create_date < cur.entered ? t.create_date : cur.entered;
+                DateTime? finished = cur.finished;
+                if (CareWorkloadRules.IsFinishTaskName((t.task_name ?? "").Trim())
+                    && CareWorkloadRules.IsFinishedStatusName((t.status ?? "").Trim()))
+                {
+                    DateTime at = t.end_time ?? t.update_date ?? t.create_date;
+                    if (finished == null || at < finished) finished = at;
+                }
+                times[t.care_id] = (entered, finished);
+            }
+
+            var activeRows = await _db.careTask.Where(t => t.valid == 1
+                    && ((t.start_time != null && t.start_time >= start && t.start_time < asOf)
+                        || (t.end_time != null && t.end_time >= start && t.end_time < asOf)))
+                .Select(t => new { t.care_id, t.task_name, t.status, t.start_time, t.end_time, t.staff_id, staffName = t.staff != null ? t.staff.name : null })
+                .AsNoTracking().ToListAsync();
+            var active = activeRows.ToLookup(t => t.care_id);
+
+            var inputs = new List<CareWorkloadInput>();
+            foreach (var care in cares)
+            {
+                if (!times.TryGetValue(care.id, out var time)) continue;                         // 还没生效（没有有效任务）
+                if (time.entered >= asOf) continue;                                              // 截止时刻之后才进来
+                DateTime? finished = time.finished == null ? null : (time.finished < time.entered ? time.entered : time.finished);
+                if (finished != null && finished < start) continue;                              // 窗口开始前就已经完成的，和这天无关
+                inputs.Add(new CareWorkloadInput
+                {
+                    careId = care.id, shop = (care.shop ?? "").Trim(), orderDate = care.orderDate, bizType = care.biz_type,
+                    entered = time.entered, finished = finished,
+                    isCancel = care.is_cancel, repairMemo = care.repair_memo,
+                    tasks = active[care.id].Select(t => new CareWorkloadTask
+                    {
+                        name = (t.task_name ?? "").Trim(), status = (t.status ?? "").Trim(), start = t.start_time, end = t.end_time,
+                        staffId = t.staff_id, staffName = t.staffName
+                    }).ToList()
+                });
+            }
+
             var result = new Dictionary<string, CareWorkloadStat>();
-            foreach (var group in cares.GroupBy(c => (c.order?.shop ?? "").Trim()))
+            foreach (var group in inputs.GroupBy(c => c.shop))
             {
                 CareWorkloadStat stat = CareWorkloadRules.Compute(group, day, asOf);
                 stat.shop = group.Key;
@@ -70,15 +118,16 @@ namespace SnowmeetApi.Services
         }
         // ───────────── 每日快照 ─────────────
 
-        /// <summary>D 日的数据已经最终（过了当天 22:00）才存 / 读快照；22:00 之前一律现算。</summary>
+        /// <summary>D 日的数据已经最终（过了当天 22:00）才存快照；22:00 之前一律现算。</summary>
         public static bool IsFinal(DateTime day, DateTime now) => now >= day.Date.AddHours(CareWorkloadRules.CutoffHour);
 
         /// <summary>
-        /// 接口用：22:00 之后的日子有快照就读快照，没有（或快照表读不出来，比如表还没建）就现算；今天 22:00 前现算。
+        /// 接口用：**今天的数据永远现算**（22:00 以后也一样，截止时刻冻结在 22:00，结果和之后存下的快照一致）；
+        /// 过去的日子有快照读快照，没有（那天服务没在 22:00 跑、或快照表读不出来比如表还没建）就按当天 22:00 现算。
         /// </summary>
         public async Task<CareWorkloadStat> GetAsync(DateTime day, DateTime now, string? shop = null)
         {
-            if (IsFinal(day, now))
+            if (day.Date < now.Date)
             {
                 try
                 {
@@ -146,20 +195,17 @@ namespace SnowmeetApi.Services
         }
 
         /// <summary>
-        /// 定时任务用：把最近 backDays 天到今天里缺快照的日子补上。今天要过了 22:10 才存（等 22:00 的数据稳定）。
-        /// done 记着这个进程已经处理过的日子，反复调用时不再重复查；返回这次新存的行数。
+        /// 定时任务用：到了 22:00，把今天缺的快照存上（今天过了 22:00 才存；已经存过的不重复）。
+        /// done 记着这个进程已经处理过的日子，一分钟一次反复调用时不再碰库；返回这次新存的行数。
+        /// 没有往回补的功能：服务停了几天，那几天的历史查询会按当天 22:00 现算，数字和存快照一样。
         /// </summary>
-        public async Task<int> EnsureSnapshotsAsync(DateTime now, int backDays, ISet<DateTime>? done = null)
+        public async Task<int> EnsureSnapshotsAsync(DateTime now, ISet<DateTime>? done = null)
         {
-            int saved = 0;
-            for (int ago = backDays; ago >= 0; ago--)
-            {
-                DateTime day = now.Date.AddDays(-ago);
-                if (now < day.AddHours(CareWorkloadRules.CutoffHour).AddMinutes(10)) continue;
-                if (done != null && done.Contains(day)) continue;
-                saved += await SaveSnapshotAsync(day, now, ago == 0 ? "auto" : "catchup");
-                done?.Add(day);
-            }
+            DateTime day = now.Date;
+            if (!IsFinal(day, now)) return 0;
+            if (done != null && done.Contains(day)) return 0;
+            int saved = await SaveSnapshotAsync(day, now, "auto");
+            done?.Add(day);
             return saved;
         }
 

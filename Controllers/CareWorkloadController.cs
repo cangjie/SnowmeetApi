@@ -22,7 +22,7 @@ namespace SnowmeetApi.Controllers
 
         /// <summary>
         /// 某一天的养护进出统计和各工序工作量。date 不传 = 今天；shop 不传 = 全部门店。
-        /// 今天 22:00 前现算到当前；22:00 之后和过去的日子优先读每天存下的快照（没有就按当天 22:00 现算）。
+        /// 今天永远现算（22:00 前算到当前，22:00 后冻结在 22:00）；过去的日子优先读每晚 22:00 存下的快照，没有就按当天 22:00 现算。
         /// </summary>
         [HttpGet]
         public async Task<ActionResult<ApiResult<CareWorkloadStat>>> GetDailyWorkloadByStaff(string? date, string? shop,

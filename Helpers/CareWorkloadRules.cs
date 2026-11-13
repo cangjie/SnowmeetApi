@@ -24,11 +24,24 @@ namespace SnowmeetApi.Helpers
     ///   工序数量     = 窗口内「已完成」的有效任务，每条算 1，按完成人（staff_id）分开
     ///
     /// 截止时刻：asOf = min(当前时刻, D 22:00)。过去的日子都按当天 22:00 截止，今天 22:00 前实时、22:00 后冻结。
+    ///
+    /// 老装备不统计（崔洋 2026-11-13）：开单日期早于 LegacyCutoff（2026-04-30）的装备不参与任何统计，非雪季养护除外。
+    /// 库里有四千多块上个雪季及更早的装备一直没发板（其中 2025-05 一批是批量导入的），不排除的话「初始待完成」会是几千。
     /// </summary>
     public static class CareWorkloadRules
     {
         /// <summary>营业截止时刻（小时）。22:00 以后的操作不计入任何一天。</summary>
         public const int CutoffHour = 22;
+
+        /// <summary>老装备分界：开单日期早于这一天的装备不统计（非雪季养护除外）。</summary>
+        public static readonly DateTime LegacyCutoff = new(2026, 4, 30);
+
+        /// <summary>非雪季养护（寄存过季、之后再取）的装备类型，不受老装备分界限制。</summary>
+        public const string SummerCareType = "非雪季养护";
+
+        /// <summary>这件装备要不要统计：开单日期不早于 2026-04-30，或者是非雪季养护。</summary>
+        public static bool IsConsidered(DateTime orderDate, string? bizType) =>
+            orderDate >= LegacyCutoff || (bizType ?? "").Trim() == SummerCareType;
 
         // 工序的键（接口和快照里都用这些英文键，页面再映射成中文名）
         public const string Edge = "edge";               // 修刃
@@ -60,7 +73,13 @@ namespace SnowmeetApi.Helpers
 
         static bool IsValid(CareTask task) => task.valid == 1;
 
-        public static bool IsFinishTask(CareTask task) => FinishTaskNames.Contains(Name(task));
+        public static bool IsFinishTask(CareTask task) => IsFinishTaskName(Name(task));
+
+        /// <summary>是不是「发板」/「强行索回」（已去掉首尾空白的任务名）。</summary>
+        public static bool IsFinishTaskName(string name) => FinishTaskNames.Contains(name);
+
+        /// <summary>发板 / 强行索回的状态算不算「已结束」：已完成、强行中止。</summary>
+        public static bool IsFinishedStatusName(string status) => status == "已完成" || status == "强行中止";
 
         static bool IsFinishedStatus(CareTask task)
         {
@@ -104,14 +123,15 @@ namespace SnowmeetApi.Helpers
         /// 补板底靠装备的维修备注（repair_memo）判断：任务自己的 memo 每次改状态都会被覆盖成场景字符串，不能用。
         /// 一条维修任务只归一类：备注里有「补板底」算补板底，否则算维修。
         /// </summary>
-        public static string? Classify(CareTask task, Care care)
+        public static string? Classify(CareTask task, Care care) => Classify(Name(task), care.repair_memo);
+
+        public static string? Classify(string name, string? repairMemo)
         {
-            string name = Name(task);
             if (name == "修刃") return Edge;
             if (name == "热蜡" || name == "机打蜡" || name == "打蜡" || name.StartsWith("养板打蜡")) return Wax;
             if (name == "刮蜡" || name.StartsWith("养板刮蜡")) return Scrape;
             if (name == "维修")
-                return (care.repair_memo ?? "").Contains("补板底") ? PatchBottom : Repair;
+                return (repairMemo ?? "").Contains("补板底") ? PatchBottom : Repair;
             return null;
         }
 
@@ -121,16 +141,43 @@ namespace SnowmeetApi.Helpers
         static bool HasOperation(Care care, DateTime start, DateTime end) =>
             (care.tasks ?? new List<CareTask>()).Any(t => IsValid(t) && (In(t.start_time, start, end) || In(t.end_time, start, end)));
 
-        public static CareWorkloadStat Compute(IEnumerable<Care> cares, DateTime day, DateTime asOf)
+        /// <summary>把一件带任务的装备整理成统计用的精简输入（测试和小批量用；服务从库里直接取精简数据，不走这里）。</summary>
+        public static CareWorkloadInput ToInput(Care care) => new()
+        {
+            careId = care.id,
+            shop = (care.order?.shop ?? "").Trim(),
+            orderDate = care.order?.biz_date ?? care.create_date,
+            bizType = care.biz_type,
+            entered = EnteredAt(care),
+            finished = FinishedAt(care),
+            isCancel = care.is_cancel,
+            repairMemo = care.repair_memo,
+            tasks = (care.tasks ?? new List<CareTask>()).Where(IsValid).Select(t => new CareWorkloadTask
+            {
+                name = Name(t), status = (t.status ?? "").Trim(), start = t.start_time, end = t.end_time,
+                staffId = t.staff_id, staffName = t.staff?.name
+            }).ToList()
+        };
+
+        public static CareWorkloadStat Compute(IEnumerable<Care> cares, DateTime day, DateTime asOf) =>
+            Compute(cares.Select(ToInput), day, asOf);
+
+        /// <summary>
+        /// 统计的核心。tasks 只需要带窗口内开始 / 结束过的任务（算「有操作」和工序数量用）；
+        /// 进入时刻 entered 和完成时刻 finished 由调用方算好（finished 已不早于 entered）。
+        /// 这样库里几千块「早就进来、一直没发板」的老装备不用把任务一条条读出来。
+        /// </summary>
+        public static CareWorkloadStat Compute(IEnumerable<CareWorkloadInput> cares, DateTime day, DateTime asOf)
         {
             DateTime start = day.Date;
             var stat = new CareWorkloadStat { date = start.ToString("yyyy-MM-dd"), asOf = asOf };
             var people = new Dictionary<int, CareWorkloadStaff>();
-            foreach (Care care in cares)
+            foreach (CareWorkloadInput care in cares)
             {
-                DateTime? entered = EnteredAt(care);
-                if (entered == null) continue;
-                DateTime? finished = FinishedAt(care);
+                if (care.entered == null) continue;
+                if (!IsConsidered(care.orderDate, care.bizType)) continue;      // 老装备不统计
+                DateTime entered = care.entered.Value;
+                DateTime? finished = care.finished;
                 bool pendingAtStart = entered < start && (finished == null || finished >= start);
                 bool pendingAtEnd = entered < asOf && (finished == null || finished >= asOf);
                 if (pendingAtStart) stat.initialPending++;
@@ -138,22 +185,22 @@ namespace SnowmeetApi.Helpers
                 if (In(finished, start, asOf))
                 {
                     stat.completed++;
-                    if (care.is_cancel) stat.completedCancelled++;
+                    if (care.isCancel) stat.completedCancelled++;
                 }
                 if (pendingAtEnd) stat.pending++;
-                bool operated = HasOperation(care, start, asOf);
+                bool operated = care.tasks.Any(t => In(t.start, start, asOf) || In(t.end, start, asOf));
                 if (operated) stat.worked++;
                 if (pendingAtEnd && !operated) stat.idlePending++;
-                foreach (CareTask task in care.tasks ?? new List<CareTask>())
+                foreach (CareWorkloadTask task in care.tasks)
                 {
-                    if (!IsValid(task) || (task.status ?? "").Trim() != "已完成" || !In(task.end_time, start, asOf)) continue;
-                    string? kind = Classify(task, care);
+                    if (task.status != "已完成" || !In(task.end, start, asOf)) continue;
+                    string? kind = Classify(task.name, care.repairMemo);
                     if (kind == null) continue;
                     stat.process[kind]++;
-                    int key = task.staff_id ?? 0;
+                    int key = task.staffId ?? 0;
                     if (!people.TryGetValue(key, out CareWorkloadStaff? who))
-                        people[key] = who = new CareWorkloadStaff { staffId = key, name = task.staff?.name ?? "" };
-                    if (who.name == "" && task.staff != null) who.name = task.staff.name;
+                        people[key] = who = new CareWorkloadStaff { staffId = key, name = task.staffName ?? "" };
+                    if (who.name == "" && !string.IsNullOrEmpty(task.staffName)) who.name = task.staffName;
                     who.process[kind]++;
                 }
             }
@@ -192,6 +239,35 @@ namespace SnowmeetApi.Helpers
                 .ThenBy(p => p.staffId).ToList();
             return total;
         }
+    }
+
+    /// <summary>统计用的精简输入：一件装备（见 CareWorkloadRules.Compute）。</summary>
+    public class CareWorkloadInput
+    {
+        public int careId { get; set; }
+        public string shop { get; set; } = "";
+        /// <summary>开单日期（订单的 biz_date）；早于 CareWorkloadRules.LegacyCutoff 的不统计，非雪季养护除外</summary>
+        public DateTime orderDate { get; set; }
+        /// <summary>care.biz_type；「非雪季养护」不受老装备分界限制</summary>
+        public string? bizType { get; set; }
+        /// <summary>进入工作清单的时刻（最早的有效任务创建时间）；没有有效任务 = 订单还没生效，不统计</summary>
+        public DateTime? entered { get; set; }
+        /// <summary>完成（发板 / 强行索回已结束）的时刻；还没完成为 null；不早于 entered</summary>
+        public DateTime? finished { get; set; }
+        public bool isCancel { get; set; }
+        public string? repairMemo { get; set; }
+        /// <summary>只需带统计窗口内开始 / 结束过的有效任务</summary>
+        public List<CareWorkloadTask> tasks { get; set; } = new();
+    }
+
+    public class CareWorkloadTask
+    {
+        public string name { get; set; } = "";
+        public string status { get; set; } = "";
+        public DateTime? start { get; set; }
+        public DateTime? end { get; set; }
+        public int? staffId { get; set; }
+        public string? staffName { get; set; }
     }
 
     /// <summary>某一天（或某一天某门店）的统计结果。</summary>

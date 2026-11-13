@@ -97,7 +97,7 @@ namespace SnowmeetApi
             services.AddHostedService<SnowmeetApi.Services.SkipassJobs.SkipassCancelPoller>();
             // 微信退款成功回调没有更新退款状态，每 5 分钟主动向微信查一次处理中的退款
             services.AddHostedService<SnowmeetApi.Services.SkipassJobs.RefundStateSyncPoller>();
-            // 日养护工作列表：每天 22:10 之后把当天的统计存成快照，启动时补最近缺的日子（直接用库，不走 crontab 和公网域名）
+            // 日养护工作列表：每天晚上 22:00 把当天的统计存成快照（今天的数据直接现算；直接用库，不走 crontab 和公网域名）
             services.AddHostedService<SnowmeetApi.Services.CareWorkloadSnapshotJob>();
             services.AddScoped<SnowmeetApi.Services.Tickets.IMiniTicketTokenProvider, SnowmeetApi.Services.Tickets.MiniTicketTokenProvider>();
             services.AddHttpClient<SnowmeetApi.Services.Tickets.IMiniTicketQrService, SnowmeetApi.Services.Tickets.MiniTicketQrService>(client => client.Timeout = TimeSpan.FromSeconds(30));

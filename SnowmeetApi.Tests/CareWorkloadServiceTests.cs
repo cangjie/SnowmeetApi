@@ -75,6 +75,26 @@ public class CareWorkloadServiceTests
     }
 
     [Fact]
+    public async Task BoardsOrderedBeforeApril30AreLeftOut_ExceptOffSeasonCare()
+    {
+        await using var f = await CoachFixture.Create();
+        void Old(DateTime orderDate, string? bizType)
+        {
+            var care = AddBoard(f, "万龙服务中心", At(9, 10));
+            care.biz_type = bizType;
+            f.Db.order.Local.Single(o => o.cares.Contains(care)).biz_date = orderDate;
+        }
+        AddBoard(f, "万龙服务中心", At(9, 10));                                  // 这个雪季的，压着：算
+        Old(new DateTime(2025, 5, 3), null);                                    // 去年批量导入的：不算
+        Old(new DateTime(2026, 4, 29), "");                                     // 4 月 29 日：不算
+        Old(new DateTime(2026, 4, 30), "");                                     // 4 月 30 日：算
+        Old(new DateTime(2025, 5, 3), "非雪季养护");                             // 老的非雪季养护：算
+        await f.Db.SaveChangesAsync();
+        var s = await new CareWorkloadService(f.NewContext()).ComputeAsync(Day, NightNow, "万龙服务中心");
+        Assert.Equal((3, 0, 0, 3), (s.initialPending, s.added, s.completed, s.pending));
+    }
+
+    [Fact]
     public async Task EmptyDayOrUnknownShop_GivesAllZeros()
     {
         await using var f = await CoachFixture.Create();
