@@ -205,6 +205,7 @@ namespace SnowmeetApi.Data
         public DbSet<IntroducerRelationHistory> introducerRelationHistory { get; set; }
         public DbSet<ShareBatch> shareBatch { get; set; }
         public DbSet<MemberCareFirstOrder> memberCareFirstOrder { get; set; }
+        public DbSet<CareDailyWorkload> careDailyWorkload { get; set; }
         public DbSet<Card> card { get; set; }
         public DbSet<Printer> printer { get; set; }
         public DbSet<PrintTask> printTask { get; set; }
