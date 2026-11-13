@@ -770,6 +770,32 @@ namespace SnowmeetApi.Controllers
             }
         }
 
+        // 新 H5 对账显式选择账号，旧缓存接口留给历史调用方。
+        [HttpGet]
+        public async Task<ActionResult<List<SnowmeetApi.Services.SkipassBillRow>>> GetSupplierOrderBills(
+            DateTime start, DateTime end, string source = "大好河山", string? sessionKey = null,
+            string sessionType = "wechat_mini_openid")
+        {
+            if (!await CanSeeCostAsync(sessionKey, sessionType)) return Unauthorized();
+            source = (source ?? "").Trim();
+            if (!SkipassSaleRules.SellableSources.Contains(source)) return BadRequest("请选择正确的供应商");
+            if (end.Date < start.Date || end.Date == DateTime.MaxValue.Date) return BadRequest("查询日期范围不正确");
+            var helper = new WanlongZiwoyouHelper(_context, _oriConfig, source);
+            var service = new SnowmeetApi.Services.SkipassBillService(_context, async (account, from, to, page) =>
+            {
+                var response = await helper.GetOrderListByPage(from, to, page);
+                if (response.Result is not OkObjectResult ok || ok.Value is not ZiwoyouQueryList list)
+                    throw new InvalidOperationException("供应商订单查询失败");
+                return new SnowmeetApi.Services.SupplierBillPage(list.pageCount, list.results);
+            });
+            try { return Ok(await service.GetAsync(source, start, end)); }
+            catch (Exception err)
+            {
+                Console.WriteLine("[雪票对账] " + source + " 查询失败：" + err.GetType().Name);
+                return StatusCode(502, "供应商对账数据暂时获取失败，请稍后重试");
+            }
+        }
+
         [HttpGet]
         public async Task<ActionResult<List<ZiwoyouListOrder>>> GetOrderBills(DateTime start, DateTime end)
         {
