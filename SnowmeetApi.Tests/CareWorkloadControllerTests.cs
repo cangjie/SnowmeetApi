@@ -41,4 +41,23 @@ public class CareWorkloadControllerTests
         Assert.Equal(("2026-11-10", "万龙服务中心"), (past.data!.date, past.data.shop));
         Assert.Equal(new DateTime(2026, 11, 10, 22, 0, 0), past.data.asOf);
     }
+
+    [Fact]
+    public async Task Items_OnlyStaff_KnownMetric_ValidDate()
+    {
+        await using var f = await CoachFixture.Create();
+        var controller = new CareWorkloadController(f.NewContext());
+        ApiResult<SnowmeetApi.Services.CareWorkloadItems> Unwrap2(ActionResult<ApiResult<SnowmeetApi.Services.CareWorkloadItems>> r) =>
+            Assert.IsType<ApiResult<SnowmeetApi.Services.CareWorkloadItems>>(Assert.IsType<OkObjectResult>(r.Result).Value);
+        Assert.Equal("没有权限", Unwrap2(await controller.GetDailyWorkloadItemsByStaff(null, null, "pending", null, "session-3")).message);
+        Assert.Equal("不认识的统计项", Unwrap2(await controller.GetDailyWorkloadItemsByStaff(null, null, "nope", null, "session-7")).message);
+        Assert.Equal("日期格式不对", Unwrap2(await controller.GetDailyWorkloadItemsByStaff("不是日期", null, "pending", null, "session-7")).message);
+        Assert.Equal("不能查询还没到的日期",
+            Unwrap2(await controller.GetDailyWorkloadItemsByStaff(DateTime.Now.AddDays(1).ToString("yyyy-MM-dd"), null, "pending", null, "session-7")).message);
+        var ok = Unwrap2(await controller.GetDailyWorkloadItemsByStaff("2026-11-10", "万龙服务中心", "edge", 9, "session-7"));
+        Assert.Equal(0, ok.code);
+        Assert.Equal(("2026-11-10", "万龙服务中心", "edge", (int?)9, 0), (ok.data!.date, ok.data.shop, ok.data.metric, ok.data.staffId, ok.data.total));
+        var board = Unwrap2(await controller.GetDailyWorkloadItemsByStaff("2026-11-10", null, "pending", 9, "session-7"));
+        Assert.Null(board.data!.staffId);   // 装备类的数不看人
+    }
 }

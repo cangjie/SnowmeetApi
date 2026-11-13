@@ -201,4 +201,62 @@ public class CareWorkloadServiceTests
         var s = await new CareWorkloadService(f.NewContext()).ComputeAsync(Day, NightNow, "万龙服务中心");
         Assert.Equal((1, 0, 1, 0, 1), (s.initialPending, s.added, s.completed, s.pending, s.completedCancelled));
     }
+
+    // ───────────── 点数字看明细 ─────────────
+
+    [Fact]
+    public async Task Items_ListTheBoardsBehindANumber_WithOrderEquipmentCustomerAndTasks()
+    {
+        await using var f = await CoachFixture.Create();   // 会员 3 = 学员；员工 9 = 管理员，10 = 店员
+        Care Workshop(DateTime entered, string brand, params CareTask[] services)
+        {
+            var care = AddBoard(f, "万龙服务中心", entered, null, 0, 1, "养护", "F", 1, false, services);
+            care.brand = brand; care.scale = "160";
+            var safety = care.tasks.First(t => t.task_name == "安全检查");
+            safety.status = "已完成"; safety.start_time = entered; safety.end_time = entered.AddMinutes(1); safety.staff_id = 9; safety.sort = 10;
+            care.tasks.Last().sort = 60;
+            return care;
+        }
+        var pending = Workshop(At(9, 10), "Atomic/阿托米克", new CareTask { task_name = "修刃", create_date = At(9, 10), sort = 20 });
+        var done = Workshop(At(9, 11), "Head", Done("修刃", At(9, 11), At(10, 11), 9), Done("热蜡", At(9, 11), At(10, 14), 10));
+        var order = f.Db.order.Local.Single(o => o.cares.Contains(done));
+        order.code = "WF_YH_261109_00002"; order.contact_name = "张"; order.contact_gender = "男";
+        f.Db.order.Local.Single(o => o.cares.Contains(pending)).member_id = CoachFixture.StudentA;
+        AddBoard(f, "崇礼旗舰店", At(9, 12));
+        await f.Db.SaveChangesAsync();
+        var service = new CareWorkloadService(f.NewContext());
+
+        var completed = await service.GetItemsAsync(Day, NightNow, "万龙服务中心", CareWorkloadRules.MetricCompleted);
+        Assert.Equal((1, "completed", "万龙服务中心", "2026-11-10"), (completed.total, completed.metric, completed.shop, completed.date));
+        var item = Assert.Single(completed.items);
+        Assert.Equal((done.id, order.id, "WF_YH_261109_00002", "万龙服务中心"), (item.careId, item.orderId, item.orderCode, item.shop));
+        Assert.Equal(("双板", "Head", "160", "张 先生"), (item.equipment, item.brand, item.scale, item.customerName));
+        Assert.Equal((At(9, 11), (DateTime?)At(10, 14)), (item.enteredAt, item.finishedAt));
+        // 任务按 sort 排好返回（这里修刃、热蜡没设 sort = 0，安全检查 10，发板 60）
+        Assert.Equal(new[] { "修刃", "热蜡", "安全检查", "发板" }, item.tasks.Select(t => t.name).ToArray());
+        Assert.All(item.tasks.Where(t => t.name != "发板"), t => Assert.Equal("已完成", t.status));
+        Assert.Empty(item.hits);
+
+        var pendingItems = await service.GetItemsAsync(Day, NightNow, "万龙服务中心", CareWorkloadRules.MetricPending);
+        var p = Assert.Single(pendingItems.items);
+        Assert.Equal((pending.id, "学员A", (DateTime?)null), (p.careId, p.customerName, p.finishedAt));   // 没有联系人就用会员姓名
+        Assert.Contains(p.tasks, t => t.name == "修刃" && t.status == "未开始");
+
+        // 工序：total 是任务条数，带完成人和时间；可以只看某个人
+        var edge = await service.GetItemsAsync(Day, NightNow, "万龙服务中心", CareWorkloadRules.Edge);
+        Assert.Equal(1, edge.total);
+        var hit = Assert.Single(Assert.Single(edge.items).hits);
+        Assert.Equal(("edge", "修刃", 9, "管理员", (DateTime?)At(10, 11)), (hit.kind, hit.taskName, hit.staffId, hit.staffName, hit.endTime));
+        Assert.Equal(0, (await service.GetItemsAsync(Day, NightNow, "万龙服务中心", CareWorkloadRules.Edge, 10)).total);
+        Assert.Equal(1, (await service.GetItemsAsync(Day, NightNow, "万龙服务中心", CareWorkloadRules.Wax, 10)).total);
+
+        // 全部门店、和统计数一致；没有的数返回空列表
+        var allPending = await service.GetItemsAsync(Day, NightNow, null, CareWorkloadRules.MetricPending);
+        var stat = await service.ComputeAsync(Day, NightNow);
+        Assert.Equal(stat.pending, allPending.total);
+        Assert.Equal(2, allPending.items.Count);
+        Assert.Null(allPending.shop);
+        var none = await service.GetItemsAsync(Day, NightNow, "南山", CareWorkloadRules.MetricPending);
+        Assert.Equal((0, 0), (none.total, none.items.Count));
+    }
 }

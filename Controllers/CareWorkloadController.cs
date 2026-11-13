@@ -48,5 +48,37 @@ namespace SnowmeetApi.Controllers
             CareWorkloadStat stat = await new CareWorkloadService(_db).GetAsync(day, now, shopName);
             return Ok(new ApiResult<CareWorkloadStat>() { code = 0, message = "", data = stat });
         }
+        /// <summary>
+        /// 页面上某个数的明细。metric：initialPending / added / completed / pending / idlePending / worked，
+        /// 或工序 edge / wax / scrape / patchBottom / repair；staffId 只对工序有效（只看这个人完成的，0 = 没记录完成人）。
+        /// </summary>
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<CareWorkloadItems>>> GetDailyWorkloadItemsByStaff(string? date, string? shop,
+            string metric, int? staffId, string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await Util.GetStaffBySessionKey(_db, Util.UrlDecode(sessionKey), sessionType);
+            if (staff == null || staff.title_level < 100)
+            {
+                return Ok(new ApiResult<CareWorkloadItems>() { code = 1, message = "没有权限", data = null });
+            }
+            if (!CareWorkloadRules.IsMetric(metric))
+            {
+                return Ok(new ApiResult<CareWorkloadItems>() { code = 1, message = "不认识的统计项", data = null });
+            }
+            DateTime now = DateTime.Now;
+            DateTime day = now.Date;
+            if (!string.IsNullOrWhiteSpace(date) && !DateTime.TryParse(Util.UrlDecode(date), out day))
+            {
+                return Ok(new ApiResult<CareWorkloadItems>() { code = 1, message = "日期格式不对", data = null });
+            }
+            day = day.Date;
+            if (day > now.Date)
+            {
+                return Ok(new ApiResult<CareWorkloadItems>() { code = 1, message = "不能查询还没到的日期", data = null });
+            }
+            string? shopName = string.IsNullOrWhiteSpace(shop) ? null : Util.UrlDecode(shop).Trim();
+            CareWorkloadItems items = await new CareWorkloadService(_db).GetItemsAsync(day, now, shopName, metric, staffId);
+            return Ok(new ApiResult<CareWorkloadItems>() { code = 0, message = "", data = items });
+        }
     }
 }

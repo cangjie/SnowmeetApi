@@ -60,6 +60,21 @@ namespace SnowmeetApi.Helpers
         /// <summary>统计的工序，也是页面上展示的顺序。</summary>
         public static readonly string[] Processes = { Edge, Wax, Scrape, PatchBottom, Repair };
 
+        // 进出和有无操作这几个数的键（点页面上的数字看明细时用，和 CareWorkloadStat 的字段同名）
+        public const string MetricInitialPending = "initialPending";
+        public const string MetricAdded = "added";
+        public const string MetricCompleted = "completed";
+        public const string MetricPending = "pending";
+        public const string MetricIdlePending = "idlePending";
+        public const string MetricWorked = "worked";
+
+        /// <summary>按装备数的那几个数。</summary>
+        public static readonly string[] BoardMetrics =
+            { MetricInitialPending, MetricAdded, MetricCompleted, MetricPending, MetricIdlePending, MetricWorked };
+
+        /// <summary>页面上能点开看明细的数：进出、有无操作（按装备），或者某个工序（按完成的任务）。</summary>
+        public static bool IsMetric(string? metric) => metric != null && (BoardMetrics.Contains(metric) || Processes.Contains(metric));
+
         /// <summary>工序键 → 页面上的中文名。</summary>
         public static readonly Dictionary<string, string> Labels = new()
         {
@@ -146,51 +161,102 @@ namespace SnowmeetApi.Helpers
             Compute(cares.Select(ToInput), day, asOf);
 
         /// <summary>
-        /// 统计的核心。tasks 只需要带窗口内开始 / 结束过的任务（算「有操作」和工序数量用）；
-        /// 进入时刻 entered 和完成时刻 finished 由调用方算好（finished 已不早于 entered）。
+        /// 一件装备在这一天的统计里算什么：进出、有无养护操作、当天完成了哪些工序。不统计的装备（还没生效、老装备、非雪季养护）返回 null。
+        /// 页面上的每个数、以及点开数字看到的明细，都从这里来，所以数字和明细不会对不上。
+        /// tasks 只需要带窗口内开始 / 结束过的任务；进入时刻 entered 和完成时刻 finished 由调用方算好（finished 已不早于 entered），
         /// 这样库里几千块「早就进来、一直没发板」的老装备不用把任务一条条读出来。
         /// </summary>
+        public static CareWorkloadFacts? Judge(CareWorkloadInput care, DateTime day, DateTime asOf)
+        {
+            if (care.entered == null) return null;
+            if (!IsConsidered(care.orderDate, care.bizType)) return null;      // 老装备、非雪季养护不统计
+            DateTime start = day.Date;
+            DateTime entered = care.entered.Value;
+            DateTime? finished = care.finished;
+            var facts = new CareWorkloadFacts
+            {
+                initialPending = entered < start && (finished == null || finished >= start),
+                added = In(entered, start, asOf),
+                completed = In(finished, start, asOf),
+                pending = entered < asOf && (finished == null || finished >= asOf),
+                // 养护操作：发板 / 强行索回不算（只是把板子交还顾客）
+                worked = care.tasks.Any(t => !IsFinishTaskName(t.name) && (In(t.start, start, asOf) || In(t.end, start, asOf)))
+            };
+            facts.cancelled = facts.completed && care.isCancel;
+            facts.idlePending = facts.pending && !facts.worked;
+            foreach (CareWorkloadTask task in care.tasks)
+            {
+                if (task.status != "已完成" || !In(task.end, start, asOf)) continue;
+                string? kind = Classify(task.name, care.repairMemo);
+                if (kind != null) facts.hits.Add(new CareWorkloadHit { kind = kind, task = task });
+            }
+            return facts;
+        }
+
+        /// <summary>统计的核心：把每件装备的判定（Judge）加起来。</summary>
         public static CareWorkloadStat Compute(IEnumerable<CareWorkloadInput> cares, DateTime day, DateTime asOf)
         {
-            DateTime start = day.Date;
-            var stat = new CareWorkloadStat { date = start.ToString("yyyy-MM-dd"), asOf = asOf };
+            var stat = new CareWorkloadStat { date = day.Date.ToString("yyyy-MM-dd"), asOf = asOf };
             var people = new Dictionary<int, CareWorkloadStaff>();
             foreach (CareWorkloadInput care in cares)
             {
-                if (care.entered == null) continue;
-                if (!IsConsidered(care.orderDate, care.bizType)) continue;      // 老装备不统计
-                DateTime entered = care.entered.Value;
-                DateTime? finished = care.finished;
-                bool pendingAtStart = entered < start && (finished == null || finished >= start);
-                bool pendingAtEnd = entered < asOf && (finished == null || finished >= asOf);
-                if (pendingAtStart) stat.initialPending++;
-                if (In(entered, start, asOf)) stat.added++;
-                if (In(finished, start, asOf))
+                CareWorkloadFacts? facts = Judge(care, day, asOf);
+                if (facts == null) continue;
+                if (facts.initialPending) stat.initialPending++;
+                if (facts.added) stat.added++;
+                if (facts.completed) stat.completed++;
+                if (facts.cancelled) stat.completedCancelled++;
+                if (facts.pending) stat.pending++;
+                if (facts.worked) stat.worked++;
+                if (facts.idlePending) stat.idlePending++;
+                foreach (CareWorkloadHit hit in facts.hits)
                 {
-                    stat.completed++;
-                    if (care.isCancel) stat.completedCancelled++;
-                }
-                if (pendingAtEnd) stat.pending++;
-                // 养护操作：发板 / 强行索回不算（只是把板子交还顾客）
-                bool operated = care.tasks.Any(t => !IsFinishTaskName(t.name) && (In(t.start, start, asOf) || In(t.end, start, asOf)));
-                if (operated) stat.worked++;
-                if (pendingAtEnd && !operated) stat.idlePending++;
-                foreach (CareWorkloadTask task in care.tasks)
-                {
-                    if (task.status != "已完成" || !In(task.end, start, asOf)) continue;
-                    string? kind = Classify(task.name, care.repairMemo);
-                    if (kind == null) continue;
-                    stat.process[kind]++;
-                    int key = task.staffId ?? 0;
+                    stat.process[hit.kind]++;
+                    int key = hit.task.staffId ?? 0;
                     if (!people.TryGetValue(key, out CareWorkloadStaff? who))
-                        people[key] = who = new CareWorkloadStaff { staffId = key, name = task.staffName ?? "" };
-                    if (who.name == "" && !string.IsNullOrEmpty(task.staffName)) who.name = task.staffName;
-                    who.process[kind]++;
+                        people[key] = who = new CareWorkloadStaff { staffId = key, name = hit.task.staffName ?? "" };
+                    if (who.name == "" && !string.IsNullOrEmpty(hit.task.staffName)) who.name = hit.task.staffName;
+                    who.process[hit.kind]++;
                 }
             }
             stat.staff = people.Values.OrderBy(p => p.staffId == 0 ? 1 : 0).ThenByDescending(p => p.process.Values.Sum())
                 .ThenBy(p => p.staffId).ToList();
             return stat;
+        }
+
+        /// <summary>
+        /// 页面上某个数对应的明细：哪些装备，以及（工序类的数）是哪几条完成的任务。
+        /// metric 是 BoardMetrics 里的键或工序键；staffId 只对工序有效：只看这个人完成的（0 = 没记录完成人的）。
+        /// 装备类的数：一件装备一条，条数 = 页面上的数；工序类的数：一件装备一条，hits 是它当天完成的这类任务，hits 的总条数 = 页面上的数。
+        /// </summary>
+        public static List<CareWorkloadMatch> Select(IEnumerable<CareWorkloadInput> cares, DateTime day, DateTime asOf, string metric, int? staffId = null)
+        {
+            var matches = new List<CareWorkloadMatch>();
+            bool isProcess = Processes.Contains(metric);
+            foreach (CareWorkloadInput care in cares)
+            {
+                CareWorkloadFacts? facts = Judge(care, day, asOf);
+                if (facts == null) continue;
+                if (isProcess)
+                {
+                    List<CareWorkloadHit> hits = facts.hits
+                        .Where(h => h.kind == metric && (staffId == null || (h.task.staffId ?? 0) == staffId)).ToList();
+                    if (hits.Count > 0) matches.Add(new CareWorkloadMatch { care = care, facts = facts, hits = hits });
+                    continue;
+                }
+                bool hit = metric switch
+                {
+                    MetricInitialPending => facts.initialPending,
+                    MetricAdded => facts.added,
+                    MetricCompleted => facts.completed,
+                    MetricPending => facts.pending,
+                    MetricIdlePending => facts.idlePending,
+                    MetricWorked => facts.worked,
+                    _ => false
+                };
+                if (hit) matches.Add(new CareWorkloadMatch { care = care, facts = facts });
+            }
+            return matches;
         }
 
         /// <summary>
@@ -274,6 +340,38 @@ namespace SnowmeetApi.Helpers
                 return finished < _entered ? _entered : finished;
             }
         }
+    }
+
+    /// <summary>一件装备在某一天的判定结果（CareWorkloadRules.Judge）。</summary>
+    public sealed class CareWorkloadFacts
+    {
+        public bool initialPending { get; set; }
+        public bool added { get; set; }
+        public bool completed { get; set; }
+        /// <summary>当天完成、而且是取消的</summary>
+        public bool cancelled { get; set; }
+        public bool pending { get; set; }
+        /// <summary>当天有过养护操作（发板不算）</summary>
+        public bool worked { get; set; }
+        public bool idlePending { get; set; }
+        /// <summary>当天完成的、计工作量的任务</summary>
+        public List<CareWorkloadHit> hits { get; set; } = new();
+    }
+
+    /// <summary>当天完成的一条计工作量的任务，和它算哪种工序。</summary>
+    public sealed class CareWorkloadHit
+    {
+        public string kind { get; set; } = "";
+        public CareWorkloadTask task { get; set; } = new();
+    }
+
+    /// <summary>某个数的明细里的一件装备（CareWorkloadRules.Select）。</summary>
+    public sealed class CareWorkloadMatch
+    {
+        public CareWorkloadInput care { get; set; } = new();
+        public CareWorkloadFacts facts { get; set; } = new();
+        /// <summary>工序类的数：这件装备当天完成的这类任务；装备类的数为空</summary>
+        public List<CareWorkloadHit> hits { get; set; } = new();
     }
 
     /// <summary>统计用的精简输入：一件装备（见 CareWorkloadRules.Compute）。</summary>

@@ -427,6 +427,83 @@ public class CareWorkloadRulesTests
         Assert.Equal(1, CareWorkloadRules.Compute(new[] { keep }, Day, Asof).process[CareWorkloadRules.Edge]);
     }
 
+    // ───────────── 点数字看明细：明细和数字同一套判定 ─────────────
+
+    private static Care[] Mixed()
+    {
+        // 任务在订单生效（进店）时生成，所以创建时间跟着各自的板子走
+        CareTask Done(string name, int hour, int staff, DateTime? created = null) =>
+            Task(name, created ?? At(9, 10), "已完成", At(10, hour), At(10, hour, 30), staff, "员工" + staff);
+        return new[]
+        {
+            Workshop(1, At(9, 10), Service("修刃", At(9, 10))),                                    // 昨天收的，没动：初始待完成、待完成、无操作
+            Workshop(2, At(9, 10), Done("修刃", 9, 1), Service("热蜡", At(9, 10))),                // 今天修了刃、热蜡没做：待完成、有操作
+            Workshop(3, At(9, 10), Done("修刃", 10, 1), Done("热蜡", 11, 2), Done("刮蜡", 12, 2)), // 今天全做完：完成、有操作
+            Workshop(4, At(10, 9), Done("养板打蜡1", 13, 2, At(10, 9)), Done("养板打蜡2", 14, 2, At(10, 9))),   // 今天收今天做完：新增、完成，打蜡 2 条
+            Workshop(5, At(10, 15), Service("修刃", At(10, 15))),                                  // 今天收的没动：新增、待完成（安全检查是今天做的，算有操作）
+            Workshop(6, At(8, 10), Service("修刃", At(8, 10), At(9, 12))),                         // 昨天就做完了：和今天无关
+        };
+    }
+
+    [Fact]
+    public void Select_ReturnsExactlyTheBoardsBehindEachNumber()
+    {
+        var inputs = Mixed().Select(CareWorkloadRules.ToInput).ToList();
+        var stat = CareWorkloadRules.Compute(inputs, Day, Asof);
+        int[] Ids(string metric, int? staff = null) =>
+            CareWorkloadRules.Select(inputs, Day, Asof, metric, staff).Select(m => m.care.careId).OrderBy(x => x).ToArray();
+
+        Assert.Equal(new[] { 1, 2, 3 }, Ids(CareWorkloadRules.MetricInitialPending));
+        Assert.Equal(new[] { 4, 5 }, Ids(CareWorkloadRules.MetricAdded));
+        Assert.Equal(new[] { 3, 4 }, Ids(CareWorkloadRules.MetricCompleted));
+        Assert.Equal(new[] { 1, 2, 5 }, Ids(CareWorkloadRules.MetricPending));
+        Assert.Equal(new[] { 1 }, Ids(CareWorkloadRules.MetricIdlePending));
+        Assert.Equal(new[] { 2, 3, 4, 5 }, Ids(CareWorkloadRules.MetricWorked));
+        // 条数 = 页面上的数
+        Assert.Equal(stat.initialPending, Ids(CareWorkloadRules.MetricInitialPending).Length);
+        Assert.Equal(stat.added, Ids(CareWorkloadRules.MetricAdded).Length);
+        Assert.Equal(stat.completed, Ids(CareWorkloadRules.MetricCompleted).Length);
+        Assert.Equal(stat.pending, Ids(CareWorkloadRules.MetricPending).Length);
+        Assert.Equal(stat.idlePending, Ids(CareWorkloadRules.MetricIdlePending).Length);
+        Assert.Equal(stat.worked, Ids(CareWorkloadRules.MetricWorked).Length);
+    }
+
+    [Fact]
+    public void Select_ProcessNumbersListTheFinishedTasks_OptionallyForOnePerson()
+    {
+        var inputs = Mixed().Select(CareWorkloadRules.ToInput).ToList();
+        var stat = CareWorkloadRules.Compute(inputs, Day, Asof);
+        foreach (string kind in CareWorkloadRules.Processes)
+            Assert.Equal(stat.process[kind], CareWorkloadRules.Select(inputs, Day, Asof, kind).Sum(m => m.hits.Count));   // 任务条数 = 页面上的数
+
+        var wax = CareWorkloadRules.Select(inputs, Day, Asof, CareWorkloadRules.Wax);
+        Assert.Equal(new[] { 3, 4 }, wax.Select(m => m.care.careId).OrderBy(x => x).ToArray());
+        Assert.Equal(new[] { "养板打蜡1", "养板打蜡2" }, wax.Single(m => m.care.careId == 4).hits.Select(h => h.task.name).ToArray());   // 一块板两道打蜡：一条装备、两条任务
+        Assert.Equal(3, wax.Sum(m => m.hits.Count));
+
+        // 只看某个人：1 号员工修了 2 块，2 号员工没修过刃
+        var edgeByOne = CareWorkloadRules.Select(inputs, Day, Asof, CareWorkloadRules.Edge, 1);
+        Assert.Equal(new[] { 2, 3 }, edgeByOne.Select(m => m.care.careId).OrderBy(x => x).ToArray());
+        Assert.Equal(stat.staff.Single(p => p.staffId == 1).process[CareWorkloadRules.Edge], edgeByOne.Sum(m => m.hits.Count));
+        Assert.Empty(CareWorkloadRules.Select(inputs, Day, Asof, CareWorkloadRules.Edge, 2));
+        // 装备类的数不看人；不认识的键什么都不返回
+        Assert.Equal(3, CareWorkloadRules.Select(inputs, Day, Asof, CareWorkloadRules.MetricPending, 99).Count);
+        Assert.Empty(CareWorkloadRules.Select(inputs, Day, Asof, "nope"));
+        Assert.True(CareWorkloadRules.IsMetric("pending"));
+        Assert.True(CareWorkloadRules.IsMetric("patchBottom"));
+        Assert.False(CareWorkloadRules.IsMetric("nope"));
+        Assert.False(CareWorkloadRules.IsMetric(null));
+    }
+
+    [Fact]
+    public void Select_LeavesOutBoardsThatAreNotCounted()
+    {
+        var old = OldBoard(new DateTime(2026, 3, 1));
+        var summer = OldBoard(new DateTime(2026, 11, 8), "非雪季养护");
+        var inputs = new[] { old, summer }.Select(CareWorkloadRules.ToInput).ToList();
+        Assert.All(CareWorkloadRules.BoardMetrics, m => Assert.Empty(CareWorkloadRules.Select(inputs, Day, Asof, m)));
+    }
+
     // ───────────── 门店相加 ─────────────
 
     [Fact]

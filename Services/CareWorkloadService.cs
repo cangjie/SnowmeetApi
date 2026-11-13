@@ -29,8 +29,23 @@ namespace SnowmeetApi.Services
         /// <summary>某天各门店的统计（门店名 → 统计）；shop 不为空时只算这一家。</summary>
         public async Task<Dictionary<string, CareWorkloadStat>> ComputeByShopAsync(DateTime day, DateTime now, string? shop = null)
         {
-            DateTime start = day.Date;
             DateTime asOf = CareWorkloadRules.AsOf(day, now);
+            List<CareWorkloadInput> inputs = await LoadInputsAsync(day, asOf, shop);
+            var result = new Dictionary<string, CareWorkloadStat>();
+            foreach (var group in inputs.GroupBy(c => c.shop))
+            {
+                CareWorkloadStat stat = CareWorkloadRules.Compute(group, day, asOf);
+                stat.shop = group.Key;
+                stat.computedAt = now;
+                result[group.Key] = stat;
+            }
+            return result;
+        }
+
+        /// <summary>取出这一天要参与统计的装备（统计和点数字看明细共用）。shop 不为空时只取这一家。</summary>
+        private async Task<List<CareWorkloadInput>> LoadInputsAsync(DateTime day, DateTime asOf, string? shop)
+        {
+            DateTime start = day.Date;
             string? shopName = string.IsNullOrWhiteSpace(shop) ? null : shop.Trim();
 
             // 不能一次把「装备 + 全部任务」读出来、再在 SQL 里用 EXISTS / NOT EXISTS 去筛：生产库里有七千多块
@@ -85,15 +100,81 @@ namespace SnowmeetApi.Services
                 });
             }
 
-            var result = new Dictionary<string, CareWorkloadStat>();
-            foreach (var group in inputs.GroupBy(c => c.shop))
+            return inputs;
+        }
+
+        /// <summary>
+        /// 页面上某个数的明细：对应哪些装备（订单号、装备、顾客、进店 / 完成时间、任务进度），工序类的数还带上是谁在几点完成的。
+        /// 永远按当前数据现算（截止时刻和统计一样）；过去的日子统计读的是快照，订单后来被改过时明细条数可能和快照里的数差一点。
+        /// </summary>
+        public async Task<CareWorkloadItems> GetItemsAsync(DateTime day, DateTime now, string? shop, string metric, int? staffId = null)
+        {
+            DateTime asOf = CareWorkloadRules.AsOf(day, now);
+            string? shopName = string.IsNullOrWhiteSpace(shop) ? null : shop.Trim();
+            bool isProcess = CareWorkloadRules.Processes.Contains(metric);
+            List<CareWorkloadInput> inputs = await LoadInputsAsync(day, asOf, shopName);
+            List<CareWorkloadMatch> matches = CareWorkloadRules.Select(inputs, day, asOf, metric, isProcess ? staffId : null);
+            var result = new CareWorkloadItems
             {
-                CareWorkloadStat stat = CareWorkloadRules.Compute(group, day, asOf);
-                stat.shop = group.Key;
-                stat.computedAt = now;
-                result[group.Key] = stat;
+                date = day.Date.ToString("yyyy-MM-dd"), asOf = asOf, shop = shopName, metric = metric, staffId = isProcess ? staffId : null,
+                total = isProcess ? matches.Sum(m => m.hits.Count) : matches.Count
+            };
+            if (matches.Count == 0) return result;
+
+            List<int> ids = matches.Select(m => m.care.careId).ToList();
+            var cares = await _db.care.Where(c => ids.Contains(c.id))
+                .Select(c => new
+                {
+                    c.id, c.order_id, c.equipment, c.brand, c.scale,
+                    orderCode = c.order!.code, shop = c.order!.shop, orderDate = c.order!.biz_date,
+                    contactName = c.order!.contact_name, contactGender = c.order!.contact_gender,
+                    memberName = c.order!.member != null ? c.order!.member.real_name : null,
+                    memberGender = c.order!.member != null ? c.order!.member.gender : null
+                }).AsNoTracking().ToListAsync();
+            var careById = cares.ToDictionary(c => c.id);
+            var tasks = (await _db.careTask.Where(t => t.valid == 1 && ids.Contains(t.care_id))
+                    .Select(t => new { t.id, t.care_id, t.task_name, t.status, t.sort }).AsNoTracking().ToListAsync())
+                .ToLookup(t => t.care_id);
+
+            foreach (CareWorkloadMatch match in matches)
+            {
+                if (!careById.TryGetValue(match.care.careId, out var care)) continue;
+                result.items.Add(new CareWorkloadItem
+                {
+                    careId = care.id, orderId = care.order_id ?? 0, orderCode = care.orderCode ?? "", shop = (care.shop ?? "").Trim(),
+                    equipment = care.equipment ?? "", brand = care.brand, scale = care.scale,
+                    customerName = CalledName(care.contactName, care.contactGender, care.memberName, care.memberGender),
+                    orderDate = care.orderDate, enteredAt = match.care.entered!.Value, finishedAt = match.care.finished,
+                    isCancel = match.care.isCancel,
+                    tasks = tasks[care.id].OrderBy(t => t.sort).ThenBy(t => t.id)
+                        .Select(t => new CareWorkloadItemTask { id = t.id, name = (t.task_name ?? "").Trim(), status = (t.status ?? "").Trim(), sort = t.sort }).ToList(),
+                    hits = match.hits.OrderBy(h => h.task.end).Select(h => new CareWorkloadItemHit
+                    {
+                        kind = h.kind, taskName = h.task.name, staffId = h.task.staffId ?? 0, staffName = h.task.staffName ?? "", endTime = h.task.end
+                    }).ToList()
+                });
             }
+            // 排序：完成的按完成时间、工序按做完的时间、其余按进店时间，都是早的在前（压得最久的排最上面）
+            result.items = (metric == CareWorkloadRules.MetricCompleted
+                    ? result.items.OrderBy(i => i.finishedAt)
+                    : isProcess ? result.items.OrderBy(i => i.hits.Count > 0 ? i.hits[0].endTime : null)
+                    : result.items.OrderBy(i => (DateTime?)i.enteredAt))
+                .ThenBy(i => i.careId).ToList();
             return result;
+        }
+
+        // 顾客称呼：订单上的联系人优先，没有就用会员姓名；带「先生 / 女士」
+        static string CalledName(string? contactName, string? contactGender, string? memberName, string? memberGender)
+        {
+            string name = (contactName ?? "").Trim();
+            string? gender = contactGender;
+            if (name == "")
+            {
+                name = (memberName ?? "").Trim();
+                gender = memberGender;
+            }
+            if (name == "") return "";
+            return name + (gender == "男" ? " 先生" : gender == "女" ? " 女士" : "");
         }
 
         /// <summary>某天的统计：指定门店就是那一家，不指定就是各店相加（人员合并）。没有数据时各项都是 0。</summary>
@@ -239,5 +320,62 @@ namespace SnowmeetApi.Services
             repair_count = stat.process[CareWorkloadRules.Repair],
             staff_json = JsonSerializer.Serialize(stat.staff), source = source, create_date = now
         };
+    }
+}
+
+namespace SnowmeetApi.Services
+{
+    /// <summary>日养护工作列表里某个数的明细（CareWorkloadService.GetItemsAsync）。</summary>
+    public class CareWorkloadItems
+    {
+        public string date { get; set; } = "";
+        public DateTime asOf { get; set; }
+        /// <summary>null = 全部门店</summary>
+        public string? shop { get; set; }
+        public string metric { get; set; } = "";
+        /// <summary>只看这个人完成的工序；null = 不限</summary>
+        public int? staffId { get; set; }
+        /// <summary>和页面上那个数同口径：装备类的数 = 装备件数，工序类的数 = 完成的任务条数</summary>
+        public int total { get; set; }
+        public List<CareWorkloadItem> items { get; set; } = new();
+    }
+
+    public class CareWorkloadItem
+    {
+        public int careId { get; set; }
+        public int orderId { get; set; }
+        public string orderCode { get; set; } = "";
+        public string shop { get; set; } = "";
+        public string equipment { get; set; } = "";
+        public string? brand { get; set; }
+        public string? scale { get; set; }
+        public string customerName { get; set; } = "";
+        public DateTime orderDate { get; set; }
+        /// <summary>进入工作清单（订单生效）的时刻</summary>
+        public DateTime enteredAt { get; set; }
+        /// <summary>完成的时刻（工序都做完只差发板，或已发板）；还没完成为 null</summary>
+        public DateTime? finishedAt { get; set; }
+        public bool isCancel { get; set; }
+        /// <summary>这件装备的全部有效任务，按做的先后</summary>
+        public List<CareWorkloadItemTask> tasks { get; set; } = new();
+        /// <summary>工序类的数：当天完成的这类任务（谁、几点）</summary>
+        public List<CareWorkloadItemHit> hits { get; set; } = new();
+    }
+
+    public class CareWorkloadItemTask
+    {
+        public int id { get; set; }
+        public string name { get; set; } = "";
+        public string status { get; set; } = "";
+        public int sort { get; set; }
+    }
+
+    public class CareWorkloadItemHit
+    {
+        public string kind { get; set; } = "";
+        public string taskName { get; set; } = "";
+        public int staffId { get; set; }
+        public string staffName { get; set; } = "";
+        public DateTime? endTime { get; set; }
     }
 }
