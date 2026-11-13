@@ -21,8 +21,10 @@ namespace SnowmeetApi.Helpers
     ///   ② 新增       = 窗口内进来的
     ///   ③ 完成       = 窗口内完成的（含取消）
     ///   ④ 待完成     = asOf 时已经进来、还没完成的；恒有 ① + ② − ③ = ④
-    ///   无操作的待完成 = ④ 里窗口内一次操作（任务开始 / 结束，含安全检查）都没有的
-    ///   今日养护雪板数 = 窗口内有过操作的装备（完成和没完成的都算）
+    ///   无操作的待完成 = ④ 里窗口内一次养护操作都没有的
+    ///   今日养护雪板数 = 窗口内有过养护操作的装备（完成和没完成的都算）
+    ///     「养护操作」= 除「发板」/「强行索回」外的有效任务在窗口内开始或结束（含安全检查）。
+    ///     发板只是把板子交还顾客，不算养护操作（崔洋 2026-11-13）：昨天做完、今天来取的板子不算今天养护过。
     ///   工序数量     = 窗口内「已完成」的有效任务，每条算 1，按完成人（staff_id）分开
     ///
     /// 截止时刻：asOf = min(当前时刻, D 22:00)。过去的日子都按当天 22:00 截止，今天 22:00 前实时、22:00 后冻结。
@@ -122,10 +124,6 @@ namespace SnowmeetApi.Helpers
 
         static bool In(DateTime? time, DateTime start, DateTime end) => time != null && time >= start && time < end;
 
-        /// <summary>窗口内这件装备有没有任何操作：任一有效任务开始过或结束过。</summary>
-        static bool HasOperation(Care care, DateTime start, DateTime end) =>
-            (care.tasks ?? new List<CareTask>()).Any(t => IsValid(t) && (In(t.start_time, start, end) || In(t.end_time, start, end)));
-
         /// <summary>把一件带任务的装备整理成统计用的精简输入（测试和小批量用；服务从库里直接取精简数据，不走这里）。</summary>
         public static CareWorkloadInput ToInput(Care care) => new()
         {
@@ -173,7 +171,8 @@ namespace SnowmeetApi.Helpers
                     if (care.isCancel) stat.completedCancelled++;
                 }
                 if (pendingAtEnd) stat.pending++;
-                bool operated = care.tasks.Any(t => In(t.start, start, asOf) || In(t.end, start, asOf));
+                // 养护操作：发板 / 强行索回不算（只是把板子交还顾客）
+                bool operated = care.tasks.Any(t => !IsFinishTaskName(t.name) && (In(t.start, start, asOf) || In(t.end, start, asOf)));
                 if (operated) stat.worked++;
                 if (pendingAtEnd && !operated) stat.idlePending++;
                 foreach (CareWorkloadTask task in care.tasks)
@@ -327,9 +326,9 @@ namespace SnowmeetApi.Helpers
         public int completedCancelled { get; set; }
         /// <summary>④ asOf 时待完成（= ① + ② − ③）</summary>
         public int pending { get; set; }
-        /// <summary>④ 里窗口内一次操作都没有的</summary>
+        /// <summary>④ 里窗口内一次养护操作都没有的（发板不算操作）</summary>
         public int idlePending { get; set; }
-        /// <summary>窗口内有过操作的装备数</summary>
+        /// <summary>窗口内有过养护操作的装备数（发板不算操作）</summary>
         public int worked { get; set; }
         /// <summary>各工序完成数，键见 CareWorkloadRules.Processes：edge 修刃 / wax 打蜡 / scrape 刮蜡 / patchBottom 补板底 / repair 维修</summary>
         public Dictionary<string, int> process { get; set; } = CareWorkloadRules.Processes.ToDictionary(p => p, p => 0);

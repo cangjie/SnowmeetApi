@@ -189,7 +189,7 @@ public class CareWorkloadRulesTests
         Assert.Equal(At(9, 15), CareWorkloadRules.FinishedAt(board));
         var today = CareWorkloadRules.Compute(new[] { board }, Day, Asof);
         Assert.Equal((0, 0, 0, 0), (today.initialPending, today.added, today.completed, today.pending));
-        Assert.Equal(1, today.worked);                       // 今天发板也是一次操作
+        Assert.Equal(0, today.worked);                       // 今天只是发板，不算今天养护过
         var yesterday = CareWorkloadRules.Compute(new[] { board }, Day.AddDays(-1), CareWorkloadRules.AsOf(Day.AddDays(-1), At(10, 23)));
         Assert.Equal((0, 1, 1, 0), (yesterday.initialPending, yesterday.added, yesterday.completed, yesterday.pending));
     }
@@ -241,23 +241,41 @@ public class CareWorkloadRulesTests
     // ───────────── 有操作 / 无操作 ─────────────
 
     [Fact]
-    public void Operations_WorkedCountsAnyStartOrEndInTheWindow_IdleIsPendingWithoutOperation()
+    public void Operations_WorkedCountsCareTasksStartedOrEndedInTheWindow_HandOutIsNotAnOperation()
     {
         var cares = new[]
         {
             Board(1, At(9, 10)),                                                             // 压着，今天没人动：无操作
             Board(2, At(9, 10), null, false, Task("修刃", At(9, 10), "已开始", At(10, 13))),    // 压着，今天开始了修刃：有操作、未完成
             Board(3, At(9, 10), null, false, Task("修刃", At(9, 10), "已完成", At(9, 15), At(9, 16), 1)),  // 昨天的操作，今天没动：无操作
-            Board(4, At(9, 10), At(10, 16)),                                                 // 今天发板完成：有操作、已完成
+            Board(4, At(9, 10), At(10, 16)),                                                 // 今天只发了板：发板不算养护操作
             Board(5, At(8, 10), At(9, 16)),                                                  // 昨天就完成的：不算
             Board(6, At(10, 23), null, false, Task("修刃", At(10, 23), "已完成", At(10, 23, 5), At(10, 23, 20), 1)),   // 22:00 后的操作不算
         };
         var s = CareWorkloadRules.Compute(cares, Day, Asof);
         Assert.Equal(3, s.pending);          // 1、2、3 号还压着
         Assert.Equal(2, s.idlePending);      // 1、3 号今天没人动
-        Assert.Equal(2, s.worked);           // 2、4 号今天有操作
+        Assert.Equal(1, s.worked);           // 只有 2 号今天有养护操作；4 号只是发板
         // 恒等式：待完成 = 无操作的 + 今天有操作但没完成的（只有 2 号）
         Assert.Equal(s.pending, s.idlePending + 1);
+    }
+
+    [Fact]
+    public void Operations_HandOutOrForcedReturnAloneDoesNotMakeABoardWorkedOrActive()
+    {
+        // 待完成的板子上只动了发板（点了开始、还没完成）：仍算今天没人养护
+        var handOutStarted = Care(1, null, false, Task("安全检查", At(9, 10)), Task("修刃", At(9, 10)),
+            Task("发板", At(9, 10), "已开始", At(10, 11), null, 1));
+        // 今天强行索回：算完成，但不算今天养护过
+        var forced = Care(2, null, false, Task("安全检查", At(9, 10)), Task("修刃", At(9, 10)),
+            Task("强行索回", At(9, 10), "已完成", At(10, 12), At(10, 12), 1));
+        // 今天又做了修刃又发了板：算养护过
+        var both = Care(3, null, false, Task("安全检查", At(9, 10), "已完成", At(9, 10), At(9, 10, 1), 1),
+            Task("修刃", At(9, 10), "已完成", At(10, 9), At(10, 10), 1), Task("发板", At(9, 10), "已完成", At(10, 15), At(10, 15), 1));
+        var s = CareWorkloadRules.Compute(new[] { handOutStarted, forced, both }, Day, Asof);
+        Assert.Equal(1, s.worked);                         // 只有 3 号
+        Assert.Equal((1, 1), (s.pending, s.idlePending));  // 1 号还压着，而且今天没有养护操作
+        Assert.Equal(2, s.completed);                      // 2 号（强行索回）、3 号
     }
 
     [Fact]
