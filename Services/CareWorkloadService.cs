@@ -13,7 +13,7 @@ namespace SnowmeetApi.Services
     /// <summary>
     /// 日养护工作列表：从库里取出统计要用的装备，交给 CareWorkloadRules 算。
     /// 范围：已生效的养护装备（care.valid = 1、task_flow_code 有值）、订单有效、是养护订单、不是测试单；
-    /// 开单日期早于 2026-04-30 的老装备不统计（非雪季养护除外，见 CareWorkloadRules.IsConsidered）。
+    /// 开单日期早于 2026-04-30 的老装备和非雪季养护不统计（见 CareWorkloadRules.IsConsidered）。
     /// 只算「窗口开始前没完成」且「截止前已经进来」的装备（= 当时的待完成工作集 + 当天新增）。
     /// 取数方式见 ComputeByShopAsync：三条窄查询 + 内存里筛，库里那几千块一直没发板的老装备不会拖慢它。
     /// </summary>
@@ -36,13 +36,13 @@ namespace SnowmeetApi.Services
             // 不能一次把「装备 + 全部任务」读出来、再在 SQL 里用 EXISTS / NOT EXISTS 去筛：生产库里有七千多块
             // 「早就进来、一直没发板」的老装备，那样的相关子查询要扫任务表几千遍，一条查询占满一个核好几分钟。
             // 所以拆成三条窄查询，筛选放在内存里做：
-            //   ① 装备基本信息（不碰任务表）  ② 每件装备的进入 / 完成时刻（任务表扫一遍）  ③ 统计窗口内有过开始 / 结束的任务（很少）
+            //   ① 装备基本信息（不碰任务表）  ② 每件装备的进入 / 完成时刻（任务表扫一遍，CareWorkloadProgress 累加）  ③ 统计窗口内有过开始 / 结束的任务（很少）
             var careQuery = _db.care.Where(c => c.valid == 1 && c.task_flow_code != null
                 && c.order != null && c.order.valid == 1 && c.order.type == "养护" && c.order.is_test == 0);
             if (shopName != null) careQuery = careQuery.Where(c => c.order!.shop.Trim() == shopName);
-            // 老装备不统计：开单日期早于 2026-04-30 的不读（非雪季养护除外），库里四千多块没发板的老装备就不用进内存了
+            // 不统计的不读：开单日期早于 2026-04-30 的老装备、非雪季养护（规则见 CareWorkloadRules.IsConsidered，内存里还会再判一次）
             DateTime legacyCutoff = CareWorkloadRules.LegacyCutoff;
-            careQuery = careQuery.Where(c => c.order!.biz_date >= legacyCutoff || c.biz_type == CareWorkloadRules.SummerCareType);
+            careQuery = careQuery.Where(c => c.order!.biz_date >= legacyCutoff && c.biz_type != CareWorkloadRules.SummerCareType);
             var cares = await careQuery
                 .Select(c => new { c.id, shop = c.order!.shop, orderDate = c.order!.biz_date, c.biz_type, c.is_cancel, c.repair_memo })
                 .AsNoTracking().ToListAsync();
@@ -50,19 +50,11 @@ namespace SnowmeetApi.Services
             var taskRows = await _db.careTask.Where(t => t.valid == 1)
                 .Select(t => new { t.care_id, t.task_name, t.status, t.create_date, t.end_time, t.update_date })
                 .AsNoTracking().ToListAsync();
-            var times = new Dictionary<int, (DateTime entered, DateTime? finished)>();
+            var progress = new Dictionary<int, CareWorkloadProgress>();
             foreach (var t in taskRows)
             {
-                times.TryGetValue(t.care_id, out var cur);
-                DateTime entered = cur.entered == default || t.create_date < cur.entered ? t.create_date : cur.entered;
-                DateTime? finished = cur.finished;
-                if (CareWorkloadRules.IsFinishTaskName((t.task_name ?? "").Trim())
-                    && CareWorkloadRules.IsFinishedStatusName((t.status ?? "").Trim()))
-                {
-                    DateTime at = t.end_time ?? t.update_date ?? t.create_date;
-                    if (finished == null || at < finished) finished = at;
-                }
-                times[t.care_id] = (entered, finished);
+                if (!progress.TryGetValue(t.care_id, out CareWorkloadProgress? p)) progress[t.care_id] = p = new CareWorkloadProgress();
+                p.Add((t.task_name ?? "").Trim(), (t.status ?? "").Trim(), t.create_date, t.end_time, t.update_date);
             }
 
             var activeRows = await _db.careTask.Where(t => t.valid == 1
@@ -75,14 +67,15 @@ namespace SnowmeetApi.Services
             var inputs = new List<CareWorkloadInput>();
             foreach (var care in cares)
             {
-                if (!times.TryGetValue(care.id, out var time)) continue;                         // 还没生效（没有有效任务）
-                if (time.entered >= asOf) continue;                                              // 截止时刻之后才进来
-                DateTime? finished = time.finished == null ? null : (time.finished < time.entered ? time.entered : time.finished);
+                if (!progress.TryGetValue(care.id, out CareWorkloadProgress? p) || p.Entered == null) continue;   // 还没生效（没有有效任务）
+                DateTime entered = p.Entered.Value;
+                if (entered >= asOf) continue;                                                   // 截止时刻之后才进来
+                DateTime? finished = p.Finished;                                                 // 工序都做完只差发板，或已发板
                 if (finished != null && finished < start) continue;                              // 窗口开始前就已经完成的，和这天无关
                 inputs.Add(new CareWorkloadInput
                 {
                     careId = care.id, shop = (care.shop ?? "").Trim(), orderDate = care.orderDate, bizType = care.biz_type,
-                    entered = time.entered, finished = finished,
+                    entered = entered, finished = finished,
                     isCancel = care.is_cancel, repairMemo = care.repair_memo,
                     tasks = active[care.id].Select(t => new CareWorkloadTask
                     {

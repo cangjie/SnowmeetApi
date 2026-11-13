@@ -75,23 +75,49 @@ public class CareWorkloadServiceTests
     }
 
     [Fact]
-    public async Task BoardsOrderedBeforeApril30AreLeftOut_ExceptOffSeasonCare()
+    public async Task BoardsOrderedBeforeApril30AndOffSeasonCareAreLeftOut()
     {
         await using var f = await CoachFixture.Create();
-        void Old(DateTime orderDate, string? bizType)
+        void Other(DateTime orderDate, string? bizType)
         {
             var care = AddBoard(f, "万龙服务中心", At(9, 10));
             care.biz_type = bizType;
             f.Db.order.Local.Single(o => o.cares.Contains(care)).biz_date = orderDate;
         }
         AddBoard(f, "万龙服务中心", At(9, 10));                                  // 这个雪季的，压着：算
-        Old(new DateTime(2025, 5, 3), null);                                    // 去年批量导入的：不算
-        Old(new DateTime(2026, 4, 29), "");                                     // 4 月 29 日：不算
-        Old(new DateTime(2026, 4, 30), "");                                     // 4 月 30 日：算
-        Old(new DateTime(2025, 5, 3), "非雪季养护");                             // 老的非雪季养护：算
+        Other(new DateTime(2025, 5, 3), null);                                  // 去年批量导入的：不算
+        Other(new DateTime(2026, 4, 29), "");                                   // 4 月 29 日：不算
+        Other(new DateTime(2026, 4, 30), "");                                   // 4 月 30 日：算
+        Other(new DateTime(2026, 3, 8), "非雪季养护");                           // 春天收的非雪季养护：不算
+        Other(new DateTime(2026, 11, 8), "非雪季养护");                          // 这个雪季开的非雪季养护：也不算
         await f.Db.SaveChangesAsync();
         var s = await new CareWorkloadService(f.NewContext()).ComputeAsync(Day, NightNow, "万龙服务中心");
-        Assert.Equal((3, 0, 0, 3), (s.initialPending, s.added, s.completed, s.pending));
+        Assert.Equal((2, 0, 0, 2), (s.initialPending, s.added, s.completed, s.pending));
+    }
+
+    [Fact]
+    public async Task OnlyHandOutLeftCountsAsFinished_ReadFromTheDatabase()
+    {
+        await using var f = await CoachFixture.Create();
+        Care Workshop(DateTime entered, params CareTask[] services)
+        {
+            var care = AddBoard(f, "万龙服务中心", entered, null, 0, 1, "养护", "F", 1, false, services);
+            var safety = care.tasks.First(t => t.task_name == "安全检查");
+            safety.status = "已完成"; safety.start_time = entered; safety.end_time = entered.AddMinutes(1); safety.staff_id = 9;
+            return care;
+        }
+        Workshop(At(9, 10), Done("修刃", At(9, 10), At(10, 11), 9), Done("热蜡", At(9, 10), At(10, 14), 10));   // 今天做完，只差发板：完成
+        Workshop(At(9, 10), Done("修刃", At(9, 10), At(10, 11), 9),
+            new CareTask { task_name = "热蜡", create_date = At(9, 10) });                                       // 热蜡没做：压着
+        Workshop(At(9, 10), Done("修刃", At(9, 10), At(9, 15), 9));                                              // 昨天就做完了：今天不算
+        Workshop(At(10, 9), Done("修刃", At(10, 9), At(10, 10), 9));                                             // 今天收今天做完
+        await f.Db.SaveChangesAsync();
+        var service = new CareWorkloadService(f.NewContext());
+        var s = await service.ComputeAsync(Day, NightNow, "万龙服务中心");
+        Assert.Equal((2, 1, 2, 1), (s.initialPending, s.added, s.completed, s.pending));
+        Assert.Equal(3, s.process[CareWorkloadRules.Edge]);                   // 今天完成的修刃 3 条（昨天那条不算）
+        var noon = await service.ComputeAsync(Day, At(10, 12), "万龙服务中心");
+        Assert.Equal((2, 1, 1, 2), (noon.initialPending, noon.added, noon.completed, noon.pending));   // 12:00 时第一块的热蜡还没做完
     }
 
     [Fact]

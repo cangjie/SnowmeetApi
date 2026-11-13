@@ -11,8 +11,10 @@ namespace SnowmeetApi.Helpers
     ///
     /// 「一件雪板」= 一条 care。
     ///   进入工作清单的时刻 = 该装备有效任务里最早的 create_date（订单生效时一次性生成整条任务链）；
-    ///   完成的时刻 = 有效的「发板」/「强行索回」任务（状态已完成 / 强行中止）的 end_time。
-    ///   取消的装备走的也是这条发板任务（care.is_cancel），所以取消算「完成」，并单独标出取消了几块。
+    ///   完成的时刻 = 养护工序都做完、只差发板的那一刻（除「发板」/「强行索回」外的有效任务全部已完成 / 强行中止，
+    ///     取其中最晚的结束时间）——崔洋 2026-11-13：只差发板按完成算，顾客什么时候来取不影响工作量；
+    ///     工序没做完就发板了（取消、强行索回）的，按发板那一刻算完成。
+    ///   取消的装备走的也是发板任务（care.is_cancel），所以取消算「完成」，并单独标出取消了几块。
     ///
     /// 统计窗口 [D 00:00, asOf)：
     ///   ① 初始待完成 = D 00:00 时已经进来、还没完成的
@@ -25,23 +27,26 @@ namespace SnowmeetApi.Helpers
     ///
     /// 截止时刻：asOf = min(当前时刻, D 22:00)。过去的日子都按当天 22:00 截止，今天 22:00 前实时、22:00 后冻结。
     ///
-    /// 老装备不统计（崔洋 2026-11-13）：开单日期早于 LegacyCutoff（2026-04-30）的装备不参与任何统计，非雪季养护除外。
-    /// 库里有四千多块上个雪季及更早的装备一直没发板（其中 2025-05 一批是批量导入的），不排除的话「初始待完成」会是几千。
+    /// 不统计的装备（崔洋 2026-11-13）：
+    ///   · 开单日期早于 LegacyCutoff（2026-04-30）的：库里有四千多块上个雪季及更早的装备一直没发板
+    ///     （其中 2025-05 一批是批量导入的），不排除的话「初始待完成」会是几千；
+    ///   · 非雪季养护（寄存过夏、顾客回来取时才刮蜡发板）：一百多块长期压着，和当天的养护工作量无关，整类排除。
+    ///   这两类装备不进任何数字（进出、有无操作、工序数量都不算）。
     /// </summary>
     public static class CareWorkloadRules
     {
         /// <summary>营业截止时刻（小时）。22:00 以后的操作不计入任何一天。</summary>
         public const int CutoffHour = 22;
 
-        /// <summary>老装备分界：开单日期早于这一天的装备不统计（非雪季养护除外）。</summary>
+        /// <summary>老装备分界：开单日期早于这一天的装备不统计。</summary>
         public static readonly DateTime LegacyCutoff = new(2026, 4, 30);
 
-        /// <summary>非雪季养护（寄存过季、之后再取）的装备类型，不受老装备分界限制。</summary>
+        /// <summary>非雪季养护（寄存过季、之后再取）的装备类型：整类不统计。</summary>
         public const string SummerCareType = "非雪季养护";
 
-        /// <summary>这件装备要不要统计：开单日期不早于 2026-04-30，或者是非雪季养护。</summary>
+        /// <summary>这件装备要不要统计：开单日期不早于 2026-04-30，并且不是非雪季养护。</summary>
         public static bool IsConsidered(DateTime orderDate, string? bizType) =>
-            orderDate >= LegacyCutoff || (bizType ?? "").Trim() == SummerCareType;
+            orderDate >= LegacyCutoff && (bizType ?? "").Trim() != SummerCareType;
 
         // 工序的键（接口和快照里都用这些英文键，页面再映射成中文名）
         public const string Edge = "edge";               // 修刃
@@ -81,42 +86,22 @@ namespace SnowmeetApi.Helpers
         /// <summary>发板 / 强行索回的状态算不算「已结束」：已完成、强行中止。</summary>
         public static bool IsFinishedStatusName(string status) => status == "已完成" || status == "强行中止";
 
-        static bool IsFinishedStatus(CareTask task)
+        static CareWorkloadProgress ProgressOf(Care care)
         {
-            string status = (task.status ?? "").Trim();
-            return status == "已完成" || status == "强行中止";
-        }
-
-        /// <summary>装备进入工作清单的时刻；没有任何有效任务（订单还没生效）返回 null。</summary>
-        public static DateTime? EnteredAt(Care care)
-        {
-            DateTime? entered = null;
+            var progress = new CareWorkloadProgress();
             foreach (CareTask task in care.tasks ?? new List<CareTask>())
             {
                 if (!IsValid(task)) continue;
-                if (entered == null || task.create_date < entered) entered = task.create_date;
+                progress.Add(Name(task), (task.status ?? "").Trim(), task.create_date, task.end_time, task.update_date);
             }
-            return entered;
+            return progress;
         }
 
-        /// <summary>
-        /// 装备完成（发板 / 强行索回已完成或强行中止）的时刻；还没完成返回 null。
-        /// 取任务的 end_time，缺了退回 update_date、create_date；再不早于进入时刻，保证 ① + ② − ③ = ④。
-        /// </summary>
-        public static DateTime? FinishedAt(Care care)
-        {
-            DateTime? entered = EnteredAt(care);
-            if (entered == null) return null;
-            DateTime? finished = null;
-            foreach (CareTask task in care.tasks ?? new List<CareTask>())
-            {
-                if (!IsValid(task) || !IsFinishTask(task) || !IsFinishedStatus(task)) continue;
-                DateTime at = task.end_time ?? task.update_date ?? task.create_date;
-                if (finished == null || at < finished) finished = at;
-            }
-            if (finished == null) return null;
-            return finished < entered ? entered : finished;
-        }
+        /// <summary>装备进入工作清单的时刻；没有任何有效任务（订单还没生效）返回 null。</summary>
+        public static DateTime? EnteredAt(Care care) => ProgressOf(care).Entered;
+
+        /// <summary>装备完成的时刻（工序都做完只差发板，或已经发板 / 强行索回）；还没完成返回 null。算法见 CareWorkloadProgress。</summary>
+        public static DateTime? FinishedAt(Care care) => ProgressOf(care).Finished;
 
         /// <summary>
         /// 一条已完成任务算哪种工序；不计工作量的（安全检查、发板、寄存或快递……）返回 null。
@@ -241,18 +226,69 @@ namespace SnowmeetApi.Helpers
         }
     }
 
+    /// <summary>
+    /// 一件装备的进度累加器：把它的有效任务一条条喂进来，得到进入时刻和完成时刻。规则类（按 Care 算）和服务（按库里的任务行算）共用。
+    /// 完成时刻取下面两个里较早的一个，都没有就是还没完成：
+    ///   · 工序都做完、只差发板：除「发板」/「强行索回」外至少有一条有效任务，且全部已完成 / 强行中止，取其中最晚的结束时间；
+    ///   · 已经发板 / 强行索回（含取消）：该任务的结束时间。
+    /// 时间取 end_time，缺了退回 update_date、create_date；完成时刻不早于进入时刻，保证 ① + ② − ③ = ④。
+    /// </summary>
+    public sealed class CareWorkloadProgress
+    {
+        DateTime? _entered, _handedOut, _workDone;
+        int _serviceTasks, _openServiceTasks;
+
+        /// <param name="name">任务名（已去首尾空白）</param>
+        /// <param name="status">任务状态（已去首尾空白）</param>
+        public void Add(string name, string status, DateTime created, DateTime? end, DateTime? updated)
+        {
+            if (_entered == null || created < _entered) _entered = created;
+            bool done = CareWorkloadRules.IsFinishedStatusName(status);
+            DateTime at = end ?? updated ?? created;
+            if (CareWorkloadRules.IsFinishTaskName(name))
+            {
+                if (done && (_handedOut == null || at < _handedOut)) _handedOut = at;
+                return;
+            }
+            _serviceTasks++;
+            if (!done)
+            {
+                _openServiceTasks++;
+                return;
+            }
+            if (_workDone == null || at > _workDone) _workDone = at;
+        }
+
+        /// <summary>进入工作清单的时刻；一条任务都没有为 null。</summary>
+        public DateTime? Entered => _entered;
+
+        /// <summary>完成时刻；还没完成为 null。</summary>
+        public DateTime? Finished
+        {
+            get
+            {
+                if (_entered == null) return null;
+                DateTime? finished = _handedOut;
+                bool onlyHandOutLeft = _serviceTasks > 0 && _openServiceTasks == 0 && _workDone != null;
+                if (onlyHandOutLeft && (finished == null || _workDone < finished)) finished = _workDone;
+                if (finished == null) return null;
+                return finished < _entered ? _entered : finished;
+            }
+        }
+    }
+
     /// <summary>统计用的精简输入：一件装备（见 CareWorkloadRules.Compute）。</summary>
     public class CareWorkloadInput
     {
         public int careId { get; set; }
         public string shop { get; set; } = "";
-        /// <summary>开单日期（订单的 biz_date）；早于 CareWorkloadRules.LegacyCutoff 的不统计，非雪季养护除外</summary>
+        /// <summary>开单日期（订单的 biz_date）；早于 CareWorkloadRules.LegacyCutoff 的不统计</summary>
         public DateTime orderDate { get; set; }
-        /// <summary>care.biz_type；「非雪季养护」不受老装备分界限制</summary>
+        /// <summary>care.biz_type；「非雪季养护」整类不统计</summary>
         public string? bizType { get; set; }
         /// <summary>进入工作清单的时刻（最早的有效任务创建时间）；没有有效任务 = 订单还没生效，不统计</summary>
         public DateTime? entered { get; set; }
-        /// <summary>完成（发板 / 强行索回已结束）的时刻；还没完成为 null；不早于 entered</summary>
+        /// <summary>完成的时刻（工序都做完只差发板，或已发板 / 强行索回）；还没完成为 null；不早于 entered</summary>
         public DateTime? finished { get; set; }
         public bool isCancel { get; set; }
         public string? repairMemo { get; set; }
@@ -285,7 +321,7 @@ namespace SnowmeetApi.Helpers
         public int initialPending { get; set; }
         /// <summary>② 窗口内新增</summary>
         public int added { get; set; }
-        /// <summary>③ 窗口内完成（含取消）</summary>
+        /// <summary>③ 窗口内完成：工序都做完只差发板，或已发板（含取消）</summary>
         public int completed { get; set; }
         /// <summary>③ 里其中取消的</summary>
         public int completedCancelled { get; set; }

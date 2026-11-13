@@ -5,7 +5,8 @@ namespace SnowmeetApi.Tests;
 
 /// <summary>
 /// 日养护工作列表的统计规则（CareWorkloadRules，纯函数）：
-///   ① 初始待完成 + ② 新增 − ③ 完成 = ④ 待完成；过去的日子按当天 22:00 截止；取消算完成并标出；
+///   ① 初始待完成 + ② 新增 − ③ 完成 = ④ 待完成；过去的日子按当天 22:00 截止；工序都做完只差发板就算完成；取消算完成并标出；
+///   2026-04-30 前开单的老装备和非雪季养护不统计；
 ///   无操作的待完成、今日养护雪板数；工序数量按「已完成」的任务条数、按完成人拆分；补板底与维修互斥。
 /// </summary>
 public class CareWorkloadRulesTests
@@ -139,6 +140,104 @@ public class CareWorkloadRulesTests
         Assert.Equal((0, 1, 1, 0), (s.initialPending, s.added, s.completed, s.pending));
     }
 
+    // ───────────── 只差发板算完成 ─────────────
+
+    /// <summary>一块板：安全检查（已做）+ 若干工序 + 发板（没发）。</summary>
+    private static Care Workshop(int id, DateTime entered, params CareTask[] services)
+    {
+        var tasks = new List<CareTask> { Task("安全检查", entered, "已完成", entered, entered.AddMinutes(1), 1) };
+        tasks.AddRange(services);
+        tasks.Add(Task("发板", entered));
+        return Care(id, null, false, tasks.ToArray());
+    }
+
+    private static CareTask Service(string name, DateTime created, DateTime? end = null, string status = "已完成") =>
+        Task(name, created, end == null ? "未开始" : status, end?.AddMinutes(-10), end, end == null ? null : 1);
+
+    [Fact]
+    public void Finished_WhenEveryServiceTaskIsDoneAndOnlyHandOutIsLeft_AtTheLastServiceTask()
+    {
+        var cares = new[]
+        {
+            // 昨天收的，今天 11:00 修刃、14:00 热蜡做完，还没发板：今天完成（14:00）
+            Workshop(1, At(9, 10), Service("修刃", At(9, 10), At(10, 11)), Service("热蜡", At(9, 10), At(10, 14))),
+            // 昨天收的，修刃做完、热蜡没做：还压着
+            Workshop(2, At(9, 10), Service("修刃", At(9, 10), At(10, 11)), Service("热蜡", At(9, 10))),
+            // 今天收的，工序今天都做完：新增 + 完成
+            Workshop(3, At(10, 9), Service("修刃", At(10, 9), At(10, 10))),
+            // 昨天工序就都做完了，只差发板：昨天已经算完成，今天不在待完成里
+            Workshop(4, At(9, 10), Service("修刃", At(9, 10), At(9, 15))),
+        };
+        Assert.Equal(At(10, 14), CareWorkloadRules.FinishedAt(cares[0]));
+        Assert.Null(CareWorkloadRules.FinishedAt(cares[1]));
+        Assert.Equal(At(9, 15), CareWorkloadRules.FinishedAt(cares[3]));
+        var s = CareWorkloadRules.Compute(cares, Day, Asof);
+        Assert.Equal((2, 1, 2, 1), (s.initialPending, s.added, s.completed, s.pending));
+        Assert.Equal(s.pending, s.initialPending + s.added - s.completed);
+        // 今天 12:00 看：1 号板的热蜡还没做完，仍在待完成
+        var noon = CareWorkloadRules.Compute(cares, Day, CareWorkloadRules.AsOf(Day, At(10, 12)));
+        Assert.Equal((2, 1, 1, 2), (noon.initialPending, noon.added, noon.completed, noon.pending));
+    }
+
+    [Fact]
+    public void Finished_HandingOutLaterDoesNotCountASecondTime()
+    {
+        // 昨天 15:00 工序做完，今天 10:00 顾客取走：完成算在昨天，今天既不是初始待完成也不算完成
+        var board = Workshop(1, At(9, 10), Service("修刃", At(9, 10), At(9, 15)));
+        var handOut = board.tasks.Last();
+        handOut.status = "已完成"; handOut.start_time = At(10, 10); handOut.end_time = At(10, 10); handOut.staff_id = 1;
+        Assert.Equal(At(9, 15), CareWorkloadRules.FinishedAt(board));
+        var today = CareWorkloadRules.Compute(new[] { board }, Day, Asof);
+        Assert.Equal((0, 0, 0, 0), (today.initialPending, today.added, today.completed, today.pending));
+        Assert.Equal(1, today.worked);                       // 今天发板也是一次操作
+        var yesterday = CareWorkloadRules.Compute(new[] { board }, Day.AddDays(-1), CareWorkloadRules.AsOf(Day.AddDays(-1), At(10, 23)));
+        Assert.Equal((0, 1, 1, 0), (yesterday.initialPending, yesterday.added, yesterday.completed, yesterday.pending));
+    }
+
+    [Fact]
+    public void Finished_TerminatedServiceTasksCountAsDone_ButAnOpenSafetyCheckKeepsTheBoardPending()
+    {
+        // 热蜡强行中止也算做完了
+        var terminated = Workshop(1, At(9, 10), Service("修刃", At(9, 10), At(10, 11)), Service("热蜡", At(9, 10), At(10, 12), "强行中止"));
+        Assert.Equal(At(10, 12), CareWorkloadRules.FinishedAt(terminated));
+        // 安全检查也是一道工序：没做就不算只差发板
+        var noSafety = Care(2, null, false, Task("安全检查", At(9, 10)), Service("修刃", At(9, 10), At(10, 11)), Task("发板", At(9, 10)));
+        Assert.Null(CareWorkloadRules.FinishedAt(noSafety));
+        // 除了发板没有任何工序的装备：要等发板才算完成
+        var onlyHandOut = Care(3, null, false, Task("发板", At(9, 10)));
+        Assert.Null(CareWorkloadRules.FinishedAt(onlyHandOut));
+        var s = CareWorkloadRules.Compute(new[] { terminated, noSafety, onlyHandOut }, Day, Asof);
+        Assert.Equal((3, 0, 1, 2), (s.initialPending, s.added, s.completed, s.pending));
+    }
+
+    [Fact]
+    public void Finished_HandedOutBeforeTheWorkWasDone_CountsAtTheHandOut()
+    {
+        // 取消：工序没做完，发板任务在取消时被记成已完成
+        var cancelled = Workshop(1, At(9, 10), Service("修刃", At(9, 10)));
+        cancelled.is_cancel = true;
+        var handOut = cancelled.tasks.Last();
+        handOut.status = "已完成"; handOut.end_time = At(10, 10);
+        Assert.Equal(At(10, 10), CareWorkloadRules.FinishedAt(cancelled));
+        var s = CareWorkloadRules.Compute(new[] { cancelled }, Day, Asof);
+        Assert.Equal((1, 0, 1, 0, 1), (s.initialPending, s.added, s.completed, s.pending, s.completedCancelled));
+    }
+
+    [Fact]
+    public void Progress_AccumulatorGivesTheSameAnswerInAnyTaskOrder()
+    {
+        var p = new CareWorkloadProgress();
+        p.Add("发板", "未开始", At(9, 10), null, null);
+        p.Add("热蜡", "已完成", At(9, 10), At(10, 14), null);
+        p.Add("修刃", "已完成", At(9, 10), At(10, 11), null);
+        p.Add("安全检查", "已完成", At(9, 10), null, At(9, 10, 5));     // 没有结束时间：退回更新时间
+        Assert.Equal(At(9, 10), p.Entered);
+        Assert.Equal(At(10, 14), p.Finished);
+        var empty = new CareWorkloadProgress();
+        Assert.Null(empty.Entered);
+        Assert.Null(empty.Finished);
+    }
+
     // ───────────── 有操作 / 无操作 ─────────────
 
     [Fact]
@@ -270,27 +369,31 @@ public class CareWorkloadRulesTests
     }
 
     [Fact]
-    public void Legacy_BoardsOrderedBeforeApril30AreIgnored_ExceptOffSeasonCare()
+    public void Legacy_BoardsOrderedBeforeApril30AndOffSeasonCareAreIgnored()
     {
         Assert.Equal(new DateTime(2026, 4, 30), CareWorkloadRules.LegacyCutoff);
         Assert.False(CareWorkloadRules.IsConsidered(new DateTime(2026, 4, 29, 23, 59, 59), null));
         Assert.True(CareWorkloadRules.IsConsidered(new DateTime(2026, 4, 30), null));          // 4 月 30 日当天起算
         Assert.True(CareWorkloadRules.IsConsidered(new DateTime(2026, 11, 1), ""));
-        Assert.True(CareWorkloadRules.IsConsidered(new DateTime(2025, 5, 3), "非雪季养护"));      // 非雪季养护不受分界限制
-        Assert.True(CareWorkloadRules.IsConsidered(new DateTime(2025, 5, 3), " 非雪季养护 "));
+        Assert.True(CareWorkloadRules.IsConsidered(new DateTime(2026, 11, 1), "雪季养护"));
         Assert.False(CareWorkloadRules.IsConsidered(new DateTime(2025, 5, 3), "雪季养护"));
+        // 非雪季养护整类不统计：不管是哪天开的单
+        Assert.False(CareWorkloadRules.IsConsidered(new DateTime(2025, 5, 3), "非雪季养护"));
+        Assert.False(CareWorkloadRules.IsConsidered(new DateTime(2026, 7, 20), "非雪季养护"));
+        Assert.False(CareWorkloadRules.IsConsidered(new DateTime(2026, 11, 1), " 非雪季养护 "));
 
         var cares = new[]
         {
             OldBoard(new DateTime(2025, 5, 3)),                              // 去年批量导入的：不算
             OldBoard(new DateTime(2026, 4, 29)),                             // 4 月 29 日开的单：不算
             OldBoard(new DateTime(2026, 4, 30)),                             // 4 月 30 日：算（压着）
-            OldBoard(new DateTime(2025, 5, 3), "非雪季养护"),                  // 老的非雪季养护：算（压着）
-            OldBoard(new DateTime(2026, 11, 8)),                             // 这个雪季的：算（压着）
+            OldBoard(new DateTime(2026, 3, 8), "非雪季养护"),                  // 春天收的非雪季养护：不算
+            OldBoard(new DateTime(2026, 11, 8), "非雪季养护"),                 // 这个雪季开的非雪季养护：也不算
+            OldBoard(new DateTime(2026, 11, 8)),                             // 这个雪季的普通养护：算（压着）
         };
         var s = CareWorkloadRules.Compute(cares, Day, Asof);
-        Assert.Equal((3, 0, 0, 3), (s.initialPending, s.added, s.completed, s.pending));
-        Assert.Equal(3, s.idlePending);
+        Assert.Equal((2, 0, 0, 2), (s.initialPending, s.added, s.completed, s.pending));
+        Assert.Equal(2, s.idlePending);
     }
 
     [Fact]
