@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.Sqlite;
@@ -13,7 +14,7 @@ namespace SnowmeetApi.Tests
     /// <summary>
     /// 万龙自我游（供应商）订单回调 POST core/WanlongZiwoyouHelper/CallBack。
     /// 以前只返回 200，收到什么都不留；现在把原文和时间记进 web_api_log，事后能对上「哪一条通知是哪张票什么状态」。
-    /// 返回给供应商的响应保持不变：200、空正文，记录失败也不能改变它（否则供应商会当成失败反复重发）。
+    /// 按供应商协议返回 HTTP 200 和 state=1 的 JSON，记录失败时仍保持原有的成功应答行为。
     /// </summary>
     public class ZiwoyouCallbackTests
     {
@@ -26,7 +27,7 @@ namespace SnowmeetApi.Tests
             await using var db = f.NewContext();
             string body = "{\"orderId\":1223005729,\"orderState\":4,\"other\":\"x\"}";
             var result = await f.Controller(db, body).CallBack();
-            Assert.IsType<OkResult>(result);
+            AssertSuccessResponse(result);
 
             var rows = await db.webApiLog.ToListAsync();
             var row = Assert.Single(rows);
@@ -95,7 +96,7 @@ namespace SnowmeetApi.Tests
             await using var f = await Fixture.Create();
             await using var db = f.NewContext();
             var result = await f.Controller(db, "").CallBack();
-            Assert.IsType<OkResult>(result);
+            AssertSuccessResponse(result);
             var row = await db.webApiLog.SingleAsync();
             Assert.Equal("", row.payload);
         }
@@ -148,7 +149,16 @@ namespace SnowmeetApi.Tests
             await using var db = f.NewContext();
             await f.CloseConnection();            // 库连接断了，SaveChanges 会抛异常
             var result = await f.Controller(db, "{\"orderId\":1}").CallBack();
-            Assert.IsType<OkResult>(result);
+            AssertSuccessResponse(result);
+        }
+
+        private static void AssertSuccessResponse(ActionResult result)
+        {
+            var ok = Assert.IsType<OkObjectResult>(result);
+            Assert.Equal(200, ok.StatusCode);
+            using var json = JsonDocument.Parse(JsonSerializer.Serialize(ok.Value));
+            Assert.Equal(1, json.RootElement.GetProperty("state").GetInt32());
+            Assert.Equal("", json.RootElement.GetProperty("msg").GetString());
         }
 
         private sealed class Fixture : IAsyncDisposable
