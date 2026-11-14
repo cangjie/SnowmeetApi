@@ -4214,13 +4214,16 @@ namespace SnowmeetApi.Controllers
             // member_id / staff_id 是独立标量列，置空导航对象不影响归属。与下面 details / category 同属防级联清理。
             order.member = null;
             order.staff = null;
+            // 保证金记录只由 PlaceRentOrder 生成，草稿保存不接收、也不改写它。「去结算」后小程序把订单脱钩成
+            // id=0 的新单，却会带着刚生成的保证金记录：新单分支 AddAsync 会把它们按已有 id 插入
+            // （SQL 544 / 同 id 重复跟踪，页面只看到 500，2026-11-12 生产实录）；更新分支 Update 则会把前端值写回。
+            // 这条记录同时挂在两处：订单级 order.guarantys（Guaranty.order_id）和租赁级 rental.guaranties（biz_id），
+            // 两处都要清（11-13 只清了租赁级，11-14 杨天帅又 500 一次）。
+            // 用空列表而不是 null：Order / Rental 的汇总属性直接 foreach 这两个集合。
+            order.guarantys = new List<Guaranty>();
             for (int i = 0; i < order.rentals.Count; i++)
             {
                 order.rentals[i].details = null;
-                // 保证金记录只由 PlaceRentOrder 生成，草稿保存不接收、也不改写它。「去结算」后小程序把订单脱钩成
-                // id=0 的新单，却会带着刚生成的 guaranties：新单分支 AddAsync 会把它们按已有 id 插入
-                // （SQL 544 / 同 id 重复跟踪，页面只看到 500，2026-11-12 生产实录）；更新分支 Update 则会把前端值写回。
-                // 用空列表而不是 null：Rental.totalGuarantyAmount 直接 foreach(guaranties)。
                 order.rentals[i].guaranties = new List<Guaranty>();
                 for (int j = 0; j < order.rentals[i].rentItems.Count; j++)
                 {

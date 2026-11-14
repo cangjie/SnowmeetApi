@@ -62,6 +62,35 @@ public class SaveRentReceptGuarantyTests
         Assert.Empty(await f.Db.guaranty.AsNoTracking().ToListAsync());
     }
 
+    // 2026-11-14 生产实录（e0f9804a 部署后仍 500）：PlaceRentOrder 新增的保证金记录同时挂到订单级 order.guarantys
+    // （Guaranty.order_id）和租赁级 rental.guaranties（biz_id），小程序脱钩时两处都带着，只清租赁级还不够。
+    [Fact]
+    public async Task OrderLevelGuarantyCarriedOverAfterCheckoutIsIgnoredToo()
+    {
+        await using var f = await CoachFixture.Create(withPricing: false);
+        var order = ReceptOrder(new Rental { name = "中级双板套餐", guaranty = 3000 });
+        order.guarantys = new List<Guaranty> { Stale() };
+
+        var saved = Data(await new RentController(f.NewContext(), f.Config, Http()).SaveRentRecept(order, "session-1"));
+
+        Assert.True(saved!.id > 0);
+        Assert.Empty(await f.Db.guaranty.AsNoTracking().ToListAsync());
+        Assert.Empty(saved.guarantys);
+    }
+
+    [Fact]
+    public async Task SameGuarantyInBothTheOrderAndTheRentalNoLongerBreaksTheSave()
+    {
+        await using var f = await CoachFixture.Create(withPricing: false);
+        var order = ReceptOrder(new Rental { name = "中级双板套餐", guaranty = 3000, guaranties = new List<Guaranty> { Stale() } });
+        order.guarantys = new List<Guaranty> { Stale() };
+
+        var saved = Data(await new RentController(f.NewContext(), f.Config, Http()).SaveRentRecept(order, "session-1"));
+
+        Assert.True(saved!.id > 0);
+        Assert.Empty(await f.Db.guaranty.AsNoTracking().ToListAsync());
+    }
+
     [Fact]
     public async Task SavingAnExistingOrderNeverRewritesGuarantyRows()
     {
