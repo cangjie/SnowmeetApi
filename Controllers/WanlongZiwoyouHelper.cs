@@ -802,15 +802,10 @@ namespace SnowmeetApi.Controllers
             var l = await _context.ziwoyouOrder
             .Include(z => z.skipasses)
                 .ThenInclude(s => s.order)
-                    .ThenInclude(o => o.availablePayments.Where(p => p.status.Equals("支付成功")))
-                        .ThenInclude(p => p.refunds.Where(r => (r.state == 1 || r.refund_id.Trim().Equals(""))))
-            .Include(z => z.skipasses)
-                .ThenInclude(s => s.order)
-                    .ThenInclude(o => o.availablePayments.Where(p => p.status.Equals("支付成功")))
-                        //.ThenInclude(p => p.shares)
-                        //    .ThenInclude(s => s.kol)
-
-
+                    // availablePayments 是计算属性，EF 只能 Include 映射的 payments 导航。
+                    .ThenInclude(o => o.payments.Where(p => p.status == "支付成功"))
+                        .ThenInclude(p => p.refunds.Where(r => r.state == 1
+                            || (r.refund_id != null && r.refund_id.Trim() != "")))
             .Where(z => (z.orderDate.Date >= start.Date && z.orderDate.Date <= end.Date))
             .ToListAsync();
             return Ok(l.OrderByDescending(l => l.orderDate).ToList());

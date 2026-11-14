@@ -109,6 +109,30 @@ public class SkipassBillTests
         Assert.IsType<UnauthorizedResult>((await controller.GetSupplierOrderBills(Day, Day, sessionKey: "customer")).Result);
     }
 
+    [Fact]
+    public async Task Old_cached_report_preserves_its_shape_and_loads_payments_without_including_computed_properties()
+    {
+        await using var f = await Fixture.Create();
+        f.Db.order.Add(new Order { id = 10, type = "雪票", valid = 1 });
+        f.Db.skiPassProduct.Add(new SkiPassProduct { product_id = 20, source = "大好河山" });
+        f.Db.ziwoyouOrder.Add(Row("A"));
+        f.Db.skiPass.Add(Pass(1, "A", 100));
+        f.Db.orderPayment.AddRange(new OrderPayment { id = 30, order_id = 10, pay_method = "微信支付", amount = 100, status = "支付成功" },
+            new OrderPayment { id = 31, order_id = 10, amount = 999, status = "待支付" });
+        f.Db.Set<OrderPaymentRefund>().AddRange(
+            new OrderPaymentRefund { id = 40, order_id = 10, payment_id = 30, amount = 40, state = 1 },
+            new OrderPaymentRefund { id = 41, order_id = 10, payment_id = 30, amount = 20, refund_id = "accepted" },
+            new OrderPaymentRefund { id = 42, order_id = 10, payment_id = 30, amount = 900, state = 0 });
+        await f.Db.SaveChangesAsync(); f.Db.ChangeTracker.Clear();
+        var config = new ConfigurationBuilder().AddInMemoryCollection(
+            new Dictionary<string, string?> { ["Settings:AppId"] = "local-test" }).Build();
+        var response = await new WanlongZiwoyouHelper(f.Db, config).GetOrderBills(Day, Day);
+        var rows = Assert.IsType<List<ZiwoyouListOrder>>(Assert.IsType<OkObjectResult>(response.Result).Value);
+        var order = Assert.Single(Assert.Single(rows).skipasses).order!;
+        Assert.Equal(100, order.paidAmount); Assert.Equal(60, order.refundAmount);
+        Assert.Single(order.availablePayments); Assert.Equal(2, order.availableRefunds!.Count);
+    }
+
     static SkipassBillService Service(ApplicationDBContext db, params ZiwoyouListOrder[] rows)
         => new(db, (_, _, _, _) => Task.FromResult(new SupplierBillPage(1, rows)));
     static ZiwoyouListOrder Row(string id, DateTime? date = null) => new()
