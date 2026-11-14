@@ -133,6 +133,31 @@ public class SkipassBillTests
         Assert.Single(order.availablePayments); Assert.Equal(2, order.availableRefunds!.Count);
     }
 
+    // 生产库 snowmeet_new 里没有旧缓存表 ziwoyou_order（SQL Server 错误 208）；仍打开着旧后台页的人调 GetOrderBills 不该再看到 500。
+    [Fact]
+    public async Task Old_cached_report_returns_an_empty_list_when_the_cache_table_does_not_exist()
+    {
+        await using var f = await Fixture.Create();
+        await f.Db.Database.ExecuteSqlRawAsync("DROP TABLE ziwoyou_order");
+        var config = new ConfigurationBuilder().AddInMemoryCollection(
+            new Dictionary<string, string?> { ["Settings:AppId"] = "local-test" }).Build();
+        var response = await new WanlongZiwoyouHelper(f.Db, config).GetOrderBills(Day, Day);
+        var rows = Assert.IsType<List<ZiwoyouListOrder>>(Assert.IsType<OkObjectResult>(response.Result).Value);
+        Assert.Empty(rows);
+    }
+
+    // 只接「表不存在」这一种错误；别的错误（连接断了、权限、超时…）照常抛出，不能被悄悄吞成空列表。
+    [Fact]
+    public async Task Old_cached_report_still_fails_for_errors_other_than_a_missing_table()
+    {
+        await using var f = await Fixture.Create();
+        var config = new ConfigurationBuilder().AddInMemoryCollection(
+            new Dictionary<string, string?> { ["Settings:AppId"] = "local-test" }).Build();
+        var helper = new WanlongZiwoyouHelper(f.Db, config);
+        await f.Db.DisposeAsync();
+        await Assert.ThrowsAnyAsync<Exception>(() => helper.GetOrderBills(Day, Day));
+    }
+
     static SkipassBillService Service(ApplicationDBContext db, params ZiwoyouListOrder[] rows)
         => new(db, (_, _, _, _) => Task.FromResult(new SupplierBillPage(1, rows)));
     static ZiwoyouListOrder Row(string id, DateTime? date = null) => new()

@@ -799,16 +799,38 @@ namespace SnowmeetApi.Controllers
         [HttpGet]
         public async Task<ActionResult<List<ZiwoyouListOrder>>> GetOrderBills(DateTime start, DateTime end)
         {
-            var l = await _context.ziwoyouOrder
-            .Include(z => z.skipasses)
-                .ThenInclude(s => s.order)
-                    // availablePayments 是计算属性，EF 只能 Include 映射的 payments 导航。
-                    .ThenInclude(o => o.payments.Where(p => p.status == "支付成功"))
-                        .ThenInclude(p => p.refunds.Where(r => r.state == 1
-                            || (r.refund_id != null && r.refund_id.Trim() != "")))
-            .Where(z => (z.orderDate.Date >= start.Date && z.orderDate.Date <= end.Date))
-            .ToListAsync();
-            return Ok(l.OrderByDescending(l => l.orderDate).ToList());
+            try
+            {
+                var l = await _context.ziwoyouOrder
+                .Include(z => z.skipasses)
+                    .ThenInclude(s => s.order)
+                        // availablePayments 是计算属性，EF 只能 Include 映射的 payments 导航。
+                        .ThenInclude(o => o.payments.Where(p => p.status == "支付成功"))
+                            .ThenInclude(p => p.refunds.Where(r => r.state == 1
+                                || (r.refund_id != null && r.refund_id.Trim() != "")))
+                .Where(z => (z.orderDate.Date >= start.Date && z.orderDate.Date <= end.Date))
+                .ToListAsync();
+                return Ok(l.OrderByDescending(l => l.orderDate).ToList());
+            }
+            catch (Exception err) when (IsMissingTable(err))
+            {
+                // 旧缓存表 ziwoyou_order 在生产库 snowmeet_new 里不存在（SQL Server 错误 208），仍打开着旧后台页
+                // （background/skipass/dhhs_list.html）的人调到这里原来每次 500。新页面走 GetSupplierOrderBills，不读这张表。
+                // 只接「表不存在」这一种错误，别的错误照常抛出。
+                Console.WriteLine("[雪票对账] 旧缓存表不存在，GetOrderBills 返回空列表：" + err.GetType().Name);
+                return Ok(new List<ZiwoyouListOrder>());
+            }
+        }
+
+        // 「对象/表不存在」：SQL Server 错误 208（Invalid object name），测试用的 SQLite 是 "no such table"。顺着内层异常找。
+        private static bool IsMissingTable(Exception? err)
+        {
+            for (var e = err; e != null; e = e.InnerException)
+            {
+                if (e is Microsoft.Data.SqlClient.SqlException sql && sql.Number == 208) return true;
+                if (e.GetType().Name == "SqliteException" && e.Message.Contains("no such table", StringComparison.OrdinalIgnoreCase)) return true;
+            }
+            return false;
         }
         [HttpGet]
         public async Task ExportOrderBills()
