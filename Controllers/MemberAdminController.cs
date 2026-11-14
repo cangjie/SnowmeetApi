@@ -185,12 +185,8 @@ namespace SnowmeetApi.Controllers
                 contactCells = msaAll.Where(a => a.type == "contact").Select(a => a.num).ToList()
             };
 
-            // 最近订单（轻量直查，避免 GetCommonOrders 重 include）
-            var recentOrders = await _db.order
-                .Where(o => o.member_id == memberId && o.valid == 1)
-                .OrderByDescending(o => o.id).Take(30)
-                .Select(o => new { id = o.id, code = o.code, type = o.type, bizDate = o.biz_date })
-                .AsNoTracking().ToListAsync();
+            // 最近订单（轻量直查，避免 GetCommonOrders 重 include）：每单带订单金额 / 减免 / 实付和用了哪些券、卡（2026-11-14）
+            var recentOrders = await new SnowmeetApi.Services.MemberRecentOrderService(_db).GetAsync(memberId, 30);
 
             // 名下次卡（已退款的卡一并列出，带 is_refund 供前端标灰——不能让它凭空消失，
             // 店员查会员时需要能看到"这张卡退过款"）
