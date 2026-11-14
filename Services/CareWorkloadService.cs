@@ -26,6 +26,12 @@ namespace SnowmeetApi.Services
             _db = db;
         }
 
+        /// <summary>shop 参数：null / 空白 = 全部门店；一个店名；或逗号分隔的多个店名（联合查询，见 ShopFilter）。</summary>
+        private static List<string>? ParseShops(string? shop) => string.IsNullOrWhiteSpace(shop) ? null : ShopFilter.Parse(shop);
+
+        /// <summary>回显给页面的门店：单店就是店名，多店用逗号连起来，全部门店是 null。</summary>
+        private static string? ShopLabel(List<string>? shops) => shops == null ? null : string.Join(",", shops);
+
         /// <summary>某天各门店的统计（门店名 → 统计）；shop 不为空时只算这一家。</summary>
         public async Task<Dictionary<string, CareWorkloadStat>> ComputeByShopAsync(DateTime day, DateTime now, string? shop = null)
         {
@@ -46,7 +52,7 @@ namespace SnowmeetApi.Services
         private async Task<List<CareWorkloadInput>> LoadInputsAsync(DateTime day, DateTime asOf, string? shop)
         {
             DateTime start = day.Date;
-            string? shopName = string.IsNullOrWhiteSpace(shop) ? null : shop.Trim();
+            List<string>? shops = ParseShops(shop);
 
             // 不能一次把「装备 + 全部任务」读出来、再在 SQL 里用 EXISTS / NOT EXISTS 去筛：生产库里有七千多块
             // 「早就进来、一直没发板」的老装备，那样的相关子查询要扫任务表几千遍，一条查询占满一个核好几分钟。
@@ -54,7 +60,7 @@ namespace SnowmeetApi.Services
             //   ① 装备基本信息（不碰任务表）  ② 每件装备的进入 / 完成时刻（任务表扫一遍，CareWorkloadProgress 累加）  ③ 统计窗口内有过开始 / 结束的任务（很少）
             var careQuery = _db.care.Where(c => c.valid == 1 && c.task_flow_code != null
                 && c.order != null && c.order.valid == 1 && c.order.type == "养护" && c.order.is_test == 0);
-            if (shopName != null) careQuery = careQuery.Where(c => c.order!.shop.Trim() == shopName);
+            if (shops != null) careQuery = careQuery.Where(c => shops.Contains(c.order!.shop.Trim()));
             // 不统计的不读：开单日期早于 2026-04-30 的老装备、非雪季养护（规则见 CareWorkloadRules.IsConsidered，内存里还会再判一次）
             DateTime legacyCutoff = CareWorkloadRules.LegacyCutoff;
             careQuery = careQuery.Where(c => c.order!.biz_date >= legacyCutoff && c.biz_type != CareWorkloadRules.SummerCareType);
@@ -110,7 +116,7 @@ namespace SnowmeetApi.Services
         public async Task<CareWorkloadItems> GetItemsAsync(DateTime day, DateTime now, string? shop, string metric, int? staffId = null)
         {
             DateTime asOf = CareWorkloadRules.AsOf(day, now);
-            string? shopName = string.IsNullOrWhiteSpace(shop) ? null : shop.Trim();
+            string? shopName = ShopLabel(ParseShops(shop));
             bool isProcess = CareWorkloadRules.Processes.Contains(metric);
             List<CareWorkloadInput> inputs = await LoadInputsAsync(day, asOf, shopName);
             List<CareWorkloadMatch> matches = CareWorkloadRules.Select(inputs, day, asOf, metric, isProcess ? staffId : null);
@@ -181,7 +187,7 @@ namespace SnowmeetApi.Services
         public async Task<CareWorkloadStat> ComputeAsync(DateTime day, DateTime now, string? shop = null)
         {
             DateTime asOf = CareWorkloadRules.AsOf(day, now);
-            string? shopName = string.IsNullOrWhiteSpace(shop) ? null : shop.Trim();
+            string? shopName = ShopLabel(ParseShops(shop));
             Dictionary<string, CareWorkloadStat> byShop = await ComputeByShopAsync(day, now, shopName);
             CareWorkloadStat stat = shopName != null && byShop.TryGetValue(shopName, out CareWorkloadStat? one)
                 ? one
@@ -223,20 +229,29 @@ namespace SnowmeetApi.Services
         public async Task<CareWorkloadStat?> GetSnapshotAsync(DateTime day, string? shop = null)
         {
             DateTime date = day.Date;
-            string? shopName = string.IsNullOrWhiteSpace(shop) ? null : shop.Trim();
+            List<string>? shops = ParseShops(shop);
+            string? shopName = ShopLabel(shops);
             List<CareDailyWorkload> rows = await _db.careDailyWorkload.AsNoTracking().Where(r => r.stat_date == date).ToListAsync();
             if (rows.Count == 0) return null;
             DateTime asOf = rows.Max(r => r.as_of);
             DateTime savedAt = rows.Max(r => r.create_date);
             CareWorkloadStat stat;
-            if (shopName == null)
+            if (shops == null)
             {
                 stat = CareWorkloadRules.Merge(rows.Select(ToStat), day, asOf);
             }
+            else if (shops.Count == 1)
+            {
+                CareDailyWorkload? row = rows.FirstOrDefault(r => r.shop == shops[0]);
+                stat = row != null ? ToStat(row) : new CareWorkloadStat { date = date.ToString("yyyy-MM-dd"), asOf = asOf };
+            }
             else
             {
-                CareDailyWorkload? row = rows.FirstOrDefault(r => r.shop == shopName);
-                stat = row != null ? ToStat(row) : new CareWorkloadStat { date = date.ToString("yyyy-MM-dd"), asOf = asOf };
+                // 多个门店：只把这几家的行相加（人员合并）；这几家那天都没有行 = 全 0
+                List<CareDailyWorkload> picked = rows.Where(r => shops.Contains(r.shop)).ToList();
+                stat = picked.Count > 0
+                    ? CareWorkloadRules.Merge(picked.Select(ToStat), day, asOf)
+                    : new CareWorkloadStat { date = date.ToString("yyyy-MM-dd"), asOf = asOf };
             }
             stat.shop = shopName;
             stat.source = "snapshot";

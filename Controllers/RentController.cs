@@ -8260,7 +8260,10 @@ namespace SnowmeetApi.Controllers
             {
                 shop = Util.UrlDecode(shop);
             }
-            List<Models.RentItem> list = (await GetUnReturnedRentItems()).Where(l => (l.rental.order.shop == shop || shop == null)).ToList();
+            // shop 可以是逗号分隔的多个店名（联合查询）；单个店名或不带时和以前一样
+            var (allShops, shopList) = SnowmeetApi.Helpers.ShopFilter.ForQuery(shop);
+            List<Models.RentItem> list = (await GetUnReturnedRentItems())
+                .Where(l => allShops || shopList.Contains((l.rental.order.shop ?? "").Trim())).ToList();
             var g = list.GroupBy(r => r.category_id).Select(g => new { category_id = g.Key, items = g.ToList() }).OrderByDescending(g => g.items.Count).ToList();
             List<CategoryRentItem> finalList = new List<CategoryRentItem>();
             for (int i = 0; i < g.Count; i++)

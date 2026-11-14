@@ -1844,6 +1844,8 @@ namespace SnowmeetApi.Controllers
         {
             sessionKey = Util.UrlDecode(sessionKey);
             shop = shop == null ? null : Util.UrlDecode(shop);
+            // shop 可以是逗号分隔的多个店名（联合查询）；单个店名或不带时和以前一样
+            var (allShops, shopList) = SnowmeetApi.Helpers.ShopFilter.ForQuery(shop);
             equipment = equipment == null ? null : Util.UrlDecode(equipment);
             brand = brand == null ? null : Util.UrlDecode(brand);
             cell = cell == null ? null : Util.UrlDecode(cell);
@@ -1857,7 +1859,7 @@ namespace SnowmeetApi.Controllers
             List<Care> candidates = await _db.care
                 .Where(c => c.valid == 1 && c.task_flow_code != null
                     && c.order.valid == 1 && c.order.type == "养护"
-                    && (shop == null || c.order.shop.Trim().Equals(shop.Trim()))
+                    && (allShops || shopList.Contains(c.order.shop.Trim()))
                     && (equipment == null || c.equipment.Trim().Equals(equipment.Trim()))
                     && (brand == null || (c.brand != null && c.brand.Contains(brand)))
                     && (cell == null ||
@@ -1911,6 +1913,8 @@ namespace SnowmeetApi.Controllers
         {
             sessionKey = Util.UrlDecode(sessionKey);
             shop = shop == null ? null : Util.UrlDecode(shop);
+            // shop 可以是逗号分隔的多个店名（联合查询）；单个店名或不带时和以前一样
+            var (allShops, shopList) = SnowmeetApi.Helpers.ShopFilter.ForQuery(shop);
             equipment = equipment == null ? null : Util.UrlDecode(equipment);
             brand = brand == null ? null : Util.UrlDecode(brand);
             cell = cell == null ? null : Util.UrlDecode(cell);
@@ -1924,7 +1928,7 @@ namespace SnowmeetApi.Controllers
             List<Care> candidates = await _db.care
                 .Where(c => c.valid == 1 && c.task_flow_code != null && c.is_cancel != true
                     && c.order.valid == 1 && c.order.type == "养护"
-                    && (shop == null || c.order.shop.Trim().Equals(shop.Trim()))
+                    && (allShops || shopList.Contains(c.order.shop.Trim()))
                     && (equipment == null || c.equipment != null && c.equipment.Trim().Equals(equipment.Trim()))
                     && (brand == null || (c.brand != null && c.brand.Contains(brand)))
                     && (startDate == null || c.create_date.Date >= ((DateTime)startDate).Date)

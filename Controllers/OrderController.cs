@@ -179,6 +179,8 @@ namespace SnowmeetApi.Controllers
         {
             startDate = startDate == null ? DateTime.MinValue : startDate;
             endDate = endDate == null ? DateTime.MaxValue : endDate;
+            // shop 可以是逗号分隔的多个店名（万龙体验中心,万龙服务中心 = 联合查询）；单个店名或不带时和以前一样
+            var (allShops, shopList) = SnowmeetApi.Helpers.ShopFilter.ForQuery(shop);
             List<SnowmeetApi.Models.Order> orderList = new List<Models.Order>();
             switch (type)
             {
@@ -191,12 +193,12 @@ namespace SnowmeetApi.Controllers
                     orderList = await _db.order.Where(o => (o.biz_date.Date >= ((DateTime)startDate).Date && o.biz_date.Date <= ((DateTime)endDate).Date)
                         && (memberId == null || o.member_id == memberId) && (staffId == null || o.staff_id == staffId)
                         && (payOption == null || o.pay_option.Trim().Equals(payOption.Trim()))
-                        && ((!crossShopOnly && (shop == null || o.shop.Trim().Equals(shop.Trim())))
+                        && ((!crossShopOnly && (allShops || shopList.Contains(o.shop.Trim())))
                             || (crossShopOnly && o.rentals.Any(r => r.valid == 1
                                 && (r.appending == null || (r.appending == false && r.append_commit_time != null))
                                 && r.rentItems.Any(i => i.valid == 1 && !i.noNeed
                                 && i.pickup_shop != null && i.pickup_shop != ""
-                                && (shop == null || o.shop.Trim() == shop.Trim() || i.pickup_shop.Trim() == shop.Trim())))))
+                                && (allShops || shopList.Contains(o.shop.Trim()) || shopList.Contains(i.pickup_shop.Trim()))))))
                         && (type == null || o.type.Trim().Equals(type.Trim()))
                         && o.valid == 1 && (orderId == null || o.id == orderId)
                         && (closeStartDate == null || (o.close_date != null && ((DateTime)o.close_date).Date >= ((DateTime)closeStartDate).Date))
@@ -233,7 +235,7 @@ namespace SnowmeetApi.Controllers
                     orderList = await _db.order.Where(o => (o.biz_date.Date >= ((DateTime)startDate).Date && o.biz_date.Date <= ((DateTime)endDate).Date)
                         && (memberId == null || o.member_id == memberId) && (staffId == null || o.staff_id == staffId)
                         && (payOption == null || o.pay_option.Trim().Equals(payOption.Trim()))
-                        && (shop == null || o.shop.Trim().Equals(shop.Trim()))
+                        && (allShops || shopList.Contains(o.shop.Trim()))
                         && (o.type == "零售" || (o.type == "养护" && o.order_source == CareCardSaleService.SingleOrderSource))
                         && o.valid == 1 && (orderId == null || o.id == orderId)
                         
@@ -254,7 +256,7 @@ namespace SnowmeetApi.Controllers
                     IQueryable<SnowmeetApi.Models.Order> careOrders = _db.order.Where(o => (o.biz_date.Date >= ((DateTime)startDate).Date && o.biz_date.Date <= ((DateTime)endDate).Date)
                             && (memberId == null || o.member_id == memberId) && (staffId == null || o.staff_id == staffId)
                             && (payOption == null || o.pay_option.Trim().Equals(payOption.Trim()))
-                            && (shop == null || o.shop.Trim().Equals(shop.Trim())) && (type == null || o.type.Trim().Equals(type.Trim()))
+                            && (allShops || shopList.Contains(o.shop.Trim())) && (type == null || o.type.Trim().Equals(type.Trim()))
                             && o.valid == 1 && (orderId == null || o.id == orderId)
                             && (isSummerCare == null || (o.cares.Any(c => (c.biz_type == "非雪季养护")) == isSummerCare))
                             && (useCard == null || (useCard == (o.cares.Any(c => (c.valid == 1 && c.use_card == true))
@@ -279,7 +281,7 @@ namespace SnowmeetApi.Controllers
                     orderList = await _db.order.Where(o => (o.biz_date.Date >= ((DateTime)startDate).Date && o.biz_date.Date <= ((DateTime)endDate).Date)
                             && (memberId == null || o.member_id == memberId) && (staffId == null || o.staff_id == staffId)
                             && (payOption == null || o.pay_option.Trim().Equals(payOption.Trim()))
-                            && (shop == null || o.shop.Trim().Equals(shop.Trim())) && (type == null || o.type.Trim().Equals(type.Trim()))
+                            && (allShops || shopList.Contains(o.shop.Trim())) && (type == null || o.type.Trim().Equals(type.Trim()))
                             && o.valid == 1 && (orderId == null || o.id == orderId))
                         .Include(o => o.fdOrders.Where(f => f.valid == 1)).ThenInclude(f => f.product).ThenInclude(p => p.category)
                         .Include(o => o.retails.Where(r => r.valid == 1))
