@@ -38,7 +38,11 @@ namespace SnowmeetApi.Controllers
         {
             return await _db.UploadFile.FindAsync(id);
         }
+        // 上传不设应用层大小上限：Kestrel 默认只收约 30MB、表单默认 128MB，养护维修留证的视频会被拦。
+        // 前面的 nginx 对 mini.snowmeet.top 设的是 client_max_body_size 1000M，那是实际的上限；文件直接写进 S3 私有桶。
         [HttpPost]
+        [DisableRequestSizeLimit]
+        [RequestFormLimits(MultipartBodyLengthLimit = long.MaxValue)]
         public async Task<ActionResult<UploadFile>> UploadFileWithThumb(IFormFile file, [FromQuery] string sessionKey, [FromQuery] string purpose = "",
             [FromQuery] bool isWeb = true, [FromQuery] string fileType = "", [FromQuery] int? mainId = null, [FromQuery] string sessionType = "wechat_mini_openid")
         {
@@ -79,6 +83,8 @@ namespace SnowmeetApi.Controllers
             return NoContent();
         }
         [HttpPost]
+        [DisableRequestSizeLimit]
+        [RequestFormLimits(MultipartBodyLengthLimit = long.MaxValue)]
         public async Task<ActionResult<UploadFile>> UploadFile([FromQuery] string sessionKey, [FromQuery] string purpose,
             [FromQuery] bool isWeb, IFormFile file)
         {
@@ -125,6 +131,8 @@ namespace SnowmeetApi.Controllers
 
         }
         [HttpPost("{sessionKey}")]
+        [DisableRequestSizeLimit]
+        [RequestFormLimits(MultipartBodyLengthLimit = long.MaxValue)]
         public async Task<ActionResult<string>> Upload(string sessionKey, IFormFile file)
         {
             sessionKey = Util.UrlDecode(sessionKey);

@@ -98,6 +98,12 @@ namespace SnowmeetApi.Services.Storage
                 case "svg": return "image/svg+xml";
                 case "mp4": return "video/mp4";
                 case "mov": return "video/quicktime";
+                case "m4v": return "video/x-m4v";
+                case "3gp": return "video/3gpp";
+                case "webm": return "video/webm";
+                case "avi": return "video/x-msvideo";
+                case "mpeg":
+                case "mpg": return "video/mpeg";
                 case "mp3": return "audio/mpeg";
                 case "pdf": return "application/pdf";
                 case "txt": return "text/plain; charset=utf-8";

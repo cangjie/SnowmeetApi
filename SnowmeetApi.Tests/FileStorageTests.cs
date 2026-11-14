@@ -75,6 +75,14 @@ public class FileStorageTests
     [Theory]
     [InlineData("/upload/1/a.JPEG", "image/jpeg")]
     [InlineData("/upload/1/a.png", "image/png")]
+    [InlineData("/upload/1/a.mp4", "video/mp4")]
+    [InlineData("/upload/1/a.MOV", "video/quicktime")]
+    [InlineData("/upload/1/a.m4v", "video/x-m4v")]
+    [InlineData("/upload/1/a.3gp", "video/3gpp")]
+    [InlineData("/upload/1/a.webm", "video/webm")]
+    [InlineData("/upload/1/a.avi", "video/x-msvideo")]
+    [InlineData("/upload/1/a.mpeg", "video/mpeg")]
+    [InlineData("/upload/1/a.mpg", "video/mpeg")]
     [InlineData("/upload/1/a.xyz", "application/octet-stream")]
     public void ContentTypeFollowsExtension(string path, string expected)
     {
