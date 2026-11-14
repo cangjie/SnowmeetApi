@@ -60,6 +60,9 @@ namespace SnowmeetApi.Models
         public double ticket_discount { get; set; }
         public double discount { get; set; }
         public bool? with_pole { get; set; } = null;
+        // 含雪包（2026-11-14）：和 with_pole（含雪杖）并列的装备附带件；单板没有雪杖，含雪包不受影响。
+        // 数据库列 care.with_bag bit NULL，见 snowmeet_ai_doc/sql/2026-11-14_care_with_bag.sql（先建列，再部署读写它的后端）。
+        public bool? with_bag { get; set; } = null;
         public int finish { get; set; }
         public bool warranty {get; set;} = false;
         public bool entertain {get; set;} = false;
