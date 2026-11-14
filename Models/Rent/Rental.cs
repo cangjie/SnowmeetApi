@@ -241,6 +241,33 @@ namespace SnowmeetApi.Models
                 return GetTotalAmountByType("赔偿金");
             }
         }
+        // 赔偿减免：挂在「赔偿金」明细上的减免（discount.sub_biz_id = 赔偿金明细 id）。它已经含在 totalDiscountAmount 里，
+        // totalSummary 不用再减一次；这里只是给订单详情页拆开显示「赔偿金额 / 赔偿减免 / 实际赔偿」。
+        [NotMapped]
+        public double totalRepairationDiscountAmount
+        {
+            get
+            {
+                if (details == null)
+                {
+                    return 0;
+                }
+                HashSet<int> repairDetailIds = details
+                    .Where(d => d.valid == 1 && d.charge_type.Trim().Equals("赔偿金"))
+                    .Select(d => d.id).ToHashSet();
+                return availableDiscounts
+                    .Where(d => d.sub_biz_id != null && repairDetailIds.Contains(d.sub_biz_id.Value))
+                    .Sum(d => d.amount);
+            }
+        }
+        [NotMapped]
+        public double actualRepairationAmount
+        {
+            get
+            {
+                return totalRepairationAmount - totalRepairationDiscountAmount;
+            }
+        }
         [NotMapped]
         public double totalSummary
         {
@@ -523,6 +550,23 @@ namespace SnowmeetApi.Models
                     }
                     return amount;
                 }
+            }
+        }
+        // 这件租赁物的赔偿减免：挂在它有效「赔偿金」明细上的减免合计（赔偿明细要连 discounts 一起加载，GetRental 已加载）。
+        [NotMapped]
+        public double totalRepairationDiscountAmount
+        {
+            get
+            {
+                return availableRepairationCharges.Sum(d => d.discountTotalAmount);
+            }
+        }
+        [NotMapped]
+        public double actualRepairationAmount
+        {
+            get
+            {
+                return totalRepairationAmount - totalRepairationDiscountAmount;
             }
         }
         [NotMapped]

@@ -5133,8 +5133,9 @@ namespace SnowmeetApi.Controllers
             for (int i = 0; i < rental.rentItems.Count; i++)
             {
                 Models.RentItem rentItem = rental.rentItems[i];
+                // 连 discounts 一起加载：赔偿减免挂在赔偿金明细上（RentItem.totalRepairationDiscountAmount 要用）
                 rentItem.repairationCharges = await _db.rentalDetail
-                    .Where(r => r.rent_item_id == rentItem.id).AsNoTracking().ToListAsync();
+                    .Where(r => r.rent_item_id == rentItem.id).Include(r => r.discounts).AsNoTracking().ToListAsync();
                 //await _db.rentItem.Entry(rentItem).Collection(i => i.repairationCharges).LoadAsync();
             }
             return rental;
@@ -5289,9 +5290,15 @@ namespace SnowmeetApi.Controllers
             return Ok(new ApiResult<Models.Rental?> { code = 0, data = await GetRental(item.rental_id.Value) });
         }
 
+        // 设置某件租赁物的赔偿金额，可同时设置赔偿减免（discount）：
+        //   · 赔偿金 = 一条 charge_type=「赔偿金」的 rental_detail（挂 rent_item_id），每次设置作废旧的、新建一条；
+        //   · 赔偿减免 = 一条 discount（biz_type=租赁、biz_id=rental.id、sub_biz_type=赔偿金、sub_biz_id=这条赔偿明细的 id）。
+        //     它已含在 Rental.totalDiscountAmount 里，应退押金等金额自动扣减；因为挂在赔偿明细上，万龙租赁分账不会把它当租金减免。
+        //   · discount 不传（旧版小程序）= 沿用原来的减免金额（不超过新赔偿金额）；传 0 = 清掉减免；不能为负、不能大于赔偿金额。
+        //   · 赔偿金额设为 0 = 取消赔偿，它的减免一并作废。
         [HttpGet("{rentItemId}")]
         public async Task<ActionResult<ApiResult<Models.Rental?>>> SetRentItemRepairAmount(int rentItemId,
-            double amount, string sessionKey, string sessionType = "wechat_mini_openid")
+            double amount, string sessionKey, string sessionType = "wechat_mini_openid", double? discount = null)
         {
             Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
             if (staff == null || staff.title_level < 100)
@@ -5314,18 +5321,43 @@ namespace SnowmeetApi.Controllers
                     data = null
                 });
             }
+            double newAmount = amount > 0 ? amount : 0;
+            if (discount != null && discount < 0)
+            {
+                return Ok(new ApiResult<Models.Rental?>() { code = 1, message = "赔偿减免不能为负", data = null });
+            }
+            if (discount != null && Math.Round(discount.Value - newAmount, 2) > 0)
+            {
+                return Ok(new ApiResult<Models.Rental?>() { code = 1, message = "赔偿减免不能大于赔偿金额", data = null });
+            }
             List<Models.RentalDetail> details = await _db.rentalDetail
                 .Where(d => d.rent_item_id == rentItemId && d.charge_type == "赔偿金"
                     && d.valid == 1 && d.rental_id == rentItem.rental_id)
                 .AsNoTracking().ToListAsync();
+            List<int> oldDetailIds = details.Select(d => d.id).ToList();
+            // 原来挂在这些赔偿明细上的减免：每次设置都作废旧的，按新数字重建（不传 discount 时沿用旧金额）
+            List<Discount> oldDiscounts = oldDetailIds.Count == 0 ? new List<Discount>()
+                : await _db.discount.Where(d => d.valid == 1 && d.biz_type == "租赁" && d.biz_id == rentItem.rental_id
+                    && d.sub_biz_id != null && oldDetailIds.Contains(d.sub_biz_id.Value)).AsNoTracking().ToListAsync();
+            double oldAmount = details.Sum(d => d.amount);
+            double oldDiscount = oldDiscounts.Sum(d => d.amount);
+            double newDiscount = newAmount > 0 ? (discount ?? Math.Min(oldDiscount, newAmount)) : 0;
             for (int i = 0; i < details.Count; i++)
             {
                 details[i].valid = 0;
                 details[i].update_date = DateTime.Now;
                 _db.rentalDetail.Entry(details[i]).State = EntityState.Modified;
             }
-            if (amount > 0)
+            for (int i = 0; i < oldDiscounts.Count; i++)
             {
+                oldDiscounts[i].valid = 0;
+                oldDiscounts[i].update_date = DateTime.Now;
+                _db.discount.Entry(oldDiscounts[i]).State = EntityState.Modified;
+            }
+            if (newAmount > 0)
+            {
+                Models.Rental? parentRental = await _db.rental.Where(r => r.id == rentItem.rental_id)
+                    .AsNoTracking().FirstOrDefaultAsync();
                 Models.RentalDetail detail = new Models.RentalDetail()
                 {
                     id = 0,
@@ -5333,13 +5365,44 @@ namespace SnowmeetApi.Controllers
                     rent_item_id = rentItemId,
                     charge_type = "赔偿金",
                     rental_date = DateTime.Now,
-                    amount = amount,
+                    amount = newAmount,
                     memo = "手动设置赔偿金",
                     staff_id = staff.id,
                     valid = 1,
                     create_date = DateTime.Now
                 };
+                if (newDiscount > 0)
+                {
+                    // sub_biz_id 随赔偿明细入库时由 EF 回填（同 UpdateRentalDetails 的做法）
+                    detail.discounts = new List<Discount>()
+                    {
+                        new Discount()
+                        {
+                            order_id = parentRental?.order_id,
+                            amount = newDiscount,
+                            biz_type = "租赁",
+                            biz_id = rentItem.rental_id,
+                            sub_biz_type = "赔偿金",
+                            staff_id = staff.id,
+                            valid = 1,
+                            memo = "赔偿减免",
+                            create_date = DateTime.Now
+                        }
+                    };
+                }
                 await _db.rentalDetail.AddAsync(detail);
+            }
+            // 留痕：赔偿金额、赔偿减免有变化才记
+            const string repairScene = "租赁订单详细页设置赔偿";
+            if (Math.Round(oldAmount - newAmount, 2) != 0)
+            {
+                await _db.coreDataModLog.AddAsync(CoreDataModLog.CreateManualLog("rental", "赔偿金额", (int)rentItem.rental_id,
+                    repairScene, null, staff.id, oldAmount.ToString("0.##"), newAmount.ToString("0.##"), "租赁物 " + rentItemId));
+            }
+            if (Math.Round(oldDiscount - newDiscount, 2) != 0)
+            {
+                await _db.coreDataModLog.AddAsync(CoreDataModLog.CreateManualLog("rental", "赔偿减免", (int)rentItem.rental_id,
+                    repairScene, null, staff.id, oldDiscount.ToString("0.##"), newDiscount.ToString("0.##"), "租赁物 " + rentItemId));
             }
             await _db.SaveChangesAsync();
             Rental rental = await GetRental((int)rentItem.rental_id);
