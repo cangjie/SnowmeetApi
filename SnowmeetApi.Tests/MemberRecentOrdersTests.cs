@@ -9,7 +9,8 @@ namespace SnowmeetApi.Tests;
 /// <summary>
 /// 会员详情页「最近订单」（2026-11-14 用户要求）：每个订单除了单号、类型、日期，还要带订单金额、减免金额、实际支付金额，
 /// 以及用了哪些优惠券、哪些卡（次卡带「记几次、余几次」）。口径和订单自己的计算属性一致：
-///   减免 = 有效的 discount 行合计（Order.discountAmount）；实付 = Order.availablePayments 里支付成功的合计（Order.paidAmount）；
+///   减免 = 有效的 discount 行合计（Order.discountAmount）；支付 = Order.availablePayments 里支付成功的合计（Order.paidAmount，含租赁押金）；
+///   退款 = 这些支付上已受理的退款合计（Order.refundAmount：state = 1 或有退款单号），页面上「实付」= 支付 − 退款（2026-11-14：押金不能算实付）；
 ///   券 = 订单上已使用的券（ticket.order_id，或养护装备的 ticket_code / 券 biz 关联）；
 ///   卡 = 次卡 / 季卡核销（punch_card_used）和学员卡使用（coach_card_use）；次卡「余几次」= 这一单用完之后还剩几次。
 /// 只读，不改任何数据；新增字段，旧版小程序读不到也不受影响。
@@ -61,6 +62,18 @@ public class MemberRecentOrdersTests
             Pay(rent1.id, 5000), Pay(rent1.id, 300, status: "待支付"),
             Pay(rent2.id, 5000), Pay(rent2.id, 40, method: "现金", valid: 0), Pay(rent2.id, 60, method: "现金", valid: 1),
             Pay(care.id, 200), Pay(retail.id, 99, method: "支付宝"), Pay(ski.id, 309));
+        await db.SaveChangesAsync();
+        // 退款：只算「可用支付」上已受理的（state = 1 或有退款单号）；没受理的、挂在不可用支付上的不算
+        var rent2Pays = db.orderPayment.Local.Where(p => p.order_id == rent2.id).ToList();
+        int goodPay = rent2Pays.Single(p => p.pay_method == "微信支付" && p.amount == 5000).id;
+        int unavailablePay = rent2Pays.Single(p => p.pay_method == "现金" && p.valid == 0).id;
+        var carePay = db.orderPayment.Local.Single(p => p.order_id == care.id).id;
+        db.Set<OrderPaymentRefund>().AddRange(
+            new OrderPaymentRefund { order_id = rent2.id, payment_id = goodPay, amount = 4780, state = 0, refund_id = "R-1" },
+            new OrderPaymentRefund { order_id = rent2.id, payment_id = goodPay, amount = 100, state = 1, refund_id = "" },
+            new OrderPaymentRefund { order_id = rent2.id, payment_id = goodPay, amount = 999, state = 0, refund_id = "" },
+            new OrderPaymentRefund { order_id = rent2.id, payment_id = unavailablePay, amount = 40, state = 1, refund_id = "R-2" },
+            new OrderPaymentRefund { order_id = care.id, payment_id = carePay, amount = 20, state = 1, refund_id = "R-3" });
         // 减免：只算 valid=1 的
         db.discount.AddRange(
             new Discount { order_id = care.id, amount = 20, valid = 1 }, new Discount { order_id = care.id, amount = 10, valid = 1 },
@@ -125,6 +138,11 @@ public class MemberRecentOrdersTests
         Assert.Equal(5000, rent1.GetProperty("paidAmount").GetDouble());           // 待支付的 300 不算
         Assert.Equal(5060, Row(d, s.Rent2).GetProperty("paidAmount").GetDouble()); // 现金 valid=0 的 40 不算，valid=1 的 60 算
         Assert.Equal(99, Row(d, s.Retail).GetProperty("paidAmount").GetDouble());  // 支付宝
+        // 退款：已受理的才算（4780 有退款单号 + 100 state=1）；没受理的 999、挂在不可用支付（现金 valid=0）上的 40 都不算
+        Assert.Equal(4880, Row(d, s.Rent2).GetProperty("refundAmount").GetDouble());
+        Assert.Equal(20, care.GetProperty("refundAmount").GetDouble());
+        Assert.Equal(0, rent1.GetProperty("refundAmount").GetDouble());
+        Assert.Equal(0, Row(d, s.Retail).GetProperty("refundAmount").GetDouble());
         Assert.Equal(309, Row(d, s.Ski).GetProperty("paidAmount").GetDouble());
     }
 

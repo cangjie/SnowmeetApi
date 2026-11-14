@@ -11,7 +11,9 @@ namespace SnowmeetApi.Services
     /// 会员详情页「最近订单」：最近 30 单，每单带订单金额、减免、实付、用了哪些券和卡（2026-11-14 用户要求）。
     /// 只读，一批订单只做固定几条按订单号 IN 的聚合查询，不逐单查。口径和订单自己的计算属性一致：
     ///   减免 = 有效（valid = 1）的 discount 行合计（Order.discountAmount）；
-    ///   实付 = Order.availablePayments 里支付成功的合计（Order.paidAmount）：微信 / 支付宝成功就算，其它方式要 valid = 1；
+    ///   支付 = Order.availablePayments 里支付成功的合计（Order.paidAmount）：微信 / 支付宝成功就算，其它方式要 valid = 1；
+    ///        租赁单的支付里含押金，所以单独给退款：页面上的「实付」= 支付 − 退款（2026-11-14 用户：押金不能算实付）；
+    ///   退款 = 这些可用支付上已受理的退款合计（Order.refundAmount）：state = 1 或有退款单号；
     ///   券 = 订单上已使用的券：ticket.order_id，或这单养护装备的 ticket_code（同名券合并，带数量）；
     ///   卡 = 次卡 / 季卡核销（punch_card_used，valid）和学员卡使用（coach_card_use）。
     ///   次卡「余几次」= 这一单用完之后还剩几次（按核销时间先后累计），不是卡现在的余额；季卡不限次数没有余次。
@@ -50,9 +52,21 @@ namespace SnowmeetApi.Services
             var paid = await _db.orderPayment
                 .Where(p => ids.Contains(p.order_id) && p.status == "支付成功"
                     && (p.pay_method == "微信支付" || p.pay_method == "支付宝" || p.valid == 1))
-                .GroupBy(p => p.order_id).Select(g => new { orderId = g.Key, sum = g.Sum(p => p.amount) })
+                .Select(p => new { p.id, orderId = p.order_id, p.amount })
                 .AsNoTracking().ToListAsync();
-            foreach (var p in paid) if (byId.TryGetValue(p.orderId, out var r)) r.paidAmount = Math.Round(p.sum, 2);
+            foreach (var g in paid.GroupBy(p => p.orderId)) if (byId.TryGetValue(g.Key, out var r)) r.paidAmount = Math.Round(g.Sum(p => p.amount), 2);
+            // 退款挂在支付上（payment_refund.payment_id）：只算可用支付上已受理的，和 Order.availableRefunds 同口径
+            List<int> payIds = paid.Select(p => p.id).ToList();
+            if (payIds.Count > 0)
+            {
+                var refunds = await _db.paymentRefund
+                    .Where(f => payIds.Contains(f.payment_id) && (f.state == 1 || (f.refund_id != null && f.refund_id.Trim() != "")))
+                    .Select(f => new { f.payment_id, f.amount })
+                    .AsNoTracking().ToListAsync();
+                var orderOfPayment = paid.ToDictionary(p => p.id, p => p.orderId);
+                foreach (var g in refunds.GroupBy(f => orderOfPayment[f.payment_id]))
+                    if (byId.TryGetValue(g.Key, out var r)) r.refundAmount = Math.Round(g.Sum(f => f.amount), 2);
+            }
 
             await AddTicketsAsync(ids, byId);
             await AddPunchCardsAsync(ids, byId);
@@ -147,7 +161,10 @@ namespace SnowmeetApi.Services
         public DateTime? bizDate { get; set; }
         public double totalAmount { get; set; }
         public double discountAmount { get; set; }
+        /// <summary>支付成功的合计（含租赁押金）；页面上的「实付」= paidAmount − refundAmount。</summary>
         public double paidAmount { get; set; }
+        /// <summary>这些支付上已受理的退款合计。</summary>
+        public double refundAmount { get; set; }
         public List<MemberOrderTicket> tickets { get; set; } = new();
         public List<MemberOrderCard> cards { get; set; } = new();
     }
