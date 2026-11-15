@@ -59,7 +59,7 @@ python3 -m snowmeet_backup drill --yes          # 还原演练：还原成临时
    **只对 `full/`、`diff/` 这几个前缀设规则**，不要设在整个 `private/backup/` 上，否则会误伤已有的老备份和回滚归档。
    不要直接用示例 JSON 调 `put-bucket-lifecycle-configuration`：它会替换整个桶的规则，桶上可能已经有别的规则（服务器角色看不到）。
 4. 手动跑第一次 `full`（建立基准），再手动跑一次 `diff`、`check`，在 S3 里确认文件和 `.sha256` 都在。
-5. 低峰时手动跑一次 `drill --yes`，确认还原演练能跑通（这一步在服务器上还没试过）。
+5. 低峰时手动跑一次 `drill --yes`，确认还原演练能跑通。
 6. 安装 cron：把 `cron.example` 复制成 `/etc/cron.d/snowmeet-backup`（属主 root，权限 644），填上桶名。
 7. 可选：`/etc/logrotate.d/snowmeet-backup`：`/var/log/snowmeet-backup.log { weekly rotate 8 compress missingok notifempty }`。
 
@@ -101,6 +101,8 @@ DBCC CHECKDB ([snowmeet_new_restore]) WITH NO_INFOMSGS;
 
 ## 已知限制
 
-- 单元测试用假的 SQL 和 S3 覆盖了流程；**还没有在真实服务器上跑过**（真实的 `BACKUP`、`RESTORE`、`aws s3 cp`、`drill`）。
+- 单元测试用假的 SQL 和 S3 覆盖流程。2026-11-15 在真实服务器上手动试跑过 `full`（76 秒，946MB → gzip 302MB）、`diff`（4 秒）、
+  `check` 和 `drill`（40 秒，`DBCC CHECKDB` 0 个错误），S3 上的文件逐个核对过大小和 sha256。**cron 还没有安装**，S3 过期规则也要在控制台另设。
+- 还原演练要占用等于源库数据文件原始大小的磁盘（现在约 3.7 GB），不是备份文件的大小；脚本按这个检查剩余空间。
 - Express 不能压缩，完整备份约等于库的已用大小（`web_api_log` 清理后约 1 GB），gzip 在传 S3 之前做。
 - 差异备份是累计的，到 17:00 最大。库明显变大（完整备份超过约 3 GB）时，应改成「每周日完整 + 每天差异」。

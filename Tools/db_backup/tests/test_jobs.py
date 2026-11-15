@@ -277,6 +277,16 @@ class DrillTests(JobTestBase):
         self.assertTrue(self.sql.executed[-1].startswith("IF DB_ID"))
         self.assertIn("drill:snowmeet_new", self.state()["failures"])
 
+    def test_drill_refuses_when_restored_files_would_not_fit(self):
+        jobs.run_full(self.env, "snowmeet_new")
+        self.sql.executed.clear()
+        self.sql.size_mb = 30 * 1024            # 数据文件 30 GB：还原要按这个大小分配
+        self.free = 20.0
+        with self.assertRaises(jobs.BackupError) as cm:
+            jobs.run_drill(self.env, "snowmeet_new")
+        self.assertIn("磁盘不够", str(cm.exception))
+        self.assertEqual(self.sql.executed, [])
+
     def test_drill_never_drops_a_pre_existing_database(self):
         jobs.run_full(self.env, "snowmeet_new")
         self.sql.executed.clear()

@@ -306,7 +306,10 @@ def run_drill(env: Env, db: str) -> Dict[str, object]:
             rows = env.sql.query("SELECT DB_ID(%s)", (rt,))
             if rows and rows[0][0] is not None:
                 raise BackupError("%s 已经存在，先处理掉再演练" % rt)
-            need_gb = full.stat().st_size * 2.2 / 1e9 + 1
+            # 还原会按源库数据文件的原始大小分配磁盘（不是按备份文件大小），所以以数据文件大小为准
+            rows = env.sql.query(DB_SIZE_SQL, (db,))
+            size_mb = rows[0][0] if rows and rows[0][0] else 0
+            need_gb = max(full.stat().st_size * 2.2 / 1e9, size_mb * 1.2 / 1024.0) + 1
             if env.free_gb(env.staging) < need_gb:
                 raise BackupError("磁盘不够做演练：需要至少 %.1f GB" % need_gb)
             _prepare_dir(env.staging)
