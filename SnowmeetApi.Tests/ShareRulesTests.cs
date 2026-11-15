@@ -23,7 +23,7 @@ public class ShareRulesTests
         Assert.True(IntroducerRules.IsValidType("机构"));
         Assert.False(IntroducerRules.IsValidType("分销"));
         Assert.False(IntroducerRules.IsValidType(null));
-        Assert.Equal("公司", IntroducerRules.RelationType("机构"));
+        Assert.Equal("个人", IntroducerRules.RelationType("机构"));    // 机构、教练、KOL 收款方式一样（2026-11-15 定）
         Assert.Equal("个人", IntroducerRules.RelationType("KOL"));
     }
 

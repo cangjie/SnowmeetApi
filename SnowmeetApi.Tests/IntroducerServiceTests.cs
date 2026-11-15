@@ -26,15 +26,15 @@ public class IntroducerServiceTests
     [InlineData("KOL", "机构")]
     [InlineData("机构", "教练")]
     [InlineData("机构", "KOL")]
-    public async Task Role_change_preserves_identity_and_existing_share_account(string from, string to)
+    public async Task Role_change_preserves_identity_and_the_same_personal_share_account_for_all_three_types(string from, string to)
     {
         await using var db = await ShareFixture.ClosedWanlongOrderAsync("支付宝", 1000, 0, 400);
         await SeedMemberAsync(db, 100, "member-openid");
         var svc = new IntroducerService(db, new FakeBinder());
+        // 机构、教练、KOL 收款方式一样（用户 2026-11-15 定）：旧版小程序机构表单带来的商户号 / 商户全称一律忽略
         var account = from == "机构" ? new IntroducerService.AccountInput("1600000001", "旧商户", "13800001234") : new(null, null, "13800001234");
         var added = await svc.AddAsync(ShareFixture.Manager(300), 100, from, "甲", "真实姓名", account);
         var old = await db.introducer.AsNoTracking().SingleAsync(i => i.id == added.id);
-        var oldRelation = await db.orderShareRelation.AsNoTracking().SingleAsync(r => r.id == old.relation_id);
         var share = await new OrderShareService(db, ShareFixture.Config, ShareFixture.Http)
             .SetIntroducerShareAsync(ShareFixture.Manager(), 1, added.id, 40, null);
         var nextAccount = to == "机构" ? new IntroducerService.AccountInput("1600000002", "新商户", null) : NoAccount;
@@ -46,32 +46,26 @@ public class IntroducerServiceTests
         Assert.Equal(to, updated.type);
         Assert.Equal(old.member_id, current.member_id);
         Assert.Equal(old.coach_id, current.coach_id);
-        Assert.Equal(to == "机构" ? "公司" : "个人", receiver.type);
-        Assert.Equal(to == "机构" ? "MERCHANT_ID" : "PERSONAL_OPENID", receiver.wepay_account_type);
-        Assert.Equal(to == "机构" ? "1600000002" : "member-openid", receiver.wepay_account_num);
+        // 改类型不换收款方：还是同一条个人收款关系，微信是会员的小程序 openid，没有商户号
+        Assert.Equal(old.relation_id, current.relation_id);
+        Assert.Equal(("个人", "PERSONAL_OPENID", "member-openid"), (receiver.type, receiver.wepay_account_type, receiver.wepay_account_num));
+        Assert.Null(receiver.wepay_account_name);
         Assert.Equal(old.relation_id, (await db.orderShare.AsNoTracking().SingleAsync(s => s.id == share.orderShareId)).relation_id);
         Assert.True(await db.shareRelationBind.AsNoTracking().AnyAsync(b => b.share_relation_id == current.relation_id && b.pay_method == "支付宝" && b.valid));
-        if ((from == "机构") != (to == "机构"))
-        {
-            Assert.NotEqual(old.relation_id, current.relation_id);
-            var historical = await db.orderShareRelation.AsNoTracking().SingleAsync(r => r.id == old.relation_id);
-            Assert.Equal(oldRelation.wepay_account_num, historical.wepay_account_num);
-            Assert.Equal(oldRelation.type, historical.type);
-            Assert.True(await db.introducerRelationHistory.AsNoTracking().AnyAsync(h => h.introducer_id == added.id && h.relation_id == old.relation_id));
-        }
-        else Assert.Equal(old.relation_id, current.relation_id);
+        Assert.Empty(await db.introducerRelationHistory.ToListAsync());
     }
 
     [Fact]
-    public async Task Role_change_rejects_unknown_type_and_organization_without_merchant_details()
+    public async Task Role_change_rejects_unknown_type_and_allows_organization_without_merchant_details()
     {
         await using var db = await ShareFixture.NewDbAsync();
         await SeedMemberAsync(db, 100, "member-openid");
         var svc = new IntroducerService(db, new FakeBinder());
         var added = await svc.AddAsync(ShareFixture.Manager(300), 100, "KOL", "甲", null, NoAccount);
         await Assert.ThrowsAsync<ShareException>(() => svc.UpdateAsync(added.id, null, null, null, NoAccount, type: "其他"));
-        await Assert.ThrowsAsync<ShareException>(() => svc.UpdateAsync(added.id, null, null, null, NoAccount, type: "机构"));
         Assert.Equal("KOL", (await db.introducer.AsNoTracking().SingleAsync(i => i.id == added.id)).type);
+        // 机构不需要商户号和商户全称：和 KOL、教练一样
+        Assert.Equal("机构", (await svc.UpdateAsync(added.id, null, null, null, NoAccount, type: "机构")).type);
         Assert.Empty(await db.introducerRelationHistory.ToListAsync());
     }
 
@@ -81,7 +75,7 @@ public class IntroducerServiceTests
         await using var db = await ShareFixture.NewDbAsync();
         await SeedMemberAsync(db, 100, null);
         var svc = new IntroducerService(db, new FakeBinder());
-        var added = await svc.AddAsync(ShareFixture.Manager(300), 100, "机构", "甲", null, new("1600000001", "商户", null));
+        var added = await svc.AddAsync(ShareFixture.Manager(300), 100, "机构", "甲", null, NoAccount);
         var view = await svc.UpdateAsync(added.id, null, null, null, NoAccount, type: "KOL");
         var current = await db.introducer.AsNoTracking().SingleAsync(i => i.id == added.id);
         var receiver = await db.orderShareRelation.AsNoTracking().SingleAsync(r => r.id == current.relation_id);
@@ -220,7 +214,7 @@ public class IntroducerServiceTests
     }
 
     [Fact]
-    public async Task Changing_organization_wechat_keeps_old_bind_and_preserves_unchanged_alipay_bind()
+    public async Task Organization_ignores_merchant_fields_and_changing_alipay_keeps_the_wechat_bind()
     {
         await using var db = await ShareFixture.NewDbAsync();
         await SeedMemberAsync(db, 100, "oABC");
@@ -230,13 +224,14 @@ public class IntroducerServiceTests
         db.shareRelationBind.Add(new ShareRelationBind { share_relation_id = oldId, pay_method = "微信支付", wepay_key_id = 7, valid = true });
         await db.SaveChangesAsync();
         db.ChangeTracker.Clear();
-        await svc.UpdateAsync(added.id, null, null, null, new("1600000002", "新商户", null));
+        // 带商户号的旧请求体：商户号被忽略，微信收款方不变；只有支付宝变了才建新的收款关系
+        await svc.UpdateAsync(added.id, null, null, null, new("1600000002", "新商户", "13900001234"));
         int newId = (await db.introducer.AsNoTracking().SingleAsync(i => i.id == added.id)).relation_id;
         Assert.NotEqual(oldId, newId);
-        Assert.Equal("1600000001", (await db.orderShareRelation.AsNoTracking().SingleAsync(r => r.id == oldId)).wepay_account_num);
-        Assert.Equal("1600000002", (await db.orderShareRelation.AsNoTracking().SingleAsync(r => r.id == newId)).wepay_account_num);
-        Assert.True(await db.shareRelationBind.AsNoTracking().AnyAsync(b => b.share_relation_id == oldId && b.pay_method == "微信支付" && b.valid));
-        Assert.False(await db.shareRelationBind.AsNoTracking().AnyAsync(b => b.share_relation_id == newId && b.pay_method == "微信支付" && b.valid));
+        var current = await db.orderShareRelation.AsNoTracking().SingleAsync(r => r.id == newId);
+        Assert.Equal(("个人", "PERSONAL_OPENID", "oABC", "13900001234"), (current.type, current.wepay_account_type, current.wepay_account_num, current.ali_account_num));
+        Assert.Equal("oABC", (await db.orderShareRelation.AsNoTracking().SingleAsync(r => r.id == oldId)).wepay_account_num);
+        Assert.True(await db.shareRelationBind.AsNoTracking().AnyAsync(b => b.share_relation_id == newId && b.pay_method == "微信支付" && b.valid));   // 微信没变，绑定带到新关系
         Assert.True(await db.shareRelationBind.AsNoTracking().AnyAsync(b => b.share_relation_id == newId && b.pay_method == "支付宝" && b.valid));
     }
 
@@ -263,23 +258,23 @@ public class IntroducerServiceTests
     }
 
     [Fact]
-    public async Task Add_organization_requires_merchant_id_and_name()
+    public async Task Add_organization_is_a_personal_receiver_like_a_coach_and_ignores_merchant_fields()
     {
         await using var db = await ShareFixture.NewDbAsync();
         await SeedMemberAsync(db, 100, "oABC");
+        await SeedMemberAsync(db, 101, "oDEF");
         var svc = new IntroducerService(db, new FakeBinder());
 
-        var ex = await Assert.ThrowsAsync<ShareException>(() =>
-            svc.AddAsync(ShareFixture.Manager(300), 100, "机构", "某俱乐部", null, new("1600000001", null, null)));
-        Assert.Equal(1, ex.Code);
-
-        var view = await svc.AddAsync(ShareFixture.Manager(300), 100, "机构", "某俱乐部", null, new("1600000001", "某某滑雪俱乐部有限公司", null));
-        var relation = await db.orderShareRelation.AsNoTracking().SingleAsync(r => r.id ==
-            db.introducer.Single(i => i.id == view.id).relation_id);
-        Assert.Equal("公司", relation.type);
-        Assert.Equal("MERCHANT_ID", relation.wepay_account_type);
-        Assert.Equal("1600000001", relation.wepay_account_num);
-        Assert.Equal("某某滑雪俱乐部有限公司", relation.wepay_account_name);
+        // 不需要商户号和商户全称；旧请求体带了也忽略
+        foreach (var (member, account) in new[] { (100, NoAccount), (101, new IntroducerService.AccountInput("1600000001", "某某滑雪俱乐部有限公司", null)) })
+        {
+            var view = await svc.AddAsync(ShareFixture.Manager(300), member, "机构", "某俱乐部" + member, null, account);
+            var relation = await db.orderShareRelation.AsNoTracking().SingleAsync(r => r.id == db.introducer.Single(i => i.id == view.id).relation_id);
+            Assert.Equal("机构", view.type);
+            Assert.Equal(("个人", "PERSONAL_OPENID"), (relation.type, relation.wepay_account_type));
+            Assert.Equal(member == 100 ? "oABC" : "oDEF", relation.wepay_account_num);
+            Assert.Null(relation.wepay_account_name);
+        }
     }
 
     [Fact]

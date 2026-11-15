@@ -16,6 +16,10 @@ namespace SnowmeetApi.Services.Share;
 /// </summary>
 public sealed class IntroducerService(ApplicationDBContext db, IAlipayRoyaltyBinder binder)
 {
+    /// <summary>
+    /// 收款资料输入。教练、KOL、机构收款方式一样（用户 2026-11-15 定）：微信分账分给会员在我们小程序里的 openid（系统自动取），
+    /// 支付宝只填登录号（和真实姓名）。wepayAccountNum / wepayAccountName 是旧版小程序机构表单留下的字段，现在一律忽略，只为兼容旧请求体。
+    /// </summary>
     public sealed record AccountInput(string? wepayAccountNum, string? wepayAccountName, string? aliAccountNum);
 
     /// <param name="wechat">已填写 / 未填写</param>
@@ -255,22 +259,12 @@ public sealed class IntroducerService(ApplicationDBContext db, IAlipayRoyaltyBin
             throw new ShareException("这位会员已经是介绍人");
         }
 
-        string? wepayType, wepayNum, wepayName;
-        if (type == IntroducerRules.TypeOrg)
-        {
-            wepayNum = Clean(account.wepayAccountNum);
-            wepayName = Clean(account.wepayAccountName);
-            if (wepayNum == "" || wepayName == "") throw new ShareException("机构要填商户号和商户全称");
-            wepayType = "MERCHANT_ID";
-        }
-        else
-        {
-            wepayNum = await db.memberSocialAccount.AsNoTracking()
-                .Where(a => a.member_id == memberId && a.valid == 1 && a.type == MemberSocialAccount.TYPE_WECHAT_MINI_OPENID)
-                .OrderByDescending(a => a.id).Select(a => a.num).FirstOrDefaultAsync();
-            wepayType = string.IsNullOrWhiteSpace(wepayNum) ? null : "PERSONAL_OPENID";
-            wepayName = null;
-        }
+        // 三类分销商一样：微信分给会员在我们小程序里的 openid（没有 openid 就先空着，会员进一次小程序后重算时补上）
+        string? wepayNum = await db.memberSocialAccount.AsNoTracking()
+            .Where(a => a.member_id == memberId && a.valid == 1 && a.type == MemberSocialAccount.TYPE_WECHAT_MINI_OPENID)
+            .OrderByDescending(a => a.id).Select(a => a.num).FirstOrDefaultAsync();
+        string? wepayType = string.IsNullOrWhiteSpace(wepayNum) ? null : "PERSONAL_OPENID";
+        string? wepayName = null;
         string? aliNum = ValidateAli(account, real);
 
         // 保留旧教练 id 和卡券历史；状态冲突由管理员处理，不能悄悄恢复被单独停用的教练。
@@ -333,33 +327,12 @@ public sealed class IntroducerService(ApplicationDBContext db, IAlipayRoyaltyBin
         if (!IntroducerRules.IsValidType(newType)) throw new ShareException("介绍人类型只能是教练、KOL、机构");
         string newRealName = realName == null ? oldRealName : Clean(realName);
         string? aliNum = account == null ? null : ValidateAli(account, newRealName);
-        string wepayNum = Clean(account?.wepayAccountNum), wepayName = Clean(account?.wepayAccountName);
-        bool wasOrg = i.type == IntroducerRules.TypeOrg, isOrg = newType == IntroducerRules.TypeOrg;
-        bool changeReceiverType = wasOrg != isOrg;
-        if (isOrg && !wasOrg && (wepayNum == "" || wepayName == ""))
-            throw new ShareException("机构要填商户号和商户全称");
-        if (isOrg && ((wepayNum == "") != (wepayName == "")))
-            throw new ShareException("机构商户号和商户全称需要一起填写");
-        string? nextWepayType = r.wepay_account_type, nextWepayNum = r.wepay_account_num, nextWepayName = r.wepay_account_name;
-        if (isOrg && wepayNum != "")
-        {
-            nextWepayType = "MERCHANT_ID"; nextWepayNum = wepayNum; nextWepayName = wepayName;
-        }
-        else if (changeReceiverType)
-        {
-            nextWepayNum = await db.memberSocialAccount.AsNoTracking()
-                .Where(a => a.member_id == i.member_id && a.valid == 1 && a.type == MemberSocialAccount.TYPE_WECHAT_MINI_OPENID)
-                .OrderByDescending(a => a.id).Select(a => a.num).FirstOrDefaultAsync();
-            nextWepayType = string.IsNullOrWhiteSpace(nextWepayNum) ? null : "PERSONAL_OPENID";
-            nextWepayName = null;
-        }
-        bool wepayChanged = changeReceiverType || (isOrg && wepayNum != ""
-            && (wepayNum != r.wepay_account_num || wepayName != r.wepay_account_name));
+        // 三类分销商收款方式一样：改类型不换微信收款方（仍是会员的小程序 openid），也不再接收商户号 / 商户全称
         bool aliChanged = (aliNum != null && (r.ali_account_type != IntroducerRules.AlipayLoginType || aliNum != r.ali_account_num))
             || (realName != null && oldRealName != newRealName && !string.IsNullOrWhiteSpace(r.ali_account_num));
         if (aliChanged && newRealName == "") throw new ShareException("支付宝登录号要同时填真实姓名");
         // 每次改收款资料都新建关系，即使此刻尚无订单；避免并发申请刚读取旧关系时被改号。
-        bool snapshot = wepayChanged || aliChanged;
+        bool snapshot = aliChanged;
         Coach? linkedCoach = null;
         if (i.coach_id != null)
         {
@@ -389,7 +362,7 @@ public sealed class IntroducerService(ApplicationDBContext db, IAlipayRoyaltyBin
             db.introducerRelationHistory.Add(new IntroducerRelationHistory { introducer_id = i.id, relation_id = oldRelationId,
                 real_name = oldRealName == "" ? null : oldRealName });
             i.relation_id = r.id;
-            foreach (var old in oldBinds.Where(b => !(aliChanged && b.pay_method == "支付宝") && !(wepayChanged && b.pay_method == "微信支付")))
+            foreach (var old in oldBinds.Where(b => !(aliChanged && b.pay_method == "支付宝")))
             {
                 db.shareRelationBind.Add(new ShareRelationBind { share_relation_id = r.id, pay_method = old.pay_method,
                     wepay_key_id = old.wepay_key_id, ali_account_id = old.ali_account_id, valid = true, create_date = DateTime.Now });
@@ -400,9 +373,9 @@ public sealed class IntroducerService(ApplicationDBContext db, IAlipayRoyaltyBin
         i.real_name = newRealName == "" ? null : newRealName;
         if (valid != null) i.valid = valid.Value ? 1 : 0;
         i.update_date = DateTime.Now;
-        r.type = IntroducerRules.RelationType(newType);
+        // 早期按「机构 = 公司」建的商户号收款方（生产库里没有）保持原样，其余一律个人
+        if (r.wepay_account_type != "MERCHANT_ID") r.type = IntroducerRules.RelationType(newType);
         r.name = newName;
-        if (wepayChanged) { r.wepay_account_type = nextWepayType; r.wepay_account_num = nextWepayNum; r.wepay_account_name = nextWepayName; }
         if (aliNum != null) { r.ali_account_type = IntroducerRules.AlipayLoginType; r.ali_account_num = aliNum; }
         db.introducer.Update(i);
         if (!snapshot) db.orderShareRelation.Update(r);

@@ -18,8 +18,11 @@ namespace SnowmeetApi.Helpers
 
         public static bool IsValidType(string? type) => type == TypeCoach || type == TypeKol || type == TypeOrg;
 
-        /// <summary>收款账号的类型：机构是公司，其余是个人。</summary>
-        public static string RelationType(string type) => type == TypeOrg ? "公司" : "个人";
+        /// <summary>
+        /// 收款账号的类型。教练、KOL、机构一样，都是个人（用户 2026-11-15 定）：微信分给会员的小程序 openid，支付宝填登录号。
+        /// 以前机构按「公司」走微信商户号，现在不用了；TenpayController 仍认「公司」= 商户号，只为兼容历史数据。
+        /// </summary>
+        public static string RelationType(string type) => "个人";
 
         public static double SuggestedRentShare(double rentAfterDiscounts) => Math.Round(rentAfterDiscounts * RentShareRate, 2);
 
