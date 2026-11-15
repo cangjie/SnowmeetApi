@@ -1655,8 +1655,7 @@ namespace SnowmeetApi.Controllers
             if (distributor != null)
             {
                 // 订单归属：记在这位分销商名下（顾客自己的归属在取票成功后按「先到先得」建立）。记失败不影响下单。
-                try { await new DistributorCustomerService(_context).RecordOrderAsync(order.id, distributor.id, member.id, DistributorOrder.SourceQr, DateTime.Now); }
-                catch (Exception) { /* 归属记录失败不影响顾客下单 */ }
+                await new DistributorCustomerService(_context).TryRecordOrderAsync(order.id, distributor.id, member.id, DistributorOrder.SourceQr, DateTime.Now);
             }
             return Ok(order);
         }

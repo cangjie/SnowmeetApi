@@ -3904,8 +3904,9 @@ namespace SnowmeetApi.Controllers
             {
                 return;
             }
-            // 通过分销商订票二维码订的：取票成功后按「先到先得」建立顾客归属（已有归属不变）
-            await new SnowmeetApi.Services.CoachPlatform.DistributorCustomerService(_db).EstablishForPickedUpOrderAsync(orderId, DateTime.Now);
+            // 通过分销商订票二维码订的：取票成功后按「先到先得」建立顾客归属（已有归属不变）。
+            // 容错版：归属记不成（新表没建等）不能让取票失败，见 DistributorCustomerService.GuardAsync。
+            await new SnowmeetApi.Services.CoachPlatform.DistributorCustomerService(_db).TryEstablishForPickedUpOrderAsync(orderId, DateTime.Now);
             BizReferee referee = await _db.bizReferee
                 .Where(b => b.biz_type == "雪票" && b.member_id == order.member_id && b.valid)
                 .AsNoTracking().FirstOrDefaultAsync();

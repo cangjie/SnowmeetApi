@@ -188,8 +188,7 @@ public sealed class CoachCardService(ApplicationDBContext db, IConfiguration? co
             if (rows != 1) return Fail(ShareCardState.Taken, "这张学员卡已被领取");
             CoachCard claimed = (await db.coachCard.AsNoTracking().FirstAsync(c => c.id == card.id));
             // 领卡也建立顾客归属（先到先得，已有归属不变）；失败不影响领卡
-            try { await new DistributorCustomerService(db).OnCardClaimedAsync(coach.id, memberId, card.id, now); }
-            catch (Exception) { /* 归属记录失败不影响领卡 */ }
+            await new DistributorCustomerService(db).TryOnCardClaimedAsync(coach.id, memberId, card.id, now);
             return new ClaimResult { state = ShareCardState.ClaimedByMe, message = "", card = claimed };
         });
     }

@@ -316,6 +316,68 @@ namespace SnowmeetApi.Tests
             Assert.Equal(2, await check.distributorOrder.AsNoTracking().CountAsync());
         }
 
+        // ---- 归属记录是附带的：新表没建（部署顺序错了）或写入失败，都不能影响取票和下单 ----
+
+        [Fact]
+        public async Task 取票时分销商归属表不存在也能取票_员工推荐照常建立()
+        {
+            await using var f = await Fixture.Create();
+            await using var db = f.NewContext();
+            db.order.Add(new Order { id = 951, member_id = 11, staff_id = 28, type = "雪票", valid = 1 });
+            db.skiPass.Add(new SkiPass { id = 952, order_id = 951, member_id = 11, resort = "万龙", valid = 1, is_used = 0 });
+            await db.SaveChangesAsync(); db.ChangeTracker.Clear();
+            await db.Database.ExecuteSqlRawAsync("DROP TABLE distributor_order");
+            await db.Database.ExecuteSqlRawAsync("DROP TABLE distributor_customer");
+            var method = typeof(SkiPassController).GetMethod("CommitPickupAndReferralAsync");
+            var pass = await db.skiPass.AsNoTracking().SingleAsync(s => s.id == 952);
+            await (Task)method!.Invoke(f.Controller(db), new object[] { pass })!;       // 以前这里会抛异常、取票回滚
+            db.ChangeTracker.Clear();
+            Assert.Equal(1, (await db.skiPass.AsNoTracking().SingleAsync(s => s.id == 952)).is_used);
+            Assert.Equal(28, (await db.bizReferee.AsNoTracking().SingleAsync(r => r.member_id == 11 && r.valid)).staff_id);
+        }
+
+        [Fact]
+        public async Task 取票时归属写入失败也能取票_不留半条归属()
+        {
+            await using var f = await Fixture.Create();
+            await using var db = f.NewContext();
+            var intro = await AddDistributor(db, 12, 301);
+            db.order.Add(new Order { id = 961, member_id = 11, type = "雪票", valid = 1 });
+            db.skiPass.Add(new SkiPass { id = 962, order_id = 961, member_id = 11, resort = "万龙", valid = 1, is_used = 0 });
+            db.distributorOrder.Add(new DistributorOrder { order_id = 961, introducer_id = intro.id, member_id = 11, source = "雪票码" });
+            await db.SaveChangesAsync(); db.ChangeTracker.Clear();
+            await db.Database.ExecuteSqlRawAsync("CREATE TRIGGER fail_customer BEFORE INSERT ON distributor_customer BEGIN SELECT RAISE(ABORT, 'test-failure'); END");
+            var method = typeof(SkiPassController).GetMethod("CommitPickupAndReferralAsync");
+            var pass = await db.skiPass.AsNoTracking().SingleAsync(s => s.id == 962);
+            await (Task)method!.Invoke(f.Controller(db), new object[] { pass })!;
+            db.ChangeTracker.Clear();
+            Assert.Equal(1, (await db.skiPass.AsNoTracking().SingleAsync(s => s.id == 962)).is_used);
+            Assert.Empty(await db.distributorCustomer.AsNoTracking().ToListAsync());
+            // 表恢复正常后，下一次取票（同一顾客的另一张）照常建立归属
+            await db.Database.ExecuteSqlRawAsync("DROP TRIGGER fail_customer");
+            db.order.Add(new Order { id = 971, member_id = 11, type = "雪票", valid = 1 });
+            db.skiPass.Add(new SkiPass { id = 972, order_id = 971, member_id = 11, resort = "万龙", valid = 1, is_used = 0 });
+            db.distributorOrder.Add(new DistributorOrder { order_id = 971, introducer_id = intro.id, member_id = 11, source = "雪票码" });
+            await db.SaveChangesAsync(); db.ChangeTracker.Clear();
+            await (Task)method!.Invoke(f.Controller(db), new object[] { await db.skiPass.AsNoTracking().SingleAsync(s => s.id == 972) })!;
+            db.ChangeTracker.Clear();
+            Assert.Equal(intro.id, (await db.distributorCustomer.AsNoTracking().SingleAsync(c => c.member_id == 11)).introducer_id);
+        }
+
+        [Fact]
+        public async Task 下单时订单归属表不存在也能下单_分账照常生成()
+        {
+            await using var f = await Fixture.Create();
+            await using var db = f.NewContext();
+            var intro = await AddDistributor(db, 12, 301);
+            await db.Database.ExecuteSqlRawAsync("DROP TABLE distributor_order");
+            var request = new SkipassCartRequest { introducerId = intro.id, items = new List<SkipassCartItem> { Item(901, "13501177897", date: D0, count: 2) } };
+            var order = Assert.IsType<Order>(Assert.IsType<OkObjectResult>((await f.Controller(db).ReserveSkiPassCart(request, "customer-session")).Result).Value);
+            await using var check = f.NewContext();
+            Assert.Equal(2, await check.skiPass.CountAsync(s => s.order_id == order.id));
+            Assert.Equal(2, await check.orderShare.CountAsync(s => s.order_id == order.id && s.valid && s.relation_id == 301 && s.amount == 1));
+        }
+
         [Fact]
         public async Task 员工系统分账_每条分账记到自己那张票上_一张票最多一条()
         {

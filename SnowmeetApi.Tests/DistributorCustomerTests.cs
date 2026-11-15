@@ -209,4 +209,61 @@ public class DistributorCustomerTests
         Assert.Equal(0, res.code);
         Assert.Equal(1, JsonSerializer.SerializeToElement(res.data).GetProperty("created").GetInt32());
     }
+
+    // ---------- 归属记录是附带的：新表没建或写入失败，都不能影响取票 / 领卡 / 接券 / 下单 ----------
+
+    [Fact]
+    public async Task Guarded_hooks_return_false_instead_of_throwing_when_the_new_tables_are_missing()
+    {
+        await using var f = await CoachFixture.Create();
+        var intro = await AddIntro(f, CoachFixture.CoachMember, f.CoachId);
+        var db = f.NewContext();
+        await db.Database.ExecuteSqlRawAsync("DROP TABLE distributor_order");
+        await db.Database.ExecuteSqlRawAsync("DROP TABLE distributor_customer");
+        var svc = new DistributorCustomerService(db);
+        Assert.False(await svc.TryRecordOrderAsync(1, intro.id, CoachFixture.StudentA, "雪票码", DateTime.Now));
+        Assert.False(await svc.TryEstablishForPickedUpOrderAsync(1, DateTime.Now));
+        Assert.False(await svc.TryOnCardClaimedAsync(f.CoachId, CoachFixture.StudentA, 1, DateTime.Now));
+        Assert.False(await svc.TryOnTicketAcceptedAsync(await GrantOne(f, f.CoachId, "g-x"), CoachFixture.CoachMember, CoachFixture.StudentA, DateTime.Now));
+        // 没有留下待插入的归属行，调用方后面的 SaveChanges 不受牵连
+        Assert.Empty(db.ChangeTracker.Entries().Where(e => e.State == EntityState.Added));
+        db.member.Add(new Member { id = 99, real_name = "后面的保存" });
+        await db.SaveChangesAsync();
+    }
+
+    [Fact]
+    public async Task A_failed_insert_is_swallowed_leaves_nothing_tracked_and_the_next_write_works()
+    {
+        await using var f = await CoachFixture.Create();
+        var intro = await AddIntro(f, CoachFixture.CoachMember, f.CoachId);
+        var db = f.NewContext();
+        db.distributorOrder.Add(new DistributorOrder { order_id = 7, introducer_id = intro.id, member_id = CoachFixture.StudentA, source = "雪票码" });
+        await db.SaveChangesAsync();
+        await db.Database.ExecuteSqlRawAsync("CREATE TRIGGER fail_customer BEFORE INSERT ON distributor_customer BEGIN SELECT RAISE(ABORT, 'test-failure'); END");
+        await db.Database.ExecuteSqlRawAsync("CREATE TRIGGER fail_order BEFORE INSERT ON distributor_order BEGIN SELECT RAISE(ABORT, 'test-failure'); END");
+        var svc = new DistributorCustomerService(db);
+        Assert.True(await svc.TryEstablishForPickedUpOrderAsync(7, DateTime.Now));      // 内部已处理插入失败，没抛
+        Assert.True(await svc.TryRecordOrderAsync(8, intro.id, CoachFixture.StudentB, "雪票码", DateTime.Now));
+        Assert.Empty(db.ChangeTracker.Entries().Where(e => e.State == EntityState.Added));
+        Assert.Null(await OwnerOf(f, CoachFixture.StudentA));
+        Assert.Equal(1, await f.NewContext().distributorOrder.CountAsync());
+        // 触发器去掉后，同一个上下文里再来一次就能记上
+        await db.Database.ExecuteSqlRawAsync("DROP TRIGGER fail_customer");
+        Assert.True(await svc.TryEstablishForPickedUpOrderAsync(7, DateTime.Now));
+        Assert.NotNull(await OwnerOf(f, CoachFixture.StudentA));
+    }
+
+    [Fact]
+    public async Task Card_claim_and_coupon_accept_still_succeed_when_the_new_tables_are_missing()
+    {
+        await using var f = await CoachFixture.Create();
+        await AddIntro(f, CoachFixture.CoachMember, f.CoachId);
+        var db = f.NewContext();
+        await db.Database.ExecuteSqlRawAsync("DROP TABLE distributor_order");
+        await db.Database.ExecuteSqlRawAsync("DROP TABLE distributor_customer");
+        CoachCard card = await f.IssueAndClaim(CoachFixture.StudentA);                  // 里面断言了领卡成功
+        Assert.Equal(CoachCard.StatusClaimed, card.status);
+        await AcceptCoupon(f, await GrantOne(f, f.CoachId, "g-one"), "session-2", "session-4");   // 里面断言了接券 code == 0
+        Assert.Equal(CoachFixture.StudentB, (await f.NewContext().ticket.AsNoTracking().SingleAsync(t => t.member_id == CoachFixture.StudentB)).member_id);
+    }
 }

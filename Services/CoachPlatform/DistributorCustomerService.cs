@@ -46,6 +46,38 @@ public sealed class DistributorCustomerService(ApplicationDBContext db)
         }
     }
 
+    // ---------- 容错版：归属记录是附带的，任何失败都不能影响取票 / 领卡 / 接券 / 下单 ----------
+    // 失败的原因可以是新表还没建（部署顺序错了）、并发、数据库抖动。失败时把没存成的归属行从上下文里摘掉，
+    // 免得调用方后面的 SaveChanges 又去插一遍而连累主流程。返回 false = 没记成。
+
+    private async Task<bool> GuardAsync(Func<Task> action)
+    {
+        try
+        {
+            await action();
+            return true;
+        }
+        catch (Exception)
+        {
+            foreach (var entry in db.ChangeTracker.Entries()
+                .Where(e => e.State == EntityState.Added && (e.Entity is DistributorCustomer || e.Entity is DistributorOrder)).ToList())
+                entry.State = EntityState.Detached;
+            return false;
+        }
+    }
+
+    public Task<bool> TryRecordOrderAsync(int orderId, int introducerId, int memberId, string source, DateTime at)
+        => GuardAsync(() => RecordOrderAsync(orderId, introducerId, memberId, source, at));
+
+    public Task<bool> TryEstablishForPickedUpOrderAsync(int orderId, DateTime at)
+        => GuardAsync(() => EstablishForPickedUpOrderAsync(orderId, at));
+
+    public Task<bool> TryOnCardClaimedAsync(int coachId, int memberId, int cardId, DateTime at)
+        => GuardAsync(() => OnCardClaimedAsync(coachId, memberId, cardId, at));
+
+    public Task<bool> TryOnTicketAcceptedAsync(string ticketCode, int? senderMemberId, int accepterMemberId, DateTime at)
+        => GuardAsync(() => OnTicketAcceptedAsync(ticketCode, senderMemberId, accepterMemberId, at));
+
     /// <summary>订单归属：同一单同一位分销商只记一次。</summary>
     public async Task RecordOrderAsync(int orderId, int introducerId, int memberId, string source, DateTime at)
     {

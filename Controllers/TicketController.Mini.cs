@@ -104,8 +104,7 @@ public partial class TicketController
             }
             await _context.SaveChangesAsync();
             // 接受了分销商转发的券：按「先到先得」建立顾客归属（已有归属不变）；失败不影响接券
-            try { await new SnowmeetApi.Services.CoachPlatform.DistributorCustomerService(_context).OnTicketAcceptedAsync(ticket.code, sender?.id, accepter.id, now); }
-            catch (Exception) { /* 归属记录失败不影响接券 */ }
+            await new SnowmeetApi.Services.CoachPlatform.DistributorCustomerService(_context).TryOnTicketAcceptedAsync(ticket.code, sender?.id, accepter.id, now);
             return new ApiResult<Ticket> { code = 0, message = "", data = ticket };
         });
         if (result.code == 0 && reward != null) {
