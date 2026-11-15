@@ -93,6 +93,9 @@ namespace SnowmeetApi
             services.AddSingleton(sp => SnowmeetApi.Services.Fnb.MeituanCollectorMonitor.Create(
                 sp.GetRequiredService<IServiceScopeFactory>()));
             services.AddHostedService<SnowmeetApi.Services.Fnb.MeituanCollectorWatchdog>();
+            // 数据库备份脚本（Tools/db_backup）出问题时，由服务器发企业微信提醒
+            services.AddSingleton(sp => SnowmeetApi.Services.Ops.BackupAlertService.Create(
+                sp.GetRequiredService<IServiceScopeFactory>()));
             // 雪票取消后自动退款的轮询：自我游确认取消可能要几分钟，每分钟查一次（30 分钟后放缓），24 小时没确认标成取消失败
             services.AddHostedService<SnowmeetApi.Services.SkipassJobs.SkipassCancelPoller>();
             // 微信退款成功回调没有更新退款状态，每 5 分钟主动向微信查一次处理中的退款

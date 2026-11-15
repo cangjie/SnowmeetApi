@@ -95,9 +95,23 @@ DBCC CHECKDB ([snowmeet_new_restore]) WITH NO_INFOMSGS;
 
 ## 告警
 
-目前脚本把问题写到日志和 syslog（`journalctl -t snowmeet-backup`）。如果存在可执行的 `/etc/snowmeet-backup/alert.sh`，
-脚本会以 `alert.sh <级别> <内容>` 调用它（用来接企业微信等）。后端里已有企业微信文字提醒（`FnbWeComController.SendText`），
-但要从脚本推到企业微信，需要后端加一个带令牌的小接口，模式参照 `MeituanCollectorMonitor`，这一步还没做。
+备份出问题（`error`）或需要留意（`warning`）时，脚本会：
+
+1. 写日志和 syslog（`journalctl -t snowmeet-backup`）；
+2. 调本机后端 `POST http://127.0.0.1:5000/api/BackupAlert/Notify`，由后端发企业微信文字消息
+   （企业微信接口有 IP 白名单，只能从后端发；模式参照 `MeituanCollectorMonitor`）；
+3. 如果存在可执行的 `/etc/snowmeet-backup/alert.sh`，再以 `alert.sh <级别> <内容>` 调用它（可选）。
+
+后端这一块：`Controllers/Ops/BackupAlertController.cs`、`Services/Ops/BackupAlertService.cs`。**需要部署后端才生效**，并且在服务器工作目录
+`/home/ubuntu/webs/SnowmeetApi/` 下放两个本机文件（不进 git）：
+
+- `config.backupAlertToken`：一行随机字符串（如 `openssl rand -hex 24`）。脚本和后端读的是同一个文件；没有这个文件时后端一律拒绝。
+- `config.backupAlertReceivers`（可选）：一行企业微信 UserId，多个用 `|` 分隔。没有时沿用 `config.meituanCollectorNotify`；都没有就不发。
+
+同一条内容 30 分钟内只发一次，避免连续失败时刷屏；`check` 对同一个问题 6 小时内只提醒一次。
+令牌文件路径、后端地址可用环境变量 `SNOWMEET_BACKUP_ALERT_TOKEN_FILE`、`SNOWMEET_BACKUP_ALERT_URL` 改。
+验证：`curl -s -X POST http://127.0.0.1:5000/api/BackupAlert/Notify -H "X-Backup-Token: $(cat config.backupAlertToken)" -H 'Content-Type: application/json' -d '{"level":"info","message":"测试"}'`
+（会真的给接收人发一条企业微信消息；`info` 级别的消息脚本自己不会发，只有这样手动调用才会发）。
 
 ## 已知限制
 

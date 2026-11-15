@@ -415,6 +415,8 @@ config.sqlServer
 config.fnbAlertReceivers
 config.meituanCollectorToken
 config.meituanCollectorNotify
+config.backupAlertToken
+config.backupAlertReceivers
 meituan_collector_state.json
 meituan_collector_state.json.tmp
 *.dll

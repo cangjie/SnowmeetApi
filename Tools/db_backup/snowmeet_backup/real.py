@@ -3,14 +3,16 @@ from __future__ import annotations
 
 import atexit
 import datetime as dt
+import json
 import logging
 import os
 import shutil
 import subprocess
 import sys
 import tempfile
+import urllib.request
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 from . import core
 from .jobs import BackupError, Env
@@ -22,6 +24,9 @@ DEFAULT_PYDEPS = "/home/ubuntu/fnb-v4-deploy-20261006/deps"      # 服务器上�
 DEFAULT_STAGING = "/var/opt/mssql/backup"                        # mssql 用户可写
 DEFAULT_STATE_DIR = "/var/lib/snowmeet-backup"
 ALERT_HOOK = "/etc/snowmeet-backup/alert.sh"
+# 企业微信提醒：调本机后端的 BackupAlert/Notify，令牌和后端读的是同一个文件 config.backupAlertToken
+DEFAULT_ALERT_URL = "http://127.0.0.1:5000/api/BackupAlert/Notify"
+DEFAULT_ALERT_TOKEN_FILE = "/home/ubuntu/webs/SnowmeetApi/config.backupAlertToken"
 
 
 def _import_pymssql():
@@ -107,8 +112,38 @@ def free_gb(path: Path) -> float:
     return shutil.disk_usage(str(p)).free / 1e9
 
 
-def make_notifier(hook: str = ALERT_HOOK):
-    """日志 + syslog；如果存在可执行的 /etc/snowmeet-backup/alert.sh，就把 (级别, 内容) 传给它（用来接企业微信等）。"""
+def post_alert(url: str, token: str, level: str, msg: str, opener=None, timeout: int = 15) -> bool:
+    """把提醒发给后端 BackupAlert/Notify（由服务器发企业微信）。成功返回 True；失败只记日志，不抛异常。"""
+    opener = opener or urllib.request.urlopen
+    body = json.dumps({"level": level, "message": msg}, ensure_ascii=False).encode("utf-8")
+    req = urllib.request.Request(url, data=body, method="POST", headers={
+        "Content-Type": "application/json; charset=utf-8", "X-Backup-Token": token})
+    try:
+        with opener(req, timeout=timeout) as r:
+            data = json.loads(r.read().decode("utf-8") or "{}")
+        if data.get("code", 0) != 0:
+            log.warning("企业微信提醒没有发出：%s", data.get("message"))
+            return False
+        return True
+    except Exception as e:
+        log.warning("企业微信提醒发送失败：%s", e)
+        return False
+
+
+def _default_poster(level: str, msg: str) -> bool:
+    token_file = os.environ.get("SNOWMEET_BACKUP_ALERT_TOKEN_FILE", DEFAULT_ALERT_TOKEN_FILE)
+    try:
+        token = Path(token_file).read_text(encoding="utf-8").strip()
+    except OSError:
+        return False            # 没配令牌就不发（后端也会拒绝）
+    if not token:
+        return False
+    return post_alert(os.environ.get("SNOWMEET_BACKUP_ALERT_URL", DEFAULT_ALERT_URL), token, level, msg)
+
+
+def make_notifier(hook: str = ALERT_HOOK, poster: Optional[Callable[[str, str], bool]] = None):
+    """日志 + syslog + 企业微信（经后端）；如果存在可执行的 /etc/snowmeet-backup/alert.sh，还会把 (级别, 内容) 传给它。"""
+    poster = poster or _default_poster
 
     def notify(level: str, msg: str) -> None:
         {"error": log.error, "warning": log.warning}.get(level, log.info)(msg)
@@ -117,6 +152,11 @@ def make_notifier(hook: str = ALERT_HOOK):
             subprocess.run(["logger", "-t", "snowmeet-backup", "-p", prio, msg], timeout=10)
         except Exception:
             pass
+        if level in ("error", "warning"):
+            try:
+                poster(level, msg)
+            except Exception as e:
+                log.warning("企业微信提醒出错：%s", e)
         if level in ("error", "warning") and os.access(hook, os.X_OK):
             try:
                 subprocess.run([hook, level, msg], timeout=30)
