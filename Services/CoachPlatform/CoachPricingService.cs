@@ -15,6 +15,7 @@ public sealed class UsableCoachCard
     public int cardId { get; set; }
     public int coachId { get; set; }
     public string coachName { get; set; } = "";
+    public string? cardName { get; set; }
     public string bizType { get; set; } = "";
     /// <summary>这张卡在本单的门店/档位（养护）或租赁上有没有优惠。没有时前端灰显不可选。</summary>
     public bool applicable { get; set; }
@@ -31,6 +32,7 @@ public sealed class CoachCareQuote
     public int cardId { get; set; }
     public int coachId { get; set; }
     public string coachName { get; set; } = "";
+    public string? cardName { get; set; }
     public string mode { get; set; } = CoachCardRules.ModeNone;
     public double value { get; set; }
     /// <summary>单项/双项的基础价（不含加急加价），教练价只作用于它。</summary>
@@ -61,7 +63,7 @@ public sealed class CoachPricingService(ApplicationDBContext db)
         CoachCardRules.CarePriceCell? cell = CoachCardRules.FindCell(CoachCardRules.ParseCarePrices(card.care_price_snapshot),
             shop, CoachCardRules.ResolveTier(care));
         double bas = basePrice > 0 ? Math.Min(basePrice, commonCharge > 0 ? commonCharge : basePrice) : 0;
-        CoachCareQuote quote = new() { cardId = card.id, coachId = card.coach_id, coachName = coachName, baseAmount = bas };
+        CoachCareQuote quote = new() { cardId = card.id, coachId = card.coach_id, coachName = coachName, cardName = card.card_name_snapshot, baseAmount = bas };
         if (cell != null)
         {
             quote.mode = cell.mode; quote.value = cell.value;
@@ -93,6 +95,7 @@ public sealed class CoachPricingService(ApplicationDBContext db)
             UsableCoachCard item = new()
             {
                 cardId = card.id, coachId = card.coach_id, bizType = bizType, validUntil = card.end_date,
+                cardName = card.card_name_snapshot,
                 coachName = names.TryGetValue(card.coach_id, out string? n) ? n : "",
             };
             if (bizType == CoachCardRules.BizRental)

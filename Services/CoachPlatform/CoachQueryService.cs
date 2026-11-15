@@ -19,6 +19,7 @@ public sealed class CoachCardView
     public DateTime createDate { get; set; }
     public int? memberId { get; set; }
     public string? studentName { get; set; }
+    public string? cardName { get; set; }
     public string? phoneTail { get; set; }
     public DateTime? claimedAt { get; set; }
     public DateTime? validUntil { get; set; }
@@ -88,7 +89,7 @@ public sealed class CoachQueryService(ApplicationDBContext db)
             {
                 id = c.id, token = c.token, tokenTail = c.token.Length >= 4 ? c.token.Substring(c.token.Length - 4).ToUpperInvariant() : c.token,
                 status = c.status, createDate = c.create_date, memberId = c.member_id,
-                studentName = c.member_id == null ? null : p.name, phoneTail = c.member_id == null ? null : p.tail,
+                studentName = c.member_id == null ? null : p.name, cardName = c.card_name_snapshot, phoneTail = c.member_id == null ? null : p.tail,
                 claimedAt = c.claimed_at, validUntil = c.end_date, useCount = uses.TryGetValue(c.id, out int n) ? n : 0,
                 carePrices = CoachCardRules.ParseCarePrices(c.care_price_snapshot), rentalRate = c.rental_rate_snapshot,
             };

@@ -21,6 +21,22 @@ public sealed class CoachCardController(ApplicationDBContext db, IConfiguration 
     private readonly CoachCardService _cards = new(db, config);
     private readonly CoachPricingService _pricing = new(db);
 
+    [HttpGet]
+    public async Task<ApiResult<object>> GetShareTemplate(string t, string? sessionKey = null)
+    {
+        var session = await SessionAsync(sessionKey); if (session == null) return Result(2, "登录已失效，请重新进入小程序");
+        var member = await MemberOfAsync(session);
+        return await Run(async () => new { view = await new CoachCardTemplateService(Db, config).ViewAsync(t, member?.id, DateTime.Now), needMember = member == null });
+    }
+
+    [HttpPost]
+    public async Task<ApiResult<object>> ClaimShareTemplate(string t, string sessionKey)
+    {
+        var session = await SessionAsync(sessionKey); if (session == null) return Result(2, "登录已失效，请重新进入小程序");
+        var member = await MemberOfAsync(session); if (member == null) return Result(5, "请先授权手机号");
+        return await Run(async () => { var svc = new CoachCardTemplateService(Db, config); await svc.ClaimAsync(t, member.id, DateTime.Now); return new { view = await svc.ViewAsync(t, member.id, DateTime.Now), needMember = false }; });
+    }
+
     /// <summary>
     /// 分享卡当前状态：可领取 / 已领取（本人）/ 已被别人领走 / 已失效 / 教练本人 / 已有该教练的卡。
     /// 还没有会员（没授权过手机号）的人也能看，needMember=true 时前端走手机号授权。
@@ -78,7 +94,7 @@ public sealed class CoachCardController(ApplicationDBContext db, IConfiguration 
             {
                 cards = cards.Select(c => new
                 {
-                    id = c.id, coachName = names.TryGetValue(c.coach_id, out string? n) ? n : "", claimedAt = c.claimed_at, validUntil = c.end_date,
+                    id = c.id, cardName = c.card_name_snapshot, coachName = names.TryGetValue(c.coach_id, out string? n) ? n : "", claimedAt = c.claimed_at, validUntil = c.end_date,
                     expired = c.end_date != null && c.end_date < now,
                     carePrices = CoachCardRules.ParseCarePrices(c.care_price_snapshot), rentalRate = c.rental_rate_snapshot,
                 }),

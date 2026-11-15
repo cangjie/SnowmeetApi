@@ -26,7 +26,7 @@ public sealed class IntroducerService(ApplicationDBContext db, IAlipayRoyaltyBin
     /// <param name="alipay">未填写 / 已绑定 / 未绑定</param>
     /// <param name="alipayMessage">这次绑定失败的原因，没有则为空</param>
     public sealed record IntroducerView(int id, int memberId, string type, string name, string? realName, bool valid, int? coachId,
-        string wechat, string alipay, string alipayMessage, string phoneTail);
+        string wechat, string alipay, string alipayMessage, string phoneTail, string phone);
 
     private static string Clean(string? s) => (s ?? "").Trim();
 
@@ -444,7 +444,7 @@ public sealed class IntroducerService(ApplicationDBContext db, IAlipayRoyaltyBin
         string alipay = string.IsNullOrWhiteSpace(r.ali_account_num) ? "未填写" : (bound ? "已绑定" : "未绑定");
         string? cell = await db.memberSocialAccount.AsNoTracking().Where(a => a.member_id == i.member_id && a.valid == 1 && a.type == MemberSocialAccount.TYPE_CELL)
             .OrderByDescending(a => a.id).Select(a => a.num).FirstOrDefaultAsync();
-        return new IntroducerView(i.id, i.member_id, i.type, i.name, i.real_name, i.valid == 1, i.coach_id, wechat, alipay, alipayMessage, CoachCardRules.PhoneTail(cell));
+        return new IntroducerView(i.id, i.member_id, i.type, i.name, i.real_name, i.valid == 1, i.coach_id, wechat, alipay, alipayMessage, CoachCardRules.PhoneTail(cell), cell ?? "");
     }
 
     /// <summary>支付宝登录号：空就是没填；填了要是手机号或邮箱，并且要有真实姓名（支付宝按登录号绑定时核对）。</summary>

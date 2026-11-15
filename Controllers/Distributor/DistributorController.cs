@@ -24,6 +24,7 @@ public sealed class DistributorController(ApplicationDBContext db, IConfiguratio
 {
     public sealed record SaveStandardInput(List<CarePriceInput>? care, double? rental_rate);
     public sealed record MakeCouponsInput(string? shop, string? tier, string? mode, double value, int count, string? requestId);
+    public sealed record SaveCardTemplateInput(int? id, string? name, List<CarePriceInput>? care, double? rental_rate);
 
     /// <summary>当前登录会员的启用中分销商（只看有菜单的类型）；没有返回 null。</summary>
     private async Task<(Introducer? introducer, ApiResult<object>? error)> CurrentAsync(string? sessionKey)
@@ -114,6 +115,31 @@ public sealed class DistributorController(ApplicationDBContext db, IConfiguratio
         if (introducer.coach_id == null) return null;
         Coach? coach = await Db.coach.AsNoTracking().FirstOrDefaultAsync(c => c.id == introducer.coach_id && c.member_id == introducer.member_id);
         return coach == null ? null : (introducer, coach);
+    }
+
+    [HttpGet]
+    public async Task<ApiResult<object>> ListMyCardTemplates(string sessionKey)
+    {
+        var (intro, error) = await CurrentAsync(sessionKey); if (error != null) return error;
+        var own = await OwnCoachAsync(intro!); if (own == null) return Result(1, "机构资料不完整");
+        return await Run(async () => await new CoachCardTemplateService(Db, config).ListAsync(own.Value.coach, intro!));
+    }
+
+    [HttpGet]
+    public async Task<ApiResult<object>> GetMyCardTemplate(string sessionKey, int? id = null)
+    {
+        var (intro, error) = await CurrentAsync(sessionKey); if (error != null) return error;
+        var own = await OwnCoachAsync(intro!); if (own == null) return Result(1, "机构资料不完整");
+        return await Run(async () => await new CoachCardTemplateService(Db, config).EditorAsync(own.Value.coach, intro!, id));
+    }
+
+    [HttpPost]
+    public async Task<ApiResult<object>> SaveMyCardTemplate(string sessionKey, [FromBody] SaveCardTemplateInput input)
+    {
+        var (intro, error) = await CurrentAsync(sessionKey); if (error != null) return error;
+        var own = await OwnCoachAsync(intro!); if (own == null) return Result(1, "机构资料不完整");
+        if (input == null) return Result(1, "请填写卡种信息");
+        return await Run(async () => { var t = await new CoachCardTemplateService(Db, config).SaveAsync(own.Value.coach, intro!, input.id, input.name, input.care, input.rental_rate); return new { t.id }; });
     }
 
     /// <summary>机构「制作会员卡」页：当前设置，加每一格的底价和是否开放。教练（价格由管理员设）看到 canEdit=false。</summary>

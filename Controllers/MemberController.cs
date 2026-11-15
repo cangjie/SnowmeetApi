@@ -150,7 +150,7 @@ namespace SnowmeetApi.Controllers
             {
                 bool duplicate = card.status == CoachCard.StatusClaimed && await _db.coachCard.AsNoTracking().AnyAsync(c =>
                     c.coach_id == card.coach_id && c.member_id == targetId && c.status == CoachCard.StatusClaimed
-                    && c.season_end_year == card.season_end_year);
+                    && c.season_end_year == card.season_end_year && c.template_id == card.template_id);
                 if (duplicate)
                 {
                     card.status = CoachCard.StatusMerged;

@@ -149,18 +149,19 @@ public class IntroducerServiceTests
     }
 
     [Fact]
-    public async Task Distributor_list_exposes_only_the_phone_tail_for_search()
+    public async Task Distributor_list_exposes_latest_valid_phone_and_tail()
     {
         await using var db = await ShareFixture.NewDbAsync();
         await SeedMemberAsync(db, 100, "oABC");
         db.memberSocialAccount.Add(new MemberSocialAccount { member_id = 100, type = MemberSocialAccount.TYPE_CELL, num = "13800001234", valid = 1 });
+        db.memberSocialAccount.Add(new MemberSocialAccount { member_id = 100, type = MemberSocialAccount.TYPE_CELL, num = "13900005678", valid = 0 });
         await db.SaveChangesAsync();
         var svc = new IntroducerService(db, new FakeBinder());
         await svc.AddAsync(ShareFixture.Manager(300), 100, "KOL", "甲", null, NoAccount);
         var json = System.Text.Json.JsonSerializer.Serialize((await svc.ListAsync(false)).Single());
         using var item = System.Text.Json.JsonDocument.Parse(json);
         Assert.Equal("1234", item.RootElement.GetProperty("phoneTail").GetString());
-        Assert.DoesNotContain("13800001234", json);
+        Assert.Equal("13800001234", item.RootElement.GetProperty("phone").GetString());
     }
 
     [Fact]

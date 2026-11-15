@@ -39,6 +39,7 @@ public sealed class ShareCardView
     public string state { get; set; } = ShareCardState.Invalid;
     public string message { get; set; } = "";
     public string coachName { get; set; } = "";
+    public string? cardName { get; set; }
     public List<CoachCardRules.CarePriceCell> carePrices { get; set; } = new();
     public double? rentalRate { get; set; }
     public DateTime? validUntil { get; set; }
@@ -197,7 +198,7 @@ public sealed class CoachCardService(ApplicationDBContext db, IConfiguration? co
 
     private Task<bool> HoldsCardAsync(int coachId, int memberId, int seasonEndYear) =>
         db.coachCard.AsNoTracking().AnyAsync(c => c.coach_id == coachId && c.member_id == memberId
-            && c.status == CoachCard.StatusClaimed && c.season_end_year == seasonEndYear);
+            && c.template_id == null && c.status == CoachCard.StatusClaimed && c.season_end_year == seasonEndYear);
 
     private async Task<CoachCard?> FindByTokenAsync(string? token)
     {

@@ -30,12 +30,21 @@ internal static class CoachSchemaConfiguration
         card.Property(x => x.token).HasMaxLength(32);
         card.Property(x => x.status).HasMaxLength(12);
         card.Property(x => x.remark).HasMaxLength(200);
+        card.Property(x => x.card_name_snapshot).HasMaxLength(100);
         card.HasIndex(x => x.token).IsUnique().HasDatabaseName("UX_coach_card_token");
         card.HasIndex(x => new { x.coach_id, x.status, x.create_date }).HasDatabaseName("IX_coach_card_coach");
         card.HasIndex(x => new { x.member_id, x.status }).HasDatabaseName("IX_coach_card_member");
         // 同一学员本雪季对同一位教练只能有一张已领取的卡（并发领取的兜底）
         card.HasIndex(x => new { x.coach_id, x.member_id, x.season_end_year }).IsUnique()
-            .HasFilter("[member_id] IS NOT NULL AND [status] = 'claimed'").HasDatabaseName("UX_coach_card_holder");
+            .HasFilter("[member_id] IS NOT NULL AND [status] = 'claimed' AND [template_id] IS NULL").HasDatabaseName("UX_coach_card_holder");
+        card.HasIndex(x => new { x.template_id, x.member_id, x.season_end_year }).IsUnique()
+            .HasFilter("[member_id] IS NOT NULL AND [status] = 'claimed' AND [template_id] IS NOT NULL").HasDatabaseName("UX_coach_card_template_holder");
+
+        var template = m.Entity<CoachCardTemplate>();
+        template.Property(x => x.name).HasMaxLength(100);
+        template.Property(x => x.token).HasMaxLength(32);
+        template.HasIndex(x => x.token).IsUnique().HasDatabaseName("UX_coach_card_template_token");
+        template.HasIndex(x => new { x.coach_id, x.valid }).HasDatabaseName("IX_coach_card_template_coach");
 
         var use = m.Entity<CoachCardUse>();
         use.Property(x => x.biz_type).HasMaxLength(10);

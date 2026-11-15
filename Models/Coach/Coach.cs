@@ -57,6 +57,8 @@ namespace SnowmeetApi.Models
         [Key]
         public int id { get; set; }
         public int coach_id { get; set; }
+        public int? template_id { get; set; }
+        public string? card_name_snapshot { get; set; }
         /// <summary>24 位随机串，分享路径里用它，不可枚举。</summary>
         public string token { get; set; } = "";
         /// <summary>issued 待领取 | claimed 已领取 | revoked 已撤销 | merged 会员合并时因重复而作废</summary>
@@ -82,6 +84,20 @@ namespace SnowmeetApi.Models
         public const string StatusClaimed = "claimed";
         public const string StatusRevoked = "revoked";
         public const string StatusMerged = "merged";
+    }
+
+    [Table("coach_card_template")]
+    public class CoachCardTemplate
+    {
+        [Key] public int id { get; set; }
+        public int coach_id { get; set; }
+        public string name { get; set; } = "";
+        public string token { get; set; } = "";
+        public string care_prices { get; set; } = "[]";
+        public double? rental_rate { get; set; }
+        public int valid { get; set; } = 1;
+        public DateTime create_date { get; set; } = DateTime.Now;
+        public DateTime? update_date { get; set; }
     }
 
     /// <summary>
