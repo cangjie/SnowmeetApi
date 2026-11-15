@@ -1,0 +1,29 @@
+{
+  "_说明": "只是示例，用来对照在 AWS 控制台里手工添加规则。不要直接 put-bucket-lifecycle-configuration：那会替换整个桶的规则。full 7 天、diff 6 天，两者在同一时刻过期（原因见 README）；legacy / snowmeet 每月 1 份、约留 2 份。把 _说明 这一行去掉后才是合法的生命周期配置。",
+  "Rules": [
+    {
+      "ID": "snowmeet-new-full-7d",
+      "Filter": { "Prefix": "private/backup/db/snowmeet_new/full/" },
+      "Status": "Enabled",
+      "Expiration": { "Days": 7 }
+    },
+    {
+      "ID": "snowmeet-new-diff-6d",
+      "Filter": { "Prefix": "private/backup/db/snowmeet_new/diff/" },
+      "Status": "Enabled",
+      "Expiration": { "Days": 6 }
+    },
+    {
+      "ID": "legacy-full-60d",
+      "Filter": { "Prefix": "private/backup/db/legacy/full/" },
+      "Status": "Enabled",
+      "Expiration": { "Days": 60 }
+    },
+    {
+      "ID": "snowmeet-full-60d",
+      "Filter": { "Prefix": "private/backup/db/snowmeet/full/" },
+      "Status": "Enabled",
+      "Expiration": { "Days": 60 }
+    }
+  ]
+}

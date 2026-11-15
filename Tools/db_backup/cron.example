@@ -1,0 +1,24 @@
+# /etc/cron.d/snowmeet-backup —— 示例，还没有安装。安装前先看 README.md，并填上桶名。
+# 属主 root、权限 644。时间是服务器本地时间（北京时间）。
+# 04:30 服务器会重启，02:30 的完整备份必须在 04:15 前做完。
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+SNOWMEET_BACKUP_BUCKET=<桶名>
+
+# 完整备份：每天 02:30
+30 2 * * * root cd /home/ubuntu/webs/SnowmeetApi/Tools/db_backup && nice -n 19 ionice -c2 -n7 python3 -m snowmeet_backup full >> /var/log/snowmeet-backup.log 2>&1
+
+# 差异备份：09:00～16:30 每半小时、17:00、次日 00:10（共 18 次）
+0,30 9-16 * * * root cd /home/ubuntu/webs/SnowmeetApi/Tools/db_backup && nice -n 19 ionice -c2 -n7 python3 -m snowmeet_backup diff >> /var/log/snowmeet-backup.log 2>&1
+0 17 * * * root cd /home/ubuntu/webs/SnowmeetApi/Tools/db_backup && nice -n 19 ionice -c2 -n7 python3 -m snowmeet_backup diff >> /var/log/snowmeet-backup.log 2>&1
+10 0 * * * root cd /home/ubuntu/webs/SnowmeetApi/Tools/db_backup && nice -n 19 ionice -c2 -n7 python3 -m snowmeet_backup diff >> /var/log/snowmeet-backup.log 2>&1
+
+# 健康检查：每 30 分钟
+*/30 * * * * root cd /home/ubuntu/webs/SnowmeetApi/Tools/db_backup && python3 -m snowmeet_backup check >> /var/log/snowmeet-backup.log 2>&1
+
+# 另外两个几乎不变的库：每月 1 号各做一次完整备份（传完就删本机文件）
+0 3 1 * * root cd /home/ubuntu/webs/SnowmeetApi/Tools/db_backup && nice -n 19 ionice -c2 -n7 python3 -m snowmeet_backup full --db legacy >> /var/log/snowmeet-backup.log 2>&1
+30 3 1 * * root cd /home/ubuntu/webs/SnowmeetApi/Tools/db_backup && nice -n 19 ionice -c2 -n7 python3 -m snowmeet_backup full --db snowmeet >> /var/log/snowmeet-backup.log 2>&1
+
+# 还原演练：每月 15 号 03:30。先手动跑通一次再取消注释。
+#30 3 15 * * root cd /home/ubuntu/webs/SnowmeetApi/Tools/db_backup && nice -n 19 ionice -c2 -n7 python3 -m snowmeet_backup drill --yes >> /var/log/snowmeet-backup.log 2>&1
