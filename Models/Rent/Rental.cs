@@ -325,6 +325,9 @@ namespace SnowmeetApi.Models
         public string charge_type { get; set; } = "租金";
         public DateTime rental_date { get; set; }
         public int? rent_price_id { get; set; }
+        // 这一天租金用的价目场景：门市 / 预约（2026-11-15 新增，rental_detail.scene，可空；历史明细为空，按门市价看待）。
+        // 来源：首日取价格预设的 scene，续租沿用上一天的场景，连租按预约价封顶的那天记预约。
+        public string? scene { get; set; }
         public double amount { get; set; }
         public string memo { get; set; } = "";
         [NotMapped]

@@ -4860,6 +4860,8 @@ namespace SnowmeetApi.Controllers
                 id = 0,
                 rental_id = rentalId,
                 rent_price_id = rentPrice == null ? null : rentPrice.id,
+                // 记下这天租金是门市价还是预约价：来自价格预设的 scene（开单时店员选的），没有预设按门市
+                scene = RentSceneRules.Normalize(scene),
                 charge_type = "租金",
                 rental_date = date,
                 rent_item_id = null,
@@ -5797,6 +5799,11 @@ namespace SnowmeetApi.Controllers
                 if (oriDetail == null)
                 {
                     continue;
+                }
+                // 旧版小程序回传的明细没有 scene 字段：沿用库里原来的门市/预约，不能被冲成空（整行 Modified 会把 null 写回去）
+                if (string.IsNullOrWhiteSpace(detail.scene))
+                {
+                    detail.scene = oriDetail.scene;
                 }
                 List<CoreDataModLog> logs = Util.GetUpdateDifferenceLog<Models.RentalDetail>(oriDetail, detail, null, staff.id, scene);
                 _db.rentalDetail.Entry(detail).State = EntityState.Modified;
@@ -7884,8 +7891,23 @@ namespace SnowmeetApi.Controllers
             else
             {
                 rentType = "多日";
+                // 没有当天的价格预设：沿用上一天租金的场景（开单选了预约价，之后每天都按预约价续）。
+                // 只沿用「预约」：其它（门市、历史上的 会员 / 脏值）仍和以前一样按门市取价，不改历史行为。
+                Models.RentalDetail? prevRent = rental.details
+                    .Where(d => d.valid == 1 && d.charge_type == "租金" && d.rental_date.Date < rentDate.Date)
+                    .OrderByDescending(d => d.rental_date).ThenByDescending(d => d.id).FirstOrDefault();
+                if (RentSceneRules.IsReserve(prevRent?.scene))
+                {
+                    scene = RentSceneRules.Reserve;
+                }
             }
             RentPrice? price = await FindCatalogPriceAsync(rental, dayType, rentType, scene);
+            // 预约价目表里查不到这天的价（预约价只配了一部分商品/场次）：退回门市价，别记成 0 元租金；这天的场景也记门市
+            if (price == null && preset == null && RentSceneRules.IsReserve(scene))
+            {
+                scene = RentSceneRules.Shop;
+                price = await FindCatalogPriceAsync(rental, dayType, rentType, scene);
+            }
             double newPrice = (double)(price == null ? 0 : price.price);
             if (preset != null)
             {
@@ -7911,6 +7933,7 @@ namespace SnowmeetApi.Controllers
                 {
                     newPrice = reservePrice.price.Value;
                     price = reservePrice;
+                    scene = RentSceneRules.Reserve;   // 封顶后用的就是预约价，这天记预约
                 }
                 await CapPreviousDayRentAtReservePriceAsync(rental, rentDate);
             }
@@ -7934,6 +7957,7 @@ namespace SnowmeetApi.Controllers
                 id = 0,
                 rental_id = rental.id,
                 rent_price_id = price == null ? null : price.id,
+                scene = RentSceneRules.Normalize(scene),   // 这天租金是门市价还是预约价
                 charge_type = "租金",
                 rental_date = rentDate,
                 rent_item_id = null,
@@ -8010,6 +8034,7 @@ namespace SnowmeetApi.Controllers
             double oldAmount = prev.amount;
             prev.amount = reserve.price.Value;
             prev.rent_price_id = reserve.id;
+            prev.scene = RentSceneRules.Reserve;   // 封顶后上一天用的也是预约价
             prev.update_date = DateTime.Now;
             await _db.coreDataModLog.AddAsync(CoreDataModLog.CreateManualLog("RentDetail", "amount", prev.id, "系统续租",
                 null, null, oldAmount.ToString(System.Globalization.CultureInfo.InvariantCulture),
@@ -9360,6 +9385,11 @@ namespace SnowmeetApi.Controllers
                         }
                     }
                     Models.RentalDetail oriDetail = oriList.Where(d => d.id == detail.id).FirstOrDefault();
+                    // 旧版小程序回传的明细没有 scene 字段：沿用库里原来的门市/预约，不能被冲成空
+                    if (string.IsNullOrWhiteSpace(detail.scene))
+                    {
+                        detail.scene = oriDetail.scene;
+                    }
                     if (oriDetail.othersDiscountAmount != detail._filledOthersDiscountAmount)
                     {
                         for (int j = 0; j < oriDetail.discounts.Count; j++)
