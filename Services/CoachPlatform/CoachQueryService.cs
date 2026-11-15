@@ -111,6 +111,14 @@ public sealed class CoachQueryService(ApplicationDBContext db)
 
     private sealed record Link(int memberId, string source, DateTime since);
 
+    /// <summary>现有学员关系（领卡 / 接券）原样给「顾客归属」补录用：来源 card / coupon，时间 = 领卡/接券时刻。</summary>
+    public async Task<List<(int memberId, string source, DateTime since)>> GetStudentLinksAsync(int coachId)
+    {
+        Models.Coach? coach = await db.coach.AsNoTracking().FirstOrDefaultAsync(c => c.id == coachId);
+        if (coach == null) return new();
+        return (await LoadLinksAsync(coach)).Select(l => (l.memberId, l.source, l.since)).ToList();
+    }
+
     /// <summary>学员 = 领过该教练学员卡的人 ∪ 接了该教练转发券的人；起算日 = 领卡/接券当天（同一人取最早）。</summary>
     private async Task<List<Link>> LoadLinksAsync(Models.Coach coach)
     {
@@ -147,7 +155,7 @@ public sealed class CoachQueryService(ApplicationDBContext db)
         .Where(m => m.member_id == memberId && m.valid == 1 && m.type == MemberSocialAccount.TYPE_WECHAT_MINI_OPENID)
         .OrderByDescending(m => m.id).Select(m => m.num).FirstOrDefaultAsync();
 
-    private async Task<Dictionary<int, (string name, string tail)>> LoadPeopleAsync(List<int> memberIds)
+    internal async Task<Dictionary<int, (string name, string tail)>> LoadPeopleAsync(List<int> memberIds)
     {
         Dictionary<int, (string, string)> result = new();
         if (memberIds.Count == 0) return result;
@@ -243,7 +251,7 @@ public sealed class CoachQueryService(ApplicationDBContext db)
         return Math.Max(net, 0);
     }
 
-    private static string ItemName(Models.Order o)
+    internal static string ItemName(Models.Order o)
     {
         string type = (o.type ?? "").Trim();
         if (type == "养护" && o.cares != null && o.cares.Count > 0)

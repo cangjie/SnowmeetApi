@@ -54,7 +54,11 @@ public sealed class CoachCardService(ApplicationDBContext db, IConfiguration? co
         Coach? coach = await db.coach.AsNoTracking().FirstOrDefaultAsync(c => c.id == coachId);
         if (coach == null || coach.valid != 1 || !await DistributorAccess.CanIssueAsync(db, coach))
             throw new CoachException("你的分销商身份已停用或存在冲突，不能再发学员卡");
-        if (!await HasAnyBenefitAsync(coach)) throw new CoachException("管理员还没有给你设置学员卡的价格，请先联系管理员");
+        if (!await HasAnyBenefitAsync(coach))
+        {
+            bool isOrg = await db.introducer.AsNoTracking().AnyAsync(i => i.coach_id == coachId && i.valid == 1 && i.type == IntroducerRules.TypeOrg);
+            throw new CoachException(isOrg ? "你还没有制作会员卡，请先到「制作会员卡」设置折扣（需要管理员先给你开放底价）" : "管理员还没有给你设置学员卡的价格，请先联系管理员");
+        }
         int pending = await db.coachCard.AsNoTracking().CountAsync(c => c.coach_id == coachId && c.status == CoachCard.StatusIssued
             && (c.claim_deadline == null || c.claim_deadline >= now));
         if (pending >= CoachCardRules.MaxUnclaimedCards)
@@ -183,6 +187,9 @@ public sealed class CoachCardService(ApplicationDBContext db, IConfiguration? co
             }
             if (rows != 1) return Fail(ShareCardState.Taken, "这张学员卡已被领取");
             CoachCard claimed = (await db.coachCard.AsNoTracking().FirstAsync(c => c.id == card.id));
+            // 领卡也建立顾客归属（先到先得，已有归属不变）；失败不影响领卡
+            try { await new DistributorCustomerService(db).OnCardClaimedAsync(coach.id, memberId, card.id, now); }
+            catch (Exception) { /* 归属记录失败不影响领卡 */ }
             return new ClaimResult { state = ShareCardState.ClaimedByMe, message = "", card = claimed };
         });
     }

@@ -25,6 +25,7 @@ public sealed class CoachAdminController(ApplicationDBContext db, IConfiguration
     public sealed record AddCoachInput(int? memberId, string? cell, string? name);
     public sealed record UpdateCoachInput(int coachId, string? name, bool? valid);
     public sealed record SetPricingInput(int coachId, List<CarePriceInput>? care, double? rental_rate);
+    public sealed record SetFloorsInput(int coachId, List<CareFloorInput>? care, double? rental_min_rate);
     public sealed record CardIdInput(int cardId);
     public sealed record GrantInput(List<int>? coachIds, int templateId, int countEach, string? requestId);
 
@@ -41,9 +42,10 @@ public sealed class CoachAdminController(ApplicationDBContext db, IConfiguration
         List<CoachCarePrice> prices = await _admin.GetCarePricesAsync(c.id);
         object counts = await _query.CardCountsAsync(c.id);
         string? tail = await PhoneTailAsync(c.member_id);
+        string? introducerType = await Db.introducer.AsNoTracking().Where(i => i.coach_id == c.id && i.valid == 1).Select(i => i.type).FirstOrDefaultAsync();
         return new
         {
-            id = c.id, memberId = c.member_id, name = c.display_name, valid = c.valid == 1, phoneTail = tail,
+            id = c.id, memberId = c.member_id, name = c.display_name, valid = c.valid == 1, phoneTail = tail, introducerType,
             rentalRate = c.rental_rate, carePrices = prices.Select(p => new { p.shop, p.tier, p.mode, p.value }), cards = counts,
         };
     }
@@ -102,6 +104,19 @@ public sealed class CoachAdminController(ApplicationDBContext db, IConfiguration
     {
         Models.Coach c = await _admin.SetPricingAsync(input.coachId, new PricingInput(input.care, input.rental_rate));
         return await CoachViewAsync(c);
+    });
+
+    /// <summary>机构自己制作会员卡时的底价（下限）：养护每店×单项/双项 + 租赁。没设的格子机构不能设优惠。</summary>
+    [HttpGet]
+    public Task<ApiResult<object>> GetCoachFloors(string sessionKey, int coachId) =>
+        AsAdmin(sessionKey, async _ => await new CoachFloorService(Db, config).GetFloorViewAsync(coachId));
+
+    [HttpPost]
+    public Task<ApiResult<object>> SetCoachFloors(string sessionKey, [FromBody] SetFloorsInput input) => AsAdmin(sessionKey, async op =>
+    {
+        var svc = new CoachFloorService(Db, config);
+        await svc.SetFloorsAsync(input.coachId, new FloorInput(input.care, input.rental_min_rate), op);
+        return await svc.GetFloorViewAsync(input.coachId);
     });
 
     [HttpGet]

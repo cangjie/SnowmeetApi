@@ -20,6 +20,8 @@ namespace SnowmeetApi.Helpers
     {
         public List<SkipassCartItem> items { get; set; } = new List<SkipassCartItem>();
         public int? staffId { get; set; }
+        /// <summary>扫了分销商（教练 / 机构）订票二维码；不是客户端能随便指定：服务端校验启用、类型、不是本人。</summary>
+        public int? introducerId { get; set; }
     }
 
     // 只放不碰数据库的判定，便于单测。

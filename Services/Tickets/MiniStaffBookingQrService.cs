@@ -14,6 +14,18 @@ public sealed class MiniStaffBookingQrService(IMiniTicketTokenProvider tokens, H
     public async Task<byte[]> GetAsync(int staffId, string envVersion = "release")
     {
         if (staffId <= 0) throw new ArgumentException("员工编号无效");
+        return await RenderAsync("s=" + staffId, envVersion);
+    }
+
+    // 分销商（教练 / 机构）专属码：scene 用 d= 与员工的 s= 区分，落地同一个雪票选购页。
+    public async Task<byte[]> GetForDistributorAsync(int introducerId, string envVersion = "release")
+    {
+        if (introducerId <= 0) throw new ArgumentException("分销商编号无效");
+        return await RenderAsync("d=" + introducerId, envVersion);
+    }
+
+    private async Task<byte[]> RenderAsync(string scene, string envVersion)
+    {
         envVersion = (envVersion ?? "release").Trim();
         if (envVersion != "release" && envVersion != "trial" && envVersion != "develop")
             throw new ArgumentException("小程序版本无效");
@@ -21,7 +33,7 @@ public sealed class MiniStaffBookingQrService(IMiniTicketTokenProvider tokens, H
         {
             string token = await tokens.GetTokenAsync(attempt > 0);
             if (string.IsNullOrWhiteSpace(token)) throw new InvalidOperationException("获取小程序凭据失败");
-            string body = JsonSerializer.Serialize(new { page = "pages/ski_pass/ski_pass_selector", scene = "s=" + staffId,
+            string body = JsonSerializer.Serialize(new { page = "pages/ski_pass/ski_pass_selector", scene,
                 env_version = envVersion, check_path = envVersion == "release", width = 430 });
             using var content = new StringContent(body, Encoding.UTF8, "application/json");
             using var response = await http.PostAsync("https://api.weixin.qq.com/wxa/getwxacodeunlimit?access_token=" + Uri.EscapeDataString(token), content);

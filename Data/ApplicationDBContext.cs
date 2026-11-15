@@ -200,11 +200,14 @@ namespace SnowmeetApi.Data
         public DbSet<TicketShareClaim> ticketShareClaim { get; set; }
         public DbSet<Coach> coach { get; set; }
         public DbSet<CoachCarePrice> coachCarePrice { get; set; }
+        public DbSet<CoachPriceFloor> coachPriceFloor { get; set; }
         public DbSet<CoachCard> coachCard { get; set; }
         public DbSet<CoachCardUse> coachCardUse { get; set; }
         public DbSet<CoachCouponGrant> coachCouponGrant { get; set; }
         public DbSet<Introducer> introducer { get; set; }
         public DbSet<IntroducerRelationHistory> introducerRelationHistory { get; set; }
+        public DbSet<DistributorCustomer> distributorCustomer { get; set; }
+        public DbSet<DistributorOrder> distributorOrder { get; set; }
         public DbSet<ShareBatch> shareBatch { get; set; }
         public DbSet<MemberCareFirstOrder> memberCareFirstOrder { get; set; }
         public DbSet<MemberProfile> memberProfile { get; set; }

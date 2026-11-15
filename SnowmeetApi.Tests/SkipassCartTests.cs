@@ -213,6 +213,109 @@ namespace SnowmeetApi.Tests
             Assert.Equal(1, (await check.orderPayment.SingleAsync(p => p.order_id == order.id)).need_share);
         }
 
+        // ---------------- 分销商（教练 / 机构）订票二维码 ----------------
+
+        static async Task<Introducer> AddDistributor(ApplicationDBContext db, int memberId, int relationId, string type = "教练", int valid = 1, bool newMember = true)
+        {
+            if (newMember) db.member.Add(new Member { id = memberId, real_name = "分销商" + memberId, gender = "男" });
+            db.orderShareRelation.Add(new OrderShareRelation { id = relationId, type = "个人", name = "分销商" + memberId, valid = true });
+            var intro = new Introducer { member_id = memberId, type = type, name = "分销商" + memberId, relation_id = relationId, valid = valid };
+            db.introducer.Add(intro);
+            await db.SaveChangesAsync();
+            db.ChangeTracker.Clear();
+            return intro;
+        }
+
+        [Fact]
+        public async Task 分销商码_每张票1元系统分账给分销商_订单记在分销商名下_不记员工()
+        {
+            await using var f = await Fixture.Create();
+            await using var db = f.NewContext();
+            var intro = await AddDistributor(db, 12, 301, "机构");
+            var request = new SkipassCartRequest { introducerId = intro.id,
+                items = new List<SkipassCartItem> { Item(901, "13501177897", date: D0, count: 2), Item(902, "13900139000", date: D1, count: 1) } };
+            var order = Assert.IsType<Order>(Assert.IsType<OkObjectResult>((await f.Controller(db).ReserveSkiPassCart(request, "customer-session")).Result).Value);
+            await using var check = f.NewContext();
+            var shares = await check.orderShare.Where(s => s.order_id == order.id && s.valid).ToListAsync();
+            Assert.Equal(3, shares.Count);
+            Assert.All(shares, s => { Assert.Equal(1, s.amount); Assert.Equal(301, s.relation_id); Assert.False(s.dealed); Assert.Null(s.share_method); Assert.NotNull(s.skipass_id); });
+            Assert.Equal(3, shares.Select(s => s.skipass_id).Distinct().Count());   // 一张票最多一条
+            Assert.Null((await check.order.AsNoTracking().SingleAsync(o => o.id == order.id)).staff_id);
+            Assert.Equal(1, (await check.orderPayment.SingleAsync(p => p.order_id == order.id)).need_share);
+            var row = await check.distributorOrder.SingleAsync(o => o.order_id == order.id);
+            Assert.Equal((intro.id, 11, "雪票码"), (row.introducer_id, row.member_id, row.source));
+            // 下单本身不建顾客归属：要等取票成功
+            Assert.Empty(await check.distributorCustomer.ToListAsync());
+        }
+
+        [Fact]
+        public async Task 分销商码优先于顾客原来的员工推荐_本单不再回退到员工()
+        {
+            await using var f = await Fixture.Create();
+            await using var db = f.NewContext();
+            db.bizReferee.Add(new BizReferee { member_id = 11, biz_type = "雪票", staff_id = 28, valid = true });
+            db.orderShareRelation.Add(new OrderShareRelation { id = 201, staff_id = 28, type = "个人", name = "原推荐员工", valid = true });
+            var intro = await AddDistributor(db, 12, 301);
+            await db.SaveChangesAsync();
+            var request = new SkipassCartRequest { introducerId = intro.id, staffId = 28, items = new List<SkipassCartItem> { Item(901, "13501177897", date: D0) } };
+            var order = Assert.IsType<Order>(Assert.IsType<OkObjectResult>((await f.Controller(db).ReserveSkiPassCart(request, "customer-session")).Result).Value);
+            await using var check = f.NewContext();
+            Assert.Equal(new[] { 301 }, await check.orderShare.Where(s => s.order_id == order.id).Select(s => s.relation_id).ToArrayAsync());
+            Assert.Null((await check.order.AsNoTracking().SingleAsync(o => o.id == order.id)).staff_id);
+        }
+
+        [Theory]
+        [InlineData("停用")]
+        [InlineData("KOL")]
+        [InlineData("本人")]
+        [InlineData("不存在")]
+        public async Task 无效的分销商码照常下单_但不分账_不记归属(string kind)
+        {
+            await using var f = await Fixture.Create();
+            await using var db = f.NewContext();
+            int introducerId = 9999;
+            if (kind == "停用") introducerId = (await AddDistributor(db, 12, 301, "教练", valid: 0)).id;
+            if (kind == "KOL") introducerId = (await AddDistributor(db, 12, 301, "KOL")).id;
+            if (kind == "本人") introducerId = (await AddDistributor(db, 11, 301, "教练", newMember: false)).id;   // 顾客 11 自己就是这位分销商
+            var request = new SkipassCartRequest { introducerId = introducerId, items = new List<SkipassCartItem> { Item(901, "13501177897", date: D0) } };
+            var order = Assert.IsType<Order>(Assert.IsType<OkObjectResult>((await f.Controller(db).ReserveSkiPassCart(request, "customer-session")).Result).Value);
+            await using var check = f.NewContext();
+            Assert.Equal(1, await check.skiPass.CountAsync(s => s.order_id == order.id));
+            Assert.Empty(await check.orderShare.Where(s => s.order_id == order.id).ToListAsync());
+            Assert.Empty(await check.distributorOrder.ToListAsync());
+            Assert.Equal(0, (await check.orderPayment.SingleAsync(p => p.order_id == order.id)).need_share);
+        }
+
+        [Fact]
+        public async Task 分销商码订单取票成功后建立顾客归属_先到先得_已有归属不变但订单仍记在当前分销商名下()
+        {
+            await using var f = await Fixture.Create();
+            await using var db = f.NewContext();
+            var first = await AddDistributor(db, 12, 301, "教练");
+            var second = await AddDistributor(db, 13, 302, "机构");
+            var method = typeof(SkiPassController).GetMethod("CommitPickupAndReferralAsync");
+            async Task<int> BuyAndPick(int introducerId)
+            {
+                var request = new SkipassCartRequest { introducerId = introducerId, items = new List<SkipassCartItem> { Item(901, "13501177897", date: D0) } };
+                var order = Assert.IsType<Order>(Assert.IsType<OkObjectResult>((await f.Controller(db).ReserveSkiPassCart(request, "customer-session")).Result).Value);
+                // 取票用一个新的上下文：下单的上下文里这张票已被跟踪
+                await using var pick = f.NewContext();
+                var pass = await pick.skiPass.AsNoTracking().FirstAsync(s => s.order_id == order.id);
+                await (Task)method!.Invoke(f.Controller(pick), new object[] { pass })!;
+                return order.id;
+            }
+            int o1 = await BuyAndPick(first.id);
+            await using var check = f.NewContext();
+            var rel = await check.distributorCustomer.AsNoTracking().SingleAsync(c => c.member_id == 11 && c.valid == 1);
+            Assert.Equal((first.id, "雪票码", o1.ToString()), (rel.introducer_id, rel.source, rel.source_ref));
+
+            int o2 = await BuyAndPick(second.id);
+            rel = await check.distributorCustomer.AsNoTracking().SingleAsync(c => c.member_id == 11 && c.valid == 1);
+            Assert.Equal(first.id, rel.introducer_id);                       // 关系不变
+            Assert.Equal(second.id, (await check.distributorOrder.AsNoTracking().SingleAsync(o => o.order_id == o2)).introducer_id);   // 这一单记在第二位名下
+            Assert.Equal(2, await check.distributorOrder.AsNoTracking().CountAsync());
+        }
+
         [Fact]
         public async Task 员工系统分账_每条分账记到自己那张票上_一张票最多一条()
         {

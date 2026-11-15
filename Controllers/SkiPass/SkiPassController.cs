@@ -18,6 +18,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using SixLabors.ImageSharp;
 using SnowmeetApi.Controllers.Order;
 using SnowmeetApi.Helpers;
+using SnowmeetApi.Services.CoachPlatform;
 using Org.BouncyCastle.Asn1.Crmf;
 using System.Runtime.CompilerServices;
 using Microsoft.CodeAnalysis.CSharp;
@@ -1424,7 +1425,7 @@ namespace SnowmeetApi.Controllers
             {
                 new SkipassCartItem { productId = productId, date = date, cell = cell ?? "", name = name ?? "", count = count, idNo = idNo }
             };
-            return await ReserveTickets(items, staffId, sessionKey, sessionType);
+            return await ReserveTickets(items, staffId, null, sessionKey, sessionType);
         }
 
         // 购物车结算：一个订单、一笔付款，每张票一条 ski_pass 记录（张数都是 1）。
@@ -1437,11 +1438,11 @@ namespace SnowmeetApi.Controllers
             {
                 return BadRequest("购物车是空的");
             }
-            return await ReserveTickets(request.items, request.staffId, sessionKey, sessionType);
+            return await ReserveTickets(request.items, request.staffId, request.introducerId, sessionKey, sessionType);
         }
 
         [NonAction]
-        private async Task<ActionResult<object>> ReserveTickets(List<SkipassCartItem> cartItems, int? staffId, string sessionKey, string sessionType)
+        private async Task<ActionResult<object>> ReserveTickets(List<SkipassCartItem> cartItems, int? staffId, int? introducerId, string sessionKey, string sessionType)
         {
             string? invalid = SkipassCartRules.Validate(cartItems);
             if (invalid != null)
@@ -1541,12 +1542,16 @@ namespace SnowmeetApi.Controllers
                 create_date = DateTime.Now,
                 valid = 1
             };
+            // 扫了分销商（教练 / 机构）订票二维码：本单归这位分销商，不再回退到顾客原来的员工推荐或公众号扫码员工。
+            // 校验在服务端：启用、教练或机构、不是顾客本人（自己买自己的码不分账）；不满足就当没扫，不拦着顾客下单。
+            Introducer? distributor = await new DistributorCustomerService(_context).ResolveSkipassDistributorAsync(introducerId, member.id);
+            if (distributor != null) staffId = null;
             BizReferee referee = await _context.bizReferee.Where(r => r.valid && r.biz_type == "雪票" && r.member_id == member.id).AsNoTracking().FirstOrDefaultAsync();
-            if (staffId == null && referee != null && referee.staff_id != null)
+            if (distributor == null && staffId == null && referee != null && referee.staff_id != null)
             {
                 staffId = referee.staff_id;
             }
-            if (staffId == null)
+            if (distributor == null && staffId == null)
             {
                 List<MemberSocialAccount> msaOaList = member.GetInfo("wechat_oa_openid");
                 if (msaOaList != null && msaOaList.Count > 0)
@@ -1606,6 +1611,29 @@ namespace SnowmeetApi.Controllers
                 }
                 
             }
+            else if (distributor != null)
+            {
+                // 分销商码与员工码一致（用户 2026-11-15 定）：每张票一条 1 元的系统分账，收款方是这位分销商的收款账号。
+                OrderShareRelation distributorRelation = await _context.orderShareRelation
+                    .Where(r => r.id == distributor.relation_id && r.valid).AsNoTracking().FirstOrDefaultAsync();
+                if (distributorRelation != null)
+                {
+                    for (int i = 0; i < passes.Count; i++)
+                    {
+                        order.orderShares.Add(new OrderShare()
+                        {
+                            id = 0,
+                            order_id = order.id,
+                            relation_id = distributorRelation.id,
+                            amount = 1,
+                            valid = true,
+                            dealed = false,
+                            create_date = DateTime.Now,
+                            skipass = passes[i]
+                        });
+                    }
+                }
+            }
             OrderController _orderHelper = new OrderController(_context, _config, _http);
             await _orderHelper.GenerateOrderCode(order);
             OrderPayment payment = new OrderPayment()
@@ -1624,6 +1652,12 @@ namespace SnowmeetApi.Controllers
             order.skipasses = passes;
             await _context.order.AddAsync(order);
             await _context.SaveChangesAsync();
+            if (distributor != null)
+            {
+                // 订单归属：记在这位分销商名下（顾客自己的归属在取票成功后按「先到先得」建立）。记失败不影响下单。
+                try { await new DistributorCustomerService(_context).RecordOrderAsync(order.id, distributor.id, member.id, DistributorOrder.SourceQr, DateTime.Now); }
+                catch (Exception) { /* 归属记录失败不影响顾客下单 */ }
+            }
             return Ok(order);
         }
         [HttpGet]

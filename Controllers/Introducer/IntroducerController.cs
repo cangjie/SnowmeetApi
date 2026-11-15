@@ -51,6 +51,11 @@ public sealed class IntroducerController(ApplicationDBContext db, IConfiguration
         => AsStaff(sessionKey, StaffAccountRules.IsAdmin, AdminOnly, async op => await Service.UpdateAsync(input.introducerId, input.name,
             input.realName, input.valid, new(input.wepayAccountNum, input.wepayAccountName, input.aliAccountNum), op.id, input.type));
 
+    /// <summary>把现有的学员关系（领卡 / 接券）补录成顾客归属：按时间先到先得，已有归属不动，可重复执行。部署新表后跑一次。</summary>
+    [HttpPost]
+    public Task<ApiResult<object>> BackfillCustomers(string sessionKey)
+        => AsStaff(sessionKey, StaffAccountRules.IsAdmin, AdminOnly, async _ => new { created = await new DistributorCustomerService(Db).BackfillLegacyLinksAsync() });
+
     [HttpPost]
     public Task<ApiResult<object>> BindAlipay(string sessionKey, [FromBody] IntroducerIdInput input)
         => AsStaff(sessionKey, StaffAccountRules.IsAdmin, AdminOnly, async _ => await Service.BindAlipayAsync(input.introducerId));
