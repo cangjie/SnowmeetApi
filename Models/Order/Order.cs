@@ -134,7 +134,11 @@ namespace SnowmeetApi.Models
         public List<Retail> retails { get; set; } = new List<Retail>();
         [NotMapped]
         public CareCardSaleInfo? careCardSale { get; set; }
-         
+        // 养护订单列表用：这张养护订单里卖出的卡的金额（养护购卡单、已生效；不含「养护附加费用」）。
+        // 只有列表接口 GetOrdersByStaffPaged（type=养护）会填；普通养护单和别处都是 null。不映射数据库。
+        [NotMapped]
+        public double? careCardAmount { get; set; }
+
 
         public List<Care> cares { get; set; } = new List<Care>();
         // 不变量：rentals 里不会有 null 元素。接口（Startup 里 ReferenceHandler.IgnoreCycles）输出 rental.order 时，

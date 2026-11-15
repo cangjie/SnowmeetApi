@@ -116,6 +116,23 @@ public class CareCardSaleService
         return care;
     }
 
+    // 养护订单列表「卡类零售」：一批订单一次查出每张养护购卡单（order_source = care_card_single）已卖出的卡款，
+    // = 它名下有效零售明细里不是「养护附加费用」的成交价合计。只算已生效（dealed = 1）、有效、不在接待中的单——
+    // 还在购物车里没成交的草稿不算卖出。返回 订单 id → 金额，不是购卡单或没有卡款的订单不在字典里。
+    public static async Task<Dictionary<int, double>> GetCardAmountsAsync(ApplicationDBContext db, IEnumerable<Models.Order> orders)
+    {
+        var ids = orders.Where(o => IsSingleOrder(o) && o.valid == 1 && o.dealed == 1 && o.recepting == 0)
+            .Select(o => o.id).Distinct().ToList();
+        var result = new Dictionary<int, double>();
+        if (ids.Count == 0) return result;
+        var rows = await db.retail.AsNoTracking()
+            .Where(r => r.order_id != null && ids.Contains(r.order_id.Value) && r.valid == 1 && r.retail_type != CareChargeRetailType)
+            .Select(r => new { OrderId = r.order_id!.Value, r.deal_price }).ToListAsync();
+        foreach (var g in rows.GroupBy(r => r.OrderId))
+            result[g.Key] = (double)g.Sum(r => Money(r.deal_price));
+        return result;
+    }
+
     public static async Task<CareCardSaleInfo?> GetInfoAsync(ApplicationDBContext db, Models.Order order)
     {
         var retail = order.type == "养护" ? await GetLinkedRetailAsync(db, order.id)

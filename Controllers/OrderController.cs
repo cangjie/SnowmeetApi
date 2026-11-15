@@ -1285,6 +1285,8 @@ namespace SnowmeetApi.Controllers
                 await FillCareCardInfoAsync(paged);
                 // 用了券 / 学员卡的装备：券名、学员卡名（和次卡一起显示在装备块里）
                 await FillCareTicketAndCoachCardNamesAsync(paged);
+                // 养护购卡单里卖出的卡款（列表汇总行「卡类零售」）
+                await FillCareCardAmountsAsync(paged);
             }
             SnowmeetApi.Models.Order.RendOrderList(paged);
             return Ok(new ApiResult<PagedOrderResult>()
@@ -1293,6 +1295,27 @@ namespace SnowmeetApi.Controllers
                 message = "",
                 data = result
             });
+        }
+
+        // 给本页养护购卡单填已卖出的卡款（Order.careCardAmount，规则见 CareCardSaleService.GetCardAmountsAsync）。
+        // 读不出来只是这页没有「卡类零售」数字，不能把整个列表弄坏。
+        private async Task FillCareCardAmountsAsync(List<SnowmeetApi.Models.Order> pageOrders)
+        {
+            try
+            {
+                Dictionary<int, double> amounts = await CareCardSaleService.GetCardAmountsAsync(_db, pageOrders);
+                foreach (SnowmeetApi.Models.Order order in pageOrders)
+                {
+                    if (amounts.TryGetValue(order.id, out double amount))
+                    {
+                        order.careCardAmount = amount;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("养护订单列表卡款读取失败：" + ex.Message);
+            }
         }
 
         // 给本页养护订单里用次卡的装备填展示用的卡名 / 剩余次数（Care.cardDisplayName / cardRemaining / cardUnlimited，规则见 CareCardInfoRules）。
