@@ -134,6 +134,8 @@ def _ship(env: Env, bak: Path, key: str) -> Tuple[int, str]:
         if remote != size:
             raise BackupError("S3 上的大小 %s 和本机 %s 不一致：%s" % (remote, size, key))
         env.s3.upload(sha_file, key + ".sha256")
+        if env.s3.head_size(key + ".sha256") != sha_file.stat().st_size:
+            raise BackupError("S3 上的校验文件大小不一致：%s" % key)
         return size, sha
     finally:
         for p in (gz, sha_file):
@@ -157,21 +159,26 @@ def _fail(env: Env, job: str, msg: str) -> None:
     env.notify("error", "%s 失败：%s" % (job, msg))
 
 
-def run_full(env: Env, db: str, copy_only: bool = False, keep_local: bool = True) -> Dict[str, object]:
+def run_full(env: Env, db: str, copy_only: bool = False, keep_local: bool = True, deployment: bool = False) -> Dict[str, object]:
     core.check_db_name(db)
-    job = ("adhoc:%s" if copy_only else "full:%s") % db
+    if deployment and not copy_only:
+        raise ValueError("部署前备份必须使用 COPY_ONLY")
+    job = ("deployment:%s" if deployment else ("adhoc:%s" if copy_only else "full:%s")) % db
     with file_lock(env.lock_path):
         t0 = env.now()
-        bak = env.staging / core.local_bak_name(db, "full", t0)
+        staging = env.staging / "deployment" if deployment else env.staging
+        bak = staging / core.local_bak_name(db, "full", t0)
         try:
-            _prepare_dir(env.staging)
+            _prepare_dir(staging)
             _ensure_space(env, db)
             if bak.exists():
                 bak.unlink()
             env.sql.execute(_bak_sql(db, bak, copy_only=copy_only))
             env.sql.execute(_verify_sql(bak))
-            key = core.full_key(db, t0, adhoc=copy_only)
+            key = core.deployment_key(db, t0) if deployment else core.full_key(db, t0, adhoc=copy_only)
             size, sha = _ship(env, bak, key)
+            if deployment and env.s3.sha256(key) != sha:
+                raise BackupError("从 S3 读回的备份 SHA-256 不一致：%s" % key)
             info = {"stamp": core.stamp(t0), "key": key, "bytes": size, "sha256": sha}
             if not copy_only:
                 rows = env.sql.query(MSDB_LAST_FULL, (db,))

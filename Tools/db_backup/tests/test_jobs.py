@@ -1,11 +1,35 @@
 import datetime as dt
+import hashlib
 import re
 import subprocess
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
-from snowmeet_backup import core, jobs
+from snowmeet_backup import cli, core, jobs, real
+
+
+class DeploymentCliTests(unittest.TestCase):
+    def test_deployment_option_enforces_copy_only_and_no_local_retention(self):
+        with mock.patch("snowmeet_backup.real.build_env", return_value=object()), mock.patch.object(jobs, "run_full") as run:
+            self.assertEqual(cli.main(["full", "--deployment"]), 0)
+        self.assertEqual(run.call_args.kwargs, {"copy_only": True, "keep_local": False, "deployment": True})
+
+    def test_busy_deployment_backup_is_failure_not_success(self):
+        with mock.patch("snowmeet_backup.real.build_env", return_value=object()), mock.patch.object(jobs, "run_full", side_effect=jobs.Busy):
+            self.assertNotEqual(cli.main(["full", "--deployment"]), 0)
+
+    def test_streamed_s3_hash_checks_all_bytes_and_reports_download_errors(self):
+        with tempfile.TemporaryDirectory() as folder:
+            command = Path(folder) / "fake-aws"
+            command.write_text("#!/bin/sh\nhead -c 2100000 /dev/zero\n", encoding="utf-8")
+            command.chmod(0o755)
+            s3 = real.S3("bucket", aws=str(command))
+            self.assertEqual(s3.sha256("deployment/test"), hashlib.sha256(bytes(2100000)).hexdigest())
+            command.write_text("#!/bin/sh\necho fail >&2\nexit 1\n", encoding="utf-8")
+            with self.assertRaisesRegex(jobs.BackupError, "读回备份失败"):
+                s3.sha256("deployment/test")
 
 
 class FakeSql:
@@ -39,13 +63,19 @@ class FakeSql:
 class FakeS3:
     def __init__(self):
         self.objects = {}
+        self.hashes = {}
         self.corrupt = False
+        self.bad_digest = False
 
     def upload(self, local, key):
         self.objects[key] = Path(local).stat().st_size
+        self.hashes[key] = hashlib.sha256(Path(local).read_bytes()).hexdigest()
 
     def head_size(self, key):
         return self.objects[key] + (1 if self.corrupt else 0)
+
+    def sha256(self, key):
+        return "mismatch" if self.bad_digest else self.hashes[key]
 
 
 def gz(src, dst):
@@ -82,6 +112,35 @@ class JobTestBase(unittest.TestCase):
 
 
 class FullTests(JobTestBase):
+    def test_deployment_backup_is_copy_only_and_leaves_no_local_copy_or_changes_to_baseline(self):
+        jobs.run_full(self.env, "snowmeet_new")
+        before = self.state()["jobs"]["full:snowmeet_new"]
+        # 同一分钟执行部署备份，也不能覆盖或删除定时备份基准文件。
+        result = jobs.run_full(self.env, "snowmeet_new", copy_only=True, deployment=True)
+        self.assertIn("COPY_ONLY", self.sql.executed[-2])
+        self.assertIn("/deployment/", result["key"])
+        self.assertIn(result["key"], self.s3.objects)
+        self.assertIn(result["key"] + ".sha256", self.s3.objects)
+        self.assertEqual(self.state()["jobs"]["full:snowmeet_new"], before)
+        self.assertEqual(sorted(p.name for p in (self.staging / "deployment").iterdir()), [])
+        self.assertTrue((self.staging / "snowmeet_new_full_20261116_0230.bak").exists())
+
+    def test_deployment_failure_cleans_temporary_files_and_cannot_change_the_baseline(self):
+        with self.assertRaises(ValueError):
+            jobs.run_full(self.env, "snowmeet_new", deployment=True)
+        self.s3.corrupt = True
+        with self.assertRaises(jobs.BackupError):
+            jobs.run_full(self.env, "snowmeet_new", copy_only=True, deployment=True)
+        self.assertEqual(list((self.staging / "deployment").iterdir()), [])
+        self.assertNotIn("full:snowmeet_new", self.state().get("jobs", {}))
+
+    def test_deployment_rejects_remote_hash_mismatch_and_cleans_temporary_files(self):
+        self.s3.bad_digest = True
+        with self.assertRaisesRegex(jobs.BackupError, "SHA-256"):
+            jobs.run_full(self.env, "snowmeet_new", copy_only=True, deployment=True)
+        self.assertEqual(list((self.staging / "deployment").iterdir()), [])
+        self.assertNotIn("deployment:snowmeet_new", self.state().get("jobs", {}))
+
     def test_full_happy_path(self):
         r = jobs.run_full(self.env, "snowmeet_new")
         self.assertTrue(self.sql.executed[0].startswith("BACKUP DATABASE [snowmeet_new] TO DISK = N'"))

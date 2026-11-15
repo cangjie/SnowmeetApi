@@ -11,6 +11,9 @@
 | 差异 | 09:00～17:00 每半小时（17 次）+ 00:10 收尾（1 次） | `private/backup/db/snowmeet_new/diff/` | 6 天（见下） |
 | `legacy`、`snowmeet` | 每月 1 号完整备份 | `private/backup/db/<库名>/full/` | 约 60 天（留最近 2 份） |
 | 手动完整备份（`full --copy-only`） | 随时 | `private/backup/db/<库名>/adhoc/` | 不自动过期 |
+| 部署前备份（`full --deployment`） | 部署前 | `private/backup/db/snowmeet_new/deployment/` | 7 天（须先配置生命周期） |
+
+2026-11-15 用户确认：部署前备份只保存在 S3，保留 7 天；允许在服务器临时生成，上传并核验后立即删除。部署前备份会从 S3 流式读回并核对 SHA-256，成功后才删除本次 `.bak`。异常中断时还需检查并清理临时文件。独立 `deployment/` 前缀不影响 `adhoc/` 和已有备份。用户表示已在 AWS 控制台设置并确认该前缀 7 天生命周期（如启用版本控制，也设置非当前版本过期）；服务器角色无权读取规则，无法独立核实。S3 生命周期按 UTC 日界线计算，到期删除可能稍有延迟。
 
 - 一份完整备份和它的 18 份差异备份是一组：当天 09:00～17:00 的差异备份，加次日 00:10 的那份，都以当天 02:30 的完整备份为基准。
 - 还原时只需要：同一个基准的完整备份 + 最近的一份差异备份。差异备份文件名里的 `base_<时间>` 就是它的基准。
@@ -38,6 +41,7 @@
 python3 -m snowmeet_backup plan                 # 打印计划和过期对齐检查，不连接任何东西
 python3 -m snowmeet_backup full                 # 完整备份（改变差异备份的基准）
 python3 -m snowmeet_backup full --copy-only     # 手动备份：不改变基准，传到 adhoc/
+python3 -m snowmeet_backup full --deployment    # 部署前 COPY_ONLY，传到 deployment/，本地不保留
 python3 -m snowmeet_backup full --db legacy     # 其他库的完整备份（传完就删本机文件）
 python3 -m snowmeet_backup diff                 # 差异备份
 python3 -m snowmeet_backup check                # 健康检查，有问题就告警

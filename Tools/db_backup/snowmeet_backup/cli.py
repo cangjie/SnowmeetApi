@@ -40,6 +40,7 @@ def main(argv=None) -> int:
     f.add_argument("--copy-only", action="store_true",
                    help="手动备份用：不影响差异备份的基准；上传到 adhoc/ 目录，没有自动过期")
     f.add_argument("--no-keep-local", action="store_true", help="上传后不在本机留备份文件（非主库默认如此）")
+    f.add_argument("--deployment", action="store_true", help="部署前临时备份：COPY_ONLY，上传到 deployment/，本地不保留")
     d = sub.add_parser("diff", help="差异备份并上传 S3")
     d.add_argument("--db", default=core.PRIMARY_DB)
     c = sub.add_parser("check", help="健康检查，有问题就告警")
@@ -63,7 +64,7 @@ def main(argv=None) -> int:
         env = real.build_env()
         if args.cmd == "full":
             keep_local = (args.db == core.PRIMARY_DB) and not args.no_keep_local
-            jobs.run_full(env, args.db, copy_only=args.copy_only, keep_local=keep_local)
+            jobs.run_full(env, args.db, copy_only=args.copy_only or args.deployment, keep_local=keep_local and not args.deployment, deployment=args.deployment)
         elif args.cmd == "diff":
             jobs.run_diff(env, args.db)
         elif args.cmd == "check":
@@ -78,7 +79,7 @@ def main(argv=None) -> int:
         return 0
     except jobs.Busy:
         log.warning("另一个备份任务正在运行，本次 %s 跳过", args.cmd)
-        return 0
+        return 2 if args.cmd == "full" and args.deployment else 0
     except Exception as e:
         log.error("%s 失败：%s", args.cmd, e)
         return 1

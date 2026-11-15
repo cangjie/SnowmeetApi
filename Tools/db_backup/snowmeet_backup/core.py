@@ -45,6 +45,11 @@ def full_key(db: str, t: dt.datetime, adhoc: bool = False) -> str:
     return "%s/%s/%s/%s_full_%s.bak.gz" % (S3_PREFIX, db, kind, db, stamp(t))
 
 
+def deployment_key(db: str, t: dt.datetime) -> str:
+    check_db_name(db)
+    return "%s/%s/deployment/%s_full_%s.bak.gz" % (S3_PREFIX, db, db, t.strftime("%Y%m%d_%H%M%S_%f"))
+
+
 def diff_key(db: str, t: dt.datetime, base_stamp: str) -> str:
     check_db_name(db)
     return "%s/%s/diff/%s_diff_%s_base_%s.bak.gz" % (S3_PREFIX, db, db, stamp(t), base_stamp)

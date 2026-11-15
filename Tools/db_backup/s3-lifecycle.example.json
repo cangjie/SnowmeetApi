@@ -14,6 +14,12 @@
       "Expiration": { "Days": 6 }
     },
     {
+      "ID": "snowmeet-new-deployment-7d",
+      "Filter": { "Prefix": "private/backup/db/snowmeet_new/deployment/" },
+      "Status": "Enabled",
+      "Expiration": { "Days": 7 }
+    },
+    {
       "ID": "legacy-full-60d",
       "Filter": { "Prefix": "private/backup/db/legacy/full/" },
       "Status": "Enabled",

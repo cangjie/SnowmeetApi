@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import atexit
 import datetime as dt
+import hashlib
 import json
 import logging
 import os
@@ -10,6 +11,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import urllib.request
 from pathlib import Path
 from typing import Callable, Optional
@@ -92,6 +94,40 @@ class S3:
         out = self._run(["s3api", "head-object", "--bucket", self.bucket, "--key", key, "--region", self.region,
                          "--query", "ContentLength", "--output", "text"], 120)
         return int(out.strip())
+
+    def sha256(self, key: str) -> str:
+        """从 S3 流式读回，不在服务器落第二份备份文件。"""
+        args = [self.aws, "s3", "cp", "s3://%s/%s" % (self.bucket, key), "-", "--region", self.region, "--only-show-errors"]
+        env = dict(os.environ, AWS_CONFIG_FILE=self._cfg)
+        digest = hashlib.sha256()
+        errors = []
+        with tempfile.TemporaryFile() as stderr:
+            proc = subprocess.Popen(args, env=env, stdout=subprocess.PIPE, stderr=stderr)
+            def read():
+                try:
+                    for chunk in iter(lambda: proc.stdout.read(1 << 20), b""):
+                        digest.update(chunk)
+                except Exception as exc:
+                    errors.append(exc)
+                    proc.kill()
+                finally:
+                    proc.stdout.close()
+            thread = threading.Thread(target=read, daemon=True)
+            thread.start()
+            try:
+                code = proc.wait(timeout=7200)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                proc.wait()
+                thread.join()
+                raise BackupError("从 S3 读回备份超时")
+            thread.join()
+            if errors:
+                raise BackupError("读取 S3 备份失败：%s" % errors[0])
+            if code:
+                stderr.seek(0)
+                raise BackupError("从 S3 读回备份失败：%s" % stderr.read(300).decode("utf-8", errors="replace").strip())
+        return digest.hexdigest()
 
 
 def gzip_file(src: Path, dst: Path) -> None:
