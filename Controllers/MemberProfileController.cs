@@ -136,7 +136,7 @@ namespace SnowmeetApi.Controllers
         {
             return new MemberProfileView
             {
-                needProfile = MemberProfileRules.NeedPrompt(p?.nick_avatar_update_date, DateTime.Now),
+                needProfile = MemberProfileRules.NeedPrompt(p?.nick_avatar_update_date, DateTime.Now, p?.nick_name, p?.avatar),
                 nickName = string.IsNullOrWhiteSpace(p?.nick_name) ? null : p!.nick_name,
                 avatarUrl = string.IsNullOrWhiteSpace(p?.avatar) ? null : _storage.PublicUrl(p!.avatar!),
                 updateDate = p?.nick_avatar_update_date

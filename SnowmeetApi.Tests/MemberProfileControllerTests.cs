@@ -104,6 +104,33 @@ public sealed class MemberProfileControllerTests
         Assert.NotNull(r.data.updateDate);
     }
 
+    [Fact]
+    public async Task GetMyProfile_AProfileMissingTheNickNameOrTheAvatarIsAskedAgain_ButWhatIsSavedComesBack()
+    {
+        await using var f = await CoachFixture.Create();
+        var storage = new MiniTicketQrTests.Storage();
+        await Controller(f, storage).SaveMyProfile("session-3", nickName: null, avatar: File(Jpeg));            // 只存了头像
+        await Controller(f, storage).SaveMyProfile("session-4", nickName: "只有昵称", avatar: null);            // 只存了昵称
+
+        var avatarOnly = Unwrap(await Controller(f, storage).GetMyProfile("session-3")).data!;
+        Assert.True(avatarOnly.needProfile, "昵称还没填，要再问");
+        Assert.Null(avatarOnly.nickName);
+        Assert.NotNull(avatarOnly.avatarUrl);
+        Assert.NotNull(avatarOnly.updateDate);
+
+        var nickOnly = Unwrap(await Controller(f, storage).GetMyProfile("session-4")).data!;
+        Assert.True(nickOnly.needProfile, "头像还没选，要再问");
+        Assert.Equal("只有昵称", nickOnly.nickName);
+        Assert.Null(nickOnly.avatarUrl);
+
+        // 补齐之后就不再问
+        await Controller(f, storage).SaveMyProfile("session-3", nickName: "补上的昵称", avatar: null);
+        var completed = Unwrap(await Controller(f, storage).GetMyProfile("session-3")).data!;
+        Assert.False(completed.needProfile);
+        Assert.Equal("补上的昵称", completed.nickName);
+        Assert.NotNull(completed.avatarUrl);
+    }
+
     // ───────────── SaveMyProfile：成功 ─────────────
 
     [Fact]

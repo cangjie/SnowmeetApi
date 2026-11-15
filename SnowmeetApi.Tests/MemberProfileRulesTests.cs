@@ -27,6 +27,21 @@ public sealed class MemberProfileRulesTests
         Assert.False(MemberProfileRules.NeedPrompt(Now.AddYears(-3), Now));
     }
 
+    [Theory]
+    [InlineData(false, "雪友", "/upload/20261115/avatar_a.jpg", false)]   // 头像昵称都有：不用再问
+    [InlineData(false, null, "/upload/20261115/avatar_a.jpg", true)]     // 只有头像：昵称还没填，要再问（2026-11-15 用户：两个都做）
+    [InlineData(false, "", "/upload/20261115/avatar_a.jpg", true)]
+    [InlineData(false, "   ", "/upload/20261115/avatar_a.jpg", true)]
+    [InlineData(false, "雪友", null, true)]                               // 只有昵称：头像还没选，要再问
+    [InlineData(false, "雪友", "", true)]
+    [InlineData(true, "雪友", "/upload/20261115/avatar_a.jpg", true)]    // 从没保存过（没有更新时间）：一定要问
+    [InlineData(true, null, null, true)]
+    public void NeedPrompt_ProfileStillMissingAPieceIsAskedAgain(bool neverSaved, string? nickName, string? avatar, bool expected)
+    {
+        DateTime? updated = neverSaved ? null : Now.AddDays(-1);
+        Assert.Equal(expected, MemberProfileRules.NeedPrompt(updated, Now, nickName, avatar));
+    }
+
     // ───────────── 昵称 ─────────────
 
     [Theory]

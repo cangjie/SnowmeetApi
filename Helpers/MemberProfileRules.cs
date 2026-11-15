@@ -28,6 +28,16 @@ namespace SnowmeetApi.Helpers
         }
 
         /// <summary>
+        /// 同上，再加一条：昵称或头像缺任何一样（只存了头像、或只存了昵称）也要再问，让顾客补齐
+        /// （2026-11-15 用户：存过头像没存昵称的会员，下次再问一次；「我的」页也可以点顶部头像自己补）。
+        /// 顾客可以跳过，小程序里本次运行跳过过就不会再弹。
+        /// </summary>
+        public static bool NeedPrompt(DateTime? updateDate, DateTime now, string? nickName, string? avatar)
+        {
+            return NeedPrompt(updateDate, now) || string.IsNullOrWhiteSpace(nickName) || string.IsNullOrWhiteSpace(avatar);
+        }
+
+        /// <summary>
         /// 昵称清洗：去掉控制字符、两端空白，超过 32 个字截掉（不把表情等多字符的字切成两半）。清洗后什么都没有返回 null。
         /// </summary>
         public static string? CleanNickName(string? raw)
