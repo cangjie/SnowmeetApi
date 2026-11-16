@@ -822,7 +822,7 @@ namespace SnowmeetApi.Controllers
         [HttpPost]
         public async Task<ActionResult<ApiResult<SnowmeetApi.Models.Order?>>> PlaceOrder([FromBody] SnowmeetApi.Models.Order order,
             [FromQuery] string sessionKey, [FromQuery] string sessionType = "wechat_mini_openid",
-            [FromQuery] bool isTest = false)
+            [FromQuery] bool isTest = false, [FromQuery] int? receptCheckinId = null)
         {
             if (order.id != 0 && await CareCardSaleService.HasDraftAsync(_db, order.id))
                 return Ok(new ApiResult<Models.Order?> { code = 1, message = "本单包含养护购卡，请通过购卡结算入口提交", data = null });
@@ -986,6 +986,21 @@ namespace SnowmeetApi.Controllers
                 order.is_test = 0;
             }
 
+            await using var receptTransaction = staff != null && staff.title_level >= 100 && receptCheckinId != null
+                && _db.Database.CurrentTransaction == null
+                ? await _db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable) : null;
+            bool linkedReceptMember = false;
+            if (staff != null && staff.title_level >= 100 && receptCheckinId != null)
+            {
+                try { linkedReceptMember = await new ReceptOrderMemberService(_db).PrepareAsync(order, staff.id, receptCheckinId); }
+                catch (InvalidOperationException ex) { return Ok(new ApiResult<Models.Order?> { code = 1, message = ex.Message }); }
+                if (linkedReceptMember)
+                {
+                    (_, verified, checkinId) = await new QrCodeController(_db, _config, _http)
+                        .ResolveReceptOrderVerified(order, staff.id);
+                    order.wechat_unverified = verified;
+                }
+            }
             await GenerateOrderCode(order);
             await _db.order.AddAsync(order);
 
@@ -1007,6 +1022,11 @@ namespace SnowmeetApi.Controllers
             };
             await _db.coreDataModLog.AddAsync(log);
             await _db.SaveChangesAsync();
+            if (linkedReceptMember)
+            {
+                await _db.coreDataModLog.AddAsync(ReceptOrderMemberService.ChangeLog(order.id, order.member_id!.Value, staff!.id, receptCheckinId!.Value));
+                await _db.SaveChangesAsync();
+            }
             if (verified)
             {
                 await _db.coreDataModLog.AddAsync(OrderVerifiedRules.ChangeLog(order.id, true, staff.id, checkinId));
@@ -1048,6 +1068,7 @@ namespace SnowmeetApi.Controllers
 
             }
             await _db.SaveChangesAsync();
+            if (receptTransaction != null) await receptTransaction.CommitAsync();
             if (order.paying_amount == 0 && order.type == "养护")
             {
                 _db.order.Entry(order).State = EntityState.Detached;

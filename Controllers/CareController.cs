@@ -2074,7 +2074,7 @@ namespace SnowmeetApi.Controllers
         [HttpPost]
         public async Task<ActionResult<ApiResult<Models.Order?>>> SaveCareRecept([FromBody] Models.Order order,
             [FromQuery] string sessionKey, [FromQuery] string sessionType = "wechat_mini_openid",
-            [FromQuery] bool isTest = false)
+            [FromQuery] bool isTest = false, [FromQuery] int? receptCheckinId = null)
         {
             sessionKey = Util.UrlDecode(sessionKey);
             Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
@@ -2089,7 +2089,7 @@ namespace SnowmeetApi.Controllers
             }
             // 草稿店名保持开单门店，不再把体验中心改记成服务中心（见 OrderController.PlaceCareOrder 的同款说明）。
             // 与选卡、提交、付款共用订单锁，避免迟到的草稿保存覆盖已经提交的主订单。
-            await using var draftTransaction = order.id != 0 && _db.Database.CurrentTransaction == null
+            await using var draftTransaction = (order.id != 0 || receptCheckinId != null) && _db.Database.CurrentTransaction == null
                 ? await _db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable) : null;
             if (order.id != 0) await CareCardSaleService.LockAsync(_db, "care-card-order:" + order.id);
             if (order.id != 0 && await CareCardSaleService.IsLinkedCareAsync(_db, order.id))
@@ -2126,6 +2126,9 @@ namespace SnowmeetApi.Controllers
                 }
             }
             // 「已核验本人」由后端定，不采信前端带来的值：开单前扫码报到验证过本人的，订单一生成就是 1
+            bool linkedReceptMember;
+            try { linkedReceptMember = await new ReceptOrderMemberService(_db).PrepareAsync(order, staff.id, receptCheckinId); }
+            catch (InvalidOperationException ex) { return Ok(new ApiResult<Models.Order?> { code = 1, message = ex.Message }); }
             var (prevVerified, verified, checkinId) = await new QrCodeController(_db, _config, _http)
                 .ResolveReceptOrderVerified(order, staff.id);
             order.wechat_unverified = verified;
@@ -2153,6 +2156,11 @@ namespace SnowmeetApi.Controllers
                 }
                 await _db.order.AddAsync(order);
                 await _db.SaveChangesAsync();
+                if (linkedReceptMember)
+                {
+                    await _db.coreDataModLog.AddAsync(ReceptOrderMemberService.ChangeLog(order.id, order.member_id!.Value, staff.id, receptCheckinId!.Value));
+                    await _db.SaveChangesAsync();
+                }
                 if (verified)
                 {
                     await _db.coreDataModLog.AddAsync(OrderVerifiedRules.ChangeLog(order.id, true, staff.id, checkinId));

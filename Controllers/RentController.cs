@@ -10,6 +10,7 @@ using Microsoft.Extensions.Configuration;
 using SnowmeetApi.Data;
 using SnowmeetApi.Helpers;
 using SnowmeetApi.Services.CoachPlatform;
+using SnowmeetApi.Services;
 using SnowmeetApi.Models;
 using SnowmeetApi.Models.Rent;
 using SnowmeetApi.Models.Users;
@@ -4178,7 +4179,7 @@ namespace SnowmeetApi.Controllers
         [HttpPost]
         public async Task<ActionResult<ApiResult<Models.Order?>>> SaveRentRecept([FromBody] Models.Order order,
             [FromQuery] string sessionKey, [FromQuery] string sessionType = "wechat_mini_openid",
-            [FromQuery] bool isTest = false)
+            [FromQuery] bool isTest = false, [FromQuery] int? receptCheckinId = null)
         {
             sessionKey = Util.UrlDecode(sessionKey);
             Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
@@ -4193,6 +4194,11 @@ namespace SnowmeetApi.Controllers
             }
             if (!ValidCrossShopRentals(order.shop, order.rentals))
                 return Ok(new ApiResult<Models.Order?> { code = 1, message = "异店领取门店不符合开单门店规则", data = null });
+            await using var receptTransaction = receptCheckinId != null && _db.Database.CurrentTransaction == null
+                ? await _db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable) : null;
+            bool linkedReceptMember;
+            try { linkedReceptMember = await new ReceptOrderMemberService(_db).PrepareAsync(order, staff.id, receptCheckinId); }
+            catch (InvalidOperationException ex) { return Ok(new ApiResult<Models.Order?> { code = 1, message = ex.Message }); }
             order.needRender = false;
             // 学员卡校验（2026-10-30）：所选的卡必须属于该订单会员、已领取、在有效期内，否则清掉，不让无效卡留在草稿里
             for (int i = 0; i < order.rentals.Count; i++)
@@ -4279,6 +4285,11 @@ namespace SnowmeetApi.Controllers
                 }
                 await _db.order.AddAsync(order);
                 await _db.SaveChangesAsync();
+                if (linkedReceptMember)
+                {
+                    await _db.coreDataModLog.AddAsync(ReceptOrderMemberService.ChangeLog(order.id, order.member_id!.Value, staff.id, receptCheckinId!.Value));
+                    await _db.SaveChangesAsync();
+                }
                 if (verified)
                 {
                     await _db.coreDataModLog.AddAsync(
@@ -4403,6 +4414,7 @@ namespace SnowmeetApi.Controllers
                     }
                 }
             }
+            if (receptTransaction != null) await receptTransaction.CommitAsync();
             return Ok(new ApiResult<Models.Order?>()
             {
                 code = 0,
