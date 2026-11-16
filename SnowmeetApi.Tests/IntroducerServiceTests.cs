@@ -131,7 +131,15 @@ public class IntroducerServiceTests
         await new CoachAdminService(db, ShareFixture.Config).SetPricingAsync(coach.id, new PricingInput(null, 0.9));
         var self = new CoachController(db, ShareFixture.Config);
         Assert.Equal(0, (await self.GetMyCoach("distributor-session")).code);
-        Assert.Equal(0, (await self.CreateCard("distributor-session")).code);
+        if (type == "机构")
+        {
+            Assert.Equal(1, (await self.CreateCard("distributor-session")).code);
+            db.coachPriceFloor.Add(new CoachPriceFloor { coach_id = coach.id, biz_type = "租赁", shop = "", tier = "", min_rate = 0.5 });
+            var template = new CoachCardTemplate { coach_id = coach.id, name = "学员卡", token = SnowmeetApi.Helpers.CoachCardRules.NewToken(), care_prices = "[]", rental_rate = 0.9 };
+            db.coachCardTemplate.Add(template); await db.SaveChangesAsync();
+            Assert.Equal(0, (await self.CreateCard("distributor-session", new CoachController.CreateCardInput(template.id))).code);
+        }
+        else Assert.Equal(0, (await self.CreateCard("distributor-session")).code);
         Assert.Single(await db.coachCard.AsNoTracking().Where(c => c.coach_id == coach.id).ToListAsync());
     }
 

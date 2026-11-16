@@ -11,7 +11,7 @@ using SnowmeetApi.Services.Tickets;
 
 namespace SnowmeetApi.Services.CoachPlatform;
 
-// 每个机构可维护多种卡。分享的是卡种，领取时创建独立的卡并锁定价格。
+// 每个机构可维护多种卡。每次发卡创建独立分享卡，领取时锁定价格。
 public sealed class CoachCardTemplateService(ApplicationDBContext db, IConfiguration config)
 {
     private async Task CheckOwner(Coach coach, Introducer intro)
@@ -48,7 +48,7 @@ public sealed class CoachCardTemplateService(ApplicationDBContext db, IConfigura
         await CheckOwner(coach, intro);
         var rows = await db.coachCardTemplate.AsNoTracking().Where(t => t.coach_id == coach.id && t.valid == 1).OrderByDescending(t => t.id).ToListAsync();
         return new { templates = rows.Select(t => new { t.id, t.name, carePrices = CoachCardRules.ParseCarePrices(t.care_prices), rentalRate = t.rental_rate,
-            sharePath = "/pages/coach/claim/claim?template=" + t.token }).ToList() };
+            sharePath = (string?)null }).ToList() };
     }
 
     public async Task<object> EditorAsync(Coach coach, Introducer intro, int? id)
@@ -98,38 +98,22 @@ public sealed class CoachCardTemplateService(ApplicationDBContext db, IConfigura
         return t;
     }
 
-    private Task<CoachCardTemplate?> FindAsync(string? token) => db.coachCardTemplate.AsNoTracking().FirstOrDefaultAsync(t => t.token == (token ?? "") && t.valid == 1);
     private static List<CarePriceInput> Prices(CoachCardTemplate t) => CoachCardRules.ParseCarePrices(t.care_prices).Select(p => new CarePriceInput(p.shop, p.tier, p.mode, p.value)).ToList();
 
-    public async Task<ShareCardView> ViewAsync(string? token, int? memberId, DateTime now)
+    // 生成和领取均检查底价；待领取卡始终使用当前卡种权益，已领取卡使用快照。
+    public async Task<CoachCardTemplate> GetAvailableAsync(int id, int coachId)
     {
-        var t = await FindAsync(token);
-        var coach = t == null ? null : await db.coach.AsNoTracking().FirstOrDefaultAsync(c => c.id == t.coach_id);
-        if (t == null || coach == null) return new ShareCardView { message = "卡种已失效" };
-        var v = new ShareCardView { coachName = coach.display_name, cardName = t.name, carePrices = CoachCardRules.ParseCarePrices(t.care_prices), rentalRate = t.rental_rate, validUntil = CoachCardRules.SeasonEnd(now, config) };
-        if (memberId == coach.member_id) { v.state = ShareCardState.Self; return v; }
-        var owned = memberId == null ? null : await db.coachCard.AsNoTracking().FirstOrDefaultAsync(c => c.template_id == t.id && c.member_id == memberId && c.status == CoachCard.StatusClaimed && c.season_end_year == v.validUntil.Value.Year);
-        if (owned != null) { v.state = ShareCardState.ClaimedByMe; v.cardId = owned.id; v.cardName = owned.card_name_snapshot ?? t.name; v.carePrices = CoachCardRules.ParseCarePrices(owned.care_price_snapshot); v.rentalRate = owned.rental_rate_snapshot; v.validUntil = owned.end_date; return v; }
-        if (coach.valid != 1 || !await DistributorAccess.CanIssueAsync(db, coach)) { v.message = "卡种已失效"; return v; }
-        try { await ValidatePrices(coach.id, Prices(t), t.rental_rate); }
-        catch (CoachException) { v.message = "该卡种权益需要机构调整后才能领取"; return v; }
-        v.state = ShareCardState.Claimable; return v;
+        var t = await db.coachCardTemplate.AsNoTracking().FirstOrDefaultAsync(x => x.id == id && x.coach_id == coachId && x.valid == 1)
+            ?? throw new CoachException("卡种已失效，请联系分销商重新发卡");
+        await ValidatePrices(coachId, Prices(t), t.rental_rate);
+        return t;
     }
 
-    public Task<CoachCard> ClaimAsync(string token, int memberId, DateTime now) => MiniTicketTransaction.Run(db, async () =>
+    // 旧版分享的是卡种固定链接，无法辨认每次转发，必须停用以避免多人领取。
+    public Task<ShareCardView> ViewAsync(string? token, int? memberId, DateTime now) => Task.FromResult(new ShareCardView
     {
-        var t = await FindAsync(token) ?? throw new CoachException("卡种已失效");
-        var coach = await db.coach.AsNoTracking().FirstOrDefaultAsync(c => c.id == t.coach_id) ?? throw new CoachException("卡种已失效");
-        if (coach.member_id == memberId) throw new CoachException("不能领取自己发出的卡");
-        var end = CoachCardRules.SeasonEnd(now, config);
-        var existing = await db.coachCard.AsNoTracking().FirstOrDefaultAsync(c => c.template_id == t.id && c.member_id == memberId && c.status == CoachCard.StatusClaimed && c.season_end_year == end.Year);
-        if (existing != null) return existing;
-        if (coach.valid != 1 || !await DistributorAccess.CanIssueAsync(db, coach)) throw new CoachException("卡种已失效");
-        await ValidatePrices(coach.id, Prices(t), t.rental_rate);
-        var card = new CoachCard { coach_id = coach.id, template_id = t.id, card_name_snapshot = t.name, token = CoachCardRules.NewToken(), status = CoachCard.StatusClaimed,
-            member_id = memberId, claimed_at = now, start_date = now, end_date = end, season_end_year = end.Year, care_price_snapshot = t.care_prices, rental_rate_snapshot = t.rental_rate, create_date = now };
-        db.coachCard.Add(card); await db.SaveChangesAsync();
-        await new DistributorCustomerService(db).TryOnCardClaimedAsync(coach.id, memberId, card.id, now);
-        return card;
+        state = ShareCardState.Invalid, message = "此旧分享链接已失效，请联系分销商重新发送单张卡"
     });
+    public Task<CoachCard> ClaimAsync(string token, int memberId, DateTime now) =>
+        Task.FromException<CoachCard>(new CoachException("此旧分享链接已失效，请联系分销商重新发送单张卡"));
 }

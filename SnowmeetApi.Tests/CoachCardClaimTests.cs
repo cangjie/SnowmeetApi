@@ -10,6 +10,18 @@ namespace SnowmeetApi.Tests;
 public class CoachCardClaimTests
 {
     [Fact]
+    public async Task Card_list_uses_member_profile_even_when_legacy_mini_users_table_is_absent()
+    {
+        await using var f = await CoachFixture.Create();
+        await f.IssueAndClaim(CoachFixture.StudentA);
+        await f.Db.Database.ExecuteSqlRawAsync("DROP TABLE mini_users");
+        await f.Db.Database.ExecuteSqlRawAsync("UPDATE member SET real_name = '', nick_name = '雪友昵称' WHERE id = 3");
+        var card = Assert.Single(await f.Query().ListCardsAsync(f.CoachId, null));
+        Assert.Equal("雪友昵称", card.studentName);
+        Assert.Equal("1003", card.phoneTail);
+    }
+
+    [Fact]
     public async Task CreateCard_NeedsPricingAndCapsPendingCards()
     {
         await using var noPricing = await CoachFixture.Create(withPricing: false);

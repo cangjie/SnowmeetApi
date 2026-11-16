@@ -49,22 +49,29 @@ public sealed class ShareCardView
 public sealed class CoachCardService(ApplicationDBContext db, IConfiguration? config = null)
 {
     /// <summary>教练名下待领取的卡：先在服务器建一行，再由前端用 open-type=share 分享出去。</summary>
-    public async Task<CoachCard> CreateCardAsync(int coachId, DateTime now)
+    public async Task<CoachCard> CreateCardAsync(int coachId, DateTime now, int? templateId = null)
     {
         await using var tx = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
         Coach? coach = await db.coach.AsNoTracking().FirstOrDefaultAsync(c => c.id == coachId);
         if (coach == null || coach.valid != 1 || !await DistributorAccess.CanIssueAsync(db, coach))
             throw new CoachException("你的分销商身份已停用或存在冲突，不能再发学员卡");
-        if (!await HasAnyBenefitAsync(coach))
+        bool isOrg = await db.introducer.AsNoTracking().AnyAsync(i => i.coach_id == coachId && i.valid == 1 && i.type == IntroducerRules.TypeOrg);
+        CoachCardTemplate? template = null;
+        if (templateId != null)
         {
-            bool isOrg = await db.introducer.AsNoTracking().AnyAsync(i => i.coach_id == coachId && i.valid == 1 && i.type == IntroducerRules.TypeOrg);
-            throw new CoachException(isOrg ? "你还没有制作会员卡，请先到「制作会员卡」设置折扣（需要管理员先给你开放底价）" : "管理员还没有给你设置学员卡的价格，请先联系管理员");
+            if (!isOrg) throw new CoachException("只有机构可以使用卡种发卡");
+            template = await new CoachCardTemplateService(db, config!).GetAvailableAsync(templateId.Value, coachId);
+        }
+        else if (isOrg) throw new CoachException("请选择卡种后生成分享卡");
+        else if (!await HasAnyBenefitAsync(coach))
+        {
+            throw new CoachException("管理员还没有给你设置学员卡的价格，请先联系管理员");
         }
         int pending = await db.coachCard.AsNoTracking().CountAsync(c => c.coach_id == coachId && c.status == CoachCard.StatusIssued
             && (c.claim_deadline == null || c.claim_deadline >= now));
         if (pending >= CoachCardRules.MaxUnclaimedCards)
             throw new CoachException("待领取的学员卡已有 " + pending + " 张，请等学员领取或撤销一些再生成");
-        CoachCard card = new() { coach_id = coachId, token = CoachCardRules.NewToken(), status = CoachCard.StatusIssued, create_date = now };
+        CoachCard card = new() { coach_id = coachId, template_id = templateId, card_name_snapshot = template?.name, token = CoachCardRules.NewToken(), status = CoachCard.StatusIssued, create_date = now };
         db.coachCard.Add(card);
         await db.SaveChangesAsync();
         await tx.CommitAsync();
@@ -88,7 +95,7 @@ public sealed class CoachCardService(ApplicationDBContext db, IConfiguration? co
         if (memberId != null && memberId == coach.member_id)
         {
             view.state = ShareCardState.Self; view.message = "这是你发出的学员卡，转发给你的学员即可，教练本人不能领取";
-            await FillBenefitAsync(view, card, coach, now); return view;
+            try { await FillBenefitAsync(view, card, coach, now); } catch (CoachException) { view.message = "该卡种权益需要机构调整"; } return view;
         }
         if (card.status == CoachCard.StatusClaimed)
         {
@@ -101,8 +108,9 @@ public sealed class CoachCardService(ApplicationDBContext db, IConfiguration? co
         {
             view.state = ShareCardState.Invalid; view.message = "这张学员卡已失效，请联系教练重新发送"; return view;
         }
-        await FillBenefitAsync(view, card, coach, now);
-        if (memberId != null && await HoldsCardAsync(coach.id, memberId.Value, CoachCardRules.SeasonEnd(now, config).Year))
+        try { await FillBenefitAsync(view, card, coach, now); }
+        catch (CoachException) { view.state = ShareCardState.Invalid; view.message = "该卡种权益需要机构调整后才能领取"; return view; }
+        if (memberId != null && await HoldsCardAsync(coach.id, card.template_id, memberId.Value, CoachCardRules.SeasonEnd(now, config).Year))
         {
             view.state = ShareCardState.AlreadyHas; view.message = "本雪季你已经领过" + coach.display_name + "的学员卡了"; return view;
         }
@@ -117,9 +125,19 @@ public sealed class CoachCardService(ApplicationDBContext db, IConfiguration? co
     {
         if (card.status == CoachCard.StatusClaimed)
         {
+            view.cardName = card.card_name_snapshot;
             view.carePrices = CoachCardRules.ParseCarePrices(card.care_price_snapshot);
             view.rentalRate = card.rental_rate_snapshot;
             view.validUntil = card.end_date;
+            return;
+        }
+        if (card.template_id != null)
+        {
+            var template = await new CoachCardTemplateService(db, config!).GetAvailableAsync(card.template_id.Value, coach.id);
+            view.cardName = template.name;
+            view.carePrices = CoachCardRules.ParseCarePrices(template.care_prices);
+            view.rentalRate = template.rental_rate;
+            view.validUntil = CoachCardRules.SeasonEnd(now, config);
             return;
         }
         List<CoachCarePrice> prices = await db.coachCarePrice.AsNoTracking().Where(p => p.coach_id == coach.id).ToListAsync();
@@ -159,12 +177,24 @@ public sealed class CoachCardService(ApplicationDBContext db, IConfiguration? co
                 return Fail(ShareCardState.Invalid, "这张学员卡已失效，请联系教练重新发送");
 
             DateTime end = CoachCardRules.SeasonEnd(now, config);
-            if (await HoldsCardAsync(coach.id, memberId, end.Year))
+            if (await HoldsCardAsync(coach.id, card.template_id, memberId, end.Year))
                 return Fail(ShareCardState.AlreadyHas, "本雪季你已经领过" + coach.display_name + "的学员卡了");
 
-            List<CoachCarePrice> prices = await db.coachCarePrice.AsNoTracking().Where(p => p.coach_id == coach.id).ToListAsync();
-            string snapshot = CoachCardRules.SerializeCarePrices(prices);
-            double? rentalRate = coach.rental_rate;
+            string snapshot;
+            double? rentalRate;
+            string? cardName = null;
+            if (card.template_id != null)
+            {
+                CoachCardTemplate template;
+                try { template = await new CoachCardTemplateService(db, config!).GetAvailableAsync(card.template_id.Value, coach.id); }
+                catch (CoachException) { return Fail(ShareCardState.Invalid, "该卡种权益需要机构调整后才能领取"); }
+                snapshot = template.care_prices; rentalRate = template.rental_rate; cardName = template.name;
+            }
+            else
+            {
+                List<CoachCarePrice> prices = await db.coachCarePrice.AsNoTracking().Where(p => p.coach_id == coach.id).ToListAsync();
+                snapshot = CoachCardRules.SerializeCarePrices(prices); rentalRate = coach.rental_rate;
+            }
             int rows;
             try
             {
@@ -177,6 +207,7 @@ public sealed class CoachCardService(ApplicationDBContext db, IConfiguration? co
                         .SetProperty(c => c.start_date, (DateTime?)now)
                         .SetProperty(c => c.end_date, (DateTime?)end)
                         .SetProperty(c => c.season_end_year, (int?)end.Year)
+                        .SetProperty(c => c.card_name_snapshot, cardName)
                         .SetProperty(c => c.care_price_snapshot, snapshot)
                         .SetProperty(c => c.rental_rate_snapshot, rentalRate)
                         .SetProperty(c => c.update_date, (DateTime?)now));
@@ -196,9 +227,9 @@ public sealed class CoachCardService(ApplicationDBContext db, IConfiguration? co
 
     private static ClaimResult Fail(string state, string message) => new() { state = state, message = message };
 
-    private Task<bool> HoldsCardAsync(int coachId, int memberId, int seasonEndYear) =>
+    private Task<bool> HoldsCardAsync(int coachId, int? templateId, int memberId, int seasonEndYear) =>
         db.coachCard.AsNoTracking().AnyAsync(c => c.coach_id == coachId && c.member_id == memberId
-            && c.template_id == null && c.status == CoachCard.StatusClaimed && c.season_end_year == seasonEndYear);
+            && c.template_id == templateId && c.status == CoachCard.StatusClaimed && c.season_end_year == seasonEndYear);
 
     private async Task<CoachCard?> FindByTokenAsync(string? token)
     {

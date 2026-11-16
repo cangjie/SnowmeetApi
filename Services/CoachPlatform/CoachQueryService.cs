@@ -163,7 +163,7 @@ public sealed class CoachQueryService(ApplicationDBContext db)
         var members = await db.member.AsNoTracking().Where(m => memberIds.Contains(m.id)).Select(m => new { m.id, m.real_name }).ToListAsync();
         var accounts = await db.memberSocialAccount.AsNoTracking().Where(a => a.valid == 1 && memberIds.Contains(a.member_id)
             && (a.type == MemberSocialAccount.TYPE_CELL)).OrderByDescending(a => a.id).Select(a => new { a.member_id, a.num }).ToListAsync();
-        var nicks = await db.MiniAppUsers.AsNoTracking().Where(u => memberIds.Contains(u.member_id)).Select(u => new { u.member_id, u.nick }).ToListAsync();
+        var nicks = await db.memberProfile.AsNoTracking().Where(u => memberIds.Contains(u.member_id)).Select(u => new { u.member_id, nick = u.nick_name }).ToListAsync();
         foreach (int id in memberIds)
         {
             string? real = members.FirstOrDefault(m => m.id == id)?.real_name;

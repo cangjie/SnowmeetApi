@@ -23,116 +23,81 @@ public class CoachCardTemplateTests
     }
 
     [Fact]
-    public async Task Templates_are_independent_shareable_and_lock_their_prices()
+    public async Task Each_share_is_single_recipient_and_different_templates_remain_independent()
     {
-        var (f, coach, intro) = await Setup();
-        await using (f)
+        var (f, coach, intro) = await Setup(); await using (f)
         {
             var svc = new CoachCardTemplateService(f.NewContext(), f.Config);
-            List<CarePriceInput> p = new() { new("万龙服务中心", "单项", "fixed", 60) };
-            var a = await svc.SaveAsync(coach, intro, null, "学员卡", p, 0.8);
+            var a = await svc.SaveAsync(coach, intro, null, "学员卡", new() { new("万龙服务中心", "单项", "fixed", 60) }, 0.8);
             var b = await svc.SaveAsync(coach, intro, null, "教练卡", new() { new("万龙服务中心", "单项", "fixed", 50) }, 0.5);
             var now = DateTime.Now;
-            var cardA = await new CoachCardTemplateService(f.NewContext(), f.Config).ClaimAsync(a.token, CoachFixture.StudentA, now);
-            var duplicate = await new CoachCardTemplateService(f.NewContext(), f.Config).ClaimAsync(a.token, CoachFixture.StudentA, now);
-            var cardB = await new CoachCardTemplateService(f.NewContext(), f.Config).ClaimAsync(b.token, CoachFixture.StudentA, now);
-            var other = await new CoachCardTemplateService(f.NewContext(), f.Config).ClaimAsync(a.token, CoachFixture.StudentB, now);
-            Assert.Equal(cardA.id, duplicate.id); Assert.NotEqual(cardA.id, cardB.id); Assert.NotEqual(cardA.id, other.id);
-            var usable = await f.Pricing().ListUsableAsync(CoachFixture.StudentA, "租赁", null, null, 0, 0, 100, now);
-            Assert.Contains(usable, c => c.cardId == cardA.id && c.cardName == "学员卡");
-            Assert.Contains(usable, c => c.cardId == cardB.id && c.cardName == "教练卡");
-            await new CoachCardTemplateService(f.NewContext(), f.Config).SaveAsync(coach, intro, a.id, "新学员卡", new() { new("万龙服务中心", "单项", "fixed", 80) }, 0.9);
-            var old = await f.NewContext().coachCard.AsNoTracking().FirstAsync(c => c.id == cardA.id);
-            Assert.Equal("学员卡", old.card_name_snapshot);
-            Assert.Equal(60, CoachCardRules.ParseCarePrices(old.care_price_snapshot).Single().value);
-            var newest = await new CoachCardTemplateService(f.NewContext(), f.Config).ClaimAsync(a.token, CoachFixture.StudentC, now);
-            Assert.Equal("新学员卡", newest.card_name_snapshot);
-            Assert.Equal(80, CoachCardRules.ParseCarePrices(newest.care_price_snapshot).Single().value);
+            var first = await f.Cards().CreateCardAsync(coach.id, now, a.id);
+            var second = await f.Cards().CreateCardAsync(coach.id, now, a.id);
+            var third = await f.Cards().CreateCardAsync(coach.id, now, b.id);
+            Assert.NotEqual(first.token, second.token);
+            var won = await f.Cards().ClaimAsync(first.token, CoachFixture.StudentA, now);
+            Assert.Equal(ShareCardState.ClaimedByMe, won.state);
+            Assert.Equal(ShareCardState.ClaimedByMe, (await f.Cards().ClaimAsync(first.token, CoachFixture.StudentA, now)).state);
+            Assert.Equal(ShareCardState.Taken, (await f.Cards().ClaimAsync(first.token, CoachFixture.StudentB, now)).state);
+            Assert.Equal(ShareCardState.Taken, (await f.Cards().GetShareCardAsync(first.token, null, now)).state);
+            Assert.Equal(ShareCardState.AlreadyHas, (await f.Cards().ClaimAsync(second.token, CoachFixture.StudentA, now)).state);
+            Assert.Equal(ShareCardState.ClaimedByMe, (await f.Cards().ClaimAsync(second.token, CoachFixture.StudentB, now)).state);
+            Assert.Equal(ShareCardState.ClaimedByMe, (await f.Cards().ClaimAsync(third.token, CoachFixture.StudentA, now)).state);
+            Assert.Equal("学员卡", won.card!.card_name_snapshot);
+            Assert.Equal(60, CoachCardRules.ParseCarePrices(won.card.care_price_snapshot).Single().value);
+            Assert.Equal(2, (await f.Pricing().ListUsableAsync(CoachFixture.StudentA, "租赁", null, null, 0, 0, 100, now)).Count);
         }
     }
 
     [Fact]
-    public async Task Shared_template_controller_allows_many_recipients_and_requires_a_session()
+    public async Task Concurrent_recipients_only_one_wins_and_old_template_link_cannot_claim()
     {
-        var (f, coach, intro) = await Setup();
-        await using (f)
+        var (f, coach, intro) = await Setup(); await using (f)
         {
-            var t = await new CoachCardTemplateService(f.NewContext(), f.Config).SaveAsync(coach, intro, null, "教练卡", new() { new("万龙服务中心", "单项", "fixed", 60) }, null);
-            CoachCardController Card() => new(f.NewContext(), f.Config, ShareFixture.Http);
-            Assert.Equal(2, (await Card().GetShareTemplate(t.token, "bad")).code);
-            Assert.Equal(5, (await Card().ClaimShareTemplate(t.token, "session-new")).code);
-            Assert.Equal(0, (await Card().ClaimShareTemplate(t.token, "session-3")).code);
-            Assert.Equal(0, (await Card().ClaimShareTemplate(t.token, "session-4")).code);
-            var view = System.Text.Json.JsonSerializer.SerializeToElement((await Card().GetShareTemplate(t.token, "session-3")).data).GetProperty("view");
-            Assert.Equal("claimed_by_me", view.GetProperty("state").GetString());
-            Assert.Equal("教练卡", view.GetProperty("cardName").GetString());
-            Assert.Equal(2, await f.NewContext().coachCard.CountAsync());
-        }
-    }
-
-    [Fact]
-    public async Task Concurrent_repeat_claims_create_only_one_card()
-    {
-        var (f, coach, intro) = await Setup();
-        await using (f)
-        {
-            var t = await new CoachCardTemplateService(f.NewContext(), f.Config).SaveAsync(coach, intro, null, "卡", new() { new("万龙服务中心", "单项", "fixed", 60) }, null);
-            var results = await Task.WhenAll(Enumerable.Range(0, 4).Select(_ => new CoachCardTemplateService(f.NewContext(), f.Config).ClaimAsync(t.token, CoachFixture.StudentA, DateTime.Now)));
-            Assert.Single(results.Select(c => c.id).Distinct());
+            var template = await new CoachCardTemplateService(f.NewContext(), f.Config).SaveAsync(coach, intro, null, "卡", new() { new("万龙服务中心", "单项", "fixed", 60) }, null);
+            var now = DateTime.Now;
+            var issued = await f.Cards().CreateCardAsync(coach.id, now, template.id);
+            var results = await Task.WhenAll(f.Cards().ClaimAsync(issued.token, CoachFixture.StudentA, now), f.Cards().ClaimAsync(issued.token, CoachFixture.StudentB, now), f.Cards().ClaimAsync(issued.token, CoachFixture.StudentC, now));
+            Assert.Single(results, r => r.state == ShareCardState.ClaimedByMe);
+            Assert.Equal(2, results.Count(r => r.state == ShareCardState.Taken));
+            var old = new CoachCardController(f.NewContext(), f.Config, ShareFixture.Http);
+            Assert.Equal(1, (await old.ClaimShareTemplate(template.token, "session-4")).code);
+            var view = System.Text.Json.JsonSerializer.SerializeToElement((await old.GetShareTemplate(template.token, "session-4")).data).GetProperty("view");
+            Assert.Equal("invalid", view.GetProperty("state").GetString());
             Assert.Equal(1, await f.NewContext().coachCard.CountAsync());
         }
     }
 
     [Fact]
-    public async Task Disabling_the_issuer_stops_new_claims_but_preserves_existing_cards()
+    public async Task Prices_are_validated_again_at_claim_and_snapshot_is_locked()
     {
-        var (f, coach, intro) = await Setup();
-        await using (f)
-        {
-            var t = await new CoachCardTemplateService(f.NewContext(), f.Config).SaveAsync(coach, intro, null, "卡", new() { new("万龙服务中心", "单项", "fixed", 60) }, null);
-            var now = DateTime.Now;
-            var card = await new CoachCardTemplateService(f.NewContext(), f.Config).ClaimAsync(t.token, CoachFixture.StudentA, now);
-            var tracked = await f.Db.coach.AsTracking().SingleAsync(c => c.id == f.CoachId);
-            tracked.valid = 0; await f.Db.SaveChangesAsync();
-            var svc = new CoachCardTemplateService(f.NewContext(), f.Config);
-            Assert.Equal(ShareCardState.ClaimedByMe, (await svc.ViewAsync(t.token, CoachFixture.StudentA, now)).state);
-            Assert.Equal(card.id, (await svc.ClaimAsync(t.token, CoachFixture.StudentA, now)).id);
-            Assert.Equal(ShareCardState.Invalid, (await svc.ViewAsync(t.token, CoachFixture.StudentB, now)).state);
-            await Assert.ThrowsAsync<CoachException>(() => svc.ClaimAsync(t.token, CoachFixture.StudentB, now));
-        }
-    }
-
-    [Fact]
-    public async Task Floors_are_enforced_on_save_and_again_on_claim()
-    {
-        var (f, coach, intro) = await Setup();
-        await using (f)
+        var (f, coach, intro) = await Setup(); await using (f)
         {
             var svc = new CoachCardTemplateService(f.NewContext(), f.Config);
             await Assert.ThrowsAsync<CoachException>(() => svc.SaveAsync(coach, intro, null, "卡", new() { new("万龙服务中心", "单项", "fixed", 49) }, null));
-            var t = await new CoachCardTemplateService(f.NewContext(), f.Config).SaveAsync(coach, intro, null, "卡", new() { new("万龙服务中心", "单项", "fixed", 60) }, null);
-            var floor = await f.Db.coachPriceFloor.AsTracking().SingleAsync(x => x.coach_id == f.CoachId && x.biz_type == "养护");
+            var template = await new CoachCardTemplateService(f.NewContext(), f.Config).SaveAsync(coach, intro, null, "卡", new() { new("万龙服务中心", "单项", "fixed", 60) }, null);
+            var now = DateTime.Now;
+            var first = await f.Cards().CreateCardAsync(coach.id, now, template.id);
+            Assert.Equal(ShareCardState.ClaimedByMe, (await f.Cards().ClaimAsync(first.token, CoachFixture.StudentA, now)).state);
+            var second = await f.Cards().CreateCardAsync(coach.id, now, template.id);
+            var floor = await f.Db.coachPriceFloor.AsTracking().SingleAsync(x => x.coach_id == coach.id && x.biz_type == "养护");
             floor.min_fixed = 70; await f.Db.SaveChangesAsync();
-            var view = await new CoachCardTemplateService(f.NewContext(), f.Config).ViewAsync(t.token, CoachFixture.StudentA, DateTime.Now);
-            Assert.Equal(ShareCardState.Invalid, view.state);
-            await Assert.ThrowsAsync<CoachException>(() => new CoachCardTemplateService(f.NewContext(), f.Config).ClaimAsync(t.token, CoachFixture.StudentA, DateTime.Now));
-            Assert.Equal(0, await f.NewContext().coachCard.CountAsync());
+            Assert.Equal(ShareCardState.Invalid, (await f.Cards().GetShareCardAsync(second.token, CoachFixture.StudentB, now)).state);
+            Assert.Equal(ShareCardState.Invalid, (await f.Cards().ClaimAsync(second.token, CoachFixture.StudentB, now)).state);
+            Assert.Equal(60, CoachCardRules.ParseCarePrices((await f.NewContext().coachCard.SingleAsync(c => c.id == first.id)).care_price_snapshot).Single().value);
+            await Assert.ThrowsAsync<CoachException>(() => f.Cards().CreateCardAsync(coach.id, now, template.id));
         }
     }
 
     [Fact]
-    public async Task Other_members_and_coaches_cannot_manage_organization_templates()
+    public async Task Only_owner_can_issue_and_manage_templates()
     {
-        var (f, coach, intro) = await Setup();
-        await using (f)
+        var (f, coach, intro) = await Setup(); await using (f)
         {
-            var controller = new DistributorController(f.NewContext(), f.Config);
-            Assert.Equal(3, (await controller.ListMyCardTemplates("session-3")).code);
-            var editor = await controller.GetMyCardTemplate("session-2");
-            Assert.Equal(0, editor.code);
-            Assert.Equal(4, System.Text.Json.JsonSerializer.SerializeToElement(editor.data).GetProperty("cells").GetArrayLength());
-            intro.type = "教练";
-            await Assert.ThrowsAsync<CoachException>(() => new CoachCardTemplateService(f.NewContext(), f.Config).ListAsync(coach, intro));
+            var t = await new CoachCardTemplateService(f.NewContext(), f.Config).SaveAsync(coach, intro, null, "卡", new() { new("万龙服务中心", "单项", "fixed", 60) }, null);
+            await Assert.ThrowsAsync<CoachException>(() => f.Cards().CreateCardAsync(f.Coach2Id, DateTime.Now, t.id));
+            await Assert.ThrowsAsync<CoachException>(() => f.Cards().CreateCardAsync(coach.id, DateTime.Now));
+            Assert.Equal(3, (await new DistributorController(f.NewContext(), f.Config).ListMyCardTemplates("session-3")).code);
         }
     }
 }

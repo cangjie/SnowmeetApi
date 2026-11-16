@@ -22,6 +22,7 @@ public sealed class CoachController(ApplicationDBContext db, IConfiguration conf
     private readonly CoachQueryService _query = new(db);
 
     public sealed record CardIdInput(int cardId);
+    public sealed record CreateCardInput(int? templateId);
 
     /// <summary>分享卡的落地页路径（小程序 onShareAppMessage 的 path）。</summary>
     public const string ClaimPage = "/pages/coach/claim/claim";
@@ -66,10 +67,10 @@ public sealed class CoachController(ApplicationDBContext db, IConfiguration conf
 
     /// <summary>先在服务器建一张待领取的卡，返回分享路径。前端随后用 open-type="share" 的按钮把它分享出去。</summary>
     [HttpPost]
-    public Task<ApiResult<object>> CreateCard(string sessionKey) => AsCoach(sessionKey, async coach =>
+    public Task<ApiResult<object>> CreateCard(string sessionKey, [FromBody] CreateCardInput? input = null) => AsCoach(sessionKey, async coach =>
     {
-        CoachCard card = await _cards.CreateCardAsync(coach.id, DateTime.Now);
-        return new { cardId = card.id, tokenTail = card.token.Substring(card.token.Length - 4).ToUpperInvariant(), sharePath = ClaimPage + "?t=" + card.token };
+        CoachCard card = await _cards.CreateCardAsync(coach.id, DateTime.Now, input?.templateId);
+        return new { cardId = card.id, cardName = card.card_name_snapshot, tokenTail = card.token.Substring(card.token.Length - 4).ToUpperInvariant(), sharePath = ClaimPage + "?t=" + card.token };
     });
 
     [HttpGet]

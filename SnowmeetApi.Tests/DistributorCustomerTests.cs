@@ -88,7 +88,11 @@ public class DistributorCustomerTests
         await f.IssueAndClaim(CoachFixture.StudentA);                                  // 学员A 领一位的卡 → 归属一位
         var rel = await f.NewContext().distributorCustomer.AsNoTracking().SingleAsync(c => c.member_id == CoachFixture.StudentA);
         Assert.Equal((one.id, "领卡"), (rel.introducer_id, rel.source));
-        await f.IssueAndClaim(CoachFixture.StudentA, f.Coach2Id);                      // 再领二位的卡 → 不变
+        f.Db.coachPriceFloor.Add(new CoachPriceFloor { coach_id = f.Coach2Id, biz_type = "租赁", shop = "", tier = "", min_rate = 0.5 });
+        var template = new CoachCardTemplate { coach_id = f.Coach2Id, name = "学员卡", token = CoachCardRules.NewToken(), care_prices = "[]", rental_rate = 0.9 };
+        f.Db.coachCardTemplate.Add(template); await f.Db.SaveChangesAsync();
+        var share = await f.Cards().CreateCardAsync(f.Coach2Id, DateTime.Now, template.id);
+        Assert.Equal(ShareCardState.ClaimedByMe, (await f.Cards().ClaimAsync(share.token, CoachFixture.StudentA, DateTime.Now)).state); // 领二位的卡 → 不变
         Assert.Equal(one.id, await OwnerOf(f, CoachFixture.StudentA));
 
         string code = await GrantOne(f, f.Coach2Id, "g-two");                          // 学员B 接二位转发的券 → 归属二位
