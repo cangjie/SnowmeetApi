@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -62,6 +63,27 @@ public sealed class MemberProfileHttpTests
         var get1 = Body(await client.GetStringAsync("/api/MemberProfile/GetMyProfile?sessionKey=customer-key"));
         Assert.Equal(0, get1.GetProperty("code").GetInt32());
         Assert.True(get1.GetProperty("data").GetProperty("needProfile").GetBoolean());
+
+        // 点击昵称输入框只记行为，绑定会员和页面，不会写入昵称。
+        var click = await Json(await client.PostAsJsonAsync("/api/MemberProfile/LogNicknameClick",
+            new { sessionKey = "customer-key", sessionType = "wechat_mini_openid", sourcePage = "pages/order/recept_checkin" }));
+        Assert.Equal(0, click.GetProperty("code").GetInt32());
+        var refusedClick = await Json(await client.PostAsJsonAsync("/api/MemberProfile/LogNicknameClick",
+            new { sessionKey = "unbound-key", sessionType = "wechat_mini_openid", sourcePage = "pages/order/recept_checkin" }));
+        Assert.Equal(1, refusedClick.GetProperty("code").GetInt32());
+        using (var scope = server.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDBContext>();
+            var log = Assert.Single(await db.coreDataModLog.AsNoTracking().ToListAsync());
+            Assert.Equal("点击获取昵称", log.scene);
+            Assert.Equal("member", log.table_name);
+            Assert.Equal(3, log.member_id);
+            Assert.Equal(3, log.key_value);
+            Assert.Equal("pages/order/recept_checkin", log.manual_memo);
+            Assert.Null(log.current_value);
+            Assert.Null(log.prev_value);
+            Assert.False(await db.memberProfile.AsNoTracking().AnyAsync());
+        }
 
         // 2. wx.uploadFile：multipart，文件字段名 avatar，昵称是表单字段
         using var multipart = new MultipartFormDataContent();

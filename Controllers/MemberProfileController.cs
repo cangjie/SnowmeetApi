@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -42,6 +43,36 @@ namespace SnowmeetApi.Controllers
             }
             MemberProfile? profile = await _db.memberProfile.AsNoTracking().FirstOrDefaultAsync(p => p.member_id == memberId.Value);
             return Ok(Result(0, "", ToView(profile)));
+        }
+
+        public sealed class NicknameClickRequest
+        {
+            public string? sessionKey { get; set; }
+            public string? sessionType { get; set; }
+            public string? sourcePage { get; set; }
+        }
+
+        // 记录顾客实际聚焦昵称输入框，不代表已经选择微信昵称或保存成功。
+        [HttpPost]
+        public async Task<ActionResult<ApiResult<MemberProfileView>>> LogNicknameClick([FromBody] NicknameClickRequest? request)
+        {
+            try
+            {
+                (bool sessionOk, int? memberId) = await FindSessionAsync(request?.sessionKey, request?.sessionType);
+                if (!sessionOk || memberId == null) return Ok(Result(1, "会话无效或未绑定会员"));
+                string page = (request?.sourcePage ?? "").Trim();
+                if (page.Length > 120 || !Regex.IsMatch(page, @"^pages/[a-zA-Z0-9_/-]+$")) page = "";
+                var log = CoreDataModLog.CreateManualLog("member", "", memberId.Value,
+                    "点击获取昵称", memberId.Value, null, null, null, page);
+                await _db.coreDataModLog.AddAsync(log);
+                await _db.SaveChangesAsync();
+                return Ok(Result(0, ""));
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("昵称点击记录失败：" + ex.Message);
+                return Ok(Result(1, "记录失败"));
+            }
         }
 
         // 选了头像：小程序用 wx.uploadFile 发 multipart；只改昵称：用 wx.request 发表单编码。

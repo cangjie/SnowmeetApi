@@ -10,6 +10,7 @@ using SnowmeetApi.Data;
 using SnowmeetApi.Helpers;
 using SnowmeetApi.Models;
 using SnowmeetApi.Models.Users;
+using SnowmeetApi.Services.Storage;
 
 namespace SnowmeetApi.Controllers
 {
@@ -44,6 +45,29 @@ namespace SnowmeetApi.Controllers
         private async Task<Staff?> GetStaff(string sessionKey, string sessionType)
         {
             return await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+        }
+
+        private sealed record ProfileView(string? NickName, string? AvatarUrl);
+
+        // 仅查询本页，避免逐个会员请求；画像列不可用时不能让会员管理整体不可用。
+        private async Task<Dictionary<int, ProfileView>> GetProfilesAsync(List<int> ids)
+        {
+            if (ids.Count == 0) return new Dictionary<int, ProfileView>();
+            try
+            {
+                var rows = await _db.memberProfile.AsNoTracking()
+                    .Where(p => ids.Contains(p.member_id))
+                    .Select(p => new { p.member_id, p.nick_name, p.avatar }).ToListAsync();
+                string baseUrl = FileStorageOptions.From(_config).PublicBaseUrl;
+                return rows.ToDictionary(p => p.member_id, p => new ProfileView(
+                    string.IsNullOrWhiteSpace(p.nick_name) ? null : p.nick_name.Trim(),
+                    string.IsNullOrWhiteSpace(p.avatar) ? null : UploadPaths.PublicUrl(baseUrl, p.avatar)));
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("会员昵称头像读取失败：" + ex.Message);
+                return new Dictionary<int, ProfileView>();
+            }
         }
 
         // ───────────────────────── 1. 列表搜索（分页） ─────────────────────────
@@ -124,18 +148,25 @@ namespace SnowmeetApi.Controllers
             var bizRows = await _db.order
                 .Where(o => idsN.Contains(o.member_id) && o.valid == 1 && BIZ_TAGS.Contains(o.type))
                 .Select(o => new { o.member_id, o.type }).Distinct().AsNoTracking().ToListAsync();
+            var profiles = await GetProfilesAsync(ids);
 
-            var items = pageMembers.Select(m => new
+            var items = pageMembers.Select(m =>
             {
-                id = m.id,
-                name = m.real_name,
-                gender = m.gender,
-                isVip = m.is_vip,
-                phone = cells.Where(c => c.member_id == m.id).Select(c => c.num).FirstOrDefault() ?? "",
-                deposit = Math.Round(deposits.Where(d => d.member_id == m.id).Sum(d => d.income_amount - d.consume_amount), 2),
-                points = pts.Where(p => p.member_id == m.id).Sum(p => p.points),
-                sys = bizRows.Where(b => b.member_id == m.id).Select(b => b.type).ToList(),
-                custom = ctags.Where(t => t.member_id == m.id).Select(t => t.tag).ToList()
+                profiles.TryGetValue(m.id, out var profile);
+                return new
+                {
+                    id = m.id,
+                    name = m.real_name,
+                    nickName = profile?.NickName,
+                    avatarUrl = profile?.AvatarUrl,
+                    gender = m.gender,
+                    isVip = m.is_vip,
+                    phone = cells.Where(c => c.member_id == m.id).Select(c => c.num).FirstOrDefault() ?? "",
+                    deposit = Math.Round(deposits.Where(d => d.member_id == m.id).Sum(d => d.income_amount - d.consume_amount), 2),
+                    points = pts.Where(p => p.member_id == m.id).Sum(p => p.points),
+                    sys = bizRows.Where(b => b.member_id == m.id).Select(b => b.type).ToList(),
+                    custom = ctags.Where(t => t.member_id == m.id).Select(t => t.tag).ToList()
+                };
             }).ToList();
 
             return Ok(new ApiResult<object>() { code = 0, message = "", data = new { items, total } });
@@ -153,6 +184,9 @@ namespace SnowmeetApi.Controllers
             Member m = await _db.member.Where(x => x.id == memberId).AsNoTracking().FirstOrDefaultAsync();
             if (m == null)
                 return Ok(new ApiResult<object>() { code = 1, message = "会员不存在", data = null });
+
+            var profiles = await GetProfilesAsync(new List<int> { memberId });
+            profiles.TryGetValue(memberId, out var profile);
 
             var msaAll = await _db.memberSocialAccount
                 .Where(a => a.member_id == memberId && a.valid == 1)
@@ -199,6 +233,8 @@ namespace SnowmeetApi.Controllers
             {
                 id = m.id,
                 name = m.real_name,
+                nickName = profile?.NickName,
+                avatarUrl = profile?.AvatarUrl,
                 gender = m.gender,
                 isVip = m.is_vip,
                 phone = cell,
