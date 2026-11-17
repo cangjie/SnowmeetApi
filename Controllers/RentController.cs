@@ -8061,7 +8061,8 @@ namespace SnowmeetApi.Controllers
             Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
             if (staff.title_level == 50)
             {
-                shop = "万龙体验中心";
+                // 万龙对账账号：看万龙体验中心 + 万龙服务中心两家的租赁订单（2026-11-17 用户定，服务中心的租赁也要给万龙分账）
+                shop = "万龙体验中心,万龙服务中心";
             }
             if (staff.title_level < 50)
             {

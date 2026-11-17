@@ -100,7 +100,7 @@
         btnCtrl.disabled = true;
         btnCtrl.innerText = "查询中……";
         var getUrl = '../../api/Rent/GetConfirmedRentOrder?sessionKey=' + encodeURIComponent(sessionKey)
-            + '&startDate=' + formatDate(startDate) + '&endDate=' + formatDate(endDate) + '&shop=' + encodeURIComponent('万龙体验中心');
+            + '&startDate=' + formatDate(startDate) + '&endDate=' + formatDate(endDate) + '&shop=' + encodeURIComponent('万龙体验中心,万龙服务中心');   // 2026-11-17：服务中心的租赁订单也要给万龙分账，一起显示
         $.ajax({
             url: getUrl,
             type: 'GET',

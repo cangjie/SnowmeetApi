@@ -254,9 +254,45 @@ public class CoachCardShareTests
 
             Assert.Equal(ShareCardState.Invalid, (await f.Cards().ClaimAsync(token, CoachFixture.StudentA, DateTime.Now)).state);
             Assert.Equal(ShareCardState.Invalid, (await f.Cards().GetShareCardAsync(token, CoachFixture.StudentA, DateTime.Now)).state);
-            // 取消的记录仍在列表里，标「已取消」
-            var cards = J((await Ctl(f).ListMyCards("session-2")).data).GetProperty("cards").EnumerateArray().ToList();
-            Assert.Equal("revoked", Assert.Single(cards).GetProperty("card").GetProperty("status").GetString());
+            // 删除的分享不再列出、不计入统计；库里的行还在（标已撤销，留审计）
+            var listed = J((await Ctl(f).ListMyCards("session-2")).data);
+            Assert.Empty(listed.GetProperty("cards").EnumerateArray());
+            Assert.Equal(0, listed.GetProperty("counts").GetProperty("total").GetInt32());
+            Assert.Equal(0, listed.GetProperty("counts").GetProperty("revoked").GetInt32());
+            Assert.Equal(0, J((await Ctl(f).GetMyCoach("session-2")).data).GetProperty("cards").GetProperty("total").GetInt32());
+        }
+    }
+
+    [Fact]
+    public async Task Deleting_hides_only_unclaimed_shares_a_claimed_card_the_admin_revoked_is_still_listed()
+    {
+        var (f, coach, template) = await Setup(); await using (f)
+        {
+            var now = DateTime.Now;
+            var deleted = await f.Cards().CreateCardAsync(coach.id, now, template.id, "card");
+            await f.Cards().RevokeAsync(deleted.id, coach.id, now);
+            var waiting = await f.Cards().CreateCardAsync(coach.id, now, template.id, "qr");
+            var claimed = await f.Cards().CreateCardAsync(coach.id, now, template.id, "qr");
+            await f.Cards().ClaimAsync(claimed.token, CoachFixture.StudentA, now);
+            var revokedLater = await f.Cards().CreateCardAsync(coach.id, now, template.id, "qr");
+            await f.Cards().ClaimAsync(revokedLater.token, CoachFixture.StudentB, now);
+            await f.Cards().RevokeAsync(revokedLater.id, null, now);   // 管理员撤销已领取的卡
+
+            var res = J((await Ctl(f).ListMyCards("session-2")).data);
+            var rows = res.GetProperty("cards").EnumerateArray().Select(x => x.GetProperty("card")).ToList();
+            Assert.Equal(new[] { waiting.id, claimed.id, revokedLater.id }.OrderBy(x => x), rows.Select(r => r.GetProperty("id").GetInt32()).OrderBy(x => x));
+            Assert.DoesNotContain(rows, r => r.GetProperty("id").GetInt32() == deleted.id);
+            Assert.Equal(template.id, rows[0].GetProperty("templateId").GetInt32());
+            var counts = res.GetProperty("counts");
+            Assert.Equal(3, counts.GetProperty("total").GetInt32());
+            Assert.Equal(1, counts.GetProperty("issued").GetInt32());
+            Assert.Equal(1, counts.GetProperty("claimed").GetInt32());
+            Assert.Equal(1, counts.GetProperty("revoked").GetInt32());   // 只有「领取后被撤销」的那张
+            // 管理员看某个教练的卡，仍然看得到被删除的分享
+            Assert.Equal(4, (await f.Query().ListCardsAsync(coach.id, null)).Count);
+            // 没有领取过的再次分享：待领取的卡带分享路径，同一张卡
+            var waitingRow = res.GetProperty("cards").EnumerateArray().Single(x => x.GetProperty("card").GetProperty("id").GetInt32() == waiting.id);
+            Assert.Equal("/pages/coach/claim/claim?t=" + waiting.token, waitingRow.GetProperty("sharePath").GetString());
         }
     }
 

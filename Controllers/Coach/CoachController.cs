@@ -66,7 +66,7 @@ public sealed class CoachController(ApplicationDBContext db, IConfiguration conf
         Models.Coach? coach = member == null ? null : await Db.coach.AsNoTracking().Where(c => c.member_id == member.id)
             .OrderByDescending(c => c.valid).ThenByDescending(c => c.id).FirstOrDefaultAsync();
         if (coach == null) return Result(0, "", new { isCoach = false });
-        return await Run(async () => new { isCoach = true, coach = await CoachInfoAsync(coach), cards = await _query.CardCountsAsync(coach.id) });
+        return await Run(async () => new { isCoach = true, coach = await CoachInfoAsync(coach), cards = await _query.CardCountsAsync(coach.id, hideDeletedShares: true) });
     }
 
     /// <summary>先在服务器建一张待领取的卡，返回分享路径。前端随后用 open-type="share" 的按钮把它分享出去。</summary>
@@ -110,10 +110,11 @@ public sealed class CoachController(ApplicationDBContext db, IConfiguration conf
     [HttpGet]
     public Task<ApiResult<object>> ListMyCards(string sessionKey, string? status = null) => AsCoach(sessionKey, async coach =>
     {
-        List<CoachCardView> cards = await _query.ListCardsAsync(coach.id, status);
-        // 待领取的卡带上分享路径，前端每行都有自己的分享按钮
+        // 机构「删除」的分享（没人领取就撤销的卡）不再列出，也不计入统计
+        List<CoachCardView> cards = await _query.ListCardsAsync(coach.id, status, hideDeletedShares: true);
+        // 待领取的卡带上分享路径，前端每行都有「分享小程序卡片」（再次分享同一张卡，不再新记一次）
         var withPath = cards.Select(c => new { card = c, sharePath = c.status == CoachCard.StatusIssued ? ClaimPage + "?t=" + c.token : null }).ToList();
-        return new { counts = await _query.CardCountsAsync(coach.id), cards = withPath };
+        return new { counts = await _query.CardCountsAsync(coach.id, hideDeletedShares: true), cards = withPath };
     });
 
     [HttpPost]

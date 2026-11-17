@@ -18,6 +18,8 @@ public sealed class CoachCardView
     public string status { get; set; } = "";
     public DateTime createDate { get; set; }
     public int? memberId { get; set; }
+    /// <summary>卡种（机构的分享记录按卡种分组显示）；旧卡没有</summary>
+    public int? templateId { get; set; }
     public string? studentName { get; set; }
     public string? cardName { get; set; }
     public string? phoneTail { get; set; }
@@ -78,9 +80,14 @@ public sealed class CoachCouponItem
 /// <summary>教练首页 / 管理员教练详情用到的只读查询：卡的领取情况、学员及其消费、券的转发状态。</summary>
 public sealed class CoachQueryService(ApplicationDBContext db, string? publicBaseUrl = null)
 {
-    public async Task<List<CoachCardView>> ListCardsAsync(int coachId, string? status)
+    /// <summary>
+    /// hideDeletedShares：机构自己「删除」的分享记录不再列出。删除 = 把还没人领取的卡标成已撤销（不物理删除，留审计），
+    /// 所以「已撤销且没有领取人」就是被删除的分享；已领取后被管理员撤销的卡（有领取人）照常列出。
+    /// </summary>
+    public async Task<List<CoachCardView>> ListCardsAsync(int coachId, string? status, bool hideDeletedShares = false)
     {
         IQueryable<CoachCard> q = db.coachCard.AsNoTracking().Where(c => c.coach_id == coachId);
+        if (hideDeletedShares) q = q.Where(c => !(c.status == CoachCard.StatusRevoked && c.member_id == null));
         if (!string.IsNullOrWhiteSpace(status)) q = q.Where(c => c.status == status);
         List<CoachCard> cards = await q.OrderByDescending(c => c.create_date).ThenByDescending(c => c.id).ToListAsync();
         List<int> memberIds = cards.Where(c => c.member_id != null).Select(c => c.member_id!.Value).Distinct().ToList();
@@ -99,7 +106,7 @@ public sealed class CoachQueryService(ApplicationDBContext db, string? publicBas
             return new CoachCardView
             {
                 id = c.id, token = c.token, tokenTail = c.token.Length >= 4 ? c.token.Substring(c.token.Length - 4).ToUpperInvariant() : c.token,
-                status = c.status, createDate = c.create_date, memberId = c.member_id,
+                status = c.status, createDate = c.create_date, memberId = c.member_id, templateId = c.template_id,
                 studentName = c.member_id == null ? null : p.name, cardName = c.card_name_snapshot, phoneTail = c.member_id == null ? null : p.tail,
                 claimedAt = c.claimed_at, validUntil = c.end_date, useCount = uses.TryGetValue(c.id, out int n) ? n : 0,
                 carePrices = CoachCardRules.ParseCarePrices(c.care_price_snapshot), rentalRate = c.rental_rate_snapshot,
@@ -111,9 +118,11 @@ public sealed class CoachQueryService(ApplicationDBContext db, string? publicBas
         }).ToList();
     }
 
-    public async Task<object> CardCountsAsync(int coachId)
+    public async Task<object> CardCountsAsync(int coachId, bool hideDeletedShares = false)
     {
-        var rows = await db.coachCard.AsNoTracking().Where(c => c.coach_id == coachId)
+        IQueryable<CoachCard> all = db.coachCard.AsNoTracking().Where(c => c.coach_id == coachId);
+        if (hideDeletedShares) all = all.Where(c => !(c.status == CoachCard.StatusRevoked && c.member_id == null));
+        var rows = await all
             .GroupBy(c => c.status).Select(g => new { status = g.Key, n = g.Count() }).ToListAsync();
         int Count(string s) => rows.Where(r => r.status == s).Sum(r => r.n);
         return new
