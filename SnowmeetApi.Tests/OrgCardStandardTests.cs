@@ -146,7 +146,7 @@ public class OrgCardStandardTests
     }
 
     [Fact]
-    public async Task Saving_is_checked_cell_by_cell_against_the_floors_and_takes_effect_for_new_cards_only()
+    public async Task Saving_the_single_price_set_is_checked_cell_by_cell_against_the_card_floors()
     {
         await using var f = await NewFixture();
         await SetFloors(f, f.Coach2Id, new() { Floor(Wl, "单项", 0.7, null), Floor(Cl, "单项", null, 60) }, 0.8);
@@ -163,10 +163,7 @@ public class OrgCardStandardTests
         Assert.Contains("租赁：折扣不能低于 8 折", bad.message);
         Assert.Empty(await f.NewContext().coachCarePrice.Where(p => p.coach_id == f.Coach2Id && p.mode != "none").ToListAsync());
 
-        // 一张在改价之前领取的卡
-        await f.Admin_().SetPricingAsync(f.Coach2Id, new PricingInput(new() { Care(Wl, "单项", "rate", 0.9) }, null));
-        CoachCard oldCard = await f.IssueAndClaim(CoachFixture.StudentA, f.Coach2Id);
-
+        // （2026-11-15 夜起机构发卡必须选卡种，卡种自己带价格；这套单一价格只剩旧卡和旧入口，新卡的价格快照见 CoachCardTemplateTests）
         // 刚好等于底价可以；一口价刚好等于底价可以
         var ok = await Org(f).SaveMyCardStandard("session-6", new(new() { Care(Wl, "单项", "rate", 0.7), Care(Cl, "单项", "fixed", 60) }, 0.8));
         Assert.Equal(0, ok.code);
@@ -175,14 +172,6 @@ public class OrgCardStandardTests
         Assert.Equal(("rate", 0.7), (wlOne.GetProperty("mode").GetString(), wlOne.GetProperty("value").GetDouble()));
         Assert.Equal(0.8, saved.GetProperty("rental").GetProperty("rate").GetDouble());
         Assert.Equal(0.8, (await f.NewContext().coach.AsNoTracking().SingleAsync(c => c.id == f.Coach2Id)).rental_rate);
-
-        // 只影响之后领取的新卡
-        CoachCard newCard = await f.IssueAndClaim(CoachFixture.StudentB, f.Coach2Id);
-        Assert.Contains("0.9", (await f.NewContext().coachCard.AsNoTracking().SingleAsync(c => c.id == oldCard.id)).care_price_snapshot);
-        var newSnapshot = (await f.NewContext().coachCard.AsNoTracking().SingleAsync(c => c.id == newCard.id)).care_price_snapshot;
-        Assert.Contains("0.7", newSnapshot);
-        Assert.Contains("60", newSnapshot);
-        Assert.Equal(0.8, (await f.NewContext().coachCard.AsNoTracking().SingleAsync(c => c.id == newCard.id)).rental_rate_snapshot);
 
         // 审计：谁（会员 6）、改了什么
         var log = await f.NewContext().coreDataModLog.AsNoTracking().SingleAsync(l => l.scene == "机构自助设置会员卡");
@@ -222,16 +211,12 @@ public class OrgCardStandardTests
     }
 
     [Fact]
-    public async Task An_organization_without_a_card_is_told_to_make_one_rather_than_to_ask_the_admin()
+    public async Task An_organization_must_pick_a_card_type_to_issue_a_card()
     {
         await using var f = await NewFixture();
         var org = await Assert.ThrowsAsync<CoachException>(() => f.Cards().CreateCardAsync(f.Coach2Id, DateTime.Now));
-        Assert.Contains("制作会员卡", org.Message);
+        Assert.Contains("请选择卡种", org.Message);               // 机构发卡必须先选卡种（2026-11-15 夜上线的多卡种）
         var coach = await Assert.ThrowsAsync<CoachException>(() => f.Cards().CreateCardAsync(f.CoachId, DateTime.Now));
         Assert.Contains("管理员还没有给你设置", coach.Message);
-        // 做好之后就能发卡
-        await SetFloors(f, f.Coach2Id, new() { Floor(Wl, "单项", 0.7, null) }, null);
-        Assert.Equal(0, (await Org(f).SaveMyCardStandard("session-6", new(new() { Care(Wl, "单项", "rate", 0.8) }, null))).code);
-        Assert.NotNull(await f.Cards().CreateCardAsync(f.Coach2Id, DateTime.Now));
     }
 }

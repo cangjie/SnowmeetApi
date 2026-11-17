@@ -139,7 +139,13 @@ public class IntroducerServiceTests
             db.coachCardTemplate.Add(template); await db.SaveChangesAsync();
             Assert.Equal(0, (await self.CreateCard("distributor-session", new CoachController.CreateCardInput(template.id))).code);
         }
-        else Assert.Equal(0, (await self.CreateCard("distributor-session")).code);
+        else
+        {
+            // 只有机构能发整个雪季的会籍卡；教练和 KOL 只能发单张优惠券（2026-11-17）
+            Assert.Equal(1, (await self.CreateCard("distributor-session")).code);
+            Assert.Empty(await db.coachCard.AsNoTracking().Where(c => c.coach_id == coach.id).ToListAsync());
+            return;
+        }
         Assert.Single(await db.coachCard.AsNoTracking().Where(c => c.coach_id == coach.id).ToListAsync());
     }
 

@@ -26,6 +26,7 @@ public sealed class CoachAdminController(ApplicationDBContext db, IConfiguration
     public sealed record UpdateCoachInput(int coachId, string? name, bool? valid);
     public sealed record SetPricingInput(int coachId, List<CarePriceInput>? care, double? rental_rate);
     public sealed record SetFloorsInput(int coachId, List<CareFloorInput>? care, double? rental_min_rate);
+    public sealed record SetCouponFloorsInput(int coachId, List<CouponFloorInput>? care);
     public sealed record CardIdInput(int cardId);
     public sealed record GrantInput(List<int>? coachIds, int templateId, int countEach, string? requestId);
 
@@ -104,6 +105,19 @@ public sealed class CoachAdminController(ApplicationDBContext db, IConfiguration
     {
         Models.Coach c = await _admin.SetPricingAsync(input.coachId, new PricingInput(input.care, input.rental_rate));
         return await CoachViewAsync(c);
+    });
+
+    /// <summary>优惠券底价（原来的「价格设置」）：限制这位分销商自己生成的单张优惠券不能低于多少钱、多少折扣、减免不能超过多少。三种方式各自可空，空 = 没开放，分销商界面不显示。</summary>
+    [HttpGet]
+    public Task<ApiResult<object>> GetCouponFloors(string sessionKey, int coachId) =>
+        AsAdmin(sessionKey, async _ => await new CoachFloorService(Db, config).GetCouponFloorViewAsync(coachId));
+
+    [HttpPost]
+    public Task<ApiResult<object>> SetCouponFloors(string sessionKey, [FromBody] SetCouponFloorsInput input) => AsAdmin(sessionKey, async op =>
+    {
+        var svc = new CoachFloorService(Db, config);
+        await svc.SetCouponFloorsAsync(input.coachId, input.care, op);
+        return await svc.GetCouponFloorViewAsync(input.coachId);
     });
 
     /// <summary>机构自己制作会员卡时的底价（下限）：养护每店×单项/双项 + 租赁。没设的格子机构不能设优惠。</summary>

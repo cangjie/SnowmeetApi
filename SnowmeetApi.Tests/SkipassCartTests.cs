@@ -249,6 +249,19 @@ namespace SnowmeetApi.Tests
         }
 
         [Fact]
+        public async Task KOL的分销商码和教练机构一样_每张票1元分账()
+        {
+            await using var f = await Fixture.Create();
+            await using var db = f.NewContext();
+            var intro = await AddDistributor(db, 12, 301, "KOL");
+            var request = new SkipassCartRequest { introducerId = intro.id, items = new List<SkipassCartItem> { Item(901, "13501177897", date: D0, count: 2) } };
+            var order = Assert.IsType<Order>(Assert.IsType<OkObjectResult>((await f.Controller(db).ReserveSkiPassCart(request, "customer-session")).Result).Value);
+            await using var check = f.NewContext();
+            Assert.Equal(2, await check.orderShare.CountAsync(s => s.order_id == order.id && s.valid && s.relation_id == 301 && s.amount == 1));
+            Assert.Equal(intro.id, (await check.distributorOrder.SingleAsync(o => o.order_id == order.id)).introducer_id);
+        }
+
+        [Fact]
         public async Task 分销商码优先于顾客原来的员工推荐_本单不再回退到员工()
         {
             await using var f = await Fixture.Create();
@@ -266,7 +279,7 @@ namespace SnowmeetApi.Tests
 
         [Theory]
         [InlineData("停用")]
-        [InlineData("KOL")]
+        [InlineData("其他类型")]
         [InlineData("本人")]
         [InlineData("不存在")]
         public async Task 无效的分销商码照常下单_但不分账_不记归属(string kind)
@@ -275,7 +288,7 @@ namespace SnowmeetApi.Tests
             await using var db = f.NewContext();
             int introducerId = 9999;
             if (kind == "停用") introducerId = (await AddDistributor(db, 12, 301, "教练", valid: 0)).id;
-            if (kind == "KOL") introducerId = (await AddDistributor(db, 12, 301, "KOL")).id;
+            if (kind == "其他类型") introducerId = (await AddDistributor(db, 12, 301, "其他类型")).id;
             if (kind == "本人") introducerId = (await AddDistributor(db, 11, 301, "教练", newMember: false)).id;   // 顾客 11 自己就是这位分销商
             var request = new SkipassCartRequest { introducerId = introducerId, items = new List<SkipassCartItem> { Item(901, "13501177897", date: D0) } };
             var order = Assert.IsType<Order>(Assert.IsType<OkObjectResult>((await f.Controller(db).ReserveSkiPassCart(request, "customer-session")).Result).Value);

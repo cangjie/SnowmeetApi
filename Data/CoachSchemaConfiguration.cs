@@ -26,6 +26,11 @@ internal static class CoachSchemaConfiguration
         floor.Property(x => x.tier).HasMaxLength(10);
         floor.HasIndex(x => new { x.coach_id, x.biz_type, x.shop, x.tier }).IsUnique().HasDatabaseName("UX_coach_price_floor");
 
+        var couponFloor = m.Entity<CoachCouponFloor>();
+        couponFloor.Property(x => x.shop).HasMaxLength(50);
+        couponFloor.Property(x => x.tier).HasMaxLength(10);
+        couponFloor.HasIndex(x => new { x.coach_id, x.shop, x.tier }).IsUnique().HasDatabaseName("UX_coach_coupon_floor");
+
         var card = m.Entity<CoachCard>();
         card.Property(x => x.token).HasMaxLength(32);
         card.Property(x => x.status).HasMaxLength(12);

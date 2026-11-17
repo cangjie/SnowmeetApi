@@ -24,8 +24,9 @@ public class DistributorPortalTests
 
     [Theory]
     [InlineData("教练")]
+    [InlineData("KOL")]
     [InlineData("机构")]
-    public async Task Coach_and_organization_get_the_menu_with_their_entries(string type)
+    public async Task Coach_kol_and_organization_get_the_menu_with_their_entries(string type)
     {
         await using var db = await ShareFixture.NewDbAsync();
         var intro = await ShareFixture.AddIntroducerAsync(db, 301, type);
@@ -39,15 +40,15 @@ public class DistributorPortalTests
         // 机构多一个「制作会员卡」；教练的会员卡价格由管理员设置
         string[] expected = type == "机构"
             ? new[] { "qrcode", "customers", "makeCard", "makeCoupon", "cards", "coupons", "payee" }
-            : new[] { "qrcode", "customers", "cards", "coupons", "payee" };
+            : new[] { "qrcode", "customers", "makeCoupon", "coupons", "payee" };   // 教练和 KOL 没有会籍卡
         Assert.Equal(expected, data.GetProperty("entries").EnumerateArray().Select(e => e.GetString()).ToArray());
     }
 
     [Fact]
-    public async Task Kol_stopped_and_unrelated_members_do_not_get_the_menu()
+    public async Task Stopped_and_unrelated_members_do_not_get_the_menu()
     {
         await using var db = await ShareFixture.NewDbAsync();
-        await ShareFixture.AddIntroducerAsync(db, 302, "KOL");
+        await ShareFixture.AddIntroducerAsync(db, 302, "其他类型");
         var stopped = await ShareFixture.AddIntroducerAsync(db, 303, "教练");
         var row = await db.introducer.AsNoTracking().SingleAsync(i => i.id == stopped.id);
         row.valid = 0;
@@ -106,14 +107,14 @@ public class DistributorPortalTests
     {
         await using var db = await ShareFixture.NewDbAsync();
         var intro = await ShareFixture.AddIntroducerAsync(db, 307, "机构");
-        await ShareFixture.AddIntroducerAsync(db, 308, "KOL");
+        await ShareFixture.AddIntroducerAsync(db, 308, "其他类型");
         await AddSessionAsync(db, 307, "sk-307");
         await AddSessionAsync(db, 308, "sk-308");
         var handler = new MiniTicketQrTests.Handler();
         var qr = new MiniStaffBookingQrService(new MiniTicketQrTests.Tokens(), new HttpClient(handler));
         var ctl = new DistributorController(db, ShareFixture.Config);
 
-        Assert.IsType<BadRequestObjectResult>(await ctl.GetQrCode("sk-308", qr));   // KOL 暂无入口
+        Assert.IsType<BadRequestObjectResult>(await ctl.GetQrCode("sk-308", qr));   // 不是教练 / KOL / 机构
         Assert.IsType<BadRequestObjectResult>(await ctl.GetQrCode("nope", qr));
         Assert.Equal(0, handler.Calls);
 

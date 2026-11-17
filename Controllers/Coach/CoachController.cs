@@ -69,6 +69,9 @@ public sealed class CoachController(ApplicationDBContext db, IConfiguration conf
     [HttpPost]
     public Task<ApiResult<object>> CreateCard(string sessionKey, [FromBody] CreateCardInput? input = null) => AsCoach(sessionKey, async coach =>
     {
+        // 只有机构能发整个雪季有效的会籍卡；教练和 KOL 只能发单张优惠券（用户 2026-11-17 定）
+        string? type = await Db.introducer.AsNoTracking().Where(i => i.coach_id == coach.id && i.valid == 1).Select(i => i.type).FirstOrDefaultAsync();
+        if (type != IntroducerRules.TypeOrg) throw new CoachException("只有机构可以发整个雪季有效的会籍卡；教练和 KOL 请使用单张优惠券");
         CoachCard card = await _cards.CreateCardAsync(coach.id, DateTime.Now, input?.templateId);
         return new { cardId = card.id, cardName = card.card_name_snapshot, tokenTail = card.token.Substring(card.token.Length - 4).ToUpperInvariant(), sharePath = ClaimPage + "?t=" + card.token };
     });

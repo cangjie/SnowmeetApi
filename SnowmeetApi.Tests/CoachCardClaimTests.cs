@@ -216,11 +216,11 @@ public class CoachCardClaimTests
         var mine = await ctl().GetMyCoach("session-3");
         Assert.Equal(0, mine.code);
         Assert.False(System.Text.Json.JsonSerializer.SerializeToElement(mine.data).GetProperty("isCoach").GetBoolean());
+        // 教练不能再发会籍卡（只有机构能；教练和 KOL 只能发单张优惠券），原有的卡仍能查
         var made = await ctl().CreateCard("session-2");
-        Assert.Equal(0, made.code);
-        string path = System.Text.Json.JsonSerializer.SerializeToElement(made.data).GetProperty("sharePath").GetString()!;
-        Assert.StartsWith("/pages/coach/claim/claim?t=", path);
+        Assert.Equal(1, made.code);
+        Assert.Contains("只有机构", made.message);
         var list = await ctl().ListMyCards("session-2");
-        Assert.Equal(1, System.Text.Json.JsonSerializer.SerializeToElement(list.data).GetProperty("cards").GetArrayLength());
+        Assert.Equal(0, System.Text.Json.JsonSerializer.SerializeToElement(list.data).GetProperty("cards").GetArrayLength());
     }
 }

@@ -14,7 +14,10 @@ namespace SnowmeetApi.Services.CoachPlatform;
 public sealed record MakeCouponInput(string? shop, string? tier, string? mode, double value, int count, string? requestId);
 
 /// <summary>
-/// 机构自己生成优惠券（用户 2026-11-15 定：根据管理员设的底价生成）。
+/// 分销商自己生成单张优惠券：教练 / KOL / 机构都可以（用户 2026-11-17 定：只有机构能发整个雪季的会籍卡，
+/// 教练和 KOL 只能发单张优惠券）。券价受管理员设的**优惠券底价**（coach_coupon_floor，原来的「价格设置」）约束：
+/// 一口价不能低于、折扣不能低于、减免不能超过；底价里没设的方式没有开放，界面不显示。
+/// （2026-11-15 的版本只给机构、按会籍卡底价限制；现已改为所有分销商、按优惠券底价。）
 /// 一次生成 = 一个只给这批券用的券模板（隐藏、养护券）+ 模板上针对「该店单项 / 双项」养护商品的价格规则（一口价或折扣率，
 /// 复用现有 product_ticket_template 计价，开单选券和核销都不用改）+ N 张券放进机构自己的券包，并登记成「分销商发出的券」
 /// （coach_coupon_grant）：这样转发、顾客接券建立归属、按券统计消费都沿用现有流程。
@@ -22,6 +25,7 @@ public sealed record MakeCouponInput(string? shop, string? tier, string? mode, d
 /// </summary>
 public sealed class CoachCouponMakerService(ApplicationDBContext db, IConfiguration config)
 {
+    /// <summary>券的渠道名沿用「机构自制券」（生产库里已有这个值），教练 / KOL 自己生成的也用它。</summary>
     public const string Channel = "机构自制券";
     public const int MaxPerRequest = 50;
     /// <summary>名下还没用完、没过期的自制券上限，防止无限生成。</summary>
@@ -31,7 +35,7 @@ public sealed class CoachCouponMakerService(ApplicationDBContext db, IConfigurat
 
     private static string? Blocked(Coach coach, Introducer intro)
     {
-        if (intro.type != IntroducerRules.TypeOrg) return "只有机构可以自己生成优惠券";
+        if (!DistributorMenuRules.HasMenu(intro.type)) return "只有教练、KOL 和机构可以生成优惠券";
         if (coach.valid != 1) return "你的分销商身份已停用，不能生成优惠券";
         return null;
     }
@@ -55,20 +59,21 @@ public sealed class CoachCouponMakerService(ApplicationDBContext db, IConfigurat
         where g.coach_id == coachId && t.channel == Channel && t.used == 0 && t.valid == 1 && (t.expire_date == null || t.expire_date >= now)
         select t;
 
-    /// <summary>「制作优惠券」页的数据：能做的格子（来自管理员的底价）、额度、最近做过的券。</summary>
+    /// <summary>「制作优惠券」页的数据：能做的格子和每格开放的方式（来自管理员的优惠券底价，没开放的不返回方式）、额度、最近做过的券。</summary>
     public async Task<object> GetMakerViewAsync(Coach coach, Introducer intro)
     {
         DateTime now = DateTime.Now;
         string? blocked = await BlockedAsync(coach, intro);
-        List<CoachPriceFloor> floors = await new CoachFloorService(db, config).GetFloorsAsync(coach.id);
+        List<CoachCouponFloor> floors = await new CoachFloorService(db, config).GetCouponFloorsAsync(coach.id);
         var cells = new List<object>();
         foreach (string shop in CoachCardRules.CareShops)
             foreach (string tier in new[] { CoachCardRules.TierOne, CoachCardRules.TierTwo })
             {
-                CoachPriceFloor? f = floors.FirstOrDefault(x => x.biz_type == CoachCardRules.BizCare && x.shop == shop && x.tier == tier);
-                bool open = CoachFloorRules.IsOpen(f);
+                CoachCouponFloor? f = floors.FirstOrDefault(x => x.shop == shop && x.tier == tier);
+                List<string> modes = CoachFloorRules.CouponModes(f);
+                bool open = modes.Count > 0;
                 bool productReady = open && await CareProductAsync(shop, tier) != null;
-                cells.Add(new { shop, tier, open, productReady, minRate = f?.min_rate, minFixed = f?.min_fixed });
+                cells.Add(new { shop, tier, open, productReady, modes, minFixed = f?.min_fixed, minRate = f?.min_rate, maxOff = f?.max_off });
             }
         // 最近做过的券：按券模板汇总（数量、已用）
         var rows = await (from g in db.coachCouponGrant.AsNoTracking()
@@ -97,15 +102,14 @@ public sealed class CoachCouponMakerService(ApplicationDBContext db, IConfigurat
         string shop = (input.shop ?? "").Trim(), tier = (input.tier ?? "").Trim(), mode = (input.mode ?? "").Trim(), req = (input.requestId ?? "").Trim();
         if (!CoachCardRules.CareShops.Contains(shop)) throw new CoachException("优惠券只能用于万龙服务中心和崇礼旗舰店的养护");
         if (!CoachCardRules.IsValidTier(tier)) throw new CoachException("优惠券档位只能是单项或双项");
-        if (mode != CoachCardRules.ModeRate && mode != CoachCardRules.ModeFixed) throw new CoachException("请选择折扣或一口价");
-        if (!CoachCardRules.TryValidateCarePrice(mode, input.value, out string valueError)) throw new CoachException(valueError);
+        if (!CoachFloorRules.TryValidateCouponValue(mode, input.value, out string valueError)) throw new CoachException(valueError);
         if (input.count < 1 || input.count > MaxPerRequest) throw new CoachException("一次生成 1～" + MaxPerRequest + " 张");
         if (req.Length == 0 || req.Length > 60) throw new CoachException("缺少请求编号，请重新提交");
 
         string label = shop + " " + tier;
-        CoachPriceFloor? floor = (await new CoachFloorService(db, config).GetFloorsAsync(coach.id))
-            .FirstOrDefault(x => x.biz_type == CoachCardRules.BizCare && x.shop == shop && x.tier == tier);
-        string? floorError = CoachFloorRules.CheckCare(floor, mode, input.value, label);
+        CoachCouponFloor? floor = (await new CoachFloorService(db, config).GetCouponFloorsAsync(coach.id))
+            .FirstOrDefault(x => x.shop == shop && x.tier == tier);
+        string? floorError = CoachFloorRules.CheckCoupon(floor, mode, input.value, label);
         if (floorError != null) throw new CoachException(floorError);
 
         Product? baseProduct = await CareProductAsync(shop, tier);
@@ -129,10 +133,12 @@ public sealed class CoachCouponMakerService(ApplicationDBContext db, IConfigurat
         DateTime end = CoachCardRules.SeasonEnd(now, config);
         // 生产库 ticket_template.name 是 varchar(50)、Chinese_PRC_CI_AS（汉字 2 字节）：名字按 48 字节截，别用 ¥ 这类
         // GBK 里没有的符号（会变成 ?），价格写「68元」。机构名放在前面，太长就截机构名。
-        string priceText = mode == CoachCardRules.ModeFixed ? Math.Round(input.value, 2).ToString("0.##") + "元一口价" : Math.Round(input.value * 10, 2).ToString("0.##") + "折";
+        string value = Math.Round(input.value, 2).ToString("0.##"), rateText = Math.Round(input.value * 10, 2).ToString("0.##");
+        string priceText = mode == CoachCardRules.ModeFixed ? value + "元一口价" : mode == CoachCardRules.ModeRate ? rateText + "折" : "减" + value + "元";
         string suffix = " " + (Short.TryGetValue(shop, out string? s) ? s : shop) + tier + priceText + "券";
         string name = FitBytes(intro.name.Trim(), 48 - ByteLen(suffix)) + suffix;
-        string memo = "凭券在" + shop + "做" + tier + "养护，养护服务费" + (mode == CoachCardRules.ModeFixed ? "按" + Math.Round(input.value, 2).ToString("0.##") + "元收取" : "享" + Math.Round(input.value * 10, 2).ToString("0.##") + "折")
+        string feeText = mode == CoachCardRules.ModeFixed ? "按" + value + "元收取" : mode == CoachCardRules.ModeRate ? "享" + rateText + "折" : "减" + value + "元";
+        string memo = "凭券在" + shop + "做" + tier + "养护，养护服务费" + feeText
             + "；加急加价、维修费照收；每张券限用一次，有效期至" + end.ToString("yyyy-MM-dd") + "。";
 
         return await MiniTicketTransaction.Run(db, async () =>
@@ -201,6 +207,7 @@ public sealed class CoachCouponMakerService(ApplicationDBContext db, IConfigurat
         ticket_template_id = templateId, product_id = productId, valid = true, create_date = DateTime.Now,
         fixed_price = mode == CoachCardRules.ModeFixed ? value : null,
         discount_rate = mode == CoachCardRules.ModeRate ? value : null,
+        discount_amount = mode == CoachFloorRules.ModeOff ? value : null,   // 减免：立减金额，加急商品同额
     });
 
     private async Task<string> NewCodeAsync()

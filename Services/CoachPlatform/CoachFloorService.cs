@@ -12,6 +12,7 @@ namespace SnowmeetApi.Services.CoachPlatform;
 
 public sealed record CareFloorInput(string? shop, string? tier, double? min_rate, double? min_fixed);
 public sealed record FloorInput(List<CareFloorInput>? care, double? rental_min_rate);
+public sealed record CouponFloorInput(string? shop, string? tier, double? min_fixed, double? min_rate, double? max_off);
 
 /// <summary>
 /// 机构自己制作会员卡：管理员给机构设底价（下限），机构在底价之内自己设养护 / 租赁优惠，保存即生效，只影响之后领取的新卡。
@@ -87,6 +88,65 @@ public sealed class CoachFloorService(ApplicationDBContext db, IConfiguration co
             before, Describe(await GetFloorsAsync(coachId)), coach.display_name));
         await db.SaveChangesAsync();
     }
+
+    // ---------- 优惠券底价（教练 / KOL / 机构自己生成单张优惠券；2026-11-17 起取代原来的「价格设置」）----------
+
+    public async Task<List<CoachCouponFloor>> GetCouponFloorsAsync(int coachId) =>
+        await db.coachCouponFloor.AsNoTracking().Where(f => f.coach_id == coachId).ToListAsync();
+
+    /// <summary>管理员看到的优惠券底价：固定 4 格（门店 × 单项/双项），三个值各自可空 = 没开放。</summary>
+    public async Task<object> GetCouponFloorViewAsync(int coachId)
+    {
+        List<CoachCouponFloor> floors = await GetCouponFloorsAsync(coachId);
+        var care = new List<object>();
+        foreach (string shop in CoachCardRules.CareShops)
+            foreach (string tier in Tiers)
+            {
+                CoachCouponFloor? f = floors.FirstOrDefault(x => x.shop == shop && x.tier == tier);
+                care.Add(new { shop, tier, minFixed = f?.min_fixed, minRate = f?.min_rate, maxOff = f?.max_off });
+            }
+        return new { care };
+    }
+
+    /// <summary>管理员设优惠券底价。四格都 upsert 一行，三个值都空 = 这一项不开放。写审计。</summary>
+    public async Task SetCouponFloorsAsync(int coachId, List<CouponFloorInput>? input, Staff op)
+    {
+        Coach coach = await db.coach.AsNoTracking().FirstOrDefaultAsync(c => c.id == coachId) ?? throw new CoachException("没有找到这位分销商");
+        var wanted = new Dictionary<(string, string), CouponFloorInput>();
+        foreach (CouponFloorInput p in input ?? new())
+        {
+            string shop = (p.shop ?? "").Trim(), tier = (p.tier ?? "").Trim();
+            if (!CoachCardRules.CareShops.Contains(shop)) throw new CoachException("优惠券底价只能设置万龙服务中心和崇礼旗舰店");
+            if (!CoachCardRules.IsValidTier(tier)) throw new CoachException("养护档位只能是单项或双项");
+            string? bad = CoachFloorRules.ValidateCouponFloorInput(p.min_fixed, p.min_rate, p.max_off, shop + " " + tier);
+            if (bad != null) throw new CoachException(bad);
+            wanted[(shop, tier)] = p;
+        }
+        List<CoachCouponFloor> existing = await GetCouponFloorsAsync(coachId);
+        string before = DescribeCoupon(existing);
+        DateTime now = DateTime.Now;
+        foreach (string shop in CoachCardRules.CareShops)
+            foreach (string tier in Tiers)
+            {
+                wanted.TryGetValue((shop, tier), out CouponFloorInput? p);
+                CoachCouponFloor? row = existing.FirstOrDefault(f => f.shop == shop && f.tier == tier);
+                if (row == null)
+                    db.coachCouponFloor.Add(new CoachCouponFloor { coach_id = coachId, shop = shop, tier = tier, min_fixed = p?.min_fixed, min_rate = p?.min_rate, max_off = p?.max_off, updated_by_staff_id = op.id, update_date = now });
+                else if (row.min_fixed != p?.min_fixed || row.min_rate != p?.min_rate || row.max_off != p?.max_off)
+                {
+                    row.min_fixed = p?.min_fixed; row.min_rate = p?.min_rate; row.max_off = p?.max_off; row.updated_by_staff_id = op.id; row.update_date = now;
+                    db.Entry(row).State = EntityState.Modified;
+                }
+            }
+        await db.SaveChangesAsync();
+        db.coreDataModLog.Add(CoreDataModLog.CreateManualLog("coach_coupon_floor", "floor", coach.id, "管理员设置优惠券底价", coach.member_id, op.id,
+            before, DescribeCoupon(await GetCouponFloorsAsync(coachId)), coach.display_name));
+        await db.SaveChangesAsync();
+    }
+
+    private static string DescribeCoupon(List<CoachCouponFloor> floors) => string.Join("；", floors
+        .OrderBy(f => f.shop).ThenBy(f => f.tier)
+        .Select(f => f.shop + f.tier + ":" + (f.min_fixed?.ToString("0.##") ?? "-") + "/" + (f.min_rate?.ToString("0.##") ?? "-") + "/" + (f.max_off?.ToString("0.##") ?? "-")));
 
     private static string Describe(List<CoachPriceFloor> floors) => string.Join("；", floors
         .OrderBy(f => f.biz_type).ThenBy(f => f.shop).ThenBy(f => f.tier)
