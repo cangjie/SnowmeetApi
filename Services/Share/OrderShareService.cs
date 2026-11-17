@@ -248,9 +248,12 @@ public sealed class OrderShareService(ApplicationDBContext db, IConfiguration co
             if (share.batch_id != null || (ticket && share.share_method == null && share.amount == 1)) continue;
             string? problem = relations.TryGetValue(share.relation_id, out OrderShareRelation? relation)
                 ? ShareReceiverRules.Problem(relation, relation.binds ?? new List<ShareRelationBind>(), payment.pay_method) : null;
+            // 2026-11-17 用户定：给万龙的分账一律不自动分账，重算时也不能把标记恢复成自动
+            bool wanlong = share.relation_id == WanlongShareRules.WanlongRelationId;
             string? autoMemo = usedTicket ? ShareMemoRules.TicketMemo
-                : (problem ?? (over ? ShareCapRules.OverCapMemo(payment) : (share.auto_share ? null : ShareMemoRules.ManualChosenMemo)));
-            bool flag = usedTicket || over || problem != null || !share.auto_share;
+                : (problem ?? (over ? ShareCapRules.OverCapMemo(payment)
+                    : (wanlong ? WanlongShareRules.NoAutoMemo : (share.auto_share ? null : ShareMemoRules.ManualChosenMemo))));
+            bool flag = usedTicket || over || problem != null || !share.auto_share || wanlong;
             if (share.share_method == ShareWorkflowRules.Auto) { autoMemo = problem; flag = problem != null; }
             if (share.share_method == ShareWorkflowRules.Manual) { autoMemo = problem ?? ShareMemoRules.ManualChosenMemo; flag = true; }
             string? memo = ShareMemoRules.WithAuto(row.memo, autoMemo);

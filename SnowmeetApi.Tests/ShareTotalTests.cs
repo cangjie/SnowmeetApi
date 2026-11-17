@@ -66,7 +66,9 @@ public class ShareTotalTests
         await Helper(db).CreatePaymentShare(intro);
 
         var all = await db.paymentShare.AsNoTracking().ToListAsync();
-        Assert.All(all, r => Assert.False(r.can_not_share));
+        // 2026-11-17 起万龙那条一律不自动分，介绍人那条不受影响
+        Assert.All(all.Where(r => r.share_id == wanlong.id), r => Assert.True(r.can_not_share));
+        Assert.All(all.Where(r => r.share_id == intro.id), r => Assert.False(r.can_not_share));
         Assert.Equal(261, all.Where(r => r.payment_id == 5).Sum(r => r.amount), 2);
         Assert.Equal(29, all.Where(r => r.payment_id == 4).Sum(r => r.amount), 2);
         var introRecord = Assert.Single(all, r => r.share_id == intro.id);
@@ -124,7 +126,8 @@ public class ShareTotalTests
         var record = Assert.Single(await Helper(db).CreatePaymentShare(wanlong));
 
         Assert.Equal(35, record.amount, 2);
-        Assert.False(record.can_not_share);
+        Assert.True(record.can_not_share);   // 2026-11-17 起万龙分账一律不自动分；这里要验证的是表不存在也照常生成
+        Assert.Equal(SnowmeetApi.Helpers.WanlongShareRules.NoAutoMemo, record.memo);
     }
 
     [Fact]
@@ -135,6 +138,8 @@ public class ShareTotalTests
 
         var record = Assert.Single(await Helper(db).CreatePaymentShare(wanlong));
 
-        Assert.False(record.can_not_share);
+        // 不因为「没有支付宝绑定」被标记；2026-11-17 起只因为「万龙一律不自动分」被标记
+        Assert.True(record.can_not_share);
+        Assert.Equal(SnowmeetApi.Helpers.WanlongShareRules.NoAutoMemo, record.memo);
     }
 }

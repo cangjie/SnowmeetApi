@@ -99,11 +99,9 @@ public class WanlongRentShareAmountTests
 
         var paymentShare = await db.paymentShare.AsNoTracking().SingleAsync(s => s.share_id == orderShare.id);
         Assert.Equal(expectedShare, paymentShare.amount, 2);
-        Assert.Equal(expectedManualOnly, paymentShare.can_not_share);
-        if (expectedManualOnly)
-        {
-            Assert.Equal("租赁用了优惠券，不自动分账", paymentShare.memo);
-        }
+        // 2026-11-17 起给万龙的分账一律不自动分：用了券的备注是券的说明，没用券的是统一说明
+        Assert.True(paymentShare.can_not_share);
+        Assert.Equal(expectedManualOnly ? "租赁用了优惠券，不自动分账" : SnowmeetApi.Helpers.WanlongShareRules.NoAutoMemo, paymentShare.memo);
     }
 
     // 2026-11-02 用户定：微信、支付宝分账上限都是 30%，按「实收 − 已退款」的净额算（微信会拒绝超过净额 30% 的分账，
@@ -133,10 +131,15 @@ public class WanlongRentShareAmountTests
 
         var paymentShare = await db.paymentShare.AsNoTracking().SingleAsync(s => s.share_id == orderShare.id);
         Assert.Equal(200, paymentShare.amount, 2);                  // 金额不因超限而少分，记录照常生成
-        Assert.Equal(expectedManualOnly, paymentShare.can_not_share);
+        // 2026-11-17 起给万龙的分账一律不自动分：超净额 30% 的备注是「分账金额超过…」，没超的是统一说明
+        Assert.True(paymentShare.can_not_share);
         if (expectedManualOnly)
         {
-            Assert.Contains("30%", paymentShare.memo);
+            Assert.StartsWith("分账金额超过", paymentShare.memo);
+        }
+        else
+        {
+            Assert.Equal(SnowmeetApi.Helpers.WanlongShareRules.NoAutoMemo, paymentShare.memo);
         }
     }
 
@@ -162,7 +165,9 @@ public class WanlongRentShareAmountTests
         await shareHelper.CreatePaymentShare(orderShare);
 
         var paymentShare = await db.paymentShare.AsNoTracking().SingleAsync(s => s.share_id == orderShare.id);
-        Assert.False(paymentShare.can_not_share);
+        // 别的订单的券不算：备注不是券的说明，只是 11-17 起的统一「万龙不自动分」
+        Assert.True(paymentShare.can_not_share);
+        Assert.Equal(SnowmeetApi.Helpers.WanlongShareRules.NoAutoMemo, paymentShare.memo);
     }
 
     private static readonly IConfiguration Config = new ConfigurationBuilder()

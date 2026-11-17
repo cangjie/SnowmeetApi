@@ -24,6 +24,29 @@ namespace SnowmeetApi.Helpers
         /// <summary>万龙租赁分账的收款方（order_share_relation.id，「万龙租赁分账」）。</summary>
         public const int WanlongRelationId = 4;
 
+        /// <summary>万龙租赁商户 1604236346 在 wepay_key 里的 id（TenpayController.GetMchId：万龙租赁订单走它）。</summary>
+        public const int WanlongRentalMchId = 5;
+
+        /// <summary>
+        /// 2026-11-17 用户定：万龙租赁商户（1604236346）下的租赁订单，从现在起一律是「非分账订单」——
+        /// 下微信单时不带 profit_sharing 标识，付款记录 need_share = 0，资金不冻结。
+        /// 原因：微信分账的最大可分账金额按「付款 − 退款」的净额算（11-01 起实测），而万龙租赁应分是租金的一半、押金退完后占净额 50%，几乎都超限被拒。
+        /// </summary>
+        public static bool IsNoShareOrder(string? orderType, int? mchId)
+            => (orderType ?? "").Trim() == "租赁" && mchId == WanlongRentalMchId;
+
+        /// <summary>
+        /// 2026-11-17 用户定：所有给万龙生成的分账一律标成「不自动分账」（payment_share.can_not_share = 1），夜间任务不提交，应分的钱线下结算。
+        /// </summary>
+        public const string NoAutoMemo = "万龙租赁分账一律不自动分账（11-17 起，微信按净额限 30%）";
+
+        /// <summary>
+        /// 夜间「关闭微信分账」（解冻剩余资金）不用等分账成功满 4 天、可以立刻解冻的付款：万龙租赁商户（1604236346）下的租赁订单
+        /// （2026-11-17 用户定「只解冻万龙租赁商户」，万龙租赁不再走微信分账）。
+        /// 雪票等其它类型还有 1 元分账等着提交，旗舰租赁等其它商户的老付款也不动，都仍按原规则。
+        /// </summary>
+        public static bool UnfreezeImmediately(string? orderType, int? mchId) => IsNoShareOrder(orderType, mchId);
+
         // 一个租赁计入分账基数的租金：有效「租金」明细合计，减去挂在这些租金明细上的减免，
         // 再减去不挂明细的减免（优惠券、整单减免），每笔减免只扣一次。
         // 超时费、赔偿金不是租金，挂在它们上面的减免也不扣；已免除那天（明细 valid=0）的减免不扣；

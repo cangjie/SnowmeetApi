@@ -41,7 +41,9 @@ public class WanlongShareAtCloseTests
         var orderShare = await db.orderShare.AsNoTracking().SingleAsync(s => s.order_id == 1 && s.valid);
         var paymentShare = await db.paymentShare.AsNoTracking().SingleAsync(s => s.share_id == orderShare.id);
         Assert.Equal(35, paymentShare.amount, 2);
-        Assert.False(paymentShare.can_not_share);
+        // 没超支付宝的 30%（备注不是「分账金额超过…」）；2026-11-17 起万龙分账一律不自动分
+        Assert.True(paymentShare.can_not_share);
+        Assert.Equal(SnowmeetApi.Helpers.WanlongShareRules.NoAutoMemo, paymentShare.memo);
     }
 
     // 没有任何退款（押金刚好等于租金）的单以前永远没有应分记录

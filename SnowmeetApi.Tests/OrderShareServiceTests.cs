@@ -85,7 +85,7 @@ public class OrderShareServiceTests
         await using var db = await ShareFixture.ClosedWanlongOrderAsync("微信支付", 1000, 500, 200);   // 万龙 100，门槛 150
         var introducer = await ShareFixture.AddIntroducerAsync(db);
         var wanlong = await WanlongAsync(db);
-        Assert.False(Assert.Single(await RecordsAsync(db, wanlong.id)).can_not_share);
+        Assert.True(Assert.Single(await RecordsAsync(db, wanlong.id)).can_not_share);   // 2026-11-17 起万龙一律不自动分
 
         var view = await Svc(db).SetIntroducerShareAsync(ShareFixture.Manager(), 1, introducer.id, 60, null);
 
@@ -114,7 +114,7 @@ public class OrderShareServiceTests
         await Svc(db).SetIntroducerShareAsync(ShareFixture.Manager(), 1, introducer.id, 60, null);
 
         var after = await db.paymentShare.AsNoTracking().SingleAsync(r => r.id == record.id);
-        Assert.False(after.can_not_share);
+        Assert.True(after.can_not_share);   // 原样不动：生成时就是不自动分（2026-11-17 起万龙一律如此）
         Assert.True(after.success);
         var intro = await db.paymentShare.AsNoTracking().SingleAsync(r => r.share_id != wanlong.id);
         Assert.False(intro.can_not_share);
@@ -190,8 +190,8 @@ public class OrderShareServiceTests
         Assert.False((await db.orderShare.AsNoTracking().SingleAsync(s => s.id == introShare.id)).valid);
         Assert.Empty(await RecordsAsync(db, introShare.id));
         var wanlongRecord = Assert.Single(await RecordsAsync(db, wanlong.id));
-        Assert.False(wanlongRecord.can_not_share);          // 合计回到 100，门槛 150，万龙那条恢复自动
-        Assert.Null(wanlongRecord.memo);
+        Assert.True(wanlongRecord.can_not_share);           // 合计回到 100，门槛 150，但 2026-11-17 起万龙那条一律不自动分
+        Assert.Equal(SnowmeetApi.Helpers.WanlongShareRules.NoAutoMemo, wanlongRecord.memo);
 
         await svc.SetIntroducerShareAsync(ShareFixture.Manager(), 1, introducer.id, 20, null);
         var again = await db.orderShare.AsNoTracking().SingleAsync(s => s.relation_id == introducer.relation_id && s.valid);
@@ -233,7 +233,10 @@ public class OrderShareServiceTests
         var intro = await db.paymentShare.AsNoTracking().SingleAsync(r => r.share_id != wanlong.id);
         Assert.True(intro.can_not_share);
         Assert.Equal("未绑定分账关系", intro.memo);
-        Assert.False(Assert.Single(await RecordsAsync(db, wanlong.id)).can_not_share);
+        // 万龙那条不因为介绍人的「未绑定」被标记；2026-11-17 起只因为「万龙一律不自动分」被标记
+        var wanlongRecord = Assert.Single(await RecordsAsync(db, wanlong.id));
+        Assert.True(wanlongRecord.can_not_share);
+        Assert.Equal(SnowmeetApi.Helpers.WanlongShareRules.NoAutoMemo, wanlongRecord.memo);
     }
 
     [Fact]

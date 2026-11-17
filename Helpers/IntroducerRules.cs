@@ -92,6 +92,7 @@ namespace SnowmeetApi.Helpers
             ManualChosenMemo,
             "分账金额超过实收（扣除退款）的30%，不自动分账",
             "分账金额超过付款总额的30%，不自动分账",
+            WanlongShareRules.NoAutoMemo,   // 2026-11-17 起万龙分账一律不自动分
             "介绍人没有微信收款账号",
             "介绍人没有支付宝收款账号",
             "未绑定分账关系",

@@ -70,6 +70,13 @@ namespace SnowmeetApi.Controllers
             {
                 return null;
             }
+            // 2026-11-17 用户定：万龙租赁商户（1604236346）下的租赁订单是「非分账订单」：不带 profit_sharing 标识、need_share = 0
+            // （不管调用方传了什么；以后不再冻结这些资金）。
+            if (SnowmeetApi.Helpers.WanlongShareRules.IsNoShareOrder(order.type, payment.mch_id))
+            {
+                needProfitShare = false;
+                payment.need_share = 0;
+            }
             //List<PaymentShare> shares = await _db.paymentShare.Where(s => s.valid == 1 && s.submit_date == null)
             //    .AsNoTracking().ToListAsync();
             CreatePayTransactionJsapiRequest.Types.Detail detail = new CreatePayTransactionJsapiRequest.Types.Detail();

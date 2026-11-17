@@ -119,14 +119,17 @@ public class ShareWorkflowPermissionTests
             .SetIntroducerShareAsync(ShareFixture.Manager(), 1, introducer.id, 40, null, DateTime.Today, true);
         var helper = new OrderShareController(db, ShareFixture.Config, ShareFixture.Http);
 
-        Assert.Equal(new[] { 900 }, (await helper.GetDueWanlongShares(DateTime.Today.AddDays(-1))).Select(x => x.id).ToArray());
+        // 2026-11-17 起给万龙的分账一律不自动分（重算时标成不自动分），夜间任务只剩分销商那条，且要等审核
+        Assert.Empty(await helper.GetDueWanlongShares(DateTime.Today.AddDays(-1)));
         var share = await db.orderShare.AsNoTracking().SingleAsync(s => s.id == created.orderShareId);
         share.approved_by_staff_id = 303;
         share.approved_at = DateTime.Now;
         db.orderShare.Update(share);
         await db.SaveChangesAsync();
         db.ChangeTracker.Clear();
-        Assert.Contains(await helper.GetDueWanlongShares(DateTime.Today.AddDays(-1)), s => s.share_id == share.id);
+        var due = await helper.GetDueWanlongShares(DateTime.Today.AddDays(-1));
+        Assert.Contains(due, s => s.share_id == share.id);
+        Assert.DoesNotContain(due, s => s.id == 900);   // 万龙那条不会被夜间任务提交
     }
 
     [Fact]
@@ -383,7 +386,7 @@ public class ShareWorkflowPermissionTests
         var service = new OrderShareService(db, ShareFixture.Config, ShareFixture.Http);
         var view = await service.SetIntroducerShareAsync(ShareFixture.Manager(), 1, intro.id, 60, null);
         Assert.True((await db.paymentShare.AsNoTracking().SingleAsync(p => p.share_id == system.id && p.valid)).can_not_share);
-        await db.Database.ExecuteSqlRawAsync("CREATE TRIGGER fail_recalc BEFORE UPDATE ON payment_share WHEN OLD.can_not_share = 1 AND NEW.can_not_share = 0 BEGIN SELECT RAISE(ABORT, 'recalc failed'); END;");
+        await db.Database.ExecuteSqlRawAsync("CREATE TRIGGER fail_recalc BEFORE UPDATE ON payment_share WHEN OLD.memo LIKE '分账金额超过%' AND NEW.memo LIKE '万龙租赁分账一律%' BEGIN SELECT RAISE(ABORT, 'recalc failed'); END;");
 
         await Assert.ThrowsAnyAsync<Exception>(() => service.RemoveIntroducerShareAsync(ShareFixture.Manager(), view.orderShareId));
         db.ChangeTracker.Clear();
@@ -473,6 +476,10 @@ public class ShareWorkflowPermissionTests
         batch.create_date = DateTime.Today.AddDays(-5);
         db.shareBatch.Update(batch);
         await db.SaveChangesAsync();
+        db.ChangeTracker.Clear();
+        // 2026-11-17 起租赁订单的付款不用等「银行转账记账 / 分账成功满 4 天」，立刻可以解冻（另有测试）；
+        // 这个用例验证的是其它类型订单的原规则，所以先把订单改成非租赁类型
+        await db.order.ExecuteUpdateAsync(s => s.SetProperty(o => o.type, "养护"));
         db.ChangeTracker.Clear();
         var helper = new OrderShareController(db, ShareFixture.Config, ShareFixture.Http);
         var method = typeof(OrderShareController).GetMethod("CanCloseWechatShareAsync");

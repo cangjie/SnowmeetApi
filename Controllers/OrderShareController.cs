@@ -153,8 +153,10 @@ namespace SnowmeetApi.Controllers
                 rowCounts[payment.id] = seq;
                 string? problem = introducerRelation == null ? null
                     : ShareReceiverRules.Problem(introducerRelation, introducerRelation.binds ?? new List<ShareRelationBind>(), payment.pay_method);
+                // 2026-11-17 用户定：所有给万龙生成的分账一律标成不自动分账（夜间任务不提交，应分的钱线下结算）
+                bool wanlongNoAuto = orderShare.relation_id == WanlongShareRules.WanlongRelationId;
                 string? autoMemo = usedTicket ? ShareMemoRules.TicketMemo
-                    : (problem ?? (overFlow ? ShareCapRules.OverCapMemo(payment) : null));
+                    : (problem ?? (overFlow ? ShareCapRules.OverCapMemo(payment) : (wanlongNoAuto ? WanlongShareRules.NoAutoMemo : null)));
                 PaymentShare pShare = new PaymentShare()
                 {
                     id = 0,
@@ -163,7 +165,7 @@ namespace SnowmeetApi.Controllers
                     amount = currentAmount,
                     valid = true,
                     out_trade_no = payment.out_trade_no.Trim() + "_FZ_" + seq.ToString().PadLeft(2, '0'),
-                    can_not_share = overFlow || usedTicket || problem != null,
+                    can_not_share = overFlow || usedTicket || problem != null || wanlongNoAuto,
                     memo = autoMemo,
                     create_date = DateTime.Now
                 };
@@ -488,13 +490,18 @@ namespace SnowmeetApi.Controllers
                 select new { share.order_id, batch.create_date }).ToListAsync();
             var latestBank = bankEvents.GroupBy(e => e.order_id).ToDictionary(g => g.Key, g => g.Max(e => e.create_date));
             var pending = await PendingDistributorPaymentIdsAsync(payments.Select(p => p.id).ToArray());
+            // 万龙租赁商户（1604236346）下租赁订单的付款不用等分账成功满 4 天，立刻可以解冻（2026-11-17 用户定，万龙租赁不再走微信分账；
+            // 仍然排除还有待提交的分销商/自动分账的付款）。雪票、其它商户的租赁等按原规则。
+            var orderTypes = await _db.order.AsNoTracking().Where(o => orderIds.Contains(o.id))
+                .Select(o => new { o.id, o.type }).ToDictionaryAsync(o => o.id, o => o.type);
             return payments.Where(p => !pending.Contains(p.id) &&
-                p.paymentShares.Select(s => s.response_time).Where(t => t != null)
+                ((orderTypes.TryGetValue(p.order_id, out var orderType) && WanlongShareRules.UnfreezeImmediately(orderType, p.mch_id)) ||
+                (p.paymentShares.Select(s => s.response_time).Where(t => t != null)
                     .Concat(latestBank.TryGetValue(p.order_id, out var bankDate) ? new DateTime?[] { bankDate } : Array.Empty<DateTime?>())
                     .Any(t => t != null) &&
                 p.paymentShares.Select(s => s.response_time).Where(t => t != null)
                     .Concat(latestBank.TryGetValue(p.order_id, out var date) ? new DateTime?[] { date } : Array.Empty<DateTime?>())
-                    .Max()!.Value.Date <= now.Date.AddDays(-4))
+                    .Max()!.Value.Date <= now.Date.AddDays(-4))))
                 .Select(p => p.id).ToHashSet();
         }
 
@@ -516,7 +523,11 @@ namespace SnowmeetApi.Controllers
             var closable = await ClosableWechatPaymentIdsAsync(payments, DateTime.Now);
             TenpayController helper = new TenpayController(_db, _config, _http);
             foreach (var payment in payments.Where(p => closable.Contains(p.id)))
-                await UnFreezeWepaySharePayment(payment, helper);
+            {
+                try { await UnFreezeWepaySharePayment(payment, helper); }
+                catch (Exception e) { Console.WriteLine("解冻失败，下次再试 payment=" + payment.id + " " + e.GetType().Name + " " + e.Message); }
+                await Task.Delay(400);   // 一次可能有上百笔（租赁立即解冻），别一口气打爆微信接口
+            }
         }
         [NonAction]
         public async Task UnFreezeWepaySharePayment(OrderPayment payment, TenpayController _tHelper, string description = "完成关闭")
@@ -534,7 +545,25 @@ namespace SnowmeetApi.Controllers
                 payment.share_close_date = DateTime.Now;
                 payment.update_date = DateTime.Now;
                 _db.orderPayment.Entry(payment).State = EntityState.Modified;
+                // 留审计：解冻不可逆，解冻后这笔交易不能再分账（微信回「订单已完结分账」）
+                await _db.coreDataModLog.AddAsync(new CoreDataModLog()
+                {
+                    table_name = "order_payment",
+                    field_name = "share_close_date",
+                    key_value = payment.id,
+                    prev_value = null,
+                    current_value = payment.share_close_date.Value.ToString("yyyy-MM-ddTHH:mm:ss.fff"),
+                    scene = "wechat unfreeze",
+                    trace_id = 0,
+                    is_manual = 0,
+                    manual_memo = description,
+                    create_date = DateTime.Now
+                });
                 await _db.SaveChangesAsync();
+            }
+            else
+            {
+                Console.WriteLine($"解冻被微信拒绝 payment={payment.id} {payment.out_trade_no} code={res.ErrorCode} {res.ErrorMessage}");
             }
         }
     }
