@@ -17,7 +17,7 @@ public class MemberAdminProfileDisplayTests
     [Fact]
     public async Task 列表和详情显示昵称头像_空资料保留原姓名_图片地址按配置生成()
     {
-        await using var f = await CoachFixture.Create();
+        await using var f = await CoachFixture.Create(withProfiles: false);
         f.Config["FileStorage:PublicBaseUrl"] = "https://images.example.test";
         await f.Db.Database.ExecuteSqlRawAsync("UPDATE member SET nick_name = 'Snow Friend', avatar = '/upload/avatar.jpg' WHERE id = 3");
         var controller = Controller(f);
@@ -41,7 +41,7 @@ public class MemberAdminProfileDisplayTests
     [Fact]
     public async Task 已是完整头像地址不重复拼接_权限校验仍生效()
     {
-        await using var f = await CoachFixture.Create();
+        await using var f = await CoachFixture.Create(withProfiles: false);
         await f.Db.Database.ExecuteSqlRawAsync("UPDATE member SET avatar = 'https://other.example.test/a.png' WHERE id = 3");
         var controller = Controller(f);
         var detail = Data(Result(await controller.GetMemberDetailByStaff(CoachFixture.StudentA, "session-7")));

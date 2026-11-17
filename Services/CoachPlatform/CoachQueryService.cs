@@ -26,6 +26,13 @@ public sealed class CoachCardView
     public int useCount { get; set; }
     public List<CoachCardRules.CarePriceCell> carePrices { get; set; } = new();
     public double? rentalRate { get; set; }
+    /// <summary>分享方式：qr 二维码 / card 小程序卡片 / null（旧卡或旧版小程序发的）</summary>
+    public string? channel { get; set; }
+    /// <summary>会籍卡卡号 HJ000123：只有已领取的卡有</summary>
+    public string? cardNo { get; set; }
+    /// <summary>领取人授权的微信昵称、头像（完整网址）：分享列表条目里显示</summary>
+    public string? nickName { get; set; }
+    public string? avatarUrl { get; set; }
 }
 
 public sealed class StudentSummary
@@ -69,7 +76,7 @@ public sealed class CoachCouponItem
 }
 
 /// <summary>教练首页 / 管理员教练详情用到的只读查询：卡的领取情况、学员及其消费、券的转发状态。</summary>
-public sealed class CoachQueryService(ApplicationDBContext db)
+public sealed class CoachQueryService(ApplicationDBContext db, string? publicBaseUrl = null)
 {
     public async Task<List<CoachCardView>> ListCardsAsync(int coachId, string? status)
     {
@@ -78,6 +85,9 @@ public sealed class CoachQueryService(ApplicationDBContext db)
         List<CoachCard> cards = await q.OrderByDescending(c => c.create_date).ThenByDescending(c => c.id).ToListAsync();
         List<int> memberIds = cards.Where(c => c.member_id != null).Select(c => c.member_id!.Value).Distinct().ToList();
         Dictionary<int, (string name, string tail)> people = await LoadPeopleAsync(memberIds);
+        var profileRows = await db.memberProfile.AsNoTracking().Where(u => memberIds.Contains(u.member_id))
+            .Select(u => new { u.member_id, u.nick_name, u.avatar }).ToListAsync();
+        string baseUrl = publicBaseUrl ?? new Services.Storage.FileStorageOptions().PublicBaseUrl;
         List<int> cardIds = cards.Select(c => c.id).ToList();
         Dictionary<int, int> uses = (await db.coachCardUse.AsNoTracking()
             .Where(u => cardIds.Contains(u.card_id) && u.status == CoachCardUse.StatusEffective)
@@ -85,6 +95,7 @@ public sealed class CoachQueryService(ApplicationDBContext db)
         return cards.Select(c =>
         {
             people.TryGetValue(c.member_id ?? 0, out var p);
+            var profile = c.member_id == null ? null : profileRows.FirstOrDefault(x => x.member_id == c.member_id);
             return new CoachCardView
             {
                 id = c.id, token = c.token, tokenTail = c.token.Length >= 4 ? c.token.Substring(c.token.Length - 4).ToUpperInvariant() : c.token,
@@ -92,6 +103,10 @@ public sealed class CoachQueryService(ApplicationDBContext db)
                 studentName = c.member_id == null ? null : p.name, cardName = c.card_name_snapshot, phoneTail = c.member_id == null ? null : p.tail,
                 claimedAt = c.claimed_at, validUntil = c.end_date, useCount = uses.TryGetValue(c.id, out int n) ? n : 0,
                 carePrices = CoachCardRules.ParseCarePrices(c.care_price_snapshot), rentalRate = c.rental_rate_snapshot,
+                channel = CoachCardRules.ShareChannelOf(c.remark),
+                cardNo = c.status == CoachCard.StatusClaimed ? CoachCardRules.CardNo(c.id) : null,
+                nickName = string.IsNullOrWhiteSpace(profile?.nick_name) ? null : profile!.nick_name!.Trim(),
+                avatarUrl = string.IsNullOrWhiteSpace(profile?.avatar) ? null : Services.Storage.UploadPaths.PublicUrl(baseUrl, profile!.avatar!),
             };
         }).ToList();
     }

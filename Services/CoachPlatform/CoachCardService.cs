@@ -32,6 +32,8 @@ public static class ShareCardState
     public const string Self = "self";
     /// <summary>本雪季已领过这位教练的卡</summary>
     public const string AlreadyHas = "already_has";
+    /// <summary>领取人还没有授权头像和昵称：领取会籍卡要求两样都有（2026-11-17），授权后再领</summary>
+    public const string NeedProfile = "need_profile";
 }
 
 public sealed class ShareCardView
@@ -44,12 +46,16 @@ public sealed class ShareCardView
     public double? rentalRate { get; set; }
     public DateTime? validUntil { get; set; }
     public int? cardId { get; set; }
+    /// <summary>可领取状态下：打开的人是会员但头像或昵称不全，领取前要先授权（没有会员的人先授权手机号，这里是 false）</summary>
+    public bool needProfile { get; set; }
+    /// <summary>本人已领取时的会籍卡卡号（HJ000123）</summary>
+    public string? cardNo { get; set; }
 }
 
 public sealed class CoachCardService(ApplicationDBContext db, IConfiguration? config = null)
 {
     /// <summary>教练名下待领取的卡：先在服务器建一行，再由前端用 open-type=share 分享出去。</summary>
-    public async Task<CoachCard> CreateCardAsync(int coachId, DateTime now, int? templateId = null)
+    public async Task<CoachCard> CreateCardAsync(int coachId, DateTime now, int? templateId = null, string? shareChannel = null)
     {
         await using var tx = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
         Coach? coach = await db.coach.AsNoTracking().FirstOrDefaultAsync(c => c.id == coachId);
@@ -71,7 +77,8 @@ public sealed class CoachCardService(ApplicationDBContext db, IConfiguration? co
             && (c.claim_deadline == null || c.claim_deadline >= now));
         if (pending >= CoachCardRules.MaxUnclaimedCards)
             throw new CoachException("待领取的学员卡已有 " + pending + " 张，请等学员领取或撤销一些再生成");
-        CoachCard card = new() { coach_id = coachId, template_id = templateId, card_name_snapshot = template?.name, token = CoachCardRules.NewToken(), status = CoachCard.StatusIssued, create_date = now };
+        CoachCard card = new() { coach_id = coachId, template_id = templateId, card_name_snapshot = template?.name, token = CoachCardRules.NewToken(), status = CoachCard.StatusIssued, create_date = now,
+            remark = CoachCardRules.ShareChannelRemark(shareChannel) };
         db.coachCard.Add(card);
         await db.SaveChangesAsync();
         await tx.CommitAsync();
@@ -102,6 +109,7 @@ public sealed class CoachCardService(ApplicationDBContext db, IConfiguration? co
             bool mine = memberId != null && memberId == card.member_id;
             view.state = mine ? ShareCardState.ClaimedByMe : ShareCardState.Taken;
             view.message = mine ? "你已领取这张学员卡" : "这张学员卡已被领取";
+            if (mine) view.cardNo = CoachCardRules.CardNo(card.id);
             await FillBenefitAsync(view, card, coach, now); return view;
         }
         if (card.status != CoachCard.StatusIssued || !CoachCardRules.IsClaimable(card, now) || coach.valid != 1 || !await DistributorAccess.CanIssueAsync(db, coach))
@@ -115,7 +123,16 @@ public sealed class CoachCardService(ApplicationDBContext db, IConfiguration? co
             view.state = ShareCardState.AlreadyHas; view.message = "本雪季你已经领过" + coach.display_name + "的学员卡了"; return view;
         }
         view.state = ShareCardState.Claimable; view.message = "";
+        view.needProfile = memberId != null && !await HasProfileAsync(memberId.Value);
         return view;
+    }
+
+    /// <summary>领取人的昵称和头像是否都已授权（member 表的 nick_name / avatar，由 MemberProfile 实体读）。</summary>
+    private async Task<bool> HasProfileAsync(int memberId)
+    {
+        var p = await db.memberProfile.AsNoTracking().Where(x => x.member_id == memberId)
+            .Select(x => new { x.nick_name, x.avatar }).FirstOrDefaultAsync();
+        return p != null && MemberProfileRules.IsComplete(p.nick_name, p.avatar);
     }
 
     private static ShareCardView Invalid(string message) => new() { state = ShareCardState.Invalid, message = message };
@@ -195,6 +212,8 @@ public sealed class CoachCardService(ApplicationDBContext db, IConfiguration? co
                 List<CoachCarePrice> prices = await db.coachCarePrice.AsNoTracking().Where(p => p.coach_id == coach.id).ToListAsync();
                 snapshot = CoachCardRules.SerializeCarePrices(prices); rentalRate = coach.rental_rate;
             }
+            // 领取会籍卡要求会员已授权头像和昵称（2026-11-17）：服务端把关，小程序绕不过；卡仍保持待领取，授权后可再领
+            if (!await HasProfileAsync(memberId)) return Fail(ShareCardState.NeedProfile, "领取会籍卡前，请先授权头像和昵称");
             int rows;
             try
             {

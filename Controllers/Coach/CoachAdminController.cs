@@ -19,7 +19,7 @@ namespace SnowmeetApi.Controllers.CoachPlatform;
 public sealed class CoachAdminController(ApplicationDBContext db, IConfiguration config) : CoachApiBase(db)
 {
     private readonly CoachAdminService _admin = new(db, config);
-    private readonly CoachQueryService _query = new(db);
+    private readonly CoachQueryService _query = new(db, SnowmeetApi.Services.Storage.FileStorageOptions.From(config).PublicBaseUrl);
     private readonly CoachCardService _cards = new(db, config);
 
     public sealed record AddCoachInput(int? memberId, string? cell, string? name);

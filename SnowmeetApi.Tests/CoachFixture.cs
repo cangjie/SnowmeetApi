@@ -23,7 +23,7 @@ internal sealed class CoachFixture : IAsyncDisposable
     public int CoachId { get; private set; }
     public int Coach2Id { get; private set; }
 
-    public static async Task<CoachFixture> Create(bool withPricing = true)
+    public static async Task<CoachFixture> Create(bool withPricing = true, bool withProfiles = true)
     {
         var f = new CoachFixture();
         await f.Connection.OpenAsync();
@@ -65,6 +65,9 @@ internal sealed class CoachFixture : IAsyncDisposable
         f.Db.coach.Add(coach); f.Db.coach.Add(coach2);
         await f.Db.SaveChangesAsync();
         f.CoachId = coach.id; f.Coach2Id = coach2.id;
+        // 领取会籍卡要求已授权头像和昵称（2026-11-17）：默认让 1～7 号会员都有，要测「没授权」的用例自己清掉
+        // （withProfiles: false 给「昵称头像」自己的测试用：它们要从空资料开始）
+        if (withProfiles) await f.Db.Database.ExecuteSqlRawAsync("UPDATE member SET nick_name = '昵称' || CAST(id AS TEXT), avatar = '/upload/20261117/avatar_' || CAST(id AS TEXT) || '.jpg', nick_avatar_update_date = CURRENT_TIMESTAMP WHERE id BETWEEN 1 AND 7");
         if (withPricing) await f.Admin_().SetPricingAsync(f.CoachId, Standard());
         f.Db.ChangeTracker.Clear();
         return f;

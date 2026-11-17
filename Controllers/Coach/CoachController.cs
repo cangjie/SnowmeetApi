@@ -9,6 +9,8 @@ using SnowmeetApi.Data;
 using SnowmeetApi.Helpers;
 using SnowmeetApi.Models;
 using SnowmeetApi.Services.CoachPlatform;
+using SnowmeetApi.Services.Storage;
+using SnowmeetApi.Services.Tickets;
 
 namespace SnowmeetApi.Controllers.CoachPlatform;
 
@@ -19,10 +21,12 @@ namespace SnowmeetApi.Controllers.CoachPlatform;
 public sealed class CoachController(ApplicationDBContext db, IConfiguration config) : CoachApiBase(db)
 {
     private readonly CoachCardService _cards = new(db, config);
-    private readonly CoachQueryService _query = new(db);
+    private readonly CoachQueryService _query = new(db, FileStorageOptions.From(config).PublicBaseUrl);
 
     public sealed record CardIdInput(int cardId);
-    public sealed record CreateCardInput(int? templateId);
+    /// <param name="templateId">卡种（机构必填）</param>
+    /// <param name="channel">分享方式：qr 二维码 / card 小程序卡片；每次分享都新建一张待领取的卡并记下方式（旧版小程序不传）</param>
+    public sealed record CreateCardInput(int? templateId, string? channel = null);
 
     /// <summary>分享卡的落地页路径（小程序 onShareAppMessage 的 path）。</summary>
     public const string ClaimPage = "/pages/coach/claim/claim";
@@ -72,9 +76,36 @@ public sealed class CoachController(ApplicationDBContext db, IConfiguration conf
         // 只有机构能发整个雪季有效的会籍卡；教练和 KOL 只能发单张优惠券（用户 2026-11-17 定）
         string? type = await Db.introducer.AsNoTracking().Where(i => i.coach_id == coach.id && i.valid == 1).Select(i => i.type).FirstOrDefaultAsync();
         if (type != IntroducerRules.TypeOrg) throw new CoachException("只有机构可以发整个雪季有效的会籍卡；教练和 KOL 请使用单张优惠券");
-        CoachCard card = await _cards.CreateCardAsync(coach.id, DateTime.Now, input?.templateId);
-        return new { cardId = card.id, cardName = card.card_name_snapshot, tokenTail = card.token.Substring(card.token.Length - 4).ToUpperInvariant(), sharePath = ClaimPage + "?t=" + card.token };
+        CoachCard card = await _cards.CreateCardAsync(coach.id, DateTime.Now, input?.templateId, input?.channel);
+        return new
+        {
+            cardId = card.id, cardName = card.card_name_snapshot, tokenTail = card.token.Substring(card.token.Length - 4).ToUpperInvariant(),
+            sharePath = ClaimPage + "?t=" + card.token, channel = CoachCardRules.ShareChannelOf(card.remark), createDate = card.create_date,
+        };
     });
+
+    /// <summary>
+    /// 分享二维码（PNG）：给「分享二维码」按钮刚建好的那张待领取卡。scene = t=卡 token，落到领取页；
+    /// 只有这张卡所属的机构、且卡还没被领取没被取消时才能取。顾客扫码后由登录的会员领取（领取要求已授权头像昵称）。
+    /// </summary>
+    [HttpGet]
+    public async Task<IActionResult> GetCardQr(string sessionKey, int cardId, [FromServices] MiniStaffBookingQrService qr, string envVersion = "release")
+    {
+        MiniSession? session = await SessionAsync(sessionKey);
+        if (session == null) return BadRequest(new { code = 2, message = "登录已失效，请重新进入小程序" });
+        Member? member = await MemberOfAsync(session);
+        Models.Coach? coach = member == null ? null : await Db.coach.AsNoTracking().Where(c => c.member_id == member.id)
+            .OrderByDescending(c => c.valid).ThenByDescending(c => c.id).FirstOrDefaultAsync();
+        if (coach == null) return BadRequest(new { code = 3, message = "你还不是教练" });
+        CoachCard? card = await Db.coachCard.AsNoTracking().FirstOrDefaultAsync(c => c.id == cardId && c.coach_id == coach.id);
+        if (card == null) return BadRequest(new { code = 1, message = "没有找到这张会籍卡" });
+        if (card.status != CoachCard.StatusIssued) return BadRequest(new { code = 1, message = "这张会籍卡已被领取或已取消，不能再生成二维码" });
+        try { return File(await qr.GetForCoachCardAsync(card.token, envVersion), "image/png"); }
+        catch (Exception e) when (e is ArgumentException || e is InvalidOperationException)
+        { return BadRequest(new { code = 1, message = e.Message }); }
+        catch (Exception e) when (e is System.Net.Http.HttpRequestException || e is System.Text.Json.JsonException)
+        { return BadRequest(new { code = 1, message = "小程序码服务暂时不可用，请重试" }); }
+    }
 
     [HttpGet]
     public Task<ApiResult<object>> ListMyCards(string sessionKey, string? status = null) => AsCoach(sessionKey, async coach =>

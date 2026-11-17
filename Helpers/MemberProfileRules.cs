@@ -38,6 +38,15 @@ namespace SnowmeetApi.Helpers
         }
 
         /// <summary>
+        /// 昵称和头像都有才算「资料完整」。领取会籍卡以它为门槛（2026-11-17 用户：领取会籍卡，要求会员必须授权头像和昵称）；
+        /// 和 NeedPrompt 不同，这里不看更新时间，也不能靠「跳过」绕过。
+        /// </summary>
+        public static bool IsComplete(string? nickName, string? avatar)
+        {
+            return !string.IsNullOrWhiteSpace(nickName) && !string.IsNullOrWhiteSpace(avatar);
+        }
+
+        /// <summary>
         /// 昵称清洗：去掉控制字符、两端空白，超过 32 个字截掉（不把表情等多字符的字切成两半）。清洗后什么都没有返回 null。
         /// </summary>
         public static string? CleanNickName(string? raw)

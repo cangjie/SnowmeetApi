@@ -57,7 +57,7 @@ public sealed class MemberProfileControllerTests
     [Fact]
     public async Task GetMyProfile_AskWhenTheMemberHasNoProfileYet()
     {
-        await using var f = await CoachFixture.Create();
+        await using var f = await CoachFixture.Create(withProfiles: false);
         var r = Unwrap(await Controller(f).GetMyProfile("session-3"));
         Assert.Equal(0, r.code);
         Assert.True(r.data!.needProfile);
@@ -68,7 +68,7 @@ public sealed class MemberProfileControllerTests
     [Fact]
     public async Task GetMyProfile_DoNotAskWithoutAMember()
     {
-        await using var f = await CoachFixture.Create();
+        await using var f = await CoachFixture.Create(withProfiles: false);
         // 会话还没绑会员（没验证手机号）、会话不存在、会话密钥为空：都不弹，也不报错
         foreach (string key in new[] { "session-new", "no-such-session", "" })
         {
@@ -81,7 +81,7 @@ public sealed class MemberProfileControllerTests
     [Fact]
     public async Task GetMyProfile_DoNotAskForAnExpiredSession()
     {
-        await using var f = await CoachFixture.Create();
+        await using var f = await CoachFixture.Create(withProfiles: false);
         await using (var db = f.NewContext())
         {
             await db.Database.ExecuteSqlRawAsync("UPDATE mini_session SET expire_date = {0} WHERE session_key = 'session-3'", DateTime.Now.AddHours(-1));
@@ -93,7 +93,7 @@ public sealed class MemberProfileControllerTests
     [Fact]
     public async Task GetMyProfile_ReturnsTheSavedProfileAndStopsAsking()
     {
-        await using var f = await CoachFixture.Create();
+        await using var f = await CoachFixture.Create(withProfiles: false);
         var storage = new MiniTicketQrTests.Storage();
         await Controller(f, storage).SaveMyProfile("session-3", nickName: "雪友小明", avatar: File(Jpeg));
 
@@ -107,7 +107,7 @@ public sealed class MemberProfileControllerTests
     [Fact]
     public async Task GetMyProfile_AProfileMissingTheNickNameOrTheAvatarIsAskedAgain_ButWhatIsSavedComesBack()
     {
-        await using var f = await CoachFixture.Create();
+        await using var f = await CoachFixture.Create(withProfiles: false);
         var storage = new MiniTicketQrTests.Storage();
         await Controller(f, storage).SaveMyProfile("session-3", nickName: null, avatar: File(Jpeg));            // 只存了头像
         await Controller(f, storage).SaveMyProfile("session-4", nickName: "只有昵称", avatar: null);            // 只存了昵称
@@ -136,7 +136,7 @@ public sealed class MemberProfileControllerTests
     [Fact]
     public async Task Save_NickNameAndAvatar_WritesThreeColumnsAndStoresTheFileInS3()
     {
-        await using var f = await CoachFixture.Create();
+        await using var f = await CoachFixture.Create(withProfiles: false);
         var storage = new MiniTicketQrTests.Storage();
         DateTime before = DateTime.Now.AddSeconds(-2);
 
@@ -155,7 +155,7 @@ public sealed class MemberProfileControllerTests
     [Fact]
     public async Task Save_StoresAPublicFileNamedByWhatTheBytesAre_NotByTheUploadedName()
     {
-        await using var f = await CoachFixture.Create();
+        await using var f = await CoachFixture.Create(withProfiles: false);
         var storage = new RecordingStorage();
 
         // 文件头是 JPEG，文件名却叫 .png / 没有扩展名：按内容存成 .jpg，公开（isWeb）、带 avatar_ 前缀
@@ -170,7 +170,7 @@ public sealed class MemberProfileControllerTests
     [Fact]
     public async Task Save_NickNameOnly_LeavesTheAvatarAlone()
     {
-        await using var f = await CoachFixture.Create();
+        await using var f = await CoachFixture.Create(withProfiles: false);
         var storage = new MiniTicketQrTests.Storage();
         await Controller(f, storage).SaveMyProfile("session-3", nickName: "旧昵称", avatar: File(Png, "a.png"));
         string avatarBefore = (await Stored(f, CoachFixture.StudentA)).avatar!;
@@ -188,7 +188,7 @@ public sealed class MemberProfileControllerTests
     [Fact]
     public async Task Save_AvatarOnly_LeavesTheNickNameAlone()
     {
-        await using var f = await CoachFixture.Create();
+        await using var f = await CoachFixture.Create(withProfiles: false);
         var storage = new MiniTicketQrTests.Storage();
         await Controller(f, storage).SaveMyProfile("session-3", nickName: "原昵称", avatar: null);
 
@@ -203,7 +203,7 @@ public sealed class MemberProfileControllerTests
     [Fact]
     public async Task Save_RefreshesTheUpdateDateEveryTime()
     {
-        await using var f = await CoachFixture.Create();
+        await using var f = await CoachFixture.Create(withProfiles: false);
         await Controller(f).SaveMyProfile("session-3", nickName: "甲", avatar: null);
         DateTime first = (await Stored(f, CoachFixture.StudentA)).nick_avatar_update_date!.Value;
         await Task.Delay(1100);
@@ -215,7 +215,7 @@ public sealed class MemberProfileControllerTests
     [Fact]
     public async Task Save_OnlyTouchesTheSessionsOwnMember()
     {
-        await using var f = await CoachFixture.Create();
+        await using var f = await CoachFixture.Create(withProfiles: false);
         await Controller(f).SaveMyProfile("session-3", nickName: "学员甲", avatar: null);
 
         var other = await Stored(f, CoachFixture.StudentB);
@@ -229,7 +229,7 @@ public sealed class MemberProfileControllerTests
     {
         // 代码里有好几处整行保存 Member（Entry(member).State = Modified）；
         // 昵称头像三列不在 Member 实体里，这样的保存碰不到它们（和养护首单列同一做法）。
-        await using var f = await CoachFixture.Create();
+        await using var f = await CoachFixture.Create(withProfiles: false);
         await Controller(f).SaveMyProfile("session-3", nickName: "雪友小明", avatar: File(Jpeg));
 
         await using (var db = f.NewContext())
@@ -249,7 +249,7 @@ public sealed class MemberProfileControllerTests
     [Fact]
     public async Task Save_CleansTheNickNameAndCutsItAtThirtyTwo()
     {
-        await using var f = await CoachFixture.Create();
+        await using var f = await CoachFixture.Create(withProfiles: false);
         await Controller(f).SaveMyProfile("session-3", nickName: "\t" + new string('甲', 40) + "\n", avatar: null);
         Assert.Equal(new string('甲', 32), (await Stored(f, CoachFixture.StudentA)).nick_name);
     }
@@ -259,7 +259,7 @@ public sealed class MemberProfileControllerTests
     [Fact]
     public async Task Save_WithoutAMember_AsksForPhoneVerificationAndWritesNothing()
     {
-        await using var f = await CoachFixture.Create();
+        await using var f = await CoachFixture.Create(withProfiles: false);
         var storage = new MiniTicketQrTests.Storage();
         var r = Unwrap(await Controller(f, storage).SaveMyProfile("session-new", nickName: "谁", avatar: File(Jpeg)));
         Assert.Equal(1, r.code);
@@ -271,7 +271,7 @@ public sealed class MemberProfileControllerTests
     [Fact]
     public async Task Save_WithAnInvalidSession_IsRefused()
     {
-        await using var f = await CoachFixture.Create();
+        await using var f = await CoachFixture.Create(withProfiles: false);
         var storage = new MiniTicketQrTests.Storage();
         var r = Unwrap(await Controller(f, storage).SaveMyProfile("no-such-session", nickName: "谁", avatar: File(Jpeg)));
         Assert.Equal(1, r.code);
@@ -281,7 +281,7 @@ public sealed class MemberProfileControllerTests
     [Fact]
     public async Task Save_NeedsAtLeastOneOfNickNameOrAvatar()
     {
-        await using var f = await CoachFixture.Create();
+        await using var f = await CoachFixture.Create(withProfiles: false);
         foreach (string? nick in new string?[] { null, "", "   " })
         {
             var r = Unwrap(await Controller(f).SaveMyProfile("session-3", nickName: nick, avatar: null));
@@ -293,7 +293,7 @@ public sealed class MemberProfileControllerTests
     [Fact]
     public async Task Save_RejectsAFileThatIsNotAnImage_EvenWithAnImageName()
     {
-        await using var f = await CoachFixture.Create();
+        await using var f = await CoachFixture.Create(withProfiles: false);
         var storage = new MiniTicketQrTests.Storage();
         byte[] html = System.Text.Encoding.UTF8.GetBytes("<html><script>alert(1)</script></html>");
 
@@ -309,7 +309,7 @@ public sealed class MemberProfileControllerTests
     [Fact]
     public async Task Save_RejectsAFileOverFiveMegabytes()
     {
-        await using var f = await CoachFixture.Create();
+        await using var f = await CoachFixture.Create(withProfiles: false);
         var storage = new MiniTicketQrTests.Storage();
         var big = new byte[MemberProfileRules.AvatarMaxBytes + 1];
         Jpeg.CopyTo(big, 0);
@@ -323,7 +323,7 @@ public sealed class MemberProfileControllerTests
     [Fact]
     public async Task Save_WhenTheStorageFails_NothingIsWritten()
     {
-        await using var f = await CoachFixture.Create();
+        await using var f = await CoachFixture.Create(withProfiles: false);
         var storage = new MiniTicketQrTests.Storage { Fail = true };
 
         var r = Unwrap(await Controller(f, storage).SaveMyProfile("session-3", nickName: "有昵称", avatar: File(Jpeg)));

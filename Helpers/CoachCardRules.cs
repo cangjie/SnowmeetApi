@@ -222,6 +222,39 @@ namespace SnowmeetApi.Helpers
             return card.status == CoachCard.StatusIssued && (card.claim_deadline == null || card.claim_deadline >= now);
         }
 
+        /// <summary>
+        /// 会籍卡卡号：「HJ」+ 卡 id 补足 6 位（HJ000123）。卡 id 在分享时就有了，但只在顾客领取后才给出，
+        /// 所以对顾客和分销商来说，卡号是「领取那一刻」才出现的、和领取人绑定的编号。不另建列、不另建计数。
+        /// </summary>
+        public static string CardNo(int cardId) => "HJ" + cardId.ToString("D6");
+
+        public const string ShareChannelQr = "qr";
+        public const string ShareChannelCard = "card";
+        private const string ShareChannelQrText = "二维码";
+        private const string ShareChannelCardText = "小程序卡片";
+
+        /// <summary>
+        /// 分享方式（二维码 / 小程序卡片）记在 coach_card.remark 里（不加列）。入参只认 qr / card；
+        /// 不认识或没传（旧版小程序）返回 null，remark 留空。
+        /// </summary>
+        public static string? ShareChannelRemark(string? channel) => (channel ?? "").Trim().ToLowerInvariant() switch
+        {
+            ShareChannelQr => ShareChannelQrText,
+            ShareChannelCard => ShareChannelCardText,
+            _ => null,
+        };
+
+        /// <summary>remark 里的分享方式 → qr / card；其它内容（旧卡、管理员备注）返回 null。</summary>
+        public static string? ShareChannelOf(string? remark) => (remark ?? "").Trim() switch
+        {
+            ShareChannelQrText => ShareChannelQr,
+            ShareChannelCardText => ShareChannelCard,
+            _ => null,
+        };
+
+        /// <summary>二维码的 scene：t=卡 token。token 是 24 位十六进制，加上「t=」共 26 位，不超过微信 32 位的限制。</summary>
+        public static string ClaimScene(string token) => "t=" + token;
+
         /// <summary>24 位随机十六进制串，分享路径里用，不可枚举。</summary>
         public static string NewToken() => Convert.ToHexString(RandomNumberGenerator.GetBytes(12)).ToLowerInvariant();
 

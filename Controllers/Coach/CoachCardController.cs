@@ -94,7 +94,7 @@ public sealed class CoachCardController(ApplicationDBContext db, IConfiguration 
             {
                 cards = cards.Select(c => new
                 {
-                    id = c.id, cardName = c.card_name_snapshot, coachName = names.TryGetValue(c.coach_id, out string? n) ? n : "", claimedAt = c.claimed_at, validUntil = c.end_date,
+                    id = c.id, cardNo = CoachCardRules.CardNo(c.id), cardName = c.card_name_snapshot, coachName = names.TryGetValue(c.coach_id, out string? n) ? n : "", claimedAt = c.claimed_at, validUntil = c.end_date,
                     expired = c.end_date != null && c.end_date < now,
                     carePrices = CoachCardRules.ParseCarePrices(c.care_price_snapshot), rentalRate = c.rental_rate_snapshot,
                 }),

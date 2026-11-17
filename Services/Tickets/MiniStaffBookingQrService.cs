@@ -24,7 +24,22 @@ public sealed class MiniStaffBookingQrService(IMiniTicketTokenProvider tokens, H
         return await RenderAsync("d=" + introducerId, envVersion);
     }
 
-    private async Task<byte[]> RenderAsync(string scene, string envVersion)
+    public const string BookingPage = "pages/ski_pass/ski_pass_selector";
+    public const string CoachClaimPage = "pages/coach/claim/claim";
+
+    // 机构会籍卡分享码：顾客扫码落到领取页，scene = t=<卡 token>（见 CoachCardRules.ClaimScene）。
+    // 每次分享一张新卡、一个新 token，所以每次分享二维码都不同；二维码本身不带任何身份，领取时才认登录的会员。
+    public async Task<byte[]> GetForCoachCardAsync(string token, string envVersion = "release")
+    {
+        string t = (token ?? "").Trim();
+        if (t.Length < 8 || t.Length > 30 || !System.Text.RegularExpressions.Regex.IsMatch(t, "^[0-9a-zA-Z]+$"))
+            throw new ArgumentException("会籍卡分享码无效");
+        return await RenderAsync(CoachClaimPage, SnowmeetApi.Helpers.CoachCardRules.ClaimScene(t), envVersion);
+    }
+
+    private Task<byte[]> RenderAsync(string scene, string envVersion) => RenderAsync(BookingPage, scene, envVersion);
+
+    private async Task<byte[]> RenderAsync(string page, string scene, string envVersion)
     {
         envVersion = (envVersion ?? "release").Trim();
         if (envVersion != "release" && envVersion != "trial" && envVersion != "develop")
@@ -33,7 +48,7 @@ public sealed class MiniStaffBookingQrService(IMiniTicketTokenProvider tokens, H
         {
             string token = await tokens.GetTokenAsync(attempt > 0);
             if (string.IsNullOrWhiteSpace(token)) throw new InvalidOperationException("获取小程序凭据失败");
-            string body = JsonSerializer.Serialize(new { page = "pages/ski_pass/ski_pass_selector", scene,
+            string body = JsonSerializer.Serialize(new { page, scene,
                 env_version = envVersion, check_path = envVersion == "release", width = 430 });
             using var content = new StringContent(body, Encoding.UTF8, "application/json");
             using var response = await http.PostAsync("https://api.weixin.qq.com/wxa/getwxacodeunlimit?access_token=" + Uri.EscapeDataString(token), content);
