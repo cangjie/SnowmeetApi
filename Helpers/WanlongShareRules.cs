@@ -4,8 +4,9 @@ using SnowmeetApi.Models;
 
 namespace SnowmeetApi.Helpers
 {
-    // 万龙体验中心租赁订单分给万龙的金额：应分 = 各租赁「租金 − 减免」合计 ÷ 2。
+    // 万龙体验中心、万龙服务中心租赁订单分给万龙的金额：应分 = 各租赁「租金 − 减免」合计 ÷ 2。
     // 2026-10-31 用户确认：以租金明细为准，绝不用「收款 − 退款」代替租金；用了优惠券按券后分。
+    // 2026-11-17 用户确认：万龙服务中心开的租赁订单也要给万龙分账，规则和万龙体验中心一样（分租金的一半）。
     public static class WanlongShareRules
     {
         // 一笔付款能拿来算分账上限（30%）的金额，两个平台口径不同：
@@ -23,6 +24,16 @@ namespace SnowmeetApi.Helpers
 
         /// <summary>万龙租赁分账的收款方（order_share_relation.id，「万龙租赁分账」）。</summary>
         public const int WanlongRelationId = 4;
+
+        /// <summary>
+        /// 要给万龙分账的门店：万龙体验中心、万龙服务中心（2026-11-17 用户定，服务中心的租赁订单也分租金的一半）。
+        /// 只用于租赁订单；其它门店（崇礼旗舰店等）不分。
+        /// </summary>
+        public static bool IsWanlongShop(string? shop)
+        {
+            string s = (shop ?? "").Trim();
+            return s == "万龙体验中心" || s == "万龙服务中心";
+        }
 
         /// <summary>万龙租赁商户 1604236346 在 wepay_key 里的 id（TenpayController.GetMchId：万龙租赁订单走它）。</summary>
         public const int WanlongRentalMchId = 5;

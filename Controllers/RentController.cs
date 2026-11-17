@@ -8204,7 +8204,7 @@ namespace SnowmeetApi.Controllers
         {
             try
             {
-                if (order.type == "租赁" && order.shop == "万龙体验中心" && order.hide == false
+                if (order.type == "租赁" && WanlongShareRules.IsWanlongShop(order.shop) && order.hide == false
                     && order.paidAmount > 0)
                 {
                     bool hasPaymentShare = await _db.paymentShare.AnyAsync(p => p.valid
@@ -8228,7 +8228,7 @@ namespace SnowmeetApi.Controllers
         // 租赁订单详情页「订单关闭」按钮：满足 RentOrderCloseRules.CanManualClose 才能关，不可逆。
         // 订单变成了结关闭（closed = 1），close_date 记关闭时间；操作的员工记在审计日志（core_data_mod_log.staff_id，
         // 场景「订单关闭」），不动订单上的 staff_id（那是开单员工）。关单和写日志在同一个事务里。
-        // 万龙体验中心的订单和夜间关单一样，随后生成应分记录。
+        // 万龙体验中心、万龙服务中心的订单和夜间关单一样，随后生成应分记录。
         [HttpPost("{orderId}")]
         public async Task<ActionResult<ApiResult<ManualCloseResult?>>> CloseOrderByStaff(int orderId,
             [FromQuery] string sessionKey, [FromQuery] string sessionType = "wechat_mini_openid")

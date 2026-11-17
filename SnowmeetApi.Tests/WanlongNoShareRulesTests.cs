@@ -14,6 +14,19 @@ namespace SnowmeetApi.Tests;
 // 起因：微信的最大可分账金额按「付款 − 退款」的净额算，万龙租赁应分是租金的一半、押金退完后占净额 50%，11-01 起几乎都被微信拒绝。
 public class WanlongNoShareRulesTests
 {
+    // ---------- 0) 要给万龙分账的门店 ----------
+
+    [Theory]
+    [InlineData("万龙体验中心", true)]
+    [InlineData("万龙服务中心", true)]
+    [InlineData(" 万龙服务中心 ", true)]
+    [InlineData("崇礼旗舰店", false)]
+    [InlineData("万龙", false)]
+    [InlineData("", false)]
+    [InlineData(null, false)]
+    public void Both_wanlong_shops_share_rentals_with_wanlong(string? shop, bool expected)
+        => Assert.Equal(expected, WanlongShareRules.IsWanlongShop(shop));
+
     // ---------- 1) 非分账订单 ----------
 
     [Theory]

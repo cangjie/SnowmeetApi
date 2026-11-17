@@ -62,7 +62,7 @@ namespace SnowmeetApi.Controllers
                 _db.orderShare.Entry(oriShares[i]).State = EntityState.Modified;
             }
             List<OrderShare> shares = new List<OrderShare>();
-            if (order.shop == "万龙体验中心" && order.type == "租赁")
+            if (WanlongShareRules.IsWanlongShop(order.shop) && order.type == "租赁")
             {
                 double rentalAmount = 0;
                 for (int i = 0; i < order.rentals.Count; i++)
@@ -361,7 +361,8 @@ namespace SnowmeetApi.Controllers
                 && (s.orderShare.plan_date == null || s.orderShare.plan_date <= planLimit)
                 && s.can_not_share == false
                 && ((!distributorRelations.Contains(s.orderShare.relation_id) && s.orderShare.share_method == null
-                     && s.orderShare.order.type == "租赁" && s.orderShare.order.shop == "万龙体验中心"
+                     && s.orderShare.order.type == "租赁"
+                     && (s.orderShare.order.shop == "万龙体验中心" || s.orderShare.order.shop == "万龙服务中心")
                      && s.orderShare.order.close_date != null && s.orderShare.order.close_date.Value.Date <= shareDate.Date)
                     || (distributorRelations.Contains(s.orderShare.relation_id) && s.orderShare.approved_at != null
                         && s.orderShare.approved_by_staff_id != null

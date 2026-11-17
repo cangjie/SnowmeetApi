@@ -61,6 +61,36 @@ public class WanlongShareAtCloseTests
         Assert.Equal(90, paymentShare.amount, 2);
     }
 
+    // 2026-11-17 用户定：万龙服务中心开的租赁订单也要给万龙分账，规则和万龙体验中心一样（租金的一半），同样一律不自动分
+    [Theory]
+    [InlineData("微信支付")]
+    [InlineData("支付宝")]
+    public async Task CloseOrder_also_creates_the_wanlong_share_for_the_service_center(string payMethod)
+    {
+        await using var db = await SeedAsync(shop: "万龙服务中心", payMethod: payMethod, paid: 500, refunded: 430, rent: 70);
+
+        await new RentController(db, Config, Http).CloseOrder();
+
+        Assert.Equal(1, (await db.order.AsNoTracking().SingleAsync(o => o.id == 1)).closed);
+        var orderShare = await db.orderShare.AsNoTracking().SingleAsync(s => s.order_id == 1 && s.valid);
+        Assert.Equal(4, orderShare.relation_id);
+        Assert.Equal(35, orderShare.amount, 2);      // 租金 70 的一半，和万龙体验中心一样
+        var paymentShare = await db.paymentShare.AsNoTracking().SingleAsync(s => s.share_id == orderShare.id);
+        Assert.Equal(35, paymentShare.amount, 2);
+        Assert.True(paymentShare.can_not_share);
+    }
+
+    [Fact]
+    public async Task The_service_center_wanlong_share_is_never_picked_by_the_nightly_job()
+    {
+        await using var db = await SeedAsync(shop: "万龙服务中心", payMethod: "支付宝", paid: 180, refunded: 0, rent: 180);
+        await new RentController(db, Config, Http).CloseOrder();
+
+        var due = await new OrderShareController(db, Config, Http).GetDueWanlongShares(DateTime.Today.AddDays(-1));
+
+        Assert.Empty(due);
+    }
+
     [Fact]
     public async Task CloseOrder_does_not_create_shares_for_other_shops()
     {
