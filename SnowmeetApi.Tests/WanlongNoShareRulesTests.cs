@@ -130,6 +130,18 @@ public class WanlongNoShareRulesTests
     public void Only_wanlong_rental_merchant_rental_payments_unfreeze_immediately(string? orderType, int? mchId, bool expected)
         => Assert.Equal(expected, WanlongShareRules.UnfreezeImmediately(orderType, mchId));
 
+    // 11-17 实跑：189 笔里 105 笔回「订单已完结分账，不支持分账」、62 笔回「订单已逾期解冻，不支持分账」，这两种记为已完结，不再每晚重试
+    [Theory]
+    [InlineData("订单已完结分账，不支持分账", true)]
+    [InlineData("订单已逾期解冻，不支持分账", true)]
+    [InlineData("INVALID_REQUEST:订单已完结分账，不支持分账", true)]
+    [InlineData("分账金额超出最大分账比例", false)]
+    [InlineData("系统繁忙，请稍后再试", false)]
+    [InlineData("", false)]
+    [InlineData(null, false)]
+    public void Only_the_two_already_closed_wechat_replies_count_as_closed(string? message, bool expected)
+        => Assert.Equal(expected, WanlongShareRules.IsAlreadyClosedAtWechat(message));
+
     private static Task<bool> CanClose(ApplicationDBContext db, int paymentId)
     {
         var helper = new OrderShareController(db, ShareFixture.Config, ShareFixture.Http);

@@ -47,6 +47,17 @@ namespace SnowmeetApi.Helpers
         /// </summary>
         public static bool UnfreezeImmediately(string? orderType, int? mchId) => IsNoShareOrder(orderType, mchId);
 
+        /// <summary>
+        /// 解冻时微信回的错误说明表示这笔交易在微信侧已经不是冻结状态：「订单已完结分账，不支持分账」（已经完结）、
+        /// 「订单已逾期解冻，不支持分账」（超过了可解冻的期限）。11-17 万龙租赁 189 笔里有 167 笔是这两种。
+        /// 这种情况记为已完结（写 share_close_date），夜间任务不再每晚重试。
+        /// </summary>
+        public static bool IsAlreadyClosedAtWechat(string? errorMessage)
+        {
+            string m = errorMessage ?? "";
+            return m.Contains("订单已完结分账") || m.Contains("订单已逾期解冻");
+        }
+
         // 一个租赁计入分账基数的租金：有效「租金」明细合计，减去挂在这些租金明细上的减免，
         // 再减去不挂明细的减免（优惠券、整单减免），每笔减免只扣一次。
         // 超时费、赔偿金不是租金，挂在它们上面的减免也不扣；已免除那天（明细 valid=0）的减免不扣；

@@ -561,6 +561,27 @@ namespace SnowmeetApi.Controllers
                 });
                 await _db.SaveChangesAsync();
             }
+            else if (WanlongShareRules.IsAlreadyClosedAtWechat(res.ErrorMessage))
+            {
+                // 微信说这笔交易已经完结分账 / 已逾期解冻：它在微信侧不再冻结，记为已完结，别每晚再试一遍（2026-11-17 用户要求）
+                payment.share_close_date = DateTime.Now;
+                payment.update_date = DateTime.Now;
+                _db.orderPayment.Entry(payment).State = EntityState.Modified;
+                await _db.coreDataModLog.AddAsync(new CoreDataModLog()
+                {
+                    table_name = "order_payment",
+                    field_name = "share_close_date",
+                    key_value = payment.id,
+                    prev_value = null,
+                    current_value = payment.share_close_date.Value.ToString("yyyy-MM-ddTHH:mm:ss.fff"),
+                    scene = "wechat unfreeze",
+                    trace_id = 0,
+                    is_manual = 0,
+                    manual_memo = "微信回执「" + res.ErrorMessage + "」：这笔交易在微信侧已不是冻结状态，记为已完结（不是这次解冻成功），以后不再重试",
+                    create_date = DateTime.Now
+                });
+                await _db.SaveChangesAsync();
+            }
             else
             {
                 Console.WriteLine($"解冻被微信拒绝 payment={payment.id} {payment.out_trade_no} code={res.ErrorCode} {res.ErrorMessage}");
