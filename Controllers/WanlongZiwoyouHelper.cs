@@ -752,6 +752,14 @@ namespace SnowmeetApi.Controllers
         [NonAction]
         public async Task<double> QueryBalance(string? account = null)
         {
+            // 查不到按 0 处理：出票前、订票前的余额核对一直是这个行为（0 就是「不够」）
+            return (await QueryBalanceOrNull(account)) ?? 0;
+        }
+
+        // 同上，但查不到（供应商没回、回的不是余额）返回 null 而不是 0：余额预警要区分「查不到」和「真的 0 元」
+        [NonAction]
+        public async Task<double?> QueryBalanceOrNull(string? account = null)
+        {
             // account 不传就用构造时的账号（出票前查余额走这条，账号由商品的来源决定）
             SetParam(string.IsNullOrWhiteSpace(account) ? source : account.Trim());
             string postData = "{\"apikey\": \"" + apiKey + "\", \"custId\": " + custId + "}";
@@ -766,7 +774,7 @@ namespace SnowmeetApi.Controllers
             }
             catch
             {
-                return 0;
+                return null;
             }
         }
 

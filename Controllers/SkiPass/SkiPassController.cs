@@ -22,6 +22,7 @@ using SnowmeetApi.Services.CoachPlatform;
 using Org.BouncyCastle.Asn1.Crmf;
 using System.Runtime.CompilerServices;
 using Microsoft.CodeAnalysis.CSharp;
+using SnowmeetApi.Services.Ops;
 namespace SnowmeetApi.Controllers
 {
     [Route("core/[controller]/[action]")]
@@ -857,8 +858,10 @@ namespace SnowmeetApi.Controllers
             // 一单多张票（购物车）时每张票单独一个我方单号，否则自我游把第 2、3… 张当成重复下单，
             // 返回第一张的订单号，这几张票就一直没有出成。单号固定，所以重试同一张票不会重复出票
             string outTradeNo = await SupplierSourceIdOf(skipass);
-            double balance = await _zwHelper.QueryBalance();
-            //balance = 10000;
+            double? queriedBalance = await QuerySourceBalanceOrNull(skipassProduct.source);
+            double balance = queriedBalance ?? 0;
+            // 出票时每张票都会查一次余额：前面的票扣掉之后掉到 2000 以下，也在这里发现、预警
+            NoteSupplierBalance(skipassProduct.source, queriedBalance);
             if (balance <= skipass.deal_price)
             {
                 // 没向供应商下单，顾客的钱要退回
@@ -1405,14 +1408,32 @@ namespace SnowmeetApi.Controllers
         // 向自我游查某个账号的预存款；测试里替换成假的，不发真实请求
         public Func<string, Task<double>>? BalanceProvider { get; set; }
 
+        // 余额预警（大好河山低于 2000 时给企业微信发提醒）：测试里换成假的；没设置就用 Startup 设的全局那个，再没有就什么都不发
+        public SupplierBalanceAlertService? BalanceAlerts { get; set; }
+
+        // 查到某个账号的余额之后都调一下（下单时、付款后出票时）；余额没查到传 null。任何情况都不抛、不拖慢下单（发送在后台）
         [NonAction]
-        private async Task<double> QuerySourceBalance(string source)
+        public void NoteSupplierBalance(string? source, double? balance)
+        {
+            try
+            {
+                (BalanceAlerts ?? SupplierBalanceAlertService.Shared)?.Check(source, balance);
+            }
+            catch (Exception err)
+            {
+                Console.WriteLine("[雪票预警] 检查余额异常 " + source + "：" + err.GetType().Name);
+            }
+        }
+
+        // 查不到返回 null（不是 0）：核对够不够付时按 0 处理，预警时查不到不算没钱
+        [NonAction]
+        private async Task<double?> QuerySourceBalanceOrNull(string source)
         {
             if (BalanceProvider != null)
             {
                 return await BalanceProvider(source);
             }
-            return await new WanlongZiwoyouHelper(_context, _config, source).QueryBalance();
+            return await new WanlongZiwoyouHelper(_context, _config, source).QueryBalanceOrNull();
         }
 
         [HttpGet("{productId}")]
@@ -1482,14 +1503,18 @@ namespace SnowmeetApi.Controllers
             {
                 double need = group.Sum(r => r.price.deal_price);
                 double balance;
+                double? queried;
                 try
                 {
-                    balance = await QuerySourceBalance(group.Key);
+                    queried = await QuerySourceBalanceOrNull(group.Key);
+                    balance = queried ?? 0;
                 }
                 catch
                 {
                     return BadRequest(isStaff ? "查询" + group.Key + "预存款失败，请稍后再试" : SkipassSaleRules.CUSTOMER_UNAVAILABLE_MESSAGE);
                 }
+                // 大好河山低于 2000 就给企业微信发预警；放在「够不够付」之前，余额低到订不了票时更要提醒
+                NoteSupplierBalance(group.Key, queried);
                 if (!(need < balance))
                 {
                     // 预存款和账号名是内部信息，只告诉店员；顾客只看到通用提示

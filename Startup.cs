@@ -116,6 +116,9 @@ namespace SnowmeetApi
         {
             IConfiguration config = app.ApplicationServices.GetService<IConfiguration>();
             IHttpContextAccessor http = app.ApplicationServices.GetService<IHttpContextAccessor>();
+            // 雪票供应商（大好河山）预存款低于 2000 时给企业微信发预警；SkiPassController 在好几处是 new 出来的，所以用全局共用的一个
+            SnowmeetApi.Services.Ops.SupplierBalanceAlertService.UseShared(
+                SnowmeetApi.Services.Ops.SupplierBalanceAlertService.Create(app.ApplicationServices.GetRequiredService<IServiceScopeFactory>()));
             app.UseStaticFiles();
             // 上传文件已改存 S3：本机磁盘没有的 /upload/... 一律 302 到图片域名。旧版小程序、库里写死
             // mini.snowmeet.top/upload/ 的完整地址都靠这条继续能打开；磁盘上还在的老文件仍由上面的静态文件直接返回

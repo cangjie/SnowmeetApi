@@ -9,6 +9,7 @@ using SnowmeetApi.Data;
 using SnowmeetApi.Helpers;
 using SnowmeetApi.Models;
 using SnowmeetApi.Models.Users;
+using SnowmeetApi.Services.Ops;
 using SnowmeetApi.Services.Share;
 using Xunit;
 
@@ -800,6 +801,136 @@ namespace SnowmeetApi.Tests
             Assert.DoesNotContain("万龙自我游", msg);
             var staff = Assert.IsType<BadRequestObjectResult>((await f.Controller(db).ReserveSkiPassCart(request, "staff-session")).Result);
             Assert.Contains("预存款失败", (string)staff.Value!);
+        }
+
+        // ---------------- 下单预警：大好河山预存款低于 2000 时给苍杰、布乖发企业微信（2026-11-18） ----------------
+
+        sealed class AlertRecorder
+        {
+            public readonly List<(string text, string to)> Sent = new();
+            public bool Throw;
+            public Task<bool> Send(string text, string to)
+            {
+                Sent.Add((text, to));
+                if (Throw) throw new InvalidOperationException("企业微信接口不可用");
+                return Task.FromResult(true);
+            }
+        }
+
+        static SupplierBalanceAlertService NewAlerts(AlertRecorder rec) =>
+            new(rec.Send, () => DateTime.Now, () => "Snowmeet-CangJie_1|Snowmeet-Buguai");
+
+        static SkipassCartRequest 一张票(int productId) =>
+            new() { items = new List<SkipassCartItem> { Item(productId, "13501177897", date: D0) } };
+
+        [Fact]
+        public async Task 下单预警_大好河山余额低于2000_发给两个人_订单照常下()
+        {
+            await using var f = await Fixture.Create();
+            f.Balances["大好河山"] = 1500;   // 票价 399，付得起，但低于 2000
+            await using var db = f.NewContext();
+            var rec = new AlertRecorder();
+            var alerts = NewAlerts(rec);
+            var ctl = f.Controller(db);
+            ctl.BalanceAlerts = alerts;
+            Assert.IsType<Order>(Assert.IsType<OkObjectResult>((await ctl.ReserveSkiPassCart(一张票(902), "customer-session")).Result).Value);
+            await alerts.WhenIdleAsync();
+            var sent = Assert.Single(rec.Sent);
+            Assert.Equal("Snowmeet-CangJie_1|Snowmeet-Buguai", sent.to);
+            Assert.Contains("大好河山", sent.text);
+            Assert.Contains("1500.00", sent.text);
+        }
+
+        [Fact]
+        public async Task 下单预警_余额低到付不起这张票_订单被拒绝但预警照发()
+        {
+            await using var f = await Fixture.Create();
+            f.Balances["大好河山"] = 100;    // 票价 399，不够
+            await using var db = f.NewContext();
+            var rec = new AlertRecorder();
+            var alerts = NewAlerts(rec);
+            var ctl = f.Controller(db);
+            ctl.BalanceAlerts = alerts;
+            Assert.IsType<BadRequestObjectResult>((await ctl.ReserveSkiPassCart(一张票(902), "customer-session")).Result);
+            await alerts.WhenIdleAsync();
+            Assert.Contains("100.00", Assert.Single(rec.Sent).text);
+        }
+
+        [Fact]
+        public async Task 下单预警_大好河山余额够_或是别的账号余额低_都不发()
+        {
+            await using var f = await Fixture.Create();
+            f.Balances["大好河山"] = 2500;
+            f.Balances["万龙自我游"] = 700;    // 万龙自我游低于 2000 也不预警（用户只要大好河山）
+            await using var db = f.NewContext();
+            var rec = new AlertRecorder();
+            var alerts = NewAlerts(rec);
+            var ctl = f.Controller(db);
+            ctl.BalanceAlerts = alerts;
+            Assert.IsType<OkObjectResult>((await ctl.ReserveSkiPassCart(一张票(902), "customer-session")).Result);
+            Assert.IsType<OkObjectResult>((await ctl.ReserveSkiPassCart(一张票(901), "customer-session")).Result);   // 579 付得起 700
+            await alerts.WhenIdleAsync();
+            Assert.Empty(rec.Sent);
+        }
+
+        [Fact]
+        public async Task 下单预警_查余额失败不预警_查不到不等于没钱()
+        {
+            await using var f = await Fixture.Create();
+            f.BalanceFails = true;
+            await using var db = f.NewContext();
+            var rec = new AlertRecorder();
+            var alerts = NewAlerts(rec);
+            var ctl = f.Controller(db);
+            ctl.BalanceAlerts = alerts;
+            Assert.IsType<BadRequestObjectResult>((await ctl.ReserveSkiPassCart(一张票(902), "customer-session")).Result);
+            await alerts.WhenIdleAsync();
+            Assert.Empty(rec.Sent);
+        }
+
+        [Fact]
+        public async Task 下单预警_企业微信发不出去也不影响下单()
+        {
+            await using var f = await Fixture.Create();
+            f.Balances["大好河山"] = 1500;
+            await using var db = f.NewContext();
+            var rec = new AlertRecorder { Throw = true };
+            var alerts = NewAlerts(rec);
+            var ctl = f.Controller(db);
+            ctl.BalanceAlerts = alerts;
+            Assert.IsType<Order>(Assert.IsType<OkObjectResult>((await ctl.ReserveSkiPassCart(一张票(902), "customer-session")).Result).Value);
+            await alerts.WhenIdleAsync();
+            Assert.Single(rec.Sent);
+        }
+
+        [Fact]
+        public async Task 下单预警_没有配置预警服务时订单照常下_不抛异常()
+        {
+            await using var f = await Fixture.Create();
+            f.Balances["大好河山"] = 1500;
+            await using var db = f.NewContext();
+            var ctl = f.Controller(db);   // 没设 BalanceAlerts，也没有全局共用的：什么都不发
+            Assert.IsType<Order>(Assert.IsType<OkObjectResult>((await ctl.ReserveSkiPassCart(一张票(902), "customer-session")).Result).Value);
+        }
+
+        [Fact]
+        public async Task 出票时查到的余额也走同一个预警入口()
+        {
+            // 付款后出票（AutoReserveOnce）会再查一次余额，用的就是这个入口；出票本身要请求供应商，这里直接测入口
+            await using var f = await Fixture.Create();
+            await using var db = f.NewContext();
+            var rec = new AlertRecorder();
+            var alerts = NewAlerts(rec);
+            var ctl = f.Controller(db);
+            ctl.BalanceAlerts = alerts;
+            ctl.NoteSupplierBalance("大好河山", null);       // 没查到：不发
+            ctl.NoteSupplierBalance("万龙自我游", 100);      // 不是大好河山：不发
+            ctl.NoteSupplierBalance("大好河山", 5000);       // 够：不发
+            await alerts.WhenIdleAsync();
+            Assert.Empty(rec.Sent);
+            ctl.NoteSupplierBalance("大好河山", 1200);
+            await alerts.WhenIdleAsync();
+            Assert.Contains("1200.00", Assert.Single(rec.Sent).text);
         }
 
         [Fact]
