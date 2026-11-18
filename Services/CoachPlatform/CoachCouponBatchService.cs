@@ -58,7 +58,8 @@ public sealed class CoachCouponBatchService(ApplicationDBContext db, IConfigurat
     /// <summary>领取页（小程序卡片的路径、二维码落地页）</summary>
     public const string ClaimPage = "/pages/coach/coupon_claim/coupon_claim";
 
-    public sealed record CreateInput(string? shop, string? tier, string? mode, double value, int count, string? requestId);
+    /// <summary>name = 券名；items = 这张券适用的服务（每个服务各自的方式和价格，留空的服务不适用）。</summary>
+    public sealed record CreateInput(string? name, List<CoachCouponMakerService.CouponItemInput>? items, int count, string? requestId);
     public sealed record CreateResult(CoachCouponBatch batch, bool repeated);
 
     private static readonly Regex TokenPattern = new("^[0-9a-zA-Z]{8,32}$", RegexOptions.Compiled);
@@ -72,12 +73,12 @@ public sealed class CoachCouponBatchService(ApplicationDBContext db, IConfigurat
         var maker = new CoachCouponMakerService(db, config);
         string? blocked = await maker.BlockedAsync(coach, intro);
         if (blocked != null) throw new CoachException(blocked, 3);
-        var (shop, tier, mode) = CoachCouponMakerService.ValidateInput(input.shop, input.tier, input.mode, input.value);
+        string name = CoachCouponMakerService.ValidateName(input.name);
         string req = (input.requestId ?? "").Trim();
         if (input.count < 1 || input.count > MaxBatchSize) throw new CoachException("一个批次 1～" + MaxBatchSize + " 张");
         if (req.Length == 0 || req.Length > 60) throw new CoachException("缺少请求编号，请重新提交");
-        var prepared = await maker.PrepareAsync(coach, shop, tier, mode, input.value);
-        var (name, memo, end) = maker.Describe(intro, prepared, now);
+        var prepared = await maker.PrepareManyAsync(coach, input.items);
+        var (memo, end) = maker.DescribeMany(prepared, now);
 
         return await MiniTicketTransaction.Run(db, async () =>
         {
@@ -87,12 +88,12 @@ public sealed class CoachCouponBatchService(ApplicationDBContext db, IConfigurat
             int open = await db.coachCouponBatch.AsNoTracking().Where(b => b.coach_id == coach.id && b.valid == 1).SumAsync(b => b.total_count - b.claimed_count);
             if (open + input.count > MaxOpenCapacity)
                 throw new CoachException("还没领完的批次里剩余可领的券已有 " + open + " 张，等领取或删掉一些再做（合计上限 " + MaxOpenCapacity + " 张）");
-            TicketTemplate template = await maker.FindOrCreateTemplateAsync(coach, prepared, name, memo, end);
+            TicketTemplate template = await maker.FindOrCreateManyAsync(coach, prepared, name, memo, end);
             var batch = new CoachCouponBatch { coach_id = coach.id, template_id = template.id, token = CoachCardRules.NewToken(), total_count = input.count, request_id = req, create_date = now };
             db.coachCouponBatch.Add(batch);
             await db.SaveChangesAsync();
             db.coreDataModLog.Add(CoreDataModLog.CreateManualLog("coach_coupon_batch", "batch", batch.id, "机构制作优惠券批次", coach.member_id, null, null,
-                prepared.label + " " + mode + " " + input.value + " × " + input.count, intro.name));
+                name + "：" + string.Join("、", prepared.Select(p => p.label + " " + p.mode + " " + p.value)) + " × " + input.count, intro.name));
             await db.SaveChangesAsync();
             return new CreateResult(batch, false);
         });

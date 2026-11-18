@@ -26,7 +26,7 @@ public sealed class DistributorController(ApplicationDBContext db, IConfiguratio
     public sealed record MakeCouponsInput(string? shop, string? tier, string? mode, double value, int count, string? requestId);
     public sealed record SaveCardTemplateInput(int? id, string? name, List<CarePriceInput>? care, double? rental_rate);
     public sealed record DeleteCardTemplateInput(int id);
-    public sealed record CreateCouponBatchInput(string? shop, string? tier, string? mode, double value, int count, string? requestId);
+    public sealed record CreateCouponBatchInput(string? name, List<CoachCouponMakerService.CouponItemInput>? items, int count, string? requestId);
     public sealed record DeleteCouponBatchInput(int id);
 
     /// <summary>当前登录会员的启用中分销商（只看有菜单的类型）；没有返回 null。</summary>
@@ -228,7 +228,7 @@ public sealed class DistributorController(ApplicationDBContext db, IConfiguratio
         {
             var batches = new CoachCouponBatchService(Db, config, SnowmeetApi.Services.Storage.FileStorageOptions.From(config).PublicBaseUrl);
             var made = await batches.CreateAsync(own.Value.coach, own.Value.introducer,
-                new CoachCouponBatchService.CreateInput(input.shop, input.tier, input.mode, input.value, input.count, input.requestId), DateTime.Now);
+                new CoachCouponBatchService.CreateInput(input.name, input.items, input.count, input.requestId), DateTime.Now);
             return new { made = new { id = made.batch.id, total = made.batch.total_count, repeated = made.repeated, sharePath = CoachCouponBatchService.SharePath(made.batch.token) },
                 maker = await new CoachCouponMakerService(Db, config).GetMakerViewAsync(own.Value.coach, own.Value.introducer) };
         });

@@ -40,13 +40,17 @@ public class CoachCouponBatchTests
     private static DistributorController Dist(CoachFixture f) => new(f.NewContext(), f.Config);
     private static CouponBatchController Claimer(CoachFixture f) => new(f.NewContext(), f.Config);
 
+    private static CoachCouponMakerService.CouponItemInput Item(string tier, string mode, double value, string shop = Wl) => new(shop, tier, mode, value);
+    private static CoachCouponBatchService.CreateInput One(string tier, string mode, double value, int count, string req, string name = "测试券", string shop = Wl)
+        => new(name, new() { Item(tier, mode, value, shop) }, count, req);
+
     private static async Task<(Coach coach, Introducer intro)> Own(CoachFixture f, int coachId)
         => (await f.NewContext().coach.AsNoTracking().SingleAsync(c => c.id == coachId), await f.NewContext().introducer.AsNoTracking().SingleAsync(i => i.coach_id == coachId));
 
     private static async Task<CoachCouponBatch> Batch(CoachFixture f, int count = 3, string req = "r1", string mode = "fixed", double value = 68, int? coachId = null)
     {
         var (coach, intro) = await Own(f, coachId ?? f.Coach2Id);
-        return (await Svc(f).CreateAsync(coach, intro, new CoachCouponBatchService.CreateInput(Wl, "单项", mode, value, count, req), DateTime.Now)).batch;
+        return (await Svc(f).CreateAsync(coach, intro, One("单项", mode, value, count, req), DateTime.Now)).batch;
     }
 
     private static async Task<CouponShareView> Claim(CoachFixture f, CoachCouponBatch batch, int memberId, DateTime? now = null, string? openId = null)
@@ -70,7 +74,8 @@ public class CoachCouponBatchTests
         Assert.Equal(0, await f.NewContext().coachCouponGrant.AsNoTracking().CountAsync());
         var tpl = await f.NewContext().ticketTemplate.AsNoTracking().SingleAsync(t => t.id == batch.template_id);
         Assert.Equal((1, 0, "养护券"), (tpl.hide, tpl.sharable, tpl.type));                                // 隐藏的养护券模板
-        Assert.Contains("68元一口价", tpl.name);
+        Assert.Equal("测试券", tpl.name);                                                                   // 券名是分销商自己起的
+        Assert.Contains("万龙服务中心单项养护：养护服务费按68元收取", tpl.memo);
         Assert.Equal(1, await f.NewContext().productTicketTemplate.AsNoTracking().CountAsync(r => r.ticket_template_id == tpl.id && r.fixed_price == 68));
         Assert.Equal(1, await f.NewContext().coreDataModLog.AsNoTracking().CountAsync(l => l.table_name == "coach_coupon_batch" && l.key_value == batch.id));
     }
@@ -80,8 +85,8 @@ public class CoachCouponBatchTests
     {
         await using var f = await NewFixture();
         var (coach, intro) = await Own(f, f.Coach2Id);
-        async Task<string> Bad(string? shop, string? tier, string? mode, double value, int count, string? req = "x")
-            => (await Assert.ThrowsAsync<CoachException>(() => Svc(f).CreateAsync(coach, intro, new(shop, tier, mode, value, count, req), DateTime.Now))).Message;
+        async Task<string> Bad(string? shop, string? tier, string? mode, double value, int count, string? req = "x", string? name = "测试券")
+            => (await Assert.ThrowsAsync<CoachException>(() => Svc(f).CreateAsync(coach, intro, new(name, new() { new(shop, tier, mode, value) }, count, req), DateTime.Now))).Message;
         Assert.Contains("不能低于", await Bad(Wl, "单项", "fixed", 59, 5));
         Assert.Contains("不能低于", await Bad(Wl, "单项", "rate", 0.6, 5));
         Assert.Contains("不能超过", await Bad(Wl, "单项", "off", 31, 5));
@@ -93,8 +98,8 @@ public class CoachCouponBatchTests
         Assert.Equal(0, await f.NewContext().coachCouponBatch.AsNoTracking().CountAsync());
         // 教练只开放了减免：一口价不行
         var (c1, i1) = await Own(f, f.CoachId);
-        Assert.Contains("没有开放一口价", (await Assert.ThrowsAsync<CoachException>(() => Svc(f).CreateAsync(c1, i1, new(Wl, "单项", "fixed", 100, 5, "x"), DateTime.Now))).Message);
-        Assert.Equal(0, (await Svc(f).CreateAsync(c1, i1, new(Wl, "单项", "off", 50, 5, "x"), DateTime.Now)).batch.claimed_count);
+        Assert.Contains("没有开放一口价", (await Assert.ThrowsAsync<CoachException>(() => Svc(f).CreateAsync(c1, i1, One("单项", "fixed", 100, 5, "x"), DateTime.Now))).Message);
+        Assert.Equal(0, (await Svc(f).CreateAsync(c1, i1, One("单项", "off", 50, 5, "x"), DateTime.Now)).batch.claimed_count);
     }
 
     [Fact]
@@ -102,8 +107,8 @@ public class CoachCouponBatchTests
     {
         await using var f = await NewFixture();
         var (coach, intro) = await Own(f, f.Coach2Id);
-        var first = await Svc(f).CreateAsync(coach, intro, new(Wl, "单项", "fixed", 68, 5, "same"), DateTime.Now);
-        var again = await Svc(f).CreateAsync(coach, intro, new(Wl, "单项", "fixed", 68, 5, "same"), DateTime.Now);
+        var first = await Svc(f).CreateAsync(coach, intro, One("单项", "fixed", 68, 5, "same"), DateTime.Now);
+        var again = await Svc(f).CreateAsync(coach, intro, One("单项", "fixed", 68, 5, "same"), DateTime.Now);
         Assert.False(first.repeated); Assert.True(again.repeated);
         Assert.Equal(first.batch.id, again.batch.id);
         Assert.Equal(1, await f.NewContext().coachCouponBatch.AsNoTracking().CountAsync());
@@ -118,12 +123,106 @@ public class CoachCouponBatchTests
         Assert.Equal(1, await f.NewContext().ticketTemplate.AsNoTracking().CountAsync(t => t.id == a.template_id));
         var (coach, intro) = await Own(f, f.Coach2Id);
         await Batch(f, 500, "c"); await Batch(f, 300, "d");                                              // 剩余合计 1000
-        var full = await Assert.ThrowsAsync<CoachException>(() => Svc(f).CreateAsync(coach, intro, new(Wl, "单项", "fixed", 68, 1, "e"), DateTime.Now));
+        var full = await Assert.ThrowsAsync<CoachException>(() => Svc(f).CreateAsync(coach, intro, One("单项", "fixed", 68, 1, "e"), DateTime.Now));
         Assert.Contains("合计上限", full.Message);
         // 领走或删掉一些就腾出额度
         Assert.Equal(CouponBatchState.ClaimedByMe, (await Claim(f, a, CoachFixture.StudentA)).state);
         await Svc(f).DeleteAsync(coach, intro, b.id, DateTime.Now);
-        Assert.Equal(0, (await Svc(f).CreateAsync(coach, intro, new(Wl, "单项", "fixed", 68, 101, "e"), DateTime.Now)).batch.claimed_count);
+        Assert.Equal(0, (await Svc(f).CreateAsync(coach, intro, One("单项", "fixed", 68, 101, "e"), DateTime.Now)).batch.claimed_count);
+    }
+
+    // ---------- 一张券适用于多个服务（和做会员卡选项目一样）----------
+
+    private static async Task<(double charge, double discount)> Price(CoachFixture f, string code, bool urgent, bool two)
+    {
+        var db = f.NewContext();
+        Ticket ticket = await db.ticket.Include(t => t.template).ThenInclude(t => t.productTicketTemplates).AsNoTracking().SingleAsync(t => t.code == code);
+        var care = new Care { need_edge = 1, need_wax = two ? 1 : 0, urgent = urgent ? 1 : 0, valid = 1 };
+        return await new SnowmeetApi.Controllers.CareController(db, f.Config, ShareFixture.Http).CalcCharge(Wl, care, ticket);
+    }
+
+    [Fact]
+    public async Task One_coupon_can_cover_several_services_each_with_its_own_price()
+    {
+        await using var f = await NewFixture();
+        var (coach, intro) = await Own(f, f.Coach2Id);
+        var batch = (await Svc(f).CreateAsync(coach, intro, new("万龙双服务券", new() { Item("单项", "fixed", 68), Item("双项", "rate", 0.8) }, 5, "multi"), DateTime.Now)).batch;
+        var tpl = await f.NewContext().ticketTemplate.AsNoTracking().SingleAsync(t => t.id == batch.template_id);
+        Assert.Equal("万龙双服务券", tpl.name);
+        Assert.Contains("万龙服务中心单项养护：养护服务费按68元收取", tpl.memo);
+        Assert.Contains("万龙服务中心双项养护：享8折", tpl.memo);
+        Assert.Contains("任选其一", tpl.memo);
+        // 单项、双项（含各自的加急商品）都挂了价格规则
+        Assert.Equal(4, await f.NewContext().productTicketTemplate.AsNoTracking().CountAsync(r => r.ticket_template_id == tpl.id));
+
+        var code = (await Claim(f, batch, CoachFixture.StudentA)).code!;
+        var ticket = await f.NewContext().ticket.AsNoTracking().SingleAsync(t => t.code == code);
+        Assert.Equal(("万龙双服务券", tpl.memo), (ticket.name, ticket.memo));
+        // 开单计价：单项一口价 68，双项 8 折；加急单：一口价 = 券价 + 加急加价（180 − 120），折扣率一样
+        Assert.Equal(68, Math.Round((await Price(f, code, urgent: false, two: false)) is var a ? a.charge - a.discount : 0, 2));
+        Assert.Equal(134.4, Math.Round((await Price(f, code, urgent: false, two: true)) is var b ? b.charge - b.discount : 0, 2));
+        Assert.Equal(128, Math.Round((await Price(f, code, urgent: true, two: false)) is var c ? c.charge - c.discount : 0, 2));
+        Assert.Equal(182.4, Math.Round((await Price(f, code, urgent: true, two: true)) is var d ? d.charge - d.discount : 0, 2));
+    }
+
+    [Fact]
+    public async Task Every_service_in_the_coupon_is_checked_against_its_own_floor_and_all_problems_are_reported_together()
+    {
+        await using var f = await NewFixture();
+        var (coach, intro) = await Own(f, f.Coach2Id);
+        async Task<string> Bad(params CoachCouponMakerService.CouponItemInput[] items)
+            => (await Assert.ThrowsAsync<CoachException>(() => Svc(f).CreateAsync(coach, intro, new("券", items.ToList(), 5, "x"), DateTime.Now))).Message;
+        // 单项一口价低于底价 + 双项只开放折扣却填了一口价：两条都要说出来
+        string both = await Bad(Item("单项", "fixed", 59), Item("双项", "fixed", 100));
+        Assert.Contains("不能低于", both); Assert.Contains("没有开放", both); Assert.Contains("；", both);
+        // 一格有问题整批都不创建；好的格子单独没问题
+        Assert.Contains("不能低于", await Bad(Item("单项", "fixed", 68), Item("双项", "rate", 0.6)));
+        Assert.Equal(0, await f.NewContext().coachCouponBatch.AsNoTracking().CountAsync());
+        Assert.Equal(0, (await Svc(f).CreateAsync(coach, intro, new("券", new() { Item("单项", "fixed", 60), Item("双项", "rate", 0.7) }, 5, "ok"), DateTime.Now)).batch.claimed_count);   // 刚好等于底价
+    }
+
+    [Fact]
+    public async Task The_service_list_must_not_be_empty_duplicated_or_unknown()
+    {
+        await using var f = await NewFixture();
+        var (coach, intro) = await Own(f, f.Coach2Id);
+        async Task<string> Bad(List<CoachCouponMakerService.CouponItemInput>? items)
+            => (await Assert.ThrowsAsync<CoachException>(() => Svc(f).CreateAsync(coach, intro, new("券", items, 5, "x"), DateTime.Now))).Message;
+        Assert.Contains("至少给一个服务", await Bad(null));
+        Assert.Contains("至少给一个服务", await Bad(new()));
+        Assert.Contains("重复", await Bad(new() { Item("单项", "fixed", 68), Item("单项", "fixed", 70) }));
+        Assert.Contains("太多", await Bad(new() { Item("单项", "fixed", 68), Item("双项", "rate", 0.8), Item("单项", "fixed", 68, "崇礼旗舰店"), Item("双项", "fixed", 90, "崇礼旗舰店"), Item("单项", "off", 10) }));
+        Assert.Contains("只能用于", await Bad(new() { Item("单项", "fixed", 68, "南山") }));
+        Assert.Equal(0, await f.NewContext().coachCouponBatch.AsNoTracking().CountAsync());
+    }
+
+    [Theory]
+    [InlineData("", "请填写券名")]
+    [InlineData("   ", "请填写券名")]
+    [InlineData("养护体验券🎿", "特殊符号")]
+    [InlineData("养护券¥68", "特殊符号")]
+    [InlineData("一二三四五六七八九十一二三四五六七八九十一二三四五", "最多 24 个汉字")]     // 25 个汉字 = 50 字节
+    public async Task The_coupon_name_is_required_short_and_plain(string name, string error)
+    {
+        await using var f = await NewFixture();
+        var (coach, intro) = await Own(f, f.Coach2Id);
+        var e = await Assert.ThrowsAsync<CoachException>(() => Svc(f).CreateAsync(coach, intro, One("单项", "fixed", 68, 5, "x", name), DateTime.Now));
+        Assert.Contains(error, e.Message);
+        // 24 个汉字刚好可以
+        var ok = await Svc(f).CreateAsync(coach, intro, One("单项", "fixed", 68, 5, "y", "一二三四五六七八九十一二三四五六七八九十一二三四"), DateTime.Now);
+        Assert.Equal(0, ok.batch.claimed_count);
+    }
+
+    [Fact]
+    public async Task Batches_with_the_same_name_and_prices_share_a_template_but_different_names_or_services_do_not()
+    {
+        await using var f = await NewFixture();
+        var a = await Batch(f, 5, "a"); var b = await Batch(f, 5, "b");
+        Assert.Equal(a.template_id, b.template_id);
+        var (coach, intro) = await Own(f, f.Coach2Id);
+        var otherService = (await Svc(f).CreateAsync(coach, intro, One("双项", "rate", 0.8, 5, "c"), DateTime.Now)).batch;     // 同名、不同服务
+        Assert.NotEqual(a.template_id, otherService.template_id);
+        Assert.Equal(2, await f.NewContext().ticketTemplate.AsNoTracking().CountAsync(t => t.name == "测试券"));
     }
 
     // ---------- 领取：这时才生成券 ----------
@@ -198,7 +297,7 @@ public class CoachCouponBatchTests
         var a = await Batch(f, 5, "a");
         var b = await Batch(f, 5, "b");                                                                  // 同价格的另一个批次
         var (c1, i1) = await Own(f, f.CoachId);
-        var other = (await Svc(f).CreateAsync(c1, i1, new(Wl, "双项", "off", 40, 5, "o"), DateTime.Now)).batch;   // 另一个分销商的批次
+        var other = (await Svc(f).CreateAsync(c1, i1, One("双项", "off", 40, 5, "o"), DateTime.Now)).batch;   // 另一个分销商的批次
 
         Assert.Equal(CouponBatchState.ClaimedByMe, (await Claim(f, a, CoachFixture.StudentA)).state);
         foreach (var blocked in new[] { b, other })
@@ -365,7 +464,7 @@ public class CoachCouponBatchTests
         await Claim(f, batch, CoachFixture.StudentA);
         var view = J((await Dist(f).GetMyCouponMaker("session-6")).data);
         Assert.Equal(0, view.GetProperty("outstanding").GetInt32());                                      // 领走的券已经是顾客的
-        var made = await Dist(f).MakeMyCoupons("session-6", new DistributorController.MakeCouponsInput(Wl, "单项", "fixed", 68, 3, "old1"));   // 旧版小程序的一次性生成
+        var made = await Dist(f).MakeMyCoupons("session-6", new DistributorController.MakeCouponsInput(Wl, "双项", "rate", 0.8, 3, "old1"));   // 旧版小程序的一次性生成（用双项：SQLite 测试库里同一个商品只能挂一个券模板的规则）
         Assert.Equal(0, made.code);
         Assert.Equal(3, J(J(made.data).GetProperty("maker")).GetProperty("outstanding").GetInt32());
     }
@@ -388,7 +487,7 @@ public class CoachCouponBatchTests
         // 会员：看到券名、说明、剩余；领取后是 claimed_by_me + 券码
         var share = J((await Claimer(f).GetShare(batch.token, "session-3")).data).GetProperty("view");
         Assert.Equal((3, 3, "某机构"), (share.GetProperty("total").GetInt32(), share.GetProperty("remaining").GetInt32(), share.GetProperty("distributorName").GetString()));
-        Assert.Contains("68元一口价", share.GetProperty("name").GetString());
+        Assert.Equal("测试券", share.GetProperty("name").GetString());
         var claimed = J((await Claimer(f).Claim(batch.token, "session-3")).data);
         Assert.False(claimed.GetProperty("needMember").GetBoolean());
         Assert.Equal("claimed_by_me", claimed.GetProperty("view").GetProperty("state").GetString());
