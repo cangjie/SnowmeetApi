@@ -14,6 +14,19 @@ public static class ShareWorkflowRules
 
     public static bool IsValidMethod(string? method) => method is Auto or Manual or Bank;
 
+    /// <summary>
+    /// 微信分账成功（或银行转账记账）之后，等几个日历日再由夜间「关闭微信分账」任务（23:15）解冻剩余资金。
+    /// 2026-11-18 用户定：由 4 天缩短为 1 天多——分账成功的第二天夜里就解冻。要再改，只改这一个值。
+    /// </summary>
+    public const int WechatUnfreezeWaitDays = 1;
+
+    /// <summary>
+    /// 最近一次分账成功（或银行转账记账）的时间是否已经过了等待期。按日期比、不按小时：
+    /// 11-17 任何时刻分账成功，11-18 夜里的任务就算到期；11-18 当天成功的，要等 11-19 夜里。
+    /// </summary>
+    public static bool UnfreezeWaitOver(DateTime lastShareTime, DateTime now)
+        => lastShareTime.Date <= now.Date.AddDays(-WechatUnfreezeWaitDays);
+
     public static bool CanUsePayment(Models.Order order, OrderPayment payment)
     {
         if (order.valid != 1 || order.hide || payment.valid != 1 || payment.status != "支付成功"

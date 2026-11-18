@@ -477,7 +477,7 @@ public class ShareWorkflowPermissionTests
         db.shareBatch.Update(batch);
         await db.SaveChangesAsync();
         db.ChangeTracker.Clear();
-        // 2026-11-17 起租赁订单的付款不用等「银行转账记账 / 分账成功满 4 天」，立刻可以解冻（另有测试）；
+        // 2026-11-17 起租赁订单的付款不用等「银行转账记账 / 分账成功后的 1 天」，立刻可以解冻（另有测试）；
         // 这个用例验证的是其它类型订单的原规则，所以先把订单改成非租赁类型
         await db.order.ExecuteUpdateAsync(s => s.SetProperty(o => o.type, "养护"));
         db.ChangeTracker.Clear();

@@ -491,18 +491,20 @@ namespace SnowmeetApi.Controllers
                 select new { share.order_id, batch.create_date }).ToListAsync();
             var latestBank = bankEvents.GroupBy(e => e.order_id).ToDictionary(g => g.Key, g => g.Max(e => e.create_date));
             var pending = await PendingDistributorPaymentIdsAsync(payments.Select(p => p.id).ToArray());
-            // 万龙租赁商户（1604236346）下租赁订单的付款不用等分账成功满 4 天，立刻可以解冻（2026-11-17 用户定，万龙租赁不再走微信分账；
+            // 万龙租赁商户（1604236346）下租赁订单的付款不用等分账成功后的等待期（ShareWorkflowRules.WechatUnfreezeWaitDays，11-18 起 1 天），立刻可以解冻（2026-11-17 用户定，万龙租赁不再走微信分账；
             // 仍然排除还有待提交的分销商/自动分账的付款）。雪票、其它商户的租赁等按原规则。
             var orderTypes = await _db.order.AsNoTracking().Where(o => orderIds.Contains(o.id))
                 .Select(o => new { o.id, o.type }).ToDictionaryAsync(o => o.id, o => o.type);
+            // 这笔付款最近一次分账成功（或这笔订单最近一次银行转账记账）的时间；一次都没有就是 null，不会被解冻
+            DateTime? LastShareTime(OrderPayment p)
+            {
+                var times = p.paymentShares.Select(s => s.response_time).Where(t => t != null).ToList();
+                if (latestBank.TryGetValue(p.order_id, out var bankDate)) times.Add(bankDate);
+                return times.Count == 0 ? null : times.Max();
+            }
             return payments.Where(p => !pending.Contains(p.id) &&
                 ((orderTypes.TryGetValue(p.order_id, out var orderType) && WanlongShareRules.UnfreezeImmediately(orderType, p.mch_id)) ||
-                (p.paymentShares.Select(s => s.response_time).Where(t => t != null)
-                    .Concat(latestBank.TryGetValue(p.order_id, out var bankDate) ? new DateTime?[] { bankDate } : Array.Empty<DateTime?>())
-                    .Any(t => t != null) &&
-                p.paymentShares.Select(s => s.response_time).Where(t => t != null)
-                    .Concat(latestBank.TryGetValue(p.order_id, out var date) ? new DateTime?[] { date } : Array.Empty<DateTime?>())
-                    .Max()!.Value.Date <= now.Date.AddDays(-4))))
+                (LastShareTime(p) is DateTime lastShare && ShareWorkflowRules.UnfreezeWaitOver(lastShare, now))))
                 .Select(p => p.id).ToHashSet();
         }
 
