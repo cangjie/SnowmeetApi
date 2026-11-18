@@ -7,6 +7,7 @@ using Microsoft.Extensions.Configuration;
 using SnowmeetApi.Data;
 using SnowmeetApi.Helpers;
 using SnowmeetApi.Models;
+using SnowmeetApi.Services.Storage;
 using SnowmeetApi.Services.Tickets;
 
 namespace SnowmeetApi.Services.CoachPlatform;
@@ -33,14 +34,14 @@ public sealed class CoachCouponMakerService(ApplicationDBContext db, IConfigurat
 
     private static readonly Dictionary<string, string> Short = new() { ["万龙服务中心"] = "万龙", ["崇礼旗舰店"] = "崇礼" };
 
-    private static string? Blocked(Coach coach, Introducer intro)
+    internal static string? Blocked(Coach coach, Introducer intro)
     {
         if (!DistributorMenuRules.HasMenu(intro.type)) return "只有教练、KOL 和机构可以生成优惠券";
         if (coach.valid != 1) return "你的分销商身份已停用，不能生成优惠券";
         return null;
     }
 
-    private async Task<string?> BlockedAsync(Coach coach, Introducer intro) =>
+    internal async Task<string?> BlockedAsync(Coach coach, Introducer intro) =>
         Blocked(coach, intro) ?? (await DistributorAccess.CanIssueAsync(db, coach) ? null : "你的分销商身份已停用或存在冲突，不能生成优惠券");
 
     private async Task<Product?> CareProductAsync(string shop, string name)
@@ -57,6 +58,7 @@ public sealed class CoachCouponMakerService(ApplicationDBContext db, IConfigurat
         from g in db.coachCouponGrant.AsNoTracking()
         join t in db.ticket.AsNoTracking() on g.ticket_code equals t.code
         where g.coach_id == coachId && t.channel == Channel && t.used == 0 && t.valid == 1 && (t.expire_date == null || t.expire_date >= now)
+              && !db.coachCouponClaim.Any(c => c.ticket_code == t.code)   // 批次里顾客领走的券已经是顾客的了，不算分销商自己手里的
         select t;
 
     /// <summary>「制作优惠券」页的数据：能做的格子和每格开放的方式（来自管理员的优惠券底价，没开放的不返回方式）、额度、最近做过的券。</summary>
@@ -90,31 +92,96 @@ public sealed class CoachCouponMakerService(ApplicationDBContext db, IConfigurat
             validUntil = CoachCardRules.SeasonEnd(now, config), maxPerRequest = MaxPerRequest, maxOutstanding = MaxOutstanding,
             outstanding = await OutstandingQuery(coach.id, now).CountAsync(),
             cells, recent,
+            // 分享批次（2026-11-18）：每做一次是一个批次，领取时才生成券
+            batches = await new CoachCouponBatchService(db, config, FileStorageOptions.From(config).PublicBaseUrl).ListAsync(coach),
+            maxBatchSize = CoachCouponBatchService.MaxBatchSize, maxOpenCapacity = CoachCouponBatchService.MaxOpenCapacity,
         };
     }
 
     public sealed record MakeResult(int templateId, string name, string memo, int created, bool repeated);
 
-    public async Task<MakeResult> MakeAsync(Coach coach, Introducer intro, MakeCouponInput input, DateTime now)
+    /// <summary>校验后的券参数（门店 / 档位 / 方式 / 数值）和这一格的养护商品，批次创建和直接生成共用。</summary>
+    public sealed record Prepared(string shop, string tier, string mode, double value, string label, Product baseProduct, Product? urgentProduct);
+
+    /// <summary>门店、档位、方式、数值的基本校验（不查库）。</summary>
+    public static (string shop, string tier, string mode) ValidateInput(string? shopIn, string? tierIn, string? modeIn, double value)
     {
-        string? blocked = await BlockedAsync(coach, intro);
-        if (blocked != null) throw new CoachException(blocked, 3);
-        string shop = (input.shop ?? "").Trim(), tier = (input.tier ?? "").Trim(), mode = (input.mode ?? "").Trim(), req = (input.requestId ?? "").Trim();
+        string shop = (shopIn ?? "").Trim(), tier = (tierIn ?? "").Trim(), mode = (modeIn ?? "").Trim();
         if (!CoachCardRules.CareShops.Contains(shop)) throw new CoachException("优惠券只能用于万龙服务中心和崇礼旗舰店的养护");
         if (!CoachCardRules.IsValidTier(tier)) throw new CoachException("优惠券档位只能是单项或双项");
-        if (!CoachFloorRules.TryValidateCouponValue(mode, input.value, out string valueError)) throw new CoachException(valueError);
-        if (input.count < 1 || input.count > MaxPerRequest) throw new CoachException("一次生成 1～" + MaxPerRequest + " 张");
-        if (req.Length == 0 || req.Length > 60) throw new CoachException("缺少请求编号，请重新提交");
+        if (!CoachFloorRules.TryValidateCouponValue(mode, value, out string valueError)) throw new CoachException(valueError);
+        return (shop, tier, mode);
+    }
 
+    /// <summary>券价不能越过管理员给这一格设的优惠券底价；这家店要有养护价目。</summary>
+    public async Task<Prepared> PrepareAsync(Coach coach, string shop, string tier, string mode, double value)
+    {
         string label = shop + " " + tier;
         CoachCouponFloor? floor = (await new CoachFloorService(db, config).GetCouponFloorsAsync(coach.id))
             .FirstOrDefault(x => x.shop == shop && x.tier == tier);
-        string? floorError = CoachFloorRules.CheckCoupon(floor, mode, input.value, label);
+        string? floorError = CoachFloorRules.CheckCoupon(floor, mode, value, label);
         if (floorError != null) throw new CoachException(floorError);
 
         Product? baseProduct = await CareProductAsync(shop, tier);
         if (baseProduct == null) throw new CoachException(label + "：这家店还没有配置养护价目，请联系管理员");
         Product? urgentProduct = await CareProductAsync(shop, tier + "加急");
+        return new Prepared(shop, tier, mode, value, label, baseProduct, urgentProduct);
+    }
+
+    /// <summary>券模板的名字、说明和有效期。生产库 ticket_template.name 是 varchar(50)、Chinese_PRC_CI_AS（汉字 2 字节）：
+    /// 名字按 48 字节截，别用 ¥ 这类 GBK 里没有的符号（会变成 ?），价格写「68元」。机构名放在前面，太长就截机构名。</summary>
+    public (string name, string memo, DateTime end) Describe(Introducer intro, Prepared p, DateTime now)
+    {
+        DateTime end = CoachCardRules.SeasonEnd(now, config);
+        string value = Math.Round(p.value, 2).ToString("0.##"), rateText = Math.Round(p.value * 10, 2).ToString("0.##");
+        string priceText = p.mode == CoachCardRules.ModeFixed ? value + "元一口价" : p.mode == CoachCardRules.ModeRate ? rateText + "折" : "减" + value + "元";
+        string suffix = " " + (Short.TryGetValue(p.shop, out string? s) ? s : p.shop) + p.tier + priceText + "券";
+        string name = FitBytes(intro.name.Trim(), 48 - ByteLen(suffix)) + suffix;
+        string feeText = p.mode == CoachCardRules.ModeFixed ? "按" + value + "元收取" : p.mode == CoachCardRules.ModeRate ? "享" + rateText + "折" : "减" + value + "元";
+        string memo = "凭券在" + p.shop + "做" + p.tier + "养护，养护服务费" + feeText
+            + "；加急加价、维修费照收；每张券限用一次，有效期至" + end.ToString("yyyy-MM-dd") + "。";
+        return (name, memo, end);
+    }
+
+    /// <summary>
+    /// 同一位分销商、同一档位、同一价格、同一雪季的券共用一个模板（隐藏的养护券 + 针对该店单项 / 双项养护商品的价格规则）：
+    /// 多次生成、多个批次不会让模板和价格规则越积越多。必须在 MiniTicketTransaction 里调用。
+    /// </summary>
+    public async Task<TicketTemplate> FindOrCreateTemplateAsync(Coach coach, Prepared p, string name, string memo, DateTime end)
+    {
+        List<int> mine = await db.coachCouponGrant.AsNoTracking().Where(g => g.coach_id == coach.id).Select(g => g.template_id).Distinct().ToListAsync();
+        // 批次创建时还没有发出过券（券在领取时才生成），模板也要能被同一分销商的批次找到：批次登记过的模板也算
+        mine.AddRange(await db.coachCouponBatch.AsNoTracking().Where(b => b.coach_id == coach.id).Select(b => b.template_id).Distinct().ToListAsync());
+        TicketTemplate? template = await db.ticketTemplate.AsNoTracking()
+            .Where(t => mine.Contains(t.id) && t.valid == 1 && t.name == name && t.expire_date == end).OrderBy(t => t.id).FirstOrDefaultAsync();
+        if (template != null) return template;
+        template = new TicketTemplate
+        {
+            type = "养护券", biz_type = "养护", name = name, memo = memo, hide = 1, sharable = 0, miniapp_recept_path = "",
+            expire_date = end, valid = 1,
+        };
+        db.ticketTemplate.Add(template);
+        await db.SaveChangesAsync();
+        // 单项 / 双项基础商品的价格规则；有加急商品的店，加急商品同价：折扣率一样，一口价 = 券价 + 加急加价（生成时的价目差）
+        AddRule(template.id, p.baseProduct.id, p.mode, p.value);
+        if (p.urgentProduct != null)
+        {
+            double surcharge = Math.Max(0, Math.Round(p.urgentProduct.sale_price - p.baseProduct.sale_price, 2));
+            AddRule(template.id, p.urgentProduct.id, p.mode, p.mode == CoachCardRules.ModeFixed ? Math.Round(p.value + surcharge, 2) : p.value);
+        }
+        await db.SaveChangesAsync();
+        return template;
+    }
+
+    public async Task<MakeResult> MakeAsync(Coach coach, Introducer intro, MakeCouponInput input, DateTime now)
+    {
+        string? blocked = await BlockedAsync(coach, intro);
+        if (blocked != null) throw new CoachException(blocked, 3);
+        var (shop, tier, mode) = ValidateInput(input.shop, input.tier, input.mode, input.value);
+        string req = (input.requestId ?? "").Trim();
+        if (input.count < 1 || input.count > MaxPerRequest) throw new CoachException("一次生成 1～" + MaxPerRequest + " 张");
+        if (req.Length == 0 || req.Length > 60) throw new CoachException("缺少请求编号，请重新提交");
+        Prepared prepared = await PrepareAsync(coach, shop, tier, mode, input.value);
 
         // 重复提交（同一个请求编号）：不再生成，返回上次的结果
         var existing = await db.coachCouponGrant.AsNoTracking().Where(g => g.coach_id == coach.id && g.grant_key.StartsWith(req + "-")).FirstOrDefaultAsync();
@@ -130,41 +197,11 @@ public sealed class CoachCouponMakerService(ApplicationDBContext db, IConfigurat
             .Include(m => m.memberSocialAccounts.Where(a => a.valid == 1)).AsNoTracking().FirstOrDefaultAsync()
             ?? throw new CoachException("分销商的会员不存在");
         string openId = member.wechatMiniOpenId ?? "";
-        DateTime end = CoachCardRules.SeasonEnd(now, config);
-        // 生产库 ticket_template.name 是 varchar(50)、Chinese_PRC_CI_AS（汉字 2 字节）：名字按 48 字节截，别用 ¥ 这类
-        // GBK 里没有的符号（会变成 ?），价格写「68元」。机构名放在前面，太长就截机构名。
-        string value = Math.Round(input.value, 2).ToString("0.##"), rateText = Math.Round(input.value * 10, 2).ToString("0.##");
-        string priceText = mode == CoachCardRules.ModeFixed ? value + "元一口价" : mode == CoachCardRules.ModeRate ? rateText + "折" : "减" + value + "元";
-        string suffix = " " + (Short.TryGetValue(shop, out string? s) ? s : shop) + tier + priceText + "券";
-        string name = FitBytes(intro.name.Trim(), 48 - ByteLen(suffix)) + suffix;
-        string feeText = mode == CoachCardRules.ModeFixed ? "按" + value + "元收取" : mode == CoachCardRules.ModeRate ? "享" + rateText + "折" : "减" + value + "元";
-        string memo = "凭券在" + shop + "做" + tier + "养护，养护服务费" + feeText
-            + "；加急加价、维修费照收；每张券限用一次，有效期至" + end.ToString("yyyy-MM-dd") + "。";
+        var (name, memo, end) = Describe(intro, prepared, now);
 
         return await MiniTicketTransaction.Run(db, async () =>
         {
-            // 同一位分销商、同一档位、同一价格、同一雪季的券共用一个模板：多次生成不会让模板和价格规则越积越多
-            List<int> mine = await db.coachCouponGrant.AsNoTracking().Where(g => g.coach_id == coach.id).Select(g => g.template_id).Distinct().ToListAsync();
-            TicketTemplate? template = await db.ticketTemplate.AsNoTracking()
-                .Where(t => mine.Contains(t.id) && t.valid == 1 && t.name == name && t.expire_date == end).OrderBy(t => t.id).FirstOrDefaultAsync();
-            if (template == null)
-            {
-                template = new TicketTemplate
-                {
-                    type = "养护券", biz_type = "养护", name = name, memo = memo, hide = 1, sharable = 0, miniapp_recept_path = "",
-                    expire_date = end, valid = 1,
-                };
-                db.ticketTemplate.Add(template);
-                await db.SaveChangesAsync();
-                // 单项 / 双项基础商品的价格规则；有加急商品的店，加急商品同价：折扣率一样，一口价 = 券价 + 加急加价（生成时的价目差）
-                AddRule(template.id, baseProduct.id, mode, input.value);
-                if (urgentProduct != null)
-                {
-                    double surcharge = Math.Max(0, Math.Round(urgentProduct.sale_price - baseProduct.sale_price, 2));
-                    AddRule(template.id, urgentProduct.id, mode, mode == CoachCardRules.ModeFixed ? Math.Round(input.value + surcharge, 2) : input.value);
-                }
-                await db.SaveChangesAsync();
-            }
+            TicketTemplate template = await FindOrCreateTemplateAsync(coach, prepared, name, memo, end);
             for (int seq = 1; seq <= input.count; seq++)
             {
                 string code = await NewCodeAsync();
@@ -179,7 +216,7 @@ public sealed class CoachCouponMakerService(ApplicationDBContext db, IConfigurat
                 await db.SaveChangesAsync();
             }
             db.coreDataModLog.Add(CoreDataModLog.CreateManualLog("ticket_template", "coupon", template.id, "机构自制优惠券", coach.member_id, null, null,
-                label + " " + mode + " " + input.value + " × " + input.count, intro.name));
+                prepared.label + " " + mode + " " + input.value + " × " + input.count, intro.name));
             await db.SaveChangesAsync();
             return new MakeResult(template.id, name, memo, input.count, false);
         });
@@ -210,7 +247,7 @@ public sealed class CoachCouponMakerService(ApplicationDBContext db, IConfigurat
         discount_amount = mode == CoachFloorRules.ModeOff ? value : null,   // 减免：立减金额，加急商品同额
     });
 
-    private async Task<string> NewCodeAsync()
+    internal async Task<string> NewCodeAsync()
     {
         for (int i = 0; i < 1000; i++)
         {

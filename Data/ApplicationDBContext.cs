@@ -206,6 +206,8 @@ namespace SnowmeetApi.Data
         public DbSet<CoachCardTemplate> coachCardTemplate { get; set; }
         public DbSet<CoachCardUse> coachCardUse { get; set; }
         public DbSet<CoachCouponGrant> coachCouponGrant { get; set; }
+        public DbSet<CoachCouponBatch> coachCouponBatch { get; set; }
+        public DbSet<CoachCouponClaim> coachCouponClaim { get; set; }
         public DbSet<Introducer> introducer { get; set; }
         public DbSet<IntroducerRelationHistory> introducerRelationHistory { get; set; }
         public DbSet<DistributorCustomer> distributorCustomer { get; set; }

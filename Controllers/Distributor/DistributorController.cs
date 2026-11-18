@@ -26,6 +26,8 @@ public sealed class DistributorController(ApplicationDBContext db, IConfiguratio
     public sealed record MakeCouponsInput(string? shop, string? tier, string? mode, double value, int count, string? requestId);
     public sealed record SaveCardTemplateInput(int? id, string? name, List<CarePriceInput>? care, double? rental_rate);
     public sealed record DeleteCardTemplateInput(int id);
+    public sealed record CreateCouponBatchInput(string? shop, string? tier, string? mode, double value, int count, string? requestId);
+    public sealed record DeleteCouponBatchInput(int id);
 
     /// <summary>当前登录会员的启用中分销商（只看有菜单的类型）；没有返回 null。</summary>
     private async Task<(Introducer? introducer, ApiResult<object>? error)> CurrentAsync(string? sessionKey)
@@ -208,6 +210,57 @@ public sealed class DistributorController(ApplicationDBContext db, IConfiguratio
                 new MakeCouponInput(input.shop, input.tier, input.mode, input.value, input.count, input.requestId), DateTime.Now);
             return new { made = new { made.templateId, made.name, made.memo, made.created, made.repeated }, maker = await svc.GetMakerViewAsync(own.Value.coach, own.Value.introducer) };
         });
+    }
+
+    /// <summary>
+    /// 创建优惠券分享批次（2026-11-18）：规定张数，创建时不生成券，顾客扫码 / 点开领取时才生成。
+    /// 价格受管理员设的优惠券底价约束；同一请求编号只建一次。
+    /// </summary>
+    [HttpPost]
+    public async Task<ApiResult<object>> CreateMyCouponBatch(string sessionKey, [FromBody] CreateCouponBatchInput input)
+    {
+        var (introducer, error) = await CurrentAsync(sessionKey);
+        if (error != null) return error;
+        var own = await OwnCoachAsync(introducer!);
+        if (own == null) return Result(1, "你的分销商资料还没有关联优惠券能力，请联系管理员");
+        if (input == null) return Result(1, "请填写优惠券信息");
+        return await Run(async () =>
+        {
+            var batches = new CoachCouponBatchService(Db, config, SnowmeetApi.Services.Storage.FileStorageOptions.From(config).PublicBaseUrl);
+            var made = await batches.CreateAsync(own.Value.coach, own.Value.introducer,
+                new CoachCouponBatchService.CreateInput(input.shop, input.tier, input.mode, input.value, input.count, input.requestId), DateTime.Now);
+            return new { made = new { id = made.batch.id, total = made.batch.total_count, repeated = made.repeated, sharePath = CoachCouponBatchService.SharePath(made.batch.token) },
+                maker = await new CoachCouponMakerService(Db, config).GetMakerViewAsync(own.Value.coach, own.Value.introducer) };
+        });
+    }
+
+    /// <summary>删除批次：只有没人领取过的能删，二维码和小程序卡片立即失效。</summary>
+    [HttpPost]
+    public async Task<ApiResult<object>> DeleteMyCouponBatch(string sessionKey, [FromBody] DeleteCouponBatchInput input)
+    {
+        var (introducer, error) = await CurrentAsync(sessionKey);
+        if (error != null) return error;
+        var own = await OwnCoachAsync(introducer!);
+        if (own == null) return Result(1, "你的分销商资料还没有关联优惠券能力，请联系管理员");
+        if (input == null || input.id <= 0) return Result(1, "没有找到这个批次");
+        return await Run(async () => await new CoachCouponBatchService(Db, config).DeleteAsync(own.Value.coach, own.Value.introducer, input.id, DateTime.Now));
+    }
+
+    /// <summary>批次的分享二维码（PNG）：scene = c=批次 token，落到优惠券领取页；只给批次所属的分销商取，已删除的批次不出码。</summary>
+    [HttpGet]
+    public async Task<IActionResult> GetCouponBatchQr(string sessionKey, int batchId, [FromServices] MiniStaffBookingQrService qr, string envVersion = "release")
+    {
+        var (introducer, error) = await CurrentAsync(sessionKey);
+        if (error != null) return BadRequest(new { code = error.code, message = error.message });
+        var own = await OwnCoachAsync(introducer!);
+        if (own == null) return BadRequest(new { code = 1, message = "你的分销商资料还没有关联优惠券能力，请联系管理员" });
+        CoachCouponBatch? batch = await new CoachCouponBatchService(Db, config).OwnBatchAsync(own.Value.coach.id, batchId);
+        if (batch == null) return BadRequest(new { code = 1, message = "没有找到这个批次，可能已经删除" });
+        try { return File(await qr.GetForCouponBatchAsync(batch.token, envVersion), "image/png"); }
+        catch (Exception e) when (e is ArgumentException || e is InvalidOperationException)
+        { return BadRequest(new { code = 1, message = e.Message }); }
+        catch (Exception e) when (e is HttpRequestException || e is JsonException)
+        { return BadRequest(new { code = 1, message = "小程序码服务暂时不可用，请重试" }); }
     }
 
     /// <summary>我的订票二维码（PNG）：和员工订票码同款，scene 带分销商编号，顾客扫码直达雪票选购页。</summary>

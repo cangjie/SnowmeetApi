@@ -68,5 +68,22 @@ internal static class CoachSchemaConfiguration
         grant.HasIndex(x => x.ticket_code).IsUnique().HasDatabaseName("UX_coach_coupon_grant_ticket");
         grant.HasIndex(x => x.grant_key).IsUnique().HasDatabaseName("UX_coach_coupon_grant_key");
         grant.HasIndex(x => x.coach_id).HasDatabaseName("IX_coach_coupon_grant_coach");
+
+        var batch = m.Entity<CoachCouponBatch>();
+        batch.Property(x => x.token).HasMaxLength(32);
+        batch.Property(x => x.request_id).HasMaxLength(60);
+        batch.HasIndex(x => x.token).IsUnique().HasDatabaseName("UX_coach_coupon_batch_token");
+        batch.HasIndex(x => new { x.coach_id, x.request_id }).IsUnique().HasDatabaseName("UX_coach_coupon_batch_request");
+        batch.HasIndex(x => new { x.coach_id, x.valid }).HasDatabaseName("IX_coach_coupon_batch_coach");
+
+        var claim = m.Entity<CoachCouponClaim>();
+        claim.Property(x => x.open_id).HasMaxLength(64);
+        claim.Property(x => x.ticket_code).HasMaxLength(50);
+        claim.Property(x => x.claim_date).HasColumnType("date");
+        // 同一批次每个会员只能领一次；每个会员每天只能领一次（跨批次）——并发领取的兜底
+        claim.HasIndex(x => new { x.batch_id, x.member_id }).IsUnique().HasDatabaseName("UX_coach_coupon_claim_batch_member");
+        claim.HasIndex(x => new { x.member_id, x.claim_date }).IsUnique().HasDatabaseName("UX_coach_coupon_claim_member_day");
+        claim.HasIndex(x => x.ticket_code).IsUnique().HasDatabaseName("UX_coach_coupon_claim_ticket");
+        claim.HasIndex(x => x.batch_id).HasDatabaseName("IX_coach_coupon_claim_batch");
     }
 }
