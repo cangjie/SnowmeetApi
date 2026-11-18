@@ -2,6 +2,7 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SnowmeetApi.Controllers.CoachPlatform;
+using SnowmeetApi.Controllers.DistributorPortal;
 using SnowmeetApi.Helpers;
 using SnowmeetApi.Models;
 using SnowmeetApi.Services.CoachPlatform;
@@ -306,6 +307,100 @@ public class CoachCardShareTests
             var res = await Ctl(f).RevokeMyCard("session-2", new CoachController.CardIdInput(card.id));
             Assert.NotEqual(0, res.code);
             Assert.Equal("claimed", (await f.NewContext().coachCard.AsNoTracking().FirstAsync(c => c.id == card.id)).status);
+        }
+    }
+
+    // ---------- 删除卡种：从来没人领取过才能删（2026-11-18）----------
+
+    private static DistributorController Org(CoachFixture f) => new(f.NewContext(), f.Config);
+    private static CoachCardTemplateService Templates(CoachFixture f) => new(f.NewContext(), f.Config);
+
+    [Fact]
+    public async Task Template_list_says_how_many_claimed_and_whether_it_can_be_deleted()
+    {
+        var (f, coach, template) = await Setup(); await using (f)
+        {
+            var intro = await f.NewContext().introducer.AsNoTracking().FirstAsync(i => i.coach_id == f.CoachId);
+            var other = await Templates(f).SaveAsync(coach, intro, null, "另一种卡", new() { new("万龙服务中心", "单项", "fixed", 60) }, null);
+            var now = DateTime.Now;
+            await f.Cards().CreateCardAsync(coach.id, now, template.id, "qr");                       // 待领取
+            var claimed = await f.Cards().CreateCardAsync(coach.id, now, template.id, "card");
+            await f.Cards().ClaimAsync(claimed.token, CoachFixture.StudentA, now);                      // 已领取
+            await f.Cards().CreateCardAsync(coach.id, now, other.id, "qr");                          // 另一种卡：只有待领取
+
+            var list = J((await Org(f).ListMyCardTemplates("session-2")).data).GetProperty("templates").EnumerateArray().ToList();
+            var a = list.Single(x => x.GetProperty("id").GetInt32() == template.id);
+            var b = list.Single(x => x.GetProperty("id").GetInt32() == other.id);
+            Assert.Equal((1, 1, false), (a.GetProperty("claimedCount").GetInt32(), a.GetProperty("pendingCount").GetInt32(), a.GetProperty("canDelete").GetBoolean()));
+            Assert.Equal((0, 1, true), (b.GetProperty("claimedCount").GetInt32(), b.GetProperty("pendingCount").GetInt32(), b.GetProperty("canDelete").GetBoolean()));
+        }
+    }
+
+    [Fact]
+    public async Task A_template_nobody_claimed_can_be_deleted_and_its_waiting_shares_go_with_it()
+    {
+        var (f, coach, template) = await Setup(); await using (f)
+        {
+            var now = DateTime.Now;
+            var qr = await f.Cards().CreateCardAsync(coach.id, now, template.id, "qr");
+            var card = await f.Cards().CreateCardAsync(coach.id, now, template.id, "card");
+            var cancelledEarlier = await f.Cards().CreateCardAsync(coach.id, now, template.id, "qr");
+            await f.Cards().RevokeAsync(cancelledEarlier.id, coach.id, now);
+
+            var res = await Org(f).DeleteMyCardTemplate("session-2", new DistributorController.DeleteCardTemplateInput(template.id));
+            Assert.Equal(0, res.code);
+            Assert.Equal(2, J(res.data).GetProperty("revokedShares").GetInt32());
+
+            var row = await f.NewContext().coachCardTemplate.AsNoTracking().FirstAsync(t => t.id == template.id);
+            Assert.Equal(0, row.valid);                                                              // 软删除：行还在
+            Assert.Empty(J((await Org(f).ListMyCardTemplates("session-2")).data).GetProperty("templates").EnumerateArray());
+            // 它还没人领取的分享一并删了：不再列出、统计里没有、二维码和卡片都领不了
+            var listed = J((await Ctl(f).ListMyCards("session-2")).data);
+            Assert.Empty(listed.GetProperty("cards").EnumerateArray());
+            Assert.Equal(0, listed.GetProperty("counts").GetProperty("total").GetInt32());
+            foreach (var c in new[] { qr, card })
+            {
+                Assert.Equal(CoachCard.StatusRevoked, (await f.NewContext().coachCard.AsNoTracking().FirstAsync(x => x.id == c.id)).status);
+                Assert.Equal(ShareCardState.Invalid, (await f.Cards().ClaimAsync(c.token, CoachFixture.StudentA, now)).state);
+            }
+            Assert.Equal(1, await f.NewContext().coreDataModLog.AsNoTracking().CountAsync(l => l.table_name == "coach_card_template" && l.key_value == template.id && l.scene == "机构删除会员卡种"));
+            // 再删一次：已经没有这个卡种
+            Assert.NotEqual(0, (await Org(f).DeleteMyCardTemplate("session-2", new DistributorController.DeleteCardTemplateInput(template.id))).code);
+        }
+    }
+
+    [Fact]
+    public async Task A_template_somebody_claimed_cannot_be_deleted_even_if_that_card_was_revoked_later()
+    {
+        var (f, coach, template) = await Setup(); await using (f)
+        {
+            var now = DateTime.Now;
+            var waiting = await f.Cards().CreateCardAsync(coach.id, now, template.id, "qr");
+            var claimed = await f.Cards().CreateCardAsync(coach.id, now, template.id, "card");
+            await f.Cards().ClaimAsync(claimed.token, CoachFixture.StudentA, now);
+
+            var refused = await Org(f).DeleteMyCardTemplate("session-2", new DistributorController.DeleteCardTemplateInput(template.id));
+            Assert.Equal(1, refused.code); Assert.Contains("领取过", refused.message);
+            Assert.Equal(1, (await f.NewContext().coachCardTemplate.AsNoTracking().FirstAsync(t => t.id == template.id)).valid);
+            Assert.Equal(CoachCard.StatusIssued, (await f.NewContext().coachCard.AsNoTracking().FirstAsync(c => c.id == waiting.id)).status);   // 什么都没动
+
+            await f.Cards().RevokeAsync(claimed.id, null, now);                                          // 管理员撤销这张已领取的卡：仍然「领取过」
+            Assert.Equal(1, (await Org(f).DeleteMyCardTemplate("session-2", new DistributorController.DeleteCardTemplateInput(template.id))).code);
+            Assert.False(J((await Org(f).ListMyCardTemplates("session-2")).data).GetProperty("templates").EnumerateArray().Single().GetProperty("canDelete").GetBoolean());
+        }
+    }
+
+    [Fact]
+    public async Task Only_the_owning_organization_can_delete_a_template()
+    {
+        var (f, coach, template) = await Setup(); await using (f)
+        {
+            // 会员 6 的教练（不是机构）、没有分销商身份的会员、没登录，都删不了
+            Assert.NotEqual(0, (await Org(f).DeleteMyCardTemplate("session-6", new DistributorController.DeleteCardTemplateInput(template.id))).code);
+            Assert.NotEqual(0, (await Org(f).DeleteMyCardTemplate("session-3", new DistributorController.DeleteCardTemplateInput(template.id))).code);
+            Assert.NotEqual(0, (await Org(f).DeleteMyCardTemplate("nope", new DistributorController.DeleteCardTemplateInput(template.id))).code);
+            Assert.NotEqual(0, (await Org(f).DeleteMyCardTemplate("session-2", new DistributorController.DeleteCardTemplateInput(template.id + 999))).code);
+            Assert.Equal(1, (await f.NewContext().coachCardTemplate.AsNoTracking().FirstAsync(t => t.id == template.id)).valid);
         }
     }
 

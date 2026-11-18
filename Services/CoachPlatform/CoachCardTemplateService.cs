@@ -47,8 +47,45 @@ public sealed class CoachCardTemplateService(ApplicationDBContext db, IConfigura
     {
         await CheckOwner(coach, intro);
         var rows = await db.coachCardTemplate.AsNoTracking().Where(t => t.coach_id == coach.id && t.valid == 1).OrderByDescending(t => t.id).ToListAsync();
-        return new { templates = rows.Select(t => new { t.id, t.name, carePrices = CoachCardRules.ParseCarePrices(t.care_prices), rentalRate = t.rental_rate,
-            sharePath = (string?)null }).ToList() };
+        // 每个卡种有多少人领取过（有领取人的卡，含领取后被撤销的）和多少条还没人领取的分享：无人领取过的卡种可以删除（2026-11-18）
+        var ids = rows.Select(t => t.id).ToList();
+        var counts = await db.coachCard.AsNoTracking().Where(c => c.coach_id == coach.id && c.template_id != null && ids.Contains(c.template_id.Value))
+            .GroupBy(c => c.template_id!.Value)
+            .Select(g => new { id = g.Key, claimed = g.Count(c => c.member_id != null), pending = g.Count(c => c.status == CoachCard.StatusIssued) }).ToListAsync();
+        return new { templates = rows.Select(t =>
+        {
+            var n = counts.FirstOrDefault(x => x.id == t.id);
+            int claimed = n?.claimed ?? 0;
+            return new { t.id, t.name, carePrices = CoachCardRules.ParseCarePrices(t.care_prices), rentalRate = t.rental_rate,
+                sharePath = (string?)null, claimedCount = claimed, pendingCount = n?.pending ?? 0, canDelete = claimed == 0 };
+        }).ToList() };
+    }
+
+    /// <summary>
+    /// 删除卡种（2026-11-18 用户：会员卡如果无人领取过，应该可以删除）。只有从来没人领取过的卡种能删；
+    /// 领取过的（含领取后被撤销的）不能删，已发出的卡要保留它领取时的名称和价格。
+    /// 删除 = 卡种 valid=0（软删除，留审计），同时把它还没人领取的分享一并撤销（这些记录对机构来说就是删了：二维码、小程序卡片立即失效）。
+    /// </summary>
+    public async Task<object> DeleteAsync(Coach coach, Introducer intro, int id)
+    {
+        await CheckOwner(coach, intro);
+        await using var tx = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
+        var t = await db.coachCardTemplate.AsTracking().FirstOrDefaultAsync(x => x.id == id && x.coach_id == coach.id && x.valid == 1)
+            ?? throw new CoachException("没有找到这个卡种");
+        int claimed = await db.coachCard.AsNoTracking().CountAsync(c => c.template_id == id && c.member_id != null);
+        if (claimed > 0) throw new CoachException("这个卡种已经有 " + claimed + " 位顾客领取过，不能删除");
+        DateTime now = DateTime.Now;
+        int revoked = await db.coachCard.Where(c => c.template_id == id && c.coach_id == coach.id && c.status == CoachCard.StatusIssued)
+            .ExecuteUpdateAsync(s => s.SetProperty(c => c.status, CoachCard.StatusRevoked)
+                .SetProperty(c => c.revoked_at, (DateTime?)now).SetProperty(c => c.update_date, (DateTime?)now));
+        string before = t.name + " | " + t.care_prices + " | 租赁:" + (t.rental_rate?.ToString("0.##") ?? "无");
+        t.valid = 0; t.update_date = now;
+        await db.SaveChangesAsync();
+        db.coreDataModLog.Add(CoreDataModLog.CreateManualLog("coach_card_template", "template", t.id, "机构删除会员卡种", intro.member_id, null, before,
+            "已删除（同时撤销 " + revoked + " 条没人领取的分享）", intro.name));
+        await db.SaveChangesAsync();
+        await tx.CommitAsync();
+        return new { id, revokedShares = revoked };
     }
 
     public async Task<object> EditorAsync(Coach coach, Introducer intro, int? id)
