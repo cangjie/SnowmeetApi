@@ -23,6 +23,7 @@ using Org.BouncyCastle.Asn1.Crmf;
 using System.Runtime.CompilerServices;
 using Microsoft.CodeAnalysis.CSharp;
 using SnowmeetApi.Services.Ops;
+using SnowmeetApi.Services.Share;
 namespace SnowmeetApi.Controllers
 {
     [Route("core/[controller]/[action]")]
@@ -1048,6 +1049,7 @@ namespace SnowmeetApi.Controllers
         [NonAction]
         public async Task<bool> AutoRefundCancelled(Models.SkiPass skipass, string reason, int? staffId)
         {
+            await CancelTicketShareAsync(skipass);
             await AutoRefundLock.WaitAsync();
             try
             {
@@ -1059,10 +1061,32 @@ namespace SnowmeetApi.Controllers
             }
         }
 
+        // 票确定作废了（取消已确认、出票失败），这张票那 1 元系统分账也取消。退票和出票失败的退款都先走这里；
+        // 票没有作废（is_cancel 不是 1 / -2）什么都不做。分账取消失败只记日志，不能挡住退款。
+        [NonAction]
+        private async Task CancelTicketShareAsync(Models.SkiPass skipass)
+        {
+            if (!SkipassSaleRules.IsTicketVoided(skipass.is_cancel)) return;
+            try
+            {
+                List<int> voided = await new SkipassShareCancelService(_context).CancelPendingAsync(skipass.id);
+                if (voided.Count > 0)
+                {
+                    await LogSkipassEvent(skipass, "取消分账", null, null,
+                        "票已取消，作废没提交的 1 元系统分账（order_share " + string.Join("、", voided) + "）");
+                }
+            }
+            catch (Exception err)
+            {
+                Console.WriteLine("[雪票取消] 作废分账失败 skipass=" + skipass.id + " " + err.GetType().Name + " " + err.Message);
+            }
+        }
+
         // 预订失败（供应商没接单）的票：顾客已经付款，自动退这一张的钱
         [NonAction]
         public async Task<bool> AutoRefundFailedBooking(Models.SkiPass skipass, string reason)
         {
+            await CancelTicketShareAsync(skipass);
             await AutoRefundLock.WaitAsync();
             try
             {

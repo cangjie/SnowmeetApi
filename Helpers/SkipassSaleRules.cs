@@ -60,6 +60,10 @@ namespace SnowmeetApi.Helpers
             return Math.Abs(a - b) > PRICE_EPSILON;
         }
 
+        // 这张票已经确定作废了：1 = 取消已确认；-2 = 出票失败（确认出不了票）。其它值（0 正常、2/3 取消申请中、-1 取消出错、-3 取消超时）都不算。
+        // 作废的票那 1 元系统分账也跟着取消，分账记录卡片显示「已取消」。
+        public static bool IsTicketVoided(int isCancel) => isCancel == 1 || isCancel == -2;
+
         // 取消已确认（is_cancel=1）、有效、还没发起过退款的万龙雪票，需要自动退款。
         // 取消先提交给自我游，即时确认的当场退，需要审核的等 RefreshCancel 查到已取消再退；
         // 退款行（payment_refund）一旦存在就不再自动退，避免失败重试变成重复退款（由调用方查）。

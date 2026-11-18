@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using SnowmeetApi.Data;
+using SnowmeetApi.Helpers;
 using SnowmeetApi.Models;
 
 namespace SnowmeetApi.Services.Share;
@@ -16,7 +17,8 @@ public sealed record SkipassShareRecordItem(int orderShareId, string receiver, d
 /// <param name="pickedUp">这张票是否已取票</param>
 /// <param name="record">这张票的分账；一张票最多一笔，没有时为 null</param>
 /// <param name="emptyReason">没有分账时说明原因，有分账时为 null</param>
-public sealed record SkipassShareRecordResult(int skipassId, bool pickedUp, SkipassShareRecordItem? record, string? emptyReason);
+/// <param name="cancelled">这张票已经取消（取消已确认或出票失败）：小程序据此不再写「取票后自动分给推荐员工」</param>
+public sealed record SkipassShareRecordResult(int skipassId, bool pickedUp, SkipassShareRecordItem? record, string? emptyReason, bool cancelled = false);
 
 /// <summary>
 /// 后台「大好河山雪票」页每张票下面的分账记录：只读，看系统给推荐员工的那 1 元（order_share 金额 1、没有 share_method）。
@@ -35,9 +37,18 @@ public sealed class SkipassShareRecordService(ApplicationDBContext db)
         Models.Order? order = await db.order.AsNoTracking().FirstOrDefaultAsync(o => o.id == pass.order_id && o.valid == 1);
         if (order == null || order.type != "雪票") throw new ShareException("不是雪票订单");
         bool pickedUp = pass.is_used == 1;
+        // 票已取消（取消已确认、出票失败）：这一笔分账也是取消状态，显示「已取消」
+        bool cancelled = SkipassSaleRules.IsTicketVoided(pass.is_cancel);
 
         OrderShare? share = await SystemShares(order.id).Where(s => s.skipass_id == skipassId).OrderBy(s => s.id).FirstOrDefaultAsync();
-        if (share == null) return new SkipassShareRecordResult(skipassId, pickedUp, null, await EmptyReasonAsync(order));
+        if (share == null && cancelled)
+        {
+            // 已经被作废的那一笔（SkipassShareCancelService）：还要能看到它是分给谁的
+            share = await db.orderShare.AsNoTracking()
+                .Where(s => !s.valid && s.order_id == order.id && s.share_method == null && s.amount == 1 && s.skipass_id == skipassId)
+                .OrderByDescending(s => s.id).FirstOrDefaultAsync();
+        }
+        if (share == null) return new SkipassShareRecordResult(skipassId, pickedUp, null, await EmptyReasonAsync(order, cancelled), cancelled);
 
         OrderShareRelation? relation = await db.orderShareRelation.AsNoTracking().FirstOrDefaultAsync(r => r.id == share.relation_id);
         string receiver = "未知收款人";
@@ -48,15 +59,21 @@ public sealed class SkipassShareRecordService(ApplicationDBContext db)
                 : !string.IsNullOrWhiteSpace(relation.name) ? relation.name.Trim() : receiver;
         }
         List<PaymentShare> rows = await db.paymentShare.AsNoTracking().Where(p => p.valid && p.share_id == share.id).ToListAsync();
-        return new SkipassShareRecordResult(skipassId, pickedUp, Describe(share, receiver, rows), null);
+        return new SkipassShareRecordResult(skipassId, pickedUp, Describe(share, receiver, rows, cancelled), null, cancelled);
     }
 
     /// <summary>订单上有效的系统员工分账：金额 1、没有 share_method（金额恰好是 1 的介绍人分账靠 share_method 区分）。</summary>
     IQueryable<OrderShare> SystemShares(int orderId)
         => db.orderShare.AsNoTracking().Where(s => s.valid && s.order_id == orderId && s.share_method == null && s.amount == 1);
 
-    static SkipassShareRecordItem Describe(OrderShare share, string receiver, List<PaymentShare> mine)
+    public const string CancelledState = "已取消";
+    public const string CancelledPlanText = "票已取消，不再分账";
+
+    static SkipassShareRecordItem Describe(OrderShare share, string receiver, List<PaymentShare> mine, bool cancelled)
     {
+        // 票已取消，而且这笔分账没有提交给微信过（处理中、已成功、被拒绝都是真实发生过的，照常显示）：取消状态
+        if (cancelled && !mine.Any(r => r.submit_time != null))
+            return new SkipassShareRecordItem(share.id, receiver, share.amount, CancelledState, CancelledPlanText, null, null, null);
         double succeeded = mine.Where(r => r.success == true).Sum(r => r.amount);
         DateTime? submit = mine.Where(r => r.submit_time != null).Select(r => r.submit_time).Max();
         string? submitText = submit?.ToString(TimeFormat);
@@ -80,10 +97,11 @@ public sealed class SkipassShareRecordService(ApplicationDBContext db)
         return new SkipassShareRecordItem(share.id, receiver, share.amount, "待分账", plan, null, null, null);
     }
 
-    async Task<string> EmptyReasonAsync(Models.Order order)
+    async Task<string> EmptyReasonAsync(Models.Order order, bool cancelled)
     {
         List<OrderShare> orderShares = await SystemShares(order.id).ToListAsync();
         if (orderShares.Any(s => s.skipass_id == null)) return "旧订单的分账没有记到具体的票上";
+        if (cancelled) return "这张票已取消，没有分账";
         if (orderShares.Count > 0) return "这张票没有分账";
         if (order.staff_id == null) return "这单没有记录推荐员工，不产生分账";
         Staff? staff = await db.staff.AsNoTracking().FirstOrDefaultAsync(s => s.id == order.staff_id);

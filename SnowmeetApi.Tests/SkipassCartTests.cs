@@ -951,6 +951,189 @@ namespace SnowmeetApi.Tests
             Assert.Empty(await check.order.ToListAsync());
         }
 
+        // ---------------- 票取消 → 这张票那 1 元分账也取消（2026-11-18 用户：票取消了，分账也应该是取消状态） ----------------
+
+        // 给订单 900 的某张票挂一笔系统分账（1 元，没有 share_method）；submitted 为真表示已经提交给微信
+        static async Task SeedTicketShare(Fixture f, int shareId, int ticketId, bool submitted = false, bool succeeded = false)
+        {
+            await using var db = f.NewContext();
+            db.orderShare.Add(new OrderShare { id = shareId, order_id = 900, relation_id = 202, amount = 1, valid = true, skipass_id = ticketId, create_date = DateTime.Now });
+            db.paymentShare.Add(new PaymentShare { id = shareId + 10, payment_id = 800, share_id = shareId, out_trade_no = "x_FZ_" + shareId, amount = 1, valid = true,
+                submit_time = submitted || succeeded ? DateTime.Now : null, response_time = succeeded ? DateTime.Now : null, success = succeeded ? true : null });
+            await db.SaveChangesAsync();
+        }
+
+        [Fact]
+        public async Task 确认取消一张票_这张票没提交的1元分账作废_别的票和介绍人分账不动()
+        {
+            await using var f = await Fixture.Create();
+            await SeedPaidCartOrder(f, payMethod: "线下");
+            await SeedTicketShare(f, 701, 501); await SeedTicketShare(f, 702, 502); await SeedTicketShare(f, 703, 503);
+            await using (var seed = f.NewContext())
+            {
+                seed.orderShare.Add(new OrderShare { id = 790, order_id = 900, relation_id = 202, amount = 20, valid = true, share_method = "auto", create_date = DateTime.Now });
+                seed.paymentShare.Add(new PaymentShare { id = 800, payment_id = 800, share_id = 790, out_trade_no = "x_FZ_790", amount = 20, valid = true });
+                await seed.SaveChangesAsync();
+            }
+            await using var db = f.NewContext();
+            var pass = await db.skiPass.AsNoTracking().FirstAsync(s => s.id == 502);
+            pass.is_cancel = 1;
+            await f.Controller(db).AutoRefundCancelled(pass, "退票确认退款", null);
+
+            await using var check = f.NewContext();
+            Assert.False((await check.orderShare.SingleAsync(s => s.id == 702)).valid);
+            var voided = await check.paymentShare.SingleAsync(p => p.share_id == 702);
+            Assert.False(voided.valid);
+            Assert.Contains("票已取消", voided.memo);
+            Assert.Null(voided.submit_time);
+            foreach (int keep in new[] { 701, 703, 790 })
+            {
+                Assert.True((await check.orderShare.SingleAsync(s => s.id == keep)).valid);
+                Assert.True((await check.paymentShare.SingleAsync(p => p.share_id == keep)).valid);
+            }
+        }
+
+        [Fact]
+        public async Task 出票失败的票_这张票的1元分账同样作废()
+        {
+            await using var f = await Fixture.Create();
+            await SeedPaidCartOrder(f, payMethod: "线下");
+            await SeedTicketShare(f, 701, 501); await SeedTicketShare(f, 703, 503);
+            await using var db = f.NewContext();
+            var failed = await db.skiPass.AsNoTracking().FirstAsync(s => s.id == 503);
+            failed.is_cancel = -2;
+            await f.Controller(db).AutoRefundFailedBooking(failed, "出票失败退款");
+
+            await using var check = f.NewContext();
+            Assert.False((await check.orderShare.SingleAsync(s => s.id == 703)).valid);
+            Assert.False((await check.paymentShare.SingleAsync(p => p.share_id == 703)).valid);
+            Assert.True((await check.orderShare.SingleAsync(s => s.id == 701)).valid);
+        }
+
+        [Fact]
+        public async Task 已经提交给微信的分账不作废_处理中或已成功的不能当没发生过()
+        {
+            await using var f = await Fixture.Create();
+            await SeedPaidCartOrder(f, payMethod: "线下");
+            await SeedTicketShare(f, 701, 501, submitted: true);     // 处理中
+            await SeedTicketShare(f, 702, 502, succeeded: true);     // 已分账
+            await using var db = f.NewContext();
+            foreach (int id in new[] { 501, 502 })
+            {
+                var pass = await db.skiPass.AsNoTracking().FirstAsync(s => s.id == id);
+                pass.is_cancel = 1;
+                await f.Controller(db).AutoRefundCancelled(pass, "退票确认退款", null);
+            }
+            await using var check = f.NewContext();
+            Assert.True((await check.orderShare.SingleAsync(s => s.id == 701)).valid);
+            Assert.True((await check.orderShare.SingleAsync(s => s.id == 702)).valid);
+            Assert.True((await check.paymentShare.SingleAsync(p => p.share_id == 702)).valid);
+        }
+
+        [Theory]
+        [InlineData(0)]    // 正常
+        [InlineData(2)]    // 取消申请待供应商审核
+        [InlineData(3)]    // 取消申请已提交
+        [InlineData(-1)]   // 取消出错
+        public async Task 还没确认取消的票_分账不动(int isCancel)
+        {
+            await using var f = await Fixture.Create();
+            await SeedPaidCartOrder(f, payMethod: "线下");
+            await SeedTicketShare(f, 702, 502);
+            await using var db = f.NewContext();
+            var pass = await db.skiPass.AsNoTracking().FirstAsync(s => s.id == 502);
+            pass.is_cancel = isCancel;
+            await f.Controller(db).AutoRefundCancelled(pass, "退票确认退款", null);
+            await using var check = f.NewContext();
+            Assert.True((await check.orderShare.SingleAsync(s => s.id == 702)).valid);
+            Assert.True((await check.paymentShare.SingleAsync(p => p.share_id == 702)).valid);
+        }
+
+        [Fact]
+        public async Task 重复处理同一张取消的票_不出错_分账还是作废的()
+        {
+            await using var f = await Fixture.Create();
+            await SeedPaidCartOrder(f, payMethod: "线下");
+            await SeedTicketShare(f, 702, 502);
+            await using var db = f.NewContext();
+            var pass = await db.skiPass.AsNoTracking().FirstAsync(s => s.id == 502);
+            pass.is_cancel = 1;
+            var ctl = f.Controller(db);
+            await ctl.AutoRefundCancelled(pass, "退票确认退款", null);
+            await ctl.AutoRefundCancelled(pass, "退票确认退款", null);
+            await using var check = f.NewContext();
+            Assert.False((await check.orderShare.SingleAsync(s => s.id == 702)).valid);
+            Assert.Single(await check.paymentShare.Where(p => p.share_id == 702).ToListAsync());
+        }
+
+        [Fact]
+        public async Task 分账记录卡片_票已取消显示已取消_不再写取票后自动分账()
+        {
+            await using var f = await Fixture.Create();
+            var order = await 下单并付款_员工29有分账关系(f, 2);
+            var tickets = await 票号(f, order.id);
+            await using var db = f.NewContext();
+            // 票已确认取消，但分账还没来得及作废（比如存量数据）：卡片也要显示已取消
+            await db.skiPass.Where(s => s.id == tickets[0]).ExecuteUpdateAsync(x => x.SetProperty(s => s.is_cancel, 1));
+            var ctl = new SkipassShareRecordController(db);
+            var cancelled = 取记录(await ctl.GetBySkipass("staff-session", tickets[0]));
+            Assert.False(cancelled.pickedUp);
+            Assert.True(cancelled.cancelled);                 // 小程序据此不再写「取票后自动分给推荐员工」
+            Assert.Equal("已取消", cancelled.record!.state);
+            Assert.Equal("张小飞", cancelled.record.receiver);
+            Assert.Contains("不再分账", cancelled.record.plan);
+            Assert.DoesNotContain("取票后自动分账", cancelled.record.plan);
+            var other = 取记录(await ctl.GetBySkipass("staff-session", tickets[1]));
+            Assert.False(other.cancelled);
+            Assert.Equal("待分账", other.record!.state);     // 同订单另一张没取消的票不受影响
+        }
+
+        [Fact]
+        public async Task 分账记录卡片_分账作废之后仍显示已取消_不是没有分账()
+        {
+            await using var f = await Fixture.Create();
+            var order = await 下单并付款_员工29有分账关系(f, 1);
+            var tickets = await 票号(f, order.id);
+            await using var db = f.NewContext();
+            await db.skiPass.Where(s => s.id == tickets[0]).ExecuteUpdateAsync(x => x.SetProperty(s => s.is_cancel, 1));
+            var voided = await new SkipassShareCancelService(db).CancelPendingAsync(tickets[0]);
+            Assert.Single(voided);
+            Assert.Empty(await new SkipassShareCancelService(db).CancelPendingAsync(tickets[0]));   // 再来一次没有可作废的
+
+            var result = 取记录(await new SkipassShareRecordController(db).GetBySkipass("staff-session", tickets[0]));
+            Assert.Null(result.emptyReason);
+            Assert.Equal("已取消", result.record!.state);
+            Assert.Equal("张小飞", result.record.receiver);
+        }
+
+        [Fact]
+        public async Task 分账记录卡片_票取消了但分账已经成功_按已分账显示()
+        {
+            await using var f = await Fixture.Create();
+            var order = await 下单并付款_员工29有分账关系(f, 1);
+            var tickets = await 票号(f, order.id);
+            await using var db = f.NewContext();
+            await db.paymentShare.Where(p => p.orderShare.order_id == order.id).ExecuteUpdateAsync(x => x.SetProperty(p => p.success, (bool?)true)
+                .SetProperty(p => p.submit_time, (DateTime?)DateTime.Now).SetProperty(p => p.response_time, (DateTime?)DateTime.Now));
+            await db.skiPass.Where(s => s.id == tickets[0]).ExecuteUpdateAsync(x => x.SetProperty(s => s.is_cancel, 1));
+            Assert.Equal("已分账", 取记录(await new SkipassShareRecordController(db).GetBySkipass("staff-session", tickets[0])).record!.state);
+        }
+
+        [Fact]
+        public async Task 分账记录卡片_取消的票没有任何分账_说明是因为票已取消()
+        {
+            await using var f = await Fixture.Create();
+            var order = await 下单并付款_员工29有分账关系(f, 1);
+            var tickets = await 票号(f, order.id);
+            await using var db = f.NewContext();
+            await db.orderShare.Where(s => s.skipass_id == tickets[0]).ExecuteDeleteAsync();   // 没有分账记录的取消票
+            await db.skiPass.Where(s => s.id == tickets[0]).ExecuteUpdateAsync(x => x.SetProperty(s => s.is_cancel, 1));
+            var result = 取记录(await new SkipassShareRecordController(db).GetBySkipass("staff-session", tickets[0]));
+            Assert.Null(result.record);
+            Assert.True(result.cancelled);
+            Assert.Contains("已取消", result.emptyReason);
+        }
+
         // ---------------- 退款：按票退、写到对应的票 ----------------
 
         [Fact]
