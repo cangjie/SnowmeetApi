@@ -155,6 +155,11 @@ public class CoachCouponBatchTests
         // 单项、双项（含各自的加急商品）都挂了价格规则
         Assert.Equal(4, await f.NewContext().productTicketTemplate.AsNoTracking().CountAsync(r => r.ticket_template_id == tpl.id));
 
+        // 批次列表里写明这张券的优惠项目：每个服务的方式和价格（只列单项 / 双项基础商品的规则，加急商品的换算规则不列）
+        var listed = J((await Dist(f).GetMyCouponMaker("session-6")).data).GetProperty("batches").EnumerateArray().Single(x => x.GetProperty("id").GetInt32() == batch.id);
+        var items = listed.GetProperty("items").EnumerateArray().Select(i => (i.GetProperty("shop").GetString(), i.GetProperty("tier").GetString(), i.GetProperty("mode").GetString(), i.GetProperty("value").GetDouble())).ToList();
+        Assert.Equal(new[] { (Wl, "单项", "fixed", 68.0), (Wl, "双项", "rate", 0.8) }, items);
+
         var code = (await Claim(f, batch, CoachFixture.StudentA)).code!;
         var ticket = await f.NewContext().ticket.AsNoTracking().SingleAsync(t => t.code == code);
         Assert.Equal(("万龙双服务券", tpl.memo), (ticket.name, ticket.memo));
@@ -163,6 +168,19 @@ public class CoachCouponBatchTests
         Assert.Equal(134.4, Math.Round((await Price(f, code, urgent: false, two: true)) is var b ? b.charge - b.discount : 0, 2));
         Assert.Equal(128, Math.Round((await Price(f, code, urgent: true, two: false)) is var c ? c.charge - c.discount : 0, 2));
         Assert.Equal(182.4, Math.Round((await Price(f, code, urgent: true, two: true)) is var d ? d.charge - d.discount : 0, 2));
+    }
+
+    [Theory]
+    [InlineData("fixed", 68.0)]
+    [InlineData("rate", 0.8)]
+    [InlineData("off", 20.0)]
+    public async Task The_batch_list_shows_the_discount_item_for_each_mode(string mode, double value)
+    {
+        await using var f = await NewFixture();
+        var batch = await Batch(f, 3, "m", mode, value);
+        var listed = J((await Dist(f).GetMyCouponMaker("session-6")).data).GetProperty("batches").EnumerateArray().Single(x => x.GetProperty("id").GetInt32() == batch.id);
+        var item = listed.GetProperty("items").EnumerateArray().Single();
+        Assert.Equal((Wl, "单项", mode, value), (item.GetProperty("shop").GetString(), item.GetProperty("tier").GetString(), item.GetProperty("mode").GetString(), item.GetProperty("value").GetDouble()));
     }
 
     [Fact]

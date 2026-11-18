@@ -116,6 +116,12 @@ public sealed class CoachCouponBatchService(ApplicationDBContext db, IConfigurat
         var people = await new CoachQueryService(db).LoadPeopleAsync(memberIds);
         var profiles = (await db.memberProfile.AsNoTracking().Where(p => memberIds.Contains(p.member_id)).Select(p => new { p.member_id, p.nick_name, p.avatar }).ToListAsync())
             .ToDictionary(p => p.member_id);
+        // 这批券的优惠项目（每个服务的方式和价格）：读模板上的价格规则，只看单项 / 双项基础商品的那条（加急商品的规则是按加急加价换算出来的，不用显示）
+        var ruleRows = await (from r in db.productTicketTemplate.AsNoTracking()
+                              join p in db.product.AsNoTracking() on r.product_id equals p.id
+                              join sh in db.shop.AsNoTracking() on p.shop_id equals sh.id
+                              where templateIds.Contains(r.ticket_template_id) && r.valid && (p.name.Trim() == CoachCardRules.TierOne || p.name.Trim() == CoachCardRules.TierTwo)
+                              select new { r.ticket_template_id, shop = sh.name.Trim(), tier = p.name.Trim(), r.fixed_price, r.discount_rate, r.discount_amount }).ToListAsync();
         string baseUrl = publicBaseUrl ?? new FileStorageOptions().PublicBaseUrl;
         return batches.Select(b =>
         {
@@ -137,6 +143,14 @@ public sealed class CoachCouponBatchService(ApplicationDBContext db, IConfigurat
                 id = b.id, templateId = b.template_id, name = t?.name ?? "", memo = t?.memo ?? "", total = b.total_count, claimed = b.claimed_count,
                 remaining = b.total_count - b.claimed_count, soldOut = b.claimed_count >= b.total_count, canDelete = b.claimed_count == 0 && mine.Count == 0,
                 sharePath = SharePath(b.token), createDate = b.create_date, claimers = mine,
+                items = ruleRows.Where(r => r.ticket_template_id == b.template_id)
+                    .OrderBy(r => Array.IndexOf(CoachCardRules.CareShops, r.shop) < 0 ? 99 : Array.IndexOf(CoachCardRules.CareShops, r.shop)).ThenBy(r => r.tier == CoachCardRules.TierOne ? 0 : 1)
+                    .Select(r => new
+                    {
+                        shop = r.shop, tier = r.tier,
+                        mode = r.fixed_price != null ? CoachCardRules.ModeFixed : r.discount_rate != null ? CoachCardRules.ModeRate : CoachFloorRules.ModeOff,
+                        value = r.fixed_price ?? r.discount_rate ?? r.discount_amount ?? 0,
+                    }).ToList(),
             };
         }).ToList();
     }
