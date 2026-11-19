@@ -5277,7 +5277,10 @@ namespace SnowmeetApi.Controllers
             if (request == null || item == null || item.valid != 1 || item.noNeed || string.IsNullOrWhiteSpace(item.pickup_shop) || item.status != "未发放")
                 return Ok(new ApiResult<Models.Rental?> { code = 1, message = "只能录入未发放的异店租赁物" });
             string? previousValue = item.noCode ? item.name : item.code;
-            if (item.noCode)
+            // 无码的异店租赁物原来只能录入名称；现在也可以按编码选择具体的租赁物（2026-11-19 用户要求），选了就改成带码的：
+            // 传了 productId 走带码的流程（无码的会被改成带码），没传 productId 的无码物品还是录入名称。
+            bool byProduct = request.productId != null && request.productId > 0;
+            if (item.noCode && !byProduct)
             {
                 if (string.IsNullOrWhiteSpace(request.name))
                     return Ok(new ApiResult<Models.Rental?> { code = 1, message = "请输入租赁物名称" });
@@ -5299,6 +5302,7 @@ namespace SnowmeetApi.Controllers
                 item.rent_product_id = product.id;
                 item.code = product.barcode;
                 item.name = product.name;
+                item.noCode = false;   // 无码的改成带码（本来就带码的不变）
             }
             item.update_date = DateTime.Now;
             item.logs = null;

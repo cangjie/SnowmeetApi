@@ -200,4 +200,64 @@ public class CrossShopRentalTests
         Assert.True(string.IsNullOrWhiteSpace(saved.name));
         Assert.False(saved.atOnce);   // 异店的装备不当场发放
     }
+
+    // 2026-11-19 用户：无码的异店租赁物录入装备时，也可以改成按编码选择具体的租赁物（选了就改成带码的）。
+    [Fact]
+    public async Task A_no_code_cross_shop_item_can_be_assigned_by_product_and_becomes_a_coded_item()
+    {
+        var (f, itemId) = await SeedItemAsync(noCode: true, "万龙体验中心", "异店租赁");
+        await using var _ = f;
+
+        var result = await new RentController(f.NewContext(), f.Config, Http())
+            .AssignCrossShopItem(itemId, new RentController.AssignCrossShopItemRequest { productId = 310 }, "session-1");
+
+        Assert.Equal(0, CodeOf(result));
+        var saved = await f.Db.rentItem.AsNoTracking().SingleAsync(i => i.id == itemId);
+        Assert.False(saved.noCode);
+        Assert.Equal("A310", saved.code);
+        Assert.Equal("雪鞋 A", saved.name);
+        Assert.Equal(310, saved.rent_product_id);
+        Assert.Equal("万龙体验中心", saved.pickup_shop);
+        // 已经是带码的了，可以按带码的流程发放（租赁物变成租赁中）
+        Assert.Equal(0, CodeOf(await new RentController(f.NewContext(), f.Config, Http()).SetRentItemStatus(itemId, "已发放", "session-1")));
+        Assert.Equal("租赁中", (await f.Db.rentProduct.AsNoTracking().SingleAsync(p => p.id == 310)).status);
+    }
+
+    [Fact]
+    public async Task A_no_code_item_assigned_with_an_unusable_product_stays_no_code()
+    {
+        var (f, itemId) = await SeedItemAsync(noCode: true, "万龙体验中心", "异店租赁");
+        await using var _ = f;
+        var db = f.NewContext();
+        db.rentProduct.AddRange(
+            new RentProduct { id = 311, category_id = 99, name = "雪板 B", barcode = "B311", valid = 1, status = "正常" },     // 分类不符
+            new RentProduct { id = 312, category_id = 31, name = "雪鞋 C", barcode = "C312", valid = 1, status = "租赁中" });  // 不可用
+        await db.SaveChangesAsync();
+
+        foreach (int productId in new[] { 311, 312, 999 })
+        {
+            Assert.Equal(1, CodeOf(await new RentController(f.NewContext(), f.Config, Http())
+                .AssignCrossShopItem(itemId, new RentController.AssignCrossShopItemRequest { productId = productId }, "session-1")));
+        }
+        var saved = await f.Db.rentItem.AsNoTracking().SingleAsync(i => i.id == itemId);
+        Assert.True(saved.noCode);
+        Assert.True(string.IsNullOrWhiteSpace(saved.code));
+        Assert.Null(saved.rent_product_id);
+    }
+
+    [Fact]
+    public async Task Assigning_nothing_is_rejected_for_both_kinds_of_cross_shop_items()
+    {
+        foreach (bool noCode in new[] { true, false })
+        {
+            var (f, itemId) = await SeedItemAsync(noCode, "万龙体验中心", "异店租赁");
+            await using var _ = f;
+
+            Assert.Equal(1, CodeOf(await new RentController(f.NewContext(), f.Config, Http())
+                .AssignCrossShopItem(itemId, new RentController.AssignCrossShopItemRequest(), "session-1")));
+            // 带码的租赁物只能按编码选，只给名称不行
+            Assert.Equal(1, CodeOf(await new RentController(f.NewContext(), f.Config, Http())
+                .AssignCrossShopItem(itemId, new RentController.AssignCrossShopItemRequest { name = noCode ? "" : "随便填" }, "session-1")));
+        }
+    }
 }
