@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Linq.Expressions;
 using SnowmeetApi.Models;
 
@@ -10,7 +12,8 @@ namespace SnowmeetApi.Helpers
         Unused,          // 未使用
         Used,            // 已使用
         SharedPending,   // 已分享，对方还没接受
-        SharedAccepted   // 已分享，对方已接受（券已经不在我名下了）
+        SharedAccepted,  // 已分享，对方已接受（券已经不在我名下了）
+        Accepted         // 已接受：我通过别人分享（真转赠）收到的券，不论是否已使用、过期
     }
 
     /// <summary>券卡片上那行时间的最终展示形态。</summary>
@@ -221,6 +224,23 @@ namespace SnowmeetApi.Helpers
         }
 
         /// <summary>
+        /// 「已接受」列表：哪些券是我通过别人分享收到的。只看真转赠日志（TransferLogFilter），
+        /// 每张券取最新的一条转赠记录，接受人是我才算——收到后又转给别人、最新接受人变成对方的就不算我的了；
+        /// 送出去又被送回来、最新接受人又是我的，算。myOpenId 为空返回空集合。
+        /// </summary>
+        public static HashSet<string> ReceivedCodes(IEnumerable<TicketLog> logs, string myOpenId)
+        {
+            string me = (myOpenId ?? "").Trim();
+            if (me == "") return new HashSet<string>();
+            Func<TicketLog, bool> isTransfer = TransferLogFilter().Compile();
+            return logs.Where(isTransfer)
+                .GroupBy(l => l.code)
+                .Where(g => g.OrderByDescending(x => x.transact_time).ThenByDescending(x => x.id).First().accepter_open_id == me)
+                .Select(g => g.Key)
+                .ToHashSet();
+        }
+
+        /// <summary>
         /// 券卡片上那行时间显示什么。
         ///
         /// ⚠️ 千万别用 ticket.accepted_time —— 名字像"接受时间"，实际只在建券时赋 DateTime.Now、
@@ -248,6 +268,10 @@ namespace SnowmeetApi.Helpers
                 case TicketListContext.SharedAccepted:
                     time = transferTime;
                     label = "对方领取时间";
+                    break;
+                case TicketListContext.Accepted:
+                    time = transferTime;
+                    label = "领取时间";
                     break;
                 default:
                     // 未使用：转赠得来的显示领取时间，自己获得的显示获得时间

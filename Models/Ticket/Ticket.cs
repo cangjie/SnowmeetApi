@@ -103,6 +103,9 @@ namespace SnowmeetApi.Models
         public string expireText { get; set; } = "";
         [NotMapped]
         public bool expireUrgent { get; set; } = false;
+        /// <summary>已经过期（到期日早于今天；当天到期的当天仍可用，长期有效永不过期）。「已接受」列表里要区分已过期的券，其它列表不用。</summary>
+        [NotMapped]
+        public bool expired { get; set; } = false;
 
         // 券种 banner：配色 class + 短标签，由券名关键词判定（TicketTransferRules.ResolveBanner）。
         // 放后端算是为了四个页面（顾客列表/后台列表/会员详情/券详情）口径一致。

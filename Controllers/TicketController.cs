@@ -135,6 +135,7 @@ namespace SnowmeetApi.Controllers
         {
             t.expireText = TicketTransferRules.FormatExpire(t.expire_date);
             t.expireUrgent = TicketTransferRules.IsExpiringSoon(t, now);
+            t.expired = !TicketTransferRules.IsNotExpired(t, now);
             TicketStateView bn = TicketTransferRules.ResolveBanner(t.name);
             t.bannerCls = bn.Cls;
             t.bannerLabel = bn.Label;
@@ -160,7 +161,7 @@ namespace SnowmeetApi.Controllers
             Dictionary<string, DateTime> transferTimes = new Dictionary<string, DateTime>();
             // 未使用列表要区分"转赠领来的"和"自己获得的"，已分享-已接受要拿最后一次转赠时间；
             // 已使用 / 已分享-未接受 用不到转赠记录，省掉这次查询。
-            if (context == TicketListContext.Unused || context == TicketListContext.SharedAccepted)
+            if (context == TicketListContext.Unused || context == TicketListContext.SharedAccepted || context == TicketListContext.Accepted)
             {
                 List<string> codes = tickets.Select(t => t.code).Distinct().ToList();
                 bool anySender = context == TicketListContext.SharedAccepted;
@@ -185,6 +186,47 @@ namespace SnowmeetApi.Controllers
 
                 FillIntrinsicFields(t, now);
             }
+        }
+
+        // "我的优惠券-已接受"列表（2026-11-19）：我通过别人分享（真转赠）收到的券，现在还在我名下的，不论已使用、已过期；
+        // 收到后又挂出去分享中的在"已分享"里，不重复列。口径：每张券最新一条转赠记录的接受人是我（TicketTransferRules.ReceivedCodes），
+        // 按领取时间（ticket_log.transact_time）倒序。新增接口，不改任何现有接口。
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<List<Ticket>>>> GetMyAcceptedTickets(string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            sessionKey = Util.UrlDecode(sessionKey);
+            MemberController _memberHelper = new MemberController(_context, _oriConfig);
+            Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
+            if (member == null)
+            {
+                return Ok(new ApiResult<List<Ticket>>() { code = 0, message = "用户未登录", data = null });
+            }
+            string myOpenId = (member.wechatMiniOpenId ?? "").Trim();
+            List<Ticket> tickets = new List<Ticket>();
+            if (!myOpenId.Equals(""))
+            {
+                List<string> candidateCodes = await _context.ticketLog
+                    .Where(TicketTransferRules.TransferLogFilter())
+                    .Where(l => l.accepter_open_id == myOpenId)
+                    .Select(l => l.code).Distinct().ToListAsync();
+                if (candidateCodes.Count > 0)
+                {
+                    List<TicketLog> allLogs = await _context.ticketLog
+                        .Where(TicketTransferRules.TransferLogFilter())
+                        .Where(l => candidateCodes.Contains(l.code))
+                        .AsNoTracking().ToListAsync();
+                    HashSet<string> mine = TicketTransferRules.ReceivedCodes(allLogs, myOpenId);
+                    if (mine.Count > 0)
+                    {
+                        tickets = await _context.ticket
+                            .Where(t => mine.Contains(t.code) && t.valid == 1 && t.shared != 1 && t.member_id == member.id)
+                            .AsNoTracking().ToListAsync();
+                    }
+                }
+            }
+            await FillCardFields(tickets, TicketListContext.Accepted, myOpenId);
+            tickets = tickets.OrderByDescending(t => t.displayTimeText, StringComparer.Ordinal).ThenBy(t => t.code, StringComparer.Ordinal).ToList();
+            return Ok(new ApiResult<List<Ticket>>() { code = 0, message = "", data = tickets });
         }
 
         // "我的优惠券-已分享"列表：包含两部分——① 我当前还持有、正在分享中等对方接受的券；
