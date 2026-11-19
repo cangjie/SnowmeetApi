@@ -10,8 +10,8 @@ namespace SnowmeetApi.Models
     [Table("care")]
     public class Care
     {
-        public enum SkiService { 修底刃, 补板底, 贴板面, 前固定器, 后固定器, 雪耙 };
-        public enum BoardService { 修底刃, 补板底, 贴板面, 固定器, 罗盘, 绑带, 扒扣, 螺丝 };
+        public enum SkiService { 修底刃, 补板底, 贴板面, 前固定器, 后固定器, 雪耙, 调鞋 };
+        public enum BoardService { 修底刃, 补板底, 贴板面, 固定器, 罗盘, 绑带, 扒扣, 螺丝, 调鞋 };
 
        
         [Key]

@@ -3352,6 +3352,12 @@ namespace SnowmeetApi.Controllers
                     data = null
                 });
             }
+            var availability = new SnowmeetApi.Services.Rent.RentProductAvailability(_db);
+            foreach (var item in order.rentals.SelectMany(r => r.rentItems ?? new List<Models.RentItem>()))
+            {
+                if (!item.noNeed && !item.noCode && await availability.IsBlockedAsync(item.rent_product_id, item.code?.Trim(), DateTime.Now))
+                    return Ok(new ApiResult<Models.Order> { code = 1, message = $"租赁物 {item.code ?? item.name} 当前不可用，请重新选择" });
+            }
             double paidAmount = 0;
             RentController _rentHelper = new RentController(_db, _config, _http);
             for (int i = 0; i < order.rentals.Count; i++)

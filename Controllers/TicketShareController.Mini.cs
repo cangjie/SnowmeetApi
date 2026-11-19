@@ -32,8 +32,10 @@ public partial class TicketShareController
             claimedCode = await _db.ticketShareClaim.AsNoTracking().Where(c => c.batch_id == batch.id && c.member_id == member.id
                 && (batch.share_type != MiniTicketRules.Group || (c.claim_date >= today && c.claim_date < tomorrow)))
                 .Select(c => c.ticket_code).FirstOrDefaultAsync();
+        var staffBatch = batch.share_type == MiniTicketRules.StaffBatch ? await _db.staffCouponBatch.AsNoTracking().FirstOrDefaultAsync(x => x.batch_id == batch.id) : null;
+        if (batch.share_type == MiniTicketRules.StaffBatch && staffBatch == null) return Ok(MiniError("分享链接已失效"));
         return Ok(new ApiResult<object> { code = 0, message = "", data = new {
-            batchId = batch.id, templateName = (tpl.name ?? "").Trim(), templateMemo = (tpl.memo ?? "").Trim(),
+            claimQuantity = staffBatch?.per_person_limit ?? 1, batchId = batch.id, templateName = (tpl.name ?? "").Trim(), templateMemo = (tpl.memo ?? "").Trim(),
             shareType = MiniTicketRules.DisplayType(batch.share_type), claimed = claimedCode != null,
             claimedCode = claimedCode ?? "", soldOut = !TicketShareRules.IsClaimable(batch) } });
     }

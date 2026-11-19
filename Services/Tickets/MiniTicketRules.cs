@@ -12,12 +12,12 @@ namespace SnowmeetApi.Services.Tickets;
 
 public static class MiniTicketRules
 {
-    public const string Personal = "mini_p", Group = "mini_g", QrCode = "mini_q";
+    public const string Personal = "mini_p", Group = "mini_g", QrCode = "mini_q", StaffBatch = "mini_b";
     public const string ShareMarker = "小程序直接领取分享";
     public const string ShareReplacedMarker = "小程序分享已被后续分享替代";
     public const string ClaimPage = "pages/mine/ticket/ticket_claim_mini/ticket_claim_mini";
-    public static bool IsMini(string type) => type == Personal || type == Group || type == QrCode;
-    public static string DisplayType(string type) => type switch { Personal => "personal", Group => "group", QrCode => "qrcode", _ => type };
+    public static bool IsMini(string type) => type == Personal || type == Group || type == QrCode || type == StaffBatch;
+    public static string DisplayType(string type) => type switch { Personal => "personal", Group => "group", QrCode => "qrcode", StaffBatch => "staff_batch", _ => type };
     // Both production columns are SQL datetime. Round once before assigning either value.
     public static DateTime ShareTime() => new SqlDateTime(DateTime.Now).Value;
     public static Task<bool> HasCurrentMarker(ApplicationDBContext db, Ticket ticket) =>

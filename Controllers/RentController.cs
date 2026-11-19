@@ -10,6 +10,7 @@ using Microsoft.Extensions.Configuration;
 using SnowmeetApi.Data;
 using SnowmeetApi.Helpers;
 using SnowmeetApi.Services.CoachPlatform;
+using SnowmeetApi.Services.Rent;
 using SnowmeetApi.Services;
 using SnowmeetApi.Models;
 using SnowmeetApi.Models.Rent;
@@ -1063,6 +1064,8 @@ namespace SnowmeetApi.Controllers
             {
                 return NotFound();
             }
+            // 返回的不可用状态是时间段的实时计算结果，不能覆盖库存基础状态。
+            rentProduct.status = ori.status;
             List<CoreDataModLog> logs = Util.GetUpdateDifferenceLog<RentProduct>(ori, rentProduct, null, staff.id, "修改租赁商品基础信息");
             for (int i = 0; i < logs.Count; i++)
             {
@@ -1089,6 +1092,7 @@ namespace SnowmeetApi.Controllers
                 return NotFound();
             }
             RentProduct product = productList[0];
+            await new RentProductAvailability(_db).ApplyAsync(new[] { product }, DateTime.Now);
             RentCategory category = (RentCategory)((OkObjectResult)((await GetCategoryById(product.category_id)).Result)).Value;
             for (int i = 0; i < category.infoFields.Count; i++)
             {
@@ -1124,6 +1128,68 @@ namespace SnowmeetApi.Controllers
                 data = product
             });
         }
+        public class RentProductUnavailabilityInput
+        {
+            public int? id { get; set; }
+            public DateTime? start_time { get; set; }
+            public DateTime? end_time { get; set; }
+        }
+
+        [HttpGet("{productId}")]
+        public async Task<ActionResult<ApiResult<List<RentProductUnavailability>>>> GetRentProductUnavailability(int productId)
+        {
+            var list = await _db.rentProductUnavailability.AsNoTracking()
+                .Where(x => x.rent_product_id == productId && x.valid == 1)
+                .OrderByDescending(x => x.id).ToListAsync();
+            return Ok(new ApiResult<List<RentProductUnavailability>> { code = 0, data = list });
+        }
+
+        [HttpPost("{productId}")]
+        public async Task<ActionResult<ApiResult<RentProductUnavailability>>> AddRentProductUnavailability(int productId,
+            [FromBody] RentProductUnavailabilityInput input, string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            var staff = await Util.GetStaffBySessionKey(_db, Util.UrlDecode(sessionKey), Util.UrlDecode(sessionType));
+            if (staff == null || staff.title_level < 200)
+                return Ok(new ApiResult<RentProductUnavailability> { code = 1, message = "没有权限" });
+            if (input == null || (input.start_time.HasValue && input.end_time.HasValue && input.start_time >= input.end_time))
+                return Ok(new ApiResult<RentProductUnavailability> { code = 1, message = "结束时间必须晚于开始时间" });
+            if (!await _db.rentProduct.AnyAsync(p => p.id == productId && p.valid == 1))
+                return Ok(new ApiResult<RentProductUnavailability> { code = 1, message = "租赁物不存在" });
+            RentProductUnavailability record;
+            if (input.id.HasValue)
+            {
+                record = await _db.rentProductUnavailability.FirstOrDefaultAsync(x => x.id == input.id && x.rent_product_id == productId && x.valid == 1);
+                if (record == null) return Ok(new ApiResult<RentProductUnavailability> { code = 1, message = "记录不存在" });
+                record.start_time = input.start_time;
+                record.end_time = input.end_time;
+                record.staff_id = staff.id;
+                _db.Entry(record).State = EntityState.Modified;
+            }
+            else
+            {
+                record = new RentProductUnavailability { rent_product_id = productId, start_time = input.start_time,
+                    end_time = input.end_time, staff_id = staff.id };
+                _db.rentProductUnavailability.Add(record);
+            }
+            await _db.SaveChangesAsync();
+            return Ok(new ApiResult<RentProductUnavailability> { code = 0, data = record });
+        }
+
+        [HttpPost("{id}")]
+        public async Task<ActionResult<ApiResult<object>>> DeleteRentProductUnavailability(int id,
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            var staff = await Util.GetStaffBySessionKey(_db, Util.UrlDecode(sessionKey), Util.UrlDecode(sessionType));
+            if (staff == null || staff.title_level < 200)
+                return Ok(new ApiResult<object> { code = 1, message = "没有权限" });
+            var record = await _db.rentProductUnavailability.FirstOrDefaultAsync(x => x.id == id && x.valid == 1);
+            if (record == null) return Ok(new ApiResult<object> { code = 1, message = "记录不存在" });
+            record.valid = 0;
+            _db.Entry(record).Property(x => x.valid).IsModified = true;
+            await _db.SaveChangesAsync();
+            return Ok(new ApiResult<object> { code = 0 });
+        }
+
         [HttpPost("{productId}")]
         public async Task<ActionResult<ApiResult<RentProduct?>>> UpdateRentProductDetailInfo(int productId,
             [FromQuery] string sessionKey, [FromQuery] string sessionType, List<RentProductDetailInfo> details)
@@ -3959,6 +4025,7 @@ namespace SnowmeetApi.Controllers
             RentProduct product = await _db.rentProduct
                 .Include(p => p.category).ThenInclude(c => c.priceList)
                 .Where(p => p.id == productId).AsNoTracking().FirstAsync();
+            await new RentProductAvailability(_db).ApplyAsync(new[] { product }, DateTime.Now);
             return product;
         }
         [HttpGet]
@@ -4055,6 +4122,7 @@ namespace SnowmeetApi.Controllers
             List<RentProduct> products = await _db.rentProduct
                 .Where(p => p.valid == 1 && (p.barcode.Contains(key) || p.name.ToLower().Contains(key.ToLower())))
                 .Include(p => p.category).AsNoTracking().ToListAsync();
+            await new RentProductAvailability(_db).ApplyAsync(products, DateTime.Now);
             if (categoryId != null)
             {
                 RentCategory category = await _db.rentCategory.Where(c => c.id == categoryId).AsNoTracking().FirstOrDefaultAsync();
@@ -4105,6 +4173,7 @@ namespace SnowmeetApi.Controllers
                 .Where(p => p.valid == 1 && (p.category.code.StartsWith(category.code) || p.category_id == categoryId))
                 //.Include(p => p.category)
                 .AsNoTracking().ToListAsync();
+            await new RentProductAvailability(_db).ApplyAsync(products, DateTime.Now);
             return Ok(new ApiResult<List<RentProduct>>()
             {
                 code = 0,
@@ -4940,6 +5009,14 @@ namespace SnowmeetApi.Controllers
                 item.valid = 1;
                 item.update_date = DateTime.Now;
                 _db.rentItem.Entry(item).State = EntityState.Modified;
+                // 支付完成后时间段可能刚生效：保留已支付订单，但不发放被锁定的物品。
+                if (item.atOnce && !item.noNeed && !item.noCode
+                    && await new RentProductAvailability(_db).IsBlockedAsync(item.rent_product_id, item.code?.Trim(), DateTime.Now))
+                {
+                    item.atOnce = false;
+                    await _db.coreDataModLog.AddAsync(CoreDataModLog.CreateManualLog("RentItem", "", item.id, "租赁开单",
+                        null, staffId, null, null, "租赁物当前不可用，未自动发放"));
+                }
                 if (item.atOnce)
                 {
                     RentItemLog log = new RentItemLog()
@@ -5294,6 +5371,8 @@ namespace SnowmeetApi.Controllers
                 if (product == null || string.IsNullOrWhiteSpace(product.barcode)
                     || (!string.IsNullOrWhiteSpace(product.status) && product.status.Trim() != "正常"))
                     return Ok(new ApiResult<Models.Rental?> { code = 1, message = "租赁物不存在、分类不符或不可用" });
+                if (await new RentProductAvailability(_db).IsBlockedAsync(product.id, null, DateTime.Now))
+                    return Ok(new ApiResult<Models.Rental?> { code = 1, message = "租赁物当前不可用，请重新录入" });
                 if (!await IsCompatibleRentCategory(item.category_id, product.category_id))
                     return Ok(new ApiResult<Models.Rental?> { code = 1, message = "租赁物不存在、分类不符或不可用" });
                 if (item.category_id != product.category_id)
@@ -5571,6 +5650,12 @@ namespace SnowmeetApi.Controllers
                     _db.rentItem.Entry(rentItem).State = EntityState.Modified;
                 }
             }
+            // 暂存后取回是同一笔已发放租赁的继续，不是重新出租。
+            bool resumingExistingRental = (rentItem.status == "暂存" || rentItem.status == "已暂存")
+                && rentItem.availableLog.Any(l => l.status == "已发放");
+            if (status == "已发放" && !rentItem.noCode && !resumingExistingRental
+                && await new RentProductAvailability(_db).IsBlockedAsync(rentItem.rent_product_id, rentItem.code?.Trim(), DateTime.Now))
+                return Ok(new ApiResult<Models.Rental?> { code = 1, message = "租赁物当前不可用，无法发放" });
             RentItemLog log = new RentItemLog()
             {
                 id = 0,

@@ -21,6 +21,8 @@ namespace SnowmeetApi.Data
         {
             FnbSchemaConfiguration.Configure(modelBuilder, Database.IsSqlServer());
             CoachSchemaConfiguration.Configure(modelBuilder);
+            modelBuilder.Entity<StaffCouponBatch>().HasIndex(x => new { x.staff_id, x.request_id }).IsUnique();
+            modelBuilder.Entity<StaffCouponBatchTicket>().HasIndex(x => x.batch_id);
             IntroducerSchemaConfiguration.Configure(modelBuilder);
             ShareBatchSchemaConfiguration.Configure(modelBuilder, Database.IsSqlite());
             // 会员列表「只看 VIP」走这个索引：WHERE is_vip = 1 ORDER BY id DESC（线上由 sql/2026-11-09_member_is_vip.sql 建）
@@ -181,6 +183,7 @@ namespace SnowmeetApi.Data
         public DbSet<RentPrice> rentPrice { get; set; }
         public DbSet<RentCategoryInfoField> rentCategoryInfoField { get; set; }
         public DbSet<RentProduct> rentProduct { get; set; }
+        public DbSet<RentProductUnavailability> rentProductUnavailability { get; set; }
         public DbSet<RentProductDetailInfo> rentProductDetailInfo { get; set; }
         public DbSet<Rental> rental { get; set; }
         public DbSet<Models.RentalDetail> rentalDetail { get; set; }
@@ -198,6 +201,8 @@ namespace SnowmeetApi.Data
         public DbSet<TicketTemplate> ticketTemplate { get; set; }
         public DbSet<TicketShareBatch> ticketShareBatch { get; set; }
         public DbSet<TicketShareClaim> ticketShareClaim { get; set; }
+        public DbSet<StaffCouponBatch> staffCouponBatch { get; set; }
+        public DbSet<StaffCouponBatchTicket> staffCouponBatchTicket { get; set; }
         public DbSet<Coach> coach { get; set; }
         public DbSet<CoachCarePrice> coachCarePrice { get; set; }
         public DbSet<CoachPriceFloor> coachPriceFloor { get; set; }

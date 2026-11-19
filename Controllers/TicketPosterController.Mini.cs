@@ -14,13 +14,21 @@ namespace SnowmeetApi.Controllers
 {
     public partial class TicketPosterController
     {
+        private async Task<bool> CanAccessMiniPoster(Staff? staff, int batchId)
+        {
+            if (staff == null || staff.valid != 1) return false;
+            if (staff.title_level >= 200) return true;
+            return staff.title_level >= 100 && await _db.ticketShareBatch.AsNoTracking()
+                .AnyAsync(b => b.id == batchId && b.share_type == MiniTicketRules.StaffBatch && b.valid == 1);
+        }
+
         [HttpGet]
         public async Task<IActionResult> GetMiniQrCode(int batchId, string sessionKey,
             [FromServices] IMiniTicketQrService qrService,
             string sessionType = "wechat_mini_openid", string envVersion = "release")
         {
             Staff staff = await Util.GetStaffBySessionKey(_db, Util.UrlDecode(sessionKey ?? ""), sessionType);
-            if (staff == null || staff.title_level < 200) return BadRequest(new { code = 1, message = "没有权限" });
+            if (!await CanAccessMiniPoster(staff, batchId)) return BadRequest(new { code = 1, message = "没有权限" });
             try { return File(await qrService.GetAsync(batchId, envVersion), "image/png"); }
             catch (Exception e) when (e is ArgumentException || e is InvalidOperationException || e is IOException || e is HttpRequestException)
             { return BadRequest(new { code = 1, message = e.Message }); }
@@ -33,7 +41,7 @@ namespace SnowmeetApi.Controllers
             string sessionType = "wechat_mini_openid", string envVersion = "release")
         {
             Staff staff = await Util.GetStaffBySessionKey(_db, Util.UrlDecode(sessionKey), sessionType);
-            if (staff == null || staff.title_level < 200)
+            if (!await CanAccessMiniPoster(staff, batchId))
             {
                 return BadRequest(new { code = 1, message = "没有权限" });
             }
