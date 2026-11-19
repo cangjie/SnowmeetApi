@@ -42,6 +42,8 @@ namespace SnowmeetApi
         {
 
             string conStr = Util.GetSqlServerConnectionString();
+            // 本地调试：SNOWMEET_DISABLE_BACKGROUND_JOBS=1 时不启动后台定时任务（本地连的是生产库，不能和服务器上那份同时跑）；服务器不设这个变量
+            bool backgroundJobsOff = SnowmeetApi.Helpers.BackgroundJobSwitch.Disabled();
 
 
             // 2026-07-21：mat_expire H5（企微内浏览器，托管于 mini.snowmeet.top）改为把图片上传到
@@ -92,16 +94,16 @@ namespace SnowmeetApi
             // 美团管家采集程序的心跳看护：登录失效、采集电脑停机时由服务器发企业微信提醒
             services.AddSingleton(sp => SnowmeetApi.Services.Fnb.MeituanCollectorMonitor.Create(
                 sp.GetRequiredService<IServiceScopeFactory>()));
-            services.AddHostedService<SnowmeetApi.Services.Fnb.MeituanCollectorWatchdog>();
+            if (!backgroundJobsOff) services.AddHostedService<SnowmeetApi.Services.Fnb.MeituanCollectorWatchdog>();
             // 数据库备份脚本（Tools/db_backup）出问题时，由服务器发企业微信提醒
             services.AddSingleton(sp => SnowmeetApi.Services.Ops.BackupAlertService.Create(
                 sp.GetRequiredService<IServiceScopeFactory>()));
             // 雪票取消后自动退款的轮询：自我游确认取消可能要几分钟，每分钟查一次（30 分钟后放缓），24 小时没确认标成取消失败
-            services.AddHostedService<SnowmeetApi.Services.SkipassJobs.SkipassCancelPoller>();
+            if (!backgroundJobsOff) services.AddHostedService<SnowmeetApi.Services.SkipassJobs.SkipassCancelPoller>();
             // 微信退款成功回调没有更新退款状态，每 5 分钟主动向微信查一次处理中的退款
-            services.AddHostedService<SnowmeetApi.Services.SkipassJobs.RefundStateSyncPoller>();
+            if (!backgroundJobsOff) services.AddHostedService<SnowmeetApi.Services.SkipassJobs.RefundStateSyncPoller>();
             // 日养护工作列表：每天晚上 22:00 把当天的统计存成快照（今天的数据直接现算；直接用库，不走 crontab 和公网域名）
-            services.AddHostedService<SnowmeetApi.Services.CareWorkloadSnapshotJob>();
+            if (!backgroundJobsOff) services.AddHostedService<SnowmeetApi.Services.CareWorkloadSnapshotJob>();
             services.AddScoped<SnowmeetApi.Services.Tickets.IMiniTicketTokenProvider, SnowmeetApi.Services.Tickets.MiniTicketTokenProvider>();
             services.AddHttpClient<SnowmeetApi.Services.Tickets.IMiniTicketQrService, SnowmeetApi.Services.Tickets.MiniTicketQrService>(client => client.Timeout = TimeSpan.FromSeconds(30));
             services.AddHttpClient<SnowmeetApi.Services.Tickets.MiniStaffBookingQrService>(client => client.Timeout = TimeSpan.FromSeconds(30));
