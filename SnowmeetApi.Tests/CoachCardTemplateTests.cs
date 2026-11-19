@@ -90,6 +90,36 @@ public class CoachCardTemplateTests
     }
 
     [Fact]
+    public async Task Claimed_card_uses_current_template_for_display_and_both_pricing_paths()
+    {
+        var (f, coach, intro) = await Setup(); await using (f)
+        {
+            f.Db.coachPriceFloor.Add(new CoachPriceFloor { coach_id = coach.id, biz_type = "养护", shop = "万龙服务中心", tier = "双项", min_fixed = 50 });
+            await f.Db.SaveChangesAsync();
+            var t = await new CoachCardTemplateService(f.NewContext(), f.Config).SaveAsync(coach, intro, null, "学员卡", new() { new("万龙服务中心", "单项", "fixed", 60) }, 0.8);
+            var issued = await f.Cards().CreateCardAsync(coach.id, DateTime.Now, t.id);
+            Assert.Equal(ShareCardState.ClaimedByMe, (await f.Cards().ClaimAsync(issued.token, CoachFixture.StudentA, DateTime.Now)).state);
+            await new CoachCardTemplateService(f.NewContext(), f.Config).SaveAsync(coach, intro, t.id, "学员卡", new() {
+                new("万龙服务中心", "单项", "fixed", 70), new("万龙服务中心", "双项", "fixed", 90) }, 0.7);
+            var raw = await f.NewContext().coachCard.AsNoTracking().SingleAsync(c => c.id == issued.id);
+            Assert.Equal(60, CoachCardRules.ParseCarePrices(raw.care_price_snapshot).Single().value); // 领取快照仍保留
+            var live = await f.Pricing().GetEffectiveCardAsync(issued.id, CoachFixture.StudentA, DateTime.Now);
+            Assert.Equal(0.7, live!.rental_rate_snapshot);
+            Assert.Equal(30, CoachPricingService.QuoteRentalDiscount(live, 100));
+            var care = await f.Pricing().ListUsableAsync(CoachFixture.StudentA, "养护", "万龙服务中心", new Care { equipment = "", need_edge = 1, need_wax = 1 }, 168, 168, 0, DateTime.Now);
+            Assert.Equal(78, care.Single().estimatedDiscount); // 新开放的双项已对旧卡生效
+            var rental = await f.Pricing().ListUsableAsync(CoachFixture.StudentA, "租赁", null, null, 0, 0, 100, DateTime.Now);
+            Assert.Equal(30, rental.Single().estimatedDiscount);
+            var view = await f.Cards().GetShareCardAsync(issued.token, CoachFixture.StudentA, DateTime.Now);
+            Assert.Equal(2, view.carePrices.Count); Assert.Equal(0.7, view.rentalRate);
+            var ctl = new CoachCardController(f.NewContext(), f.Config, ShareFixture.Http);
+            var json = System.Text.Json.JsonSerializer.SerializeToElement((await ctl.GetMyCards("session-3")).data);
+            Assert.Equal(2, json.GetProperty("cards")[0].GetProperty("carePrices").GetArrayLength());
+            Assert.Equal(0.7, json.GetProperty("cards")[0].GetProperty("rentalRate").GetDouble());
+        }
+    }
+
+    [Fact]
     public async Task Only_owner_can_issue_and_manage_templates()
     {
         var (f, coach, intro) = await Setup(); await using (f)

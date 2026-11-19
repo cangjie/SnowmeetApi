@@ -207,6 +207,46 @@ public class CoachPricingIntegrationTests
     }
 
     [Fact]
+    public async Task Rental_order_locks_current_template_rate_when_placed()
+    {
+        await using var f = await CoachFixture.Create();
+        CoachCard card = await f.IssueAndClaim(CoachFixture.StudentA);
+        var template = new CoachCardTemplate { coach_id = f.CoachId, name = "机构卡", token = "rent-template", valid = 1,
+            care_prices = card.care_price_snapshot!, rental_rate = 0.6 };
+        f.Db.coachCardTemplate.Add(template); await f.Db.SaveChangesAsync();
+        await f.Db.coachCard.Where(c => c.id == card.id).ExecuteUpdateAsync(s => s.SetProperty(c => c.template_id, (int?)template.id));
+        int rentalId = await NewRental(f, CoachFixture.StudentA, card.id);
+        int orderId = (await f.Db.rental.AsNoTracking().SingleAsync(r => r.id == rentalId)).order_id!.Value;
+        await f.Db.order.Where(o => o.id == orderId).ExecuteUpdateAsync(s => s.SetProperty(o => o.valid, 0));
+        await f.Db.rental.Where(r => r.id == rentalId).ExecuteUpdateAsync(s => s.SetProperty(r => r.valid, 0).SetProperty(r => r.noGuaranty, true));
+        var placed = await new OrderController(f.NewContext(), f.Config, new Http()).PlaceRentOrder(orderId, "session-1");
+        Assert.Equal(0, Assert.IsType<ApiResult<SnowmeetApi.Models.Order>>(Assert.IsType<OkObjectResult>(placed.Result).Value).code);
+        Assert.Equal(0.6, (await f.Db.coachCardRentalQuote.AsNoTracking().SingleAsync(q => q.rental_id == rentalId)).rental_rate);
+        await f.Db.coachCardTemplate.Where(t => t.id == template.id).ExecuteUpdateAsync(s => s.SetProperty(t => t.rental_rate, (double?)0.8));
+        var current = await f.Pricing().ListUsableAsync(CoachFixture.StudentA, "租赁", null, null, 0, 0, 180, DateTime.Now);
+        Assert.Equal(36, current.Single().estimatedDiscount); // 新订单为 8 折
+        await Rent(f).SetRentalDetail(rentalId, DateTime.Now.Date, 9);
+        Assert.Equal(72, (await f.Db.discount.AsNoTracking().SingleAsync(d => d.biz_id == rentalId)).amount); // 已开单仍为 6 折
+        var use = await f.Db.coachCardUse.AsNoTracking().SingleAsync();
+        Assert.Equal(0.6, use.mode_value);
+        Assert.Equal(0.9, (await f.Db.coachCard.AsNoTracking().SingleAsync(c => c.id == card.id)).rental_rate_snapshot);
+    }
+
+    [Fact]
+    public async Task Rental_order_created_before_upgrade_keeps_claim_snapshot()
+    {
+        await using var f = await CoachFixture.Create();
+        CoachCard card = await f.IssueAndClaim(CoachFixture.StudentA);
+        var template = new CoachCardTemplate { coach_id = f.CoachId, name = "旧卡", token = "old-rent", valid = 1,
+            care_prices = card.care_price_snapshot!, rental_rate = 0.6 };
+        f.Db.coachCardTemplate.Add(template); await f.Db.SaveChangesAsync();
+        await f.Db.coachCard.Where(c => c.id == card.id).ExecuteUpdateAsync(s => s.SetProperty(c => c.template_id, (int?)template.id));
+        int rentalId = await NewRental(f, CoachFixture.StudentA, card.id); // 模拟升级前已开单：没有报价行
+        await Rent(f).SetRentalDetail(rentalId, DateTime.Now.Date, 9);
+        Assert.Equal(18, (await f.Db.discount.AsNoTracking().SingleAsync(d => d.biz_id == rentalId)).amount);
+    }
+
+    [Fact]
     public async Task Rental_NotAppliedWhenManualPriceOtherMemberExpiredOrNoCard()
     {
         await using var f = await CoachFixture.Create();
@@ -301,6 +341,48 @@ public class CoachCareOrderFlowTests
         Assert.Equal(0, (await Place(f, o2)).code);
         var cl = await f.Db.care.AsNoTracking().SingleAsync(c => c.id == c2);
         Assert.Equal((188d, 60d), (cl.common_charge, cl.discount));   // 崇礼双项一口价 128
+    }
+
+    [Fact]
+    public async Task Existing_unpaid_order_keeps_its_quote_when_template_changes()
+    {
+        await using var f = await CoachFixture.Create();
+        CoachCard card = await f.IssueAndClaim(CoachFixture.StudentA);
+        var template = new CoachCardTemplate { coach_id = f.CoachId, name = "机构卡", token = "test-template", valid = 1,
+            care_prices = card.care_price_snapshot!, rental_rate = card.rental_rate_snapshot };
+        f.Db.coachCardTemplate.Add(template); await f.Db.SaveChangesAsync();
+        await f.Db.coachCard.Where(c => c.id == card.id).ExecuteUpdateAsync(s => s.SetProperty(c => c.template_id, (int?)template.id));
+        var (orderId, careId) = await Draft(f, CoachFixture.StudentA, card.id);
+        Assert.Equal(0, (await Place(f, orderId)).code);
+        var before = await f.Db.coachCardOrderQuote.AsNoTracking().SingleAsync(q => q.care_id == careId);
+        Assert.Equal((0.8, 33.6), (before.mode_value, before.discount_amount));
+        var changed = CoachCardRules.SerializeCarePrices(new[] { new CoachCarePrice { shop = "万龙服务中心", tier = "双项", mode = "rate", value = 0.5 } });
+        await f.Db.coachCardTemplate.Where(t => t.id == template.id).ExecuteUpdateAsync(s => s.SetProperty(t => t.care_prices, changed));
+        var fresh = await f.Pricing().ListUsableAsync(CoachFixture.StudentA, "养护", "万龙服务中心", new Care { equipment = "", need_edge = 1, need_wax = 1 }, 168, 168, 0, DateTime.Now);
+        Assert.Equal(84, fresh.Single().estimatedDiscount); // 新开单使用 5 折
+        await new CareController(f.NewContext(), f.Config, new Http()).EffectCareOrder(orderId);
+        var use = await f.Db.coachCardUse.AsNoTracking().SingleAsync();
+        Assert.Equal((0.8, 33.6), (use.mode_value, use.discount_amount));
+        Assert.Equal(33.6, (await f.Db.care.AsNoTracking().SingleAsync(c => c.id == careId)).discount);
+    }
+
+    [Fact]
+    public async Task Unpaid_order_created_before_upgrade_uses_its_original_snapshot()
+    {
+        await using var f = await CoachFixture.Create();
+        CoachCard card = await f.IssueAndClaim(CoachFixture.StudentA);
+        var template = new CoachCardTemplate { coach_id = f.CoachId, name = "旧卡", token = "legacy-order", valid = 1,
+            care_prices = card.care_price_snapshot!, rental_rate = card.rental_rate_snapshot };
+        f.Db.coachCardTemplate.Add(template); await f.Db.SaveChangesAsync();
+        await f.Db.coachCard.Where(c => c.id == card.id).ExecuteUpdateAsync(s => s.SetProperty(c => c.template_id, (int?)template.id));
+        var (orderId, careId) = await Draft(f, CoachFixture.StudentA, card.id);
+        Assert.Equal(0, (await Place(f, orderId)).code);
+        await f.Db.coachCardOrderQuote.Where(q => q.care_id == careId).ExecuteDeleteAsync(); // 模拟升级前已开单
+        var changed = CoachCardRules.SerializeCarePrices(new[] { new CoachCarePrice { shop = "万龙服务中心", tier = "双项", mode = "rate", value = 0.5 } });
+        await f.Db.coachCardTemplate.Where(t => t.id == template.id).ExecuteUpdateAsync(s => s.SetProperty(t => t.care_prices, changed));
+        await new CareController(f.NewContext(), f.Config, new Http()).EffectCareOrder(orderId);
+        var use = await f.Db.coachCardUse.AsNoTracking().SingleAsync();
+        Assert.Equal((0.8, 33.6), (use.mode_value, use.discount_amount));
     }
 
     [Fact]

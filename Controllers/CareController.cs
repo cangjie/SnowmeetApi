@@ -485,7 +485,7 @@ namespace SnowmeetApi.Controllers
         // 与券、会员卡互斥（同一件装备只能选一个）；不做自动比价，选哪个用哪个。
         // 学员卡只作用于养护服务费里单项/双项的基础价：维修费不打折，加急加价不打折；
         // 质保/招待/非雪季养护/没有计费项的单不享受（卡不报错，只是没有优惠）。
-        // 价格按卡内领取时的快照取（门店 × 单项/双项那一格），折扣率或一口价。
+        // 有卡种的会员卡按当前卡种权益计价；历史无卡种的卡仍使用领取快照。
         [NonAction]
         public async Task<(double commonCharge, double ticketDiscount, CoachCareQuote? coach)> CalcChargeWithCoach(
             string shop, Care care, Ticket? ticket, PunchCard? card, int? memberId)
@@ -1256,7 +1256,14 @@ namespace SnowmeetApi.Controllers
                     CoachCard? coachCard = await _db.coachCard.AsNoTracking().FirstOrDefaultAsync(c => c.id == care.coach_card_id && c.member_id != null);
                     if (coachCard != null)
                     {
-                        CoachCareQuote? coachQuote = await BuildCoachQuoteAsync(order.shop, care, coachCard, care.common_charge);
+                        // 开单时保存过报价就使用该笔订单当时的权益；部署前的老订单回退到领取快照。
+                        var savedQuote = await _db.coachCardOrderQuote.AsNoTracking()
+                            .FirstOrDefaultAsync(q => q.care_id == care.id && q.card_id == coachCard.id);
+                        CoachCareQuote? coachQuote = savedQuote != null
+                            ? new CoachCareQuote { cardId = coachCard.id, coachId = coachCard.coach_id,
+                                mode = savedQuote.mode, value = savedQuote.mode_value,
+                                baseAmount = savedQuote.base_amount, discount = savedQuote.discount_amount }
+                            : await BuildCoachQuoteAsync(order.shop, care, coachCard, care.common_charge);
                         if (coachQuote != null && coachQuote.discount > 0)
                         {
                             CoachCardUse? coachUse = await new CoachPricingService(_db).NewUseAsync(coachCard, order.id, "养护", care.id, 0,

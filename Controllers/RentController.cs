@@ -4780,6 +4780,10 @@ namespace SnowmeetApi.Controllers
             {
                 return (null, 0);
             }
+            // 新订单使用开单时记录的折扣；上线前订单没有报价记录，继续按领取快照计价。
+            var quote = await _db.coachCardRentalQuote.AsNoTracking()
+                .FirstOrDefaultAsync(q => q.rental_id == rental.id && q.card_id == card!.id);
+            if (quote != null) card!.rental_rate_snapshot = quote.rental_rate;
             double coachDiscount = CoachPricingService.QuoteRentalDiscount(card!, amount);
             return coachDiscount > 0 ? (card, coachDiscount) : (null, 0);
         }

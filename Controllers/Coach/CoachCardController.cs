@@ -88,6 +88,7 @@ public sealed class CoachCardController(ApplicationDBContext db, IConfiguration 
             DateTime now = DateTime.Now;
             List<CoachCard> cards = await Db.coachCard.AsNoTracking().Where(c => c.member_id == member.id && c.status == CoachCard.StatusClaimed)
                 .OrderByDescending(c => c.claimed_at).ToListAsync();
+            await new CoachCardBenefits(Db).ApplyCurrentAsync(cards);
             List<int> coachIds = cards.Select(c => c.coach_id).Distinct().ToList();
             Dictionary<int, string> names = await Db.coach.AsNoTracking().Where(c => coachIds.Contains(c.id)).ToDictionaryAsync(c => c.id, c => c.display_name);
             return new

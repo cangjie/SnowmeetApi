@@ -42,7 +42,7 @@ public sealed class CoachCareQuote
 
 /// <summary>
 /// 学员卡的计价与使用记录。定价口径见 CoachCardRules；这里只负责：
-/// 校验卡能不能用、按卡内快照报价、写使用记录（每笔只记一次）、取消时反向。
+/// 校验卡能不能用、按当前卡种权益报价、写使用记录（每笔只记一次）、取消时反向。
 /// </summary>
 public sealed class CoachPricingService(ApplicationDBContext db)
 {
@@ -50,7 +50,9 @@ public sealed class CoachPricingService(ApplicationDBContext db)
     public async Task<CoachCard?> GetEffectiveCardAsync(int cardId, int memberId, DateTime now)
     {
         CoachCard? card = await db.coachCard.AsNoTracking().FirstOrDefaultAsync(c => c.id == cardId);
-        return CoachCardRules.IsEffective(card, memberId, now) ? card : null;
+        if (!CoachCardRules.IsEffective(card, memberId, now)) return null;
+        await new CoachCardBenefits(db).ApplyCurrentAsync(card!);
+        return card;
     }
 
     /// <summary>
@@ -73,7 +75,7 @@ public sealed class CoachPricingService(ApplicationDBContext db)
         return quote;
     }
 
-    /// <summary>租赁优惠：按卡内快照的折扣率。</summary>
+    /// <summary>租赁优惠：传入已加载当前权益的卡，按其折扣率计算。</summary>
     public static double QuoteRentalDiscount(CoachCard card, double amount) => CoachCardRules.RentalDiscount(card.rental_rate_snapshot, amount);
 
     /// <summary>
@@ -86,6 +88,7 @@ public sealed class CoachPricingService(ApplicationDBContext db)
         List<CoachCard> cards = await db.coachCard.AsNoTracking()
             .Where(c => c.member_id == memberId && c.status == CoachCard.StatusClaimed && c.end_date >= now && c.start_date <= now)
             .OrderBy(c => c.end_date).ThenBy(c => c.id).ToListAsync();
+        await new CoachCardBenefits(db).ApplyCurrentAsync(cards);
         List<int> coachIds = cards.Select(c => c.coach_id).Distinct().ToList();
         Dictionary<int, string> names = await db.coach.AsNoTracking().Where(c => coachIds.Contains(c.id))
             .ToDictionaryAsync(c => c.id, c => c.display_name);

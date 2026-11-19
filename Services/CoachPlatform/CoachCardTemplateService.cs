@@ -11,7 +11,7 @@ using SnowmeetApi.Services.Tickets;
 
 namespace SnowmeetApi.Services.CoachPlatform;
 
-// 每个机构可维护多种卡。每次发卡创建独立分享卡，领取时锁定价格。
+// 每个机构可维护多种卡。每次发卡创建独立分享卡，已领卡的权益跟随卡种更新。
 public sealed class CoachCardTemplateService(ApplicationDBContext db, IConfiguration config)
 {
     private async Task CheckOwner(Coach coach, Introducer intro)
@@ -63,7 +63,7 @@ public sealed class CoachCardTemplateService(ApplicationDBContext db, IConfigura
 
     /// <summary>
     /// 删除卡种（2026-11-18 用户：会员卡如果无人领取过，应该可以删除）。只有从来没人领取过的卡种能删；
-    /// 领取过的（含领取后被撤销的）不能删，已发出的卡要保留它领取时的名称和价格。
+    /// 领取过的（含领取后被撤销的）不能删，已发出的卡需要继续关联该卡种。
     /// 删除 = 卡种 valid=0（软删除，留审计），同时把它还没人领取的分享一并撤销（这些记录对机构来说就是删了：二维码、小程序卡片立即失效）。
     /// </summary>
     public async Task<object> DeleteAsync(Coach coach, Introducer intro, int id)
@@ -137,7 +137,7 @@ public sealed class CoachCardTemplateService(ApplicationDBContext db, IConfigura
 
     private static List<CarePriceInput> Prices(CoachCardTemplate t) => CoachCardRules.ParseCarePrices(t.care_prices).Select(p => new CarePriceInput(p.shop, p.tier, p.mode, p.value)).ToList();
 
-    // 生成和领取均检查底价；待领取卡始终使用当前卡种权益，已领取卡使用快照。
+    // 生成和领取均检查底价；已领取卡计价使用当前卡种权益。
     public async Task<CoachCardTemplate> GetAvailableAsync(int id, int coachId)
     {
         var t = await db.coachCardTemplate.AsNoTracking().FirstOrDefaultAsync(x => x.id == id && x.coach_id == coachId && x.valid == 1)

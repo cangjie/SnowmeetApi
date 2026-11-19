@@ -3358,6 +3358,17 @@ namespace SnowmeetApi.Controllers
                 if (!item.noNeed && !item.noCode && await availability.IsBlockedAsync(item.rent_product_id, item.code?.Trim(), DateTime.Now))
                     return Ok(new ApiResult<Models.Order> { code = 1, message = $"租赁物 {item.code ?? item.name} 当前不可用，请重新选择" });
             }
+            // 租赁按日计费；在开单时固定本单选用卡的折扣，防止后续卡种改价改变已开订单。
+            var coachCardIds = order.rentals.Where(r => r.coach_card_id != null).Select(r => r.coach_card_id!.Value).Distinct().ToList();
+            var selectedCards = await _db.coachCard.AsNoTracking().Where(c => coachCardIds.Contains(c.id)).ToListAsync();
+            await new SnowmeetApi.Services.CoachPlatform.CoachCardBenefits(_db).ApplyCurrentAsync(selectedCards);
+            foreach (var rental in order.rentals.Where(r => r.coach_card_id != null))
+            {
+                var selected = selectedCards.FirstOrDefault(c => c.id == rental.coach_card_id);
+                if (order.member_id != null && CoachCardRules.IsEffectiveOnDate(selected, order.member_id.Value, rental.start_date ?? DateTime.Now))
+                    _db.coachCardRentalQuote.Add(new CoachCardRentalQuote { rental_id = rental.id, card_id = selected!.id,
+                        rental_rate = selected.rental_rate_snapshot > 0 && selected.rental_rate_snapshot <= 1 ? selected.rental_rate_snapshot : null, create_date = DateTime.Now });
+            }
             double paidAmount = 0;
             RentController _rentHelper = new RentController(_db, _config, _http);
             for (int i = 0; i < order.rentals.Count; i++)
@@ -3491,6 +3502,7 @@ namespace SnowmeetApi.Controllers
                 return Ok(new ApiResult<Models.Order> { code = 1, message = e.Message, data = null });
             }
             double total = 0;
+            var coachQuotes = new List<CoachCardOrderQuote>();
             // 本单已用掉的季卡：季卡每天限一次，同一张卡在本单多件装备上重复选也要拦
             // （下单这一刻它们都还没落 punch_card_used，只查库看不出来）
             List<int> seasonCardUsedInThisOrder = new List<int>();
@@ -3577,6 +3589,10 @@ namespace SnowmeetApi.Controllers
                     // 学员卡优惠同样取「保底」（与 CalcCareCharge 同口径）：店员手动加大的减免保留，低于卡面才补齐
                     care.discount = coachQuote.discount;
                 }
+                if (coachQuote != null && care.coach_card_id != null)
+                    coachQuotes.Add(new CoachCardOrderQuote { care_id = care.id, card_id = care.coach_card_id.Value,
+                        mode = coachQuote.mode, mode_value = coachQuote.value, base_amount = coachQuote.baseAmount,
+                        discount_amount = Math.Max(0, Math.Min(coachQuote.discount, care.discount)), create_date = DateTime.Now });
                 care.member_pick_date = care.urgent == 1 ? DateTime.Now.Date : DateTime.Now.Date.AddDays(1);
                 care.valid = 1;
                 care.update_date = DateTime.Now;
@@ -3605,6 +3621,7 @@ namespace SnowmeetApi.Controllers
             // EffectCareOrder 用 order.code.Split('_') 生成 task_flow_code，必须先生成订单号
             await GenerateOrderCode(order);
             _db.order.Entry(order).State = EntityState.Modified;
+            _db.coachCardOrderQuote.AddRange(coachQuotes);
             await _db.SaveChangesAsync();
             _db.order.Entry(order).State = EntityState.Detached;
             for (int i = 0; i < order.cares.Count; i++)

@@ -137,11 +137,12 @@ public sealed class CoachCardService(ApplicationDBContext db, IConfiguration? co
 
     private static ShareCardView Invalid(string message) => new() { state = ShareCardState.Invalid, message = message };
 
-    // 待领取的卡显示教练当前的价格（领取时会锁定这个价格）；已领取的显示快照
+    // 已领卡随卡种更新权益；无卡种的历史卡继续使用领取快照。
     private async Task FillBenefitAsync(ShareCardView view, CoachCard card, Coach coach, DateTime now)
     {
         if (card.status == CoachCard.StatusClaimed)
         {
+            await new CoachCardBenefits(db).ApplyCurrentAsync(card);
             view.cardName = card.card_name_snapshot;
             view.carePrices = CoachCardRules.ParseCarePrices(card.care_price_snapshot);
             view.rentalRate = card.rental_rate_snapshot;
@@ -173,7 +174,7 @@ public sealed class CoachCardService(ApplicationDBContext db, IConfiguration? co
     /// <summary>
     /// 学员领卡。主保证是原子 CAS：UPDATE … WHERE status='issued' 影响 1 行才算领到；
     /// 同一学员同一教练同一雪季的过滤唯一索引兜底；整个过程在 Serializable 事务 + 全局发放锁里。
-    /// 领取时把教练当时的价格写进卡的快照，之后教练改价不影响这张卡。
+    /// 领取时保留一份权益快照供历史追溯；有卡种的卡使用时读取卡种当前权益。
     /// </summary>
     public Task<ClaimResult> ClaimAsync(string? token, int memberId, DateTime now)
     {

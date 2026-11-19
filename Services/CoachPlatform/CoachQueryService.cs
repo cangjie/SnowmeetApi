@@ -90,6 +90,7 @@ public sealed class CoachQueryService(ApplicationDBContext db, string? publicBas
         if (hideDeletedShares) q = q.Where(c => !(c.status == CoachCard.StatusRevoked && c.member_id == null));
         if (!string.IsNullOrWhiteSpace(status)) q = q.Where(c => c.status == status);
         List<CoachCard> cards = await q.OrderByDescending(c => c.create_date).ThenByDescending(c => c.id).ToListAsync();
+        await new CoachCardBenefits(db).ApplyCurrentAsync(cards);
         List<int> memberIds = cards.Where(c => c.member_id != null).Select(c => c.member_id!.Value).Distinct().ToList();
         Dictionary<int, (string name, string tail)> people = await LoadPeopleAsync(memberIds);
         var profileRows = await db.memberProfile.AsNoTracking().Where(u => memberIds.Contains(u.member_id))
