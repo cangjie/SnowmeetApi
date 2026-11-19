@@ -23,6 +23,10 @@ namespace SnowmeetApi.Data
             CoachSchemaConfiguration.Configure(modelBuilder);
             modelBuilder.Entity<StaffCouponBatch>().HasIndex(x => new { x.staff_id, x.request_id }).IsUnique();
             modelBuilder.Entity<StaffCouponBatchTicket>().HasIndex(x => x.batch_id);
+            modelBuilder.Entity<RentalSeasonCardUse>().HasIndex(x => new { x.card_id, x.rental_date })
+                .IsUnique().HasFilter("[valid] = 1");
+            modelBuilder.Entity<RentalSeasonCardUse>().HasIndex(x => x.rental_detail_id)
+                .IsUnique().HasFilter("[valid] = 1");
             IntroducerSchemaConfiguration.Configure(modelBuilder);
             ShareBatchSchemaConfiguration.Configure(modelBuilder, Database.IsSqlite());
             // 会员列表「只看 VIP」走这个索引：WHERE is_vip = 1 ORDER BY id DESC（线上由 sql/2026-11-09_member_is_vip.sql 建）
@@ -236,6 +240,11 @@ namespace SnowmeetApi.Data
         public DbSet<Discount> discount { get; set; }
         public DbSet<FdOrder> fdOrder { get; set; }
         public DbSet<RentalPricePreset> rentalPricePreset { get; set; }
+        public DbSet<RentalBenefitPreference> rentalBenefitPreference { get; set; }
+        public DbSet<RentalBenefitRentalPreference> rentalBenefitRentalPreference { get; set; }
+        public DbSet<RentalBenefitDetailPreference> rentalBenefitDetailPreference { get; set; }
+        public DbSet<RentalBenefitSettlement> rentalBenefitSettlement { get; set; }
+        public DbSet<RentalSeasonCardUse> rentalSeasonCardUse { get; set; }
         public DbSet<CareImage> careImage { get; set; }
         public DbSet<OrderPaymentRefund> orderPaymentRefund { get; set; }
         public DbSet<RentItemLog> rentItemLog { get; set; }

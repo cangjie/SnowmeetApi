@@ -3237,8 +3237,8 @@ namespace SnowmeetApi.Controllers
                 return new ApiResult<Models.Order?>() { code = 1, message = message, data = null };
             }
             await _db.SaveChangesAsync();
-            AliController _aliHelper = new AliController(_db, _config, _http);
-            TenpayController _weHelper = new TenpayController(_db, _config, _http);
+            AliController? _aliHelper = null;
+            TenpayController? _weHelper = null;
             for (int i = 0; i < refunds.Count; i++)
             {
                 OrderPaymentRefund refund = refunds[i];
@@ -3246,9 +3246,11 @@ namespace SnowmeetApi.Controllers
                 switch (payment.pay_method.Trim())
                 {
                     case "支付宝":
+                        _aliHelper ??= new AliController(_db, _config, _http);
                         refund = await _aliHelper.Refund(refund.id);
                         break;
                     case "微信支付":
+                        _weHelper ??= new TenpayController(_db, _config, _http);
                         refund = await _weHelper.Refund(refund.id);
                         break;
                     default:
@@ -3323,13 +3325,34 @@ namespace SnowmeetApi.Controllers
                     data = null
                 });
             }
+            if (await _db.rentalBenefitSettlement.AsNoTracking().AnyAsync(s => s.order_id == orderId))
+            {
+                var checkedResult = await SnowmeetApi.Services.Rent.RentalBenefitRefundLock.Run(_db, async () =>
+                {
+                    Models.Order lockedOrder = await GetOrder(orderId);
+                    if (lockedOrder == null || lockedOrder.type != "租赁") return new ApiResult<Models.Order?> { code = 1, message = "未找到租赁订单" };
+                    // Include pending refund requests, so a retry cannot refund them twice.
+                    if (refunds == null || refunds.Count == 0 || refunds.Any(r => !double.IsFinite(r.amount) || r.amount <= 0)
+                        || refunds.Select(r => r.payment_id).Distinct().Count() != refunds.Count)
+                        return new ApiResult<Models.Order?> { code = 1, message = "退款金额无效" };
+                    double sale = lockedOrder.retails.Where(r => r.valid == 1 && r.product_id != null && !(r.memo ?? "").Contains("补差价"))
+                        .Sum(r => r.deal_price);
+                    double alreadyRequested = await _db.orderPaymentRefund.Where(r => r.order_id == orderId).SumAsync(r => (double?)r.amount) ?? 0;
+                    double allowed = Math.Round(Math.Min(lockedOrder.totalGuarantyAmount ?? 0, lockedOrder.paidAmount)
+                        - (lockedOrder.totalRentSummaryAmount ?? 0) + lockedOrder.depositPaidAmount - sale - alreadyRequested, 2);
+                    if (Math.Round(refunds.Sum(r => r.amount), 2) > Math.Max(0, allowed))
+                        return new ApiResult<Models.Order?> { code = 1, message = "退款金额已变化，请刷新后重试" };
+                    return await RefundCore(lockedOrder, staff, refunds);
+                });
+                return Ok(checkedResult);
+            }
             Models.Order order = await GetOrder(orderId);
             ApiResult<Models.Order?> result = await RefundCore(order, staff, refunds);
             return Ok(result);
         }
         [HttpGet("{tempOrderId}")]
         public async Task<ActionResult<ApiResult<Models.Order>>> PlaceRentOrder(int tempOrderId,
-            string sessionKey, string sessionType = "wechat_mini_openid")
+            string sessionKey, string sessionType = "wechat_mini_openid", bool autoBenefit = false)
         {
             Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
             if (staff == null || staff.title_level < 100)
@@ -3368,6 +3391,13 @@ namespace SnowmeetApi.Controllers
                 if (order.member_id != null && CoachCardRules.IsEffectiveOnDate(selected, order.member_id.Value, rental.start_date ?? DateTime.Now))
                     _db.coachCardRentalQuote.Add(new CoachCardRentalQuote { rental_id = rental.id, card_id = selected!.id,
                         rental_rate = selected.rental_rate_snapshot > 0 && selected.rental_rate_snapshot <= 1 ? selected.rental_rate_snapshot : null, create_date = DateTime.Now });
+            }
+            if (autoBenefit)
+            {
+                var preference = await _db.rentalBenefitPreference.FirstOrDefaultAsync(p => p.order_id == order.id);
+                if (preference == null) { preference = new RentalBenefitPreference { order_id = order.id }; _db.rentalBenefitPreference.Add(preference); }
+                else _db.Entry(preference).State = EntityState.Modified;
+                preference.mode = "auto"; preference.staff_id = staff.id; preference.update_date = DateTime.Now;
             }
             double paidAmount = 0;
             RentController _rentHelper = new RentController(_db, _config, _http);

@@ -384,6 +384,8 @@ namespace SnowmeetApi.Controllers
             /// <summary>"fixed" | "rate" | "amount" | "none"</summary>
             public string? mode { get; set; }
             public double? value { get; set; }
+            // New clients explicitly opt into the whole-order rental coupon editor.
+            public bool rentalWholeOrder { get; set; } = false;
         }
 
         [HttpPost]
@@ -399,6 +401,19 @@ namespace SnowmeetApi.Controllers
             if (req == null || req.templateId <= 0)
             {
                 return Ok(new ApiResult<object>() { code = 1, message = "参数为空", data = null });
+            }
+
+            var template = await _db.ticketTemplate.AsNoTracking().FirstOrDefaultAsync(t => t.id == req.templateId);
+            if (template == null) return Ok(new ApiResult<object> { code = 1, message = "优惠券模板不存在" });
+            if (template.biz_type == "租赁" && req.rentalWholeOrder)
+            {
+                if (req.productId != 0) return Ok(new ApiResult<object> { code = 1, message = "租赁券作用于整单租金" });
+                if (req.mode != "fixed" && req.mode != "rate" && req.mode != "amount")
+                    return Ok(new ApiResult<object> { code = 1, message = "请选择租赁券优惠方式" });
+                if (await _db.productTicketTemplate.AnyAsync(r => r.ticket_template_id == req.templateId && r.product_id == 0 && r.valid && r.id != req.id))
+                    return Ok(new ApiResult<object> { code = 1, message = "每个租赁券模板只能设置一条整单优惠" });
+                if (req.id > 0 && !await _db.productTicketTemplate.AnyAsync(r => r.id == req.id && r.ticket_template_id == req.templateId))
+                    return Ok(new ApiResult<object> { code = 1, message = "优惠规则不属于当前模板" });
             }
 
             string mode = (req.mode ?? "").Trim();

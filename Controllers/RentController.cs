@@ -11,6 +11,7 @@ using SnowmeetApi.Data;
 using SnowmeetApi.Helpers;
 using SnowmeetApi.Services.CoachPlatform;
 using SnowmeetApi.Services.Rent;
+using SnowmeetApi.Services.Tickets;
 using SnowmeetApi.Services;
 using SnowmeetApi.Models;
 using SnowmeetApi.Models.Rent;
@@ -4248,7 +4249,7 @@ namespace SnowmeetApi.Controllers
         [HttpPost]
         public async Task<ActionResult<ApiResult<Models.Order?>>> SaveRentRecept([FromBody] Models.Order order,
             [FromQuery] string sessionKey, [FromQuery] string sessionType = "wechat_mini_openid",
-            [FromQuery] bool isTest = false, [FromQuery] int? receptCheckinId = null)
+            [FromQuery] bool isTest = false, [FromQuery] int? receptCheckinId = null, [FromQuery] bool benefitOptions = false)
         {
             sessionKey = Util.UrlDecode(sessionKey);
             Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
@@ -4263,6 +4264,8 @@ namespace SnowmeetApi.Controllers
             }
             if (!ValidCrossShopRentals(order.shop, order.rentals))
                 return Ok(new ApiResult<Models.Order?> { code = 1, message = "异店领取门店不符合开单门店规则", data = null });
+            if (benefitOptions && order.rentals.Any(r => (r.benefit_mode == "none" || r.benefit_mode == "auto") && r.coach_card_id != null))
+                return Ok(new ApiResult<Models.Order?> { code = 1, message = "优惠选择冲突，请重新选择" });
             await using var receptTransaction = receptCheckinId != null && _db.Database.CurrentTransaction == null
                 ? await _db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable) : null;
             bool linkedReceptMember;
@@ -4450,6 +4453,28 @@ namespace SnowmeetApi.Controllers
                 {
                     Console.WriteLine(ex.Message);
                 }
+            }
+            if (benefitOptions)
+            {
+                foreach (var rental in order.rentals.Where(r => r.id > 0 && r.benefit_mode != null))
+                {
+                    if (rental.benefit_mode != "auto" && rental.benefit_mode != "none" && rental.benefit_mode != "manual")
+                        return Ok(new ApiResult<Models.Order?> { code = 1, message = "优惠选择无效" });
+                    if (!await _db.rental.AnyAsync(r => r.id == rental.id && r.order_id == order.id))
+                        return Ok(new ApiResult<Models.Order?> { code = 1, message = "租赁项目不属于当前订单" });
+                    var pref = await _db.rentalBenefitRentalPreference.FirstOrDefaultAsync(p => p.rental_id == rental.id);
+                    if (rental.benefit_mode == "auto")
+                    {
+                        if (pref != null) _db.rentalBenefitRentalPreference.Remove(pref);
+                    }
+                    else
+                    {
+                        if (pref == null) { pref = new RentalBenefitRentalPreference { rental_id = rental.id }; _db.rentalBenefitRentalPreference.Add(pref); }
+                        else _db.Entry(pref).State = EntityState.Modified;
+                        pref.mode = rental.benefit_mode; pref.staff_id = staff.id; pref.update_date = DateTime.Now;
+                    }
+                }
+                await _db.SaveChangesAsync();
             }
             for (int i = 0; i < order.rentals.Count; i++)
             {
@@ -4729,7 +4754,7 @@ namespace SnowmeetApi.Controllers
         }
         [HttpGet("{orderId}")]
         public async Task<ActionResult<ApiResult<Models.Order?>>> GetReceptingOrder(int orderId,
-            string sessionKey, string sessionType = "wechat_mini_openid")
+            string sessionKey, string sessionType = "wechat_mini_openid", bool benefitOptions = false)
         {
             Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
             if (staff == null || staff.title_level < 100)
@@ -4750,6 +4775,12 @@ namespace SnowmeetApi.Controllers
             // 找回中断单的购物车按「添加时间正序」（先添加在上），id 自增=创建先后。
             // 原 OrderByDescending 会让后加的排最上，与开单页期望相反。
             order.rentals = order.rentals.OrderBy(r => r.id).ToList();
+            if (benefitOptions)
+            {
+                var ids = order.rentals.Select(r => r.id).ToList();
+                var prefs = await _db.rentalBenefitRentalPreference.Where(p => ids.Contains(p.rental_id)).AsNoTracking().ToListAsync();
+                foreach (var rental in order.rentals) rental.benefit_mode = prefs.FirstOrDefault(p => p.rental_id == rental.id)?.mode;
+            }
             order.cares = order.cares.OrderBy(c => c.id).ToList();
             return Ok(new ApiResult<Models.Order?>()
             {
@@ -5962,6 +5993,21 @@ namespace SnowmeetApi.Controllers
             {
                 return Ok(new ApiResult<Models.Rental?>() { code = 1, message = "无此租金明细", data = null });
             }
+            if (await _db.rentalBenefitSettlement.AnyAsync(s => s.order_id == rental.order_id))
+                return Ok(new ApiResult<Models.Rental?> { code = 1, message = "本单优惠已核销，无法修改租金明细" });
+            var oldDailyDiscount = await _db.discount.AsNoTracking().Where(d => d.order_id == rental.order_id
+                    && d.biz_type == "租赁" && d.biz_id == rental.id && d.sub_biz_type == "日租金"
+                    && d.sub_biz_id == rentDetail.id && d.ticket_code == null && d.valid == 1)
+                .SumAsync(d => (double?)d.amount) ?? 0;
+            if (waived || Math.Round(rentDetail.amount, 2) != Math.Round(rent, 2)
+                || Math.Round(oldDailyDiscount, 2) != Math.Round(discount, 2) || rentDetail.valid != 1)
+            {
+                var choice = await _db.rentalBenefitDetailPreference.FirstOrDefaultAsync(p => p.rental_detail_id == rentDetail.id);
+                if (choice == null) { choice = new RentalBenefitDetailPreference { rental_detail_id = rentDetail.id }; _db.rentalBenefitDetailPreference.Add(choice); }
+                else _db.Entry(choice).State = EntityState.Modified;
+                choice.staff_id = staff.id; choice.update_date = DateTime.Now;
+                await _db.SaveChangesAsync();
+            }
             DateTime theDay = rentDetail.rental_date.Date;
             OrderController _orderHelper = new OrderController(_db, _oriConfig, _httpContextAccessor);
 
@@ -6174,12 +6220,47 @@ namespace SnowmeetApi.Controllers
             return new SkiRentPunchQueueResult { skiRentals = skiRentals, queue = queue };
         }
 
+        // A punch replaces the net rent actually charged for a day, not the gross rent.
+        private async Task<Dictionary<int, double>> PunchNetRentAsync(List<Models.RentalDetail> details)
+        {
+            var ids = details.Select(d => d.id).ToList();
+            var discounts = await _db.discount.Where(d => d.valid == 1 && d.biz_type == "租赁"
+                && d.sub_biz_type == "日租金" && d.sub_biz_id != null && ids.Contains(d.sub_biz_id.Value))
+                .AsNoTracking().ToListAsync();
+            return details.ToDictionary(x => x.id, x => Math.Max(0,
+                x.amount - discounts.Where(d => d.biz_id == x.rental_id && d.sub_biz_id == x.id).Sum(d => d.amount)));
+        }
+
         // 共享：从（已按日期全局排序的）队列里取前 need 条翻 valid=0，按 rental 分组写 PunchCardUsed，扣卡 punches。
         // 只改内存 + AddAsync，不调用 SaveChangesAsync——调用方负责在自己的事务边界内提交
         // （UseRentalPunchCard 单独提交；FinalizePunchCardSale 会连同 Retail/PunchCard 一起原子提交）。
         private async Task WriteOffSkiPunches(PunchCard card, List<Models.RentalDetail> queue, int need, int orderId, int staffId)
         {
             Dictionary<int, int> perRental = new Dictionary<int, int>();   // rental_id → 被免天数
+            var selected = queue.Take(need).ToList();
+            var selectedIds = selected.Select(d => d.id).ToList();
+            var rentalIds = selected.Select(d => d.rental_id).Distinct().ToList();
+            // A punch replaces the day's rent, including any discount already attached to that day.
+            // Keep these changes in the caller's SaveChanges transaction, alongside the punch usage.
+            var discounts = await _db.discount.Where(d => d.valid == 1 && d.biz_type == "租赁"
+                && d.sub_biz_type == "日租金" && d.biz_id != null && rentalIds.Contains(d.biz_id.Value)
+                && d.sub_biz_id != null && selectedIds.Contains(d.sub_biz_id.Value)).ToListAsync();
+            foreach (var discount in discounts)
+            {
+                discount.valid = 0;
+                discount.update_date = DateTime.Now;
+                _db.discount.Entry(discount).State = EntityState.Modified;
+            }
+            var cardUses = await _db.coachCardUse.Where(u => u.biz_type == "租赁"
+                && rentalIds.Contains(u.biz_id) && selectedIds.Contains(u.sub_biz_id)
+                && u.status == CoachCardUse.StatusEffective).ToListAsync();
+            foreach (var use in cardUses)
+            {
+                use.status = CoachCardUse.StatusReversed;
+                use.reverse_date = DateTime.Now;
+                use.reverse_reason = "次卡免除租金";
+                _db.coachCardUse.Entry(use).State = EntityState.Modified;
+            }
             for (int i = 0; i < need; i++)
             {
                 Models.RentalDetail d = queue[i];
@@ -6235,13 +6316,14 @@ namespace SnowmeetApi.Controllers
                     && c.total != null && c.total > (c.punches ?? 0))
                 .AsNoTracking().ToListAsync();
             SkiRentPunchQueueResult q = await BuildSkiRentPunchQueue(orderId);
+            var netRent = await PunchNetRentAsync(q.queue);
             List<object> skiRentals = new List<object>();
             int totalPunchNeed = 0;
             foreach (Models.Rental r in q.skiRentals)
             {
                 var dateAmts = q.queue.Where(d => d.rental_id == r.id)
                     .GroupBy(d => d.rental_date.Date)
-                    .Select(g => new { date = g.Key.ToString("yyyy-MM-dd"), amount = g.Sum(x => x.amount) })
+                    .Select(g => new { date = g.Key.ToString("yyyy-MM-dd"), amount = g.Sum(x => netRent[x.id]) })
                     .OrderBy(x => x.date).ToList();
                 if (dateAmts.Count <= 0) continue;
                 totalPunchNeed += dateAmts.Count;
@@ -6276,23 +6358,32 @@ namespace SnowmeetApi.Controllers
         // 按 rental_date 升序排队，逐天免除前 punch_count 条（valid=0），写 punch_card_used（每个被触及 rental 一条）+ 扣 punches。
         [HttpPost("{orderId}")]
         public async Task<ActionResult<ApiResult<Models.Order?>>> UseRentalPunchCard(int orderId,
-            [FromBody] PunchCardUseRequest req, string sessionKey, string sessionType = "wechat_mini_openid")
+            [FromBody] PunchCardUseRequest req, string sessionKey, string sessionType = "wechat_mini_openid", bool requireVerified = false)
         {
             Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
             if (staff == null || staff.title_level < 100)
             {
                 return Ok(new ApiResult<Models.Order?>() { code = 1, message = "没有权限", data = null });
             }
+            await using var benefitTransaction = await _db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
+            await MiniTicketTransaction.Lock(_db, "snowmeet:rental-benefit:commit");
             Models.Order order = await _db.order.Where(o => o.id == orderId).AsNoTracking().FirstOrDefaultAsync();
             if (order == null || order.member_id == null)
             {
                 return Ok(new ApiResult<Models.Order?>() { code = 1, message = "未找到订单/会员", data = null });
             }
+            bool isNewBenefitOrder = await _db.rentalBenefitPreference.AnyAsync(p => p.order_id == orderId);
+            if ((requireVerified || isNewBenefitOrder) && !order.wechat_unverified)
+                return Ok(new ApiResult<Models.Order?> { code = 1, message = "使用次卡前请先核验会员身份" });
+            if (await _db.rentalBenefitSettlement.AnyAsync(s => s.order_id == orderId))
+                return Ok(new ApiResult<Models.Order?> { code = 1, message = "本单优惠已核销" });
             PunchCard card = await _db.punchCard.Where(c => c.id == req.card_id).FirstOrDefaultAsync();
             if (card == null || card.member_id != order.member_id || card.biz_type != "租赁")
             {
                 return Ok(new ApiResult<Models.Order?>() { code = 1, message = "次卡不属于该会员", data = null });
             }
+            if (card.total == null)
+                return Ok(new ApiResult<Models.Order?> { code = 1, message = "租赁季卡请使用自动匹配核销" });
             // 已退款的卡钱已退回顾客，不能再拿来抵租金（列表本就不返回它，这里是防御）
             if (card.is_refund)
             {
@@ -6312,6 +6403,7 @@ namespace SnowmeetApi.Controllers
             if (need > q.queue.Count) need = q.queue.Count;   // 兜底：不超过实际可免天数
             await WriteOffSkiPunches(card, q.queue, need, orderId, staff.id);
             await _db.SaveChangesAsync();
+            await benefitTransaction.CommitAsync();
             OrderController _orderH = new OrderController(_db, _oriConfig, _httpContextAccessor);
             Models.Order updated = await _orderH.GetOrder(orderId);
             return Ok(new ApiResult<Models.Order?>() { code = 0, message = "", data = updated });
@@ -7569,6 +7661,16 @@ namespace SnowmeetApi.Controllers
         private async Task<PunchCardSaleCalc> ComputePunchCardSaleCalc(int orderId, int productId)
         {
             PunchCardSaleCalc calc = new PunchCardSaleCalc();
+            if (await _db.rentalBenefitSettlement.AnyAsync(s => s.order_id == orderId))
+            {
+                calc.errorMessage = "本单优惠已核销，不能再购买次卡抵扣";
+                return calc;
+            }
+            if (await _db.rentalBenefitPreference.AnyAsync(p => p.order_id == orderId && p.mode == "auto"))
+            {
+                calc.errorMessage = "请先关闭自动匹配，再选择购买次卡";
+                return calc;
+            }
             OrderController _orderH = new OrderController(_db, _oriConfig, _httpContextAccessor);
             Models.Order order = await _orderH.GetOrder(orderId);
             if (order == null || order.member_id == null)
@@ -7606,7 +7708,8 @@ namespace SnowmeetApi.Controllers
                 calc.errorMessage = "本单应核销次数超过次卡总次数，无法购买";
                 return calc;
             }
-            calc.freedRentValue = Math.Round(q.queue.Take(punchCountNow).Sum(d => d.amount), 2);
+            var netRent = await PunchNetRentAsync(q.queue);
+            calc.freedRentValue = Math.Round(q.queue.Take(punchCountNow).Sum(d => netRent[d.id]), 2);
             // 核销前应退押金：照抄前端已验证的公式（不信任 order.totalRentNeedToRefundAmount，
             // 该 getter 在 GetOrder 路径下因 guarantys 未 Include 恒为 0）
             calc.refundableDepositBeforeCard = Math.Round(Math.Min(order.totalGuarantyAmount ?? 0, order.paidAmount)
