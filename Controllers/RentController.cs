@@ -5143,7 +5143,9 @@ namespace SnowmeetApi.Controllers
                 .Include(r => r.order)
                 .Include(r => r.guaranties).ThenInclude(g => g.guarantyPayments).ThenInclude(p => p.payment)
                 .AsNoTracking().FirstOrDefaultAsync();
-            rental.rentItems = rental.rentItems.OrderBy(i => i.next_id).ThenByDescending(i => i.id).ToList();
+            // 当前的租赁物按开单时的顺序（id 升序，雪板在前、雪杖在后）排在前面；被更换掉的（next_id 有值）排到后面。
+            // 以前同一组里按 id 倒序，订单详情页的租赁物顺序就和开单时倒过来了（2026-11-19 用户截图）。
+            rental.rentItems = rental.rentItems.OrderBy(i => i.next_id).ThenBy(i => i.id).ToList();
             for (int i = 0; i < rental.rentItems.Count; i++)
             {
                 Models.RentItem rentItem = rental.rentItems[i];
