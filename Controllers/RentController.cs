@@ -5261,6 +5261,11 @@ namespace SnowmeetApi.Controllers
             return !string.IsNullOrEmpty(parentCode) && childCode != null && childCode.StartsWith(parentCode, StringComparison.Ordinal);
         }
 
+        /// <summary>异店租赁的租赁物：有领取门店，或租赁模式是「异店租赁」。</summary>
+        [NonAction]
+        public static bool IsCrossShopRentItem(Models.RentItem item)
+            => !string.IsNullOrWhiteSpace(item.pickup_shop) || (item.pick_type ?? "").Trim() == "异店租赁";
+
         [HttpPost("{rentItemId}")]
         public async Task<ActionResult<ApiResult<Models.Rental?>>> AssignCrossShopItem(int rentItemId,
             [FromBody] AssignCrossShopItemRequest request, string sessionKey, string sessionType = "wechat_mini_openid")
@@ -5532,9 +5537,11 @@ namespace SnowmeetApi.Controllers
                     data = null
                 });
             }
-            if (status == "已发放" && !string.IsNullOrWhiteSpace(rentItem.pickup_shop)
+            // 异店租赁的租赁物开单时只选分类就能下单结算，但必须先录入具体的编码（带码的）或名称（无码的）才能发放
+            // （2026-11-19 用户再次明确）。异店的判断：有领取门店，或租赁模式就是「异店租赁」。
+            if (status == "已发放" && IsCrossShopRentItem(rentItem)
                 && (rentItem.noCode ? string.IsNullOrWhiteSpace(rentItem.name) : string.IsNullOrWhiteSpace(rentItem.code)))
-                return Ok(new ApiResult<Models.Rental?> { code = 1, message = "请先录入异店租赁物信息" });
+                return Ok(new ApiResult<Models.Rental?> { code = 1, message = "请先录入异店租赁物信息（带码的录入编码，无码的录入名称），录入后才能发放" });
             if (status == "已发放" && !string.IsNullOrWhiteSpace(rentItem.pickup_shop) && !rentItem.noCode)
             {
                 var product = await _db.rentProduct.AsNoTracking().FirstOrDefaultAsync(p => rentItem.rent_product_id != null

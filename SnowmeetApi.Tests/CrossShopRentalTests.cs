@@ -104,4 +104,100 @@ public class CrossShopRentalTests
         Assert.Equal(32, persisted.category_id);
         Assert.Equal(320, persisted.rent_product_id);
     }
+
+    // 2026-11-19 用户：异店租赁的租赁物开单只选分类就能下单结算，但不录入编码（带码）/名称（无码）不允许发放。
+    private static async Task<(CoachFixture f, int itemId)> SeedItemAsync(bool noCode, string? pickupShop, string? pickType, string? code = null, string? name = null)
+    {
+        var f = await CoachFixture.Create(withPricing: false);
+        var db = f.NewContext();
+        var order = new Order { type = "租赁", shop = "崇礼旗舰店", valid = 1 };
+        db.order.Add(order); await db.SaveChangesAsync();
+        var rental = new Rental { order_id = order.id, valid = 1 };
+        db.rental.Add(rental); await db.SaveChangesAsync();
+        var item = new RentItem { rental_id = rental.id, valid = 1, class_name = "雪鞋", category_id = 31, noCode = noCode,
+            pickup_shop = pickupShop, pick_type = pickType, code = code, name = name };
+        db.rentItem.Add(item);
+        db.rentProduct.Add(new RentProduct { id = 310, category_id = 31, name = "雪鞋 A", barcode = "A310", valid = 1, status = "正常" });
+        await db.SaveChangesAsync();
+        return (f, item.id);
+    }
+
+    private static int CodeOf(ActionResult<ApiResult<Rental?>> result) => ((ApiResult<Rental?>)((OkObjectResult)result.Result!).Value!).code;
+
+    [Theory]
+    [InlineData(false, "万龙体验中心", "异店租赁")]   // 带码的异店租赁物，没录入编码
+    [InlineData(true, "万龙体验中心", "异店租赁")]    // 无码的异店租赁物，没录入名称
+    [InlineData(false, null, "异店租赁")]            // 租赁模式是异店租赁但领取门店空（也按异店处理）
+    [InlineData(true, "万龙服务中心", null)]          // 只有领取门店、模式字段空
+    public async Task A_cross_shop_item_without_a_code_or_name_cannot_be_issued(bool noCode, string? pickupShop, string? pickType)
+    {
+        var (f, itemId) = await SeedItemAsync(noCode, pickupShop, pickType);
+        await using var _ = f;
+
+        var result = await new RentController(f.NewContext(), f.Config, Http()).SetRentItemStatus(itemId, "已发放", "session-1");
+
+        Assert.Equal(1, CodeOf(result));
+        Assert.Empty(await f.Db.rentItemLog.AsNoTracking().Where(l => l.rent_item_id == itemId && l.status == "已发放").ToListAsync());
+    }
+
+    [Fact]
+    public async Task A_cross_shop_item_with_only_whitespace_as_name_is_still_not_issuable()
+    {
+        var (f, itemId) = await SeedItemAsync(noCode: true, "万龙体验中心", "异店租赁", name: "   ");
+        await using var _ = f;
+
+        Assert.Equal(1, CodeOf(await new RentController(f.NewContext(), f.Config, Http()).SetRentItemStatus(itemId, "已发放", "session-1")));
+    }
+
+    [Fact]
+    public async Task A_no_code_cross_shop_item_can_be_issued_once_it_has_a_name()
+    {
+        var (f, itemId) = await SeedItemAsync(noCode: true, "万龙体验中心", "异店租赁");
+        await using var _ = f;
+        var rent = new RentController(f.NewContext(), f.Config, Http());
+        Assert.Equal(1, CodeOf(await rent.SetRentItemStatus(itemId, "已发放", "session-1")));
+
+        Assert.Equal(0, CodeOf(await new RentController(f.NewContext(), f.Config, Http())
+            .AssignCrossShopItem(itemId, new RentController.AssignCrossShopItemRequest { name = "雪鞋 红色 42" }, "session-1")));
+        Assert.Equal(0, CodeOf(await new RentController(f.NewContext(), f.Config, Http()).SetRentItemStatus(itemId, "已发放", "session-1")));
+        Assert.Single(await f.Db.rentItemLog.AsNoTracking().Where(l => l.rent_item_id == itemId && l.status == "已发放").ToListAsync());
+    }
+
+    // 本店的无码物品不受影响（只有异店租赁的才要先录入）
+    [Fact]
+    public async Task A_normal_item_is_not_affected_by_the_cross_shop_issuing_rule()
+    {
+        var (f, itemId) = await SeedItemAsync(noCode: true, null, "立即租赁");
+        await using var _ = f;
+
+        Assert.Equal(0, CodeOf(await new RentController(f.NewContext(), f.Config, Http()).SetRentItemStatus(itemId, "已发放", "session-1")));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task The_reception_draft_with_a_cross_shop_item_that_only_has_a_category_is_saved(bool noCode)
+    {
+        await using var f = await CoachFixture.Create(withPricing: false);
+        var order = new Order
+        {
+            shop = "崇礼旗舰店", type = "租赁",
+            rentals = new List<Rental>
+            {
+                new Rental { name = "单板", pick_type = "异店租赁", rentItems = new List<RentItem>
+                {
+                    new RentItem { class_name = "雪鞋", category_id = 31, noCode = noCode, pick_type = "异店租赁", pickup_shop = "万龙体验中心", atOnce = true }
+                } }
+            }
+        };
+
+        var api = (ApiResult<Order?>)((OkObjectResult)(await new RentController(f.NewContext(), f.Config, Http()).SaveRentRecept(order, "session-1")).Result!).Value!;
+
+        Assert.Equal(0, api.code);
+        var saved = await f.Db.rentItem.AsNoTracking().SingleAsync(i => i.rental_id == api.data!.rentals[0].id);
+        Assert.Equal("万龙体验中心", saved.pickup_shop);
+        Assert.True(string.IsNullOrWhiteSpace(saved.code));
+        Assert.True(string.IsNullOrWhiteSpace(saved.name));
+        Assert.False(saved.atOnce);   // 异店的装备不当场发放
+    }
 }
