@@ -137,6 +137,14 @@ public sealed class CoachAdminController(ApplicationDBContext db, IConfiguration
     public Task<ApiResult<object>> ListCoachCards(string sessionKey, int coachId, string? status = null) =>
         AsAdmin(sessionKey, async _ => new { counts = await _query.CardCountsAsync(coachId), cards = await _query.ListCardsAsync(coachId, status) });
 
+    [HttpGet]
+    public Task<ApiResult<object>> GetDistributionSummary(string sessionKey, int coachId) =>
+        AsAdmin(sessionKey, async _ => await new CoachDistributionReportService(Db).SummaryAsync(coachId, DateTime.Now));
+
+    [HttpGet]
+    public Task<ApiResult<object>> GetDistributionRecipients(string sessionKey, int coachId, string kind, int templateId, int page = 1, int pageSize = 20) =>
+        AsAdmin(sessionKey, async _ => await new CoachDistributionReportService(Db).RecipientsAsync(coachId, kind, templateId, page, pageSize, DateTime.Now));
+
     [HttpPost]
     public Task<ApiResult<object>> RevokeCard(string sessionKey, [FromBody] CardIdInput input) =>
         AsAdmin(sessionKey, async _ => { await _cards.RevokeAsync(input.cardId, null, DateTime.Now); return new { cardId = input.cardId }; });

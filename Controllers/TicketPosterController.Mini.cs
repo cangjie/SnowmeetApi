@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
@@ -17,9 +18,11 @@ namespace SnowmeetApi.Controllers
         private async Task<bool> CanAccessMiniPoster(Staff? staff, int batchId)
         {
             if (staff == null || staff.valid != 1) return false;
-            if (staff.title_level >= 200) return true;
-            return staff.title_level >= 100 && await _db.ticketShareBatch.AsNoTracking()
-                .AnyAsync(b => b.id == batchId && b.share_type == MiniTicketRules.StaffBatch && b.valid == 1);
+            return await (from b in _db.ticketShareBatch.AsNoTracking()
+                join t in _db.ticketTemplate.AsNoTracking() on b.template_id equals t.id
+                where b.id == batchId && b.valid == 1 && t.valid == 1 && t.marketing_promotion == 1
+                    && (staff.title_level >= 200 || (staff.title_level >= 100 && b.share_type == MiniTicketRules.StaffBatch))
+                select b.id).AnyAsync();
         }
 
         [HttpGet]

@@ -33,7 +33,7 @@ public sealed class TicketMigrationTests
                 f.Db.memberSocialAccount.Add(new MemberSocialAccount {member_id=id,type="cell",num="1380000000"+id,valid=1});
                 f.Db.miniSession.Add(new MiniSession {session_key="session-"+id,session_type="wechat_mini_openid",member_id=id,wechat_openid="mini-"+id, valid=1,expire_date=DateTime.Now.AddHours(1)});
             }
-            f.Db.ticketTemplate.Add(new TicketTemplate {id=12,name="测试券",memo="说明",type="养护券",miniapp_recept_path="",sharable=1,valid=1});
+            f.Db.ticketTemplate.Add(new TicketTemplate {id=12,name="测试券",memo="说明",type="养护券",miniapp_recept_path="",sharable=1,marketing_promotion=1,valid=1});
             f.Db.ticketShareBatch.Add(new TicketShareBatch {id=1,template_id=12,staff_id=9,share_type=type,max_claims=limit,channel="门店"});
             await f.Db.SaveChangesAsync(); f.Db.ChangeTracker.Clear(); return f;
         }
@@ -101,15 +101,15 @@ public sealed class TicketMigrationTests
     [InlineData("mini_p")]
     [InlineData("mini_g")]
     [InlineData("mini_q")]
-    public async Task ClosingTemplateSharingStopsNewQueriesAndClaims(string type)
+    public async Task CustomerTransferSwitchDoesNotDisableExistingPromotionClaims(string type)
     {
         await using var f = await Fixture.Create(type, type == "mini_p" ? 1 : null);
         await f.Db.ticketTemplate.Where(t => t.id == 12).ExecuteUpdateAsync(s => s.SetProperty(t => t.sharable, 0));
-        Assert.Equal(1, (await Mini(f.Share(), "GetMiniShareBatch", 1, "session-2")).code);
+        Assert.Equal(0, (await Mini(f.Share(), "GetMiniShareBatch", 1, "session-2")).code);
         string endpoint = type == "mini_q" ? "ClaimMiniQrCodeTicket" : "ClaimMiniSharedTicket";
-        Assert.Equal(1, (await Mini(f.Share(), endpoint, 1, "session-2")).code);
-        Assert.Empty(await f.Db.ticket.ToListAsync());
-        Assert.Empty(await f.Db.ticketShareClaim.ToListAsync());
+        Assert.Equal(0, (await Mini(f.Share(), endpoint, 1, "session-2")).code);
+        Assert.Single(await f.Db.ticket.ToListAsync());
+        Assert.Single(await f.Db.ticketShareClaim.ToListAsync());
     }
     [Fact] public async Task ClosingTemplateSharingStopsNewTransfersWithoutChangingTheCoupon()
     {

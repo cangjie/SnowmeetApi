@@ -224,7 +224,8 @@ namespace SnowmeetApi.Controllers
             batch.claim_count = batch.claim_count + 1;
             batch.update_date = now;
             _db.Entry(batch).State = EntityState.Modified;
-            await _db.SaveChangesAsync();
+            try { await _db.SaveChangesAsync(); }
+            catch (DbUpdateConcurrencyException) { return Ok(new ApiResult<object>() { code = 1, message = "分享状态已改变，请重新打开", data = null }); }
 
             return Ok(new ApiResult<object>()
             {
@@ -342,7 +343,8 @@ namespace SnowmeetApi.Controllers
             batch.claim_count = batch.claim_count + 1;
             batch.update_date = now;
             _db.Entry(batch).State = EntityState.Modified;
-            await _db.SaveChangesAsync();
+            try { await _db.SaveChangesAsync(); }
+            catch (DbUpdateConcurrencyException) { return Ok(new ApiResult<object>() { code = 1, message = "分享状态已改变，请重新打开", data = null }); }
 
             return Ok(new ApiResult<object>()
             {
@@ -462,7 +464,8 @@ namespace SnowmeetApi.Controllers
             batch.claim_count = batch.claim_count + 1;
             batch.update_date = now;
             _db.Entry(batch).State = EntityState.Modified;
-            await _db.SaveChangesAsync();
+            try { await _db.SaveChangesAsync(); }
+            catch (DbUpdateConcurrencyException) { return Ok(new ApiResult<object>() { code = 1, message = "分享状态已改变，请重新打开", data = null }); }
 
             return Ok(new ApiResult<object>()
             {

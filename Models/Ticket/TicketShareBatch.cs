@@ -32,8 +32,8 @@ namespace SnowmeetApi.Models
         /// <summary>领取上限。personal 恒为 1；group 为空表示不限人数。</summary>
         public int? max_claims { get; set; } = null;
         public int claim_count { get; set; } = 0;
-        /// <summary>0 = 已撤回，链接失效。</summary>
-        public int valid { get; set; } = 1;
+        /// <summary>1 = 分享中，0 = 已撤回，-1 = 已删除（保留记录及请求幂等信息）。</summary>
+        [ConcurrencyCheck] public int valid { get; set; } = 1;
         public DateTime create_date { get; set; } = DateTime.Now;
         public DateTime? update_date { get; set; } = null;
 
@@ -41,6 +41,8 @@ namespace SnowmeetApi.Models
         public const string ShareGroup = "group";
         /// <summary>固定二维码：长期有效、任意陌生人可扫，一人一天一张（按模板算）。</summary>
         public const string ShareQrCode = "qrcode";
+        public const string DeletedQrCode = "deleted_qr"; // 已删除的旧固定码，避免重新创建时命中原唯一索引或恢复旧链接
+        public const int Deleted = -1;
 
         /// <summary>
         /// 关注公众号校验用的场景值。与顾客转赠的 ticket_gift_* 分属两套，互不干扰。

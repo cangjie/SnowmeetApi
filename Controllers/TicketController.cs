@@ -128,6 +128,36 @@ namespace SnowmeetApi.Controllers
             });
         }
 
+        // 新版券包按实际状态分类；保留 GetMyTickets 原有行为，兼容已发布小程序。
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<List<Ticket>>>> GetMyTicketsByState(string state,
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            if (state != "available" && state != "inactive" && state != "expired")
+                return Ok(new ApiResult<List<Ticket>>() { code = 1, message = "优惠券状态无效", data = null });
+            Member member = await new MemberController(_context, _oriConfig).GetMemberBySessionKey(Util.UrlDecode(sessionKey ?? ""), sessionType);
+            if (member == null)
+                return Ok(new ApiResult<List<Ticket>>() { code = 0, message = "用户未登录", data = null });
+
+            DateTime today = DateTime.Now.Date;
+            DateTime tomorrow = today.AddDays(1);
+            var query = _context.ticket.AsNoTracking().Where(t =>
+                t.member_id == member.id && t.valid == 1 && t.used == 0 && t.shared != 1);
+            if (state == "expired")
+                query = query.Where(t => t.expire_date != null && t.expire_date < today);
+            else
+            {
+                query = query.Where(t => t.expire_date == null || t.expire_date >= today);
+                if (state == "inactive")
+                    query = query.Where(t => t.is_active != 1 || (t.start_date != null && t.start_date >= tomorrow));
+                else
+                    query = query.Where(t => t.is_active == 1 && (t.start_date == null || t.start_date < tomorrow));
+            }
+            List<Ticket> tickets = await query.OrderBy(t => t.create_date).ToListAsync();
+            await FillCardFields(tickets, TicketListContext.Unused, (member.wechatMiniOpenId ?? "").Trim());
+            return Ok(new ApiResult<List<Ticket>>() { code = 0, message = "", data = tickets });
+        }
+
         // 券自身的派生字段（有效期文案、临期、券种 banner）——与"在哪个列表里"无关，
         // 所以 GetTicket 这种单张查询也要填，否则详情页的 banner 和有效期会是空的。
         [NonAction]

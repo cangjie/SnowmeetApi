@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using SnowmeetApi.Controllers;
+using SnowmeetApi.Models;
 using SnowmeetApi.Services.Tickets;
 using Xunit;
 using static SnowmeetApi.Tests.TicketMigrationTests;
@@ -100,9 +101,77 @@ public class StaffCouponBatchTests
         await using var f = await Fixture.Create(); await f.AddStaff();
         var admin = new StaffCouponBatchController(f.Db);
         Assert.Equal(1, Result(await admin.Create("session-2", new(12, 2, "multiple", Guid.NewGuid().ToString()))).code);
-        await f.Db.ticketTemplate.Where(t => t.id == 12).ExecuteUpdateAsync(s => s.SetProperty(t => t.sharable, 0));
+        await f.Db.ticketTemplate.Where(t => t.id == 12).ExecuteUpdateAsync(s => s.SetProperty(t => t.marketing_promotion, 0));
         f.Db.ChangeTracker.Clear();
         Assert.Equal(1, Result(await admin.Create("session-1", new(12, 2, "multiple", Guid.NewGuid().ToString()))).code);
         Assert.True(MiniTicketRules.IsMini(MiniTicketRules.Group));
+    }
+
+    [Fact]
+    public async Task OnlyOwnerCanDeleteRevokedUnclaimedBatchWithoutReactivatingItsLink()
+    {
+        await using var f = await Fixture.Create(); await f.AddStaff();
+        string request = Guid.NewGuid().ToString(); int id = await Create(f, "multiple", 2, request);
+        var controller = new StaffCouponBatchController(f.Db);
+        Assert.Equal(1, Result(await controller.Delete(id, "session-1")).code);
+        Assert.Equal(0, Result(await controller.Revoke(id, "session-1")).code);
+        await f.AddStaff(2, 19);
+        Assert.Equal(1, Result(await controller.Delete(id, "session-2")).code);
+        var row = TicketMigrationTests.Data(Result(await controller.Batches(12, "session-1"))).GetProperty("batches")
+            .EnumerateArray().First(x => x.GetProperty("batchId").GetInt32() == id);
+        Assert.True(row.GetProperty("canDelete").GetBoolean());
+        Assert.Equal(0, Result(await controller.Delete(id, "session-1")).code);
+        f.Db.ChangeTracker.Clear();
+        Assert.Equal(TicketShareBatch.Deleted, (await f.Db.ticketShareBatch.SingleAsync(b => b.id == id)).valid);
+        Assert.True(await f.Db.staffCouponBatch.AnyAsync(b => b.batch_id == id));
+        Assert.True(await f.Db.coreDataModLog.AnyAsync(l => l.table_name == "ticket_share_batch" && l.key_value == id));
+        Assert.DoesNotContain(TicketMigrationTests.Data(Result(await controller.Batches(12, "session-1"))).GetProperty("batches").EnumerateArray(), x => x.GetProperty("batchId").GetInt32() == id);
+        Assert.Equal(1, Result(await f.Share().ClaimStaffBatch(id, "session-3")).code);
+        Assert.Equal(1, Result(await controller.Revoke(id, "session-1")).code);
+        Assert.Equal(1, Result(await controller.Create("session-1", new(12, 2, "multiple", request))).code);
+    }
+
+    [Fact]
+    public async Task ClaimedBatchCannotBeDeletedEvenAfterRevokingOrInconsistentCounter()
+    {
+        await using var f = await Fixture.Create(); await f.AddStaff(); int id = await Create(f, "multiple", 2);
+        Assert.Equal(0, Result(await f.Share().ClaimStaffBatch(id, "session-2")).code);
+        var controller = new StaffCouponBatchController(f.Db);
+        Assert.Equal(0, Result(await controller.Revoke(id, "session-1")).code);
+        await f.Db.ticketShareBatch.Where(b => b.id == id).ExecuteUpdateAsync(s => s.SetProperty(b => b.claim_count, 0));
+        f.Db.ChangeTracker.Clear();
+        var row = TicketMigrationTests.Data(Result(await controller.Batches(12, "session-1"))).GetProperty("batches")
+            .EnumerateArray().First(x => x.GetProperty("batchId").GetInt32() == id);
+        Assert.False(row.GetProperty("canDelete").GetBoolean());
+        Assert.Equal(1, Result(await controller.Delete(id, "session-1")).code);
+        Assert.Equal(1, await f.Db.ticket.CountAsync());
+    }
+
+    [Theory]
+    [InlineData("qrcode")]
+    [InlineData("mini_q")]
+    public async Task DeletedOldFixedQrDoesNotGetRevivedWhenRecreated(string type)
+    {
+        await using var f = await Fixture.Create(type); await f.AddStaff();
+        await f.Db.ticketShareBatch.Where(b => b.id == 1).ExecuteUpdateAsync(s => s.SetProperty(b => b.valid, 0));
+        Assert.Equal(0, Result(await new StaffCouponBatchController(f.Db).Delete(1, "session-1")).code);
+        f.Db.ChangeTracker.Clear();
+        var admin = new TicketTemplateAdminController(f.Db, f.Config);
+        var result = type == "qrcode" ? Result(await admin.CreateQrCodeBatchByStaff(12, "门店", "session-1"))
+            : Result(await admin.CreateMiniQrCodeBatchByStaff(12, "门店", "session-1"));
+        Assert.Equal(0, result.code);
+        Assert.NotEqual(1, TicketMigrationTests.Data(result).GetProperty("batchId").GetInt32());
+        Assert.Equal(TicketShareBatch.Deleted, (await f.Db.ticketShareBatch.AsNoTracking().SingleAsync(b => b.id == 1)).valid);
+    }
+
+    [Fact]
+    public async Task StaleClaimCannotRestoreDeletedBatch()
+    {
+        await using var f = await Fixture.Create();
+        await using var stale = f.NewContext();
+        var batch = await stale.ticketShareBatch.AsTracking().SingleAsync(b => b.id == 1);
+        await f.Db.ticketShareBatch.Where(b => b.id == 1).ExecuteUpdateAsync(s => s.SetProperty(b => b.valid, TicketShareBatch.Deleted));
+        batch.claim_count++;
+        await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => stale.SaveChangesAsync());
     }
 }

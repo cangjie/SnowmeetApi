@@ -21,7 +21,7 @@ public partial class TicketShareController
             var batch = await _db.ticketShareBatch.AsTracking().FirstOrDefaultAsync(b => b.id == batchId && b.share_type == MiniTicketRules.StaffBatch);
             var settings = await _db.staffCouponBatch.AsNoTracking().FirstOrDefaultAsync(s => s.batch_id == batchId);
             if (batch == null || settings == null || batch.valid != 1) return MiniError("分享链接已失效");
-            var tpl = await _db.ticketTemplate.AsNoTracking().FirstOrDefaultAsync(t => t.id == batch.template_id && t.valid == 1 && t.sharable == 1 && t.hide == 0);
+            var tpl = await _db.ticketTemplate.AsNoTracking().FirstOrDefaultAsync(t => t.id == batch.template_id && t.valid == 1 && t.hide == 0);
             if (tpl == null) return MiniError("该券已停用");
             DateTime now = DateTime.Now;
             DateTime expiry = TicketTemplateRules.ResolveTicketExpireDate(tpl, now);

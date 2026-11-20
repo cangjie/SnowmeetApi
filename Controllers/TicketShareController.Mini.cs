@@ -21,7 +21,7 @@ public partial class TicketShareController
         if (member == null) return Ok(MiniError("请先登录"));
         TicketShareBatch batch = await _db.ticketShareBatch.AsNoTracking().FirstOrDefaultAsync(b => b.id == batchId);
         if (batch == null || batch.valid != 1 || !MiniTicketRules.IsMini(batch.share_type)) return Ok(MiniError("分享链接已失效"));
-        TicketTemplate tpl = await _db.ticketTemplate.AsNoTracking().FirstOrDefaultAsync(t => t.id == batch.template_id && t.valid == 1 && t.sharable == 1);
+        TicketTemplate tpl = await _db.ticketTemplate.AsNoTracking().FirstOrDefaultAsync(t => t.id == batch.template_id && t.valid == 1);
         if (tpl == null) return Ok(MiniError("该券已停用"));
         DateTime today = DateTime.Now.Date, tomorrow = today.AddDays(1);
         string claimedCode;
@@ -58,7 +58,7 @@ public partial class TicketShareController
             if (batch == null || batch.valid != 1 || (qr ? batch.share_type != MiniTicketRules.QrCode
                 : batch.share_type != MiniTicketRules.Personal && batch.share_type != MiniTicketRules.Group))
                 return MiniError("分享链接已失效，请使用对应的领取入口");
-            TicketTemplate tpl = await _db.ticketTemplate.AsNoTracking().FirstOrDefaultAsync(t => t.id == batch.template_id && t.valid == 1 && t.sharable == 1);
+            TicketTemplate tpl = await _db.ticketTemplate.AsNoTracking().FirstOrDefaultAsync(t => t.id == batch.template_id && t.valid == 1);
             if (tpl == null) return MiniError("该券已停用");
             DateTime now = DateTime.Now, today = now.Date, tomorrow = today.AddDays(1);
             DateTime expiry = TicketTemplateRules.ResolveTicketExpireDate(tpl, now);

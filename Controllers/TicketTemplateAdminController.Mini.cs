@@ -30,10 +30,10 @@ public partial class TicketTemplateAdminController
         string raw = mode == "personal" ? MiniTicketRules.Personal : mode == "group" ? MiniTicketRules.Group : MiniTicketRules.QrCode;
         var result = await MiniTicketTransaction.Run(_db, async () => {
             TicketTemplate tpl = await _db.ticketTemplate.AsNoTracking().FirstOrDefaultAsync(t => t.id == templateId);
-            if (tpl == null || tpl.valid != 1 || tpl.sharable != 1)
+            if (tpl == null || tpl.valid != 1 || tpl.marketing_promotion != 1)
                 return new ApiResult<object> { code = 1, message = "该模板未开放分享或已停用", data = null };
-            TicketShareBatch batch = mode != "qrcode" ? null : await _db.ticketShareBatch.AsNoTracking().FirstOrDefaultAsync(
-                b => b.staff_id == staff.id && b.template_id == templateId && b.share_type == MiniTicketRules.QrCode && b.channel == ch);
+            TicketShareBatch batch = mode != "qrcode" ? null : await _db.ticketShareBatch.AsTracking().FirstOrDefaultAsync(
+                b => b.staff_id == staff.id && b.template_id == templateId && b.share_type == MiniTicketRules.QrCode && b.channel == ch && b.valid != TicketShareBatch.Deleted);
             if (batch == null) {
                 batch = new TicketShareBatch { template_id = templateId, staff_id = staff.id, share_type = raw,
                     channel = mode == "qrcode" ? ch : null, max_claims = mode == "personal" ? 1 : null, valid = 1, create_date = DateTime.Now };

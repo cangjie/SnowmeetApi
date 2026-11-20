@@ -46,7 +46,7 @@ namespace SnowmeetApi.Controllers
             }
             TicketTemplate template = await _db.ticketTemplate.AsNoTracking()
                 .FirstOrDefaultAsync(x => x.id == batch.template_id);
-            if (template == null || template.cover_upload_id == null)
+            if (template == null || template.valid != 1 || template.marketing_promotion != 1 || template.cover_upload_id == null)
             {
                 return BadRequest(new { code = 1, message = "模板海报不存在" });
             }

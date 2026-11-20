@@ -96,6 +96,7 @@ namespace SnowmeetApi.Controllers
                 hide = t.hide,
                 valid = t.valid,
                 sharable = t.sharable,
+                marketingPromotion = t.marketing_promotion,
                     coverUploadId = t.cover_upload_id,
                     posterWidth = t.poster_width,
                     posterHeight = t.poster_height,
@@ -194,6 +195,7 @@ namespace SnowmeetApi.Controllers
                     hide = t.hide,
                     valid = t.valid,
                     sharable = t.sharable,
+                    marketingPromotion = t.marketing_promotion,
                     coverUploadId = t.cover_upload_id,
                     coverUrl = coverUrl,
                     posterWidth = t.poster_width,
@@ -271,8 +273,10 @@ namespace SnowmeetApi.Controllers
             public string? miniappReceptPath { get; set; }
             public int hide { get; set; } = 0;
             public int valid { get; set; } = 1;
-            /// <summary>0 = 不可分享 / 1 = 允许店员用小程序卡片分享发券</summary>
+            /// <summary>是否允许符合现有转赠规则的顾客互相转赠。</summary>
             public int sharable { get; set; } = 0;
+            // 旧版客户端没有该字段：更新已有模板时保留原值。
+            public int? marketingPromotion { get; set; }
             public int? coverUploadId { get; set; }
             public int posterWidth { get; set; } = 1080;
             public int posterHeight { get; set; } = 1440;
@@ -334,6 +338,9 @@ namespace SnowmeetApi.Controllers
             t.hide = req.hide;
             t.valid = req.valid;
             t.sharable = req.sharable;
+            if (req.marketingPromotion is not null && req.marketingPromotion != 0 && req.marketingPromotion != 1)
+                return Ok(new ApiResult<object>() { code = 1, message = "市场推广设置无效", data = null });
+            if (req.marketingPromotion is not null) t.marketing_promotion = req.marketingPromotion.Value;
             t.cover_upload_id = req.coverUploadId;
             t.poster_width = req.posterWidth > 0 ? req.posterWidth : 1080;
             t.poster_height = req.posterHeight > 0 ? req.posterHeight : 1440;
@@ -527,7 +534,7 @@ namespace SnowmeetApi.Controllers
             {
                 return Ok(new ApiResult<object>() { code = 1, message = "模板不存在", data = null });
             }
-            if (tpl.sharable != 1)
+            if (tpl.marketing_promotion != 1)
             {
                 return Ok(new ApiResult<object>() { code = 1, message = "该模板未开放分享", data = null });
             }
@@ -601,7 +608,7 @@ namespace SnowmeetApi.Controllers
             {
                 return Ok(new ApiResult<object>() { code = 1, message = "模板不存在", data = null });
             }
-            if (tpl.sharable != 1)
+            if (tpl.marketing_promotion != 1)
             {
                 return Ok(new ApiResult<object>() { code = 1, message = "该模板未开放分享", data = null });
             }
@@ -612,7 +619,7 @@ namespace SnowmeetApi.Controllers
 
             // 幂等：三要素相同就复用已有批次，连已撤回的也一并恢复
             //（店员的本意显然是"我要这张码"，而不是"再来一张新的"）
-            TicketShareBatch batch = await _db.ticketShareBatch.FirstOrDefaultAsync(
+            TicketShareBatch batch = await _db.ticketShareBatch.AsTracking().FirstOrDefaultAsync(
                 b => b.staff_id == staff.id && b.template_id == templateId
                     && b.share_type == TicketShareBatch.ShareQrCode && b.channel == ch);
             if (batch == null)
@@ -671,7 +678,7 @@ namespace SnowmeetApi.Controllers
             {
                 return Ok(Deny());
             }
-            IQueryable<TicketShareBatch> q = _db.ticketShareBatch.AsNoTracking();
+            IQueryable<TicketShareBatch> q = _db.ticketShareBatch.AsNoTracking().Where(b => b.valid != TicketShareBatch.Deleted);
             if (templateId != null)
             {
                 q = q.Where(b => b.template_id == templateId);
@@ -750,12 +757,14 @@ namespace SnowmeetApi.Controllers
             {
                 return Ok(Deny());
             }
-            TicketShareBatch batch = await _db.ticketShareBatch
+            TicketShareBatch batch = await _db.ticketShareBatch.AsTracking()
                 .FirstOrDefaultAsync(b => b.id == batchId);
             if (batch == null)
             {
                 return Ok(new ApiResult<object>() { code = 1, message = "分享不存在", data = null });
             }
+            if (batch.valid == TicketShareBatch.Deleted)
+                return Ok(new ApiResult<object>() { code = 1, message = "分享已删除", data = null });
             if (batch.staff_id != staff.id)
             {
                 // 只能撤自己发起的：撤别人的分享既没需求，也容易误操作
