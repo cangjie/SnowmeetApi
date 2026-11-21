@@ -20,11 +20,18 @@ public class RentProductAvailability
     {
         var productIds = ids.Distinct().ToArray();
         if (productIds.Length == 0) return new HashSet<int>();
-        return (await db.rentProductUnavailability.AsNoTracking()
+        var blocked = (await db.rentProductUnavailability.AsNoTracking()
             .Where(x => x.valid == 1 && productIds.Contains(x.rent_product_id)
                 && (x.start_time == null || x.start_time <= now)
                 && (x.end_time == null || now < x.end_time))
             .Select(x => x.rent_product_id).Distinct().ToListAsync()).ToHashSet();
+        var trials = await db.trialReservation.AsNoTracking()
+            .Where(x => productIds.Contains(x.rent_product_id) &&
+                (x.status == TrialReservation.InUse ||
+                 (x.status == TrialReservation.Pending && x.reservation_date == now.Date)))
+            .Select(x => x.rent_product_id).Distinct().ToListAsync();
+        blocked.UnionWith(trials);
+        return blocked;
     }
 
     // 只改变返回值；库存基础状态仍由发放和归还维护。
@@ -63,5 +70,21 @@ public class RentProductAvailability
         if (product != null && !string.IsNullOrWhiteSpace(product.status) && product.status.Trim() != "正常")
             return true;
         return await IsBlockedAsync(id, code, now);
+    }
+
+    public async Task<bool> IsBlockedForOpenRentalAsync(int? id, string? barcode, DateTime start, DateTime now)
+    {
+        var ids = new List<int>();
+        if (id != null) ids.Add(id.Value);
+        if (!string.IsNullOrWhiteSpace(barcode))
+        {
+            var matches = await db.rentProduct.AsNoTracking().Where(p => p.valid == 1 && p.barcode != null && p.barcode.Trim() == barcode.Trim())
+                .Select(p => p.id).ToListAsync();
+            ids.AddRange(matches);
+        }
+        if (ids.Count == 0) return false;
+        return await db.trialReservation.AsNoTracking().AnyAsync(r => ids.Contains(r.rent_product_id)
+            && (r.status == TrialReservation.InUse || (r.status == TrialReservation.Pending
+                && r.reservation_date >= start.Date && r.reservation_date >= now.Date)));
     }
 }

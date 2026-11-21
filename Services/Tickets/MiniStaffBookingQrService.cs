@@ -28,6 +28,14 @@ public sealed class MiniStaffBookingQrService(IMiniTicketTokenProvider tokens, H
     public const string CoachClaimPage = "pages/coach/claim/claim";
     public const string CouponClaimPage = "pages/coach/coupon_claim/coupon_claim";
     public const string MemberWechatBindPage = "pages/member/wechat_bind";
+    public const string TrialCheckinPage = "pages/trial/checkin";
+
+    public Task<byte[]> GetForTrialCheckinAsync(string token, string envVersion = "release")
+    {
+        if (token == null || !System.Text.RegularExpressions.Regex.IsMatch(token, "^[0-9a-f]{24}$"))
+            throw new ArgumentException("签到码无效");
+        return RenderAsync(TrialCheckinPage, token, envVersion);
+    }
 
     public Task<byte[]> GetForMemberWechatBindAsync(string token, string envVersion = "release")
     {

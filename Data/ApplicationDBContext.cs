@@ -21,6 +21,7 @@ namespace SnowmeetApi.Data
         {
             FnbSchemaConfiguration.Configure(modelBuilder, Database.IsSqlServer());
             CoachSchemaConfiguration.Configure(modelBuilder);
+            TrialReservationSchemaConfiguration.Configure(modelBuilder);
             modelBuilder.Entity<StaffCouponBatch>().HasIndex(x => new { x.staff_id, x.request_id }).IsUnique();
             modelBuilder.Entity<StaffCouponBatchTicket>().HasIndex(x => x.batch_id);
             modelBuilder.Entity<RentalSeasonCardUse>().HasIndex(x => new { x.card_id, x.rental_date })
@@ -188,6 +189,8 @@ namespace SnowmeetApi.Data
         public DbSet<RentCategoryInfoField> rentCategoryInfoField { get; set; }
         public DbSet<RentProduct> rentProduct { get; set; }
         public DbSet<RentProductUnavailability> rentProductUnavailability { get; set; }
+        public DbSet<TrialBoard> trialBoard { get; set; }
+        public DbSet<TrialReservation> trialReservation { get; set; }
         public DbSet<RentProductDetailInfo> rentProductDetailInfo { get; set; }
         public DbSet<Rental> rental { get; set; }
         public DbSet<Models.RentalDetail> rentalDetail { get; set; }

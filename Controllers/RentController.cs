@@ -5047,7 +5047,9 @@ namespace SnowmeetApi.Controllers
                 _db.rentItem.Entry(item).State = EntityState.Modified;
                 // 支付完成后时间段可能刚生效：保留已支付订单，但不发放被锁定的物品。
                 if (item.atOnce && !item.noNeed && !item.noCode
-                    && await new RentProductAvailability(_db).IsBlockedAsync(item.rent_product_id, item.code?.Trim(), DateTime.Now))
+                    && (await new RentProductAvailability(_db).IsBlockedAsync(item.rent_product_id, item.code?.Trim(), DateTime.Now)
+                        || await new RentProductAvailability(_db).IsBlockedForOpenRentalAsync(item.rent_product_id, item.code,
+                            DateTime.Now, DateTime.Now)))
                 {
                     item.atOnce = false;
                     await _db.coreDataModLog.AddAsync(CoreDataModLog.CreateManualLog("RentItem", "", item.id, "租赁开单",
@@ -5404,6 +5406,15 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<ApiResult<Models.Rental?>>> AssignCrossShopItem(int rentItemId,
             [FromBody] AssignCrossShopItemRequest request, string sessionKey, string sessionType = "wechat_mini_openid")
         {
+            if (request?.productId == null || !await _db.trialBoard.AsNoTracking().AnyAsync(b => b.valid == 1 && b.rent_product_id == request.productId))
+                return await AssignCrossShopItemCore(rentItemId, request, sessionKey, sessionType);
+            return await SnowmeetApi.Services.Tickets.MiniTicketTransaction.Run(_db,
+                () => AssignCrossShopItemCore(rentItemId, request, sessionKey, sessionType));
+        }
+
+        private async Task<ActionResult<ApiResult<Models.Rental?>>> AssignCrossShopItemCore(int rentItemId,
+            AssignCrossShopItemRequest request, string sessionKey, string sessionType)
+        {
             Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
             if (staff == null || staff.title_level < 100)
                 return Ok(new ApiResult<Models.Rental?> { code = 1, message = "没有权限" });
@@ -5428,6 +5439,10 @@ namespace SnowmeetApi.Controllers
                     return Ok(new ApiResult<Models.Rental?> { code = 1, message = "租赁物不存在、分类不符或不可用" });
                 if (await new RentProductAvailability(_db).IsBlockedAsync(product.id, null, DateTime.Now))
                     return Ok(new ApiResult<Models.Rental?> { code = 1, message = "租赁物当前不可用，请重新录入" });
+                var rentalStart = await _db.rental.AsNoTracking().Where(r => r.id == item.rental_id)
+                    .Select(r => r.start_date).FirstOrDefaultAsync();
+                if (await new RentProductAvailability(_db).IsBlockedForOpenRentalAsync(product.id, null, rentalStart ?? DateTime.Now, DateTime.Now))
+                    return Ok(new ApiResult<Models.Rental?> { code = 1, message = "该租赁物暂不可用" });
                 if (!await IsCompatibleRentCategory(item.category_id, product.category_id))
                     return Ok(new ApiResult<Models.Rental?> { code = 1, message = "租赁物不存在、分类不符或不可用" });
                 if (item.category_id != product.category_id)
@@ -5647,6 +5662,24 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<ApiResult<Models.Rental?>>> SetRentItemStatus(int rentItemId,
             string status, string sessionKey, string sessionType = "wechat_mini_openid")
         {
+            bool trialBoard = await _db.rentItem.AsNoTracking().Where(item => item.id == rentItemId).AnyAsync(item =>
+                _db.trialBoard.Any(board => board.valid == 1 && (board.rent_product_id == item.rent_product_id ||
+                    _db.rentProduct.Any(product => product.id == board.rent_product_id && product.barcode != null
+                        && item.code != null && product.barcode.Trim() == item.code.Trim()))));
+            if (!trialBoard || (status != "已发放" && status != "已归还"))
+                return await SetRentItemStatusCore(rentItemId, status, sessionKey, sessionType);
+            if (_db.Database.CurrentTransaction != null)
+            {
+                await SnowmeetApi.Services.Tickets.MiniTicketTransaction.Lock(_db, "snowmeet:mini-ticket:issuance");
+                return await SetRentItemStatusCore(rentItemId, status, sessionKey, sessionType);
+            }
+            return await SnowmeetApi.Services.Tickets.MiniTicketTransaction.Run(_db,
+                () => SetRentItemStatusCore(rentItemId, status, sessionKey, sessionType));
+        }
+
+        private async Task<ActionResult<ApiResult<Models.Rental?>>> SetRentItemStatusCore(int rentItemId,
+            string status, string sessionKey, string sessionType)
+        {
             Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
             if (staff == null || staff.title_level < 100)
             {
@@ -5711,6 +5744,9 @@ namespace SnowmeetApi.Controllers
             if (status == "已发放" && !rentItem.noCode && !resumingExistingRental
                 && await new RentProductAvailability(_db).IsBlockedAsync(rentItem.rent_product_id, rentItem.code?.Trim(), DateTime.Now))
                 return Ok(new ApiResult<Models.Rental?> { code = 1, message = "租赁物当前不可用，无法发放" });
+            if (status == "已发放" && !rentItem.noCode && !resumingExistingRental
+                && await new RentProductAvailability(_db).IsBlockedForOpenRentalAsync(rentItem.rent_product_id, rentItem.code, DateTime.Now, DateTime.Now))
+                return Ok(new ApiResult<Models.Rental?> { code = 1, message = "租赁物已被试滑预约，无法发放" });
             RentItemLog log = new RentItemLog()
             {
                 id = 0,
@@ -9209,6 +9245,7 @@ namespace SnowmeetApi.Controllers
             return await RentalBenefitRefundLock.Run(_db, () => RentAppendOrderLock.Run(_db, orderId, async () =>
             {
                 await using var transaction = await _db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
+                await SnowmeetApi.Services.Tickets.MiniTicketTransaction.Lock(_db, "snowmeet:mini-ticket:issuance");
                 var result = await SaveAppendingsCore(orderId, appendings, sessionKey, sessionType, true, expectedOffset);
                 await transaction.CommitAsync();
                 return result;
@@ -9246,6 +9283,16 @@ namespace SnowmeetApi.Controllers
                 || (r.guaranty_discount.HasValue && (!double.IsFinite(r.guaranty_discount.Value) || r.guaranty_discount.Value < 0))
                 || (r.guaranty_discount ?? 0) > (r.guaranty ?? 0)))
                 return Ok(new ApiResult<Models.Order> { code = 1, message = "追加押金或减免金额无效" });
+            if (commit)
+            {
+                var availability = new RentProductAvailability(_db);
+                foreach (var rental in appendings)
+                foreach (var item in rental.rentItems ?? new List<Models.RentItem>())
+                    if (!item.noNeed && (item.rent_product_id != null || !item.noCode)
+                        && await availability.IsBlockedForOpenRentalAsync(item.rent_product_id, item.code,
+                            item.atOnce && rental.start_date > DateTime.Now ? DateTime.Now : rental.start_date ?? DateTime.Now, DateTime.Now))
+                        return Ok(new ApiResult<Models.Order> { code = 1, message = "该租赁物暂不可用" });
+            }
             if (commit && expectedOffset.HasValue)
             {
                 var preview = await new GuarantyTransferService(_db).CalculateAsync(mainOrder, appendings);
