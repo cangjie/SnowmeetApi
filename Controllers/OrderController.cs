@@ -3400,8 +3400,8 @@ namespace SnowmeetApi.Controllers
             var availability = new SnowmeetApi.Services.Rent.RentProductAvailability(_db);
             foreach (var item in order.rentals.SelectMany(r => r.rentItems ?? new List<Models.RentItem>()))
             {
-                if (!item.noNeed && !item.noCode && await availability.IsBlockedAsync(item.rent_product_id, item.code?.Trim(), DateTime.Now))
-                    return Ok(new ApiResult<Models.Order> { code = 1, message = $"租赁物 {item.code ?? item.name} 当前不可用，请重新选择" });
+                if (!item.noNeed && !item.noCode && await availability.IsUnavailableForNewRentalAsync(item.rent_product_id, item.code, DateTime.Now))
+                    return Ok(new ApiResult<Models.Order> { code = 1, message = "该租赁物暂不可用" });
             }
             // 租赁按日计费；在开单时固定本单选用卡的折扣，防止后续卡种改价改变已开订单。
             var coachCardIds = order.rentals.Where(r => r.coach_card_id != null).Select(r => r.coach_card_id!.Value).Distinct().ToList();

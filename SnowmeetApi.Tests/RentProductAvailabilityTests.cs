@@ -92,9 +92,59 @@ public class RentProductAvailabilityTests
         f.Db.rentItem.Add(new RentItem { rental_id = rental.id, class_name = "雪板", category_id = 1, code = "TEST-101" });
         await f.Db.SaveChangesAsync();
         var result = await new OrderController(f.NewContext(), f.Config, Http()).PlaceRentOrder(order.id, "session-1");
-        Assert.Equal(1, ((ApiResult<Order>)((OkObjectResult)result.Result!).Value!).code);
+        var response = (ApiResult<Order>)((OkObjectResult)result.Result!).Value!;
+        Assert.Equal(1, response.code);
+        Assert.Equal("该租赁物暂不可用", response.message);
         Assert.Equal(0, (await f.Db.order.AsNoTracking().SingleAsync(x => x.id == order.id)).valid);
         Assert.Empty(await f.Db.guaranty.AsNoTracking().Where(x => x.order_id == order.id).ToListAsync());
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task CheckoutRejectsItemRentedAfterSearch(bool useProductId)
+    {
+        await using var f = await CoachFixture.Create(withPricing: false);
+        f.Db.rentProduct.Add(new RentProduct { id = 101, name = "雪板", barcode = "TEST-101",
+            valid = 1, category_id = 1, status = "租赁中" });
+        var order = new Order { type = "租赁", shop = "万龙服务中心", valid = 0 };
+        f.Db.order.Add(order); await f.Db.SaveChangesAsync();
+        var rental = new Rental { order_id = order.id };
+        f.Db.rental.Add(rental); await f.Db.SaveChangesAsync();
+        f.Db.rentItem.Add(new RentItem { rental_id = rental.id, class_name = "雪板", category_id = 1,
+            rent_product_id = useProductId ? 101 : null, code = "TEST-101" });
+        await f.Db.SaveChangesAsync();
+
+        var result = await new OrderController(f.NewContext(), f.Config, Http()).PlaceRentOrder(order.id, "session-1");
+        var response = (ApiResult<Order>)((OkObjectResult)result.Result!).Value!;
+        Assert.Equal(1, response.code);
+        Assert.Equal("该租赁物暂不可用", response.message);
+        Assert.Equal(0, (await f.Db.order.AsNoTracking().SingleAsync(x => x.id == order.id)).valid);
+        Assert.Empty(await f.Db.guaranty.AsNoTracking().Where(x => x.order_id == order.id).ToListAsync());
+    }
+
+    [Fact]
+    public async Task NewRentalAvailabilityChecksStatusAndOnlyCurrentPeriods()
+    {
+        await using var f = await CoachFixture.Create(withPricing: false);
+        var now = new DateTime(2026, 11, 21, 12, 0, 0);
+        f.Db.rentProduct.AddRange(
+            new RentProduct { id = 101, name = "空状态", barcode = "A101", valid = 1, category_id = 1 },
+            new RentProduct { id = 102, name = "正常", barcode = "A102", valid = 1, category_id = 1, status = "正常" },
+            new RentProduct { id = 103, name = "维修", barcode = "A103", valid = 1, category_id = 1, status = "维修" },
+            new RentProduct { id = 104, name = "已删除", barcode = "A104", valid = 0, category_id = 1 });
+        f.Db.rentProductUnavailability.AddRange(
+            new RentProductUnavailability { rent_product_id = 101, start_time = now, end_time = now.AddHours(1) },
+            new RentProductUnavailability { rent_product_id = 102, start_time = now.AddHours(1) });
+        await f.Db.SaveChangesAsync();
+        var availability = new RentProductAvailability(f.NewContext());
+        Assert.True(await availability.IsUnavailableForNewRentalAsync(101, "A101", now));
+        Assert.False(await availability.IsUnavailableForNewRentalAsync(101, "A101", now.AddHours(1)));
+        Assert.False(await availability.IsUnavailableForNewRentalAsync(102, "A102", now));
+        Assert.True(await availability.IsUnavailableForNewRentalAsync(null, "A103", now));
+        Assert.True(await availability.IsUnavailableForNewRentalAsync(999, "missing", now));
+        Assert.True(await availability.IsUnavailableForNewRentalAsync(104, "A104", now));
+        Assert.False(await availability.IsUnavailableForNewRentalAsync(null, "unregistered", now));
     }
 
     [Fact]

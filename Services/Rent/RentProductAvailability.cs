@@ -49,4 +49,19 @@ public class RentProductAvailability
         }
         return (await BlockedIdsAsync(ids, now)).Count > 0;
     }
+
+    public async Task<bool> IsUnavailableForNewRentalAsync(int? id, string? barcode, DateTime now)
+    {
+        var code = barcode?.Trim();
+        var product = id.HasValue
+            ? await db.rentProduct.AsNoTracking().FirstOrDefaultAsync(p => p.id == id.Value)
+            : string.IsNullOrEmpty(code) ? null
+            : await db.rentProduct.AsNoTracking()
+                .Where(p => p.valid == 1 && p.barcode != null && p.barcode.Trim() == code)
+                .OrderByDescending(p => p.id).FirstOrDefaultAsync();
+        if (id.HasValue && (product == null || product.valid != 1)) return true;
+        if (product != null && !string.IsNullOrWhiteSpace(product.status) && product.status.Trim() != "正常")
+            return true;
+        return await IsBlockedAsync(id, code, now);
+    }
 }
