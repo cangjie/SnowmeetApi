@@ -35,6 +35,7 @@ namespace SnowmeetApi.Controllers
     public class RentController : ControllerBase
     {
         private static readonly SemaphoreSlim RentalChargeLock = new SemaphoreSlim(1, 1);
+        private static readonly SemaphoreSlim[] AppendSaveLocks = Enumerable.Range(0, 64).Select(_ => new SemaphoreSlim(1, 1)).ToArray();
         private readonly ApplicationDBContext _db;
         private IConfiguration _config;
         public string _appId = "";
@@ -5109,6 +5110,17 @@ namespace SnowmeetApi.Controllers
         [NonAction]
         public async Task<Models.Order> EffectAppendingRentals(int orderId, int paymentId)
         {
+            return await RentalBenefitRefundLock.Run(_db, () => RentAppendOrderLock.Run(_db, orderId, async () =>
+            {
+                await using var transaction = await _db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
+                var result = await EffectAppendingRentalsCore(orderId, paymentId);
+                await transaction.CommitAsync();
+                return result;
+            }));
+        }
+        [NonAction]
+        private async Task<Models.Order> EffectAppendingRentalsCore(int orderId, int paymentId)
+        {
             OrderController _orderH = new OrderController(_db, _oriConfig, _httpContextAccessor);
             Models.Order order = await _orderH.GetOrder(orderId);
             if (order.availablePayments.Where(a => a.id == paymentId).ToList().Count <= 0)
@@ -5161,6 +5173,14 @@ namespace SnowmeetApi.Controllers
                 return null;
             }
             OrderController _orderHelper = new OrderController(_db, _oriConfig, _httpContextAccessor);
+            // 追加补款的重复支付回调：该支付已关联到生效的追加项时，不能再次生效整张原订单。
+            bool alreadyAppliedToAppend = await (from gp in _db.guarantyPayment.AsNoTracking()
+                join g in _db.guaranty.AsNoTracking() on gp.guaranty_id equals g.id
+                join r in _db.rental.AsNoTracking() on g.biz_id equals (int?)r.id
+                where gp.payment_id == paymentId && g.order_id == orderId && g.valid == 1
+                    && g.biz_type == "租赁" && r.appending == false && r.append_commit_time != null
+                select gp.guaranty_id).AnyAsync();
+            if (alreadyAppliedToAppend) return await _orderHelper.GetOrder(orderId);
             Models.Order order = (await _orderHelper.GetCommonOrders(orderId, null, null, null, null, null, null)).FirstOrDefault();
             OrderPayment payment = order.availablePayments.Where(p => p.id == paymentId).FirstOrDefault();
             List<Guaranty> guaranties = new List<Guaranty>();
@@ -9075,6 +9095,23 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<ApiResult<Models.Order>>> RemoveAppendingRental(int rentalId,
             string sessionKey, string sessionType = "wechat_mini_openid")
         {
+            return await RentalBenefitRefundLock.Run(_db, async () =>
+            {
+                var orderId = await _db.rental.AsNoTracking().Where(r => r.id == rentalId).Select(r => r.order_id).FirstOrDefaultAsync();
+                if (orderId == null) return Ok(new ApiResult<Models.Order> { code = 1, message = "追加项不存在" });
+                return await RentAppendOrderLock.Run(_db, orderId.Value, async () =>
+                {
+                    await using var transaction = await _db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
+                    var result = await RemoveAppendingRentalCore(rentalId, sessionKey, sessionType);
+                    await transaction.CommitAsync();
+                    return result;
+                });
+            });
+        }
+        [NonAction]
+        private async Task<ActionResult<ApiResult<Models.Order>>> RemoveAppendingRentalCore(int rentalId,
+            string sessionKey, string sessionType)
+        {
             Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
             if (staff == null || staff.title_level < 100)
             {
@@ -9088,12 +9125,21 @@ namespace SnowmeetApi.Controllers
             Rental rental = await _db.rental
                 .Where(r => r.id == rentalId && r.appending != null && r.append_commit_time == null)
                 .AsNoTracking().FirstOrDefaultAsync();
+            if (rental == null) return Ok(new ApiResult<Models.Order> { code = 1, message = "追加项不存在或已生效" });
             rental.valid = 0;
             _db.rental.Entry(rental).State = EntityState.Modified;
             // 清掉该追加项的押金应收记录（已确认待支付项可能已建 Guaranty），避免删除后残留虚账
             List<Models.Guaranty> gs = await _db.guaranty
                 .Where(g => g.valid == 1 && g.order_id == rental.order_id && g.biz_type == "租赁" && g.biz_id == rental.id)
                 .ToListAsync();
+            var targetGuarantyIds = gs.Select(g => g.id).ToArray();
+            var transferStarted = await _db.guarantyTransfer.AsNoTracking()
+                .Where(t => t.order_id == rental.order_id && t.valid == 1 && targetGuarantyIds.Contains(t.target_guaranty_id))
+                .Select(t => (DateTime?)t.create_date).MinAsync();
+            if (transferStarted.HasValue && await _db.orderPayment.AsNoTracking().AnyAsync(p => p.order_id == rental.order_id
+                && p.valid == 1 && p.create_date >= transferStarted.Value && (p.status == "待支付" || p.status == "支付成功")))
+                return Ok(new ApiResult<Models.Order> { code = 1, message = "追加支付尚未取消或已支付，请先处理支付再删除" });
+            await new GuarantyTransferService(_db).ReverseAsync((int)rental.order_id, targetGuarantyIds);
             for (int gi = 0; gi < gs.Count; gi++)
             {
                 gs[gi].valid = 0;
@@ -9138,8 +9184,39 @@ namespace SnowmeetApi.Controllers
             });
         }
         [HttpPost("{orderId}")]
+        public async Task<ActionResult<ApiResult<GuarantyTransferService.Quote>>> GetAppendDepositQuote(int orderId,
+            [FromBody] List<Rental> appendings, string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            var staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            if (staff == null || staff.title_level < 100)
+                return Ok(new ApiResult<GuarantyTransferService.Quote> { code = 1, message = "没有权限" });
+            var order = await new OrderController(_db, _oriConfig, _httpContextAccessor).GetOrder(orderId);
+            if (order == null || order.type != "租赁")
+                return Ok(new ApiResult<GuarantyTransferService.Quote> { code = 1, message = "订单不存在" });
+            if (appendings == null || appendings.Any(r => r == null || r.order_id != orderId))
+                return Ok(new ApiResult<GuarantyTransferService.Quote> { code = 1, message = "追加项不属于当前订单" });
+            var quote = await new GuarantyTransferService(_db).CalculateAsync(order, appendings);
+            return Ok(new ApiResult<GuarantyTransferService.Quote> { code = 0, data = quote });
+        }
+
+        [HttpPost("{orderId}")]
         public async Task<ActionResult<ApiResult<Models.Order>>> SaveAppendings([FromRoute] int orderId, [FromBody] List<Rental> appendings,
-            [FromQuery] string sessionKey, [FromQuery] string sessionType = "wechat_mini_openid", [FromQuery] bool commit = true)
+            [FromQuery] string sessionKey, [FromQuery] string sessionType = "wechat_mini_openid", [FromQuery] bool commit = true,
+            [FromQuery] double? expectedOffset = null)
+        {
+            if (!commit) return await RentAppendOrderLock.Run(_db, orderId,
+                () => SaveAppendingsCore(orderId, appendings, sessionKey, sessionType, false, null));
+            return await RentalBenefitRefundLock.Run(_db, () => RentAppendOrderLock.Run(_db, orderId, async () =>
+            {
+                await using var transaction = await _db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
+                var result = await SaveAppendingsCore(orderId, appendings, sessionKey, sessionType, true, expectedOffset);
+                await transaction.CommitAsync();
+                return result;
+            }));
+        }
+        [NonAction]
+        private async Task<ActionResult<ApiResult<Models.Order>>> SaveAppendingsCore(int orderId, List<Rental> appendings,
+            string sessionKey, string sessionType, bool commit, double? expectedOffset)
         {
             Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
             if (staff == null || staff.title_level < 100)
@@ -9164,6 +9241,25 @@ namespace SnowmeetApi.Controllers
                     data = null
                 });
             }
+            if (appendings == null || appendings.Any(r => r == null
+                || (r.guaranty.HasValue && (!double.IsFinite(r.guaranty.Value) || r.guaranty.Value < 0))
+                || (r.guaranty_discount.HasValue && (!double.IsFinite(r.guaranty_discount.Value) || r.guaranty_discount.Value < 0))
+                || (r.guaranty_discount ?? 0) > (r.guaranty ?? 0)))
+                return Ok(new ApiResult<Models.Order> { code = 1, message = "追加押金或减免金额无效" });
+            if (commit && expectedOffset.HasValue)
+            {
+                var preview = await new GuarantyTransferService(_db).CalculateAsync(mainOrder, appendings);
+                if (!double.IsFinite(expectedOffset.Value) || Math.Round(expectedOffset.Value, 2) != Math.Round(preview.offset, 2))
+                    return Ok(new ApiResult<Models.Order> { code = 1, message = "可抵扣押金已变化，请重新确认" });
+            }
+            // 自动保存和确认追加只能操作仍未确认的草稿，防止迟到请求把已确认记录改回草稿。
+            {
+                var requestedIds = appendings.Where(r => r != null && r.order_id == orderId).Select(r => r.id).ToArray();
+                int validDraftCount = await _db.rental.AsNoTracking().CountAsync(r => requestedIds.Contains(r.id)
+                    && r.order_id == orderId && r.valid == 1 && r.appending == true && r.append_commit_time == null);
+                if (requestedIds.Length != appendings.Count || requestedIds.Distinct().Count() != requestedIds.Length || validDraftCount != requestedIds.Length)
+                    return Ok(new ApiResult<Models.Order> { code = 1, message = "追加项已确认或不存在，请刷新订单" });
+            }
             for (int i = 0; i < appendings.Count; i++)
             {
                 if (orderId == appendings[i].order_id)
@@ -9172,6 +9268,11 @@ namespace SnowmeetApi.Controllers
                 }
             }
             Models.Order order = await _orderH.GetOrder(orderId);
+            if (commit)
+            {
+                await new GuarantyTransferService(_db).ApplyAsync(order, appendings, staff.id);
+                order = await _orderH.GetOrder(orderId);
+            }
             // commit=false：实时保存草稿（只持久化字段，保持 appending=true，不提交/不生效/不算应付）
             if (commit)
             {
@@ -9196,7 +9297,9 @@ namespace SnowmeetApi.Controllers
                 {
                     guarantyAmount = guarantyAmount - (double)rental.guaranty_discount;
                 }
-                if (rental.noGuaranty || guarantyAmount == 0)
+                bool coveredByDeposit = rental.guaranties != null && rental.guaranties.Any(g => g.valid == 1)
+                    && rental.guaranties.Where(g => g.valid == 1).All(g => g.payStatus == "支付完成");
+                if (rental.noGuaranty || guarantyAmount == 0 || coveredByDeposit)
                 {
                     rental.appending = false;
                     rental.append_commit_time = DateTime.Now;
@@ -9228,47 +9331,68 @@ namespace SnowmeetApi.Controllers
         [NonAction]
         public async Task<Rental> SaveAppendingRental(Rental rental, bool commit = true)
         {
-            rental.priceList = new List<RentPrice>();
-            rental.appending = commit ? false : true;
-            rental.update_date = DateTime.Now;
-            for (int i = 0; rental.pricePresets != null && i < rental.pricePresets.Count; i++)
+            // 同一草稿的自动保存可能并发，配套项和价目可能一直以 id=0 重复提交。
+            var saveLock = AppendSaveLocks[(int)((uint)rental.id % (uint)AppendSaveLocks.Length)];
+            await saveLock.WaitAsync();
+            try
             {
-                RentalPricePreset preset = rental.pricePresets[i];
-                if (preset.id == 0)
+                rental.priceList = new List<RentPrice>();
+                rental.appending = commit ? false : true;
+                rental.update_date = DateTime.Now;
+                var presets = rental.pricePresets ?? new List<RentalPricePreset>();
+                var presetIds = presets.Where(p => p != null && p.id > 0).Select(p => p.id).ToHashSet();
+                var savedPresets = presets.Any(p => p != null && p.id == 0)
+                    ? await _db.rentalPricePreset.AsNoTracking().Where(p => p.rental_id == rental.id).OrderBy(p => p.id).ToListAsync()
+                    : new List<RentalPricePreset>();
+                foreach (var preset in presets)
                 {
-                    await _db.rentalPricePreset.AddAsync(preset);
+                    if (preset == null) continue;
+                    if (preset.id == 0)
+                    {
+                        var existing = savedPresets.FirstOrDefault(p => !presetIds.Contains(p.id) && p.rent_date.Date == preset.rent_date.Date);
+                        if (existing != null) { preset.id = existing.id; presetIds.Add(existing.id); }
+                    }
+                    preset.rental_id = rental.id;
+                    preset.rental = null;
+                    if (preset.id == 0) await _db.rentalPricePreset.AddAsync(preset);
+                    else _db.rentalPricePreset.Entry(preset).State = EntityState.Modified;
                 }
-                else
+                var items = rental.rentItems ?? new List<Models.RentItem>();
+                var itemIds = items.Where(i => i != null && i.id > 0).Select(i => i.id).ToHashSet();
+                var savedAssociates = items.Any(i => i != null && i.id == 0 && i.is_associate && i.category_id != null)
+                    ? await _db.rentItem.AsNoTracking().Where(i => i.rental_id == rental.id && i.valid == 1 && i.is_associate)
+                        .OrderBy(i => i.id).ToListAsync()
+                    : new List<Models.RentItem>();
+                foreach (var item in items)
                 {
-                    _db.rentalPricePreset.Entry(preset).State = EntityState.Modified;
+                    if (item == null) continue;
+                    if (item.id == 0 && item.is_associate && item.category_id != null)
+                    {
+                        var existing = savedAssociates.FirstOrDefault(i => !itemIds.Contains(i.id) && i.category_id == item.category_id);
+                        if (existing != null) { item.id = existing.id; itemIds.Add(existing.id); }
+                    }
+                    item.rental_id = rental.id;
+                    // 分类对象只供显示，含 IgnoreCycles 序列化留下的 null 引用，不能作为 EF 新实体图保存。
+                    item.category = null;
+                    item.rental = null;
+                    item.logs = new List<RentItemLog>();
+                    if (item.id == 0) await _db.rentItem.AddAsync(item);
+                    else _db.rentItem.Entry(item).State = EntityState.Modified;
                 }
+                // 押金应收记录只在确认提交时建/改。
+                if (commit) await SyncRentalGuaranty(rental);
+                _db.rental.Entry(rental).State = EntityState.Modified;
+                await _db.SaveChangesAsync();
+                _db.rental.Entry(rental).State = EntityState.Detached;
+                foreach (var item in items)
+                    if (item != null) _db.rentItem.Entry(item).State = EntityState.Detached;
+                await _db.SaveChangesAsync();
+                return rental;
             }
-            for (int i = 0; rental.rentItems != null && i < rental.rentItems.Count; i++)
+            finally
             {
-                Models.RentItem rentItem = rental.rentItems[i];
-                if (rentItem.id == 0)
-                {
-                    await _db.rentItem.AddAsync(rentItem);
-                }
-                else
-                {
-                    _db.rentItem.Entry(rentItem).State = EntityState.Modified;
-                }
+                saveLock.Release();
             }
-            // 押金应收记录只在确认提交（commit）时建/改；实时保存草稿阶段不建，避免中途删草稿残留 Guaranty
-            if (commit)
-            {
-                await SyncRentalGuaranty(rental);
-            }
-            _db.rental.Entry(rental).State = EntityState.Modified;
-            await _db.SaveChangesAsync();
-            _db.rental.Entry(rental).State = EntityState.Detached;
-            for (int i = 0; rental.rentItems != null && i < rental.rentItems.Count; i++)
-            {
-                _db.rentItem.Entry(rental.rentItems[i]).State = EntityState.Detached;
-            }
-            await _db.SaveChangesAsync();
-            return rental;
         }
         // 依据 rental.guaranty - guaranty_discount 同步未支付的 Guaranty 记录（>0 建/改，否则置 valid=0）。
         // 仅暂存改动，由调用方负责 SaveChangesAsync。
@@ -9277,7 +9401,7 @@ namespace SnowmeetApi.Controllers
         {
             if (rental.noGuaranty != true)
             {
-                double gAmount = Math.Round((double)rental.guaranty - (double)rental.guaranty_discount, 2);
+                double gAmount = Math.Round((rental.guaranty ?? 0) - (rental.guaranty_discount ?? 0), 2);
                 Models.Guaranty? guaranty = await _db.guaranty
                     .Where(g => g.valid == 1 && g.order_id == rental.order_id && g.biz_type == "租赁" && g.biz_id == rental.id)
                     .AsNoTracking().FirstOrDefaultAsync();

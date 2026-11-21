@@ -3194,8 +3194,30 @@ namespace SnowmeetApi.Controllers
         // payment_refund.staff_id 留空即可（同 StartMyPunchCardPayment 里顾客自助支付单 staff_id=null 的先例）；
         // 这类调用方应在传入的 refunds 上预填 oper_member_id，把"谁发起的"记在会员维度。
         [NonAction]
-        public async Task<ApiResult<Models.Order?>> RefundCore(Models.Order order, Staff? staff, List<OrderPaymentRefund> refunds)
+        public async Task<ApiResult<Models.Order?>> RefundCore(Models.Order order, Staff? staff, List<OrderPaymentRefund> refunds,
+            bool rentLockHeld = false)
         {
+            if (order?.type == "租赁" && !rentLockHeld)
+                return await SnowmeetApi.Services.Rent.RentAppendOrderLock.Run(_db, order.id, async () =>
+                    await RefundCore(await GetOrder(order.id), staff, refunds, true));
+            // 押金已转用于新租赁时，不能把占用中的部分再次退款；包括尚未完成的退款申请。
+            if (order?.type == "租赁" && await _db.guarantyTransfer.AsNoTracking().AnyAsync(t => t.order_id == order.id && t.valid == 1))
+            {
+                var quote = await new SnowmeetApi.Services.Rent.GuarantyTransferService(_db)
+                    .CalculateAsync(order, new List<Rental>());
+                if (refunds == null || refunds.Any(r => !double.IsFinite(r.amount) || r.amount <= 0)
+                    || refunds.Select(r => r.payment_id).Distinct().Count() != refunds.Count
+                    || Math.Round(refunds.Sum(r => r.amount), 2) > Math.Round(quote.refundable, 2))
+                    return new ApiResult<Models.Order?> { code = 1, message = "可退押金已变化，请刷新后重试" };
+                foreach (var refund in refunds)
+                {
+                    var payment = order.availablePayments.FirstOrDefault(p => p.id == refund.payment_id);
+                    var alreadyRequested = await _db.orderPaymentRefund.AsNoTracking().Where(r => r.payment_id == refund.payment_id)
+                        .SumAsync(r => (double?)r.amount) ?? 0;
+                    if (payment == null || Math.Round(alreadyRequested + refund.amount, 2) > Math.Round(payment.amount, 2))
+                        return new ApiResult<Models.Order?> { code = 1, message = "该笔支付的可退金额已变化，请刷新后重试" };
+                }
+            }
             if (await CareCardSaleService.ContainsCardSaleAsync(_db, order.id))
                 return new ApiResult<Models.Order?> { code = 1, message = "含卡订单不允许退款，取消养护只返还次数", data = null };
             int orderId = order.id;

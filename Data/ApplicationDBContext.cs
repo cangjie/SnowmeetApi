@@ -194,6 +194,7 @@ namespace SnowmeetApi.Data
         public DbSet<Models.RentItem> rentItem { get; set; }
         public DbSet<Guaranty> guaranty { get; set; }
         public DbSet<GuarantyPayment> guarantyPayment { get; set; }
+        public DbSet<GuarantyTransfer> guarantyTransfer { get; set; }
         public DbSet<Models.DepositAccount> depositAccount { get; set; }
         public DbSet<Models.DepositBalance> depositBalance { get; set; }
         public DbSet<Models.ScanQrCode> scanQrCode { get; set; }

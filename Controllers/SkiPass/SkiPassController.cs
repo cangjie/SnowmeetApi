@@ -24,6 +24,7 @@ using System.Runtime.CompilerServices;
 using Microsoft.CodeAnalysis.CSharp;
 using SnowmeetApi.Services.Ops;
 using SnowmeetApi.Services.Share;
+using SnowmeetApi.Services;
 namespace SnowmeetApi.Controllers
 {
     [Route("core/[controller]/[action]")]
@@ -1496,9 +1497,19 @@ namespace SnowmeetApi.Controllers
             }
             List<SkipassCartItem> tickets = SkipassCartRules.Expand(cartItems);
             Member member = await _memberHelper.GetMemberBySessionKey(sessionKey, sessionType);
-            if (member == null)
+            if (member == null || member.is_merge == 1 || member.merge_id != null)
             {
-                return BadRequest("会话无效");
+                try
+                {
+                    int? memberId = await new SkipassMemberService(_context).EnsureAsync(sessionKey, sessionType);
+                    if (memberId == null) return BadRequest("登录信息已失效，请重新进入小程序");
+                    member = await _memberHelper.GetWholeMemberById(memberId.Value);
+                    if (member == null) return BadRequest("会员信息不可用，请联系工作人员");
+                }
+                catch (InvalidOperationException ex)
+                {
+                    return BadRequest(ex.Message);
+                }
             }
 
             // 逐张核对商品和当天价格行

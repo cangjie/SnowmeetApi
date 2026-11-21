@@ -91,6 +91,125 @@ namespace SnowmeetApi.Tests
         // ---------------- 下单 ----------------
 
         [Fact]
+        public async Task 新客人雪票结算创建微信会员并关联订单_重复下单复用会员()
+        {
+            await using var f = await Fixture.Create();
+            await using (var seed = f.NewContext())
+            {
+                seed.miniSession.Add(new MiniSession { session_key = "new-session", session_type = "wechat_mini_openid",
+                    wechat_openid = "new-openid", wechat_unionid = "new-unionid", valid = 1, expire_date = DateTime.Now.AddHours(1) });
+                await seed.SaveChangesAsync();
+            }
+            int memberId;
+            await using (var db = f.NewContext())
+            {
+                var result = await f.Controller(db).ReserveSkiPassCart(new SkipassCartRequest { items = new() { Item(901, "13501177897") } }, "new-session");
+                var order = Assert.IsType<Order>(Assert.IsType<OkObjectResult>(result.Result).Value);
+                memberId = Assert.IsType<int>(order.member_id);
+                Assert.Equal(memberId, (await db.skiPass.AsNoTracking().SingleAsync(p => p.order_id == order.id)).member_id);
+            }
+            await using (var db = f.NewContext())
+            {
+                var member = await db.member.AsNoTracking().SingleAsync(m => m.id == memberId);
+                Assert.Equal(0, member.is_admin); Assert.Equal(0, member.is_staff); Assert.Equal(0, member.is_manager);
+                Assert.Equal(memberId, (await db.miniSession.SingleAsync(s => s.session_key == "new-session")).member_id);
+                Assert.Equal(2, await db.memberSocialAccount.CountAsync(a => a.member_id == memberId && a.valid == 1));
+                Assert.Equal(0, await db.memberSocialAccount.CountAsync(a => a.member_id == memberId && a.type == "cell"));
+                var result = await f.Controller(db).ReserveSkiPassCart(new SkipassCartRequest { items = new() { Item(901, "13501177897") } }, "new-session");
+                Assert.Equal(memberId, Assert.IsType<Order>(Assert.IsType<OkObjectResult>(result.Result).Value).member_id);
+                Assert.Equal(2, await db.memberSocialAccount.CountAsync(a => a.member_id == memberId && a.valid == 1));
+            }
+        }
+
+        [Fact]
+        public async Task 雪票结算按UnionId复用已有会员并绑定微信()
+        {
+            await using var f = await Fixture.Create();
+            await using var db = f.NewContext();
+            db.memberSocialAccount.Add(new MemberSocialAccount { member_id = 11, type = "wechat_unionid", num = "existing-union", valid = 1 });
+            db.miniSession.Add(new MiniSession { session_key = "union-session", session_type = "wechat_mini_openid", wechat_openid = "new-openid",
+                wechat_unionid = "existing-union", valid = 1, expire_date = DateTime.Now.AddHours(1) });
+            await db.SaveChangesAsync(); db.ChangeTracker.Clear();
+            var result = await f.Controller(db).ReserveSkiPassCart(new SkipassCartRequest { items = new() { Item(901, "13501177897") } }, "union-session");
+            Assert.Equal(11, Assert.IsType<Order>(Assert.IsType<OkObjectResult>(result.Result).Value).member_id);
+            Assert.Equal(11, (await db.miniSession.AsNoTracking().SingleAsync(s => s.session_key == "union-session")).member_id);
+            Assert.Single(await db.memberSocialAccount.AsNoTracking().Where(a => a.num == "new-openid" && a.member_id == 11).ToListAsync());
+        }
+
+        [Fact]
+        public async Task 雪票结算复用员工历史微信会员()
+        {
+            await using var f = await Fixture.Create();
+            await using var db = f.NewContext();
+            db.miniSession.Add(new MiniSession { session_key = "job-session", session_type = "wechat_mini_openid", wechat_openid = "staff-openid",
+                valid = 1, expire_date = DateTime.Now.AddHours(1) });
+            await db.SaveChangesAsync(); db.ChangeTracker.Clear();
+            var result = await f.Controller(db).ReserveSkiPassCart(new SkipassCartRequest { items = new() { Item(901, "13501177897") } }, "job-session");
+            Assert.Equal(10, Assert.IsType<Order>(Assert.IsType<OkObjectResult>(result.Result).Value).member_id);
+            Assert.Equal(2, await db.member.CountAsync());
+        }
+
+        [Fact]
+        public async Task 雪票结算复用同一微信其他有效会话的会员()
+        {
+            await using var f = await Fixture.Create();
+            await using var db = f.NewContext();
+            db.miniSession.AddRange(
+                new MiniSession { session_key = "peer-session", session_type = "wechat_mini_openid", wechat_openid = "peer-open", member_id = 11, valid = 1, expire_date = DateTime.Now.AddHours(1) },
+                new MiniSession { session_key = "new-peer", session_type = "wechat_mini_openid", wechat_openid = "peer-open", valid = 1, expire_date = DateTime.Now.AddHours(1) });
+            await db.SaveChangesAsync(); db.ChangeTracker.Clear();
+            var result = await f.Controller(db).ReserveSkiPassCart(new SkipassCartRequest { items = new() { Item(901, "13501177897") } }, "new-peer");
+            Assert.Equal(11, Assert.IsType<Order>(Assert.IsType<OkObjectResult>(result.Result).Value).member_id);
+            Assert.Equal(2, await db.member.CountAsync());
+        }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task 合并来源的旧微信关联不阻止新会员购买雪票(bool sessionPointsToMerged)
+        {
+            await using var f = await Fixture.Create();
+            await using var db = f.NewContext();
+            db.member.Add(new Member { id = 20, valid = 1, is_merge = 1, merge_id = 11, real_name = "", gender = "" });
+            db.memberSocialAccount.AddRange(
+                new MemberSocialAccount { member_id = 20, type = "wechat_mini_openid", num = "merged-open", valid = 0 },
+                new MemberSocialAccount { member_id = 20, type = "wechat_unionid", num = "merged-union", valid = 0 });
+            db.socialAccountForJob.Add(new SocialAccountForJob { wechat_mini_openid = "merged-open", member_id = 99999 });
+            db.miniSession.Add(new MiniSession { session_key = "merged-session", session_type = "wechat_mini_openid", wechat_openid = "merged-open",
+                wechat_unionid = "merged-union", member_id = sessionPointsToMerged ? 20 : null, valid = 1, expire_date = DateTime.Now.AddHours(1) });
+            await db.SaveChangesAsync(); db.ChangeTracker.Clear();
+            var result = await f.Controller(db).ReserveSkiPassCart(new SkipassCartRequest { items = new() { Item(901, "13501177897") } }, "merged-session");
+            var order = Assert.IsType<Order>(Assert.IsType<OkObjectResult>(result.Result).Value);
+            Assert.NotNull(order.member_id);
+            Assert.NotEqual(20, order.member_id);
+            Assert.NotEqual(11, order.member_id);
+            Assert.Equal(order.member_id, (await db.miniSession.AsNoTracking().SingleAsync(s => s.session_key == "merged-session")).member_id);
+            Assert.Equal(2, await db.memberSocialAccount.AsNoTracking().CountAsync(a => a.member_id == order.member_id && a.valid == 1));
+            Assert.Equal(2, await db.memberSocialAccount.AsNoTracking().CountAsync(a => a.member_id == 20 && a.valid == 0));
+        }
+
+        [Fact]
+        public async Task 雪票结算拒绝过期会话和有冲突的微信会员()
+        {
+            await using var f = await Fixture.Create();
+            await using var db = f.NewContext();
+            db.miniSession.AddRange(
+                new MiniSession { session_key = "expired", session_type = "wechat_mini_openid", wechat_openid = "expired-id", valid = 1, expire_date = DateTime.Now.AddMinutes(-1) },
+                new MiniSession { session_key = "conflict", session_type = "wechat_mini_openid", wechat_openid = "conflict-open", wechat_unionid = "conflict-union", valid = 1, expire_date = DateTime.Now.AddHours(1) });
+            db.memberSocialAccount.AddRange(
+                new MemberSocialAccount { member_id = 10, type = "wechat_mini_openid", num = "conflict-open", valid = 1 },
+                new MemberSocialAccount { member_id = 11, type = "wechat_unionid", num = "conflict-union", valid = 1 });
+            await db.SaveChangesAsync(); db.ChangeTracker.Clear();
+            foreach (var key in new[] { "expired", "conflict" })
+            {
+                var result = await f.Controller(db).ReserveSkiPassCart(new SkipassCartRequest { items = new() { Item(901, "13501177897") } }, key);
+                Assert.IsType<BadRequestObjectResult>(result.Result);
+            }
+            Assert.Equal(2, await db.member.CountAsync());
+            Assert.Empty(await db.order.ToListAsync());
+        }
+
+        [Fact]
         public async Task 取票状态与首次推荐绑定共同提交_写推荐失败时可下次重试()
         {
             await using var f = await Fixture.Create();

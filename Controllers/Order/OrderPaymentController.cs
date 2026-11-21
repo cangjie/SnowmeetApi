@@ -574,8 +574,21 @@ namespace SnowmeetApi.Controllers.Order
         // 系统自动退款（雪票取消确认后）没有店员会话，直接调这里，staffId 留空、oper 写明来源。
         // 不能退（未支付成功、超过可退金额）返回 null。
         [NonAction]
-        public async Task<OrderPaymentRefund?> RefundCore(OrderPayment payment, double amount, string reason, int? staffId, string oper, int? skipassId = null)
+        public async Task<OrderPaymentRefund?> RefundCore(OrderPayment payment, double amount, string reason, int? staffId, string oper, int? skipassId = null,
+            bool rentLockHeld = false)
         {
+            if (!rentLockHeld && await _context.order.AsNoTracking().AnyAsync(o => o.id == payment.order_id && o.type == "租赁"))
+                return await SnowmeetApi.Services.Rent.RentAppendOrderLock.Run(_context, payment.order_id, () =>
+                    RefundCore(payment, amount, reason, staffId, oper, skipassId, true));
+            if (rentLockHeld && await _context.guarantyTransfer.AsNoTracking().AnyAsync(t => t.order_id == payment.order_id && t.valid == 1))
+            {
+                var order = await new SnowmeetApi.Controllers.OrderController(_context, _originConfig, _httpContextAccessor).GetOrder(payment.order_id);
+                var quote = await new SnowmeetApi.Services.Rent.GuarantyTransferService(_context).CalculateAsync(order, new List<Models.Rental>());
+                var requested = await _context.orderPaymentRefund.AsNoTracking().Where(r => r.payment_id == payment.id)
+                    .SumAsync(r => (double?)r.amount) ?? 0;
+                if (!double.IsFinite(amount) || amount <= 0 || Math.Round(amount, 2) > Math.Round(quote.refundable, 2)
+                    || Math.Round(requested + amount, 2) > Math.Round(payment.amount, 2)) return null;
+            }
             int paymentId = payment.id;
             if (!payment.status.Equals("支付成功"))
             {
