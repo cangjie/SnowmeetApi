@@ -31,6 +31,8 @@ public class WanlongNoShareRulesTests
 
     [Theory]
     [InlineData("租赁", 5, true)]     // 万龙租赁商户下的租赁订单
+    [InlineData("租赁", 1018, true)]  // 2026-11-22 新商户 1006012310（wepay_key 1018）同样是非分账订单
+    [InlineData("养护", 1018, false)]
     [InlineData(" 租赁 ", 5, true)]
     [InlineData("租赁", 10, false)]   // 旗舰租赁商户本来就不分账，不在这条规则里
     [InlineData("租赁", 17, false)]

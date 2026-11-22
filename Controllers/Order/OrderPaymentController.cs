@@ -753,16 +753,15 @@ namespace SnowmeetApi.Controllers.Order
 
             try
             {
-                var manager = SnowmeetApi.Services.Payments.WepayPlatformCertificates.CreateManager(key, serial, path);
                 var options = new WechatTenpayClientOptions()
                 {
                     MerchantId = key.mch_id.Trim(),
                     MerchantV3Secret = apiKey,
                     MerchantCertificateSerialNumber = key.key_serial,
-                    MerchantCertificatePrivateKey = key.private_key,
-                    PlatformCertificateManager = manager
-
+                    MerchantCertificatePrivateKey = key.private_key
                 };
+                // 回调头 Wechatpay-Serial 是平台证书序列号（老商户）或微信支付公钥 ID（PUB_KEY_ID_…，公钥模式商户）
+                SnowmeetApi.Services.Payments.WepayPlatformCertificates.ApplyCallbackAuth(options, key, serial, path);
 
                 var client = new WechatTenpayClient(options);
                 //Exception? verifyErr;

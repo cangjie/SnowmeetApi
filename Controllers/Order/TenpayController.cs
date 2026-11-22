@@ -361,16 +361,15 @@ namespace SnowmeetApi.Controllers
 
             try
             {
-                var manager = WepayPlatformCertificates.CreateManager(key, serial, path);
                 var options = new WechatTenpayClientOptions()
                 {
                     MerchantId = key.mch_id.Trim(),
                     MerchantV3Secret = apiKey,
                     MerchantCertificateSerialNumber = key.key_serial,
-                    MerchantCertificatePrivateKey = key.private_key,
-                    PlatformCertificateManager = manager
-
+                    MerchantCertificatePrivateKey = key.private_key
                 };
+                // 回调头 Wechatpay-Serial 是平台证书序列号（老商户）或微信支付公钥 ID（PUB_KEY_ID_…，公钥模式商户）
+                WepayPlatformCertificates.ApplyCallbackAuth(options, key, serial, path);
 
                 var client = new WechatTenpayClient(options);
                 bool valid = client.VerifyEventSignature(timeStamp, nonce, postJson, paySign, serial);
@@ -663,13 +662,11 @@ namespace SnowmeetApi.Controllers
 
             apiKey = key.api_key.Trim();
 
-            var certManager = WepayPlatformCertificates.CreateManager(key, serial, path);
             var options = new WechatTenpayClientOptions()
             {
-                MerchantV3Secret = apiKey,
-                PlatformCertificateManager = certManager
-
+                MerchantV3Secret = apiKey
             };
+            WepayPlatformCertificates.ApplyCallbackAuth(options, key, serial, path);
 
             var client = new WechatTenpayClient(options);
             bool valid = client.VerifyEventSignature(timeStamp, nonce, postData.ToString(), paySign, serial);
@@ -1927,8 +1924,11 @@ namespace SnowmeetApi.Controllers
                         mchId = 3;
                         break;
                     case "租赁":
-                        mchId = 5;
-                        //mchId = 10;
+                        // 2026-11-22 万龙租赁换新微信商户 1006012310（wepay_key 1018，微信支付公钥模式）。
+                        // 用户定：先建行、先部署，试付一笔后再全部切过去——所以现在只有测试订单（is_test = 1）走新账号，
+                        // 其它万龙租赁订单仍走老账号 5；试通了把这里改成 mchId = WanlongRentalNewMchId。
+                        // 已经付过款的订单，退款按付款记录里的 mch_id 走原来的账号，不受这里影响。
+                        mchId = order.is_test == 1 ? SnowmeetApi.Helpers.WanlongShareRules.WanlongRentalNewMchId : 5;
                         break;
                     case "零售":
                         mchId = 12;

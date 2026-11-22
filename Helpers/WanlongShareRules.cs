@@ -39,12 +39,19 @@ namespace SnowmeetApi.Helpers
         public const int WanlongRentalMchId = 5;
 
         /// <summary>
+        /// 万龙租赁新商户 1006012310（微信支付公钥模式）在 wepay_key 里的 id（2026-11-22 用户要求万龙租赁换微信支付账号，建行得到 1018）。
+        /// 新账号下的租赁订单同样是非分账订单（用户 2026-11-22 定：沿用 11-17 的规则）。
+        /// 先只让测试订单走它试付（TenpayController.GetMchId），试通了再让全部万龙租赁走它；老账号 id 5 保留，已付款订单的退款仍走老账号。
+        /// </summary>
+        public const int WanlongRentalNewMchId = 1018;
+
+        /// <summary>
         /// 2026-11-17 用户定：万龙租赁商户（1604236346）下的租赁订单，从现在起一律是「非分账订单」——
         /// 下微信单时不带 profit_sharing 标识，付款记录 need_share = 0，资金不冻结。
         /// 原因：微信分账的最大可分账金额按「付款 − 退款」的净额算（11-01 起实测），而万龙租赁应分是租金的一半、押金退完后占净额 50%，几乎都超限被拒。
         /// </summary>
         public static bool IsNoShareOrder(string? orderType, int? mchId)
-            => (orderType ?? "").Trim() == "租赁" && mchId == WanlongRentalMchId;
+            => (orderType ?? "").Trim() == "租赁" && (mchId == WanlongRentalMchId || mchId == WanlongRentalNewMchId);
 
         /// <summary>
         /// 2026-11-17 用户定：所有给万龙生成的分账一律标成「不自动分账」（payment_share.can_not_share = 1），夜间任务不提交，应分的钱线下结算。

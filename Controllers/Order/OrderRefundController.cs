@@ -309,13 +309,11 @@ namespace SnowmeetApi.Controllers.Order
 
             apiKey = key.api_key.Trim();
 
-            var certManager = SnowmeetApi.Services.Payments.WepayPlatformCertificates.CreateManager(key, serial, path);
             var options = new WechatTenpayClientOptions()
             {
-                MerchantV3Secret = apiKey,
-                PlatformCertificateManager = certManager
-
+                MerchantV3Secret = apiKey
             };
+            SnowmeetApi.Services.Payments.WepayPlatformCertificates.ApplyCallbackAuth(options, key, serial, path);
 
             var client = new WechatTenpayClient(options);
             bool valid = client.VerifyEventSignature(timeStamp, nonce, postData.ToString(), paySign, serial);
