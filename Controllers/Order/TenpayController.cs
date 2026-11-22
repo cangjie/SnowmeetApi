@@ -988,7 +988,8 @@ namespace SnowmeetApi.Controllers
         [HttpGet]
         public async Task DownloadToday()
         {
-            int[] mchId = new int[] { 1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 15, 17 };
+            // 1018 = 万龙租赁新商户（2026-11-22），放最后：它出问题不拖累前面的账号
+            int[] mchId = new int[] { 1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 15, 17, 1018 };
             for (int j = 0; j < mchId.Length; j++)
             {
                 await RequestTradeBill(mchId[j], DateTime.Now.Date.AddDays(-1));
@@ -1000,7 +1001,7 @@ namespace SnowmeetApi.Controllers
         [HttpGet]
         public async Task DownloadHistoryData(DateTime date)
         {
-            int[] mchId = new int[] { 1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 15, 17 };
+            int[] mchId = new int[] { 1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 15, 17, 1018 };
             for (int j = 0; j < mchId.Length; j++)
             {
                 await RequestTradeBill(mchId[j], date);
@@ -1924,11 +1925,10 @@ namespace SnowmeetApi.Controllers
                         mchId = 3;
                         break;
                     case "租赁":
-                        // 2026-11-22 万龙租赁换新微信商户 1006012310（wepay_key 1018，微信支付公钥模式）。
-                        // 用户定：先建行、先部署，试付一笔后再全部切过去——所以现在只有测试订单（is_test = 1）走新账号，
-                        // 其它万龙租赁订单仍走老账号 5；试通了把这里改成 mchId = WanlongRentalNewMchId。
-                        // 已经付过款的订单，退款按付款记录里的 mch_id 走原来的账号，不受这里影响。
-                        mchId = order.is_test == 1 ? SnowmeetApi.Helpers.WanlongShareRules.WanlongRentalNewMchId : 5;
+                        // 2026-11-22 万龙租赁换新微信商户 1006012310（wepay_key 1018，微信支付公钥模式）：
+                        // 体验中心、服务中心的租赁订单一律走新账号（用户 11-22 说「现在就切」；试付一笔 0.01 元，支付回调的公钥验签已验证通过）。
+                        // 老账号 5（1604236346）保留：已经付过款的订单，退款按付款记录里的 mch_id 走原来的账号，不受这里影响。
+                        mchId = SnowmeetApi.Helpers.WanlongShareRules.WanlongRentalNewMchId;
                         break;
                     case "零售":
                         mchId = 12;

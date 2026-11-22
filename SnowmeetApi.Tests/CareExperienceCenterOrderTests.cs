@@ -130,7 +130,7 @@ public class CareExperienceCenterOrderTests
     [Theory]
     [InlineData(Experience, "养护", ServiceCareMerchant)]   // 体验中心的养护 → 服务中心养护商户
     [InlineData(Service, "养护", ServiceCareMerchant)]
-    [InlineData(Experience, "租赁", 5)]                     // 体验中心自己的其它业务不受影响
+    [InlineData(Experience, "租赁", 1018)]                  // 体验中心自己的其它业务不受影响（租赁 2026-11-22 起走万龙租赁新商户 1018）
     [InlineData(Experience, "零售", 12)]
     public void WanlongMerchants_ByShopAndBusiness(string shop, string type, int expected)
     {

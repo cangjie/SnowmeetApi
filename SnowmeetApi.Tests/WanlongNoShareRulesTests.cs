@@ -44,13 +44,15 @@ public class WanlongNoShareRulesTests
         => Assert.Equal(expected, WanlongShareRules.IsNoShareOrder(orderType, mchId));
 
     [Fact]
-    public void The_wanlong_rental_merchant_is_the_one_GetMchId_picks_for_wanlong_rentals()
+    public void The_new_wanlong_rental_merchant_is_the_one_GetMchId_picks_for_wanlong_rentals()
     {
         var helper = new TenpayControllerProbe();
-        Assert.Equal(WanlongShareRules.WanlongRentalMchId, helper.MchIdOf("万龙体验中心", "租赁"));
-        Assert.Equal(WanlongShareRules.WanlongRentalMchId, helper.MchIdOf("万龙服务中心", "租赁"));
-        Assert.NotEqual(WanlongShareRules.WanlongRentalMchId, helper.MchIdOf("万龙体验中心", "养护"));
-        Assert.NotEqual(WanlongShareRules.WanlongRentalMchId, helper.MchIdOf("崇礼旗舰店", "租赁"));
+        // 2026-11-22 起万龙租赁走新商户 1006012310（wepay_key 1018），老商户 5 只保留给之前的付款
+        Assert.Equal(WanlongShareRules.WanlongRentalNewMchId, helper.MchIdOf("万龙体验中心", "租赁"));
+        Assert.Equal(WanlongShareRules.WanlongRentalNewMchId, helper.MchIdOf("万龙服务中心", "租赁"));
+        Assert.NotEqual(WanlongShareRules.WanlongRentalNewMchId, helper.MchIdOf("万龙体验中心", "养护"));
+        Assert.NotEqual(WanlongShareRules.WanlongRentalNewMchId, helper.MchIdOf("崇礼旗舰店", "租赁"));
+        Assert.NotEqual(WanlongShareRules.WanlongRentalMchId, helper.MchIdOf("万龙体验中心", "租赁"));
     }
 
     // GetMchId 只看订单的 shop / type，不碰数据库；用 null 依赖构造会被基类拒绝，这里直接走它的公开方法

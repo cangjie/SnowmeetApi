@@ -35,13 +35,13 @@ namespace SnowmeetApi.Helpers
             return s == "万龙体验中心" || s == "万龙服务中心";
         }
 
-        /// <summary>万龙租赁商户 1604236346 在 wepay_key 里的 id（TenpayController.GetMchId：万龙租赁订单走它）。</summary>
+        /// <summary>万龙租赁老商户 1604236346 在 wepay_key 里的 id。2026-11-22 起新订单走新商户（WanlongRentalNewMchId），老商户保留给之前的付款记录（退款仍走它）。</summary>
         public const int WanlongRentalMchId = 5;
 
         /// <summary>
         /// 万龙租赁新商户 1006012310（微信支付公钥模式）在 wepay_key 里的 id（2026-11-22 用户要求万龙租赁换微信支付账号，建行得到 1018）。
         /// 新账号下的租赁订单同样是非分账订单（用户 2026-11-22 定：沿用 11-17 的规则）。
-        /// 先只让测试订单走它试付（TenpayController.GetMchId），试通了再让全部万龙租赁走它；老账号 id 5 保留，已付款订单的退款仍走老账号。
+        /// 2026-11-22 起体验中心、服务中心的万龙租赁订单一律走它（TenpayController.GetMchId）；老账号 id 5 保留，已付款订单的退款仍走老账号。
         /// </summary>
         public const int WanlongRentalNewMchId = 1018;
 
