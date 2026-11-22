@@ -4137,6 +4137,13 @@ namespace SnowmeetApi.Controllers
                 data = balances
             });
         }
+        // 订单关闭 / 重开（2026-11-22 用户要求租赁订单能重开，沿用这个老接口）。
+        // 返回 null = 没有改动（订单已经是要的状态，或者没有关闭时间——未付款作废的订单 closed = 1、close_date 为空，不在此列）。
+        // 关闭：closed = 1、close_date = 现在；重开：closed = 0，close_date 保留上一次的关闭时间（夜间关单只选 close_date 为空的订单，
+        //       所以重开后的订单夜间不会被自动再关，满足条件后要在订单详情页点「订单关闭」）。
+        // 状态和审计日志在同一个事务里，只改还处在原状态的那一行：并发点两次，只有一次生效，只记一条日志。
+        // 重开时如果这张订单还没有任何关闭日志（夜间自动关单不写日志），先把那次自动关单补记成一条日志（员工为空，时间取 close_date），
+        // 这样关闭 / 重开记录（GetOrderCloseHistory）以后是完整的。
         [NonAction]
         public async Task<Models.Order?> SetOrderClosedState(Models.Order order, bool closed, int staffId)
         {
@@ -4149,69 +4156,139 @@ namespace SnowmeetApi.Controllers
             {
                 return null;
             }
-            order.closed = closed ? 1 : 0;
-            order.close_date = closed ? DateTime.Now : order.close_date;
-            CoreDataModLog log = new CoreDataModLog()
+            DateTime now = DateTime.Now;
+            DateTime closeDateBefore = order.close_date.Value;
+            await using (var tx = await _db.Database.BeginTransactionAsync())
             {
-                table_name = "Order",
-                field_name = "closed",
-                key_value = order.id,
-                prev_value = isOpen ? "0" : "1",
-                current_value = closed ? "1" : "0",
-                staff_id = staffId,
-                is_manual = 1,
-                scene = closed ? "订单关闭" : "订单重开",
-                create_date = DateTime.Now
-            };
-            await _db.coreDataModLog.AddAsync(log);
-            _db.order.Entry(order).State = EntityState.Modified;
-            await _db.SaveChangesAsync();
+                int updated = closed
+                    ? await _db.order.Where(o => o.id == order.id && o.closed == 0)
+                        .ExecuteUpdateAsync(s => s.SetProperty(o => o.closed, 1)
+                            .SetProperty(o => o.close_date, (DateTime?)now)
+                            .SetProperty(o => o.update_date, (DateTime?)now))
+                    : await _db.order.Where(o => o.id == order.id && o.closed == 1 && o.close_date != null)
+                        .ExecuteUpdateAsync(s => s.SetProperty(o => o.closed, 0)
+                            .SetProperty(o => o.update_date, (DateTime?)now));
+                if (updated == 0)
+                {
+                    await tx.RollbackAsync();
+                    return null;
+                }
+                if (!closed && !await _db.coreDataModLog.AnyAsync(l => l.table_name == OrderCloseHistoryRules.TABLE
+                    && l.field_name == OrderCloseHistoryRules.FIELD && l.key_value == order.id && l.current_value == "1"))
+                {
+                    await _db.coreDataModLog.AddAsync(new CoreDataModLog()
+                    {
+                        table_name = OrderCloseHistoryRules.TABLE,
+                        field_name = OrderCloseHistoryRules.FIELD,
+                        key_value = order.id,
+                        prev_value = "0",
+                        current_value = "1",
+                        staff_id = null,
+                        is_manual = 0,
+                        manual_memo = OrderCloseHistoryRules.AUTO_CLOSE_MEMO,
+                        scene = OrderCloseHistoryRules.SCENE_CLOSE,
+                        create_date = closeDateBefore
+                    });
+                }
+                await _db.coreDataModLog.AddAsync(new CoreDataModLog()
+                {
+                    table_name = OrderCloseHistoryRules.TABLE,
+                    field_name = OrderCloseHistoryRules.FIELD,
+                    key_value = order.id,
+                    prev_value = isOpen ? "0" : "1",
+                    current_value = closed ? "1" : "0",
+                    staff_id = staffId,
+                    is_manual = 1,
+                    manual_memo = closed ? "订单详情页关闭订单" : "订单详情页重开订单",
+                    scene = closed ? OrderCloseHistoryRules.SCENE_CLOSE : OrderCloseHistoryRules.SCENE_REOPEN,
+                    create_date = now
+                });
+                await _db.SaveChangesAsync();
+                await tx.CommitAsync();
+            }
+            order.closed = closed ? 1 : 0;
+            order.close_date = closed ? now : order.close_date;
+            order.update_date = now;
             return order;
-
         }
         [HttpGet("{orderId}")]
         public async Task<ActionResult<ApiResult<Models.Order?>>> SetOrderCloseStatus(int orderId, bool closed,
             string sessionKey, string sessionType = "wechat_mini_openid")
         {
+            ActionResult<ApiResult<Models.Order?>> Fail(string message) => Ok(new ApiResult<Models.Order?>()
+            {
+                code = 1,
+                message = message,
+                data = null
+            });
             Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
             if (staff == null || staff.title_level < 100)
             {
-                return Ok(new ApiResult<List<OrderBalance>?>()
-                {
-                    code = 1,
-                    message = "没有权限",
-                    data = null
-                });
+                return Fail("没有权限");
             }
-            Models.Order order = await _db.order.FindAsync(orderId);
+            // 不跟踪：状态由 SetOrderClosedState 用带条件的 UPDATE 改，不靠实体回写
+            Models.Order? order = await _db.order.AsNoTracking().FirstOrDefaultAsync(o => o.id == orderId);
             if (order == null)
             {
-                return Ok(new ApiResult<Models.Order?>()
-                {
-                    code = 1,
-                    message = "没有找到订单",
-                    data = null
-                });
+                return Fail("没有找到订单");
             }
-            order = await SetOrderClosedState(order, closed, staff.id);
+            if (closed && order.type == "租赁")
+            {
+                // 租赁订单关闭要满足条件、并生成万龙应分记录，走订单详情页的「订单关闭」（Rent/CloseOrderByStaff）；
+                // 重开后订单带着上次的关闭时间，不能让它从这里绕过条件直接关掉
+                return Fail("租赁订单请在订单详情页点「订单关闭」");
+            }
+            if (!closed && order.closed != 1)
+            {
+                return Fail("订单没有关闭，不用重开");
+            }
+            if (!closed && order.close_date == null)
+            {
+                return Fail("这是未付款作废的订单，不能重开");
+            }
+            Models.Order? changed = await SetOrderClosedState(order, closed, staff.id);
+            if (changed == null)
+            {
+                return Fail("无需重复操作");
+            }
+            return Ok(new ApiResult<Models.Order?>()
+            {
+                code = 0,
+                message = "",
+                data = changed
+            });
+        }
+        // 订单页「关闭 / 重开记录」：每次关闭、重开的时间和操作的员工（夜间自动关单显示「系统自动」）。职级 >= 100 的员工可看。
+        [HttpGet("{orderId}")]
+        public async Task<ActionResult<ApiResult<List<OrderCloseEvent>?>>> GetOrderCloseHistory(int orderId,
+            string sessionKey, string sessionType = "wechat_mini_openid")
+        {
+            ActionResult<ApiResult<List<OrderCloseEvent>?>> Fail(string message) => Ok(new ApiResult<List<OrderCloseEvent>?>()
+            {
+                code = 1,
+                message = message,
+                data = null
+            });
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            if (staff == null || staff.title_level < 100)
+            {
+                return Fail("没有权限");
+            }
+            var order = await _db.order.AsNoTracking().Where(o => o.id == orderId)
+                .Select(o => new { o.closed, o.close_date }).FirstOrDefaultAsync();
             if (order == null)
             {
-                return Ok(new ApiResult<List<OrderBalance>?>()
-                {
-                    code = 1,
-                    message = "无需重复操作",
-                    data = null
-                });
+                return Fail("没有找到订单");
             }
-            else
+            List<CoreDataModLog> logs = await _db.coreDataModLog.AsNoTracking().Include(l => l.staff)
+                .Where(l => l.table_name == OrderCloseHistoryRules.TABLE && l.field_name == OrderCloseHistoryRules.FIELD
+                    && l.key_value == orderId).ToListAsync();
+            return Ok(new ApiResult<List<OrderCloseEvent>?>()
             {
-                return Ok(new ApiResult<Models.Order>()
-                {
-                    code = 0,
-                    message = "",
-                    data = order
-                });
-            }
+                code = 0,
+                message = "",
+                data = OrderCloseHistoryRules.Build(order.closed, order.close_date, logs)
+            });
         }
     }
 
