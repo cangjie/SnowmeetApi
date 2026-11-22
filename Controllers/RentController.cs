@@ -8156,6 +8156,12 @@ namespace SnowmeetApi.Controllers
             {
                 return;
             }
+            // 崇礼旗舰店（2026-11-22 用户定）：续租时每天的价格都按多日价，第一天也改。到这里说明下面就要生成这一天的续租行了，
+            // 第一次续租的订单在这一刻把第一天改成多日价（之后每天本来就是多日价）；已经续租过的订单不再动已记的行。
+            if (ContinueRentRules.UsesMultiDayFromFirstDay(await ShopNameOfRentalAsync(rental)))
+            {
+                await RepriceFirstDayAtMultiDayPriceAsync(rental, rentDate);
+            }
             string? rentType = null;
             string? scene = "门市";
             string? dayType = rentDate.DayOfWeek == DayOfWeek.Saturday || rentDate.DayOfWeek == DayOfWeek.Sunday ? "周末" : "平日";
@@ -8276,6 +8282,67 @@ namespace SnowmeetApi.Controllers
                 await new CoachPricingService(_db).RecordUseAsync(coachCard, rental.order_id, "租赁", rental.id, detail.id,
                     CoachCardRules.ModeRate, coachCard.rental_rate_snapshot ?? 0, newPrice, coachDiscount, DateTime.Now);
             }
+        }
+        private async Task<string?> ShopNameOfRentalAsync(Models.Rental rental)
+        {
+            string? shop = rental.order?.shop;
+            if (!string.IsNullOrWhiteSpace(shop))
+            {
+                return shop;
+            }
+            return await _db.order.AsNoTracking().Where(o => o.id == rental.order_id).Select(o => o.shop).FirstOrDefaultAsync();
+        }
+        // 崇礼旗舰店续租：第一次续租时把第一天的租金改成多日价（见 ContinueRentRules）。
+        // 「第一次续租」= 这天之前只有一条有效租金行，而且它不是系统续租生成的；已经续租过的订单（有两条以上，或剩下的唯一一条是续租行）不动。
+        // 多日价按第一天自己的日类型、场景查（预约价租赁查预约的多日价，查不到退回门市价）；只往低改，多日价不比第一天低就不动。
+        // 手改过价（preset.manual）的租赁以店员为准。改动写审计日志，由调用方随这一天的租金一起 SaveChanges。
+        private async Task RepriceFirstDayAtMultiDayPriceAsync(Models.Rental rental, DateTime rentDate)
+        {
+            if (rental.pricePresets.Any(p => p.manual))
+            {
+                return;
+            }
+            List<Models.RentalDetail> prior = await _db.rentalDetail.AsTracking()
+                .Where(d => d.rental_id == rental.id && d.valid == 1 && d.charge_type == "租金" && d.rental_date.Date < rentDate.Date)
+                .ToListAsync();
+            if (prior.Count != 1 || (prior[0].memo ?? "").Trim() == ContinueRentRules.SystemContinueMemo)
+            {
+                return;
+            }
+            Models.RentalDetail first = prior[0];
+            string? dayType = null;
+            if (first.rent_price_id != null)
+            {
+                dayType = (await _db.rentPrice.AsNoTracking().FirstOrDefaultAsync(p => p.id == first.rent_price_id))?.day_type;
+            }
+            if (string.IsNullOrWhiteSpace(dayType))
+            {
+                dayType = rental.pricePresets.FirstOrDefault(p => p.rent_date.Date == first.rental_date.Date)?.day_type;
+            }
+            if (string.IsNullOrWhiteSpace(dayType))
+            {
+                dayType = first.rental_date.DayOfWeek == DayOfWeek.Saturday || first.rental_date.DayOfWeek == DayOfWeek.Sunday ? "周末" : "平日";
+            }
+            string scene = RentSceneRules.Normalize(first.scene);
+            RentPrice? multi = await FindCatalogPriceAsync(rental, dayType.Trim(), "多日", scene);
+            if (multi?.price == null && scene != RentSceneRules.Shop)
+            {
+                scene = RentSceneRules.Shop;
+                multi = await FindCatalogPriceAsync(rental, dayType.Trim(), "多日", scene);
+            }
+            if (multi?.price == null || multi.price.Value >= first.amount)
+            {
+                return;
+            }
+            double oldAmount = first.amount;
+            first.amount = multi.price.Value;
+            first.rent_price_id = multi.id;
+            first.scene = scene;
+            first.update_date = DateTime.Now;
+            await _db.coreDataModLog.AddAsync(CoreDataModLog.CreateManualLog("RentDetail", "amount", first.id, ContinueRentRules.SystemContinueMemo,
+                null, null, oldAmount.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                first.amount.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                "崇礼旗舰店续租：第一天（" + first.rental_date.ToString("MM-dd") + "）的租金改按多日价"));
         }
         // 连租按预约价封顶的「上一日」部分：上一日有效的租金明细若大于它那一天场次/日类型对应的预约价，就改成预约价。
         // 只改 amount 和指向的价目（rent_price_id）；已有的减免行不动。改动由调用方随次日租金一起 SaveChanges。
