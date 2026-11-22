@@ -5047,9 +5047,9 @@ namespace SnowmeetApi.Controllers
                 _db.rentItem.Entry(item).State = EntityState.Modified;
                 // 支付完成后时间段可能刚生效：保留已支付订单，但不发放被锁定的物品。
                 if (item.atOnce && !item.noNeed && !item.noCode
-                    && (await new RentProductAvailability(_db).IsBlockedAsync(item.rent_product_id, item.code?.Trim(), DateTime.Now)
+                    && (await new RentProductAvailability(_db).IsBlockedAsync(item.rent_product_id, item.code?.Trim(), DateTime.Now, item.category_id)
                         || await new RentProductAvailability(_db).IsBlockedForOpenRentalAsync(item.rent_product_id, item.code,
-                            DateTime.Now, DateTime.Now)))
+                            DateTime.Now, DateTime.Now, item.category_id)))
                 {
                     item.atOnce = false;
                     await _db.coreDataModLog.AddAsync(CoreDataModLog.CreateManualLog("RentItem", "", item.id, "租赁开单",
@@ -5664,8 +5664,9 @@ namespace SnowmeetApi.Controllers
         {
             bool trialBoard = await _db.rentItem.AsNoTracking().Where(item => item.id == rentItemId).AnyAsync(item =>
                 _db.trialBoard.Any(board => board.valid == 1 && (board.rent_product_id == item.rent_product_id ||
-                    _db.rentProduct.Any(product => product.id == board.rent_product_id && product.barcode != null
-                        && item.code != null && product.barcode.Trim() == item.code.Trim()))));
+                    (item.rent_product_id == null && !item.noCode && _db.rentProduct.Any(product => product.id == board.rent_product_id
+                        && product.category_id == item.category_id && product.barcode != null
+                        && item.code != null && product.barcode.Trim() == item.code.Trim())))));
             if (!trialBoard || (status != "已发放" && status != "已归还"))
                 return await SetRentItemStatusCore(rentItemId, status, sessionKey, sessionType);
             if (_db.Database.CurrentTransaction != null)
@@ -5742,10 +5743,10 @@ namespace SnowmeetApi.Controllers
             bool resumingExistingRental = (rentItem.status == "暂存" || rentItem.status == "已暂存")
                 && rentItem.availableLog.Any(l => l.status == "已发放");
             if (status == "已发放" && !rentItem.noCode && !resumingExistingRental
-                && await new RentProductAvailability(_db).IsBlockedAsync(rentItem.rent_product_id, rentItem.code?.Trim(), DateTime.Now))
+                && await new RentProductAvailability(_db).IsBlockedAsync(rentItem.rent_product_id, rentItem.code?.Trim(), DateTime.Now, rentItem.category_id))
                 return Ok(new ApiResult<Models.Rental?> { code = 1, message = "租赁物当前不可用，无法发放" });
             if (status == "已发放" && !rentItem.noCode && !resumingExistingRental
-                && await new RentProductAvailability(_db).IsBlockedForOpenRentalAsync(rentItem.rent_product_id, rentItem.code, DateTime.Now, DateTime.Now))
+                && await new RentProductAvailability(_db).IsBlockedForOpenRentalAsync(rentItem.rent_product_id, rentItem.code, DateTime.Now, DateTime.Now, rentItem.category_id))
                 return Ok(new ApiResult<Models.Rental?> { code = 1, message = "租赁物已被试滑预约，无法发放" });
             RentItemLog log = new RentItemLog()
             {
@@ -9290,7 +9291,7 @@ namespace SnowmeetApi.Controllers
                 foreach (var item in rental.rentItems ?? new List<Models.RentItem>())
                     if (!item.noNeed && (item.rent_product_id != null || !item.noCode)
                         && await availability.IsBlockedForOpenRentalAsync(item.rent_product_id, item.code,
-                            item.atOnce && rental.start_date > DateTime.Now ? DateTime.Now : rental.start_date ?? DateTime.Now, DateTime.Now))
+                            item.atOnce && rental.start_date > DateTime.Now ? DateTime.Now : rental.start_date ?? DateTime.Now, DateTime.Now, item.category_id))
                         return Ok(new ApiResult<Models.Order> { code = 1, message = "该租赁物暂不可用" });
             }
             if (commit && expectedOffset.HasValue)

@@ -3379,11 +3379,12 @@ namespace SnowmeetApi.Controllers
             bool containsTrialBoard = await (from rental in _db.rental.AsNoTracking()
                 join item in _db.rentItem.AsNoTracking() on rental.id equals item.rental_id
                 where rental.order_id == tempOrderId && !item.noNeed
-                select new { item.rent_product_id, item.code }).AnyAsync(x =>
+                select new { item.rent_product_id, item.code, item.category_id, item.noCode }).AnyAsync(x =>
                     _db.trialBoard.Any(b => b.valid == 1 &&
                         (b.rent_product_id == x.rent_product_id ||
-                         _db.rentProduct.Any(p => p.id == b.rent_product_id && p.barcode != null && x.code != null
-                             && p.barcode.Trim() == x.code.Trim()))));
+                         (x.rent_product_id == null && !x.noCode && _db.rentProduct.Any(p => p.id == b.rent_product_id
+                             && p.category_id == x.category_id && p.barcode != null && x.code != null
+                             && p.barcode.Trim() == x.code.Trim())))));
             if (!containsTrialBoard)
                 return await PlaceRentOrderCore(tempOrderId, sessionKey, sessionType, autoBenefit);
             return await SnowmeetApi.Services.Tickets.MiniTicketTransaction.Run(_db,
@@ -3419,9 +3420,9 @@ namespace SnowmeetApi.Controllers
             foreach (var item in rental.rentItems ?? new List<Models.RentItem>())
             {
                 if (!item.noNeed && (item.rent_product_id != null || !item.noCode)
-                    && (await availability.IsUnavailableForNewRentalAsync(item.rent_product_id, item.code, DateTime.Now)
+                    && (await availability.IsUnavailableForNewRentalAsync(item.rent_product_id, item.code, DateTime.Now, item.category_id)
                         || await availability.IsBlockedForOpenRentalAsync(item.rent_product_id, item.code,
-                            item.atOnce && rental.start_date > DateTime.Now ? DateTime.Now : rental.start_date ?? DateTime.Now, DateTime.Now)))
+                            item.atOnce && rental.start_date > DateTime.Now ? DateTime.Now : rental.start_date ?? DateTime.Now, DateTime.Now, item.category_id)))
                     return Ok(new ApiResult<Models.Order> { code = 1, message = "该租赁物暂不可用" });
             }
             // 租赁按日计费；在开单时固定本单选用卡的折扣，防止后续卡种改价改变已开订单。

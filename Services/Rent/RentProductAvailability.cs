@@ -44,41 +44,41 @@ public class RentProductAvailability
                 product.status = "不可用";
     }
 
-    public async Task<bool> IsBlockedAsync(int? id, string? barcode, DateTime now)
+    public async Task<bool> IsBlockedAsync(int? id, string? barcode, DateTime now, int? categoryId = null)
     {
         var ids = new List<int>();
         if (id.HasValue) ids.Add(id.Value);
-        if (!string.IsNullOrWhiteSpace(barcode))
+        if (!id.HasValue && categoryId.HasValue && !string.IsNullOrWhiteSpace(barcode))
         {
-            var barcodeId = await db.rentProduct.AsNoTracking().Where(p => p.valid == 1 && p.barcode.Trim() == barcode.Trim())
+            var barcodeId = await db.rentProduct.AsNoTracking().Where(p => p.valid == 1 && p.category_id == categoryId && p.barcode != null && p.barcode.Trim() == barcode.Trim())
                 .OrderByDescending(p => p.id).Select(p => (int?)p.id).FirstOrDefaultAsync();
             if (barcodeId.HasValue) ids.Add(barcodeId.Value);
         }
         return (await BlockedIdsAsync(ids, now)).Count > 0;
     }
 
-    public async Task<bool> IsUnavailableForNewRentalAsync(int? id, string? barcode, DateTime now)
+    public async Task<bool> IsUnavailableForNewRentalAsync(int? id, string? barcode, DateTime now, int? categoryId = null)
     {
         var code = barcode?.Trim();
         var product = id.HasValue
             ? await db.rentProduct.AsNoTracking().FirstOrDefaultAsync(p => p.id == id.Value)
-            : string.IsNullOrEmpty(code) ? null
+            : string.IsNullOrEmpty(code) || !categoryId.HasValue ? null
             : await db.rentProduct.AsNoTracking()
-                .Where(p => p.valid == 1 && p.barcode != null && p.barcode.Trim() == code)
+                .Where(p => p.valid == 1 && p.category_id == categoryId && p.barcode != null && p.barcode.Trim() == code)
                 .OrderByDescending(p => p.id).FirstOrDefaultAsync();
         if (id.HasValue && (product == null || product.valid != 1)) return true;
         if (product != null && !string.IsNullOrWhiteSpace(product.status) && product.status.Trim() != "正常")
             return true;
-        return await IsBlockedAsync(id, code, now);
+        return await IsBlockedAsync(id, code, now, categoryId);
     }
 
-    public async Task<bool> IsBlockedForOpenRentalAsync(int? id, string? barcode, DateTime start, DateTime now)
+    public async Task<bool> IsBlockedForOpenRentalAsync(int? id, string? barcode, DateTime start, DateTime now, int? categoryId = null)
     {
         var ids = new List<int>();
         if (id != null) ids.Add(id.Value);
-        if (!string.IsNullOrWhiteSpace(barcode))
+        if (!id.HasValue && categoryId.HasValue && !string.IsNullOrWhiteSpace(barcode))
         {
-            var matches = await db.rentProduct.AsNoTracking().Where(p => p.valid == 1 && p.barcode != null && p.barcode.Trim() == barcode.Trim())
+            var matches = await db.rentProduct.AsNoTracking().Where(p => p.valid == 1 && p.category_id == categoryId && p.barcode != null && p.barcode.Trim() == barcode.Trim())
                 .Select(p => p.id).ToListAsync();
             ids.AddRange(matches);
         }

@@ -141,7 +141,7 @@ public class RentProductAvailabilityTests
         Assert.True(await availability.IsUnavailableForNewRentalAsync(101, "A101", now));
         Assert.False(await availability.IsUnavailableForNewRentalAsync(101, "A101", now.AddHours(1)));
         Assert.False(await availability.IsUnavailableForNewRentalAsync(102, "A102", now));
-        Assert.True(await availability.IsUnavailableForNewRentalAsync(null, "A103", now));
+        Assert.True(await availability.IsUnavailableForNewRentalAsync(null, "A103", now, 1));
         Assert.True(await availability.IsUnavailableForNewRentalAsync(999, "missing", now));
         Assert.True(await availability.IsUnavailableForNewRentalAsync(104, "A104", now));
         Assert.False(await availability.IsUnavailableForNewRentalAsync(null, "unregistered", now));

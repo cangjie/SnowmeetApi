@@ -83,6 +83,48 @@ public class TrialReservationTests
         Assert.True(await new RentProductAvailability(f.NewContext()).IsBlockedForOpenRentalAsync(101, null, now, now));
     }
 
+    [Theory]
+    [InlineData(null, 69, false, true)]
+    [InlineData(null, 70, false, false)]
+    [InlineData(null, null, false, false)]
+    [InlineData(null, 69, true, false)]
+    [InlineData(101, 70, false, true)]
+    [InlineData(103, 69, false, false)]
+    public async Task RentalConflictUsesProductIdOrCategoryAndBarcode(int? productId, int? categoryId, bool noCode, bool expected)
+    {
+        await using var f = await CoachFixture.Create(false);
+        await Setup(f);
+        var now = DateTime.Now;
+        var order = new Order { type = "租赁", valid = 1 };
+        f.Db.order.Add(order); await f.Db.SaveChangesAsync();
+        var rental = new Rental { order_id = order.id, valid = 1, start_date = now };
+        f.Db.rental.Add(rental); await f.Db.SaveChangesAsync();
+        f.Db.rentItem.Add(new RentItem { rental_id = rental.id, rent_product_id = productId,
+            category_id = categoryId, code = " 108 ", noCode = noCode });
+        await f.Db.SaveChangesAsync();
+        var svc = new TrialReservationService(f.NewContext(), f.Config);
+        Assert.Equal(expected, await svc.BoardUnavailableAsync(101, now));
+    }
+
+    [Fact]
+    public async Task TrialBlocksOnlyTheMatchingProductOrCategory()
+    {
+        await using var f = await CoachFixture.Create(false);
+        await Setup(f);
+        f.Db.rentProduct.Add(new RentProduct { id = 103, name = "鞋", barcode = "108", category_id = 70, valid = 1 });
+        await f.Db.SaveChangesAsync();
+        var now = DateTime.Now;
+        await new TrialReservationService(f.NewContext(), f.Config).ReserveAsync(CoachFixture.StudentA, 101, now, now);
+        var availability = new RentProductAvailability(f.NewContext());
+        Assert.True(await availability.IsBlockedForOpenRentalAsync(null, "108", now, now, 69));
+        Assert.False(await availability.IsBlockedForOpenRentalAsync(null, "108", now, now, 70));
+        Assert.False(await availability.IsBlockedForOpenRentalAsync(null, "108", now, now));
+        Assert.False(await availability.IsBlockedForOpenRentalAsync(103, "108", now, now, 69));
+        Assert.True(await availability.IsBlockedAsync(null, "108", now, 69));
+        Assert.False(await availability.IsBlockedAsync(null, "108", now, 70));
+        Assert.False(await availability.IsUnavailableForNewRentalAsync(103, "108", now, 70));
+    }
+
     [Fact]
     public async Task ExpiredOrForeignQrCannotCheckIn()
     {
@@ -119,6 +161,28 @@ public class TrialReservationTests
         Assert.Equal(1, response.code);
         Assert.Equal("该租赁物暂不可用", response.message);
         Assert.Equal(0, (await f.Db.order.AsNoTracking().SingleAsync(o => o.id == order.id)).valid);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task CheckoutAllowsAnotherCategoryWithSameBarcode(bool useProductId)
+    {
+        await using var f = await CoachFixture.Create(false);
+        await Setup(f);
+        f.Db.rentProduct.Add(new RentProduct { id = 103, name = "鞋", barcode = "108", category_id = 70, valid = 1 });
+        await f.Db.SaveChangesAsync();
+        var now = DateTime.Now;
+        await new TrialReservationService(f.NewContext(), f.Config).ReserveAsync(CoachFixture.StudentA, 101, now, now);
+        var order = new Order { type = "租赁", shop = "万龙服务中心", valid = 0 };
+        f.Db.order.Add(order); await f.Db.SaveChangesAsync();
+        var rental = new Rental { order_id = order.id, start_date = now, noGuaranty = true };
+        f.Db.rental.Add(rental); await f.Db.SaveChangesAsync();
+        f.Db.rentItem.Add(new RentItem { rental_id = rental.id, rent_product_id = useProductId ? 103 : null, code = "108", category_id = 70 });
+        await f.Db.SaveChangesAsync();
+        var controller = new OrderController(f.NewContext(), f.Config, new HttpContextAccessor { HttpContext = new DefaultHttpContext() });
+        var result = await controller.PlaceRentOrder(order.id, "session-1");
+        Assert.Equal(0, ((ApiResult<Order>)((OkObjectResult)result.Result!).Value!).code);
     }
 
     [Fact]

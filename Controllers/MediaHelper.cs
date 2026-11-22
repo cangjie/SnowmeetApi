@@ -95,22 +95,14 @@ namespace SnowmeetApi.Controllers
         }
 
         [HttpGet]
-        public void GetQRCode(string qrCodeText)
+        public IActionResult GetQRCode(string qrCodeText)
         {
             if (qrCodeText.StartsWith("http"))
             {
                 qrCodeText = Util.UrlDecode(qrCodeText);
             }
-            byte[] bArr = QRCoder.BitmapByteQRCodeHelper.GetQRCode(qrCodeText, QRCoder.QRCodeGenerator.ECCLevel.Q, 5);
-            Response.ContentType = "image/jpeg";
-            Response.ContentLength = bArr.Length;
-            PipeWriter pw = Response.BodyWriter;
-            Stream sOut = pw.AsStream();
-            for (int k = 0; k < bArr.Length; k++)
-            {
-                sOut.WriteByte(bArr[k]);
-            }
-            sOut.Close();
+            byte[] bytes = QRCoder.PngByteQRCodeHelper.GetQRCode(qrCodeText, QRCoder.QRCodeGenerator.ECCLevel.Q, 5);
+            return File(bytes, "image/png");
         }
     }
 }

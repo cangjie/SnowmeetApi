@@ -35,7 +35,8 @@ public sealed class TrialReservationService(ApplicationDBContext db, IConfigurat
                                 join order in db.order.AsNoTracking() on rental.order_id equals order.id
                                 where order.valid == 1 && rental.valid == 1 && rental.appending != true && !item.noNeed
                                     && (item.rent_product_id == product.id ||
-                                        (item.code != null && barcode != null && item.code.Trim() == barcode))
+                                        (item.rent_product_id == null && !item.noCode && item.category_id == product.category_id
+                                            && item.code != null && barcode != null && item.code.Trim() == barcode))
                                     && (item.atOnce || rental.start_date == null || rental.start_date < day.Date.AddDays(1))
                                 select item.id).ToListAsync();
         if (candidates.Count == 0) return false;
