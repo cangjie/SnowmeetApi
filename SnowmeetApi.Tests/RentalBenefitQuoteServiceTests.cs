@@ -151,17 +151,77 @@ public class RentalBenefitQuoteServiceTests
     }
 
     [Fact]
-    public async Task EditingDailyRentThroughStaffEndpointPreservesThatAmount()
+    public async Task EditingDailyRentAfterBenefitSettlementIsAllowedAndAudited()
     {
         await using var f = await CoachFixture.Create(withPricing: false);
         var (orderId, rentalId) = await Seed(f, true);
-        var detail = await f.NewContext().rentalDetail.SingleAsync(d => d.rental_id == rentalId);
+        var db = f.NewContext();
+        var detail = await db.rentalDetail.SingleAsync(d => d.rental_id == rentalId);
+        db.rentalBenefitSettlement.Add(new RentalBenefitSettlement
+        {
+            order_id = orderId,
+            rent_payable = 200,
+            staff_id = 9,
+            create_date = DateTime.Now
+        });
+        await db.SaveChangesAsync();
         var controller = new RentController(f.NewContext(), f.Config, new HttpContextAccessor { HttpContext = new DefaultHttpContext() });
         var result = await controller.UpdateRentalDayChargesByStaff(rentalId, detail.id, 150, 0, 0, "测试手动改租金", "session-1");
         Assert.Equal(0, Assert.IsType<ApiResult<Rental?>>(Assert.IsType<OkObjectResult>(result.Result).Value).code);
-        Assert.True(await f.NewContext().rentalBenefitDetailPreference.AnyAsync(p => p.rental_detail_id == detail.id));
+        var after = f.NewContext();
+        Assert.True(await after.rentalBenefitDetailPreference.AnyAsync(p => p.rental_detail_id == detail.id && p.staff_id == 9));
+        var audit = await after.coreDataModLog.SingleAsync(l => l.table_name == "rental_detail"
+            && l.key_value == detail.id && l.field_name == "amount");
+        Assert.Equal(9, audit.staff_id);
+        Assert.Equal("200", audit.prev_value);
+        Assert.Equal("150", audit.current_value);
         var q = await new RentalBenefitQuoteService(f.NewContext()).QuoteAsync(orderId, false, DateTime.Now);
         Assert.Equal(150m, q.quote.Payable);
+    }
+
+    [Fact]
+    public async Task WaivingDailyRentAfterBenefitSettlementIsAllowedAndAudited()
+    {
+        await using var f = await CoachFixture.Create(withPricing: false);
+        var (orderId, rentalId) = await Seed(f, true);
+        var db = f.NewContext();
+        var detail = await db.rentalDetail.SingleAsync(d => d.rental_id == rentalId);
+        db.rentalBenefitSettlement.Add(new RentalBenefitSettlement
+        {
+            order_id = orderId,
+            rent_payable = 200,
+            staff_id = 9,
+            create_date = DateTime.Now
+        });
+        await db.SaveChangesAsync();
+        var controller = new RentController(f.NewContext(), f.Config, new HttpContextAccessor { HttpContext = new DefaultHttpContext() });
+        var result = await controller.UpdateRentalDayChargesByStaff(rentalId, detail.id, 60, 0, 0, "测试免除租金",
+            "session-1", waived: true);
+        Assert.Equal(0, Assert.IsType<ApiResult<Rental?>>(Assert.IsType<OkObjectResult>(result.Result).Value).code);
+        var after = f.NewContext();
+        Assert.Equal(0, (await after.rentalDetail.SingleAsync(d => d.id == detail.id)).valid);
+        var audit = await after.coreDataModLog.SingleAsync(l => l.table_name == "rental_detail"
+            && l.key_value == detail.id && l.field_name == "valid");
+        Assert.Equal(9, audit.staff_id);
+        Assert.Equal("1", audit.prev_value);
+        Assert.Equal("0", audit.current_value);
+    }
+
+    [Fact]
+    public async Task EditingDailyRentIsRejectedForClosedOrder()
+    {
+        await using var f = await CoachFixture.Create(withPricing: false);
+        var (orderId, rentalId) = await Seed(f, false);
+        var db = f.NewContext();
+        await db.order.Where(o => o.id == orderId).ExecuteUpdateAsync(s => s.SetProperty(o => o.closed, 1));
+        var detail = await db.rentalDetail.SingleAsync(d => d.rental_id == rentalId);
+        var controller = new RentController(f.NewContext(), f.Config, new HttpContextAccessor { HttpContext = new DefaultHttpContext() });
+        var result = await controller.UpdateRentalDayChargesByStaff(rentalId, detail.id, 150, 0, 0, "测试已关闭订单", "session-1");
+        var data = Assert.IsType<ApiResult<Rental?>>(Assert.IsType<OkObjectResult>(result.Result).Value);
+        Assert.Equal(1, data.code);
+        Assert.Equal("订单已关闭，无法修改租金明细", data.message);
+        Assert.Equal(200, (await f.NewContext().rentalDetail.SingleAsync(d => d.id == detail.id)).amount);
+        Assert.Empty(await f.NewContext().coreDataModLog.ToListAsync());
     }
 
     [Fact]

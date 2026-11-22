@@ -6043,6 +6043,15 @@ namespace SnowmeetApi.Controllers
             {
                 return Ok(new ApiResult<Models.Rental?>() { code = 1, message = "无此租赁", data = null });
             }
+            Models.Order? order = await _db.order.AsNoTracking().FirstOrDefaultAsync(o => o.id == rental.order_id);
+            if (order == null)
+            {
+                return Ok(new ApiResult<Models.Rental?>() { code = 1, message = "无此订单", data = null });
+            }
+            if (order.closed == 1)
+            {
+                return Ok(new ApiResult<Models.Rental?> { code = 1, message = "订单已关闭，无法修改租金明细" });
+            }
             // 当天租金明细：用 id 定位（每一行的真理之源），同时也确定"当天"
             Models.RentalDetail rentDetail = await _db.rentalDetail
                 .Where(d => d.id == rentDetailId && d.rental_id == rentalId).FirstOrDefaultAsync();
@@ -6050,8 +6059,6 @@ namespace SnowmeetApi.Controllers
             {
                 return Ok(new ApiResult<Models.Rental?>() { code = 1, message = "无此租金明细", data = null });
             }
-            if (await _db.rentalBenefitSettlement.AnyAsync(s => s.order_id == rental.order_id))
-                return Ok(new ApiResult<Models.Rental?> { code = 1, message = "本单优惠已核销，无法修改租金明细" });
             var oldDailyDiscount = await _db.discount.AsNoTracking().Where(d => d.order_id == rental.order_id
                     && d.biz_type == "租赁" && d.biz_id == rental.id && d.sub_biz_type == "日租金"
                     && d.sub_biz_id == rentDetail.id && d.ticket_code == null && d.valid == 1)
