@@ -71,7 +71,7 @@ namespace SnowmeetApi.Tests
         }
 
         [Fact]
-        public async Task 供应商还没出码_不写票也不写日志_下一轮继续查()
+        public async Task 供应商还没出码_第一次查到时票变成已出票_之后不再写票也不写日志_下一轮继续查()
         {
             await using var f = await Fixture.Create();
             await f.AddTicket(1, "1001", paidMinutesAgo: 1);
@@ -79,6 +79,7 @@ namespace SnowmeetApi.Tests
             var c = f.Controller(_ => { asked++; return NoCodeJson; }, _ => { notified++; });
 
             await c.RefreshAutoReserve(minutes: 10);
+            var afterFirst = await f.Ticket(1);
             await c.RefreshAutoReserve(minutes: 10);
             await c.RefreshAutoReserve(minutes: 10);
 
@@ -86,10 +87,37 @@ namespace SnowmeetApi.Tests
             Assert.Equal(3, asked);                // 一直没出码就一直查
             Assert.Null(t.card_no);
             Assert.Null(t.qr_code_url);
-            Assert.Null(t.card_member_pick_time);  // 没有新数据，不动票
-            Assert.Null(t.update_date);
+            // 后台管理页的「申请取消」只在状态是「已出票」时可点；原来每轮查询都写 card_member_pick_time，
+            // 下单成功后一分钟内就是「已出票」，哪怕供应商一直没出码（要能取消的恰恰是这种票）。第一次查到时写一次，之后不再动
+            Assert.Equal("已出票", t.status);
+            Assert.NotNull(t.card_member_pick_time);
+            Assert.Equal(afterFirst.card_member_pick_time, t.card_member_pick_time);
+            Assert.Equal(afterFirst.update_date, t.update_date);
             Assert.Equal(0, notified);
-            Assert.Equal(0, await f.LogCount("万龙雪票信息更新成功"));
+            Assert.Equal(0, await f.LogCount("万龙雪票信息更新成功"));   // 没取到码，不记「更新成功」
+        }
+
+        [Fact]
+        public async Task 下单成功但还没查过的票是已确认_取到码后是已出票_pick_time取到码那一轮的时间()
+        {
+            await using var f = await Fixture.Create();
+            await f.AddTicket(1, "1001", paidMinutesAgo: 1);
+            Assert.Equal("已确认", (await f.Ticket(1)).status);
+            string body = NoCodeJson;
+            var c = f.Controller(_ => body);
+
+            await c.RefreshAutoReserve(minutes: 10);
+            var withoutCode = await f.Ticket(1);
+            await Task.Delay(30);                  // 保证两轮的时间戳能分开
+            body = CodeJson;
+            await c.RefreshAutoReserve(minutes: 10);
+            var withCode = await f.Ticket(1);
+
+            Assert.Equal("已出票", withoutCode.status);
+            Assert.Equal("已出票", withCode.status);
+            // 优惠券激活日按 card_member_pick_time 算：取到码那一轮要覆盖掉前一轮写的时间（和原来每轮覆盖、最终是取到码那一轮一致）
+            Assert.True(withCode.card_member_pick_time > withoutCode.card_member_pick_time);
+            Assert.Equal(1, await f.LogCount("万龙雪票信息更新成功"));
         }
 
         [Theory]

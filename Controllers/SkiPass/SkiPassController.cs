@@ -1365,6 +1365,7 @@ namespace SnowmeetApi.Controllers
                 {
                     continue;
                 }
+                bool logUpdate = false;   // 取到新内容（码、订单状态变化）才记「万龙雪票信息更新成功」
                 try
                 {
                     //WanlongZiwoyouHelper _zwHelper = new WanlongZiwoyouHelper(_context, _config, skipassProduct.source.Trim());
@@ -1453,12 +1454,16 @@ namespace SnowmeetApi.Controllers
                         skipass.send_content = sendContent.Trim();
                         gotSendContent = true;
                     }
-                    // 供应商那边还没出码、订单也没变化：不写票、不写日志（原来每查一次都写一遍；现在每 10 秒查一次，不能这样）。
-                    // card_member_pick_time 同样只在取到码的那一轮写，和原来「最后一轮写进去的值」一致（优惠券激活日按它算）
-                    if (!SkipassSaleRules.SupplierOrderChanged(gotCardNo, gotQr, gotSendContent, order.orderState))
+                    // 供应商那边还没出码、订单也没变化：不要每查一次就写一遍票和日志（原来每分钟写一遍；现在每 10 秒查一次，不能这样）。
+                    // 但 card_member_pick_time 有没有值决定票状态是「已确认」还是「已出票」，后台管理页的「申请取消」只在「已出票」时可点：
+                    // 原来下单成功后第一轮查询就写了它，所以哪怕供应商一直没出码，一分钟内票也是「已出票」、能取消。
+                    // 因此还没写过它的票，第一次查到时写一次（保持这个行为），之后没变化就不再动；取到码那一轮照旧覆盖成当时的时间（优惠券激活日按它算）
+                    bool changed = SkipassSaleRules.SupplierOrderChanged(gotCardNo, gotQr, gotSendContent, order.orderState);
+                    if (!changed && skipass.card_member_pick_time != null)
                     {
                         continue;
                     }
+                    logUpdate = changed;
                     skipass.update_date = DateTime.Now;
                     skipass.card_member_pick_time = DateTime.Now;
                 }
@@ -1470,6 +1475,10 @@ namespace SnowmeetApi.Controllers
                 await _context.SaveChangesAsync();
                 _context.skiPass.Entry(skipass).State = EntityState.Detached;
                 await _context.SaveChangesAsync();
+                if (!logUpdate)
+                {
+                    continue;
+                }
                 CoreDataModLog logTicket = CoreDataModLog.CreateManualLog("ski_pass", "", skipass.id, "万龙雪票信息更新成功", null, null, null, null, "");
                 await _context.coreDataModLog.AddAsync(logTicket);
                 await _context.SaveChangesAsync();
