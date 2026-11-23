@@ -1,6 +1,7 @@
 using System.Reflection;
 using Microsoft.AspNetCore.Mvc;
 using SnowmeetApi.Controllers;
+using SnowmeetApi.Helpers;
 using SnowmeetApi.Services.SkipassJobs;
 
 namespace SnowmeetApi.Tests;
@@ -38,5 +39,17 @@ public class PollerRouteTests
         {
             Assert.NotNull(typeof(SkiPassController).GetMethod(action));
         }
+    }
+
+    [Fact]
+    public void SkipassPoller_FreshCodeCall_IsTheRealActionWithItsMinutesParameter()
+    {
+        // 刚付款的票每 10 秒取一次二维码：调的是 RefreshAutoReserve 的 minutes 参数，名字写错只会静静地不生效
+        var uri = new Uri(new Uri(SkipassCancelPoller.DefaultBase), SkipassCancelPoller.FreshCodeCall);
+        MethodInfo? action = typeof(SkiPassController).GetMethod("RefreshAutoReserve");
+        Assert.NotNull(action);
+        Assert.EndsWith("/RefreshAutoReserve", uri.AbsolutePath);
+        Assert.Contains(action!.GetParameters(), p => p.Name == "minutes");
+        Assert.Equal("?minutes=" + SkipassSaleRules.FreshCodeWindowMinutes, uri.Query);
     }
 }

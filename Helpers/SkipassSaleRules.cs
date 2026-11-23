@@ -122,6 +122,20 @@ namespace SnowmeetApi.Helpers
             return lastRun == null || now - lastRun.Value >= PickupCheckInterval - PickupCheckTolerance;
         }
 
+        // 刚付款的票取二维码（取票码）的后台轮询节奏（2026-11-23 用户确认）：
+        // 付款后供应商大约 15～25 秒出码（最慢见过 4～5 分钟），原来每分钟才查一次，平均要等 52 秒。
+        // 现在对「最近 10 分钟内付款成功、还没取到码」的票每 10 秒查一次（RefreshAutoReserve?minutes=10）；
+        // 更早的票仍由每分钟那一轮（最近 48 小时）兜底。
+        public static readonly TimeSpan FreshCodePollInterval = TimeSpan.FromSeconds(10);
+        public const int FreshCodeWindowMinutes = 10;
+
+        // 向供应商查完一张票的订单之后，有没有新东西值得写回票：取到取票码 / 二维码 / 短信内容，或订单已取消（3）/ 已核销（4）。
+        // 什么都没变就不写票、不写日志——10 秒一轮，不能每轮都动这张票。
+        public static bool SupplierOrderChanged(bool gotCardNo, bool gotQr, bool gotSendContent, int? orderState)
+        {
+            return gotCardNo || gotQr || gotSendContent || orderState == 3 || orderState == 4;
+        }
+
         // 超过 30 分钟没出成、准备确认出票失败之前，先按我方单号去供应商那里核对这张票有没有订单：
         //   没有订单 / 订单已取消 → 可以确认失败并退款；
         //   有订单、有取票码 → 其实出成了（我们没记上），补记订单号，不退款；

@@ -278,5 +278,28 @@ namespace SnowmeetApi.Tests
         {
             Assert.False(SkipassSaleRules.CancelTimedOut(null, Requested.AddDays(30)));
         }
+
+        // ---------- 刚付款的票每 10 秒取一次二维码（2026-11-23） ----------
+
+        [Fact]
+        public void 刚付款的票_每10秒查一次_只看最近10分钟内付款的()
+        {
+            Assert.Equal(TimeSpan.FromSeconds(10), SkipassSaleRules.FreshCodePollInterval);
+            Assert.Equal(10, SkipassSaleRules.FreshCodeWindowMinutes);
+        }
+
+        [Theory]
+        [InlineData(false, false, false, 2, false)]   // 供应商还没出码、订单正常：没有新东西，不写票
+        [InlineData(false, false, false, null, false)]
+        [InlineData(true, false, false, 2, true)]     // 取到取票码
+        [InlineData(false, true, false, 2, true)]     // 取到二维码
+        [InlineData(false, false, true, 2, true)]     // 取到短信内容
+        [InlineData(false, false, false, 3, true)]    // 订单已取消
+        [InlineData(false, false, false, 4, true)]    // 订单已核销
+        [InlineData(false, false, false, 1, false)]   // 已预订：还没出票
+        public void 向供应商查完订单_只有拿到新东西才写回票(bool gotCardNo, bool gotQr, bool gotSendContent, int? orderState, bool expected)
+        {
+            Assert.Equal(expected, SkipassSaleRules.SupplierOrderChanged(gotCardNo, gotQr, gotSendContent, orderState));
+        }
     }
 }

@@ -1299,19 +1299,64 @@ namespace SnowmeetApi.Controllers
             }
         }
 
-        // hours > 0 只处理最近这么多小时下的单：后台轮询每分钟调一次，不能每分钟都把历史上一直没有取票码的老票再查一遍
+        // 供应商订单的原文（JSON）；测试里替换成假的，不发真实请求。生产走本机公开地址的 GetOrder
+        public Func<string, Task<string?>>? SupplierOrderJsonProvider { get; set; }
+
+        // 取到取票码/二维码后通知顾客；测试里替换成假的，不发真实消息。没设置就走 SetNotify
+        public Func<Models.SkiPass, Task>? CodeReadyNotifier { get; set; }
+
+        // 取码的两路轮询（每分钟的、每 10 秒的）共用一把进程内的锁：同一时刻只有一路在处理，
+        // 否则两路各自读到「还没取到码」的同一张票，会各通知顾客一次、各写一遍日志
+        private static readonly SemaphoreSlim RefreshCodeGate = new SemaphoreSlim(1, 1);
+
+        // hours > 0 只处理最近这么多小时下的单：后台轮询每分钟调一次，不能每分钟都把历史上一直没有取票码的老票再查一遍。
+        // minutes > 0 是刚付款的票的快轮询（每 10 秒一次）：只处理最近这么多分钟内付款成功的票；
+        // 慢的一路正在处理时快的直接让位，下一个 10 秒再来。
         [HttpGet]
-        public async Task RefreshAutoReserve(int hours = 0)
+        public async Task RefreshAutoReserve(int hours = 0, int minutes = 0)
         {
-            DateTime since = hours > 0 ? DateTime.Now.AddHours(-hours) : DateTime.MinValue;
-            List<Models.SkiPass> skipassList = await _context.skiPass
+            if (minutes > 0)
+            {
+                if (!await RefreshCodeGate.WaitAsync(0)) return;
+            }
+            else
+            {
+                await RefreshCodeGate.WaitAsync();
+            }
+            try
+            {
+                await RefreshAutoReserveCore(hours, minutes);
+            }
+            finally
+            {
+                RefreshCodeGate.Release();
+            }
+        }
+
+        [NonAction]
+        private async Task RefreshAutoReserveCore(int hours, int minutes)
+        {
+            bool fresh = minutes > 0;
+            IQueryable<Models.SkiPass> pending = _context.skiPass
                 .Include(s => s.order)
                     .ThenInclude(o => o.payments.Where(p => p.status.Equals("支付成功")))
                 .Where(s => (s.valid == 1 && s.reserve_no != null && !s.resort.Trim().Equals("南山")
                 && s.card_no == null && s.qr_code_url == null && s.send_content == null && s.is_cancel == 0
-                && s.create_date > since
                 //&& s.id == 2008
-                )).ToListAsync();
+                ));
+            if (fresh)
+            {
+                // 以付款成功的时间为准：顾客下单后可能过一会儿才付款，不能按票的创建时间算
+                DateTime paidSince = DateTime.Now.AddMinutes(-minutes);
+                pending = pending.Where(s => s.order != null
+                    && s.order.payments.Any(p => p.status.Equals("支付成功") && p.paid_date != null && p.paid_date > paidSince));
+            }
+            else
+            {
+                DateTime since = hours > 0 ? DateTime.Now.AddHours(-hours) : DateTime.MinValue;
+                pending = pending.Where(s => s.create_date > since);
+            }
+            List<Models.SkiPass> skipassList = await pending.ToListAsync();
             for(int i = 0; i < skipassList.Count; i++)
             {
                 Models.SkiPass skipass = skipassList[i];
@@ -1324,10 +1369,15 @@ namespace SnowmeetApi.Controllers
                 {
                     //WanlongZiwoyouHelper _zwHelper = new WanlongZiwoyouHelper(_context, _config, skipassProduct.source.Trim());
                     //WanlongZiwoyouHelper.ZiwoyouOrder order = _zwHelper.GetOrder(int.Parse(skipass.reserve_no));
-                    string json = Util.GetWebContent("https://mini.snowmeet.top/core/WanlongZiwoyouHelper/GetOrder?orderId=" + skipass.reserve_no);
+                    string json = SupplierOrderJsonProvider != null
+                        ? (await SupplierOrderJsonProvider(skipass.reserve_no) ?? "")
+                        : Util.GetWebContent("https://mini.snowmeet.top/core/WanlongZiwoyouHelper/GetOrder?orderId=" + skipass.reserve_no);
                     WanlongZiwoyouHelper.ZiwoyouOrder order = JsonConvert.DeserializeObject<WanlongZiwoyouHelper.ZiwoyouOrder>(json);
                     if (order == null)
                     {
+                        // 快轮询一天要查好几千次：一时没查到（本机接口抖一下返回空）不能当成「没有这个订单」把票标成出票失败，
+                        // 跳过，下一个 10 秒再来；每分钟那一轮保持原来的做法
+                        if (fresh) continue;
                         skipass.is_cancel = -2;
                         skipass.memo = "未获取到自我游订单号";
                         skipass.update_date = DateTime.Now;
@@ -1337,6 +1387,7 @@ namespace SnowmeetApi.Controllers
 
                         continue;
                     }
+                    bool gotCardNo = false, gotQr = false, gotSendContent = false;
                     if (order.vouchers.Length > 0)
                     {
                         bool updated = false;
@@ -1344,17 +1395,26 @@ namespace SnowmeetApi.Controllers
                         {
                             skipass.card_no = order.vouchers[0].code.Trim();
                             updated = true;
+                            gotCardNo = true;
                         }
                         if (order.vouchers[0].qrcodeUrl != null && !order.vouchers[0].qrcodeUrl.Trim().Equals(""))
                         {
                             skipass.qr_code_url = order.vouchers[0].qrcodeUrl.Trim();
                             updated = true;
+                            gotQr = true;
                         }
                         if (updated)
                         {
                             try
                             {
-                                await SetNotify(skipass);    
+                                if (CodeReadyNotifier != null)
+                                {
+                                    await CodeReadyNotifier(skipass);
+                                }
+                                else
+                                {
+                                    await SetNotify(skipass);
+                                }
                             }
                             catch
                             {
@@ -1391,6 +1451,13 @@ namespace SnowmeetApi.Controllers
                     if (!sendContent.Trim().Equals(""))
                     {
                         skipass.send_content = sendContent.Trim();
+                        gotSendContent = true;
+                    }
+                    // 供应商那边还没出码、订单也没变化：不写票、不写日志（原来每查一次都写一遍；现在每 10 秒查一次，不能这样）。
+                    // card_member_pick_time 同样只在取到码的那一轮写，和原来「最后一轮写进去的值」一致（优惠券激活日按它算）
+                    if (!SkipassSaleRules.SupplierOrderChanged(gotCardNo, gotQr, gotSendContent, order.orderState))
+                    {
+                        continue;
                     }
                     skipass.update_date = DateTime.Now;
                     skipass.card_member_pick_time = DateTime.Now;
