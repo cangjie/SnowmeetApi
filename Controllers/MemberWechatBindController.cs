@@ -65,7 +65,8 @@ public sealed class MemberWechatBindController(ApplicationDBContext db) : Contro
         db.scanQrCode.Add(qr);
         await db.SaveChangesAsync();
         await tx.CommitAsync();
-        return Ok(OkData(new { id = qr.id, expireTime = qr.expire_time }));
+        // token：绑定码本身，只返回给创建它的店员，用来拼「转发给客人」的小程序卡片路径（二维码里装的也是它）
+        return Ok(OkData(new { id = qr.id, expireTime = qr.expire_time, token = qr.code }));
     }
 
     private async Task<ScanQrCode?> StaffQr(int id, string sessionKey)

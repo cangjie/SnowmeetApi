@@ -269,6 +269,29 @@ public class MemberWechatBindTests
         }
     }
 
+    // 2026-11-23 用户：店员能把绑定二维码转发给客人（小程序卡片）。卡片路径要带绑定码，所以创建接口把绑定码也返回给创建它的店员
+    // （店员本来就能看到码——二维码里就是它；新增字段，旧客户端不受影响）。
+    [Fact]
+    public async Task Create_also_returns_the_token_the_staff_member_needs_to_share_the_code()
+    {
+        var f = await CoachFixture.Create(withPricing: false);
+        await using (f)
+        {
+            var account = await f.Db.memberSocialAccount.AsTracking().SingleAsync(a => a.member_id == CoachFixture.StudentA && a.type == "wechat_mini_openid");
+            account.valid = 0;
+            await f.Db.SaveChangesAsync();
+            var create = Result(await new MemberWechatBindController(f.NewContext()).Create(CoachFixture.StudentA, "session-7"));
+            Assert.Equal(0, create.code);
+            using var json = JsonDocument.Parse(JsonSerializer.Serialize(create.data));
+            var root = json.RootElement;
+            var stored = await f.Db.scanQrCode.AsNoTracking().SingleAsync(q => q.scene == "会员绑定微信");
+            Assert.Equal(stored.id, root.GetProperty("id").GetInt32());
+            Assert.True(root.TryGetProperty("expireTime", out _));
+            Assert.Equal(stored.code, root.GetProperty("token").GetString());          // 返回的就是库里的绑定码
+            Assert.Matches("^[0-9a-f]{24}$", root.GetProperty("token").GetString()!);
+        }
+    }
+
     [Fact]
     public async Task RejectedWechatPhoneCodeDoesNotBind()
     {
