@@ -249,6 +249,26 @@ public class MemberWechatBindTests
         }
     }
 
+    // 2026-11-23 用户：会员绑定微信的二维码有效期由 2 分钟改成 30 分钟（2 分钟来不及：扫码、等小程序加载、授权手机号）。
+    [Fact]
+    public async Task The_bind_qr_code_is_valid_for_thirty_minutes()
+    {
+        Assert.Equal(30, MemberWechatBindController.QrValidMinutes);
+        var (f, id, token) = await Setup();
+        await using (f)
+        {
+            var qr = await f.Db.scanQrCode.AsNoTracking().SingleAsync(q => q.id == id);
+            var left = qr.expire_time!.Value - DateTime.Now;
+            Assert.InRange(left.TotalMinutes, 29.5, 30.1);            // 刚生成：还剩约 30 分钟
+            // 25 分钟后（原来 2 分钟的规则下早已失效）仍然能绑定
+            qr.expire_time = DateTime.Now.AddMinutes(5);
+            f.Db.scanQrCode.Update(qr);
+            await f.Db.SaveChangesAsync();
+            f.Db.ChangeTracker.Clear();
+            Assert.Equal(0, Result(await Bind(f, token, "13800001003")).code);
+        }
+    }
+
     [Fact]
     public async Task RejectedWechatPhoneCodeDoesNotBind()
     {

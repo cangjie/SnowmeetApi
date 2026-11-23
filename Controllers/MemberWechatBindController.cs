@@ -32,6 +32,12 @@ public sealed class MemberWechatBindController(ApplicationDBContext db) : Contro
         return staff != null && staff.valid == 1 && staff.title_level >= 100 ? staff : null;
     }
 
+    /// <summary>
+    /// 绑定二维码有效期（分钟）。2026-11-23 用户：由 2 分钟改成 30 分钟（2 分钟来不及：顾客扫码、等小程序加载、授权手机号）。
+    /// 二维码一次性，绑定成功或店员重新生成后旧码作废；店员页的提示文字（member_detail.js）要和这个数一致。
+    /// </summary>
+    public const int QrValidMinutes = 30;
+
     [HttpPost]
     public async Task<ActionResult<ApiResult<object>>> Create(int memberId, string sessionKey)
     {
@@ -54,7 +60,7 @@ public sealed class MemberWechatBindController(ApplicationDBContext db) : Contro
         {
             id = id, code = Convert.ToHexString(RandomNumberGenerator.GetBytes(12)).ToLowerInvariant(),
             staff_id = staff.id, platform = "wechat_mini", scene = Scene, purpose = memberId.ToString(),
-            expire_time = DateTime.Now.AddMinutes(2)
+            expire_time = DateTime.Now.AddMinutes(QrValidMinutes)
         };
         db.scanQrCode.Add(qr);
         await db.SaveChangesAsync();
