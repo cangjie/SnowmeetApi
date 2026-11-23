@@ -4,6 +4,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -125,11 +126,28 @@ public sealed class MemberWechatBindController(ApplicationDBContext db) : Contro
         if (candidate == null) return Ok(Fail("二维码已失效，请让店员重新生成"));
 
         var accessToken = await tokens.GetTokenAsync();
-        using var response = await clients.CreateClient().PostAsJsonAsync(
-            "https://api.weixin.qq.com/wxa/business/getuserphonenumber?access_token=" + Uri.EscapeDataString(accessToken),
-            new { code = body.phoneCode });
-        response.EnsureSuccessStatusCode();
-        using var result = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        // 向微信换手机号。⚠️ 不能用 PostAsJsonAsync：它的请求体没有 Content-Length、按 chunked 发送，微信对 chunked 一律回 412
+        // （2026-11-23 顾客授权手机号后绑定接口 500 的根因，用 curl 加 Transfer-Encoding: chunked 复现）；用 StringContent（带长度）。
+        // 微信回非 2xx、网络出错、回的不是 JSON，都当作「手机号授权验证失败」返回，不能让它变成 500。
+        JsonDocument result;
+        try
+        {
+            using var content = new StringContent(JsonSerializer.Serialize(new { code = body.phoneCode }), Encoding.UTF8, "application/json");
+            using var response = await clients.CreateClient().PostAsync(
+                "https://api.weixin.qq.com/wxa/business/getuserphonenumber?access_token=" + Uri.EscapeDataString(accessToken), content);
+            if (!response.IsSuccessStatusCode)
+            {
+                Console.WriteLine("[绑定微信] 微信换手机号返回 HTTP " + (int)response.StatusCode);
+                return Ok(Fail("手机号授权验证失败，请稍后重试"));
+            }
+            result = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        }
+        catch (Exception err) when (err is HttpRequestException or JsonException or TaskCanceledException)
+        {
+            Console.WriteLine("[绑定微信] 微信换手机号出错 " + err.GetType().Name + " " + err.Message);
+            return Ok(Fail("手机号授权验证失败，请稍后重试"));
+        }
+        using var _ = result;
         var root = result.RootElement;
         if (!root.TryGetProperty("errcode", out var error) || error.GetInt32() != 0
             || !root.TryGetProperty("phone_info", out var info)

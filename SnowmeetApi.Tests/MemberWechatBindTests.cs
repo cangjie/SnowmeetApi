@@ -163,6 +163,92 @@ public class MemberWechatBindTests
         }
     }
 
+    // 2026-11-23：顾客授权手机号后绑定接口 500。根因：向微信 getuserphonenumber 发请求时用了 PostAsJsonAsync，
+    // 它的请求体没有 Content-Length、按 chunked 发送，微信一律回 412（用 curl 加 Transfer-Encoding: chunked 复现），
+    // 代码里 EnsureSuccessStatusCode 抛异常 → 500。改用带长度的 StringContent，并且微信回非 2xx、网络出错、回的不是 JSON 都返回
+    // 「手机号授权验证失败」而不是 500。
+    private sealed class CapturingHandler : HttpMessageHandler
+    {
+        public long? ContentLength; public bool? Chunked; public string Body = "";
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            // 在读 Content 之前看：.NET 发请求时，Content-Length 算不出来的内容（JsonContent）会改用 chunked
+            ContentLength = request.Content!.Headers.ContentLength;
+            Chunked = request.Headers.TransferEncodingChunked;
+            Body = await request.Content.ReadAsStringAsync(cancellationToken);
+            return new HttpResponseMessage(HttpStatusCode.OK) {
+                Content = new StringContent("{\"errcode\":0,\"phone_info\":{\"countryCode\":\"86\",\"purePhoneNumber\":\"13800001003\"}}", Encoding.UTF8, "application/json")
+            };
+        }
+    }
+    private sealed class FixedClients(HttpMessageHandler handler) : IHttpClientFactory
+    {
+        public HttpClient CreateClient(string name) => new(handler);
+    }
+    private sealed class FuncHandler(Func<HttpRequestMessage, HttpResponseMessage> respond) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
+            Task.FromResult(respond(request));
+    }
+    private sealed class ThrowingHandler(Exception error) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) => throw error;
+    }
+
+    [Fact]
+    public async Task The_request_to_wechat_has_a_known_length_not_chunked_because_wechat_answers_412_to_chunked_bodies()
+    {
+        var (f, id, token) = await Setup();
+        await using (f)
+        {
+            var capture = new CapturingHandler();
+            var result = Result(await new MemberWechatBindController(f.NewContext()).Bind(
+                new() { token = token, phoneCode = "phone-code" }, "session-new", new Tokens(), new FixedClients(capture)));
+            Assert.Equal(0, result.code);
+            Assert.NotNull(capture.ContentLength);                  // 带长度，不是 chunked
+            Assert.NotEqual(true, capture.Chunked);
+            Assert.Equal("{\"code\":\"phone-code\"}", capture.Body);
+        }
+    }
+
+    [Theory]
+    [InlineData(412)]
+    [InlineData(500)]
+    [InlineData(502)]
+    public async Task A_non_success_answer_from_wechat_is_reported_not_thrown_as_a_500(int status)
+    {
+        var (f, id, token) = await Setup();
+        await using (f)
+        {
+            var clients = new FixedClients(new FuncHandler(_ => new HttpResponseMessage((HttpStatusCode)status)));
+            var result = Result(await new MemberWechatBindController(f.NewContext()).Bind(
+                new() { token = token, phoneCode = "phone-code" }, "session-new", new Tokens(), clients));
+            Assert.Equal(1, result.code);
+            Assert.Contains("手机号", result.message);
+            Assert.Equal(0, (await f.Db.scanQrCode.AsNoTracking().SingleAsync(q => q.id == id)).authed);   // 二维码还能再用
+        }
+    }
+
+    [Fact]
+    public async Task A_network_error_or_a_non_json_answer_is_reported_not_thrown()
+    {
+        var (f, id, token) = await Setup();
+        await using (f)
+        {
+            var network = Result(await new MemberWechatBindController(f.NewContext()).Bind(
+                new() { token = token, phoneCode = "phone-code" }, "session-new", new Tokens(),
+                new FixedClients(new ThrowingHandler(new HttpRequestException("network down")))));
+            Assert.Equal(1, network.code);
+            Assert.Contains("手机号", network.message);
+            var html = Result(await new MemberWechatBindController(f.NewContext()).Bind(
+                new() { token = token, phoneCode = "phone-code" }, "session-new", new Tokens(),
+                new FixedClients(new FuncHandler(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("<html>bad gateway</html>") }))));
+            Assert.Equal(1, html.code);
+            Assert.Contains("手机号", html.message);
+            Assert.Equal(0, (await f.Db.scanQrCode.AsNoTracking().SingleAsync(q => q.id == id)).authed);
+        }
+    }
+
     [Fact]
     public async Task RejectedWechatPhoneCodeDoesNotBind()
     {
