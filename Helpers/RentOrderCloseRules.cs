@@ -35,8 +35,9 @@ namespace SnowmeetApi.Helpers
             }
             if (status == Order.RentStatus.全部归还.ToString())
             {
-                // 应退押金 = 已收押金 − 应收费用 + 储值付租金（与 rentProperties 里算「退押金状态」的口径一致）
-                double needRefund = (order.totalGuarantyAmount ?? 0) - (order.totalRentSummaryAmount ?? 0) + order.depositPaidAmount;
+                // 应退押金 = 已收押金 − 应收费用 + 储值付租金 − 退押金时顺带买次卡的卡款（与 rentProperties 里算「退押金状态」的口径一致）
+                double needRefund = order.RefundableAfterCardSale(
+                    (order.totalGuarantyAmount ?? 0) - (order.totalRentSummaryAmount ?? 0) + order.depositPaidAmount);
                 return Math.Round(needRefund, 2) == 0;
             }
             return false;

@@ -195,6 +195,66 @@ public class ManualCloseRentOrderTests
         Assert.Empty(await f.Db.orderShare.AsNoTracking().ToListAsync());
     }
 
+    // ---------------- 退押金时顺带买了租赁次卡（订单 73208 / 73227 的坑，2026-11-25） ----------------
+    // 卡款从押金里扣：应退押金 = 押金 − 租金 − 卡款。以前订单状态、手动关单、夜间关单都没扣卡款，
+    // 押金 10000、卡款 1500、已退 8500 的订单被当成「还有 1500 没退」，按钮不显示、夜间也关不掉。
+
+    [Fact]
+    public async Task 购卡后退完剩余押金_可以关单()
+    {
+        await using var f = await Fixture.Create(paid: 10000, refunded: 8500, rent: 0, cardSale: 1500);
+        var order = await f.LoadOrder();
+        Assert.Equal("全额退押金", order.rentProperties!.rentStatus);
+        Assert.Equal(0, order.totalRentUnRefund);
+        Assert.True(order.canManualClose);
+    }
+
+    [Fact]
+    public async Task 购卡后剩余押金还没退完_不能关单()
+    {
+        await using var f = await Fixture.Create(paid: 10000, refunded: 5000, rent: 0, cardSale: 1500);
+        var order = await f.LoadOrder();
+        Assert.Equal("部分退押金", order.rentProperties!.rentStatus);
+        Assert.Equal(3500, order.totalRentUnRefund);
+        Assert.False(order.canManualClose);
+    }
+
+    [Fact]
+    public async Task 购卡后一分没退_但押金正好抵卡款_可以关单()
+    {
+        await using var f = await Fixture.Create(paid: 1500, refunded: 0, rent: 0, cardSale: 1500);
+        var order = await f.LoadOrder();
+        Assert.Equal("全部归还", order.rentProperties!.rentStatus);
+        Assert.True(order.canManualClose);
+    }
+
+    [Fact]
+    public async Task 购卡款超出可扣押金_客人补了差价_扣到零为止_可以关单()
+    {
+        // 押金 500、租金被次卡免掉，卡 1500：押金全部用来抵卡款，差额由客人另付（不在这张押金单里），没有可退
+        await using var f = await Fixture.Create(paid: 500, refunded: 0, rent: 0, cardSale: 1500);
+        var order = await f.LoadOrder();
+        Assert.Equal(0, order.totalRentUnRefund);
+        Assert.True(order.canManualClose);
+    }
+
+    [Fact]
+    public async Task 无效的购卡零售行_不抵扣押金()
+    {
+        await using var f = await Fixture.Create(paid: 10000, refunded: 8500, rent: 0, cardSale: 1500, cardSaleValid: 0);
+        var order = await f.LoadOrder();
+        Assert.Equal("部分退押金", order.rentProperties!.rentStatus);
+        Assert.False(order.canManualClose);
+    }
+
+    [Fact]
+    public async Task 购卡后退完剩余押金_夜间关单任务会关掉它()
+    {
+        await using var f = await Fixture.Create(paid: 10000, refunded: 8500, rent: 0, cardSale: 1500);
+        await new RentController(f.Db, Config, Http).CloseOrder();
+        Assert.Equal(1, (await f.Db.order.AsNoTracking().SingleAsync(o => o.id == 1)).closed);
+    }
+
     [Fact]
     public async Task 手动关闭后_夜间关单任务不再处理它()
     {
@@ -223,7 +283,8 @@ public class ManualCloseRentOrderTests
 
         // 一张租赁单：一次付款 paid，退 refunded，租金明细 rent；staffLevel 是 staff-session 那位员工的职级
         public static async Task<Fixture> Create(double paid, double refunded, double rent, int settled = 1, int closed = 0,
-            string type = "租赁", string shop = "测试店", double? stillOwed = null, int staffLevel = 300)
+            string type = "租赁", string shop = "测试店", double? stillOwed = null, int staffLevel = 300,
+            double cardSale = 0, int cardSaleValid = 1)
         {
             var connection = new SqliteConnection("Data Source=:memory:;Foreign Keys=False");
             await connection.OpenAsync();
@@ -252,6 +313,12 @@ public class ManualCloseRentOrderTests
             }
             db.guaranty.Add(new Guaranty { id = 6, order_id = 1, biz_type = "租赁", biz_id = 2, valid = 1, amount = paid });
             db.guarantyPayment.Add(new GuarantyPayment { guaranty_id = 6, payment_id = 4 });
+            if (cardSale > 0)
+            {
+                // 退押金时顺带买的租赁次卡（RentController.FinalizePunchCardSale 写的那种零售行）
+                db.retail.Add(new Retail { id = 8, order_id = 1, product_id = 716, deal_price = cardSale, sale_price = cardSale,
+                    order_type = "租赁附加", retail_type = "租赁卡类", valid = cardSaleValid, memo = "购买『租赁10次卡』次卡" });
+            }
             await db.SaveChangesAsync();
             db.ChangeTracker.Clear();
             return new Fixture(connection, db);

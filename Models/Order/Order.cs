@@ -999,13 +999,34 @@ namespace SnowmeetApi.Models
         {
             get
             {
-                if (rentals != null && rentals.Count >= 0 && rentProperties != null 
+                if (rentals != null && rentals.Count >= 0 && rentProperties != null
                     && rentProperties.totalPaidGuarantyAmount != null)
                 {
-                    return rentProperties.totalPaidGuarantyAmount - totalRentSummaryAmount + depositPaidAmount;
+                    double? beforeCard = rentProperties.totalPaidGuarantyAmount - totalRentSummaryAmount + depositPaidAmount;
+                    return beforeCard == null ? null : RefundableAfterCardSale(beforeCard.Value);
                 }
                 return null;
             }
+        }
+        // 退押金时顺带买的租赁次卡（RentController.FinalizePunchCardSale 写的零售行：valid=1 且 product_id 非空）的卡款合计。
+        [NotMapped]
+        public double rentCardSaleAmount
+        {
+            get
+            {
+                if (retails == null) return 0;
+                return Math.Round(retails.Where(r => r.valid == 1 && r.product_id != null).Sum(r => r.deal_price), 2);
+            }
+        }
+        // 卡款从「押金 − 租金 + 储值付租金」里扣：应退押金 = 扣完卡款后剩下的。
+        // 卡款超过可扣的部分（客人补了差价）由客人另付，不从押金里再扣，所以最多扣到 0；还欠租金（可扣为负）时不扣。
+        // 订单状态、手动关单（RentOrderCloseRules）和夜间关单（totalRentUnRefund）都走这里，口径一致
+        // （2026-11-25：以前三处都没扣卡款，押金 10000、卡款 1500、已退 8500 的订单被当成「还有 1500 没退」，关不掉）。
+        public double RefundableAfterCardSale(double refundableBeforeCard)
+        {
+            double before = Math.Round(refundableBeforeCard, 2);
+            double deduction = Math.Min(rentCardSaleAmount, Math.Max(0, before));
+            return Math.Round(before - deduction, 2);
         }
         [NotMapped]
         public double? totalRentUnRefund
@@ -1230,7 +1251,7 @@ namespace SnowmeetApi.Models
                         // 退押金状态以「实际退款」为准（refundAmount = payment_refund 汇总）。
                         // 不能用 relieve 标记：归还全部租赁物时 RentController 会把 guaranty.relieve 置 1
                         // （仅表示押金占用解除、可退），并不代表已退款。应退押金 = 已收押金 − 应收费用 + 储值付租金。
-                        double needRefund = (totalGuarantyAmount ?? 0) - (totalRentSummaryAmount ?? 0) + depositPaidAmount;
+                        double needRefund = RefundableAfterCardSale((totalGuarantyAmount ?? 0) - (totalRentSummaryAmount ?? 0) + depositPaidAmount);
                         if (refundAmount <= 0.001)
                         {
                             status = RentStatus.全部归还.ToString();
