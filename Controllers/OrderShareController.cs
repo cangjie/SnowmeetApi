@@ -502,7 +502,8 @@ namespace SnowmeetApi.Controllers
                 if (latestBank.TryGetValue(p.order_id, out var bankDate)) times.Add(bankDate);
                 return times.Count == 0 ? null : times.Max();
             }
-            return payments.Where(p => !pending.Contains(p.id) &&
+            // 新商户 1018（1006012310）的付款一律冻结，只由人手动解冻（2026-11-25 用户定，防自动提现），夜间任务不碰。
+            return payments.Where(p => !pending.Contains(p.id) && !WanlongShareRules.FreezeAllPayments(p.mch_id) &&
                 ((orderTypes.TryGetValue(p.order_id, out var orderType) && WanlongShareRules.UnfreezeImmediately(orderType, p.mch_id)) ||
                 (LastShareTime(p) is DateTime lastShare && ShareWorkflowRules.UnfreezeWaitOver(lastShare, now))))
                 .Select(p => p.id).ToHashSet();

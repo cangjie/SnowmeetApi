@@ -40,7 +40,7 @@ namespace SnowmeetApi.Helpers
 
         /// <summary>
         /// 万龙租赁新商户 1006012310（微信支付公钥模式）在 wepay_key 里的 id（2026-11-22 用户要求万龙租赁换微信支付账号，建行得到 1018）。
-        /// 新账号下的租赁订单同样是非分账订单（用户 2026-11-22 定：沿用 11-17 的规则）。
+        /// 11-22 曾定新账号的租赁订单同样是非分账订单；2026-11-25 用户改了：新账号的所有付款反过来都是分账订单（见 FreezeAllPayments）。
         /// 2026-11-22 起体验中心、服务中心的万龙租赁订单一律走它（TenpayController.GetMchId）；老账号 id 5 保留，已付款订单的退款仍走老账号。
         /// </summary>
         public const int WanlongRentalNewMchId = 1018;
@@ -51,7 +51,23 @@ namespace SnowmeetApi.Helpers
         /// 原因：微信分账的最大可分账金额按「付款 − 退款」的净额算（11-01 起实测），而万龙租赁应分是租金的一半、押金退完后占净额 50%，几乎都超限被拒。
         /// </summary>
         public static bool IsNoShareOrder(string? orderType, int? mchId)
-            => (orderType ?? "").Trim() == "租赁" && (mchId == WanlongRentalMchId || mchId == WanlongRentalNewMchId);
+            => (orderType ?? "").Trim() == "租赁" && mchId == WanlongRentalMchId;
+
+        /// <summary>
+        /// 2026-11-25 用户定：为防止新微信支付账号 1006012310（wepay_key 1018）自动提现，凡是支付给它的（不分订单类型）一律是分账订单——
+        /// 下微信单带 profit_sharing，付款记录 need_share = 1，资金冻结在「待分账」里，日后由人手动解冻。
+        /// 所以这类付款：下单时一律带分账标识；夜间「关闭微信分账」任务不解冻（见 OrderShareController.ClosableWechatPaymentIdsAsync）。
+        /// 微信对直连商户的冻结期最长 30 天，到期会自动解冻，手动解冻要赶在这之前。
+        /// 这条取代 11-22 那条「新账号同样是非分账订单」。
+        /// </summary>
+        public static bool FreezeAllPayments(int? mchId) => mchId == WanlongRentalNewMchId;
+
+        /// <summary>
+        /// 下微信单时最终带给微信的 profit_sharing 标识：老商户 5 的租赁订单不带（11-17）；新商户 1018 的所有付款都带（11-25）；
+        /// 其它商户照调用方（雪票有分账的才带）。
+        /// </summary>
+        public static bool ResolveProfitSharing(string? orderType, int? mchId, bool requested)
+            => FreezeAllPayments(mchId) || (!IsNoShareOrder(orderType, mchId) && requested);
 
         /// <summary>
         /// 2026-11-17 用户定：所有给万龙生成的分账一律标成「不自动分账」（payment_share.can_not_share = 1），夜间任务不提交，应分的钱线下结算。

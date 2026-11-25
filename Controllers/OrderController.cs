@@ -2035,13 +2035,24 @@ namespace SnowmeetApi.Controllers
             var careCardError = await CareCardSaleService.PaymentErrorAsync(_db, order, payment.amount, "微信支付", member.id, true);
             if (careCardError != null) return Ok(new ApiResult<OrderPayment?> { code = 1, message = careCardError, data = null });
 
-            if (WanlongShareRules.IsNoShareOrder(order.type, new TenpayController(_db, _config, _http).GetMchId(order)))
+            int payMchId = new TenpayController(_db, _config, _http).GetMchId(order);
+            if (WanlongShareRules.IsNoShareOrder(order.type, payMchId))
             {
                 // 2026-11-17 用户定：万龙租赁商户（1604236346）下的租赁订单是「非分账订单」（以前万龙体验中心的租赁在这里置 need_share = 1）。
                 // 可能是重新支付的旧付款记录，原来带着 1，这里改回 0 并保存。
                 if (payment.need_share != 0)
                 {
                     payment.need_share = 0;
+                    _db.orderPayment.Entry(payment).State = EntityState.Modified;
+                    await _db.SaveChangesAsync();
+                }
+            }
+            else if (WanlongShareRules.FreezeAllPayments(payMchId))
+            {
+                // 2026-11-25 用户定：新账号 1006012310（1018）的付款一律是分账订单（need_share = 1，下单带 profit_sharing），防自动提现、日后手动解冻。
+                if (payment.need_share != 1)
+                {
+                    payment.need_share = 1;
                     _db.orderPayment.Entry(payment).State = EntityState.Modified;
                     await _db.SaveChangesAsync();
                 }

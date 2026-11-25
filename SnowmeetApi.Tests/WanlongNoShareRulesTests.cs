@@ -31,7 +31,7 @@ public class WanlongNoShareRulesTests
 
     [Theory]
     [InlineData("租赁", 5, true)]     // 万龙租赁商户下的租赁订单
-    [InlineData("租赁", 1018, true)]  // 2026-11-22 新商户 1006012310（wepay_key 1018）同样是非分账订单
+    [InlineData("租赁", 1018, false)] // 2026-11-25 用户改：新商户 1006012310（wepay_key 1018）不再是非分账订单，反过来所有付款都分账（见下一组）
     [InlineData("养护", 1018, false)]
     [InlineData(" 租赁 ", 5, true)]
     [InlineData("租赁", 10, false)]   // 旗舰租赁商户本来就不分账，不在这条规则里
@@ -42,6 +42,33 @@ public class WanlongNoShareRulesTests
     [InlineData(null, 5, false)]
     public void Rental_orders_under_the_wanlong_rental_merchant_are_non_sharing_orders(string? orderType, int? mchId, bool expected)
         => Assert.Equal(expected, WanlongShareRules.IsNoShareOrder(orderType, mchId));
+
+    // ---------- 1b) 新商户 1006012310（wepay_key 1018）：所有付款都是分账订单 ----------
+    // 2026-11-25 用户定：为防止这个微信支付账号自动提现，凡是支付给它的，下单一律带 profit_sharing（资金冻结在「待分账」里），日后由人手动解冻。
+    // 老商户 5 的租赁订单仍是非分账订单；其它商户照调用方的意思。
+
+    [Theory]
+    [InlineData("租赁", 1018, false, true)]
+    [InlineData("租赁", 1018, true, true)]
+    [InlineData("养护", 1018, false, true)]   // 「凡是支付给 1006012310 的」，不分订单类型
+    [InlineData("零售", 1018, false, true)]
+    [InlineData(null, 1018, false, true)]
+    [InlineData("租赁", 5, true, false)]      // 老商户 5 的租赁不管调用方传什么都不分账
+    [InlineData("租赁", 5, false, false)]
+    [InlineData("租赁", 10, true, true)]      // 其它商户照调用方的意思
+    [InlineData("租赁", 10, false, false)]
+    [InlineData("雪票", 7, true, true)]
+    [InlineData("租赁", null, false, false)]
+    public void The_profit_sharing_flag_sent_to_wechat(string? orderType, int? mchId, bool requested, bool expected)
+        => Assert.Equal(expected, WanlongShareRules.ResolveProfitSharing(orderType, mchId, requested));
+
+    [Theory]
+    [InlineData(1018, true)]
+    [InlineData(5, false)]
+    [InlineData(10, false)]
+    [InlineData(null, false)]
+    public void Only_the_new_merchant_holds_every_payment_frozen(int? mchId, bool expected)
+        => Assert.Equal(expected, WanlongShareRules.FreezeAllPayments(mchId));
 
     [Fact]
     public void The_new_wanlong_rental_merchant_is_the_one_GetMchId_picks_for_wanlong_rentals()
@@ -173,6 +200,39 @@ public class WanlongNoShareRulesTests
         await using var db = await ShareFixture.ClosedWanlongOrderAsync("微信支付", 5000, 4600, 400);
         await db.orderPayment.Where(p => p.id == 4).ExecuteUpdateAsync(s => s.SetProperty(p => p.mch_id, WanlongShareRules.WanlongRentalMchId));
         db.ChangeTracker.Clear();
+
+        Assert.True(await CanClose(db, 4));
+    }
+
+    // ---------- 4) 新商户 1018 的付款只由人手动解冻，夜间任务不碰 ----------
+
+    // 订单 1 的付款 4：分账成功已经 5 天（按旧规则早该解冻），商户和订单类型由调用方定。
+    private static async Task<ApplicationDBContext> PaymentSharedFiveDaysAgoAsync(int mchId)
+    {
+        var db = await ShareFixture.ClosedWanlongOrderAsync("微信支付", 5000, 0, 400);
+        await db.orderPayment.Where(p => p.id == 4).ExecuteUpdateAsync(s => s.SetProperty(p => p.mch_id, mchId));
+        var shared = DateTime.Today.AddDays(-5).AddHours(9);
+        db.orderShare.Add(new OrderShare { id = 900, order_id = 1, relation_id = 4, amount = 1, valid = true, dealed = true,
+            create_date = shared.AddHours(-1), auto_share = true });
+        db.paymentShare.Add(new PaymentShare { id = 901, payment_id = 4, share_id = 900, out_trade_no = "WT_ZL_261031_00001_FZ_01", amount = 1,
+            success = true, valid = true, submit_time = shared, response_time = shared, create_date = shared.AddHours(-1) });
+        await db.SaveChangesAsync();
+        db.ChangeTracker.Clear();
+        return db;
+    }
+
+    [Fact]
+    public async Task A_payment_to_the_new_merchant_is_never_unfrozen_by_the_nightly_job_even_long_after_a_successful_share()
+    {
+        await using var db = await PaymentSharedFiveDaysAgoAsync(WanlongShareRules.WanlongRentalNewMchId);
+
+        Assert.False(await CanClose(db, 4));
+    }
+
+    [Fact]
+    public async Task The_same_payment_of_another_merchant_is_unfrozen_after_the_wait_so_the_hold_is_what_stops_the_new_one()
+    {
+        await using var db = await PaymentSharedFiveDaysAgoAsync(10);   // 旗舰租赁
 
         Assert.True(await CanClose(db, 4));
     }
