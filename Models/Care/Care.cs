@@ -35,6 +35,14 @@ namespace SnowmeetApi.Models
         public string? right_angle { get; set; }
         public string? serials { get; set; }
         public string? edge_degree { get; set; }
+        // 标签存根上印的修刃角度（2026-11-25 加 DB 列 care.label_edge_degree varchar(20) NULL，
+        // 见 snowmeet_ai_doc/sql/2026-11-25_care_label_edge_degree.sql；先建列，再部署读写它的后端）。
+        // NULL = 没有待重打的改动；改过角度后记「改之前标签上印的角度」，重新打印标签后清空。
+        // 只由 CareController.SetEdgeDegree / MarkEdgeLabelPrinted 改（UpdateCare 整份回传不覆盖它）。规则见 Helpers/CareEdgeLabelRules.cs。
+        public string? label_edge_degree { get; set; } = null;
+        // 角度改过、标签还没重新打印：此时不能开始修刃。小程序据此显示提示和置灰「开始」。
+        [NotMapped]
+        public bool edgeLabelPending => Helpers.CareEdgeLabelRules.IsPending(label_edge_degree, edge_degree);
         public string? others_associates { get; set; } = null;
         public int need_edge { get; set; } = 0;
         public int need_wax { get; set; } = 0;

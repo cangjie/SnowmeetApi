@@ -32,6 +32,9 @@ namespace SnowmeetApi.Controllers
         {
             Care oriCare = await _db.care.Where(c => c.id == care.id)
                 .Include(c => c.careImages).AsNoTracking().FirstOrDefaultAsync();
+            // 「标签上印的修刃角度」只由 SetEdgeDegree / MarkEdgeLabelPrinted 改：页面上较早读到的装备整份回传时，
+            // 不能把「角度改过、标签还没重打」的状态冲掉（也不留下一条假的修改日志）。
+            care.label_edge_degree = oriCare?.label_edge_degree;
             List<CoreDataModLog> logs = Util.GetUpdateDifferenceLog<Care>(oriCare, care, memberId, staffId, scene);
             foreach (CoreDataModLog log in logs)
             {
@@ -1370,6 +1373,94 @@ namespace SnowmeetApi.Controllers
 
             });
         }
+        /// <summary>
+        /// 修改修刃角度（用户 2026-11-25）：修刃开始之前都可以改；改了以后标签存根上印的角度就错了，
+        /// 必须重新打印（MarkEdgeLabelPrinted），否则 SetTaskStatus 不让开始修刃。规则见 CareEdgeLabelRules。
+        /// 第一次改时把改之前的角度记进 label_edge_degree（标签上印的），连改几次不变；改回标签上的角度就不用重打。
+        /// </summary>
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<Care?>>> SetEdgeDegree(int careId, string degree, string sessionKey,
+            string sessionType = "wechat_mini_openid")
+        {
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            if (staff == null || staff.title_level < 100)
+            {
+                return Ok(new ApiResult<Care?> { code = 1, message = "没有权限", data = null });
+            }
+            if (!CareEdgeLabelRules.TryParseAngle(degree, out string newDegree, out string parseError))
+            {
+                return Ok(new ApiResult<Care?> { code = 1, message = parseError, data = null });
+            }
+            // 与「开始修刃」互斥：读到「修刃还没开始」到写入之间，不能让别人把它开始了
+            await using var transaction = _db.Database.CurrentTransaction == null
+                ? await _db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable) : null;
+            Care? care = await _db.care.Where(c => c.id == careId).AsTracking().FirstOrDefaultAsync();
+            CareTask? edgeTask = await _db.careTask.AsNoTracking()
+                .Where(t => t.care_id == careId && t.valid == 1 && t.task_name == CareEdgeLabelRules.EdgeTaskName)
+                .OrderByDescending(t => t.id).FirstOrDefaultAsync();
+            string? why = CareEdgeLabelRules.WhyCannotChange(care, edgeTask);
+            if (why != null)
+            {
+                return Ok(new ApiResult<Care?> { code = 1, message = why, data = null });
+            }
+            string printed = CareEdgeLabelRules.PrintedDegree(care!.edge_degree);
+            if (printed != newDegree)
+            {
+                string? prevDegree = care.edge_degree;
+                care.label_edge_degree ??= printed;
+                care.edge_degree = newDegree;
+                care.update_date = DateTime.Now;
+                await _db.coreDataModLog.AddAsync(Util.CreateCoreDataModLog("care", "edge_degree", care.id, prevDegree, newDegree,
+                    null, staff.id, "养护订单详情页修改修刃角度"));
+                await _db.SaveChangesAsync();
+            }
+            if (transaction != null) await transaction.CommitAsync();
+            return Ok(new ApiResult<Care?> { code = 0, message = "", data = await GetCare(careId) });
+        }
+
+        /// <summary>
+        /// 标签存根重新打印成功后调用：清掉「角度改过、标签没重打」的状态。degree 是这次打在标签上的角度，
+        /// 和当前角度对不上（打印期间又被改了）就不算数，状态保留，要重新打。
+        /// </summary>
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<Care?>>> MarkEdgeLabelPrinted(int careId, string sessionKey,
+            string sessionType = "wechat_mini_openid", string? degree = null)
+        {
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            if (staff == null || staff.title_level < 100)
+            {
+                return Ok(new ApiResult<Care?> { code = 1, message = "没有权限", data = null });
+            }
+            await using var transaction = _db.Database.CurrentTransaction == null
+                ? await _db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable) : null;
+            Care? care = await _db.care.Where(c => c.id == careId).AsTracking().FirstOrDefaultAsync();
+            if (care == null || care.valid != 1)
+            {
+                return Ok(new ApiResult<Care?> { code = 1, message = "未找到养护装备", data = null });
+            }
+            if (CareEdgeLabelRules.IsPending(care.label_edge_degree, care.edge_degree))
+            {
+                string current = CareEdgeLabelRules.PrintedDegree(care.edge_degree);
+                if (!string.IsNullOrWhiteSpace(degree) && degree.Trim() != current)
+                {
+                    return Ok(new ApiResult<Care?>
+                    {
+                        code = 1,
+                        message = "打印的标签角度（" + degree.Trim() + "°）和当前修刃角度（" + current + "°）不一致，请重新打印",
+                        data = null
+                    });
+                }
+                string? prevLabel = care.label_edge_degree;
+                care.label_edge_degree = null;
+                care.update_date = DateTime.Now;
+                await _db.coreDataModLog.AddAsync(Util.CreateCoreDataModLog("care", "label_edge_degree", care.id, prevLabel, null,
+                    null, staff.id, "重新打印标签存根"));
+                await _db.SaveChangesAsync();
+            }
+            if (transaction != null) await transaction.CommitAsync();
+            return Ok(new ApiResult<Care?> { code = 0, message = "", data = await GetCare(careId) });
+        }
+
         [HttpGet("{taskId}")]
         public async Task<ActionResult<ApiResult<Care?>>> SetTaskStatus(int taskId, string status,
             string scene, string sessionKey, string sessionType = "wechat_mini_openid",
@@ -1397,6 +1488,14 @@ namespace SnowmeetApi.Controllers
                 if (isCancel) await CareCardSaleService.LockAsync(_db, "care-card-order:" + taskOrderId);
                 careTask = await _db.careTask.Where(t => t.id == taskId && t.valid == 1).AsTracking().FirstOrDefaultAsync();
                 if (careTask == null) return Ok(new ApiResult<Care?> { code = 1, message = "未找到养护任务", data = null });
+
+                // 改过修刃角度、标签还没重新打印：不能开始修刃（标签上印的角度是错的）。只拦「开始」，已开始的照常结束。
+                if (status == "已开始" && careTask.task_name == CareEdgeLabelRules.EdgeTaskName)
+                {
+                    Care? edgeCare = await _db.care.AsNoTracking().FirstOrDefaultAsync(c => c.id == careTask.care_id);
+                    string? blocked = CareEdgeLabelRules.StartBlockedMessage(edgeCare);
+                    if (blocked != null) return Ok(new ApiResult<Care?> { code = 1, message = blocked, data = null });
+                }
 
                 Care? careCancel = null;
                 if (isCancel && status == "已完成" && careTask.task_name == "发板")
