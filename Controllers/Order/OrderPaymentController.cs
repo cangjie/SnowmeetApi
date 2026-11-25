@@ -585,7 +585,7 @@ namespace SnowmeetApi.Controllers.Order
                 var order = await new SnowmeetApi.Controllers.OrderController(_context, _originConfig, _httpContextAccessor).GetOrder(payment.order_id);
                 var quote = await new SnowmeetApi.Services.Rent.GuarantyTransferService(_context).CalculateAsync(order, new List<Models.Rental>());
                 var requested = await _context.orderPaymentRefund.AsNoTracking().Where(r => r.payment_id == payment.id)
-                    .SumAsync(r => (double?)r.amount) ?? 0;
+                    .Where(SnowmeetApi.Helpers.RefundRequestRules.CountsAsRequested).SumAsync(r => (double?)r.amount) ?? 0;
                 if (!double.IsFinite(amount) || amount <= 0 || Math.Round(amount, 2) > Math.Round(quote.refundable, 2)
                     || Math.Round(requested + amount, 2) > Math.Round(payment.amount, 2)) return null;
             }

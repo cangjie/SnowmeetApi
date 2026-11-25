@@ -230,4 +230,72 @@ public class GuarantyTransferTests
         Assert.Null(refund);
         Assert.Empty(await db.orderPaymentRefund.AsNoTracking().Where(r => r.order_id == orderId).ToListAsync());
     }
+
+    // 押金转用过、已归还可退 5000 的订单；再按需要补一条退款行（模拟渠道拒绝 / 处理中）。
+    private static async Task<(int orderId, int paymentId)> SeedReturnedTransferredDeposit(CoachFixture f, string refundId,
+        double rowAmount = 5000, double charge = 0)
+    {
+        var (orderId, _, draftId, paymentId) = await Seed(f);
+        Assert.Equal(0, (await Commit(f, orderId, 5000)).code);
+        var db = f.NewContext();
+        // 租金在转用之后才产生（先带租金转用会让追加押金只部分抵扣、拆成两行，偏离本组测试要的场景）。
+        if (charge > 0)
+        {
+            var oldRentalId = await db.rental.Where(r => r.order_id == orderId && r.name == "旧雪板").Select(r => r.id).SingleAsync();
+            db.rentalDetail.Add(new RentalDetail { rental_id = oldRentalId, rental_date = DateTime.Now.Date, amount = charge, valid = 1, charge_type = "租金" });
+        }
+        var target = await db.guaranty.SingleAsync(g => g.biz_id == draftId && g.valid == 1);
+        target.relieve = 1; db.Entry(target).State = EntityState.Modified;
+        var rental = await db.rental.SingleAsync(r => r.id == draftId);
+        rental.settled = 1; db.Entry(rental).State = EntityState.Modified;
+        db.orderPaymentRefund.Add(new OrderPaymentRefund { order_id = orderId, payment_id = paymentId, amount = rowAmount, state = 0,
+            refund_id = refundId, reason = "租赁退押金", memo = "基本账户余额不足，请充值后重新发起", out_refund_no = "TEST_TK_01" });
+        await db.SaveChangesAsync();
+        return (orderId, paymentId);
+    }
+
+    // 渠道拒绝的退款行（state=0、没有退款单号）不占额度：押金转用过的订单重试退款不能被它拦死。
+    [Fact]
+    public async Task RefundRejectedByTheChannelDoesNotBlockTheRetryOfTransferredDeposit()
+    {
+        await using var f = await CoachFixture.Create(withPricing: false);
+        var (orderId, paymentId) = await SeedReturnedTransferredDeposit(f, "");
+        var controller = Orders(f);
+        var retry = await controller.RefundCore(await controller.GetOrder(orderId), null,
+            new List<OrderPaymentRefund> { new() { payment_id = paymentId, amount = 5000 } });
+        Assert.Equal(0, retry.code);
+        Assert.Equal(2, await f.NewContext().orderPaymentRefund.AsNoTracking().CountAsync(r => r.order_id == orderId));
+    }
+
+    // 边界：已提交到渠道、拿到退款单号的退款（处理中）继续占额度。
+    // 押金 5000、租金 500 → 可退 4500；处理中已有 1000，再退 3600 合计 4600 没超过这笔支付（支付级检查放行），
+    // 但超过可退额 4500 - 1000 = 3500，只有「处理中算已申请」才拦得住；退 3500 则放行。
+    [Fact]
+    public async Task RefundAlreadySubmittedToTheChannelStillCountsAgainstTransferredDeposit()
+    {
+        await using var f = await CoachFixture.Create(withPricing: false);
+        var (orderId, paymentId) = await SeedReturnedTransferredDeposit(f, "50300000000202611250000000001", rowAmount: 1000, charge: 500);
+        var controller = Orders(f);
+        var tooMuch = await controller.RefundCore(await controller.GetOrder(orderId), null,
+            new List<OrderPaymentRefund> { new() { payment_id = paymentId, amount = 3600 } });
+        Assert.Equal(1, tooMuch.code);
+        Assert.Single(await f.NewContext().orderPaymentRefund.AsNoTracking().Where(r => r.order_id == orderId).ToListAsync());
+
+        var rest = await Orders(f).RefundCore(await Orders(f).GetOrder(orderId), null,
+            new List<OrderPaymentRefund> { new() { payment_id = paymentId, amount = 3500 } });
+        Assert.Equal(0, rest.code);
+    }
+
+    // 直连支付退款入口（OrderPaymentController.RefundCore）同样：渠道拒绝的退款行不占额度。
+    [Fact]
+    public async Task DirectPaymentRefundIgnoresRefundRejectedByTheChannel()
+    {
+        await using var f = await CoachFixture.Create(withPricing: false);
+        var (orderId, paymentId) = await SeedReturnedTransferredDeposit(f, "");
+        var payment = await f.NewContext().orderPayment.AsNoTracking().SingleAsync(p => p.id == paymentId);
+        var controller = new SnowmeetApi.Controllers.Order.OrderPaymentController(f.NewContext(), f.Config, Http());
+        var refund = await controller.RefundCore(payment, 5000, "租赁押金", 9, "");
+        Assert.NotNull(refund);
+        Assert.Equal(2, await f.NewContext().orderPaymentRefund.AsNoTracking().CountAsync(r => r.order_id == orderId));
+    }
 }

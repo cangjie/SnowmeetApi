@@ -39,7 +39,7 @@ public sealed class GuarantyTransferService
         long released = gs.Where(g => g.relieve == 1).Sum(g => Cents(g.amount ?? 0));
         long locked = gs.Where(g => g.relieve != 1).Sum(g => Cents(g.amount ?? 0));
         long requestedRefund = Cents(await db.orderPaymentRefund.AsNoTracking().Where(r => r.order_id == order.id)
-            .SumAsync(r => (double?)r.amount) ?? 0);
+            .Where(SnowmeetApi.Helpers.RefundRequestRules.CountsAsRequested).SumAsync(r => (double?)r.amount) ?? 0);
         long charges = Math.Max(0, Cents(order.totalRentSummaryAmount ?? 0));
         long storedRent = Math.Max(0, Cents(order.depositPaidAmount));
         long cardPurchase = (order.retails ?? new List<Retail>())

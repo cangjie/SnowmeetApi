@@ -409,6 +409,74 @@ public class RentalBenefitQuoteServiceTests
         Assert.Equal(400, (await f.NewContext().orderPaymentRefund.SingleAsync(r => r.order_id == orderId)).amount);
     }
 
+    // 已提交租金结算、押金 deposit、租金 100 的订单：最多可退 deposit - 100（押金 500 时与上一个测试同一场景）。
+    private static async Task<(int orderId, int paymentId)> SeedSettledDepositOrder(CoachFixture f, double deposit = 500)
+    {
+        var (orderId, rentalId) = await Seed(f, true);
+        var db = f.NewContext();
+        var payment = new OrderPayment { order_id = orderId, amount = deposit, status = "支付成功", pay_method = "现金", valid = 1, out_trade_no = "test" };
+        db.orderPayment.Add(payment);
+        var guaranty = new Guaranty { order_id = orderId, biz_type = "租赁", biz_id = rentalId, amount = deposit, valid = 1 };
+        db.guaranty.Add(guaranty);
+        await db.SaveChangesAsync();
+        db.guarantyPayment.Add(new GuarantyPayment { guaranty_id = guaranty.id, payment_id = payment.id });
+        await db.SaveChangesAsync();
+        var q = await new RentalBenefitQuoteService(f.NewContext()).QuoteAsync(orderId, false, DateTime.Now);
+        await new RentalBenefitSettlementService(f.NewContext()).CommitAsync(orderId, q.fingerprint, 9, DateTime.Now);
+        return (orderId, payment.id);
+    }
+
+    private static async Task<ApiResult<Order?>> RefundAsStaff(CoachFixture f, int orderId, int paymentId, double amount)
+    {
+        var controller = new OrderController(f.NewContext(), f.Config, new HttpContextAccessor { HttpContext = new DefaultHttpContext() });
+        var result = await controller.Refund(orderId, new() { new OrderPaymentRefund { payment_id = paymentId, amount = amount, reason = "租赁退押金" } }, "session-1");
+        return Assert.IsType<ApiResult<Order?>>(Assert.IsType<OkObjectResult>(result.Result).Value);
+    }
+
+    // 渠道拒绝的退款（微信「基本账户余额不足」）：行留在 state=0、没有退款单号，钱从未动过。
+    // 它不能算「已申请」，否则租金结算后的订单每次重试都被「退款金额已变化」拦死。
+    // （订单 WT_ZL_261125_00002，2026-11-25 一天内被拦 15 次）
+    [Fact]
+    public async Task RefundRejectedByTheChannelDoesNotBlockTheRetry()
+    {
+        await using var f = await CoachFixture.Create(withPricing: false);
+        var (orderId, paymentId) = await SeedSettledDepositOrder(f);
+        var db = f.NewContext();
+        db.orderPaymentRefund.Add(new OrderPaymentRefund { order_id = orderId, payment_id = paymentId, amount = 400, state = 0,
+            refund_id = "", reason = "租赁退押金", memo = "基本账户余额不足，请充值后重新发起", out_refund_no = "test_TK_01" });
+        await db.SaveChangesAsync();
+
+        var retry = await RefundAsStaff(f, orderId, paymentId, 400);
+
+        Assert.Equal(0, retry.code);
+        var rows = await f.NewContext().orderPaymentRefund.Where(r => r.order_id == orderId).OrderBy(r => r.id).ToListAsync();
+        Assert.Equal(2, rows.Count);
+        Assert.Equal(0, rows[0].state);   // 失败行原样保留（审计）
+        Assert.Equal(1, rows[1].state);
+        Assert.Equal(400, rows[1].amount);
+    }
+
+    // 边界：已经提交到渠道、拿到退款单号的退款（state 仍是 0 = 处理中）必须继续占额度，防止超退。
+    // 押金 1000、租金 100 → 最多可退 900；处理中已有 500，再退 500 合计 1000 没超过这笔支付（支付级检查放行），
+    // 但超过订单可退上限 900，只有「处理中算已申请」才拦得住。
+    [Fact]
+    public async Task RefundAlreadySubmittedToTheChannelStillCountsAsRequested()
+    {
+        await using var f = await CoachFixture.Create(withPricing: false);
+        var (orderId, paymentId) = await SeedSettledDepositOrder(f, 1000);
+        var db = f.NewContext();
+        db.orderPaymentRefund.Add(new OrderPaymentRefund { order_id = orderId, payment_id = paymentId, amount = 500, state = 0,
+            refund_id = "50300000000202611250000000001", reason = "租赁退押金", out_refund_no = "test_TK_01" });
+        await db.SaveChangesAsync();
+
+        var tooMuch = await RefundAsStaff(f, orderId, paymentId, 500);
+        Assert.Equal(1, tooMuch.code);
+        Assert.Single(await f.NewContext().orderPaymentRefund.Where(r => r.order_id == orderId).ToListAsync());
+
+        var rest = await RefundAsStaff(f, orderId, paymentId, 400);   // 900 - 500 = 400 仍可退
+        Assert.Equal(0, rest.code);
+    }
+
     [Fact]
     public async Task TwoOrdersCannotConsumeTheSameLastPunch()
     {

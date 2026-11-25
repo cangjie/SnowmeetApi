@@ -3213,7 +3213,7 @@ namespace SnowmeetApi.Controllers
                 {
                     var payment = order.availablePayments.FirstOrDefault(p => p.id == refund.payment_id);
                     var alreadyRequested = await _db.orderPaymentRefund.AsNoTracking().Where(r => r.payment_id == refund.payment_id)
-                        .SumAsync(r => (double?)r.amount) ?? 0;
+                        .Where(RefundRequestRules.CountsAsRequested).SumAsync(r => (double?)r.amount) ?? 0;
                     if (payment == null || Math.Round(alreadyRequested + refund.amount, 2) > Math.Round(payment.amount, 2))
                         return new ApiResult<Models.Order?> { code = 1, message = "该笔支付的可退金额已变化，请刷新后重试" };
                 }
@@ -3359,7 +3359,8 @@ namespace SnowmeetApi.Controllers
                         return new ApiResult<Models.Order?> { code = 1, message = "退款金额无效" };
                     double sale = lockedOrder.retails.Where(r => r.valid == 1 && r.product_id != null && !(r.memo ?? "").Contains("补差价"))
                         .Sum(r => r.deal_price);
-                    double alreadyRequested = await _db.orderPaymentRefund.Where(r => r.order_id == orderId).SumAsync(r => (double?)r.amount) ?? 0;
+                    double alreadyRequested = await _db.orderPaymentRefund.Where(r => r.order_id == orderId)
+                        .Where(RefundRequestRules.CountsAsRequested).SumAsync(r => (double?)r.amount) ?? 0;
                     double allowed = Math.Round(Math.Min(lockedOrder.totalGuarantyAmount ?? 0, lockedOrder.paidAmount)
                         - (lockedOrder.totalRentSummaryAmount ?? 0) + lockedOrder.depositPaidAmount - sale - alreadyRequested, 2);
                     if (Math.Round(refunds.Sum(r => r.amount), 2) > Math.Max(0, allowed))
