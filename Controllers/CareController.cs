@@ -1461,6 +1461,34 @@ namespace SnowmeetApi.Controllers
             return Ok(new ApiResult<Care?> { code = 0, message = "", data = await GetCare(careId) });
         }
 
+        /// <summary>
+        /// 修刃角度的修改历史（用户 2026-11-25）：这件装备角度改过几次、谁什么时候从几度改成几度、重新打印过几次标签存根，新的在前。
+        /// 职级 >= 100 的员工可看。记录来自审计日志，规则见 CareEdgeHistoryRules。
+        /// </summary>
+        [HttpGet]
+        public async Task<ActionResult<ApiResult<List<CareEdgeHistoryItem>?>>> GetEdgeHistory(int careId, string sessionKey,
+            string sessionType = "wechat_mini_openid")
+        {
+            ActionResult<ApiResult<List<CareEdgeHistoryItem>?>> Fail(string message)
+                => Ok(new ApiResult<List<CareEdgeHistoryItem>?> { code = 1, message = message, data = null });
+            Staff staff = await Util.GetStaffBySessionKey(_db, sessionKey, sessionType);
+            if (staff == null || staff.title_level < 100)
+            {
+                return Fail("没有权限");
+            }
+            var care = await _db.care.AsNoTracking().Where(c => c.id == careId).Select(c => new { c.edge_degree }).FirstOrDefaultAsync();
+            if (care == null)
+            {
+                return Fail("未找到养护装备");
+            }
+            // 写日志的两处 table_name 大小写不同（care / Care）；库里不区分大小写，这里都查出来，规则里再按忽略大小写过滤
+            List<CoreDataModLog> logs = await _db.coreDataModLog.AsNoTracking().Include(l => l.staff)
+                .Where(l => l.key_value == careId && (l.table_name == "care" || l.table_name == "Care")
+                    && (l.field_name == CareEdgeHistoryRules.FIELD_ANGLE || l.field_name == CareEdgeHistoryRules.FIELD_LABEL))
+                .ToListAsync();
+            return Ok(new ApiResult<List<CareEdgeHistoryItem>?> { code = 0, message = "", data = CareEdgeHistoryRules.Build(care.edge_degree, logs) });
+        }
+
         [HttpGet("{taskId}")]
         public async Task<ActionResult<ApiResult<Care?>>> SetTaskStatus(int taskId, string status,
             string scene, string sessionKey, string sessionType = "wechat_mini_openid",

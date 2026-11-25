@@ -1,6 +1,13 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Abstractions;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
+using Microsoft.AspNetCore.Mvc.ModelBinding.Validation;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using SnowmeetApi.Controllers;
 using SnowmeetApi.Helpers;
 using SnowmeetApi.Models;
@@ -361,6 +368,66 @@ public class CareEdgeLabelTests
         await Ctl(f).UpdateCare(stale, null, 10, "养护订单详情页修改装备信息");
         var care = await Reload(f, careId);
         Assert.Equal("备注改了", care.memo);
+        Assert.Equal("89", care.label_edge_degree);
+        Assert.True(care.edgeLabelPending);
+    }
+    // ---------- 小程序真实的 JSON 往返：装备原样回传（UpdateCare）不能被新字段绊倒 ----------
+
+    // 和 Startup 一致：AddControllers().AddJsonOptions(IgnoreCycles)，其余是 MVC 默认的 Web 选项
+    private static readonly JsonSerializerOptions MvcJson = new(JsonSerializerDefaults.Web) { ReferenceHandler = ReferenceHandler.IgnoreCycles };
+
+    // 和 MVC 绑定 [FromBody] 之后做的验证一样：逐个读公开属性（ValidationVisitor），计算属性的 getter 抛异常就是 500
+    private static ModelStateDictionary Validate(object model)
+    {
+        var provider = new ServiceCollection().AddLogging().AddControllers().Services.BuildServiceProvider();
+        var context = new ActionContext(new DefaultHttpContext { RequestServices = provider }, new RouteData(), new ActionDescriptor(), new ModelStateDictionary());
+        provider.GetRequiredService<IObjectModelValidator>().Validate(context, null, "", model);
+        return context.ModelState;
+    }
+
+    [Fact]
+    public async Task ResponseJson_CarriesTheNewFields_AndPostingItBackBindsValidatesAndSaves()
+    {
+        await using var f = await CoachFixture.Create();
+        var (careId, _) = await EdgeCare(f, "89");
+        // 新小程序从 SetEdgeDegree 的返回里拿到装备（含 label_edge_degree、edgeLabelPending），页面再整份 POST 回 UpdateCare
+        Care? returned = Result(await Ctl(f).SetEdgeDegree(careId, "88", Clerk)).data;
+        string json = JsonSerializer.Serialize(returned, MvcJson);
+        Assert.Contains("\"label_edge_degree\":\"89\"", json);
+        Assert.Contains("\"edgeLabelPending\":true", json);
+
+        // 页面实际回传的装备是从订单里取出来的（GetOrder 的 care.order 因循环引用为 null），所以回传时没有 order
+        var body = System.Text.Json.Nodes.JsonNode.Parse(json)!.AsObject();
+        body.Remove("order");
+        Care posted = JsonSerializer.Deserialize<Care>(body.ToJsonString(), MvcJson)!;   // 只读的 edgeLabelPending 反序列化时被忽略，不报错
+        var modelState = Validate(posted);
+        Assert.True(modelState.IsValid, string.Join("; ", modelState.Select(e => e.Key + ":" + string.Join(",", e.Value!.Errors.Select(x => x.ErrorMessage)))));
+        posted.memo = "页面整份回传";
+        await Ctl(f).UpdateCare(posted, null, 10, "养护订单详情页修改装备信息");
+        var care = await Reload(f, careId);
+        Assert.Equal("页面整份回传", care.memo);
+        Assert.Equal("88", care.edge_degree);
+        Assert.Equal("89", care.label_edge_degree);
+        Assert.True(care.edgeLabelPending);
+    }
+
+    [Fact]
+    public async Task OldClientJson_WithoutTheNewFields_StillSavesAndKeepsThePendingState()
+    {
+        await using var f = await CoachFixture.Create();
+        var (careId, _) = await EdgeCare(f, "89");
+        Care? returned = Result(await Ctl(f).SetEdgeDegree(careId, "88", Clerk)).data;
+        // 旧版小程序读到的装备里没有这两个字段（它们不认识），回传时自然也没有
+        var node = System.Text.Json.Nodes.JsonNode.Parse(JsonSerializer.Serialize(returned, MvcJson))!.AsObject();
+        node.Remove("label_edge_degree");
+        node.Remove("edgeLabelPending");
+        node.Remove("order");   // 同上：页面回传的装备没有 order
+        Care posted = JsonSerializer.Deserialize<Care>(node.ToJsonString(), MvcJson)!;
+        Assert.True(Validate(posted).IsValid);
+        posted.memo = "旧版小程序回传";
+        await Ctl(f).UpdateCare(posted, null, 10, "养护订单详情页修改装备信息");
+        var care = await Reload(f, careId);
+        Assert.Equal("旧版小程序回传", care.memo);
         Assert.Equal("89", care.label_edge_degree);
         Assert.True(care.edgeLabelPending);
     }
