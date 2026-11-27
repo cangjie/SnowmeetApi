@@ -54,7 +54,7 @@ namespace SnowmeetApi.Controllers
                     foreach (var retail in order.retails) retail.memo = "";
                 order.retailImages = await _db.retailImage.Include(i => i.image).Where(i => i.order_id == orderId && i.valid).AsNoTracking().ToListAsync();
             }
-            if (order.type == "养护"
+            if (order.type == "养护")
             {
                 order.cares = await _db.order.Entry(order).Collection(o => o.cares).Query()
                     .Include(c => c.tasks.Where(t => t.valid == 1).OrderBy(t => t.sort)).ThenInclude(t => t.staff)
