@@ -143,9 +143,35 @@ public class CareCardSaleService
         else if (!int.TryParse(retail.source_order_no, out careId)) return null;
         var charges = await db.retail.AsNoTracking().Where(r => r.order_id == retail.id && r.valid == 1).ToListAsync();
         var cardAmount = charges.Where(r => r.retail_type != CareChargeRetailType).Sum(r => Money(r.deal_price));
-        return new CareCardSaleInfo { careOrderId = careId, retailOrderId = retail.id, completed = retail.dealed == 1,
+        var info = new CareCardSaleInfo { careOrderId = careId, retailOrderId = retail.id, completed = retail.dealed == 1,
             cardAmount = cardAmount, careAmount = IsSingleOrder(retail) ? Money(retail.total_amount) - cardAmount
                 : charges.Where(r => r.retail_type == CareChargeRetailType).Sum(r => Money(r.deal_price)) };
+        if (!IsSingleOrder(retail))
+        {
+            info.refundMessage = "历史关联订单请联系管理员核对后退款";
+            return info;
+        }
+        var batch = await db.cardOrderRefundBatch.AsNoTracking().Where(b => b.order_id == retail.id)
+            .OrderByDescending(b => b.id).FirstOrDefaultAsync();
+        if (batch != null && batch.status != "failed")
+        {
+            info.refundStatus = batch.status;
+            info.refundMessage = batch.status == "succeeded" ? "整单退款已完成，会员卡已停用" : "整单退款处理中，会员卡已暂时冻结";
+            if (batch.status == "processing")
+            {
+                var legs = await db.orderPaymentRefund.AsNoTracking().Where(r => r.card_refund_batch_id == batch.id)
+                    .Select(r => new { r.id, r.payment_id, r.card_refund_state }).ToListAsync();
+                info.canRetryRefund = legs.GroupBy(r => r.payment_id).Select(g => g.OrderByDescending(r => r.id).First())
+                    .Any(r => r.card_refund_state == "failed" || r.card_refund_state == "prepared" || r.card_refund_state == "retryable");
+            }
+        }
+        else
+        {
+            var eligibility = await CardOrderRefundEligibility.EvaluateAsync(db, retail.id);
+            info.canRefund = eligibility.CanRefund;
+            info.refundMessage = eligibility.Reason;
+        }
+        return info;
     }
 
     // SQL Server跨进程锁；SQLite隔离测试由写事务串行化。不能只用进程内锁保护支付回调。

@@ -53,9 +53,9 @@ public sealed class RentalBenefitSettlementService(ApplicationDBContext db)
                 throw new InvalidOperationException("未找到会员");
 
             var punchCards = await db.punchCard.AsNoTracking().Where(c => c.member_id == order.member_id && c.biz_type == "租赁"
-                && !c.is_refund && c.total != null && c.total > (c.punches ?? 0)).OrderBy(c => c.id).ToListAsync();
+                && !c.is_refund && !c.refund_pending && c.total != null && c.total > (c.punches ?? 0)).OrderBy(c => c.id).ToListAsync();
             var seasonCards = await db.punchCard.AsNoTracking().Where(c => c.member_id == order.member_id && c.biz_type == "租赁"
-                && !c.is_refund && c.total == null).OrderBy(c => c.id).ToListAsync();
+                && !c.is_refund && !c.refund_pending && c.total == null).OrderBy(c => c.id).ToListAsync();
             var punchConsumption = new Dictionary<(int card, int rental), int>();
             var seasonTaken = new HashSet<(int card, DateTime day)>();
             var allIds = quote.units.SelectMany(u => u.detailIds).ToList();
@@ -135,7 +135,7 @@ public sealed class RentalBenefitSettlementService(ApplicationDBContext db)
             foreach (var byCard in punchConsumption.GroupBy(x => x.Key.card))
             {
                 int count = byCard.Sum(x => x.Value);
-                int changed = await db.punchCard.Where(c => c.id == byCard.Key && c.member_id == order.member_id && !c.is_refund
+                int changed = await db.punchCard.Where(c => c.id == byCard.Key && c.member_id == order.member_id && !c.is_refund && !c.refund_pending
                         && c.total != null && c.total - (c.punches ?? 0) >= count)
                     .ExecuteUpdateAsync(s => s.SetProperty(c => c.punches, c => (c.punches ?? 0) + count).SetProperty(c => c.update_date, now));
                 if (changed != 1) throw new InvalidOperationException("次卡余额已变化，请刷新");

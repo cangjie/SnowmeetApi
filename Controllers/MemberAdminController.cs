@@ -860,7 +860,7 @@ namespace SnowmeetApi.Controllers
             int points = await _db.point.Where(p => p.member_id == memberId && p.valid == 1)
                 .SumAsync(p => (int?)p.points) ?? 0;
             // 已退款的卡（is_refund）钱已退回顾客，不算会员资产
-            var cards = await _db.punchCard.Where(c => c.member_id == memberId && !c.is_refund)
+            var cards = await _db.punchCard.Where(c => c.member_id == memberId && !c.is_refund && !c.refund_pending)
                 .Select(c => new { c.total, c.punches, c.biz_type }).AsNoTracking().ToListAsync();
             // 次卡剩余聚合：季卡（total=NULL 不限次数）不计入
             int punchRemaining = cards.Where(c => c.total != null).Sum(c => (c.total ?? 0) - (c.punches ?? 0));
@@ -904,7 +904,7 @@ namespace SnowmeetApi.Controllers
                 return Ok(new ApiResult<object>() { code = 1, message = "没有权限", data = null });
 
             // 已退款的卡（is_refund）不出现在开单选卡列表里——钱已退回顾客，不能再用来抵扣
-            var q = _db.punchCard.Where(c => c.member_id == memberId && !c.is_refund);
+            var q = _db.punchCard.Where(c => c.member_id == memberId && !c.is_refund && !c.refund_pending);
             if (!string.IsNullOrWhiteSpace(bizType))
                 q = q.Where(c => c.biz_type == bizType.Trim());
             var cards = await q

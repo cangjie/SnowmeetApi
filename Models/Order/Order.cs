@@ -314,6 +314,8 @@ namespace SnowmeetApi.Models
                 }
                 foreach (OrderPaymentRefund refund in availableRefunds)
                 {
+                    // 含卡退款受理不等于成功；待确认的退款继续占额度，但不计入已退款金额。
+                    if (refund.card_refund_batch_id != null && refund.state != 1) continue;
                     refundAmount += refund.amount;
                 }
                 return refundAmount;

@@ -472,7 +472,9 @@ namespace SnowmeetApi.Controllers
         {
             OrderPaymentRefund refund = await _db.orderPaymentRefund.FindAsync(refundId);
             OrderPayment payment = await _db.OrderPayment.FindAsync(refund.payment_id);
-            if (await SnowmeetApi.Services.CareCardSaleService.ContainsCardSaleAsync(_db, payment.order_id))
+            if (refund.card_refund_batch_id != null && refund.state == 1) return refund;
+            if (await SnowmeetApi.Services.CareCardSaleService.ContainsCardSaleAsync(_db, payment.order_id)
+                && !await SnowmeetApi.Services.CardOrderRefundService.IsApprovedChannelRequestAsync(_db, refund.id))
             {
                 refund.memo = "含卡订单不允许退款，取消养护只返还次数";
                 refund.state = 0;
@@ -487,8 +489,14 @@ namespace SnowmeetApi.Controllers
             // 通知地址写成 /core 微信永远回调不到；支付回调（TenpayPaymentCallBack）用的就是 /api
             notifyUrl = "https://" + notifyUrl + "/api/Tenpay/RefundCallback/" + payment.mch_id.ToString();
             refund.notify_url = notifyUrl.Trim();
-            _db.orderPaymentRefund.Entry(refund).State = EntityState.Modified;
-            await _db.SaveChangesAsync();
+            if (refund.card_refund_batch_id != null)
+                await _db.orderPaymentRefund.Where(r => r.id == refund.id && r.state == 0)
+                    .ExecuteUpdateAsync(s => s.SetProperty(r => r.notify_url, notifyUrl));
+            else
+            {
+                _db.orderPaymentRefund.Entry(refund).State = EntityState.Modified;
+                await _db.SaveChangesAsync();
+            }
             var client = await GetClient((int)payment.mch_id);
             var request = new CreateRefundDomesticRefundRequest()
             {
@@ -506,21 +514,44 @@ namespace SnowmeetApi.Controllers
             var response = await client.ExecuteCreateRefundDomesticRefundAsync(request);
             try
             {
-                string refundStrId = response.RefundId.Trim();
-                if (refundStrId == null || refundStrId.Trim().Equals(""))
+                string refundStrId = (response.RefundId ?? "").Trim();
+                if (refundStrId == "")
                 {
+                    if (refund.card_refund_batch_id != null)
+                    {
+                        // 渠道错误可能是系统超时或结果不明，不能据此解冻卡。
+                        refund.card_refund_state = "unknown";
+                        refund.memo = response.ErrorMessage ?? "";
+                        await _db.orderPaymentRefund.Where(r => r.id == refund.id && r.state == 0)
+                            .ExecuteUpdateAsync(s => s.SetProperty(r => r.card_refund_state, "unknown")
+                                .SetProperty(r => r.memo, refund.memo));
+                    }
                     return refund;
                 }
                 refund.refund_id = refundStrId;
-                _db.Entry<OrderPaymentRefund>(refund).State = EntityState.Modified;
-                await _db.SaveChangesAsync();
+                if (refund.card_refund_batch_id != null)
+                    await _db.orderPaymentRefund.Where(r => r.id == refund.id && r.state == 0)
+                        .ExecuteUpdateAsync(s => s.SetProperty(r => r.refund_id, refundStrId)
+                            .SetProperty(r => r.card_refund_state, "pending"));
+                else
+                {
+                    _db.Entry<OrderPaymentRefund>(refund).State = EntityState.Modified;
+                    await _db.SaveChangesAsync();
+                }
                 return refund;
             }
             catch
             {
-                refund.memo = response.ErrorMessage.Trim();
-                _db.Entry<OrderPaymentRefund>(refund).State = EntityState.Modified;
-                await _db.SaveChangesAsync();
+                refund.memo = (response.ErrorMessage ?? "").Trim();
+                if (refund.card_refund_batch_id != null)
+                    await _db.orderPaymentRefund.Where(r => r.id == refund.id && r.state == 0)
+                        .ExecuteUpdateAsync(s => s.SetProperty(r => r.memo, refund.memo)
+                            .SetProperty(r => r.card_refund_state, "unknown"));
+                else
+                {
+                    _db.Entry<OrderPaymentRefund>(refund).State = EntityState.Modified;
+                    await _db.SaveChangesAsync();
+                }
                 return refund;
             }
         }
@@ -535,18 +566,37 @@ namespace SnowmeetApi.Controllers
             await RefundApplyLock.WaitAsync();
             try
             {
+                if (refund.card_refund_batch_id != null)
+                {
+                    string channelTransactionId = (transactionId ?? "").Trim();
+                    int updated = await _db.orderPaymentRefund.Where(r => r.id == refund.id && r.state == 0)
+                        .ExecuteUpdateAsync(s => s.SetProperty(r => r.state, 1)
+                            .SetProperty(r => r.card_refund_state, "success")
+                            .SetProperty(r => r.memo, transactionId ?? "")
+                            .SetProperty(r => r.TransactionId, channelTransactionId)
+                            .SetProperty(r => r.update_date, DateTime.Now));
+                    await new SnowmeetApi.Services.CardOrderRefundService(_db).ReconcileAsync(refund.card_refund_batch_id.Value);
+                    if (updated == 1 && sideEffects)
+                        await _orderPaymentHelper.SetPaymentRefundSuccess(payment.id, refund.id);
+                    return;
+                }
                 int currentState = await _db.orderPaymentRefund.AsNoTracking()
                     .Where(r => r.id == refund.id).Select(r => r.state).FirstOrDefaultAsync();
                 if (currentState == 1)
                 {
+                    if (refund.card_refund_batch_id != null)
+                        await new SnowmeetApi.Services.CardOrderRefundService(_db).ReconcileAsync(refund.card_refund_batch_id.Value);
                     return;
                 }
                 refund.state = 1;
+                if (refund.card_refund_batch_id != null) refund.card_refund_state = "success";
                 refund.memo = transactionId ?? "";
                 refund.TransactionId = (transactionId ?? "").Trim();
                 refund.update_date = DateTime.Now;
                 _db.Entry(refund).State = EntityState.Modified;
                 await _db.SaveChangesAsync();
+                if (refund.card_refund_batch_id != null)
+                    await new SnowmeetApi.Services.CardOrderRefundService(_db).ReconcileAsync(refund.card_refund_batch_id.Value);
                 if (sideEffects)
                 {
                     await _orderPaymentHelper.SetPaymentRefundSuccess(payment.id, refund.id);
@@ -572,7 +622,9 @@ namespace SnowmeetApi.Controllers
             {
                 DateTime from = DateTime.Now.AddDays(-Math.Max(days, 1));
                 List<OrderPaymentRefund> pending = await _db.orderPaymentRefund
-                    .Where(r => r.state == 0 && r.refund_id != null && r.refund_id != "" && r.create_date > from)
+                    .Where(r => r.state == 0 && ((r.refund_id != null && r.refund_id != "" && r.create_date > from)
+                        || (r.card_refund_batch_id != null && (r.card_refund_state == "pending"
+                            || r.card_refund_state == "unknown" || r.card_refund_state == "sending" || r.card_refund_state == "retryable"))))
                     .OrderBy(r => r.id).ToListAsync();
                 int succeeded = 0, other = 0, failed = 0;
                 foreach (OrderPaymentRefund refund in pending)
@@ -589,6 +641,14 @@ namespace SnowmeetApi.Controllers
                             new GetRefundDomesticRefundByOutRefundNumberRequest() { OutRefundNumber = refund.out_refund_no.Trim() });
                         if (!response.IsSuccessful())
                         {
+                            if (refund.card_refund_batch_id != null && response.ErrorCode == "RESOURCE_NOT_EXISTS"
+                                && refund.create_date <= DateTime.Now.AddSeconds(-10))
+                            {
+                                // 查询确认暂无退款单，可按原退款单号重试；保持冻结且继续查询。
+                                await _db.orderPaymentRefund.Where(r => r.id == refund.id && r.state == 0
+                                        && (r.card_refund_state == "sending" || r.card_refund_state == "unknown" || r.card_refund_state == "retryable"))
+                                    .ExecuteUpdateAsync(s => s.SetProperty(r => r.card_refund_state, "retryable"));
+                            }
                             failed++;
                             Console.WriteLine("[微信退款查询] 失败 refund=" + refund.id + " " + response.ErrorMessage);
                             continue;
@@ -597,6 +657,14 @@ namespace SnowmeetApi.Controllers
                         {
                             await ApplyRefundSuccess(refund, payment, response.TransactionId, sideEffects == 1);
                             succeeded++;
+                        }
+                        else if (refund.card_refund_batch_id != null && "CLOSED".Equals(response.Status))
+                        {
+                            await _db.orderPaymentRefund.Where(r => r.id == refund.id && r.state == 0 && r.card_refund_state != "success")
+                                .ExecuteUpdateAsync(s => s.SetProperty(r => r.card_refund_state, "failed")
+                                    .SetProperty(r => r.memo, "微信确认退款已关闭").SetProperty(r => r.refund_id, ""));
+                            await new SnowmeetApi.Services.CardOrderRefundService(_db).ReconcileAsync(refund.card_refund_batch_id.Value);
+                            other++;
                         }
                         else
                         {
@@ -608,6 +676,20 @@ namespace SnowmeetApi.Controllers
                         failed++;
                         Console.WriteLine("[微信退款查询] 出错 refund=" + refund.id + " " + err.Message);
                     }
+                }
+                if (await _db.orderPaymentRefund.AsNoTracking().AnyAsync(r => r.card_refund_batch_id != null
+                    && r.state == 0 && (r.card_refund_state == "sending" || r.card_refund_state == "unknown")
+                    && _db.orderPayment.Any(p => p.id == r.payment_id && p.pay_method == "支付宝")))
+                {
+                    try { await new AliController(_db, _oriConfig, _http).SyncUnknownCardRefunds(); }
+                    catch (Exception ex) { Console.WriteLine("[支付宝含卡退款查询] 无法查询 " + ex.GetType().Name); }
+                }
+                var openBatches = await _db.cardOrderRefundBatch.AsNoTracking()
+                    .Where(b => b.status == "processing").Select(b => b.id).ToListAsync();
+                foreach (int batchId in openBatches)
+                {
+                    try { await new SnowmeetApi.Services.CardOrderRefundService(_db).ReconcileAsync(batchId); }
+                    catch (Exception ex) { Console.WriteLine("[含卡整单退款] 状态核对失败 batch=" + batchId + " " + ex.GetType().Name); }
                 }
                 return Ok(new { total = pending.Count, succeeded, notYet = other, failed });
             }

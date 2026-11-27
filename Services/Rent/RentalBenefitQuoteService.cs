@@ -59,7 +59,7 @@ public sealed class RentalBenefitQuoteService(ApplicationDBContext db)
         await new CoachCardBenefits(db).ApplyCurrentAsync(cards);
         cards = cards.Where(c => memberId != null && CoachCardRules.IsEffectiveOnDate(c, memberId.Value, now)).ToList();
         var punchCards = memberId == null ? new List<PunchCard>() : await db.punchCard.AsNoTracking()
-            .Where(c => c.member_id == memberId && c.biz_type == "租赁" && !c.is_refund).OrderBy(c => c.id).ToListAsync();
+            .Where(c => c.member_id == memberId && c.biz_type == "租赁" && !c.is_refund && !c.refund_pending).OrderBy(c => c.id).ToListAsync();
         int punches = punchCards.Where(c => c.total != null).Sum(c => Math.Max(0, c.total!.Value - (c.punches ?? 0)));
         var seasonIds = punchCards.Where(c => c.total == null).Select(c => c.id).ToList();
         var seasonUses = await db.rentalSeasonCardUse.AsNoTracking().Where(u => u.valid && seasonIds.Contains(u.card_id)).ToListAsync();

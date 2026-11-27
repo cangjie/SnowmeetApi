@@ -6376,7 +6376,7 @@ namespace SnowmeetApi.Controllers
             // 季卡（total=NULL 不限次数）暂不参与租赁次卡核销，核销语义定义后再放开。
             // 已退款的卡（is_refund）钱已经退回顾客，一律不得再参与核销
             List<PunchCard> cards = await _db.punchCard
-                .Where(c => c.member_id == order.member_id && c.biz_type == "租赁" && !c.is_refund
+                .Where(c => c.member_id == order.member_id && c.biz_type == "租赁" && !c.is_refund && !c.refund_pending
                     && c.total != null && c.total > (c.punches ?? 0))
                 .AsNoTracking().ToListAsync();
             SkiRentPunchQueueResult q = await BuildSkiRentPunchQueue(orderId);
@@ -6449,9 +6449,9 @@ namespace SnowmeetApi.Controllers
             if (card.total == null)
                 return Ok(new ApiResult<Models.Order?> { code = 1, message = "租赁季卡请使用自动匹配核销" });
             // 已退款的卡钱已退回顾客，不能再拿来抵租金（列表本就不返回它，这里是防御）
-            if (card.is_refund)
+            if (card.is_refund || card.refund_pending)
             {
-                return Ok(new ApiResult<Models.Order?>() { code = 1, message = "该次卡已退款，不能使用", data = null });
+                return Ok(new ApiResult<Models.Order?>() { code = 1, message = "该次卡已退款或正在退款，不能使用", data = null });
             }
             if (req.punch_count <= 0)
             {
@@ -6840,6 +6840,7 @@ namespace SnowmeetApi.Controllers
                 remaining = c.total == null ? (int?)null : c.total - (c.punches ?? 0),
                 isSeason = c.total == null,
                 isRefund = c.is_refund,
+                isRefundPending = c.refund_pending,
                 // 开卡日期在服务端格式化好下发，与使用明细页 createDateStr 同一口径，
                 // 免得各端各自解析 ISO 串（iOS 对 new Date('yyyy-MM-dd HH:mm') 挑食）
                 createDateStr = c.create_date.ToString("yyyy-MM-dd")
@@ -7226,6 +7227,7 @@ namespace SnowmeetApi.Controllers
                     remaining = remaining,
                     isSeason = card.total == null,
                     isRefund = card.is_refund,
+                    isRefundPending = card.refund_pending,
                     // 季卡绑定装备：管理后台明细页可改品牌/长度
                     card.equip_type,
                     card.equip_brand,
@@ -7559,7 +7561,8 @@ namespace SnowmeetApi.Controllers
             // 含卡订单一律禁退，即使未使用或取消养护后次数已全部返还。
             if (!card.is_refund)
             {
-                eval.blockReason = "含卡订单不允许退款，取消养护只返还次数";
+                eval.contactStaff = true;
+                eval.blockReason = card.refund_pending ? "退款正在处理中，请稍后查询" : "请联系门店办理整单退款";
                 return eval;
             }
             if (card.is_refund)

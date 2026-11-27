@@ -8,4 +8,8 @@ public class CareCardSaleInfo
     public bool completed { get; set; }
     public decimal cardAmount { get; set; }
     public decimal careAmount { get; set; }
+    public bool canRefund { get; set; }
+    public string? refundStatus { get; set; }
+    public string? refundMessage { get; set; }
+    public bool canRetryRefund { get; set; }
 }

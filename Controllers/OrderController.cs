@@ -3356,6 +3356,32 @@ namespace SnowmeetApi.Controllers
                     data = null
                 });
             }
+            if (await CareCardSaleService.ContainsCardSaleAsync(_db, orderId))
+            {
+                var refundOrder = await _db.order.AsNoTracking().FirstOrDefaultAsync(o => o.id == orderId);
+                string orderType = refundOrder?.type;
+                if (orderType != "养护" && orderType != "零售")
+                    return Ok(new ApiResult<Models.Order?> { code = 1, message = "此类型的含卡订单暂不支持整单退款" });
+                if (refundOrder?.order_source == CareCardSaleService.OrderSource
+                    || (orderType == "养护" && !CareCardSaleService.IsSingleOrder(refundOrder)
+                        && await CareCardSaleService.GetLinkedRetailAsync(_db, orderId) != null))
+                    return Ok(new ApiResult<Models.Order?> { code = 1, message = "历史关联订单请联系管理员核对后退款" });
+                var service = new CardOrderRefundService(_db);
+                string reason = refunds?.FirstOrDefault()?.reason ?? "";
+                if (string.IsNullOrWhiteSpace(reason))
+                    return Ok(new ApiResult<Models.Order?> { code = 1, message = "请填写退款备注" });
+                if (reason.Length > 40)
+                    return Ok(new ApiResult<Models.Order?> { code = 1, message = "退款备注不能超过40个字符" });
+                var prepared = await service.PrepareAsync(orderId, staff.id, reason, refunds);
+                if (prepared.BatchId == null)
+                    return Ok(new ApiResult<Models.Order?> { code = 1, message = prepared.Error });
+                string status = await service.SubmitPreparedAsync(prepared.BatchId.Value, _config, _http);
+                if (status == "failed")
+                    return Ok(new ApiResult<Models.Order?> { code = 1, message = "退款未成功，会员卡已恢复使用" });
+                return Ok(new ApiResult<Models.Order?> { code = 0,
+                    message = status == "succeeded" ? "退款成功" : "退款处理中，请稍后查询结果",
+                    data = await GetOrder(orderId) });
+            }
             if (await _db.rentalBenefitSettlement.AsNoTracking().AnyAsync(s => s.order_id == orderId))
             {
                 var checkedResult = await SnowmeetApi.Services.Rent.RentalBenefitRefundLock.Run(_db, async () =>
@@ -3614,7 +3640,7 @@ namespace SnowmeetApi.Controllers
                 {
                     card = await _db.punchCard.Where(c => c.id == care.card_id).AsNoTracking().FirstOrDefaultAsync();
                     // 卡不属于该会员、或卡已退款（钱已退回顾客）→ 一律不认这张卡（与 CalcCareCharge 同口径）
-                    if (card != null && ((order.member_id != null && card.member_id != order.member_id) || card.is_refund))
+                    if (card != null && ((order.member_id != null && card.member_id != order.member_id) || card.is_refund || card.refund_pending))
                     {
                         card = null;
                         // 一并清掉 care 上的卡引用，保证「定价没享卡权益的单，生效时也不会核销卡」——

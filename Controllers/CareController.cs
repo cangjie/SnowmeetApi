@@ -791,7 +791,7 @@ namespace SnowmeetApi.Controllers
                 {
                     card = null;   // 卡不属于该会员，忽略
                 }
-                if (card != null && card.is_refund)
+                if (card != null && (card.is_refund || card.refund_pending))
                 {
                     card = null;   // 已退款的卡钱已退回顾客，不再享受卡权益（不参与定价）
                 }
@@ -877,7 +877,7 @@ namespace SnowmeetApi.Controllers
                     ? await _db.punchCard.AsTracking().FirstOrDefaultAsync(c => c.id == group.Key)
                     : await _db.punchCard.AsNoTracking().FirstOrDefaultAsync(c => c.id == group.Key);
                 if (lockCards && card != null) await _db.Entry(card).ReloadAsync();
-                if (card == null || card.is_refund || (memberId != null && card.member_id != memberId))
+                if (card == null || card.is_refund || card.refund_pending || (memberId != null && card.member_id != memberId))
                 {
                     if (lockCards) throw new InvalidOperationException("所选会员卡已不可用，请重新选择");
                     continue; // 下单时原有定价逻辑会清除无效/不属于顾客的卡。
@@ -1304,7 +1304,7 @@ namespace SnowmeetApi.Controllers
                         // 定价已享卡权益的单，生效时必须落 punch_card_used，否则计次卡白嫖、季卡丢使用记录。
                         // is_refund 例外：卡已退款（钱退回顾客）不得核销——PlaceCareOrder 定价时已清掉这类
                         // 卡引用，这里是防御（万一是先下单、后退卡的时序）
-                        if (punchCard != null && !punchCard.is_refund)
+                        if (punchCard != null && !punchCard.is_refund && !punchCard.refund_pending)
                         {
                             if (punchCard.total != null && punchCard.remaining <= 0)
                                 throw new InvalidOperationException("会员卡剩余次数不足");

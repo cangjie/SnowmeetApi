@@ -29,6 +29,8 @@ namespace SnowmeetApi.Models
         // 已退款（2026-07-25 起）：顾客在「我的次卡」详情页对一次未核销过的卡自助退款成功后置 true。
         // 置位后该卡在所有核销入口一律不可用（租赁/养护定价、选卡列表、资产聚合都要排除它）。
         public bool is_refund { get; set; } = false;
+        // 整单退款处理中冻结；只有渠道确认全部成功后才标记 is_refund。
+        public bool refund_pending { get; set; } = false;
 
         [ForeignKey("source_retail_id")]
         public Retail? sourceRetail { get; set; } = null;

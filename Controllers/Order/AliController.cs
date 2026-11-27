@@ -872,6 +872,7 @@ namespace SnowmeetApi.Controllers
             {
                 return null;
             }
+            if (refund.card_refund_batch_id != null && refund.state == 1) return refund;
             OrderPayment payment = await _db.OrderPayment.FindAsync(refund.payment_id);
             if (payment == null)
             {
@@ -885,18 +886,76 @@ namespace SnowmeetApi.Controllers
                 if (res.FundChange != null && res.FundChange.ToUpper() == "Y")
                 {
                     refund.state = 1;
+                    if (refund.card_refund_batch_id != null) refund.card_refund_state = "success";
                 }
-                refund.memo = res.Msg.Trim();
-                refund.refund_id = res.TradeNo;
+                else if (refund.card_refund_batch_id != null)
+                {
+                    // 仅对明确拒绝受理的业务码认定失败；系统异常或含义不明时继续冻结并查询。
+                    string subCode = (res.SubCode ?? "").Trim();
+                    bool rejected = res.IsError && (subCode == "ACQ.TRADE_NOT_EXIST"
+                        || subCode == "ACQ.TRADE_NOT_ALLOW_REFUND" || subCode == "ACQ.REASON_TRADE_BEEN_FREEZEN");
+                    refund.card_refund_state = rejected ? "failed" : "unknown";
+                }
+                refund.memo = (res.Msg ?? "").Trim();
+                if (refund.card_refund_batch_id == null || refund.state == 1)
+                    refund.refund_id = res.TradeNo ?? "";
             }
             catch (Exception ex)
             {
                 refund.memo = ex.ToString().Length > 500 ? ex.ToString().Substring(0, 500) : ex.ToString();
+                if (refund.card_refund_batch_id != null) refund.card_refund_state = "unknown";
             }
 
-            _db.orderPaymentRefund.Entry(refund).State = EntityState.Modified;
-            await _db.SaveChangesAsync();
+            if (refund.card_refund_batch_id != null)
+                await _db.orderPaymentRefund.Where(r => r.id == refund.id && r.state == 0)
+                    .ExecuteUpdateAsync(s => s.SetProperty(r => r.state, refund.state)
+                        .SetProperty(r => r.memo, refund.memo).SetProperty(r => r.refund_id, refund.refund_id)
+                        .SetProperty(r => r.card_refund_state, refund.card_refund_state));
+            else
+            {
+                _db.orderPaymentRefund.Entry(refund).State = EntityState.Modified;
+                await _db.SaveChangesAsync();
+            }
             return refund;
+        }
+
+        // 只查询结果不明的含卡退款；未查到或查询失败都继续冻结，不能视为失败。
+        [NonAction]
+        public async Task SyncUnknownCardRefunds()
+        {
+            DateTime cutoff = DateTime.Now.AddSeconds(-10);
+            var rows = await _db.orderPaymentRefund.AsNoTracking()
+                .Where(r => r.card_refund_batch_id != null && r.state == 0 && r.create_date <= cutoff
+                    && (r.card_refund_state == "sending" || r.card_refund_state == "unknown"))
+                .OrderBy(r => r.id).ToListAsync();
+            foreach (var row in rows)
+            {
+                try
+                {
+                    var payment = await _db.orderPayment.AsNoTracking().FirstOrDefaultAsync(p => p.id == row.payment_id);
+                    if (payment == null || payment.pay_method != "支付宝" || string.IsNullOrWhiteSpace(payment.out_trade_no)) continue;
+                    var request = new AlipayTradeFastpayRefundQueryRequest();
+                    request.SetBizModel(new AlipayTradeFastpayRefundQueryModel {
+                        OutTradeNo = payment.out_trade_no.Trim(), OutRequestNo = row.out_refund_no.Trim() });
+                    var response = client.CertificateExecute(request);
+                    if (response.IsError || response.RefundStatus != "REFUND_SUCCESS") continue;
+                    if (!string.Equals(response.OutTradeNo?.Trim(), payment.out_trade_no.Trim(), StringComparison.Ordinal)
+                        || !string.Equals(response.OutRequestNo?.Trim(), row.out_refund_no.Trim(), StringComparison.Ordinal)) continue;
+                    if (!decimal.TryParse(response.RefundAmount, System.Globalization.NumberStyles.Number,
+                        System.Globalization.CultureInfo.InvariantCulture, out decimal amount)
+                        || Math.Round(amount, 2) != Math.Round((decimal)row.amount, 2)) continue;
+                    await _db.orderPaymentRefund.Where(r => r.id == row.id && r.state == 0)
+                        .ExecuteUpdateAsync(s => s.SetProperty(r => r.state, 1)
+                            .SetProperty(r => r.card_refund_state, "success")
+                            .SetProperty(r => r.refund_id, response.TradeNo ?? "")
+                            .SetProperty(r => r.update_date, DateTime.Now));
+                    await new SnowmeetApi.Services.CardOrderRefundService(_db).ReconcileAsync(row.card_refund_batch_id.Value);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("[支付宝含卡退款查询] 结果未知 refund=" + row.id + " " + ex.GetType().Name);
+                }
+            }
         }
 
 
@@ -905,7 +964,13 @@ namespace SnowmeetApi.Controllers
         {
             var payment = await _db.OrderPayment.AsNoTracking().FirstOrDefaultAsync(p => p.out_trade_no == outTradeNo);
             if (payment != null && await SnowmeetApi.Services.CareCardSaleService.ContainsCardSaleAsync(_db, payment.order_id))
-                return new AlipayTradeRefundResponse { Code = "40004", Msg = "含卡订单不允许退款，取消养护只返还次数" };
+            {
+                int? refundId = await _db.orderPaymentRefund.AsNoTracking()
+                    .Where(r => r.payment_id == payment.id && r.out_refund_no == outRefundNo)
+                    .Select(r => (int?)r.id).FirstOrDefaultAsync();
+                if (refundId == null || !await SnowmeetApi.Services.CardOrderRefundService.IsApprovedChannelRequestAsync(_db, refundId.Value))
+                    return new AlipayTradeRefundResponse { Code = "40004", Msg = "含卡订单退款须通过整单退款入口" };
+            }
 
             AlipayTradeRefundRequest req = new AlipayTradeRefundRequest();
             AlipayTradeRefundModel model = new AlipayTradeRefundModel();
