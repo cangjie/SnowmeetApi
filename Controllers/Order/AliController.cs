@@ -680,7 +680,11 @@ namespace SnowmeetApi.Controllers
                             // 不再只在 member_id==null 时跑：本人/代付单（member_id 已知）也要把 openid 补绑到对应会员，
                             // 否则该支付宝账号永远绑不上、下次仍要靠 session 兜底、alipayPayerId getter 也取不到。
                             // member_id 已知时不覆盖订单归属，仅补绑 openid；为空时用物化结果回填。
-                            if (!string.IsNullOrEmpty(payerOpenId))
+                            // 例外：免验证订单（订单会员有绑定手机号），付款账号只记在付款记录上，不绑账号、不建会员。
+                            int? orderMemberId = await _db.order.Where(o => o.id == payment.order_id)
+                                .Select(o => o.member_id).FirstOrDefaultAsync();
+                            if (!string.IsNullOrEmpty(payerOpenId)
+                                && !await SnowmeetApi.Helpers.AlipayPayRules.SkipsPhoneVerifyAsync(_db, orderMemberId))
                             {
                                 int? resolvedMemberId = await _materializeAlipayMemberOnPaid(payment, payerOpenId);
                                 if (resolvedMemberId != null && payment.member_id == null)

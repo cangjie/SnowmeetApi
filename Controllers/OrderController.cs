@@ -2160,7 +2160,7 @@ namespace SnowmeetApi.Controllers
 
         // 支付宝小程序支付调起：对标 WechatPayByOrderPayment 的 alipay 等价。
         // 顾客在 alipay_snowmeet/pages/payment_entry 点支付按钮时调本接口，拿 trade_no 后调 my.tradePay({tradeNO}) 完成支付。
-        // 与 wechat 版同样的 3 分支 op 字段补写：首次 / 换人 / ali_buyer_id 不匹配
+        // 下单时按本次登录账号补写付款记录；只有还没建出交易、或换了付款账号时才换单号、丢旧交易
         // 给店员小程序用：建一笔 pay_method='支付宝' 的 OrderPayment，**不**调 alipay.trade.precreate
         //（precreate 是商户扫码付的旧模式；小程序流程的 trade.create 在顾客点支付时由 AlipayPayByOrderPayment 调）
         // 返回 paymentId，店员小程序拿它编进支付宝小程序唤起 URL 做成二维码给顾客扫
@@ -2258,6 +2258,11 @@ namespace SnowmeetApi.Controllers
             {
                 return Ok(new ApiResult<OrderPayment?>() { code = 1, message = "支付记录不存在", data = null });
             }
+            // 已支付、已作废的记录不能再下单：下面会改付款人和单号
+            if (payment.valid != 1 || payment.status?.Trim() != OrderPayment.PaymentStatus.待支付.ToString())
+            {
+                return Ok(new ApiResult<OrderPayment?>() { code = 1, message = "订单已支付或已取消", data = null });
+            }
             Models.Order order = await GetOrder(payment.order_id);
 
             // 计算新 out_trade_no：用订单下所有 payment 的最大序号+1（与 wechat 版同算法）
@@ -2277,20 +2282,10 @@ namespace SnowmeetApi.Controllers
                 outTradeNo = order.code + "_ZF_" + outNum.ToString().PadLeft(2, '0');
             }
 
-            // 分支 1: 首次 — payment.member_id == null (sessionMemberId 可空, 一并赋值即可)
-            if (payment.member_id == null)
-            {
-                payment.member_id = sessionMemberId;
-                payment.ali_buyer_id = buyerId;
-                payment.out_trade_no = outTradeNo.Trim();
-                payment.pay_method = "支付宝";
-                payment.update_date = DateTime.Now;
-                _db.orderPayment.Entry(payment).State = EntityState.Modified;
-                await _db.SaveChangesAsync();
-            }
-            // 分支 2: 换人 — payment.member_id 已存在但 sessionMemberId 不一致(且非 null)
-            // sessionMemberId == null 时跳过本分支(guest 接续, 不视为换人), 由分支 3 仅更新 buyer_id/out_trade_no
-            if (payment.member_id != null && sessionMemberId != null && payment.member_id != sessionMemberId)
+            // 付款会员与代付标记。免验证订单按本次登录账号重写（认不出就留空）；其它订单认不出时沿用原值
+            bool skipsVerify = await AlipayPayRules.SkipsPhoneVerifyAsync(_db, order.member_id);
+            int? payerMemberId = skipsVerify ? sessionMemberId : sessionMemberId ?? payment.member_id;
+            if (payment.member_id != null && payerMemberId != null && payment.member_id != payerMemberId)
             {
                 CoreDataModLog log = new CoreDataModLog()
                 {
@@ -2299,46 +2294,34 @@ namespace SnowmeetApi.Controllers
                     field_name = "member_id",
                     key_value = payment.id,
                     scene = "支付顾客换人",
-                    member_id = sessionMemberId,
+                    member_id = payerMemberId,
                     staff_id = null,
                     prev_value = payment.member_id.ToString(),
-                    current_value = sessionMemberId.ToString(),
+                    current_value = payerMemberId.ToString(),
                     trace_id = 0,
                     is_manual = 1,
                     manual_memo = ""
                 };
                 await _db.coreDataModLog.AddAsync(log);
-                payment.member_id = sessionMemberId;
-                payment.ali_buyer_id = buyerId;
-                payment.out_trade_no = outTradeNo.Trim();
-                payment.ali_trade_no = null;       // 清掉旧 trade_no，强制重新 trade.create
-                payment.response_data = null;
-                payment.update_date = DateTime.Now;
-                _db.orderPayment.Entry(payment).State = EntityState.Modified;
-                await _db.SaveChangesAsync();
             }
-            // 分支 3: ali_buyer_id 不匹配 — payment.member_id 与 sessionMemberId 同(含两者都 null) 但 buyer_id 没跟上
-            if (payment.member_id == sessionMemberId
-                && !string.IsNullOrEmpty(buyerId)
-                && (payment.ali_buyer_id == null || payment.ali_buyer_id.Trim() != buyerId))
+            if (skipsVerify)
             {
-                payment.ali_buyer_id = buyerId;
+                payment.is_proxy_pay = payerMemberId != null && payerMemberId != order.member_id;
+            }
+            payment.member_id = payerMemberId;
+            // 付款记录上的单号必须一直是建当前这笔交易用的那个：支付回调按单号找记录。
+            // 所以只有还没建出交易、或换了付款账号时，才换单号并丢掉旧交易
+            if (string.IsNullOrEmpty(payment.ali_trade_no) || payment.ali_buyer_id?.Trim() != buyerId)
+            {
                 payment.out_trade_no = outTradeNo.Trim();
                 payment.ali_trade_no = null;
                 payment.response_data = null;
-                payment.update_date = DateTime.Now;
-                _db.orderPayment.Entry(payment).State = EntityState.Modified;
-                await _db.SaveChangesAsync();
             }
-
-            // 兜底：三个分支都没命中但 ali_trade_no 是 null（如刷新后再点）—— 同步 out_trade_no
-            if (payment.ali_trade_no == null && payment.out_trade_no != outTradeNo)
-            {
-                payment.out_trade_no = outTradeNo;
-                payment.update_date = DateTime.Now;
-                _db.orderPayment.Entry(payment).State = EntityState.Modified;
-                await _db.SaveChangesAsync();
-            }
+            payment.ali_buyer_id = buyerId;
+            payment.pay_method = "支付宝";
+            payment.update_date = DateTime.Now;
+            _db.orderPayment.Entry(payment).State = EntityState.Modified;
+            await _db.SaveChangesAsync();
 
             // 如果 ali_trade_no 还没生成，调 alipay.trade.create（小程序 appId 的 client）
             if (string.IsNullOrEmpty(payment.ali_trade_no))
@@ -2692,8 +2675,11 @@ namespace SnowmeetApi.Controllers
                     // scanner == order 原归属 时,paidOp.member_id == order.member_id,赋值无副作用
                     // 已挂会员的养护单一律不转给付款人（别人代付时券、卡、季卡开卡、养护完成赠券都归原会员），
                     // 不论走的是哪条付款路径（OrderVerifiedRules.KeepOrderMemberOnPaid）
+                    // 支付宝付免验证订单同样不转归属：付款人没验证过手机号，是谁付的只记在付款记录上（AlipayPayRules）
                     if (paidOp.is_proxy_pay == false && paidOp.member_id != null
-                        && !OrderVerifiedRules.KeepOrderMemberOnPaid(order.type, order.member_id))
+                        && !OrderVerifiedRules.KeepOrderMemberOnPaid(order.type, order.member_id)
+                        && !(paidOp.pay_method?.Trim() == "支付宝"
+                             && await AlipayPayRules.SkipsPhoneVerifyAsync(_db, order.member_id)))
                     {
                         order.member_id = paidOp.member_id;
                     }
@@ -3009,7 +2995,8 @@ namespace SnowmeetApi.Controllers
             Models.Order order = await GetOrder(payment.order_id);
             // 游客(member==null)允许查看待支付订单准备付款;但已支付订单仅对相关会员开放
             if (payment.status.Trim() == OrderPayment.PaymentStatus.支付成功.ToString()
-             && (member == null || (order.member_id != member.id && payment.member_id != member.id)))
+             && (member == null || (order.member_id != member.id && payment.member_id != member.id))
+             && !await IsAlipayBuyerSessionAsync(sessionKey, payment))
             {
                 return Ok(new ApiResult<Models.Order?>()
                 {
@@ -3024,6 +3011,17 @@ namespace SnowmeetApi.Controllers
                 message = "",
                 data = order
             });
+        }
+        // 支付宝付款人看自己付过的单：付款账号可能认不出是哪个会员（免验证直接付款），
+        // 所以另认一条：本次支付宝会话的 open_id 就是这笔付款记录上的付款账号
+        private async Task<bool> IsAlipayBuyerSessionAsync(string sessionKey, OrderPayment payment)
+        {
+            string buyer = payment.ali_buyer_id?.Trim() ?? "";
+            string sk = Util.UrlDecode(sessionKey ?? "").Trim();
+            if (buyer == "" || sk == "") return false;
+            return await _db.miniSession.AnyAsync(s => s.session_key.Trim() == sk
+                && s.session_type.Trim() == "alipay_payerid" && s.valid == 1 && s.expire_date >= DateTime.Now
+                && s.alipay_openid != null && s.alipay_openid.Trim() == buyer);
         }
         // 支付二维码实时状态：供收银端轮询。只读、店员鉴权。
         // stage：waiting(等待扫码) / scanned(顾客已扫码,打开了支付页) / paying(顾客已发起支付) / paid(已支付) / cancelled(已取消)

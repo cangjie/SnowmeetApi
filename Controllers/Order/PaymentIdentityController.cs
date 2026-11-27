@@ -351,6 +351,14 @@ namespace SnowmeetApi.Controllers.Order
                 }
             }
 
+            // 支付宝：订单会员有绑定手机号 → 不再验证手机号，谁扫码都直接支付（订单归属不变，见 AlipayPayRules）
+            if (payerType == "alipay"
+                && await SnowmeetApi.Helpers.AlipayPayRules.SkipsPhoneVerifyAsync(_db, order.member_id))
+            {
+                result.status = "direct";
+                return result;
+            }
+
             // 4) Status
             // 仅基于 order.member_id (订单归属) + scannerMemberId 决策。
             // op.member_id 是「付款方意图」,只在 _applyChoice/_applyConfirmDirect 当次返回时强制 direct,
@@ -733,7 +741,8 @@ namespace SnowmeetApi.Controllers.Order
             }
             if (payerType == "alipay")
             {
-                op.ali_buyer_id = openId;
+                // 已经建了交易时不改：ali_buyer_id 记的是建这笔交易用的账号，下单接口靠它认出换了付款账号
+                if (string.IsNullOrEmpty(op.ali_trade_no)) op.ali_buyer_id = openId;
             }
             else
             {

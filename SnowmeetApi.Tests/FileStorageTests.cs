@@ -11,6 +11,7 @@ using SnowmeetApi.Services.Storage;
 
 namespace SnowmeetApi.Tests;
 
+[Collection("working-path")]   // 会临时改静态的 Util.workingPath，和读它的测试串行跑
 public class FileStorageTests
 {
     private static readonly FileStorageOptions Options = new FileStorageOptions()
