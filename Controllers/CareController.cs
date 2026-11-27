@@ -949,7 +949,7 @@ namespace SnowmeetApi.Controllers
                 if (todayCareList == null)
                 {
                     todayCareList = await _db.care.Include(c => c.order)
-                        .Where(c => c.id < care.id && c.valid == 1 && c.order.valid == 1
+                        .Where(c => c.id < care.id && c.valid == 1 && c.order.valid == 1 && c.order.type == "养护"
                         && c.task_flow_code != null && c.order.biz_date.Date == DateTime.Now.Date
                         && c.order.shop == order.shop).AsNoTracking().ToListAsync();
                 }
@@ -1542,6 +1542,12 @@ namespace SnowmeetApi.Controllers
                         return Ok(new ApiResult<Care> { code = 0, message = "", data = await GetCare(careTask.care_id) });
                 }
 
+                if (status == "已开始" && careTask.status == "强行中止"
+                    && await _db.care.AnyAsync(c => c.id == careTask.care_id && c.biz_type == InternalCareRules.OrderType))
+                {
+                    careTask.end_time = null;
+                    careTask.terminate_staff_id = null;
+                }
                 CoreDataModLog log = Util.CreateCoreDataModLog("care_task", "status", taskId, careTask.status, status, null, staff.id, scene);
                 careTask.status = status;
                 switch (status)
