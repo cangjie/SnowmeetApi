@@ -170,7 +170,8 @@ namespace SnowmeetApi.Helpers
                 return "";
             }
             string c = cell.Trim();
-            return c.Length == 11 ? c.Substring(0, 3) + "****" + c.Substring(7) : c;
+            return c.Length == 11 ? c.Substring(0, 3) + "****" + c.Substring(7)
+                : c.Length <= 4 ? "****" : "****" + c.Substring(c.Length - 4);
         }
     }
 }

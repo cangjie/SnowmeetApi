@@ -119,7 +119,7 @@ namespace SnowmeetApi.Models
         {
             get
             {
-                if (_cell == null || _cell == "" || _cell.Length != 11)
+                if (string.IsNullOrWhiteSpace(_cell))
                 {
                     return cell;
                 }

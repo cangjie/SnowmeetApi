@@ -585,7 +585,7 @@ namespace SnowmeetApi.Controllers
             {
                 return Ok(_checkinError("手机号解析失败: " + ex.Message));
             }
-            if (string.IsNullOrEmpty(phone) || phone.Length != 11)
+            if (string.IsNullOrWhiteSpace(phone))
             {
                 return Ok(_checkinError("手机号无效"));
             }

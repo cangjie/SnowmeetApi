@@ -420,7 +420,8 @@ namespace SnowmeetApi.Controllers.Order
                 }
                 return Ok(_err("phone_decrypt_failed", "手机号解析失败: " + ex.Message));
             }
-            if (string.IsNullOrEmpty(phone) || phone.Length != 11)
+            // 微信授权的号码可能带国际区号；支付宝沿用原有验证规则。
+            if (string.IsNullOrWhiteSpace(phone) || (payerType == "alipay" && phone.Length != 11))
             {
                 return Ok(_err("phone_invalid", "手机号无效"));
             }
@@ -963,7 +964,7 @@ namespace SnowmeetApi.Controllers.Order
         {
             if (string.IsNullOrEmpty(cell)) return null;
             cell = cell.Trim();
-            if (cell.Length != 11) return cell;
+            if (cell.Length != 11) return cell.Length <= 4 ? "****" : "****" + cell.Substring(cell.Length - 4);
             return cell.Substring(0, 3) + "****" + cell.Substring(7);
         }
 
