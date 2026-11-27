@@ -351,6 +351,29 @@ namespace SnowmeetApi.Controllers
                 await _db.coreDataModLog.AddAsync(logTicket);
             }
             await MergeCoachDataAsync(sourceId, targetId, traceId);
+            List<MemberEquipment> equipList = await _db.memberEquipment.Where(e => e.member_id == sourceId).ToListAsync();
+            for (int i = 0; i < equipList.Count; i++)
+            {
+                MemberEquipment equip = equipList[i];
+                equip.member_id = targetId;
+                equip.update_date = DateTime.Now;
+                _db.memberEquipment.Entry(equip).State = EntityState.Modified;
+                CoreDataModLog logEquip = new CoreDataModLog()
+                {
+                    id = 0,
+                    trace_id = traceId,
+                    table_name = "member_equipment",
+                    key_value = equip.id,
+                    member_id = targetId,
+                    scene = "用户批量合并",
+                    field_name = "member_id",
+                    prev_value = sourceId.ToString(),
+                    current_value = targetId.ToString(),
+                    is_manual = 1,
+                    manual_memo = "会员装备迁移"
+                };
+                await _db.coreDataModLog.AddAsync(logEquip);
+            }
             await _db.SaveChangesAsync();
             // 订单已改挂到目标会员：养护首单跟着走（目标取两边更早的，来源清空）；出错只记日志，不影响合并
             await CareFirstOrderService.TryMergeAsync(_db, sourceId, targetId);

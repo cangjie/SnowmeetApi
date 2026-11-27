@@ -54,7 +54,7 @@ namespace SnowmeetApi.Controllers
                     foreach (var retail in order.retails) retail.memo = "";
                 order.retailImages = await _db.retailImage.Include(i => i.image).Where(i => i.order_id == orderId && i.valid).AsNoTracking().ToListAsync();
             }
-            if (order.type == "养护")
+            if (order.type == "养护"
             {
                 order.cares = await _db.order.Entry(order).Collection(o => o.cares).Query()
                     .Include(c => c.tasks.Where(t => t.valid == 1).OrderBy(t => t.sort)).ThenInclude(t => t.staff)
@@ -3712,6 +3712,8 @@ namespace SnowmeetApi.Controllers
             {
                 _db.care.Entry(order.cares[i]).State = EntityState.Detached;
             }
+            // 同步会员装备列表（新建装备入库，修改过的已有装备更新并记历史）
+            await new MemberEquipmentService(_db, _config).SyncOrderEquipmentsAsync(order, order.cares, staff.id, "养护开单");
             // 订单生效这一刻就记下该会员的养护首单（读取时也会补；这里让记录不依赖有人打开列表）。出错只记日志，不影响下单
             await CareFirstOrderService.TryReconcileAsync(_db, order.member_id);
             for (int i = 0; i < order.cares.Count; i++)

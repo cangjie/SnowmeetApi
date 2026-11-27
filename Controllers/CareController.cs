@@ -35,6 +35,8 @@ namespace SnowmeetApi.Controllers
             // 「标签上印的修刃角度」只由 SetEdgeDegree / MarkEdgeLabelPrinted 改：页面上较早读到的装备整份回传时，
             // 不能把「角度改过、标签还没重打」的状态冲掉（也不留下一条假的修改日志）。
             care.label_edge_degree = oriCare?.label_edge_degree;
+            // 旧版详情页整份回传不含 member_equipment_id 时保留原关联
+            care.member_equipment_id ??= oriCare?.member_equipment_id;
             List<CoreDataModLog> logs = Util.GetUpdateDifferenceLog<Care>(oriCare, care, memberId, staffId, scene);
             foreach (CoreDataModLog log in logs)
             {
@@ -932,6 +934,12 @@ namespace SnowmeetApi.Controllers
                 return;
             }
             await ValidateCardBalances(order.cares ?? new List<Care>(), lockCards: true);
+            // 散客单开始无 member_id、后续扫码支付绑定会员后生效时，幂等补入会员装备列表
+            if (order.member_id != null && order.cares != null
+                && order.cares.Any(c => !c.is_cancel && (c.member_equipment_id == null || c.member_equipment_id <= 0)))
+            {
+                await new MemberEquipmentService(_db, _config).SyncOrderEquipmentsAsync(order, order.cares, order.staff_id, "养护订单生效");
+            }
             List<Care>? todayCareList = null;
             for (int i = 0; order.cares != null && i < order.cares.Count; i++)
             {
@@ -1858,8 +1866,7 @@ namespace SnowmeetApi.Controllers
             });
             */
         }
-        // 会员在本系统养护过的装备（按装备类型），开单时快速带出品牌/长度。
-        // 只取 valid=1（已下单生效）的 care；按 brand+scale 去重，每件装备取最近一次养护时间，按时间倒序
+        // 会员名下装备列表（按装备类型）：优先从 member_equipment 读取；若该会员尚未建立装备档案（如旧测试直接写 care 表）则回退按历史有效 care 聚合。
         [HttpGet]
         public async Task<ActionResult<ApiResult<object>>> GetMemberCaredEquipments([FromQuery] int memberId,
             [FromQuery] string equipment, [FromQuery] string sessionKey, [FromQuery] string sessionType = "wechat_mini_openid")
@@ -1871,6 +1878,15 @@ namespace SnowmeetApi.Controllers
                 return Ok(new ApiResult<object>() { code = 1, message = "没有权限", data = null });
             }
             equipment = Util.UrlDecode(equipment).Trim();
+            if (await _db.memberEquipment.AsNoTracking().AnyAsync(e => e.member_id == memberId && e.valid == 1))
+            {
+                // 旧版小程序只调本接口（新版调 MemberEquipment/ListByStaff）：过滤无品牌项并兜底日期，保证旧版弹窗展示不留空
+                List<MemberEquipmentView> managedList = (await new MemberEquipmentService(_db, _config).ListAsync(memberId, equipment))
+                    .Where(v => !string.IsNullOrWhiteSpace(v.brand))
+                    .Select(v => { v.last_care_date ??= v.create_date; return v; })
+                    .ToList();
+                return Ok(new ApiResult<object>() { code = 0, message = "", data = managedList });
+            }
             List<Care> cares = await _db.care
                 .Where(c => c.valid == 1 && c.equipment != null && c.equipment.Trim() == equipment
                     && c.order.member_id == memberId

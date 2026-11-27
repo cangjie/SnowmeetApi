@@ -17,6 +17,8 @@ namespace SnowmeetApi.Models
         [Key]
         public int id { get; set; }
         public int? order_id { get; set; }
+        // 关联会员名下装备列表 member_equipment.id（2026-11-27 加可空列；开单草稿中 -1 代表明确新增装备，下单落库时回填真实正整数 id）
+        public int? member_equipment_id { get; set; } = null;
         public string? biz_type { get; set; }
         public string equipment { get; set; }
         public string? brand { get; set; }

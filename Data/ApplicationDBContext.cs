@@ -36,6 +36,7 @@ namespace SnowmeetApi.Data
             modelBuilder.Entity<MemberCareFirstOrder>().HasOne<Member>().WithOne().HasForeignKey<MemberCareFirstOrder>(x => x.member_id);
             // 顾客昵称、头像：member 表上三个可空列，同样用共表的另一个实体读写（见 MemberProfile）
             modelBuilder.Entity<MemberProfile>().HasOne<Member>().WithOne().HasForeignKey<MemberProfile>(x => x.member_id);
+            modelBuilder.Entity<MemberEquipment>().HasIndex(x => new { x.member_id, x.valid, x.id }).HasDatabaseName("IX_member_equipment_member_valid");
             modelBuilder.Entity<Order>().Property(x => x.order_source).HasColumnType("varchar(32)");
             modelBuilder.Entity<Order>().Property(x => x.source_order_no).HasColumnType("varchar(128)");
             modelBuilder.Entity<MaintainLive>().HasKey(c => c.id);
@@ -230,6 +231,7 @@ namespace SnowmeetApi.Data
         public DbSet<ShareBatch> shareBatch { get; set; }
         public DbSet<MemberCareFirstOrder> memberCareFirstOrder { get; set; }
         public DbSet<MemberProfile> memberProfile { get; set; }
+        public DbSet<MemberEquipment> memberEquipment { get; set; }
         public DbSet<CareDailyWorkload> careDailyWorkload { get; set; }
         public DbSet<Card> card { get; set; }
         public DbSet<Printer> printer { get; set; }

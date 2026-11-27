@@ -229,6 +229,10 @@ namespace SnowmeetApi.Controllers
                 .Select(c => new { c.id, c.biz_type, c.card_name, c.total, c.punches, c.is_refund })
                 .AsNoTracking().ToListAsync();
 
+            int equipmentCount = await _db.memberEquipment
+                .Where(e => e.member_id == memberId && e.valid == 1)
+                .CountAsync();
+
             var data = new
             {
                 id = m.id,
@@ -247,7 +251,8 @@ namespace SnowmeetApi.Controllers
                 custom = customTags,
                 accounts = accounts,
                 recentOrders = recentOrders,
-                punchCards = punchCards
+                punchCards = punchCards,
+                equipmentCount = equipmentCount
             };
             return Ok(new ApiResult<object>() { code = 0, message = "", data = data });
         }
