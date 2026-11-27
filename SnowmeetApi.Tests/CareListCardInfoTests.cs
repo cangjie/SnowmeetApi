@@ -11,7 +11,7 @@ namespace SnowmeetApi.Tests;
 /// 养护订单列表里，用次卡的装备要能看出「用的是哪张次卡、还剩几次」（Care.cardDisplayName / cardRemaining / cardUnlimited，只用于展示，不改库）：
 ///   · 次卡装备（use_card）：库里项目收费、减免本来就是 0（卡抵掉了），金额 / 减免照常显示库里的值，不补价；
 ///   · 卡名取次卡本身的名字，次卡找不到时退回装备上记的 card_name；
-///   · 剩余次数 = 这件装备「用完之后」卡里还剩几次 = 卡现在的余量 + 这件之后又用掉的次数（核销明细 id 更大的有效记录）：
+///   · 剩余次数 = 这件装备「用完之后」卡里还剩几次 = 卡现在的余量 + 这件之后又用掉的次数（核销时间在后的有效记录，同一时刻按 id）：
 ///     同一张卡上先后用的两件装备，先用的比后用的多 1，最后一次使用显示卡现在的余量；自己没有有效核销记录就取卡现在的余量；不为负、不超过总次数；
 ///   · 季卡（总次数为空）不限次，标 cardUnlimited；
 ///   · 卡号 = 卡 id，沿用装备自带的 card_id（列表接口照常返回），小程序直接显示；
@@ -40,10 +40,10 @@ public class CareListCardInfoTests
         return o.id;
     }
 
-    // 次卡核销明细（punch_card_used）：每件装备核销一次写一条，id 递增 = 使用先后
-    private static async Task AddUse(CoachFixture f, int cardId, int orderId, int bizId, bool valid = true, int punchCount = 1, string bizType = "养护")
+    // 次卡核销明细（punch_card_used）：每件装备核销一次写一条；使用先后看核销时间 create_date，同一时刻再看 id
+    private static async Task AddUse(CoachFixture f, int cardId, int orderId, int bizId, bool valid = true, int punchCount = 1, string bizType = "养护", DateTime? at = null)
     {
-        f.Db.punchCardUsed.Add(new PunchCardUsed { card_id = cardId, order_id = orderId, biz_type = bizType, biz_id = bizId, punch_count = punchCount, valid = valid });
+        f.Db.punchCardUsed.Add(new PunchCardUsed { card_id = cardId, order_id = orderId, biz_type = bizType, biz_id = bizId, punch_count = punchCount, valid = valid, create_date = at ?? DateTime.Now });
         await f.Db.SaveChangesAsync();
     }
 
@@ -75,7 +75,7 @@ public class CareListCardInfoTests
     }
 
     [Fact]
-    public void Rule_UsedAfter_CountsOnlyValidUsesWithLargerIdThanTheCaresOwn_AndNullWithoutAnOwnValidUse()
+    public void Rule_UsedAfter_CountsOnlyValidLaterUses_AndNullWithoutAnOwnValidUse()
     {
         PunchCardUsed U(int id, int bizId, int count = 1, bool valid = true, string type = "养护") =>
             new PunchCardUsed { id = id, card_id = 1, biz_id = bizId, punch_count = count, valid = valid, biz_type = type };
@@ -85,6 +85,28 @@ public class CareListCardInfoTests
         Assert.Null(CareCardInfoRules.UsedAfter(uses, 400));        // 自己的记录作废
         Assert.Null(CareCardInfoRules.UsedAfter(uses, 999));        // 自己没有记录
         Assert.Null(CareCardInfoRules.UsedAfter(new[] { U(1, 100, type: "租赁") }, 100));   // 租赁核销的 biz_id 是 rental，不是 care
+    }
+
+    [Fact]
+    public void Rule_UsedAfter_GoesByTheTimeOfUse_SoBackfilledRecordsWithLargerIdsAreNotLater()
+    {
+        // 实录（次卡 32）：11-27 那次先记进库（id 99），随后把上个雪季的 4 次按各自当时的时间补记进来（id 更大）
+        PunchCardUsed U(int id, int bizId, int month, int day) =>
+            new PunchCardUsed { id = id, card_id = 32, biz_id = bizId, punch_count = 1, valid = true, biz_type = "养护", create_date = new DateTime(2026, month, day, 14, 0, 0) };
+        var uses = new[] { U(99, 500, 11, 27), U(104, 100, 2, 10), U(105, 200, 2, 26), U(106, 300, 3, 11), U(107, 400, 3, 17) };
+        Assert.Equal(0, CareCardInfoRules.UsedAfter(uses, 500));    // 时间上最后一次：后面没有了
+        Assert.Equal(4, CareCardInfoRules.UsedAfter(uses, 100));    // 时间上第一次：后面 4 次（含 id 更小的 99）
+        Assert.Equal(1, CareCardInfoRules.UsedAfter(uses, 400));    // 补记里最晚的一次：后面只有 11-27 那次
+    }
+
+    [Fact]
+    public void Rule_UsedAfter_UsesAtTheSameMomentAreOrderedById()
+    {
+        var at = new DateTime(2026, 11, 27, 16, 6, 47);
+        PunchCardUsed U(int id, int bizId) => new PunchCardUsed { id = id, card_id = 1, biz_id = bizId, punch_count = 1, valid = true, biz_type = "养护", create_date = at };
+        var uses = new[] { U(2, 200), U(1, 100) };
+        Assert.Equal(1, CareCardInfoRules.UsedAfter(uses, 100));
+        Assert.Equal(0, CareCardInfoRules.UsedAfter(uses, 200));
     }
 
     [Fact]
@@ -154,6 +176,20 @@ public class CareListCardInfoTests
         var cares = await ListCares(f, orderId);
         Assert.Equal(new int?[] { 6, 5 }, cares.Select(c => c.cardRemaining).ToArray());
         Assert.Equal(new int?[] { cardId, cardId }, cares.Select(c => c.card_id).ToArray());   // 卡号（卡 id）随装备一起返回
+    }
+
+    [Fact]
+    public async Task EarlierUsesBackfilledAfterwards_DoNotRaiseWhatThisOrderShowsAsLeft()
+    {
+        // 这一单先核销，之后补记了 4 次更早的：总 10 次、现在已用 5，这一单是时间上最后一次，应显示剩 5（不是 9）
+        await using var f = await CoachFixture.Create();
+        int cardId = await AddCard(f, total: 10, punches: 5);
+        Care care = CardCare(cardId);
+        int orderId = await AddOrder(f, care);
+        await AddUse(f, cardId, orderId, care.id, at: Now.AddHours(-1));
+        for (int i = 0; i < 4; i++)
+            await AddUse(f, cardId, orderId: 900 + i, bizId: 9000 + i, at: Now.AddDays(-200 + i * 10));
+        Assert.Equal(5, Assert.Single(await ListCares(f, orderId)).cardRemaining);
     }
 
     [Fact]

@@ -9,7 +9,7 @@ namespace SnowmeetApi.Helpers
     // 填到 Care.cardDisplayName / cardRemaining / cardUnlimited，由 OrderController.FillCareCardInfoAsync 调用）：
     //   · 卡名：优先取次卡本身的名字，取不到（卡找不到、名字是空的）退回装备上记的 card_name；
     //   · 剩余次数 = 这件装备「用完之后」卡里还剩几次：同一张卡上的两件装备先后各用一次，先用的那件显示得比后用的多 1。
-    //     算法：卡现在的剩余（总次数 - 已用次数，和别处同口径）+ 这件装备之后又用掉的次数（核销明细 punch_card_used 里 id 比它大的有效记录）；
+    //     算法：卡现在的剩余（总次数 - 已用次数，和别处同口径）+ 这件装备之后又用掉的次数（核销明细 punch_card_used 里核销时间在它之后的有效记录）；
     //     所以这张卡上最后一次使用的那件装备，显示的就是卡现在的余量。
     //     这件装备自己没有有效的核销记录（订单还没生效、已取消返次）时，取卡现在的余量。不显示负数，也不超过总次数；
     //   · 季卡（总次数为空）不限次数：unlimited = true，没有剩余次数；
@@ -38,15 +38,16 @@ namespace SnowmeetApi.Helpers
 
         // 这张卡上，这件装备自己的核销之后又用掉了几次；装备自己没有有效核销记录时返回 null。
         // cardUses = 这张卡的有效核销明细（punch_card_used）。
+        // 先后看核销时间 create_date，同一时刻再看 id（与会员详情「最近订单」同口径）：事后补记的旧核销 id 更大、时间更早，不算「之后」。
         public static int? UsedAfter(IEnumerable<PunchCardUsed> cardUses, int careId)
         {
-            List<PunchCardUsed> uses = cardUses.Where(u => u.valid).ToList();
-            PunchCardUsed? own = uses.Where(u => u.biz_type == "养护" && u.biz_id == careId).OrderBy(u => u.id).FirstOrDefault();
-            if (own == null)
+            List<PunchCardUsed> uses = cardUses.Where(u => u.valid).OrderBy(u => u.create_date).ThenBy(u => u.id).ToList();
+            int own = uses.FindIndex(u => u.biz_type == "养护" && u.biz_id == careId);
+            if (own < 0)
             {
                 return null;
             }
-            return uses.Where(u => u.id > own.id).Sum(u => u.punch_count);
+            return uses.Skip(own + 1).Sum(u => u.punch_count);
         }
 
         public static (string? name, int? remaining, bool unlimited) Build(Care care, PunchCard? card, int? usedAfterThis = null)
