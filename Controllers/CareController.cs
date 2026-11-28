@@ -934,11 +934,16 @@ namespace SnowmeetApi.Controllers
                 return;
             }
             await ValidateCardBalances(order.cares ?? new List<Care>(), lockCards: true);
-            // 散客单开始无 member_id、后续扫码支付绑定会员后生效时，幂等补入会员装备列表
-            if (order.member_id != null && order.cares != null
-                && order.cares.Any(c => !c.is_cancel && (c.member_equipment_id == null || c.member_equipment_id <= 0)))
+            // 散客单开始无 member_id、后续扫码支付绑定会员后生效时，幂等补入会员装备列表。
+            // 只同步第一次生效（还没有任务编号）且还没有装备号的装备：每次支付成功都会再走到这里，
+            // 已有装备号的再同步一遍，会把订单上的旧值写回装备列表，冲掉之后改过的装备档案。
+            List<Care> unlinkedCares = (order.cares ?? new List<Care>())
+                .Where(c => !c.is_cancel && c.task_flow_code == null
+                    && (c.member_equipment_id == null || c.member_equipment_id <= 0))
+                .ToList();
+            if (order.member_id != null && unlinkedCares.Count > 0)
             {
-                await new MemberEquipmentService(_db, _config).SyncOrderEquipmentsAsync(order, order.cares, order.staff_id, "养护订单生效");
+                await new MemberEquipmentService(_db, _config).SyncOrderEquipmentsAsync(order, unlinkedCares, order.staff_id, "养护订单生效");
             }
             List<Care>? todayCareList = null;
             for (int i = 0; order.cares != null && i < order.cares.Count; i++)

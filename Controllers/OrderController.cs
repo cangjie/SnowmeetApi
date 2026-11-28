@@ -1550,6 +1550,8 @@ namespace SnowmeetApi.Controllers
             }
             else
             {
+                // 养护装备和顾客装备列表对不上的项带回给订单详情页做标注
+                await CareEquipmentDiffService.FillAsync(_db, order);
                 return Ok(new ApiResult<SnowmeetApi.Models.Order>()
                 {
                     code = 0,

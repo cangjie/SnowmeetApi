@@ -152,6 +152,10 @@ namespace SnowmeetApi.Models
         public string? ticketDisplayName { get; set; } = null;
         [NotMapped]
         public string? coachCardDisplayName { get; set; } = null;
+        // 和顾客装备列表里对应那件（member_equipment_id）不一样的项（不入库，只由员工订单详情填充，见 Services/CareEquipmentDiffService）；
+        // 一样或匹配不到时为 null。setter 必须是 internal：页面把装备整份传回保存时反序列化会忽略它，UpdateCare 的修改日志也就看不到它。
+        [NotMapped]
+        public List<Helpers.CareEquipmentDiff>? equipmentDiffs { get; internal set; }
         // 浅拷贝（只用于按「去掉招待 / 质保标记」的副本重新计价，不会存库）
         public Care ShallowCopy()
         {
