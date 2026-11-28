@@ -1,5 +1,6 @@
 using System;
 using System.Data;
+using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
@@ -20,6 +21,13 @@ public sealed class RestaurantOrderService(ApplicationDBContext db)
             throw new InvalidOperationException("请输入正确金额");
         if (request.discount < 0 || request.discount > request.amount || decimal.Round(request.discount, 2) != request.discount)
             throw new InvalidOperationException("请输入正确的减免金额");
+        DateTime? requestedCheckout = null;
+        if (request.checkoutTime != null)
+        {
+            if (!DateTime.TryParseExact(request.checkoutTime, "yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture,
+                DateTimeStyles.None, out var parsedCheckout)) throw new InvalidOperationException("请输入正确的结账时间");
+            requestedCheckout = parsedCheckout;
+        }
         var name = (request.customerName ?? "").Trim();
         var cell = (request.customerCell ?? "").Trim();
         var gender = (request.gender ?? "").Trim();
@@ -40,6 +48,7 @@ public sealed class RestaurantOrderService(ApplicationDBContext db)
             if (saved.staff_id != staffId || saved.type != "餐饮" || saved.valid != 1 || existing.table_no != table
                 || (decimal)saved.total_amount != request.amount || saved.is_test != (request.isTest || staffId == 28 || staffId == 31 || staffId == 34 ? 1 : 0)
                 || existing.discount_amount != request.discount || (decimal)saved.discountAmount != request.discount
+                || (requestedCheckout != null && existing.checkout_time != requestedCheckout)
                 || (saved.contact_name ?? "") != name || (saved.contact_num ?? "") != cell || (saved.contact_gender ?? "") != gender
                 || (request.memberId != null && saved.member_id != request.memberId))
                 throw new InvalidOperationException("下单内容已变化，请重新开单");
@@ -64,7 +73,8 @@ public sealed class RestaurantOrderService(ApplicationDBContext db)
         var linked = await new ReceptOrderMemberService(db).PrepareAsync(order, staffId, request.receptCheckinId);
         db.order.Add(order);
         await db.SaveChangesAsync();
-        var info = new RestaurantOrder { order_id = order.id, table_no = table, discount_amount = request.discount, request_id = requestId, create_date = now };
+        var checkoutTime = requestedCheckout ?? new DateTime(now.Year, now.Month, now.Day, now.Hour, now.Minute, 0);
+        var info = new RestaurantOrder { order_id = order.id, table_no = table, discount_amount = request.discount, checkout_time = checkoutTime, request_id = requestId, create_date = now };
         db.restaurantOrder.Add(info);
         await db.SaveChangesAsync();
         if (request.discount > 0)

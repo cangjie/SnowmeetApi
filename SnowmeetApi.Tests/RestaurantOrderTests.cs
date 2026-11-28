@@ -13,6 +13,50 @@ public class RestaurantOrderTests
     private static RestaurantOrderRequest Request(string token) => new() { requestId = token, tableNo = "卡1", amount = 38.50m, memberId = CoachFixture.StudentA, isTest = true };
 
     [Fact]
+    public async Task CheckoutTimeIsRecordedAndChangingItOnRetryIsRejected()
+    {
+        await using var fixture = await CoachFixture.Create();
+        var token = Guid.NewGuid().ToString();
+        RestaurantOrderRequest Make(string checkoutTime) => System.Text.Json.JsonSerializer.Deserialize<RestaurantOrderRequest>(
+            $"{{\"requestId\":\"{token}\",\"tableNo\":\"卡1\",\"amount\":38.50,\"isTest\":true,\"checkoutTime\":\"{checkoutTime}\"}}")!;
+        var service = new RestaurantOrderService(fixture.NewContext());
+        var order = await service.CreateAsync(Make("2026-11-27 18:35"), 9);
+        var infoJson = System.Text.Json.JsonSerializer.SerializeToElement(order.restaurantInfo);
+        Assert.Equal("2026-11-27T18:35:00", infoJson.GetProperty("checkout_time").GetString());
+        var loaded = await new OrderController(fixture.NewContext(), fixture.Config, new HttpContextAccessor { HttpContext = new DefaultHttpContext() }).GetOrder(order.id);
+        Assert.Equal("2026-11-27T18:35:00", System.Text.Json.JsonSerializer.SerializeToElement(loaded.restaurantInfo).GetProperty("checkout_time").GetString());
+        await service.CreateAsync(Make("2026-11-27 18:35"), 9);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.CreateAsync(Make("2026-11-27 18:36"), 9));
+    }
+
+    [Fact]
+    public async Task OlderClientDefaultsCheckoutTimeToCurrentMinuteAndCanRetry()
+    {
+        await using var fixture = await CoachFixture.Create();
+        var service = new RestaurantOrderService(fixture.NewContext());
+        var request = Request(Guid.NewGuid().ToString());
+        var before = DateTime.Now.AddMinutes(-1);
+        var order = await service.CreateAsync(request, 9);
+        var checkoutTime = order.restaurantInfo!.checkout_time!.Value;
+        Assert.InRange(checkoutTime, before, DateTime.Now);
+        Assert.Equal(0, checkoutTime.Second);
+        Assert.Equal(order.id, (await service.CreateAsync(request, 9)).id);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("2026-02-30 18:35")]
+    [InlineData("2026-11-27 18:35:00")]
+    public async Task InvalidCheckoutTimeDoesNotCreateAnOrder(string checkoutTime)
+    {
+        await using var fixture = await CoachFixture.Create();
+        var request = Request(Guid.NewGuid().ToString());
+        request.checkoutTime = checkoutTime;
+        await Assert.ThrowsAsync<InvalidOperationException>(() => new RestaurantOrderService(fixture.NewContext()).CreateAsync(request, 9));
+        Assert.Equal(0, await fixture.NewContext().order.CountAsync(o => o.type == "餐饮"));
+    }
+
+    [Fact]
     public async Task CreatesRestaurantOrderWithTableAndIdempotentRetry()
     {
         await using var fixture = await CoachFixture.Create();
