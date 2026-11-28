@@ -64,6 +64,7 @@ namespace SnowmeetApi.Controllers
             }
             if (order.type == "餐饮")
             {
+                order.restaurantInfo = await _db.restaurantOrder.AsNoTracking().FirstOrDefaultAsync(r => r.order_id == order.id);
                 order.fdOrders = await _db.order.Entry(order).Collection(o => o.fdOrders).Query()
                     .Where(r => r.valid == 1).AsNoTracking()
                     .Include(f => f.product).ThenInclude(p => p.category)
@@ -1848,11 +1849,22 @@ namespace SnowmeetApi.Controllers
             }
         }
 
+        private static string? RestaurantOnlinePaymentError(Models.Order? order, double? amount)
+        {
+            if (order?.type?.Trim() != "餐饮" || order.order_source != RestaurantOrder.OrderSource) return null;
+            if (order.paying_amount == null || order.paying_amount <= 0) return "本单无需在线支付";
+            if (amount != null && (!double.IsFinite(amount.Value) || Math.Abs(amount.Value - order.paying_amount.Value) > 0.000001))
+                return "付款金额与实收金额不一致";
+            return null;
+        }
+
         [HttpGet("{orderId}")]
         public async Task<ActionResult<ActionResult<OrderPayment?>>> GetWepayPayment(int orderId, double? amount,
             string sessionKey, string sessionType = "wechat_mini_openid")
         {
             Models.Order order = await GetOrder(orderId);
+            var restaurantPaymentError = RestaurantOnlinePaymentError(order, amount);
+            if (restaurantPaymentError != null) return Ok(new ApiResult<OrderPayment?> { code = 1, message = restaurantPaymentError });
             if (order != null)
             {
                 var cardError = await CareCardSaleService.PaymentErrorAsync(_db, order, amount, "微信支付");
@@ -1931,6 +1943,8 @@ namespace SnowmeetApi.Controllers
             string sessionKey, string sessionType = "wechat_mini_openid")
         {
             Models.Order order = await GetOrder(orderId);
+            var restaurantPaymentError = RestaurantOnlinePaymentError(order, amount);
+            if (restaurantPaymentError != null) return Ok(new ApiResult<OrderPayment> { code = 1, message = restaurantPaymentError });
             if (order != null)
             {
                 var cardError = await CareCardSaleService.PaymentErrorAsync(_db, order, amount, "支付宝");
@@ -2170,6 +2184,8 @@ namespace SnowmeetApi.Controllers
         public async Task<ActionResult<ApiResult<OrderPayment?>>> GetAlipayMiniPayment(int orderId, double? amount, string sessionKey, string sessionType = "wechat_mini_openid")
         {
             Models.Order order = await GetOrder(orderId);
+            var restaurantPaymentError = RestaurantOnlinePaymentError(order, amount);
+            if (restaurantPaymentError != null) return Ok(new ApiResult<OrderPayment?> { code = 1, message = restaurantPaymentError });
             if (order != null)
             {
                 var cardError = await CareCardSaleService.PaymentErrorAsync(_db, order, amount, "支付宝");

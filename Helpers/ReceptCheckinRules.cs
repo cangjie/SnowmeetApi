@@ -165,13 +165,7 @@ namespace SnowmeetApi.Helpers
 
         public static string MaskCell(string? cell)
         {
-            if (string.IsNullOrWhiteSpace(cell))
-            {
-                return "";
-            }
-            string c = cell.Trim();
-            return c.Length == 11 ? c.Substring(0, 3) + "****" + c.Substring(7)
-                : c.Length <= 4 ? "****" : "****" + c.Substring(c.Length - 4);
+            return (cell ?? "").Trim();
         }
     }
 }

@@ -27,22 +27,17 @@ public static class DistributorMenuRules
         return new[] { EntryQrCode, EntryCustomers, EntryMakeCoupon, EntryCoupons, EntryPayee };
     }
 
-    /// <summary>真实姓名：只露第一个字，其余用 * 代替。</summary>
+    /// <summary>真实姓名完整显示。</summary>
     public static string MaskName(string? name)
     {
         string n = (name ?? "").Trim();
-        if (n.Length == 0) return "";
-        return n.Substring(0, 1) + new string('*', n.Length - 1);
+        return n;
     }
 
-    /// <summary>支付宝登录号：手机号露前 3 后 4；邮箱露首字母和域名；其它只露后 4 位。</summary>
+    /// <summary>支付宝登录号完整显示。</summary>
     public static string MaskLoginName(string? loginName)
     {
         string s = (loginName ?? "").Trim();
-        if (s.Length == 0) return "";
-        int at = s.IndexOf('@');
-        if (at > 0) return s.Substring(0, 1) + "***" + s.Substring(at);
-        if (s.Length == 11 && s.All(char.IsDigit)) return s.Substring(0, 3) + "****" + s.Substring(7);
-        return s.Length <= 4 ? new string('*', s.Length) : "***" + s.Substring(s.Length - 4);
+        return s;
     }
 }

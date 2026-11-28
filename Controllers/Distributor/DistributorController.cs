@@ -57,7 +57,7 @@ public sealed class DistributorController(ApplicationDBContext db, IConfiguratio
         });
     }
 
-    /// <summary>收款资料，只读：方式、是否已填、支付宝是否已绑定；登录号和姓名脱敏。修改仍由系统管理员在分销商管理里做。</summary>
+    /// <summary>收款资料只读；修改仍由系统管理员在分销商管理里做。</summary>
     [HttpGet]
     public async Task<ApiResult<object>> GetPayee(string sessionKey)
     {

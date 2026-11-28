@@ -68,7 +68,7 @@ public class DistributorPortalTests
     }
 
     [Fact]
-    public async Task Payee_is_read_only_and_masks_the_alipay_login_and_real_name()
+    public async Task Payee_is_read_only_and_shows_the_alipay_login_and_real_name()
     {
         await using var db = await ShareFixture.NewDbAsync();
         var intro = await ShareFixture.AddIntroducerAsync(db, 305, "教练", aliType: "loginName", aliNum: "13691457006", aliBound: true);
@@ -81,13 +81,13 @@ public class DistributorPortalTests
         var result = await new DistributorController(db, ShareFixture.Config).GetPayee("sk-305");
         Assert.Equal(0, result.code);
         string text = JsonSerializer.Serialize(result.data);
-        Assert.DoesNotContain("13691457006", text);
+        Assert.Contains("13691457006", text);
         Assert.DoesNotContain("oINTRO", text);
         var alipay = Json(result.data).GetProperty("alipay");
         Assert.True(alipay.GetProperty("filled").GetBoolean());
         Assert.True(alipay.GetProperty("bound").GetBoolean());
-        Assert.Equal("136****7006", alipay.GetProperty("loginName").GetString());
-        Assert.Equal("周**", alipay.GetProperty("realName").GetString());
+        Assert.Equal("13691457006", alipay.GetProperty("loginName").GetString());
+        Assert.Equal("周小明", alipay.GetProperty("realName").GetString());
         Assert.True(Json(result.data).GetProperty("wechat").GetProperty("filled").GetBoolean());
     }
 
@@ -126,10 +126,10 @@ public class DistributorPortalTests
     }
 
     [Theory]
-    [InlineData("13691457006", "136****7006")]
-    [InlineData("abc@example.com", "a***@example.com")]
-    [InlineData("loginname01", "***me01")]
+    [InlineData("13691457006", "13691457006")]
+    [InlineData("abc@example.com", "abc@example.com")]
+    [InlineData("loginname01", "loginname01")]
     [InlineData("", "")]
-    public void Login_names_are_masked(string input, string expected)
+    public void Login_names_are_shown_in_full(string input, string expected)
         => Assert.Equal(expected, DistributorMenuRules.MaskLoginName(input));
 }

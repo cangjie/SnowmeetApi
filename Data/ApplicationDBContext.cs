@@ -19,6 +19,9 @@ namespace SnowmeetApi.Data
         }
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
+            modelBuilder.Entity<RestaurantOrder>().HasIndex(x => x.order_id).IsUnique();
+            modelBuilder.Entity<RestaurantOrder>().HasIndex(x => x.request_id).IsUnique();
+            modelBuilder.Entity<RestaurantOrder>().Property(x => x.discount_amount).HasPrecision(18, 2);
             FnbSchemaConfiguration.Configure(modelBuilder, Database.IsSqlServer());
             CoachSchemaConfiguration.Configure(modelBuilder);
             TrialReservationSchemaConfiguration.Configure(modelBuilder);
@@ -247,6 +250,7 @@ namespace SnowmeetApi.Data
         public DbSet<ProductStock> productStock { get; set; }
         public DbSet<Discount> discount { get; set; }
         public DbSet<FdOrder> fdOrder { get; set; }
+        public DbSet<RestaurantOrder> restaurantOrder { get; set; }
         public DbSet<RentalPricePreset> rentalPricePreset { get; set; }
         public DbSet<RentalBenefitPreference> rentalBenefitPreference { get; set; }
         public DbSet<RentalBenefitRentalPreference> rentalBenefitRentalPreference { get; set; }

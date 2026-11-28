@@ -154,6 +154,8 @@ namespace SnowmeetApi.Models
         [NotMapped]
         public List<Rental> appendingRentals { get; set; } = new List<Rental>();
         public List<FdOrder> fdOrders { get; set; } = new List<FdOrder>();
+        [NotMapped]
+        public RestaurantOrder? restaurantInfo { get; set; }
         public List<OrderPayment>? payments { get; set; } = new List<OrderPayment>();
         public List<OrderPaymentRefund>? refunds { get; set; } = new List<OrderPaymentRefund>();
         //public List<PaymentShare>? shares { get; set; } = new List<PaymentShare>();
@@ -205,7 +207,10 @@ namespace SnowmeetApi.Models
         {
             get
             {
-                return total_amount - discountAmount;
+                var total = total_amount - discountAmount;
+                // 餐饮减免按分计价，避免浮点误差把实收相等的订单误判为部分支付。
+                return order_source == RestaurantOrder.OrderSource
+                    ? Math.Round(total, 2, MidpointRounding.AwayFromZero) : total;
             }
         }
         [NotMapped]

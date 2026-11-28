@@ -1980,6 +1980,10 @@ namespace SnowmeetApi.Controllers
         [NonAction]
         public int GetMchId(Models.Order order)
         {
+            // 多呆一会儿吧餐饮使用商户 1635960258（wepay_key 15）。
+            if (order.shop.Trim() == "多呆一会儿吧" && order.type.Trim() == "餐饮")
+                return 15;
+
             int mchId = 3;
             if (order.shop.Trim().IndexOf("南山") >= 0)
             {

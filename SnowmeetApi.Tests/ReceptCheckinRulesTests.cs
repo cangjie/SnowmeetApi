@@ -188,9 +188,9 @@ namespace SnowmeetApi.Tests
         }
 
         [Fact]
-        public void 手机号只给中间四位打码()
+        public void 手机号完整显示()
         {
-            Assert.Equal("138****8000", ReceptCheckinRules.MaskCell("13800138000"));
+            Assert.Equal("13800138000", ReceptCheckinRules.MaskCell("13800138000"));
             Assert.Equal("+85251234567", ReceptCheckinRules.MaskCell("+85251234567"));
             Assert.Equal("", ReceptCheckinRules.MaskCell(null));
         }

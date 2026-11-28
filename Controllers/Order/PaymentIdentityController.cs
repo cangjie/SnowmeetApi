@@ -963,9 +963,7 @@ namespace SnowmeetApi.Controllers.Order
         private string _maskCell(string cell)
         {
             if (string.IsNullOrEmpty(cell)) return null;
-            cell = cell.Trim();
-            if (cell.Length != 11) return cell.Length <= 4 ? "****" : "****" + cell.Substring(cell.Length - 4);
-            return cell.Substring(0, 3) + "****" + cell.Substring(7);
+            return cell.Trim();
         }
 
         private ApiResult<CheckPayerIdentityResult> _err(string errorCode, string message)
