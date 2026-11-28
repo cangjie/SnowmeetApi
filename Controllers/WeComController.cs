@@ -8,6 +8,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Newtonsoft.Json;
 using SnowmeetApi;
+using SnowmeetApi.Controllers.Fnb;
 using SnowmeetApi.Data;
 using SnowmeetApi.Models;
 using wechat_miniapp_base.Models;
@@ -635,6 +636,45 @@ namespace SnowmeetApi.Controllers
                 return null;
             }
         }
+        /// <summary>「报表」应用的应用编号；上面的 cropSecret 就是它的密钥。</summary>
+        public const int REPORT_AGENT_ID = 1000008;
+
+        public static string TextMessagePayload(string content, string toUser)
+        {
+            return JsonConvert.SerializeObject(new
+            {
+                touser = toUser,
+                msgtype = "text",
+                agentid = REPORT_AGENT_ID,
+                text = new { content = content.Trim() },
+                enable_duplicate_check = 0
+            });
+        }
+
+        // 用「报表」应用下发纯文本消息（content ≤ 2048 字节）。标 [NonAction]：不能让人从网络上调一下就发消息。
+        // 日志的 memo「下发文本消息」是大好河山余额日报判断「今天发过没有」的依据，改的话两边一起改。
+        [NonAction]
+        public async Task<FnbWeComController.WeComSendResponse?> SendText(string content, string toUser, string purpose)
+        {
+            string batchId = DateTime.Now.ToString("yyyyMMddHHmmssfff");
+            string? token = await GetToken(batchId, purpose);
+            if (token == null)
+            {
+                return null;
+            }
+            WebApiLog log = await _mH.PerformRequest(
+                "https://qyapi.weixin.qq.com/cgi-bin/message/send?access_token=" + token,
+                "", TextMessagePayload(content, toUser), "POST", "企业微信", purpose, "下发文本消息", batchId);
+            try
+            {
+                return JsonConvert.DeserializeObject<FnbWeComController.WeComSendResponse>(log.response);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
         [NonAction]
         public async Task<List<SheetProperties>?> GetSheetProperties(string docId, string token, string batchId, string purpose = "", string memo = "")
         {

@@ -22,6 +22,8 @@ namespace SnowmeetApi.Services
         public int? image_id { get; set; }
         public string? photoUrl { get; set; }
         public string? photoFullUrl { get; set; }
+        public string? seasonPhotoUrl { get; set; }
+        public string? seasonPhotoFullUrl { get; set; }
         public DateTime? last_care_date { get; set; }
         public DateTime create_date { get; set; }
         public DateTime? update_date { get; set; }
@@ -102,7 +104,7 @@ namespace SnowmeetApi.Services
                 .CountAsync(e => e.member_id == memberId && e.valid == 1);
         }
 
-        public async Task<List<MemberEquipmentView>> ListAsync(int memberId, string? equipment = null)
+        public async Task<List<MemberEquipmentView>> ListAsync(int memberId, string? equipment = null, DateTime? asOf = null)
         {
             string? equipType = string.IsNullOrWhiteSpace(equipment) ? null : NormalizeEquipmentType(equipment);
             if (!string.IsNullOrWhiteSpace(equipment) && equipType == null)
@@ -112,14 +114,10 @@ namespace SnowmeetApi.Services
 
             IQueryable<MemberEquipment> q = _db.memberEquipment.AsNoTracking()
                 .Include(e => e.image)
-                .Where(e => e.member_id == memberId && e.valid == 1);
+                .Where(e => e.member_id == memberId);
 
-            if (equipType != null)
-            {
-                q = q.Where(e => e.equipment == equipType);
-            }
-
-            List<MemberEquipment> rows = await q.OrderByDescending(e => e.id).ToListAsync();
+            List<MemberEquipment> allRows = await q.OrderByDescending(e => e.id).ToListAsync();
+            List<MemberEquipment> rows = allRows.Where(e => e.valid == 1 && (equipType == null || e.equipment == equipType)).ToList();
             if (rows.Count == 0) return new List<MemberEquipmentView>();
 
             // 关联查询该会员历次有效非取消养护单时间，兼容回填前的历史单（按类型+品牌+长度匹配）与新单（按 member_equipment_id 匹配）
@@ -129,15 +127,50 @@ namespace SnowmeetApi.Services
                 where o.member_id == memberId && o.valid == 1 && c.valid == 1 && !c.is_cancel
                 select new
                 {
+                    c.id,
                     c.member_equipment_id,
                     c.equipment,
                     c.brand,
                     c.scale,
-                    c.create_date
+                    c.create_date,
+                    orderType = o.type,
+                    o.is_test
                 }
             ).ToListAsync();
 
             string baseUrl = BaseUrl;
+            DateTime now = asOf ?? DateTime.Now;
+            DateTime seasonStart = new DateTime(now.Month >= 10 ? now.Year : now.Year - 1, 10, 1);
+            DateTime seasonEnd = seasonStart.AddYears(1);
+            var seasonCares = careDates.Where(c => c.orderType == "养护" && c.is_test == 0
+                && c.create_date >= seasonStart && c.create_date < seasonEnd && c.create_date <= now).ToList();
+            var legacyCounts = allRows.Where(r => !string.IsNullOrWhiteSpace(r.brand))
+                .GroupBy(r => ((r.equipment ?? "").Trim(), r.brand!.Trim(), (r.scale ?? "").Trim()))
+                .ToDictionary(g => g.Key, g => g.Count());
+            var sourceOwners = allRows.Where(r => r.source_care_id != null)
+                .GroupBy(r => r.source_care_id!.Value)
+                .ToDictionary(g => g.Key, g => g.Select(r => r.id).ToArray());
+            var firstCareByEquipment = new Dictionary<int, int>();
+            foreach (var row in rows)
+            {
+                var key = ((row.equipment ?? "").Trim(), (row.brand ?? "").Trim(), (row.scale ?? "").Trim());
+                bool uniqueLegacy = key.Item2.Length > 0 && legacyCounts.TryGetValue(key, out int count) && count == 1;
+                var first = seasonCares.Where(c => c.member_equipment_id == row.id
+                    || (c.member_equipment_id == null &&
+                        ((sourceOwners.TryGetValue(c.id, out var owners) && owners.Length == 1 && owners[0] == row.id)
+                        || (!sourceOwners.ContainsKey(c.id) && uniqueLegacy
+                            && (c.equipment ?? "").Trim() == key.Item1 && (c.brand ?? "").Trim() == key.Item2
+                            && (c.scale ?? "").Trim() == key.Item3))))
+                    .OrderBy(c => c.create_date).ThenBy(c => c.id).FirstOrDefault();
+                if (first != null) firstCareByEquipment[row.id] = first.id;
+            }
+            int[] firstCareIds = firstCareByEquipment.Values.Distinct().ToArray();
+            var seasonPhotos = firstCareIds.Length == 0 ? new List<CareImage>() : await _db.careImage.AsNoTracking()
+                .Include(ci => ci.image).Where(ci => firstCareIds.Contains(ci.care_id) && ci.valid)
+                .OrderBy(ci => ci.id).ToListAsync();
+            var firstPhotoByCare = seasonPhotos.Where(ci => ci.image != null && !IsRepairStage(ci.title)
+                    && !string.IsNullOrWhiteSpace(ci.image.file_path_name) && !IsVideoFile(ci.image.file_path_name))
+                .GroupBy(ci => ci.care_id).ToDictionary(g => g.Key, g => g.First().image);
             List<MemberEquipmentView> views = rows.Select(r =>
             {
                 DateTime? byId = careDates
@@ -163,7 +196,14 @@ namespace SnowmeetApi.Services
                     ? (byId > byLegacyMatch ? byId : byLegacyMatch)
                     : (byId ?? byLegacyMatch);
 
-                return ToView(r, baseUrl, lastCare);
+                var view = ToView(r, baseUrl, lastCare);
+                if (firstCareByEquipment.TryGetValue(r.id, out int careId) && firstPhotoByCare.TryGetValue(careId, out var image))
+                {
+                    view.seasonPhotoUrl = UploadPaths.PublicUrl(baseUrl,
+                        !string.IsNullOrWhiteSpace(image.thumbUrl) ? image.thumbUrl : image.file_path_name.Trim());
+                    view.seasonPhotoFullUrl = UploadPaths.PublicUrl(baseUrl, image.file_path_name.Trim());
+                }
+                return view;
             })
             .OrderByDescending(v => v.last_care_date ?? v.create_date)
             .ThenByDescending(v => v.id)
